@@ -52,7 +52,8 @@
     "test:mutation": "stryker run",
     "test:mutation:report": "open reports/mutation-report.html",
     "lint:package": "publint",
-    "lint:types": "attw --pack ."
+    "lint:types": "attw --pack .",
+    "build:dist-only": "tsup"
   },
   "sideEffects": false,
   "dependencies": {

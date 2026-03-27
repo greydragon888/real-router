@@ -99,7 +99,6 @@ export class HashPlugin {
           navOptions,
           toState,
           fromState,
-          this.#router,
         );
 
         const url = this.#router.buildUrl(toState.name, toState.params);

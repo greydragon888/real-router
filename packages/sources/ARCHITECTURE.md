@@ -12,6 +12,7 @@ src/
 ├── createTransitionSource.ts  — Transition lifecycle source (isTransitioning, toRoute, fromRoute)
 ├── BaseSource.ts              — Internal Set-based listener management (not exported)
 ├── computeSnapshot.ts        — Same-reference snapshot optimization for route nodes
+├── stabilizeState.ts         — Path-based State ref stabilization (not exported)
 ├── shouldUpdateCache.ts      — WeakMap<Router, Map<string, fn>> two-level cache
 ├── types.ts                  — RouterSource, RouteSnapshot, RouteNodeSnapshot, RouterTransitionSnapshot, ActiveRouteSourceOptions
 └── index.ts                  — Public exports (4 factories + types)
@@ -43,21 +44,26 @@ Each source applies a different pipeline between the raw router event and the li
 
 ### `createRouteSource`
 
-No filter. Every navigation triggers a listener notification. The snapshot is the raw `{ route, previousRoute }` state from the router.
+```
+Router event
+  → stabilizeState per field (path-based ref stabilization)
+  → reference dedup guard
+  → listener notification
+```
 
 ### `createRouteNodeSource`
 
 ```
 Router event
   → shouldUpdateNode filter (cached predicate)
-  → computeSnapshot (same-ref optimization)
+  → computeSnapshot (stabilizeState + same-ref optimization)
   → Object.is dedup guard
   → listener notification
 ```
 
 `shouldUpdateNode` checks whether the named node is in the transition path. If the navigation doesn't touch the node, the pipeline short-circuits and listeners are not called.
 
-`computeSnapshot` returns the existing snapshot by reference when neither `route` nor `previousRoute` has changed. This prevents unnecessary re-renders in frameworks that use reference equality.
+`computeSnapshot` applies `stabilizeState` on both `route` and `previousRoute`. When a State's `path` hasn't changed (same canonical URL), the previous State reference is returned. This prevents unnecessary re-renders across all frameworks that use reference equality.
 
 The `Object.is` dedup guard is a final safety net: if the snapshot reference hasn't changed, listeners are not notified.
 
@@ -87,9 +93,15 @@ Manages a `Set` of listener functions. Exposes `subscribe`, `getSnapshot`, `upda
 
 ### `computeSnapshot`
 
-Accepts the current snapshot, the router, nodeName, and an optional incoming `{ route, previousRoute }` transition. Determines whether the node is active by checking if the current route name equals or starts with `nodeName`. If the node is not active, sets `route` to `undefined`. Returns the current snapshot by reference if both `route` and `previousRoute` are identical to the values already in the snapshot. Otherwise returns a new snapshot object.
+Accepts the current snapshot, the router, nodeName, and an optional incoming `{ route, previousRoute }` transition. Determines whether the node is active by checking if the current route name equals or starts with `nodeName`. If the node is not active, sets `route` to `undefined`. Returns the current snapshot by reference if both `route` and `previousRoute` are identical to the values already in the snapshot (fast path). Then applies `stabilizeState` on both fields — when `path` matches, the previous State reference is preserved. Returns currentSnapshot if both stabilized refs match.
 
-This node-scoping logic combined with reference stability keeps the snapshot stable across navigations that don't affect the node, which is the common case for deeply nested route trees.
+This node-scoping logic combined with path-based stabilization keeps the snapshot stable across navigations that don't affect the node, which is the common case for deeply nested route trees.
+
+### `stabilizeState`
+
+Path-based State reference stabilization. Compares `prev.path` with `next.path` — the canonical representation of rendering-relevant State fields (`name` + `params`). When paths match, returns `prev` (preserving reference). When paths differ, returns `next`. Ignores `meta` (internal: auto-increment id) and `transition` (reference data). O(1) string comparison — no recursive traversal.
+
+Used by `computeSnapshot`, `createRouteSource`, and `createTransitionSource` to prevent unnecessary re-renders across all frameworks.
 
 ### `shouldUpdateCache`
 
@@ -139,11 +151,11 @@ On first access for a given router+nodeName combination, the predicate is create
 
 7 stress tests in `tests/stress/` validate behavior under extreme conditions:
 
-| Category | Tests | What they verify |
-|----------|-------|-----------------|
-| Memory & leaks | source-creation-memory, eager-subscription-leak, should-update-cache-growth | No leaks from source creation/destruction cycles, cache bounded |
-| Concurrent | reconnection-storm, destroy-during-notification | Rapid subscribe/unsubscribe churn, destroy safety during emit |
-| Integrity | listener-set-integrity, notification-pipeline, cross-source-interaction | Listener set consistency, notification ordering, multi-source isolation |
+| Category       | Tests                                                                       | What they verify                                                        |
+| -------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Memory & leaks | source-creation-memory, eager-subscription-leak, should-update-cache-growth | No leaks from source creation/destruction cycles, cache bounded         |
+| Concurrent     | reconnection-storm, destroy-during-notification                             | Rapid subscribe/unsubscribe churn, destroy safety during emit           |
+| Integrity      | listener-set-integrity, notification-pipeline, cross-source-interaction     | Listener set consistency, notification ordering, multi-source isolation |
 
 ## See Also
 

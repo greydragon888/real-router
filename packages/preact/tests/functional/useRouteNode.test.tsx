@@ -238,7 +238,7 @@ describe("useRouteNode", () => {
       });
 
       expect(result.current.route?.name).toBe("users.list");
-      expect(result.current.route).not.toBe(initialRoute);
+      expect(result.current.route).toBe(initialRoute);
     });
   });
 

@@ -4,15 +4,15 @@
 
 ## createRouteSource — Snapshot Tracking
 
-| #   | Invariant                                                    | Description                                                                                                                                       |
-| --- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Initial snapshot reflects router state                       | `getSnapshot()` returns `{ route: router.getState(), previousRoute: undefined }` at source creation time, regardless of prior navigation history. |
-| 2   | Route name matches navigation target                         | After navigating to a route, `getSnapshot().route.name` equals the navigated route name.                                                          |
-| 3   | previousRoute after A to B equals A                          | After navigating A then B, `getSnapshot().previousRoute.name` equals A's route name.                                                              |
-| 4   | Snapshot after A to B to C has route C and previousRoute B   | After three sequential navigations, the snapshot correctly reflects the last two routes in the chain.                                             |
-| 5   | getSnapshot returns same object reference without navigation | Calling `getSnapshot()` multiple times without any intervening navigation returns the exact same object reference (referential equality).         |
-| 6   | Listener called exactly once per navigation                  | A subscribed listener is invoked exactly once for each successful navigation, no more and no fewer.                                               |
-| 7   | Destructured methods work without `this` context             | `subscribe`, `getSnapshot`, and `destroy` extracted via destructuring all function correctly without being bound to the source instance.          |
+| #   | Invariant                                                    | Description                                                                                                                                                                         |
+| --- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Initial snapshot reflects router state                       | `getSnapshot()` returns `{ route: router.getState(), previousRoute: undefined }` at source creation time, regardless of prior navigation history.                                   |
+| 2   | Route name matches navigation target                         | After navigating to a route, `getSnapshot().route.name` equals the navigated route name.                                                                                            |
+| 3   | previousRoute after A to B equals A                          | After navigating A then B, `getSnapshot().previousRoute.name` equals A's route name.                                                                                                |
+| 4   | Snapshot after A to B to C has route C and previousRoute B   | After three sequential navigations, the snapshot correctly reflects the last two routes in the chain.                                                                               |
+| 5   | getSnapshot returns same object reference without navigation | Calling `getSnapshot()` multiple times without any intervening navigation returns the exact same object reference (referential equality).                                           |
+| 6   | Listener called at most once per navigation                  | A subscribed listener is invoked at most once for each successful navigation. When `stabilizeState` determines the snapshot hasn't changed (same path), the listener is not called. |
+| 7   | Destructured methods work without `this` context             | `subscribe`, `getSnapshot`, and `destroy` extracted via destructuring all function correctly without being bound to the source instance.                                            |
 
 ## createRouteSource — Lazy-Connection
 
@@ -128,6 +128,17 @@
 | 3   | post-destroy getSnapshot returns the last snapshot before destroy | `getSnapshot()` returns the snapshot that was current at destroy time.                                                        |
 | 4   | post-destroy navigation does not update snapshot or throw errors  | Navigating after `destroy()` does not change the snapshot and does not throw. The snapshot remains at its destroy-time value. |
 | 5   | post-destroy subscribe returns no-op unsubscribe                  | After `destroy()`, `subscribe()` returns a no-op. The listener is never called and the returned unsubscribe does not throw.   |
+
+## stabilizeState — State Stabilization
+
+| #   | Invariant                                            | Description                                                                       |
+| --- | ---------------------------------------------------- | --------------------------------------------------------------------------------- |
+| 1   | `stabilizeState(a, a) === a`                         | Same reference is returned immediately.                                           |
+| 2   | `prev.path === next.path → result === prev`          | When paths match (same canonical URL), the previous State reference is preserved. |
+| 3   | `prev.path !== next.path → result === next`          | When paths differ, the new State is returned.                                     |
+| 4   | `stabilizeState(undefined, undefined) === undefined` | Both nullish values return prev.                                                  |
+| 5   | `stabilizeState(undefined, state) === state`         | Transition from nullish to State returns next.                                    |
+| 6   | `stabilizeState(state, undefined) === undefined`     | Transition from State to nullish returns next.                                    |
 
 ---
 

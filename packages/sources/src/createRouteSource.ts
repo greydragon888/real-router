@@ -1,4 +1,5 @@
 import { BaseSource } from "./BaseSource";
+import { stabilizeState } from "./stabilizeState.js";
 
 import type { RouteSnapshot, RouterSource } from "./types.js";
 import type { Router } from "@real-router/core";
@@ -28,10 +29,22 @@ export function createRouteSource(router: Router): RouterSource<RouteSnapshot> {
     {
       onFirstSubscribe: () => {
         routerUnsubscribe = router.subscribe((next) => {
-          source.updateSnapshot({
-            route: next.route,
-            previousRoute: next.previousRoute,
-          });
+          const prev = source.getSnapshot();
+          const newRoute = stabilizeState(prev.route, next.route);
+          const newPreviousRoute = stabilizeState(
+            prev.previousRoute,
+            next.previousRoute,
+          );
+
+          if (
+            newRoute !== prev.route ||
+            newPreviousRoute !== prev.previousRoute
+          ) {
+            source.updateSnapshot({
+              route: newRoute,
+              previousRoute: newPreviousRoute,
+            });
+          }
         });
       },
       onLastUnsubscribe: disconnect,

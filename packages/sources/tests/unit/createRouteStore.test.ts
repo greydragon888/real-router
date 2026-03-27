@@ -89,6 +89,21 @@ describe("createRouteSources", () => {
     cleanup();
   });
 
+  it("stabilizeState skips update when both route and previousRoute paths unchanged", async () => {
+    const source = createRouteSource(router);
+    const listener = vi.fn();
+
+    source.subscribe(listener);
+
+    await router.navigate("home", {}, { reload: true });
+
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    await router.navigate("home", {}, { reload: true });
+
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
   it("destroy: unsubscribes from router (further navigations don't call listener)", async () => {
     const source = createRouteSource(router);
     const listener = vi.fn();

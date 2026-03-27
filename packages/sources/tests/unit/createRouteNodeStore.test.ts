@@ -220,6 +220,33 @@ describe("createRouteNodeSources", () => {
     }).not.toThrow();
   });
 
+  it("stabilizeState: snapshot ref preserved on second reload to same path within node", async () => {
+    const source = createRouteNodeSource(router, "users");
+
+    source.subscribe(() => {});
+
+    await router.navigate("users.view", { id: "42" });
+    await router.navigate("users.view", { id: "42" }, { reload: true });
+
+    const snapshotAfterFirstReload = source.getSnapshot();
+
+    await router.navigate("users.view", { id: "42" }, { reload: true });
+
+    expect(source.getSnapshot()).toBe(snapshotAfterFirstReload);
+  });
+
+  it("onFirstSubscribe reconciles snapshot when router state changed since creation", async () => {
+    const source = createRouteNodeSource(router, "users");
+
+    expect(source.getSnapshot().route).toBeUndefined();
+
+    await router.navigate("users");
+
+    source.subscribe(() => {});
+
+    expect(source.getSnapshot().route?.name).toBe("users");
+  });
+
   it("lazy: does not subscribe to router until first listener", () => {
     const originalSubscribe = router.subscribe.bind(router);
     let subscribeCalls = 0;

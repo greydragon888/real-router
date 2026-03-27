@@ -43,13 +43,6 @@ export interface NavigationDependencies {
     routeParams: Params,
   ) => State | undefined;
 
-  /** Check if states are equal */
-  areStatesEqual: (
-    state1: State | undefined,
-    state2: State | undefined,
-    ignoreQueryParams?: boolean,
-  ) => boolean;
-
   /** Resolve defaultRoute and defaultParams options (static value or callback) */
   resolveDefault: () => { route: string; params: Params };
 

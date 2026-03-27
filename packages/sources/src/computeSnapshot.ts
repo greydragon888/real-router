@@ -1,3 +1,5 @@
+import { stabilizeState } from "./stabilizeState.js";
+
 import type { RouteNodeSnapshot } from "./types.js";
 import type { Router, SubscribeState } from "@real-router/core";
 
@@ -25,5 +27,18 @@ export function computeSnapshot(
     return currentSnapshot;
   }
 
-  return { route, previousRoute };
+  const newRoute = stabilizeState(currentSnapshot.route, route);
+  const newPreviousRoute = stabilizeState(
+    currentSnapshot.previousRoute,
+    previousRoute,
+  );
+
+  if (
+    newRoute === currentSnapshot.route &&
+    newPreviousRoute === currentSnapshot.previousRoute
+  ) {
+    return currentSnapshot;
+  }
+
+  return { route: newRoute, previousRoute: newPreviousRoute };
 }
