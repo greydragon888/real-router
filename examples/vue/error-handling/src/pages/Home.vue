@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { RouterError } from "@real-router/core";
-import { useNavigator } from "@real-router/vue";
-import { ref } from "vue";
+import { Link, RouterErrorBoundary, useNavigator } from "@real-router/vue";
+import { h, ref } from "vue";
 
 const navigator = useNavigator();
 const toast = ref<{ msg: string; type: string } | null>(null);
@@ -52,6 +52,14 @@ function fireAndForget() {
   navigator.navigate("protected").catch(() => {});
   showToast("Fire-and-forget sent (error suppressed internally)", "success");
 }
+
+function errorFallback(error: RouterError, resetError: () => void) {
+  return h("div", { class: "toast error", style: { position: "relative" } }, [
+    error.code,
+    " ",
+    h("button", { onClick: resetError, style: { marginLeft: "8px" } }, "✕"),
+  ]);
+}
 </script>
 
 <template>
@@ -77,6 +85,21 @@ function fireAndForget() {
       <button @click="fireAndForget()">
         Fire-and-forget (no await, error suppressed)
       </button>
+    </div>
+
+    <div class="card" :style="{ marginTop: '16px' }">
+      <h3>Declarative approach — RouterErrorBoundary</h3>
+      <p :style="{ fontSize: '13px', color: '#888' }">
+        No try/catch needed. Errors are shown as a toast alongside the links.
+      </p>
+      <RouterErrorBoundary :fallback="errorFallback">
+        <div :style="{ display: 'flex', flexDirection: 'column', gap: '8px' }">
+          <Link routeName="@@nonexistent-route">
+            Go to Unknown → ROUTE_NOT_FOUND
+          </Link>
+          <Link routeName="protected">Go to Protected → CANNOT_ACTIVATE</Link>
+        </div>
+      </RouterErrorBoundary>
     </div>
 
     <div v-if="toast" :class="['toast', toast.type]">{{ toast.msg }}</div>

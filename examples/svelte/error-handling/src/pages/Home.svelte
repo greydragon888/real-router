@@ -1,6 +1,6 @@
 <script lang="ts">
   import { RouterError } from "@real-router/core";
-  import { useNavigator } from "@real-router/svelte";
+  import { Link, RouterErrorBoundary, useNavigator } from "@real-router/svelte";
 
   const navigator = useNavigator();
   let toast = $state<{ msg: string; type: string } | null>(null);
@@ -89,6 +89,27 @@
     <button onclick={fireAndForget}>
       Fire-and-forget (no await, error suppressed)
     </button>
+  </div>
+
+  <div class="card" style="margin-top: 16px">
+    <h3>Declarative approach — RouterErrorBoundary</h3>
+    <p style="font-size: 13px; color: #888">
+      No try/catch needed. Errors are shown as a toast alongside the links.
+    </p>
+    <RouterErrorBoundary>
+      {#snippet fallback(error, resetError)}
+        <div class="toast error" style="position: relative">
+          {error.code}
+          <button onclick={resetError} style="margin-left: 8px">✕</button>
+        </div>
+      {/snippet}
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <Link routeName="@@nonexistent-route">
+          Go to Unknown → ROUTE_NOT_FOUND
+        </Link>
+        <Link routeName="protected">Go to Protected → CANNOT_ACTIVATE</Link>
+      </div>
+    </RouterErrorBoundary>
   </div>
 
   {#if toast}

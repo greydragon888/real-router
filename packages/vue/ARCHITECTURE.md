@@ -7,7 +7,7 @@
 ```
 @real-router/vue
 ├── @real-router/core         # Router instance, Navigator, State types
-├── @real-router/sources      # Subscription layer (createRouteSource, createRouteNodeSource, createActiveRouteSource)
+├── @real-router/sources      # Subscription layer (createRouteSource, createRouteNodeSource, createActiveRouteSource, createErrorSource)
 └── @real-router/route-utils  # Route tree queries (getRouteUtils, getChain, getSiblings)
 ```
 
@@ -49,9 +49,11 @@ src/
 │   ├── useRouteNode.ts         # Node-scoped subscription via useRefFromSource
 │   ├── useIsActiveRoute.ts     # Active state subscription (internal — used by Link)
 │   ├── useRouteUtils.ts        # RouteUtils from route tree (never reactive)
-│   └── useRouterTransition.ts  # Transition lifecycle ShallowRef (isTransitioning, toRoute, fromRoute)
+│   ├── useRouterTransition.ts  # Transition lifecycle ShallowRef (isTransitioning, toRoute, fromRoute)
+│   └── useRouterError.ts     # Internal — error subscription (used by RouterErrorBoundary)
 └── components/
     ├── Link.ts                 # defineComponent + h('a'), computed href/class, active state
+    ├── RouterErrorBoundary.ts   # Declarative navigation error handling
     └── RouteView/              # Declarative route matching with native keepAlive support
         ├── index.ts            # Barrel re-exports
         ├── RouteView.ts        # RouteViewComponent + compound export (RouteView.Match, RouteView.NotFound)
@@ -129,6 +131,7 @@ useNavigator()  — reads NavigatorKey → returns Navigator, never reactive
 useRouteNode(name)      — createRouteNodeSource(router, name)     → { navigator, route: ShallowRef, previousRoute: ShallowRef }
 useRouterTransition()   — createTransitionSource(router)          → ShallowRef<RouterTransitionSnapshot>
 useIsActiveRoute(...)   — createActiveRouteSource(router, ...)    → ShallowRef<boolean>
+useRouterError()  [internal]  — createErrorSource(router) with WeakMap cache
 RouterProvider          — createRouteSource(router)               → updates route/previousRoute ShallowRefs
 ```
 
@@ -141,6 +144,12 @@ Link (defineComponent + h('a'))
 ├── computed(() => router.buildUrl() || router.buildPath()) — reactive href
 ├── computed(() => ...) — reactive class string concat
 └── onClick → router.navigate(...).catch(() => {})
+
+RouterErrorBoundary (defineComponent)
+├── useRouterError() — error subscription via createErrorSource (internal, cached)
+├── dismissedVersion state — tracks manually dismissed errors (version-based)
+├── onErrorRef — for callback stability (avoids closure churn)
+└── Renders: default slot + fallback(error, resetError) via Fragment
 ```
 
 **No `memo()` needed:** Vue's reactivity system tracks which refs a computed or template expression reads. Only the parts that depend on changed refs re-evaluate. No component-level re-render optimization is required.

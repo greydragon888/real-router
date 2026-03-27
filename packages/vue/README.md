@@ -288,6 +288,49 @@ const LazyDashboard = defineAsyncComponent(() => import("./Dashboard.vue"));
 
 Without `fallback`, no `<Suspense>` boundary is added. The prop is optional.
 
+### `<RouterErrorBoundary>`
+
+Declarative error handling for navigation errors. Shows a fallback **alongside** children (not instead of) when a guard rejects or a route is not found.
+
+```typescript
+import { RouterErrorBoundary } from "@real-router/vue";
+
+h(
+  RouterErrorBoundary,
+  {
+    fallback: (error, resetError) =>
+      h("div", { class: "toast" }, [
+        error.code,
+        h("button", { onClick: resetError }, "Dismiss"),
+      ]),
+    onError: (error) => analytics.track("nav_error", { code: error.code }),
+  },
+  {
+    default: () =>
+      h(Link, { routeName: "protected" }, { default: () => "Go to Protected" }),
+  },
+);
+```
+
+In a template:
+
+```vue
+<RouterErrorBoundary
+  :fallback="
+    (error, resetError) =>
+      h('div', { class: 'toast' }, [
+        error.code,
+        h('button', { onClick: resetError }, 'Dismiss'),
+      ])
+  "
+  :onError="(error) => analytics.track('nav_error', { code: error.code })"
+>
+  <Link routeName="protected">Go to Protected</Link>
+</RouterErrorBoundary>
+```
+
+Auto-resets on next successful navigation. Works with both `<Link>` and imperative `router.navigate()`.
+
 ## Directives
 
 ### `v-link`
@@ -409,7 +452,7 @@ When enabled, a visually hidden `aria-live` region announces each navigation. Fo
 
 Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 
-- [RouterProvider](https://github.com/greydragon888/real-router/wiki/RouterProvider) · [RouteView](https://github.com/greydragon888/real-router/wiki/RouteView) · [Link](https://github.com/greydragon888/real-router/wiki/Link)
+- [RouterProvider](https://github.com/greydragon888/real-router/wiki/RouterProvider) · [RouteView](https://github.com/greydragon888/real-router/wiki/RouteView) · [RouterErrorBoundary](https://github.com/greydragon888/real-router/wiki/RouterErrorBoundary) · [Link](https://github.com/greydragon888/real-router/wiki/Link)
 - [useRouter](https://github.com/greydragon888/real-router/wiki/useRouter) · [useRoute](https://github.com/greydragon888/real-router/wiki/useRoute) · [useRouteNode](https://github.com/greydragon888/real-router/wiki/useRouteNode) · [useNavigator](https://github.com/greydragon888/real-router/wiki/useNavigator) · [useRouteUtils](https://github.com/greydragon888/real-router/wiki/useRouteUtils) · [useRouterTransition](https://github.com/greydragon888/real-router/wiki/useRouterTransition)
 
 ## Examples

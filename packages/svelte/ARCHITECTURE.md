@@ -7,7 +7,7 @@
 ```
 @real-router/svelte
 ├── @real-router/core         # Router instance, Navigator, State types
-├── @real-router/sources      # Subscription layer (createRouteSource, createRouteNodeSource, createActiveRouteSource)
+├── @real-router/sources      # Subscription layer (createRouteSource, createRouteNodeSource, createActiveRouteSource, createErrorSource)
 └── @real-router/route-utils  # Route tree queries (getRouteUtils, getChain, getSiblings)
 ```
 
@@ -58,10 +58,12 @@ src/
 │   ├── useRoute.svelte.ts                # Full route context from getContext (every navigation)
 │   ├── useRouteNode.svelte.ts            # Node-scoped subscription via createReactiveSource
 │   ├── useIsActiveRoute.svelte.ts        # Active state subscription (internal — used by Link)
-│   ├── useRouteUtils.svelte.ts           # RouteUtils from route tree (never reactive)
-│   └── useRouterTransition.svelte.ts     # Transition lifecycle (isTransitioning, toRoute, fromRoute)
+│   ├── useRouteUtils.svelte.ts
+│   ├── useRouterTransition.svelte.ts
+│   └── useRouterError.svelte.ts        # Internal — error subscription (used by RouterErrorBoundary)
 └── components/
     ├── Link.svelte                        # Navigation link with $derived href/class, active state
+    ├── RouterErrorBoundary.svelte          # Declarative navigation error handling
     └── RouteView.svelte                   # Declarative route matching via named snippets
 ```
 
@@ -162,6 +164,7 @@ useNavigator()  — reads NAVIGATOR_KEY → returns Navigator, never reactive
 useRouteNode(name)      — createRouteNodeSource(router, name)     → { navigator, route: { current }, previousRoute: { current } }
 useRouterTransition()   — createTransitionSource(router)          → { current: RouterTransitionSnapshot }
 useIsActiveRoute(...)   — createActiveRouteSource(router, ...)    → { current: boolean }
+useRouterError()  [internal]  — createErrorSource(router) with WeakMap cache
 RouterProvider          — createRouteSource(router)               → updates route/previousRoute .current getters
 ```
 
@@ -175,6 +178,12 @@ Link (.svelte)
 ├── $derived(...) — reactive class string concat
 └── onclick (lowercase) → router.navigate(...).catch(() => {})
     └── {@render children?.()}
+
+RouterErrorBoundary (.svelte)
+├── useRouterError() — error subscription via createErrorSource (internal, cached)
+├── dismissedVersion state — tracks manually dismissed errors (version-based)
+├── fallback snippet — {#snippet fallback(error, resetError)} passed by caller
+└── Renders: {@render children?.()} + {@render fallback?.(error, resetError)}
 ```
 
 **No `memo()` needed:** Svelte's compiler tracks which reactive values a template expression reads. Only the expressions that depend on changed values re-evaluate. No component-level re-render optimization is required.

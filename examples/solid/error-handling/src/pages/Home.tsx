@@ -1,5 +1,5 @@
 import { RouterError } from "@real-router/core";
-import { useNavigator } from "@real-router/solid";
+import { Link, RouterErrorBoundary, useNavigator } from "@real-router/solid";
 import { createSignal, Show } from "solid-js";
 
 import type { JSX } from "solid-js";
@@ -94,6 +94,32 @@ export function Home(): JSX.Element {
         <button onClick={fireAndForget}>
           Fire-and-forget (no await, error suppressed)
         </button>
+      </div>
+
+      <div class="card" style={{ "margin-top": "16px" }}>
+        <h3>Declarative approach — RouterErrorBoundary</h3>
+        <p style={{ "font-size": "13px", color: "#888" }}>
+          No try/catch needed. Errors are shown as a toast alongside the links.
+        </p>
+        <RouterErrorBoundary
+          fallback={(error, resetError) => (
+            <div class="toast error" style={{ position: "relative" }}>
+              {error.code}{" "}
+              <button onClick={resetError} style={{ "margin-left": "8px" }}>
+                ✕
+              </button>
+            </div>
+          )}
+        >
+          <div
+            style={{ display: "flex", "flex-direction": "column", gap: "8px" }}
+          >
+            <Link routeName="@@nonexistent-route">
+              Go to Unknown → ROUTE_NOT_FOUND
+            </Link>
+            <Link routeName="protected">Go to Protected → CANNOT_ACTIVATE</Link>
+          </div>
+        </RouterErrorBoundary>
       </div>
 
       <Show when={toast()}>

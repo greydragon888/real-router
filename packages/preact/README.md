@@ -157,6 +157,27 @@ const LazyDashboard = lazy(() => import("./Dashboard"));
 </RouteView>;
 ```
 
+### `<RouterErrorBoundary>`
+
+Declarative error handling for navigation errors. Shows a fallback **alongside** children (not instead of) when a guard rejects or a route is not found.
+
+```tsx
+import { RouterErrorBoundary } from "@real-router/preact";
+
+<RouterErrorBoundary
+  fallback={(error, resetError) => (
+    <div className="toast">
+      {error.code} <button onClick={resetError}>Dismiss</button>
+    </div>
+  )}
+  onError={(error) => analytics.track("nav_error", { code: error.code })}
+>
+  <Link routeName="protected">Go to Protected</Link>
+</RouterErrorBoundary>;
+```
+
+Auto-resets on next successful navigation. Works with both `<Link>` and imperative `router.navigate()`.
+
 ## Accessibility
 
 Enable screen reader announcements for route changes:
@@ -173,7 +194,7 @@ When enabled, a visually hidden `aria-live` region announces each navigation. Fo
 
 Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 
-- [RouterProvider](https://github.com/greydragon888/real-router/wiki/RouterProvider) · [RouteView](https://github.com/greydragon888/real-router/wiki/RouteView) · [Link](https://github.com/greydragon888/real-router/wiki/Link)
+- [RouterProvider](https://github.com/greydragon888/real-router/wiki/RouterProvider) · [RouteView](https://github.com/greydragon888/real-router/wiki/RouteView) · [RouterErrorBoundary](https://github.com/greydragon888/real-router/wiki/RouterErrorBoundary) · [Link](https://github.com/greydragon888/real-router/wiki/Link)
 - [useRouter](https://github.com/greydragon888/real-router/wiki/useRouter) · [useRoute](https://github.com/greydragon888/real-router/wiki/useRoute) · [useRouteNode](https://github.com/greydragon888/real-router/wiki/useRouteNode) · [useNavigator](https://github.com/greydragon888/real-router/wiki/useNavigator) · [useRouteUtils](https://github.com/greydragon888/real-router/wiki/useRouteUtils) · [useRouterTransition](https://github.com/greydragon888/real-router/wiki/useRouterTransition)
 
 ## Examples
