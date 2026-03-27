@@ -1,6 +1,6 @@
 {
   "name": "@real-router/sources",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "type": "commonjs",
   "description": "Framework-agnostic subscription layer for Real-Router state",
   "main": "./dist/cjs/index.js",

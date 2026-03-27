@@ -1,5 +1,24 @@
 # @real-router/core
 
+## 0.40.0
+
+### Minor Changes
+
+- [#362](https://github.com/greydragon888/real-router/pull/362) [`fb7d2e1`](https://github.com/greydragon888/real-router/commit/fb7d2e1fe128b69249395bc691110a078cf5d440) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `getStaticPaths()` utility for SSG pre-rendering ([#335](https://github.com/greydragon888/real-router/issues/335))
+
+  New `getStaticPaths(router, entries?)` function in `@real-router/core/utils` enumerates all leaf routes from the router tree and builds their URLs. For dynamic routes (`:id`), accepts an `entries` map providing parameter sets to pre-render.
+
+  ```typescript
+  import { getStaticPaths } from "@real-router/core/utils";
+
+  const paths = await getStaticPaths(router, {
+    "users.profile": async () => [{ id: "1" }, { id: "2" }],
+  });
+  // → ["/", "/users", "/users/1", "/users/2"]
+  ```
+
+  Also exports `StaticPathEntries` type for the `entries` parameter.
+
 ## 0.39.0
 
 ### Minor Changes

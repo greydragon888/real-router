@@ -7,6 +7,127 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-03-26]
 
+### @real-router/core@0.40.0
+
+### Minor Changes
+
+- [#362](https://github.com/greydragon888/real-router/pull/362) [`fb7d2e1`](https://github.com/greydragon888/real-router/commit/fb7d2e1fe128b69249395bc691110a078cf5d440) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `getStaticPaths()` utility for SSG pre-rendering ([#335](https://github.com/greydragon888/real-router/issues/335))
+
+  New `getStaticPaths(router, entries?)` function in `@real-router/core/utils` enumerates all leaf routes from the router tree and builds their URLs. For dynamic routes (`:id`), accepts an `entries` map providing parameter sets to pre-render.
+
+  ```typescript
+  import { getStaticPaths } from "@real-router/core/utils";
+
+  const paths = await getStaticPaths(router, {
+    "users.profile": async () => [{ id: "1" }, { id: "2" }],
+  });
+  // → ["/", "/users", "/users/1", "/users/2"]
+  ```
+
+  Also exports `StaticPathEntries` type for the `entries` parameter.
+
+### @real-router/browser-plugin@0.10.5
+
+### Patch Changes
+
+- Updated dependencies [[`fb7d2e1`](https://github.com/greydragon888/real-router/commit/fb7d2e1fe128b69249395bc691110a078cf5d440)]:
+  - @real-router/core@0.40.0
+
+### @real-router/hash-plugin@0.2.5
+
+### Patch Changes
+
+- Updated dependencies [[`fb7d2e1`](https://github.com/greydragon888/real-router/commit/fb7d2e1fe128b69249395bc691110a078cf5d440)]:
+  - @real-router/core@0.40.0
+
+### @real-router/logger-plugin@0.3.5
+
+### Patch Changes
+
+- Updated dependencies [[`fb7d2e1`](https://github.com/greydragon888/real-router/commit/fb7d2e1fe128b69249395bc691110a078cf5d440)]:
+  - @real-router/core@0.40.0
+
+### @real-router/persistent-params-plugin@0.1.44
+
+### Patch Changes
+
+- Updated dependencies [[`fb7d2e1`](https://github.com/greydragon888/real-router/commit/fb7d2e1fe128b69249395bc691110a078cf5d440)]:
+  - @real-router/core@0.40.0
+
+### @real-router/preact@0.1.2
+
+### Patch Changes
+
+- Updated dependencies [[`fb7d2e1`](https://github.com/greydragon888/real-router/commit/fb7d2e1fe128b69249395bc691110a078cf5d440)]:
+  - @real-router/core@0.40.0
+  - dom-utils@0.2.2
+  - @real-router/sources@0.2.7
+
+### @real-router/react@0.13.2
+
+### Patch Changes
+
+- Updated dependencies [[`fb7d2e1`](https://github.com/greydragon888/real-router/commit/fb7d2e1fe128b69249395bc691110a078cf5d440)]:
+  - @real-router/core@0.40.0
+  - dom-utils@0.2.2
+  - @real-router/sources@0.2.7
+
+### @real-router/rx@0.1.32
+
+### Patch Changes
+
+- Updated dependencies [[`fb7d2e1`](https://github.com/greydragon888/real-router/commit/fb7d2e1fe128b69249395bc691110a078cf5d440)]:
+  - @real-router/core@0.40.0
+
+### @real-router/solid@0.1.2
+
+### Patch Changes
+
+- Updated dependencies [[`fb7d2e1`](https://github.com/greydragon888/real-router/commit/fb7d2e1fe128b69249395bc691110a078cf5d440)]:
+  - @real-router/core@0.40.0
+  - dom-utils@0.2.2
+  - @real-router/sources@0.2.7
+
+### @real-router/sources@0.2.7
+
+### Patch Changes
+
+- Updated dependencies [[`fb7d2e1`](https://github.com/greydragon888/real-router/commit/fb7d2e1fe128b69249395bc691110a078cf5d440)]:
+  - @real-router/core@0.40.0
+
+### @real-router/ssr-data-plugin@0.1.2
+
+### Patch Changes
+
+- Updated dependencies [[`fb7d2e1`](https://github.com/greydragon888/real-router/commit/fb7d2e1fe128b69249395bc691110a078cf5d440)]:
+  - @real-router/core@0.40.0
+
+### @real-router/svelte@0.1.2
+
+### Patch Changes
+
+- Updated dependencies [[`fb7d2e1`](https://github.com/greydragon888/real-router/commit/fb7d2e1fe128b69249395bc691110a078cf5d440)]:
+  - @real-router/core@0.40.0
+  - dom-utils@0.2.2
+  - @real-router/sources@0.2.7
+
+### @real-router/validation-plugin@0.1.1
+
+### Patch Changes
+
+- Updated dependencies [[`fb7d2e1`](https://github.com/greydragon888/real-router/commit/fb7d2e1fe128b69249395bc691110a078cf5d440)]:
+  - @real-router/core@0.40.0
+
+### @real-router/vue@0.1.2
+
+### Patch Changes
+
+- Updated dependencies [[`fb7d2e1`](https://github.com/greydragon888/real-router/commit/fb7d2e1fe128b69249395bc691110a078cf5d440)]:
+  - @real-router/core@0.40.0
+  - dom-utils@0.2.2
+  - @real-router/sources@0.2.7
+
+
 ### @real-router/core@0.39.0
 
 ### Minor Changes
