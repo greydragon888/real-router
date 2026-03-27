@@ -1,4 +1,4 @@
-import type { State } from "@real-router/core";
+import type { RouterError, State } from "@real-router/core";
 
 export interface RouteSnapshot {
   route: State | undefined;
@@ -25,4 +25,11 @@ export interface RouterTransitionSnapshot {
   isTransitioning: boolean;
   toRoute: State | null;
   fromRoute: State | null;
+}
+
+export interface RouterErrorSnapshot {
+  error: RouterError | null;
+  toRoute: State | null;
+  fromRoute: State | null;
+  version: number;
 }
