@@ -244,12 +244,12 @@ describe("link-mass-rendering stress tests", () => {
       </RouterProvider>,
     );
 
-    const changeBtn = screen.getByTestId("change");
+    const changeButton = screen.getByTestId("change");
 
     try {
       for (let i = 0; i < 100; i++) {
         await act(() => {
-          changeBtn.click();
+          changeButton.click();
         });
       }
     } catch (error) {

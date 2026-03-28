@@ -26,9 +26,7 @@ describe("Matching Properties", () => {
         const result = matcher.match(path);
 
         expect(result).toBeDefined();
-        expect(result!.segments[result!.segments.length - 1].fullName).toBe(
-          "users.profile",
-        );
+        expect(result!.segments.at(-1)!.fullName).toBe("users.profile");
       },
     );
   });
@@ -63,10 +61,8 @@ describe("Matching Properties", () => {
         expect(resultWith).toBeDefined();
         expect(resultWithout).toBeDefined();
 
-        const nameWith =
-          resultWith!.segments[resultWith!.segments.length - 1].fullName;
-        const nameWithout =
-          resultWithout!.segments[resultWithout!.segments.length - 1].fullName;
+        const nameWith = resultWith!.segments.at(-1)!.fullName;
+        const nameWithout = resultWithout!.segments.at(-1)!.fullName;
 
         expect(nameWith).toBe("search");
         expect(nameWithout).toBe("search");
@@ -120,9 +116,7 @@ describe("Matching Properties", () => {
         const result = matcher.match(`/users/${segment}`);
 
         expect(result).toBeDefined();
-        expect(result!.segments[result!.segments.length - 1].fullName).toBe(
-          "users.new",
-        );
+        expect(result!.segments.at(-1)!.fullName).toBe("users.new");
         expect(result!.params).toStrictEqual({});
       },
     );
@@ -137,9 +131,7 @@ describe("Matching Properties", () => {
       const result = matcher.match(`/users/${id}`);
 
       expect(result).toBeDefined();
-      expect(result!.segments[result!.segments.length - 1].fullName).toBe(
-        "users.profile",
-      );
+      expect(result!.segments.at(-1)!.fullName).toBe("users.profile");
       expect(result!.params).toStrictEqual({ id });
     });
   });
@@ -153,9 +145,7 @@ describe("Matching Properties", () => {
         const result = matcher.match(`/items/${id}`);
 
         expect(result).toBeDefined();
-        expect(result!.segments[result!.segments.length - 1].fullName).toBe(
-          "items.specific",
-        );
+        expect(result!.segments.at(-1)!.fullName).toBe("items.specific");
         expect(result!.params).toStrictEqual({ id });
       },
     );
@@ -209,10 +199,8 @@ describe("Matching Properties", () => {
         expect(resultLower).toBeDefined();
         expect(resultUpper).toBeDefined();
 
-        const nameFromLower =
-          resultLower!.segments[resultLower!.segments.length - 1].fullName;
-        const nameFromUpper =
-          resultUpper!.segments[resultUpper!.segments.length - 1].fullName;
+        const nameFromLower = resultLower!.segments.at(-1)!.fullName;
+        const nameFromUpper = resultUpper!.segments.at(-1)!.fullName;
 
         expect(nameFromLower).toBe("users.profile");
         expect(nameFromUpper).toBe("users.profile");
@@ -381,9 +369,7 @@ describe("Matching Properties", () => {
         const result = matcher.match(path);
 
         expect(result).toBeDefined();
-        expect(result!.segments[result!.segments.length - 1].fullName).toBe(
-          "users.profile",
-        );
+        expect(result!.segments.at(-1)!.fullName).toBe("users.profile");
         expect(result!.params).toStrictEqual({ id });
       },
     );

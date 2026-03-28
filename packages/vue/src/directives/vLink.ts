@@ -51,10 +51,10 @@ function createClickHandler(
 function createKeydownHandler(
   router: Router,
   value: LinkDirectiveValue,
-  el: HTMLElement,
+  element: HTMLElement,
 ): (evt: KeyboardEvent) => void {
   return (evt: KeyboardEvent) => {
-    if (evt.key === "Enter" && !(el instanceof HTMLButtonElement)) {
+    if (evt.key === "Enter" && !(element instanceof HTMLButtonElement)) {
       router
         .navigate(value.name, value.params ?? {}, value.options ?? {})
         .catch(() => {});
@@ -63,54 +63,54 @@ function createKeydownHandler(
 }
 
 function attachHandlers(
-  el: HTMLElement,
+  element: HTMLElement,
   router: Router,
   value: LinkDirectiveValue,
 ): void {
   const handleClick = createClickHandler(router, value);
-  const handleKeyDown = createKeydownHandler(router, value, el);
+  const handleKeyDown = createKeydownHandler(router, value, element);
 
-  el.addEventListener("click", handleClick);
-  el.addEventListener("keydown", handleKeyDown);
+  element.addEventListener("click", handleClick);
+  element.addEventListener("keydown", handleKeyDown);
 
-  clickHandlers.set(el, handleClick);
-  keydownHandlers.set(el, handleKeyDown);
+  clickHandlers.set(element, handleClick);
+  keydownHandlers.set(element, handleKeyDown);
 }
 
-function detachHandlers(el: HTMLElement): void {
-  const clickHandler = clickHandlers.get(el);
-  const keydownHandler = keydownHandlers.get(el);
+function detachHandlers(element: HTMLElement): void {
+  const clickHandler = clickHandlers.get(element);
+  const keydownHandler = keydownHandlers.get(element);
 
   if (clickHandler) {
-    el.removeEventListener("click", clickHandler);
+    element.removeEventListener("click", clickHandler);
   }
   if (keydownHandler) {
-    el.removeEventListener("keydown", keydownHandler);
+    element.removeEventListener("keydown", keydownHandler);
   }
 
-  clickHandlers.delete(el);
-  keydownHandlers.delete(el);
+  clickHandlers.delete(element);
+  keydownHandlers.delete(element);
 }
 
 export const vLink: Directive<HTMLElement, LinkDirectiveValue> = {
-  mounted(el, binding) {
+  mounted(element, binding) {
     const router = getDirectiveRouter();
 
-    applyLinkA11y(el);
+    applyLinkA11y(element);
 
-    el.style.cursor = "pointer";
+    element.style.cursor = "pointer";
 
-    attachHandlers(el, router, binding.value);
+    attachHandlers(element, router, binding.value);
   },
 
-  updated(el, binding) {
+  updated(element, binding) {
     const router = getDirectiveRouter();
 
-    detachHandlers(el);
-    attachHandlers(el, router, binding.value);
+    detachHandlers(element);
+    attachHandlers(element, router, binding.value);
   },
 
-  beforeUnmount(el) {
-    detachHandlers(el);
+  beforeUnmount(element) {
+    detachHandlers(element);
   },
 };

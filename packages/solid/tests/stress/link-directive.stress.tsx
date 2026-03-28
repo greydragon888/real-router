@@ -35,10 +35,10 @@ describe("link-directive stress tests", () => {
     ));
 
     for (let i = 0; i < 100; i++) {
-      const el = screen.getByTestId(`dlink-${i}`);
+      const element = screen.getByTestId(`dlink-${i}`);
 
-      expect(el.getAttribute("role")).toBe("link");
-      expect(el.getAttribute("tabindex")).toBe("0");
+      expect(element.getAttribute("role")).toBe("link");
+      expect(element.getAttribute("tabindex")).toBe("0");
     }
   });
 

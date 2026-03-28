@@ -261,7 +261,6 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
       if (resolveGuard !== null) {
         const secondResolver = resolveGuard as GuardResolver;
 
-        // eslint-disable-next-line no-useless-assignment
         resolveGuard = null;
         secondResolver(true);
       }

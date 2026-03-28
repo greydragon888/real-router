@@ -35,7 +35,6 @@ export function resolveOption(
   getDependency: (name: string) => unknown,
 ): Params;
 
-// eslint-disable-next-line sonarjs/function-return-type -- overloads: string for defaultRoute, Params for defaultParams
 export function resolveOption(
   value: Options["defaultRoute"] | Options["defaultParams"],
   getDependency: (name: string) => unknown,

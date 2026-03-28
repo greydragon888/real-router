@@ -271,12 +271,12 @@ describe("subscription-fanout stress tests", () => {
       </RouterProvider>,
     );
 
-    const changeBtn = getByTestId("change");
+    const changeButton = getByTestId("change");
 
     try {
       for (let i = 0; i < 100; i++) {
         act(() => {
-          changeBtn.click();
+          changeButton.click();
         });
       }
     } catch (error) {

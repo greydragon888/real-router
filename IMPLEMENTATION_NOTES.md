@@ -706,24 +706,120 @@ Blocks installation of npm packages published less than 24 hours ago. Protects a
 
 **Allowed packages:** Express 5 transitive dependencies (`unpipe`, `toidentifier`, `escape-html`, `ee-first`, `depd`, `cookie-signature`) are allowlisted via `allow-packages` — they have low OpenSSF Scorecard (< 3) but are well-established Express ecosystem utilities. Used only in `examples/react/ssr` (private).
 
-## ESLint React Plugin Migration
+## ESLint 10 Migration
 
-### eslint-plugin-react → @eslint-react/eslint-plugin
+### Overview
 
-`packages/react/eslint.config.mjs` migrated from `eslint-plugin-react` (v7) to `@eslint-react/eslint-plugin` (v2).
+Migrated from ESLint 9.39 to ESLint 10.1. Tracking issue: [#237](https://github.com/greydragon888/real-router/issues/237).
 
-**Why:**
+### Package Changes
 
-- Type-aware rules (e.g., `no-leaked-conditional-rendering` catches `{count && <Comp />}` via TypeScript types)
-- Drops dead class-component rules (`no-direct-mutation-state`, `no-find-dom-node`, `no-is-mounted`, etc.)
-- Active maintenance, flat config first
-- Extra hooks rules (`hooks-extra/no-unnecessary-use-memo`, `hooks-extra/no-unnecessary-use-callback`)
+| Package                         | Before | After       | Notes                         |
+| ------------------------------- | ------ | ----------- | ----------------------------- |
+| `eslint`                        | 9.39.2 | 10.1.0      | Major upgrade                 |
+| `@eslint/js`                    | 9.39.2 | 10.0.1      | Major upgrade                 |
+| `@eslint-react/eslint-plugin`   | 2.13.0 | 3.0.0       | Absorbs react-hooks           |
+| `typescript-eslint`             | 8.53.1 | 8.57.2      | Patch                         |
+| `@stylistic/eslint-plugin`      | 5.7.1  | 5.10.0      | Minor                         |
+| `eslint-plugin-import-x`        | 4.16.1 | 4.16.2      | Patch                         |
+| `eslint-plugin-unicorn`         | 62.0.0 | 64.0.0      | 2 major versions, 5 new rules |
+| `eslint-plugin-sonarjs`         | 3.0.5  | 4.0.2       | Major — ESLint 10 support     |
+| `eslint-plugin-jsdoc`           | 62.4.1 | 62.8.1      | Minor                         |
+| `eslint-plugin-testing-library` | 7.15.4 | 7.16.2      | Patch                         |
+| `@vitest/eslint-plugin`         | 1.6.12 | 1.6.13      | Patch                         |
+| `eslint-plugin-promise`         | 7.2.1  | **Removed** | Covered by typescript-eslint  |
+| `eslint-plugin-react-hooks`     | 7.0.1  | **Removed** | Absorbed by @eslint-react v3  |
 
-**Preset:** `recommended-type-checked` — disables rules already enforced by TypeScript (`jsx-no-undef`), adds type-aware rules.
+### eslint-plugin-promise Removal
+
+All critical promise rules were already covered by `typescript-eslint strictTypeChecked`:
+
+| promise rule              | typescript-eslint replacement             |
+| ------------------------- | ----------------------------------------- |
+| `promise/always-return`   | `@typescript-eslint/no-floating-promises` |
+| `promise/catch-or-return` | `@typescript-eslint/no-floating-promises` |
+| `promise/no-return-wrap`  | `@typescript-eslint/no-misused-promises`  |
+
+### @eslint-react v3 Migration (replaces eslint-plugin-react-hooks)
+
+**Problem:** `eslint-plugin-react-hooks` 7.0.1 did not declare ESLint 10 in peer deps ([facebook/react#35758](https://github.com/facebook/react/issues/35758)).
+
+**Solution:** `@eslint-react/eslint-plugin` v3.0.0 absorbed `rules-of-hooks` and `exhaustive-deps` (ported verbatim from react-hooks). This eliminated the need for a separate plugin.
+
+**Breaking changes applied:**
+
+- Removed rules now native to ESLint 10: `jsx-uses-vars`, `jsx-uses-react`, `jsx-no-undef`
+- Renamed: `react-hooks/exhaustive-deps` → `@eslint-react/exhaustive-deps` in eslint-disable comments
+- `eslint-plugin-react-hooks-extra` merged into `react-x` namespace
+- Preact adapter uses `@eslint-react` v3 with `settings["react-x"].importSource: "preact"`
+
+**Node.js requirement:** v3.0.0 requires Node >=22.0.0. Acceptable because real-router is a client-side library — Node version only constrains dev tooling.
+
+### eslint-plugin-sonarjs v4 Migration
+
+**Problem:** Old GitHub repo (`SonarSource/eslint-plugin-sonarjs`) was archived. Appeared abandoned.
+
+**Solution:** Development moved to [`SonarSource/SonarJS`](https://github.com/SonarSource/SonarJS) monorepo. v4.0.0 added ESLint 10 support. [CHANGELOG](https://github.com/SonarSource/SonarJS/blob/master/packages/analysis/src/jsts/rules/CHANGELOG.md) is public.
+
+**Removed rules:** `enforce-trailing-comma` (covered by `@stylistic/comma-dangle`), `super-invocation` (covered by ESLint core `constructor-super`).
+
+**New security rules (recommended):** `hardcoded-secret-signatures`, `dynamically-constructed-templates`, `review-blockchain-mnemonic`, `no-session-cookies-on-static-assets`. Last two disabled as irrelevant for client-side router.
+
+### Adapter Config Cleanup (~2,000 lines removed)
+
+**Problem:** Each adapter config (React, Preact, Vue, Solid, Svelte) duplicated ~250-300 lines of rules already covered by the root config: TypeScript, JSDoc, Unicorn, Promise, SonarJS, Prettier, Vitest, no-only-tests.
+
+**Root cause:** Root config targets `**/*.ts` and `**/*.tsx`. Adapters extend root via `...eslintConfig`. All root rules already apply to adapter files.
+
+**Solution:** Stripped all duplicated blocks. Each adapter now contains only framework-specific configuration:
+
+| Adapter | Before    | After    | Content                                                  |
+| ------- | --------- | -------- | -------------------------------------------------------- |
+| React   | 556 lines | 82 lines | `@eslint-react` v3 + testing-library/react               |
+| Preact  | 442 lines | 68 lines | `@eslint-react` v3 (Preact source) + testing-library/dom |
+| Vue     | 419 lines | 22 lines | testing-library/dom (no .vue files)                      |
+| Solid   | 410 lines | 22 lines | testing-library/dom (no solid plugin — dormant project)  |
+| Svelte  | 442 lines | 55 lines | eslint-plugin-svelte + testing-library/dom               |
+
+### eslint-plugin-solid — Not Added
+
+Evaluated `eslint-plugin-solid@0.14.5` for the Solid adapter. Decision: not added.
+
+- Project dormant (last release Dec 2024, maintainer inactive on the project)
+- Does not declare ESLint 10 support (works at runtime but no guarantee)
+- No alternatives exist (checked npm, GitHub, Solid.js org)
+- Solid adapter is 804 lines with 100% test coverage — all Solid patterns are correct (`props.xxx` everywhere, no destructuring, correct `splitProps` usage). The plugin's key rules target mistakes not present in the codebase.
+
+### typescript-eslint pinned to 8.57.1 (not 8.57.2)
+
+`typescript-eslint@8.57.2` introduced a fixer crash in `no-unnecessary-type-arguments`. The rule's `fix()` function accesses `typeArguments.params[-1]` → `undefined` → crash on `.range`. Occurs on both ESLint 9 and 10, even without `--fix`.
+
+**Bisected:** 8.57.1 OK → 8.57.2 CRASH. Pinned to 8.57.1 until a fix ships.
+
+**Override required:** `typescript-eslint@8.57.1` pulls `@typescript-eslint/eslint-plugin@8.57.2` and `@typescript-eslint/parser@8.57.1` as transitive deps, causing an unmet peer dep error (`eslint-plugin 8.57.2` expects `parser@^8.57.2`). Added pnpm overrides to pin both `@typescript-eslint/eslint-plugin` and `@typescript-eslint/parser` to 8.57.1.
+
+### New Rules Added
+
+**Unicorn v63-v64 (5 rules):**
+
+- `unicorn/isolated-functions` (warn) — functions without `this` should be standalone
+- `unicorn/consistent-template-literal-escape` (error) — consistent escaping in template literals
+- `unicorn/no-useless-iterator-to-array` (error) — no unnecessary `Iterator#toArray()`
+- `unicorn/prefer-simple-condition-first` (warn) — simpler condition first in logical expressions
+- `unicorn/switch-case-break-position` (warn) — consistent break position in switch cases
+
+**ESLint 10 recommended changes:**
+
+- `no-useless-assignment` promoted to `error` — kept as `warn` for gradual adoption
+- `no-unassigned-vars` added to recommended — disabled for test files (common `let unsubscribe` in describe scope pattern)
+
+### ESLint React Plugin Migration (historical)
+
+_Previous migration from eslint-plugin-react v7 to @eslint-react v2. Now superseded by v3 migration above._
+
+**Original preset:** `recommended-type-checked` — disables rules already enforced by TypeScript, adds type-aware rules.
 
 **Gaps:** `react/no-unescaped-entities` has no equivalent — dropped (JSX compiler catches most cases).
-
-**Note:** `eslint-plugin-react-hooks` is kept as-is — `@eslint-react` does not replace `rules-of-hooks` or `exhaustive-deps`.
 
 ## React 18/19 Split via Subpath Exports
 

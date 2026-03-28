@@ -32,11 +32,11 @@ describe("link-action stress tests (Svelte)", () => {
     await tick();
 
     for (let i = 0; i < 50; i++) {
-      const el = container.querySelector(`[data-testid='action-${i}']`);
+      const element = container.querySelector(`[data-testid='action-${i}']`);
 
-      expect(el).not.toBeNull();
-      expect(el?.getAttribute("role")).toBe("link");
-      expect(el?.getAttribute("tabindex")).toBe("0");
+      expect(element).not.toBeNull();
+      expect(element?.getAttribute("role")).toBe("link");
+      expect(element?.getAttribute("tabindex")).toBe("0");
     }
 
     unmount();
@@ -65,23 +65,23 @@ describe("link-action stress tests (Svelte)", () => {
 
     await tick();
 
-    const el5 = container.querySelector("[data-testid='action-5']");
+    const element5 = container.querySelector("[data-testid='action-5']");
 
-    expect(el5).not.toBeNull();
-    expect(el5).toBeInstanceOf(HTMLElement);
+    expect(element5).not.toBeNull();
+    expect(element5).toBeInstanceOf(HTMLElement);
 
-    (el5 as HTMLElement).click();
+    (element5 as HTMLElement).click();
 
     await tick();
 
     expect(router.getState()?.name).toBe("route5");
 
-    const el10 = container.querySelector("[data-testid='action-10']");
+    const element10 = container.querySelector("[data-testid='action-10']");
 
-    expect(el10).not.toBeNull();
-    expect(el10).toBeInstanceOf(HTMLElement);
+    expect(element10).not.toBeNull();
+    expect(element10).toBeInstanceOf(HTMLElement);
 
-    (el10 as HTMLElement).click();
+    (element10 as HTMLElement).click();
 
     await tick();
 

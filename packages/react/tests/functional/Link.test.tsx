@@ -257,7 +257,7 @@ describe("Link component", () => {
       fireEvent.click(screen.getByTestId("link"), { button: 1 });
 
       expect(onClickMock).toHaveBeenCalled();
-      // eslint-disable-next-line @typescript-eslint/unbound-method -- spied method
+
       expect(router.navigate).not.toHaveBeenCalled();
       expect(router.getState()?.name).toStrictEqual(currentRouteName);
 
@@ -269,15 +269,15 @@ describe("Link component", () => {
       await user.keyboard("{/Meta}");
 
       expect(onClickMock).toHaveBeenCalled();
-      // eslint-disable-next-line @typescript-eslint/unbound-method -- spied method
+
       expect(router.navigate).not.toHaveBeenCalled();
       expect(router.getState()?.name).toStrictEqual(currentRouteName);
     });
 
     it("should not navigate when onClick prevents default", async () => {
       vi.spyOn(router, "navigate");
-      const onClickMock = vi.fn((e: MouseEvent) => {
-        e.preventDefault();
+      const onClickMock = vi.fn((event: MouseEvent) => {
+        event.preventDefault();
       });
       const currentRouteName = router.getState()?.name;
 
@@ -295,7 +295,7 @@ describe("Link component", () => {
       await user.click(screen.getByTestId("link"));
 
       expect(onClickMock).toHaveBeenCalled();
-      // eslint-disable-next-line @typescript-eslint/unbound-method -- spied method
+
       expect(router.navigate).not.toHaveBeenCalled();
       expect(router.getState()?.name).toStrictEqual(currentRouteName);
     });
@@ -313,7 +313,6 @@ describe("Link component", () => {
 
       fireEvent.click(screen.getByTestId("link"));
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method -- spied method
       expect(router.navigate).not.toHaveBeenCalled();
       expect(router.getState()?.name).toStrictEqual(currentRouteName);
     });

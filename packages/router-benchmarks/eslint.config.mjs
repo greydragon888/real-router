@@ -50,10 +50,6 @@ export default tsEslint.config(
       "@typescript-eslint/no-floating-promises": "off",
       "@typescript-eslint/no-misused-promises": "off",
       "@typescript-eslint/require-await": "off",
-      // Promise chains in bench runners
-      "promise/always-return": "off",
-      "promise/no-callback-in-promise": "off",
-      "promise/catch-or-return": "off",
       // Benchmark test data and side-effect assignments
       "sonarjs/no-unused-collection": "off",
       "sonarjs/no-dead-store": "off",

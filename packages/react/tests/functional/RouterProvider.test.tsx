@@ -81,7 +81,6 @@ describe("RouterProvider component", () => {
       wrapper,
     });
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method -- spied method
     expect(router.subscribe).toHaveBeenCalledTimes(1);
 
     unmount();
@@ -98,12 +97,10 @@ describe("RouterProvider component", () => {
       wrapper,
     });
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method -- spied method
     expect(router.subscribe).toHaveBeenCalledTimes(1);
 
     rerender();
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method -- spied method
     expect(router.subscribe).toHaveBeenCalledTimes(1);
 
     unmount();
@@ -124,7 +121,6 @@ describe("RouterProvider component", () => {
 
     const { unmount } = renderHook(() => use(RouteContext), { wrapper });
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method -- spied method
     expect(router.subscribe).toHaveBeenCalledTimes(1);
 
     unmount();

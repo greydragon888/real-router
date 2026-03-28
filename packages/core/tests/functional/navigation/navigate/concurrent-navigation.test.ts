@@ -126,8 +126,8 @@ describe("router.navigate() - concurrent navigation", () => {
     it("should cancel navigation during async guard execution", async () => {
       vi.useFakeTimers();
 
-      const asyncGuard = vi.fn().mockImplementation(
-        () => () =>
+      const asyncGuard = vi.fn().mockReturnValue(
+        () =>
           new Promise((resolve) => {
             setTimeout(() => {
               resolve(true);
@@ -158,7 +158,7 @@ describe("router.navigate() - concurrent navigation", () => {
     it("should cancel navigation during async guard execution on settings", async () => {
       vi.useFakeTimers();
 
-      const guard = vi.fn().mockImplementation(() => () => {
+      const guard = vi.fn().mockReturnValue(() => {
         return new Promise<boolean>((resolve) => {
           setTimeout(() => {
             resolve(true);
@@ -189,8 +189,8 @@ describe("router.navigate() - concurrent navigation", () => {
     it("should prioritize cancellation over other errors", async () => {
       vi.useFakeTimers();
 
-      const failingGuard = vi.fn().mockImplementation(
-        () => () =>
+      const failingGuard = vi.fn().mockReturnValue(
+        () =>
           new Promise((_resolve, reject) => {
             setTimeout(() => {
               reject(new Error("Guard failed"));

@@ -8,7 +8,6 @@ import { setDirectiveRouter } from "./directives/vLink";
 import type { Router } from "@real-router/core";
 import type { Plugin } from "vue";
 
-// eslint-disable-next-line sonarjs/function-return-type -- Plugin<[]> return type is consistent
 export function createRouterPlugin(router: Router): Plugin<[]> {
   return {
     install(app): void {

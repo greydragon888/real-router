@@ -231,13 +231,13 @@ function App() {
 
 ### Framework Integration
 
-| Package                                  | Version                                                                                                                           | Description                                                        |
-| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| [`@real-router/react`](packages/react)   | [![npm](https://img.shields.io/npm/v/@real-router/react.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/react) | React 19.2+ (hooks, `RouteView`, `Link`). React 18+ via `./legacy` |
-| [`@real-router/preact`](packages/preact) |                                                                                                                                   | Preact (hooks, `RouteView`, `Link`, Suspense)                      |
-| [`@real-router/solid`](packages/solid)   |                                                                                                                                   | Solid.js (signals, `RouteView`, `Link`, store-based state)         |
-| [`@real-router/vue`](packages/vue)       |                                                                                                                                   | Vue 3 (composables, `RouteView`, `Link`, `KeepAlive`, `v-link`)    |
-| [`@real-router/svelte`](packages/svelte) |                                                                                                                                   | Svelte 5 (runes, `RouteView` with snippets, `Lazy`, `use:link`)    |
+| Package                                  | Version                                                                                                                             | Description                                                         |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| [`@real-router/react`](packages/react)   | [![npm](https://img.shields.io/npm/v/@real-router/react.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/react)   | React 19.2+ (hooks, `RouteView`, `Link`). React 18+ via `./legacy` |
+| [`@real-router/preact`](packages/preact) | [![npm](https://img.shields.io/npm/v/@real-router/preact.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/preact) | Preact (hooks, `RouteView`, `Link`, Suspense)                       |
+| [`@real-router/solid`](packages/solid)   | [![npm](https://img.shields.io/npm/v/@real-router/solid.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/solid)   | Solid.js (signals, `RouteView`, `Link`, store-based state)          |
+| [`@real-router/vue`](packages/vue)       | [![npm](https://img.shields.io/npm/v/@real-router/vue.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/vue)       | Vue 3 (composables, `RouteView`, `Link`, `KeepAlive`, `v-link`)    |
+| [`@real-router/svelte`](packages/svelte) | [![npm](https://img.shields.io/npm/v/@real-router/svelte.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/svelte) | Svelte 5 (runes, `RouteView` with snippets, `Lazy`, `use:link`)    |
 
 ### Plugins
 

@@ -25,7 +25,7 @@ const arbBoolParams = fc.dictionary(arbSafeKey, fc.boolean(), {
   maxKeys: 5,
 });
 
-const arbNullParams = fc.dictionary(arbSafeKey, fc.constant<null>(null), {
+const arbNullParams = fc.dictionary(arbSafeKey, fc.constant(null), {
   minKeys: 1,
   maxKeys: 5,
 });

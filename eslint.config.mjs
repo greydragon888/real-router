@@ -1,8 +1,8 @@
 // @ts-check
 
 // ============================================
-// ESLint 9.39+ Configuration
-// Using globalIgnores helper (ESLint 9.30+) with typescript-eslint
+// ESLint 10.1+ Configuration
+// Using globalIgnores helper with typescript-eslint
 // ============================================
 
 import { globalIgnores } from "eslint/config";
@@ -18,7 +18,6 @@ import { createTypeScriptImportResolver } from "eslint-import-resolver-typescrip
 import jsdoc from "eslint-plugin-jsdoc";
 import unicorn from "eslint-plugin-unicorn";
 import noOnlyTests from "eslint-plugin-no-only-tests";
-import promisePlugin from "eslint-plugin-promise";
 
 export default tsEslint.config(
   // ============================================
@@ -57,29 +56,19 @@ export default tsEslint.config(
   {
     rules: {
       // ============================================
-      // ESLint v9 NEW RULES
+      // ESLint v10 RULES (now in eslint:recommended)
       // ============================================
-      // v9.0.0: Detects useless assignments (dead code)
-      // Finds variables assigned but never used afterward
+      // v10: Detects useless assignments (dead code)
+      // In eslint:recommended as "error" since v10 — keep as "warn" for gradual adoption
       "no-useless-assignment": "warn",
-
-      // v9.35.0: Enforces error cause preservation in catch blocks
-      // Will be in eslint:recommended in v10.0.0
-      // Ensures original error context is not lost during re-throws
-      "preserve-caught-error": "error",
     },
   },
 
   // ============================================
   // 4. STYLISTIC RULES (all files)
   // ============================================
-  // Updated for @stylistic/eslint-plugin v5.7.0
+  // Updated for @stylistic/eslint-plugin v5.10.0
   // Changelog: https://github.com/eslint-stylistic/eslint-stylistic/releases
-  // New features in v5.7.0:
-  // - type-annotation-spacing: new option to ignore arrow function annotations
-  // - dot-location: extended TypeScript/JSX node support
-  // - object-curly-spacing: bug fix for spaces before comments in multiline objects
-  // - Improved compatibility with @typescript-eslint/parser 8.48.0+
   {
     plugins: {
       "@stylistic": stylistic,
@@ -167,13 +156,8 @@ export default tsEslint.config(
   // ============================================
   // 5. TYPESCRIPT CONFIGURATION
   // ============================================
-  // Updated for typescript-eslint v8.51.0
+  // Updated for typescript-eslint v8.57.2
   // Changelog: https://github.com/typescript-eslint/typescript-eslint/releases
-  // Key changes since v8.29:
-  // - projectService is now stable and recommended (v8.0+)
-  // - no-useless-default-assignment rule (v8.50.0)
-  // - Intl.Segmenter replaces graphemer (v8.49.0)
-  // - tinyglobby replaces fast-glob (v8.48.0)
   tsEslint.configs.strictTypeChecked,
   tsEslint.configs.stylisticTypeChecked,
   {
@@ -488,13 +472,8 @@ export default tsEslint.config(
   // ============================================
   // 7. JSDOC CONFIGURATION (for public APIs)
   // ============================================
-  // Updated for eslint-plugin-jsdoc v61.5.0
+  // Updated for eslint-plugin-jsdoc v62.8.1
   // Changelog: https://github.com/gajus/eslint-plugin-jsdoc/releases
-  // New features in v61.x:
-  // - Granular flat configs (contents/logical/stylistic)
-  // - check-template-names rule for TypeScript generics
-  // - informative-docs rule for meaningful documentation
-  // - no-blank-block-descriptions rule
   {
     files: [
       "**/src/**/*.ts",
@@ -571,7 +550,7 @@ export default tsEslint.config(
   // ============================================
   // 8. UNICORN CONFIGURATION (Modern JS/TS patterns)
   // ============================================
-  // Updated for eslint-plugin-unicorn v62.0.0
+  // Updated for eslint-plugin-unicorn v64.0.0
   // Changelog: https://github.com/sindresorhus/eslint-plugin-unicorn/releases
   {
     files: ["**/*.ts", "**/*.tsx"],
@@ -582,7 +561,7 @@ export default tsEslint.config(
       ...unicorn.configs.recommended.rules,
 
       // ============================================
-      // NEW RULES (v56-v62)
+      // NEW RULES (v56-v64)
       // ============================================
       // v62: Disallow mutating variables immediately after declaration
       "unicorn/no-immediate-mutation": "error",
@@ -606,6 +585,18 @@ export default tsEslint.config(
       "unicorn/consistent-empty-array-spread": "error",
       // v56: Prefer String.raw for template literals with escapes
       "unicorn/prefer-string-raw": "warn",
+
+      // v63: Functions without `this` should be standalone, not methods
+      "unicorn/isolated-functions": "warn",
+
+      // v64: Enforce consistent escaping in template literals
+      "unicorn/consistent-template-literal-escape": "error",
+      // v64: Disallow unnecessary Iterator#toArray() calls
+      "unicorn/no-useless-iterator-to-array": "error",
+      // v64: Put simpler condition first in logical expressions
+      "unicorn/prefer-simple-condition-first": "warn",
+      // v64: Enforce consistent break position in switch cases
+      "unicorn/switch-case-break-position": "warn",
 
       // ============================================
       // DISABLED RULES (too strict or unsuitable)
@@ -681,26 +672,7 @@ export default tsEslint.config(
   },
 
   // ============================================
-  // 9. PROMISE CONFIGURATION
-  // ============================================
-  {
-    files: ["**/*.ts", "**/*.tsx"],
-    plugins: {
-      promise: promisePlugin,
-    },
-    rules: {
-      ...promisePlugin.configs.recommended.rules,
-      "promise/prefer-await-to-then": "off", // Stylistic, not an error
-      "promise/prefer-await-to-callbacks": "off", // Stylistic, callbacks are allowed
-      "promise/always-return": "error",
-      "promise/catch-or-return": "error",
-      "promise/no-return-wrap": "error",
-      "promise/no-nesting": "warn",
-    },
-  },
-
-  // ============================================
-  // 10. NO-ONLY-TESTS CONFIGURATION (CI/CD protection)
+  // 9. NO-ONLY-TESTS CONFIGURATION (CI/CD protection)
   // ============================================
   {
     files: ["**/tests/**/*.ts", "**/benchmarks/**/*.ts"],
@@ -713,7 +685,7 @@ export default tsEslint.config(
   },
 
   // ============================================
-  // 11. PRETTIER CONFIGURATION
+  // 10. PRETTIER CONFIGURATION
   // ============================================
   {
     files: ["**/*.ts", "**/*.tsx"],
@@ -728,8 +700,14 @@ export default tsEslint.config(
   },
 
   // ============================================
-  // 12. SONARJS CONFIGURATION
+  // 11. SONARJS CONFIGURATION
   // ============================================
+  // Updated for eslint-plugin-sonarjs v4.0.2
+  // Repo moved from archived SonarSource/eslint-plugin-sonarjs to SonarSource/SonarJS
+  // Changelog: https://github.com/SonarSource/SonarJS/blob/master/packages/analysis/src/jsts/rules/CHANGELOG.md
+  // v4 breaking: removed enforce-trailing-comma, super-invocation (covered by eslint core)
+  // v4 new: hardcoded-secret-signatures, dynamically-constructed-templates,
+  //         review-blockchain-mnemonic, no-session-cookies-on-static-assets (all recommended)
   {
     files: ["**/*.ts", "**/*.tsx"],
     plugins: {
@@ -742,11 +720,15 @@ export default tsEslint.config(
       "sonarjs/different-types-comparison": "off",
       "sonarjs/cognitive-complexity": ["warn", 15],
       "sonarjs/no-duplicate-string": ["warn", { threshold: 5 }],
+
+      // v4.0.0: New security rules — disable irrelevant for client-side router
+      "sonarjs/review-blockchain-mnemonic": "off",
+      "sonarjs/no-session-cookies-on-static-assets": "off",
     },
   },
 
   // ============================================
-  // 13. VITEST CONFIGURATION (Test Files)
+  // 12. VITEST CONFIGURATION (Test Files)
   // ============================================
   {
     files: [
@@ -783,6 +765,10 @@ export default tsEslint.config(
       "vitest/padding-around-expect-groups": "warn",
       "vitest/consistent-test-filename": "warn",
       "vitest/prefer-strict-equal": "error",
+      // v1.6.4: Prefer mockReturnValue over mockImplementation(() => value)
+      // NOT enabled: autofix is unsafe — breaks mockImplementation with dynamic expressions
+      // e.g. mockImplementation(() => timestamps[callIndex++]) → mockReturnValue(timestamps[callIndex++])
+      // "vitest/prefer-mock-return-shorthand": "warn",
       // Disable some TypeScript rules for tests
       "@typescript-eslint/consistent-type-assertions": "off",
       "@typescript-eslint/prefer-promise-reject-errors": "off",
@@ -806,6 +792,8 @@ export default tsEslint.config(
       "sonarjs/function-return-type": "off",
       "sonarjs/different-types-comparison": "off",
       "sonarjs/no-unused-collection": "off",
+      "no-useless-assignment": "off", // Common test pattern: callIndex++ in mock setup
+      "no-unassigned-vars": "off", // Common test pattern: let unsubscribe in describe scope, assigned in beforeEach
       "unicorn/consistent-function-scoping": "off",
       "import-x/no-default-export": "off",
       "import-x/no-unresolved": "off",
@@ -819,7 +807,7 @@ export default tsEslint.config(
   },
 
   // ============================================
-  // 13.1 PROPERTY-BASED TESTS (@fast-check/vitest)
+  // 12.1 PROPERTY-BASED TESTS (@fast-check/vitest)
   // ============================================
   {
     files: ["**/tests/**/*.properties.ts"],
@@ -837,7 +825,7 @@ export default tsEslint.config(
   },
 
   // ============================================
-  // 14. BENCHMARK FILES (mitata, tests/benchmarks)
+  // 13. BENCHMARK FILES (mitata, tests/benchmarks)
   // ============================================
   {
     files: [
@@ -865,9 +853,6 @@ export default tsEslint.config(
       "@typescript-eslint/no-unused-expressions": "off",
       "@typescript-eslint/use-unknown-in-catch-callback-variable": "off",
       "@typescript-eslint/no-non-null-assertion": "off",
-      // Allow promise without return for benchmark runners
-      "promise/always-return": "off",
-      "promise/no-callback-in-promise": "off",
       // Sonarjs rules relaxed for benchmarks
       "sonarjs/constructor-for-side-effects": "off",
       "sonarjs/pseudo-random": "off",
@@ -890,7 +875,7 @@ export default tsEslint.config(
   },
 
   // ============================================
-  // 15. TEST HELPERS AND MOCKS (relaxed JSDoc)
+  // 14. TEST HELPERS AND MOCKS (relaxed JSDoc)
   // ============================================
   {
     files: [
@@ -903,7 +888,7 @@ export default tsEslint.config(
   },
 
   // ============================================
-  // 16. CONFIG FILES (allow Node.js modules)
+  // 15. CONFIG FILES (allow Node.js modules)
   // ============================================
   {
     files: [
@@ -936,5 +921,6 @@ export default tsEslint.config(
   // ============================================
   // 16. TURBO CONFIGURATION (must be last)
   // ============================================
+  // eslint-config-turbo v2.8.20
   ...turboConfig,
 );

@@ -52,12 +52,12 @@ describe("v-link directive stress tests (Vue)", () => {
     await flushPromises();
 
     for (let i = 0; i < 200; i++) {
-      const el = wrapper.find(`[data-testid='vlink-${i}']`)
+      const element = wrapper.find(`[data-testid='vlink-${i}']`)
         .element as HTMLElement;
 
-      expect(el.style.cursor).toBe("pointer");
-      expect(el.getAttribute("role")).toBe("link");
-      expect(el.getAttribute("tabindex")).toBe("0");
+      expect(element.style.cursor).toBe("pointer");
+      expect(element.getAttribute("role")).toBe("link");
+      expect(element.getAttribute("tabindex")).toBe("0");
     }
 
     wrapper.unmount();

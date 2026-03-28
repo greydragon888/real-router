@@ -194,7 +194,6 @@ describe("Browser Plugin — Security", () => {
     it("blocks javascript: protocol URLs in matchUrl", async () => {
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
 
-      // eslint-disable-next-line sonarjs/code-eval
       const state = router.matchUrl("javascript:alert('xss')");
 
       expect(state).toBeUndefined();

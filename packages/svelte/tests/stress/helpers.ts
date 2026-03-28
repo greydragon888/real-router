@@ -36,7 +36,7 @@ export function createStressRouter(routeCount = 10): Router {
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export function renderWithRouter(
   router: Router,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   Component: any,
   props: Record<string, unknown> = {},
 ) {

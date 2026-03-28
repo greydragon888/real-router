@@ -39,7 +39,7 @@ export function RouterErrorBoundary({
         snapshot.fromRoute,
       );
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- onError tracked via ref, snapshot fields accessed inside callback
+    // eslint-disable-next-line @eslint-react/exhaustive-deps -- onError tracked via ref, snapshot fields accessed inside callback
   }, [snapshot.version]);
 
   const visibleError =
