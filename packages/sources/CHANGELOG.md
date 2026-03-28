@@ -1,5 +1,13 @@
 # @real-router/sources
 
+## 0.3.0
+
+### Minor Changes
+
+- [#370](https://github.com/greydragon888/real-router/pull/370) [`36bff43`](https://github.com/greydragon888/real-router/commit/36bff43b21e065feeb0cc488b5a72873cac4e514) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `createErrorSource` factory for navigation error tracking ([#366](https://github.com/greydragon888/real-router/issues/366))
+
+  New eager-subscription source that tracks `TRANSITION_ERROR` events. Provides `RouterErrorSnapshot` with `error`, `toRoute`, `fromRoute`, and `version` fields. Resets on `TRANSITION_SUCCESS`. Skips update when no error exists (avoids unnecessary re-renders).
+
 ## 0.2.8
 
 ### Patch Changes
