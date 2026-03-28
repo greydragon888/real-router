@@ -860,6 +860,24 @@ After `pnpm add -Dw typescript@6.0.2`, packages with `rollup-plugin-dts` as a de
 
 **Root cause:** pnpm doesn't regenerate binary shims in package-local `node_modules/.bin/` when a workspace root devDependency is updated. The old shim hardcodes the pnpm store path including the version (`typescript@5.9.3`).
 
+### Peer Dependency Warnings
+
+typescript-eslint, tsconfck (via vite-tsconfig-paths), and svelte2tsx declare `typescript <6.0.0` or `^5.0.0` as peer deps. All work correctly with TS 6.0, but pnpm's strict peer checking fails on install.
+
+**Fix:** `peerDependencyRules.allowedVersions` in root package.json:
+
+```json
+"pnpm": {
+  "peerDependencyRules": {
+    "allowedVersions": {
+      "typescript": "6"
+    }
+  }
+}
+```
+
+**TODO:** Remove after these packages update their peer dep ranges to include TS 6.
+
 ### What Did NOT Need Changing
 
 - **No code changes** — zero source files modified
