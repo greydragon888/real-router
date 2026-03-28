@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "ignoreDeprecations": "6.0",
     "customConditions": ["development"],
     "types": ["vitest/globals", "node"],
     "target": "ESNext",

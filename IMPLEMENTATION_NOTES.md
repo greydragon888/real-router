@@ -821,6 +821,53 @@ _Previous migration from eslint-plugin-react v7 to @eslint-react v2. Now superse
 
 **Gaps:** `react/no-unescaped-entities` has no equivalent — dropped (JSX compiler catches most cases).
 
+## TypeScript 6.0 Migration
+
+### Problem
+
+TypeScript 6.0.2 released 2026-03-23 as the final JS-based compiler before the Go rewrite (TS 7.0). Needed to migrate from TS 5.9.3 to stay on the supported path.
+
+### Solution
+
+Migrated on 2026-03-28. Single config change required:
+
+```json
+// tsconfig.json
+{
+  "compilerOptions": {
+    "ignoreDeprecations": "6.0"
+  }
+}
+```
+
+### Why `ignoreDeprecations`
+
+tsup 8.5.1 (via rollup-plugin-dts 6.4.1) internally sets `baseUrl` when generating `.d.ts` files. `baseUrl` is deprecated in TS 6.0, causing DTS builds to fail with:
+
+```
+error TS5101: Option 'baseUrl' is deprecated and will stop functioning in TypeScript 7.0.
+```
+
+Tracked: [egoist/tsup#1389](https://github.com/egoist/tsup/issues/1389), fix PR: [egoist/tsup#1390](https://github.com/egoist/tsup/pull/1390).
+
+**TODO:** Remove `ignoreDeprecations` after tsup ships the fix. Must happen before TS 7.0 (where `baseUrl` is removed entirely).
+
+### Pitfall: Stale pnpm Binary Shims
+
+After `pnpm add -Dw typescript@6.0.2`, packages with `rollup-plugin-dts` as a dependency (`solid`, `svelte`, `vue`) retained stale `node_modules/.bin/tsc` shims pointing to `typescript@5.9.3` in the pnpm store — even though the lockfile only referenced 6.0.2. This caused `tsc --noEmit` to run with TS 5.9.3 where `"ignoreDeprecations": "6.0"` is an invalid value.
+
+**Fix:** `rm -rf node_modules && pnpm install` to regenerate all shims.
+
+**Root cause:** pnpm doesn't regenerate binary shims in package-local `node_modules/.bin/` when a workspace root devDependency is updated. The old shim hardcodes the pnpm store path including the version (`typescript@5.9.3`).
+
+### What Did NOT Need Changing
+
+- **No code changes** — zero source files modified
+- **`"Bundler"` casing** — TS compiler is case-insensitive for option values; no need to lowercase
+- **typescript-eslint** — works with TS 6.0 via `projectService` despite no official support yet ([typescript-eslint#12123](https://github.com/typescript-eslint/typescript-eslint/issues/12123))
+- **`noUncheckedSideEffectImports: true`** (new default) — no false positives in the project
+- **All explicit tsconfig values** (`strict`, `module`, `target`, `types`) — already set, unaffected by new defaults
+
 ## React 18/19 Split via Subpath Exports
 
 ### Problem
