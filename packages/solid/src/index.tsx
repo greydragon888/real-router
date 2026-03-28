@@ -2,6 +2,8 @@ export { RouteView } from "./components/RouteView";
 
 export { Link } from "./components/Link";
 
+export { RouterErrorBoundary } from "./components/RouterErrorBoundary";
+
 export { link } from "./directives/link";
 
 export { useRouter } from "./hooks/useRouter";
@@ -29,6 +31,8 @@ export { createSignalFromSource } from "./createSignalFromSource";
 export { createStoreFromSource } from "./createStoreFromSource";
 
 export type { LinkProps, RouteState } from "./types";
+
+export type { RouterErrorBoundaryProps } from "./components/RouterErrorBoundary";
 
 export type { LinkDirectiveOptions } from "./directives/link";
 

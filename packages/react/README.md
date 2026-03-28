@@ -170,6 +170,27 @@ const LazyDashboard = lazy(() => import("./Dashboard"));
 
 `fallback` and `keepAlive` work together — `<Activity>` wraps the whole match including the `<Suspense>` boundary.
 
+### `<RouterErrorBoundary>`
+
+Declarative error handling for navigation errors. Shows a fallback **alongside** children (not instead of) when a guard rejects or a route is not found.
+
+```tsx
+<RouterErrorBoundary
+  fallback={(error, resetError) => (
+    <div className="toast">
+      {error.code} <button onClick={resetError}>Dismiss</button>
+    </div>
+  )}
+  onError={(error) => analytics.track("nav_error", { code: error.code })}
+>
+  <Link routeName="protected">Go to Protected</Link>
+</RouterErrorBoundary>
+```
+
+Auto-resets on next successful navigation. Works with both `<Link>` and imperative `router.navigate()`.
+
+Available from both `@real-router/react` and `@real-router/react/legacy`.
+
 ## React 18 Migration
 
 One import path change — all hooks and `Link` work identically:
@@ -189,6 +210,7 @@ One import path change — all hooks and `Link` work identically:
 | `useRouter`, `useRoute`, `useRouteNode`                | Yes           | Yes                |
 | `RouteView` with `keepAlive`                           | No            | Yes (React 19.2+)  |
 | `useNavigator`, `useRouteUtils`, `useRouterTransition` | No            | Yes                |
+| `RouterErrorBoundary` (declarative error handling)     | No            | Yes                |
 | `withRouter`, `withRoute`, `routeNode` (HOCs)          | Yes           | No — use hooks     |
 | `Router`, `Route`, `RouteNode` (render props)          | Yes           | No — use hooks     |
 
@@ -208,7 +230,7 @@ When enabled, a visually hidden `aria-live` region announces each navigation. Fo
 
 Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 
-- [RouterProvider](https://github.com/greydragon888/real-router/wiki/RouterProvider) · [RouteView](https://github.com/greydragon888/real-router/wiki/RouteView) · [Link](https://github.com/greydragon888/real-router/wiki/Link)
+- [RouterProvider](https://github.com/greydragon888/real-router/wiki/RouterProvider) · [RouteView](https://github.com/greydragon888/real-router/wiki/RouteView) · [RouterErrorBoundary](https://github.com/greydragon888/real-router/wiki/RouterErrorBoundary) · [Link](https://github.com/greydragon888/real-router/wiki/Link)
 - [useRouter](https://github.com/greydragon888/real-router/wiki/useRouter) · [useRoute](https://github.com/greydragon888/real-router/wiki/useRoute) · [useRouteNode](https://github.com/greydragon888/real-router/wiki/useRouteNode) · [useNavigator](https://github.com/greydragon888/real-router/wiki/useNavigator) · [useRouteUtils](https://github.com/greydragon888/real-router/wiki/useRouteUtils) · [useRouterTransition](https://github.com/greydragon888/real-router/wiki/useRouterTransition)
 
 ## Examples

@@ -5,6 +5,8 @@ export { default as Link } from "./components/Link.svelte";
 
 export { default as Lazy } from "./components/Lazy.svelte";
 
+export { default as RouterErrorBoundary } from "./components/RouterErrorBoundary.svelte";
+
 // Reactive Primitives
 export { createReactiveSource } from "./createReactiveSource.svelte";
 
@@ -36,4 +38,7 @@ export type { LinkProps, RouteContext } from "./types";
 
 export type { Navigator } from "@real-router/core";
 
-export type { RouterTransitionSnapshot } from "@real-router/sources";
+export type {
+  RouterTransitionSnapshot,
+  RouterErrorSnapshot,
+} from "@real-router/sources";

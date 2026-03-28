@@ -7,7 +7,7 @@
 ```
 @real-router/solid
 ├── @real-router/core         # Router instance, Navigator, State types
-├── @real-router/sources      # Subscription layer (createRouteSource, createRouteNodeSource, createActiveRouteSource)
+├── @real-router/sources      # Subscription layer (createRouteSource, createRouteNodeSource, createActiveRouteSource, createErrorSource)
 └── @real-router/route-utils  # Route tree queries (getRouteUtils, getChain, getSiblings)
 ```
 
@@ -48,9 +48,11 @@ src/
 │   ├── useRoute.tsx            # Full route state Accessor from context (every navigation)
 │   ├── useRouteNode.tsx        # Node-scoped subscription via createSignalFromSource
 │   ├── useRouteUtils.tsx       # RouteUtils from route tree (never reactive)
-│   └── useRouterTransition.tsx # Transition lifecycle Accessor (isTransitioning, toRoute, fromRoute)
+│   ├── useRouterTransition.tsx # Transition lifecycle Accessor (isTransitioning, toRoute, fromRoute)
+│   └── useRouterError.tsx    # Internal — error subscription (used by RouterErrorBoundary)
 └── components/
     ├── Link.tsx                # Reactive link with classList-based active state
+    ├── RouterErrorBoundary.tsx  # Declarative navigation error handling
     └── RouteView/              # Declarative route matching (no keepAlive)
         ├── index.ts            # Barrel re-exports
         ├── RouteView.tsx       # RouteViewRoot + compound export (RouteView.Match, RouteView.NotFound)
@@ -123,6 +125,7 @@ useNavigator()  — reads RouterContext → returns Navigator, never reactive
 useRouteNode(name)      — createRouteNodeSource(router, name)     → Accessor<RouteState>
 useRouterTransition()   — createTransitionSource(router)          → Accessor<RouterTransitionSnapshot>
 Link (internal)         — createActiveRouteSource(router, ...)    → Accessor<boolean>
+useRouterError()  [internal]  — createErrorSource(router) with WeakMap cache
 RouterProvider          — createRouteSource(router)               → Accessor<RouteState>
 ```
 
@@ -135,6 +138,12 @@ Link (no memo — Solid components run once)
 ├── createMemo(() => router.buildUrl() || router.buildPath()) — reactive href
 ├── createMemo(() => ...) — reactive class via classList pattern
 └── onClick → router.navigate(...).catch(() => {})
+
+RouterErrorBoundary
+├── useRouterError() — error subscription via createErrorSource (internal, cached)
+├── dismissedVersion state — tracks manually dismissed errors (version-based)
+├── onErrorRef — for callback stability (avoids closure churn)
+└── Renders: children + fallback(error, resetError) via Fragment
 ```
 
 **No `memo()` needed:** Solid components are functions that run exactly once. The reactive graph tracks signal dependencies automatically. `createMemo` is used for derived values (href, class), not for preventing re-renders.

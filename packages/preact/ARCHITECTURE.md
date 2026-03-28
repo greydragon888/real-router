@@ -7,7 +7,7 @@
 ```
 @real-router/preact
 ├── @real-router/core         # Router instance, Navigator, State types
-├── @real-router/sources      # Subscription layer (createRouteSource, createRouteNodeSource, createActiveRouteSource)
+├── @real-router/sources      # Subscription layer (createRouteSource, createRouteNodeSource, createActiveRouteSource, createErrorSource)
 └── @real-router/route-utils  # Route tree queries (getRouteUtils, getChain, getSiblings)
 ```
 
@@ -50,9 +50,11 @@ src/
 │   ├── useIsActiveRoute.tsx    # Active state subscription (internal — used by Link)
 │   ├── useRouteUtils.tsx       # RouteUtils from route tree (never re-renders)
 │   ├── useRouterTransition.tsx # Transition lifecycle (isTransitioning, toRoute, fromRoute)
+│   ├── useRouterError.tsx    # Internal — error subscription (used by RouterErrorBoundary)
 │   └── useStableValue.tsx      # JSON-based reference stabilization
 └── components/
     ├── Link.tsx                # memo'd link with custom areLinkPropsEqual + active state
+    ├── RouterErrorBoundary.tsx  # Declarative navigation error handling
     └── RouteView/              # Declarative route matching (no keepAlive)
         ├── index.ts            # Barrel re-exports
         ├── RouteView.tsx       # RouteViewRoot + compound export (RouteView.Match, RouteView.NotFound)
@@ -119,6 +121,7 @@ useNavigator()  — reads NavigatorContext → never re-renders
 useRouteNode(name)              — createRouteNodeSource(router, name)
 useRouterTransition()           — createTransitionSource(router)
 useIsActiveRoute(name, params)  — createActiveRouteSource(router, name, params, opts)  [internal]
+useRouterError()  [internal]        — createErrorSource(router) with WeakMap cache
 RouterProvider                  — createRouteSource(router)
 ```
 
@@ -131,6 +134,12 @@ Link (memo + areLinkPropsEqual)
 ├── useIsActiveRoute() — subscription for active/inactive CSS (internal hook)
 ├── href = router.buildUrl() || router.buildPath()
 └── onClick → void router.navigate(...)   # fire-and-forget
+
+RouterErrorBoundary
+├── useRouterError() — error subscription via createErrorSource (internal, cached)
+├── dismissedVersion state — tracks manually dismissed errors (version-based)
+├── onErrorRef — useRef for callback stability (avoids closure churn)
+└── Renders: children + fallback(error, resetError) via Fragment
 ```
 
 **Custom comparator (`areLinkPropsEqual`):** `JSON.stringify` for `routeParams` and `routeOptions`, strict equality for primitives. Prevents re-renders from inline object literals.

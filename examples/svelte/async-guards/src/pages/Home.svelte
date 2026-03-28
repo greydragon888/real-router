@@ -1,6 +1,6 @@
 <script lang="ts">
   import { RouterError } from "@real-router/core";
-  import { useNavigator } from "@real-router/svelte";
+  import { Link, RouterErrorBoundary, useNavigator } from "@real-router/svelte";
 
   import { cartState } from "../cart-state";
 
@@ -78,6 +78,23 @@
       CANNOT_ACTIVATE toast. Cancellation: second navigation aborts the
       first → TRANSITION_CANCELLED.
     </p>
+  </div>
+
+  <div class="card" style="margin-top: 16px">
+    <h3>Declarative approach — RouterErrorBoundary</h3>
+    <p style="font-size: 13px; color: #888">
+      Click "Checkout" with empty cart — error toast appears automatically.
+      Dismiss manually or navigate successfully to auto-reset.
+    </p>
+    <RouterErrorBoundary>
+      {#snippet fallback(error, resetError)}
+        <div class="toast error" style="position: relative">
+          {error.code}: cart is empty
+          <button onclick={resetError} style="margin-left: 8px">✕</button>
+        </div>
+      {/snippet}
+      <Link routeName="checkout">Go to Checkout (declarative)</Link>
+    </RouterErrorBoundary>
   </div>
 
   {#if toast}
