@@ -1,5 +1,20 @@
 # @real-router/browser-plugin
 
+## 0.11.0
+
+### Minor Changes
+
+- [#376](https://github.com/greydragon888/real-router/pull/376) [`fce4316`](https://github.com/greydragon888/real-router/commit/fce43162adc4423bb4423eacd23c91f19e99b7f0) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `meta` from history state, remove `forceId` from popstate restoration ([#202](https://github.com/greydragon888/real-router/issues/202))
+
+  **Breaking Change:** `state.meta` is no longer written to `history.state` or restored on popstate. `forceId` no longer passed to `makeState`.
+
+  Existing history entries with `meta` are not affected — extra fields are ignored.
+
+### Patch Changes
+
+- Updated dependencies [[`fce4316`](https://github.com/greydragon888/real-router/commit/fce43162adc4423bb4423eacd23c91f19e99b7f0)]:
+  - @real-router/core@0.41.0
+
 ## 0.10.6
 
 ### Patch Changes

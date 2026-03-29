@@ -1,5 +1,31 @@
 # @real-router/types
 
+## 0.27.0
+
+### Minor Changes
+
+- [#376](https://github.com/greydragon888/real-router/pull/376) [`fce4316`](https://github.com/greydragon888/real-router/commit/fce43162adc4423bb4423eacd23c91f19e99b7f0) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `State.meta` from public API, remove `forceId` from `PluginApi.makeState` ([#202](https://github.com/greydragon888/real-router/issues/202))
+
+  **Breaking Change:** `State` no longer exposes `meta` property. `StateMeta` type removed from public exports. Second type parameter `MP` removed from `State<P, MP>` (now `State<P>`). `forceId` parameter removed from `PluginApi.makeState`.
+
+  `TransitionMeta` extended with optional `reload` and `redirected` fields.
+
+  **Migration:**
+
+  ```diff
+  - if (state.meta?.options?.redirected) { ... }
+  + if (state.transition?.redirected) { ... }
+
+  - if (state.meta?.options?.reload) { ... }
+  + if (state.transition?.reload) { ... }
+
+  - const guard = (router: Router) => (toState: State<P, MP>) => { ... }
+  + const guard = (router: Router) => (toState: State<P>) => { ... }
+
+  - api.makeState("route", params, path, meta, forceId)
+  + api.makeState("route", params, path, meta)
+  ```
+
 ## 0.26.0
 
 ### Minor Changes

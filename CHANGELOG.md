@@ -5,6 +5,184 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-03-29]
+
+### @real-router/browser-plugin@0.11.0
+
+### Minor Changes
+
+- [#376](https://github.com/greydragon888/real-router/pull/376) [`fce4316`](https://github.com/greydragon888/real-router/commit/fce43162adc4423bb4423eacd23c91f19e99b7f0) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `meta` from history state, remove `forceId` from popstate restoration ([#202](https://github.com/greydragon888/real-router/issues/202))
+
+  **Breaking Change:** `state.meta` is no longer written to `history.state` or restored on popstate. `forceId` no longer passed to `makeState`.
+
+  Existing history entries with `meta` are not affected — extra fields are ignored.
+
+### Patch Changes
+
+- Updated dependencies [[`fce4316`](https://github.com/greydragon888/real-router/commit/fce43162adc4423bb4423eacd23c91f19e99b7f0)]:
+  - @real-router/core@0.41.0
+
+### @real-router/core@0.41.0
+
+### Minor Changes
+
+- [#376](https://github.com/greydragon888/real-router/pull/376) [`fce4316`](https://github.com/greydragon888/real-router/commit/fce43162adc4423bb4423eacd23c91f19e99b7f0) Thanks [@greydragon888](https://github.com/greydragon888)! - Internalize `State.meta`, remove `forceId` pipeline, optimize `areStatesEqual` ([#202](https://github.com/greydragon888/real-router/issues/202))
+
+  **Breaking Change:** `State.meta` is no longer part of the public API. `forceId` parameter removed from `makeState`.
+  - `reload` and `redirected` flags moved to `state.transition`
+  - `transitionPath` accepts optional `opts` parameter for reload detection
+  - `shouldUpdateNode` reads `reload` from `state.transition` instead of `state.meta.options`
+  - Removed `EMPTY_OPTIONS` constant, `cleanOpts` helper, `getUrlParamsFromMeta` helper
+  - Removed `meta.id`, `#stateId` counter, `forceId` parameter (dead code — nobody read `meta.id`)
+  - Route param type mapping stored in `WeakMap<State, Params>` (no wrapper object)
+  - `areStatesEqual` uses cached `#urlParamsCache` instead of WeakMap lookup
+  - `freezeStateInPlace` no longer freezes internal meta
+  - `areStatesEqual` and `areParamValuesEqual` use `for` loops instead of `.every()`
+
+### Patch Changes
+
+- Updated dependencies [[`fce4316`](https://github.com/greydragon888/real-router/commit/fce43162adc4423bb4423eacd23c91f19e99b7f0)]:
+  - @real-router/types@0.27.0
+
+### @real-router/types@0.27.0
+
+### Minor Changes
+
+- [#376](https://github.com/greydragon888/real-router/pull/376) [`fce4316`](https://github.com/greydragon888/real-router/commit/fce43162adc4423bb4423eacd23c91f19e99b7f0) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `State.meta` from public API, remove `forceId` from `PluginApi.makeState` ([#202](https://github.com/greydragon888/real-router/issues/202))
+
+  **Breaking Change:** `State` no longer exposes `meta` property. `StateMeta` type removed from public exports. Second type parameter `MP` removed from `State<P, MP>` (now `State<P>`). `forceId` parameter removed from `PluginApi.makeState`.
+
+  `TransitionMeta` extended with optional `reload` and `redirected` fields.
+
+  **Migration:**
+
+  ```diff
+  - if (state.meta?.options?.redirected) { ... }
+  + if (state.transition?.redirected) { ... }
+
+  - if (state.meta?.options?.reload) { ... }
+  + if (state.transition?.reload) { ... }
+
+  - const guard = (router: Router) => (toState: State<P, MP>) => { ... }
+  + const guard = (router: Router) => (toState: State<P>) => { ... }
+
+  - api.makeState("route", params, path, meta, forceId)
+  + api.makeState("route", params, path, meta)
+  ```
+
+### @real-router/validation-plugin@0.2.0
+
+### Minor Changes
+
+- [#376](https://github.com/greydragon888/real-router/pull/376) [`fce4316`](https://github.com/greydragon888/real-router/commit/fce43162adc4423bb4423eacd23c91f19e99b7f0) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `forceId` validation from `validateMakeStateArgs` ([#202](https://github.com/greydragon888/real-router/issues/202))
+
+  **Breaking Change:** `validateMakeStateArgs` no longer accepts or validates `forceId` parameter (4th argument removed).
+
+### Patch Changes
+
+- Updated dependencies [[`fce4316`](https://github.com/greydragon888/real-router/commit/fce43162adc4423bb4423eacd23c91f19e99b7f0)]:
+  - @real-router/core@0.41.0
+
+### @real-router/hash-plugin@0.2.7
+
+### Patch Changes
+
+- Updated dependencies [[`fce4316`](https://github.com/greydragon888/real-router/commit/fce43162adc4423bb4423eacd23c91f19e99b7f0)]:
+  - @real-router/core@0.41.0
+
+### @real-router/logger-plugin@0.3.6
+
+### Patch Changes
+
+- Updated dependencies [[`fce4316`](https://github.com/greydragon888/real-router/commit/fce43162adc4423bb4423eacd23c91f19e99b7f0)]:
+  - @real-router/core@0.41.0
+
+### @real-router/persistent-params-plugin@0.1.45
+
+### Patch Changes
+
+- Updated dependencies [[`fce4316`](https://github.com/greydragon888/real-router/commit/fce43162adc4423bb4423eacd23c91f19e99b7f0)]:
+  - @real-router/core@0.41.0
+
+### @real-router/preact@0.2.1
+
+### Patch Changes
+
+- Updated dependencies [[`fce4316`](https://github.com/greydragon888/real-router/commit/fce43162adc4423bb4423eacd23c91f19e99b7f0)]:
+  - @real-router/core@0.41.0
+  - dom-utils@0.2.3
+  - @real-router/sources@0.3.1
+  - @real-router/route-utils@0.1.7
+
+### @real-router/react@0.14.1
+
+### Patch Changes
+
+- Updated dependencies [[`fce4316`](https://github.com/greydragon888/real-router/commit/fce43162adc4423bb4423eacd23c91f19e99b7f0)]:
+  - @real-router/core@0.41.0
+  - dom-utils@0.2.3
+  - @real-router/sources@0.3.1
+  - @real-router/route-utils@0.1.7
+
+### @real-router/route-utils@0.1.7
+
+### Patch Changes
+
+- Updated dependencies [[`fce4316`](https://github.com/greydragon888/real-router/commit/fce43162adc4423bb4423eacd23c91f19e99b7f0)]:
+  - @real-router/types@0.27.0
+
+### @real-router/rx@0.1.33
+
+### Patch Changes
+
+- Updated dependencies [[`fce4316`](https://github.com/greydragon888/real-router/commit/fce43162adc4423bb4423eacd23c91f19e99b7f0)]:
+  - @real-router/core@0.41.0
+
+### @real-router/solid@0.2.1
+
+### Patch Changes
+
+- Updated dependencies [[`fce4316`](https://github.com/greydragon888/real-router/commit/fce43162adc4423bb4423eacd23c91f19e99b7f0)]:
+  - @real-router/core@0.41.0
+  - dom-utils@0.2.3
+  - @real-router/sources@0.3.1
+  - @real-router/route-utils@0.1.7
+
+### @real-router/sources@0.3.1
+
+### Patch Changes
+
+- Updated dependencies [[`fce4316`](https://github.com/greydragon888/real-router/commit/fce43162adc4423bb4423eacd23c91f19e99b7f0)]:
+  - @real-router/core@0.41.0
+  - @real-router/route-utils@0.1.7
+
+### @real-router/ssr-data-plugin@0.1.3
+
+### Patch Changes
+
+- Updated dependencies [[`fce4316`](https://github.com/greydragon888/real-router/commit/fce43162adc4423bb4423eacd23c91f19e99b7f0)]:
+  - @real-router/core@0.41.0
+
+### @real-router/svelte@0.2.1
+
+### Patch Changes
+
+- Updated dependencies [[`fce4316`](https://github.com/greydragon888/real-router/commit/fce43162adc4423bb4423eacd23c91f19e99b7f0)]:
+  - @real-router/core@0.41.0
+  - dom-utils@0.2.3
+  - @real-router/sources@0.3.1
+  - @real-router/route-utils@0.1.7
+
+### @real-router/vue@0.2.1
+
+### Patch Changes
+
+- Updated dependencies [[`fce4316`](https://github.com/greydragon888/real-router/commit/fce43162adc4423bb4423eacd23c91f19e99b7f0)]:
+  - @real-router/core@0.41.0
+  - dom-utils@0.2.3
+  - @real-router/sources@0.3.1
+  - @real-router/route-utils@0.1.7
+
 ## [2026-03-28]
 
 ### @real-router/preact@0.2.0
