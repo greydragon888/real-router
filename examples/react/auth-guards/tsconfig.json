@@ -11,7 +11,8 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": true
+    "noEmit": true,
+    "types": ["vitest/globals", "@testing-library/jest-dom"]
   },
-  "include": ["src", "../shared"]
+  "include": ["src", "tests", "../shared"]
 }

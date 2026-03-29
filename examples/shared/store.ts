@@ -13,4 +13,8 @@ export const store = {
       listeners.delete(fn);
     };
   },
+  clear: () => {
+    data.clear();
+    listeners.forEach((fn) => fn());
+  },
 };

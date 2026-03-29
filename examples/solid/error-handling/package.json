@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
+    "test": "vitest run",
     "test:e2e": "playwright test"
   },
   "dependencies": {
@@ -17,8 +18,13 @@
   },
   "devDependencies": {
     "@playwright/test": "1.58.2",
+    "@solidjs/testing-library": "0.8.10",
+    "@testing-library/jest-dom": "6.9.1",
+    "@testing-library/user-event": "14.6.1",
+    "jsdom": "26.1.0",
     "typescript": "5.8.3",
     "vite": "7.2.0",
-    "vite-plugin-solid": "2.11.11"
+    "vite-plugin-solid": "2.11.11",
+    "vitest": "4.1.0"
   }
 }

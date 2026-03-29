@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview",
+    "test": "vitest run",
     "test:e2e": "playwright test"
   },
   "dependencies": {
@@ -19,9 +20,14 @@
   },
   "devDependencies": {
     "@playwright/test": "1.58.2",
+    "@testing-library/jest-dom": "6.9.1",
+    "@testing-library/user-event": "14.6.1",
+    "@testing-library/vue": "8.1.0",
     "@vitejs/plugin-vue": "6.0.5",
+    "jsdom": "26.1.0",
     "typescript": "5.8.3",
     "vite": "7.2.0",
+    "vitest": "4.1.0",
     "vue-tsc": "3.2.6"
   }
 }
