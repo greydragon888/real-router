@@ -1,5 +1,12 @@
 # @real-router/route-utils
 
+## 0.1.7
+
+### Patch Changes
+
+- Updated dependencies [[`fce4316`](https://github.com/greydragon888/real-router/commit/fce43162adc4423bb4423eacd23c91f19e99b7f0)]:
+  - @real-router/types@0.27.0
+
 ## 0.1.6
 
 ### Patch Changes

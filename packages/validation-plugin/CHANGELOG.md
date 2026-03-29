@@ -1,5 +1,18 @@
 # @real-router/validation-plugin
 
+## 0.2.0
+
+### Minor Changes
+
+- [#376](https://github.com/greydragon888/real-router/pull/376) [`fce4316`](https://github.com/greydragon888/real-router/commit/fce43162adc4423bb4423eacd23c91f19e99b7f0) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `forceId` validation from `validateMakeStateArgs` ([#202](https://github.com/greydragon888/real-router/issues/202))
+
+  **Breaking Change:** `validateMakeStateArgs` no longer accepts or validates `forceId` parameter (4th argument removed).
+
+### Patch Changes
+
+- Updated dependencies [[`fce4316`](https://github.com/greydragon888/real-router/commit/fce43162adc4423bb4423eacd23c91f19e99b7f0)]:
+  - @real-router/core@0.41.0
+
 ## 0.1.1
 
 ### Patch Changes
