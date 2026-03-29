@@ -18,7 +18,6 @@ describe("RouterError Circular References Properties", () => {
         name: "test",
         path: "/test",
         params,
-        meta: undefined,
       };
 
       // deepFreezeState should handle circular references via structuredClone
@@ -43,7 +42,6 @@ describe("RouterError Circular References Properties", () => {
         name: "route",
         path: "/route",
         params,
-        meta: undefined,
       };
 
       const err = new RouterError("ERR", { redirect: state });
@@ -68,39 +66,12 @@ describe("RouterError Circular References Properties", () => {
         name: "test",
         path: "/test",
         params,
-        meta: undefined,
       };
 
       const err = new RouterError("ERR", { redirect: state });
 
       expect(Object.isFrozen(err.redirect)).toBe(true);
       expect(err.redirect?.params.array).toHaveLength(4);
-    });
-  });
-
-  describe("Handling circular references in meta", () => {
-    it("deepFreezeState handles circular reference in meta.params", () => {
-      const metaParams: Params = { foo: "bar" };
-
-      metaParams.self = metaParams;
-
-      const state: State = {
-        name: "test",
-        path: "/test",
-        params: {},
-        meta: {
-          id: 1,
-          params: metaParams,
-        },
-      };
-
-      const err = new RouterError("ERR", { redirect: state });
-
-      expect(Object.isFrozen(err.redirect)).toBe(true);
-      expect(
-        (err.redirect?.meta as { params: { foo: string } } | undefined)?.params
-          .foo,
-      ).toBe("bar");
     });
   });
 
@@ -120,7 +91,6 @@ describe("RouterError Circular References Properties", () => {
           obj1: obj1 as Params,
           obj2: obj2 as Params,
         },
-        meta: undefined,
       };
 
       const err = new RouterError("ERR", { redirect: state });
@@ -148,7 +118,6 @@ describe("RouterError Circular References Properties", () => {
         params: {
           data: level1 as Params,
         },
-        meta: undefined,
       };
 
       const err = new RouterError("ERR", { redirect: state });
@@ -177,7 +146,6 @@ describe("RouterError Circular References Properties", () => {
         name: "test",
         path: "/test",
         params,
-        meta: undefined,
       };
 
       const err = new RouterError("ERR", { redirect: state });
@@ -209,11 +177,6 @@ describe("RouterError Circular References Properties", () => {
           name: fc.string({ minLength: 1, maxLength: 20 }),
           path: fc.string({ minLength: 1, maxLength: 50 }),
           params: fc.dictionary(fc.string(), fc.anything(), { maxKeys: 5 }),
-          meta: fc.option(
-            fc.record({
-              params: fc.dictionary(fc.string(), fc.anything(), { maxKeys: 3 }),
-            }),
-          ),
         }),
       ],
       { numRuns: 1000 },
@@ -244,7 +207,6 @@ describe("RouterError Circular References Properties", () => {
         name: "test",
         path: "/test",
         params: { empty: empty as Params },
-        meta: undefined,
       };
 
       const err = new RouterError("ERR", { redirect: state });
@@ -261,7 +223,6 @@ describe("RouterError Circular References Properties", () => {
         name: "test",
         path: "/test",
         params: { arr: arr as Params[] },
-        meta: undefined,
       };
 
       const err = new RouterError("ERR", { redirect: state });
@@ -275,14 +236,12 @@ describe("RouterError Circular References Properties", () => {
         name: "test",
         path: "/test",
         params: { nullValue: null },
-        meta: undefined,
       };
 
       const err = new RouterError("ERR", { redirect: state });
 
       expect(Object.isFrozen(err.redirect)).toBe(true);
       expect(err.redirect?.params.nullValue).toBeNull();
-      expect(err.redirect?.meta).toBeUndefined();
     });
   });
 });

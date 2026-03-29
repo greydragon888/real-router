@@ -57,16 +57,11 @@ function createTestRouter(routes: Route[]): Router {
   return router;
 }
 
-function makeState(
-  name: string,
-  params: Record<string, string> = {},
-  hasMeta?: boolean,
-): State {
+function makeState(name: string, params: Record<string, string> = {}): State {
   return {
     name,
     params,
     path: `/${name.replaceAll(".", "/")}`,
-    meta: hasMeta ? { id: 1, params: {} } : undefined,
   };
 }
 
@@ -104,7 +99,7 @@ const STATES = {
   usersList: makeState("users.list"),
   usersView: makeState(ROUTE_USERS_VIEW, { id: "123" }),
   adminDashboard: makeState("admin.dashboard"),
-  withReload: makeState(ROUTE_USERS_VIEW, { id: "123" }, true),
+  withReload: makeState(ROUTE_USERS_VIEW, { id: "123" }),
   deep5: makeState(generateDeepRoute(5).name),
   deep10: makeState(generateDeepRoute(10).name),
 };

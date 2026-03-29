@@ -243,10 +243,6 @@ describe("router.navigate() - promise resolve values", () => {
           name: "settings",
           params: {},
           path: "/settings",
-          meta: {
-            id: 555,
-            params: {},
-          },
         };
         const redirectingMiddleware = vi.fn().mockReturnValue(redirectState);
 
@@ -268,10 +264,6 @@ describe("router.navigate() - promise resolve values", () => {
           name: "profile",
           params: {},
           path: "/profile",
-          meta: {
-            id: 444,
-            params: {},
-          },
         };
         const redirectingMiddleware = vi.fn().mockReturnValue(redirectState);
 
@@ -292,10 +284,6 @@ describe("router.navigate() - promise resolve values", () => {
           name: "orders",
           params: {},
           path: "/orders",
-          meta: {
-            id: 333,
-            params: {},
-          },
         };
         const redirectingMiddleware = vi.fn().mockReturnValue(redirectState);
 
@@ -427,10 +415,6 @@ describe("router.navigate() - promise resolve values", () => {
           name: "settings",
           params: {},
           path: "/settings",
-          meta: {
-            id: 555,
-            params: {},
-          },
         };
         const promiseRedirectMiddleware = vi
           .fn()
@@ -454,10 +438,6 @@ describe("router.navigate() - promise resolve values", () => {
           name: "profile",
           params: {},
           path: "/profile",
-          meta: {
-            id: 444,
-            params: {},
-          },
         };
         const promiseRedirectMiddleware = vi
           .fn()
@@ -482,10 +462,6 @@ describe("router.navigate() - promise resolve values", () => {
           name: "orders",
           params: {},
           path: "/orders",
-          meta: {
-            id: 333,
-            params: {},
-          },
         };
         const promiseRedirectMiddleware = vi
           .fn()

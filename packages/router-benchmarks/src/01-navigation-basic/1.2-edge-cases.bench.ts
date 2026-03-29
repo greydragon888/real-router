@@ -163,23 +163,6 @@ if (!IS_ROUTER5) {
   }).gc("inner");
 }
 
-// 1.2.9 Fast sequential navigations
-// Chain starts from about (not home) to avoid SAME_STATES on first navigate
-{
-  const router = createSimpleRouter();
-
-  router.start("/");
-
-  bench("1.2.9 Fast sequential navigations", () => {
-    router.navigate("about");
-    router.navigate("users");
-    router.navigate("user", { id: "1" });
-    router.navigate("home");
-    router.navigate("about");
-    router.navigate("users");
-  }).gc("inner");
-}
-
 // 1.2.10 Navigation with reload flag
 // reload=true forces navigation even to same state
 {
@@ -282,5 +265,27 @@ if (!IS_ROUTER5) {
         force: true,
       },
     );
+  }).gc("inner");
+}
+
+// 1.2.9 Fast sequential navigations
+// Chain starts from about (not home) to avoid SAME_STATES on first navigate
+// NOTE: Placed last because 6 navigations to 4 different routes per iteration
+// creates megamorphic V8 inline caches on shared functions (navigate, makeState,
+// freezeStateInPlace). Running this before single-navigation tests pollutes their
+// IC state, causing 10-60x measurement artifacts. See:
+// .claude/anomalies-investigation/2026-03-29-reload-flag-artifact.md
+{
+  const router = createSimpleRouter();
+
+  router.start("/");
+
+  bench("1.2.9 Fast sequential navigations", () => {
+    router.navigate("about");
+    router.navigate("users");
+    router.navigate("user", { id: "1" });
+    router.navigate("home");
+    router.navigate("about");
+    router.navigate("users");
   }).gc("inner");
 }

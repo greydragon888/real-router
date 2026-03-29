@@ -149,7 +149,7 @@ export class RouterWiringBuilder<
 
         const path = ctx.buildPath(name, params);
 
-        return this.state.makeState(name, params, path, meta, undefined, true);
+        return this.state.makeState(name, params, path, meta, true);
       },
       resolveDefault: () => {
         const options = this.options.get();

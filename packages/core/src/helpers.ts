@@ -159,7 +159,6 @@ export function freezeStateInPlace<T extends State>(state: T): T {
     return state;
   }
 
-  // Freeze the entire state tree
   freezeRecursive(state);
 
   // Mark root as processed for future calls

@@ -53,7 +53,7 @@ describe("B4 — Cannot Deactivate Storm", () => {
     getLifecycleApi(router).addDeactivateGuard("users.list", () => () => false);
 
     for (let i = 0; i < 50; i++) {
-      dispatchPopstate(makePopstateState("home", {}, "/home", i));
+      dispatchPopstate(makePopstateState("home", {}, "/home"));
     }
 
     await waitForTransitions();
@@ -74,7 +74,7 @@ describe("B4 — Cannot Deactivate Storm", () => {
     for (let i = 0; i < 50; i++) {
       const targetName = i % 2 === 0 ? "home" : "users.list";
       const path = i % 2 === 0 ? "/home" : "/users/list";
-      const popState = makePopstateState(targetName, {}, path, i);
+      const popState = makePopstateState(targetName, {}, path);
 
       dispatchPopstate(popState);
     }
@@ -93,7 +93,7 @@ describe("B4 — Cannot Deactivate Storm", () => {
     );
 
     for (let i = 0; i < 50; i++) {
-      dispatchPopstate(makePopstateState("home", {}, "/home", i));
+      dispatchPopstate(makePopstateState("home", {}, "/home"));
     }
 
     await waitForTransitions();
@@ -112,7 +112,7 @@ describe("B4 — Cannot Deactivate Storm", () => {
     });
 
     for (let i = 0; i < 20; i++) {
-      dispatchPopstate(makePopstateState("home", {}, "/home", i));
+      dispatchPopstate(makePopstateState("home", {}, "/home"));
     }
 
     await waitForTransitions();

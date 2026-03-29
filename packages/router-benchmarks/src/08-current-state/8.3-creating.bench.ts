@@ -55,14 +55,14 @@ function getMakeState(router: ReturnType<typeof createSimpleRouter>) {
   }).gc("inner");
 }
 
-// 8.3.4 Batch creating 1000 states with forceId
+// 8.3.4 Batch creating 1000 states with meta
 {
   const router = createSimpleRouter();
   const makeState = getMakeState(router);
 
-  bench("8.3.4 Batch creating 1000 states with forceId", () => {
+  bench("8.3.4 Batch creating 1000 states with meta", () => {
     for (let i = 0; i < 1000; i++) {
-      do_not_optimize(makeState("about", {}, "/about", undefined, i));
+      do_not_optimize(makeState("about", {}, "/about", { params: {} }));
     }
   }).gc("inner");
 }

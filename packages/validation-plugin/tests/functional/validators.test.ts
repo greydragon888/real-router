@@ -263,31 +263,25 @@ describe("state validators", () => {
   describe("validateMakeStateArgs", () => {
     it("throws TypeError for non-string name", () => {
       expect(() => {
-        validateMakeStateArgs(123, undefined, undefined, undefined);
+        validateMakeStateArgs(123, undefined, undefined);
       }).toThrow(TypeError);
     });
 
     it("throws TypeError for invalid params", () => {
       expect(() => {
-        validateMakeStateArgs("home", "string", undefined, undefined);
+        validateMakeStateArgs("home", "string", undefined);
       }).toThrow(TypeError);
     });
 
     it("throws TypeError for non-string path", () => {
       expect(() => {
-        validateMakeStateArgs("home", undefined, 123, undefined);
-      }).toThrow(TypeError);
-    });
-
-    it("throws TypeError for non-number forceId", () => {
-      expect(() => {
-        validateMakeStateArgs("home", undefined, undefined, "string");
+        validateMakeStateArgs("home", undefined, 123);
       }).toThrow(TypeError);
     });
 
     it("accepts valid args", () => {
       expect(() => {
-        validateMakeStateArgs("home", {}, "/home", undefined);
+        validateMakeStateArgs("home", {}, "/home");
       }).not.toThrow();
     });
   });

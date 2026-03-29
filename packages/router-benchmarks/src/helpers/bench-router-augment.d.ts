@@ -9,17 +9,14 @@ import type {
 
 declare module "@real-router/core" {
   interface Router {
-    matchPath<P extends Params = Params, MP extends Params = Params>(
-      path: string,
-    ): State<P, MP> | undefined;
+    matchPath<P extends Params = Params>(path: string): State<P> | undefined;
 
-    makeState<P extends Params = Params, MP extends Params = Params>(
+    makeState<P extends Params = Params>(
       name: string,
       params?: P,
       path?: string,
-      meta?: StateMetaInput<MP>,
-      forceId?: number,
-    ): State<P, MP>;
+      meta?: StateMetaInput,
+    ): State<P>;
 
     forwardState<P extends Params = Params>(
       routeName: string,

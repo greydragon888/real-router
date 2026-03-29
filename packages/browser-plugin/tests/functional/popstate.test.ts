@@ -56,7 +56,6 @@ describe("Browser Plugin — Popstate", () => {
         name: "users.view",
         params: { id: "1" },
         path: "/users/view/1",
-        meta: { id: 2, params: {}, source: "popstate" },
       };
 
       globalThis.dispatchEvent(
@@ -161,14 +160,12 @@ describe("Browser Plugin — Popstate", () => {
         name: "users.view",
         params: { id: "1" },
         path: "/users/view/1",
-        meta: { id: 1, params: {} },
       };
 
       const state2 = {
         name: "users.view",
         params: { id: "2" },
         path: "/users/view/2",
-        meta: { id: 2, params: {} },
       };
 
       globalThis.dispatchEvent(
@@ -214,21 +211,18 @@ describe("Browser Plugin — Popstate", () => {
         name: "users.view",
         params: { id: "1" },
         path: "/users/view/1",
-        meta: { id: 1, params: {} },
       };
 
       const state2: State = {
         name: "users.view",
         params: { id: "2" },
         path: "/users/view/2",
-        meta: { id: 2, params: {} },
       };
 
       const state3: State = {
         name: "users.list",
         params: {},
         path: "/users/list",
-        meta: { id: 3, params: {} },
       };
 
       globalThis.dispatchEvent(
@@ -315,7 +309,6 @@ describe("Browser Plugin — Popstate", () => {
         name: "home",
         params: {},
         path: "/home",
-        meta: { id: 2, params: {} },
       };
 
       globalThis.dispatchEvent(
@@ -351,7 +344,6 @@ describe("Browser Plugin — Popstate", () => {
         name: "home",
         params: {},
         path: "/home",
-        meta: { id: 2, params: {} },
       };
 
       globalThis.dispatchEvent(
@@ -423,7 +415,6 @@ describe("Browser Plugin — Popstate", () => {
             name: "home",
             params: {},
             path: "/home",
-            meta: { id: 99, params: {} },
           },
         }),
       );

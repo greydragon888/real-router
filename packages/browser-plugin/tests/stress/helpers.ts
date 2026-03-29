@@ -75,9 +75,8 @@ export function makePopstateState(
   name: string,
   params: Record<string, string>,
   path: string,
-  id: number,
 ): Record<string, unknown> {
-  return { name, params, path, meta: { id, params: {} } };
+  return { name, params, path };
 }
 
 export async function waitForTransitions(ms = 50): Promise<void> {
@@ -94,7 +93,7 @@ export function roundRobinStates(
     (_, i) => {
       const s = states[i % states.length];
 
-      return makePopstateState(s.name, s.params, s.path, i + 1);
+      return makePopstateState(s.name, s.params, s.path);
     },
   );
 }

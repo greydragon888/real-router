@@ -12,25 +12,25 @@ Centralized type guards and validators for all Real-Router types. Provides both 
 
 ### Type Guards
 
-| Guard | Returns | Used by |
-|-------|---------|---------|
-| `isState(value)` | `value is State` | Quick field presence check |
-| `isStateStrict(value)` | `value is State` | Deep validation (types, meta). Browser plugins, serialization |
-| `isParams(value)` | `value is Params` | Flexible — allows nested objects. Core |
-| `isParamsStrict(value)` | `value is Params` | Strict — primitives and arrays only. Rejects `NaN`, `Infinity`, nested objects. URL serialization |
-| `isNavigationOptions(value)` | `value is NavigationOptions` | Core |
-| `isRouteName(value)` | `value is string` | Route validation |
-| `isString(value)` | `value is string` | Primitive |
-| `isBoolean(value)` | `value is boolean` | Primitive |
-| `isPrimitiveValue(value)` | `value is string \| number \| boolean` | Persistent params |
-| `isObjKey(key, obj)` | `key is keyof typeof obj` | Key narrowing |
+| Guard                        | Returns                                | Used by                                                                                           |
+| ---------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `isState(value)`             | `value is State`                       | Quick field presence check                                                                        |
+| `isStateStrict(value)`       | `value is State`                       | Deep validation (types, params). Browser plugins, serialization                                   |
+| `isParams(value)`            | `value is Params`                      | Flexible — allows nested objects. Core                                                            |
+| `isParamsStrict(value)`      | `value is Params`                      | Strict — primitives and arrays only. Rejects `NaN`, `Infinity`, nested objects. URL serialization |
+| `isNavigationOptions(value)` | `value is NavigationOptions`           | Core                                                                                              |
+| `isRouteName(value)`         | `value is string`                      | Route validation                                                                                  |
+| `isString(value)`            | `value is string`                      | Primitive                                                                                         |
+| `isBoolean(value)`           | `value is boolean`                     | Primitive                                                                                         |
+| `isPrimitiveValue(value)`    | `value is string \| number \| boolean` | Persistent params                                                                                 |
+| `isObjKey(key, obj)`         | `key is keyof typeof obj`              | Key narrowing                                                                                     |
 
 ### Validators (assertion)
 
-| Validator | Throws | Description |
-|-----------|--------|-------------|
+| Validator                             | Throws      | Description              |
+| ------------------------------------- | ----------- | ------------------------ |
 | `validateRouteName(name, methodName)` | `TypeError` | Asserts valid route name |
-| `validateState(value)` | `TypeError` | Asserts valid State |
+| `validateState(value)`                | `TypeError` | Asserts valid State      |
 
 ### Utilities
 

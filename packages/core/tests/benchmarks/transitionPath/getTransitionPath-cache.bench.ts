@@ -16,6 +16,7 @@
 
 import { bench, boxplot, run, summary } from "mitata";
 
+import { setStateMetaParams } from "../../../src/stateMetaStore";
 import { getTransitionPath } from "../../../src/transitionPath";
 
 import type { State } from "@real-router/types";
@@ -29,15 +30,15 @@ function makeState(
   params: Record<string, any> = {},
   metaParams: Record<string, any> = {},
 ): State {
-  return {
+  const state: State = {
     name,
     params,
     path: `/${name.replaceAll(".", "/")}`,
-    meta: {
-      id: 1,
-      params: metaParams,
-    },
   };
+
+  setStateMetaParams(state, metaParams);
+
+  return state;
 }
 
 // ============================================================================

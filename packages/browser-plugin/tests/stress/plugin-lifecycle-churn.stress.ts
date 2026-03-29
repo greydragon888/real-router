@@ -48,7 +48,7 @@ describe("B5: Browser plugin lifecycle churn", () => {
     const stateAfterStop = router.getState();
     const navigateSpy = vi.spyOn(router, "navigate");
 
-    dispatchPopstate(makePopstateState("home", {}, "/home", 999));
+    dispatchPopstate(makePopstateState("home", {}, "/home"));
     await waitForTransitions();
 
     expect(navigateSpy).not.toHaveBeenCalled();
@@ -105,7 +105,7 @@ describe("B5: Browser plugin lifecycle churn", () => {
 
     globalThis.dispatchEvent(
       new PopStateEvent("popstate", {
-        state: makePopstateState("home", {}, "/home", 999),
+        state: makePopstateState("home", {}, "/home"),
       }),
     );
     await waitForTransitions();
@@ -119,9 +119,7 @@ describe("B5: Browser plugin lifecycle churn", () => {
     await router.start();
 
     for (let i = 0; i < 10; i++) {
-      dispatchPopstate(
-        makePopstateState("users.list", {}, "/users/list", i + 1),
-      );
+      dispatchPopstate(makePopstateState("users.list", {}, "/users/list"));
     }
 
     await waitForTransitions();
@@ -129,7 +127,7 @@ describe("B5: Browser plugin lifecycle churn", () => {
 
     await router.start();
 
-    dispatchPopstate(makePopstateState("home", {}, "/home", 999));
+    dispatchPopstate(makePopstateState("home", {}, "/home"));
     await waitForTransitions();
 
     expect(router.getState()?.name).toBe("home");

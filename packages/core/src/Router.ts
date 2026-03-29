@@ -189,8 +189,8 @@ export class Router<
     const interceptorsMap: RouterInternals["interceptors"] = new Map();
 
     registerInternals(this, {
-      makeState: (name, params, path, meta, forceId) =>
-        this.#state.makeState(name, params, path, meta, forceId),
+      makeState: (name, params, path, meta) =>
+        this.#state.makeState(name, params, path, meta),
       forwardState: createInterceptable2(
         "forwardState",
         (name: string, params: Params) =>
@@ -345,10 +345,8 @@ export class Router<
   // State Management (delegated to StateNamespace)
   // ============================================================================
 
-  getState<P extends Params = Params, MP extends Params = Params>():
-    | State<P, MP>
-    | undefined {
-    return this.#state.get<P, MP>();
+  getState<P extends Params = Params>(): State<P> | undefined {
+    return this.#state.get<P>();
   }
 
   getPreviousState(): State | undefined {

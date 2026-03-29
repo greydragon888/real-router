@@ -12,7 +12,6 @@ export type {
 export type {
   Params,
   State,
-  StateMeta,
   StateMetaInput,
   SimpleState,
   NavigationOptions,

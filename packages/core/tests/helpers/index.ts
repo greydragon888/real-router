@@ -1,3 +1,5 @@
+import { setStateMetaParams } from "../../src/stateMetaStore";
+
 import type { Params, State } from "@real-router/core";
 
 export { createTestRouter } from "./testRouters";
@@ -18,12 +20,14 @@ export const makeState = (
   name: string,
   params: Params = {},
   metaParams: Params = {},
-): State => ({
-  name,
-  path: `/${name.replaceAll(".", "/")}`,
-  params,
-  meta: {
-    id: 0,
-    params: metaParams,
-  },
-});
+): State => {
+  const state: State = {
+    name,
+    path: `/${name.replaceAll(".", "/")}`,
+    params,
+  };
+
+  setStateMetaParams(state, metaParams);
+
+  return state;
+};

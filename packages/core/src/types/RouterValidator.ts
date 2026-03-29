@@ -136,7 +136,6 @@ export interface RouterValidator {
       name: unknown,
       params: unknown,
       path: unknown,
-      forceId: unknown,
     ) => void;
     validateAreStatesEqualArgs: (
       s1: unknown,
