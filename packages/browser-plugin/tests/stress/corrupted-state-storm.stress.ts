@@ -77,7 +77,7 @@ describe("B6: Corrupted popstate state storm", () => {
     for (let i = 0; i < 100; i++) {
       const state =
         i % 2 === 0
-          ? makePopstateState("users.list", {}, "/users/list", i)
+          ? makePopstateState("users.list", {}, "/users/list")
           : { name: 123 };
 
       globalThis.dispatchEvent(new PopStateEvent("popstate", { state }));

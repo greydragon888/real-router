@@ -84,28 +84,9 @@ describe("State Type Guards Properties", () => {
     );
 
     test.prop([stateFullArbitrary], { numRuns: 10_000 })(
-      "always returns true for full State with meta (if meta is not null)",
+      "always returns true for full State with extra properties",
       (state) => {
-        // stateFullArbitrary can generate meta: null/undefined
-        // which is valid for isState, but may be invalid for isStateStrict
-        // if meta contains undefined values for fields
-        const result = isStateStrict(state);
-
-        // If meta exists and contains undefined fields, isStateStrict returns false
-        if (state.meta) {
-          const meta = state.meta as unknown as Record<string, unknown>;
-          const hasUndefinedFields =
-            ("id" in meta && meta.id === undefined) ||
-            ("params" in meta && meta.params === undefined);
-
-          if (hasUndefinedFields) {
-            expect(result).toBe(false);
-          } else {
-            expect(result).toBe(true);
-          }
-        } else {
-          expect(result).toBe(true);
-        }
+        expect(isStateStrict(state)).toBe(true);
       },
     );
 

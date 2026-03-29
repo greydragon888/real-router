@@ -52,7 +52,6 @@ describe("B3 — Popstate/Navigate Interleave Stress", () => {
         "users.view",
         { id: String(i) },
         `/users/view/${i}`,
-        i,
       );
 
       dispatchPopstate(state);
@@ -71,7 +70,7 @@ describe("B3 — Popstate/Navigate Interleave Stress", () => {
     for (let i = 0; i < 100; i++) {
       router.navigate("users.list").catch(noop);
 
-      const state = makePopstateState("home", {}, "/home", i);
+      const state = makePopstateState("home", {}, "/home");
 
       dispatchPopstate(state);
     }
@@ -90,13 +89,12 @@ describe("B3 — Popstate/Navigate Interleave Stress", () => {
         "users.view",
         { id: String(i) },
         `/users/view/${i}`,
-        i * 2,
       );
 
       dispatchPopstate(popState1);
       router.navigate("users.list").catch(noop);
 
-      const popState2 = makePopstateState("home", {}, "/home", i * 2 + 1);
+      const popState2 = makePopstateState("home", {}, "/home");
 
       dispatchPopstate(popState2);
       router.navigate("users.view", { id: String(i) }).catch(noop);
@@ -117,7 +115,7 @@ describe("B3 — Popstate/Navigate Interleave Stress", () => {
       const params: Record<string, string> =
         i % 3 === 0 ? { id: String(i) } : {};
       const path = i % 3 === 0 ? `/users/view/${i}` : "/home";
-      const popState = makePopstateState(targetName, params, path, i);
+      const popState = makePopstateState(targetName, params, path);
 
       router.navigate(routeName).catch(noop);
       dispatchPopstate(popState);

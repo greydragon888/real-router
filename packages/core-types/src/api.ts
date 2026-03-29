@@ -51,13 +51,12 @@ export type InterceptorFn<M extends keyof InterceptableMethodMap> = (
  * Hides plugin-internal methods from public autocomplete.
  */
 export interface PluginApi {
-  makeState: <P extends Params = Params, MP extends Params = Params>(
+  makeState: <P extends Params = Params>(
     name: string,
     params?: P,
     path?: string,
-    meta?: StateMetaInput<MP>,
-    forceId?: number,
-  ) => State<P, MP>;
+    meta?: StateMetaInput,
+  ) => State<P>;
 
   buildState: (
     routeName: string,
@@ -69,9 +68,7 @@ export interface PluginApi {
     routeParams: P,
   ) => SimpleState<P>;
 
-  matchPath: <P extends Params = Params, MP extends Params = Params>(
-    path: string,
-  ) => State<P, MP> | undefined;
+  matchPath: <P extends Params = Params>(path: string) => State<P> | undefined;
 
   setRootPath: (rootPath: string) => void;
   getRootPath: () => string;

@@ -1711,3 +1711,32 @@ function isStateStructural(value): value is State {
 - `isStateStructural` in `helpers.ts` — for internal operations like `deepFreezeState` that handle any structure
 
 **Lesson:** Validation strictness depends on context. Public API should be strict; internal utilities may need flexibility.
+
+## State.meta → WeakMap
+
+### Problem
+
+`State.meta` (StateMeta) — internal implementation detail (param source mapping) that leaked into the public `State` interface. Visible via autocomplete, JSON.stringify, DevTools, spread operator.
+
+### Solution
+
+Module-level `WeakMap<State, Params>` inside `@real-router/core` (`stateMetaStore.ts`). All consumers use `getStateMetaParams(state)` / `setStateMetaParams(state, params)` instead of `state.meta`. The `StateMeta` wrapper type was removed — the WeakMap stores `Params` directly.
+
+### What was removed
+
+- `meta.id` and the `#stateId` auto-increment counter — nobody read `meta.id`, so the whole pipeline was dead code
+- `forceId` parameter removed from the entire `PluginApi.makeState` chain
+- `areStatesEqual` no longer reads from the WeakMap — uses the cached `#urlParamsCache` instead
+- `freezeStateInPlace` no longer freezes meta — it's internal, no need to freeze
+
+### Why WeakMap over Symbol
+
+- No TypeScript complexity (`unique symbol` + cross-package export)
+- State type is fully clean — no hidden fields
+- WeakMap entries are auto-collected by GC when State is dereferenced
+- Complete invisibility: JSON.stringify, Object.keys, DevTools, spread — nothing leaks
+
+### Caveats
+
+- `deepFreezeState()` uses `structuredClone()` → clone loses WeakMap entry. `err.redirect` intentionally has no meta (only needs name + params for redirect target).
+- `_MP` phantom generic preserved on `State<P, _MP>` for backward compatibility.

@@ -175,7 +175,7 @@ describe("B1 — Popstate Storm", () => {
     await router.start();
     await router.navigate("home").catch(noop);
 
-    const homeState = makePopstateState("home", {}, "/home", 1);
+    const homeState = makePopstateState("home", {}, "/home");
     const stateBefore = router.getState();
 
     for (let i = 0; i < 50; i++) {

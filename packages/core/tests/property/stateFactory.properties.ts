@@ -17,9 +17,15 @@ describe("buildState / makeState Properties", () => {
 
       expect(result).toBeDefined();
 
-      const state = pluginApi.makeState(result!.name, result!.params, path, {
-        params: result!.meta,
-      });
+      const buildStateResult = result!;
+      const state = pluginApi.makeState(
+        buildStateResult.name,
+        buildStateResult.params,
+        path,
+        {
+          params: buildStateResult.meta,
+        },
+      );
 
       expect(state.path).toBe(path);
     },

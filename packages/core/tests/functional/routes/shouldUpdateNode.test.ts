@@ -418,7 +418,6 @@ describe("core/routes", () => {
       const state = makeState("a.b.c", {}, meta.params);
       const reloadState = {
         ...state,
-        meta: { ...state.meta, id: 1, params: {} },
         transition: {
           reload: true,
           phase: "activating" as const,

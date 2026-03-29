@@ -32,7 +32,6 @@ describe("makeState", () => {
       path: "/home",
       params: { foo: "bar" },
     });
-    expect(state.meta).toBe(undefined);
   });
 
   it("merges with defaultParams", () => {
@@ -61,17 +60,5 @@ describe("makeState", () => {
     );
 
     expect(state.params).toStrictEqual({});
-  });
-
-  it("uses forced ID if provided", () => {
-    const state = getPluginApi(router).makeState(
-      "home",
-      {},
-      "/home",
-      { params: {} },
-      999,
-    );
-
-    expect(state.meta?.id).toBe(999);
   });
 });

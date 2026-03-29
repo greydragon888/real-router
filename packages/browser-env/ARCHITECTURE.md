@@ -45,13 +45,13 @@ graph LR
     BE -.->|provides| UTILS[Plugin utilities]
 ```
 
-| Consumer            | What it uses                                                                                    | Purpose                                         |
-| ------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| **browser-plugin**  | `createSafeBrowser`, `normalizeBase`, `safelyEncodePath`                                        | Factory setup and path normalization            |
-| **browser-plugin**  | `createPopstateHandler`, `createPopstateLifecycle`                                              | Back/forward navigation handling                |
-| **browser-plugin**  | `createStartInterceptor`, `createReplaceHistoryState`, `shouldReplaceHistory`, `updateBrowserState` | Router extension methods and transition sync |
-| **browser-plugin**  | `safeParseUrl`, `createOptionsValidator`                                                        | URL parsing and options validation              |
-| **hash-plugin**     | Same set as browser-plugin                                                                      | Hash-based routing with identical abstractions  |
+| Consumer           | What it uses                                                                                        | Purpose                                        |
+| ------------------ | --------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| **browser-plugin** | `createSafeBrowser`, `normalizeBase`, `safelyEncodePath`                                            | Factory setup and path normalization           |
+| **browser-plugin** | `createPopstateHandler`, `createPopstateLifecycle`                                                  | Back/forward navigation handling               |
+| **browser-plugin** | `createStartInterceptor`, `createReplaceHistoryState`, `shouldReplaceHistory`, `updateBrowserState` | Router extension methods and transition sync   |
+| **browser-plugin** | `safeParseUrl`, `createOptionsValidator`                                                            | URL parsing and options validation             |
+| **hash-plugin**    | Same set as browser-plugin                                                                          | Hash-based routing with identical abstractions |
 
 ## Types
 
@@ -94,13 +94,14 @@ Both `window` and `history` must be present — some SSR environments expose `wi
 Thin module-level wrappers — no state, no closures, no overhead:
 
 ```typescript
-pushState  = (state, path) => globalThis.history.pushState(state, "", path)
-replaceState = (state, path) => globalThis.history.replaceState(state, "", path)
+pushState = (state, path) => globalThis.history.pushState(state, "", path);
+replaceState = (state, path) =>
+  globalThis.history.replaceState(state, "", path);
 addPopstateListener = (fn) => {
   globalThis.addEventListener("popstate", fn);
   return () => globalThis.removeEventListener("popstate", fn); // cleanup fn
-}
-getHash = () => globalThis.location.hash
+};
+getHash = () => globalThis.location.hash;
 ```
 
 ### `createSafeBrowser(getLocation, context): Browser`
@@ -126,7 +127,9 @@ const createWarnOnce = (context: string) => {
   let hasWarned = false;
   return (method: string) => {
     if (!hasWarned) {
-      console.warn(`[browser-env] ... context: "${context}" ... method "${method}" is a no-op ...`);
+      console.warn(
+        `[browser-env] ... context: "${context}" ... method "${method}" is a no-op ...`,
+      );
       hasWarned = true;
     }
   };
@@ -216,7 +219,7 @@ teardown  → removes listener, clears shared.removePopStateListener, calls clea
 Two-phase route resolution from a popstate event:
 
 ```
-isState(evt.state)?   ← isStateStrict from type-guards validates { name, params, meta, path }
+isState(evt.state)?   ← isStateStrict from type-guards validates { name, params, path }
     YES → { name: evt.state.name, params: evt.state.params }  (fast path — state already parsed)
     NO  → api.matchPath(browser.getLocation())                 (URL matching fallback)
          └── returns { name, params } or undefined
@@ -226,14 +229,20 @@ Falls back to URL matching when `history.state` is invalid (manually entered URL
 
 ### `updateBrowserState(state, url, replace, browser)`
 
-Writes router state to browser history. Stores only the fields needed for `getRouteFromEvent` to work:
+Writes router state to browser history. Stores only the 3 fields needed for `getRouteFromEvent` to work:
 
 ```typescript
-const historyState = { meta: state.meta, name: state.name, params: state.params, path: state.path };
-replace ? browser.replaceState(historyState, url) : browser.pushState(historyState, url);
+const historyState = {
+  name: state.name,
+  params: state.params,
+  path: state.path,
+};
+replace
+  ? browser.replaceState(historyState, url)
+  : browser.pushState(historyState, url);
 ```
 
-The full `State` object is not stored — only the 4 fields needed for route reconstruction. This keeps `history.state` lean.
+The full `State` object is not stored — only the 3 fields needed for route reconstruction. This keeps `history.state` lean.
 
 ## Plugin Utilities
 
@@ -242,7 +251,9 @@ The full `State` object is not stored — only the 4 fields needed for route rec
 Makes `router.start(path?)` path-optional. Registers an interceptor on the `"start"` method:
 
 ```typescript
-api.addInterceptor("start", (next, path) => next(path ?? browser.getLocation()))
+api.addInterceptor("start", (next, path) =>
+  next(path ?? browser.getLocation()),
+);
 ```
 
 If `path` is omitted, substitutes the current browser URL. Returns the unsubscribe function — callers store it for `teardown`.
@@ -252,7 +263,7 @@ If `path` is omitted, substitutes the current browser URL. Returns the unsubscri
 Creates `router.replaceHistoryState(name, params)` — updates URL in-place without a router transition:
 
 1. Validates route exists via `api.buildState(name, params)`
-2. Constructs a `State` via `api.makeState(...)` with `forceId: 1`
+2. Constructs a `State` via `api.makeState(...)`
 3. Calls `updateBrowserState(builtState, url, replace: true, browser)`
 
 Throws if the route name is unknown (not a `RouterError` — callers should validate first).
@@ -260,9 +271,10 @@ Throws if the route name is unknown (not a `RouterError` — callers should vali
 ### `shouldReplaceHistory(navOptions, toState, fromState): boolean`
 
 ```typescript
-return (navOptions.replace ?? !fromState)      // replace if explicitly set or no fromState (first nav)
-    || (!!navOptions.reload && toState.path === fromState?.path);
-                                                // replace on same-state reload (avoid duplicate history entries)
+return (
+  (navOptions.replace ?? !fromState) || // replace if explicitly set or no fromState (first nav)
+  (!!navOptions.reload && toState.path === fromState?.path)
+); // replace on same-state reload (avoid duplicate history entries)
 ```
 
 ## URL and Path Utilities
@@ -278,6 +290,7 @@ Ensures leading slash, removes trailing slash: `"app/"` → `"/app"`, `""` → `
 ### `safeParseUrl(url, loggerContext): URL | null`
 
 Parses URL relative to `globalThis.location.origin`. Returns `null` for:
+
 - Parse errors
 - Non-`http:` / `https:` protocols
 
@@ -286,6 +299,7 @@ Returns a `URL` object on success. Used by hash-plugin and browser-plugin `urlTo
 ### `createOptionsValidator<T>(defaults, loggerContext)`
 
 Returns a validator `(opts) => void` that iterates provided keys and compares `typeof value` against `typeof defaults[key]`. Throws on type mismatch:
+
 ```
 [browser-plugin] Invalid type for 'base': expected string, got number
 ```

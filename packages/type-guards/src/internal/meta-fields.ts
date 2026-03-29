@@ -1,36 +1,7 @@
 // packages/type-guards/modules/internal/meta-fields.ts
 
-import { isParams, isParamsStrict } from "../guards/params";
+import { isParams } from "../guards/params";
 import { isRouteName } from "../guards/routes";
-
-import type { Params, StateMeta } from "@real-router/types";
-
-/**
- * Type guard for meta object fields if present.
- * Used by isStateStrict.
- *
- * @param meta - Value to check
- * @returns true if meta has valid StateMeta structure
- * @internal
- */
-export function isMetaFields<MP extends Params = Params>(
-  meta: unknown,
-): meta is StateMeta<MP> {
-  // Early check: must be a non-null object
-  if (typeof meta !== "object" || meta === null) {
-    return false;
-  }
-
-  const obj = meta as Record<string, unknown>;
-
-  // Check params field if present
-  if ("params" in obj && !isParamsStrict(obj.params)) {
-    return false;
-  }
-
-  // Check id field if present
-  return !("id" in obj) || typeof obj.id === "number";
-}
 
 /**
  * Type guard helper that checks if required State fields have valid types.

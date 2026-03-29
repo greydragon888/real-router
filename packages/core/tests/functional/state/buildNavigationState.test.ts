@@ -48,22 +48,12 @@ describe("getPluginApi().buildNavigationState()", () => {
       expect(state?.path).toBe("/items/456");
     });
 
-    it("should return State with correct meta", () => {
-      const state = api.buildNavigationState("home");
-
-      expect(state).toBeDefined();
-      expect(state?.meta).toBeDefined();
-      expect(state?.meta?.id).toBeGreaterThanOrEqual(0);
-      expect(state?.meta?.params).toBeDefined();
-    });
-
     it("should return frozen State (immutable)", () => {
       const state = api.buildNavigationState("home");
 
       expect(state).toBeDefined();
       expect(Object.isFrozen(state)).toBe(true);
       expect(Object.isFrozen(state?.params)).toBe(true);
-      expect(Object.isFrozen(state?.meta)).toBe(true);
     });
   });
 

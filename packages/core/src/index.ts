@@ -28,7 +28,6 @@ export type {
   Plugin,
   SimpleState,
   State,
-  StateMeta,
   SubscribeFn,
   SubscribeState,
   Subscription,

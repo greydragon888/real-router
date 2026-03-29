@@ -12,8 +12,8 @@ export function getPluginApi<
   const ctx = getInternals(router);
 
   return {
-    makeState: (name, params, path, meta, forceId) => {
-      ctx.validator?.state.validateMakeStateArgs(name, params, path, forceId);
+    makeState: (name, params, path, meta) => {
+      ctx.validator?.state.validateMakeStateArgs(name, params, path);
 
       return ctx.makeState(
         name,
@@ -22,7 +22,6 @@ export function getPluginApi<
         meta?.params as
           | Record<string, Record<string, "url" | "query">>
           | undefined,
-        forceId,
       );
     },
     buildState: (routeName, routeParams) => {

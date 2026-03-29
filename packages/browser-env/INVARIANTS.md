@@ -36,10 +36,10 @@
 
 ## Browser State Management
 
-| #   | Invariant                                      | Description                                                                                                                                                              |
-| --- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1   | `updateBrowserState` — push vs replace routing | When `replace` is `true`, calls `browser.replaceState`; when `false`, calls `browser.pushState`. Verifies the boolean flag correctly selects the History API method.     |
-| 2   | `updateBrowserState` — history state shape     | Only `meta`, `name`, `params`, and `path` are stored in `history.state`. Transient fields (`id`, `transition`) are excluded to keep serialized state minimal and stable. |
+| #   | Invariant                                      | Description                                                                                                                                                                           |
+| --- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `updateBrowserState` — push vs replace routing | When `replace` is `true`, calls `browser.replaceState`; when `false`, calls `browser.pushState`. Verifies the boolean flag correctly selects the History API method.                  |
+| 2   | `updateBrowserState` — history state shape     | Only `name`, `params`, and `path` are stored in `history.state`. Transient and internal fields (`meta`, `id`, `transition`) are excluded to keep serialized state minimal and stable. |
 
 ## Route Extraction from Popstate
 

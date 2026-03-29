@@ -473,22 +473,6 @@ describe("core/routes/replaceRoutes", () => {
       expect(router.getState()?.name).toBe("index");
     });
 
-    it("should update state.meta.params from new tree (not stale)", async () => {
-      await router.navigate("index");
-      const stateBefore = router.getState();
-
-      expect(stateBefore?.name).toBe("index");
-      expect(stateBefore?.path).toBe("/");
-
-      // Replace with same route — state is revalidated via matchPath
-      routesApi.replace([{ name: "index", path: "/" }]);
-
-      const stateAfter = router.getState();
-
-      expect(stateAfter?.name).toBe("index");
-      expect(stateAfter?.path).toBe("/");
-    });
-
     it("should clear state if current route removed from new tree", async () => {
       await router.navigate("index");
 

@@ -6,7 +6,6 @@ export function validateMakeStateArgs(
   name: unknown,
   params: unknown,
   path: unknown,
-  forceId: unknown,
 ): void {
   if (!isString(name)) {
     throw new TypeError(
@@ -23,12 +22,6 @@ export function validateMakeStateArgs(
   if (path !== undefined && !isString(path)) {
     throw new TypeError(
       `[router.makeState] Invalid path: ${getTypeDescription(path)}. Expected string.`,
-    );
-  }
-
-  if (forceId !== undefined && typeof forceId !== "number") {
-    throw new TypeError(
-      `[router.makeState] Invalid forceId: ${getTypeDescription(forceId)}. Expected number.`,
     );
   }
 }

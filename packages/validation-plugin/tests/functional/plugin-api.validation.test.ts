@@ -57,23 +57,6 @@ describe("plugin API validation — with validationPlugin", () => {
       expect(() => raw.makeState("home", {}, 123)).toThrow(TypeError);
     });
 
-    it("throws TypeError for non-number forceId", () => {
-      const api = getPluginApi(router);
-      const raw = api as unknown as {
-        makeState: (
-          n: unknown,
-          p?: unknown,
-          path?: unknown,
-          m?: unknown,
-          id?: unknown,
-        ) => unknown;
-      };
-
-      expect(() => raw.makeState("home", {}, "/home", {}, "string-id")).toThrow(
-        TypeError,
-      );
-    });
-
     it("accepts valid arguments", () => {
       const api = getPluginApi(router);
 

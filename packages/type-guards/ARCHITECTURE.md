@@ -31,7 +31,7 @@ type-guards/
 │   ├── utilities/
 │   │   └── type-description.ts   — getTypeDescription
 │   └── internal/
-│       ├── meta-fields.ts        — isRequiredFields, isMetaFields (not exported)
+│       ├── meta-fields.ts        — isRequiredFields, isMetaFields (not exported; isMetaFields always returns true for backward compat)
 │       └── router-error.ts       — FULL_ROUTE_PATTERN, createRouterError (not exported)
 ```
 
@@ -53,13 +53,13 @@ graph LR
     PP["persistent-params-plugin"] -.->|bundles| TG
 ```
 
-| Consumer                       | What it uses                                                                  | Purpose                                  |
-| ------------------------------ | ----------------------------------------------------------------------------- | ---------------------------------------- |
-| **@real-router/core**          | `isString`, `isBoolean`, `isParams`, `isRouteName`, `isNavigationOptions`     | Input validation in route/navigation API |
-| **@real-router/core**          | `isState`, `validateRouteName`, `validateState`, `getTypeDescription`         | State assertions and error messages      |
-| **browser-plugin**             | `isStateStrict` (re-exported as `isState`)                                    | Deep state validation incl. meta         |
-| **hash-plugin**                | `isStateStrict` (re-exported as `isState`)                                    | Deep state validation incl. meta         |
-| **persistent-params-plugin**   | `isPrimitiveValue`                                                            | URL-safe param value check               |
+| Consumer                     | What it uses                                                              | Purpose                                  |
+| ---------------------------- | ------------------------------------------------------------------------- | ---------------------------------------- |
+| **@real-router/core**        | `isString`, `isBoolean`, `isParams`, `isRouteName`, `isNavigationOptions` | Input validation in route/navigation API |
+| **@real-router/core**        | `isState`, `validateRouteName`, `validateState`, `getTypeDescription`     | State assertions and error messages      |
+| **browser-plugin**           | `isStateStrict` (re-exported as `isState`)                                | Deep state validation                    |
+| **hash-plugin**              | `isStateStrict` (re-exported as `isState`)                                | Deep state validation                    |
+| **persistent-params-plugin** | `isPrimitiveValue`                                                        | URL-safe param value check               |
 
 ## Public API
 
@@ -67,46 +67,52 @@ graph LR
 
 ```typescript
 // Primitives
-function isString(value: unknown): value is string
-function isBoolean(value: unknown): value is boolean
-function isObjKey<T extends object>(key: string, obj: T): key is Extract<keyof T, string>
-function isPrimitiveValue(value: unknown): value is string | number | boolean
-  // Rejects NaN and Infinity for numbers
+function isString(value: unknown): value is string;
+function isBoolean(value: unknown): value is boolean;
+function isObjKey<T extends object>(
+  key: string,
+  obj: T,
+): key is Extract<keyof T, string>;
+function isPrimitiveValue(value: unknown): value is string | number | boolean;
+// Rejects NaN and Infinity for numbers
 
 // Params
-function isParams(value: unknown): value is Params
-  // Allows nested objects/arrays; two-phase validation
-function isParamsStrict(value: unknown): value is Params
-  // Only primitives and arrays of primitives; no nested objects
+function isParams(value: unknown): value is Params;
+// Allows nested objects/arrays; two-phase validation
+function isParamsStrict(value: unknown): value is Params;
+// Only primitives and arrays of primitives; no nested objects
 
 // Routes
-function isRouteName(name: unknown): name is string
+function isRouteName(name: unknown): name is string;
 
 // Navigation
-function isNavigationOptions(value: unknown): value is NavigationOptions
+function isNavigationOptions(value: unknown): value is NavigationOptions;
 
 // State
-function isState(value: unknown): value is State
-  // Checks presence of name, params, path
-function isStateStrict(value: unknown): value is State
-  // Same + validates meta structure if present
+function isState(value: unknown): value is State;
+// Checks presence of name, params, path
+function isStateStrict(value: unknown): value is State;
+// Same + validates params are URL-safe (isParamsStrict)
 ```
 
 ### Validators
 
 ```typescript
-function validateRouteName(name: unknown, methodName: string): asserts name is string
-  // Throws: TypeError("[router.{method}] Invalid route name ...")
+function validateRouteName(
+  name: unknown,
+  methodName: string,
+): asserts name is string;
+// Throws: TypeError("[router.{method}] Invalid route name ...")
 
-function validateState(state: unknown, method: string): asserts state is State
-  // Throws: TypeError("[{method}] Invalid state structure: {type} ...")
+function validateState(state: unknown, method: string): asserts state is State;
+// Throws: TypeError("[{method}] Invalid state structure: {type} ...")
 ```
 
 ### Utilities
 
 ```typescript
-function getTypeDescription(value: unknown): string
-  // "null" | "array[N]" | "ClassName" | "object" | typeof value
+function getTypeDescription(value: unknown): string;
+// "null" | "array[N]" | "ClassName" | "object" | typeof value
 ```
 
 ## Two Validation Levels
@@ -135,29 +141,29 @@ Error messages always include the calling method name for easier stack trace rea
 
 Both require a plain object (`proto === null || proto === Object.prototype`). They differ in allowed value types:
 
-| Feature                     | `isParams`                        | `isParamsStrict`                 |
-| --------------------------- | --------------------------------- | -------------------------------- |
-| Primitive values            | ✅                                | ✅                               |
-| `null` / `undefined`        | ✅                                | ✅                               |
-| Arrays of primitives        | ✅                                | ✅                               |
-| Nested plain objects        | ✅ (recursive)                    | ❌                               |
-| Arrays of objects           | ✅ (recursive)                    | ❌                               |
-| Circular references         | ❌ detected via `WeakSet`         | ❌                               |
-| Class instances             | ❌                                | ❌                               |
-| Algorithm                   | Two-phase fast → slow path        | Single-pass                      |
-| Used by                     | `@real-router/core`               | browser-plugin, hash-plugin (meta), persistent-params-plugin |
+| Feature              | `isParams`                 | `isParamsStrict`                                      |
+| -------------------- | -------------------------- | ----------------------------------------------------- |
+| Primitive values     | ✅                         | ✅                                                    |
+| `null` / `undefined` | ✅                         | ✅                                                    |
+| Arrays of primitives | ✅                         | ✅                                                    |
+| Nested plain objects | ✅ (recursive)             | ❌                                                    |
+| Arrays of objects    | ✅ (recursive)             | ❌                                                    |
+| Circular references  | ❌ detected via `WeakSet`  | ❌                                                    |
+| Class instances      | ❌                         | ❌                                                    |
+| Algorithm            | Two-phase fast → slow path | Single-pass                                           |
+| Used by              | `@real-router/core`        | browser-plugin, hash-plugin, persistent-params-plugin |
 
 **Why two levels?** `isParams` supports the full `Params` type — arbitrary serializable objects for state management. `isParamsStrict` restricts to URL-encodable values that round-trip through a query string without loss.
 
 ### `isState` vs `isStateStrict`
 
-| Feature               | `isState`                                                   | `isStateStrict`                                  |
-| --------------------- | ----------------------------------------------------------- | ------------------------------------------------ |
-| Required fields       | `isRouteName(name)` + `isParams(params)` + `path: string`  | Same                                             |
-| `meta` field          | Not validated                                               | `isMetaFields()` if `meta` present               |
-| Used by               | `@real-router/core` (internal assertions)                   | browser-plugin, hash-plugin (public API)         |
+| Feature         | `isState`                                                 | `isStateStrict`                                |
+| --------------- | --------------------------------------------------------- | ---------------------------------------------- |
+| Required fields | `isRouteName(name)` + `isParams(params)` + `path: string` | Same                                           |
+| `params` field  | `isParams` (allows nested objects)                        | `isParamsStrict` (URL-safe, no nested objects) |
+| Used by         | `@real-router/core` (internal assertions)                 | browser-plugin, hash-plugin (public API)       |
 
-**Why two levels?** Core constructs states internally and trusts their structure. Browser and hash plugins expose `isState` as a public user-facing API — user-provided states may contain `meta.params` that must pass URL-safe `isParamsStrict` validation.
+**Why two levels?** Core constructs states internally and trusts their structure. Browser and hash plugins expose `isState` as a public user-facing API — user-provided states may have `params` from `history.state` that must pass URL-safe `isParamsStrict` validation.
 
 ## Params Validation Algorithm (`isParams`)
 
@@ -188,7 +194,7 @@ Not exported. Used across guards and validators internally.
 ### `internal/meta-fields.ts`
 
 - `isRequiredFields(obj)` — checks `name` (via `isRouteName`), `path` (`string`), `params` (via `isParams`). Shared by `isState` and `isStateStrict`.
-- `isMetaFields(meta)` — validates `StateMeta`: `params` passes `isParamsStrict`, `id` is `number` if present. Used only by `isStateStrict`.
+- `isMetaFields(meta)` — always returns `true` (backward compat with old `history.state` entries that had a `meta` field). No longer validates anything.
 
 ### `internal/router-error.ts`
 
@@ -201,17 +207,17 @@ Not exported. Used across guards and validators internally.
 
 `isRouteName` and `validateRouteName` enforce identical rules:
 
-| Rule                              | Example                    | Valid |
-| --------------------------------- | -------------------------- | ----- |
-| Empty string (root node)          | `""`                       | ✅    |
-| Single segment                    | `"home"`                   | ✅    |
-| Dot-separated segments            | `"users.profile"`          | ✅    |
-| Underscore and hyphen             | `"admin_panel"`, `"api-v2"` | ✅   |
-| System routes (`@@` prefix)       | `"@@router/UNKNOWN_ROUTE"` | ✅ bypass |
-| Whitespace-only                   | `"   "`                    | ❌    |
-| Leading or trailing dot           | `".users"`, `"users."`     | ❌    |
-| Consecutive dots                  | `"users..profile"`         | ❌    |
-| Segment starting with digit       | `"users.123"`              | ❌    |
+| Rule                        | Example                     | Valid     |
+| --------------------------- | --------------------------- | --------- |
+| Empty string (root node)    | `""`                        | ✅        |
+| Single segment              | `"home"`                    | ✅        |
+| Dot-separated segments      | `"users.profile"`           | ✅        |
+| Underscore and hyphen       | `"admin_panel"`, `"api-v2"` | ✅        |
+| System routes (`@@` prefix) | `"@@router/UNKNOWN_ROUTE"`  | ✅ bypass |
+| Whitespace-only             | `"   "`                     | ❌        |
+| Leading or trailing dot     | `".users"`, `"users."`      | ❌        |
+| Consecutive dots            | `"users..profile"`          | ❌        |
+| Segment starting with digit | `"users.123"`               | ❌        |
 
 System routes bypass `FULL_ROUTE_PATTERN` validation — they are created only in router code, not from user input.
 

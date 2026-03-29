@@ -127,53 +127,30 @@ export const stateMinimalArbitrary: fc.Arbitrary<State> = fc.record({
 });
 
 /**
- * Generator for full valid State with meta (can be null/undefined)
+ * Generator for full valid State with extra properties (backward compat testing)
  * Note: uses valid route names and paths since isState now validates via isRequiredFields
  */
 export const stateFullArbitrary = fc.record({
   name: validRouteNameArbitrary,
   path: validRoutePathArbitrary,
   params: paramsWithArraysArbitrary,
-  meta: fc.option(
-    fc.record({
-      id: fc.option(fc.integer({ min: 0 }), { nil: undefined }),
-      params: fc.option(paramsSimpleArbitrary, { nil: undefined }),
-    }),
-    { nil: undefined },
-  ),
+  extra: fc.option(fc.string(), { nil: undefined }),
 }) as fc.Arbitrary<State>;
 
 /**
- * Generator for valid State with non-null meta.
+ * Generator for valid State with extra properties (simulating old history.state with meta).
  */
 export const historyStateArbitrary = fc
   .record({
     name: validRouteNameArbitrary,
     path: validRoutePathArbitrary,
     params: paramsWithArraysArbitrary,
-    hasId: fc.boolean(),
-    id: fc.integer({ min: 0 }),
-    hasParams: fc.boolean(),
-    metaParams: paramsSimpleArbitrary,
   })
-  .map((data) => {
-    const meta: Record<string, unknown> = {};
-
-    if (data.hasId) {
-      meta.id = data.id;
-    }
-
-    if (data.hasParams) {
-      meta.params = data.metaParams;
-    }
-
-    return {
-      name: data.name,
-      path: data.path,
-      params: data.params,
-      meta,
-    };
-  }) as unknown as fc.Arbitrary<State>;
+  .map((data) => ({
+    name: data.name,
+    path: data.path,
+    params: data.params,
+  })) as unknown as fc.Arbitrary<State>;
 
 /**
  * Generator for invalid State (missing required fields or wrong types)

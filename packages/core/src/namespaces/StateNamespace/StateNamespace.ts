@@ -1,8 +1,9 @@
 // packages/core/src/namespaces/StateNamespace/StateNamespace.ts
 
-import { areParamValuesEqual, getUrlParamsFromMeta } from "./helpers";
+import { areParamValuesEqual } from "./helpers";
 import { EMPTY_PARAMS } from "../../constants";
 import { freezeStateInPlace } from "../../helpers";
+import { setStateMetaParams } from "../../stateMetaStore";
 
 import type { StateNamespaceDependencies } from "./types";
 import type { Params, State } from "@real-router/types";
@@ -15,11 +16,6 @@ import type { RouteTreeStateMeta } from "route-tree";
  * Instance methods handle state storage, freezing, and creation.
  */
 export class StateNamespace {
-  /**
-   * Auto-incrementing state ID for tracking navigation history.
-   */
-  #stateId = 0;
-
   /**
    * Cached frozen state - avoids structuredClone on every getState() call.
    */
@@ -50,10 +46,8 @@ export class StateNamespace {
    * The returned state is deeply frozen (immutable) for safety.
    * Returns `undefined` if the router has not been started or has been stopped.
    */
-  get<P extends Params = Params, MP extends Params = Params>():
-    | State<P, MP>
-    | undefined {
-    return this.#frozenState as State<P, MP> | undefined; // NOSONAR -- generic narrowing needed for public API
+  get<P extends Params = Params>(): State<P> | undefined {
+    return this.#frozenState as State<P> | undefined; // NOSONAR -- generic narrowing needed for public API
   }
 
   /**
@@ -84,7 +78,6 @@ export class StateNamespace {
     this.#frozenState = undefined;
     this.#previousState = undefined;
     this.#urlParamsCache.clear();
-    this.#stateId = 0;
   }
 
   // =========================================================================
@@ -106,18 +99,13 @@ export class StateNamespace {
   /**
    * Creates a frozen state object for a route.
    */
-  makeState<P extends Params = Params, MP extends Params = Params>(
+  makeState<P extends Params = Params>(
     name: string,
     params?: P,
     path?: string,
     meta?: RouteTreeStateMeta,
-    forceId?: number,
     skipFreeze?: boolean,
-  ): State<P, MP> {
-    const madeMeta = meta
-      ? { id: forceId ?? ++this.#stateId, params: meta as unknown as MP }
-      : undefined;
-
+  ): State<P> {
     // Optimization: O(1) lookup instead of O(depth) ancestor iteration
     const defaultParamsConfig = this.#deps.getDefaultParams();
     const hasDefaultParams = Object.hasOwn(defaultParamsConfig, name);
@@ -133,12 +121,15 @@ export class StateNamespace {
       mergedParams = { ...params };
     }
 
-    const state: State<P, MP> = {
+    const state: State<P> = {
       name,
       params: mergedParams,
       path: path ?? this.#deps.buildPath(name, params),
-      meta: madeMeta,
     };
+
+    if (meta) {
+      setStateMetaParams(state, meta as unknown as Params);
+    }
 
     return skipFreeze ? state : freezeStateInPlace(state);
   }
@@ -165,17 +156,17 @@ export class StateNamespace {
     }
 
     if (ignoreQueryParams) {
-      const stateMeta = (state1.meta?.params ?? state2.meta?.params) as  // NOSONAR -- narrowing from Params to RouteTreeStateMeta
-        | RouteTreeStateMeta
-        | undefined;
+      const urlParams = this.#getUrlParams(state1.name);
 
-      const urlParams = stateMeta
-        ? getUrlParamsFromMeta(stateMeta)
-        : this.#getUrlParams(state1.name);
+      for (const urlParam of urlParams) {
+        if (
+          !areParamValuesEqual(state1.params[urlParam], state2.params[urlParam])
+        ) {
+          return false;
+        }
+      }
 
-      return urlParams.every((param) =>
-        areParamValuesEqual(state1.params[param], state2.params[param]),
-      );
+      return true;
     }
 
     const state1Keys = Object.keys(state1.params);
@@ -185,11 +176,16 @@ export class StateNamespace {
       return false;
     }
 
-    return state1Keys.every(
-      (param) =>
-        param in state2.params &&
-        areParamValuesEqual(state1.params[param], state2.params[param]),
-    );
+    for (const param of state1Keys) {
+      if (
+        !(param in state2.params) ||
+        !areParamValuesEqual(state1.params[param], state2.params[param])
+      ) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   // =========================================================================

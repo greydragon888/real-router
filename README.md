@@ -122,21 +122,21 @@ Custom **Segment Trie** matcher — O(segments) traversal, O(1) for static route
 **vs [router5](https://github.com/router5/router5):**
 
 | Metric             | Improvement                              |
-| ------------------ | ---------------------------------------- |
+| ------------------ |------------------------------------------|
 | Navigation         | 2-3x faster                              |
-| URL building       | 7-16x faster                             |
+| URL building       | 8-35x faster                             |
 | URL matching       | 3-5x faster                              |
-| Memory allocations | 3-5x fewer                               |
-| Scaling            | O(1) vs O(n) — up to 12x at 1000+ routes |
+| Memory allocations | 5-18x fewer                              |
+| Scaling            | O(1) vs O(n) — up to 14x at 1000+ routes |
 
 **vs [router6](https://github.com/nicolo-ribaudo/router6):**
 
 | Metric             | Improvement                        |
-| ------------------ | ---------------------------------- |
+| ------------------ |------------------------------------|
 | Navigation         | ~2x faster                         |
-| URL building       | 3-7x faster                        |
+| URL building       | 3-10x faster                       |
 | URL matching       | ~2x faster                         |
-| Memory allocations | 5-6x fewer                         |
+| Memory allocations | 5-8x fewer                         |
 | Scaling            | Both O(1) — up to 5x on deep trees |
 
 </details>

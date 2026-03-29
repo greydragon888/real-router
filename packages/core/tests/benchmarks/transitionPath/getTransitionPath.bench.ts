@@ -10,6 +10,7 @@
 
 import { bench, boxplot, summary } from "mitata";
 
+import { setStateMetaParams } from "../../../src/stateMetaStore";
 import { getTransitionPath } from "../../../src/transitionPath";
 
 import type { State } from "@real-router/core";
@@ -22,15 +23,15 @@ function createState(
 
   metaParams: Record<string, any> = {},
 ): State {
-  return {
+  const state: State = {
     name,
     params,
     path: `/${name.replaceAll(".", "/")}`,
-    meta: {
-      id: 1,
-      params: metaParams,
-    },
   };
+
+  setStateMetaParams(state, metaParams);
+
+  return state;
 }
 
 function generateDeepRoute(depth: number): string {
@@ -186,9 +187,6 @@ const TEST_DATA = {
         from: state,
         to: {
           ...state,
-          meta: {
-            ...state.meta,
-          },
         },
       };
     })(),
@@ -302,7 +300,6 @@ boxplot(() => {
 
     bench("getTransitionPath: force reload (same route)", () => {
       getTransitionPath(
-        // @ts-expect-error - Testing force reload with same route
         TEST_DATA.realWorld.forceReload.to,
         TEST_DATA.realWorld.forceReload.from,
       );

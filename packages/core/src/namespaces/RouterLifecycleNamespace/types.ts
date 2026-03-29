@@ -16,9 +16,7 @@ export interface RouterLifecycleDependencies {
   ) => Promise<State>;
   navigateToNotFound: (path: string) => State;
   clearState: () => void;
-  matchPath: <P extends Params = Params, MP extends Params = Params>(
-    path: string,
-  ) => State<P, MP> | undefined;
+  matchPath: <P extends Params = Params>(path: string) => State<P> | undefined;
   completeStart: () => void;
   emitTransitionError: (
     toState: State | undefined,

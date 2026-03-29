@@ -76,14 +76,12 @@ export const stateArbitrary = fc
     name: fc.string({ minLength: 1, maxLength: 50 }),
     path: fc.string({ minLength: 1, maxLength: 100 }),
     params: fc.dictionary(fc.string(), jsonPrimitive),
-    meta: fc.option(fc.dictionary(fc.string(), jsonPrimitive)),
   })
   .map(
     (s) =>
       ({
         ...s,
         params: { ...s.params },
-        meta: s.meta ? { ...s.meta } : s.meta,
       }) as unknown as State,
   );
 
