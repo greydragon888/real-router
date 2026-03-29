@@ -44,16 +44,16 @@ describe("State Edge Cases (Uncovered Branches)", () => {
         numRuns: 5000,
       },
     )(
-      "rejects state with meta.id as non-number",
+      "accepts state with extra meta property (backward compat)",
       (name, path, params, idValue) => {
         const state = {
           name,
           path,
           params,
-          meta: { id: `${idValue}` }, // String instead of number
+          meta: { id: `${idValue}` },
         };
 
-        expect(isStateStrict(state)).toBe(false);
+        expect(isStateStrict(state)).toBe(true);
       },
     );
   });

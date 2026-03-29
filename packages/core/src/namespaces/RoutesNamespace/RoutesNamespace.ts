@@ -224,10 +224,10 @@ export class RoutesNamespace<
    * Matches a URL path to a route in the tree.
    * Note: Argument validation is done by facade (Router.ts) via validateMatchPathArgs.
    */
-  matchPath<P extends Params = Params, MP extends Params = Params>(
+  matchPath<P extends Params = Params>(
     path: string,
     options?: Options,
-  ): State<P, MP> | undefined {
+  ): State<P> | undefined {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Router.ts always passes options
     const opts = options!;
 
@@ -268,7 +268,7 @@ export class RoutesNamespace<
       });
     }
 
-    return this.#deps.makeState<P, MP>(routeName, routeParams, builtPath, meta);
+    return this.#deps.makeState<P>(routeName, routeParams, builtPath, meta);
   }
 
   /**

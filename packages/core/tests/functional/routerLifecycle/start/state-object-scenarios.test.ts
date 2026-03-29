@@ -5,17 +5,11 @@ import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 
 import { createTestRouter, omitMeta } from "../../../helpers";
 
-import type { Router, State } from "@real-router/core";
+import type { Router } from "@real-router/core";
 import type { LifecycleApi } from "@real-router/core/api";
 
 let router: Router;
 let lifecycle: LifecycleApi;
-const homeState: State = {
-  name: "home",
-  params: {},
-  path: "/home",
-  meta: { id: 5, params: { home: {} } },
-};
 
 describe("router.start() - state object scenarios", () => {
   beforeEach(() => {
@@ -119,22 +113,6 @@ describe("router.start() - state object scenarios", () => {
   // Transition error behavior is tested in "emit TRANSITION_ERROR on router start error" section.;
 
   describe("router start with state object", () => {
-    describe("meta data handling", () => {
-      it("should assign new meta id on transitions after starting with path", async () => {
-        await router.start(homeState.path);
-
-        expect(router.getState()?.meta?.id).toBeDefined();
-
-        await router.navigate("users");
-
-        const firstNavId = router.getState()?.meta?.id;
-
-        await router.navigate("profile");
-
-        expect(router.getState()?.meta?.id).not.toStrictEqual(firstNavId);
-      });
-    });
-
     describe("invalid path initialization attempt", () => {
       // Fix for issue #42: now returns ROUTE_NOT_FOUND error instead of throwing
       it("should return ROUTE_NOT_FOUND error for non-existent route path", async () => {

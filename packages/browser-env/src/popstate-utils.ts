@@ -45,7 +45,6 @@ export function updateBrowserState(
   browser: Browser,
 ): void {
   const historyState = {
-    meta: state.meta,
     name: state.name,
     params: state.params,
     path: state.path,

@@ -245,9 +245,7 @@ export interface Router<D extends DefaultDependencies = DefaultDependencies> {
 
   buildPath: (route: string, params?: Params) => string;
 
-  getState: <P extends Params = Params, MP extends Params = Params>() =>
-    | State<P, MP>
-    | undefined;
+  getState: <P extends Params = Params>() => State<P> | undefined;
 
   getPreviousState: () => State | undefined;
 

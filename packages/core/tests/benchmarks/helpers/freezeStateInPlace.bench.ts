@@ -11,22 +11,28 @@
 import { bench, boxplot, do_not_optimize, summary } from "mitata";
 
 import { freezeStateInPlace } from "../../../src/helpers";
+import { setStateMetaParams } from "../../../src/stateMetaStore";
 
-import type { State, StateMeta, Params } from "@real-router/types";
+import type { State, Params } from "@real-router/types";
 
 // Helper to create unfrozen state
 function createState(
   name: string,
   params: Params = {},
   path = "/test",
-  meta?: StateMeta,
+  metaParams?: Params,
 ): State {
-  return {
+  const state: State = {
     name,
     params,
     path,
-    meta,
   };
+
+  if (metaParams) {
+    setStateMetaParams(state, metaParams);
+  }
+
+  return state;
 }
 
 // Helper to create deep nested params
@@ -54,8 +60,7 @@ boxplot(() => {
     // Typical state with meta
     bench("freeze: typical state with meta", () => {
       const state = createState("users", { id: "123" }, "/users/123", {
-        id: 1,
-        params: { source: "browser" },
+        source: "browser",
       });
 
       do_not_optimize(freezeStateInPlace(state));
@@ -132,8 +137,7 @@ boxplot(() => {
     {
       const frozenState = freezeStateInPlace(
         createState("users", { id: "123" }, "/users/123", {
-          id: 1,
-          params: { source: "browser" },
+          source: "browser",
         }),
       );
 

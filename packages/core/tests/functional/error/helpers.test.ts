@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 
 import { deepFreezeState, freezeStateInPlace } from "../../../src/helpers";
+import {
+  getStateMetaParams,
+  setStateMetaParams,
+} from "../../../src/stateMetaStore";
 
 import type { Params, State } from "@real-router/types";
 
@@ -46,17 +50,12 @@ describe("deepFreezeState", () => {
         name: "home",
         path: "/",
         params: {},
-        meta: {
-          id: 1,
-          params: { source: "browser" },
-        },
       };
 
       const frozen = deepFreezeState(state);
 
       expect(Object.isFrozen(frozen)).toBe(true);
-      expect(Object.isFrozen(frozen.meta)).toBe(true);
-      expect(Object.isFrozen(frozen.meta?.params)).toBe(true);
+      expect(Object.isFrozen(frozen.params)).toBe(true);
     });
   });
 
@@ -462,46 +461,39 @@ describe("deepFreezeState", () => {
     });
   });
 
-  describe("meta object freezing", () => {
-    it("should freeze meta.params", () => {
+  describe("meta object freezing (deepFreezeState clones — no WeakMap meta)", () => {
+    it("should freeze state params deeply", () => {
       const state: State = {
         name: "test",
         path: "/test",
-        params: {},
-        meta: {
-          id: 1,
-          params: { source: "navigation" },
-        },
+        params: { source: "navigation" },
       };
 
       const frozen = deepFreezeState(state);
 
-      expect(Object.isFrozen(frozen.meta?.params)).toBe(true);
+      expect(Object.isFrozen(frozen.params)).toBe(true);
 
       expect(() => {
-        frozen.meta!.params.source = "modified";
+        (frozen.params as Record<string, unknown>).source = "modified";
       }).toThrow();
     });
 
-    it("should handle circular reference in meta", () => {
+    it("should handle circular reference in params", () => {
       const state: State = {
         name: "test",
         path: "/test",
         params: {},
-        meta: {
-          id: 1,
-          params: {},
-        },
       };
 
-      // Create circular reference in meta.params
-      (state.meta!.params as Record<string, unknown>).ref = state.meta;
+      (state.params as Record<string, unknown>).ref = state.params;
 
       expect(() => deepFreezeState(state)).not.toThrow();
 
       const frozen = deepFreezeState(state);
 
-      expect(frozen.meta?.params.ref).toBe(frozen.meta);
+      expect((frozen.params as Record<string, unknown>).ref).toBe(
+        frozen.params,
+      );
     });
   });
 });
@@ -545,23 +537,24 @@ describe("freezeStateInPlace", () => {
       }).toThrow();
     });
 
-    it("should freeze state with meta in place", () => {
+    it("should not freeze internal meta (meta is internal, no need to freeze)", () => {
       const state: State = {
         name: "home",
         path: "/",
         params: {},
-        meta: {
-          id: 1,
-          params: { source: "browser" },
-        },
       };
+
+      setStateMetaParams(state, { source: "browser" });
 
       const frozen = freezeStateInPlace(state);
 
       expect(frozen).toBe(state);
       expect(Object.isFrozen(frozen)).toBe(true);
-      expect(Object.isFrozen(frozen.meta)).toBe(true);
-      expect(Object.isFrozen(frozen.meta?.params)).toBe(true);
+
+      const metaParams = getStateMetaParams(frozen);
+
+      expect(metaParams).toBeDefined();
+      expect(Object.isFrozen(metaParams)).toBe(false);
     });
   });
 

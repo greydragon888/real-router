@@ -20,13 +20,12 @@ import type { RouteTree } from "route-tree";
 export interface RouterInternals<
   D extends DefaultDependencies = DefaultDependencies,
 > {
-  readonly makeState: <P extends Params = Params, MP extends Params = Params>(
+  readonly makeState: <P extends Params = Params>(
     name: string,
     params?: P,
     path?: string,
     meta?: Record<string, Record<string, "url" | "query">>,
-    forceId?: number,
-  ) => State<P, MP>;
+  ) => State<P>;
 
   readonly forwardState: <P extends Params = Params>(
     routeName: string,
@@ -38,10 +37,10 @@ export interface RouterInternals<
     resolvedParams: Params,
   ) => RouteTreeState | undefined;
 
-  readonly matchPath: <P extends Params = Params, MP extends Params = Params>(
+  readonly matchPath: <P extends Params = Params>(
     path: string,
     options?: Options,
-  ) => State<P, MP> | undefined;
+  ) => State<P> | undefined;
 
   readonly getOptions: () => Options;
 

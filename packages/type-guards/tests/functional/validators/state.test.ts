@@ -18,15 +18,12 @@ describe("State Validators", () => {
       }).not.toThrow();
     });
 
-    it("accepts state with meta", () => {
+    it("accepts state with extra properties", () => {
       const state = {
         name: "users.profile",
         params: { id: "123" },
         path: "/users/123",
-        meta: {
-          id: 1,
-          params: {},
-        },
+        extra: "value",
       };
 
       expect(() => {

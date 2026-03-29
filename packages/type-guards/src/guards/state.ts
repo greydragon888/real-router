@@ -1,6 +1,6 @@
 // packages/type-guards/modules/guards/state.ts
 
-import { isMetaFields, isRequiredFields } from "../internal/meta-fields";
+import { isRequiredFields } from "../internal/meta-fields";
 
 import type { Params, State } from "@real-router/types";
 
@@ -16,9 +16,9 @@ import type { Params, State } from "@real-router/types";
  * isState({ name: 'home', params: {}, path: '/' }); // true
  * isState({ name: 'home', path: '/' }); // false (missing params)
  */
-export function isState<P extends Params = Params, MP extends Params = Params>(
+export function isState<P extends Params = Params>(
   value: unknown,
-): value is State<P, MP> {
+): value is State<P> {
   if (typeof value !== "object" || value === null) {
     return false;
   }
@@ -40,10 +40,9 @@ export function isState<P extends Params = Params, MP extends Params = Params>(
  * isStateStrict({ name: 'home', params: {}, path: '/', meta: { id: 1 } }); // true
  * isStateStrict({ name: 'home', params: 'invalid', path: '/' }); // false
  */
-export function isStateStrict<
-  P extends Params = Params,
-  MP extends Params = Params,
->(value: unknown): value is State<P, MP> {
+export function isStateStrict<P extends Params = Params>(
+  value: unknown,
+): value is State<P> {
   // Basic structure check
   if (typeof value !== "object" || value === null) {
     return false;
@@ -54,11 +53,6 @@ export function isStateStrict<
   // Check required fields and their types
   if (!isRequiredFields(obj)) {
     return false;
-  }
-
-  // Validate meta if present
-  if (obj.meta !== undefined) {
-    return isMetaFields(obj.meta);
   }
 
   return true;

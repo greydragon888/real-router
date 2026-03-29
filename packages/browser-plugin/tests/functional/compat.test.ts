@@ -86,10 +86,6 @@ describe("Browser Plugin — Compatibility", () => {
           name: routes[routeIndex],
           params: {},
           path: paths[routeIndex],
-          meta: {
-            id: i,
-            params: {},
-          },
         };
       });
 

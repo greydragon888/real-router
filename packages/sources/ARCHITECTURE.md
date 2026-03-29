@@ -100,7 +100,7 @@ This node-scoping logic combined with path-based stabilization keeps the snapsho
 
 ### `stabilizeState`
 
-Path-based State reference stabilization. Compares `prev.path` with `next.path` — the canonical representation of rendering-relevant State fields (`name` + `params`). When paths match, returns `prev` (preserving reference). When paths differ, returns `next`. Ignores `meta` (internal: auto-increment id) and `transition` (reference data). O(1) string comparison — no recursive traversal.
+Path-based State reference stabilization. Compares `prev.path` with `next.path` — the canonical representation of rendering-relevant State fields (`name` + `params`). When paths match, returns `prev` (preserving reference). When paths differ, returns `next`. Ignores `transition` (reference data). O(1) string comparison — no recursive traversal.
 
 Used by `computeSnapshot`, `createRouteSource`, and `createTransitionSource` to prevent unnecessary re-renders across all frameworks.
 

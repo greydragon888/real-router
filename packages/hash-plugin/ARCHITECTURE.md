@@ -307,8 +307,8 @@ router.navigate(name, params, opts)
         │
         └── updateBrowserState(toState, url, shouldReplace, browser)
                   │
-                  ├── Create historyState = { meta, name, params, path }
-                  └── browser.pushState() or browser.replaceState()
+                   ├── Create historyState = { name, params, path }
+                   └── browser.pushState() or browser.replaceState()
 ```
 
 **Note:** Unlike browser-plugin, hash-plugin does NOT preserve hash fragments (the hash IS the route).
@@ -407,7 +407,7 @@ Popstate event handling (`getRouteFromEvent`, `updateBrowserState`), critical er
 See [browser-env/ARCHITECTURE.md](../browser-env/ARCHITECTURE.md) for details on:
 
 - Route extraction from popstate events (history.state validation → URL matching fallback)
-- `historyState` as a subset of `State` (only `meta`, `name`, `params`, `path` stored in `history.state`)
+- `historyState` as a subset of `State` (only `name`, `params`, `path` stored in `history.state`)
 - Error categorization (RouterError = expected, anything else = critical recovery via `replaceState`)
 
 ## Options Validation

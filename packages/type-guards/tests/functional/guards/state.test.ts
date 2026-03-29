@@ -142,64 +142,17 @@ describe("State Type Guards", () => {
       expect(isStateStrict([])).toBe(false);
     });
 
-    describe("meta validation", () => {
-      it("accepts empty meta object", () => {
-        const state = {
+    describe("extra properties", () => {
+      it("accepts state with arbitrary extra properties", () => {
+        const stateWithExtra = {
           name: "home",
           params: {},
-          path: "/home",
-          meta: {},
+          path: "/",
+          foo: "bar",
+          baz: 42,
         };
 
-        expect(isStateStrict(state)).toBe(true);
-      });
-
-      it("rejects non-object meta (string)", () => {
-        const invalid = {
-          name: "home",
-          params: {},
-          path: "/home",
-          meta: "invalid",
-        };
-
-        expect(isStateStrict(invalid)).toBe(false);
-      });
-
-      it("rejects null meta", () => {
-        const invalid = {
-          name: "home",
-          params: {},
-          path: "/home",
-          meta: null,
-        };
-
-        expect(isStateStrict(invalid)).toBe(false);
-      });
-
-      it("rejects meta with invalid params type", () => {
-        const invalid = {
-          name: "home",
-          params: {},
-          path: "/home",
-          meta: {
-            params: "invalid",
-          },
-        };
-
-        expect(isStateStrict(invalid)).toBe(false);
-      });
-
-      it("rejects meta with invalid id type", () => {
-        const invalid = {
-          name: "home",
-          params: {},
-          path: "/home",
-          meta: {
-            id: "invalid",
-          },
-        };
-
-        expect(isStateStrict(invalid)).toBe(false);
+        expect(isStateStrict(stateWithExtra)).toBe(true);
       });
     });
   });

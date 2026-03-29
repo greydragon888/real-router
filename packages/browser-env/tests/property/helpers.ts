@@ -183,5 +183,4 @@ export const arbFullState: fc.Arbitrary<State> = fc
     name,
     params,
     path,
-    meta: { id: 1, params: {} },
   }));

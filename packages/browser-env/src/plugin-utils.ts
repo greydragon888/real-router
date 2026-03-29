@@ -40,7 +40,6 @@ export function createReplaceHistoryState(
       {
         params: state.meta,
       },
-      1, // forceId
     );
 
     updateBrowserState(builtState, buildUrl(name, params), true, browser);

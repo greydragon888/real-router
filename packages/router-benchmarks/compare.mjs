@@ -302,14 +302,23 @@ function formatTime(microseconds) {
 }
 
 /**
+ * Minimum heap threshold in KB below which allocation is considered zero (GC noise).
+ * V8's getHeapStatistics reports sub-byte averages when batch operations (×50, ×100)
+ * divide total GC noise by iteration count. These are not real allocations.
+ */
+const HEAP_NOISE_THRESHOLD_KB = 0.05; // 51.2 bytes
+
+/**
  * Format memory in appropriate unit
  */
 function formatMemory(kb) {
+  if (kb < HEAP_NOISE_THRESHOLD_KB) {
+    return "~0 b";
+  }
+
   const bytes = kb * 1024;
 
-  if (bytes < 1) {
-    return "< 1 b";
-  } else if (bytes < 1024) {
+  if (bytes < 1024) {
     return `${bytes.toFixed(0)} b`;
   } else if (kb < 1024) {
     return `${kb.toFixed(2)} kb`;
@@ -567,8 +576,20 @@ function compareTwoBenchmarks(
       continue;
     }
 
-    const memDiff =
-      ((current.memoryKb - baseline.memoryKb) / baseline.memoryKb) * 100;
+    // Treat sub-threshold values as zero to avoid nonsensical ratios
+    const baselineMemKb = baseline.memoryKb < HEAP_NOISE_THRESHOLD_KB ? 0 : baseline.memoryKb;
+    const currentMemKb = current.memoryKb < HEAP_NOISE_THRESHOLD_KB ? 0 : current.memoryKb;
+
+    // Skip diff calculation when both are zero (GC noise vs GC noise)
+    if (baselineMemKb === 0 && currentMemKb === 0) {
+      const nameDisplay = name.length > 68 ? name.substring(0, 65) + "..." : name;
+      log(`${nameDisplay.padEnd(70)} ${"~0 b".padStart(15)} ${"~0 b".padStart(15)} ${GRAY}~0${RESET}`);
+      continue;
+    }
+
+    const memDiff = baselineMemKb === 0
+      ? 100 // baseline was noise, current is real → treat as +100%
+      : ((currentMemKb - baselineMemKb) / baselineMemKb) * 100;
     totalMemDiff += memDiff;
     memCount++;
 
@@ -599,8 +620,8 @@ function compareTwoBenchmarks(
     const currentMem = formatMemory(current.memoryKb).padStart(15);
     const diffDisplay = formatDiff(
       memDiff,
-      baseline.memoryKb,
-      current.memoryKb,
+      baselineMemKb,
+      currentMemKb,
       "memory",
     );
 
@@ -783,13 +804,20 @@ function compareThreeBenchmarks(router5File, router6File, realRouterFile) {
     const nameDisplay = name.length > 48 ? name.substring(0, 45) + "..." : name;
     const r5Mem = formatMemory(r5.memoryKb).padStart(12);
 
+    const r5MemKb = r5.memoryKb < HEAP_NOISE_THRESHOLD_KB ? 0 : r5.memoryKb;
+
     let r6Mem = GRAY + "N/A".padStart(12) + RESET;
     let r6MemDiff = GRAY + "N/A".padStart(10) + RESET;
     if (r6 && r6.memoryKb) {
       r6Mem = formatMemory(r6.memoryKb).padStart(12);
-      const diff = ((r6.memoryKb - r5.memoryKb) / r5.memoryKb) * 100;
-      r6MemDiff = formatDiffCompact(diff).padStart(10);
-      if (diff < 0) r6MemBetter++;
+      const r6MemKb = r6.memoryKb < HEAP_NOISE_THRESHOLD_KB ? 0 : r6.memoryKb;
+      if (r5MemKb === 0 && r6MemKb === 0) {
+        r6MemDiff = (GRAY + "~0" + RESET).padStart(10);
+      } else {
+        const diff = r5MemKb === 0 ? 100 : ((r6MemKb - r5MemKb) / r5MemKb) * 100;
+        r6MemDiff = formatDiffCompact(diff).padStart(10);
+        if (diff < 0) r6MemBetter++;
+      }
     }
 
     let rrMem = GRAY + "N/A".padStart(12) + RESET;
@@ -797,14 +825,24 @@ function compareThreeBenchmarks(router5File, router6File, realRouterFile) {
     let rrMemVsR6 = GRAY + "N/A".padStart(10) + RESET;
     if (rr && rr.memoryKb) {
       rrMem = formatMemory(rr.memoryKb).padStart(12);
-      const diffVsR5 = ((rr.memoryKb - r5.memoryKb) / r5.memoryKb) * 100;
-      rrMemVsR5 = formatDiffCompact(diffVsR5).padStart(10);
-      if (diffVsR5 < 0) rrMemVsR5Better++;
+      const rrMemKb = rr.memoryKb < HEAP_NOISE_THRESHOLD_KB ? 0 : rr.memoryKb;
+      if (r5MemKb === 0 && rrMemKb === 0) {
+        rrMemVsR5 = (GRAY + "~0" + RESET).padStart(10);
+      } else {
+        const diffVsR5 = r5MemKb === 0 ? 100 : ((rrMemKb - r5MemKb) / r5MemKb) * 100;
+        rrMemVsR5 = formatDiffCompact(diffVsR5).padStart(10);
+        if (diffVsR5 < 0) rrMemVsR5Better++;
+      }
 
       if (r6 && r6.memoryKb) {
-        const diffVsR6 = ((rr.memoryKb - r6.memoryKb) / r6.memoryKb) * 100;
-        rrMemVsR6 = formatDiffCompact(diffVsR6).padStart(10);
-        if (diffVsR6 < 0) rrMemVsR6Better++;
+        const r6MemKb = r6.memoryKb < HEAP_NOISE_THRESHOLD_KB ? 0 : r6.memoryKb;
+        if (r6MemKb === 0 && rrMemKb === 0) {
+          rrMemVsR6 = (GRAY + "~0" + RESET).padStart(10);
+        } else {
+          const diffVsR6 = r6MemKb === 0 ? 100 : ((rrMemKb - r6MemKb) / r6MemKb) * 100;
+          rrMemVsR6 = formatDiffCompact(diffVsR6).padStart(10);
+          if (diffVsR6 < 0) rrMemVsR6Better++;
+        }
       }
     }
 
@@ -899,12 +937,12 @@ function getLatestBenchmarkSet() {
         type: "pair",
       };
     }
-    // Duo: baseline router and real-router only
-    if (set[BASELINE_ROUTER] && set["real-router"]) {
+    // Duo: router6 and real-router only
+    if (set["router6"] && set["real-router"]) {
       return {
-        baseline: set[BASELINE_ROUTER],
+        baseline: set["router6"],
         current: set["real-router"],
-        baselineLabel: BASELINE_ROUTER,
+        baselineLabel: "router6",
         type: "duo",
       };
     }

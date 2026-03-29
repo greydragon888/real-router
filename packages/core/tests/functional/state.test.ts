@@ -179,25 +179,6 @@ describe("core/stateBuilder", () => {
 
       expect(state.name).toBe("custom.name");
     });
-
-    it("creates state with query params meta", () => {
-      const tree = createRouteTree("", "", [
-        { name: "search", path: "/search?q&page" },
-      ]);
-
-      const matcher = createMatcher();
-
-      matcher.registerTree(tree);
-      const result = matcher.match("/search?q=test&page=1");
-
-      expect(result).not.toBeNull();
-
-      const state = createRouteState(result!);
-
-      expect(state.meta).toStrictEqual({
-        search: { q: "query", page: "query" },
-      });
-    });
   });
 
   describe("not found state via start with allowNotFound", () => {

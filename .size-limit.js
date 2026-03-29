@@ -200,7 +200,7 @@ export default [
   {
     name: "type-guards (ESM)",
     path: "packages/type-guards/dist/esm/index.mjs",
-    limit: "1.1 kB",
+    limit: "1 kB",
     modifyEsbuildConfig: addDevelopmentCondition,
   },
   {

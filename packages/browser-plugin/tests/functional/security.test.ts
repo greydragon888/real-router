@@ -62,7 +62,6 @@ describe("Browser Plugin — Security", () => {
         name: "home",
         params: {},
         // Missing 'path' - invalid state structure
-        meta: "invalid", // meta should be object, not string
       };
 
       const stateBefore = router.getState();
@@ -84,7 +83,6 @@ describe("Browser Plugin — Security", () => {
         name: '<script>alert("xss")</script>',
         params: {},
         path: "/malicious",
-        meta: { id: 1, params: {} },
       };
 
       globalThis.dispatchEvent(
@@ -123,7 +121,6 @@ describe("Browser Plugin — Security", () => {
         name: "users.view",
         params: { id: "123", __proto__: { polluted: true } },
         path: "/users/view/123",
-        meta: { id: 1, params: {} },
       };
 
       globalThis.dispatchEvent(
@@ -144,7 +141,6 @@ describe("Browser Plugin — Security", () => {
         name: "home",
         params: { constructor: { prototype: { polluted: true } } },
         path: "/home",
-        meta: { id: 1, params: {} },
       };
 
       globalThis.dispatchEvent(
@@ -171,7 +167,6 @@ describe("Browser Plugin — Security", () => {
         name: "home",
         params: { deep: deeplyNested },
         path: "/home",
-        meta: { id: 1, params: {} },
       };
 
       // The key test: router should not crash with deeply nested objects

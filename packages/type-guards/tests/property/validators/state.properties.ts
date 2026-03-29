@@ -32,7 +32,7 @@ describe("State Validators - Property-Based Tests", () => {
       );
 
       test.prop([stateFullArbitrary, methodNameArbitrary], { numRuns: 5000 })(
-        "does not throw exception for full valid State with meta",
+        "does not throw exception for full valid State with extra properties",
         (state, method) => {
           expect(() => {
             validateState(state, method);

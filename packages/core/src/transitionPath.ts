@@ -1,5 +1,7 @@
 // packages/core/src/transitionPath.ts
 
+import { getStateMetaParams } from "./stateMetaStore";
+
 import type { State } from "@real-router/types";
 
 /**
@@ -96,10 +98,11 @@ function isPrimitive(value: unknown): value is PrimitiveParam {
  */
 function segmentParamsEqual(
   name: string,
+  toMetaParams: Record<string, unknown>,
   toState: State,
   fromState: State,
 ): boolean {
-  const keys = toState.meta?.params[name];
+  const keys = toMetaParams[name];
 
   if (!keys || typeof keys !== "object") {
     return true;
@@ -125,6 +128,7 @@ function segmentParamsEqual(
  * Finds the point where two state paths diverge based on segments and parameters.
  * Compares both segment names and their parameters to find the first difference.
  *
+ * @param toMetaParams - Cached meta.params from toState (avoids per-segment WeakMap lookup)
  * @param toState - Target state
  * @param fromState - Source state
  * @param toStateIds - Segment IDs for target state
@@ -133,6 +137,7 @@ function segmentParamsEqual(
  * @returns Index of first difference, or maxI if all checked segments match
  */
 function pointOfDifference(
+  toMetaParams: Record<string, unknown>,
   toState: State,
   fromState: State,
   toStateIds: string[],
@@ -148,7 +153,7 @@ function pointOfDifference(
       return i;
     }
 
-    if (!segmentParamsEqual(toSegment, toState, fromState)) {
+    if (!segmentParamsEqual(toSegment, toMetaParams, toState, fromState)) {
       return i;
     }
   }
@@ -339,13 +344,12 @@ function computeTransitionPath(
     };
   }
 
-  // ===== FAST PATH 3: Missing meta or meta.params requires full reload =====
-  // Check if meta or meta.params is actually missing (not just empty)
-  const toHasMeta = toState.meta?.params !== undefined;
-  const fromHasMeta = fromState.meta?.params !== undefined;
+  // ===== FAST PATH 3: Missing meta requires full reload =====
+  // Single WeakMap lookup per state, reused in pointOfDifference/segmentParamsEqual
+  const toMetaParams = getStateMetaParams(toState);
+  const fromMetaParams = getStateMetaParams(fromState);
 
-  if (!toHasMeta && !fromHasMeta) {
-    // Both states missing meta.params - require full reload
+  if (!toMetaParams && !fromMetaParams) {
     return {
       intersection: EMPTY_INTERSECTION,
       toActivate: nameToIDs(toState.name),
@@ -354,14 +358,12 @@ function computeTransitionPath(
   }
 
   // ===== STANDARD PATH: Routes with parameters =====
-  // Use original algorithm for complex cases with parameters
   const toStateIds = nameToIDs(toState.name);
   const fromStateIds = nameToIDs(fromState.name);
   const maxI = Math.min(fromStateIds.length, toStateIds.length);
 
-  // Find where paths diverge based on segments and parameters
-  // not obvious validate toState and fromState
   const i = pointOfDifference(
+    (toMetaParams ?? fromMetaParams) as Record<string, unknown>,
     toState,
     fromState,
     toStateIds,
@@ -402,12 +404,7 @@ function computeTransitionPath(
 export function getTransitionPath(
   toState: State,
   fromState?: State,
-  reload?: boolean,
 ): TransitionPath {
-  if (reload) {
-    return computeTransitionPath(toState, fromState);
-  }
-
   if (
     cached1Result !== null &&
     toState === cached1To &&

@@ -6,11 +6,8 @@ import type {
 } from "@real-router/core";
 import type { HTMLAttributes, MouseEventHandler } from "react";
 
-export interface RouteState<
-  P extends Params = Params,
-  MP extends Params = Params,
-> {
-  route: State<P, MP> | undefined;
+export interface RouteState<P extends Params = Params> {
+  route: State<P> | undefined;
   previousRoute?: State | undefined;
 }
 

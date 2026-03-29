@@ -305,8 +305,8 @@ router.navigate(name, params, opts)
         │
         └── updateBrowserState(toState, finalUrl, shouldReplace, browser)
                   │
-                  ├── Create historyState = { meta, name, params, path }
-                  └── browser.pushState() or browser.replaceState()
+                   ├── Create historyState = { name, params, path }
+                   └── browser.pushState() or browser.replaceState()
 ```
 
 ## Data Flow: popstate (back/forward buttons)
@@ -405,7 +405,7 @@ Popstate event handling (`getRouteFromEvent`, `updateBrowserState`), critical er
 See [browser-env/ARCHITECTURE.md](../browser-env/ARCHITECTURE.md) for details on:
 
 - Route extraction from popstate events (history.state validation → URL matching fallback)
-- `historyState` as a subset of `State` (only `meta`, `name`, `params`, `path` stored in `history.state`)
+- `historyState` as a subset of `State` (only `name`, `params`, `path` stored in `history.state`)
 - Error categorization (RouterError = expected, anything else = critical recovery via `replaceState`)
 
 ## Options Validation
@@ -498,12 +498,12 @@ The hash fragment (`#section`) is always preserved when navigating to the same p
 
 6 stress tests in `tests/stress/` validate behavior under extreme conditions:
 
-| Category | Tests | What they verify |
-|----------|-------|-----------------|
-| Popstate | popstate-storm, popstate-navigate-interleave | Rapid back/forward, popstate during navigation |
-| Guards | cannot-deactivate-storm | canDeactivate guard blocking under rapid back/forward |
-| State | corrupted-state-storm, history-state-accumulation | Corrupted history.state recovery, history entry growth |
-| Lifecycle | plugin-lifecycle-churn | Rapid plugin register/unregister cycles |
+| Category  | Tests                                             | What they verify                                       |
+| --------- | ------------------------------------------------- | ------------------------------------------------------ |
+| Popstate  | popstate-storm, popstate-navigate-interleave      | Rapid back/forward, popstate during navigation         |
+| Guards    | cannot-deactivate-storm                           | canDeactivate guard blocking under rapid back/forward  |
+| State     | corrupted-state-storm, history-state-accumulation | Corrupted history.state recovery, history entry growth |
+| Lifecycle | plugin-lifecycle-churn                            | Rapid plugin register/unregister cycles                |
 
 ## Related Documents
 

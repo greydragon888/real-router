@@ -17,45 +17,45 @@ Extracts all browser-specific logic shared between the two URL plugins: History 
 
 ### Browser Abstraction
 
-| Function | Description |
-|----------|-------------|
+| Function                                  | Description                                                            |
+| ----------------------------------------- | ---------------------------------------------------------------------- |
 | `createSafeBrowser(getLocation, context)` | Create `Browser` instance — real API in browser, no-op fallback in SSR |
-| `isBrowserEnvironment()` | Detect browser via `globalThis.window` + `globalThis.history` |
+| `isBrowserEnvironment()`                  | Detect browser via `globalThis.window` + `globalThis.history`          |
 
 ### Popstate Handling
 
-| Function | Description |
-|----------|-------------|
-| `createPopstateHandler(deps)` | Create popstate event handler with deferred queue and error recovery |
-| `createPopstateLifecycle(deps)` | Create `onStart`/`onStop`/`teardown` hooks for listener management |
-| `getRouteFromEvent(evt, api, browser)` | Extract route from popstate event, fallback to URL matching |
+| Function                               | Description                                                          |
+| -------------------------------------- | -------------------------------------------------------------------- |
+| `createPopstateHandler(deps)`          | Create popstate event handler with deferred queue and error recovery |
+| `createPopstateLifecycle(deps)`        | Create `onStart`/`onStop`/`teardown` hooks for listener management   |
+| `getRouteFromEvent(evt, api, browser)` | Extract route from popstate event, fallback to URL matching          |
 
 ### Router Extensions
 
-| Function | Description |
-|----------|-------------|
-| `createStartInterceptor(api, browser)` | Inject browser location when `router.start()` called without path |
-| `createReplaceHistoryState(api, router, browser, buildUrl)` | Replace URL without triggering navigation |
+| Function                                                    | Description                                                       |
+| ----------------------------------------------------------- | ----------------------------------------------------------------- |
+| `createStartInterceptor(api, browser)`                      | Inject browser location when `router.start()` called without path |
+| `createReplaceHistoryState(api, router, browser, buildUrl)` | Replace URL without triggering navigation                         |
 
 ### History Utilities
 
-| Function | Description |
-|----------|-------------|
-| `shouldReplaceHistory(navOptions, toState, fromState, router)` | Decide `pushState` vs `replaceState` |
-| `updateBrowserState(state, url, replace, browser)` | Update `history.state` with state subset |
+| Function                                                       | Description                              |
+| -------------------------------------------------------------- | ---------------------------------------- |
+| `shouldReplaceHistory(navOptions, toState, fromState, router)` | Decide `pushState` vs `replaceState`     |
+| `updateBrowserState(state, url, replace, browser)`             | Update `history.state` with state subset |
 
 ### URL Utilities
 
-| Function | Description |
-|----------|-------------|
-| `normalizeBase(base)` | Ensure leading slash, remove trailing slash |
-| `safelyEncodePath(path)` | Encode URI path, return original on failure |
+| Function                     | Description                                              |
+| ---------------------------- | -------------------------------------------------------- |
+| `normalizeBase(base)`        | Ensure leading slash, remove trailing slash              |
+| `safelyEncodePath(path)`     | Encode URI path, return original on failure              |
 | `safeParseUrl(url, context)` | Parse URL with protocol validation (`null` for non-HTTP) |
 
 ### Validation
 
-| Function | Description |
-|----------|-------------|
+| Function                                    | Description                                                |
+| ------------------------------------------- | ---------------------------------------------------------- |
 | `createOptionsValidator(defaults, context)` | Runtime type validator comparing `typeof` against defaults |
 
 ## Popstate Flow
@@ -78,7 +78,7 @@ popstate event
 - **SSR fallback** — `createSafeBrowser` returns no-op implementation with one-time warning per context
 - **Deferred queue** — only the **last** deferred popstate event is kept (intermediate states skipped)
 - **Critical error recovery** — when guard blocks navigation but browser already changed URL, `replaceState` restores the previous URL
-- **History state subset** — only `meta`, `name`, `params`, `path` stored in `history.state` (not the full `State`)
+- **History state subset** — only `name`, `params`, `path` stored in `history.state` (not the full `State`)
 - **State validation** — `isStateStrict` from `type-guards` validates `history.state` (can be corrupted by external code)
 
 ## Dependencies

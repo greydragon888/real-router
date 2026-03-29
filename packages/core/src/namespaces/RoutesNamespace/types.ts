@@ -31,12 +31,12 @@ export interface RoutesDependencies<
   ) => void;
 
   /** Create state object */
-  makeState: <P extends Params = Params, MP extends Params = Params>(
+  makeState: <P extends Params = Params>(
     name: string,
     params?: P,
     path?: string,
     meta?: Record<string, Record<string, "url" | "query">>,
-  ) => State<P, MP>;
+  ) => State<P>;
 
   /** Get current router state */
   getState: () => State | undefined;

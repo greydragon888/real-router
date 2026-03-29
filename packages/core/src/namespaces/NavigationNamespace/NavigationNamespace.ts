@@ -149,7 +149,6 @@ export class NavigationNamespace {
       const { toDeactivate, toActivate, intersection } = getTransitionPath(
         toState,
         fromState,
-        opts.reload,
       );
 
       const shouldDeactivate =
