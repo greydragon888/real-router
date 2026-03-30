@@ -118,6 +118,50 @@ describe("buildHref", () => {
 
     expect(router.buildPath).toHaveBeenCalledWith("home", {});
   });
+
+  it("5 — returns undefined and logs error when buildPath throws for unknown route", () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    const router = {
+      buildPath: vi.fn().mockImplementation(() => {
+        throw new Error(
+          "[SegmentMatcher.buildPath] 'nonexistent' is not defined",
+        );
+      }),
+    } as unknown as Router;
+
+    const result = buildHref(router, "nonexistent", {});
+
+    expect(result).toBeUndefined();
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining("nonexistent"),
+    );
+
+    consoleError.mockRestore();
+  });
+
+  it("6 — returns undefined and logs error when buildUrl throws for unknown route", () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    const router = {
+      buildUrl: vi.fn().mockImplementation(() => {
+        throw new Error("Route not found");
+      }),
+      buildPath: vi.fn(),
+    } as unknown as Router;
+
+    const result = buildHref(router, "nonexistent", {});
+
+    expect(result).toBeUndefined();
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining("nonexistent"),
+    );
+    expect(router.buildPath).not.toHaveBeenCalled();
+
+    consoleError.mockRestore();
+  });
 });
 
 describe("buildActiveClassName", () => {

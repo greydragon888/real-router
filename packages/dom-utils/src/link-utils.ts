@@ -17,14 +17,22 @@ export function buildHref(
   router: Router,
   routeName: string,
   routeParams: Params,
-): string {
-  const buildUrl = router.buildUrl as BuildUrlFn | undefined;
+): string | undefined {
+  try {
+    const buildUrl = router.buildUrl as BuildUrlFn | undefined;
 
-  if (buildUrl) {
-    return buildUrl(routeName, routeParams);
+    if (buildUrl) {
+      return buildUrl(routeName, routeParams);
+    }
+
+    return router.buildPath(routeName, routeParams);
+  } catch {
+    console.error(
+      `[real-router] Route "${routeName}" is not defined. The element will render without an href attribute.`,
+    );
+
+    return undefined;
   }
-
-  return router.buildPath(routeName, routeParams);
 }
 
 export function buildActiveClassName(

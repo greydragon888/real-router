@@ -1,5 +1,5 @@
 import { createActiveRouteSource } from "@real-router/sources";
-import { shouldNavigate, applyLinkA11y } from "dom-utils";
+import { shouldNavigate, applyLinkA11y, buildHref } from "dom-utils";
 import { createEffect, onCleanup } from "solid-js";
 
 import { EMPTY_PARAMS, EMPTY_OPTIONS } from "../constants";
@@ -26,10 +26,17 @@ export function link<P extends Params = Params>(
 
   // Set href on <a> elements
   if (element instanceof HTMLAnchorElement) {
-    element.href = router.buildPath(
+    const href = buildHref(
+      router,
       options.routeName,
       options.routeParams ?? (EMPTY_PARAMS as P),
     );
+
+    if (href === undefined) {
+      element.removeAttribute("href");
+    } else {
+      element.href = href;
+    }
   }
 
   applyLinkA11y(element);

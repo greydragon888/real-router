@@ -61,6 +61,28 @@ describe("link directive", () => {
 
       expect(screen.getByTestId("link")).toHaveAttribute("href", "/items/123");
     });
+
+    it("should not set href and log error for invalid routeName", () => {
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
+      render(
+        () => (
+          <a use:link={{ routeName: "@@nonexistent-route" }} data-testid="link">
+            Test
+          </a>
+        ),
+        { wrapper },
+      );
+
+      expect(screen.getByTestId("link")).not.toHaveAttribute("href");
+      expect(consoleError).toHaveBeenCalledWith(
+        expect.stringContaining("@@nonexistent-route"),
+      );
+
+      consoleError.mockRestore();
+    });
   });
 
   describe("a11y attributes", () => {

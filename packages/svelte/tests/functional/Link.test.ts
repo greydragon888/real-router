@@ -1,7 +1,7 @@
 import { createRouter } from "@real-router/core";
 import { userEvent } from "@testing-library/user-event";
 import { flushSync } from "svelte";
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import Link from "../../src/components/Link.svelte";
 import {
@@ -149,5 +149,23 @@ describe("Link component", () => {
 
       routerWithoutBuildUrl.stop();
     });
+  });
+
+  it("should render without href and log error for invalid routeName", () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
+    renderWithRouter(router, Link, { routeName: "@@nonexistent-route" });
+
+    const link = document.querySelector("a")!;
+
+    expect(link).toBeInTheDocument();
+    expect(link.hasAttribute("href")).toBe(false);
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining("@@nonexistent-route"),
+    );
+
+    consoleError.mockRestore();
   });
 });

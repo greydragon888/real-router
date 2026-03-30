@@ -1,6 +1,6 @@
 import { createRouter } from "@real-router/core";
 import { mount, flushPromises } from "@vue/test-utils";
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 import { defineComponent, h } from "vue";
 
 import { Link } from "../../src/components/Link";
@@ -275,5 +275,23 @@ describe("Link component", () => {
       expect(link.text()).toBe("Link Text");
       expect(link.attributes("href")).toBe("/test");
     });
+  });
+
+  it("should render without href and log error for invalid routeName", () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
+    const wrapper = mountLink(router, { routeName: "@@nonexistent-route" });
+
+    const link = wrapper.find("a");
+
+    expect(link.exists()).toBe(true);
+    expect(link.attributes("href")).toBeUndefined();
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining("@@nonexistent-route"),
+    );
+
+    consoleError.mockRestore();
   });
 });

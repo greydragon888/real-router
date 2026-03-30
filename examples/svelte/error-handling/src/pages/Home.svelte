@@ -94,7 +94,8 @@
   <div class="card" style="margin-top: 16px">
     <h3>Declarative approach — RouterErrorBoundary</h3>
     <p style="font-size: 13px; color: #888">
-      No try/catch needed. Errors are shown as a toast alongside the links.
+      No try/catch needed. Click a link to trigger an error — the toast
+      appears alongside the links.
     </p>
     <RouterErrorBoundary>
       {#snippet fallback(error, resetError)}

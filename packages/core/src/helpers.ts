@@ -91,12 +91,15 @@ export function deepFreezeState<T extends State>(state: T): T {
     // Freeze the object/array itself
     Object.freeze(obj);
 
-    // Get all values to freeze recursively
-    const values = Array.isArray(obj) ? obj : Object.values(obj);
-
-    // Recursively freeze nested values
-    for (const value of values) {
-      freezeClonedRecursive(value);
+    // Iterate without Object.values() allocation
+    if (Array.isArray(obj)) {
+      for (const item of obj) {
+        freezeClonedRecursive(item);
+      }
+    } else {
+      for (const key in obj) {
+        freezeClonedRecursive((obj as Record<string, unknown>)[key]);
+      }
     }
   }
 

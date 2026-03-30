@@ -424,4 +424,25 @@ describe("Link component", () => {
       expect(screen.getByTestId("link")).toBeInTheDocument();
     });
   });
+
+  it("should render without href and log error for invalid routeName", () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
+    render(
+      <Link routeName="@@nonexistent-route" data-testid="link">
+        Test
+      </Link>,
+      { wrapper },
+    );
+
+    expect(screen.getByTestId("link")).toBeInTheDocument();
+    expect(screen.getByTestId("link")).not.toHaveAttribute("href");
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining("@@nonexistent-route"),
+    );
+
+    consoleError.mockRestore();
+  });
 });

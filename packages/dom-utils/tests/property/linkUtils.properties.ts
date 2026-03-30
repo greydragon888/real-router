@@ -1,5 +1,5 @@
 import { fc, test } from "@fast-check/vitest";
-import { describe, expect } from "vitest";
+import { describe, expect, vi } from "vitest";
 
 import {
   NUM_RUNS,
@@ -9,7 +9,14 @@ import {
   arbGenericTagName,
   arbRepeatCount,
 } from "./helpers";
-import { shouldNavigate, buildActiveClassName, applyLinkA11y } from "../../src";
+import {
+  shouldNavigate,
+  buildHref,
+  buildActiveClassName,
+  applyLinkA11y,
+} from "../../src";
+
+import type { Router } from "@real-router/core";
 
 describe("Link Utils — Property Tests", () => {
   describe("Invariant 4: shouldNavigate is pure", () => {
@@ -103,6 +110,28 @@ describe("Link Utils — Property Tests", () => {
         if (existingTabindex !== undefined) {
           expect(element.getAttribute("tabindex")).toBe(existingTabindex);
         }
+      },
+    );
+  });
+
+  describe("Invariant 8: buildHref never throws", () => {
+    test.prop([fc.string(), fc.dictionary(fc.string(), fc.string())], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "returns string or undefined for any routeName, never throws",
+      (routeName, params) => {
+        const consoleError = vi
+          .spyOn(console, "error")
+          .mockImplementation(() => {});
+        const router = {
+          buildPath: vi.fn().mockImplementation(() => {
+            throw new Error("boom");
+          }),
+        } as unknown as Router;
+
+        expect(() => buildHref(router, routeName, params)).not.toThrow();
+
+        consoleError.mockRestore();
       },
     );
   });
