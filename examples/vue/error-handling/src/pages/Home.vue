@@ -90,7 +90,8 @@ function errorFallback(error: RouterError, resetError: () => void) {
     <div class="card" :style="{ marginTop: '16px' }">
       <h3>Declarative approach — RouterErrorBoundary</h3>
       <p :style="{ fontSize: '13px', color: '#888' }">
-        No try/catch needed. Errors are shown as a toast alongside the links.
+        No try/catch needed. Click a link to trigger an error — the toast
+        appears alongside the links.
       </p>
       <RouterErrorBoundary :fallback="errorFallback">
         <div :style="{ display: 'flex', flexDirection: 'column', gap: '8px' }">

@@ -2,7 +2,7 @@ import { createRouter } from "@real-router/core";
 import { render, screen } from "@solidjs/testing-library";
 import { fireEvent } from "@testing-library/dom";
 import { userEvent } from "@testing-library/user-event";
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { Link, RouterProvider } from "@real-router/solid";
 
@@ -368,5 +368,28 @@ describe("Link component", () => {
 
       routerWithoutBuildUrl.stop();
     });
+  });
+
+  it("should render without href and log error for invalid routeName", () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
+    render(
+      () => (
+        <Link routeName="@@nonexistent-route" data-testid="link">
+          Test
+        </Link>
+      ),
+      { wrapper },
+    );
+
+    expect(screen.getByTestId("link")).toBeInTheDocument();
+    expect(screen.getByTestId("link")).not.toHaveAttribute("href");
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining("@@nonexistent-route"),
+    );
+
+    consoleError.mockRestore();
   });
 });
