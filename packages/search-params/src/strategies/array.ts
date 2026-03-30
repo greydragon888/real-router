@@ -53,8 +53,19 @@ const encodeValue = (value: unknown): string => {
  * Example: items=a&items=b
  */
 export const noneArrayStrategy: ArrayStrategy = {
-  encodeArray: (name, values) =>
-    values.map((val) => `${name}=${encodeValue(val)}`).join("&"),
+  encodeArray: (name, values) => {
+    if (values.length === 0) {
+      return "";
+    }
+
+    let result = `${name}=${encodeValue(values[0])}`;
+
+    for (let i = 1; i < values.length; i++) {
+      result += `&${name}=${encodeValue(values[i])}`;
+    }
+
+    return result;
+  },
 };
 
 /**
@@ -62,8 +73,19 @@ export const noneArrayStrategy: ArrayStrategy = {
  * Example: items[]=a&items[]=b
  */
 export const bracketsArrayStrategy: ArrayStrategy = {
-  encodeArray: (name, values) =>
-    values.map((val) => `${name}[]=${encodeValue(val)}`).join("&"),
+  encodeArray: (name, values) => {
+    if (values.length === 0) {
+      return "";
+    }
+
+    let result = `${name}[]=${encodeValue(values[0])}`;
+
+    for (let i = 1; i < values.length; i++) {
+      result += `&${name}[]=${encodeValue(values[i])}`;
+    }
+
+    return result;
+  },
 };
 
 /**
@@ -71,8 +93,19 @@ export const bracketsArrayStrategy: ArrayStrategy = {
  * Example: items[0]=a&items[1]=b
  */
 export const indexArrayStrategy: ArrayStrategy = {
-  encodeArray: (name, values) =>
-    values.map((val, i) => `${name}[${i}]=${encodeValue(val)}`).join("&"),
+  encodeArray: (name, values) => {
+    if (values.length === 0) {
+      return "";
+    }
+
+    let result = `${name}[0]=${encodeValue(values[0])}`;
+
+    for (let i = 1; i < values.length; i++) {
+      result += `&${name}[${i}]=${encodeValue(values[i])}`;
+    }
+
+    return result;
+  },
 };
 
 /**
@@ -80,8 +113,19 @@ export const indexArrayStrategy: ArrayStrategy = {
  * Example: items=a,b,c
  */
 export const commaArrayStrategy: ArrayStrategy = {
-  encodeArray: (name, values) =>
-    `${name}=${values.map((val) => encodeValue(val)).join(",")}`,
+  encodeArray: (name, values) => {
+    if (values.length === 0) {
+      return `${name}=`;
+    }
+
+    let result = `${name}=${encodeValue(values[0])}`;
+
+    for (let i = 1; i < values.length; i++) {
+      result += `,${encodeValue(values[i])}`;
+    }
+
+    return result;
+  },
 };
 
 /**

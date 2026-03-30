@@ -32,7 +32,7 @@ export const decodeValue = (value: string): string => {
   }
 
   // Only replace + if present (avoid regex overhead)
-  const withSpaces = plusIdx === -1 ? value : value.split("+").join(" ");
+  const withSpaces = plusIdx === -1 ? value : value.replaceAll("+", " ");
 
   // Only decode if % is present
   return percentIdx === -1 ? withSpaces : decodeURIComponent(withSpaces);
@@ -67,6 +67,12 @@ export const decode = (
 
   // Decode URI and check decoded value for boolean formats (e.g., ✓/✗)
   const decoded = decodeValue(value);
+
+  const numberResult = strategies.number.decode(decoded);
+
+  if (numberResult !== null) {
+    return numberResult;
+  }
 
   return strategies.boolean.decodeValue(decoded);
 };

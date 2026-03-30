@@ -13,6 +13,7 @@
 import { arrayStrategies, type ArrayStrategy } from "./array";
 import { booleanStrategies, type BooleanStrategy } from "./boolean";
 import { nullStrategies, type NullStrategy } from "./null";
+import { numberStrategies, type NumberStrategy } from "./number";
 
 import type { FinalOptions } from "../types";
 
@@ -26,6 +27,8 @@ export type { BooleanStrategy } from "./boolean";
 
 export type { NullStrategy } from "./null";
 
+export type { NumberStrategy } from "./number";
+
 // =============================================================================
 // Resolved Strategies
 // =============================================================================
@@ -37,6 +40,7 @@ export type { NullStrategy } from "./null";
 export interface ResolvedStrategies {
   readonly boolean: BooleanStrategy;
   readonly null: NullStrategy;
+  readonly number: NumberStrategy;
   readonly array: ArrayStrategy;
 }
 
@@ -46,15 +50,18 @@ export interface ResolvedStrategies {
  * @param arrayFormat - Array format
  * @param booleanFormat - Boolean format
  * @param nullFormat - Null format
+ * @param numberFormat - Number format
  * @returns Resolved strategy implementations
  */
 export const resolveStrategies = (
   arrayFormat: FinalOptions["arrayFormat"],
   booleanFormat: FinalOptions["booleanFormat"],
   nullFormat: FinalOptions["nullFormat"],
+  numberFormat: FinalOptions["numberFormat"],
 ): ResolvedStrategies => ({
   boolean: booleanStrategies[booleanFormat],
   null: nullStrategies[nullFormat],
+  number: numberStrategies[numberFormat],
   array: arrayStrategies[arrayFormat],
 });
 
@@ -69,5 +76,6 @@ export const resolveStrategies = (
 export const DEFAULT_STRATEGIES: ResolvedStrategies = {
   boolean: booleanStrategies.none,
   null: nullStrategies.default,
+  number: numberStrategies.none,
   array: arrayStrategies.none,
 };

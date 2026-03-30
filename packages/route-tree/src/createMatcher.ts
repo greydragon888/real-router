@@ -20,12 +20,13 @@ import { parse, build } from "search-params";
 /**
  * Query string formatting options.
  *
- * Controls how arrays, booleans, and nulls are serialized in query strings.
+ * Controls how arrays, booleans, nulls, and numbers are serialized in query strings.
  */
 export interface QueryParamsConfig {
   readonly arrayFormat?: "none" | "brackets" | "index" | "comma";
   readonly booleanFormat?: "none" | "string" | "empty-true";
   readonly nullFormat?: "default" | "hidden";
+  readonly numberFormat?: "none" | "auto";
 }
 
 /**

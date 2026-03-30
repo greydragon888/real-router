@@ -95,6 +95,19 @@ describe("New API - matchPath", () => {
     expect(result?.params.flag).toBe(true);
   });
 
+  it("should match with numberFormat auto in matchOptions", () => {
+    const tree = createRouteTree("", "", [
+      { name: "route", path: "/route?page&sort" },
+    ]);
+
+    const result = matchPath(tree, "/route?page=5&sort=name", {
+      queryParams: { numberFormat: "auto" },
+    });
+
+    expect(result?.params.page).toBe(5);
+    expect(result?.params.sort).toBe("name");
+  });
+
   it("should match with urlParamsEncoding option", () => {
     const tree = createRouteTree("", "", [
       { name: "route", path: "/route/:param" },

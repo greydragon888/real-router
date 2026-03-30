@@ -42,6 +42,15 @@ export type BooleanFormat = "none" | "string" | "empty-true";
  */
 export type NullFormat = "default" | "hidden";
 
+/**
+ * Number parameter encoding format.
+ *
+ * @remarks
+ * - `none` - no special handling
+ * - `auto` - decode numeric strings (/^\d+(\.\d+)?$/) to Number()
+ */
+export type NumberFormat = "none" | "auto";
+
 // =============================================================================
 // Options Types
 // =============================================================================
@@ -56,6 +65,8 @@ export interface Options {
   booleanFormat?: BooleanFormat;
   /** Null parameter encoding format. @default "default" */
   nullFormat?: NullFormat;
+  /** Number parameter encoding format. @default "none" */
+  numberFormat?: NumberFormat;
 }
 
 /**
@@ -65,6 +76,7 @@ export interface FinalOptions {
   arrayFormat: ArrayFormat;
   booleanFormat: BooleanFormat;
   nullFormat: NullFormat;
+  numberFormat: NumberFormat;
 }
 
 // =============================================================================
@@ -130,4 +142,4 @@ export interface KeepResponse {
 /**
  * Result of decoding a parameter value.
  */
-export type DecodeResult = boolean | string | null;
+export type DecodeResult = boolean | string | number | null;

@@ -9,7 +9,7 @@ import {
 } from "./helpers";
 import { build, parse } from "../../src";
 
-import type { ArrayFormat, BooleanFormat } from "../../src";
+import type { ArrayFormat, BooleanFormat, NumberFormat } from "../../src";
 
 const arbArrayParamsBracketsOrIndex = fc.tuple(
   fc.dictionary(
@@ -125,6 +125,56 @@ describe("null format roundtrip", () => {
 
       expect(qs).toBe("");
       expect(parse(qs, opts)).toStrictEqual({});
+    },
+  );
+});
+
+describe("number format roundtrip", () => {
+  const arbNatParams = fc.dictionary(arbSafeKey, fc.nat({ max: 99_999 }), {
+    minKeys: 1,
+    maxKeys: 5,
+  });
+
+  test.prop([arbNatParams], { numRuns: NUM_RUNS.standard })(
+    "numberFormat 'auto': parse(build(params, opts), opts) === params for non-negative integers",
+    (params: Record<string, number>) => {
+      const opts = { numberFormat: "auto" as NumberFormat };
+      const qs = build(params, opts);
+      const parsed = parse(qs, opts);
+
+      expect(parsed).toStrictEqual({ ...params });
+    },
+  );
+
+  const arbDecimalParams = fc.dictionary(
+    arbSafeKey,
+    fc
+      .tuple(fc.nat({ max: 9999 }), fc.integer({ min: 1, max: 99 }))
+      .map(([int, frac]) => Number(`${int}.${frac}`)),
+    { minKeys: 1, maxKeys: 5 },
+  );
+
+  test.prop([arbDecimalParams], { numRuns: NUM_RUNS.standard })(
+    "numberFormat 'auto': parse(build(params, opts), opts) === params for decimals",
+    (params: Record<string, number>) => {
+      const opts = { numberFormat: "auto" as NumberFormat };
+      const qs = build(params, opts);
+      const parsed = parse(qs, opts);
+
+      expect(parsed).toStrictEqual({ ...params });
+    },
+  );
+
+  test.prop([arbNatParams], { numRuns: NUM_RUNS.standard })(
+    "numberFormat 'none': numbers become strings after roundtrip",
+    (params: Record<string, number>) => {
+      const opts = { numberFormat: "none" as NumberFormat };
+      const qs = build(params, opts);
+      const parsed = parse(qs, opts);
+
+      for (const key of Object.keys(params)) {
+        expect(typeof parsed[key]).toBe("string");
+      }
     },
   );
 });

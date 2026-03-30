@@ -24,6 +24,7 @@ describe("createMatcher", () => {
         booleanFormat: "string",
         arrayFormat: "brackets",
         nullFormat: "hidden",
+        numberFormat: "auto",
       },
     });
 
@@ -151,5 +152,58 @@ describe("createMatcher", () => {
     expect(path).toContain("/search");
     expect(path).toContain("q=hello");
     expect(path).toContain("active=true"); // booleanFormat: "string" serializes true → "true"
+  });
+
+  it("should parse numbers with numberFormat auto", () => {
+    const matcher = createMatcher({
+      queryParams: { numberFormat: "auto" },
+    });
+
+    matcher.registerTree({
+      name: "@@router-root@@",
+      path: "",
+      fullName: "",
+      absolute: false,
+      children: new Map([
+        [
+          "search",
+          {
+            name: "search",
+            path: "/search?page&limit",
+            fullName: "search",
+            absolute: false,
+            children: new Map(),
+            nonAbsoluteChildren: [],
+            paramMeta: {
+              urlParams: [],
+              queryParams: ["page", "limit"],
+              spatParams: [],
+              paramTypeMap: { page: "query", limit: "query" },
+              constraintPatterns: new Map(),
+              pathPattern: "/search",
+            },
+            paramTypeMap: { page: "query", limit: "query" },
+            staticPath: "/search",
+          },
+        ],
+      ]),
+      nonAbsoluteChildren: [],
+      paramMeta: {
+        urlParams: [],
+        queryParams: [],
+        spatParams: [],
+        paramTypeMap: {},
+        constraintPatterns: new Map(),
+        pathPattern: "",
+      },
+      paramTypeMap: {},
+      staticPath: null,
+    });
+
+    const result = matcher.match("/search?page=3&limit=20");
+
+    expect(result).toBeDefined();
+    expect(result?.params.page).toBe(3); // numberFormat: "auto" parses "3" → 3
+    expect(result?.params.limit).toBe(20);
   });
 });

@@ -52,6 +52,9 @@
 | 7   | Plus-as-space equivalence            | `parse(qs.replace(/%20/g, '+'))` produces the same result as `parse(qs)`. The decoder treats `+` as a space, equivalent to `%20`.                                                                                                                        |
 | 8   | Array element type partition         | `build({key: [v]})` succeeds for `v: string \| number \| boolean` and throws `TypeError` for `v: null \| undefined \| object`. Array elements must be primitives (excluding null).                                                                       |
 | 9   | None format: single-element collapse | `parse(build({a: [x]}, {arrayFormat: "none"}))` returns `{a: x}` (scalar), not `{a: [x]}` (array). Single-element arrays lose their array type through the none-format roundtrip because the parser cannot distinguish a single-value key from a scalar. |
+| 10  | Number format: auto integers         | `parse(build(params, {numberFormat: "auto"}), {numberFormat: "auto"}) === params` for non-negative integer values. Numbers roundtrip through the encode/decode cycle losslessly.                                                                            |
+| 11  | Number format: auto decimals         | `parse(build(params, {numberFormat: "auto"}), {numberFormat: "auto"}) === params` for decimal values (e.g., `12.5`). Decimal numbers survive the roundtrip.                                                                                                  |
+| 12  | Number format: none preserves strings | `typeof parse(build({a: 42}, {numberFormat: "none"}), {numberFormat: "none"}).a === "string"`. With `numberFormat: "none"`, numbers become strings after the build/parse cycle.                                                                                |
 
 ## Test Files
 
@@ -60,4 +63,4 @@
 | `tests/property/parseBuild.properties.ts` | 1–9        | Core parse/build cycle     |
 | `tests/property/omitKeep.properties.ts`   | 1–10       | Omit and keep operations   |
 | `tests/property/parseInto.properties.ts`  | 1–3        | parseInto equivalence      |
-| `tests/property/formats.properties.ts`    | 1–9        | Format-specific roundtrips |
+| `tests/property/formats.properties.ts`    | 1–12       | Format-specific roundtrips |

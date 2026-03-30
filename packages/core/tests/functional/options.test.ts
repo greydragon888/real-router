@@ -175,6 +175,7 @@ describe("core/options", () => {
         arrayFormat: "none",
         booleanFormat: "none",
         nullFormat: "default",
+        numberFormat: "none",
       });
 
       plainRouter.stop();
@@ -439,6 +440,12 @@ describe("core/options", () => {
         ).not.toThrow();
       });
 
+      it("without validation plugin, invalid numberFormat value does NOT throw", () => {
+        expect(() =>
+          createRouter([], { queryParams: { numberFormat: "bad" } as any }),
+        ).not.toThrow();
+      });
+
       it("should accept all valid queryParams combinations", () => {
         expect(() =>
           createRouter([], {
@@ -446,6 +453,7 @@ describe("core/options", () => {
               arrayFormat: "none",
               booleanFormat: "none",
               nullFormat: "default",
+              numberFormat: "none",
             },
           }),
         ).not.toThrow();
@@ -456,6 +464,7 @@ describe("core/options", () => {
               arrayFormat: "brackets",
               booleanFormat: "string",
               nullFormat: "hidden",
+              numberFormat: "auto",
             },
           }),
         ).not.toThrow();

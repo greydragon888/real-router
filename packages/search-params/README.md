@@ -59,11 +59,28 @@ omit("page=1&sort=name&limit=10", ["sort", "limit"]);
 | `"default"` | `key` (key only) |
 | `"hidden"` | omitted |
 
+### `numberFormat`
+
+| Format | Decoded |
+|--------|---------|
+| `"none"` (default) | `{ page: "1" }` (string) |
+| `"auto"` | `{ page: 1 }` (number) |
+
+Detects integers and decimals matching `/^\d+(\.\d+)?$/`. No encoding change needed — numbers are encoded identically regardless of format.
+
+```typescript
+parse("page=1&price=12.5&name=abc", { numberFormat: "auto" });
+// → { page: 1, price: 12.5, name: "abc" }
+```
+
 ## Key Design Decisions
 
 - **Single-pass parsing** — no intermediate arrays
 - **`parseInto` direct mutation** — avoids object allocation on hot path
 - **Set-based filtering** — O(1) lookup for omit/keep operations
+- **Zero intermediate allocations in omit/keep** — inline loop with string concatenation instead of array accumulation
+- **Loop-based array encoding** — replaces `.map().join()` to avoid intermediate arrays
+- **`codePointAt` scan in number detection** — avoids regex engine overhead
 
 ## Dependencies
 

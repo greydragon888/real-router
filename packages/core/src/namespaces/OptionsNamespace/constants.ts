@@ -14,6 +14,7 @@ export const defaultOptions: Options = {
     arrayFormat: "none",
     booleanFormat: "none",
     nullFormat: "default",
+    numberFormat: "none",
   },
   urlParamsEncoding: "default",
   allowNotFound: true,

@@ -17,6 +17,7 @@ export type {
   FinalOptions,
   KeepResponse,
   NullFormat,
+  NumberFormat,
   OmitResponse,
   Options,
   QueryParamPrimitive,

@@ -16,6 +16,7 @@ const URL_PARAMS_ENCODING_VALUES = [
 const ARRAY_FORMAT_VALUES = ["none", "brackets", "index", "comma"] as const;
 const BOOLEAN_FORMAT_VALUES = ["none", "string", "empty-true"] as const;
 const NULL_FORMAT_VALUES = ["default", "hidden"] as const;
+const NUMBER_FORMAT_VALUES = ["none", "auto"] as const;
 const LOGGER_LEVEL_VALUES = [
   "all",
   "warn-error",
@@ -56,6 +57,9 @@ const validQueryParamsArbitrary = fc
       nil: undefined,
     }),
     nullFormat: fc.option(fc.constantFrom(...NULL_FORMAT_VALUES), {
+      nil: undefined,
+    }),
+    numberFormat: fc.option(fc.constantFrom(...NUMBER_FORMAT_VALUES), {
       nil: undefined,
     }),
   })

@@ -21,7 +21,8 @@ search-params/
 │   │   ├── index.ts          — Strategy factory & resolution (resolveStrategies)
 │   │   ├── array.ts          — Array format strategies (4 implementations)
 │   │   ├── boolean.ts        — Boolean format strategies (3 implementations)
-│   │   └── null.ts           — Null format strategies (2 implementations)
+│   │   ├── null.ts           — Null format strategies (2 implementations)
+│   │   └── number.ts         — Number format strategies (2 implementations)
 │   ├── types.ts              — All type definitions
 │   └── index.ts              — Public API exports
 ```
@@ -86,12 +87,14 @@ keep(path: string, paramsToKeep: string[], opts?: Options): KeepResponse
 type ArrayFormat = "none" | "brackets" | "index" | "comma";
 type BooleanFormat = "none" | "string" | "empty-true";
 type NullFormat = "default" | "hidden";
+type NumberFormat = "none" | "auto";
 
 // Options
 interface Options {
   arrayFormat?: ArrayFormat; // default: "none"
   booleanFormat?: BooleanFormat; // default: "none"
   nullFormat?: NullFormat; // default: "default"
+  numberFormat?: NumberFormat; // default: "none"
 }
 
 // Parameter types
@@ -114,8 +117,9 @@ interface FinalOptions {
   arrayFormat: ArrayFormat;
   booleanFormat: BooleanFormat;
   nullFormat: NullFormat;
+  numberFormat: NumberFormat;
 }
-type DecodeResult = boolean | string | null;
+type DecodeResult = boolean | number | string | null;
 ```
 
 ## Strategy Pattern
@@ -125,13 +129,14 @@ type DecodeResult = boolean | string | null;
 Format-specific encoding/decoding is delegated to strategy objects, resolved once per call via `makeOptions()`:
 
 ```
-Options { arrayFormat, booleanFormat, nullFormat }
+Options { arrayFormat, booleanFormat, nullFormat, numberFormat }
     │
     ▼  makeOptions()
 OptionsWithStrategies { ...options, strategies: ResolvedStrategies }
     │
     ├── strategies.boolean  — encode/decode boolean values
     ├── strategies.null     — encode null values
+    ├── strategies.number   — decode numeric values
     └── strategies.array    — encode array values
 ```
 
@@ -147,6 +152,10 @@ interface BooleanStrategy {
 
 interface NullStrategy {
   encode(name: string): string;
+}
+
+interface NumberStrategy {
+  decode(decodedValue: string): number | null;
 }
 
 interface ArrayStrategy {
@@ -172,6 +181,15 @@ interface ArrayStrategy {
 | `"none"`       | `flag=true`       | `flag=false`       | No conversion — remains string                    |
 | `"string"`     | `flag=true`       | `flag=false`       | `"true"`/`"false"` → `boolean`                    |
 | `"empty-true"` | `flag`            | `flag=false`       | Key-only → `true`, value passed through as string |
+
+#### Number Formats
+
+| Format   | Decoding                                                                  |
+| -------- | ------------------------------------------------------------------------- |
+| `"none"` | No conversion — numbers remain strings                                    |
+| `"auto"` | `/^\d+(\.\d+)?$/` → `Number()` (codePointAt scan, no regex engine)       |
+
+Encoding is not needed — `encode.ts` handles `typeof value === "number"` via `encodeURIComponent` regardless of format.
 
 #### Null Formats
 
@@ -271,13 +289,16 @@ omit(path, paramsToOmit, opts?)
        │
        ▼
 ┌─────────────────┐
-│  forEachParam() │  Iterate "&"-separated chunks
-│                 │  Classify: omit set → removed[], else → kept[]
+│  Inline iterate │  Loop over "&"-separated chunks (no closure)
+│  searchPart     │  For each chunk:
+│                 │    1. sliceParamName() — 1 slice for name (no intermediates)
+│                 │    2. Set.has(name) → appendChunk to keptStr or removedStr
+│                 │  No arrays — direct string concatenation
 └──────┬──────────┘
        │
        ▼
-  { querystring: hasPrefix ? `?${kept.join("&")}` : kept.join("&"),
-    removedParams: parse(removed.join("&"), options) }
+  { querystring: hasPrefix && keptStr ? `?${keptStr}` : keptStr,
+    removedParams: parse(removedStr, options) }
 ```
 
 **`hasPrefix` logic:** If the input `path` started with `?`, the output `querystring` is re-prefixed with `?` (only when the result is non-empty — empty `querystring` is never prefixed).
@@ -294,7 +315,7 @@ decodeValue(value: string): string
 
 1. Check for `%` (percent-encoding) and `+` (space encoding)
 2. Neither present → return as-is (**fast path** — most common case)
-3. `+` present → replace with spaces via `split("+").join(" ")`
+3. `+` present → replace with spaces via `replaceAll("+", " ")`
 4. `%` present → `decodeURIComponent()`
 
 ### Array Accumulation
@@ -319,7 +340,8 @@ types.ts (leaf — no imports)
     │   ├── array.ts → types (has own local encodeValue)
     │   ├── boolean.ts → types
     │   ├── null.ts → types
-    │   └── index.ts → array, boolean, null
+    │   ├── number.ts → types
+    │   └── index.ts → array, boolean, null, number, types
     ├── encode.ts → types, strategies
     └── searchParams.ts → decode, encode, utils, strategies, types
 ```
@@ -340,15 +362,21 @@ No circular dependencies.
 
 ### Optimizations
 
-| Optimization               | Benefit                                      |
-| -------------------------- | -------------------------------------------- |
-| Empty string fast path     | O(1) for empty query strings                 |
-| No-options fast path       | Skip strategy resolution (most common case)  |
-| `DEFAULT_OPTIONS` constant | Cached default strategies, no allocation     |
-| Index-based iteration      | No `split("&")` intermediate array           |
-| `decodeValue` two-check    | Most values skip decoding entirely           |
-| Set-based omit/keep        | O(1) per-param lookup instead of O(m) scan   |
-| `parseInto()` mutation     | Avoids intermediate object + `Object.assign` |
+| Optimization                             | Benefit                                          |
+| ---------------------------------------- | ------------------------------------------------ |
+| Empty string fast path                   | O(1) for empty query strings                     |
+| No-options fast path                     | Skip strategy resolution (most common case)      |
+| `DEFAULT_OPTIONS` constant               | Cached default strategies, no allocation         |
+| Index-based iteration                    | No `split("&")` intermediate array               |
+| `decodeValue` two-check                  | Most values skip decoding entirely               |
+| `replaceAll` instead of `split().join()` | No intermediate array for `+` replacement         |
+| Inline bracket scan in parse             | No `{ name, hasBrackets }` object allocation      |
+| `sliceParamName` in omit/keep            | 1 slice instead of 2-3 for param name extraction  |
+| String concat in omit/keep               | No `kept[]`/`removed[]` array allocations          |
+| Loop instead of `.map().join()` in arrays | No intermediate array during encoding              |
+| `codePointAt` scan in numberFormat       | No regex engine overhead                          |
+| Set-based omit/keep                      | O(1) per-param lookup instead of O(m) scan        |
+| `parseInto()` mutation                   | Avoids intermediate object + `Object.assign`      |
 
 ### Memory
 
@@ -356,6 +384,9 @@ No circular dependencies.
 - `parseInto()` mutates target directly
 - Strategy objects are singletons (one per format combination)
 - `Set` for omit/keep (O(m) space, recycled after call)
+- No intermediate arrays in omit/keep (string concatenation via `appendChunk`)
+- No intermediate arrays in array strategies (loop instead of `.map().join()`)
+- No object allocation for param name extraction (inline index scan)
 
 ## Error Handling
 
@@ -363,7 +394,7 @@ No circular dependencies.
 | -------------------------- | ----------------------------------------------------------------- |
 | Invalid array element type | `TypeError` during `build()` (only string/number/boolean allowed) |
 | `undefined` values         | Skipped in `build()` (not serializable)                           |
-| Objects in params          | Fallback to `String(obj)` → `"[object Object]"`                   |
+| Objects in params          | Fallback to `encodeURIComponent(obj)` → `"%5Bobject%20Object%5D"` |
 | Malformed query string     | Best-effort parse (missing `=` → `null` value)                    |
 
 ## See Also

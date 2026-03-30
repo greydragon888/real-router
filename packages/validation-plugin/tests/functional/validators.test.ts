@@ -831,6 +831,12 @@ describe("Phase 2 options validators", () => {
       }).toThrow(TypeError);
     });
 
+    it("throws for invalid queryParams.numberFormat", () => {
+      expect(() => {
+        validateOptions({ queryParams: { numberFormat: "bad" } }, "test");
+      }).toThrow(TypeError);
+    });
+
     it("throws for invalid logger (non-object)", () => {
       expect(() => {
         validateOptions({ logger: "string" }, "test");
@@ -891,6 +897,7 @@ describe("Phase 2 options validators", () => {
               arrayFormat: "none",
               booleanFormat: "none",
               nullFormat: "default",
+              numberFormat: "none",
             },
             logger: {
               level: "warn-error",
