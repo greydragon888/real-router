@@ -1,5 +1,5 @@
 import { mergeConfig, defineProject } from "vitest/config";
-import unitConfig from "../../vitest.config.unit.mts";
+import unitConfig from "../../vitest.config.unit.mjs";
 
 /**
  * Vitest configuration for event-emitter package

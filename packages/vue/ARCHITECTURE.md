@@ -19,7 +19,7 @@ One entry point. Vue has native `<KeepAlive>`, so no modern/legacy split is need
 @real-router/vue  →  src/index.ts  →  Full API (Vue 3.3+)
 ```
 
-**Build output** (tsup single entry):
+**Build output** (tsdown single entry):
 
 ```
 dist/
@@ -76,7 +76,7 @@ src/
 | Context mechanism           | `createContext` + Provider         | `createContext` + Provider                 | `createContext` + Provider                              | `provide` / `inject` + `InjectionKey`                |
 | Context count               | 2 (React), 3 (Preact)              | 3                                          | 2                                                       | 3                                                    |
 | Components                  | JSX (.tsx)                         | JSX (.tsx)                                 | JSX (.tsx)                                              | `defineComponent` + `h()` (.ts)                      |
-| Build tool                  | tsup                               | tsup                                       | rollup + babel-preset-solid                             | tsup                                                 |
+| Build tool                  | tsdown                             | tsdown                                     | rollup + babel-preset-solid                             | tsdown                                               |
 | Peer dependency             | `react` >= 19.0.0                  | `preact` >= 10.0.0                         | `solid-js` >= 1.7.0                                     | `vue` >= 3.3.0                                       |
 | Children access             | `{children}` / slots               | `{children}` / slots                       | slots                                                   | `slots.default?.()`                                  |
 | File extensions             | .tsx                               | .tsx                                       | .tsx                                                    | .ts                                                  |

@@ -30,14 +30,14 @@
     "url": "https://github.com/greydragon888/real-router/issues"
   },
   "scripts": {
-    "build": "tsup",
+    "build": "tsdown --config-loader unrun",
     "test": "vitest",
     "test:stress": "vitest run --config vitest.config.stress.mts",
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache src/ tests/ --fix --max-warnings 0",
     "lint:package": "publint",
     "lint:types": "attw --pack .",
-    "build:dist-only": "tsup"
+    "build:dist-only": "tsdown --config-loader unrun"
   },
   "keywords": [
     "router",

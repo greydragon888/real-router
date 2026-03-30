@@ -32,13 +32,13 @@
   },
   "license": "MIT",
   "scripts": {
-    "build": "tsup",
+    "build": "tsdown --config-loader unrun",
     "bench": "NODE_OPTIONS='--expose-gc --max-old-space-size=4096' npx tsx tests/benchmarks/index.ts",
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
     "test": "vitest run",
     "test:properties": "vitest --config vitest.config.properties.mts --run",
-    "build:dist-only": "tsup"
+    "build:dist-only": "tsdown --config-loader unrun"
   },
   "sideEffects": false
 }

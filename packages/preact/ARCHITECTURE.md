@@ -19,7 +19,7 @@ One entry point — Preact has no equivalent of React's `<Activity>` API, so no 
 @real-router/preact  →  src/index.ts  →  Full API (Preact 10+)
 ```
 
-**Build output** (tsup single entry):
+**Build output** (tsdown single entry):
 
 ```
 dist/

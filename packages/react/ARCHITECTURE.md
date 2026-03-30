@@ -22,7 +22,7 @@ Two entry points via `package.json` subpath exports. Single codebase, no duplica
 
 Both files are pure re-exports. The difference: `index.ts` includes `components/modern/*` exports (e.g. `RouteView` with `keepAlive` support via React Activity), `legacy.ts` does not.
 
-**Build output** (tsup multi-entry with shared chunks):
+**Build output** (tsdown multi-entry with shared chunks):
 
 ```
 dist/
@@ -31,7 +31,7 @@ dist/
 │   ├── index.d.mts
 │   ├── legacy.mjs        # Legacy entry
 │   ├── legacy.d.mts
-│   └── chunk-*.mjs       # Shared code (auto-extracted by tsup)
+│   └── chunk-*.mjs       # Shared code (auto-extracted by tsdown)
 └── cjs/
     ├── index.js
     ├── index.d.ts

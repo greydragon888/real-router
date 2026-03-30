@@ -1,4 +1,4 @@
-import { createIsomorphicConfig } from "../../tsup.base.mjs";
+import { createIsomorphicConfig } from "../../tsdown.base.js";
 
 export default createIsomorphicConfig({
   custom: {

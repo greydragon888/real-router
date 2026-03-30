@@ -37,12 +37,12 @@
   "homepage": "https://github.com/greydragon888/real-router",
   "scripts": {
     "test": "vitest",
-    "build": "tsup",
+    "build": "tsdown --config-loader unrun",
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
     "lint:package": "publint",
     "lint:types": "attw --pack .",
-    "build:dist-only": "tsup"
+    "build:dist-only": "tsdown --config-loader unrun"
   },
   "sideEffects": false,
   "peerDependencies": {

@@ -41,7 +41,7 @@
   },
   "license": "MIT",
   "scripts": {
-    "build": "tsup",
+    "build": "tsdown --config-loader unrun",
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
     "test": "vitest run",
@@ -49,7 +49,7 @@
     "bench": "NODE_OPTIONS='--expose-gc --max-old-space-size=4096' npx tsx tests/benchmarks/index.ts",
     "test:mutation": "stryker run",
     "test:mutation:report": "open reports/mutation-report.html",
-    "build:dist-only": "tsup"
+    "build:dist-only": "tsdown --config-loader unrun"
   },
   "sideEffects": false
 }

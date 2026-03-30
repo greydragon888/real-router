@@ -31,7 +31,7 @@ pnpm lint:unused        # Check for unused code (knip)
 - 100% test coverage required (enforced in vitest.config). Framework adapters may have slightly lower thresholds for branches/functions due to compiler-generated phantom code (Solid: babel-preset-solid, Vue: defineComponent, Svelte: compiler transforms)
 - Pinned versions (`save-exact=true` in .npmrc)
 - Workspace packages use `workspace:^` protocol
-- Dual ESM/CJS builds via tsup (Solid uses rollup + babel-preset-solid, Svelte uses svelte-package)
+- Dual ESM/CJS builds via tsdown (Solid uses rollup + babel-preset-solid, Svelte uses svelte-package)
 - `customConditions: ["development"]` in tsconfig — resolves workspace imports to `src/` via `"development"` export condition in each package.json
 - Pre-push hook runs full validation (build + lint:types + lint:package)
 - Pre-commit hook runs tests + knip + jscpd + `lint:e2e` (verifies e2e dirs have spec files)

@@ -1,8 +1,9 @@
-import { createIsomorphicConfig } from "../../tsup.base.mjs";
+import { createIsomorphicConfig } from "../../tsdown.base.js";
 
-// Bundle private dependencies into the output
 export default createIsomorphicConfig({
-  noExternal: ["event-emitter", "route-tree"],
+  deps: {
+    alwaysBundle: ["event-emitter", "route-tree"],
+  },
   custom: {
     entry: {
       index: "src/index.ts",

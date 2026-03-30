@@ -12,7 +12,7 @@
         ".changeset/*.md"
       ],
       "project": ["*.{ts,mts,js,mjs}"],
-      "ignoreDependencies": ["terser", "fast-check"]
+      "ignoreDependencies": ["fast-check"]
     },
     "packages/router-benchmarks": {
       "entry": ["src/**/*.ts"],

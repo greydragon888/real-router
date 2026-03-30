@@ -75,7 +75,7 @@ src/
 | Active class on Link        | `className` string concat          | `className` string concat                  | `classList` object                                      |
 | `keepAlive` / Activity      | React 19.2+                        | Not available                              | Not available                                           |
 | Entry points                | Main + Legacy                      | Single                                     | Single                                                  |
-| Build tool                  | tsup                               | tsup                                       | rollup + babel-preset-solid                             |
+| Build tool                  | tsdown                             | tsdown                                     | rollup + babel-preset-solid                             |
 | Peer dependency             | `react` >= 19.0.0                  | `preact` >= 10.0.0                         | `solid-js` >= 1.7.0                                     |
 | RouteView child detection   | React element type checking        | `toChildArray` + element type checking     | Symbol-based marker objects (`$$type`)                  |
 

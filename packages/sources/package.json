@@ -43,7 +43,7 @@
   "homepage": "https://github.com/greydragon888/real-router",
   "scripts": {
     "test": "vitest",
-    "build": "tsup",
+    "build": "tsdown --config-loader unrun",
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0 --no-error-on-unmatched-pattern",
     "lint:package": "publint",
@@ -51,7 +51,7 @@
     "test:properties": "vitest --config vitest.config.properties.mts --run",
     "test:stress": "vitest run --config vitest.config.stress.mts",
     "bench": "NODE_OPTIONS='--expose-gc --max-old-space-size=4096' npx tsx tests/benchmarks/index.ts",
-    "build:dist-only": "tsup"
+    "build:dist-only": "tsdown --config-loader unrun"
   },
   "sideEffects": false,
   "dependencies": {

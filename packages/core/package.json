@@ -86,7 +86,7 @@
   },
   "homepage": "https://github.com/greydragon888/real-router",
   "scripts": {
-    "build": "tsup",
+    "build": "tsdown --config-loader unrun",
     "test": "vitest run functional/",
     "test:properties": "vitest run --config vitest.config.properties.mts",
     "test:coverage": "vitest run functional/ --coverage",
@@ -97,11 +97,9 @@
     "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
     "lint:package": "publint",
     "lint:types": "attw --pack .",
-    "build:dist-only": "tsup"
+    "build:dist-only": "tsdown --config-loader unrun"
   },
-  "sideEffects": [
-    "./dist/esm/chunk-*.mjs"
-  ],
+  "sideEffects": false,
   "dependencies": {
     "@real-router/fsm": "workspace:^",
     "@real-router/logger": "workspace:^",

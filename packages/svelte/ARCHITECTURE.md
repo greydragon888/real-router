@@ -39,7 +39,7 @@ dist/
 └── RouterProvider.svelte
 ```
 
-Unlike tsup (which bundles into a single file), `svelte-package` outputs individual files. The consumer's bundler (Vite, Rollup, etc.) handles tree-shaking and final bundling.
+Unlike tsdown (which bundles into a single file), `svelte-package` outputs individual files. The consumer's bundler (Vite, Rollup, etc.) handles tree-shaking and final bundling.
 
 ## Source Structure
 
@@ -88,7 +88,7 @@ src/
 | Context count               | 2 (React), 3 (Preact)             | 3                                                | 2                                                   | 3                                         |
 | Components                  | JSX (.tsx)                        | `defineComponent` + `h()` (.ts)                  | JSX (.tsx)                                          | `.svelte` SFC                             |
 | Composable files            | .tsx                              | .ts                                              | .tsx                                                | `.svelte.ts`                              |
-| Build tool                  | tsup                              | tsup                                             | rollup + babel-preset-solid                         | svelte-package                            |
+| Build tool                  | tsdown                            | tsdown                                           | rollup + babel-preset-solid                         | svelte-package                            |
 | Peer dependency             | `react` >= 19.0.0                 | `vue` >= 3.3.0                                   | `solid-js` >= 1.7.0                                 | `svelte` >= 5.7.0                         |
 | RouteView children          | Element type markers              | `vnode.type === Match`                           | Symbol `$$type` markers                             | Named snippets (rest `$props()`)          |
 

@@ -3,5 +3,5 @@
   "compilerOptions": {
     "tsBuildInfoFile": "./.tsbuildinfo-node"
   },
-  "include": ["*.mts", "../../*.mts"]
+  "include": ["*.mts", "../../*.mts", "../../tsdown.base.ts"]
 }

@@ -162,23 +162,18 @@ router.usePlugin(browserPluginFactory()); // ❌ TypeScript Error
 
 **Solution:** Publish `@real-router/types` as a standalone public package. All packages import types from it.
 
-**JS bundling:** tsup with `noExternal` option bundles private packages:
+**JS bundling:** tsdown with `deps.alwaysBundle` option bundles private packages:
 
 ```typescript
-// packages/core/tsup.config.mts
+// packages/core/tsdown.config.mts
 export default createIsomorphicConfig({
-  noExternal: ["event-emitter", "type-guards", "route-tree"],
+  deps: {
+    alwaysBundle: ["event-emitter", "route-tree"],
+  },
 });
 ```
 
-**DTS generation:** tsup with `dts: { resolve: true }` generates type declarations:
-
-```typescript
-// tsup.base.mts
-dts: {
-  resolve: true, // Resolve types from dependencies
-},
-```
+**DTS generation:** tsdown with `dts: true` generates type declarations and automatically resolves types from bundled dependencies.
 
 **Results:**
 
@@ -454,7 +449,7 @@ Uses knip v6+ (migrated from v5). Schema URL updated to `https://unpkg.com/knip@
 
 `knip.json` ignores:
 
-- `terser`, `fast-check` (used but not detected by knip)
+- `fast-check` (used but not detected by knip)
 - `@real-router/browser-plugin`, `@real-router/logger` (internal workspace deps)
 - `@stryker-mutator/api`, `jsdom` (test infrastructure)
 
@@ -596,7 +591,7 @@ pnpm test:verbose       # Tests with full output
 "build:dist-only": {
   "dependsOn": ["^build:dist-only"],
   "outputs": ["dist/**"],
-  "inputs": ["src/**/*.{ts,tsx,vue,svelte}", "tsup.config.*", "tsconfig.json", "package.json"]
+   "inputs": ["src/**/*.{ts,tsx,vue,svelte}", "tsdown.config.*", "tsconfig.json", "package.json"]
 }
 ```
 
@@ -840,17 +835,11 @@ Migrated on 2026-03-28. Single config change required:
 }
 ```
 
-### Why `ignoreDeprecations`
+### Why `ignoreDeprecations` Was Removed
 
-tsup 8.5.1 (via rollup-plugin-dts 6.4.1) internally sets `baseUrl` when generating `.d.ts` files. `baseUrl` is deprecated in TS 6.0, causing DTS builds to fail with:
+tsup 8.5.1 (via rollup-plugin-dts 6.4.1) internally set `baseUrl` when generating `.d.ts` files. `baseUrl` is deprecated in TS 6.0, requiring `"ignoreDeprecations": "6.0"` in tsconfig.json.
 
-```
-error TS5101: Option 'baseUrl' is deprecated and will stop functioning in TypeScript 7.0.
-```
-
-Tracked: [egoist/tsup#1389](https://github.com/egoist/tsup/issues/1389), fix PR: [egoist/tsup#1390](https://github.com/egoist/tsup/pull/1390).
-
-**TODO:** Remove `ignoreDeprecations` after tsup ships the fix. Must happen before TS 7.0 (where `baseUrl` is removed entirely).
+**Resolved:** Migration to tsdown eliminated this issue — tsdown uses rolldown-plugin-dts which doesn't set `baseUrl`. The `ignoreDeprecations` setting has been removed from tsconfig.json.
 
 ### Pitfall: Stale pnpm Binary Shims
 
@@ -927,7 +916,7 @@ No barrel files — both entry points use explicit imports. No code duplication.
 
 ### Build
 
-`tsup.config.mts` uses multi-entry to produce shared chunks:
+`tsdown.config.mts` uses multi-entry to produce shared chunks:
 
 ```ts
 export default createIsomorphicConfig({
@@ -940,7 +929,7 @@ export default createIsomorphicConfig({
 });
 ```
 
-tsup generates a shared chunk for code common to both entries — no duplication in the output.
+tsdown generates a shared chunk for code common to both entries — no duplication in the output.
 
 ### Key Decision: `useContext` vs `use()`
 
@@ -962,15 +951,15 @@ Architecture and design: [`packages/react/ARCHITECTURE.md`](packages/react/ARCHI
 
 | Adapter | Build Tool                  | Reason                                          | Output               |
 | ------- | --------------------------- | ----------------------------------------------- | -------------------- |
-| React   | tsup                        | Standard — pure `.tsx`                          | Dual ESM/CJS bundle  |
-| Preact  | tsup                        | Standard — pure `.tsx`                          | Dual ESM/CJS bundle  |
+| React   | tsdown                      | Standard — pure `.tsx`                          | Dual ESM/CJS bundle  |
+| Preact  | tsdown                      | Standard — pure `.tsx`                          | Dual ESM/CJS bundle  |
 | Solid   | rollup + babel-preset-solid | Solid's JSX needs babel transform               | Dual ESM/CJS bundle  |
-| Vue     | tsup                        | Pure `.ts` with `defineComponent` + `h()`       | Dual ESM/CJS bundle  |
+| Vue     | tsdown                      | Pure `.ts` with `defineComponent` + `h()`       | Dual ESM/CJS bundle  |
 | Svelte  | svelte-package              | `.svelte` and `.svelte.ts` need Svelte compiler | ESM individual files |
 
 ### Svelte Package Specifics
 
-`@real-router/svelte` uses `@sveltejs/package` (not tsup):
+`@real-router/svelte` uses `@sveltejs/package` (not tsdown):
 
 - `.svelte` files are copied as-is (consumer's bundler compiles them)
 - `.svelte.ts` files are compiled to `.svelte.js` (runes processed)
@@ -995,8 +984,8 @@ Framework compilers generate code that v8 coverage tracks but tests can't reach:
 | Solid   | `branches: 90, functions: 97` | babel-preset-solid phantom branches, `.catch(() => {})` |
 | Vue     | `branches: 95, functions: 95` | `defineComponent` internal type guards                  |
 | Svelte  | `branches: 96, functions: 93` | Svelte compiler `$derived`/`$props` transforms          |
-| React   | None                          | tsup preserves original code                            |
-| Preact  | None                          | tsup preserves original code                            |
+| React   | None                          | tsdown preserves original code                          |
+| Preact  | None                          | tsdown preserves original code                          |
 
 ## dom-utils: Private Shared DOM Package
 
@@ -1066,7 +1055,7 @@ Packages that imported themselves by published name (e.g., `@real-router/core` i
 
 ### Production Safety
 
-`"development"` is a custom condition name. Node.js, esbuild, webpack, rollup, and tsup do **not** recognize it by default. Verified with `pnpm build && pnpm lint:types` (attw --pack).
+`"development"` is a custom condition name. Node.js, esbuild, webpack, rollup, and tsdown do **not** recognize it by default. Verified with `pnpm build && pnpm lint:types` (attw --pack).
 
 ## Infrastructure Changes (rou3 Migration — historical)
 

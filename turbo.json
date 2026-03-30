@@ -6,7 +6,7 @@
     "tsconfig.json",
     "prettier.config.*",
     "pnpm-lock.yaml",
-    "tsup.base.*",
+    "tsdown.base.*",
     "eslint.config.*",
     "vitest.config.*"
   ],
@@ -17,7 +17,7 @@
       "outputs": ["dist/**"],
       "inputs": [
         "src/**/*.{ts,tsx,vue,svelte}",
-        "tsup.config.*",
+        "tsdown.config.*",
         "tsconfig.json",
         "package.json"
       ],
@@ -30,7 +30,7 @@
       "outputs": ["dist/**"],
       "inputs": [
         "src/**/*.{ts,tsx,vue,svelte}",
-        "tsup.config.*",
+        "tsdown.config.*",
         "tsconfig.json",
         "package.json"
       ],
