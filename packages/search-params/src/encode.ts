@@ -33,9 +33,9 @@ export interface OptionsWithStrategies extends FinalOptions {
  */
 const DEFAULT_OPTIONS: OptionsWithStrategies = {
   arrayFormat: "none",
-  booleanFormat: "none",
+  booleanFormat: "auto",
   nullFormat: "default",
-  numberFormat: "none",
+  numberFormat: "auto",
   strategies: DEFAULT_STRATEGIES,
 };
 
@@ -56,9 +56,9 @@ export const makeOptions = (opts?: Options): OptionsWithStrategies => {
 
   // Avoid object spread - direct property assignment is faster
   const arrayFormat = opts.arrayFormat ?? "none";
-  const booleanFormat = opts.booleanFormat ?? "none";
+  const booleanFormat = opts.booleanFormat ?? "auto";
   const nullFormat = opts.nullFormat ?? "default";
-  const numberFormat = opts.numberFormat ?? "none";
+  const numberFormat = opts.numberFormat ?? "auto";
 
   return {
     arrayFormat,

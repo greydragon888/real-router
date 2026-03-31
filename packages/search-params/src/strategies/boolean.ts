@@ -38,7 +38,7 @@ export interface BooleanStrategy {
 
   /**
    * Decodes a raw (not URI-decoded) value before decodeValue() is called.
-   * Used for formats that check raw values (e.g., "string" checks "true"/"false").
+   * Used for formats that check raw values (e.g., "auto" checks "true"/"false").
    *
    * @param rawValue - Raw value before URI decoding
    * @returns boolean if matched, null to continue with URI decoding
@@ -69,10 +69,10 @@ export const noneBooleanStrategy: BooleanStrategy = {
 };
 
 /**
- * Parse "true"/"false" strings as boolean values.
+ * Auto-detect "true"/"false" strings as boolean values.
  * Checks raw value before URI decoding.
  */
-export const stringBooleanStrategy: BooleanStrategy = {
+export const autoBooleanStrategy: BooleanStrategy = {
   encode: (name, value) => `${name}=${value}`,
   decodeUndefined: () => null,
   decodeRaw: (raw) => {
@@ -104,6 +104,6 @@ export const emptyTrueBooleanStrategy: BooleanStrategy = {
  */
 export const booleanStrategies: Record<BooleanFormat, BooleanStrategy> = {
   none: noneBooleanStrategy,
-  string: stringBooleanStrategy,
+  auto: autoBooleanStrategy,
   "empty-true": emptyTrueBooleanStrategy,
 };

@@ -66,8 +66,9 @@ describe("buildPath ↔ matchPath Roundtrip Properties", () => {
 
       expect(matched).toBeDefined();
       expect(matched!.name).toBe("search");
-      expect(matched!.params.q).toBe(params.q);
-      expect(matched!.params.page).toBe(params.page);
+      // numberFormat: "auto" parses numeric strings → numbers
+      expect(`${matched!.params.q as string | number}`).toBe(params.q);
+      expect(`${matched!.params.page as string | number}`).toBe(params.page);
     },
   );
 

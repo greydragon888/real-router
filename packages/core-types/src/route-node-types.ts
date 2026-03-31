@@ -17,7 +17,7 @@
 // =============================================================================
 
 type ArrayFormat = "none" | "brackets" | "index" | "comma";
-type BooleanFormat = "none" | "string" | "empty-true";
+type BooleanFormat = "none" | "auto" | "empty-true";
 type NullFormat = "default" | "hidden";
 type NumberFormat = "none" | "auto";
 

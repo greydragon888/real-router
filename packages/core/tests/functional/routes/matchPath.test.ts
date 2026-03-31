@@ -74,8 +74,8 @@ describe("core/routes/routePath/matchPath", () => {
       const state = getPluginApi(router).matchPath("/search?first=1&second=2");
 
       expect(state?.name).toBe("search");
-      expect(state?.params.first).toBe("1");
-      expect(state?.params.second).toBe("2");
+      expect(state?.params.first).toBe(1);
+      expect(state?.params.second).toBe(2);
     });
   });
 
@@ -458,7 +458,7 @@ describe("core/routes/routePath/matchPath", () => {
       expect(state?.name).toBe("search");
       // Undeclared query params are included in default mode
       expect(state?.params.q).toBe("test");
-      expect(state?.params.limit).toBe("10");
+      expect(state?.params.limit).toBe(10);
     });
 
     it("should NOT match path with undeclared query params in strict mode", async () => {
@@ -525,7 +525,7 @@ describe("core/routes/routePath/matchPath", () => {
 
       expect(state?.name).toBe("search");
       expect(state?.params.q).toBe("test");
-      expect(state?.params.page).toBe("2");
+      expect(state?.params.page).toBe(2);
       // Extra undeclared param also included in default mode
       expect(state?.params.sort).toBe("name");
     });

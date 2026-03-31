@@ -224,7 +224,7 @@ export function createArrayMatcher(
   arrayFormat: "none" | "brackets" | "index" | "comma",
 ): ReturnType<typeof createMatcher> {
   const matcher = createMatcher({
-    queryParams: { arrayFormat },
+    queryParams: { arrayFormat, numberFormat: "none" },
   });
   const tree = createRouteTree("", "", [
     { name: "items", path: "/items?tags" },

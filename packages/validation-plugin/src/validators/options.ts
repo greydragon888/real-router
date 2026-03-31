@@ -10,7 +10,7 @@ const VALID_OPTION_VALUES = {
 
 const VALID_QUERY_PARAMS = {
   arrayFormat: ["none", "brackets", "index", "comma"] as const,
-  booleanFormat: ["none", "string", "empty-true"] as const,
+  booleanFormat: ["none", "auto", "empty-true"] as const,
   nullFormat: ["default", "hidden"] as const,
   numberFormat: ["none", "auto"] as const,
 } as const;

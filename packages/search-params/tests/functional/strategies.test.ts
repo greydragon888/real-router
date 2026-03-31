@@ -9,7 +9,7 @@ import {
 } from "../../src/strategies/array";
 import {
   noneBooleanStrategy,
-  stringBooleanStrategy,
+  autoBooleanStrategy,
   emptyTrueBooleanStrategy,
 } from "../../src/strategies/boolean";
 import {
@@ -42,24 +42,24 @@ describe("search-params strategies", () => {
       });
     });
 
-    describe("stringBooleanStrategy", () => {
+    describe("autoBooleanStrategy", () => {
       it("should encode boolean as string", () => {
-        expect(stringBooleanStrategy.encode("flag", true)).toBe("flag=true");
-        expect(stringBooleanStrategy.encode("flag", false)).toBe("flag=false");
+        expect(autoBooleanStrategy.encode("flag", true)).toBe("flag=true");
+        expect(autoBooleanStrategy.encode("flag", false)).toBe("flag=false");
       });
 
       it("should return null for undefined", () => {
-        expect(stringBooleanStrategy.decodeUndefined()).toBe(null);
+        expect(autoBooleanStrategy.decodeUndefined()).toBe(null);
       });
 
       it("should parse true/false strings in decodeRaw", () => {
-        expect(stringBooleanStrategy.decodeRaw("true")).toBe(true);
-        expect(stringBooleanStrategy.decodeRaw("false")).toBe(false);
-        expect(stringBooleanStrategy.decodeRaw("other")).toBe(null);
+        expect(autoBooleanStrategy.decodeRaw("true")).toBe(true);
+        expect(autoBooleanStrategy.decodeRaw("false")).toBe(false);
+        expect(autoBooleanStrategy.decodeRaw("other")).toBe(null);
       });
 
       it("should return value as-is for decodeValue", () => {
-        expect(stringBooleanStrategy.decodeValue("hello")).toBe("hello");
+        expect(autoBooleanStrategy.decodeValue("hello")).toBe("hello");
       });
     });
 

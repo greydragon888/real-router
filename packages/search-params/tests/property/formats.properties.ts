@@ -32,14 +32,14 @@ const arbNullParams = fc.dictionary(arbSafeKey, fc.constant(null), {
 
 const arbBoolFormatForNull = fc.constantFrom(
   "none",
-  "string",
+  "auto",
 ) as fc.Arbitrary<BooleanFormat>;
 
 describe("array format roundtrip", () => {
   test.prop([arbArrayParamsBracketsOrIndex], { numRuns: NUM_RUNS.standard })(
     "brackets/index formats: parse(build(params, opts), opts) === params for string arrays",
     ([params, arrayFormat]: [Record<string, string[]>, ArrayFormat]) => {
-      const opts = { arrayFormat };
+      const opts = { arrayFormat, numberFormat: "none" as NumberFormat };
       const qs = build(params, opts);
       const parsed = parse(qs, opts);
 
@@ -59,7 +59,10 @@ describe("array format roundtrip", () => {
   )(
     "none format: multi-element string arrays roundtrip correctly",
     (params: Record<string, string[]>) => {
-      const opts = { arrayFormat: "none" as ArrayFormat };
+      const opts = {
+        arrayFormat: "none" as ArrayFormat,
+        numberFormat: "none" as NumberFormat,
+      };
       const qs = build(params, opts);
       const parsed = parse(qs, opts);
 
@@ -70,9 +73,9 @@ describe("array format roundtrip", () => {
 
 describe("boolean format roundtrip", () => {
   test.prop([arbBoolParams], { numRuns: NUM_RUNS.standard })(
-    "booleanFormat 'string': parse(build(params, opts), opts) === params preserving boolean types",
+    "booleanFormat 'auto': parse(build(params, opts), opts) === params preserving boolean types",
     (params: Record<string, boolean>) => {
-      const opts = { booleanFormat: "string" as BooleanFormat };
+      const opts = { booleanFormat: "auto" as BooleanFormat };
       const qs = build(params, opts);
       const parsed = parse(qs, opts);
 
@@ -248,7 +251,10 @@ describe("single-element array asymmetry", () => {
   )(
     "none format: single-element arrays collapse to scalars after roundtrip",
     (params: Record<string, [string]>) => {
-      const opts = { arrayFormat: "none" as ArrayFormat };
+      const opts = {
+        arrayFormat: "none" as ArrayFormat,
+        numberFormat: "none" as NumberFormat,
+      };
       const qs = build(params, opts);
       const parsed = parse(qs, opts);
 

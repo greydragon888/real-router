@@ -24,7 +24,7 @@ import { parse, build } from "search-params";
  */
 export interface QueryParamsConfig {
   readonly arrayFormat?: "none" | "brackets" | "index" | "comma";
-  readonly booleanFormat?: "none" | "string" | "empty-true";
+  readonly booleanFormat?: "none" | "auto" | "empty-true";
   readonly nullFormat?: "default" | "hidden";
   readonly numberFormat?: "none" | "auto";
 }
@@ -62,7 +62,7 @@ export type Matcher = SegmentMatcher;
  * ```typescript
  * const matcher = createMatcher({
  *   strictTrailingSlash: true,
- *   queryParams: { booleanFormat: "string" },
+ *   queryParams: { booleanFormat: "auto" },
  * });
  * matcher.registerTree(tree);
  * const result = matcher.match("/users/123");

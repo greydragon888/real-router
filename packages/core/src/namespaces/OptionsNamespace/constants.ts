@@ -12,9 +12,9 @@ export const defaultOptions: Options = {
   queryParamsMode: "loose",
   queryParams: {
     arrayFormat: "none",
-    booleanFormat: "none",
+    booleanFormat: "auto",
     nullFormat: "default",
-    numberFormat: "none",
+    numberFormat: "auto",
   },
   urlParamsEncoding: "default",
   allowNotFound: true,

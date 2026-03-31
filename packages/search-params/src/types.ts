@@ -28,10 +28,10 @@ export type ArrayFormat = "none" | "brackets" | "index" | "comma";
  *
  * @remarks
  * - `none` - no special handling
- * - `string` - encode as "true"/"false" strings
+ * - `auto` - auto-detect "true"/"false" strings as boolean values
  * - `empty-true` - true values have no value: `?flag` instead of `?flag=true`
  */
-export type BooleanFormat = "none" | "string" | "empty-true";
+export type BooleanFormat = "none" | "auto" | "empty-true";
 
 /**
  * Null parameter encoding format.
@@ -61,11 +61,11 @@ export type NumberFormat = "none" | "auto";
 export interface Options {
   /** Array parameter encoding format. @default "none" */
   arrayFormat?: ArrayFormat;
-  /** Boolean parameter encoding format. @default "none" */
+  /** Boolean parameter encoding format. @default "auto" */
   booleanFormat?: BooleanFormat;
   /** Null parameter encoding format. @default "default" */
   nullFormat?: NullFormat;
-  /** Number parameter encoding format. @default "none" */
+  /** Number parameter encoding format. @default "auto" */
   numberFormat?: NumberFormat;
 }
 

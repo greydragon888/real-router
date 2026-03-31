@@ -19,7 +19,7 @@ Invariants verified by property-based tests (`tests/property/`). Each invariant 
 - `queryParamsMode`: `"default"` | `"strict"` | `"loose"`
 - `urlParamsEncoding`: `"default"` | `"uri"` | `"uriComponent"` | `"none"`
 - `queryParams.arrayFormat`: `"none"` | `"brackets"` | `"index"` | `"comma"`
-- `queryParams.booleanFormat`: `"none"` | `"string"` | `"empty-true"`
+- `queryParams.booleanFormat`: `"none"` | `"auto"` | `"empty-true"`
 - `queryParams.nullFormat`: `"default"` | `"hidden"`
 - `logger.level`: `"all"` | `"warn-error"` | `"error-only"` | `"none"`
 

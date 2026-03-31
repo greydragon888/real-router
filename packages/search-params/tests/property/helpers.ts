@@ -89,7 +89,7 @@ const arbArrayFormat: fc.Arbitrary<ArrayFormat> = fc.constantFrom(
 
 const arbBooleanFormat: fc.Arbitrary<BooleanFormat> = fc.constantFrom(
   "none",
-  "string",
+  "auto",
   "empty-true",
 );
 
@@ -178,7 +178,7 @@ function normalizePrimitive(
   }
   if (typeof value === "boolean") {
     switch (boolFmt) {
-      case "string": {
+      case "auto": {
         return value;
       }
       case "empty-true": {
@@ -205,7 +205,7 @@ function normalizeArrayElement(
     return normalizeNumber(value, numFmt);
   }
   if (typeof value === "boolean") {
-    return boolFmt === "string"
+    return boolFmt === "auto"
       ? value
       : maybeParseAutoNumber(String(value), numFmt);
   }
@@ -247,10 +247,10 @@ export function normalizeForComparison(
   params: SearchParams,
   opts: Options,
 ): Record<string, unknown> {
-  const boolFmt = opts.booleanFormat ?? "none";
+  const boolFmt = opts.booleanFormat ?? "auto";
   const nullFmt = opts.nullFormat ?? "default";
   const arrFmt = opts.arrayFormat ?? "none";
-  const numFmt = opts.numberFormat ?? "none";
+  const numFmt = opts.numberFormat ?? "auto";
   const result: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(params)) {

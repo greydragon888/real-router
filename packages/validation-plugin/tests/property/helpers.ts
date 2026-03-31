@@ -14,7 +14,7 @@ const URL_PARAMS_ENCODING_VALUES = [
   "none",
 ] as const;
 const ARRAY_FORMAT_VALUES = ["none", "brackets", "index", "comma"] as const;
-const BOOLEAN_FORMAT_VALUES = ["none", "string", "empty-true"] as const;
+const BOOLEAN_FORMAT_VALUES = ["none", "auto", "empty-true"] as const;
 const NULL_FORMAT_VALUES = ["default", "hidden"] as const;
 const NUMBER_FORMAT_VALUES = ["none", "auto"] as const;
 const LOGGER_LEVEL_VALUES = [
