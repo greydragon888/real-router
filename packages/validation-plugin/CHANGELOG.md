@@ -1,5 +1,18 @@
 # @real-router/validation-plugin
 
+## 0.3.0
+
+### Minor Changes
+
+- [#384](https://github.com/greydragon888/real-router/pull/384) [`7f92e19`](https://github.com/greydragon888/real-router/commit/7f92e190053646c02c7263001fffbcdcaaa550e8) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `numberFormat` validation support ([#383](https://github.com/greydragon888/real-router/issues/383))
+
+  Validate `queryParams.numberFormat` option — accepts `"none"` or `"auto"`, throws `TypeError` for invalid values.
+
+### Patch Changes
+
+- Updated dependencies [[`7f92e19`](https://github.com/greydragon888/real-router/commit/7f92e190053646c02c7263001fffbcdcaaa550e8)]:
+  - @real-router/core@0.42.0
+
 ## 0.2.0
 
 ### Minor Changes

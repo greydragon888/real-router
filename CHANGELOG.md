@@ -5,6 +5,149 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-03-31]
+
+### @real-router/core@0.42.0
+
+### Minor Changes
+
+- [#384](https://github.com/greydragon888/real-router/pull/384) [`7f92e19`](https://github.com/greydragon888/real-router/commit/7f92e190053646c02c7263001fffbcdcaaa550e8) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `numberFormat` option to router query params ([#383](https://github.com/greydragon888/real-router/issues/383))
+
+  New `numberFormat` option (`"none"` | `"auto"`) in `queryParams` configuration. When set to `"auto"`, numeric query parameter values (e.g. `?page=1&price=12.5`) are automatically parsed as numbers instead of strings. Defaults to `"none"` (no behavior change).
+
+### Patch Changes
+
+- Updated dependencies [[`7f92e19`](https://github.com/greydragon888/real-router/commit/7f92e190053646c02c7263001fffbcdcaaa550e8)]:
+  - @real-router/types@0.28.0
+
+### @real-router/types@0.28.0
+
+### Minor Changes
+
+- [#384](https://github.com/greydragon888/real-router/pull/384) [`7f92e19`](https://github.com/greydragon888/real-router/commit/7f92e190053646c02c7263001fffbcdcaaa550e8) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `NumberFormat` type for numeric query parameter parsing ([#383](https://github.com/greydragon888/real-router/issues/383))
+
+  New `NumberFormat` type (`"none" | "auto"`) and `numberFormat` field in `QueryParamsOptions`. Resolves the asymmetry where `booleanFormat` existed but numeric values had no equivalent option.
+
+### @real-router/validation-plugin@0.3.0
+
+### Minor Changes
+
+- [#384](https://github.com/greydragon888/real-router/pull/384) [`7f92e19`](https://github.com/greydragon888/real-router/commit/7f92e190053646c02c7263001fffbcdcaaa550e8) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `numberFormat` validation support ([#383](https://github.com/greydragon888/real-router/issues/383))
+
+  Validate `queryParams.numberFormat` option — accepts `"none"` or `"auto"`, throws `TypeError` for invalid values.
+
+### Patch Changes
+
+- Updated dependencies [[`7f92e19`](https://github.com/greydragon888/real-router/commit/7f92e190053646c02c7263001fffbcdcaaa550e8)]:
+  - @real-router/core@0.42.0
+
+### @real-router/browser-plugin@0.11.1
+
+### Patch Changes
+
+- Updated dependencies [[`7f92e19`](https://github.com/greydragon888/real-router/commit/7f92e190053646c02c7263001fffbcdcaaa550e8)]:
+  - @real-router/core@0.42.0
+
+### @real-router/hash-plugin@0.2.8
+
+### Patch Changes
+
+- Updated dependencies [[`7f92e19`](https://github.com/greydragon888/real-router/commit/7f92e190053646c02c7263001fffbcdcaaa550e8)]:
+  - @real-router/core@0.42.0
+
+### @real-router/logger-plugin@0.3.7
+
+### Patch Changes
+
+- Updated dependencies [[`7f92e19`](https://github.com/greydragon888/real-router/commit/7f92e190053646c02c7263001fffbcdcaaa550e8)]:
+  - @real-router/core@0.42.0
+
+### @real-router/persistent-params-plugin@0.1.46
+
+### Patch Changes
+
+- Updated dependencies [[`7f92e19`](https://github.com/greydragon888/real-router/commit/7f92e190053646c02c7263001fffbcdcaaa550e8)]:
+  - @real-router/core@0.42.0
+
+### @real-router/preact@0.2.3
+
+### Patch Changes
+
+- Updated dependencies [[`7f92e19`](https://github.com/greydragon888/real-router/commit/7f92e190053646c02c7263001fffbcdcaaa550e8)]:
+  - @real-router/core@0.42.0
+  - dom-utils@0.2.4
+  - @real-router/sources@0.3.2
+  - @real-router/route-utils@0.1.8
+
+### @real-router/react@0.14.3
+
+### Patch Changes
+
+- Updated dependencies [[`7f92e19`](https://github.com/greydragon888/real-router/commit/7f92e190053646c02c7263001fffbcdcaaa550e8)]:
+  - @real-router/core@0.42.0
+  - dom-utils@0.2.4
+  - @real-router/sources@0.3.2
+  - @real-router/route-utils@0.1.8
+
+### @real-router/route-utils@0.1.8
+
+### Patch Changes
+
+- Updated dependencies [[`7f92e19`](https://github.com/greydragon888/real-router/commit/7f92e190053646c02c7263001fffbcdcaaa550e8)]:
+  - @real-router/types@0.28.0
+
+### @real-router/rx@0.1.34
+
+### Patch Changes
+
+- Updated dependencies [[`7f92e19`](https://github.com/greydragon888/real-router/commit/7f92e190053646c02c7263001fffbcdcaaa550e8)]:
+  - @real-router/core@0.42.0
+
+### @real-router/solid@0.2.3
+
+### Patch Changes
+
+- Updated dependencies [[`7f92e19`](https://github.com/greydragon888/real-router/commit/7f92e190053646c02c7263001fffbcdcaaa550e8)]:
+  - @real-router/core@0.42.0
+  - dom-utils@0.2.4
+  - @real-router/sources@0.3.2
+  - @real-router/route-utils@0.1.8
+
+### @real-router/sources@0.3.2
+
+### Patch Changes
+
+- Updated dependencies [[`7f92e19`](https://github.com/greydragon888/real-router/commit/7f92e190053646c02c7263001fffbcdcaaa550e8)]:
+  - @real-router/core@0.42.0
+  - @real-router/route-utils@0.1.8
+
+### @real-router/ssr-data-plugin@0.1.4
+
+### Patch Changes
+
+- Updated dependencies [[`7f92e19`](https://github.com/greydragon888/real-router/commit/7f92e190053646c02c7263001fffbcdcaaa550e8)]:
+  - @real-router/core@0.42.0
+
+### @real-router/svelte@0.2.3
+
+### Patch Changes
+
+- Updated dependencies [[`7f92e19`](https://github.com/greydragon888/real-router/commit/7f92e190053646c02c7263001fffbcdcaaa550e8)]:
+  - @real-router/core@0.42.0
+  - dom-utils@0.2.4
+  - @real-router/sources@0.3.2
+  - @real-router/route-utils@0.1.8
+
+### @real-router/vue@0.2.3
+
+### Patch Changes
+
+- Updated dependencies [[`7f92e19`](https://github.com/greydragon888/real-router/commit/7f92e190053646c02c7263001fffbcdcaaa550e8)]:
+  - @real-router/core@0.42.0
+  - dom-utils@0.2.4
+  - @real-router/sources@0.3.2
+  - @real-router/route-utils@0.1.8
+
 ## [2026-03-30]
 
 ### @real-router/preact@0.2.2
