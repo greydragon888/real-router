@@ -101,7 +101,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Lint & Type Check
-        run: pnpm turbo run lint type-check --affected --filter='!./examples/*'
+        run: pnpm turbo run lint type-check --affected --filter='!./examples/**'
         env:
           TURBO_SCM_BASE: ${{ needs.check.outputs.turbo_base }}
 
@@ -139,7 +139,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Test with Coverage
-        run: pnpm turbo run test --affected --filter='!./examples/*' -- --coverage
+        run: pnpm turbo run test --affected --filter='!./examples/**' -- --coverage
         env:
           TURBO_SCM_BASE: ${{ needs.check.outputs.turbo_base }}
 

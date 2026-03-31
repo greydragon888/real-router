@@ -36,7 +36,7 @@ jobs:
       # turbo dependency chain: build → test → lint, type-check
       # Single command runs the full validation pipeline
       - name: Build (includes lint, type-check, test via turbo deps)
-        run: pnpm turbo run build --filter='./examples/*'
+        run: pnpm turbo run build --filter='./examples/**'
 
   e2e:
     name: E2E Tests
@@ -63,7 +63,7 @@ jobs:
 
       # Build results cached from examples job via Turbo Remote Cache
       - name: Run E2E tests
-        run: pnpm turbo run test:e2e --filter='./examples/*' --concurrency=1
+        run: pnpm turbo run test:e2e --filter='./examples/**' --concurrency=1
 
       - name: Upload Playwright report
         if: failure()

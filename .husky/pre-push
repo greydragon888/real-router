@@ -21,7 +21,7 @@ pnpm lint:dedupe
 
 # Build the project to ensure it compiles
 echo "📦 Building project..."
-pnpm turbo run build lint:package lint:types --filter='!./examples/*'
+pnpm turbo run build lint:package lint:types --filter='!./examples/**'
 
 # Check for unused code
 echo "🧹 Checking for unused code..."
