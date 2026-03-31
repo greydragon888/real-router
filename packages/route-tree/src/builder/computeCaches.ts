@@ -14,6 +14,17 @@ import type { MutableRouteNode } from "./buildTree";
 import type { RouteTree } from "../types";
 
 // =============================================================================
+// Shared Sentinels (avoid per-node allocation for leaf nodes)
+// =============================================================================
+
+const EMPTY_CHILDREN_MAP: ReadonlyMap<string, RouteTree> = Object.freeze(
+  new Map<string, RouteTree>(),
+);
+const EMPTY_CHILDREN_ARRAY: readonly RouteTree[] = Object.freeze(
+  [] as RouteTree[],
+);
+
+// =============================================================================
 // Cache Computation Functions
 // =============================================================================
 
@@ -58,51 +69,36 @@ function joinPaths(base: string, suffix: string): string {
  * @returns Static path or null
  */
 function computeStaticPath(node: RouteTree): string | null {
-  // Root nodes without path patterns can't have static paths
   if (!node.path) {
     return null;
   }
 
   const { urlParams, queryParams, spatParams } = node.paramMeta;
 
-  // If route has any parameters, we can't pre-compute
   if (urlParams.length > 0 || queryParams.length > 0 || spatParams.length > 0) {
     return null;
   }
 
-  // Build the full path from parent segments + this segment
-  // Collect parent segments via parent chain (unshift for correct order)
-  const parentSegments: RouteTree[] = [];
-  let current = node.parent;
-
-  while (current?.path) {
-    parentSegments.unshift(current);
-    current = current.parent;
+  if (node.absolute) {
+    return node.path;
   }
 
-  let path = "";
+  // Parent staticPath is always computed before children (processNode is recursive).
+  // null staticPath means parent has params OR parent has no path (root/grouping node).
+  // Distinguish: no-path parent (staticPath=null, path="") → use "" as base.
+  //              parameterized parent (staticPath=null, path!="") → propagate null.
+  const parent = node.parent;
 
-  for (const segment of parentSegments) {
-    const {
-      urlParams: segUrlParams,
-      queryParams: segQueryParams,
-      spatParams: segSpatParams,
-    } = segment.paramMeta;
-
-    // Parent segments with params invalidate static path
-    if (
-      segUrlParams.length > 0 ||
-      segQueryParams.length > 0 ||
-      segSpatParams.length > 0
-    ) {
+  if (parent?.path) {
+    if (parent.staticPath === null) {
       return null;
     }
 
-    path = segment.absolute ? segment.path : joinPaths(path, segment.path);
+    return joinPaths(parent.staticPath, node.path);
   }
 
-  // Add this node's path
-  return node.absolute ? node.path : joinPaths(path, node.path);
+  // Parent has no path (root or grouping node) — start fresh
+  return node.path;
 }
 
 // =============================================================================
@@ -125,31 +121,6 @@ function computeChildrenMap(
 
   for (const child of childrenArray) {
     map.set(child.name, child);
-  }
-
-  return map;
-}
-
-/**
- * Builds a paramTypeMap from route parameter metadata.
- *
- * @param paramMeta - Parameter metadata from buildParamMeta
- * @param paramMeta.urlParams - URL parameter names
- * @param paramMeta.queryParams - Query parameter names
- * @returns Map of parameter names to their types
- */
-function buildParamTypeMap(paramMeta: {
-  readonly urlParams: readonly string[];
-  readonly queryParams: readonly string[];
-}): Record<string, "url" | "query"> {
-  const map: Record<string, "url" | "query"> = {};
-
-  for (const param of paramMeta.urlParams) {
-    map[param] = "url";
-  }
-
-  for (const param of paramMeta.queryParams) {
-    map[param] = "query";
   }
 
   return map;
@@ -207,7 +178,7 @@ function processNode(
   freeze: boolean,
 ): RouteTree {
   const paramMeta = buildParamMeta(mutable.path);
-  const paramTypeMap = buildParamTypeMap(paramMeta);
+  const paramTypeMap = paramMeta.paramTypeMap;
 
   // Skeleton node: children and nonAbsoluteChildren are set after recursive
   // child processing, which requires a parent reference to this node.
@@ -225,21 +196,29 @@ function processNode(
   };
 
   node.fullName = computeFullName(node as RouteTree);
-
-  const { childrenMap, nonAbsoluteChildren } = processChildren(
-    mutable.children,
-    node as RouteTree,
-    freeze,
-  );
-
-  node.children = childrenMap;
-  node.nonAbsoluteChildren = nonAbsoluteChildren;
   node.staticPath = computeStaticPath(node as RouteTree);
 
+  if (mutable.children.length === 0) {
+    node.children = EMPTY_CHILDREN_MAP;
+    node.nonAbsoluteChildren = EMPTY_CHILDREN_ARRAY as RouteTree[];
+  } else {
+    const { childrenMap, nonAbsoluteChildren } = processChildren(
+      mutable.children,
+      node as RouteTree,
+      freeze,
+    );
+
+    node.children = childrenMap;
+    node.nonAbsoluteChildren = nonAbsoluteChildren;
+  }
+
   if (freeze) {
-    Object.freeze(nonAbsoluteChildren);
+    if (mutable.children.length > 0) {
+      Object.freeze(node.nonAbsoluteChildren);
+      Object.freeze(node.children);
+    }
+
     Object.freeze(paramTypeMap);
-    Object.freeze(node.children);
     Object.freeze(node);
   }
 

@@ -104,8 +104,7 @@ export function validateRoutePath(
 
   // Absolute paths under parameterized parents
   // Check if parent has URL parameters via paramTypeMap
-  const hasUrlParams =
-    parentNode && Object.values(parentNode.paramTypeMap).includes("url");
+  const hasUrlParams = parentNode && parentNode.paramMeta.urlParams.length > 0;
 
   if (path.startsWith("~") && hasUrlParams) {
     throw createRouterError(
