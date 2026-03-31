@@ -1,5 +1,13 @@
 # @real-router/types
 
+## 0.28.0
+
+### Minor Changes
+
+- [#384](https://github.com/greydragon888/real-router/pull/384) [`7f92e19`](https://github.com/greydragon888/real-router/commit/7f92e190053646c02c7263001fffbcdcaaa550e8) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `NumberFormat` type for numeric query parameter parsing ([#383](https://github.com/greydragon888/real-router/issues/383))
+
+  New `NumberFormat` type (`"none" | "auto"`) and `numberFormat` field in `QueryParamsOptions`. Resolves the asymmetry where `booleanFormat` existed but numeric values had no equivalent option.
+
 ## 0.27.0
 
 ### Minor Changes
