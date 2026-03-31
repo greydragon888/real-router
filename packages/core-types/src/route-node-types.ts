@@ -19,6 +19,7 @@
 type ArrayFormat = "none" | "brackets" | "index" | "comma";
 type BooleanFormat = "none" | "string" | "empty-true";
 type NullFormat = "default" | "hidden";
+type NumberFormat = "none" | "auto";
 
 /**
  * Options for query parameter parsing and building.
@@ -27,6 +28,7 @@ export interface QueryParamsOptions {
   arrayFormat?: ArrayFormat;
   booleanFormat?: BooleanFormat;
   nullFormat?: NullFormat;
+  numberFormat?: NumberFormat;
 }
 
 // =============================================================================

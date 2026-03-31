@@ -99,6 +99,41 @@ describe("search-params", () => {
         disabled: false,
       });
     });
+
+    it("handles auto number format", () => {
+      expect(
+        parse("page=1&limit=20&sort=name", { numberFormat: "auto" }),
+      ).toStrictEqual({
+        page: 1,
+        limit: 20,
+        sort: "name",
+      });
+    });
+
+    it("handles auto number format with decimals and non-numeric values", () => {
+      expect(
+        parse("id=42&name=abc&price=12.5", { numberFormat: "auto" }),
+      ).toStrictEqual({
+        id: 42,
+        name: "abc",
+        price: 12.5,
+      });
+    });
+
+    it("handles combined booleanFormat and numberFormat", () => {
+      expect(
+        parse("enabled=true&disabled=false&count=1&price=12.5&name=abc", {
+          booleanFormat: "string",
+          numberFormat: "auto",
+        }),
+      ).toStrictEqual({
+        enabled: true,
+        disabled: false,
+        count: 1,
+        price: 12.5,
+        name: "abc",
+      });
+    });
   });
 
   // ===========================================================================
@@ -478,6 +513,7 @@ describe("search-params", () => {
       expect(opts1.arrayFormat).toBe("none");
       expect(opts1.booleanFormat).toBe("none");
       expect(opts1.nullFormat).toBe("default");
+      expect(opts1.numberFormat).toBe("none");
     });
 
     it("handles partial options (only arrayFormat)", () => {
@@ -486,6 +522,7 @@ describe("search-params", () => {
       expect(opts.arrayFormat).toBe("brackets");
       expect(opts.booleanFormat).toBe("none"); // default
       expect(opts.nullFormat).toBe("default"); // default
+      expect(opts.numberFormat).toBe("none"); // default
     });
 
     it("handles partial options (only booleanFormat)", () => {
@@ -494,6 +531,7 @@ describe("search-params", () => {
       expect(opts.arrayFormat).toBe("none"); // default
       expect(opts.booleanFormat).toBe("string");
       expect(opts.nullFormat).toBe("default"); // default
+      expect(opts.numberFormat).toBe("none"); // default
     });
 
     it("handles partial options (only nullFormat)", () => {
@@ -502,6 +540,16 @@ describe("search-params", () => {
       expect(opts.arrayFormat).toBe("none"); // default
       expect(opts.booleanFormat).toBe("none"); // default
       expect(opts.nullFormat).toBe("hidden");
+      expect(opts.numberFormat).toBe("none"); // default
+    });
+
+    it("handles partial options (only numberFormat)", () => {
+      const opts = makeOptions({ numberFormat: "auto" });
+
+      expect(opts.arrayFormat).toBe("none"); // default
+      expect(opts.booleanFormat).toBe("none"); // default
+      expect(opts.nullFormat).toBe("default"); // default
+      expect(opts.numberFormat).toBe("auto");
     });
 
     it("handles all options provided", () => {
@@ -509,11 +557,13 @@ describe("search-params", () => {
         arrayFormat: "index",
         booleanFormat: "empty-true",
         nullFormat: "hidden",
+        numberFormat: "auto",
       });
 
       expect(opts.arrayFormat).toBe("index");
       expect(opts.booleanFormat).toBe("empty-true");
       expect(opts.nullFormat).toBe("hidden");
+      expect(opts.numberFormat).toBe("auto");
     });
   });
 

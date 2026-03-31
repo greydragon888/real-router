@@ -21,32 +21,43 @@ import type { KeepResponse, OmitResponse, Options } from "./types";
 // =============================================================================
 
 /**
- * Extracts parameter name from raw name (removes bracket suffix).
+ * Appends a chunk from source string to an accumulator with "&" separator.
+ * Returns the new accumulator value. Avoids intermediate array allocations.
  *
  * @internal
  */
-function extractParamName(rawName: string): {
-  name: string;
-  hasBrackets: boolean;
-} {
-  const bracketPos = rawName.indexOf("[");
+function appendChunk(
+  acc: string,
+  source: string,
+  start: number,
+  end: number,
+): string {
+  if (acc) {
+    acc += "&";
+  }
 
-  return bracketPos === -1
-    ? { name: rawName, hasBrackets: false }
-    : { name: rawName.slice(0, bracketPos), hasBrackets: true };
+  return acc + source.slice(start, end);
 }
 
 /**
- * Extracts parameter name from a query parameter chunk (e.g., "key=value" or "key").
+ * Extracts parameter name directly from a range in the source string.
+ * Scans for '=' or '[' and returns a single slice — avoids intermediate
+ * rawName/chunk allocations.
  *
  * @internal
  */
-const extractChunkName = (chunk: string): string => {
-  const eqPos = chunk.indexOf("=");
-  const rawName = eqPos === -1 ? chunk : chunk.slice(0, eqPos);
+function sliceParamName(source: string, start: number, end: number): string {
+  for (let i = start; i < end; i++) {
+    const ch = source.codePointAt(i);
 
-  return extractParamName(rawName).name;
-};
+    if (ch === 61 || ch === 91) {
+      // '=' or '['
+      return source.slice(start, i);
+    }
+  }
+
+  return source.slice(start, end);
+}
 
 /**
  * Adds a decoded value to params object, handling array accumulation.
@@ -106,12 +117,21 @@ function processParamChunk(
   const eqPos = searchPart.indexOf("=", start);
   const hasValue = eqPos !== -1 && eqPos < end;
 
-  const rawName = hasValue
-    ? searchPart.slice(start, eqPos)
-    : searchPart.slice(start, end);
+  const nameSourceEnd = hasValue ? eqPos : end;
+  let nameEnd = nameSourceEnd;
+  let hasBrackets = false;
 
-  const { name, hasBrackets } = extractParamName(rawName);
-  const decodedName = decodeValue(name);
+  for (let i = start; i < nameSourceEnd; i++) {
+    if (searchPart.codePointAt(i) === 91) {
+      // '['
+      nameEnd = i;
+      hasBrackets = true;
+
+      break;
+    }
+  }
+
+  const decodedName = decodeValue(searchPart.slice(start, nameEnd));
   const decodedValue = decodeParamValue(
     searchPart,
     eqPos,
@@ -121,30 +141,6 @@ function processParamChunk(
   );
 
   addToParams(params, decodedName, decodedValue, hasBrackets);
-}
-
-/**
- * Iterates over query string parameters, calling handler for each chunk.
- *
- * @internal
- */
-function forEachParam(
-  searchPart: string,
-  handler: (chunk: string) => void,
-): void {
-  let start = 0;
-  const length = searchPart.length;
-
-  while (start < length) {
-    let end = searchPart.indexOf("&", start);
-
-    if (end === -1) {
-      end = length;
-    }
-
-    handler(searchPart.slice(start, end));
-    start = end + 1;
-  }
 }
 
 // =============================================================================
@@ -353,22 +349,33 @@ export const omit = (
   const options = makeOptions(opts);
   const hasPrefix = path.startsWith("?");
   const omitSet = new Set(paramsToOmit);
-  const kept: string[] = [];
-  const removed: string[] = [];
 
-  forEachParam(searchPart, (chunk) => {
-    if (omitSet.has(extractChunkName(chunk))) {
-      removed.push(chunk);
-    } else {
-      kept.push(chunk);
+  let keptStr = "";
+  let removedStr = "";
+  let start = 0;
+  const length = searchPart.length;
+
+  while (start < length) {
+    let end = searchPart.indexOf("&", start);
+
+    if (end === -1) {
+      end = length;
     }
-  });
 
-  const querystring = kept.join("&");
+    const name = sliceParamName(searchPart, start, end);
+
+    if (omitSet.has(name)) {
+      removedStr = appendChunk(removedStr, searchPart, start, end);
+    } else {
+      keptStr = appendChunk(keptStr, searchPart, start, end);
+    }
+
+    start = end + 1;
+  }
 
   return {
-    querystring: hasPrefix && querystring ? `?${querystring}` : querystring,
-    removedParams: parse(removed.join("&"), options),
+    querystring: hasPrefix && keptStr ? `?${keptStr}` : keptStr,
+    removedParams: parse(removedStr, options),
   };
 };
 
@@ -403,15 +410,26 @@ export const keep = (
 
   const options = makeOptions(opts);
   const keepSet = new Set(paramsToKeep);
-  const kept: string[] = [];
 
-  forEachParam(searchPart, (chunk) => {
-    if (keepSet.has(extractChunkName(chunk))) {
-      kept.push(chunk);
+  let querystring = "";
+  let start = 0;
+  const length = searchPart.length;
+
+  while (start < length) {
+    let end = searchPart.indexOf("&", start);
+
+    if (end === -1) {
+      end = length;
     }
-  });
 
-  const querystring = kept.join("&");
+    const name = sliceParamName(searchPart, start, end);
+
+    if (keepSet.has(name)) {
+      querystring = appendChunk(querystring, searchPart, start, end);
+    }
+
+    start = end + 1;
+  }
 
   return { keptParams: parse(querystring, options), querystring };
 };

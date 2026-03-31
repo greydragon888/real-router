@@ -6,6 +6,7 @@ import {
   arbSearchParamsStrings,
   arbSearchParamsEncodable,
   arbOptions,
+  arbOptionsNoAutoNumber,
   arbOptionsNonComma,
   arbSafeKey,
   arbSafeString,
@@ -17,7 +18,7 @@ import { build, parse } from "../../src";
 import type { Options, SearchParams } from "../../src";
 
 describe("parse/build roundtrip", () => {
-  test.prop([arbSearchParamsStrings, arbOptions], {
+  test.prop([arbSearchParamsStrings, arbOptionsNoAutoNumber], {
     numRuns: NUM_RUNS.standard,
   })(
     "roundtrip: parse(build(params, opts), opts) === params for string-only values",
@@ -101,7 +102,7 @@ describe("build output has no ? prefix", () => {
 // ===================================================================
 
 describe("encode/decode fidelity", () => {
-  test.prop([arbSearchParamsEncodable, arbOptions], {
+  test.prop([arbSearchParamsEncodable, arbOptionsNoAutoNumber], {
     numRuns: NUM_RUNS.standard,
   })(
     "percent-encoding roundtrip: values with special chars survive build→parse",

@@ -6,6 +6,7 @@ import type {
   ArrayFormat,
   BooleanFormat,
   NullFormat,
+  NumberFormat,
   Options,
   QueryParamPrimitive,
   QueryParamValue,
@@ -97,10 +98,23 @@ const arbNullFormat: fc.Arbitrary<NullFormat> = fc.constantFrom(
   "hidden",
 );
 
+const arbNumberFormat: fc.Arbitrary<NumberFormat> = fc.constantFrom(
+  "none",
+  "auto",
+);
+
 export const arbOptions: fc.Arbitrary<Options> = fc.record({
   arrayFormat: arbArrayFormat,
   booleanFormat: arbBooleanFormat,
   nullFormat: arbNullFormat,
+  numberFormat: arbNumberFormat,
+});
+
+export const arbOptionsNoAutoNumber: fc.Arbitrary<Options> = fc.record({
+  arrayFormat: arbArrayFormat,
+  booleanFormat: arbBooleanFormat,
+  nullFormat: arbNullFormat,
+  numberFormat: fc.constant("none" as NumberFormat),
 });
 
 export const arbOptionsNonComma: fc.Arbitrary<Options> = fc.record({
@@ -111,6 +125,7 @@ export const arbOptionsNonComma: fc.Arbitrary<Options> = fc.record({
   ) as fc.Arbitrary<ArrayFormat>,
   booleanFormat: arbBooleanFormat,
   nullFormat: arbNullFormat,
+  numberFormat: arbNumberFormat,
 });
 
 export const arbQueryStringWithOpts: fc.Arbitrary<[string, Options]> = fc
@@ -124,15 +139,42 @@ export const arbQueryString: fc.Arbitrary<string> = fc
   .tuple(arbSearchParamsStrings, arbOptions)
   .map(([params, opts]) => build(params, opts));
 
+const AUTO_NUMBER_RE = /^\d+(\.\d+)?$/;
+
+function normalizeNumber(value: number, numFmt: NumberFormat): number | string {
+  if (numFmt === "auto") {
+    const str = String(value);
+
+    return AUTO_NUMBER_RE.test(str) ? value : str;
+  }
+
+  return String(value);
+}
+
+/**
+ * Converts a string to number if it matches the auto-number pattern.
+ * After build→parse, a string like "8" becomes the URL value "8",
+ * which numberFormat: "auto" parses back as number 8.
+ */
+function maybeParseAutoNumber(
+  value: string,
+  numFmt: NumberFormat,
+): string | number {
+  return numFmt === "auto" && AUTO_NUMBER_RE.test(value)
+    ? Number(value)
+    : value;
+}
+
 function normalizePrimitive(
   value: QueryParamPrimitive,
   boolFmt: BooleanFormat,
+  numFmt: NumberFormat,
 ): QueryParamPrimitive {
   if (value === null) {
     return null;
   }
   if (typeof value === "number") {
-    return String(value);
+    return normalizeNumber(value, numFmt);
   }
   if (typeof value === "boolean") {
     switch (boolFmt) {
@@ -143,29 +185,32 @@ function normalizePrimitive(
         return value ? true : "false";
       }
       default: {
-        return String(value);
+        return maybeParseAutoNumber(String(value), numFmt);
       }
     }
   }
 
-  return value;
+  return maybeParseAutoNumber(value, numFmt);
 }
 
 function normalizeArrayElement(
   value: QueryParamPrimitive,
   boolFmt: BooleanFormat,
+  numFmt: NumberFormat,
 ): QueryParamPrimitive {
   if (value === null) {
     return null;
   }
   if (typeof value === "number") {
-    return String(value);
+    return normalizeNumber(value, numFmt);
   }
   if (typeof value === "boolean") {
-    return boolFmt === "string" ? value : String(value);
+    return boolFmt === "string"
+      ? value
+      : maybeParseAutoNumber(String(value), numFmt);
   }
 
-  return value;
+  return maybeParseAutoNumber(value, numFmt);
 }
 
 function normalizeValue(
@@ -174,6 +219,7 @@ function normalizeValue(
   boolFmt: BooleanFormat,
   nullFmt: NullFormat,
   arrFmt: ArrayFormat,
+  numFmt: NumberFormat,
   result: Record<string, unknown>,
 ): void {
   if (value === null) {
@@ -187,14 +233,14 @@ function normalizeValue(
   if (Array.isArray(value)) {
     if (arrFmt !== "comma") {
       result[key] = value.map((element) =>
-        normalizeArrayElement(element, boolFmt),
+        normalizeArrayElement(element, boolFmt, numFmt),
       );
     }
 
     return;
   }
 
-  result[key] = normalizePrimitive(value, boolFmt);
+  result[key] = normalizePrimitive(value, boolFmt, numFmt);
 }
 
 export function normalizeForComparison(
@@ -204,11 +250,12 @@ export function normalizeForComparison(
   const boolFmt = opts.booleanFormat ?? "none";
   const nullFmt = opts.nullFormat ?? "default";
   const arrFmt = opts.arrayFormat ?? "none";
+  const numFmt = opts.numberFormat ?? "none";
   const result: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined) {
-      normalizeValue(key, value, boolFmt, nullFmt, arrFmt, result);
+      normalizeValue(key, value, boolFmt, nullFmt, arrFmt, numFmt, result);
     }
   }
 

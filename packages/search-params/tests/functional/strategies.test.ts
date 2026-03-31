@@ -16,6 +16,10 @@ import {
   defaultNullStrategy,
   hiddenNullStrategy,
 } from "../../src/strategies/null";
+import {
+  noneNumberStrategy,
+  autoNumberStrategy,
+} from "../../src/strategies/number";
 
 describe("search-params strategies", () => {
   describe("boolean strategies", () => {
@@ -95,12 +99,63 @@ describe("search-params strategies", () => {
     });
   });
 
+  describe("number strategies", () => {
+    describe("noneNumberStrategy", () => {
+      it("should return null (passthrough)", () => {
+        expect(noneNumberStrategy.decode("123")).toBe(null);
+        expect(noneNumberStrategy.decode("abc")).toBe(null);
+      });
+    });
+
+    describe("autoNumberStrategy", () => {
+      it("should decode integer strings as numbers", () => {
+        expect(autoNumberStrategy.decode("0")).toBe(0);
+        expect(autoNumberStrategy.decode("42")).toBe(42);
+        expect(autoNumberStrategy.decode("12345")).toBe(12_345);
+      });
+
+      it("should decode decimal strings as numbers", () => {
+        expect(autoNumberStrategy.decode("12.5")).toBe(12.5);
+        expect(autoNumberStrategy.decode("0.99")).toBe(0.99);
+        expect(autoNumberStrategy.decode("100.0")).toBe(100);
+      });
+
+      it("should return null for non-numeric strings", () => {
+        expect(autoNumberStrategy.decode("abc")).toBe(null);
+        expect(autoNumberStrategy.decode("12abc")).toBe(null);
+        expect(autoNumberStrategy.decode("-1")).toBe(null);
+        expect(autoNumberStrategy.decode("")).toBe(null);
+        expect(autoNumberStrategy.decode(".5")).toBe(null);
+        expect(autoNumberStrategy.decode("1.")).toBe(null);
+        expect(autoNumberStrategy.decode("1.2.3")).toBe(null);
+      });
+
+      it("should parse leading zeros (lossy roundtrip)", () => {
+        expect(autoNumberStrategy.decode("01")).toBe(1);
+        expect(autoNumberStrategy.decode("007")).toBe(7);
+        expect(autoNumberStrategy.decode("00")).toBe(0);
+      });
+
+      it("should lose precision for numbers beyond Number.MAX_SAFE_INTEGER", () => {
+        const unsafeInt = "99999999999999999";
+        const result = autoNumberStrategy.decode(unsafeInt);
+
+        expect(result).toBe(Number(unsafeInt));
+        expect(Number.isSafeInteger(result)).toBe(false);
+      });
+    });
+  });
+
   describe("array strategies", () => {
     describe("noneArrayStrategy", () => {
       it("should encode as repeated keys", () => {
         expect(noneArrayStrategy.encodeArray("items", ["a", "b"])).toBe(
           "items=a&items=b",
         );
+      });
+
+      it("should return empty string for empty array", () => {
+        expect(noneArrayStrategy.encodeArray("items", [])).toBe("");
       });
     });
 
@@ -110,6 +165,10 @@ describe("search-params strategies", () => {
           "items[]=a&items[]=b",
         );
       });
+
+      it("should return empty string for empty array", () => {
+        expect(bracketsArrayStrategy.encodeArray("items", [])).toBe("");
+      });
     });
 
     describe("indexArrayStrategy", () => {
@@ -118,6 +177,10 @@ describe("search-params strategies", () => {
           "items[0]=a&items[1]=b&items[2]=c",
         );
       });
+
+      it("should return empty string for empty array", () => {
+        expect(indexArrayStrategy.encodeArray("items", [])).toBe("");
+      });
     });
 
     describe("commaArrayStrategy", () => {
@@ -125,6 +188,10 @@ describe("search-params strategies", () => {
         expect(commaArrayStrategy.encodeArray("items", ["a", "b", "c"])).toBe(
           "items=a,b,c",
         );
+      });
+
+      it("should return key= for empty array", () => {
+        expect(commaArrayStrategy.encodeArray("items", [])).toBe("items=");
       });
 
       it("should encode special characters", () => {

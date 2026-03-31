@@ -10,7 +10,9 @@
 
 import { barplot, bench, boxplot, lineplot, summary } from "mitata";
 
-import { build, keep, omit, parse } from "../../src";
+import { build, keep, omit, parse, parseInto } from "../../src";
+import { decodeValue } from "../../src/decode";
+import { makeOptions } from "../../src/encode";
 
 /** Mitata state interface for generator benchmarks */
 interface BenchState {
@@ -136,6 +138,125 @@ boxplot(() => {
 
     bench("parse: boolean (empty-true)", () => {
       parse(emptyTrue, { booleanFormat: "empty-true" });
+    });
+  });
+});
+
+// 1.5 parse: cost of strategy resolution (same input, with vs without options)
+boxplot(() => {
+  summary(() => {
+    const qs = "page=1&sort=name&limit=10&offset=0&active=true";
+
+    bench("parse: no options (parseSimple)", () => {
+      parse(qs);
+    });
+
+    bench("parse: default options (with strategies)", () => {
+      parse(qs, {});
+    });
+
+    bench("parse: numberFormat auto", () => {
+      parse(qs, { numberFormat: "auto" });
+    });
+
+    bench("parse: booleanFormat string", () => {
+      parse(qs, { booleanFormat: "string" });
+    });
+
+    bench("parse: all formats", () => {
+      parse(qs, {
+        booleanFormat: "string",
+        numberFormat: "auto",
+        nullFormat: "default",
+      });
+    });
+  });
+});
+
+// =============================================================================
+// parseInto() benchmarks
+// =============================================================================
+
+// 1.6 parseInto vs parse
+boxplot(() => {
+  summary(() => {
+    const qs = "page=1&sort=name&limit=10";
+
+    bench("parse (3 params)", () => {
+      parse(qs);
+    });
+
+    bench("parseInto (3 params)", () => {
+      const target: Record<string, unknown> = {};
+
+      parseInto(qs, target);
+    });
+  });
+});
+
+// 1.7 parseInto scaling
+lineplot(() => {
+  summary(() => {
+    bench("parseInto: $count params", function* (state: BenchState) {
+      const count = state.get("count") as number;
+      const queryString = generateQueryString(count);
+
+      yield () => {
+        const target: Record<string, unknown> = {};
+
+        parseInto(queryString, target);
+      };
+    }).args("count", [5, 10, 20, 50]);
+  });
+});
+
+// =============================================================================
+// decodeValue() benchmarks (isolated)
+// =============================================================================
+
+// 1.8 decodeValue fast path vs slow path
+boxplot(() => {
+  summary(() => {
+    const plain = "simplevalue";
+    const withPlus = "hello+world+foo";
+    const withPercent = "hello%20world%21";
+    const withBoth = "hello+world%21";
+
+    bench("decodeValue: plain (fast path)", () => {
+      decodeValue(plain);
+    });
+
+    bench("decodeValue: + only", () => {
+      decodeValue(withPlus);
+    });
+
+    bench("decodeValue: % only", () => {
+      decodeValue(withPercent);
+    });
+
+    bench("decodeValue: + and %", () => {
+      decodeValue(withBoth);
+    });
+  });
+});
+
+// =============================================================================
+// makeOptions() benchmarks (isolated)
+// =============================================================================
+
+// 1.9 makeOptions caching
+boxplot(() => {
+  summary(() => {
+    bench("makeOptions: no args (cached)", () => {
+      makeOptions();
+    });
+
+    bench("makeOptions: empty object (cached)", () => {
+      makeOptions({});
+    });
+
+    bench("makeOptions: with options (resolve)", () => {
+      makeOptions({ arrayFormat: "brackets", booleanFormat: "string" });
     });
   });
 });

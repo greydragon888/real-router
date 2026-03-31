@@ -35,6 +35,7 @@ const DEFAULT_OPTIONS: OptionsWithStrategies = {
   arrayFormat: "none",
   booleanFormat: "none",
   nullFormat: "default",
+  numberFormat: "none",
   strategies: DEFAULT_STRATEGIES,
 };
 
@@ -47,7 +48,8 @@ export const makeOptions = (opts?: Options): OptionsWithStrategies => {
     !opts ||
     (opts.arrayFormat === undefined &&
       opts.booleanFormat === undefined &&
-      opts.nullFormat === undefined)
+      opts.nullFormat === undefined &&
+      opts.numberFormat === undefined)
   ) {
     return DEFAULT_OPTIONS;
   }
@@ -56,12 +58,19 @@ export const makeOptions = (opts?: Options): OptionsWithStrategies => {
   const arrayFormat = opts.arrayFormat ?? "none";
   const booleanFormat = opts.booleanFormat ?? "none";
   const nullFormat = opts.nullFormat ?? "default";
+  const numberFormat = opts.numberFormat ?? "none";
 
   return {
     arrayFormat,
     booleanFormat,
     nullFormat,
-    strategies: resolveStrategies(arrayFormat, booleanFormat, nullFormat),
+    numberFormat,
+    strategies: resolveStrategies(
+      arrayFormat,
+      booleanFormat,
+      nullFormat,
+      numberFormat,
+    ),
   };
 };
 
