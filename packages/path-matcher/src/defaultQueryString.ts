@@ -7,16 +7,29 @@ export function defaultParseQueryString(
     return params;
   }
 
-  const pairs = queryString.split("&");
+  // M5: Manual scan avoids split("&") array allocation
+  let start = 0;
+  const length = queryString.length;
 
-  for (const pair of pairs) {
-    const eqIdx = pair.indexOf("=");
+  while (start <= length) {
+    let ampIdx = queryString.indexOf("&", start);
 
-    if (eqIdx === -1) {
-      params[pair] = "";
-    } else {
-      params[pair.slice(0, eqIdx)] = pair.slice(eqIdx + 1);
+    if (ampIdx === -1) {
+      ampIdx = length;
     }
+
+    const eqIdx = queryString.indexOf("=", start);
+
+    if (eqIdx === -1 || eqIdx > ampIdx) {
+      params[queryString.slice(start, ampIdx)] = "";
+    } else {
+      params[queryString.slice(start, eqIdx)] = queryString.slice(
+        eqIdx + 1,
+        ampIdx,
+      );
+    }
+
+    start = ampIdx + 1;
   }
 
   return params;
@@ -25,18 +38,21 @@ export function defaultParseQueryString(
 export function defaultBuildQueryString(
   params: Record<string, unknown>,
 ): string {
-  const parts: string[] = [];
+  let result = "";
 
-  for (const key of Object.keys(params)) {
+  for (const key in params) {
+    if (result.length > 0) {
+      result += "&";
+    }
+
     const value = params[key];
     const encodedKey = encodeURIComponent(key);
 
-    parts.push(
+    result +=
       value === ""
         ? encodedKey
-        : `${encodedKey}=${encodeURIComponent(String(value))}`,
-    );
+        : `${encodedKey}=${encodeURIComponent(String(value))}`;
   }
 
-  return parts.join("&");
+  return result;
 }

@@ -11,6 +11,9 @@
  * - 1.4 #collectConstraintPatterns() -> pre-compute at registration
  * - 1.5 new Set(declaredQueryParams) -> pre-compute at registration
  * - 4.1 #appendSlashChild() per match -> pre-compute at registration
+ * - 5.1 Splat/wildcard matching with backtracking
+ * - 6.1 Case-insensitive matching overhead (toLowerCase per segment)
+ * - 7.1 Percent-encoded params decode + validation overhead
  *
  * IMPORTANT: match() is a non-mutating operation.
  * Matcher must be created OUTSIDE bench blocks.
@@ -33,7 +36,20 @@ import { createMatcher } from "./helpers/buildTree";
     },
     { name: "search", path: "/search?q&page&sort" },
     { name: "org", path: String.raw`/org/:orgId<\d+>` },
+    { name: "files", path: "/files/*path" },
   ]);
+
+  const warmupCaseInsensitive = createMatcher(
+    [
+      { name: "home", path: "/" },
+      {
+        name: "users",
+        path: "/users",
+        children: [{ name: "view", path: "/:id" }],
+      },
+    ],
+    { caseSensitive: false },
+  );
 
   for (let i = 0; i < 100; i++) {
     warmupMatcher.match("/");
@@ -43,6 +59,11 @@ import { createMatcher } from "./helpers/buildTree";
     warmupMatcher.match("/org/42");
     warmupMatcher.match("/users");
     warmupMatcher.match("/nonexistent");
+    warmupMatcher.match("/files/docs/readme.md");
+    warmupMatcher.match("/files/a/b/c/d/e");
+    warmupCaseInsensitive.match("/Users");
+    warmupCaseInsensitive.match("/USERS/123");
+    warmupMatcher.match("/users/hello%20world");
   }
 }
 
@@ -313,6 +334,148 @@ barplot(() => {
 
     bench("hot: parent match (with slash child)", () => {
       matcherWithSlash.match("/users");
+    });
+  });
+});
+
+// =============================================================================
+// 7. Splat/wildcard: measures splat backtracking and capture (5.1)
+// Splat child tries specific children before wildcard capture
+// =============================================================================
+
+boxplot(() => {
+  summary(() => {
+    const matcherSimpleSplat = createMatcher([
+      { name: "files", path: "/files/*path" },
+    ]);
+
+    const matcherSplatWithStatic = createMatcher([
+      {
+        name: "files",
+        path: "/files",
+        children: [
+          { name: "docs", path: "/docs" },
+          { name: "catch", path: "/*path" },
+        ],
+      },
+    ]);
+
+    const matcherSplatWithParam = createMatcher([
+      {
+        name: "files",
+        path: "/files",
+        children: [
+          { name: "byId", path: "/:id" },
+          { name: "catch", path: "/*path" },
+        ],
+      },
+    ]);
+
+    bench("hot: splat simple (1 segment)", () => {
+      matcherSimpleSplat.match("/files/readme.md");
+    });
+
+    bench("hot: splat deep (3 segments)", () => {
+      matcherSimpleSplat.match("/files/docs/api/readme.md");
+    });
+
+    bench("hot: splat deep (5 segments)", () => {
+      matcherSimpleSplat.match("/files/a/b/c/d/e.txt");
+    });
+
+    bench("hot: splat with static child (static wins)", () => {
+      matcherSplatWithStatic.match("/files/docs");
+    });
+
+    bench("hot: splat with static child (splat captures)", () => {
+      matcherSplatWithStatic.match("/files/other/file.txt");
+    });
+
+    bench("hot: splat with param child (param wins)", () => {
+      matcherSplatWithParam.match("/files/123");
+    });
+
+    bench("hot: splat with param child (splat captures)", () => {
+      matcherSplatWithParam.match("/files/a/b/c");
+    });
+  });
+});
+
+// =============================================================================
+// 8. Case-insensitive matching: measures toLowerCase overhead (6.1)
+// =============================================================================
+
+barplot(() => {
+  summary(() => {
+    const matcherSensitive = createMatcher([
+      { name: "users", path: "/users" },
+      {
+        name: "org",
+        path: "/org/:orgId",
+        children: [{ name: "team", path: "/team/:teamId" }],
+      },
+    ]);
+
+    const matcherInsensitive = createMatcher(
+      [
+        { name: "users", path: "/users" },
+        {
+          name: "org",
+          path: "/org/:orgId",
+          children: [{ name: "team", path: "/team/:teamId" }],
+        },
+      ],
+      { caseSensitive: false },
+    );
+
+    bench("hot: case-sensitive static", () => {
+      matcherSensitive.match("/users");
+    });
+
+    bench("hot: case-insensitive static", () => {
+      matcherInsensitive.match("/Users");
+    });
+
+    bench("hot: case-sensitive nested params", () => {
+      matcherSensitive.match("/org/acme/team/core");
+    });
+
+    bench("hot: case-insensitive nested params", () => {
+      matcherInsensitive.match("/Org/acme/Team/core");
+    });
+  });
+});
+
+// =============================================================================
+// 9. Percent-encoded params: measures decode + validation overhead (7.1)
+// validatePercentEncoding scans every "%" in param values
+// =============================================================================
+
+barplot(() => {
+  summary(() => {
+    const matcher = createMatcher([
+      { name: "user", path: "/users/:id" },
+      {
+        name: "deep",
+        path: "/a/:p1",
+        children: [{ name: "b", path: "/b/:p2" }],
+      },
+    ]);
+
+    bench("hot: plain param (no encoding)", () => {
+      matcher.match("/users/123");
+    });
+
+    bench("hot: 1 encoded param (%20)", () => {
+      matcher.match("/users/hello%20world");
+    });
+
+    bench("hot: 1 heavily encoded param", () => {
+      matcher.match("/users/%E4%B8%AD%E6%96%87%E6%B5%8B%E8%AF%95");
+    });
+
+    bench("hot: 2 encoded params (nested)", () => {
+      matcher.match("/a/hello%20world/b/foo%26bar");
     });
   });
 });

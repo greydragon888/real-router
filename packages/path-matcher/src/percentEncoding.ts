@@ -1,8 +1,8 @@
-function isHexChar(code: number): boolean {
+function isHexCodePoint(code: number): boolean {
   return (
-    (code >= 48 && code <= 57) || // '0'-'9'
-    (code >= 65 && code <= 70) || // 'A'-'F'
-    (code >= 97 && code <= 102) // 'a'-'f'
+    (code >= 0x30 && code <= 0x39) ||
+    (code >= 0x41 && code <= 0x46) ||
+    (code >= 0x61 && code <= 0x66)
   );
 }
 
@@ -10,7 +10,7 @@ export function validatePercentEncoding(value: string): boolean {
   let i = 0;
 
   while (i < value.length) {
-    if (value[i] === "%") {
+    if (value.codePointAt(i) === 0x25 /* % */) {
       if (i + 2 >= value.length) {
         return false;
       }
@@ -20,7 +20,7 @@ export function validatePercentEncoding(value: string): boolean {
       const hex2 = value.codePointAt(i + 2) ?? 0;
       /* v8 ignore stop */
 
-      if (!isHexChar(hex1) || !isHexChar(hex2)) {
+      if (!isHexCodePoint(hex1) || !isHexCodePoint(hex2)) {
         return false;
       }
 

@@ -2,7 +2,7 @@
  * Path Matcher Benchmarks Entry Point
  *
  * Run: pnpm bench
- * Results: .bench/path-matcher-results.json
+ * Results: .bench/baseline.json
  *
  * Categories:
  * 1. match-hotpath - match() hot path micro-benchmarks

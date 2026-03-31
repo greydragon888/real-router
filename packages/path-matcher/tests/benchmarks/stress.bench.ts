@@ -10,6 +10,11 @@
  * 6. Large registration
  * 7. Cache effectiveness
  * 8. Worst-case no-match
+ * 9. rootPath impact on matching
+ * 10. Splat backtracking scaling
+ * 11. Mixed pattern priority (static vs param vs splat)
+ * 12. buildPath scaling with constraints
+ * 13. Case-insensitive registration + matching at scale
  *
  * IMPORTANT: match() is a non-mutating operation.
  * Matcher must be created OUTSIDE bench blocks.
@@ -75,6 +80,33 @@ function generateLongRoute(segmentCount: number): SimpleRoute[] {
   );
 
   return [{ name: "target", path }];
+}
+
+function generateMixedRoutes(staticCount: number): SimpleRoute[] {
+  const routes: SimpleRoute[] = [];
+
+  for (let i = 0; i < staticCount; i++) {
+    routes.push({ name: `static${i}`, path: `/static${i}` });
+  }
+
+  routes.push(
+    { name: "param", path: "/items/:id" },
+    { name: "splat", path: "/files/*path" },
+  );
+
+  return routes;
+}
+
+function generateSplatRoute(childStaticCount: number): SimpleRoute[] {
+  const children: SimpleRoute[] = [];
+
+  for (let i = 0; i < childStaticCount; i++) {
+    children.push({ name: `child${i}`, path: `/child${i}` });
+  }
+
+  children.push({ name: "catch", path: "/*path" });
+
+  return [{ name: "base", path: "/base", children }];
 }
 
 // =============================================================================
@@ -280,5 +312,144 @@ lineplot(() => {
         do_not_optimize(matcher.match("/this-path-does-not-exist"));
       };
     }).args("count", [10, 100, 500, 1000]);
+  });
+});
+
+// =============================================================================
+// 9. rootPath impact on matching
+// =============================================================================
+
+barplot(() => {
+  summary(() => {
+    const routes = generateWideRoutes(100);
+
+    const matcherNoRoot = createMatcher(routes);
+
+    const tree = buildTree(routes);
+    const matcherShortRoot = new SegmentMatcher();
+
+    matcherShortRoot.registerTree(tree);
+    matcherShortRoot.setRootPath("/app");
+
+    const tree2 = buildTree(routes);
+    const matcherLongRoot = new SegmentMatcher();
+
+    matcherLongRoot.registerTree(tree2);
+    matcherLongRoot.setRootPath("/base/v2/app");
+
+    bench("stress: match without rootPath (100 routes)", () => {
+      do_not_optimize(matcherNoRoot.match("/route50"));
+    });
+
+    bench("stress: match with rootPath /app (100 routes)", () => {
+      do_not_optimize(matcherShortRoot.match("/app/route50"));
+    });
+
+    bench("stress: match with rootPath /base/v2/app (100 routes)", () => {
+      do_not_optimize(matcherLongRoot.match("/base/v2/app/route50"));
+    });
+  });
+});
+
+// =============================================================================
+// 10. Splat backtracking scaling
+//     More static children under splat = more backtracking attempts
+// =============================================================================
+
+lineplot(() => {
+  summary(() => {
+    bench(
+      "stress: splat backtrack $count static siblings",
+      function* (state: BenchState) {
+        const count = state.get("count") as number;
+        const routes = generateSplatRoute(count);
+        const matcher = createMatcher(routes);
+
+        yield () => {
+          do_not_optimize(matcher.match("/base/unknown/deep/path"));
+        };
+      },
+    ).args("count", [0, 5, 10, 50]);
+  });
+});
+
+// =============================================================================
+// 11. Mixed pattern priority: static vs param vs splat at same level
+// =============================================================================
+
+barplot(() => {
+  summary(() => {
+    const routes = generateMixedRoutes(50);
+    const matcher = createMatcher(routes);
+
+    bench("stress: mixed - static hit", () => {
+      do_not_optimize(matcher.match("/static25"));
+    });
+
+    bench("stress: mixed - param hit", () => {
+      do_not_optimize(matcher.match("/items/42"));
+    });
+
+    bench("stress: mixed - splat hit", () => {
+      do_not_optimize(matcher.match("/files/some/deep/path"));
+    });
+
+    bench("stress: mixed - no match", () => {
+      do_not_optimize(matcher.match("/nonexistent"));
+    });
+  });
+});
+
+// =============================================================================
+// 12. buildPath scaling with constraints
+// =============================================================================
+
+lineplot(() => {
+  summary(() => {
+    bench(
+      "stress: buildPath $count constraints",
+      function* (state: BenchState) {
+        const count = state.get("count") as number;
+
+        const segments = Array.from(
+          { length: count },
+          (_, i) => String.raw`/s${i}/:p${i}<\d+>`,
+        ).join("");
+        const routes: SimpleRoute[] = [{ name: "target", path: segments }];
+        const matcher = createMatcher(routes);
+
+        const params: Record<string, string> = {};
+
+        for (let i = 0; i < count; i++) {
+          params[`p${i}`] = String(i);
+        }
+
+        yield () => {
+          do_not_optimize(matcher.buildPath("target", params));
+        };
+      },
+    ).args("count", [1, 5, 10, 20]);
+  });
+});
+
+// =============================================================================
+// 13. Case-insensitive registration + matching at scale
+// =============================================================================
+
+barplot(() => {
+  summary(() => {
+    bench("stress: case-sensitive register+match 500 routes", () => {
+      const routes = generateWideRoutes(500);
+      const matcher = createMatcher(routes);
+
+      do_not_optimize(matcher.match("/route250"));
+    });
+
+    bench("stress: case-insensitive register+match 500 routes", () => {
+      const routes = generateWideRoutes(500);
+      const matcher = createMatcher(routes, { caseSensitive: false });
+
+      do_not_optimize(matcher.match("/Route250"));
+    });
   });
 });

@@ -18,12 +18,6 @@ import type {
 } from "./types";
 
 // =============================================================================
-// Constants
-// =============================================================================
-
-const RAW_UNICODE_PATTERN = /[\u0080-\uFFFF]/;
-
-// =============================================================================
 // SegmentMatcher Class
 // =============================================================================
 
@@ -43,8 +37,16 @@ export class SegmentMatcher {
   >();
   readonly #staticCache = new Map<string, CompiledRoute>();
 
+  // H1: Reusable object eliminates tuple allocation per match() call
+  readonly #prepared = {
+    cleanPath: "",
+    normalized: "",
+    queryString: undefined as string | undefined,
+  };
+
   #rootPath = "";
   #rootQueryParams: readonly string[] = [];
+  #scanTruncated = "";
 
   constructor(options?: SegmentMatcherOptions) {
     this.#options = {
@@ -77,13 +79,11 @@ export class SegmentMatcher {
   }
 
   match(path: string): MatchResult | undefined {
-    const prepared = this.#preparePath(path);
-
-    if (!prepared) {
+    if (!this.#preparePath(path)) {
       return undefined;
     }
 
-    const [cleanPath, normalized, queryString] = prepared;
+    const { cleanPath, normalized, queryString } = this.#prepared;
 
     const cacheKey = this.#options.caseSensitive
       ? normalized
@@ -225,10 +225,17 @@ export class SegmentMatcher {
         continue;
       }
 
-      const stringValue =
-        typeof value === "object"
-          ? JSON.stringify(value)
-          : String(value as string | number | boolean);
+      // M2: fast-path for string values (most common case)
+      let stringValue: string;
+
+      if (typeof value === "string") {
+        stringValue = value;
+      } else if (typeof value === "object") {
+        stringValue = JSON.stringify(value);
+      } else {
+        stringValue = String(value as number | boolean);
+      }
+
       const encoded = slot.encoder(stringValue);
 
       result += encoded + parts[i + 1];
@@ -262,6 +269,10 @@ export class SegmentMatcher {
       return "";
     }
 
+    if (route.declaredQueryParams.length === 0 && queryParamsMode !== "loose") {
+      return "";
+    }
+
     const queryObj: Record<string, unknown> = {};
     let hasKeys = false;
 
@@ -292,50 +303,81 @@ export class SegmentMatcher {
     return this.#options.buildQueryString(queryObj);
   }
 
-  #preparePath(
-    path: string,
-  ):
-    | [cleanPath: string, normalized: string, queryString: string | undefined]
-    | undefined {
+  // H2: Single-pass scanner — replaces 4 separate scans (indexOf("#"), regex unicode, indexOf("?"), includes("//"))
+  #preparePath(path: string): boolean {
     if (path === "") {
       path = "/";
     }
 
-    if (!path.startsWith("/")) {
-      return undefined;
+    if (path.codePointAt(0) !== 0x2f /* / */) {
+      return false;
     }
 
-    const hashIdx = path.indexOf("#");
+    const rootLength = this.#rootPath.length;
 
-    if (hashIdx !== -1) {
-      path = path.slice(0, hashIdx);
-    }
-
-    if (RAW_UNICODE_PATTERN.test(path)) {
-      return undefined;
-    }
-
-    if (this.#rootPath.length > 0) {
-      if (!path.startsWith(this.#rootPath)) {
-        return undefined;
+    if (rootLength > 0) {
+      if (path.length < rootLength || !path.startsWith(this.#rootPath)) {
+        return false;
       }
 
-      path = path.slice(this.#rootPath.length) || "/";
+      path = path.length === rootLength ? "/" : path.slice(rootLength);
     }
 
-    const qIdx = path.indexOf("?");
-    const pathPart = qIdx === -1 ? path : path.slice(0, qIdx);
-    const queryString = qIdx === -1 ? undefined : path.slice(qIdx + 1);
+    const qIdx = this.#scanPath(path);
 
-    if (pathPart.includes("//")) {
-      return undefined;
+    if (qIdx === -2) {
+      return false;
     }
 
-    const cleanPath = pathPart;
+    if (qIdx === -3) {
+      path = this.#scanTruncated;
+    }
 
-    const normalized = normalizeTrailingSlash(cleanPath);
+    const pathPart = qIdx >= 0 ? path.slice(0, qIdx) : path;
+    const queryString = qIdx >= 0 ? path.slice(qIdx + 1) : undefined;
+    const normalized = normalizeTrailingSlash(pathPart);
 
-    return [cleanPath, normalized, queryString];
+    this.#prepared.cleanPath = pathPart;
+    this.#prepared.normalized = normalized;
+    this.#prepared.queryString = queryString;
+
+    return true;
+  }
+
+  // Returns: qIdx >= 0 (found ?), -1 (no ? or #), -2 (invalid), -3 (truncated at #, result in #scanTruncated)
+  #scanPath(path: string): number {
+    let prevSlash = false;
+
+    for (let i = 0; i < path.length; i++) {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- bounds-checked by loop condition
+      const ch = path.codePointAt(i)!;
+
+      if (ch === 0x23 /* # */) {
+        this.#scanTruncated = path.slice(0, i);
+
+        return -3;
+      }
+
+      if (ch === 0x3f /* ? */) {
+        return i;
+      }
+
+      if (ch >= 0x80) {
+        return -2;
+      }
+
+      if (ch === 0x2f /* / */) {
+        if (prevSlash) {
+          return -2;
+        }
+
+        prevSlash = true;
+      } else {
+        prevSlash = false;
+      }
+    }
+
+    return -1;
   }
 
   #buildResult(
@@ -349,15 +391,17 @@ export class SegmentMatcher {
       if (this.#options.strictQueryParams) {
         const declared = route.declaredQueryParamsSet;
 
-        for (const key of Object.keys(queryParams)) {
+        for (const key in queryParams) {
           if (!declared.has(key)) {
             return undefined;
           }
-        }
-      }
 
-      for (const key of Object.keys(queryParams)) {
-        params[key] = queryParams[key];
+          params[key] = queryParams[key];
+        }
+      } else {
+        for (const key in queryParams) {
+          params[key] = queryParams[key];
+        }
       }
     }
 
