@@ -13,6 +13,8 @@
 import { SegmentMatcher } from "path-matcher";
 import { parse, build } from "search-params";
 
+import type { Options } from "search-params";
+
 // =============================================================================
 // Public Types (route-tree's own — no path-matcher or search-params types leak)
 // =============================================================================
@@ -22,12 +24,7 @@ import { parse, build } from "search-params";
  *
  * Controls how arrays, booleans, nulls, and numbers are serialized in query strings.
  */
-export interface QueryParamsConfig {
-  readonly arrayFormat?: "none" | "brackets" | "index" | "comma";
-  readonly booleanFormat?: "none" | "auto" | "empty-true";
-  readonly nullFormat?: "default" | "hidden";
-  readonly numberFormat?: "none" | "auto";
-}
+export type QueryParamsConfig = Readonly<Options>;
 
 /**
  * Options for creating a path matcher.

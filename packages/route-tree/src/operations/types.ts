@@ -9,6 +9,7 @@
  */
 
 import type { RouteTree } from "../builder";
+import type { URLParamsEncodingType } from "path-matcher";
 import type { Options as QueryParamsOptions } from "search-params";
 
 // =============================================================================
@@ -24,11 +25,6 @@ export type QueryParamsMode = "default" | "strict" | "loose";
  * Controls how trailing slashes are handled in paths.
  */
 export type TrailingSlashMode = "default" | "never" | "always";
-
-/**
- * Controls URL parameter encoding strategy.
- */
-export type URLParamsEncodingType = "default" | "uri" | "uriComponent" | "none";
 
 // =============================================================================
 // Options Types
@@ -120,3 +116,5 @@ export interface RouteTreeState<P extends RouteParams = RouteParams> {
 /** Route parameters map. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- cross-package boundary type
 export type RouteParams = Record<string, any>;
+
+export { type URLParamsEncodingType } from "path-matcher";

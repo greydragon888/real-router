@@ -1,5 +1,7 @@
 // packages/core/src/namespaces/OptionsNamespace/constants.ts
 
+import { DEFAULT_QUERY_PARAMS } from "route-tree";
+
 import type { Options } from "@real-router/types";
 
 /**
@@ -10,12 +12,7 @@ export const defaultOptions: Options = {
   defaultParams: {},
   trailingSlash: "preserve",
   queryParamsMode: "loose",
-  queryParams: {
-    arrayFormat: "none",
-    booleanFormat: "auto",
-    nullFormat: "default",
-    numberFormat: "auto",
-  },
+  queryParams: DEFAULT_QUERY_PARAMS,
   urlParamsEncoding: "default",
   allowNotFound: true,
   rewritePathOnMatch: true,

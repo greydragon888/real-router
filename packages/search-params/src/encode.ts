@@ -18,6 +18,20 @@ import {
 import type { FinalOptions, Options } from "./types";
 
 // =============================================================================
+// Default Query Params
+// =============================================================================
+
+/**
+ * Default query parameter options. Single source of truth for all packages.
+ */
+export const DEFAULT_QUERY_PARAMS: FinalOptions = {
+  arrayFormat: "none",
+  booleanFormat: "auto",
+  nullFormat: "default",
+  numberFormat: "auto",
+};
+
+// =============================================================================
 // Options with Strategies
 // =============================================================================
 
@@ -32,10 +46,7 @@ export interface OptionsWithStrategies extends FinalOptions {
  * Cached default options with strategies - avoids allocation when no options passed.
  */
 const DEFAULT_OPTIONS: OptionsWithStrategies = {
-  arrayFormat: "none",
-  booleanFormat: "auto",
-  nullFormat: "default",
-  numberFormat: "auto",
+  ...DEFAULT_QUERY_PARAMS,
   strategies: DEFAULT_STRATEGIES,
 };
 
@@ -55,10 +66,11 @@ export const makeOptions = (opts?: Options): OptionsWithStrategies => {
   }
 
   // Avoid object spread - direct property assignment is faster
-  const arrayFormat = opts.arrayFormat ?? "none";
-  const booleanFormat = opts.booleanFormat ?? "auto";
-  const nullFormat = opts.nullFormat ?? "default";
-  const numberFormat = opts.numberFormat ?? "auto";
+  const arrayFormat = opts.arrayFormat ?? DEFAULT_QUERY_PARAMS.arrayFormat;
+  const booleanFormat =
+    opts.booleanFormat ?? DEFAULT_QUERY_PARAMS.booleanFormat;
+  const nullFormat = opts.nullFormat ?? DEFAULT_QUERY_PARAMS.nullFormat;
+  const numberFormat = opts.numberFormat ?? DEFAULT_QUERY_PARAMS.numberFormat;
 
   return {
     arrayFormat,
