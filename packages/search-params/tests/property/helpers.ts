@@ -145,7 +145,8 @@ function normalizeNumber(value: number, numFmt: NumberFormat): number | string {
   if (numFmt === "auto") {
     const str = String(value);
 
-    return AUTO_NUMBER_RE.test(str) ? value : str;
+    // -0 loses sign through URL roundtrip: String(-0) → "0" → Number("0") → +0
+    return AUTO_NUMBER_RE.test(str) ? Number(str) : str;
   }
 
   return String(value);

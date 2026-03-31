@@ -924,6 +924,16 @@ export default tsEslint.config(
   // ============================================
   // 16. TURBO CONFIGURATION (must be last)
   // ============================================
-  // eslint-config-turbo v2.8.20
+  // eslint-config-turbo v2.9.1
   ...turboConfig,
+  {
+    // eslint-config-turbo does not read global.env from turbo.json
+    // when futureFlags.globalConfiguration is enabled — allowList global env vars
+    rules: {
+      "turbo/no-undeclared-env-vars": [
+        "error",
+        { allowList: ["BENCH_ROUTER", "BENCH_NO_VALIDATE", "BENCH_SECTIONS"] },
+      ],
+    },
+  },
 );
