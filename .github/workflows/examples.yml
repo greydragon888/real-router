@@ -1,0 +1,74 @@
+name: Examples
+
+on:
+  schedule:
+    - cron: '0 22 * * 0,3' # Mon & Thu at 05:00 ICT (UTC+7)
+  workflow_dispatch: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+  TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+
+jobs:
+  examples:
+    name: Build & Test Examples
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # turbo dependency chain: build → test → lint, type-check
+      # Single command runs the full validation pipeline
+      - name: Build (includes lint, type-check, test via turbo deps)
+        run: pnpm turbo run build --filter='./examples/*'
+
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: [examples]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      # Build results cached from examples job via Turbo Remote Cache
+      - name: Run E2E tests
+        run: pnpm turbo run test:e2e --filter='./examples/*' --concurrency=1
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: examples/*/playwright-report/
+          retention-days: 7

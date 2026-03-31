@@ -10,7 +10,7 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# Turbo Remote Cache - shared across all jobs
+# Turbo Remote Cache - shared across all parallel jobs
 env:
   TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
   TURBO_TEAM: ${{ vars.TURBO_TEAM }}
@@ -23,6 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       should_run: ${{ steps.changes.outputs.should_run }}
+      turbo_base: ${{ steps.turbo.outputs.base }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -58,64 +59,91 @@ jobs:
             echo "🔍 Code changes detected, running full CI"
           fi
 
-  prepare:
-    name: Prepare (Cache Warm-up)
+      # Set Turbo SCM base for --affected:
+      # - Push: compare with previous commit (github.event.before)
+      # - PR: turbo auto-detects merge base with master (no override needed)
+      - name: Set Turbo SCM base
+        id: turbo
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "base=${{ github.event.before }}" >> $GITHUB_OUTPUT
+          fi
+
+  # ============================================
+  # PARALLEL: Lint & Test run concurrently
+  # ============================================
+
+  lint:
+    name: Lint & Type Check
     runs-on: ubuntu-latest
     needs: [check]
-    # Always run to report status, but skip heavy steps if not needed
-    if: always()
+    if: needs.check.outputs.should_run == 'true'
     steps:
-      - name: Skip notification
-        if: needs.check.outputs.should_run != 'true'
-        run: echo "✅ Skipping CI - no code changes or release PR"
-
       - name: Checkout
-        if: needs.check.outputs.should_run == 'true'
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Fetch master for Turbo comparison
-        if: needs.check.outputs.should_run == 'true' && github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request'
         run: git fetch origin master:master
 
       - name: Install pnpm
-        if: needs.check.outputs.should_run == 'true'
         uses: pnpm/action-setup@v5
 
       - name: Setup Node.js
-        if: needs.check.outputs.should_run == 'true'
         uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm
 
       - name: Install dependencies
-        if: needs.check.outputs.should_run == 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Lint & Type Check
-        if: needs.check.outputs.should_run == 'true'
-        run: pnpm turbo run lint type-check ${{ github.event_name == 'pull_request' && '--affected' || '' }}
-
-      - name: Test with Coverage
-        if: needs.check.outputs.should_run == 'true'
-        run: pnpm turbo run test ${{ github.event_name == 'pull_request' && '--affected' || '' }} -- --coverage
-
-      - name: Build
-        if: needs.check.outputs.should_run == 'true'
-        run: pnpm turbo run build ${{ github.event_name == 'pull_request' && '--affected' || '' }}
+        run: pnpm turbo run lint type-check --affected --filter='!./examples/*'
+        env:
+          TURBO_SCM_BASE: ${{ needs.check.outputs.turbo_base }}
 
       - name: Check dependency consistency
-        if: needs.check.outputs.should_run == 'true'
         run: pnpm lint:deps
 
       - name: Check for duplicate dependencies
-        if: needs.check.outputs.should_run == 'true'
         run: pnpm lint:dedupe
 
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: [check]
+    if: needs.check.outputs.should_run == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Fetch master for Turbo comparison
+        if: github.event_name == 'pull_request'
+        run: git fetch origin master:master
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Test with Coverage
+        run: pnpm turbo run test --affected --filter='!./examples/*' -- --coverage
+        env:
+          TURBO_SCM_BASE: ${{ needs.check.outputs.turbo_base }}
+
       - name: Fix coverage paths
-        if: needs.check.outputs.should_run == 'true'
         run: |
           # vitest generates lcov.info with package-relative paths (SF:src/plugin.ts)
           # Both Codecov and SonarCloud need project-root-relative paths (SF:packages/browser-plugin/src/plugin.ts)
@@ -125,24 +153,67 @@ jobs:
           done
 
       - name: Upload coverage artifacts
-        if: needs.check.outputs.should_run == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: coverage-reports
           path: packages/*/coverage/
           retention-days: 1
 
+  # ============================================
+  # SEQUENTIAL: Build runs after lint + test
+  # Gets full Turbo Remote Cache hits from both
+  # ============================================
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [check, lint, test]
+    if: >-
+      always() &&
+      needs.check.outputs.should_run == 'true' &&
+      needs.lint.result == 'success' &&
+      needs.test.result == 'success'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Fetch master for Turbo comparison
+        if: github.event_name == 'pull_request'
+        run: git fetch origin master:master
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm turbo run build --affected
+        env:
+          TURBO_SCM_BASE: ${{ needs.check.outputs.turbo_base }}
+
       - name: Upload build artifacts
-        if: needs.check.outputs.should_run == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: dist
           path: packages/*/dist/
           retention-days: 1
 
+  # ============================================
+  # DOWNSTREAM: Coverage, SonarCloud, Bundle Size
+  # ============================================
+
   coverage:
     name: Coverage (Codecov)
-    needs: [check, prepare]
+    needs: [check, test]
     if: needs.check.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -163,13 +234,13 @@ jobs:
         uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: packages/browser-env/coverage/lcov.info,packages/browser-plugin/coverage/lcov.info,packages/core/coverage/lcov.info,packages/event-emitter/coverage/lcov.info,packages/fsm/coverage/lcov.info,packages/hash-plugin/coverage/lcov.info,packages/logger/coverage/lcov.info,packages/logger-plugin/coverage/lcov.info,packages/path-matcher/coverage/lcov.info,packages/persistent-params-plugin/coverage/lcov.info,packages/react/coverage/lcov.info,packages/route-tree/coverage/lcov.info,packages/route-utils/coverage/lcov.info,packages/rx/coverage/lcov.info,packages/search-params/coverage/lcov.info,packages/sources/coverage/lcov.info,packages/type-guards/coverage/lcov.info
+          files: packages/browser-env/coverage/lcov.info,packages/browser-plugin/coverage/lcov.info,packages/core/coverage/lcov.info,packages/event-emitter/coverage/lcov.info,packages/fsm/coverage/lcov.info,packages/hash-plugin/coverage/lcov.info,packages/logger/coverage/lcov.info,packages/logger-plugin/coverage/lcov.info,packages/persistent-params-plugin/coverage/lcov.info,packages/react/coverage/lcov.info,packages/route-tree/coverage/lcov.info,packages/route-utils/coverage/lcov.info,packages/rx/coverage/lcov.info,packages/search-params/coverage/lcov.info,packages/sources/coverage/lcov.info,packages/type-guards/coverage/lcov.info
           disable_search: true
           fail_ci_if_error: true
 
   sonarcloud:
     name: SonarCloud
-    needs: [check, prepare]
+    needs: [check, test]
     if: needs.check.outputs.should_run == 'true' && github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
@@ -208,14 +279,14 @@ jobs:
 
   bundle-size:
     name: Bundle Size
-    needs: [check, prepare]
+    needs: [check, build]
     if: needs.check.outputs.should_run == 'true' && github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: write
     steps:
-      # ── PR sizes: reuse dist artifacts from prepare job ──
+      # ── PR sizes: reuse dist artifacts from build job ──
       - name: Checkout PR
         uses: actions/checkout@v6
 
@@ -377,3 +448,35 @@ jobs:
             }
 
             core.summary.addRaw(body).write();
+
+  # ============================================
+  # GATE: Single required status check
+  # Configure "CI Result" in branch protection
+  # ============================================
+
+  ci:
+    name: CI Result
+    runs-on: ubuntu-latest
+    needs: [check, lint, test, build]
+    if: always()
+    steps:
+      - name: Determine result
+        run: |
+          if [[ "${{ needs.check.outputs.should_run }}" != "true" ]]; then
+            echo "✅ Skipped — no code changes"
+            exit 0
+          fi
+
+          LINT="${{ needs.lint.result }}"
+          TEST="${{ needs.test.result }}"
+          BUILD="${{ needs.build.result }}"
+
+          echo "lint=$LINT test=$TEST build=$BUILD"
+
+          if [[ "$LINT" == "success" && "$TEST" == "success" && "$BUILD" == "success" ]]; then
+            echo "✅ All checks passed"
+            exit 0
+          fi
+
+          echo "❌ CI failed"
+          exit 1

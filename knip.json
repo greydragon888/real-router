@@ -51,6 +51,6 @@
   "ignoreWorkspaces": ["examples/**"],
   "ignore": [],
   "ignoreDependencies": ["@stryker-mutator/api", "jsdom"],
-  "ignoreBinaries": ["tree", "tsx", "open", "ps", "awk"],
+  "ignoreBinaries": ["tree", "tsx", "open", "ps", "awk", "playwright"],
   "ignoreExportsUsedInFile": true
 }

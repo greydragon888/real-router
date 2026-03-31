@@ -156,7 +156,7 @@ export default tsEslint.config(
   // ============================================
   // 5. TYPESCRIPT CONFIGURATION
   // ============================================
-  // Updated for typescript-eslint v8.57.2
+  // Updated for typescript-eslint v8.58.0
   // Changelog: https://github.com/typescript-eslint/typescript-eslint/releases
   tsEslint.configs.strictTypeChecked,
   tsEslint.configs.stylisticTypeChecked,
@@ -181,6 +181,9 @@ export default tsEslint.config(
 
       // v8.50.0: Detect useless default assignments (x = undefined)
       "@typescript-eslint/no-useless-default-assignment": "warn",
+
+      // v8.58.0: Flag unnecessary explicit type arguments that match defaults
+      "@typescript-eslint/no-unnecessary-type-arguments": "error",
 
       // v8.53.0: Strict void return type checking
       // Disabled: 746 existing violations need gradual fixes

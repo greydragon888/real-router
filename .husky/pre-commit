@@ -8,7 +8,7 @@ echo "🔍 Running pre-commit checks..."
 # Run type checking, linting, and tests via turbo pipeline
 # (turbo caching makes lint-staged redundant)
 echo "🧪 Running tests (includes type-check and lint via turbo)..."
-pnpm test
+pnpm turbo run test --filter='!./examples/*'
 
 # Check for unused code
 echo "🧹 Checking for unused code..."

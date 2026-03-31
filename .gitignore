@@ -57,6 +57,10 @@ packages/**/.vitest-stryker
 stryker.temp.config.mjs
 stryker*.config.mjs.map
 
+# Playwright
+test-results/
+playwright-report/
+
 # ESLint cache
 .eslintcache
 packages/**/.eslintcache

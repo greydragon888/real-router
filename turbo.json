@@ -1,16 +1,24 @@
 {
   "$schema": "./node_modules/turbo/schema.json",
-  "concurrency": "4",
-  "globalPassThroughEnv": ["CI", "GITHUB_ACTIONS"],
-  "globalDependencies": [
-    "tsconfig.json",
-    "prettier.config.*",
-    "pnpm-lock.yaml",
-    "tsdown.base.*",
-    "eslint.config.*",
-    "vitest.config.*"
-  ],
-  "globalEnv": ["BENCH_ROUTER", "BENCH_NO_VALIDATE", "BENCH_SECTIONS"],
+  "futureFlags": {
+    "globalConfiguration": true,
+    "errorsOnlyShowHash": true,
+    "affectedUsingTaskInputs": true,
+    "watchUsingTaskInputs": true
+  },
+  "global": {
+    "concurrency": "4",
+    "passThroughEnv": ["CI", "GITHUB_ACTIONS"],
+    "inputs": [
+      "tsconfig.json",
+      "prettier.config.*",
+      "pnpm-lock.yaml",
+      "tsdown.base.*",
+      "eslint.config.*",
+      "vitest.config.*"
+    ],
+    "env": ["BENCH_ROUTER", "BENCH_NO_VALIDATE", "BENCH_SECTIONS"]
+  },
   "tasks": {
     "build": {
       "dependsOn": ["^build", "test", "test:properties", "test:stress"],
