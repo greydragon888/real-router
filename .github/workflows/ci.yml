@@ -101,9 +101,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Lint & Type Check
-        run: pnpm turbo run lint type-check --affected --filter='!./examples/**'
-        env:
-          TURBO_SCM_BASE: ${{ needs.check.outputs.turbo_base }}
+        run: pnpm turbo run lint type-check --filter='...[${{ needs.check.outputs.turbo_base || 'origin/master' }}]' --filter='!./examples/**'
 
       - name: Check dependency consistency
         run: pnpm lint:deps
@@ -139,9 +137,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Test with Coverage
-        run: pnpm turbo run test --affected --filter='!./examples/**' -- --coverage
-        env:
-          TURBO_SCM_BASE: ${{ needs.check.outputs.turbo_base }}
+        run: pnpm turbo run test --filter='...[${{ needs.check.outputs.turbo_base || 'origin/master' }}]' --filter='!./examples/**' -- --coverage
 
       - name: Fix coverage paths
         run: |
@@ -196,9 +192,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build
-        run: pnpm turbo run build --affected
-        env:
-          TURBO_SCM_BASE: ${{ needs.check.outputs.turbo_base }}
+        run: pnpm turbo run build --filter='...[${{ needs.check.outputs.turbo_base || 'origin/master' }}]' --filter='!./examples/**'
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7
