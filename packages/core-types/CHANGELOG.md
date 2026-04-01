@@ -1,5 +1,20 @@
 # @real-router/types
 
+## 0.29.0
+
+### Minor Changes
+
+- [#389](https://github.com/greydragon888/real-router/pull/389) [`b73ba6e`](https://github.com/greydragon888/real-router/commit/b73ba6e5bbdc4e7628491d0b382b7c2827fbd780) Thanks [@greydragon888](https://github.com/greydragon888)! - Rename `BooleanFormat` value `"string"` to `"auto"` ([#387](https://github.com/greydragon888/real-router/issues/387))
+
+  **Breaking Change:** The `"string"` value of `BooleanFormat` type has been renamed to `"auto"` for symmetry with `NumberFormat`.
+
+  **Migration:**
+
+  ```diff
+  - queryParams: { booleanFormat: "string" }
+  + queryParams: { booleanFormat: "auto" }
+  ```
+
 ## 0.28.0
 
 ### Minor Changes

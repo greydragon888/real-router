@@ -1,5 +1,22 @@
 # @real-router/core
 
+## 0.43.0
+
+### Minor Changes
+
+- [#389](https://github.com/greydragon888/real-router/pull/389) [`b73ba6e`](https://github.com/greydragon888/real-router/commit/b73ba6e5bbdc4e7628491d0b382b7c2827fbd780) Thanks [@greydragon888](https://github.com/greydragon888)! - Change default `booleanFormat` and `numberFormat` to `"auto"` ([#387](https://github.com/greydragon888/real-router/issues/387))
+
+  **Breaking Change:** Default query parameter options now auto-detect types:
+  - `booleanFormat`: `"none"` → `"auto"` (`"true"`/`"false"` parsed as booleans)
+  - `numberFormat`: `"none"` → `"auto"` (numeric strings parsed as numbers)
+
+  Use `{ booleanFormat: "none", numberFormat: "none" }` to restore previous behavior.
+
+### Patch Changes
+
+- Updated dependencies [[`b73ba6e`](https://github.com/greydragon888/real-router/commit/b73ba6e5bbdc4e7628491d0b382b7c2827fbd780)]:
+  - @real-router/types@0.29.0
+
 ## 0.42.0
 
 ### Minor Changes

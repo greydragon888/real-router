@@ -1,5 +1,12 @@
 # ssr-data-plugin
 
+## 0.1.5
+
+### Patch Changes
+
+- Updated dependencies [[`b73ba6e`](https://github.com/greydragon888/real-router/commit/b73ba6e5bbdc4e7628491d0b382b7c2827fbd780)]:
+  - @real-router/core@0.43.0
+
 ## 0.1.4
 
 ### Patch Changes
