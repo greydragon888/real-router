@@ -26,6 +26,7 @@ function RouteViewRoot({
     elements,
     route.name,
     nodeName,
+    // eslint-disable-next-line @eslint-react/refs -- stable Set ref read for keepAlive tracking (never reassigned)
     hasBeenActivatedRef.current,
   );
 

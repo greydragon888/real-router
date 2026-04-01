@@ -1,11 +1,12 @@
 #!/bin/sh
 
-# Pre-push hook: ALL checks + additional validation before pushing
+# Pre-push hook: artifact validation before pushing
 #
-# Runs everything from pre-commit PLUS:
+# - lint:duplicates: Copy-paste detection (jscpd)
 # - build: Final build to ensure compilation
 # - lint:types: Validate TypeScript types in dist (arethetypeswrong)
 # - lint:package: Validate package.json exports (publint)
+# - lint:unused: Dead code detection (knip)
 
 set -e
 
@@ -14,10 +15,6 @@ echo "🚀 Running pre-push checks..."
 # Check for code duplication
 echo "📋 Checking for code duplication..."
 pnpm lint:duplicates
-
-# Check for duplicate dependencies
-echo "📦 Checking for duplicate dependencies..."
-pnpm lint:dedupe
 
 # Build the project to ensure it compiles
 echo "📦 Building project..."

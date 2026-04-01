@@ -29,6 +29,7 @@ export function RouterErrorBoundary({
 
   const onErrorRef = useRef(onError);
 
+  // eslint-disable-next-line @eslint-react/refs -- "latest ref" pattern: sync callback to ref to avoid effect re-runs
   onErrorRef.current = onError;
 
   useEffect(() => {

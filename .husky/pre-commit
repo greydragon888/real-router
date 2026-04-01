@@ -5,6 +5,15 @@ set -e
 
 echo "🔍 Running pre-commit checks..."
 
+# Auto-deduplicate lockfile if it's being committed.
+# pnpm add/update don't dedupe automatically (pnpm/pnpm#7258),
+# so we do it here to keep the lockfile clean.
+if git diff --cached --name-only | grep -q 'pnpm-lock.yaml'; then
+  echo "🔗 Auto-deduplicating lockfile..."
+  pnpm dedupe
+  git add pnpm-lock.yaml
+fi
+
 # Run type checking, linting, and tests via turbo pipeline
 # (turbo caching makes lint-staged redundant)
 echo "🧪 Running tests (includes type-check and lint via turbo)..."

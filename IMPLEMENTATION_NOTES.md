@@ -37,8 +37,9 @@ pnpm version  # runs changeset version + sync + changelog aggregation
 Scripts executed:
 
 1. `changeset version` — updates package versions and changelogs
-2. `.changeset/sync-version.mjs` — syncs root package.json version from core
-3. `.changeset/aggregate-changelog.mjs` — aggregates package changelogs to root CHANGELOG.md
+2. `.changeset/cap-major-bumps.mjs` — prevents accidental major bumps in pre-1.0 packages (caps at minor)
+3. `.changeset/sync-version.mjs` — syncs root package.json version from core
+4. `.changeset/aggregate-changelog.mjs` — aggregates package changelogs to root CHANGELOG.md
 
 Root package is private and never published (cosmetic only).
 
@@ -94,20 +95,23 @@ Root `CHANGELOG.md` is auto-populated from package changelogs:
 
 ### Workflow: `.github/workflows/changesets.yml`
 
+**Trigger:** `workflow_run` — runs after CI workflow completes successfully on master (not on direct push).
+
 **Flow:**
 
 1. Developer runs `pnpm changeset` → creates `.changeset/*.md`
-2. Push to master triggers workflow
-3. If changesets exist → creates/updates "Version Packages" PR
-4. Maintainer merges Release PR
-5. Next push to master → publishes to npm + creates GitHub Release
+2. Push to master triggers CI workflow
+3. CI passes → triggers changesets workflow
+4. If changesets exist → creates/updates "Version Packages" PR (uses `PAT_TOKEN` to trigger CI on created PR)
+5. Maintainer merges Release PR
+6. Next CI pass on master → `pnpm changeset publish` publishes to npm + creates GitHub Releases via `gh release create`
 
 **OIDC Trusted Publishing:**
 
 - Uses npm's native OIDC (no NPM_TOKEN secret needed)
 - Requires Node.js 24+ (npm >= 11.5.1)
 - First publish must be manual (`npm publish`) - can't configure Trusted Publisher before package exists
-- Trusted Publisher configured with workflow: `changesets.yml` (NOT `release.yml`)
+- Trusted Publisher configured with workflow: `changesets.yml`
 
 ### Critical: Use `pnpm publish` NOT `npm publish`
 
@@ -133,23 +137,13 @@ pnpm publish --provenance --access public --no-git-checks
 
 ### Publish Order in changesets.yml
 
-Packages are published in dependency order:
+`pnpm changeset publish` handles dependency-ordered publishing automatically. It:
 
-1. `@real-router/logger` (no @real-router deps)
-2. `@real-router/types` (no deps)
-3. `@real-router/core` (depends on types, logger)
-4. All other packages
-
-**Important:** The `publish_package` function must return `0` even when package is already published:
-
-```bash
-# ✅ CORRECT - skip is not an error
-echo "⏭️ $name@$local_version already published"
-return 0
-
-# ❌ WRONG - causes script to fail
-return 1
-```
+- Checks which versions are not on npm
+- Publishes in dependency order
+- Skips already published (warns, doesn't fail)
+- Creates git tags (with fallback for silent tag failures — see [changesets#1621](https://github.com/changesets/changesets/issues/1621))
+- Uses `pnpm publish` internally (detects from lockfile, OIDC works)
 
 ### TypeScript Declarations Generation
 
@@ -193,11 +187,12 @@ This approach ensures:
 **Removed:** `dts-bundle-generator` and `scripts/generate-dts.mjs` are no longer used.
 
 **GitHub Releases:**
-Per-package releases — each published package gets its own GitHub release:
+Per-package releases — each published package gets its own GitHub release via `gh release create`:
 
 - Tag format: `{package-name}@{version}` (e.g., `@real-router/core@0.2.0`)
-- Release notes extracted from each package's `CHANGELOG.md`
+- Release notes extracted from each package's `CHANGELOG.md` (first `## ` section)
 - Skips if release already exists (idempotent)
+- Two-pass creation: dep-bump-only releases first (sink to bottom on GitHub), then featured releases with actual code changes (float to top)
 
 ### SonarCloud Version
 
@@ -225,21 +220,21 @@ Enforces conventional commits. Types and scopes defined in `commitlint.config.mj
 
 `.husky/pre-commit` runs:
 
-- `pnpm test` (includes type-check and lint via turbo pipeline)
+- **Auto-dedupe** — if `pnpm-lock.yaml` is staged, runs `pnpm dedupe` and re-stages the lockfile. This eliminates manual `pnpm dedupe` runs after dependency updates ([pnpm/pnpm#7258](https://github.com/pnpm/pnpm/issues/7258) — no auto-dedupe setting exists in pnpm 10)
+- `pnpm turbo run test --filter='!./examples/**'` (includes type-check and lint via turbo pipeline, excludes examples)
 - `pnpm lint:unused` (knip - dead code detection)
 - `pnpm lint:duplicates` (jscpd - copy-paste detection)
 - `pnpm lint:e2e` (verifies example e2e directories have spec files)
 
 ### Pre-push
 
-`.husky/pre-push` runs everything from pre-commit PLUS:
+`.husky/pre-push` runs (artifact validation, NOT a superset of pre-commit):
 
-- `pnpm lint:dedupe` (duplicate dependencies)
-- `pnpm build` (final build)
-- `pnpm lint:types` (arethetypeswrong - validate .d.ts files)
-- `pnpm lint:package` (publint - validate package.json exports)
+- `pnpm lint:duplicates` (jscpd - copy-paste detection)
+- `pnpm turbo run build lint:package lint:types --filter='!./examples/**'` (build + validate .d.ts + validate package.json exports)
+- `pnpm lint:unused` (knip - dead code detection)
 
-**Rationale:** Pre-commit is fast (uses turbo cache). Pre-push is thorough (validates artifacts).
+**Rationale:** Pre-commit validates correctness (auto-dedupe + tests + linting). Pre-push validates artifacts (build + type declarations + package exports). CI `pnpm lint:dedupe` remains as a safety net for `--no-verify` bypasses.
 
 ## Commit Conventions
 
@@ -285,18 +280,17 @@ Node.js 24 only (no matrix). Runs on `ubuntu-latest`.
 CI uses turbo `--filter` with git diff syntax for incremental builds:
 
 ```yaml
-# PR: compare with origin/master
-pnpm turbo run lint type-check --filter='...[origin/master]' --filter='!./examples/**'
-pnpm turbo run test --filter='...[origin/master]' --filter='!./examples/**' -- --coverage
-pnpm turbo run build --filter='...[origin/master]' --filter='!./examples/**'
-
-# Push to master: compare with previous commit via TURBO_SCM_BASE
-pnpm turbo run lint type-check --filter='...[$TURBO_SCM_BASE]' --filter='!./examples/**'
+# Dynamic base: push uses github.event.before, PR uses origin/master fallback
+pnpm turbo run lint type-check --filter='...[$TURBO_BASE]' --filter='!./examples/**'
+pnpm turbo run test --filter='...[$TURBO_BASE]' --filter='!./examples/**' -- --coverage
+pnpm turbo run build --filter='...[$TURBO_BASE]' --filter='!./examples/**'
 ```
 
-**Why not `--affected`:** Turbo 2.9.1 does not allow `--affected` with `--filter`. The `--filter='!./examples/**'` exclusion is required — without it, ~70 example apps run their lint/test/build, adding ~20 minutes to CI. The `...[ref]` syntax provides equivalent git-diff filtering while allowing combination with exclusion filters.
+`$TURBO_BASE` is computed by the `check` job: `github.event.before` for push events, `origin/master` for PRs.
 
-**Check job:** Pre-filters by changed files (skips CI for docs-only changes, skips for `changeset-release/*` PRs). Computes `turbo_base` for push events (`github.event.before`). PR events use `origin/master` as fallback.
+**Why not `--affected`:** Turbo does not allow `--affected` with `--filter`. The `--filter='!./examples/**'` exclusion is required — without it, ~90 example apps run their lint/test/build, adding ~20 minutes to CI. The `...[ref]` syntax provides equivalent git-diff filtering while allowing combination with exclusion filters.
+
+**Check job:** Pre-filters by changed files (skips CI for docs-only changes, skips for `changeset-release/*` PRs). Computes `turbo_base` as a job output consumed by all downstream jobs.
 
 ### Concurrency
 
@@ -316,15 +310,17 @@ All CI workflows migrated from `pnpm/action-setup@v4` to `pnpm/action-setup@v5` 
 
 ### Workflows
 
-| Workflow             | File                       | Purpose                              |
-| -------------------- | -------------------------- | ------------------------------------ |
+| Workflow             | File                       | Purpose                                              |
+| -------------------- | -------------------------- | ---------------------------------------------------- |
 | CI                   | `ci.yml`                   | Lint, type-check, test, build, coverage, bundle size |
-| Changesets           | `changesets.yml`           | Versioning and npm publish           |
-| CodeQL               | `codeql.yml`               | Security scanning + dependency audit |
-| Dependabot Automerge | `dependabot-automerge.yml` | Auto-merge patch/minor updates       |
-| Danger               | `danger.yml`               | Automated PR review checks           |
+| Changesets           | `changesets.yml`           | Versioning and npm publish (triggered by CI success) |
+| Changeset Check      | `changeset-check.yml`      | Validate changesets on PRs (format, references)      |
+| CodeQL               | `codeql.yml`               | Security scanning + dependency audit                 |
+| Dependabot Automerge | `dependabot-automerge.yml` | Auto-merge patch/minor updates                       |
+| Danger               | `danger.yml`               | Automated PR review checks                           |
+| Examples             | `examples.yml`             | Scheduled e2e tests for example apps (Mon & Thu)     |
 
-**Removed:** `build.yml`, `sonarcloud.yml`, `coverage.yml`, `size.yml` (consolidated into `ci.yml`)
+**Removed:** `build.yml`, `sonarcloud.yml`, `coverage.yml`, `size.yml`, `release.yml` (consolidated into `ci.yml` and `changesets.yml`)
 
 ### Bundle Size Reporting
 
@@ -342,8 +338,8 @@ Bundle Size job (in `ci.yml`) compares bundle sizes between PR and base branch:
 
 - Runs CodeQL analysis on push/PR to master
 - Weekly scheduled scan (cron: `0 3 * * 1`)
-- Includes `security-extended` and `security-and-quality` queries
-- Dependency review on PRs (fails on moderate+ severity, denies GPL-3.0/AGPL-3.0)
+- Uses config file `.github/codeql/codeql-config.yml` for query configuration
+- Dependency review on PRs (fails on moderate+ severity, uses `.github/dependency-review-config.yml` for license allow-list)
 
 ### Dependabot
 
@@ -368,10 +364,11 @@ Bundle Size job (in `ci.yml`) compares bundle sizes between PR and base branch:
 | Check                   | Trigger                            | Action         |
 | ----------------------- | ---------------------------------- | -------------- |
 | IMPLEMENTATION_NOTES.md | Infrastructure files changed       | Warn           |
+| Architectural changes   | Public API, types, or new packages | Message/Warn   |
 | Changeset reminder      | Source files changed, no changeset | Warn           |
 | PR size                 | >500 lines changed                 | Message/Warn   |
 | PR description          | Empty or short description         | Warn           |
-| Lockfile sync           | package.json changed, no lockfile  | Warn           |
+| Lockfile sync           | package.json deps changed, no lock | Warn           |
 | Test coverage           | New source files without tests     | Message        |
 | Console statements      | console.log added to source files  | Warn           |
 | PR statistics           | Always                             | Markdown table |
@@ -435,7 +432,7 @@ ko_fi: greydragon888
 }
 ```
 
-Ignores: `*.d.ts`, `*.test.ts`, `*.bench.ts`, `*.spec.ts`
+Ignores: `*.d.ts`, `*.test.ts`, `*.test.tsx`, `*.bench.ts`, `*.spec.ts`, `*.properties.ts`, `packages/router-benchmarks/**`, `packages/preact/src/**`, `packages/hash-plugin/src/**`
 
 ### size-limit Configuration
 
@@ -447,11 +444,16 @@ React package ignores `react`, `react-dom`, `@real-router/core`, `@real-router/r
 
 Uses knip v6+ (migrated from v5). Schema URL updated to `https://unpkg.com/knip@6/schema.json`.
 
-`knip.json` ignores:
+Global `ignoreDependencies`: `@stryker-mutator/api`, `jsdom` (test infrastructure).
 
-- `fast-check` (used but not detected by knip)
-- `@real-router/browser-plugin`, `@real-router/logger` (internal workspace deps)
-- `@stryker-mutator/api`, `jsdom` (test infrastructure)
+Per-workspace configurations in `knip.json`:
+
+- **Root**: entry scripts, ignores `fast-check` (used but not detected by knip)
+- **`packages/router-benchmarks`**: custom `entry: ["src/**/*.ts"]` to recognize standalone benchmark scripts
+- **`packages/solid`**: ignores `@babel/preset-typescript`, `babel-preset-solid` (build-only deps)
+- **`packages/svelte`**: ignores `@real-router/browser-plugin` (workspace dep used at runtime)
+- **`packages/vue`** and **`packages/svelte`**: explicit vitest config paths
+- **`packages/*`** (catch-all): includes stryker config support
 
 `ignore` array is intentionally empty — knip excludes `dist/`, `coverage/`, and `*.d.ts` by default.
 
@@ -475,33 +477,55 @@ Uses syncpack v14 (Rust rewrite). `syncpack.config.mjs` enforces:
 
 ## Turbo Configuration
 
-Uses turbo v2.8.20+.
+Uses turbo v2.9.1.
 
-**v2.8.11 migration:** Removed `"daemon": false` from `turbo.json` — daemon was removed from `turbo run` in v2.8.11 (option deprecated, daemon only used for `turbo watch`).
+**v2.9 migration:** Adopted `futureFlags` for the new global configuration schema:
+
+```json
+"futureFlags": {
+  "globalConfiguration": true,
+  "errorsOnlyShowHash": true,
+  "affectedUsingTaskInputs": true,
+  "watchUsingTaskInputs": true
+}
+```
+
+`globalConfiguration: true` moves top-level settings into a `global` block: `concurrency`, `passThroughEnv`, `inputs`, `env`. This replaces the deprecated flat `globalPassThroughEnv`, `globalDependencies`, etc.
+
+`global.inputs` defines config-level inputs that affect all tasks (e.g., `tsconfig.json`, `pnpm-lock.yaml`, `eslint.config.*`).
+
+`global.env` passes `BENCH_ROUTER`, `BENCH_NO_VALIDATE`, `BENCH_SECTIONS` for benchmark configuration.
+
+**v2.8.11 migration (historical):** Removed `"daemon": false` from `turbo.json` — daemon was removed from `turbo run` in v2.8.11 (option deprecated, daemon only used for `turbo watch`).
 
 ### Concurrency Limit
 
-`turbo.json`:
+`turbo.json` → `global.concurrency`:
 
 ```json
 {
-  "concurrency": "4"
+  "global": {
+    "concurrency": "4"
+  }
 }
 ```
 
-**Why:** Without a limit, turbo runs all 34 tasks in parallel on uncached runs. Property-based tests (fast-check) are memory-intensive — running 5+ property test suites + builds simultaneously causes OOM kills (exit code 137). With cache, most tasks are hits and memory stays low. The limit prevents OOM on cold runs (cleared cache, new CI runner, fresh clone).
+**Why:** Without a limit, turbo runs all tasks in parallel on uncached runs. Property-based tests (fast-check) are memory-intensive — running 5+ property test suites + builds simultaneously causes OOM kills (exit code 137). With cache, most tasks are hits and memory stays low. The limit prevents OOM on cold runs (cleared cache, new CI runner, fresh clone).
 
 ### Environment Variables
 
-`turbo.json`:
+`turbo.json` → `global.passThroughEnv`:
 
 ```json
 {
-  "globalPassThroughEnv": ["CI", "GITHUB_ACTIONS"]
+  "global": {
+    "passThroughEnv": ["CI", "GITHUB_ACTIONS"],
+    "env": ["BENCH_ROUTER", "BENCH_NO_VALIDATE", "BENCH_SECTIONS"]
+  }
 }
 ```
 
-`CI` and `GITHUB_ACTIONS` are passed through globally. Test task uses `passThroughEnv` for `CI`.
+`CI` and `GITHUB_ACTIONS` are passed through globally. `BENCH_*` variables are declared as global env inputs for cache invalidation. Test task uses additional `passThroughEnv` for `CI`.
 
 ### Task Renames
 
@@ -511,11 +535,13 @@ Uses turbo v2.8.20+.
 ### Build Dependency Chain
 
 ```
-build → depends on ^build (upstream packages) + test
-test → depends on lint + type-check
+build → depends on ^build (upstream packages) + test + test:properties + test:stress
+test → depends on ^build + lint + type-check
+test:properties → depends on ^build + test + lint + type-check
+test:stress → depends on ^build + test:properties + test + lint + type-check
 ```
 
-Build only runs after tests pass.
+Build only runs after all test tiers pass. `test:properties` (property-based tests via fast-check) and `test:stress` (stress/load tests) run after unit tests.
 
 ### Input Patterns Performance
 
@@ -649,57 +675,60 @@ mdfind -onlyin ./node_modules "kMDItemFSName == '*.ts'" | wc -l
 
 ### GitHub Actions Pinned by SHA
 
-All third-party GitHub Actions are pinned to commit SHAs instead of mutable tags (`v1`, `v2`):
+Third-party (non-GitHub) actions are pinned to commit SHAs instead of mutable tags. GitHub-official actions (`actions/checkout`, `actions/setup-node`, etc.) use mutable version tags since GitHub's own actions are considered trusted.
 
 ```yaml
-# ❌ BEFORE - mutable tag, can be hijacked
+# ❌ Third-party with mutable tag - can be hijacked
 uses: changesets/action@v1
 
-# ✅ AFTER - immutable commit SHA
-uses: changesets/action@c48e67d110a68bc90ccf1098e9646092baacaa87 # v1.6.0
+# ✅ Third-party with immutable commit SHA
+uses: changesets/action@6a0a831ff30acef54f2c6aa1cbbc1096b066edaf # v1.7.0
+
+# ✅ GitHub-official with version tag (trusted)
+uses: actions/checkout@v6
 ```
 
-**Pinned actions:**
+**Pinned third-party actions:**
 
-| Action                              | SHA        | Tag    |
-| ----------------------------------- | ---------- | ------ |
-| `changesets/action`                 | `c48e67d1` | v1.6.0 |
-| `codecov/codecov-action`            | `671740ac` | v5     |
-| `SonarSource/sonarqube-scan-action` | `a31c9398` | v7     |
-| `dependabot/fetch-metadata`         | `21025c70` | v2     |
-| `softprops/action-gh-release`       | `a06a81a0` | v2     |
+| Action                              | SHA         | Tag     |
+| ----------------------------------- | ----------- | ------- |
+| `changesets/action`                 | `6a0a831f`  | v1.7.0  |
+| `codecov/codecov-action`            | `57e3a136`  | v5      |
+| `SonarSource/sonarqube-scan-action` | `a31c9398`  | v7      |
+| `dependabot/fetch-metadata`         | `ffa630c6`  | v2      |
+| `github/codeql-action/*`            | version tag | v3.30.3 |
 
 **Why:** Mutable tags can be force-pushed by a compromised maintainer. SHA pins are immutable — even if the tag is moved, the pinned commit stays the same.
 
-### Minimum Release Age
+### Minimum Release Age (Removed)
 
-`.npmrc`:
-
-```ini
-minimum-release-age=1440
-```
-
-Blocks installation of npm packages published less than 24 hours ago. Protects against compromised packages being installed before the community detects them.
-
-**Temporary exclusions:** When updating to a package released within the last 24 hours, add version-pinned entries to `minimumReleaseAgeExclude` in `pnpm-workspace.yaml` with a `TODO: remove after` comment. Include transitive dependencies (e.g., platform binaries for `turbo`). Glob patterns with version unions are not supported — list each package explicitly.
+Previously used `minimum-release-age=1440` in `.npmrc` to block packages published less than 24 hours ago. Removed due to high maintenance overhead — every dependency update required temporary exclusions in `pnpm-workspace.yaml` with manual cleanup. The `strict-dep-builds=true` setting (pnpm 10) and `pnpm.onlyBuiltDependencies` allowlist now provide the primary supply-chain protection for lifecycle scripts.
 
 ### Security Overrides
 
-`pnpm.overrides` in root `package.json` pins transitive dependencies to patched versions:
+`pnpm.overrides` in root `package.json` pins transitive dependencies to patched versions. Overrides are version-range-scoped where possible (e.g., `minimatch@3`, `minimatch@9`) to target specific major versions:
 
 ```json
-"flatted": ">=3.4.2"
+"flatted": ">=3.4.2",
+"axios": ">=1.13.5",
+"qs": ">=6.14.2",
+"rollup": ">=4.59.0",
+"undici": ">=7.24.0",
+"path-to-regexp": ">=8.4.0",
+"node-forge": ">=1.4.0"
 ```
 
-`flatted` override addresses a prototype pollution vulnerability in older versions. Override ensures all transitive consumers use the patched version.
+Each override addresses a known vulnerability in older versions. Version-scoped overrides (e.g., `"minimatch@3": "~3.1.4"`) prevent inadvertent major bumps of transitive dependencies.
 
 ### Dependency License Review
 
-`.github/dependency-review-config.yml` defines allowed licenses for production dependencies. Dependency Review check fails on PRs that introduce packages with licenses outside the allow-list.
+`.github/dependency-review-config.yml` defines allowed licenses for all dependencies. Dependency Review check fails on PRs that introduce packages with licenses outside the allow-list.
 
-**Allowed licenses:** MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD, Unlicense, CC0-1.0, CC-BY-4.0, BlueOak-1.0.0, Python-2.0, MS-PL, LGPL-3.0-only.
+**Allowed licenses:** MIT, MIT-0, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD, Unlicense, CC0-1.0, CC-BY-4.0, BlueOak-1.0.0, Python-2.0, LGPL-3.0-only, GPL-3.0-only, GPL-3.0-or-later.
 
-**Allowed packages:** Express 5 transitive dependencies (`unpipe`, `toidentifier`, `escape-html`, `ee-first`, `depd`, `cookie-signature`) are allowlisted via `allow-packages` — they have low OpenSSF Scorecard (< 3) but are well-established Express ecosystem utilities. Used only in `examples/react/ssr` (private).
+**GPL allowance:** GPL licenses are allowed for devDependencies only (build tools like `rollup-plugin-dts`). They don't link with production code, so no copyleft concern.
+
+**OpenSSF Scorecard:** `warn-on-openssf-scorecard-level: 0` — warns on low-scored packages instead of failing. Specific GHSAs can be allowed via `allow-ghsas` when a vulnerability is assessed as non-applicable.
 
 ## ESLint 10 Migration
 
@@ -709,21 +738,22 @@ Migrated from ESLint 9.39 to ESLint 10.1. Tracking issue: [#237](https://github.
 
 ### Package Changes
 
-| Package                         | Before | After       | Notes                         |
-| ------------------------------- | ------ | ----------- | ----------------------------- |
-| `eslint`                        | 9.39.2 | 10.1.0      | Major upgrade                 |
-| `@eslint/js`                    | 9.39.2 | 10.0.1      | Major upgrade                 |
-| `@eslint-react/eslint-plugin`   | 2.13.0 | 3.0.0       | Absorbs react-hooks           |
-| `typescript-eslint`             | 8.53.1 | 8.57.2      | Patch                         |
-| `@stylistic/eslint-plugin`      | 5.7.1  | 5.10.0      | Minor                         |
-| `eslint-plugin-import-x`        | 4.16.1 | 4.16.2      | Patch                         |
-| `eslint-plugin-unicorn`         | 62.0.0 | 64.0.0      | 2 major versions, 5 new rules |
-| `eslint-plugin-sonarjs`         | 3.0.5  | 4.0.2       | Major — ESLint 10 support     |
-| `eslint-plugin-jsdoc`           | 62.4.1 | 62.8.1      | Minor                         |
-| `eslint-plugin-testing-library` | 7.15.4 | 7.16.2      | Patch                         |
-| `@vitest/eslint-plugin`         | 1.6.12 | 1.6.13      | Patch                         |
-| `eslint-plugin-promise`         | 7.2.1  | **Removed** | Covered by typescript-eslint  |
-| `eslint-plugin-react-hooks`     | 7.0.1  | **Removed** | Absorbed by @eslint-react v3  |
+| Package                         | Before | After       | Notes                                            |
+| ------------------------------- | ------ | ----------- | ------------------------------------------------ |
+| `eslint`                        | 9.39.2 | 10.1.0      | Major upgrade                                    |
+| `@eslint/js`                    | 9.39.2 | 10.0.1      | Major upgrade                                    |
+| `@eslint-react/eslint-plugin`   | 2.13.0 | 4.2.1       | v3: absorbs react-hooks; v4: JSX rules split out |
+| `eslint-plugin-react-jsx`       | —      | 4.2.1       | New: JSX-specific rules (split from react-x)     |
+| `typescript-eslint`             | 8.53.1 | 8.58.0      | Minor                                            |
+| `@stylistic/eslint-plugin`      | 5.7.1  | 5.10.0      | Minor                                            |
+| `eslint-plugin-import-x`        | 4.16.1 | 4.16.2      | Patch                                            |
+| `eslint-plugin-unicorn`         | 62.0.0 | 64.0.0      | 2 major versions, 5 new rules                    |
+| `eslint-plugin-sonarjs`         | 3.0.5  | 4.0.2       | Major — ESLint 10 support                        |
+| `eslint-plugin-jsdoc`           | 62.4.1 | 62.9.0      | Minor                                            |
+| `eslint-plugin-testing-library` | 7.15.4 | 7.16.2      | Patch                                            |
+| `@vitest/eslint-plugin`         | 1.6.12 | 1.6.13      | Patch                                            |
+| `eslint-plugin-promise`         | 7.2.1  | **Removed** | Covered by typescript-eslint                     |
+| `eslint-plugin-react-hooks`     | 7.0.1  | **Removed** | Absorbed by @eslint-react v3                     |
 
 ### eslint-plugin-promise Removal
 
@@ -785,13 +815,13 @@ Evaluated `eslint-plugin-solid@0.14.5` for the Solid adapter. Decision: not adde
 - No alternatives exist (checked npm, GitHub, Solid.js org)
 - Solid adapter is 804 lines with 100% test coverage — all Solid patterns are correct (`props.xxx` everywhere, no destructuring, correct `splitProps` usage). The plugin's key rules target mistakes not present in the codebase.
 
-### typescript-eslint pinned to 8.57.1 (not 8.57.2)
+### typescript-eslint transitive pin (8.57.1)
 
 `typescript-eslint@8.57.2` introduced a fixer crash in `no-unnecessary-type-arguments`. The rule's `fix()` function accesses `typeArguments.params[-1]` → `undefined` → crash on `.range`. Occurs on both ESLint 9 and 10, even without `--fix`.
 
-**Bisected:** 8.57.1 OK → 8.57.2 CRASH. Pinned to 8.57.1 until a fix ships.
+**Bisected:** 8.57.1 OK → 8.57.2 CRASH. The main `typescript-eslint` package is now at `8.58.0`, but pnpm overrides still pin the transitive `@typescript-eslint/eslint-plugin` and `@typescript-eslint/parser` to `8.57.1` to avoid the crashing code path in the plugin package.
 
-**Override required:** `typescript-eslint@8.57.1` pulls `@typescript-eslint/eslint-plugin@8.57.2` and `@typescript-eslint/parser@8.57.1` as transitive deps, causing an unmet peer dep error (`eslint-plugin 8.57.2` expects `parser@^8.57.2`). Added pnpm overrides to pin both `@typescript-eslint/eslint-plugin` and `@typescript-eslint/parser` to 8.57.1.
+**TODO:** Remove overrides when typescript-eslint ships a fix for the `no-unnecessary-type-arguments` crash.
 
 ### New Rules Added
 
@@ -808,9 +838,31 @@ Evaluated `eslint-plugin-solid@0.14.5` for the Solid adapter. Decision: not adde
 - `no-useless-assignment` promoted to `error` — kept as `warn` for gradual adoption
 - `no-unassigned-vars` added to recommended — disabled for test files (common `let unsubscribe` in describe scope pattern)
 
+### @eslint-react v4 Migration (from v3.0.0)
+
+**v4.0.0 breaking changes applied:**
+
+- Rule prefixes changed: `@eslint-react/dom/<rule>` → `@eslint-react/dom-<rule>` (slash → hyphen). No impact — project didn't use slash-prefixed rules.
+- JSX rules (`no-useless-fragment`, `no-children-prop`, `no-comment-textnodes`, `no-key-after-spread`, `no-namespace`) moved to new `eslint-plugin-react-jsx` package. Installed separately.
+
+**New rules enabled:**
+
+| Rule                                  | Severity | Reason                                                                                     |
+| ------------------------------------- | -------- | ------------------------------------------------------------------------------------------ |
+| `@eslint-react/immutability` ⚗️       | warn     | Catches mutations of props/state — valuable for library code                               |
+| `@eslint-react/refs` ⚗️               | warn     | Prevents ref reads/writes during render                                                    |
+| `eslint-plugin-react-jsx/recommended` | preset   | JSX-specific rules: `no-key-after-spread`, `no-useless-fragment`, `no-children-prop`, etc. |
+
+**Suppressed (intentional patterns):**
+
+- `RouterErrorBoundary.tsx`: `onErrorRef.current = onError` — "latest ref" pattern for callback sync
+- `RouteView.tsx`: `hasBeenActivatedRef.current` — stable Set read for keepAlive tracking
+
+Both experimental rules disabled in test files (intentional anti-patterns).
+
 ### ESLint React Plugin Migration (historical)
 
-_Previous migration from eslint-plugin-react v7 to @eslint-react v2. Now superseded by v3 migration above._
+_Previous migration from eslint-plugin-react v7 to @eslint-react v2. Now superseded by v3/v4 migration above._
 
 **Original preset:** `recommended-type-checked` — disables rules already enforced by TypeScript, adds type-aware rules.
 
@@ -982,7 +1034,7 @@ Framework compilers generate code that v8 coverage tracks but tests can't reach:
 | Adapter | Exception                     | Cause                                                   |
 | ------- | ----------------------------- | ------------------------------------------------------- |
 | Solid   | `branches: 90, functions: 97` | babel-preset-solid phantom branches, `.catch(() => {})` |
-| Vue     | `branches: 95, functions: 95` | `defineComponent` internal type guards                  |
+| Vue     | `branches: 95, functions: 97` | `defineComponent` internal type guards                  |
 | Svelte  | `branches: 96, functions: 93` | Svelte compiler `$derived`/`$props` transforms          |
 | React   | None                          | tsdown preserves original code                          |
 | Preact  | None                          | tsdown preserves original code                          |
@@ -1086,7 +1138,7 @@ Removed `clearMocks: true` from `vitest.config.common.mts`. `restoreMocks: true`
 
 ### Examples Workspace
 
-70 example applications across 5 framework adapters (React, Preact, Solid, Vue, Svelte) plus standalone SSR/SSG examples. Organized by framework:
+80 example applications across 5 framework adapters (React, Preact, Solid, Vue, Svelte) plus standalone SSR/SSG examples. Organized by framework:
 
 ```
 examples/
@@ -1133,7 +1185,7 @@ Added `packages/router-benchmarks` workspace to `knip.json` with `entry: ["src/*
 
 ### Design Decisions
 
-**Single-class, no validation:** The entire FSM is ~137 lines. TypeScript generics enforce correctness at compile time — no runtime validation of config, states, or events. This keeps the hot path allocation-free.
+**Single-class, no validation:** The entire FSM is ~148 lines. TypeScript generics enforce correctness at compile time — no runtime validation of config, states, or events. This keeps the hot path allocation-free.
 
 **O(1) transitions:** A `#currentTransitions` cache stores the transition map for the current state, avoiding double lookup (`transitions[state][event]`).
 
@@ -1305,6 +1357,18 @@ globalThis.performance = performance;
 
 Forces all packages to use the same @types/node version from root.
 
+### pnpm 10 Settings
+
+`.npmrc`:
+
+```ini
+strict-dep-builds=true       # Lifecycle scripts disabled by default; only onlyBuiltDependencies allowed
+cleanup-unused-catalogs=true # Auto-cleanup unused catalog entries
+script-shell=bash            # Use bash for script execution
+```
+
+`pnpm.onlyBuiltDependencies` in root `package.json` allowlists packages that may run lifecycle scripts: `core-js`, `esbuild`, `fsevents`, `unrs-resolver`.
+
 ### Strict Peer Dependencies
 
 `.npmrc`:
@@ -1367,8 +1431,18 @@ Issues:
 
 ```
 src/
-├── Router.ts (facade, ~640 lines)
+├── Router.ts (facade, ~670 lines)
+├── createRouter.ts           — factory function (public entry)
+├── getNavigator.ts           — frozen read-only router subset
 ├── internals.ts              — WeakMap<Router, RouterInternals> registry
+├── guards.ts                 — guard-related logic
+├── validation.ts             — structural validation
+├── typeGuards.ts             — type guard functions
+├── stateMetaStore.ts         — WeakMap<State, Params> (replaces State.meta)
+├── helpers.ts                — internal utilities
+├── constants.ts              — error codes, constants
+├── types.ts                  — core type definitions
+├── types/                    — additional type modules
 ├── fsm/
 │   ├── routerFSM.ts          — FSM config, states, events, factory
 │   └── index.ts
@@ -1380,8 +1454,12 @@ src/
 │   ├── cloneRouter.ts        — SSR cloning
 │   ├── types.ts              — API return types
 │   └── index.ts
+├── utils/                    — SSR/SSG utilities
+│   ├── serializeState.ts     — XSS-safe JSON serialization
+│   ├── getStaticPaths.ts     — static path enumeration for SSG
+│   └── index.ts
 ├── wiring/
-│   ├── RouterWiringBuilder.ts — Builder: namespace dependency wiring (10 methods)
+│   ├── RouterWiringBuilder.ts — Builder: namespace dependency wiring
 │   ├── wireRouter.ts          — Director: calls wire methods in correct order
 │   ├── types.ts               — WiringOptions<Dependencies> interface
 │   └── index.ts
@@ -1400,7 +1478,11 @@ src/
     ├── EventBusNamespace/     — FSM + EventEmitter encapsulation (replaces ObservableNamespace)
     ├── StateNamespace/
     ├── NavigationNamespace/
-    └── ... (9 namespaces total)
+    ├── OptionsNamespace/
+    ├── PluginsNamespace/
+    ├── RouteLifecycleNamespace/
+    ├── RouterLifecycleNamespace/
+    └── index.ts               — (9 namespaces total)
 ```
 
 **Benefits:**
@@ -1650,7 +1732,7 @@ Non-navigate transitions (start, stop, dispose) still use `send()` with FSM acti
 
 #### Bundle Size
 
-Size limit updated from `22.1 kB` → `25 kB` in `.size-limit.js` to accommodate FSM integration. Current: 83.6 KB raw / 22.81 KB gzip.
+Size limit: `20 kB` for `@real-router/core (ESM)` and `20 kB` for `@real-router/core/api (ESM)` in `.size-limit.js`.
 
 ### Type Guard Hierarchy
 
