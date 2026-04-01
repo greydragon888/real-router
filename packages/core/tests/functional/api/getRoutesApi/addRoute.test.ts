@@ -912,7 +912,7 @@ describe("core/routes/addRoute", () => {
 
       expect(state?.name).toBe("search");
       expect(state?.params.q).toBe("test");
-      expect(state?.params.page).toBe("1");
+      expect(state?.params.page).toBe(1);
       expect(state?.params.sort).toBe("asc");
     });
 

@@ -48,8 +48,8 @@ omit("page=1&sort=name&limit=10", ["sort", "limit"]);
 
 | Format | Encoded | Decoded |
 |--------|---------|---------|
-| `"none"` (default) | `active=true` | `{ active: "true" }` |
-| `"string"` | `active=true` | `{ active: true }` |
+| `"auto"` (default) | `active=true` | `{ active: true }` |
+| `"none"` | `active=true` | `{ active: "true" }` |
 | `"empty-true"` | `active` | `{ active: true }` |
 
 ### `nullFormat`
@@ -63,8 +63,8 @@ omit("page=1&sort=name&limit=10", ["sort", "limit"]);
 
 | Format | Decoded |
 |--------|---------|
-| `"none"` (default) | `{ page: "1" }` (string) |
-| `"auto"` | `{ page: 1 }` (number) |
+| `"auto"` (default) | `{ page: 1 }` (number) |
+| `"none"` | `{ page: "1" }` (string) |
 
 Detects integers and decimals matching `/^\d+(\.\d+)?$/`. No encoding change needed — numbers are encoded identically regardless of format.
 

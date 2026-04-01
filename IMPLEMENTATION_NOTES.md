@@ -274,26 +274,29 @@ Added `release` type for release commits:
 
 ## CI Pipeline
 
-### Matrix Testing
+### Consolidated CI
 
-`.github/workflows/ci.yml` tests on Node 20, 22, 24:
+`.github/workflows/ci.yml` — single workflow with parallel jobs: Lint & Type Check, Test (with coverage), Build. Downstream jobs: Coverage (Codecov), SonarCloud, Bundle Size. Gate job: "CI Result" (single required status check).
 
-```yaml
-matrix:
-  node: [20, 22, 24]
-```
+Node.js 24 only (no matrix). Runs on `ubuntu-latest`.
 
-### Turbo Affected
+### Incremental Builds with --filter
 
-CI uses `--affected` flag for incremental builds:
+CI uses turbo `--filter` with git diff syntax for incremental builds:
 
 ```yaml
-pnpm turbo run lint type-check --affected
-pnpm turbo run test --affected
-pnpm turbo run build --affected
+# PR: compare with origin/master
+pnpm turbo run lint type-check --filter='...[origin/master]' --filter='!./examples/**'
+pnpm turbo run test --filter='...[origin/master]' --filter='!./examples/**' -- --coverage
+pnpm turbo run build --filter='...[origin/master]' --filter='!./examples/**'
+
+# Push to master: compare with previous commit via TURBO_SCM_BASE
+pnpm turbo run lint type-check --filter='...[$TURBO_SCM_BASE]' --filter='!./examples/**'
 ```
 
-Only runs tasks for changed packages.
+**Why not `--affected`:** Turbo 2.9.1 does not allow `--affected` with `--filter`. The `--filter='!./examples/**'` exclusion is required — without it, ~70 example apps run their lint/test/build, adding ~20 minutes to CI. The `...[ref]` syntax provides equivalent git-diff filtering while allowing combination with exclusion filters.
+
+**Check job:** Pre-filters by changed files (skips CI for docs-only changes, skips for `changeset-release/*` PRs). Computes `turbo_base` for push events (`github.event.before`). PR events use `origin/master` as fallback.
 
 ### Concurrency
 
@@ -311,24 +314,21 @@ Cancels in-progress runs when new commit pushed.
 
 All CI workflows migrated from `pnpm/action-setup@v4` to `pnpm/action-setup@v5` (`ci.yml`, `changesets.yml`, `danger.yml`). v5 auto-detects pnpm version from `packageManager` field in root `package.json` — no explicit `version` input needed.
 
-### Additional Workflows
+### Workflows
 
 | Workflow             | File                       | Purpose                              |
 | -------------------- | -------------------------- | ------------------------------------ |
-| CI                   | `ci.yml`                   | Lint, type-check, test, build        |
+| CI                   | `ci.yml`                   | Lint, type-check, test, build, coverage, bundle size |
 | Changesets           | `changesets.yml`           | Versioning and npm publish           |
-| SonarCloud           | `sonarcloud.yml`           | Code quality analysis                |
-| Coverage             | `coverage.yml`             | Upload coverage to Codecov           |
-| Bundle Size          | `size.yml`                 | PR comment with size diff            |
 | CodeQL               | `codeql.yml`               | Security scanning + dependency audit |
 | Dependabot Automerge | `dependabot-automerge.yml` | Auto-merge patch/minor updates       |
 | Danger               | `danger.yml`               | Automated PR review checks           |
 
-**Removed:** `build.yml` (replaced by `ci.yml`)
+**Removed:** `build.yml`, `sonarcloud.yml`, `coverage.yml`, `size.yml` (consolidated into `ci.yml`)
 
 ### Bundle Size Reporting
 
-`.github/workflows/size.yml` (part of `ci.yml`) compares bundle sizes between PR and base branch:
+Bundle Size job (in `ci.yml`) compares bundle sizes between PR and base branch:
 
 - Creates/updates PR comment with size diff table
 - Shows per-package sizes and total

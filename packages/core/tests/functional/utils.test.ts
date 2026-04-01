@@ -139,7 +139,7 @@ describe("core/utils", () => {
         {
           queryParamsMode: "loose",
           queryParams: {
-            booleanFormat: "string",
+            booleanFormat: "auto",
           },
         },
       );

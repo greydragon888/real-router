@@ -132,8 +132,8 @@ boxplot(() => {
       parse(stringBool);
     });
 
-    bench("parse: boolean (string)", () => {
-      parse(stringBool, { booleanFormat: "string" });
+    bench("parse: boolean (auto)", () => {
+      parse(stringBool, { booleanFormat: "auto" });
     });
 
     bench("parse: boolean (empty-true)", () => {
@@ -159,13 +159,13 @@ boxplot(() => {
       parse(qs, { numberFormat: "auto" });
     });
 
-    bench("parse: booleanFormat string", () => {
-      parse(qs, { booleanFormat: "string" });
+    bench("parse: booleanFormat auto", () => {
+      parse(qs, { booleanFormat: "auto" });
     });
 
     bench("parse: all formats", () => {
       parse(qs, {
-        booleanFormat: "string",
+        booleanFormat: "auto",
         numberFormat: "auto",
         nullFormat: "default",
       });
@@ -256,7 +256,7 @@ boxplot(() => {
     });
 
     bench("makeOptions: with options (resolve)", () => {
-      makeOptions({ arrayFormat: "brackets", booleanFormat: "string" });
+      makeOptions({ arrayFormat: "brackets", booleanFormat: "auto" });
     });
   });
 });
@@ -332,8 +332,8 @@ boxplot(() => {
       build(boolParams);
     });
 
-    bench("build: boolean (string)", () => {
-      build(boolParams, { booleanFormat: "string" });
+    bench("build: boolean (auto)", () => {
+      build(boolParams, { booleanFormat: "auto" });
     });
 
     bench("build: boolean (empty-true)", () => {

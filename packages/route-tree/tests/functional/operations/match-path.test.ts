@@ -89,7 +89,7 @@ describe("New API - matchPath", () => {
     ]);
 
     const result = matchPath(tree, "/route?flag=true", {
-      queryParams: { booleanFormat: "string" },
+      queryParams: { booleanFormat: "auto" },
     });
 
     expect(result?.params.flag).toBe(true);

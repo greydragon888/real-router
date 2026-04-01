@@ -32,6 +32,8 @@ export {
 
 export { createMatcher } from "./createMatcher";
 
+export { DEFAULT_QUERY_PARAMS } from "search-params";
+
 export type {
   CreateMatcherOptions,
   Matcher,

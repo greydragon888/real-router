@@ -85,16 +85,16 @@ keep(path: string, paramsToKeep: string[], opts?: Options): KeepResponse
 ```typescript
 // Format types
 type ArrayFormat = "none" | "brackets" | "index" | "comma";
-type BooleanFormat = "none" | "string" | "empty-true";
+type BooleanFormat = "none" | "auto" | "empty-true";
 type NullFormat = "default" | "hidden";
 type NumberFormat = "none" | "auto";
 
 // Options
 interface Options {
   arrayFormat?: ArrayFormat; // default: "none"
-  booleanFormat?: BooleanFormat; // default: "none"
+  booleanFormat?: BooleanFormat; // default: "auto"
   nullFormat?: NullFormat; // default: "default"
-  numberFormat?: NumberFormat; // default: "none"
+  numberFormat?: NumberFormat; // default: "auto"
 }
 
 // Parameter types
@@ -178,8 +178,8 @@ interface ArrayStrategy {
 
 | Format         | `true` encodes as | `false` encodes as | Parsing                                           |
 | -------------- | ----------------- | ------------------ | ------------------------------------------------- |
+| `"auto"`       | `flag=true`       | `flag=false`       | `"true"`/`"false"` → `boolean`                    |
 | `"none"`       | `flag=true`       | `flag=false`       | No conversion — remains string                    |
-| `"string"`     | `flag=true`       | `flag=false`       | `"true"`/`"false"` → `boolean`                    |
 | `"empty-true"` | `flag`            | `flag=false`       | Key-only → `true`, value passed through as string |
 
 #### Number Formats

@@ -173,9 +173,9 @@ describe("core/options", () => {
       expect(opts.defaultParams).toStrictEqual({});
       expect(opts.queryParams).toStrictEqual({
         arrayFormat: "none",
-        booleanFormat: "none",
+        booleanFormat: "auto",
         nullFormat: "default",
-        numberFormat: "none",
+        numberFormat: "auto",
       });
 
       plainRouter.stop();
@@ -462,7 +462,7 @@ describe("core/options", () => {
           createRouter([], {
             queryParams: {
               arrayFormat: "brackets",
-              booleanFormat: "string",
+              booleanFormat: "auto",
               nullFormat: "hidden",
               numberFormat: "auto",
             },

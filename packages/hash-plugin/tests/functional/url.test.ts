@@ -105,7 +105,7 @@ describe("Hash Plugin — URL Operations", () => {
 
         expect(withoutMeta(state!)).toStrictEqual({
           name: "users.list",
-          params: { page: "1", sort: "asc" },
+          params: { page: 1, sort: "asc" },
           path: "/users/list",
         });
       });

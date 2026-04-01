@@ -74,8 +74,8 @@ export const resolveStrategies = (
  * Used when no custom options are provided.
  */
 export const DEFAULT_STRATEGIES: ResolvedStrategies = {
-  boolean: booleanStrategies.none,
+  boolean: booleanStrategies.auto,
   null: nullStrategies.default,
-  number: numberStrategies.none,
+  number: numberStrategies.auto,
   array: arrayStrategies.none,
 };

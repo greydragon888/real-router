@@ -49,10 +49,8 @@ describe("search-params", () => {
 
     it("handles multiple values for same parameter with options", () => {
       // Tests the parseInternal code path (when options are provided)
-      expect(
-        parse("id=1&id=2&id=3", { booleanFormat: "string" }),
-      ).toStrictEqual({
-        id: ["1", "2", "3"],
+      expect(parse("id=1&id=2&id=3", { booleanFormat: "auto" })).toStrictEqual({
+        id: [1, 2, 3],
       });
     });
 
@@ -91,9 +89,9 @@ describe("search-params", () => {
       });
     });
 
-    it("handles string boolean format", () => {
+    it("handles auto boolean format", () => {
       expect(
-        parse("enabled=true&disabled=false", { booleanFormat: "string" }),
+        parse("enabled=true&disabled=false", { booleanFormat: "auto" }),
       ).toStrictEqual({
         enabled: true,
         disabled: false,
@@ -123,7 +121,7 @@ describe("search-params", () => {
     it("handles combined booleanFormat and numberFormat", () => {
       expect(
         parse("enabled=true&disabled=false&count=1&price=12.5&name=abc", {
-          booleanFormat: "string",
+          booleanFormat: "auto",
           numberFormat: "auto",
         }),
       ).toStrictEqual({
@@ -288,7 +286,7 @@ describe("search-params", () => {
         omit("page=1&sort=name&limit=10", ["sort", "limit"]),
       ).toStrictEqual({
         querystring: "page=1",
-        removedParams: { sort: "name", limit: "10" },
+        removedParams: { sort: "name", limit: 10 },
       });
     });
 
@@ -310,14 +308,14 @@ describe("search-params", () => {
       // This was a bug: first param had ?prefix which prevented matching
       expect(omit("?page=1&sort=name", ["page"])).toStrictEqual({
         querystring: "?sort=name",
-        removedParams: { page: "1" },
+        removedParams: { page: 1 },
       });
     });
 
     it("handles removing all parameters with ? prefix", () => {
       expect(omit("?page=1&sort=name", ["page", "sort"])).toStrictEqual({
         querystring: "",
-        removedParams: { page: "1", sort: "name" },
+        removedParams: { page: 1, sort: "name" },
       });
     });
 
@@ -328,7 +326,7 @@ describe("search-params", () => {
         }),
       ).toStrictEqual({
         querystring: "page=1",
-        removedParams: { items: ["1", "2"] },
+        removedParams: { items: [1, 2] },
       });
     });
 
@@ -362,7 +360,7 @@ describe("search-params", () => {
     it("keeps only specified parameters", () => {
       expect(keep("page=1&sort=name&limit=10", ["page"])).toStrictEqual({
         querystring: "page=1",
-        keptParams: { page: "1" },
+        keptParams: { page: 1 },
       });
     });
 
@@ -371,7 +369,7 @@ describe("search-params", () => {
         keep("page=1&sort=name&limit=10", ["page", "limit"]),
       ).toStrictEqual({
         querystring: "page=1&limit=10",
-        keptParams: { page: "1", limit: "10" },
+        keptParams: { page: 1, limit: 10 },
       });
     });
 
@@ -392,14 +390,14 @@ describe("search-params", () => {
       // This was a bug: first param had ?prefix which prevented matching
       expect(keep("?page=1&sort=name", ["page"])).toStrictEqual({
         querystring: "page=1",
-        keptParams: { page: "1" },
+        keptParams: { page: 1 },
       });
     });
 
     it("handles keeping multiple parameters with ? prefix", () => {
       expect(keep("?a=1&b=2&c=3", ["a", "c"])).toStrictEqual({
         querystring: "a=1&c=3",
-        keptParams: { a: "1", c: "3" },
+        keptParams: { a: 1, c: 3 },
       });
     });
 
@@ -410,7 +408,7 @@ describe("search-params", () => {
         }),
       ).toStrictEqual({
         querystring: "items[]=1&items[]=2",
-        keptParams: { items: ["1", "2"] },
+        keptParams: { items: [1, 2] },
       });
     });
 
@@ -428,7 +426,7 @@ describe("search-params", () => {
     it("handles all parameters kept", () => {
       expect(keep("a=1&b=2", ["a", "b"])).toStrictEqual({
         querystring: "a=1&b=2",
-        keptParams: { a: "1", b: "2" },
+        keptParams: { a: 1, b: 2 },
       });
     });
 
@@ -511,43 +509,43 @@ describe("search-params", () => {
       // Should return same cached object
       expect(opts1).toBe(opts2);
       expect(opts1.arrayFormat).toBe("none");
-      expect(opts1.booleanFormat).toBe("none");
+      expect(opts1.booleanFormat).toBe("auto");
       expect(opts1.nullFormat).toBe("default");
-      expect(opts1.numberFormat).toBe("none");
+      expect(opts1.numberFormat).toBe("auto");
     });
 
     it("handles partial options (only arrayFormat)", () => {
       const opts = makeOptions({ arrayFormat: "brackets" });
 
       expect(opts.arrayFormat).toBe("brackets");
-      expect(opts.booleanFormat).toBe("none"); // default
+      expect(opts.booleanFormat).toBe("auto"); // default
       expect(opts.nullFormat).toBe("default"); // default
-      expect(opts.numberFormat).toBe("none"); // default
+      expect(opts.numberFormat).toBe("auto"); // default
     });
 
     it("handles partial options (only booleanFormat)", () => {
-      const opts = makeOptions({ booleanFormat: "string" });
+      const opts = makeOptions({ booleanFormat: "auto" });
 
       expect(opts.arrayFormat).toBe("none"); // default
-      expect(opts.booleanFormat).toBe("string");
+      expect(opts.booleanFormat).toBe("auto");
       expect(opts.nullFormat).toBe("default"); // default
-      expect(opts.numberFormat).toBe("none"); // default
+      expect(opts.numberFormat).toBe("auto"); // default
     });
 
     it("handles partial options (only nullFormat)", () => {
       const opts = makeOptions({ nullFormat: "hidden" });
 
       expect(opts.arrayFormat).toBe("none"); // default
-      expect(opts.booleanFormat).toBe("none"); // default
+      expect(opts.booleanFormat).toBe("auto"); // default
       expect(opts.nullFormat).toBe("hidden");
-      expect(opts.numberFormat).toBe("none"); // default
+      expect(opts.numberFormat).toBe("auto"); // default
     });
 
     it("handles partial options (only numberFormat)", () => {
       const opts = makeOptions({ numberFormat: "auto" });
 
       expect(opts.arrayFormat).toBe("none"); // default
-      expect(opts.booleanFormat).toBe("none"); // default
+      expect(opts.booleanFormat).toBe("auto"); // default
       expect(opts.nullFormat).toBe("default"); // default
       expect(opts.numberFormat).toBe("auto");
     });
@@ -677,8 +675,8 @@ describe("search-params", () => {
       expect(encode("flag", false, opts)).toBe("flag=false");
     });
 
-    it("encodes boolean with string format", () => {
-      const opts = makeOptions({ booleanFormat: "string" });
+    it("encodes boolean with auto format", () => {
+      const opts = makeOptions({ booleanFormat: "auto" });
 
       expect(encode("flag", true, opts)).toBe("flag=true");
       expect(encode("flag", false, opts)).toBe("flag=false");

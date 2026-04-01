@@ -21,7 +21,7 @@ describe("createMatcher", () => {
       strictQueryParams: true,
       urlParamsEncoding: "uri",
       queryParams: {
-        booleanFormat: "string",
+        booleanFormat: "auto",
         arrayFormat: "brackets",
         nullFormat: "hidden",
         numberFormat: "auto",
@@ -41,7 +41,7 @@ describe("createMatcher", () => {
 
   it("should inject parseQueryString from search-params", () => {
     const matcher = createMatcher({
-      queryParams: { booleanFormat: "string" },
+      queryParams: { booleanFormat: "auto" },
     });
 
     matcher.registerTree({
@@ -85,17 +85,17 @@ describe("createMatcher", () => {
       staticPath: null,
     });
 
-    // Verify query string parsing with booleanFormat: "string"
+    // Verify query string parsing with booleanFormat: "auto"
     const result = matcher.match("/search?q=hello&active=true");
 
     expect(result).toBeDefined();
     expect(result?.params.q).toBe("hello");
-    expect(result?.params.active).toBe(true); // booleanFormat: "string" parses "true" → true
+    expect(result?.params.active).toBe(true); // booleanFormat: "auto" parses "true" → true
   });
 
   it("should inject buildQueryString from search-params", () => {
     const matcher = createMatcher({
-      queryParams: { booleanFormat: "string" },
+      queryParams: { booleanFormat: "auto" },
     });
 
     matcher.registerTree({
@@ -151,7 +151,7 @@ describe("createMatcher", () => {
 
     expect(path).toContain("/search");
     expect(path).toContain("q=hello");
-    expect(path).toContain("active=true"); // booleanFormat: "string" serializes true → "true"
+    expect(path).toContain("active=true"); // booleanFormat: "auto" serializes true → "true"
   });
 
   it("should parse numbers with numberFormat auto", () => {
