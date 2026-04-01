@@ -5,6 +5,156 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-04-01]
+
+### @real-router/core@0.43.0
+
+### Minor Changes
+
+- [#389](https://github.com/greydragon888/real-router/pull/389) [`b73ba6e`](https://github.com/greydragon888/real-router/commit/b73ba6e5bbdc4e7628491d0b382b7c2827fbd780) Thanks [@greydragon888](https://github.com/greydragon888)! - Change default `booleanFormat` and `numberFormat` to `"auto"` ([#387](https://github.com/greydragon888/real-router/issues/387))
+
+  **Breaking Change:** Default query parameter options now auto-detect types:
+  - `booleanFormat`: `"none"` → `"auto"` (`"true"`/`"false"` parsed as booleans)
+  - `numberFormat`: `"none"` → `"auto"` (numeric strings parsed as numbers)
+
+  Use `{ booleanFormat: "none", numberFormat: "none" }` to restore previous behavior.
+
+### Patch Changes
+
+- Updated dependencies [[`b73ba6e`](https://github.com/greydragon888/real-router/commit/b73ba6e5bbdc4e7628491d0b382b7c2827fbd780)]:
+  - @real-router/types@0.29.0
+
+### @real-router/types@0.29.0
+
+### Minor Changes
+
+- [#389](https://github.com/greydragon888/real-router/pull/389) [`b73ba6e`](https://github.com/greydragon888/real-router/commit/b73ba6e5bbdc4e7628491d0b382b7c2827fbd780) Thanks [@greydragon888](https://github.com/greydragon888)! - Rename `BooleanFormat` value `"string"` to `"auto"` ([#387](https://github.com/greydragon888/real-router/issues/387))
+
+  **Breaking Change:** The `"string"` value of `BooleanFormat` type has been renamed to `"auto"` for symmetry with `NumberFormat`.
+
+  **Migration:**
+
+  ```diff
+  - queryParams: { booleanFormat: "string" }
+  + queryParams: { booleanFormat: "auto" }
+  ```
+
+### @real-router/browser-plugin@0.11.2
+
+### Patch Changes
+
+- Updated dependencies [[`b73ba6e`](https://github.com/greydragon888/real-router/commit/b73ba6e5bbdc4e7628491d0b382b7c2827fbd780)]:
+  - @real-router/core@0.43.0
+
+### @real-router/hash-plugin@0.2.9
+
+### Patch Changes
+
+- Updated dependencies [[`b73ba6e`](https://github.com/greydragon888/real-router/commit/b73ba6e5bbdc4e7628491d0b382b7c2827fbd780)]:
+  - @real-router/core@0.43.0
+
+### @real-router/logger-plugin@0.3.8
+
+### Patch Changes
+
+- Updated dependencies [[`b73ba6e`](https://github.com/greydragon888/real-router/commit/b73ba6e5bbdc4e7628491d0b382b7c2827fbd780)]:
+  - @real-router/core@0.43.0
+
+### @real-router/persistent-params-plugin@0.1.47
+
+### Patch Changes
+
+- Updated dependencies [[`b73ba6e`](https://github.com/greydragon888/real-router/commit/b73ba6e5bbdc4e7628491d0b382b7c2827fbd780)]:
+  - @real-router/core@0.43.0
+
+### @real-router/preact@0.2.4
+
+### Patch Changes
+
+- Updated dependencies [[`b73ba6e`](https://github.com/greydragon888/real-router/commit/b73ba6e5bbdc4e7628491d0b382b7c2827fbd780)]:
+  - @real-router/core@0.43.0
+  - @real-router/route-utils@0.1.9
+  - dom-utils@0.2.5
+  - @real-router/sources@0.3.3
+
+### @real-router/react@0.14.4
+
+### Patch Changes
+
+- Updated dependencies [[`b73ba6e`](https://github.com/greydragon888/real-router/commit/b73ba6e5bbdc4e7628491d0b382b7c2827fbd780)]:
+  - @real-router/core@0.43.0
+  - @real-router/route-utils@0.1.9
+  - dom-utils@0.2.5
+  - @real-router/sources@0.3.3
+
+### @real-router/route-utils@0.1.9
+
+### Patch Changes
+
+- Updated dependencies [[`b73ba6e`](https://github.com/greydragon888/real-router/commit/b73ba6e5bbdc4e7628491d0b382b7c2827fbd780)]:
+  - @real-router/types@0.29.0
+
+### @real-router/rx@0.1.35
+
+### Patch Changes
+
+- Updated dependencies [[`b73ba6e`](https://github.com/greydragon888/real-router/commit/b73ba6e5bbdc4e7628491d0b382b7c2827fbd780)]:
+  - @real-router/core@0.43.0
+
+### @real-router/solid@0.2.4
+
+### Patch Changes
+
+- Updated dependencies [[`b73ba6e`](https://github.com/greydragon888/real-router/commit/b73ba6e5bbdc4e7628491d0b382b7c2827fbd780)]:
+  - @real-router/core@0.43.0
+  - @real-router/route-utils@0.1.9
+  - dom-utils@0.2.5
+  - @real-router/sources@0.3.3
+
+### @real-router/sources@0.3.3
+
+### Patch Changes
+
+- Updated dependencies [[`b73ba6e`](https://github.com/greydragon888/real-router/commit/b73ba6e5bbdc4e7628491d0b382b7c2827fbd780)]:
+  - @real-router/core@0.43.0
+  - @real-router/route-utils@0.1.9
+
+### @real-router/ssr-data-plugin@0.1.5
+
+### Patch Changes
+
+- Updated dependencies [[`b73ba6e`](https://github.com/greydragon888/real-router/commit/b73ba6e5bbdc4e7628491d0b382b7c2827fbd780)]:
+  - @real-router/core@0.43.0
+
+### @real-router/svelte@0.2.4
+
+### Patch Changes
+
+- Updated dependencies [[`b73ba6e`](https://github.com/greydragon888/real-router/commit/b73ba6e5bbdc4e7628491d0b382b7c2827fbd780)]:
+  - @real-router/core@0.43.0
+  - @real-router/route-utils@0.1.9
+  - dom-utils@0.2.5
+  - @real-router/sources@0.3.3
+
+### @real-router/validation-plugin@0.3.1
+
+### Patch Changes
+
+- [#389](https://github.com/greydragon888/real-router/pull/389) [`b73ba6e`](https://github.com/greydragon888/real-router/commit/b73ba6e5bbdc4e7628491d0b382b7c2827fbd780) Thanks [@greydragon888](https://github.com/greydragon888)! - Update valid `booleanFormat` values: `"string"` renamed to `"auto"` ([#387](https://github.com/greydragon888/real-router/issues/387))
+
+- Updated dependencies [[`b73ba6e`](https://github.com/greydragon888/real-router/commit/b73ba6e5bbdc4e7628491d0b382b7c2827fbd780)]:
+  - @real-router/core@0.43.0
+
+### @real-router/vue@0.2.4
+
+### Patch Changes
+
+- Updated dependencies [[`b73ba6e`](https://github.com/greydragon888/real-router/commit/b73ba6e5bbdc4e7628491d0b382b7c2827fbd780)]:
+  - @real-router/core@0.43.0
+  - @real-router/route-utils@0.1.9
+  - dom-utils@0.2.5
+  - @real-router/sources@0.3.3
+
 ## [2026-03-31]
 
 ### @real-router/core@0.42.0
