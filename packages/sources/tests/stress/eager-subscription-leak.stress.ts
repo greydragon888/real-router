@@ -86,6 +86,9 @@ describe("S3. Eager subscription leak detection", () => {
   });
 
   it("S3.3: 200 TransitionSource without destroy accumulates heap; heap recovers after destroy", async () => {
+    // Extra GC to flush residual garbage from prior tests — stabilizes baseline
+    forceGC();
+    forceGC();
     const heapBeforeCreate = takeHeapSnapshot();
 
     const sources = createManySources(
