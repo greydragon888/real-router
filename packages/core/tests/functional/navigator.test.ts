@@ -19,7 +19,7 @@ describe("core/getNavigator", () => {
     router.stop();
   });
 
-  it("returns frozen object with exactly 5 methods", () => {
+  it("returns frozen object with exactly 7 methods", () => {
     const navigator = getNavigator(router);
 
     expect(Object.isFrozen(navigator)).toBe(true);
@@ -28,7 +28,9 @@ describe("core/getNavigator", () => {
     expect(navigator).toHaveProperty("isActiveRoute");
     expect(navigator).toHaveProperty("canNavigateTo");
     expect(navigator).toHaveProperty("subscribe");
-    expect(Object.keys(navigator)).toHaveLength(5);
+    expect(navigator).toHaveProperty("subscribeLeave");
+    expect(navigator).toHaveProperty("isLeaveApproved");
+    expect(Object.keys(navigator)).toHaveLength(7);
   });
 
   it("returns cached instance for same router", () => {
@@ -101,6 +103,44 @@ describe("core/getNavigator", () => {
     expect(callback).toHaveBeenCalledTimes(1);
   });
 
+  it("subscribeLeave is present and frozen", () => {
+    const navigator = getNavigator(router);
+
+    expect(navigator).toHaveProperty("subscribeLeave");
+    expect(typeof navigator.subscribeLeave).toBe("function");
+    expect(
+      Object.getOwnPropertyDescriptor(navigator, "subscribeLeave")?.writable,
+    ).toBe(false);
+  });
+
+  it("isLeaveApproved is present and frozen", () => {
+    const navigator = getNavigator(router);
+
+    expect(navigator).toHaveProperty("isLeaveApproved");
+    expect(typeof navigator.isLeaveApproved).toBe("function");
+    expect(
+      Object.getOwnPropertyDescriptor(navigator, "isLeaveApproved")?.writable,
+    ).toBe(false);
+  });
+
+  it("router.subscribeLeave(nonFunction) throws TypeError", () => {
+    expect(() => {
+      router.subscribeLeave(null as any);
+    }).toThrow(TypeError);
+
+    expect(() => {
+      router.subscribeLeave(undefined as any);
+    }).toThrow(TypeError);
+
+    expect(() => {
+      router.subscribeLeave("not a function" as any);
+    }).toThrow(TypeError);
+  });
+
+  it("router.isLeaveApproved() returns false when not in LEAVE_APPROVED state", () => {
+    expect(router.isLeaveApproved()).toBe(false);
+  });
+
   it("canNavigateTo delegates to router.canNavigateTo()", () => {
     const navigator = getNavigator(router);
 
@@ -111,8 +151,15 @@ describe("core/getNavigator", () => {
   });
 
   it("all methods are bound (work when destructured)", async () => {
-    const { navigate, getState, isActiveRoute, canNavigateTo, subscribe } =
-      getNavigator(router);
+    const {
+      navigate,
+      getState,
+      isActiveRoute,
+      canNavigateTo,
+      subscribe,
+      subscribeLeave,
+      isLeaveApproved,
+    } = getNavigator(router);
 
     await navigate("users");
 
@@ -125,5 +172,10 @@ describe("core/getNavigator", () => {
     expect(typeof unsubscribe).toBe("function");
 
     unsubscribe();
+
+    // Test new methods are bound
+    expect(typeof subscribeLeave).toBe("function");
+    expect(typeof isLeaveApproved).toBe("function");
+    expect(isLeaveApproved()).toBe(false);
   });
 });

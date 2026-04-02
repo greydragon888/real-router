@@ -30,6 +30,8 @@ describe("getNavigator Properties", () => {
     expect(nav.isActiveRoute).toBe(router.isActiveRoute);
     expect(nav.canNavigateTo).toBe(router.canNavigateTo);
     expect(nav.subscribe).toBe(router.subscribe);
+    expect(nav.subscribeLeave).toBe(router.subscribeLeave);
+    expect(nav.isLeaveApproved).toBe(router.isLeaveApproved);
   });
 
   it("contains exactly the expected methods", () => {
@@ -41,8 +43,10 @@ describe("getNavigator Properties", () => {
       "canNavigateTo",
       "getState",
       "isActiveRoute",
+      "isLeaveApproved",
       "navigate",
       "subscribe",
+      "subscribeLeave",
     ]);
   });
 });

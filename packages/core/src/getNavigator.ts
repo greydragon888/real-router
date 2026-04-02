@@ -20,7 +20,9 @@ export const getNavigator = <
       isActiveRoute: router.isActiveRoute,
       canNavigateTo: router.canNavigateTo,
       subscribe: router.subscribe,
-    });
+      subscribeLeave: router.subscribeLeave,
+      isLeaveApproved: router.isLeaveApproved,
+    } as Navigator);
     cache.set(router, nav);
   }
 

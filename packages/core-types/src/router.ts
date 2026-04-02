@@ -230,6 +230,8 @@ export interface Navigator {
   ) => boolean;
   canNavigateTo: (name: string, params?: Params) => boolean;
   subscribe: (listener: SubscribeFn) => Unsubscribe;
+  subscribeLeave: (listener: LeaveFn) => Unsubscribe;
+  isLeaveApproved: () => boolean;
 }
 
 /**
