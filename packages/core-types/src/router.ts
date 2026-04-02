@@ -166,6 +166,7 @@ export interface Plugin {
   onStart?: () => void;
   onStop?: () => void;
   onTransitionStart?: (toState: State, fromState?: State) => void;
+  onTransitionLeaveApprove?: (toState: State, fromState?: State) => void;
   onTransitionCancel?: (toState: State, fromState?: State) => void;
   onTransitionError?: (
     toState: State | undefined,
