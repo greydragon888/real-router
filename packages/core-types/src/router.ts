@@ -188,6 +188,13 @@ export interface SubscribeState {
 
 export type SubscribeFn = (state: SubscribeState) => void;
 
+export interface LeaveState {
+  route: State;
+  nextRoute: State;
+}
+
+export type LeaveFn = (state: LeaveState) => void;
+
 export interface Listener {
   [key: string]: unknown;
   next: (val: unknown) => void;

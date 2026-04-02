@@ -10,6 +10,7 @@ import type { EventMethodMap, RouterEventMap } from "../../types";
 import type { FSM } from "@real-router/fsm";
 import type {
   EventName,
+  LeaveFn,
   NavigationOptions,
   Plugin,
   State,
@@ -43,6 +44,12 @@ export class EventBusNamespace {
     }
   }
 
+  static validateSubscribeLeaveListener(listener: unknown): void {
+    if (typeof listener !== "function") {
+      throw new TypeError("[router.subscribeLeave] Expected a function");
+    }
+  }
+
   emitRouterStart(): void {
     this.#emitter.emit(events.ROUTER_START);
   }
@@ -73,6 +80,10 @@ export class EventBusNamespace {
 
   emitTransitionCancel(toState: State, fromState?: State): void {
     this.#emitter.emit(events.TRANSITION_CANCEL, toState, fromState);
+  }
+
+  emitTransitionLeaveApprove(toState: State, fromState?: State): void {
+    this.#emitter.emit(events.TRANSITION_LEAVE_APPROVE, toState, fromState);
   }
 
   sendStart(): void {
@@ -110,6 +121,12 @@ export class EventBusNamespace {
     if (this.#currentToState === state) {
       this.#currentToState = undefined;
     }
+  }
+
+  sendLeaveApprove(toState: State, fromState?: State): void {
+    // Bypass FSM dispatch — forceState + direct emit (no action lookup, no rest params)
+    this.#fsm.forceState(routerStates.LEAVE_APPROVED);
+    this.emitTransitionLeaveApprove(toState, fromState);
   }
 
   sendFail(toState?: State, fromState?: State, error?: unknown): void {
@@ -168,7 +185,16 @@ export class EventBusNamespace {
   }
 
   isTransitioning(): boolean {
-    return this.#fsm.getState() === routerStates.TRANSITION_STARTED;
+    const state = this.#fsm.getState();
+
+    return (
+      state === routerStates.TRANSITION_STARTED ||
+      state === routerStates.LEAVE_APPROVED
+    );
+  }
+
+  isLeaveApproved(): boolean {
+    return this.#fsm.getState() === routerStates.LEAVE_APPROVED;
   }
 
   isReady(): boolean {
@@ -194,6 +220,17 @@ export class EventBusNamespace {
       events.TRANSITION_SUCCESS,
       (toState: State, fromState?: State) => {
         listener({ route: toState, previousRoute: fromState });
+      },
+    );
+  }
+
+  subscribeLeave(listener: LeaveFn): Unsubscribe {
+    return this.#emitter.on(
+      events.TRANSITION_LEAVE_APPROVE,
+      (toState: State, fromState?: State) => {
+        if (fromState !== undefined) {
+          listener({ route: fromState, nextRoute: toState });
+        }
       },
     );
   }
@@ -248,6 +285,21 @@ export class EventBusNamespace {
       }
 
       this.emitTransitionCancel(toState, this.#pendingFromState);
+    });
+
+    fsm.on(routerStates.LEAVE_APPROVED, routerEvents.CANCEL, () => {
+      const toState = this.#pendingToState;
+
+      /* v8 ignore next -- @preserve: #pendingToState guaranteed set by sendCancel before send() */
+      if (toState === undefined) {
+        return;
+      }
+
+      this.emitTransitionCancel(toState, this.#pendingFromState);
+    });
+
+    fsm.on(routerStates.LEAVE_APPROVED, routerEvents.FAIL, () => {
+      this.#emitPendingError();
     });
 
     fsm.on(routerStates.STARTING, routerEvents.FAIL, () => {
