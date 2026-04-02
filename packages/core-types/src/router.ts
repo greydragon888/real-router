@@ -285,6 +285,10 @@ export interface Router<D extends DefaultDependencies = DefaultDependencies> {
 
   subscribe: (listener: SubscribeFn) => Unsubscribe;
 
+  subscribeLeave: (listener: LeaveFn) => Unsubscribe;
+
+  isLeaveApproved: () => boolean;
+
   navigate: (
     routeName: string,
     routeParams?: Params,

@@ -658,6 +658,7 @@ export class Router<
     this.usePlugin = throwDisposed as never;
 
     this.subscribe = throwDisposed as never;
+    this.subscribeLeave = throwDisposed as never;
     this.canNavigateTo = throwDisposed as never;
   }
 }
