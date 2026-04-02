@@ -39,6 +39,7 @@ describe("SV7 — useRouterTransition stress (Svelte)", () => {
 
     let snapshot: RouterTransitionSnapshot = {
       isTransitioning: false,
+      isLeaveApproved: false,
       toRoute: null,
       fromRoute: null,
     };
@@ -84,6 +85,7 @@ describe("SV7 — useRouterTransition stress (Svelte)", () => {
 
     let snapshot: RouterTransitionSnapshot = {
       isTransitioning: false,
+      isLeaveApproved: false,
       toRoute: null,
       fromRoute: null,
     };
@@ -119,6 +121,7 @@ describe("SV7 — useRouterTransition stress (Svelte)", () => {
     const snapshots: RouterTransitionSnapshot[] =
       Array.from<RouterTransitionSnapshot>({ length: 20 }).fill({
         isTransitioning: false,
+        isLeaveApproved: false,
         toRoute: null,
         fromRoute: null,
       });
@@ -168,6 +171,7 @@ describe("SV7 — useRouterTransition stress (Svelte)", () => {
 
     let snapshot: RouterTransitionSnapshot = {
       isTransitioning: false,
+      isLeaveApproved: false,
       toRoute: null,
       fromRoute: null,
     };

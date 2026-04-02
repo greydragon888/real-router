@@ -26,6 +26,7 @@ describe("createTransitionSource — state machine", () => {
 
       expect(source.getSnapshot()).toStrictEqual({
         isTransitioning: false,
+        isLeaveApproved: false,
         toRoute: null,
         fromRoute: null,
       });
@@ -80,6 +81,7 @@ describe("createTransitionSource — state machine", () => {
 
         expect(source.getSnapshot()).toStrictEqual({
           isTransitioning: false,
+          isLeaveApproved: false,
           toRoute: null,
           fromRoute: null,
         });
@@ -108,6 +110,7 @@ describe("createTransitionSource — state machine", () => {
 
       expect(source.getSnapshot()).toStrictEqual({
         isTransitioning: false,
+        isLeaveApproved: false,
         toRoute: null,
         fromRoute: null,
       });
@@ -149,6 +152,7 @@ describe("createTransitionSource — state machine", () => {
 
       expect(source.getSnapshot()).toStrictEqual({
         isTransitioning: false,
+        isLeaveApproved: false,
         toRoute: null,
         fromRoute: null,
       });
@@ -293,6 +297,7 @@ describe("createTransitionSource — concurrent navigation", () => {
 
       expect(source.getSnapshot()).toStrictEqual({
         isTransitioning: false,
+        isLeaveApproved: false,
         toRoute: null,
         fromRoute: null,
       });
@@ -316,6 +321,7 @@ describe("createTransitionSource — concurrent navigation", () => {
 
       expect(source.getSnapshot()).toStrictEqual({
         isTransitioning: false,
+        isLeaveApproved: false,
         toRoute: null,
         fromRoute: null,
       });
@@ -448,6 +454,7 @@ describe("createTransitionSource — destroy", () => {
 
       expect(source.getSnapshot()).toStrictEqual({
         isTransitioning: false,
+        isLeaveApproved: false,
         toRoute: null,
         fromRoute: null,
       });

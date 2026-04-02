@@ -403,4 +403,96 @@ describe("createTransitionSource", () => {
       source.destroy();
     }).not.toThrow();
   });
+
+  it("isLeaveApproved === false initially", () => {
+    const source = createTransitionSource(router);
+    const snapshot = source.getSnapshot();
+
+    expect(snapshot.isLeaveApproved).toBe(false);
+  });
+
+  it("isLeaveApproved === false upon TRANSITION_START", async () => {
+    const lifecycle = getLifecycleApi(router);
+    let resolveGuard!: (value: boolean) => void;
+
+    lifecycle.addActivateGuard("dashboard", () => () => {
+      return new Promise<boolean>((resolve) => {
+        resolveGuard = resolve;
+      });
+    });
+
+    const source = createTransitionSource(router);
+
+    void router.navigate("dashboard");
+    await Promise.resolve();
+
+    expect(source.getSnapshot().isLeaveApproved).toBe(false);
+
+    resolveGuard(true);
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  it("isLeaveApproved === false upon TRANSITION_SUCCESS", async () => {
+    const source = createTransitionSource(router);
+
+    await router.navigate("dashboard");
+
+    // After TRANSITION_SUCCESS, should reset to IDLE_SNAPSHOT
+    expect(source.getSnapshot().isLeaveApproved).toBe(false);
+    expect(source.getSnapshot().isTransitioning).toBe(false);
+  });
+
+  it("isLeaveApproved === false upon TRANSITION_CANCEL", async () => {
+    const lifecycle = getLifecycleApi(router);
+    let resolveGuard!: (value: boolean) => void;
+
+    lifecycle.addActivateGuard("dashboard", () => () => {
+      return new Promise<boolean>((resolve) => {
+        resolveGuard = resolve;
+      });
+    });
+
+    const source = createTransitionSource(router);
+
+    const p1 = router.navigate("dashboard");
+
+    await Promise.resolve();
+
+    expect(source.getSnapshot().isLeaveApproved).toBe(false);
+
+    const p2 = router.navigate("settings");
+
+    await Promise.resolve();
+
+    resolveGuard(true);
+
+    await p2;
+    await p1.catch(() => {});
+
+    expect(source.getSnapshot().isLeaveApproved).toBe(false);
+    expect(source.getSnapshot().isTransitioning).toBe(false);
+  });
+
+  it("isLeaveApproved === true upon TRANSITION_LEAVE_APPROVE event", async () => {
+    const api = getPluginApi(router);
+    const source = createTransitionSource(router);
+
+    api.addEventListener(
+      events.TRANSITION_LEAVE_APPROVE,
+      (toState, fromState) => {
+        expect(source.getSnapshot().isLeaveApproved).toBe(true);
+        expect(source.getSnapshot().isTransitioning).toBe(true);
+        expect(source.getSnapshot().toRoute).toBe(toState);
+        expect(source.getSnapshot().fromRoute).toBe(fromState);
+      },
+    );
+
+    api.addEventListener(events.TRANSITION_START, () => {
+      expect(source.getSnapshot().isLeaveApproved).toBe(false);
+    });
+
+    void router.navigate("dashboard");
+    await Promise.resolve();
+  });
 });
