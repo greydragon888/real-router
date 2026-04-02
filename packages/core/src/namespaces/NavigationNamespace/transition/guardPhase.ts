@@ -78,12 +78,15 @@ async function finishAsyncPipeline( // NOSONAR
   fromState: State | undefined,
   signal: AbortSignal,
   isActive: () => boolean,
+  emitLeaveApprove: () => void,
 ): Promise<void> {
   await deactivateCompletion;
 
   if (!isActive()) {
     throw new RouterError(errorCodes.TRANSITION_CANCELLED);
   }
+
+  emitLeaveApprove();
 
   if (shouldActivate) {
     const pending = runGuards(
@@ -117,6 +120,7 @@ export function executeGuardPipeline( // NOSONAR
   fromState: State | undefined,
   signal: AbortSignal,
   isActive: () => boolean,
+  emitLeaveApprove: () => void,
 ): Promise<void> | undefined {
   if (shouldDeactivate) {
     const pending = runGuards(
@@ -139,6 +143,7 @@ export function executeGuardPipeline( // NOSONAR
         fromState,
         signal,
         isActive,
+        emitLeaveApprove,
       );
     }
   }
@@ -146,6 +151,8 @@ export function executeGuardPipeline( // NOSONAR
   if (!isActive()) {
     throw new RouterError(errorCodes.TRANSITION_CANCELLED);
   }
+
+  emitLeaveApprove();
 
   if (shouldActivate) {
     return runGuards(

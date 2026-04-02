@@ -176,6 +176,7 @@ export class NavigationNamespace {
           fromState,
           signal,
           isCurrentNav,
+          () => {},
         );
 
         if (guardCompletion !== undefined) {
