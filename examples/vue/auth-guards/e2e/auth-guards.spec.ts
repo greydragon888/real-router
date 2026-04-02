@@ -207,3 +207,55 @@ test.describe("404 and route tree behavior", () => {
     ).toBeVisible();
   });
 });
+
+test.describe("subscribeLeave — draft save", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.evaluate(() => {
+      localStorage.removeItem("settings:draft");
+    });
+  });
+
+  test("draft saved on confirmed leave", async ({ page }) => {
+    await loginAs(page, "alice@example.com");
+    await page.getByRole("link", { name: "Settings" }).click();
+    await page.waitForURL(/\/settings/);
+    await page
+      .getByPlaceholder("Enter your display name…")
+      .fill("John Doe");
+    page.once("dialog", (dialog) => void dialog.accept());
+    await page.getByRole("link", { name: "Dashboard" }).click();
+    await page.waitForURL(/\/dashboard/);
+    const draft = await page.evaluate(() =>
+      localStorage.getItem("settings:draft"),
+    );
+    expect(draft).toBe("John Doe");
+  });
+
+  test("draft NOT saved on dismissed leave", async ({ page }) => {
+    await loginAs(page, "alice@example.com");
+    await page.getByRole("link", { name: "Settings" }).click();
+    await page.waitForURL(/\/settings/);
+    await page
+      .getByPlaceholder("Enter your display name…")
+      .fill("John Doe");
+    page.once("dialog", (dialog) => void dialog.dismiss());
+    await page.getByRole("link", { name: "Dashboard" }).click();
+    await expect(page).toHaveURL(/\/settings/);
+    const draft = await page.evaluate(() =>
+      localStorage.getItem("settings:draft"),
+    );
+    expect(draft).toBeNull();
+  });
+
+  test("draft NOT saved when input empty", async ({ page }) => {
+    await loginAs(page, "alice@example.com");
+    await page.getByRole("link", { name: "Settings" }).click();
+    await page.waitForURL(/\/settings/);
+    await page.getByRole("link", { name: "Dashboard" }).click();
+    await page.waitForURL(/\/dashboard/);
+    const draft = await page.evaluate(() =>
+      localStorage.getItem("settings:draft"),
+    );
+    expect(draft).toBeNull();
+  });
+});

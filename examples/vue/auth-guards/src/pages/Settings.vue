@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { onUnmounted, ref, watch } from "vue";
+import { onUnmounted, ref, watch, watchEffect } from "vue";
+import { useNavigator } from "@real-router/vue";
 import { store } from "../../../../shared/store";
 
 const displayName = ref("");
+const navigator = useNavigator();
 
 watch(displayName, (val) => {
   store.set("settings:unsaved", val !== "");
@@ -10,6 +12,15 @@ watch(displayName, (val) => {
 
 onUnmounted(() => {
   store.set("settings:unsaved", false);
+});
+
+watchEffect((onCleanup) => {
+  const unsub = navigator.subscribeLeave(({ route }) => {
+    if (route.name === "settings" && displayName.value) {
+      localStorage.setItem("settings:draft", displayName.value);
+    }
+  });
+  onCleanup(unsub);
 });
 </script>
 
