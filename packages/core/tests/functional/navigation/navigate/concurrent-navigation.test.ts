@@ -507,7 +507,7 @@ describe("router.navigate() - concurrent navigation", () => {
         onSuccess,
       );
 
-      // Start a slow navigation (FSM → TRANSITIONING)
+      // Start a slow navigation (FSM → TRANSITION_STARTED)
       const promise = router.navigate("orders.pending");
 
       // Synchronously navigate to nonexistent route while transitioning

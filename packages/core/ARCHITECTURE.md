@@ -169,13 +169,13 @@ fsm.on("READY", "STOP", () => emitter.emit("$stop"));
 fsm.on("READY", "NAVIGATE", (p) =>
   emitter.emit("$$start", p.toState, p.fromState),
 );
-fsm.on("TRANSITIONING", "COMPLETE", (p) =>
+fsm.on("TRANSITION_STARTED", "COMPLETE", (p) =>
   emitter.emit("$$success", p.state, p.fromState, p.opts),
 );
-fsm.on("TRANSITIONING", "CANCEL", (p) =>
+fsm.on("TRANSITION_STARTED", "CANCEL", (p) =>
   emitter.emit("$$cancel", p.toState, p.fromState),
 );
-// FAIL actions on STARTING, READY, TRANSITIONING → emitter.emit("$$error", ...)
+// FAIL actions on STARTING, READY, TRANSITION_STARTED → emitter.emit("$$error", ...)
 ```
 
 **`send*` vs `emit*` naming convention** in `EventBusNamespace`:
@@ -211,7 +211,7 @@ fsm.on("TRANSITIONING", "CANCEL", (p) =>
            │
            ▼
 ┌──────────────────────┐
-│  Cancel in-flight    │  if TRANSITIONING: abort prev controller, send CANCEL
+│  Cancel in-flight    │  if TRANSITION_STARTED: abort prev controller, send CANCEL
 └──────────┬───────────┘
            │
            ▼
@@ -221,7 +221,7 @@ fsm.on("TRANSITIONING", "CANCEL", (p) =>
            │
            ▼
 ┌──────────────────────┐
-│  FSM send(NAVIGATE)  │  → TRANSITIONING → emitTransitionStart(toState, fromState)
+│  FSM send(NAVIGATE)  │  → TRANSITION_STARTED → emitTransitionStart(toState, fromState)
 └──────────┬───────────┘
            │
            ▼
@@ -265,10 +265,10 @@ Errors during navigation are routed through two different paths depending on FSM
 
 | Path            | Method                  | When                                                       | Effect                                   |
 | --------------- | ----------------------- | ---------------------------------------------------------- | ---------------------------------------- |
-| **Via FSM**     | `sendFail()` → FSM FAIL | FSM is in READY or TRANSITIONING                           | FSM transitions → action emits `$$error` |
+| **Via FSM**     | `sendFail()` → FSM FAIL | FSM is in READY or TRANSITION_STARTED                      | FSM transitions → action emits `$$error` |
 | **Direct emit** | `emitTransitionError()` | Error before FSM transition (ROUTE_NOT_FOUND, SAME_STATES) | Emits directly, FSM state unchanged      |
 
-The branching logic lives in `RouterWiringBuilder` (wiring layer). When an error occurs before `startTransition()`, the wiring checks `isReady()`: if READY — routes through FSM; if TRANSITIONING — emits directly to avoid disturbing the ongoing transition.
+The branching logic lives in `RouterWiringBuilder` (wiring layer). When an error occurs before `startTransition()`, the wiring checks `isReady()`: if READY — routes through FSM; if TRANSITION_STARTED — emits directly to avoid disturbing the ongoing transition.
 
 ### navigateToNotFound() — Pipeline Bypass
 
@@ -366,7 +366,7 @@ After successful navigation, deactivated segments with `canDeactivate` guards ar
 
 1. Abort current navigation
 2. Cancel transition if running
-3. Stop router (if READY or TRANSITIONING)
+3. Stop router (if READY or TRANSITION_STARTED)
 4. FSM → DISPOSED (terminal state)
 5. Clear event listeners
 6. Dispose plugins (remove listeners + call `teardown()`)

@@ -1713,7 +1713,7 @@ After each navigation, `state.transition` contains `TransitionMeta` with:
 Router events originate from FSM state changes. The navigate hot path uses `forceState()` for direct state updates + manual emit (bypassing `send()` dispatch overhead):
 
 ```
-navigate() → fsm.forceState(TRANSITIONING) + emitTransitionStart()
+navigate() → fsm.forceState(TRANSITION_STARTED) + emitTransitionStart()
            → [guard pipeline — optimistic sync execution]
            → fsm.forceState(READY) + emitTransitionSuccess()
 

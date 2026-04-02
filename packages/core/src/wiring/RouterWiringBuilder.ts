@@ -174,7 +174,7 @@ export class RouterWiringBuilder<
       cancelNavigation: () => {
         const toState = this.eventBus.getCurrentToState();
 
-        /* v8 ignore next -- @preserve: getCurrentToState() guaranteed set before TRANSITIONING */
+        /* v8 ignore next -- @preserve: getCurrentToState() guaranteed set before TRANSITION_STARTED */
         if (toState === undefined) {
           return;
         }

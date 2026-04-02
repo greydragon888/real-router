@@ -211,25 +211,25 @@ stateDiagram-v2
     STARTING --> READY : STARTED
     STARTING --> IDLE : FAIL
 
-    READY --> TRANSITIONING : NAVIGATE
+    READY --> TRANSITION_STARTED : NAVIGATE
     READY --> READY : FAIL
     READY --> IDLE : STOP
 
-    TRANSITIONING --> TRANSITIONING : NAVIGATE
-    TRANSITIONING --> READY : COMPLETE
-    TRANSITIONING --> READY : CANCEL
-    TRANSITIONING --> READY : FAIL
+    TRANSITION_STARTED --> TRANSITION_STARTED : NAVIGATE
+    TRANSITION_STARTED --> READY : COMPLETE
+    TRANSITION_STARTED --> READY : CANCEL
+    TRANSITION_STARTED --> READY : FAIL
 
     DISPOSED --> [*]
 ```
 
-| State           | Description                                          |
-| --------------- | ---------------------------------------------------- |
-| `IDLE`          | Router not started or stopped                        |
-| `STARTING`      | Initializing (synchronous window before first await) |
-| `READY`         | Ready for navigation                                 |
-| `TRANSITIONING` | Navigation in progress                               |
-| `DISPOSED`      | Terminal state, no transitions out                   |
+| State                | Description                                          |
+| -------------------- | ---------------------------------------------------- |
+| `IDLE`               | Router not started or stopped                        |
+| `STARTING`           | Initializing (synchronous window before first await) |
+| `READY`              | Ready for navigation                                 |
+| `TRANSITION_STARTED` | Navigation in progress                               |
+| `DISPOSED`           | Terminal state, no transitions out                   |
 
 FSM events trigger observable emissions via `fsm.on(from, event, action)`:
 

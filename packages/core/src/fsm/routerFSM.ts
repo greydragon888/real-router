@@ -10,14 +10,14 @@ import type { FSMConfig } from "@real-router/fsm";
  * - IDLE: Router not started or stopped
  * - STARTING: Router is initializing
  * - READY: Router is ready for navigation
- * - TRANSITIONING: Navigation in progress
+ * - TRANSITION_STARTED: Navigation in progress
  * - DISPOSED: Router has been disposed (R2+)
  */
 export const routerStates = {
   IDLE: "IDLE",
   STARTING: "STARTING",
   READY: "READY",
-  TRANSITIONING: "TRANSITIONING",
+  TRANSITION_STARTED: "TRANSITION_STARTED",
   DISPOSED: "DISPOSED",
 } as const;
 
@@ -62,8 +62,8 @@ export interface RouterPayloads {}
  * Transitions:
  * - IDLE → STARTING (START), DISPOSED (DISPOSE)
  * - STARTING → READY (STARTED), IDLE (FAIL)
- * - READY → TRANSITIONING (NAVIGATE), READY (FAIL, self-loop for early validation errors), IDLE (STOP)
- * - TRANSITIONING → TRANSITIONING (NAVIGATE, self-loop for canSend), READY (COMPLETE, CANCEL, FAIL)
+ * - READY → TRANSITION_STARTED (NAVIGATE), READY (FAIL, self-loop for early validation errors), IDLE (STOP)
+ * - TRANSITION_STARTED → TRANSITION_STARTED (NAVIGATE, self-loop for canSend), READY (COMPLETE, CANCEL, FAIL)
  * - DISPOSED → (no transitions)
  */
 const routerFSMConfig: FSMConfig<RouterState, RouterEvent, null> = {
@@ -79,12 +79,12 @@ const routerFSMConfig: FSMConfig<RouterState, RouterEvent, null> = {
       [routerEvents.FAIL]: routerStates.IDLE,
     },
     [routerStates.READY]: {
-      [routerEvents.NAVIGATE]: routerStates.TRANSITIONING,
+      [routerEvents.NAVIGATE]: routerStates.TRANSITION_STARTED,
       [routerEvents.FAIL]: routerStates.READY,
       [routerEvents.STOP]: routerStates.IDLE,
     },
-    [routerStates.TRANSITIONING]: {
-      [routerEvents.NAVIGATE]: routerStates.TRANSITIONING,
+    [routerStates.TRANSITION_STARTED]: {
+      [routerEvents.NAVIGATE]: routerStates.TRANSITION_STARTED,
       [routerEvents.COMPLETE]: routerStates.READY,
       [routerEvents.CANCEL]: routerStates.READY,
       [routerEvents.FAIL]: routerStates.READY,

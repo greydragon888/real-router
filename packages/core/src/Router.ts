@@ -410,7 +410,7 @@ export class Router<
 
   stop(): this {
     this.#navigation.abortCurrentNavigation();
-    this.#eventBus.sendCancelIfTransitioning(this.#state.get());
+    this.#eventBus.sendCancelIfPossible(this.#state.get());
 
     if (!this.#eventBus.isReady() && !this.#eventBus.isTransitioning()) {
       return this;
@@ -428,7 +428,7 @@ export class Router<
     }
 
     this.#navigation.abortCurrentNavigation();
-    this.#eventBus.sendCancelIfTransitioning(this.#state.get());
+    this.#eventBus.sendCancelIfPossible(this.#state.get());
 
     if (this.#eventBus.isReady() || this.#eventBus.isTransitioning()) {
       this.#lifecycle.stop();

@@ -94,7 +94,7 @@ export class EventBusNamespace {
   sendNavigate(toState: State, fromState?: State): void {
     this.#currentToState = toState;
     // Bypass FSM dispatch — forceState + direct emit (no action lookup, no rest params)
-    this.#fsm.forceState(routerStates.TRANSITIONING);
+    this.#fsm.forceState(routerStates.TRANSITION_STARTED);
     this.emitTransitionStart(toState, fromState);
   }
 
@@ -168,7 +168,7 @@ export class EventBusNamespace {
   }
 
   isTransitioning(): boolean {
-    return this.#fsm.getState() === routerStates.TRANSITIONING;
+    return this.#fsm.getState() === routerStates.TRANSITION_STARTED;
   }
 
   isReady(): boolean {
@@ -210,12 +210,12 @@ export class EventBusNamespace {
     this.#emitter.setLimits(limits);
   }
 
-  sendCancelIfTransitioning(fromState: State | undefined): void {
+  sendCancelIfPossible(fromState: State | undefined): void {
     if (!this.canCancel()) {
       return;
     }
 
-    this.sendCancel(this.#currentToState!, fromState); // eslint-disable-line @typescript-eslint/no-non-null-assertion -- guaranteed set before TRANSITIONING
+    this.sendCancel(this.#currentToState!, fromState); // eslint-disable-line @typescript-eslint/no-non-null-assertion -- guaranteed set before TRANSITION_STARTED
   }
 
   #emitPendingError(): void {
@@ -239,7 +239,7 @@ export class EventBusNamespace {
 
     // NAVIGATE and COMPLETE actions bypassed — sendNavigate/sendComplete
     // use fsm.forceState() + direct emit for zero-allocation hot path.
-    fsm.on(routerStates.TRANSITIONING, routerEvents.CANCEL, () => {
+    fsm.on(routerStates.TRANSITION_STARTED, routerEvents.CANCEL, () => {
       const toState = this.#pendingToState;
 
       /* v8 ignore next -- @preserve: #pendingToState guaranteed set by sendCancel before send() */
@@ -258,7 +258,7 @@ export class EventBusNamespace {
       this.#emitPendingError();
     });
 
-    fsm.on(routerStates.TRANSITIONING, routerEvents.FAIL, () => {
+    fsm.on(routerStates.TRANSITION_STARTED, routerEvents.FAIL, () => {
       this.#emitPendingError();
     });
   }
