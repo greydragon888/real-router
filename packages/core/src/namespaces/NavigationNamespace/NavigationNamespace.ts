@@ -176,7 +176,10 @@ export class NavigationNamespace {
           fromState,
           signal,
           isCurrentNav,
-          () => {},
+          () => {
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- toState is guaranteed non-undefined by line 106 check
+            deps.sendLeaveApprove(toState!, fromState);
+          },
         );
 
         if (guardCompletion !== undefined) {

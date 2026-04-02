@@ -80,6 +80,9 @@ export interface NavigationDependencies {
     opts?: NavigationOptions,
   ) => void;
 
+  /** Send LEAVE_APPROVE event to routerFSM and emit to listeners */
+  sendLeaveApprove: (toState: State, fromState: State | undefined) => void;
+
   /** Check if navigation can begin (router is started) */
   canNavigate: () => boolean;
 

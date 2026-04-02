@@ -193,6 +193,9 @@ export class RouterWiringBuilder<
       emitTransitionSuccess: (toState, fromState, opts) => {
         this.eventBus.emitTransitionSuccess(toState, fromState, opts);
       },
+      sendLeaveApprove: (toState, fromState) => {
+        this.eventBus.sendLeaveApprove(toState, fromState);
+      },
       canNavigate: () => this.eventBus.canBeginTransition(),
       getLifecycleFunctions: () => this.routeLifecycle.getFunctions(),
       isActive: () => this.router.isActive(),
