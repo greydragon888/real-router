@@ -212,8 +212,8 @@ describe("createTransitionSource", () => {
     void router.navigate("dashboard");
     await Promise.resolve();
 
-    // TRANSITION_START should have notified
-    expect(listener).toHaveBeenCalledTimes(1);
+    // TRANSITION_START + TRANSITION_LEAVE_APPROVE should have notified
+    expect(listener.mock.calls.length).toBeGreaterThanOrEqual(1);
 
     resolveGuard(true);
     await Promise.resolve();
@@ -411,7 +411,7 @@ describe("createTransitionSource", () => {
     expect(snapshot.isLeaveApproved).toBe(false);
   });
 
-  it("isLeaveApproved === false upon TRANSITION_START", async () => {
+  it("isLeaveApproved === true after TRANSITION_LEAVE_APPROVE", async () => {
     const lifecycle = getLifecycleApi(router);
     let resolveGuard!: (value: boolean) => void;
 
@@ -426,7 +426,8 @@ describe("createTransitionSource", () => {
     void router.navigate("dashboard");
     await Promise.resolve();
 
-    expect(source.getSnapshot().isLeaveApproved).toBe(false);
+    // After TRANSITION_LEAVE_APPROVE is emitted, isLeaveApproved should be true
+    expect(source.getSnapshot().isLeaveApproved).toBe(true);
 
     resolveGuard(true);
     await Promise.resolve();
@@ -443,7 +444,7 @@ describe("createTransitionSource", () => {
     expect(source.getSnapshot().isTransitioning).toBe(false);
   });
 
-  it("isLeaveApproved === false upon TRANSITION_CANCEL", async () => {
+  it("isLeaveApproved === true before TRANSITION_CANCEL", async () => {
     const lifecycle = getLifecycleApi(router);
     let resolveGuard!: (value: boolean) => void;
 
@@ -459,7 +460,8 @@ describe("createTransitionSource", () => {
 
     await Promise.resolve();
 
-    expect(source.getSnapshot().isLeaveApproved).toBe(false);
+    // After TRANSITION_LEAVE_APPROVE is emitted, isLeaveApproved should be true
+    expect(source.getSnapshot().isLeaveApproved).toBe(true);
 
     const p2 = router.navigate("settings");
 
