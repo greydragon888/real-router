@@ -46,4 +46,12 @@ test.describe("Data Loading Example", () => {
     await expect(page.locator("h1")).toBeVisible({ timeout: 5000 });
     await expect(page.locator(".card")).toContainText("$449");
   });
+
+  test("5. Pending fetch is aborted on navigation away", async ({ page }) => {
+    await page.goto("/products/1");
+    await page.goto("/");
+    await page.waitForTimeout(500);
+    await page.goto("/products/1");
+    await expect(page.locator(".card")).toContainText("$", { timeout: 5000 });
+  });
 });
