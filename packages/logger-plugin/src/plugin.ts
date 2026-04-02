@@ -101,6 +101,19 @@ export class LoggerPlugin {
         }
       },
 
+      onTransitionLeaveApprove: (toState: State, fromState?: State) => {
+        if (this.#usePerf) {
+          this.#perf.mark(`router:leave-approved:${this.#transitionLabel}`);
+        }
+
+        if (this.#logTransition) {
+          console.log(`${this.#prefix} Leave approved`, {
+            to: toState,
+            from: fromState,
+          });
+        }
+      },
+
       onTransitionSuccess: (toState: State, fromState?: State) => {
         if (this.#usePerf) {
           const label = this.#transitionLabel;

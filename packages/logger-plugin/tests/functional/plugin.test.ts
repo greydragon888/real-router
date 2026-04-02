@@ -498,6 +498,96 @@ describe("@real-router/logger-plugin", () => {
     });
   });
 
+  describe("onTransitionLeaveApprove hook", () => {
+    it("should have onTransitionLeaveApprove in the plugin object", () => {
+      const plugin = loggerPluginFactory()(null as any, null as any);
+
+      expect(typeof plugin.onTransitionLeaveApprove).toBe("function");
+    });
+
+    it("should log leave-approved when hook is invoked directly", () => {
+      const plugin = loggerPluginFactory()(null as any, null as any);
+      const toState = { name: "users", params: {}, path: "/users" } as any;
+      const fromState = { name: "home", params: {}, path: "/" } as any;
+
+      plugin.onTransitionLeaveApprove!(toState, fromState);
+
+      expect(loggerSpy).toHaveBeenCalledWith(
+        "[logger-plugin] Leave approved",
+        expect.objectContaining({
+          to: expect.objectContaining({ name: "users" }),
+          from: expect.objectContaining({ name: "home" }),
+        }),
+      );
+    });
+
+    it("should not log leave-approved when level is none", () => {
+      const plugin = loggerPluginFactory({ level: "none" })(
+        null as any,
+        null as any,
+      );
+      const toState = { name: "users", params: {}, path: "/users" } as any;
+      const fromState = { name: "home", params: {}, path: "/" } as any;
+
+      plugin.onTransitionLeaveApprove!(toState, fromState);
+
+      const leaveApprovedCalls = loggerSpy.mock.calls.filter(
+        (call: unknown[]) => (call[0] as string).includes("Leave approved"),
+      );
+
+      expect(leaveApprovedCalls).toHaveLength(0);
+    });
+
+    it("should not log leave-approved when level is errors", () => {
+      const plugin = loggerPluginFactory({ level: "errors" })(
+        null as any,
+        null as any,
+      );
+      const toState = { name: "users", params: {}, path: "/users" } as any;
+      const fromState = { name: "home", params: {}, path: "/" } as any;
+
+      plugin.onTransitionLeaveApprove!(toState, fromState);
+
+      const leaveApprovedCalls = loggerSpy.mock.calls.filter(
+        (call: unknown[]) => (call[0] as string).includes("Leave approved"),
+      );
+
+      expect(leaveApprovedCalls).toHaveLength(0);
+    });
+
+    it("should record perf mark for leave-approved when usePerformanceMarks is true", () => {
+      const perfMarkSpy = vi.spyOn(performance, "mark");
+      const plugin = loggerPluginFactory({ usePerformanceMarks: true })(
+        null as any,
+        null as any,
+      );
+      const toState = { name: "users", params: {}, path: "/users" } as any;
+      const fromState = { name: "home", params: {}, path: "/" } as any;
+
+      plugin.onTransitionStart!(toState, fromState);
+      perfMarkSpy.mockClear();
+
+      plugin.onTransitionLeaveApprove!(toState, fromState);
+
+      expect(perfMarkSpy).toHaveBeenCalledWith(
+        expect.stringContaining("router:leave-approved:"),
+      );
+    });
+
+    it("should pass toState and fromState to the hook correctly", () => {
+      const plugin = loggerPluginFactory()(null as any, null as any);
+      const toState = { name: "users", params: {}, path: "/users" } as any;
+      const fromState = { name: "home", params: {}, path: "/" } as any;
+
+      plugin.onTransitionLeaveApprove!(toState, fromState);
+
+      expect(loggerSpy).toHaveBeenCalledWith("[logger-plugin] Leave approved", {
+        to: toState,
+        from: fromState,
+      });
+    });
+  });
+
   describe("Stress Testing", () => {
     it("should handle 100 transitions without errors", async () => {
       router.usePlugin(loggerPluginFactory());
