@@ -80,6 +80,7 @@ describe("event bus validation — with validationPlugin", () => {
         events.ROUTER_START,
         events.ROUTER_STOP,
         events.TRANSITION_START,
+        events.TRANSITION_LEAVE_APPROVE,
         events.TRANSITION_CANCEL,
         events.TRANSITION_SUCCESS,
         events.TRANSITION_ERROR,
@@ -94,6 +95,38 @@ describe("event bus validation — with validationPlugin", () => {
   describe("subscribe", () => {
     it("should accept function listener", () => {
       expect(() => router.subscribe(() => {})).not.toThrow();
+    });
+  });
+
+  describe("TRANSITION_LEAVE_APPROVE event validation", () => {
+    it("should accept TRANSITION_LEAVE_APPROVE event name", () => {
+      const api = getPluginApi(router);
+
+      expect(() =>
+        api.addEventListener(events.TRANSITION_LEAVE_APPROVE, () => {}),
+      ).not.toThrow();
+    });
+
+    it("should include TRANSITION_LEAVE_APPROVE in error message for invalid event", () => {
+      const api = getPluginApi(router);
+      const raw = api as unknown as {
+        addEventListener: (event: unknown, cb: unknown) => unknown;
+      };
+
+      expect(() => raw.addEventListener("invalidEvent", () => {})).toThrow(
+        /\$\$leaveApprove/,
+      );
+    });
+
+    it("should reject invalid event name even with valid callback", () => {
+      const api = getPluginApi(router);
+      const raw = api as unknown as {
+        addEventListener: (event: unknown, cb: unknown) => unknown;
+      };
+
+      expect(() => raw.addEventListener("$$invalid", () => {})).toThrow(
+        TypeError,
+      );
     });
   });
 });
