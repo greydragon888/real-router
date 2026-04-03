@@ -1,5 +1,20 @@
 # @real-router/sources
 
+## 0.4.0
+
+### Minor Changes
+
+- [#392](https://github.com/greydragon888/real-router/pull/392) [`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `isLeaveApproved` to `RouterTransitionSnapshot` ([#391](https://github.com/greydragon888/real-router/issues/391))
+
+  `RouterTransitionSnapshot` now includes `isLeaveApproved: boolean` field.
+  Enables direction-aware exit animations via `useRouterTransition()` in all framework adapters.
+
+### Patch Changes
+
+- Updated dependencies [[`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc)]:
+  - @real-router/core@0.44.0
+  - @real-router/route-utils@0.1.10
+
 ## 0.3.3
 
 ### Patch Changes

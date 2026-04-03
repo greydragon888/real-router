@@ -5,6 +5,198 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-04-03]
+
+### @real-router/core@0.44.0
+
+### Minor Changes
+
+- [#392](https://github.com/greydragon888/real-router/pull/392) [`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `LEAVE_APPROVED` FSM state, `TRANSITION_LEAVE_APPROVE` event, `router.subscribeLeave()` ([#391](https://github.com/greydragon888/real-router/issues/391))
+
+  New FSM state `LEAVE_APPROVED` between deactivation and activation guard phases.
+  New event `TRANSITION_LEAVE_APPROVE` fires when deactivation is confirmed but before state changes.
+  New public API `router.subscribeLeave(listener)` for leave side-effects (scroll save, analytics, cleanup).
+  New query `router.isLeaveApproved()` to distinguish deactivation-passed sub-phase.
+  Renamed FSM state `TRANSITIONING` → `TRANSITION_STARTED`.
+
+### Patch Changes
+
+- Updated dependencies [[`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc)]:
+  - @real-router/types@0.30.0
+
+### @real-router/logger-plugin@0.4.0
+
+### Minor Changes
+
+- [#392](https://github.com/greydragon888/real-router/pull/392) [`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc) Thanks [@greydragon888](https://github.com/greydragon888)! - Log `TRANSITION_LEAVE_APPROVE` event ([#391](https://github.com/greydragon888/real-router/issues/391))
+
+  New `onTransitionLeaveApprove` hook logs leave-approve phase with timing.
+  Enables deactivation phase duration measurement (time from START to LEAVE_APPROVE).
+
+### Patch Changes
+
+- Updated dependencies [[`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc)]:
+  - @real-router/core@0.44.0
+
+### @real-router/rx@0.2.0
+
+### Minor Changes
+
+- [#392](https://github.com/greydragon888/real-router/pull/392) [`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `TRANSITION_LEAVE_APPROVE` to `events$` Observable stream ([#391](https://github.com/greydragon888/real-router/issues/391))
+
+  `events$` now emits `{ type: "TRANSITION_LEAVE_APPROVE", toState, fromState }` events.
+
+### Patch Changes
+
+- Updated dependencies [[`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc)]:
+  - @real-router/core@0.44.0
+
+### @real-router/sources@0.4.0
+
+### Minor Changes
+
+- [#392](https://github.com/greydragon888/real-router/pull/392) [`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `isLeaveApproved` to `RouterTransitionSnapshot` ([#391](https://github.com/greydragon888/real-router/issues/391))
+
+  `RouterTransitionSnapshot` now includes `isLeaveApproved: boolean` field.
+  Enables direction-aware exit animations via `useRouterTransition()` in all framework adapters.
+
+### Patch Changes
+
+- Updated dependencies [[`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc)]:
+  - @real-router/core@0.44.0
+  - @real-router/route-utils@0.1.10
+
+### @real-router/types@0.30.0
+
+### Minor Changes
+
+- [#392](https://github.com/greydragon888/real-router/pull/392) [`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `LeaveState`, `LeaveFn` types and `Plugin.onTransitionLeaveApprove` hook ([#391](https://github.com/greydragon888/real-router/issues/391))
+
+  New types for leave side-effects: `LeaveState` interface, `LeaveFn` type.
+  New plugin hook `onTransitionLeaveApprove` fires after deactivation guards pass.
+  `Navigator` and `Router` interfaces extended with `subscribeLeave` and `isLeaveApproved`.
+
+### @real-router/validation-plugin@0.4.0
+
+### Minor Changes
+
+- [#392](https://github.com/greydragon888/real-router/pull/392) [`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc) Thanks [@greydragon888](https://github.com/greydragon888)! - Support `TRANSITION_LEAVE_APPROVE` event validation ([#391](https://github.com/greydragon888/real-router/issues/391))
+
+  Added `onTransitionLeaveApprove` to valid plugin methods and `$$leaveApprove` to valid event names.
+
+### Patch Changes
+
+- Updated dependencies [[`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc)]:
+  - @real-router/core@0.44.0
+
+### @real-router/vue@0.3.0
+
+### Minor Changes
+
+- [#392](https://github.com/greydragon888/real-router/pull/392) [`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc) Thanks [@greydragon888](https://github.com/greydragon888)! - Add per-Match `keepAlive` support to `RouteView` ([#391](https://github.com/greydragon888/real-router/issues/391))
+
+  `<RouteView.Match>` now accepts an optional `keepAlive` prop for granular control over which routes preserve state. Previously, `keepAlive` was only available on the root `<RouteView>` (all-or-nothing). Per-Match keepAlive uses a persistent `<KeepAlive>` instance with wrapper components to maintain Vue's cache across navigations.
+
+  ```vue
+  <RouteView nodeName="">
+    <RouteView.Match segment="dashboard" keepAlive>
+      <Dashboard />  <!-- State preserved -->
+    </RouteView.Match>
+    <RouteView.Match segment="settings">
+      <Settings />  <!-- Unmounts normally -->
+    </RouteView.Match>
+  </RouteView>
+  ```
+
+  Root-level `<RouteView keepAlive>` behavior is unchanged.
+
+### Patch Changes
+
+- Updated dependencies [[`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc), [`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc)]:
+  - @real-router/core@0.44.0
+  - @real-router/sources@0.4.0
+  - dom-utils@0.2.6
+  - @real-router/route-utils@0.1.10
+
+### @real-router/browser-plugin@0.11.3
+
+### Patch Changes
+
+- Updated dependencies [[`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc)]:
+  - @real-router/core@0.44.0
+
+### @real-router/hash-plugin@0.2.10
+
+### Patch Changes
+
+- Updated dependencies [[`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc)]:
+  - @real-router/core@0.44.0
+
+### @real-router/persistent-params-plugin@0.1.48
+
+### Patch Changes
+
+- Updated dependencies [[`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc)]:
+  - @real-router/core@0.44.0
+
+### @real-router/preact@0.2.5
+
+### Patch Changes
+
+- [#392](https://github.com/greydragon888/real-router/pull/392) [`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc) Thanks [@greydragon888](https://github.com/greydragon888)! - Add eslint-disable comment for intentional ref pattern ([#391](https://github.com/greydragon888/real-router/issues/391))
+
+- Updated dependencies [[`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc), [`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc)]:
+  - @real-router/core@0.44.0
+  - @real-router/sources@0.4.0
+  - dom-utils@0.2.6
+  - @real-router/route-utils@0.1.10
+
+### @real-router/react@0.14.5
+
+### Patch Changes
+
+- [#392](https://github.com/greydragon888/real-router/pull/392) [`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc) Thanks [@greydragon888](https://github.com/greydragon888)! - Add eslint-disable comments for intentional ref patterns ([#391](https://github.com/greydragon888/real-router/issues/391))
+
+- Updated dependencies [[`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc), [`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc)]:
+  - @real-router/core@0.44.0
+  - @real-router/sources@0.4.0
+  - dom-utils@0.2.6
+  - @real-router/route-utils@0.1.10
+
+### @real-router/route-utils@0.1.10
+
+### Patch Changes
+
+- Updated dependencies [[`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc)]:
+  - @real-router/types@0.30.0
+
+### @real-router/solid@0.2.5
+
+### Patch Changes
+
+- Updated dependencies [[`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc), [`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc)]:
+  - @real-router/core@0.44.0
+  - @real-router/sources@0.4.0
+  - dom-utils@0.2.6
+  - @real-router/route-utils@0.1.10
+
+### @real-router/ssr-data-plugin@0.1.6
+
+### Patch Changes
+
+- Updated dependencies [[`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc)]:
+  - @real-router/core@0.44.0
+
+### @real-router/svelte@0.2.5
+
+### Patch Changes
+
+- Updated dependencies [[`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc), [`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc)]:
+  - @real-router/core@0.44.0
+  - @real-router/sources@0.4.0
+  - dom-utils@0.2.6
+  - @real-router/route-utils@0.1.10
+
 ## [2026-04-01]
 
 ### @real-router/core@0.43.0
