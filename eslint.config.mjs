@@ -37,6 +37,7 @@ export default tsEslint.config(
     "**/*.mjs", // JS config files - no TypeScript type-checking needed
     "cz.config.js", // cz-git configuration
     ".changeset/**", // Changesets configuration and markdown files
+    "**/e2e/**", // Playwright e2e tests — not type-checked by ESLint
   ]),
 
   // ============================================

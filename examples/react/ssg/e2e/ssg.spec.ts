@@ -42,8 +42,11 @@ test.describe("SSG", () => {
 
   test("no hydration mismatch warnings", async ({ page }) => {
     const errors: string[] = [];
+
     page.on("console", (msg) => {
-      if (msg.type() === "error") errors.push(msg.text());
+      if (msg.type() === "error") {
+        errors.push(msg.text());
+      }
     });
 
     await page.goto("/");
@@ -55,6 +58,7 @@ test.describe("SSG", () => {
         e.includes("mismatch") ||
         e.includes("did not match"),
     );
+
     expect(hydrationErrors).toHaveLength(0);
   });
 
@@ -63,7 +67,8 @@ test.describe("SSG", () => {
     await page.waitForLoadState("networkidle");
 
     await page.evaluate(() => {
-      (window as Window & { __NAV_MARKER__?: boolean }).__NAV_MARKER__ = true;
+      (globalThis as unknown as Window & { __NAV_MARKER__?: boolean }).__NAV_MARKER__ =
+        true;
     });
 
     await page.click("text=Users");
@@ -71,8 +76,10 @@ test.describe("SSG", () => {
     await expect(page.locator("main")).toContainText("Users");
 
     const marker = await page.evaluate(
-      () => (window as Window & { __NAV_MARKER__?: boolean }).__NAV_MARKER__,
+      () =>
+        (globalThis as unknown as Window & { __NAV_MARKER__?: boolean }).__NAV_MARKER__,
     );
+
     expect(marker).toBe(true);
   });
 });
