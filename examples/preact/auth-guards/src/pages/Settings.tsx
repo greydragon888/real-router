@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState } from "preact/hooks";
-
 import { useNavigator } from "@real-router/preact";
+import { useEffect, useRef, useState } from "preact/hooks";
 
 import { store } from "../../../../shared/store";
 
@@ -10,6 +9,7 @@ export function Settings(): JSX.Element {
   const router = useNavigator();
   const [displayName, setDisplayName] = useState("");
   const displayNameRef = useRef(displayName);
+
   displayNameRef.current = displayName;
 
   useEffect(() => {

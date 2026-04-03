@@ -1,22 +1,23 @@
-import { render, screen, cleanup, waitFor } from "@testing-library/svelte";
-import userEvent from "@testing-library/user-event";
 import { createRouter } from "@real-router/core";
 import { getDependenciesApi } from "@real-router/core/api";
+import { render, screen, cleanup, waitFor } from "@testing-library/svelte";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, it, expect } from "vitest";
 
-import App from "../src/App.svelte";
-import { publicRoutes, privateRoutes } from "../src/routes";
-import { dataLoaderPluginFactory } from "../src/dataLoader";
 import { defineAbilities } from "../../../shared/abilities";
 import { store } from "../../../shared/store";
+import App from "../src/App.svelte";
+import { dataLoaderPluginFactory } from "../src/dataLoader";
+import { publicRoutes, privateRoutes } from "../src/routes";
 
-import type { Router } from "@real-router/core";
 import type { AppDependencies } from "../src/types";
+import type { Router } from "@real-router/core";
 
 let testRouter: Router<AppDependencies>;
 
 afterEach(() => {
   cleanup();
-  testRouter?.stop();
+  testRouter.stop();
 });
 
 // ---------------------------------------------------------------------------

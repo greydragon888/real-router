@@ -17,8 +17,10 @@ function ParamsToolbar(): JSX.Element {
   const routeState = useRoute();
   const navigator = useNavigator();
 
-  const lang = () => (routeState().route?.params.lang as string | undefined) ?? "en";
-  const theme = () => (routeState().route?.params.theme as string | undefined) ?? "light";
+  const lang = () =>
+    (routeState().route?.params.lang as string | undefined) ?? "en";
+  const theme = () =>
+    (routeState().route?.params.theme as string | undefined) ?? "light";
 
   const navigate = (newParams: Record<string, string>) => {
     const route = routeState().route;

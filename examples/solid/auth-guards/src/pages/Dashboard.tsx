@@ -18,6 +18,7 @@ export function Dashboard(props: DashboardProps): JSX.Element {
     const unsub = store.subscribe(() =>
       setUser(store.get("user") as User | null),
     );
+
     onCleanup(unsub);
   });
 

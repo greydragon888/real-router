@@ -23,6 +23,7 @@ export function ProductList(): JSX.Element {
       setLoading(store.get("products.list:loading") as boolean | undefined);
       setError(store.get("products.list:error") as string | null | undefined);
     });
+
     onCleanup(unsub);
   });
 
@@ -66,7 +67,10 @@ export function ProductList(): JSX.Element {
                       ${product.price}
                     </span>
                     <p>{product.description}</p>
-                    <Link routeName="products.detail" routeParams={{ id: product.id }}>
+                    <Link
+                      routeName="products.detail"
+                      routeParams={{ id: product.id }}
+                    >
                       View Details →
                     </Link>
                   </div>

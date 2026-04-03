@@ -22,11 +22,15 @@ export function App(): JSX.Element {
         </RouteView.Match>
         <RouteView.Match segment="about">
           <h1>About</h1>
-          <p>Navigate between pages — the monitor above updates in real-time.</p>
+          <p>
+            Navigate between pages — the monitor above updates in real-time.
+          </p>
         </RouteView.Match>
         <RouteView.Match segment="settings">
           <h1>Settings</h1>
-          <p>Navigate between pages — the monitor above updates in real-time.</p>
+          <p>
+            Navigate between pages — the monitor above updates in real-time.
+          </p>
         </RouteView.Match>
         <RouteView.NotFound>
           <h1>404 — Page Not Found</h1>

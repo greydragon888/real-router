@@ -1,5 +1,7 @@
 import { createRouter, errorCodes } from "@real-router/core";
 import { getRoutesApi } from "@real-router/core/api";
+import { afterEach, describe, it, expect } from "vitest";
+
 import { baseRoutes, analyticsRoute, adminRoutes } from "../src/routes";
 
 import type { Router } from "@real-router/core";
@@ -75,6 +77,7 @@ describe("remove() — removing a route", () => {
 
     routesApi.add(analyticsRoute);
     await router.navigate("analytics");
+
     expect(router.getState()?.name).toBe("analytics");
 
     await router.navigate("home");
@@ -96,6 +99,7 @@ describe("remove() — removing a route", () => {
 
     routesApi.add(adminRoutes);
     await router.navigate("admin.users");
+
     expect(router.getState()?.name).toBe("admin.users");
 
     await router.navigate("home");

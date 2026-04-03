@@ -5,15 +5,17 @@ test("scroll preserved via subscribeLeave on Reports page", async ({
 }) => {
   await page.goto("/reports");
   const container = page.locator(".reports-scroll-container");
-  await container.evaluate((el) => {
-    el.scrollTop = 300;
+
+  await container.evaluate((element) => {
+    element.scrollTop = 300;
   });
   await page.getByRole("link", { name: "Settings" }).click();
   await page.waitForURL(/\/settings/);
   await page.getByRole("link", { name: "Reports" }).click();
   await page.waitForURL(/\/reports/);
   await page.waitForTimeout(100);
-  const scrollTop = await container.evaluate((el) => el.scrollTop);
+  const scrollTop = await container.evaluate((element) => element.scrollTop);
+
   expect(scrollTop).toBeGreaterThan(250);
 });
 

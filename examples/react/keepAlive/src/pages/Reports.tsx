@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
 import { useNavigator } from "@real-router/react";
+import { useEffect, useRef } from "react";
 
 import type { JSX } from "react";
 

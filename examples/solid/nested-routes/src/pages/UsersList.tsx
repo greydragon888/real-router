@@ -18,7 +18,9 @@ export function UsersList(): JSX.Element {
         {(user) => (
           <div class="card">
             <strong>{user.name}</strong>
-            <span style={{ "margin-left": "8px", color: "#888" }}>{user.role}</span>
+            <span style={{ "margin-left": "8px", color: "#888" }}>
+              {user.role}
+            </span>
             <div style={{ "margin-top": "8px" }}>
               <Link routeName="users.profile" routeParams={{ id: user.id }}>
                 View Profile →

@@ -1,12 +1,12 @@
 import {
-  createRouteSource,
-  createTransitionSource,
-} from "@real-router/sources";
-import {
   createSignalFromSource,
   createStoreFromSource,
   useRouter,
 } from "@real-router/solid";
+import {
+  createRouteSource,
+  createTransitionSource,
+} from "@real-router/sources";
 import { createEffect, createSignal, Show } from "solid-js";
 
 import type { RouteSnapshot } from "@real-router/sources";
@@ -34,6 +34,7 @@ export function NavigationMonitor(): JSX.Element {
     if (initialized) {
       setNavCount((c) => c + 1);
     }
+
     initialized = true;
   });
 

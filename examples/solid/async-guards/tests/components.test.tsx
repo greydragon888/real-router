@@ -1,11 +1,12 @@
-import { render, screen, cleanup } from "@solidjs/testing-library";
-import userEvent from "@testing-library/user-event";
 import { createRouter } from "@real-router/core";
 import { RouterProvider } from "@real-router/solid";
+import { render, screen, cleanup } from "@solidjs/testing-library";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, it, expect } from "vitest";
 
 import { App } from "../src/App";
-import { routes } from "../src/routes";
 import { cartState } from "../src/cart-state";
+import { routes } from "../src/routes";
 
 import type { Router } from "@real-router/core";
 
@@ -13,7 +14,7 @@ let testRouter: Router;
 
 afterEach(() => {
   cleanup();
-  testRouter?.stop();
+  testRouter.stop();
   vi.useRealTimers();
 });
 
@@ -70,6 +71,7 @@ describe("Checkout guard rejection in UI", () => {
     vi.useFakeTimers();
 
     const nav = testRouter.navigate("checkout");
+
     await vi.advanceTimersByTimeAsync(500);
     await nav.catch(() => {});
 

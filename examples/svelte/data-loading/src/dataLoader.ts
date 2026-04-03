@@ -27,7 +27,10 @@ function createDataLoaderPlugin(...[router]: Parameters<PluginFactory>): {
   const pluginApi = getPluginApi(router);
   let currentController: AbortController | null = null;
 
-  const onTransitionLeaveApprove = (_toState: State, fromState?: State): void => {
+  const onTransitionLeaveApprove = (
+    _toState: State,
+    fromState?: State,
+  ): void => {
     if (fromState && currentController) {
       currentController.abort();
       currentController = null;
@@ -57,7 +60,10 @@ function createDataLoaderPlugin(...[router]: Parameters<PluginFactory>): {
           handleLoadDataSuccess(toState, data);
         }
       } catch (error: unknown) {
-        if (signal.aborted) return;
+        if (signal.aborted) {
+          return;
+        }
+
         handleLoadDataError(toState, error);
       }
     })();

@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-
 import { useNavigator } from "@real-router/react";
+import { useEffect, useRef, useState } from "react";
 
 import { store } from "../../../../shared/store";
 
@@ -10,6 +9,7 @@ export function Settings(): JSX.Element {
   const router = useNavigator();
   const [displayName, setDisplayName] = useState("");
   const displayNameRef = useRef(displayName);
+
   displayNameRef.current = displayName;
 
   useEffect(() => {

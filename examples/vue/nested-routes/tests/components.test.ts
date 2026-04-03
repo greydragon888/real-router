@@ -1,6 +1,7 @@
-import { render, screen, waitFor } from "@testing-library/vue";
 import { createRouter } from "@real-router/core";
 import { RouterProvider } from "@real-router/vue";
+import { render, screen, waitFor } from "@testing-library/vue";
+import { afterEach, describe, it, expect } from "vitest";
 import { defineComponent, h } from "vue";
 
 import App from "../src/App.vue";
@@ -11,7 +12,7 @@ import type { Router } from "@real-router/core";
 let testRouter: Router;
 
 afterEach(() => {
-  testRouter?.stop();
+  testRouter.stop();
 });
 
 function renderApp() {
@@ -84,6 +85,7 @@ describe("Active link classes", () => {
     await waitFor(() => {
       expect(usersLink).toHaveClass("active");
     });
+
     expect(homeLink).not.toHaveClass("active");
   });
 
@@ -125,6 +127,7 @@ describe("Active link classes", () => {
     await waitFor(() => {
       expect(screen.getByRole("link", { name: "List" })).toHaveClass("active");
     });
+
     expect(screen.getByRole("link", { name: "Settings" })).not.toHaveClass(
       "active",
     );
@@ -144,6 +147,7 @@ describe("Active link classes", () => {
         "active",
       );
     });
+
     expect(screen.getByRole("link", { name: "List" })).not.toHaveClass(
       "active",
     );
@@ -165,6 +169,7 @@ describe("Breadcrumbs", () => {
     await waitFor(() => {
       expect(breadcrumb).toHaveTextContent("Home");
     });
+
     expect(breadcrumb).toHaveTextContent("Users");
     expect(breadcrumb).toHaveTextContent("List");
   });

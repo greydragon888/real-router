@@ -1,29 +1,30 @@
-import { render, screen, waitFor } from "@testing-library/vue";
-import userEvent from "@testing-library/user-event";
 import { createRouter } from "@real-router/core";
 import { getDependenciesApi } from "@real-router/core/api";
 import { RouterProvider } from "@real-router/vue";
+import userEvent from "@testing-library/user-event";
+import { render, screen, waitFor } from "@testing-library/vue";
+import { afterEach, describe, it, expect } from "vitest";
 import { defineComponent, h } from "vue";
 
-import App from "../src/App.vue";
-import { publicRoutes, privateRoutes } from "../src/routes";
-import { dataLoaderPluginFactory } from "../src/dataLoader";
 import { defineAbilities } from "../../../shared/abilities";
 import { store } from "../../../shared/store";
+import App from "../src/App.vue";
+import { dataLoaderPluginFactory } from "../src/dataLoader";
+import { publicRoutes, privateRoutes } from "../src/routes";
 
-import type { Router } from "@real-router/core";
 import type { AppDependencies } from "../src/types";
+import type { Router } from "@real-router/core";
 
 let testRouter: Router<AppDependencies>;
 
-vi.mock("../src/router", () => ({
+vi.mock(import("../src/router"), () => ({
   get router() {
     return testRouter;
   },
 }));
 
 afterEach(() => {
-  testRouter?.stop();
+  testRouter.stop();
 });
 
 function renderApp() {

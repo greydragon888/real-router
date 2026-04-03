@@ -1,8 +1,9 @@
-import { render, screen, cleanup, act, waitFor } from "@testing-library/svelte";
 import { createRouter } from "@real-router/core";
+import { render, screen, cleanup, act, waitFor } from "@testing-library/svelte";
+import { afterEach, describe, it, expect } from "vitest";
 
-import ErrorPanel from "../src/pages/ErrorPanel.svelte";
 import { errorStore } from "../src/error-store";
+import ErrorPanel from "../src/pages/ErrorPanel.svelte";
 import { routes } from "../src/routes";
 
 import type { PluginFactory, Router } from "@real-router/core";
@@ -11,7 +12,7 @@ let testRouter: Router;
 
 afterEach(() => {
   cleanup();
-  testRouter?.stop();
+  testRouter.stop();
   vi.useRealTimers();
 });
 

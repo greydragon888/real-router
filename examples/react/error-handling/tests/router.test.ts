@@ -1,4 +1,6 @@
 import { createRouter, RouterError, errorCodes } from "@real-router/core";
+import { afterEach, describe, it, expect } from "vitest";
+
 import { errorStore } from "../src/error-store";
 import { routes } from "../src/routes";
 
@@ -21,6 +23,7 @@ describe("RouterError — try/catch pattern", () => {
 
     try {
       await router.navigate("@@nonexistent-route");
+
       expect.fail("should have thrown");
     } catch (error) {
       expect(error).toBeInstanceOf(RouterError);
@@ -37,6 +40,7 @@ describe("RouterError — try/catch pattern", () => {
 
     try {
       await router.navigate("protected");
+
       expect.fail("should have thrown");
     } catch (error) {
       expect(error).toBeInstanceOf(RouterError);
@@ -62,6 +66,7 @@ describe("RouterError — try/catch pattern", () => {
 
     try {
       await firstNav;
+
       expect.fail("should have thrown");
     } catch (error) {
       expect(error).toBeInstanceOf(RouterError);
@@ -93,7 +98,7 @@ describe("Fire-and-forget pattern", () => {
 
 describe("Error logger plugin — onTransitionError / onTransitionCancel", () => {
   it("onTransitionError receives CANNOT_ACTIVATE errors", async () => {
-    const errors: Array<{ code: string }> = [];
+    const errors: { code: string }[] = [];
 
     const errorLoggerPlugin: PluginFactory = () => ({
       onTransitionError(_toState, _fromState, err) {
@@ -115,7 +120,7 @@ describe("Error logger plugin — onTransitionError / onTransitionCancel", () =>
   });
 
   it("onTransitionCancel receives TRANSITION_CANCELLED", async () => {
-    const cancels: Array<{ name: string }> = [];
+    const cancels: { name: string }[] = [];
 
     const cancelLoggerPlugin: PluginFactory = () => ({
       onTransitionCancel(toState) {

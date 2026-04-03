@@ -117,6 +117,7 @@ test.describe("Multiple feature flags", () => {
     const analyticsCheckbox = page.getByRole("checkbox", {
       name: "Analytics",
     });
+
     await analyticsCheckbox.check();
     await analyticsCheckbox.uncheck();
     await analyticsCheckbox.check();

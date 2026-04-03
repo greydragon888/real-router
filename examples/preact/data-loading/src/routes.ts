@@ -12,7 +12,8 @@ export const routes: Route[] = [
       {
         name: "list",
         path: "/list",
-        loadData: (_params: Params, signal?: AbortSignal) => api.getProducts(signal),
+        loadData: (_params: Params, signal?: AbortSignal) =>
+          api.getProducts(signal),
       },
       {
         name: "detail",

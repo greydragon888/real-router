@@ -29,6 +29,7 @@ export function App(): JSX.Element {
     const unsub = store.subscribe(() =>
       setUser(store.get("user") as User | null),
     );
+
     onCleanup(unsub);
   });
 

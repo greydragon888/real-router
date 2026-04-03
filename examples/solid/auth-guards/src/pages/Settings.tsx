@@ -1,6 +1,5 @@
-import { createEffect, createSignal, onCleanup, Show } from "solid-js";
-
 import { useNavigator } from "@real-router/solid";
+import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 
 import { store } from "../../../../shared/store";
 
@@ -24,6 +23,7 @@ export function Settings(): JSX.Element {
         localStorage.setItem("settings:draft", displayName());
       }
     });
+
     onCleanup(unsub);
   });
 

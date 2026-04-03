@@ -52,7 +52,10 @@ function Breadcrumbs(): JSX.Element {
                     <Show when={i() > 0}>
                       <span> › </span>
                     </Show>
-                    <Show when={isLast()} fallback={<Link routeName={name}>{label()}</Link>}>
+                    <Show
+                      when={isLast()}
+                      fallback={<Link routeName={name}>{label()}</Link>}
+                    >
                       <span>{label()}</span>
                     </Show>
                   </>

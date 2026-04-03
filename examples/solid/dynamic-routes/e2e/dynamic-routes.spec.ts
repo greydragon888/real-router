@@ -8,9 +8,7 @@ test.describe("Initial route state", () => {
     await expect(
       page.getByRole("link", { name: "Analytics" }),
     ).not.toBeVisible();
-    await expect(
-      page.getByRole("link", { name: "Admin" }),
-    ).not.toBeVisible();
+    await expect(page.getByRole("link", { name: "Admin" })).not.toBeVisible();
   });
 
   test("route tree shows only base routes", async ({ page }) => {
@@ -35,9 +33,7 @@ test.describe("Analytics feature flag toggle", () => {
   test("enabling Analytics adds link to sidebar", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("checkbox", { name: "Analytics" }).check();
-    await expect(
-      page.getByRole("link", { name: "Analytics" }),
-    ).toBeVisible();
+    await expect(page.getByRole("link", { name: "Analytics" })).toBeVisible();
   });
 
   test("enabling Analytics updates route tree display", async ({ page }) => {
@@ -59,9 +55,7 @@ test.describe("Analytics feature flag toggle", () => {
   test("disabling Analytics removes link from sidebar", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("checkbox", { name: "Analytics" }).check();
-    await expect(
-      page.getByRole("link", { name: "Analytics" }),
-    ).toBeVisible();
+    await expect(page.getByRole("link", { name: "Analytics" })).toBeVisible();
     await page.getByRole("checkbox", { name: "Analytics" }).uncheck();
     await expect(
       page.getByRole("link", { name: "Analytics" }),
@@ -103,9 +97,7 @@ test.describe("Admin feature flag toggle", () => {
     await page.getByRole("checkbox", { name: "Admin Panel" }).check();
     await expect(page.getByRole("link", { name: "Admin" })).toBeVisible();
     await page.getByRole("checkbox", { name: "Admin Panel" }).uncheck();
-    await expect(
-      page.getByRole("link", { name: "Admin" }),
-    ).not.toBeVisible();
+    await expect(page.getByRole("link", { name: "Admin" })).not.toBeVisible();
   });
 });
 
@@ -116,9 +108,7 @@ test.describe("Multiple feature flags", () => {
     await page.goto("/");
     await page.getByRole("checkbox", { name: "Analytics" }).check();
     await page.getByRole("checkbox", { name: "Admin Panel" }).check();
-    await expect(
-      page.getByRole("link", { name: "Analytics" }),
-    ).toBeVisible();
+    await expect(page.getByRole("link", { name: "Analytics" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Admin" })).toBeVisible();
   });
 
@@ -127,12 +117,11 @@ test.describe("Multiple feature flags", () => {
     const analyticsCheckbox = page.getByRole("checkbox", {
       name: "Analytics",
     });
+
     await analyticsCheckbox.check();
     await analyticsCheckbox.uncheck();
     await analyticsCheckbox.check();
-    await expect(
-      page.getByRole("link", { name: "Analytics" }),
-    ).toBeVisible();
+    await expect(page.getByRole("link", { name: "Analytics" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Home" })).toBeVisible();
   });
 });

@@ -16,9 +16,7 @@ test.describe("Home page", () => {
 test.describe("Checkout async guard", () => {
   test("navigates to checkout when cart has items", async ({ page }) => {
     await page.goto("/checkout");
-    await expect(
-      page.getByRole("heading", { name: "Checkout" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Checkout" })).toBeVisible();
     await expect(page.getByText("You reached checkout")).toBeVisible();
   });
 
@@ -40,18 +38,14 @@ test.describe("Checkout async guard", () => {
       .getByRole("button", { name: "Go to Checkout (500ms guard)" })
       .click();
     await page.waitForURL(/\/checkout/);
-    await expect(
-      page.getByRole("heading", { name: "Checkout" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Checkout" })).toBeVisible();
   });
 
   test("empty cart blocks checkout navigation and shows toast", async ({
     page,
   }) => {
     await page.goto("/");
-    await page
-      .getByRole("checkbox", { name: /Cart has items/ })
-      .uncheck();
+    await page.getByRole("checkbox", { name: /Cart has items/ }).uncheck();
     await page
       .getByRole("button", { name: "Go to Checkout (500ms guard)" })
       .click();

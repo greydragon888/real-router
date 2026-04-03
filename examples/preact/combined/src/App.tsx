@@ -1,7 +1,6 @@
 import { getDependenciesApi, getRoutesApi } from "@real-router/core/api";
 import { RouteView, useNavigator } from "@real-router/preact";
-import { lazy } from "preact/compat";
-import { useSyncExternalStore } from "preact/compat";
+import { lazy, useSyncExternalStore } from "preact/compat";
 
 import { ProgressBar } from "./components/ProgressBar";
 import { Admin } from "./pages/Admin";

@@ -8,19 +8,22 @@ export interface Rule {
 
 export function defineAbilities(role: string): Rule[] {
   switch (role) {
-    case "admin":
+    case "admin": {
       return [
         { action: "manage", subject: "admin" },
         { action: "manage", subject: "settings" },
         { action: "read", subject: "dashboard" },
       ];
-    case "editor":
+    }
+    case "editor": {
       return [
         { action: "manage", subject: "settings" },
         { action: "read", subject: "dashboard" },
       ];
-    default:
+    }
+    default: {
       return [{ action: "read", subject: "dashboard" }];
+    }
   }
 }
 

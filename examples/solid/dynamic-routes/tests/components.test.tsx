@@ -1,7 +1,8 @@
-import { render, screen, cleanup, waitFor } from "@solidjs/testing-library";
-import userEvent from "@testing-library/user-event";
 import { createRouter } from "@real-router/core";
 import { RouterProvider } from "@real-router/solid";
+import { render, screen, cleanup, waitFor } from "@solidjs/testing-library";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, it, expect } from "vitest";
 
 import { App } from "../src/App";
 import { baseRoutes } from "../src/routes";
@@ -12,7 +13,7 @@ let testRouter: Router;
 
 afterEach(() => {
   cleanup();
-  testRouter?.stop();
+  testRouter.stop();
 });
 
 function renderApp() {

@@ -34,27 +34,41 @@ const products: Product[] = [
 function delay<T>(data: T, signal?: AbortSignal): Promise<T> {
   return new Promise((resolve, reject) => {
     signal?.throwIfAborted();
-    const timer = setTimeout(() => resolve(data), DELAY);
+    const timer = setTimeout(() => {
+      resolve(data);
+    }, DELAY);
+
     signal?.addEventListener(
       "abort",
       () => {
         clearTimeout(timer);
         reject(signal.reason);
       },
-      { once: true }
+      { once: true },
     );
   });
 }
 
 export const api = {
   getUsers: (signal?: AbortSignal) => delay(users, signal),
-  getUser: (id: string, signal?: AbortSignal) => delay(users.find((u) => u.id === id), signal),
+  getUser: (id: string, signal?: AbortSignal) =>
+    delay(
+      users.find((u) => u.id === id),
+      signal,
+    ),
   getProducts: (signal?: AbortSignal) => delay(products, signal),
-  getProduct: (id: string, signal?: AbortSignal) => delay(products.find((p) => p.id === id), signal),
-  checkCartNotEmpty: (signal?: AbortSignal) => delay(Math.random() > 0.5, signal),
-  checkPermission: (_userId: string, signal?: AbortSignal) => delay(true, signal),
+  getProduct: (id: string, signal?: AbortSignal) =>
+    delay(
+      products.find((p) => p.id === id),
+      signal,
+    ),
+  checkCartNotEmpty: (signal?: AbortSignal) =>
+    delay(Math.random() > 0.5, signal),
+  checkPermission: (_userId: string, signal?: AbortSignal) =>
+    delay(true, signal),
   login: (email: string, _password: string, signal?: AbortSignal) => {
     const user = users.find((u) => u.email === email);
+
     return delay(user ?? null, signal);
   },
 };

@@ -1,9 +1,10 @@
-import { render, screen, cleanup } from "@solidjs/testing-library";
 import { createRouter } from "@real-router/core";
 import { RouterProvider } from "@real-router/solid";
+import { render, screen, cleanup } from "@solidjs/testing-library";
+import { afterEach, describe, it, expect } from "vitest";
 
-import { ErrorPanel } from "../src/pages/ErrorPanel";
 import { errorStore } from "../src/error-store";
+import { ErrorPanel } from "../src/pages/ErrorPanel";
 import { routes } from "../src/routes";
 
 import type { PluginFactory, Router } from "@real-router/core";
@@ -12,7 +13,7 @@ let testRouter: Router;
 
 afterEach(() => {
   cleanup();
-  testRouter?.stop();
+  testRouter.stop();
   vi.useRealTimers();
 });
 

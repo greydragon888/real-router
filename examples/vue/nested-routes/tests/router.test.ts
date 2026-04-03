@@ -1,4 +1,6 @@
 import { createRouter } from "@real-router/core";
+import { afterEach, describe, it, expect } from "vitest";
+
 import { routes } from "../src/routes";
 
 import type { Router } from "@real-router/core";

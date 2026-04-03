@@ -19,6 +19,7 @@ export function ProductDetail(): JSX.Element {
       setProduct(store.get("products.detail") as Product | null | undefined);
       setLoading(store.get("products.detail:loading") as boolean | undefined);
     });
+
     onCleanup(unsub);
   });
 

@@ -12,6 +12,7 @@ export function ErrorPanel(): JSX.Element {
 
   createEffect(() => {
     const unsub = errorStore.subscribe(() => setErrors(errorStore.getAll()));
+
     onCleanup(unsub);
   });
 
@@ -21,8 +22,11 @@ export function ErrorPanel(): JSX.Element {
       <Show
         when={errors().length > 0}
         fallback={
-          <p style={{ color: "#888", "margin-top": "8px", "font-size": "13px" }}>
-            No errors yet — click the buttons above to trigger navigation errors.
+          <p
+            style={{ color: "#888", "margin-top": "8px", "font-size": "13px" }}
+          >
+            No errors yet — click the buttons above to trigger navigation
+            errors.
           </p>
         }
       >

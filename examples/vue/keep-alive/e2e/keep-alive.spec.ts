@@ -6,15 +6,17 @@ test.describe("Reports — scroll preserved via subscribeLeave", () => {
   }) => {
     await page.goto("/reports");
     const container = page.locator(".reports-scroll-container");
-    await container.evaluate((el) => {
-      el.scrollTop = 300;
+
+    await container.evaluate((element) => {
+      element.scrollTop = 300;
     });
     await page.getByRole("link", { name: "Settings" }).click();
     await page.waitForURL(/\/settings/);
     await page.getByRole("link", { name: "Reports" }).click();
     await page.waitForURL(/\/reports/);
     await page.waitForTimeout(100);
-    const scrollTop = await container.evaluate((el) => el.scrollTop);
+    const scrollTop = await container.evaluate((element) => element.scrollTop);
+
     expect(scrollTop).toBeGreaterThan(250);
   });
 });
@@ -34,6 +36,7 @@ test.describe("Dashboard keepAlive regression", () => {
     const value = await page
       .getByPlaceholder("Type here — preserved on navigation")
       .inputValue();
+
     expect(value).toBe("hello");
   });
 
