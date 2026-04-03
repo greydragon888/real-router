@@ -12,6 +12,7 @@
 ▼ Router transition
   [logger-plugin] Transition: home → users.profile {from: {...}, to: {...}}
   [logger-plugin]   Changed: { id: "123" → "456" }, Added: {"sort":"name"}
+  [logger-plugin] Leave approved {to: {...}, from: {...}}
   [logger-plugin] Transition success (1.23ms) {to: {...}, from: {...}}
 ```
 
@@ -88,6 +89,7 @@ With `usePerformanceMarks: true`, creates marks visible in DevTools Performance 
 
 ```
 router:transition-start:{from}→{to}
+router:leave-approved:{from}→{to}
 router:transition-end:{from}→{to}
 router:transition:{from}→{to}              (measure)
 router:lifetime                             (measure: start → stop)

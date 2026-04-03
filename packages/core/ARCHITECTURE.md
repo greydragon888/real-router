@@ -169,7 +169,10 @@ fsm.on("READY", "STOP", () => emitter.emit("$stop"));
 fsm.on("READY", "NAVIGATE", (p) =>
   emitter.emit("$$start", p.toState, p.fromState),
 );
-fsm.on("TRANSITION_STARTED", "COMPLETE", (p) =>
+fsm.on("TRANSITION_STARTED", "LEAVE_APPROVE", (p) =>
+  emitter.emit("$$leaveApprove", p.toState, p.fromState),
+);
+fsm.on("LEAVE_APPROVED", "COMPLETE", (p) =>
   emitter.emit("$$success", p.state, p.fromState, p.opts),
 );
 fsm.on("TRANSITION_STARTED", "CANCEL", (p) =>
@@ -229,6 +232,14 @@ fsm.on("TRANSITION_STARTED", "CANCEL", (p) =>
 │  Deactivation guards │  for each segment in toDeactivate (innermost → outermost):
 │                      │    guardFn(toState, fromState, signal)
 │                      │    false → RouterError(CANNOT_DEACTIVATE)
+└──────────┬───────────┘
+           │
+           ▼
+┌──────────────────────┐
+│  LEAVE_APPROVED      │  FSM send(LEAVE_APPROVE) → emit $$leaveApprove
+│                      │    → subscribeLeave() callbacks fire
+│                      │    safe side-effects: scroll save, fetch abort, analytics
+│                      │    route state has NOT changed yet
 └──────────┬───────────┘
            │
            ▼
@@ -312,20 +323,21 @@ router.dispose()  ───────────┘      ▼
 
 **Fire-and-forget safety:** `navigate()` internally attaches `.catch()` to suppress expected errors (`SAME_STATES`, `TRANSITION_CANCELLED`, `ROUTER_NOT_STARTED`, `ROUTE_NOT_FOUND`).
 
-**Atomicity:** Transitions are atomic — either the full pipeline completes or nothing changes. There is no "left but not arrived" state.
+**Atomicity:** **State change is atomic** — `router.getState()` updates in one step via `completeTransition`. Either the full pipeline completes or nothing changes. However, the transition pipeline now has an observable intermediate phase: after deactivation guards pass and before activation guards run, the FSM enters `LEAVE_APPROVED`. This is the moment for safe side-effects — scroll preservation, fetch abort, analytics. Route state has not yet changed.
 
 ## Plugin System
 
 Plugin hooks are bound to router events via `addEventListener()`:
 
-| Plugin method         | Router event | When                      |
-| --------------------- | ------------ | ------------------------- |
-| `onStart`             | `$start`     | `router.start()` succeeds |
-| `onStop`              | `$stop`      | `router.stop()` called    |
-| `onTransitionStart`   | `$$start`    | Navigation begins         |
-| `onTransitionSuccess` | `$$success`  | Navigation completes      |
-| `onTransitionError`   | `$$error`    | Navigation fails          |
-| `onTransitionCancel`  | `$$cancel`   | Navigation cancelled      |
+| Plugin method                | Router event      | When                                          |
+| ---------------------------- | ----------------- | --------------------------------------------- |
+| `onStart`                    | `$start`          | `router.start()` succeeds                     |
+| `onStop`                     | `$stop`           | `router.stop()` called                        |
+| `onTransitionStart`          | `$$start`         | Navigation begins                             |
+| `onTransitionLeaveApprove`   | `$$leaveApprove`  | Deactivation guards passed, before activation |
+| `onTransitionSuccess`        | `$$success`       | Navigation completes                          |
+| `onTransitionError`          | `$$error`         | Navigation fails                              |
+| `onTransitionCancel`         | `$$cancel`        | Navigation cancelled                          |
 
 **Note:** `onTransitionSuccess` can fire without a preceding `onTransitionStart` — via `navigateToNotFound()`.
 

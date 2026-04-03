@@ -5,7 +5,7 @@
 ## Overview
 
 `@real-router/fsm` is a **standalone, zero-dependency** synchronous finite state machine engine.
-It drives the entire router lifecycle — all states (IDLE, STARTING, READY, TRANSITION_STARTED, DISPOSED) and transitions are managed by a single FSM instance.
+It drives the entire router lifecycle — all states (IDLE, STARTING, READY, TRANSITION_STARTED, LEAVE_APPROVED, DISPOSED) and transitions are managed by a single FSM instance.
 
 **Key role:** No boolean flags, no ad-hoc state management. Every router state change is an FSM transition.
 Events flow through FSM actions into the event emitter.
@@ -110,11 +110,12 @@ The transition table is a nested record: `state → event → nextState`.
 ```typescript
 // Example: Router FSM
 {
-  IDLE:          { START: "STARTING", DISPOSE: "DISPOSED" },
-  STARTING:      { STARTED: "READY", FAIL: "IDLE" },
-  READY:            { NAVIGATE: "TRANSITION_STARTED", FAIL: "READY", STOP: "IDLE" },
-  TRANSITION_STARTED: { NAVIGATE: "TRANSITION_STARTED", COMPLETE: "READY", CANCEL: "READY", FAIL: "READY" },
-  DISPOSED:      {},  // terminal — no outgoing transitions
+  IDLE:               { START: "STARTING", DISPOSE: "DISPOSED" },
+  STARTING:           { STARTED: "READY", FAIL: "IDLE" },
+  READY:              { NAVIGATE: "TRANSITION_STARTED", FAIL: "READY", STOP: "IDLE" },
+  TRANSITION_STARTED: { NAVIGATE: "TRANSITION_STARTED", LEAVE_APPROVE: "LEAVE_APPROVED", CANCEL: "READY", FAIL: "READY" },
+  LEAVE_APPROVED:     { NAVIGATE: "TRANSITION_STARTED", COMPLETE: "READY", CANCEL: "READY", FAIL: "READY" },
+  DISPOSED:           {},  // terminal — no outgoing transitions
 }
 ```
 
@@ -319,9 +320,14 @@ stateDiagram-v2
     READY --> IDLE : STOP
 
     TRANSITION_STARTED --> TRANSITION_STARTED : NAVIGATE
-    TRANSITION_STARTED --> READY : COMPLETE
+    TRANSITION_STARTED --> LEAVE_APPROVED : LEAVE_APPROVE
     TRANSITION_STARTED --> READY : CANCEL
     TRANSITION_STARTED --> READY : FAIL
+
+    LEAVE_APPROVED --> TRANSITION_STARTED : NAVIGATE
+    LEAVE_APPROVED --> READY : COMPLETE
+    LEAVE_APPROVED --> READY : CANCEL
+    LEAVE_APPROVED --> READY : FAIL
 
     DISPOSED --> [*]
 ```
@@ -334,7 +340,7 @@ FSM actions trigger event emission:
 // Setup: FSM action → EventEmitter emit
 fsm.on("STARTING", "STARTED", () => emitter.emit("$start"));
 fsm.on("READY", "NAVIGATE", (payload) => emitter.emit("$$start", payload.toState, payload.fromState));
-fsm.on("TRANSITION_STARTED", "COMPLETE", (payload) => emitter.emit("$$success", ...));
+fsm.on("LEAVE_APPROVED", "COMPLETE", (payload) => emitter.emit("$$success", ...));
 // ... etc for all events
 ```
 

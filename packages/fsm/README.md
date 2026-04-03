@@ -6,7 +6,7 @@
 
 ## Purpose
 
-Drives the router's lifecycle state machine (`STOPPED → STARTED → DISPOSED`). Synchronous, zero-dependency, O(1) transition lookup.
+Drives the router's lifecycle state machine (`IDLE → STARTING → READY → TRANSITION_STARTED → LEAVE_APPROVED → READY | DISPOSED`). Synchronous, zero-dependency, O(1) transition lookup.
 
 ## Consumer
 

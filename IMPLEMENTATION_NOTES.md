@@ -1811,3 +1811,40 @@ Module-level `WeakMap<State, Params>` inside `@real-router/core` (`stateMetaStor
 
 - `deepFreezeState()` uses `structuredClone()` → clone loses WeakMap entry. `err.redirect` intentionally has no meta (only needs name + params for redirect target).
 - `_MP` phantom generic preserved on `State<P, _MP>` for backward compatibility.
+
+## TRANSITION_LEAVE_APPROVE — Observable phase between guard phases
+
+### Problem
+
+No hook existed for side-effects between deactivation and activation guards. Developers were forced to abuse `canDeactivate` guards for side-effects (scroll save, analytics, fetch abort) — mixing decision logic (boolean return) with side-effects (void). Guards are the wrong place: they block navigation, they run per-route, and their boolean contract makes side-effect intent invisible.
+
+### Solution
+
+New FSM state `LEAVE_APPROVED` between `TRANSITION_STARTED` and `READY`. New FSM event `LEAVE_APPROVE`. Public API `router.subscribeLeave(listener)` fires after all deactivation guards pass but before activation guards run. Plugin hook `onTransitionLeaveApprove(toState, fromState?)` added alongside `onTransitionStart`. Uses `forceState()` on the hot path — consistent with NAVIGATE and COMPLETE.
+
+**Why `forceState()` not `send()`:** The pipeline is the authority on order; the FSM is a state tracker. `forceState()` is honest about this. Consistent with NAVIGATE/COMPLETE. Avoids Map lookup + action dispatch overhead on the hot path.
+
+**Why between deactivation and activation:** Deactivation passing is the commitment point — the user (or guard) has confirmed leaving. Side-effects should only run after this decision, not before. This is the earliest safe moment for scroll save, analytics, fetch abort, and similar concerns.
+
+**State change remains atomic** — `router.getState()` updates in one step via `completeTransition`. What's new is an observable phase (`LEAVE_APPROVED`) between deactivation and activation guard phases where side-effects are safe.
+
+### Before
+
+```typescript
+canDeactivate: async (toState, fromState) => {
+  // Mixed decision + side-effect
+  const ok = await showDialog();
+  if (ok) saveDraft(); // side-effect in guard
+  return ok;
+}
+```
+
+### After
+
+```typescript
+canDeactivate: (toState, fromState) => showDialog(), // pure decision
+
+router.subscribeLeave(({ route }) => {
+  if (route.name === "settings") saveDraft(); // pure side-effect, only fires when confirmed
+});
+```
