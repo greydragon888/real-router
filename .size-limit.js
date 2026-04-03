@@ -141,6 +141,13 @@ export default [
     ignore: ["@real-router/core"],
     modifyEsbuildConfig: addDevelopmentCondition,
   },
+  {
+    name: "@real-router/lifecycle-plugin (ESM)",
+    path: "packages/lifecycle-plugin/dist/esm/index.mjs",
+    limit: "0.5 kB",
+    ignore: ["@real-router/core"],
+    modifyEsbuildConfig: addDevelopmentCondition,
+  },
 
   // ── Utilities ─────────────────────────────────────────────────────
   {

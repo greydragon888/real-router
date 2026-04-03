@@ -33,6 +33,7 @@ real-router/
 │   ├── logger-plugin/             # Development logging with timing and param diffs
 │   ├── persistent-params-plugin/  # Parameter persistence across navigations
 │   ├── ssr-data-plugin/           # SSR per-route data loading via start() interceptor
+│   ├── lifecycle-plugin/          # Route-level lifecycle hooks: onEnter, onStay, onLeave
 │   ├── validation-plugin/         # Opt-in argument validation (DX-only, 100% tree-shakeable)
 │   ├── route-utils/               # Route tree queries and segment testing
 │   ├── logger/                    # Isomorphic structured logging
@@ -55,7 +56,7 @@ real-router/
 │   │   └── ssg/                   # Static site generation with Vite
 ```
 
-**Public packages** (published to npm): `core`, `core-types`, `react`, `preact`, `solid`, `vue`, `svelte`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `validation-plugin`, `route-utils`, `logger`
+**Public packages** (published to npm): `core`, `core-types`, `react`, `preact`, `solid`, `vue`, `svelte`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `lifecycle-plugin`, `validation-plugin`, `route-utils`, `logger`
 
 **Internal packages** (bundled into consumers, not on npm): `route-tree`, `path-matcher`, `search-params`, `type-guards`, `event-emitter`, `browser-env`, `dom-utils`
 
@@ -156,6 +157,9 @@ graph TD
 
     SDP["ssr-data-plugin"]
     SDP -->|dep| CORE
+
+    LCP["lifecycle-plugin"]
+    LCP -->|dep| CORE
 
     VP["validation-plugin"]
     VP -->|dep| CORE
