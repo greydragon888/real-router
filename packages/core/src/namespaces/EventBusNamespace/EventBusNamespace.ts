@@ -248,11 +248,13 @@ export class EventBusNamespace {
   }
 
   sendCancelIfPossible(fromState: State | undefined): void {
-    if (!this.canCancel()) {
+    const toState = this.#currentToState;
+
+    if (!this.canCancel() || toState === undefined) {
       return;
     }
 
-    this.sendCancel(this.#currentToState!, fromState); // eslint-disable-line @typescript-eslint/no-non-null-assertion -- guaranteed set before TRANSITION_STARTED
+    this.sendCancel(toState, fromState);
   }
 
   #emitPendingError(): void {

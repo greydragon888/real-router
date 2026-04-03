@@ -151,9 +151,9 @@ export class NavigationNamespace {
       const hasGuards =
         canDeactivateFunctions.size > 0 || canActivateFunctions.size > 0;
 
+      const confirmedToState = toState;
       const emitLeaveApproveCallback = () => {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- toState guaranteed non-null (early return on undefined at top of try block)
-        deps.sendLeaveApprove(toState!, fromState);
+        deps.sendLeaveApprove(confirmedToState, fromState);
       };
 
       const isCurrentNav = () => this.#navigationId === myId && deps.isActive();
