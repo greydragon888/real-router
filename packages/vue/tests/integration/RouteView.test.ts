@@ -459,6 +459,264 @@ describe("RouteView - Integration Tests", () => {
       expect(activatedCalls).toContain("users");
     });
 
+    it("per-Match keepAlive: preserves state for the match with keepAlive=true", async () => {
+      await router.start("/users/list");
+
+      const Counter = defineComponent({
+        setup() {
+          const count = ref(0);
+
+          return () =>
+            h("div", [
+              h("span", { "data-testid": "count" }, String(count.value)),
+              h(
+                "button",
+                {
+                  "data-testid": "increment",
+                  onClick: () => {
+                    count.value++;
+                  },
+                },
+                "+",
+              ),
+            ]);
+        },
+      });
+
+      const wrapper = mount(
+        defineComponent({
+          setup: () => () =>
+            h(
+              RouterProvider,
+              { router },
+              {
+                default: () =>
+                  h(
+                    RouteView,
+                    { nodeName: "" },
+                    {
+                      default: () => [
+                        h(
+                          RouteView.Match,
+                          { segment: "users", keepAlive: true },
+                          { default: () => h(Counter) },
+                        ),
+                        h(
+                          RouteView.Match,
+                          { segment: "about" },
+                          {
+                            default: () =>
+                              h(
+                                "div",
+                                { "data-testid": "about" },
+                                "About Page",
+                              ),
+                          },
+                        ),
+                      ],
+                    },
+                  ),
+              },
+            ),
+        }),
+      );
+
+      expect(wrapper.find("[data-testid='count']").text()).toBe("0");
+
+      await wrapper.find("[data-testid='increment']").trigger("click");
+      await flushPromises();
+
+      expect(wrapper.find("[data-testid='count']").text()).toBe("1");
+
+      await router.navigate("about");
+      await flushPromises();
+
+      expect(wrapper.find("[data-testid='about']").exists()).toBe(true);
+
+      await router.navigate("users.list");
+      await flushPromises();
+
+      expect(wrapper.find("[data-testid='count']").text()).toBe("1");
+    });
+
+    it("per-Match keepAlive: calls onActivated/onDeactivated lifecycle hooks", async () => {
+      await router.start("/users/list");
+
+      const activatedCalls: string[] = [];
+      const deactivatedCalls: string[] = [];
+
+      const UsersComponent = defineComponent({
+        setup() {
+          onActivated(() => {
+            activatedCalls.push("users");
+          });
+          onDeactivated(() => {
+            deactivatedCalls.push("users");
+          });
+
+          return () => h("div", { "data-testid": "users-content" }, "Users");
+        },
+      });
+
+      mount(
+        defineComponent({
+          setup: () => () =>
+            h(
+              RouterProvider,
+              { router },
+              {
+                default: () =>
+                  h(
+                    RouteView,
+                    { nodeName: "" },
+                    {
+                      default: () => [
+                        h(
+                          RouteView.Match,
+                          { segment: "users", keepAlive: true },
+                          { default: () => h(UsersComponent) },
+                        ),
+                        h(
+                          RouteView.Match,
+                          { segment: "about" },
+                          {
+                            default: () =>
+                              h("div", { "data-testid": "about" }, "About"),
+                          },
+                        ),
+                      ],
+                    },
+                  ),
+              },
+            ),
+        }),
+      );
+
+      await router.navigate("about");
+      await flushPromises();
+
+      expect(deactivatedCalls).toContain("users");
+
+      await router.navigate("users.list");
+      await flushPromises();
+
+      expect(activatedCalls).toContain("users");
+    });
+
+    it("per-Match keepAlive: keepAlive match with empty slot renders nothing", async () => {
+      await router.start("/users/list");
+
+      const wrapper = mount(
+        defineComponent({
+          setup: () => () =>
+            h(
+              RouterProvider,
+              { router },
+              {
+                default: () =>
+                  h(
+                    RouteView,
+                    { nodeName: "" },
+                    {
+                      default: () => [
+                        h(RouteView.Match, {
+                          segment: "users",
+                          keepAlive: true,
+                        }),
+                        h(
+                          RouteView.Match,
+                          { segment: "about" },
+                          {
+                            default: () =>
+                              h("div", { "data-testid": "about" }, "About"),
+                          },
+                        ),
+                      ],
+                    },
+                  ),
+              },
+            ),
+        }),
+      );
+
+      expect(wrapper.html()).toBe("");
+    });
+
+    it("per-Match keepAlive: non-keepAlive match next to keepAlive match does not preserve state", async () => {
+      await router.start("/users/list");
+
+      const Counter = defineComponent({
+        setup() {
+          const count = ref(0);
+
+          return () =>
+            h("div", [
+              h("span", { "data-testid": "about-count" }, String(count.value)),
+              h(
+                "button",
+                {
+                  "data-testid": "about-increment",
+                  onClick: () => {
+                    count.value++;
+                  },
+                },
+                "+",
+              ),
+            ]);
+        },
+      });
+
+      const wrapper = mount(
+        defineComponent({
+          setup: () => () =>
+            h(
+              RouterProvider,
+              { router },
+              {
+                default: () =>
+                  h(
+                    RouteView,
+                    { nodeName: "" },
+                    {
+                      default: () => [
+                        h(
+                          RouteView.Match,
+                          { segment: "users", keepAlive: true },
+                          {
+                            default: () =>
+                              h("div", { "data-testid": "users" }, "Users"),
+                          },
+                        ),
+                        h(
+                          RouteView.Match,
+                          { segment: "about" },
+                          { default: () => h(Counter) },
+                        ),
+                      ],
+                    },
+                  ),
+              },
+            ),
+        }),
+      );
+
+      await router.navigate("about");
+      await flushPromises();
+
+      await wrapper.find("[data-testid='about-increment']").trigger("click");
+      await flushPromises();
+
+      expect(wrapper.find("[data-testid='about-count']").text()).toBe("1");
+
+      await router.navigate("users.list");
+      await flushPromises();
+
+      await router.navigate("about");
+      await flushPromises();
+
+      expect(wrapper.find("[data-testid='about-count']").text()).toBe("0");
+    });
+
     it("should render content without keepAlive (no state preservation)", async () => {
       await router.start("/users/list");
 
