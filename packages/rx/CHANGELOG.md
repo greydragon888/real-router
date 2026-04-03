@@ -1,5 +1,18 @@
 # @real-router/rx
 
+## 0.2.0
+
+### Minor Changes
+
+- [#392](https://github.com/greydragon888/real-router/pull/392) [`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `TRANSITION_LEAVE_APPROVE` to `events$` Observable stream ([#391](https://github.com/greydragon888/real-router/issues/391))
+
+  `events$` now emits `{ type: "TRANSITION_LEAVE_APPROVE", toState, fromState }` events.
+
+### Patch Changes
+
+- Updated dependencies [[`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc)]:
+  - @real-router/core@0.44.0
+
 ## 0.1.35
 
 ### Patch Changes

@@ -1,5 +1,34 @@
 # @real-router/vue
 
+## 0.3.0
+
+### Minor Changes
+
+- [#392](https://github.com/greydragon888/real-router/pull/392) [`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc) Thanks [@greydragon888](https://github.com/greydragon888)! - Add per-Match `keepAlive` support to `RouteView` ([#391](https://github.com/greydragon888/real-router/issues/391))
+
+  `<RouteView.Match>` now accepts an optional `keepAlive` prop for granular control over which routes preserve state. Previously, `keepAlive` was only available on the root `<RouteView>` (all-or-nothing). Per-Match keepAlive uses a persistent `<KeepAlive>` instance with wrapper components to maintain Vue's cache across navigations.
+
+  ```vue
+  <RouteView nodeName="">
+    <RouteView.Match segment="dashboard" keepAlive>
+      <Dashboard />  <!-- State preserved -->
+    </RouteView.Match>
+    <RouteView.Match segment="settings">
+      <Settings />  <!-- Unmounts normally -->
+    </RouteView.Match>
+  </RouteView>
+  ```
+
+  Root-level `<RouteView keepAlive>` behavior is unchanged.
+
+### Patch Changes
+
+- Updated dependencies [[`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc), [`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc)]:
+  - @real-router/core@0.44.0
+  - @real-router/sources@0.4.0
+  - dom-utils@0.2.6
+  - @real-router/route-utils@0.1.10
+
 ## 0.2.4
 
 ### Patch Changes

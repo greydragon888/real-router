@@ -1,5 +1,17 @@
 # @real-router/react
 
+## 0.14.5
+
+### Patch Changes
+
+- [#392](https://github.com/greydragon888/real-router/pull/392) [`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc) Thanks [@greydragon888](https://github.com/greydragon888)! - Add eslint-disable comments for intentional ref patterns ([#391](https://github.com/greydragon888/real-router/issues/391))
+
+- Updated dependencies [[`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc), [`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc)]:
+  - @real-router/core@0.44.0
+  - @real-router/sources@0.4.0
+  - dom-utils@0.2.6
+  - @real-router/route-utils@0.1.10
+
 ## 0.14.4
 
 ### Patch Changes

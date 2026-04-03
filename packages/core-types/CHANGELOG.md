@@ -1,5 +1,15 @@
 # @real-router/types
 
+## 0.30.0
+
+### Minor Changes
+
+- [#392](https://github.com/greydragon888/real-router/pull/392) [`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `LeaveState`, `LeaveFn` types and `Plugin.onTransitionLeaveApprove` hook ([#391](https://github.com/greydragon888/real-router/issues/391))
+
+  New types for leave side-effects: `LeaveState` interface, `LeaveFn` type.
+  New plugin hook `onTransitionLeaveApprove` fires after deactivation guards pass.
+  `Navigator` and `Router` interfaces extended with `subscribeLeave` and `isLeaveApproved`.
+
 ## 0.29.0
 
 ### Minor Changes

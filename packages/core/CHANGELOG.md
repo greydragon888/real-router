@@ -1,5 +1,22 @@
 # @real-router/core
 
+## 0.44.0
+
+### Minor Changes
+
+- [#392](https://github.com/greydragon888/real-router/pull/392) [`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `LEAVE_APPROVED` FSM state, `TRANSITION_LEAVE_APPROVE` event, `router.subscribeLeave()` ([#391](https://github.com/greydragon888/real-router/issues/391))
+
+  New FSM state `LEAVE_APPROVED` between deactivation and activation guard phases.
+  New event `TRANSITION_LEAVE_APPROVE` fires when deactivation is confirmed but before state changes.
+  New public API `router.subscribeLeave(listener)` for leave side-effects (scroll save, analytics, cleanup).
+  New query `router.isLeaveApproved()` to distinguish deactivation-passed sub-phase.
+  Renamed FSM state `TRANSITIONING` → `TRANSITION_STARTED`.
+
+### Patch Changes
+
+- Updated dependencies [[`98d5e4f`](https://github.com/greydragon888/real-router/commit/98d5e4f7fdef86569e3c162101d0fecec58474bc)]:
+  - @real-router/types@0.30.0
+
 ## 0.43.0
 
 ### Minor Changes

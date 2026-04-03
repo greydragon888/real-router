@@ -1,6 +1,6 @@
 {
   "name": "@real-router/persistent-params-plugin",
-  "version": "0.1.47",
+  "version": "0.1.48",
   "type": "commonjs",
   "description": "Persist query parameters across route transitions",
   "main": "./dist/cjs/index.js",
