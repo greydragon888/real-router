@@ -8,6 +8,7 @@ interface EventMethodMap {
   $start: "onStart";
   $stop: "onStop";
   $$start: "onTransitionStart";
+  $$leaveApprove: "onTransitionLeaveApprove";
   $$cancel: "onTransitionCancel";
   $$success: "onTransitionSuccess";
   $$error: "onTransitionError";
@@ -21,6 +22,7 @@ const validEventNames = new Set<EventName>([
   "$start",
   "$stop",
   "$$start",
+  "$$leaveApprove",
   "$$cancel",
   "$$success",
   "$$error",
@@ -29,7 +31,7 @@ const validEventNames = new Set<EventName>([
 export function validateEventName(eventName: unknown): void {
   if (!validEventNames.has(eventName as EventName)) {
     throw new TypeError(
-      `[router.addEventListener] Invalid event name: ${String(eventName)}. Must be one of: $start, $stop, $$start, $$cancel, $$success, $$error`,
+      `[router.addEventListener] Invalid event name: ${String(eventName)}. Must be one of: $start, $stop, $$start, $$leaveApprove, $$cancel, $$success, $$error`,
     );
   }
 }

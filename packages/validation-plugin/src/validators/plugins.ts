@@ -12,6 +12,7 @@ const PLUGIN_EVENTS_MAP: Record<string, true> = {
   onStart: true,
   onStop: true,
   onTransitionStart: true,
+  onTransitionLeaveApprove: true,
   onTransitionSuccess: true,
   onTransitionError: true,
   onTransitionCancel: true,

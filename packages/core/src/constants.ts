@@ -55,6 +55,7 @@ export const plugins: EventToPluginMap = {
   ROUTER_START: "onStart", // Plugin method called when router starts
   ROUTER_STOP: "onStop", // Plugin method called when router stops
   TRANSITION_START: "onTransitionStart", // Plugin method called when navigation begins
+  TRANSITION_LEAVE_APPROVE: "onTransitionLeaveApprove", // Plugin method called when deactivation guards pass
   TRANSITION_CANCEL: "onTransitionCancel", // Plugin method called when navigation cancelled
   TRANSITION_SUCCESS: "onTransitionSuccess", // Plugin method called when navigation succeeds
   TRANSITION_ERROR: "onTransitionError", // Plugin method called when navigation fails
@@ -68,6 +69,7 @@ export const events: EventToNameMap = {
   ROUTER_START: "$start", // Emitted when router.start() succeeds
   ROUTER_STOP: "$stop", // Emitted when router.stop() is called
   TRANSITION_START: "$$start", // Emitted when navigation begins
+  TRANSITION_LEAVE_APPROVE: "$$leaveApprove", // Emitted when deactivation guards pass
   TRANSITION_CANCEL: "$$cancel", // Emitted when navigation is cancelled
   TRANSITION_SUCCESS: "$$success", // Emitted when navigation completes successfully
   TRANSITION_ERROR: "$$error", // Emitted when navigation fails

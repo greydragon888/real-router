@@ -21,10 +21,12 @@ export default function Dashboard(props: DashboardProps): JSX.Element {
     const unsub = store.subscribe(() =>
       setUser(store.get("user") as User | null),
     );
+
     onCleanup(unsub);
   });
 
-  const lang = () => (routeState().route?.params.lang as string | undefined) ?? "en";
+  const lang = () =>
+    (routeState().route?.params.lang as string | undefined) ?? "en";
 
   return (
     <div>

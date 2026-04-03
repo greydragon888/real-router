@@ -41,6 +41,7 @@ import type { DependenciesStore } from "./namespaces";
 import type { Limits, PluginFactory, Route, RouterEventMap } from "./types";
 import type {
   DefaultDependencies,
+  LeaveFn,
   NavigationOptions,
   Options,
   Params,
@@ -290,6 +291,8 @@ export class Router<
 
     // Subscription
     this.subscribe = this.subscribe.bind(this);
+    this.subscribeLeave = this.subscribeLeave.bind(this);
+    this.isLeaveApproved = this.isLeaveApproved.bind(this);
   }
 
   // ============================================================================
@@ -410,7 +413,7 @@ export class Router<
 
   stop(): this {
     this.#navigation.abortCurrentNavigation();
-    this.#eventBus.sendCancelIfTransitioning(this.#state.get());
+    this.#eventBus.sendCancelIfPossible(this.#state.get());
 
     if (!this.#eventBus.isReady() && !this.#eventBus.isTransitioning()) {
       return this;
@@ -428,7 +431,7 @@ export class Router<
     }
 
     this.#navigation.abortCurrentNavigation();
-    this.#eventBus.sendCancelIfTransitioning(this.#state.get());
+    this.#eventBus.sendCancelIfPossible(this.#state.get());
 
     if (this.#eventBus.isReady() || this.#eventBus.isTransitioning()) {
       this.#lifecycle.stop();
@@ -529,6 +532,16 @@ export class Router<
     EventBusNamespace.validateSubscribeListener(listener);
 
     return this.#eventBus.subscribe(listener);
+  }
+
+  subscribeLeave(listener: LeaveFn): Unsubscribe {
+    EventBusNamespace.validateSubscribeLeaveListener(listener);
+
+    return this.#eventBus.subscribeLeave(listener);
+  }
+
+  isLeaveApproved(): boolean {
+    return this.#eventBus.isLeaveApproved();
   }
 
   // ============================================================================
@@ -645,6 +658,7 @@ export class Router<
     this.usePlugin = throwDisposed as never;
 
     this.subscribe = throwDisposed as never;
+    this.subscribeLeave = throwDisposed as never;
     this.canNavigateTo = throwDisposed as never;
   }
 }

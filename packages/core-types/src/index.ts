@@ -38,6 +38,8 @@ export type {
   Config,
   SubscribeState,
   SubscribeFn,
+  LeaveState,
+  LeaveFn,
   Subscription,
   PluginFactory,
   GuardFnFactory,

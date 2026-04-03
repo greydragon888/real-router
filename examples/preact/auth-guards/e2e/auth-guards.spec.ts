@@ -64,6 +64,7 @@ test.describe("Login", () => {
   }) => {
     await loginAs(page, "alice@example.com");
     const sidebar = page.locator(".sidebar");
+
     await expect(
       sidebar.getByRole("link", { name: "Services" }),
     ).not.toBeVisible();
@@ -75,6 +76,7 @@ test.describe("Login", () => {
   test("dashboard shows logged in user info", async ({ page }) => {
     await loginAs(page, "alice@example.com");
     const card = page.locator(".card").first();
+
     await expect(card).toContainText("Alice");
     await expect(card).toContainText("admin");
     await expect(card).toContainText("alice@example.com");
@@ -183,8 +185,8 @@ test.describe("404 and route tree behavior", () => {
   }) => {
     await loginAs(page, "alice@example.com");
     await page.evaluate(() => {
-      window.history.pushState({}, "", "/services");
-      window.dispatchEvent(new PopStateEvent("popstate", { state: null }));
+      globalThis.history.pushState({}, "", "/services");
+      globalThis.dispatchEvent(new PopStateEvent("popstate", { state: null }));
     });
     await expect(
       page.getByRole("heading", { name: "404 — Page Not Found" }),
@@ -198,12 +200,63 @@ test.describe("404 and route tree behavior", () => {
     await page.getByRole("link", { name: "Settings" }).click();
     await page.waitForURL(/\/settings/);
     await page.evaluate(() => {
-      window.history.pushState(null, "", "/");
-      window.dispatchEvent(new PopStateEvent("popstate"));
+      globalThis.history.pushState(null, "", "/");
+      globalThis.dispatchEvent(new PopStateEvent("popstate"));
     });
     await page.waitForURL(/\/dashboard/);
     await expect(
       page.getByRole("heading", { name: "Dashboard" }),
     ).toBeVisible();
+  });
+});
+
+test.describe("subscribeLeave — draft save", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.evaluate(() => {
+      localStorage.removeItem("settings:draft");
+    });
+  });
+
+  test("draft saved on confirmed leave", async ({ page }) => {
+    await loginAs(page, "alice@example.com");
+    await page.getByRole("link", { name: "Settings" }).click();
+    await page.waitForURL(/\/settings/);
+    await page.getByPlaceholder("Enter your display name…").fill("John Doe");
+    page.once("dialog", (dialog) => void dialog.accept());
+    await page.getByRole("link", { name: "Dashboard" }).click();
+    await page.waitForURL(/\/dashboard/);
+    const draft = await page.evaluate(() =>
+      localStorage.getItem("settings:draft"),
+    );
+
+    expect(draft).toBe("John Doe");
+  });
+
+  test("draft NOT saved on dismissed leave", async ({ page }) => {
+    await loginAs(page, "alice@example.com");
+    await page.getByRole("link", { name: "Settings" }).click();
+    await page.waitForURL(/\/settings/);
+    await page.getByPlaceholder("Enter your display name…").fill("John Doe");
+    page.once("dialog", (dialog) => void dialog.dismiss());
+    await page.getByRole("link", { name: "Dashboard" }).click();
+    await expect(page).toHaveURL(/\/settings/);
+    const draft = await page.evaluate(() =>
+      localStorage.getItem("settings:draft"),
+    );
+
+    expect(draft).toBeNull();
+  });
+
+  test("draft NOT saved when input empty", async ({ page }) => {
+    await loginAs(page, "alice@example.com");
+    await page.getByRole("link", { name: "Settings" }).click();
+    await page.waitForURL(/\/settings/);
+    await page.getByRole("link", { name: "Dashboard" }).click();
+    await page.waitForURL(/\/dashboard/);
+    const draft = await page.evaluate(() =>
+      localStorage.getItem("settings:draft"),
+    );
+
+    expect(draft).toBeNull();
   });
 });

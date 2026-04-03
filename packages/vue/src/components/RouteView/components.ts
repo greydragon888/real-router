@@ -21,6 +21,10 @@ export const Match = defineComponent({
       type: [Object, Function] as PropType<VNode | (() => VNode)>,
       default: undefined,
     },
+    keepAlive: {
+      type: Boolean,
+      default: false,
+    },
   },
   render: renderNull,
 });

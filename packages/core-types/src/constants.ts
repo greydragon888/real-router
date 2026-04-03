@@ -7,6 +7,7 @@ export type PluginMethod =
   | "onStart"
   | "onStop"
   | "onTransitionStart"
+  | "onTransitionLeaveApprove"
   | "onTransitionCancel"
   | "onTransitionSuccess"
   | "onTransitionError";
@@ -18,6 +19,7 @@ export type EventName =
   | "$start"
   | "$stop"
   | "$$start"
+  | "$$leaveApprove"
   | "$$cancel"
   | "$$success"
   | "$$error";
@@ -29,6 +31,7 @@ export type EventsKeys =
   | "ROUTER_START"
   | "ROUTER_STOP"
   | "TRANSITION_START"
+  | "TRANSITION_LEAVE_APPROVE"
   | "TRANSITION_CANCEL"
   | "TRANSITION_SUCCESS"
   | "TRANSITION_ERROR";
@@ -72,6 +75,7 @@ export interface EventToPluginMap {
   readonly ROUTER_START: "onStart";
   readonly ROUTER_STOP: "onStop";
   readonly TRANSITION_START: "onTransitionStart";
+  readonly TRANSITION_LEAVE_APPROVE: "onTransitionLeaveApprove";
   readonly TRANSITION_CANCEL: "onTransitionCancel";
   readonly TRANSITION_SUCCESS: "onTransitionSuccess";
   readonly TRANSITION_ERROR: "onTransitionError";
@@ -84,6 +88,7 @@ export interface EventToNameMap {
   ROUTER_START: "$start";
   ROUTER_STOP: "$stop";
   TRANSITION_START: "$$start";
+  TRANSITION_LEAVE_APPROVE: "$$leaveApprove";
   TRANSITION_CANCEL: "$$cancel";
   TRANSITION_SUCCESS: "$$success";
   TRANSITION_ERROR: "$$error";

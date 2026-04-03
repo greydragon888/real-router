@@ -9,7 +9,9 @@ export function Settings(): JSX.Element {
   return (
     <div>
       <h1>Settings</h1>
-      <p>You navigated here via <code>use:link</code> directive.</p>
+      <p>
+        You navigated here via <code>use:link</code> directive.
+      </p>
       <div class="card">
         <p>
           The directive automatically adds <code>role="link"</code> and{" "}

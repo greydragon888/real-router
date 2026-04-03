@@ -1,7 +1,8 @@
-import { render, screen, waitFor } from "@testing-library/vue";
-import userEvent from "@testing-library/user-event";
 import { createRouter } from "@real-router/core";
 import { RouterProvider } from "@real-router/vue";
+import userEvent from "@testing-library/user-event";
+import { render, screen, waitFor } from "@testing-library/vue";
+import { afterEach, describe, it, expect } from "vitest";
 import { defineComponent, h } from "vue";
 
 import App from "../src/App.vue";
@@ -12,7 +13,7 @@ import type { Router } from "@real-router/core";
 let testRouter: Router;
 
 afterEach(() => {
-  testRouter?.stop();
+  testRouter.stop();
 });
 
 function renderApp() {

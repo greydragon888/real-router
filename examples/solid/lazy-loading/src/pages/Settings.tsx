@@ -9,7 +9,9 @@ export default function Settings(): JSX.Element {
         <div class="form-group">
           <label>Language</label>
           <select>
-            <option value="en" selected>English</option>
+            <option value="en" selected>
+              English
+            </option>
             <option value="fr">French</option>
             <option value="de">German</option>
           </select>
@@ -17,7 +19,9 @@ export default function Settings(): JSX.Element {
         <div class="form-group">
           <label>Timezone</label>
           <select>
-            <option value="utc" selected>UTC</option>
+            <option value="utc" selected>
+              UTC
+            </option>
             <option value="est">EST</option>
             <option value="pst">PST</option>
           </select>

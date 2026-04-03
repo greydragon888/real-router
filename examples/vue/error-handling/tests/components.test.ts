@@ -1,10 +1,11 @@
-import { render, screen, waitFor } from "@testing-library/vue";
 import { createRouter } from "@real-router/core";
 import { RouterProvider } from "@real-router/vue";
+import { render, screen, waitFor } from "@testing-library/vue";
+import { afterEach, describe, it, expect } from "vitest";
 import { defineComponent, h } from "vue";
 
-import ErrorPanel from "../src/pages/ErrorPanel.vue";
 import { errorStore } from "../src/error-store";
+import ErrorPanel from "../src/pages/ErrorPanel.vue";
 import { routes } from "../src/routes";
 
 import type { PluginFactory, Router } from "@real-router/core";
@@ -12,7 +13,7 @@ import type { PluginFactory, Router } from "@real-router/core";
 let testRouter: Router;
 
 afterEach(() => {
-  testRouter?.stop();
+  testRouter.stop();
   vi.useRealTimers();
 });
 

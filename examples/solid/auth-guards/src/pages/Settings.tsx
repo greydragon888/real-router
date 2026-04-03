@@ -1,3 +1,4 @@
+import { useNavigator } from "@real-router/solid";
 import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 
 import { store } from "../../../../shared/store";
@@ -5,6 +6,7 @@ import { store } from "../../../../shared/store";
 import type { JSX } from "solid-js";
 
 export function Settings(): JSX.Element {
+  const navigator = useNavigator();
   const [displayName, setDisplayName] = createSignal("");
 
   createEffect(() => {
@@ -13,6 +15,16 @@ export function Settings(): JSX.Element {
 
   onCleanup(() => {
     store.set("settings:unsaved", false);
+  });
+
+  createEffect(() => {
+    const unsub = navigator.subscribeLeave(({ route }) => {
+      if (route.name === "settings" && displayName()) {
+        localStorage.setItem("settings:draft", displayName());
+      }
+    });
+
+    onCleanup(unsub);
   });
 
   return (

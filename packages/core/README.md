@@ -76,17 +76,26 @@ controller.abort();
 | `areStatesEqual(s1, s2, ignoreQP?)`                | `boolean`            | Compare two states                   |
 | `isActiveRoute(name, params?, strict?, ignoreQP?)` | `boolean`            | Check if route is active             |
 | `buildPath(name, params?)`                         | `string`             | Build URL path from route name       |
+| `isLeaveApproved()`                                | `boolean`            | True when deactivation guards pass   |
 
 ### Events & Plugins
 
-| Method                  | Returns       | Description                      |
-| ----------------------- | ------------- | -------------------------------- |
-| `subscribe(listener)`   | `Unsubscribe` | Listen to successful transitions |
-| `usePlugin(...plugins)` | `Unsubscribe` | Register plugin factories        |
+| Method                  | Returns       | Description                                    |
+| ----------------------- | ------------- | ---------------------------------------------- |
+| `subscribe(listener)`   | `Unsubscribe` | Listen to successful transitions               |
+| `subscribeLeave(listener)` | `Unsubscribe` | Subscribe to confirmed route departures        |
+| `usePlugin(...plugins)` | `Unsubscribe` | Register plugin factories                      |
 
 ```typescript
 const unsub = router.subscribe(({ route, previousRoute }) => {
   console.log(previousRoute?.name, "->", route.name);
+});
+
+// Save scroll position when leaving a route (fires ONLY when departure is confirmed)
+const unsubLeave = router.subscribeLeave(({ route }) => {
+  if (route.name === "products") {
+    sessionStorage.setItem("products:scroll", String(window.scrollY));
+  }
 });
 ```
 

@@ -23,6 +23,7 @@ export function ProductDetail(): JSX.Element {
       setLoading(store.get("products.detail:loading") as boolean | undefined);
       setError(store.get("products.detail:error") as string | null | undefined);
     });
+
     onCleanup(unsub);
   });
 

@@ -211,30 +211,37 @@ stateDiagram-v2
     STARTING --> READY : STARTED
     STARTING --> IDLE : FAIL
 
-    READY --> TRANSITIONING : NAVIGATE
+    READY --> TRANSITION_STARTED : NAVIGATE
     READY --> READY : FAIL
     READY --> IDLE : STOP
 
-    TRANSITIONING --> TRANSITIONING : NAVIGATE
-    TRANSITIONING --> READY : COMPLETE
-    TRANSITIONING --> READY : CANCEL
-    TRANSITIONING --> READY : FAIL
+    TRANSITION_STARTED --> TRANSITION_STARTED : NAVIGATE
+    TRANSITION_STARTED --> LEAVE_APPROVED : LEAVE_APPROVE
+    TRANSITION_STARTED --> READY : CANCEL
+    TRANSITION_STARTED --> READY : FAIL
+
+    LEAVE_APPROVED --> READY : COMPLETE
+    LEAVE_APPROVED --> READY : CANCEL
+    LEAVE_APPROVED --> READY : FAIL
+    LEAVE_APPROVED --> TRANSITION_STARTED : NAVIGATE
 
     DISPOSED --> [*]
 ```
 
-| State           | Description                                          |
-| --------------- | ---------------------------------------------------- |
-| `IDLE`          | Router not started or stopped                        |
-| `STARTING`      | Initializing (synchronous window before first await) |
-| `READY`         | Ready for navigation                                 |
-| `TRANSITIONING` | Navigation in progress                               |
-| `DISPOSED`      | Terminal state, no transitions out                   |
+| State                | Description                                          |
+| -------------------- | ---------------------------------------------------- |
+| `IDLE`               | Router not started or stopped                        |
+| `STARTING`           | Initializing (synchronous window before first await) |
+| `READY`              | Ready for navigation                                 |
+| `TRANSITION_STARTED` | Navigation in progress                               |
+| `LEAVE_APPROVED`     | Deactivation guards passed, activation guards pending |
+| `DISPOSED`           | Terminal state, no transitions out                   |
 
 FSM events trigger observable emissions via `fsm.on(from, event, action)`:
 
 - `STARTED` → `emitRouterStart()`
 - `NAVIGATE` → `emitTransitionStart()`
+- `LEAVE_APPROVE` → `emitTransitionLeaveApprove()`
 - `COMPLETE` → `emitTransitionSuccess()`
 - `CANCEL` → `emitTransitionCancel()`
 - `FAIL` → `emitTransitionError()`
@@ -248,12 +255,19 @@ All navigation methods return `Promise<State>`. The pipeline uses **optimistic s
 flowchart TD
     NAV["router.navigate(name, params, options)"] --> BUILD
     BUILD["buildNavigateState()
-    forwardState + buildPath + makeState"] --> GUARDS
-    GUARDS["executeGuardPipeline()
-    Deactivation inner→outer, Activation outer→inner"]
+    forwardState + buildPath + makeState"] --> DEACTIVATE
+    DEACTIVATE["Deactivation guards
+    inner→outer"]
 
-    GUARDS -->|all guards returned boolean| SYNC
-    GUARDS -->|a guard returned Promise| ASYNC
+    DEACTIVATE --> LEAVE["[LEAVE_APPROVED]
+    emit TRANSITION_LEAVE_APPROVE
+    subscribeLeave() callbacks"]
+
+    LEAVE --> ACTIVATE["Activation guards
+    outer→inner"]
+
+    ACTIVATE -->|all guards returned boolean| SYNC
+    ACTIVATE -->|a guard returned Promise| ASYNC
 
     SYNC["Complete inline
     no AbortController, no await"]
@@ -267,8 +281,9 @@ flowchart TD
     setState + freeze → FSM READY"]
     COMPLETE --> RESOLVE["Promise‹State› resolves"]
 
-    GUARDS -.->|error at any step| ERR["emitTransitionError()
+    DEACTIVATE -.->|error at any step| ERR["emitTransitionError()
     Promise rejects with RouterError"]
+    ACTIVATE -.->|error at any step| ERR
     ASYNC -.->|abort / cancel| ERR
 ```
 

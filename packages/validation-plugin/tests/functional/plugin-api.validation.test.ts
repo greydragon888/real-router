@@ -436,3 +436,34 @@ describe("plugins.warnPluginAfterStart", () => {
     vi.restoreAllMocks();
   });
 });
+
+describe("plugins.validatePluginKeys — onTransitionLeaveApprove", () => {
+  let router: Router;
+
+  beforeEach(() => {
+    router = createRouter([]);
+    router.usePlugin(validationPlugin());
+  });
+
+  afterEach(() => {
+    router.stop();
+  });
+
+  it("accepts plugin with onTransitionLeaveApprove method", () => {
+    expect(() =>
+      router.usePlugin(() => ({
+        onTransitionLeaveApprove: () => {},
+      })),
+    ).not.toThrow();
+  });
+
+  it("accepts plugin with onTransitionLeaveApprove alongside other methods", () => {
+    expect(() =>
+      router.usePlugin(() => ({
+        onTransitionStart: () => {},
+        onTransitionLeaveApprove: () => {},
+        onTransitionSuccess: () => {},
+      })),
+    ).not.toThrow();
+  });
+});

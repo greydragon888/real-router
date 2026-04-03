@@ -70,10 +70,10 @@ describe("Issue #308: reentrant navigate wipes #currentToState", () => {
       //   → async guard suspends → returns → sendComplete wipes #currentToState = undefined
       await router.navigate("settings");
 
-      // State: FSM = TRANSITIONING (navigate("orders") pending)
+      // State: FSM = TRANSITION_STARTED (navigate("orders") pending)
       //        #currentToState = undefined (BUG — should be ordersState)
 
-      // router.stop() → sendCancelIfTransitioning → sendCancel(#currentToState!, ...)
+      // router.stop() → sendCancelIfPossible → sendCancel(#currentToState!, ...)
       // With the bug: passes undefined as toState to TRANSITION_CANCEL listeners
       const onCancel = vi.fn();
       const unsub = getPluginApi(router).addEventListener(
@@ -133,7 +133,7 @@ describe("Issue #308: reentrant navigate wipes #currentToState", () => {
         code: errorCodes.CANNOT_ACTIVATE,
       });
 
-      // State: FSM = TRANSITIONING (navigate("orders") pending)
+      // State: FSM = TRANSITION_STARTED (navigate("orders") pending)
       //        #currentToState = undefined (BUG)
 
       const onCancel = vi.fn();
@@ -202,16 +202,16 @@ describe("Issue #308: reentrant navigate wipes #currentToState", () => {
       // Fire-and-forget navigate to "settings" (async guard pending)
       void router.navigate("settings");
 
-      // router.stop() → abortCurrentNavigation + sendCancelIfTransitioning → sendCancel
+      // router.stop() → abortCurrentNavigation + sendCancelIfPossible → sendCancel
       // Flow: sendCancel → fsm.send(CANCEL) → emitTransitionCancel
       //   → listener → navigate("orders") → sendNavigate(#currentToState = ordersState)
       //   → async guard suspends → returns → sendCancel wipes #currentToState = undefined
       router.stop();
 
-      // State: FSM = TRANSITIONING (navigate("orders") pending)
+      // State: FSM = TRANSITION_STARTED (navigate("orders") pending)
       //        #currentToState = undefined (BUG)
 
-      // Second stop exposes the bug: sendCancelIfTransitioning → sendCancel(undefined!, ...)
+      // Second stop exposes the bug: sendCancelIfPossible → sendCancel(undefined!, ...)
       const onCancel = vi.fn();
       const unsub = getPluginApi(router).addEventListener(
         events.TRANSITION_CANCEL,

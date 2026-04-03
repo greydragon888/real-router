@@ -23,6 +23,64 @@ import type { Router, State, Params } from "@real-router/core";
 import type { State, Params, NavigationOptions } from "@real-router/types";
 ```
 
+## Exported Types
+
+### Core Router Types
+
+| Type | Description |
+|------|-------------|
+| `Router<D>` | Full router interface with navigation, lifecycle, and plugin management |
+| `Navigator` | Minimal safe subset of Router methods for passing to components |
+| `State<P>` | Current route state with name, params, and metadata |
+| `Params` | Route parameters object (string key-value pairs) |
+| `NavigationOptions` | Options for navigation (e.g., replace, skipGuards) |
+| `RouterError` | Error thrown during navigation failures |
+
+### Lifecycle & Guards
+
+| Type | Description |
+|------|-------------|
+| `GuardFn` | `(toState: State, fromState?: State, signal?: AbortSignal) => boolean \| Promise<boolean>` — route activation/deactivation guard |
+| `GuardFnFactory<D>` | Factory function that creates a GuardFn with dependency injection |
+
+### Subscription & Listeners
+
+| Type | Description |
+|------|-------------|
+| `SubscribeFn` | `(state: SubscribeState) => void` — callback for route changes via `router.subscribe()` |
+| `SubscribeState` | `{ route: State, previousRoute?: State }` — argument passed to SubscribeFn |
+| `LeaveFn` | `(state: LeaveState) => void` — callback for leave events via `router.subscribeLeave()` |
+| `LeaveState` | `{ route: State, nextRoute: State }` — argument passed to LeaveFn |
+| `Unsubscribe` | `() => void` — function to unsubscribe from listeners |
+
+### Plugin System
+
+| Type | Description |
+|------|-------------|
+| `Plugin` | Plugin interface with optional lifecycle hooks |
+| `PluginFactory<D>` | Factory function that creates a Plugin with dependency injection |
+| `Plugin.onTransitionLeaveApprove` | Optional hook fired after leave guard confirms, before activation guards |
+
+### Route Configuration
+
+| Type | Description |
+|------|-------------|
+| `Route<D>` | Route configuration with name, path, guards, and children |
+| `RouteConfigUpdate<D>` | Options for updating route configuration at runtime |
+| `Options` | Router initialization options (defaults, encoding, limits) |
+
+### Navigator Methods
+
+| Method | Description |
+|--------|-------------|
+| `Navigator.navigate()` | Navigate to a named route with optional params |
+| `Navigator.getState()` | Get current route state |
+| `Navigator.isActiveRoute()` | Check if a route is currently active |
+| `Navigator.canNavigateTo()` | Check if navigation to a route is allowed |
+| `Navigator.subscribe()` | Subscribe to route changes |
+| `Navigator.subscribeLeave()` | Subscribe to leave events (fires after guard confirms) |
+| `Navigator.isLeaveApproved()` | Check if the current leave transition was approved |
+
 ## Why This Package?
 
 This package solves TypeScript type compatibility issues between `@real-router/*` packages:

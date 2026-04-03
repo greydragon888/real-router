@@ -13,9 +13,7 @@ export function Home(): JSX.Element {
         The Navigation Monitor panel above is built using these primitives
         directly, without higher-level hooks like <code>useRoute()</code>.
       </p>
-      <p>
-        Navigate between pages to see the monitor update in real-time.
-      </p>
+      <p>Navigate between pages to see the monitor update in real-time.</p>
     </div>
   );
 }

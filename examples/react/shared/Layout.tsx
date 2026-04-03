@@ -13,7 +13,11 @@ interface LayoutProps {
   children: ReactNode;
 }
 
-export function Layout({ title, links, children }: LayoutProps): ReactNode {
+export function Layout({
+  title,
+  links,
+  children,
+}: Readonly<LayoutProps>): ReactNode {
   return (
     <div className="app">
       <header className="header">{title}</header>

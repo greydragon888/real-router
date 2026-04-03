@@ -9,6 +9,7 @@ import type { Router, State } from "@real-router/core";
 
 const IDLE_SNAPSHOT: RouterTransitionSnapshot = {
   isTransitioning: false,
+  isLeaveApproved: false,
   toRoute: null,
   fromRoute: null,
 };
@@ -46,10 +47,24 @@ export function createTransitionSource(
         ) {
           source.updateSnapshot({
             isTransitioning: true,
+            isLeaveApproved: false,
             toRoute: newToRoute,
             fromRoute: newFromRoute,
           });
         }
+      },
+    ),
+    api.addEventListener(
+      events.TRANSITION_LEAVE_APPROVE,
+      (toState: State, fromState?: State) => {
+        const prev = source.getSnapshot();
+
+        source.updateSnapshot({
+          isTransitioning: true,
+          isLeaveApproved: true,
+          toRoute: stabilizeState(prev.toRoute, toState),
+          fromRoute: stabilizeState(prev.fromRoute, fromState ?? null),
+        });
       },
     ),
     api.addEventListener(events.TRANSITION_SUCCESS, resetToIdle),

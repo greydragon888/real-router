@@ -4,7 +4,8 @@ import type { JSX } from "solid-js";
 
 export function Contacts(): JSX.Element {
   const routeState = useRoute();
-  const lang = () => (routeState().route?.params.lang as string | undefined) ?? "en";
+  const lang = () =>
+    (routeState().route?.params.lang as string | undefined) ?? "en";
 
   return (
     <div>

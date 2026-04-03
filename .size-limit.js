@@ -175,7 +175,7 @@ export default [
   {
     name: "route-tree (ESM)",
     path: "packages/route-tree/dist/esm/index.mjs",
-    limit: "6 kB",
+    limit: "6.5 kB",
     modifyEsbuildConfig: addDevelopmentCondition,
   },
   {
@@ -194,7 +194,7 @@ export default [
   {
     name: "search-params (ESM)",
     path: "packages/search-params/dist/esm/index.mjs",
-    limit: "1.5 kB",
+    limit: "1.6 kB",
     modifyEsbuildConfig: addDevelopmentCondition,
   },
   {

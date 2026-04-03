@@ -73,7 +73,7 @@ export class RouterLifecycleNamespace {
   /**
    * Stops the router and resets state.
    *
-   * Called only for READY/TRANSITIONING states (facade handles STARTING/IDLE/DISPOSED).
+   * Called only for READY/TRANSITION_STARTED states (facade handles STARTING/IDLE/DISPOSED).
    */
   stop(): void {
     this.#deps.clearState();

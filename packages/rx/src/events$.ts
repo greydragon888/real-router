@@ -15,6 +15,11 @@ export type RouterEvent =
   | { type: "ROUTER_STOP" }
   | { type: "TRANSITION_START"; toState: State; fromState: State | undefined }
   | {
+      type: "TRANSITION_LEAVE_APPROVE";
+      toState: State;
+      fromState: State | undefined;
+    }
+  | {
       type: "TRANSITION_SUCCESS";
       toState: State;
       fromState: State | undefined;
@@ -50,6 +55,18 @@ export function events$(router: Router): RxObservable<RouterEvent> {
           events.TRANSITION_START,
           (toState: State, fromState: State | undefined) => {
             observer.next?.({ type: "TRANSITION_START", toState, fromState });
+          },
+        ),
+      );
+      unsubscribes.push(
+        api.addEventListener(
+          events.TRANSITION_LEAVE_APPROVE,
+          (toState: State, fromState: State | undefined) => {
+            observer.next?.({
+              type: "TRANSITION_LEAVE_APPROVE",
+              toState,
+              fromState,
+            });
           },
         ),
       );

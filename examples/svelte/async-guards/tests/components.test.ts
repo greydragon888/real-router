@@ -1,11 +1,12 @@
+import { createRouter } from "@real-router/core";
 import { render, screen, cleanup, act, waitFor } from "@testing-library/svelte";
 import userEvent from "@testing-library/user-event";
-import { createRouter } from "@real-router/core";
+import { afterEach, describe, it, expect } from "vitest";
 
 import App from "../src/App.svelte";
-import { routes } from "../src/routes";
 import { cartState } from "../src/cart-state";
 import { editorState } from "../src/editor-state";
+import { routes } from "../src/routes";
 
 import type { Router } from "@real-router/core";
 
@@ -13,7 +14,7 @@ let testRouter: Router;
 
 afterEach(() => {
   cleanup();
-  testRouter?.stop();
+  testRouter.stop();
   vi.useRealTimers();
 });
 
@@ -66,6 +67,7 @@ describe("Checkout guard rejection in UI", () => {
 
     await act(async () => {
       const nav = testRouter.navigate("checkout");
+
       await vi.advanceTimersByTimeAsync(500);
       await nav.catch(() => {});
     });

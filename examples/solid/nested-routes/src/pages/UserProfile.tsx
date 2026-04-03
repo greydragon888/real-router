@@ -46,8 +46,8 @@ export function UserProfile(): JSX.Element {
             </p>
           </div>
           <p>
-            Notice that <strong>Users</strong> in the outer sidebar remains active
-            (ancestor matching) while you browse profiles.
+            Notice that <strong>Users</strong> in the outer sidebar remains
+            active (ancestor matching) while you browse profiles.
           </p>
         </div>
       )}

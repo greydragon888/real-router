@@ -23,7 +23,13 @@ export function Home(): JSX.Element {
       </p>
 
       <h2>Product Cards (div with use:link)</h2>
-      <div style={{ display: "grid", "grid-template-columns": "repeat(auto-fill, minmax(200px, 1fr))", gap: "12px" }}>
+      <div
+        style={{
+          display: "grid",
+          "grid-template-columns": "repeat(auto-fill, minmax(200px, 1fr))",
+          gap: "12px",
+        }}
+      >
         <For each={products}>
           {(product) => (
             <div

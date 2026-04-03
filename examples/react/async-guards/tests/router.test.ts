@@ -1,4 +1,6 @@
 import { createRouter, errorCodes } from "@real-router/core";
+import { afterEach, describe, it, expect } from "vitest";
+
 import { cartState } from "../src/cart-state";
 import { editorState } from "../src/editor-state";
 import { routes } from "../src/routes";
@@ -21,6 +23,7 @@ describe("checkoutGuard — async canActivate with external state", () => {
     vi.useFakeTimers();
 
     const navPromise = router.navigate("checkout");
+
     await vi.advanceTimersByTimeAsync(500);
     const state = await navPromise;
 
@@ -35,6 +38,7 @@ describe("checkoutGuard — async canActivate with external state", () => {
     vi.useFakeTimers();
 
     const navPromise = router.navigate("checkout");
+
     await vi.advanceTimersByTimeAsync(500);
 
     await expect(navPromise).rejects.toMatchObject({
@@ -66,6 +70,7 @@ describe("editorDeactivateGuard — canDeactivate with mutable state", () => {
     vi.spyOn(globalThis, "confirm").mockReturnValue(true);
 
     const state = await router.navigate("home");
+
     expect(state.name).toBe("home");
   });
 
@@ -77,6 +82,7 @@ describe("editorDeactivateGuard — canDeactivate with mutable state", () => {
 
     const confirmSpy = vi.spyOn(globalThis, "confirm");
     const state = await router.navigate("home");
+
     expect(state.name).toBe("home");
     expect(confirmSpy).not.toHaveBeenCalled();
   });

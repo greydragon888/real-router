@@ -124,13 +124,7 @@ export class NavigationNamespace {
         return CACHED_SAME_STATES_REJECTION;
       }
 
-      this.#abortPreviousNavigation();
-
-      if (opts.signal?.aborted) {
-        throw new RouterError(errorCodes.TRANSITION_CANCELLED, {
-          reason: opts.signal.reason,
-        });
-      }
+      this.#abortPreviousNavigation(opts.signal);
 
       const myId = ++this.#navigationId;
 
@@ -157,13 +151,30 @@ export class NavigationNamespace {
       const hasGuards =
         canDeactivateFunctions.size > 0 || canActivateFunctions.size > 0;
 
+      const confirmedToState = toState;
+      const emitLeaveApproveCallback = () => {
+        deps.sendLeaveApprove(confirmedToState, fromState);
+      };
+
+      const isCurrentNav = () => this.#navigationId === myId && deps.isActive();
+
+      if (!hasGuards) {
+        // No guards — emitLeaveApprove directly before completeTransition
+        emitLeaveApproveCallback();
+
+        // Reentrant check: subscribeLeave() listener may have called router.navigate()
+        // Same pattern as reentrant check after emitTransitionStart (line 141-143)
+        /* v8 ignore next 3 -- @preserve: reentrant navigate from TRANSITION_LEAVE_APPROVE listener; tested but V8 cannot track the branch through the synchronous callback chain */
+        if (this.#navigationId !== myId) {
+          throw new RouterError(errorCodes.TRANSITION_CANCELLED);
+        }
+      }
+
       if (hasGuards) {
         controller = new AbortController();
         this.#currentController = controller;
 
         const signal = controller.signal;
-        const isCurrentNav = () =>
-          this.#navigationId === myId && deps.isActive();
 
         const guardCompletion = executeGuardPipeline(
           canDeactivateFunctions,
@@ -176,6 +187,7 @@ export class NavigationNamespace {
           fromState,
           signal,
           isCurrentNav,
+          emitLeaveApproveCallback,
         );
 
         if (guardCompletion !== undefined) {
@@ -371,7 +383,7 @@ export class NavigationNamespace {
     }
   }
 
-  #abortPreviousNavigation(): void {
+  #abortPreviousNavigation(externalSignal?: AbortSignal): void {
     if (this.#deps.isTransitioning()) {
       logger.warn(
         "router.navigate",
@@ -382,6 +394,12 @@ export class NavigationNamespace {
         new RouterError(errorCodes.TRANSITION_CANCELLED),
       );
       this.#deps.cancelNavigation();
+    }
+
+    if (externalSignal?.aborted) {
+      throw new RouterError(errorCodes.TRANSITION_CANCELLED, {
+        reason: externalSignal.reason,
+      });
     }
   }
 }

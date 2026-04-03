@@ -23,6 +23,7 @@ export interface ActiveRouteSourceOptions {
 
 export interface RouterTransitionSnapshot {
   isTransitioning: boolean;
+  isLeaveApproved: boolean;
   toRoute: State | null;
   fromRoute: State | null;
 }

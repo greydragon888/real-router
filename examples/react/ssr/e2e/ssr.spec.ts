@@ -17,8 +17,11 @@ test.describe("SSR", () => {
 
   test("no hydration mismatch warnings", async ({ page }) => {
     const errors: string[] = [];
+
     page.on("console", (msg) => {
-      if (msg.type() === "error") errors.push(msg.text());
+      if (msg.type() === "error") {
+        errors.push(msg.text());
+      }
     });
 
     await page.goto("/");
@@ -30,6 +33,7 @@ test.describe("SSR", () => {
         e.includes("mismatch") ||
         e.includes("did not match"),
     );
+
     expect(hydrationErrors).toHaveLength(0);
   });
 
@@ -48,7 +52,8 @@ test.describe("SSR", () => {
     await page.waitForLoadState("networkidle");
 
     await page.evaluate(() => {
-      (window as Window & { __NAV_MARKER__?: boolean }).__NAV_MARKER__ = true;
+      (globalThis as unknown as Window & { __NAV_MARKER__?: boolean }).__NAV_MARKER__ =
+        true;
     });
 
     await page.click("text=Users");
@@ -56,8 +61,10 @@ test.describe("SSR", () => {
     await expect(page.locator("main")).toContainText("Users");
 
     const marker = await page.evaluate(
-      () => (window as Window & { __NAV_MARKER__?: boolean }).__NAV_MARKER__,
+      () =>
+        (globalThis as unknown as Window & { __NAV_MARKER__?: boolean }).__NAV_MARKER__,
     );
+
     expect(marker).toBe(true);
   });
 
@@ -90,6 +97,7 @@ test.describe("SSR", () => {
 
   test("404 returns correct status code", async ({ page }) => {
     const response = await page.goto("/nonexistent");
+
     expect(response!.status()).toBe(404);
     await expect(page.locator("main")).toContainText("Not Found");
   });

@@ -8,7 +8,9 @@ export function UserSettings(): JSX.Element {
         <div class="form-group">
           <label>Notification Preferences</label>
           <select>
-            <option value="all" selected>All notifications</option>
+            <option value="all" selected>
+              All notifications
+            </option>
             <option value="mentions">Mentions only</option>
             <option value="none">None</option>
           </select>
@@ -16,7 +18,9 @@ export function UserSettings(): JSX.Element {
         <div class="form-group">
           <label>Theme</label>
           <select>
-            <option value="light" selected>Light</option>
+            <option value="light" selected>
+              Light
+            </option>
             <option value="dark">Dark</option>
           </select>
         </div>

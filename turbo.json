@@ -4,7 +4,8 @@
     "globalConfiguration": true,
     "errorsOnlyShowHash": true,
     "affectedUsingTaskInputs": true,
-    "watchUsingTaskInputs": true
+    "watchUsingTaskInputs": true,
+    "filterUsingTasks": true
   },
   "global": {
     "concurrency": "4",

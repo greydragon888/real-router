@@ -8,13 +8,14 @@
 import eslintConfig from "../../eslint.config.mjs";
 import tsEslint from "typescript-eslint";
 import eslintReact from "@eslint-react/eslint-plugin";
+import reactJsx from "eslint-plugin-react-jsx";
 import testingLibraryPlugin from "eslint-plugin-testing-library";
 
 export default tsEslint.config(
   ...eslintConfig,
 
   // ============================================
-  // @eslint-react v3 — recommended-type-checked
+  // @eslint-react v4 — recommended-type-checked
   // Includes rules-of-hooks + exhaustive-deps (ported from react-hooks)
   // ============================================
   {
@@ -24,7 +25,18 @@ export default tsEslint.config(
       ...eslintReact.configs["recommended-type-checked"].rules,
       "@eslint-react/no-use-context": "off",
       "@eslint-react/no-context-provider": "off",
+      // Experimental rules (useful for library code)
+      "@eslint-react/immutability": "warn",
+      "@eslint-react/refs": "warn",
     },
+  },
+
+  // ============================================
+  // eslint-plugin-react-jsx — JSX-specific rules
+  // ============================================
+  {
+    ...reactJsx.configs.recommended,
+    files: ["**/*.tsx"],
   },
 
   // ============================================
@@ -36,6 +48,8 @@ export default tsEslint.config(
       "@eslint-react/component-hook-factories": "off",
       "@eslint-react/exhaustive-deps": "off",
       "@eslint-react/use-state": "off",
+      "@eslint-react/immutability": "off",
+      "@eslint-react/refs": "off",
     },
   },
 

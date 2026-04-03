@@ -24,7 +24,7 @@ describe("RX3: events$() listener fan-out", () => {
     }
   });
 
-  it("3.1: 100 events$() subscriptions + 50 navigations each receive 100 events", async () => {
+  it("3.1: 100 events$() subscriptions + 50 navigations each receive 150 events", async () => {
     await router.start("/route0");
 
     const received: RouterEvent[][] = Array.from({ length: 100 }, () => []);
@@ -41,7 +41,7 @@ describe("RX3: events$() listener fan-out", () => {
     }
 
     for (const evs of received) {
-      expect(evs).toHaveLength(100);
+      expect(evs).toHaveLength(150);
     }
 
     const first = received[0];
@@ -142,7 +142,7 @@ describe("RX3: events$() listener fan-out", () => {
     }
   });
 
-  it("3.5: 50 events$() and 50 state$() do not interfere across 100 navigations", async () => {
+  it("3.5: 50 events$() and 50 state$() do not interfere across 100 navigations (3 events/nav)", async () => {
     await router.start("/route0");
 
     const eventsReceived: RouterEvent[][] = Array.from(
@@ -177,7 +177,7 @@ describe("RX3: events$() listener fan-out", () => {
     }
 
     for (const evs of eventsReceived) {
-      expect(evs).toHaveLength(200);
+      expect(evs).toHaveLength(300);
     }
 
     for (const states of statesReceived) {

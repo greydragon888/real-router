@@ -1,3 +1,6 @@
+import { createRouter } from "@real-router/core";
+import { getDependenciesApi } from "@real-router/core/api";
+import { RouterProvider } from "@real-router/react";
 import {
   render,
   screen,
@@ -7,21 +10,19 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { createRouter } from "@real-router/core";
-import { getDependenciesApi } from "@real-router/core/api";
-import { RouterProvider } from "@real-router/react";
+import { afterEach, describe, it, expect } from "vitest";
 
-import { App } from "../src/App";
-import { publicRoutes, privateRoutes } from "../src/routes";
 import { defineAbilities } from "../../../shared/abilities";
 import { store } from "../../../shared/store";
+import { App } from "../src/App";
+import { publicRoutes, privateRoutes } from "../src/routes";
 
-import type { Router } from "@real-router/core";
 import type { AppDependencies } from "../src/types";
+import type { Router } from "@real-router/core";
 
 let testRouter: Router<AppDependencies>;
 
-vi.mock("../src/router", () => ({
+vi.mock(import("../src/router"), () => ({
   get router() {
     return testRouter;
   },
@@ -29,7 +30,7 @@ vi.mock("../src/router", () => ({
 
 afterEach(() => {
   cleanup();
-  testRouter?.stop();
+  testRouter.stop();
 });
 
 describe("Login → sidebar swap", () => {

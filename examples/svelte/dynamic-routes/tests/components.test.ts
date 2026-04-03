@@ -1,6 +1,7 @@
+import { createRouter } from "@real-router/core";
 import { render, screen, cleanup, act, waitFor } from "@testing-library/svelte";
 import userEvent from "@testing-library/user-event";
-import { createRouter } from "@real-router/core";
+import { afterEach, describe, it, expect } from "vitest";
 
 import App from "../src/App.svelte";
 import { baseRoutes } from "../src/routes";
@@ -11,7 +12,7 @@ let testRouter: Router;
 
 afterEach(() => {
   cleanup();
-  testRouter?.stop();
+  testRouter.stop();
 });
 
 describe("Feature flag toggle — analytics", () => {

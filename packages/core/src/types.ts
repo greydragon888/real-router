@@ -27,7 +27,7 @@ export type {
 } from "@real-router/types";
 
 /**
- * Event argument tuples for the router's 6 events.
+ * Event argument tuples for the router's 7 events.
  *
  * Uses explicit `| undefined` unions (not optional `?`) to satisfy
  * `exactOptionalPropertyTypes` when passing undefined args from FSM payloads.
@@ -37,6 +37,7 @@ export type RouterEventMap = {
   $start: [];
   $stop: [];
   $$start: [toState: State, fromState: State | undefined];
+  $$leaveApprove: [toState: State, fromState: State | undefined];
   $$success: [
     toState: State,
     fromState: State | undefined,

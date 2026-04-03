@@ -6,8 +6,6 @@ export const routes: Route[] = [
     name: "users",
     path: "/users",
     forwardTo: "users.profile",
-    children: [
-      { name: "profile", path: "/:id" },
-    ],
+    children: [{ name: "profile", path: "/:id" }],
   },
 ];

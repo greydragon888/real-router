@@ -10,6 +10,7 @@ import type { EventMethodMap, RouterEventMap } from "../../types";
 import type { FSM } from "@real-router/fsm";
 import type {
   EventName,
+  LeaveFn,
   NavigationOptions,
   Plugin,
   State,
@@ -40,6 +41,12 @@ export class EventBusNamespace {
         "[router.subscribe] Expected a function. " +
           "For Observable pattern use @real-router/rx package",
       );
+    }
+  }
+
+  static validateSubscribeLeaveListener(listener: unknown): void {
+    if (typeof listener !== "function") {
+      throw new TypeError("[router.subscribeLeave] Expected a function");
     }
   }
 
@@ -75,6 +82,10 @@ export class EventBusNamespace {
     this.#emitter.emit(events.TRANSITION_CANCEL, toState, fromState);
   }
 
+  emitTransitionLeaveApprove(toState: State, fromState?: State): void {
+    this.#emitter.emit(events.TRANSITION_LEAVE_APPROVE, toState, fromState);
+  }
+
   sendStart(): void {
     this.#fsm.send(routerEvents.START);
   }
@@ -94,7 +105,7 @@ export class EventBusNamespace {
   sendNavigate(toState: State, fromState?: State): void {
     this.#currentToState = toState;
     // Bypass FSM dispatch — forceState + direct emit (no action lookup, no rest params)
-    this.#fsm.forceState(routerStates.TRANSITIONING);
+    this.#fsm.forceState(routerStates.TRANSITION_STARTED);
     this.emitTransitionStart(toState, fromState);
   }
 
@@ -110,6 +121,12 @@ export class EventBusNamespace {
     if (this.#currentToState === state) {
       this.#currentToState = undefined;
     }
+  }
+
+  sendLeaveApprove(toState: State, fromState?: State): void {
+    // Bypass FSM dispatch — forceState + direct emit (no action lookup, no rest params)
+    this.#fsm.forceState(routerStates.LEAVE_APPROVED);
+    this.emitTransitionLeaveApprove(toState, fromState);
   }
 
   sendFail(toState?: State, fromState?: State, error?: unknown): void {
@@ -168,7 +185,16 @@ export class EventBusNamespace {
   }
 
   isTransitioning(): boolean {
-    return this.#fsm.getState() === routerStates.TRANSITIONING;
+    const state = this.#fsm.getState();
+
+    return (
+      state === routerStates.TRANSITION_STARTED ||
+      state === routerStates.LEAVE_APPROVED
+    );
+  }
+
+  isLeaveApproved(): boolean {
+    return this.#fsm.getState() === routerStates.LEAVE_APPROVED;
   }
 
   isReady(): boolean {
@@ -198,6 +224,17 @@ export class EventBusNamespace {
     );
   }
 
+  subscribeLeave(listener: LeaveFn): Unsubscribe {
+    return this.#emitter.on(
+      events.TRANSITION_LEAVE_APPROVE,
+      (toState: State, fromState?: State) => {
+        if (fromState !== undefined) {
+          listener({ route: fromState, nextRoute: toState });
+        }
+      },
+    );
+  }
+
   clearAll(): void {
     this.#emitter.clearAll();
   }
@@ -210,12 +247,14 @@ export class EventBusNamespace {
     this.#emitter.setLimits(limits);
   }
 
-  sendCancelIfTransitioning(fromState: State | undefined): void {
-    if (!this.canCancel()) {
+  sendCancelIfPossible(fromState: State | undefined): void {
+    const toState = this.#currentToState;
+
+    if (!this.canCancel() || toState === undefined) {
       return;
     }
 
-    this.sendCancel(this.#currentToState!, fromState); // eslint-disable-line @typescript-eslint/no-non-null-assertion -- guaranteed set before TRANSITIONING
+    this.sendCancel(toState, fromState);
   }
 
   #emitPendingError(): void {
@@ -239,7 +278,7 @@ export class EventBusNamespace {
 
     // NAVIGATE and COMPLETE actions bypassed — sendNavigate/sendComplete
     // use fsm.forceState() + direct emit for zero-allocation hot path.
-    fsm.on(routerStates.TRANSITIONING, routerEvents.CANCEL, () => {
+    fsm.on(routerStates.TRANSITION_STARTED, routerEvents.CANCEL, () => {
       const toState = this.#pendingToState;
 
       /* v8 ignore next -- @preserve: #pendingToState guaranteed set by sendCancel before send() */
@@ -250,6 +289,21 @@ export class EventBusNamespace {
       this.emitTransitionCancel(toState, this.#pendingFromState);
     });
 
+    fsm.on(routerStates.LEAVE_APPROVED, routerEvents.CANCEL, () => {
+      const toState = this.#pendingToState;
+
+      /* v8 ignore next -- @preserve: #pendingToState guaranteed set by sendCancel before send() */
+      if (toState === undefined) {
+        return;
+      }
+
+      this.emitTransitionCancel(toState, this.#pendingFromState);
+    });
+
+    fsm.on(routerStates.LEAVE_APPROVED, routerEvents.FAIL, () => {
+      this.#emitPendingError();
+    });
+
     fsm.on(routerStates.STARTING, routerEvents.FAIL, () => {
       this.#emitPendingError();
     });
@@ -258,7 +312,7 @@ export class EventBusNamespace {
       this.#emitPendingError();
     });
 
-    fsm.on(routerStates.TRANSITIONING, routerEvents.FAIL, () => {
+    fsm.on(routerStates.TRANSITION_STARTED, routerEvents.FAIL, () => {
       this.#emitPendingError();
     });
   }

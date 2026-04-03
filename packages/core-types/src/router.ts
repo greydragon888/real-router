@@ -166,6 +166,7 @@ export interface Plugin {
   onStart?: () => void;
   onStop?: () => void;
   onTransitionStart?: (toState: State, fromState?: State) => void;
+  onTransitionLeaveApprove?: (toState: State, fromState?: State) => void;
   onTransitionCancel?: (toState: State, fromState?: State) => void;
   onTransitionError?: (
     toState: State | undefined,
@@ -186,6 +187,13 @@ export interface SubscribeState {
 }
 
 export type SubscribeFn = (state: SubscribeState) => void;
+
+export interface LeaveState {
+  route: State;
+  nextRoute: State;
+}
+
+export type LeaveFn = (state: LeaveState) => void;
 
 export interface Listener {
   [key: string]: unknown;
@@ -222,6 +230,8 @@ export interface Navigator {
   ) => boolean;
   canNavigateTo: (name: string, params?: Params) => boolean;
   subscribe: (listener: SubscribeFn) => Unsubscribe;
+  subscribeLeave: (listener: LeaveFn) => Unsubscribe;
+  isLeaveApproved: () => boolean;
 }
 
 /**
@@ -274,6 +284,10 @@ export interface Router<D extends DefaultDependencies = DefaultDependencies> {
   ) => Unsubscribe;
 
   subscribe: (listener: SubscribeFn) => Unsubscribe;
+
+  subscribeLeave: (listener: LeaveFn) => Unsubscribe;
+
+  isLeaveApproved: () => boolean;
 
   navigate: (
     routeName: string,

@@ -120,7 +120,7 @@ router.usePlugin(loggerPluginFactory(options))
             └── new LoggerPlugin(config).getPlugin()
                     │
                     ├── Constructor: create GroupManager + PerformanceTracker
-                    └── getPlugin() returns plugin object with 6 hooks:
+                    └── getPlugin() returns plugin object with 7 hooks:
 
 onStart()
     ├── perf.mark("router:start")
@@ -134,6 +134,10 @@ onTransitionStart(toState, fromState?)
     └── if logTransition:
             ├── console.log("[ctx] Transition: {from} → {to}", { from, to })
             └── if shouldLogParams && sameRoute → logParamsDiff
+
+onTransitionLeaveApprove(toState, fromState?)
+    ├── perf.mark("router:leave-approved:{label}")
+    └── if logTransition → console.log("[ctx] Leave approved", { to, from })
 
 onTransitionSuccess(toState, fromState?)
     ├── perf.mark("router:transition-end:{label}")

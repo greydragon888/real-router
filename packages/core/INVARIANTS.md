@@ -223,6 +223,27 @@ Guards registered via `getLifecycleApi(router)` run during the transition pipeli
 | 3   | Called exactly once per navigation    | A subscriber is called exactly once per successful navigation, not zero times and not multiple times.                    |
 | 4   | Unsubscribe stops delivery            | After calling the returned `unsubscribe()` function, the listener is not called on subsequent navigations.               |
 
+## subscribeLeave
+
+`router.subscribeLeave(listener)` registers a callback that fires when the FSM enters `LEAVE_APPROVED` — after deactivation guards pass and before activation guards run. This is the safe window for side-effects like scroll preservation, fetch abort, and analytics.
+
+| #   | Invariant                     | Description                                                                                                                                    |
+| --- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Non-function throws           | `subscribeLeave(nonFunction)` throws `TypeError` immediately. Only functions are accepted as listeners.                                        |
+| 2   | Callback signature            | Callback receives `{ route: State, nextRoute: State }` where `route` is the current (leaving) route and `nextRoute` is the destination.        |
+| 3   | First navigation skipped      | NOT called on first navigation (no previous route — `fromState` is `undefined`). The leave phase requires an existing route to leave from.     |
+| 4   | navigateToNotFound skipped    | NOT called when navigating via `navigateToNotFound()` — that method bypasses the pipeline entirely and emits no `LEAVE_APPROVED` event.         |
+| 5   | Returns unsubscribe           | Returns a function that removes the listener. After calling it, the callback is not invoked on subsequent navigations.                         |
+
+## isLeaveApproved
+
+`router.isLeaveApproved()` is a synchronous predicate that returns `true` only while the FSM is in the `LEAVE_APPROVED` state.
+
+| #   | Invariant                  | Description                                                                                                                                    |
+| --- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | LEAVE_APPROVED state only  | Returns `true` only when the FSM is in `LEAVE_APPROVED` state — the window between deactivation guards passing and activation guards running.  |
+| 2   | All other states false     | Returns `false` in `IDLE`, `STARTING`, `READY`, `TRANSITION_STARTED`, and `DISPOSED` states.                                                  |
+
 ## getDependenciesApi (CRUD)
 
 `getDependenciesApi(router)` provides a key-value store for dependency injection. These invariants verify basic store semantics.
@@ -275,8 +296,8 @@ Guards registered via `getLifecycleApi(router)` run during the transition pipeli
 | --- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | Cached reference | `getNavigator(router)` returns the same object reference on repeated calls. One frozen navigator per router instance.                     |
 | 2   | Frozen           | `Object.isFrozen(getNavigator(router)) === true`. The navigator cannot be modified after creation.                                        |
-| 3   | Method identity  | Navigator methods (`navigate`, `getState`, `isActiveRoute`, `canNavigateTo`, `subscribe`) are the same bound references as on the router. |
-| 4   | Expected keys    | The navigator contains exactly the keys: `canNavigateTo`, `getState`, `isActiveRoute`, `navigate`, `subscribe`. No extra properties.      |
+| 3   | Method identity  | Navigator methods (`navigate`, `getState`, `isActiveRoute`, `canNavigateTo`, `subscribe`, `subscribeLeave`, `isLeaveApproved`) are the same bound references as on the router. |
+| 4   | Expected keys    | The navigator contains exactly the keys: `canNavigateTo`, `getState`, `isActiveRoute`, `isLeaveApproved`, `navigate`, `subscribe`, `subscribeLeave`. No extra properties.      |
 
 ## pluginApi — buildNavigationState
 

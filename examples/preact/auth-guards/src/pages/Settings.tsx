@@ -1,11 +1,16 @@
-import { useEffect, useState } from "preact/hooks";
+import { useNavigator } from "@real-router/preact";
+import { useEffect, useRef, useState } from "preact/hooks";
 
 import { store } from "../../../../shared/store";
 
 import type { JSX } from "preact";
 
 export function Settings(): JSX.Element {
+  const router = useNavigator();
   const [displayName, setDisplayName] = useState("");
+  const displayNameRef = useRef(displayName);
+
+  displayNameRef.current = displayName;
 
   useEffect(() => {
     store.set("settings:unsaved", displayName !== "");
@@ -14,6 +19,16 @@ export function Settings(): JSX.Element {
       store.set("settings:unsaved", false);
     };
   }, [displayName]);
+
+  useEffect(
+    () =>
+      router.subscribeLeave(({ route }) => {
+        if (route.name === "settings" && displayNameRef.current) {
+          localStorage.setItem("settings:draft", displayNameRef.current);
+        }
+      }),
+    [router],
+  );
 
   return (
     <div>

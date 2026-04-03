@@ -1,12 +1,14 @@
 import { createRouter, errorCodes } from "@real-router/core";
 import { getDependenciesApi, getRoutesApi } from "@real-router/core/api";
+import { describe, afterEach, it, expect } from "vitest";
+
 import { defineAbilities } from "../../../shared/abilities";
 import { store } from "../../../shared/store";
 import { dataLoaderPluginFactory } from "../src/dataLoader";
 import { privateRoutes, publicRoutes } from "../src/routes";
 
-import type { Router } from "@real-router/core";
 import type { AppDependencies } from "../src/types";
+import type { Router } from "@real-router/core";
 
 // =========================================================================
 // a) Setup/teardown boilerplate
@@ -246,7 +248,9 @@ describe("Route tree swap", () => {
     await router.start("/");
 
     expect(router.getState()?.name).toBe("home");
+
     await router.navigate("login");
+
     expect(router.getState()?.name).toBe("login");
 
     // Swap route tree: clear + add (replaceRoutes via getRoutesApi().replace() is also available)

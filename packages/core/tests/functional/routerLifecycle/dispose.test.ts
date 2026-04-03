@@ -72,7 +72,7 @@ describe("dispose", () => {
   });
 
   describe("dispose() during active states", () => {
-    it("dispose() during TRANSITIONING cancels and disposes", async () => {
+    it("dispose() during TRANSITION_STARTED cancels and disposes", async () => {
       await router.start("/home");
 
       router.navigate("users.list").catch(() => {});

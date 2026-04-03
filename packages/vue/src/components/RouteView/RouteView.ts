@@ -66,6 +66,71 @@ function wrapWithSuspense(content: VNode, fallback: unknown): VNode {
   );
 }
 
+const emptyKeepAlivePlaceholder = markRaw(
+  defineComponent({
+    name: "KeepAlive-placeholder",
+    render() {
+      return null;
+    },
+  }),
+);
+
+function renderWithRootKA(
+  activeChild: VNode,
+  wrapperCache: Map<string, Component>,
+  fallback: unknown,
+): VNode {
+  const activeProps = activeChild.props as { segment?: string } | null;
+  const segment = activeProps?.segment ?? "__not-found__";
+  const WrapperComponent = getOrCreateWrapper(wrapperCache, segment);
+  const slotContent = getSlotContent(activeChild) ?? [];
+  const keepAliveContent = h(KeepAlive, null, {
+    default: () =>
+      h(WrapperComponent, { key: segment }, { default: () => slotContent }),
+  });
+
+  return wrapWithSuspense(keepAliveContent, fallback);
+}
+
+function renderWithPerMatchKA(
+  activeChild: VNode,
+  wrapperCache: Map<string, Component>,
+  fallback: unknown,
+): VNode | null {
+  const matchProps = activeChild.props as {
+    segment?: string;
+    keepAlive?: boolean;
+  } | null;
+
+  if (matchProps?.keepAlive === true && activeChild.type === Match) {
+    /* v8 ignore start */
+    const segment = matchProps.segment ?? "__not-found__";
+    /* v8 ignore stop */
+    const WrapperComponent = getOrCreateWrapper(wrapperCache, segment);
+    const slotContent = getSlotContent(activeChild) ?? [];
+
+    return h(Fragment, [
+      h(KeepAlive, null, {
+        default: () =>
+          h(WrapperComponent, { key: segment }, { default: () => slotContent }),
+      }),
+    ]);
+  }
+
+  const content = getSlotContent(activeChild);
+
+  /* v8 ignore start */
+  if (!content) {
+    return null;
+  }
+  /* v8 ignore stop */
+
+  return h(Fragment, [
+    h(KeepAlive, null, { default: () => h(emptyKeepAlivePlaceholder) }),
+    wrapWithSuspense(h(Fragment, content), fallback),
+  ]);
+}
+
 const RouteViewComponent = defineComponent({
   name: "RouteView",
   props: {
@@ -80,7 +145,6 @@ const RouteViewComponent = defineComponent({
   },
   setup(props, { slots }) {
     const routeContext = useRouteNode(props.nodeName);
-
     const wrapperCache = new Map<string, Component>();
 
     return (): VNode | null => {
@@ -106,39 +170,33 @@ const RouteViewComponent = defineComponent({
 
       const activeChild = rendered[0];
 
-      if (!props.keepAlive) {
-        if (activeChild.type === Match || activeChild.type === NotFound) {
-          const content = getSlotContent(activeChild);
-
-          if (!content) {
-            return null;
-          }
-
-          const fragment = h(Fragment, content);
-
-          return wrapWithSuspense(fragment, fallback);
-        }
-
-        /* v8 ignore start */
-        return null;
-        /* v8 ignore stop */
+      if (props.keepAlive) {
+        return renderWithRootKA(activeChild, wrapperCache, fallback);
       }
 
-      const activeProps = activeChild.props as {
-        segment?: string;
-      } | null;
-      const segment = activeProps?.segment ?? "__not-found__";
+      /* v8 ignore start */
+      if (activeChild.type !== Match && activeChild.type !== NotFound) {
+        return null;
+      }
+      /* v8 ignore stop */
 
-      const WrapperComponent = getOrCreateWrapper(wrapperCache, segment);
-      /* v8 ignore next */
-      const slotContent = getSlotContent(activeChild) ?? [];
+      const hasPerMatchKA = elements.some(
+        (element) =>
+          element.type === Match &&
+          (element.props as { keepAlive?: boolean } | null)?.keepAlive === true,
+      );
 
-      const keepAliveContent = h(KeepAlive, null, {
-        default: () =>
-          h(WrapperComponent, { key: segment }, { default: () => slotContent }),
-      });
+      if (hasPerMatchKA) {
+        return renderWithPerMatchKA(activeChild, wrapperCache, fallback);
+      }
 
-      return wrapWithSuspense(keepAliveContent, fallback);
+      const content = getSlotContent(activeChild);
+
+      if (!content) {
+        return null;
+      }
+
+      return wrapWithSuspense(h(Fragment, content), fallback);
     };
   },
 });

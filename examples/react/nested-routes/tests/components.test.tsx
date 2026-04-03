@@ -1,6 +1,7 @@
-import { render, screen, cleanup, act, waitFor } from "@testing-library/react";
 import { createRouter } from "@real-router/core";
 import { RouterProvider } from "@real-router/react";
+import { render, screen, cleanup, act, waitFor } from "@testing-library/react";
+import { afterEach, describe, it, expect } from "vitest";
 
 import { App } from "../src/App";
 import { routes } from "../src/routes";
@@ -11,7 +12,7 @@ let testRouter: Router;
 
 afterEach(() => {
   cleanup();
-  testRouter?.stop();
+  testRouter.stop();
 });
 
 function renderApp() {
@@ -81,6 +82,7 @@ describe("Active link classes", () => {
     await waitFor(() => {
       expect(usersLink).toHaveClass("active");
     });
+
     expect(homeLink).not.toHaveClass("active");
   });
 
@@ -115,6 +117,7 @@ describe("Active link classes", () => {
     await waitFor(() => {
       expect(screen.getByRole("link", { name: "List" })).toHaveClass("active");
     });
+
     expect(screen.getByRole("link", { name: "Settings" })).not.toHaveClass(
       "active",
     );
@@ -134,6 +137,7 @@ describe("Active link classes", () => {
         "active",
       );
     });
+
     expect(screen.getByRole("link", { name: "List" })).not.toHaveClass(
       "active",
     );
@@ -155,6 +159,7 @@ describe("Breadcrumbs", () => {
     await waitFor(() => {
       expect(breadcrumb).toHaveTextContent("Home");
     });
+
     expect(breadcrumb).toHaveTextContent("Users");
     expect(breadcrumb).toHaveTextContent("List");
   });
