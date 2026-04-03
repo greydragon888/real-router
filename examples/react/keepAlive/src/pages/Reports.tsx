@@ -7,35 +7,26 @@ export function Reports(): JSX.Element {
   const navigator = useNavigator();
   const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(
-    () =>
-      navigator.subscribeLeave(({ route }) => {
-        if (route.name === "reports" && containerRef.current) {
-          sessionStorage.setItem(
-            "reports:scrollY",
-            String(containerRef.current.scrollTop),
-          );
-        }
-      }),
-    [navigator],
-  );
+  useEffect(() => {
+    const saved = sessionStorage.getItem("reports:scrollY");
 
-  useEffect(
-    () =>
-      navigator.subscribe(({ route }) => {
-        if (route.name === "reports") {
-          const saved = sessionStorage.getItem("reports:scrollY");
-          if (saved) {
-            requestAnimationFrame(() => {
-              if (containerRef.current) {
-                containerRef.current.scrollTop = Number(saved);
-              }
-            });
-          }
+    if (saved && containerRef.current) {
+      requestAnimationFrame(() => {
+        if (containerRef.current) {
+          containerRef.current.scrollTop = Number(saved);
         }
-      }),
-    [navigator],
-  );
+      });
+    }
+
+    return navigator.subscribeLeave(({ route }) => {
+      if (route.name === "reports" && containerRef.current) {
+        sessionStorage.setItem(
+          "reports:scrollY",
+          String(containerRef.current.scrollTop),
+        );
+      }
+    });
+  }, [navigator]);
 
   return (
     <div>

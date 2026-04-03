@@ -4,4 +4,5 @@ export const routes: Route[] = [
   { name: "home", path: "/" },
   { name: "dashboard", path: "/dashboard" },
   { name: "settings", path: "/settings" },
+  { name: "reports", path: "/reports" },
 ];

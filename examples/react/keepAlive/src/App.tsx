@@ -2,6 +2,7 @@ import { RouteView } from "@real-router/react";
 
 import { Dashboard } from "./pages/Dashboard";
 import { Home } from "./pages/Home";
+import { Reports } from "./pages/Reports";
 import { Settings } from "./pages/Settings";
 import { Layout } from "../../shared/Layout";
 
@@ -11,6 +12,7 @@ const links = [
   { routeName: "home", label: "Home" },
   { routeName: "dashboard", label: "Dashboard" },
   { routeName: "settings", label: "Settings" },
+  { routeName: "reports", label: "Reports" },
 ];
 
 export function App(): JSX.Element {
@@ -33,6 +35,9 @@ export function App(): JSX.Element {
         */}
         <RouteView.Match segment="settings">
           <Settings />
+        </RouteView.Match>
+        <RouteView.Match segment="reports">
+          <Reports />
         </RouteView.Match>
         <RouteView.NotFound>
           <h1>404 — Page Not Found</h1>
