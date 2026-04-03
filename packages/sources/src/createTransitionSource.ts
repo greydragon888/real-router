@@ -54,7 +54,6 @@ export function createTransitionSource(
         }
       },
     ),
-    /* v8 ignore next 12 -- @preserve: TRANSITION_LEAVE_APPROVE event emitted by core after deactivation guards pass (Task 6+) */
     api.addEventListener(
       events.TRANSITION_LEAVE_APPROVE,
       (toState: State, fromState?: State) => {
