@@ -34,6 +34,7 @@ real-router/
 │   ├── persistent-params-plugin/  # Parameter persistence across navigations
 │   ├── ssr-data-plugin/           # SSR per-route data loading via start() interceptor
 │   ├── lifecycle-plugin/          # Route-level lifecycle hooks: onEnter, onStay, onLeave
+│   ├── preload-plugin/           # Preload on navigation intent (hover, touch) via event delegation
 │   ├── validation-plugin/         # Opt-in argument validation (DX-only, 100% tree-shakeable)
 │   ├── route-utils/               # Route tree queries and segment testing
 │   ├── logger/                    # Isomorphic structured logging
@@ -56,7 +57,7 @@ real-router/
 │   │   └── ssg/                   # Static site generation with Vite
 ```
 
-**Public packages** (published to npm): `core`, `core-types`, `react`, `preact`, `solid`, `vue`, `svelte`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `lifecycle-plugin`, `validation-plugin`, `route-utils`, `logger`
+**Public packages** (published to npm): `core`, `core-types`, `react`, `preact`, `solid`, `vue`, `svelte`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `lifecycle-plugin`, `preload-plugin`, `validation-plugin`, `route-utils`, `logger`
 
 **Internal packages** (bundled into consumers, not on npm): `route-tree`, `path-matcher`, `search-params`, `type-guards`, `event-emitter`, `browser-env`, `dom-utils`
 
@@ -161,6 +162,9 @@ graph TD
     LCP["lifecycle-plugin"]
     LCP -->|dep| CORE
 
+    PLP["preload-plugin"]
+    PLP -->|dep| CORE
+
     VP["validation-plugin"]
     VP -->|dep| CORE
 
@@ -232,14 +236,14 @@ stateDiagram-v2
     DISPOSED --> [*]
 ```
 
-| State                | Description                                          |
-| -------------------- | ---------------------------------------------------- |
-| `IDLE`               | Router not started or stopped                        |
-| `STARTING`           | Initializing (synchronous window before first await) |
-| `READY`              | Ready for navigation                                 |
-| `TRANSITION_STARTED` | Navigation in progress                               |
+| State                | Description                                           |
+| -------------------- | ----------------------------------------------------- |
+| `IDLE`               | Router not started or stopped                         |
+| `STARTING`           | Initializing (synchronous window before first await)  |
+| `READY`              | Ready for navigation                                  |
+| `TRANSITION_STARTED` | Navigation in progress                                |
 | `LEAVE_APPROVED`     | Deactivation guards passed, activation guards pending |
-| `DISPOSED`           | Terminal state, no transitions out                   |
+| `DISPOSED`           | Terminal state, no transitions out                    |
 
 FSM events trigger observable emissions via `fsm.on(from, event, action)`:
 

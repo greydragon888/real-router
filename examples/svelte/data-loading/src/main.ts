@@ -4,6 +4,7 @@ import { mount } from "svelte";
 
 import App from "./App.svelte";
 import { lifecyclePluginFactory } from "@real-router/lifecycle-plugin";
+import { preloadPluginFactory } from "@real-router/preload-plugin";
 import { routes } from "./routes";
 
 import "../../../shared/styles.css";
@@ -13,7 +14,11 @@ const router = createRouter(routes, {
   allowNotFound: true,
 });
 
-router.usePlugin(browserPluginFactory(), lifecyclePluginFactory());
+router.usePlugin(
+  browserPluginFactory(),
+  lifecyclePluginFactory(),
+  preloadPluginFactory(),
+);
 
 await router.start();
 

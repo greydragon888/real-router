@@ -13,6 +13,7 @@
     "@real-router/browser-plugin": "workspace:^",
     "@real-router/core": "workspace:^",
     "@real-router/lifecycle-plugin": "workspace:^",
+    "@real-router/preload-plugin": "workspace:^",
     "@real-router/solid": "workspace:^",
     "solid-js": "1.9.5"
   },

@@ -122,7 +122,7 @@ Custom **Segment Trie** matcher — O(segments) traversal, O(1) for static route
 **vs [router5](https://github.com/router5/router5):**
 
 | Metric             | Improvement                              |
-| ------------------ |------------------------------------------|
+| ------------------ | ---------------------------------------- |
 | Navigation         | 2-3x faster                              |
 | URL building       | 8-35x faster                             |
 | URL matching       | 3-5x faster                              |
@@ -132,7 +132,7 @@ Custom **Segment Trie** matcher — O(segments) traversal, O(1) for static route
 **vs [router6](https://github.com/nicolo-ribaudo/router6):**
 
 | Metric             | Improvement                        |
-| ------------------ |------------------------------------|
+| ------------------ | ---------------------------------- |
 | Navigation         | ~2x faster                         |
 | URL building       | 3-10x faster                       |
 | URL matching       | ~2x faster                         |
@@ -195,7 +195,11 @@ await router.navigate("users.profile", { id: "123" });
 >
 > const routes = [
 >   { name: "home", path: "/", onLeave: () => cleanup() },
->   { name: "users.view", path: "/users/:id", onEnter: (s) => track(s.params.id) },
+>   {
+>     name: "users.view",
+>     path: "/users/:id",
+>     onEnter: (s) => track(s.params.id),
+>   },
 > ];
 >
 > router.usePlugin(lifecyclePluginFactory());
@@ -244,11 +248,11 @@ function App() {
 
 ### Framework Integration
 
-| Package                                  | Version                                                                                                                             | Description                                                         |
-| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Package                                  | Version                                                                                                                             | Description                                                        |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
 | [`@real-router/react`](packages/react)   | [![npm](https://img.shields.io/npm/v/@real-router/react.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/react)   | React 19.2+ (hooks, `RouteView`, `Link`). React 18+ via `./legacy` |
-| [`@real-router/preact`](packages/preact) | [![npm](https://img.shields.io/npm/v/@real-router/preact.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/preact) | Preact (hooks, `RouteView`, `Link`, Suspense)                       |
-| [`@real-router/solid`](packages/solid)   | [![npm](https://img.shields.io/npm/v/@real-router/solid.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/solid)   | Solid.js (signals, `RouteView`, `Link`, store-based state)          |
+| [`@real-router/preact`](packages/preact) | [![npm](https://img.shields.io/npm/v/@real-router/preact.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/preact) | Preact (hooks, `RouteView`, `Link`, Suspense)                      |
+| [`@real-router/solid`](packages/solid)   | [![npm](https://img.shields.io/npm/v/@real-router/solid.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/solid)   | Solid.js (signals, `RouteView`, `Link`, store-based state)         |
 | [`@real-router/vue`](packages/vue)       | [![npm](https://img.shields.io/npm/v/@real-router/vue.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/vue)       | Vue 3 (composables, `RouteView`, `Link`, `KeepAlive`, `v-link`)    |
 | [`@real-router/svelte`](packages/svelte) | [![npm](https://img.shields.io/npm/v/@real-router/svelte.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/svelte) | Svelte 5 (runes, `RouteView` with snippets, `Lazy`, `use:link`)    |
 
@@ -262,6 +266,7 @@ function App() {
 | [`@real-router/persistent-params-plugin`](packages/persistent-params-plugin) | [![npm](https://img.shields.io/npm/v/@real-router/persistent-params-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/persistent-params-plugin) | Parameter persistence across navigations     |
 | [`@real-router/ssr-data-plugin`](packages/ssr-data-plugin)                   | [![npm](https://img.shields.io/npm/v/@real-router/ssr-data-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/ssr-data-plugin)                   | SSR per-route data loading via interceptor   |
 | [`@real-router/lifecycle-plugin`](packages/lifecycle-plugin)                 | [![npm](https://img.shields.io/npm/v/@real-router/lifecycle-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/lifecycle-plugin)                 | Route-level hooks: onEnter, onStay, onLeave  |
+| [`@real-router/preload-plugin`](packages/preload-plugin)                     | [![npm](https://img.shields.io/npm/v/@real-router/preload-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/preload-plugin)                     | Preload on navigation intent (hover, touch)  |
 | [`@real-router/validation-plugin`](packages/validation-plugin)               | [![npm](https://img.shields.io/npm/v/@real-router/validation-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/validation-plugin)               | Runtime argument validation for development  |
 
 ### Utilities
@@ -299,7 +304,7 @@ Full documentation is available in the [Wiki](https://github.com/greydragon888/r
 
 ### Plugins
 
-- [browser-plugin](https://github.com/greydragon888/real-router/wiki/browser-plugin) · [hash-plugin](https://github.com/greydragon888/real-router/wiki/hash-plugin) · [logger-plugin](https://github.com/greydragon888/real-router/wiki/logger-plugin) · [persistent-params-plugin](https://github.com/greydragon888/real-router/wiki/persistent-params-plugin) · [ssr-data-plugin](https://github.com/greydragon888/real-router/wiki/ssr-data-plugin) · [validation-plugin](https://github.com/greydragon888/real-router/wiki/validation-plugin) · [rx](https://github.com/greydragon888/real-router/wiki/rx-package) · [sources](https://github.com/greydragon888/real-router/wiki/sources-package) · [route-utils](https://github.com/greydragon888/real-router/wiki/route-utils)
+- [browser-plugin](https://github.com/greydragon888/real-router/wiki/browser-plugin) · [hash-plugin](https://github.com/greydragon888/real-router/wiki/hash-plugin) · [logger-plugin](https://github.com/greydragon888/real-router/wiki/logger-plugin) · [persistent-params-plugin](https://github.com/greydragon888/real-router/wiki/persistent-params-plugin) · [ssr-data-plugin](https://github.com/greydragon888/real-router/wiki/ssr-data-plugin) · [preload-plugin](https://github.com/greydragon888/real-router/wiki/preload-plugin) · [validation-plugin](https://github.com/greydragon888/real-router/wiki/validation-plugin) · [rx](https://github.com/greydragon888/real-router/wiki/rx-package) · [sources](https://github.com/greydragon888/real-router/wiki/sources-package) · [route-utils](https://github.com/greydragon888/real-router/wiki/route-utils)
 
 ## Examples
 

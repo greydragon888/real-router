@@ -1,7 +1,7 @@
 import { api } from "../../../shared/api";
 import { store } from "../../../shared/store";
 
-import type { Route } from "@real-router/core";
+import type { Params, Route } from "@real-router/core";
 
 let controller: AbortController | null = null;
 
@@ -34,8 +34,7 @@ function loadData(
       }
     } catch (error: unknown) {
       if (!signal.aborted) {
-        const message =
-          error instanceof Error ? error.message : String(error);
+        const message = error instanceof Error ? error.message : String(error);
 
         store.set(`${routeName}:error`, message);
         store.set(`${routeName}:loading`, false);
@@ -54,6 +53,11 @@ export const routes: Route[] = [
       {
         name: "list",
         path: "/list",
+        preload: async () => {
+          const data = await api.getProducts();
+
+          store.set("products.list", data);
+        },
         onEnter: () => {
           loadData("products.list", (signal) => api.getProducts(signal));
         },
@@ -62,6 +66,11 @@ export const routes: Route[] = [
       {
         name: "detail",
         path: "/:id",
+        preload: async (params: Params) => {
+          const data = await api.getProduct(String(params.id));
+
+          store.set("products.detail", data);
+        },
         onEnter: (toState) => {
           const id =
             typeof toState.params.id === "string" ? toState.params.id : "";
