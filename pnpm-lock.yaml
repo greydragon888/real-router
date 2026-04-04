@@ -2915,6 +2915,12 @@ importers:
         specifier: workspace:^
         version: link:../type-guards
 
+  packages/lifecycle-plugin:
+    dependencies:
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../core
+
   packages/logger: {}
 
   packages/logger-plugin:

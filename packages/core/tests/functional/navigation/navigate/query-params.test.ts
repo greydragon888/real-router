@@ -22,10 +22,16 @@ describe("router.navigate() - query params", () => {
   it("should append query parameters to path", async () => {
     await router.navigate("users.view", { id: 123, q: "search", page: "2" });
 
-    expect(omitMeta(router.getState())).toMatchObject({
+    const state = router.getState();
+
+    expect(omitMeta(state)).toMatchObject({
       name: "users.view",
-      params: { id: 123 },
       path: "/users/view/123?q=search&page=2",
+    });
+    expect(state?.params).toStrictEqual({
+      id: 123,
+      q: "search",
+      page: "2",
     });
   });
 
@@ -37,6 +43,7 @@ describe("router.navigate() - query params", () => {
     });
 
     expect(state?.path).toBe("/users/view/42?q=a%20b&tag=x%2Fy");
+    expect(state?.params).toStrictEqual({ id: 42, q: "a b", tag: "x/y" });
   });
 
   it("should handle empty query params correctly", async () => {

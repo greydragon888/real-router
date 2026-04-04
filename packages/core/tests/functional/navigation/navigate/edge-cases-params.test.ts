@@ -78,12 +78,13 @@ describe("router.navigate() - edge cases params", () => {
           {},
         );
 
-        expect(state).toStrictEqual(
-          expect.objectContaining({
-            name: "users.view",
-            params: expect.objectContaining({ id: 123 }),
-          }),
-        );
+        expect(state.name).toBe("users.view");
+        expect(state.params).toStrictEqual({
+          length: 2,
+          0: "a",
+          1: "b",
+          id: 123,
+        });
       });
 
       it("should handle object with numeric keys", async () => {
@@ -95,12 +96,12 @@ describe("router.navigate() - edge cases params", () => {
           {},
         );
 
-        expect(state).toStrictEqual(
-          expect.objectContaining({
-            name: "users.view",
-            params: expect.objectContaining({ id: 456 }),
-          }),
-        );
+        expect(state.name).toBe("users.view");
+        expect(state.params).toStrictEqual({
+          0: "first",
+          1: "second",
+          id: 456,
+        });
       });
     });
 

@@ -188,6 +188,19 @@ await router.navigate("users.profile", { id: "123" });
 > router.usePlugin(browserPluginFactory(), __DEV__ && validationPlugin());
 > ```
 
+> **Route-level lifecycle hooks:** add [`@real-router/lifecycle-plugin`](https://www.npmjs.com/package/@real-router/lifecycle-plugin) to attach `onEnter`, `onStay`, `onLeave` callbacks directly to route definitions — no `subscribe()` boilerplate:
+>
+> ```typescript
+> import { lifecyclePluginFactory } from "@real-router/lifecycle-plugin";
+>
+> const routes = [
+>   { name: "home", path: "/", onLeave: () => cleanup() },
+>   { name: "users.view", path: "/users/:id", onEnter: (s) => track(s.params.id) },
+> ];
+>
+> router.usePlugin(lifecyclePluginFactory());
+> ```
+
 ### With React
 
 ```tsx
@@ -248,6 +261,7 @@ function App() {
 | [`@real-router/logger-plugin`](packages/logger-plugin)                       | [![npm](https://img.shields.io/npm/v/@real-router/logger-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/logger-plugin)                       | Development logging with transition tracking |
 | [`@real-router/persistent-params-plugin`](packages/persistent-params-plugin) | [![npm](https://img.shields.io/npm/v/@real-router/persistent-params-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/persistent-params-plugin) | Parameter persistence across navigations     |
 | [`@real-router/ssr-data-plugin`](packages/ssr-data-plugin)                   | [![npm](https://img.shields.io/npm/v/@real-router/ssr-data-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/ssr-data-plugin)                   | SSR per-route data loading via interceptor   |
+| [`@real-router/lifecycle-plugin`](packages/lifecycle-plugin)                 | [![npm](https://img.shields.io/npm/v/@real-router/lifecycle-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/lifecycle-plugin)                 | Route-level hooks: onEnter, onStay, onLeave  |
 | [`@real-router/validation-plugin`](packages/validation-plugin)               | [![npm](https://img.shields.io/npm/v/@real-router/validation-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/validation-plugin)               | Runtime argument validation for development  |
 
 ### Utilities

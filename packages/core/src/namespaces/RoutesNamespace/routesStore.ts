@@ -61,20 +61,6 @@ function rebuildTree(
   return { tree, matcher };
 }
 
-export function commitTreeChanges<
-  Dependencies extends DefaultDependencies = DefaultDependencies,
->(store: RoutesStore<Dependencies>): void {
-  const result = rebuildTree(
-    store.definitions,
-    store.rootPath,
-    store.matcherOptions,
-  );
-
-  store.tree = result.tree;
-  store.matcher = result.matcher;
-  store.resolvedForwardMap = refreshForwardMap(store.config);
-}
-
 export function rebuildTreeInPlace<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(store: RoutesStore<Dependencies>): void {
@@ -86,6 +72,13 @@ export function rebuildTreeInPlace<
 
   store.tree = result.tree;
   store.matcher = result.matcher;
+}
+
+export function commitTreeChanges<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+>(store: RoutesStore<Dependencies>): void {
+  rebuildTreeInPlace(store);
+  store.resolvedForwardMap = refreshForwardMap(store.config);
 }
 
 // =============================================================================

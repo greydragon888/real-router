@@ -13,7 +13,6 @@
     "inputs": [
       "tsconfig.json",
       "prettier.config.*",
-      "pnpm-lock.yaml",
       "tsdown.base.*",
       "eslint.config.*",
       "vitest.config.*"
@@ -126,13 +125,13 @@
       "cache": true
     },
     "lint:package": {
-      "dependsOn": ["build"],
+      "dependsOn": ["build:dist-only"],
       "outputs": [],
       "inputs": ["dist/**", "package.json"],
       "cache": true
     },
     "lint:types": {
-      "dependsOn": ["build"],
+      "dependsOn": ["build:dist-only"],
       "outputs": [],
       "inputs": ["dist/**", "package.json"],
       "cache": true

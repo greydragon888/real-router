@@ -42,6 +42,16 @@ export const autoNumberStrategy: NumberStrategy = {
       return null;
     }
 
+    // Leading zeros are not canonical numbers ("00", "007") — preserve as strings.
+    // Allow "0" and "0.x" (single zero or decimal starting with 0).
+    if (
+      length > 1 &&
+      value.codePointAt(0) === 48 &&
+      value.codePointAt(1) !== 46
+    ) {
+      return null;
+    }
+
     let hasDot = false;
 
     for (let i = 0; i < length; i++) {
@@ -60,7 +70,14 @@ export const autoNumberStrategy: NumberStrategy = {
       return null; // non-digit, non-dot, or invalid dot position
     }
 
-    return Number(value);
+    const num = Number(value);
+
+    // Reject unsafe integers — precision loss would corrupt the value on roundtrip.
+    if (!Number.isSafeInteger(num) && !hasDot) {
+      return null;
+    }
+
+    return num;
   },
 };
 

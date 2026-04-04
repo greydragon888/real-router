@@ -195,6 +195,12 @@ describe("router.navigate() - same states", () => {
         );
 
         expect(state.name).toBe("section.query");
+        expect(state.params).toStrictEqual({
+          section: "section1",
+          param1: 42,
+          param2: "b",
+          param3: "c",
+        });
       });
 
       it("should skip array query params in transition path comparison", async () => {
@@ -217,6 +223,12 @@ describe("router.navigate() - same states", () => {
         );
 
         expect(state.name).toBe("section.query");
+        expect(state.params).toStrictEqual({
+          section: "section1",
+          param1: ["x", "y"],
+          param2: "b",
+          param3: "c",
+        });
       });
     });
 

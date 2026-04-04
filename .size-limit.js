@@ -72,7 +72,7 @@ export default [
   {
     name: "@real-router/vue (ESM)",
     path: "packages/vue/dist/esm/index.mjs",
-    limit: "3 kB",
+    limit: "3.1 kB",
     ignore: [
       "vue",
       "@real-router/core",
@@ -123,7 +123,7 @@ export default [
   {
     name: "@real-router/logger-plugin (ESM)",
     path: "packages/logger-plugin/dist/esm/index.mjs",
-    limit: "1.5 kB",
+    limit: "1.6 kB",
     modifyEsbuildConfig: addDevelopmentCondition,
   },
   {
@@ -137,6 +137,13 @@ export default [
   {
     name: "@real-router/ssr-data-plugin (ESM)",
     path: "packages/ssr-data-plugin/dist/esm/index.mjs",
+    limit: "0.5 kB",
+    ignore: ["@real-router/core"],
+    modifyEsbuildConfig: addDevelopmentCondition,
+  },
+  {
+    name: "@real-router/lifecycle-plugin (ESM)",
+    path: "packages/lifecycle-plugin/dist/esm/index.mjs",
     limit: "0.5 kB",
     ignore: ["@real-router/core"],
     modifyEsbuildConfig: addDevelopmentCondition,

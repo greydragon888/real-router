@@ -21,12 +21,10 @@ export function defaultParseQueryString(
     const eqIdx = queryString.indexOf("=", start);
 
     if (eqIdx === -1 || eqIdx > ampIdx) {
-      params[queryString.slice(start, ampIdx)] = "";
+      params[decodeURIComponent(queryString.slice(start, ampIdx))] = "";
     } else {
-      params[queryString.slice(start, eqIdx)] = queryString.slice(
-        eqIdx + 1,
-        ampIdx,
-      );
+      params[decodeURIComponent(queryString.slice(start, eqIdx))] =
+        decodeURIComponent(queryString.slice(eqIdx + 1, ampIdx));
     }
 
     start = ampIdx + 1;

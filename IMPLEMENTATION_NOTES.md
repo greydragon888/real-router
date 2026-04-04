@@ -1848,3 +1848,65 @@ router.subscribeLeave(({ route }) => {
   if (route.name === "settings") saveDraft(); // pure side-effect, only fires when confirmed
 });
 ```
+
+## Turbo `--filter` Does Not Exclude Downstream Dependents
+
+### Problem
+
+`pnpm turbo run test --filter='!./examples/**'` still executes `test` tasks for example packages. Turbo `--filter` controls the initial scope but does not prevent downstream dependents from being included in the execution graph. This is a known turbo limitation ([vercel/turborepo#6505](https://github.com/vercel/turborepo/discussions/7453)) with no planned fix.
+
+Pre-push hook and CI were running ~30 example `test` tasks and ~68 example `build` tasks on every run — adding minutes to both local and CI pipelines.
+
+### Solution
+
+Rename task scripts in examples so turbo cannot find them:
+
+- `"test": "vitest run"` → `"test:unit": "vitest run"` in 30 example package.json files
+- `pnpm turbo run test` no longer finds `test` script in examples → `<NONEXISTENT>` → skipped
+- Pre-push uses `build:dist-only` instead of `build` (examples don't have `build:dist-only`)
+- `lint:package`/`lint:types` dependsOn changed from `build` to `build:dist-only`
+
+### Why not `--filter-deep`
+
+Turbo has no `--filter-deep` flag. The RFC was closed without implementation. Our workaround (task name mismatch) is the same approach recommended in the turbo discussion — ensure filtered-out packages don't have matching script names.
+
+### Also removed
+
+- `pnpm-lock.yaml` from `turbo.json` `global.inputs` — lockfile changes were invalidating cache for ALL tasks across ALL packages. Dependencies are resolved by `pnpm install` before turbo runs.
+
+### `examples/*` workspace is required
+
+`examples/react/package.json` (`react-examples-shared`) hosts shared deps (`react`, `@types/react`, `@real-router/react`) for all nested examples. `../shared/Layout.tsx` imports from these — without the workspace entry, pnpm doesn't install them and `tsc -b` fails with "Cannot find module 'react'".
+
+## Leading Zeros in `numberFormat: "auto"` (search-params)
+
+### Problem
+
+`autoNumberStrategy.decode("00")` returned `0` — leading zeros were silently stripped during URL roundtrip. Property-based test (`pathRoundtrip.properties.ts`) caught this with counterexample `{q: "00"}`: `buildPath → matchPath` changed `"00"` to `0`.
+
+Similarly, `decode("99999999999999999")` returned `100000000000000000` — precision loss for unsafe integers.
+
+### Solution
+
+Two guards added to `autoNumberStrategy.decode()` in `packages/search-params/src/strategies/number.ts`:
+
+1. **Leading zeros**: strings starting with `0` where second char is not `.` return `null` (stay as strings). `"0"` and `"0.5"` still parse as numbers.
+2. **Unsafe integers**: `Number.isSafeInteger()` check rejects integers beyond `MAX_SAFE_INTEGER`.
+
+### Why this matters
+
+URL query params are fundamentally strings. `numberFormat: "auto"` is a convenience that should only convert unambiguous canonical numbers. `"00"` is not canonical (it's a string with semantic leading zero, e.g., ZIP codes, product codes). `"99999999999999999"` cannot be represented without precision loss.
+
+## `defaultParseQueryString` Missing URI Decoding (path-matcher)
+
+### Problem
+
+`defaultBuildQueryString` encodes values via `encodeURIComponent`, but `defaultParseQueryString` returned raw slices without `decodeURIComponent`. Roundtrip: `{q: "hello world"}` → `"q=hello%20world"` → `{q: "hello%20world"}`.
+
+### Solution
+
+Added `decodeURIComponent()` to both key and value extraction in `defaultParseQueryString`.
+
+### Why low priority
+
+`defaultParseQueryString` is a fallback for standalone `path-matcher` usage. Standard configuration uses `search-params` package (injected via DI in `route-tree/createMatcher.ts`) which handles encoding correctly.

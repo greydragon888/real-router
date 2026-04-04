@@ -278,7 +278,7 @@ export class EventBusNamespace {
 
     // NAVIGATE and COMPLETE actions bypassed — sendNavigate/sendComplete
     // use fsm.forceState() + direct emit for zero-allocation hot path.
-    fsm.on(routerStates.TRANSITION_STARTED, routerEvents.CANCEL, () => {
+    const handleCancel = () => {
       const toState = this.#pendingToState;
 
       /* v8 ignore next -- @preserve: #pendingToState guaranteed set by sendCancel before send() */
@@ -287,18 +287,10 @@ export class EventBusNamespace {
       }
 
       this.emitTransitionCancel(toState, this.#pendingFromState);
-    });
+    };
 
-    fsm.on(routerStates.LEAVE_APPROVED, routerEvents.CANCEL, () => {
-      const toState = this.#pendingToState;
-
-      /* v8 ignore next -- @preserve: #pendingToState guaranteed set by sendCancel before send() */
-      if (toState === undefined) {
-        return;
-      }
-
-      this.emitTransitionCancel(toState, this.#pendingFromState);
-    });
+    fsm.on(routerStates.TRANSITION_STARTED, routerEvents.CANCEL, handleCancel);
+    fsm.on(routerStates.LEAVE_APPROVED, routerEvents.CANCEL, handleCancel);
 
     fsm.on(routerStates.LEAVE_APPROVED, routerEvents.FAIL, () => {
       this.#emitPendingError();

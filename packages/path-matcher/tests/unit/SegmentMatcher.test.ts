@@ -60,6 +60,33 @@ describe("defaultParseQueryString", () => {
       b: "2",
     });
   });
+
+  it("should decode URI-encoded values", () => {
+    expect(defaultParseQueryString("q=hello%20world")).toStrictEqual({
+      q: "hello world",
+    });
+  });
+
+  it("should decode URI-encoded keys", () => {
+    expect(defaultParseQueryString("hello%20key=value")).toStrictEqual({
+      "hello key": "value",
+    });
+  });
+
+  it("should decode special characters", () => {
+    expect(defaultParseQueryString("a=%26&b=%3D")).toStrictEqual({
+      a: "&",
+      b: "=",
+    });
+  });
+
+  it("should roundtrip with defaultBuildQueryString", () => {
+    const params = { q: "hello world", tag: "a&b", eq: "x=y" };
+    const built = defaultBuildQueryString(params);
+    const parsed = defaultParseQueryString(built);
+
+    expect(parsed).toStrictEqual(params);
+  });
 });
 
 describe("defaultBuildQueryString", () => {

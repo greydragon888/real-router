@@ -7,7 +7,6 @@ import {
   createFixtureRouter,
   arbIdParam,
   arbSearchParams,
-  normalizeParams,
   NUM_RUNS,
 } from "./helpers";
 
@@ -16,26 +15,15 @@ describe("buildPath ↔ matchPath Roundtrip Properties", () => {
   const pluginApi = getPluginApi(router);
 
   test.prop([arbIdParam], { numRuns: NUM_RUNS.standard })(
-    "roundtrip: matchPath(buildPath(name, params)).name === name",
+    "roundtrip: matchPath(buildPath(name, params)) preserves name and params",
     (params) => {
       const path = router.buildPath("users.view", params);
       const matched = pluginApi.matchPath(path);
 
       expect(matched).toBeDefined();
       expect(matched!.name).toBe("users.view");
-    },
-  );
-
-  test.prop([arbIdParam], { numRuns: NUM_RUNS.standard })(
-    "params preserved through roundtrip (with string coercion)",
-    (params) => {
-      const path = router.buildPath("users.view", params);
-      const matched = pluginApi.matchPath(path);
-
-      expect(matched).toBeDefined();
-      expect(normalizeParams(matched!.params)).toStrictEqual(
-        normalizeParams(params),
-      );
+      // Path params are always strings after URL decode
+      expect(matched!.params).toStrictEqual({ id: params.id });
     },
   );
 
@@ -59,16 +47,21 @@ describe("buildPath ↔ matchPath Roundtrip Properties", () => {
   );
 
   test.prop([arbSearchParams], { numRuns: NUM_RUNS.standard })(
-    "query params roundtrip: search route preserves q and page",
+    "query params roundtrip: search route preserves q and page values",
     (params) => {
       const path = router.buildPath("search", params);
       const matched = pluginApi.matchPath(path);
 
       expect(matched).toBeDefined();
       expect(matched!.name).toBe("search");
-      // numberFormat: "auto" parses numeric strings → numbers
-      expect(`${matched!.params.q as string | number}`).toBe(params.q);
-      expect(`${matched!.params.page as string | number}`).toBe(params.page);
+
+      // numberFormat: "auto" converts canonical numeric strings to numbers.
+      // Roundtrip preserves VALUE but may change TYPE (string→number).
+      const q = matched!.params.q as string | number;
+      const page = matched!.params.page as string | number;
+
+      expect(`${q}`).toBe(params.q);
+      expect(`${page}`).toBe(params.page);
     },
   );
 
