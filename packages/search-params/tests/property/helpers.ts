@@ -117,17 +117,6 @@ export const arbOptionsNoAutoNumber: fc.Arbitrary<Options> = fc.record({
   numberFormat: fc.constant("none" as NumberFormat),
 });
 
-export const arbOptionsNonComma: fc.Arbitrary<Options> = fc.record({
-  arrayFormat: fc.constantFrom(
-    "none",
-    "brackets",
-    "index",
-  ) as fc.Arbitrary<ArrayFormat>,
-  booleanFormat: arbBooleanFormat,
-  nullFormat: arbNullFormat,
-  numberFormat: arbNumberFormat,
-});
-
 export const arbQueryStringWithOpts: fc.Arbitrary<[string, Options]> = fc
   .tuple(arbSearchParams, arbOptions)
   .map(([params, opts]) => [
@@ -139,14 +128,62 @@ export const arbQueryString: fc.Arbitrary<string> = fc
   .tuple(arbSearchParamsStrings, arbOptions)
   .map(([params, opts]) => build(params, opts));
 
-const AUTO_NUMBER_RE = /^\d+(\.\d+)?$/;
+/**
+ * Matches the actual autoNumberStrategy.decode() logic:
+ * - No leading zeros (except "0" and "0.x")
+ * - Only safe integers (for non-decimals)
+ * - Digits and optional single decimal point
+ */
+function isAutoNumber(str: string): boolean {
+  if (str.length === 0) {
+    return false;
+  }
+
+  // Leading zero check: "00", "007" etc. are not canonical numbers
+  if (
+    str.length > 1 &&
+    str.codePointAt(0) === 48 &&
+    str.codePointAt(1) !== 46
+  ) {
+    return false;
+  }
+
+  let hasDot = false;
+
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.codePointAt(i)!;
+
+    if (ch >= 48 && ch <= 57) {
+      continue;
+    }
+
+    if (ch === 46 && !hasDot && i !== 0 && i !== str.length - 1) {
+      hasDot = true;
+
+      continue;
+    }
+
+    return false;
+  }
+
+  // Unsafe integer check
+  if (!hasDot) {
+    const num = Number(str);
+
+    if (!Number.isSafeInteger(num)) {
+      return false;
+    }
+  }
+
+  return true;
+}
 
 function normalizeNumber(value: number, numFmt: NumberFormat): number | string {
   if (numFmt === "auto") {
     const str = String(value);
 
     // -0 loses sign through URL roundtrip: String(-0) → "0" → Number("0") → +0
-    return AUTO_NUMBER_RE.test(str) ? Number(str) : str;
+    return isAutoNumber(str) ? Number(str) : str;
   }
 
   return String(value);
@@ -161,9 +198,7 @@ function maybeParseAutoNumber(
   value: string,
   numFmt: NumberFormat,
 ): string | number {
-  return numFmt === "auto" && AUTO_NUMBER_RE.test(value)
-    ? Number(value)
-    : value;
+  return numFmt === "auto" && isAutoNumber(value) ? Number(value) : value;
 }
 
 function normalizePrimitive(
@@ -219,7 +254,7 @@ function normalizeValue(
   value: QueryParamValue,
   boolFmt: BooleanFormat,
   nullFmt: NullFormat,
-  arrFmt: ArrayFormat,
+  _arrFmt: ArrayFormat,
   numFmt: NumberFormat,
   result: Record<string, unknown>,
 ): void {
@@ -232,11 +267,9 @@ function normalizeValue(
   }
 
   if (Array.isArray(value)) {
-    if (arrFmt !== "comma") {
-      result[key] = value.map((element) =>
-        normalizeArrayElement(element, boolFmt, numFmt),
-      );
-    }
+    result[key] = value.map((element) =>
+      normalizeArrayElement(element, boolFmt, numFmt),
+    );
 
     return;
   }

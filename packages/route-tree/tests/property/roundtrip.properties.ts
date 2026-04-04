@@ -64,15 +64,11 @@ describe("Roundtrip Properties", () => {
         if (
           format === "brackets" ||
           format === "index" ||
-          (format === "none" && items.length > 1)
+          (format === "none" && items.length > 1) ||
+          (format === "comma" && items.length > 1)
         ) {
           expect(Array.isArray(decoded)).toBe(true);
           expect(decoded).toStrictEqual(items);
-        } else if (format === "comma") {
-          // "comma" format builds "tags=a,b,c" but parses as a flat string —
-          // this library's comma format encodes arrays but does not decode them
-          expect(typeof decoded).toBe("string");
-          expect(decoded).toBe(items.join(","));
         } else {
           // "none" single-item: scalar (no repeated key to trigger array)
           expect(decoded).toBe(items[0]);

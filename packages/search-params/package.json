@@ -1,6 +1,6 @@
 {
   "name": "search-params",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "private": true,
   "description": "Query string parsing and building with configurable strategies",
   "main": "./dist/cjs/index.js",

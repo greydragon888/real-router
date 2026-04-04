@@ -71,6 +71,41 @@ describe("search-params", () => {
       expect(Array.isArray(result.items)).toBe(true);
     });
 
+    it("handles comma-separated arrays", () => {
+      expect(parse("items=a,b,c", { arrayFormat: "comma" })).toStrictEqual({
+        items: ["a", "b", "c"],
+      });
+    });
+
+    it("handles single value with comma format (no comma = scalar)", () => {
+      expect(parse("q=hello", { arrayFormat: "comma" })).toStrictEqual({
+        q: "hello",
+      });
+    });
+
+    it("handles encoded special characters in comma array elements", () => {
+      expect(
+        parse("items=a%20b,c%26d", { arrayFormat: "comma" }),
+      ).toStrictEqual({
+        items: ["a b", "c&d"],
+      });
+    });
+
+    it("comma format roundtrip preserves array values", () => {
+      const opts = { arrayFormat: "comma" as const };
+      const original = { items: ["x", "y", "z"] };
+
+      expect(parse(build(original, opts), opts)).toStrictEqual(original);
+    });
+
+    it("comma format with numberFormat auto decodes numeric elements", () => {
+      expect(
+        parse("ids=1,2,3", { arrayFormat: "comma", numberFormat: "auto" }),
+      ).toStrictEqual({
+        ids: [1, 2, 3],
+      });
+    });
+
     it("handles + as space", () => {
       expect(parse("name=hello+world")).toStrictEqual({
         name: "hello world",

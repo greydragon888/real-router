@@ -193,14 +193,47 @@ describe("search-params strategies", () => {
         );
       });
 
-      it("should return key= for empty array", () => {
-        expect(commaArrayStrategy.encodeArray("items", [])).toBe("items=");
+      it("should return empty string for empty array", () => {
+        expect(commaArrayStrategy.encodeArray("items", [])).toBe("");
       });
 
       it("should encode special characters", () => {
         expect(commaArrayStrategy.encodeArray("items", ["a b", "c&d"])).toBe(
           "items=a%20b,c%26d",
         );
+      });
+
+      describe("decodeValue", () => {
+        it("should split comma-separated raw values", () => {
+          expect(commaArrayStrategy.decodeValue!("a,b,c")).toStrictEqual([
+            "a",
+            "b",
+            "c",
+          ]);
+        });
+
+        it("should return null for single value (no comma)", () => {
+          expect(commaArrayStrategy.decodeValue!("single")).toBeNull();
+        });
+
+        it("should return null for empty string", () => {
+          expect(commaArrayStrategy.decodeValue!("")).toBeNull();
+        });
+
+        it("should preserve encoded values (raw, before URI decode)", () => {
+          expect(commaArrayStrategy.decodeValue!("a%20b,c%26d")).toStrictEqual([
+            "a%20b",
+            "c%26d",
+          ]);
+        });
+
+        it("should handle empty elements between commas", () => {
+          expect(commaArrayStrategy.decodeValue!("a,,b")).toStrictEqual([
+            "a",
+            "",
+            "b",
+          ]);
+        });
       });
     });
   });

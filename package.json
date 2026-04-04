@@ -29,6 +29,7 @@
     "sonar:local": "pnpm type-check && pnpm test:coverage && pnpm sonar",
     "packages-structure": "find packages/*/src -type f -name \"*.ts*\" -print | tree --fromfile",
     "prepare": "husky || true",
+    "verify:examples": "pnpm -r --filter './examples/*/*' --workspace-concurrency=4 run build",
     "size": "size-limit",
     "commit": "czg",
     "changeset": "changeset",
