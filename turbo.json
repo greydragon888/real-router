@@ -13,7 +13,6 @@
     "inputs": [
       "tsconfig.json",
       "prettier.config.*",
-      "pnpm-lock.yaml",
       "tsdown.base.*",
       "eslint.config.*",
       "vitest.config.*"
