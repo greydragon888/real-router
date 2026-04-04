@@ -95,13 +95,13 @@ Root `CHANGELOG.md` is auto-populated from package changelogs:
 
 ### Workflow: `.github/workflows/changesets.yml`
 
-**Trigger:** `workflow_run` — runs after CI workflow completes successfully on master (not on direct push).
+**Trigger:** `workflow_run` — runs after `Post-Merge Build` workflow completes successfully on master.
 
 **Flow:**
 
 1. Developer runs `pnpm changeset` → creates `.changeset/*.md`
-2. Push to master triggers CI workflow
-3. CI passes → triggers changesets workflow
+2. Push to master triggers `Post-Merge Build` workflow
+3. Build passes → triggers changesets workflow
 4. If changesets exist → creates/updates "Version Packages" PR (uses `PAT_TOKEN` to trigger CI on created PR)
 5. Maintainer merges Release PR
 6. Next CI pass on master → `pnpm changeset publish` publishes to npm + creates GitHub Releases via `gh release create`
@@ -310,15 +310,16 @@ All CI workflows migrated from `pnpm/action-setup@v4` to `pnpm/action-setup@v5` 
 
 ### Workflows
 
-| Workflow             | File                       | Purpose                                              |
-| -------------------- | -------------------------- | ---------------------------------------------------- |
-| CI                   | `ci.yml`                   | Lint, type-check, test, build, coverage, bundle size |
-| Changesets           | `changesets.yml`           | Versioning and npm publish (triggered by CI success) |
-| Changeset Check      | `changeset-check.yml`      | Validate changesets on PRs (format, references)      |
-| CodeQL               | `codeql.yml`               | Security scanning + dependency audit                 |
-| Dependabot Automerge | `dependabot-automerge.yml` | Auto-merge patch/minor updates                       |
-| Danger               | `danger.yml`               | Automated PR review checks                           |
-| Examples             | `examples.yml`             | Scheduled e2e tests for example apps (Mon & Thu)     |
+| Workflow             | File                       | Purpose                                                                    |
+| -------------------- | -------------------------- | -------------------------------------------------------------------------- |
+| CI                   | `ci.yml`                   | Full pipeline on PRs: lint, type-check, test, build, coverage, bundle size |
+| Post-Merge Build     | `post-merge.yml`           | Build-only verification on master push                                     |
+| Changesets           | `changesets.yml`           | Versioning and npm publish (triggered by Post-Merge Build success)         |
+| Changeset Check      | `changeset-check.yml`      | Validate changesets on PRs (format, references)                            |
+| CodeQL               | `codeql.yml`               | Security scanning + dependency audit                                       |
+| Dependabot Automerge | `dependabot-automerge.yml` | Auto-merge patch/minor updates                                             |
+| Danger               | `danger.yml`               | Automated PR review checks                                                 |
+| Examples             | `examples.yml`             | Scheduled e2e tests for example apps (Mon & Thu)                           |
 
 **Removed:** `build.yml`, `sonarcloud.yml`, `coverage.yml`, `size.yml`, `release.yml` (consolidated into `ci.yml` and `changesets.yml`)
 
@@ -1836,17 +1837,16 @@ canDeactivate: async (toState, fromState) => {
   const ok = await showDialog();
   if (ok) saveDraft(); // side-effect in guard
   return ok;
-}
+};
 ```
 
 ### After
 
 ```typescript
-canDeactivate: (toState, fromState) => showDialog(), // pure decision
-
-router.subscribeLeave(({ route }) => {
-  if (route.name === "settings") saveDraft(); // pure side-effect, only fires when confirmed
-});
+canDeactivate: ((toState, fromState) => showDialog(), // pure decision
+  router.subscribeLeave(({ route }) => {
+    if (route.name === "settings") saveDraft(); // pure side-effect, only fires when confirmed
+  }));
 ```
 
 ## Turbo `--filter` Does Not Exclude Downstream Dependents
@@ -1931,3 +1931,20 @@ Added `decodeURIComponent()` to both key and value extraction in `defaultParseQu
 ### Why low priority
 
 `defaultParseQueryString` is a fallback for standalone `path-matcher` usage. Standard configuration uses `search-params` package (injected via DI in `route-tree/createMatcher.ts`) which handles encoding correctly.
+
+## CI/CD: Split CI into PR-only and Post-Merge Workflows
+
+### Problem
+
+Full CI pipeline (lint, type-check, test, build, coverage, bundle size, SonarCloud) ran on every push to master — redundant since the same commit was already validated on the PR. ~12 min wasted per merge.
+
+### Solution
+
+Split into two workflows:
+
+- **`ci.yml`** (`on: pull_request`) — full pipeline: lint, type-check, test, build, coverage, bundle size
+- **`post-merge.yml`** (`on: push` to master) — build-only verification (~30s)
+
+### Why this matters
+
+`changesets.yml` uses `workflow_run` trigger and must reference the workflow that runs on master push. After the split, this trigger was updated from `workflows: [CI]` to `workflows: [Post-Merge Build]`. Missing this update breaks the release pipeline — changesets never triggers after merge, no Version PR is created.
