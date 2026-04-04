@@ -47,10 +47,10 @@ describe("router.navigate() - transitions and cancellation", () => {
         router.navigate("users").catch((error: unknown) => {
           const code = (error as Record<string, unknown>)?.code;
 
-          expect(
-            code === errorCodes.TRANSITION_CANCELLED ||
-              code === errorCodes.SAME_STATES,
-          ).toBe(true);
+          expect([
+            errorCodes.TRANSITION_CANCELLED,
+            errorCodes.SAME_STATES,
+          ]).toContain(code);
         }),
       );
 

@@ -32,12 +32,13 @@ describe("buildState / makeState Properties", () => {
   );
 
   test.prop([arbIdParam], { numRuns: NUM_RUNS.standard })(
-    "buildState.name equals the requested route name",
+    "buildState preserves name and params",
     (params) => {
       const result = pluginApi.buildState("users.view", params);
 
       expect(result).toBeDefined();
       expect(result!.name).toBe("users.view");
+      expect(result!.params).toStrictEqual(params);
     },
   );
 
