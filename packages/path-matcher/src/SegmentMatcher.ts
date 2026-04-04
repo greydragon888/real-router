@@ -48,6 +48,9 @@ export class SegmentMatcher {
   #rootQueryParams: readonly string[] = [];
   #scanTruncated = "";
 
+  readonly #caseSensitive: boolean;
+  readonly #decode: ((param: string) => string) | null;
+
   constructor(options?: SegmentMatcherOptions) {
     this.#options = {
       caseSensitive: options?.caseSensitive ?? true,
@@ -57,6 +60,12 @@ export class SegmentMatcher {
       parseQueryString: options?.parseQueryString ?? defaultParseQueryString,
       buildQueryString: options?.buildQueryString ?? defaultBuildQueryString,
     };
+
+    this.#caseSensitive = this.#options.caseSensitive;
+    this.#decode =
+      this.#options.urlParamsEncoding === "none"
+        ? null
+        : DECODING_METHODS[this.#options.urlParamsEncoding];
   }
 
   registerTree(node: MatcherInputNode): void {
@@ -85,7 +94,7 @@ export class SegmentMatcher {
 
     const { cleanPath, normalized, queryString } = this.#prepared;
 
-    const cacheKey = this.#options.caseSensitive
+    const cacheKey = this.#caseSensitive
       ? normalized
       : normalized.toLowerCase();
     const cached = this.#staticCache.get(cacheKey);
@@ -96,6 +105,10 @@ export class SegmentMatcher {
         !this.#checkTrailingSlash(cleanPath, cached)
       ) {
         return undefined;
+      }
+
+      if (queryString === undefined && cached.cachedResult) {
+        return cached.cachedResult;
       }
 
       return this.#buildResult(cached, {}, queryString);
@@ -439,15 +452,14 @@ export class SegmentMatcher {
   ): CompiledRoute | undefined {
     let node = startNode;
     const length = path.length;
+    const caseSensitive = this.#caseSensitive;
 
     while (start <= length) {
       const end = path.indexOf("/", start);
       const segmentEnd = end === -1 ? length : end;
       const segment = path.slice(start, segmentEnd);
 
-      const lookupKey = this.#options.caseSensitive
-        ? segment
-        : segment.toLowerCase();
+      const lookupKey = caseSensitive ? segment : segment.toLowerCase();
       let next: SegmentNode;
 
       if (lookupKey in node.staticChildren) {
@@ -456,24 +468,7 @@ export class SegmentMatcher {
         next = node.paramChild.node;
         params[node.paramChild.name] = segment;
       } else if (node.splatChild) {
-        // Try specific child routes of splatChild before wildcard capture (static > param > splat)
-        const childParams: Record<string, string> = {};
-        const specific = this.#traverseFrom(
-          node.splatChild.node,
-          path,
-          start,
-          childParams,
-        );
-
-        if (specific) {
-          Object.assign(params, childParams);
-
-          return specific;
-        }
-
-        params[node.splatChild.name] = path.slice(start);
-
-        return node.splatChild.node.route;
+        return this.#matchSplat(node.splatChild, path, start, params);
       } else {
         return undefined;
       }
@@ -485,14 +480,40 @@ export class SegmentMatcher {
     return node.slashChildRoute ?? node.route;
   }
 
-  #decodeParams(params: Record<string, string>): boolean {
-    const encoding = this.#options.urlParamsEncoding;
+  #matchSplat(
+    splatChild: { node: SegmentNode; name: string },
+    path: string,
+    start: number,
+    params: Record<string, string>,
+  ): CompiledRoute | undefined {
+    const sn = splatChild.node;
 
-    if (encoding === "none") {
-      return true;
+    if (!sn.hasChildren) {
+      params[splatChild.name] = path.slice(start);
+
+      return sn.route;
     }
 
-    const decode = DECODING_METHODS[encoding];
+    const childParams: Record<string, string> = {};
+    const specific = this.#traverseFrom(sn, path, start, childParams);
+
+    if (specific) {
+      Object.assign(params, childParams);
+
+      return specific;
+    }
+
+    params[splatChild.name] = path.slice(start);
+
+    return sn.route;
+  }
+
+  #decodeParams(params: Record<string, string>): boolean {
+    const decode = this.#decode;
+
+    if (!decode) {
+      return true;
+    }
 
     for (const key in params) {
       const value = params[key];

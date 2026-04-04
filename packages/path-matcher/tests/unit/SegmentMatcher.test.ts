@@ -233,6 +233,7 @@ describe("createSegmentNode", () => {
 
     expect(keys).toStrictEqual([
       "staticChildren",
+      "hasChildren",
       "paramChild",
       "splatChild",
       "route",
