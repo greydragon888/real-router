@@ -1,6 +1,48 @@
 import { api } from "../../../shared/api";
+import { store } from "../../../shared/store";
 
-import type { Params, Route } from "@real-router/core";
+import type { Route } from "@real-router/core";
+
+let controller: AbortController | null = null;
+
+function abortPending(): void {
+  if (controller) {
+    controller.abort();
+    controller = null;
+  }
+}
+
+function loadData(
+  routeName: string,
+  fetcher: (signal: AbortSignal) => Promise<unknown>,
+): void {
+  abortPending();
+
+  store.set(`${routeName}:loading`, true);
+  store.set(`${routeName}:error`, null);
+
+  controller = new AbortController();
+  const { signal } = controller;
+
+  void (async () => {
+    try {
+      const data = await fetcher(signal);
+
+      if (!signal.aborted) {
+        store.set(routeName, data);
+        store.set(`${routeName}:loading`, false);
+      }
+    } catch (error: unknown) {
+      if (!signal.aborted) {
+        const message =
+          error instanceof Error ? error.message : String(error);
+
+        store.set(`${routeName}:error`, message);
+        store.set(`${routeName}:loading`, false);
+      }
+    }
+  })();
+}
 
 export const routes: Route[] = [
   { name: "home", path: "/" },
@@ -12,17 +54,21 @@ export const routes: Route[] = [
       {
         name: "list",
         path: "/list",
-        loadData: (_params: Params, signal?: AbortSignal) =>
-          api.getProducts(signal),
+        onEnter: () => {
+          loadData("products.list", (signal) => api.getProducts(signal));
+        },
+        onLeave: abortPending,
       },
       {
         name: "detail",
         path: "/:id",
-        loadData: (params: Params, signal?: AbortSignal) => {
-          const id = typeof params.id === "string" ? params.id : "";
+        onEnter: (toState) => {
+          const id =
+            typeof toState.params.id === "string" ? toState.params.id : "";
 
-          return api.getProduct(id, signal);
+          loadData("products.detail", (signal) => api.getProduct(id, signal));
         },
+        onLeave: abortPending,
       },
     ],
   },

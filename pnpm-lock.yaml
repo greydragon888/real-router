@@ -315,6 +315,9 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../../../packages/core
+      '@real-router/lifecycle-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/lifecycle-plugin
       '@real-router/logger-plugin':
         specifier: workspace:^
         version: link:../../../packages/logger-plugin
@@ -364,6 +367,9 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../../../packages/core
+      '@real-router/lifecycle-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/lifecycle-plugin
       '@real-router/preact':
         specifier: workspace:^
         version: link:../../../packages/preact
@@ -753,6 +759,9 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../../../packages/core
+      '@real-router/lifecycle-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/lifecycle-plugin
       '@real-router/logger-plugin':
         specifier: workspace:^
         version: link:../../../packages/logger-plugin
@@ -811,6 +820,9 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../../../packages/core
+      '@real-router/lifecycle-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/lifecycle-plugin
       '@real-router/react':
         specifier: workspace:^
         version: link:../../../packages/react
@@ -1435,6 +1447,9 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../../../packages/core
+      '@real-router/lifecycle-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/lifecycle-plugin
       '@real-router/logger-plugin':
         specifier: workspace:^
         version: link:../../../packages/logger-plugin
@@ -1484,6 +1499,9 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../../../packages/core
+      '@real-router/lifecycle-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/lifecycle-plugin
       '@real-router/solid':
         specifier: workspace:^
         version: link:../../../packages/solid
@@ -1920,6 +1938,9 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../../../packages/core
+      '@real-router/lifecycle-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/lifecycle-plugin
       '@real-router/logger-plugin':
         specifier: workspace:^
         version: link:../../../packages/logger-plugin
@@ -1969,6 +1990,9 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../../../packages/core
+      '@real-router/lifecycle-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/lifecycle-plugin
       '@real-router/svelte':
         specifier: workspace:^
         version: link:../../../packages/svelte
@@ -2439,6 +2463,9 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../../../packages/core
+      '@real-router/lifecycle-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/lifecycle-plugin
       '@real-router/logger-plugin':
         specifier: workspace:^
         version: link:../../../packages/logger-plugin
@@ -2491,6 +2518,9 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../../../packages/core
+      '@real-router/lifecycle-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/lifecycle-plugin
       '@real-router/vue':
         specifier: workspace:^
         version: link:../../../packages/vue

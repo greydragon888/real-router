@@ -1,10 +1,10 @@
 import { browserPluginFactory } from "@real-router/browser-plugin";
 import { createRouter } from "@real-router/core";
+import { lifecyclePluginFactory } from "@real-router/lifecycle-plugin";
 import { RouterProvider } from "@real-router/react";
 import { createRoot } from "react-dom/client";
 
 import { App } from "./App";
-import { dataLoaderPluginFactory } from "./dataLoader";
 import { routes } from "./routes";
 
 import "../../../shared/styles.css";
@@ -14,7 +14,7 @@ const router = createRouter(routes, {
   allowNotFound: true,
 });
 
-router.usePlugin(browserPluginFactory(), dataLoaderPluginFactory());
+router.usePlugin(browserPluginFactory(), lifecyclePluginFactory());
 
 await router.start();
 

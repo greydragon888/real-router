@@ -3,7 +3,7 @@ import { createRouter } from "@real-router/core";
 import { loggerPluginFactory } from "@real-router/logger-plugin";
 import { persistentParamsPluginFactory } from "@real-router/persistent-params-plugin";
 
-import { dataLoaderPluginFactory } from "./dataLoader";
+import { lifecyclePluginFactory } from "@real-router/lifecycle-plugin";
 import { publicRoutes } from "./routes";
 
 import type { AppDependencies } from "./types";
@@ -17,5 +17,5 @@ router.usePlugin(
   browserPluginFactory(),
   persistentParamsPluginFactory({ lang: "en" }),
   loggerPluginFactory(),
-  dataLoaderPluginFactory(),
+  lifecyclePluginFactory(),
 );

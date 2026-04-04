@@ -7,7 +7,7 @@ import { afterEach, describe, it, expect } from "vitest";
 import { defineAbilities } from "../../../shared/abilities";
 import { store } from "../../../shared/store";
 import App from "../src/App.svelte";
-import { dataLoaderPluginFactory } from "../src/dataLoader";
+import { lifecyclePluginFactory } from "@real-router/lifecycle-plugin";
 import { publicRoutes, privateRoutes } from "../src/routes";
 
 import type { AppDependencies } from "../src/types";
@@ -117,7 +117,7 @@ describe("Guard rejection → UI feedback", () => {
 // c) Data-driven render
 // ---------------------------------------------------------------------------
 describe("Data-driven render", () => {
-  it("loads products via dataLoader plugin and renders product cards", async () => {
+  it("loads products via lifecycle plugin and renders product cards", async () => {
     store.set("user", {
       id: "1",
       name: "Alice",
@@ -130,14 +130,14 @@ describe("Data-driven render", () => {
       allowNotFound: true,
     });
 
-    testRouter.usePlugin(dataLoaderPluginFactory());
+    testRouter.usePlugin(lifecyclePluginFactory());
     getDependenciesApi(testRouter).set("abilities", defineAbilities("admin"));
 
     await testRouter.start("/products/list");
 
     render(App, { props: { router: testRouter } });
 
-    // Wait for products to load (300ms API delay via dataLoader plugin)
+    // Wait for products to load (300ms API delay via lifecycle plugin)
     await waitFor(() => {
       expect(screen.getByText("Laptop")).toBeInTheDocument();
     });

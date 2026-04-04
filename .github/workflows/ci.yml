@@ -143,7 +143,7 @@ jobs:
         run: |
           # vitest generates lcov.info with package-relative paths (SF:src/plugin.ts)
           # Both Codecov and SonarCloud need project-root-relative paths (SF:packages/browser-plugin/src/plugin.ts)
-          for lcov in packages/*/coverage/lcov.info; do
+          for lcov in $(find packages -path '*/coverage/lcov.info' 2>/dev/null); do
             pkg_dir=$(echo "$lcov" | sed 's|/coverage/lcov.info||')
             sed -i "s|^SF:|SF:${pkg_dir}/|" "$lcov"
           done

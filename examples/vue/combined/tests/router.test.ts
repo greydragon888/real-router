@@ -4,7 +4,7 @@ import { describe, afterEach, it, expect } from "vitest";
 
 import { defineAbilities } from "../../../shared/abilities";
 import { store } from "../../../shared/store";
-import { dataLoaderPluginFactory } from "../src/dataLoader";
+import { lifecyclePluginFactory } from "@real-router/lifecycle-plugin";
 import { privateRoutes, publicRoutes } from "../src/routes";
 
 import type { AppDependencies } from "../src/types";
@@ -169,9 +169,9 @@ describe("canDeactivate + shared state — settingsDeactivateGuard", () => {
 });
 
 // =========================================================================
-// f) Custom plugin — dataLoaderPluginFactory
+// f) Custom plugin — lifecyclePluginFactory
 // =========================================================================
-describe("Custom plugin — dataLoaderPluginFactory", () => {
+describe("Custom plugin — lifecyclePluginFactory", () => {
   let router: Router<AppDependencies>;
 
   afterEach(() => {
@@ -183,7 +183,7 @@ describe("Custom plugin — dataLoaderPluginFactory", () => {
     router = createRouter<AppDependencies>(privateRoutes, {
       defaultRoute: "dashboard",
     });
-    router.usePlugin(dataLoaderPluginFactory());
+    router.usePlugin(lifecyclePluginFactory());
     await router.start("/dashboard");
 
     vi.useFakeTimers();

@@ -3,7 +3,27 @@ import { api } from "../../../shared/api";
 import { store } from "../../../shared/store";
 
 import type { AppDependencies } from "./types";
-import type { GuardFnFactory, Params, Route } from "@real-router/core";
+import type { GuardFnFactory, Route } from "@real-router/core";
+
+function loadRoute(
+  routeName: string,
+  fetcher: () => Promise<unknown>,
+): void {
+  store.set(`${routeName}:loading`, true);
+  store.set(`${routeName}:error`, null);
+
+  void (async () => {
+    try {
+      store.set(routeName, await fetcher());
+      store.set(`${routeName}:loading`, false);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+
+      store.set(`${routeName}:error`, message);
+      store.set(`${routeName}:loading`, false);
+    }
+  })();
+}
 
 const adminGuard: GuardFnFactory<AppDependencies> = (_router, getDep) => {
   return () => {
@@ -13,6 +33,7 @@ const adminGuard: GuardFnFactory<AppDependencies> = (_router, getDep) => {
   };
 };
 
+// Always succeeds after 600ms delay — demonstrates progress bar only. See async-guards example for denial demo.
 function checkoutGuardFn(
   _toState: unknown,
   _fromState: unknown,
@@ -64,15 +85,18 @@ export const privateRoutes: Route<AppDependencies>[] = [
       {
         name: "list",
         path: "/list",
-        loadData: () => api.getProducts(),
+        onEnter: () => {
+          loadRoute("products.list", () => api.getProducts());
+        },
       },
       {
         name: "detail",
         path: "/:id",
-        loadData: (params: Params) => {
-          const id = typeof params.id === "string" ? params.id : "";
+        onEnter: (toState) => {
+          const id =
+            typeof toState.params.id === "string" ? toState.params.id : "";
 
-          return api.getProduct(id);
+          loadRoute("products.detail", () => api.getProduct(id));
         },
       },
     ],

@@ -9,7 +9,7 @@ import { defineComponent, h } from "vue";
 import { defineAbilities } from "../../../shared/abilities";
 import { store } from "../../../shared/store";
 import App from "../src/App.vue";
-import { dataLoaderPluginFactory } from "../src/dataLoader";
+import { lifecyclePluginFactory } from "@real-router/lifecycle-plugin";
 import { publicRoutes, privateRoutes } from "../src/routes";
 
 import type { AppDependencies } from "../src/types";
@@ -118,7 +118,7 @@ describe("Guard rejection → UI feedback", () => {
 });
 
 describe("Data-driven render", () => {
-  it("loads products via dataLoader plugin and renders product cards", async () => {
+  it("loads products via lifecycle plugin and renders product cards", async () => {
     store.set("user", {
       id: "1",
       name: "Alice",
@@ -131,7 +131,7 @@ describe("Data-driven render", () => {
       allowNotFound: true,
     });
 
-    testRouter.usePlugin(dataLoaderPluginFactory());
+    testRouter.usePlugin(lifecyclePluginFactory());
     getDependenciesApi(testRouter).set("abilities", defineAbilities("admin"));
 
     await testRouter.start("/products/list");

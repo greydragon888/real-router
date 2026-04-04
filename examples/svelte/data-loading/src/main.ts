@@ -3,7 +3,7 @@ import { createRouter } from "@real-router/core";
 import { mount } from "svelte";
 
 import App from "./App.svelte";
-import { dataLoaderPluginFactory } from "./dataLoader";
+import { lifecyclePluginFactory } from "@real-router/lifecycle-plugin";
 import { routes } from "./routes";
 
 import "../../../shared/styles.css";
@@ -13,7 +13,7 @@ const router = createRouter(routes, {
   allowNotFound: true,
 });
 
-router.usePlugin(browserPluginFactory(), dataLoaderPluginFactory());
+router.usePlugin(browserPluginFactory(), lifecyclePluginFactory());
 
 await router.start();
 
