@@ -328,6 +328,9 @@ importers:
       '@real-router/preact':
         specifier: workspace:^
         version: link:../../../packages/preact
+      '@real-router/preload-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/preload-plugin
       preact:
         specifier: 10.28.2
         version: 10.28.2
@@ -374,6 +377,9 @@ importers:
       '@real-router/preact':
         specifier: workspace:^
         version: link:../../../packages/preact
+      '@real-router/preload-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/preload-plugin
       preact:
         specifier: 10.28.2
         version: 10.28.2
@@ -769,6 +775,9 @@ importers:
       '@real-router/persistent-params-plugin':
         specifier: workspace:^
         version: link:../../../packages/persistent-params-plugin
+      '@real-router/preload-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/preload-plugin
       '@real-router/react':
         specifier: workspace:^
         version: link:../../../packages/react
@@ -824,6 +833,9 @@ importers:
       '@real-router/lifecycle-plugin':
         specifier: workspace:^
         version: link:../../../packages/lifecycle-plugin
+      '@real-router/preload-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/preload-plugin
       '@real-router/react':
         specifier: workspace:^
         version: link:../../../packages/react
@@ -1457,6 +1469,9 @@ importers:
       '@real-router/persistent-params-plugin':
         specifier: workspace:^
         version: link:../../../packages/persistent-params-plugin
+      '@real-router/preload-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/preload-plugin
       '@real-router/solid':
         specifier: workspace:^
         version: link:../../../packages/solid
@@ -1503,6 +1518,9 @@ importers:
       '@real-router/lifecycle-plugin':
         specifier: workspace:^
         version: link:../../../packages/lifecycle-plugin
+      '@real-router/preload-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/preload-plugin
       '@real-router/solid':
         specifier: workspace:^
         version: link:../../../packages/solid
@@ -1948,6 +1966,9 @@ importers:
       '@real-router/persistent-params-plugin':
         specifier: workspace:^
         version: link:../../../packages/persistent-params-plugin
+      '@real-router/preload-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/preload-plugin
       '@real-router/svelte':
         specifier: workspace:^
         version: link:../../../packages/svelte
@@ -1994,6 +2015,9 @@ importers:
       '@real-router/lifecycle-plugin':
         specifier: workspace:^
         version: link:../../../packages/lifecycle-plugin
+      '@real-router/preload-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/preload-plugin
       '@real-router/svelte':
         specifier: workspace:^
         version: link:../../../packages/svelte
@@ -2473,6 +2497,9 @@ importers:
       '@real-router/persistent-params-plugin':
         specifier: workspace:^
         version: link:../../../packages/persistent-params-plugin
+      '@real-router/preload-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/preload-plugin
       '@real-router/vue':
         specifier: workspace:^
         version: link:../../../packages/vue
@@ -2522,6 +2549,9 @@ importers:
       '@real-router/lifecycle-plugin':
         specifier: workspace:^
         version: link:../../../packages/lifecycle-plugin
+      '@real-router/preload-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/preload-plugin
       '@real-router/vue':
         specifier: workspace:^
         version: link:../../../packages/vue
@@ -3005,6 +3035,16 @@ importers:
       preact:
         specifier: 10.25.4
         version: 10.25.4
+
+  packages/preload-plugin:
+    dependencies:
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../core
+    devDependencies:
+      jsdom:
+        specifier: 28.1.0
+        version: 28.1.0
 
   packages/react:
     dependencies:

@@ -29,6 +29,7 @@ export const SCOPES = [
   "logger-plugin",
   "persistent-params-plugin",
   "ssr-data-plugin",
+  "preload-plugin",
   "validation-plugin",
   "react",
   "preact",

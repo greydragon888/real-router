@@ -3,12 +3,9 @@ import { api } from "../../../shared/api";
 import { store } from "../../../shared/store";
 
 import type { AppDependencies } from "./types";
-import type { GuardFnFactory, Route } from "@real-router/core";
+import type { GuardFnFactory, Params, Route } from "@real-router/core";
 
-function loadRoute(
-  routeName: string,
-  fetcher: () => Promise<unknown>,
-): void {
+function loadRoute(routeName: string, fetcher: () => Promise<unknown>): void {
   store.set(`${routeName}:loading`, true);
   store.set(`${routeName}:error`, null);
 
@@ -85,6 +82,11 @@ export const privateRoutes: Route<AppDependencies>[] = [
       {
         name: "list",
         path: "/list",
+        preload: async () => {
+          const data = await api.getProducts();
+
+          store.set("products.list", data);
+        },
         onEnter: () => {
           loadRoute("products.list", () => api.getProducts());
         },
@@ -92,6 +94,11 @@ export const privateRoutes: Route<AppDependencies>[] = [
       {
         name: "detail",
         path: "/:id",
+        preload: async (params: Params) => {
+          const data = await api.getProduct(String(params.id));
+
+          store.set("products.detail", data);
+        },
         onEnter: (toState) => {
           const id =
             typeof toState.params.id === "string" ? toState.params.id : "";

@@ -6,6 +6,7 @@ import { mount } from "svelte";
 
 import App from "./App.svelte";
 import { lifecyclePluginFactory } from "@real-router/lifecycle-plugin";
+import { preloadPluginFactory } from "@real-router/preload-plugin";
 import { publicRoutes } from "./routes";
 
 import type { AppDependencies } from "./types";
@@ -21,6 +22,7 @@ router.usePlugin(
   persistentParamsPluginFactory({ lang: "en" }),
   loggerPluginFactory(),
   lifecyclePluginFactory(),
+  preloadPluginFactory(),
 );
 
 await router.start();

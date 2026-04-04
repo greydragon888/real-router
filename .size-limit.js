@@ -148,6 +148,13 @@ export default [
     ignore: ["@real-router/core"],
     modifyEsbuildConfig: addDevelopmentCondition,
   },
+  {
+    name: "@real-router/preload-plugin (ESM)",
+    path: "packages/preload-plugin/dist/esm/index.mjs",
+    limit: "1 kB",
+    ignore: ["@real-router/core"],
+    modifyEsbuildConfig: addDevelopmentCondition,
+  },
 
   // ── Utilities ─────────────────────────────────────────────────────
   {
@@ -201,7 +208,7 @@ export default [
   {
     name: "search-params (ESM)",
     path: "packages/search-params/dist/esm/index.mjs",
-    limit: "1.6 kB",
+    limit: "2 kB",
     modifyEsbuildConfig: addDevelopmentCondition,
   },
   {

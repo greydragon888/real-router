@@ -4,6 +4,7 @@ import { loggerPluginFactory } from "@real-router/logger-plugin";
 import { persistentParamsPluginFactory } from "@real-router/persistent-params-plugin";
 
 import { lifecyclePluginFactory } from "@real-router/lifecycle-plugin";
+import { preloadPluginFactory } from "@real-router/preload-plugin";
 import { publicRoutes } from "./routes";
 
 import type { AppDependencies } from "./types";
@@ -18,4 +19,5 @@ router.usePlugin(
   persistentParamsPluginFactory({ lang: "en" }),
   loggerPluginFactory(),
   lifecyclePluginFactory(),
+  preloadPluginFactory(),
 );
