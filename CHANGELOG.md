@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-04-04]
 
+### @real-router/core@0.44.2
+
+### Patch Changes
+
+- [#400](https://github.com/greydragon888/real-router/pull/400) [`a42f2ed`](https://github.com/greydragon888/real-router/commit/a42f2ed0bcc046103d075e8b5634ac50ba6a613e) Thanks [@greydragon888](https://github.com/greydragon888)! - Optimize path-matcher hot path: splat backtracking, static result caching, property access ([#386](https://github.com/greydragon888/real-router/issues/386))
+  - Skip splat backtracking when splat node has no children (-36% splat match)
+  - Pre-compute frozen `MatchResult` for static routes — zero-alloc fast path (-12% static match)
+  - Cache `caseSensitive` and decode function on instance to avoid per-segment property chain (-13% dynamic match)
+
+
 ### @real-router/core@0.44.1
 
 ### Patch Changes
