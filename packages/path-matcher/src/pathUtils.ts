@@ -3,6 +3,7 @@ import type { SegmentNode } from "./types";
 export function createSegmentNode(): SegmentNode {
   return {
     staticChildren: Object.create(null) as Record<string, SegmentNode>,
+    hasChildren: false,
     paramChild: undefined,
     splatChild: undefined,
     route: undefined,

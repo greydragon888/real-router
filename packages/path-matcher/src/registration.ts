@@ -144,6 +144,14 @@ function compileAndRegisterRoute(
     buildParamNamesSet: new Set(buildParamSlots.map((slot) => slot.paramName)),
   };
 
+  if (node.paramMeta.urlParams.length === 0) {
+    compiled.cachedResult = Object.freeze({
+      segments: compiled.matchSegments,
+      params: Object.freeze({}),
+      meta: compiled.meta,
+    });
+  }
+
   state.routesByName.set(node.fullName, compiled);
   state.segmentsByName.set(node.fullName, frozenSegments);
   state.metaByName.set(node.fullName, frozenMeta);
@@ -354,6 +362,7 @@ function processSegment(
     const splatName = segment.slice(1);
 
     node.splatChild ??= { node: createSegmentNode(), name: splatName };
+    node.hasChildren = true;
 
     return node.splatChild.node;
   }
@@ -365,6 +374,7 @@ function processSegment(
       .replace(/\?$/, "");
 
     node.paramChild ??= { node: createSegmentNode(), name: paramName };
+    node.hasChildren = true;
 
     return node.paramChild.node;
   }
@@ -373,6 +383,7 @@ function processSegment(
 
   if (!(key in node.staticChildren)) {
     node.staticChildren[key] = createSegmentNode();
+    node.hasChildren = true;
   }
 
   return node.staticChildren[key];

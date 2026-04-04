@@ -140,6 +140,8 @@ export interface CompiledRoute {
   readonly buildParamSlots: readonly BuildParamSlot[];
   readonly buildParamNamesSet: ReadonlySet<string>;
 
+  cachedResult?: MatchResult;
+
   readonly forwardTo?: string;
   readonly defaultParams?: Readonly<Record<string, unknown>>;
 }
@@ -164,6 +166,7 @@ export interface BuildPathOptions {
 
 export interface SegmentNode {
   readonly staticChildren: Record<string, SegmentNode>;
+  hasChildren: boolean;
   paramChild?: { node: SegmentNode; name: string } | undefined;
   splatChild?: { node: SegmentNode; name: string } | undefined;
   route?: CompiledRoute | undefined;
