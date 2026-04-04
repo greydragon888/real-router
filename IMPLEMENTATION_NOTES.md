@@ -1878,6 +1878,27 @@ Turbo has no `--filter-deep` flag. The RFC was closed without implementation. Ou
 
 `examples/react/package.json` (`react-examples-shared`) hosts shared deps (`react`, `@types/react`, `@real-router/react`) for all nested examples. `../shared/Layout.tsx` imports from these — without the workspace entry, pnpm doesn't install them and `tsc -b` fails with "Cannot find module 'react'".
 
+## CI Split: PR-only CI + Post-Merge Build
+
+### Problem
+
+Push to master (after PR merge) re-ran the full CI pipeline: Test ~8min + Lint ~8min + Build. Code was already verified in the PR — test and lint were redundant.
+
+### Solution
+
+Split into two workflow files:
+
+- `ci.yml` — `on: pull_request` only. Full CI: check → test + lint → build → coverage, sonarcloud, bundle-size → CI Result gate.
+- `post-merge.yml` — `on: push: branches: [master]`. Only `build:dist-only` via turbo (remote cache makes most tasks cache hit). No test, no lint, no coverage.
+
+### Why not conditions in one file
+
+Adding `github.event_name == 'pull_request'` to each job makes the file harder to read. Two files — each does one thing, no conditions.
+
+### Why no coverage on push
+
+Coverage and SonarCloud depend on test job artifacts. Without test, there are no coverage files to upload. Codecov updates baseline from PR merge commits — no separate push upload needed.
+
 ## Leading Zeros in `numberFormat: "auto"` (search-params)
 
 ### Problem
