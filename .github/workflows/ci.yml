@@ -192,7 +192,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build
-        run: pnpm turbo run build --filter='...[${{ needs.check.outputs.turbo_base || 'origin/master' }}]' --filter='!./examples/**'
+        run: pnpm turbo run build:dist-only --filter='...[${{ needs.check.outputs.turbo_base || 'origin/master' }}]' --filter='!./examples/**'
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7

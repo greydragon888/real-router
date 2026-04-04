@@ -187,6 +187,15 @@ importers:
         specifier: 4.1.0
         version: 4.1.0(@types/node@25.5.0)(@vitest/ui@4.1.0)(jsdom@28.1.0)(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
 
+  examples/preact:
+    dependencies:
+      '@real-router/preact':
+        specifier: workspace:^
+        version: link:../../packages/preact
+      preact:
+        specifier: 10.28.2
+        version: 10.28.2
+
   examples/preact/async-guards:
     dependencies:
       '@real-router/browser-plugin':
@@ -584,6 +593,19 @@ importers:
       vite:
         specifier: 7.2.0
         version: 7.2.0(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)
+
+  examples/react:
+    dependencies:
+      '@real-router/react':
+        specifier: workspace:^
+        version: link:../../packages/react
+      react:
+        specifier: 19.2.0
+        version: 19.2.0
+    devDependencies:
+      '@types/react':
+        specifier: 19.2.14
+        version: 19.2.14
 
   examples/react/async-guards:
     dependencies:
@@ -1285,6 +1307,15 @@ importers:
         specifier: 7.2.0
         version: 7.2.0(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)
 
+  examples/solid:
+    dependencies:
+      '@real-router/solid':
+        specifier: workspace:^
+        version: link:../../packages/solid
+      solid-js:
+        specifier: 1.9.5
+        version: 1.9.5
+
   examples/solid/async-guards:
     dependencies:
       '@real-router/browser-plugin':
@@ -1760,6 +1791,15 @@ importers:
       vite-plugin-solid:
         specifier: 2.11.11
         version: 2.11.11(@testing-library/jest-dom@6.9.1)(solid-js@1.9.5)(vite@7.2.0(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
+
+  examples/svelte:
+    dependencies:
+      '@real-router/svelte':
+        specifier: workspace:^
+        version: link:../../packages/svelte
+      svelte:
+        specifier: 5.54.0
+        version: 5.54.0
 
   examples/svelte/async-guards:
     dependencies:
@@ -2261,6 +2301,15 @@ importers:
       vite:
         specifier: 7.2.0
         version: 7.2.0(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)
+
+  examples/vue:
+    dependencies:
+      '@real-router/vue':
+        specifier: workspace:^
+        version: link:../../packages/vue
+      vue:
+        specifier: 3.5.13
+        version: 3.5.13(typescript@6.0.2)
 
   examples/vue/async-guards:
     dependencies:

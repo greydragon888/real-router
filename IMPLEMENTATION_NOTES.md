@@ -1873,7 +1873,10 @@ Turbo has no `--filter-deep` flag. The RFC was closed without implementation. Ou
 ### Also removed
 
 - `pnpm-lock.yaml` from `turbo.json` `global.inputs` — lockfile changes were invalidating cache for ALL tasks across ALL packages. Dependencies are resolved by `pnpm install` before turbo runs.
-- `"examples/*"` from `pnpm-workspace.yaml` — intermediate framework-group packages (`react-examples-shared`, etc.) were unnecessary workspace members with no scripts.
+
+### `examples/*` workspace is required
+
+`examples/react/package.json` (`react-examples-shared`) hosts shared deps (`react`, `@types/react`, `@real-router/react`) for all nested examples. `../shared/Layout.tsx` imports from these — without the workspace entry, pnpm doesn't install them and `tsc -b` fails with "Cannot find module 'react'".
 
 ## Leading Zeros in `numberFormat: "auto"` (search-params)
 
