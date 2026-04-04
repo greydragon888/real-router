@@ -1,5 +1,35 @@
 # search-params
 
+## 0.2.2
+
+### Minor Changes
+
+- Add comma array format decode — parse roundtrip now works (#396)
+
+`parse("items=a,b,c", { arrayFormat: "comma" })` now returns `{ items: ["a", "b", "c"] }` instead of `{ items: "a,b,c" }`.
+
+- Added `decodeValue` method to `ArrayStrategy` interface
+- Comma strategy splits on unencoded commas; encoded `%2C` stays as literal
+- Each element passes through number/boolean strategies
+- Single values without commas remain scalars (no array wrapping)
+- Empty array encode changed from `"key="` to `""` (consistent with other formats)
+
+## 0.2.1
+
+### Patch Changes
+
+- Fix `numberFormat: "auto"` lossy roundtrip for leading zeros and unsafe integers
+
+`autoNumberStrategy.decode("00")` no longer returns `0` — leading zeros are preserved as strings. Similarly, integers beyond `Number.MAX_SAFE_INTEGER` stay as strings to prevent precision loss.
+
+- Leading zeros (`"00"`, `"007"`, `"01"`) → `null` (remain strings)
+- Unsafe integers (`"99999999999999999"`) → `null` (remain strings)
+- `"0"` and `"0.5"` still parse as numbers (canonical forms)
+
+### Bug fix
+
+- Fix `defaultParseQueryString` missing URI decoding in `path-matcher` — `decodeURIComponent` now applied to both keys and values
+
 ## 0.2.0
 
 ### Minor Changes

@@ -132,6 +132,21 @@ function processParamChunk(
   }
 
   const decodedName = decodeValue(searchPart.slice(start, nameEnd));
+
+  // Comma array decode: split raw value before individual element decoding
+  if (!hasBrackets && hasValue && strategies?.array.decodeValue) {
+    const rawValue = searchPart.slice(eqPos + 1, end);
+    const parts = strategies.array.decodeValue(rawValue);
+
+    if (parts) {
+      for (const part of parts) {
+        addToParams(params, decodedName, decode(part, strategies), true);
+      }
+
+      return;
+    }
+  }
+
   const decodedValue = decodeParamValue(
     searchPart,
     eqPos,

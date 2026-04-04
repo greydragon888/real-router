@@ -7,7 +7,6 @@ import {
   arbSearchParamsEncodable,
   arbOptions,
   arbOptionsNoAutoNumber,
-  arbOptionsNonComma,
   arbSafeKey,
   arbSafeString,
   normalizeForComparison,
@@ -30,7 +29,7 @@ describe("parse/build roundtrip", () => {
     },
   );
 
-  test.prop([arbSearchParams, arbOptionsNonComma], {
+  test.prop([arbSearchParams, arbOptions], {
     numRuns: NUM_RUNS.standard,
   })(
     "roundtrip with type normalization: parse(build(params, opts), opts) ≈ normalizeForComparison(params, opts)",
@@ -45,7 +44,7 @@ describe("parse/build roundtrip", () => {
 });
 
 describe("stability", () => {
-  test.prop([arbSearchParams, arbOptionsNonComma], {
+  test.prop([arbSearchParams, arbOptions], {
     numRuns: NUM_RUNS.standard,
   })(
     "stability: parse(build(parse(build(p)), opts)) ≡ parse(build(p, opts))",
@@ -149,7 +148,7 @@ describe("encode/decode fidelity", () => {
         minKeys: 1,
         maxKeys: 5,
       }),
-      arbOptionsNonComma,
+      arbOptions,
     ],
     { numRuns: NUM_RUNS.standard },
   )(

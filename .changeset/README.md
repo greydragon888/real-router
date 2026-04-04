@@ -257,7 +257,7 @@ Move validation to core
 
 **Problem:** `route-tree` is private (`"private": true`).
 
-**Solution:** Don't create changesets for private packages.
+**Solution:** Don't create changesets for private packages. Instead, create a changeset for the **public consumer** whose behavior changed (e.g., `@real-router/core` depends on `route-tree` via `workspace:^`). The user-facing behavior changed in core, not in the internal package.
 
 ### ❌ Wrong Version Bump
 

@@ -69,6 +69,29 @@ describe("array format roundtrip", () => {
       expect(parsed).toStrictEqual({ ...params });
     },
   );
+
+  test.prop(
+    [
+      fc.dictionary(
+        arbSafeKey,
+        fc.array(arbSafeString, { minLength: 2, maxLength: 5 }),
+        { minKeys: 1, maxKeys: 3 },
+      ),
+    ],
+    { numRuns: NUM_RUNS.standard },
+  )(
+    "comma format: multi-element string arrays roundtrip correctly",
+    (params: Record<string, string[]>) => {
+      const opts = {
+        arrayFormat: "comma" as ArrayFormat,
+        numberFormat: "none" as NumberFormat,
+      };
+      const qs = build(params, opts);
+      const parsed = parse(qs, opts);
+
+      expect(parsed).toStrictEqual({ ...params });
+    },
+  );
 });
 
 describe("boolean format roundtrip", () => {

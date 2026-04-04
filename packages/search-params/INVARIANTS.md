@@ -14,7 +14,7 @@
 | 6   | No `?` prefix from build          | `build(params, opts)` never returns a string starting with `?`. Callers are responsible for prepending the separator when needed.                                                               |
 | 7   | Percent-encoding roundtrip        | Values containing special characters (spaces, `&`, `=`, `?`, `#`, `+`, `/`) survive the `build → parse` cycle losslessly via `encodeURIComponent`/`decodeURIComponent`.                         |
 | 8   | Undefined exclusion               | `build(params)` silently drops keys whose value is `undefined`, producing the same output as building without those keys.                                                                       |
-| 9   | Empty array erasure               | `build({key: []})` produces an empty string for that key (non-comma formats), so `parse(build({key: []}))` does not contain `key`.                                                              |
+| 9   | Empty array erasure               | `build({key: []})` produces an empty string for that key (all formats including comma), so `parse(build({key: []}))` does not contain `key`.                                                    |
 
 ## Omit / Keep
 
@@ -45,6 +45,7 @@
 | --- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | Array format: brackets/index         | `parse(build(params, {arrayFormat}), {arrayFormat}) === params` for `"brackets"` and `"index"` formats with string arrays.                                                                                                                               |
 | 2   | Array format: none (multi-element)   | Multi-element string arrays roundtrip correctly with `arrayFormat: "none"` via repeated keys.                                                                                                                                                            |
+| 2a  | Array format: comma (multi-element)  | Multi-element string arrays roundtrip correctly with `arrayFormat: "comma"`. Unencoded commas are separators; encoded `%2C` stays literal. Single values without commas remain scalars.                                                                   |
 | 3   | Boolean format: auto                 | `parse(build(params, {booleanFormat: "auto"}), {booleanFormat: "auto"}) === params`. Boolean types are preserved through the cycle.                                                                                                                      |
 | 4   | Boolean format: empty-true           | `true` values roundtrip correctly with `booleanFormat: "empty-true"` (key-only encoding).                                                                                                                                                                |
 | 5   | Null format: default                 | `parse(build(params, {nullFormat: "default"})) === params`. `null` is encoded as a key-only entry and parsed back as `null`.                                                                                                                             |
@@ -63,4 +64,4 @@
 | `tests/property/parseBuild.properties.ts` | 1–9        | Core parse/build cycle     |
 | `tests/property/omitKeep.properties.ts`   | 1–10       | Omit and keep operations   |
 | `tests/property/parseInto.properties.ts`  | 1–3        | parseInto equivalence      |
-| `tests/property/formats.properties.ts`    | 1–12       | Format-specific roundtrips |
+| `tests/property/formats.properties.ts`    | 1–13       | Format-specific roundtrips |

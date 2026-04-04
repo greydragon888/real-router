@@ -24,6 +24,15 @@ export interface ArrayStrategy {
    * @returns Query string segment (e.g., "items=a&items=b" or "items=a,b")
    */
   encodeArray: (name: string, values: unknown[]) => string;
+
+  /**
+   * Splits a raw (URI-encoded) value into array parts during parsing.
+   * Returns null if the value is not an array in this format.
+   *
+   * @param rawValue - Raw value before URI decoding
+   * @returns Array of raw parts, or null if not an array
+   */
+  decodeValue?: (rawValue: string) => string[] | null;
 }
 
 // =============================================================================
@@ -115,7 +124,7 @@ export const indexArrayStrategy: ArrayStrategy = {
 export const commaArrayStrategy: ArrayStrategy = {
   encodeArray: (name, values) => {
     if (values.length === 0) {
-      return `${name}=`;
+      return "";
     }
 
     let result = `${name}=${encodeValue(values[0])}`;
@@ -125,6 +134,16 @@ export const commaArrayStrategy: ArrayStrategy = {
     }
 
     return result;
+  },
+
+  decodeValue: (rawValue) => {
+    // No unencoded comma → not an array (single value).
+    // Encoded commas (%2C) are part of the value, not separators.
+    if (!rawValue.includes(",")) {
+      return null;
+    }
+
+    return rawValue.split(",");
   },
 };
 
