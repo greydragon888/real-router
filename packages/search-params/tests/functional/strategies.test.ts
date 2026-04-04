@@ -130,18 +130,21 @@ describe("search-params strategies", () => {
         expect(autoNumberStrategy.decode("1.2.3")).toBe(null);
       });
 
-      it("should parse leading zeros (lossy roundtrip)", () => {
-        expect(autoNumberStrategy.decode("01")).toBe(1);
-        expect(autoNumberStrategy.decode("007")).toBe(7);
-        expect(autoNumberStrategy.decode("00")).toBe(0);
+      it("should preserve leading zeros as strings (not parse as numbers)", () => {
+        expect(autoNumberStrategy.decode("01")).toBeNull();
+        expect(autoNumberStrategy.decode("007")).toBeNull();
+        expect(autoNumberStrategy.decode("00")).toBeNull();
       });
 
-      it("should lose precision for numbers beyond Number.MAX_SAFE_INTEGER", () => {
-        const unsafeInt = "99999999999999999";
-        const result = autoNumberStrategy.decode(unsafeInt);
+      it("should preserve unsafe integers as strings (not parse as numbers)", () => {
+        expect(autoNumberStrategy.decode("99999999999999999")).toBeNull();
+        expect(autoNumberStrategy.decode("9007199254740992")).toBeNull(); // MAX_SAFE_INTEGER + 1
+      });
 
-        expect(result).toBe(Number(unsafeInt));
-        expect(Number.isSafeInteger(result)).toBe(false);
+      it("should parse safe integers", () => {
+        expect(autoNumberStrategy.decode("9007199254740991")).toBe(
+          Number.MAX_SAFE_INTEGER,
+        );
       });
     });
   });
