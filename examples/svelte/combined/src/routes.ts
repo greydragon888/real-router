@@ -1,9 +1,16 @@
+import { z } from "zod";
+
 import { can } from "../../../shared/abilities";
 import { api } from "../../../shared/api";
 import { store } from "../../../shared/store";
 
 import type { AppDependencies } from "./types";
 import type { GuardFnFactory, Params, Route } from "@real-router/core";
+
+const productsListSchema = z.object({
+  page: z.number().int().positive().default(1),
+  sort: z.enum(["name", "price", "date"]).default("name"),
+});
 
 function loadRoute(routeName: string, fetcher: () => Promise<unknown>): void {
   store.set(`${routeName}:loading`, true);
@@ -81,7 +88,9 @@ export const privateRoutes: Route<AppDependencies>[] = [
     children: [
       {
         name: "list",
-        path: "/list",
+        path: "/list?page&sort",
+        defaultParams: { page: 1, sort: "name" },
+        searchSchema: productsListSchema,
         preload: async () => {
           const data = await api.getProducts();
 

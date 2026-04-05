@@ -1,0 +1,26 @@
+{
+  "name": "svelte-search-schema-example",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@real-router/browser-plugin": "workspace:^",
+    "@real-router/core": "workspace:^",
+    "@real-router/search-schema-plugin": "workspace:^",
+    "@real-router/svelte": "workspace:^",
+    "svelte": "5.54.0",
+    "zod": "3.24.4"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.58.2",
+    "@sveltejs/vite-plugin-svelte": "6.2.4",
+    "typescript": "5.8.3",
+    "vite": "7.2.0"
+  }
+}

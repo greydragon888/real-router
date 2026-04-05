@@ -36,6 +36,7 @@ real-router/
 │   ├── lifecycle-plugin/          # Route-level lifecycle hooks: onEnter, onStay, onLeave
 │   ├── preload-plugin/           # Preload on navigation intent (hover, touch) via event delegation
 │   ├── validation-plugin/         # Opt-in argument validation (DX-only, 100% tree-shakeable)
+│   ├── search-schema-plugin/     # Runtime search param validation via Standard Schema (Zod, Valibot, ArkType)
 │   ├── route-utils/               # Route tree queries and segment testing
 │   ├── logger/                    # Isomorphic structured logging
 │   ├── fsm/                       # Finite state machine engine (internal, published by accident)
@@ -57,7 +58,7 @@ real-router/
 │   │   └── ssg/                   # Static site generation with Vite
 ```
 
-**Public packages** (published to npm): `core`, `core-types`, `react`, `preact`, `solid`, `vue`, `svelte`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `lifecycle-plugin`, `preload-plugin`, `validation-plugin`, `route-utils`, `logger`
+**Public packages** (published to npm): `core`, `core-types`, `react`, `preact`, `solid`, `vue`, `svelte`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `lifecycle-plugin`, `preload-plugin`, `validation-plugin`, `search-schema-plugin`, `route-utils`, `logger`
 
 **Internal packages** (bundled into consumers, not on npm): `route-tree`, `path-matcher`, `search-params`, `type-guards`, `event-emitter`, `browser-env`, `dom-utils`
 
@@ -167,6 +168,9 @@ graph TD
 
     VP["validation-plugin"]
     VP -->|dep| CORE
+
+    SSP["search-schema-plugin"]
+    SSP -->|dep| CORE
 
     ROUTEUTILS -->|dep| TYPES
 ```

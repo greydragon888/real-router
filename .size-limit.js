@@ -155,6 +155,13 @@ export default [
     ignore: ["@real-router/core"],
     modifyEsbuildConfig: addDevelopmentCondition,
   },
+  {
+    name: "@real-router/search-schema-plugin (ESM)",
+    path: "packages/search-schema-plugin/dist/esm/index.mjs",
+    limit: "1.1 kB",
+    ignore: ["@real-router/core"],
+    modifyEsbuildConfig: addDevelopmentCondition,
+  },
 
   // ── Utilities ─────────────────────────────────────────────────────
   {

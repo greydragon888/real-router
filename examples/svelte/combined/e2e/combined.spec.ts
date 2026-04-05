@@ -221,4 +221,23 @@ test.describe("Combined Example", () => {
       await expect(page).toHaveURL(/\/dashboard/);
     });
   });
+
+  test.describe("Search schema validation", () => {
+    test("products list URL includes validated query params", async ({
+      page,
+    }) => {
+      await login(page);
+      await page.click(".sidebar a:has-text('Products')");
+      await expect(page).toHaveURL(/\/products\/list/);
+      await expect(page).toHaveURL(/page=1/);
+      await expect(page).toHaveURL(/sort=name/);
+    });
+
+    test("invalid query params recovered to defaults", async ({ page }) => {
+      await login(page);
+      await page.goto("/products/list?page=-1&sort=invalid");
+      await expect(page).toHaveURL(/page=1/);
+      await expect(page).toHaveURL(/sort=name/);
+    });
+  });
 });

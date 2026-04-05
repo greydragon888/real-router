@@ -17,8 +17,10 @@
     "@real-router/preload-plugin": "workspace:^",
     "@real-router/logger-plugin": "workspace:^",
     "@real-router/persistent-params-plugin": "workspace:^",
+    "@real-router/search-schema-plugin": "workspace:^",
     "@real-router/svelte": "workspace:^",
-    "svelte": "5.54.0"
+    "svelte": "5.54.0",
+    "zod": "3.24.4"
   },
   "devDependencies": {
     "@playwright/test": "1.58.2",

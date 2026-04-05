@@ -331,9 +331,15 @@ importers:
       '@real-router/preload-plugin':
         specifier: workspace:^
         version: link:../../../packages/preload-plugin
+      '@real-router/search-schema-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/search-schema-plugin
       preact:
         specifier: 10.28.2
         version: 10.28.2
+      zod:
+        specifier: 3.24.4
+        version: 3.24.4
     devDependencies:
       '@playwright/test':
         specifier: 1.58.2
@@ -607,6 +613,40 @@ importers:
         specifier: 7.2.0
         version: 7.2.0(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)
 
+  examples/preact/search-schema:
+    dependencies:
+      '@real-router/browser-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/browser-plugin
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../../../packages/core
+      '@real-router/preact':
+        specifier: workspace:^
+        version: link:../../../packages/preact
+      '@real-router/search-schema-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/search-schema-plugin
+      preact:
+        specifier: 10.28.2
+        version: 10.28.2
+      zod:
+        specifier: 3.24.4
+        version: 3.24.4
+    devDependencies:
+      '@playwright/test':
+        specifier: 1.58.2
+        version: 1.58.2
+      '@preact/preset-vite':
+        specifier: 2.10.5
+        version: 2.10.5(@babel/core@7.29.0)(preact@10.28.2)(rollup@4.60.1)(vite@7.2.0(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
+      typescript:
+        specifier: 5.8.3
+        version: 5.8.3
+      vite:
+        specifier: 7.2.0
+        version: 7.2.0(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)
+
   examples/react:
     dependencies:
       '@real-router/react':
@@ -781,12 +821,18 @@ importers:
       '@real-router/react':
         specifier: workspace:^
         version: link:../../../packages/react
+      '@real-router/search-schema-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/search-schema-plugin
       react:
         specifier: 19.2.0
         version: 19.2.0
       react-dom:
         specifier: 19.2.0
         version: 19.2.0(react@19.2.0)
+      zod:
+        specifier: 3.24.4
+        version: 3.24.4
     devDependencies:
       '@playwright/test':
         specifier: 1.58.2
@@ -1234,6 +1280,49 @@ importers:
         specifier: 7.2.0
         version: 7.2.0(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)
 
+  examples/react/search-schema:
+    dependencies:
+      '@real-router/browser-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/browser-plugin
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../../../packages/core
+      '@real-router/react':
+        specifier: workspace:^
+        version: link:../../../packages/react
+      '@real-router/search-schema-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/search-schema-plugin
+      react:
+        specifier: 19.2.0
+        version: 19.2.0
+      react-dom:
+        specifier: 19.2.0
+        version: 19.2.0(react@19.2.0)
+      zod:
+        specifier: 3.24.4
+        version: 3.24.4
+    devDependencies:
+      '@playwright/test':
+        specifier: 1.58.2
+        version: 1.58.2
+      '@types/react':
+        specifier: 19.2.14
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: 19.2.3
+        version: 19.2.3(@types/react@19.2.14)
+      '@vitejs/plugin-react':
+        specifier: 5.2.0
+        version: 5.2.0(vite@7.2.0(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
+      typescript:
+        specifier: 5.8.3
+        version: 5.8.3
+      vite:
+        specifier: 7.2.0
+        version: 7.2.0(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)
+
   examples/react/ssg:
     dependencies:
       '@real-router/browser-plugin':
@@ -1472,12 +1561,18 @@ importers:
       '@real-router/preload-plugin':
         specifier: workspace:^
         version: link:../../../packages/preload-plugin
+      '@real-router/search-schema-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/search-schema-plugin
       '@real-router/solid':
         specifier: workspace:^
         version: link:../../../packages/solid
       solid-js:
         specifier: 1.9.5
         version: 1.9.5
+      zod:
+        specifier: 3.24.4
+        version: 3.24.4
     devDependencies:
       '@playwright/test':
         specifier: 1.58.2
@@ -1751,6 +1846,40 @@ importers:
         specifier: 2.11.11
         version: 2.11.11(@testing-library/jest-dom@6.9.1)(solid-js@1.9.5)(vite@7.2.0(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
 
+  examples/solid/search-schema:
+    dependencies:
+      '@real-router/browser-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/browser-plugin
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../../../packages/core
+      '@real-router/search-schema-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/search-schema-plugin
+      '@real-router/solid':
+        specifier: workspace:^
+        version: link:../../../packages/solid
+      solid-js:
+        specifier: 1.9.5
+        version: 1.9.5
+      zod:
+        specifier: 3.24.4
+        version: 3.24.4
+    devDependencies:
+      '@playwright/test':
+        specifier: 1.58.2
+        version: 1.58.2
+      typescript:
+        specifier: 5.8.3
+        version: 5.8.3
+      vite:
+        specifier: 7.2.0
+        version: 7.2.0(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)
+      vite-plugin-solid:
+        specifier: 2.11.11
+        version: 2.11.11(@testing-library/jest-dom@6.9.1)(solid-js@1.9.5)(vite@7.2.0(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
+
   examples/solid/signal-primitives:
     dependencies:
       '@real-router/browser-plugin':
@@ -1969,12 +2098,18 @@ importers:
       '@real-router/preload-plugin':
         specifier: workspace:^
         version: link:../../../packages/preload-plugin
+      '@real-router/search-schema-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/search-schema-plugin
       '@real-router/svelte':
         specifier: workspace:^
         version: link:../../../packages/svelte
       svelte:
         specifier: 5.54.0
         version: 5.54.0
+      zod:
+        specifier: 3.24.4
+        version: 3.24.4
     devDependencies:
       '@playwright/test':
         specifier: 1.58.2
@@ -2326,6 +2461,40 @@ importers:
         specifier: 7.2.0
         version: 7.2.0(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)
 
+  examples/svelte/search-schema:
+    dependencies:
+      '@real-router/browser-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/browser-plugin
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../../../packages/core
+      '@real-router/search-schema-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/search-schema-plugin
+      '@real-router/svelte':
+        specifier: workspace:^
+        version: link:../../../packages/svelte
+      svelte:
+        specifier: 5.54.0
+        version: 5.54.0
+      zod:
+        specifier: 3.24.4
+        version: 3.24.4
+    devDependencies:
+      '@playwright/test':
+        specifier: 1.58.2
+        version: 1.58.2
+      '@sveltejs/vite-plugin-svelte':
+        specifier: 6.2.4
+        version: 6.2.4(svelte@5.54.0)(vite@7.2.0(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
+      typescript:
+        specifier: 5.8.3
+        version: 5.8.3
+      vite:
+        specifier: 7.2.0
+        version: 7.2.0(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)
+
   examples/svelte/snippets-routing:
     dependencies:
       '@real-router/browser-plugin':
@@ -2500,12 +2669,18 @@ importers:
       '@real-router/preload-plugin':
         specifier: workspace:^
         version: link:../../../packages/preload-plugin
+      '@real-router/search-schema-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/search-schema-plugin
       '@real-router/vue':
         specifier: workspace:^
         version: link:../../../packages/vue
       vue:
         specifier: 3.5.13
         version: 3.5.13(typescript@5.8.3)
+      zod:
+        specifier: 3.24.4
+        version: 3.24.4
     devDependencies:
       '@playwright/test':
         specifier: 1.58.2
@@ -2862,6 +3037,43 @@ importers:
         specifier: 3.2.6
         version: 3.2.6(typescript@5.8.3)
 
+  examples/vue/search-schema:
+    dependencies:
+      '@real-router/browser-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/browser-plugin
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../../../packages/core
+      '@real-router/search-schema-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/search-schema-plugin
+      '@real-router/vue':
+        specifier: workspace:^
+        version: link:../../../packages/vue
+      vue:
+        specifier: 3.5.13
+        version: 3.5.13(typescript@5.8.3)
+      zod:
+        specifier: 3.24.4
+        version: 3.24.4
+    devDependencies:
+      '@playwright/test':
+        specifier: 1.58.2
+        version: 1.58.2
+      '@vitejs/plugin-vue':
+        specifier: 6.0.5
+        version: 6.0.5(vite@7.2.0(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))(vue@3.5.13(typescript@5.8.3))
+      typescript:
+        specifier: 5.8.3
+        version: 5.8.3
+      vite:
+        specifier: 7.2.0
+        version: 7.2.0(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)
+      vue-tsc:
+        specifier: 3.2.6
+        version: 3.2.6(typescript@5.8.3)
+
   examples/vue/v-link-directive:
     dependencies:
       '@real-router/browser-plugin':
@@ -3139,6 +3351,12 @@ importers:
         version: link:../core
 
   packages/search-params: {}
+
+  packages/search-schema-plugin:
+    dependencies:
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../core
 
   packages/solid:
     dependencies:
@@ -9274,6 +9492,9 @@ packages:
 
   zimmerframe@1.1.4:
     resolution: {integrity: sha512-B58NGBEoc8Y9MWWCQGl/gq9xBCe4IiKM0a2x7GZdQKOW5Exr8S1W24J6OgM1njK8xCRGvAJIL/MxXHf6SkmQKQ==}
+
+  zod@3.24.4:
+    resolution: {integrity: sha512-OdqJE9UDRPwWsrHjLN2F8bPxvwJBK22EHLWtanu0LSYr5YqzsaaW3RMgmjwr8Rypg5k+meEJdSPXJZXE/yqOMg==}
 
   zod@4.3.6:
     resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
@@ -15562,5 +15783,7 @@ snapshots:
   yoctocolors@2.1.2: {}
 
   zimmerframe@1.1.4: {}
+
+  zod@3.24.4: {}
 
   zod@4.3.6: {}
