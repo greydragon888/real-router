@@ -5,6 +5,178 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-04-05]
+
+### @real-router/core@0.45.0
+
+### Minor Changes
+
+- [#406](https://github.com/greydragon888/real-router/pull/406) [`027fd5f`](https://github.com/greydragon888/real-router/commit/027fd5f300b6abdd365580f7f2d0c1229822f76f) Thanks [@greydragon888](https://github.com/greydragon888)! - Add interceptable `add` method for route addition hooks ([#406](https://github.com/greydragon888/real-router/issues/406))
+
+  The `add` method in `getRoutesApi()` is now interceptable via `addInterceptor("add", fn)`. Plugins can hook into dynamic route additions to perform validation or side effects when routes are added at runtime.
+
+### Patch Changes
+
+- Updated dependencies [[`027fd5f`](https://github.com/greydragon888/real-router/commit/027fd5f300b6abdd365580f7f2d0c1229822f76f)]:
+  - @real-router/types@0.31.0
+
+### @real-router/search-schema-plugin@0.1.0
+
+### Minor Changes
+
+- [#406](https://github.com/greydragon888/real-router/pull/406) [`027fd5f`](https://github.com/greydragon888/real-router/commit/027fd5f300b6abdd365580f7f2d0c1229822f76f) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `@real-router/search-schema-plugin` — runtime search parameter validation via Standard Schema V1 ([#406](https://github.com/greydragon888/real-router/issues/406))
+
+  New plugin that validates search parameters against Standard Schema V1 (Zod 3.24+, Valibot 1.0+, ArkType) using the `forwardState` interceptor.
+
+  Features:
+  - Automatic strip of invalid params + merge with `defaultParams` for recovery
+  - `mode: "development"` (console.error) / `"production"` (silent strip)
+  - `strict` mode to remove unknown params
+  - Custom `onError` callback for full control
+  - Dev-time `defaultParams` validation at `usePlugin()` time
+  - Dynamic route validation via `add` interceptor
+
+### Patch Changes
+
+- Updated dependencies [[`027fd5f`](https://github.com/greydragon888/real-router/commit/027fd5f300b6abdd365580f7f2d0c1229822f76f)]:
+  - @real-router/core@0.45.0
+
+### @real-router/types@0.31.0
+
+### Minor Changes
+
+- [#406](https://github.com/greydragon888/real-router/pull/406) [`027fd5f`](https://github.com/greydragon888/real-router/commit/027fd5f300b6abdd365580f7f2d0c1229822f76f) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `add` to `InterceptableMethodMap` interface ([#406](https://github.com/greydragon888/real-router/issues/406))
+
+  New `add` entry in `InterceptableMethodMap` enables type-safe `addInterceptor("add", fn)` for plugins that need to react to dynamic route additions.
+
+### @real-router/browser-plugin@0.11.4
+
+### Patch Changes
+
+- Updated dependencies [[`027fd5f`](https://github.com/greydragon888/real-router/commit/027fd5f300b6abdd365580f7f2d0c1229822f76f)]:
+  - @real-router/core@0.45.0
+
+### @real-router/hash-plugin@0.2.11
+
+### Patch Changes
+
+- Updated dependencies [[`027fd5f`](https://github.com/greydragon888/real-router/commit/027fd5f300b6abdd365580f7f2d0c1229822f76f)]:
+  - @real-router/core@0.45.0
+
+### @real-router/lifecycle-plugin@0.1.1
+
+### Patch Changes
+
+- Updated dependencies [[`027fd5f`](https://github.com/greydragon888/real-router/commit/027fd5f300b6abdd365580f7f2d0c1229822f76f)]:
+  - @real-router/core@0.45.0
+
+### @real-router/logger-plugin@0.4.1
+
+### Patch Changes
+
+- Updated dependencies [[`027fd5f`](https://github.com/greydragon888/real-router/commit/027fd5f300b6abdd365580f7f2d0c1229822f76f)]:
+  - @real-router/core@0.45.0
+
+### @real-router/persistent-params-plugin@0.1.49
+
+### Patch Changes
+
+- Updated dependencies [[`027fd5f`](https://github.com/greydragon888/real-router/commit/027fd5f300b6abdd365580f7f2d0c1229822f76f)]:
+  - @real-router/core@0.45.0
+
+### @real-router/preact@0.2.6
+
+### Patch Changes
+
+- Updated dependencies [[`027fd5f`](https://github.com/greydragon888/real-router/commit/027fd5f300b6abdd365580f7f2d0c1229822f76f)]:
+  - @real-router/core@0.45.0
+  - dom-utils@0.2.7
+  - @real-router/sources@0.4.1
+  - @real-router/route-utils@0.1.11
+
+### @real-router/preload-plugin@0.1.1
+
+### Patch Changes
+
+- Updated dependencies [[`027fd5f`](https://github.com/greydragon888/real-router/commit/027fd5f300b6abdd365580f7f2d0c1229822f76f)]:
+  - @real-router/core@0.45.0
+
+### @real-router/react@0.14.6
+
+### Patch Changes
+
+- Updated dependencies [[`027fd5f`](https://github.com/greydragon888/real-router/commit/027fd5f300b6abdd365580f7f2d0c1229822f76f)]:
+  - @real-router/core@0.45.0
+  - dom-utils@0.2.7
+  - @real-router/sources@0.4.1
+  - @real-router/route-utils@0.1.11
+
+### @real-router/route-utils@0.1.11
+
+### Patch Changes
+
+- Updated dependencies [[`027fd5f`](https://github.com/greydragon888/real-router/commit/027fd5f300b6abdd365580f7f2d0c1229822f76f)]:
+  - @real-router/types@0.31.0
+
+### @real-router/rx@0.2.1
+
+### Patch Changes
+
+- Updated dependencies [[`027fd5f`](https://github.com/greydragon888/real-router/commit/027fd5f300b6abdd365580f7f2d0c1229822f76f)]:
+  - @real-router/core@0.45.0
+
+### @real-router/solid@0.2.6
+
+### Patch Changes
+
+- Updated dependencies [[`027fd5f`](https://github.com/greydragon888/real-router/commit/027fd5f300b6abdd365580f7f2d0c1229822f76f)]:
+  - @real-router/core@0.45.0
+  - dom-utils@0.2.7
+  - @real-router/sources@0.4.1
+  - @real-router/route-utils@0.1.11
+
+### @real-router/sources@0.4.1
+
+### Patch Changes
+
+- Updated dependencies [[`027fd5f`](https://github.com/greydragon888/real-router/commit/027fd5f300b6abdd365580f7f2d0c1229822f76f)]:
+  - @real-router/core@0.45.0
+  - @real-router/route-utils@0.1.11
+
+### @real-router/ssr-data-plugin@0.1.7
+
+### Patch Changes
+
+- Updated dependencies [[`027fd5f`](https://github.com/greydragon888/real-router/commit/027fd5f300b6abdd365580f7f2d0c1229822f76f)]:
+  - @real-router/core@0.45.0
+
+### @real-router/svelte@0.2.6
+
+### Patch Changes
+
+- Updated dependencies [[`027fd5f`](https://github.com/greydragon888/real-router/commit/027fd5f300b6abdd365580f7f2d0c1229822f76f)]:
+  - @real-router/core@0.45.0
+  - dom-utils@0.2.7
+  - @real-router/sources@0.4.1
+  - @real-router/route-utils@0.1.11
+
+### @real-router/validation-plugin@0.4.1
+
+### Patch Changes
+
+- Updated dependencies [[`027fd5f`](https://github.com/greydragon888/real-router/commit/027fd5f300b6abdd365580f7f2d0c1229822f76f)]:
+  - @real-router/core@0.45.0
+
+### @real-router/vue@0.3.1
+
+### Patch Changes
+
+- Updated dependencies [[`027fd5f`](https://github.com/greydragon888/real-router/commit/027fd5f300b6abdd365580f7f2d0c1229822f76f)]:
+  - @real-router/core@0.45.0
+  - dom-utils@0.2.7
+  - @real-router/sources@0.4.1
+  - @real-router/route-utils@0.1.11
+
 ## [2026-04-04]
 
 ### @real-router/preload-plugin@0.1.0
