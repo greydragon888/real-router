@@ -49,11 +49,11 @@ real-router/
 │   └── type-guards/               # Runtime type validation (internal)
 ├── examples/
 │   ├── shared/                    # Shared store, API, abilities, styles
-│   ├── react/    (16 examples)    # React 19.2+ examples + 8 e2e suites
-│   ├── preact/   (11 examples)    # Preact examples + 8 e2e suites
-│   ├── solid/    (14 examples)    # Solid.js examples + 8 e2e suites
-│   ├── vue/      (14 examples)    # Vue 3 SFC examples + 8 e2e suites
-│   ├── svelte/   (15 examples)    # Svelte 5 examples + 8 e2e suites
+│   ├── react/    (17 examples)    # React 19.2+ examples + 9 e2e suites
+│   ├── preact/   (12 examples)    # Preact examples + 9 e2e suites
+│   ├── solid/    (15 examples)    # Solid.js examples + 9 e2e suites
+│   ├── vue/      (15 examples)    # Vue 3 SFC examples + 9 e2e suites
+│   ├── svelte/   (16 examples)    # Svelte 5 examples + 9 e2e suites
 │   │   ├── ssr/                    # Server-side rendering with Express + Vite
 │   │   └── ssg/                   # Static site generation with Vite
 ```
