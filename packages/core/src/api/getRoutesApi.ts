@@ -2,7 +2,7 @@ import { logger } from "@real-router/logger";
 
 import { throwIfDisposed } from "./helpers";
 import { guardRouteStructure } from "../guards";
-import { getInternals } from "../internals";
+import { createInterceptable, getInternals } from "../internals";
 import {
   clearConfigEntries,
   removeFromDefinitions,
@@ -405,6 +405,14 @@ export function getRoutesApi<
 
   const store = ctx.routeGetStore();
 
+  const interceptableAdd = createInterceptable(
+    "add",
+    (routeArray: Route<Dependencies>[], options?: { parent?: string }) => {
+      addRoutes(store, routeArray, options?.parent);
+    },
+    ctx.interceptors,
+  );
+
   return {
     add: (routes, options) => {
       throwIfDisposed(ctx.isDisposed);
@@ -422,7 +430,10 @@ export function getRoutesApi<
       ctx.validator?.routes.validateAddRouteArgs(routeArray);
       ctx.validator?.routes.validateRoutes(routeArray, store);
 
-      addRoutes(store, routeArray, parentName);
+      interceptableAdd(
+        routeArray,
+        parentName === undefined ? undefined : { parent: parentName },
+      );
     },
 
     remove: (name) => {

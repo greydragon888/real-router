@@ -35,6 +35,7 @@ export interface InterceptableMethodMap {
   start: (path?: string) => Promise<State>;
   buildPath: (route: string, params?: Params) => string;
   forwardState: (routeName: string, routeParams: Params) => SimpleState;
+  add: (routes: Route[], options?: { parent?: string }) => void;
 }
 
 /**
