@@ -130,11 +130,11 @@ export const createConfig = (opts: CreateConfigOptions = {}): UserConfig[] => {
  */
 export const createBrowserConfig = (
   opts: Omit<CreateConfigOptions, "platform"> = {},
-) => createConfig({ ...opts, platform: "browser" });
+): UserConfig[] => createConfig({ ...opts, platform: "browser" });
 
 /**
  * Creates configuration for isomorphic package (browser + server)
  */
 export const createIsomorphicConfig = (
   opts: Omit<CreateConfigOptions, "platform"> = {},
-) => createConfig({ ...opts, platform: "neutral" });
+): UserConfig[] => createConfig({ ...opts, platform: "neutral" });
