@@ -31,6 +31,7 @@ export const SCOPES = [
   "ssr-data-plugin",
   "preload-plugin",
   "validation-plugin",
+  "search-schema-plugin",
   "react",
   "preact",
   "solid",
