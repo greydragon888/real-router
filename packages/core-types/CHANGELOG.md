@@ -1,5 +1,13 @@
 # @real-router/types
 
+## 0.31.0
+
+### Minor Changes
+
+- [#406](https://github.com/greydragon888/real-router/pull/406) [`027fd5f`](https://github.com/greydragon888/real-router/commit/027fd5f300b6abdd365580f7f2d0c1229822f76f) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `add` to `InterceptableMethodMap` interface ([#406](https://github.com/greydragon888/real-router/issues/406))
+
+  New `add` entry in `InterceptableMethodMap` enables type-safe `addInterceptor("add", fn)` for plugins that need to react to dynamic route additions.
+
 ## 0.30.0
 
 ### Minor Changes

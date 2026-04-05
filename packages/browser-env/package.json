@@ -1,6 +1,6 @@
 {
   "name": "browser-env",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "private": true,
   "description": "Shared browser API abstractions for Real-Router",
   "main": "./dist/cjs/index.js",
