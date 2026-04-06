@@ -23,6 +23,13 @@ setGlobal("Element", dom.window.Element);
 setGlobal("Node", dom.window.Node);
 setGlobal("MouseEvent", dom.window.MouseEvent);
 setGlobal("MutationObserver", dom.window.MutationObserver);
+setGlobal("SVGElement", dom.window.SVGElement);
+// Vue checks `container instanceof MathMLElement` — needs a real constructor
+setGlobal(
+  "MathMLElement",
+  (dom.window as unknown as Record<string, unknown>).MathMLElement ??
+    dom.window.HTMLElement,
+);
 setGlobal("sessionStorage", dom.window.sessionStorage);
 setGlobal("getComputedStyle", dom.window.getComputedStyle.bind(dom.window));
 setGlobal("addEventListener", dom.window.addEventListener.bind(dom.window));

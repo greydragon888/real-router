@@ -9,5 +9,6 @@
     "incremental": false
   },
   "files": ["./jsdom.d.ts"],
-  "include": ["./**/*.ts", "./**/*.tsx"]
+  "include": ["./**/*.ts", "./**/*.tsx"],
+  "exclude": ["./real-router/solid/**", "./tanstack/solid/**", "./tanstack/vue/app.tsx"]
 }

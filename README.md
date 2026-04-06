@@ -116,13 +116,23 @@ See [Recipes](https://github.com/greydragon888/real-router/wiki/recipes) for plu
 
 Custom **Segment Trie** matcher — O(segments) traversal, O(1) for static routes.
 
-**~2x faster and >2.5x lighter** than TanStack Router in full client-side navigation benchmarks (React, 10-step navigation loop, 56 subscribers per page):
+**1.7–2.5x faster and 1.5–3x lighter** than TanStack Router in full client-side navigation benchmarks (10-step loop, 56 subscribers per page):
 
-| Metric                | vs TanStack Router                               |
-|-----------------------|--------------------------------------------------|
-| Throughput (ops/sec)  | **~2x faster**                                   |
-| p99 latency           | **2x more predictable**                          |
-| Memory per navigation | **>2.5x fewer allocations** (~2.6 KB vs ~6.8 KB) |
+**Speed** (ops/sec, higher is better):
+
+| Framework | vs TanStack Router |
+|-----------|--------------------|
+| Solid     | **2.5x faster**    |
+| Vue       | **2.1x faster**    |
+| React     | **1.7x faster**    |
+
+**Memory per navigation** (heap bytes, lower is better):
+
+| Framework | vs TanStack Router         |
+|-----------|----------------------------|
+| Solid     | **3.0x fewer allocations** |
+| React     | **2.6x fewer allocations** |
+| Vue       | **1.5x fewer allocations** |
 
 > Benchmark: [packages/router-benchmarks/client-nav](packages/router-benchmarks/client-nav) — identical workload, JSDOM, production builds, `--expose-gc`
 
