@@ -59,7 +59,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright browsers
-        run: npx playwright install chromium --with-deps
+        run: pnpm --filter react-combined-example exec playwright install chromium --with-deps
 
       # Build results cached from examples job via Turbo Remote Cache
       - name: Run E2E tests
