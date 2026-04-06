@@ -120,7 +120,8 @@
       "core-js",
       "esbuild",
       "fsevents",
-      "unrs-resolver"
+      "unrs-resolver",
+      "vue-demi"
     ],
     "peerDependencyRules": {
       "allowedVersions": {
