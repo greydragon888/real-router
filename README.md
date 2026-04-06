@@ -116,8 +116,17 @@ See [Recipes](https://github.com/greydragon888/real-router/wiki/recipes) for plu
 
 Custom **Segment Trie** matcher — O(segments) traversal, O(1) for static routes.
 
+**>2x faster** than TanStack Router in full client-side navigation benchmarks (React, 10-step navigation loop, 56 subscribers per page):
+
+| Metric               | vs TanStack Router      |
+| -------------------- |-------------------------|
+| Throughput (ops/sec) | **>2x faster**          |
+| p99 latency          | **2x more predictable** |
+
+> Benchmark: [packages/router-benchmarks/client-nav](packages/router-benchmarks/client-nav) — identical workload, JSDOM, production builds
+
 <details>
-<summary><b>Benchmarks vs router5 and router6</b></summary>
+<summary><b>Benchmarks vs router5 and router6 (core-level)</b></summary>
 
 **vs [router5](https://github.com/router5/router5):**
 
