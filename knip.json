@@ -15,8 +15,9 @@
       "ignoreDependencies": ["fast-check"]
     },
     "packages/router-benchmarks": {
-      "entry": ["src/**/*.ts"],
-      "project": ["src/**/*.{ts,tsx}"]
+      "entry": ["src/**/*.ts", "client-nav/**/*.{ts,tsx}"],
+      "project": ["src/**/*.{ts,tsx}", "client-nav/**/*.{ts,tsx}"],
+      "ignoreDependencies": ["@tanstack/router-core"]
     },
     "packages/solid": {
       "project": ["src/**/*.{ts,tsx}"],

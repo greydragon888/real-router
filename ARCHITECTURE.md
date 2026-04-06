@@ -35,6 +35,7 @@ real-router/
 │   ├── ssr-data-plugin/           # SSR per-route data loading via start() interceptor
 │   ├── lifecycle-plugin/          # Route-level lifecycle hooks: onEnter, onStay, onLeave
 │   ├── preload-plugin/           # Preload on navigation intent (hover, touch) via event delegation
+│   ├── memory-plugin/             # In-memory history stack: back/forward/go without browser History API
 │   ├── validation-plugin/         # Opt-in argument validation (DX-only, 100% tree-shakeable)
 │   ├── search-schema-plugin/     # Runtime search param validation via Standard Schema (Zod, Valibot, ArkType)
 │   ├── route-utils/               # Route tree queries and segment testing
@@ -49,16 +50,16 @@ real-router/
 │   └── type-guards/               # Runtime type validation (internal)
 ├── examples/
 │   ├── shared/                    # Shared store, API, abilities, styles
-│   ├── react/    (16 examples)    # React 19.2+ examples + 8 e2e suites
-│   ├── preact/   (11 examples)    # Preact examples + 8 e2e suites
-│   ├── solid/    (14 examples)    # Solid.js examples + 8 e2e suites
-│   ├── vue/      (14 examples)    # Vue 3 SFC examples + 8 e2e suites
-│   ├── svelte/   (15 examples)    # Svelte 5 examples + 8 e2e suites
+│   ├── react/    (17 examples)    # React 19.2+ examples + 9 e2e suites
+│   ├── preact/   (12 examples)    # Preact examples + 9 e2e suites
+│   ├── solid/    (15 examples)    # Solid.js examples + 9 e2e suites
+│   ├── vue/      (15 examples)    # Vue 3 SFC examples + 9 e2e suites
+│   ├── svelte/   (16 examples)    # Svelte 5 examples + 9 e2e suites
 │   │   ├── ssr/                    # Server-side rendering with Express + Vite
 │   │   └── ssg/                   # Static site generation with Vite
 ```
 
-**Public packages** (published to npm): `core`, `core-types`, `react`, `preact`, `solid`, `vue`, `svelte`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `lifecycle-plugin`, `preload-plugin`, `validation-plugin`, `search-schema-plugin`, `route-utils`, `logger`
+**Public packages** (published to npm): `core`, `core-types`, `react`, `preact`, `solid`, `vue`, `svelte`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `lifecycle-plugin`, `preload-plugin`, `memory-plugin`, `validation-plugin`, `search-schema-plugin`, `route-utils`, `logger`
 
 **Internal packages** (bundled into consumers, not on npm): `route-tree`, `path-matcher`, `search-params`, `type-guards`, `event-emitter`, `browser-env`, `dom-utils`
 
@@ -165,6 +166,9 @@ graph TD
 
     PLP["preload-plugin"]
     PLP -->|dep| CORE
+
+    MP["memory-plugin"]
+    MP -->|dep| CORE
 
     VP["validation-plugin"]
     VP -->|dep| CORE

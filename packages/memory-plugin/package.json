@@ -1,0 +1,60 @@
+{
+  "name": "@real-router/memory-plugin",
+  "version": "0.1.0",
+  "type": "commonjs",
+  "description": "In-memory history engine for Real-Router — non-browser environments and benchmarks",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.mjs",
+  "types": "./dist/esm/index.d.mts",
+  "exports": {
+    ".": {
+      "development": "./src/index.ts",
+      "types": {
+        "import": "./dist/esm/index.d.mts",
+        "require": "./dist/cjs/index.d.ts"
+      },
+      "import": "./dist/esm/index.mjs",
+      "require": "./dist/cjs/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/greydragon888/real-router.git"
+  },
+  "keywords": [
+    "real-router",
+    "memory",
+    "history",
+    "in-memory",
+    "react-native",
+    "benchmark"
+  ],
+  "author": {
+    "name": "Oleg Ivanov",
+    "email": "greydragon888@gmail.com",
+    "url": "https://github.com/greydragon888"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/greydragon888/real-router/issues"
+  },
+  "homepage": "https://github.com/greydragon888/real-router",
+  "scripts": {
+    "test": "vitest",
+    "test:properties": "vitest --config vitest.config.properties.mts --run",
+    "build": "tsdown --config-loader unrun",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
+    "lint:package": "publint",
+    "lint:types": "attw --pack .",
+    "build:dist-only": "tsdown --config-loader unrun"
+  },
+  "sideEffects": false,
+  "dependencies": {
+    "@real-router/core": "workspace:^"
+  }
+}
