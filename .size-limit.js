@@ -162,6 +162,13 @@ export default [
     ignore: ["@real-router/core"],
     modifyEsbuildConfig: addDevelopmentCondition,
   },
+  {
+    name: "@real-router/memory-plugin (ESM)",
+    path: "packages/memory-plugin/dist/esm/index.mjs",
+    limit: "1 kB",
+    ignore: ["@real-router/core"],
+    modifyEsbuildConfig: addDevelopmentCondition,
+  },
 
   // ── Utilities ─────────────────────────────────────────────────────
   {
