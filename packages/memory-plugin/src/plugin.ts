@@ -16,6 +16,7 @@ export class MemoryPlugin {
   readonly #removeExtensions: () => void;
   #index = -1;
   #navigatingFromHistory = false;
+  #goGeneration = 0;
 
   constructor(router: Router, api: PluginApi, options: MemoryPluginOptions) {
     this.#router = router;
@@ -92,19 +93,31 @@ export class MemoryPlugin {
     }
 
     const entry = this.#entries[targetIndex];
+    const currentState = this.#router.getState();
+
+    if (entry.path === currentState?.path) {
+      this.#index = targetIndex;
+
+      return;
+    }
+
+    const previousIndex = this.#index;
+    const generation = ++this.#goGeneration;
 
     this.#navigatingFromHistory = true;
+    this.#index = targetIndex;
 
     void this.#router
       .navigate(entry.name, entry.params, { replace: true })
-      .then(() => {
-        this.#index = targetIndex;
-      })
       .catch(() => {
-        // Guard blocked — index stays unchanged
+        if (this.#goGeneration === generation) {
+          this.#index = previousIndex;
+        }
       })
       .finally(() => {
-        this.#navigatingFromHistory = false;
+        if (this.#goGeneration === generation) {
+          this.#navigatingFromHistory = false;
+        }
       });
   }
 

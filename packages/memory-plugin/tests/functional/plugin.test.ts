@@ -28,8 +28,6 @@ async function waitForHistoryNavigation(
   action: () => void,
 ): Promise<void> {
   await waitForTransition(router, action);
-  // navigate().then() updates #index as a microtask after subscriber callbacks fire
-  await new Promise<void>((r) => setTimeout(r, 0));
 }
 
 function settle(): Promise<void> {
@@ -326,19 +324,97 @@ describe("Memory plugin", () => {
     await router.navigate("settings");
 
     // History: [home, users, user, settings], index=3
-    // Both back() calls read the same index=3, both target index=2
+    // Optimistic: first back() moves index 3→2, second 2→1
 
-    await waitForHistoryNavigation(router, () => {
-      router.back();
-      router.back();
-    });
+    router.back();
+    router.back();
+    await settle();
 
     const state = router.getState();
 
-    expect(state?.name).toBe("user");
-    expect(state?.params).toStrictEqual({ id: "1" });
+    expect(state?.name).toBe("users");
     expect(router.canGoBack()).toBe(true);
     expect(router.canGoForward()).toBe(true);
+  });
+
+  it("should not revert index when a newer navigation supersedes a blocked one", async () => {
+    let blockUsers = false;
+
+    router = createRouter(
+      [
+        { name: "home", path: "/" },
+        {
+          name: "users",
+          path: "/users",
+          canActivate: () => () => !blockUsers,
+        },
+        { name: "settings", path: "/settings" },
+      ],
+      { defaultRoute: "home" },
+    );
+
+    router.usePlugin(memoryPluginFactory());
+    await router.start("/");
+
+    await router.navigate("users");
+    await router.navigate("settings");
+
+    // History: [home, users, settings], index=2
+    blockUsers = true;
+
+    // First back() to "users" (guard blocks) — index optimistically 2→1
+    // Second back() to "home" (succeeds) — index optimistically 1→0
+    // First catch must NOT revert index because second superseded it
+    router.back();
+    router.back();
+    await settle();
+
+    expect(router.getState()?.name).toBe("home");
+    expect(router.canGoBack()).toBe(false);
+    expect(router.canGoForward()).toBe(true);
+  });
+
+  it("should update index without navigating when back() targets same state", async () => {
+    router.usePlugin(memoryPluginFactory());
+    await router.start("/");
+
+    await router.navigate("users");
+    await router.navigate("home");
+
+    // History: [home, users, home], index=2
+    // back() targets "users", forward back to "home" — same path as current
+
+    await waitForHistoryNavigation(router, () => {
+      router.back();
+    });
+
+    expect(router.getState()?.name).toBe("users");
+
+    await waitForHistoryNavigation(router, () => {
+      router.back();
+    });
+
+    // History: [home, users, home], index=0 — "home" same as entry at index=2
+    expect(router.getState()?.name).toBe("home");
+    expect(router.canGoBack()).toBe(false);
+
+    // forward() twice: index 0→1 (users, different state), then 1→2 (home, same state as... wait no)
+    // Let's test same-state: replace creates duplicate entries
+    router.stop();
+
+    router = createRouter(routes, { defaultRoute: "home" });
+    router.usePlugin(memoryPluginFactory());
+    await router.start("/");
+
+    await router.navigate("users");
+    await router.navigate("home", {}, { replace: true });
+
+    // History: [home, home], index=1 — back() targets "home" = same path
+    router.back();
+
+    expect(router.canGoBack()).toBe(false);
+    expect(router.canGoForward()).toBe(true);
+    expect(router.getState()?.name).toBe("home");
   });
 
   describe("Edge cases", () => {
