@@ -54,11 +54,11 @@
   "dependencies": {
     "@real-router/core": "workspace:^",
     "@real-router/route-utils": "workspace:^",
-    "@real-router/sources": "workspace:^",
-    "dom-utils": "workspace:^"
+    "@real-router/sources": "workspace:^"
   },
   "devDependencies": {
     "@real-router/browser-plugin": "workspace:^",
+    "dom-utils": "workspace:^",
     "@sveltejs/package": "2.5.7",
     "@sveltejs/vite-plugin-svelte": "6.2.4",
     "@testing-library/jest-dom": "6.9.1",

@@ -62,11 +62,11 @@
   "dependencies": {
     "@real-router/core": "workspace:^",
     "@real-router/route-utils": "workspace:^",
-    "@real-router/sources": "workspace:^",
-    "dom-utils": "workspace:^"
+    "@real-router/sources": "workspace:^"
   },
   "devDependencies": {
     "@real-router/browser-plugin": "workspace:^",
+    "dom-utils": "workspace:^",
     "@testing-library/jest-dom": "6.9.1",
     "@vue/test-utils": "2.4.6",
     "vue": "3.5.13"
