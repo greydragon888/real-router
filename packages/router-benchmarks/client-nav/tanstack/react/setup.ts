@@ -1,19 +1,20 @@
-import type { NavigateOptions } from "@tanstack/router-core";
-import type * as App from "./app";
 import { getRequiredLink, waitForRequiredLink } from "../../setup-helpers";
+
+import type * as App from "./app";
+import type { NavigateOptions } from "@tanstack/router-core";
 
 const appModulePath = "./dist/app.mjs";
 const { mountTestApp } = (await import(appModulePath)) as typeof App;
 
 export function setup() {
-  if (process.env.NODE_ENV !== "production") {
+  if (globalThis.process?.env?.NODE_ENV !== "production") {
     console.warn(
       "client-nav benchmark is running without NODE_ENV=production; React dev overhead will dominate results.",
     );
   }
 
-  let container: HTMLDivElement | undefined = undefined;
-  let unmount: (() => void) | undefined = undefined;
+  let container: HTMLDivElement | undefined;
+  let unmount: (() => void) | undefined;
   let unsub = () => {};
   let stepIndex = 0;
   let next: () => Promise<void> = () => Promise.reject("Test not initialized");
@@ -24,9 +25,11 @@ export function setup() {
     document.body.append(container);
 
     const { router, unmount: dispose } = mountTestApp(container);
+
     unmount = dispose;
 
     let resolveRendered: () => void = () => {};
+
     unsub = router.subscribe("onRendered", () => {
       resolveRendered();
     });
@@ -52,6 +55,7 @@ export function setup() {
     await router.load();
 
     const cachedLinks = new Map<string, HTMLAnchorElement>();
+
     for (const testId of ["go-items-1", "go-items-2", "go-search", "go-ctx"]) {
       await waitForRequiredLink(container, testId, cachedLinks);
     }
@@ -80,8 +84,10 @@ export function setup() {
     ] as const;
 
     next = () => {
-      const step = steps[stepIndex % steps.length]!;
+      const step = steps[stepIndex % steps.length];
+
       stepIndex += 1;
+
       return step();
     };
   }
