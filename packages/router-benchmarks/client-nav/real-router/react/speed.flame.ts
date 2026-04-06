@@ -19,4 +19,4 @@ async function main() {
   }
 }
 
-await main();
+void main();
