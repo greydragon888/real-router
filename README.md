@@ -116,11 +116,11 @@ See [Recipes](https://github.com/greydragon888/real-router/wiki/recipes) for plu
 
 Custom **Segment Trie** matcher — O(segments) traversal, O(1) for static routes.
 
-**>2x faster** than TanStack Router in full client-side navigation benchmarks (React, 10-step navigation loop, 56 subscribers per page):
+**~2x faster** than TanStack Router in full client-side navigation benchmarks (React, 10-step navigation loop, 56 subscribers per page):
 
 | Metric               | vs TanStack Router      |
 | -------------------- |-------------------------|
-| Throughput (ops/sec) | **>2x faster**          |
+| Throughput (ops/sec) | **~2x faster**          |
 | p99 latency          | **2x more predictable** |
 
 > Benchmark: [packages/router-benchmarks/client-nav](packages/router-benchmarks/client-nav) — identical workload, JSDOM, production builds
@@ -276,6 +276,7 @@ function App() {
 | [`@real-router/ssr-data-plugin`](packages/ssr-data-plugin)                   | [![npm](https://img.shields.io/npm/v/@real-router/ssr-data-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/ssr-data-plugin)                   | SSR per-route data loading via interceptor   |
 | [`@real-router/lifecycle-plugin`](packages/lifecycle-plugin)                 | [![npm](https://img.shields.io/npm/v/@real-router/lifecycle-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/lifecycle-plugin)                 | Route-level hooks: onEnter, onStay, onLeave  |
 | [`@real-router/preload-plugin`](packages/preload-plugin)                     | [![npm](https://img.shields.io/npm/v/@real-router/preload-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/preload-plugin)                     | Preload on navigation intent (hover, touch)  |
+| [`@real-router/memory-plugin`](packages/memory-plugin)                       | [![npm](https://img.shields.io/npm/v/@real-router/memory-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/memory-plugin)                       | In-memory history: back/forward/go (no DOM)  |
 | [`@real-router/validation-plugin`](packages/validation-plugin)               | [![npm](https://img.shields.io/npm/v/@real-router/validation-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/validation-plugin)               | Runtime argument validation for development  |
 | [`@real-router/search-schema-plugin`](packages/search-schema-plugin)         | [![npm](https://img.shields.io/npm/v/@real-router/search-schema-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/search-schema-plugin)         | Search param validation via Standard Schema  |
 
@@ -314,7 +315,7 @@ Full documentation is available in the [Wiki](https://github.com/greydragon888/r
 
 ### Plugins
 
-- [browser-plugin](https://github.com/greydragon888/real-router/wiki/browser-plugin) · [hash-plugin](https://github.com/greydragon888/real-router/wiki/hash-plugin) · [logger-plugin](https://github.com/greydragon888/real-router/wiki/logger-plugin) · [persistent-params-plugin](https://github.com/greydragon888/real-router/wiki/persistent-params-plugin) · [search-schema-plugin](https://github.com/greydragon888/real-router/wiki/search-schema-plugin) · [ssr-data-plugin](https://github.com/greydragon888/real-router/wiki/ssr-data-plugin) · [preload-plugin](https://github.com/greydragon888/real-router/wiki/preload-plugin) · [validation-plugin](https://github.com/greydragon888/real-router/wiki/validation-plugin) · [rx](https://github.com/greydragon888/real-router/wiki/rx-package) · [sources](https://github.com/greydragon888/real-router/wiki/sources-package) · [route-utils](https://github.com/greydragon888/real-router/wiki/route-utils)
+- [browser-plugin](https://github.com/greydragon888/real-router/wiki/browser-plugin) · [hash-plugin](https://github.com/greydragon888/real-router/wiki/hash-plugin) · [logger-plugin](https://github.com/greydragon888/real-router/wiki/logger-plugin) · [persistent-params-plugin](https://github.com/greydragon888/real-router/wiki/persistent-params-plugin) · [search-schema-plugin](https://github.com/greydragon888/real-router/wiki/search-schema-plugin) · [ssr-data-plugin](https://github.com/greydragon888/real-router/wiki/ssr-data-plugin) · [preload-plugin](https://github.com/greydragon888/real-router/wiki/preload-plugin) · [memory-plugin](https://github.com/greydragon888/real-router/wiki/memory-plugin) · [validation-plugin](https://github.com/greydragon888/real-router/wiki/validation-plugin) · [rx](https://github.com/greydragon888/real-router/wiki/rx-package) · [sources](https://github.com/greydragon888/real-router/wiki/sources-package) · [route-utils](https://github.com/greydragon888/real-router/wiki/route-utils)
 
 ## Examples
 
