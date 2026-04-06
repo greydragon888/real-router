@@ -2,7 +2,7 @@
 
 > Simple, powerful, view-agnostic, modular and extensible router
 
-pnpm monorepo with 29 packages + 75 example applications. Run `pnpm install` after cloning.
+pnpm monorepo with 30 packages + 75 example applications. Run `pnpm install` after cloning.
 
 ## Rules
 
@@ -159,6 +159,7 @@ When adding packages or features, keep these root files in sync:
 - [packages/search-schema-plugin/CLAUDE.md](packages/search-schema-plugin/CLAUDE.md) — Search schema plugin architecture
 - [packages/lifecycle-plugin/CLAUDE.md](packages/lifecycle-plugin/CLAUDE.md) — Lifecycle plugin architecture
 - [packages/preload-plugin/CLAUDE.md](packages/preload-plugin/CLAUDE.md) — Preload plugin architecture
+- [packages/memory-plugin/CLAUDE.md](packages/memory-plugin/CLAUDE.md) — Memory plugin architecture
 - [packages/dom-utils/.claude/CLAUDE.md](packages/dom-utils/CLAUDE.md) — DOM utilities (route announcer, link helpers)
 - [packages/fsm/CLAUDE.md](packages/fsm/CLAUDE.md) — FSM engine internals
 - [packages/router-benchmarks/CLAUDE.md](packages/router-benchmarks/CLAUDE.md) — Benchmark suite

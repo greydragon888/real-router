@@ -1,0 +1,470 @@
+import { createRouter } from "@real-router/core";
+import { describe, beforeEach, afterEach, it, expect } from "vitest";
+
+import { memoryPluginFactory } from "@real-router/memory-plugin";
+
+import type { Router } from "@real-router/core";
+
+const routes = [
+  { name: "home", path: "/" },
+  { name: "users", path: "/users" },
+  { name: "user", path: "/users/:id" },
+  { name: "settings", path: "/settings" },
+];
+
+function waitForTransition(router: Router, action: () => void): Promise<void> {
+  return new Promise<void>((resolve) => {
+    const unsub = router.subscribe(() => {
+      unsub();
+      resolve();
+    });
+
+    action();
+  });
+}
+
+async function waitForHistoryNavigation(
+  router: Router,
+  action: () => void,
+): Promise<void> {
+  await waitForTransition(router, action);
+  // navigate().then() updates #index as a microtask after subscriber callbacks fire
+  await new Promise<void>((r) => setTimeout(r, 0));
+}
+
+function settle(): Promise<void> {
+  return new Promise<void>((r) => setTimeout(r, 0));
+}
+
+describe("Memory plugin", () => {
+  let router: Router;
+
+  beforeEach(() => {
+    router = createRouter(routes, { defaultRoute: "home" });
+  });
+
+  afterEach(() => {
+    if (router.isActive()) {
+      router.stop();
+    }
+  });
+
+  describe("Factory validation", () => {
+    it("should throw TypeError for negative maxHistoryLength", () => {
+      expect(() => memoryPluginFactory({ maxHistoryLength: -1 })).toThrow(
+        TypeError,
+      );
+    });
+
+    it("should throw TypeError for non-number maxHistoryLength", () => {
+      expect(() =>
+        memoryPluginFactory({ maxHistoryLength: "10" as unknown as number }),
+      ).toThrow(TypeError);
+    });
+
+    it("should not limit history when maxHistoryLength is zero", async () => {
+      router.usePlugin(memoryPluginFactory({ maxHistoryLength: 0 }));
+      await router.start("/");
+
+      await router.navigate("users");
+      await router.navigate("settings");
+
+      expect(router.canGoBack()).toBe(true);
+    });
+  });
+
+  it("should add back/forward/go/canGoBack/canGoForward to router", async () => {
+    router.usePlugin(memoryPluginFactory());
+    await router.start("/");
+
+    expect(typeof router.back).toBe("function");
+    expect(typeof router.forward).toBe("function");
+    expect(typeof router.go).toBe("function");
+    expect(typeof router.canGoBack).toBe("function");
+    expect(typeof router.canGoForward).toBe("function");
+
+    expect(router.canGoBack()).toBe(false);
+    expect(router.canGoForward()).toBe(false);
+  });
+
+  it("should navigate back through history", async () => {
+    router.usePlugin(memoryPluginFactory());
+    await router.start("/");
+
+    await router.navigate("users");
+    await router.navigate("settings");
+
+    expect(router.getState()?.name).toBe("settings");
+    expect(router.canGoBack()).toBe(true);
+
+    await waitForHistoryNavigation(router, () => {
+      router.back();
+    });
+
+    expect(router.getState()?.name).toBe("users");
+    expect(router.canGoBack()).toBe(true);
+    expect(router.canGoForward()).toBe(true);
+  });
+
+  it("should navigate forward through history", async () => {
+    router.usePlugin(memoryPluginFactory());
+    await router.start("/");
+
+    await router.navigate("users");
+    await router.navigate("settings");
+
+    await waitForHistoryNavigation(router, () => {
+      router.back();
+    });
+
+    expect(router.getState()?.name).toBe("users");
+    expect(router.canGoForward()).toBe(true);
+
+    await waitForHistoryNavigation(router, () => {
+      router.forward();
+    });
+
+    expect(router.getState()?.name).toBe("settings");
+    expect(router.canGoForward()).toBe(false);
+  });
+
+  it("should go(delta) by arbitrary offset", async () => {
+    router.usePlugin(memoryPluginFactory());
+    await router.start("/");
+
+    await router.navigate("users");
+    await router.navigate("settings");
+
+    expect(router.getState()?.name).toBe("settings");
+
+    await waitForHistoryNavigation(router, () => {
+      router.go(-2);
+    });
+
+    expect(router.getState()?.name).toBe("home");
+    expect(router.canGoBack()).toBe(false);
+    expect(router.canGoForward()).toBe(true);
+  });
+
+  it("should no-op when go() exceeds history bounds", async () => {
+    router.usePlugin(memoryPluginFactory());
+    await router.start("/");
+
+    await router.navigate("users");
+
+    expect(router.getState()?.name).toBe("users");
+
+    router.go(-5);
+
+    expect(router.getState()?.name).toBe("users");
+
+    router.go(5);
+
+    expect(router.getState()?.name).toBe("users");
+  });
+
+  it("should respect maxHistoryLength", async () => {
+    router.usePlugin(memoryPluginFactory({ maxHistoryLength: 3 }));
+    await router.start("/");
+
+    await router.navigate("users");
+    await router.navigate("user", { id: "1" });
+    await router.navigate("settings");
+    await router.navigate("home");
+
+    expect(router.getState()?.name).toBe("home");
+    expect(router.canGoBack()).toBe(true);
+
+    await waitForHistoryNavigation(router, () => {
+      router.go(-2);
+    });
+
+    expect(router.getState()?.name).toBe("user");
+    expect(router.canGoBack()).toBe(false);
+    expect(router.canGoForward()).toBe(true);
+  });
+
+  it("should handle replace option (no new history entry)", async () => {
+    router.usePlugin(memoryPluginFactory());
+    await router.start("/");
+
+    await router.navigate("users");
+    await router.navigate("settings", {}, { replace: true });
+
+    expect(router.getState()?.name).toBe("settings");
+
+    await waitForHistoryNavigation(router, () => {
+      router.back();
+    });
+
+    expect(router.getState()?.name).toBe("home");
+    expect(router.canGoBack()).toBe(false);
+    expect(router.canGoForward()).toBe(true);
+  });
+
+  it("should clean up extensions on teardown", async () => {
+    const unsubscribe = router.usePlugin(memoryPluginFactory());
+
+    await router.start("/");
+
+    await router.navigate("users");
+
+    expect(router.canGoBack()).toBe(true);
+
+    unsubscribe();
+
+    expect(router).not.toHaveProperty("back");
+    expect(router).not.toHaveProperty("forward");
+    expect(router).not.toHaveProperty("go");
+    expect(router).not.toHaveProperty("canGoBack");
+    expect(router).not.toHaveProperty("canGoForward");
+  });
+
+  it("should clear history on stop", async () => {
+    router.usePlugin(memoryPluginFactory());
+    await router.start("/");
+
+    await router.navigate("users");
+    await router.navigate("settings");
+
+    expect(router.canGoBack()).toBe(true);
+
+    router.stop();
+
+    expect(router.canGoBack()).toBe(false);
+    expect(router.canGoForward()).toBe(false);
+  });
+
+  it("should work with guards (navigate + guard does not add entry)", async () => {
+    router = createRouter(
+      [
+        { name: "home", path: "/" },
+        { name: "users", path: "/users" },
+        { name: "user", path: "/users/:id" },
+        {
+          name: "settings",
+          path: "/settings",
+          canActivate: () => () => false,
+        },
+      ],
+      { defaultRoute: "home" },
+    );
+
+    router.usePlugin(memoryPluginFactory());
+    await router.start("/");
+
+    await router.navigate("users");
+
+    try {
+      await router.navigate("settings");
+    } catch {
+      // Guard blocked navigation — expected
+    }
+
+    expect(router.getState()?.name).toBe("users");
+    expect(router.canGoForward()).toBe(false);
+
+    await waitForHistoryNavigation(router, () => {
+      router.back();
+    });
+
+    expect(router.getState()?.name).toBe("home");
+  });
+
+  it("should not desync index when guard blocks back()", async () => {
+    let blockUsers = false;
+
+    router = createRouter(
+      [
+        { name: "home", path: "/" },
+        {
+          name: "users",
+          path: "/users",
+          canActivate: () => () => !blockUsers,
+        },
+        { name: "settings", path: "/settings" },
+      ],
+      { defaultRoute: "home" },
+    );
+
+    router.usePlugin(memoryPluginFactory());
+    await router.start("/");
+
+    await router.navigate("users");
+    await router.navigate("settings");
+
+    // History: [home, users, settings], index=2
+    blockUsers = true;
+
+    // back() tries to navigate to "users" → guard blocks
+    router.back();
+    await settle();
+
+    // State should remain "settings", index should NOT have changed
+    expect(router.getState()?.name).toBe("settings");
+    expect(router.canGoBack()).toBe(true);
+    expect(router.canGoForward()).toBe(false);
+
+    // Unblock and verify back() works again
+    blockUsers = false;
+
+    await waitForHistoryNavigation(router, () => {
+      router.back();
+    });
+
+    expect(router.getState()?.name).toBe("users");
+    expect(router.canGoBack()).toBe(true);
+    expect(router.canGoForward()).toBe(true);
+  });
+
+  it("should handle concurrent back() calls", async () => {
+    router.usePlugin(memoryPluginFactory());
+    await router.start("/");
+
+    await router.navigate("users");
+    await router.navigate("user", { id: "1" });
+    await router.navigate("settings");
+
+    // History: [home, users, user, settings], index=3
+    // Both back() calls read the same index=3, both target index=2
+
+    await waitForHistoryNavigation(router, () => {
+      router.back();
+      router.back();
+    });
+
+    const state = router.getState();
+
+    expect(state?.name).toBe("user");
+    expect(state?.params).toStrictEqual({ id: "1" });
+    expect(router.canGoBack()).toBe(true);
+    expect(router.canGoForward()).toBe(true);
+  });
+
+  describe("Edge cases", () => {
+    it("should no-op for go(0)", async () => {
+      router.usePlugin(memoryPluginFactory());
+      await router.start("/");
+
+      await router.navigate("users");
+
+      const stateBefore = router.getState();
+
+      router.go(0);
+
+      expect(router.getState()).toBe(stateBefore);
+      expect(router.canGoBack()).toBe(true);
+      expect(router.canGoForward()).toBe(false);
+    });
+
+    it("should truncate forward history when navigating after back()", async () => {
+      router.usePlugin(memoryPluginFactory());
+      await router.start("/");
+
+      await router.navigate("users");
+      await router.navigate("settings");
+
+      // History: [home, users, settings], index=2
+
+      await waitForHistoryNavigation(router, () => {
+        router.back();
+      });
+
+      // At users, index=1
+      expect(router.getState()?.name).toBe("users");
+      expect(router.canGoForward()).toBe(true);
+
+      await router.navigate("user", { id: "1" });
+
+      // History: [home, users, user], index=2 — settings truncated
+      expect(router.getState()?.name).toBe("user");
+      expect(router.canGoForward()).toBe(false);
+      expect(router.canGoBack()).toBe(true);
+
+      await waitForHistoryNavigation(router, () => {
+        router.back();
+      });
+
+      expect(router.getState()?.name).toBe("users");
+    });
+
+    it("should handle replace as first navigation after start", async () => {
+      router.usePlugin(memoryPluginFactory());
+      await router.start("/");
+
+      await router.navigate("users", {}, { replace: true });
+
+      // "home" replaced with "users": [users], index=0
+      expect(router.getState()?.name).toBe("users");
+      expect(router.canGoBack()).toBe(false);
+      expect(router.canGoForward()).toBe(false);
+    });
+
+    it("should no-op for back() on empty history after stop()", async () => {
+      router.usePlugin(memoryPluginFactory());
+      await router.start("/");
+
+      await router.navigate("users");
+
+      router.stop();
+
+      // History cleared, index=-1
+      router.back();
+      router.forward();
+      router.go(-1);
+      router.go(1);
+
+      expect(router.canGoBack()).toBe(false);
+      expect(router.canGoForward()).toBe(false);
+    });
+
+    it("should be idempotent for multiple stop() calls", async () => {
+      router.usePlugin(memoryPluginFactory());
+      await router.start("/");
+
+      await router.navigate("users");
+
+      router.stop();
+      router.stop();
+
+      expect(router.canGoBack()).toBe(false);
+      expect(router.canGoForward()).toBe(false);
+    });
+
+    it("should treat go(1) the same as forward()", async () => {
+      router.usePlugin(memoryPluginFactory());
+      await router.start("/");
+
+      await router.navigate("users");
+      await router.navigate("settings");
+
+      await waitForHistoryNavigation(router, () => {
+        router.go(-2);
+      });
+
+      expect(router.getState()?.name).toBe("home");
+
+      await waitForHistoryNavigation(router, () => {
+        router.go(1);
+      });
+
+      expect(router.getState()?.name).toBe("users");
+    });
+
+    it("should treat go(-1) the same as back()", async () => {
+      router.usePlugin(memoryPluginFactory());
+      await router.start("/");
+
+      await router.navigate("users");
+      await router.navigate("settings");
+
+      await waitForHistoryNavigation(router, () => {
+        router.go(-1);
+      });
+
+      expect(router.getState()?.name).toBe("users");
+      expect(router.canGoBack()).toBe(true);
+      expect(router.canGoForward()).toBe(true);
+    });
+  });
+});

@@ -3202,6 +3202,12 @@ importers:
         specifier: workspace:^
         version: link:../core
 
+  packages/memory-plugin:
+    dependencies:
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../core
+
   packages/path-matcher: {}
 
   packages/persistent-params-plugin:
@@ -3331,15 +3337,15 @@ importers:
       '@nanostores/react':
         specifier: 0.8.4
         version: 0.8.4(nanostores@0.11.4)(react@19.2.0)
-      '@real-router/browser-plugin':
-        specifier: workspace:^
-        version: link:../browser-plugin
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
       '@real-router/lifecycle-plugin':
         specifier: workspace:^
         version: link:../lifecycle-plugin
+      '@real-router/memory-plugin':
+        specifier: workspace:^
+        version: link:../memory-plugin
       '@real-router/react':
         specifier: workspace:^
         version: link:../react
