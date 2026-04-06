@@ -3,7 +3,7 @@ import { getRequiredLink, waitForRequiredLink } from "../../setup-helpers";
 import type * as App from "./app";
 
 const appModulePath = "./dist/app.mjs";
-const { mountTestApp } = (await import(appModulePath)) as typeof App;
+let mountTestApp: typeof App.mountTestApp;
 
 export function setup() {
   if (process.env.NODE_ENV !== "production") {
@@ -19,11 +19,15 @@ export function setup() {
   let next: () => Promise<void> = () => Promise.reject("Test not initialized");
 
   async function before() {
+    if (!mountTestApp) {
+      mountTestApp = ((await import(appModulePath)) as typeof App).mountTestApp;
+    }
+
     stepIndex = 0;
     container = document.createElement("div");
     document.body.append(container);
 
-    const { router, unmount } = mountTestApp(container);
+    const { router, unmount } = mountTestApp!(container);
 
     await router.start("/items/5");
 

@@ -4,7 +4,7 @@ import type * as App from "./app";
 import type { NavigateOptions } from "@tanstack/router-core";
 
 const appModulePath = "./dist/app.mjs";
-const { mountTestApp } = (await import(appModulePath)) as typeof App;
+let mountTestApp: typeof App.mountTestApp;
 
 export function setup() {
   if (globalThis.process?.env?.NODE_ENV !== "production") {
@@ -20,11 +20,15 @@ export function setup() {
   let next: () => Promise<void> = () => Promise.reject("Test not initialized");
 
   async function before() {
+    if (!mountTestApp) {
+      mountTestApp = ((await import(appModulePath)) as typeof App).mountTestApp;
+    }
+
     stepIndex = 0;
     container = document.createElement("div");
     document.body.append(container);
 
-    const { router, unmount: dispose } = mountTestApp(container);
+    const { router, unmount: dispose } = mountTestApp!(container);
 
     unmount = dispose;
 

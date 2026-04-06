@@ -13,8 +13,8 @@
     "bench:client-nav:build:tanstack": "vite build --config client-nav/tanstack/react/vite.config.ts",
     "bench:client-nav:real-router": "pnpm bench:client-nav:build:real-router && NODE_ENV=production vitest bench --config client-nav/real-router/react/vite.config.ts client-nav/real-router/react/speed.bench.ts",
     "bench:client-nav:tanstack": "pnpm bench:client-nav:build:tanstack && NODE_ENV=production vitest bench --config client-nav/tanstack/react/vite.config.ts client-nav/tanstack/react/speed.bench.ts",
-    "bench:client-nav:flame:real-router": "pnpm bench:client-nav:build:real-router && NODE_ENV=production node client-nav/real-router/react/speed.flame.ts",
-    "bench:client-nav:flame:tanstack": "pnpm bench:client-nav:build:tanstack && NODE_ENV=production node client-nav/tanstack/react/speed.flame.ts",
+    "bench:client-nav:flame:real-router": "pnpm bench:client-nav:build:real-router && NODE_ENV=production npx tsx client-nav/real-router/react/speed.flame.ts",
+    "bench:client-nav:flame:tanstack": "pnpm bench:client-nav:build:tanstack && NODE_ENV=production npx tsx client-nav/tanstack/react/speed.flame.ts",
     "cpu": "ps -Ao %cpu,comm -r | awk '$1 > 10 && !/webstorm/ && !/claude/ && !/WindowServer/ {print $2 \" (\" $1 \"%)\"}' | head -10",
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache src/ client-nav/ --fix --max-warnings 0"
