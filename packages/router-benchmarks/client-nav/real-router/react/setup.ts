@@ -1,5 +1,6 @@
-import type * as App from "./app";
 import { getRequiredLink, waitForRequiredLink } from "../../setup-helpers";
+
+import type * as App from "./app";
 
 const appModulePath = "./dist/app.mjs";
 const { mountTestApp } = (await import(appModulePath)) as typeof App;
@@ -11,8 +12,8 @@ export function setup() {
     );
   }
 
-  let container: HTMLDivElement | undefined = undefined;
-  let dispose: (() => void) | undefined = undefined;
+  let container: HTMLDivElement | undefined;
+  let dispose: (() => void) | undefined;
   let unsubscribe = () => {};
   let stepIndex = 0;
   let next: () => Promise<void> = () => Promise.reject("Test not initialized");
@@ -39,17 +40,21 @@ export function setup() {
 
     const navigate = (
       name: string,
-      params: Record<string, unknown>,
+      params: Record<string, string | number>,
       options?: { replace?: boolean },
     ) =>
       new Promise<void>((resolveNext) => {
-        resolveRendered = () => queueMicrotask(resolveNext);
+        resolveRendered = () => {
+          queueMicrotask(resolveNext);
+        };
         void router.navigate(name, params, options);
       });
 
     const click = (testId: string, cache?: Map<string, HTMLAnchorElement>) =>
       new Promise<void>((resolveNext) => {
-        resolveRendered = () => queueMicrotask(resolveNext);
+        resolveRendered = () => {
+          queueMicrotask(resolveNext);
+        };
         getRequiredLink(container!, testId, cache).dispatchEvent(
           new MouseEvent("click", {
             bubbles: true,
@@ -79,8 +84,10 @@ export function setup() {
     ] as const;
 
     next = () => {
-      const step = steps[stepIndex % steps.length]!;
+      const step = steps[stepIndex % steps.length];
+
       stepIndex += 1;
+
       return step();
     };
   }

@@ -13,14 +13,17 @@ import { createRoot } from "react-dom/client";
 
 function runPerfSelectorComputation(seed: number) {
   let value = Math.trunc(seed) | 0;
+
   for (let index = 0; index < 40; index++) {
-    value = (value * 1664525 + 1013904223 + index) >>> 0;
+    value = (value * 1_664_525 + 1_013_904_223 + index) >>> 0;
   }
+
   return value;
 }
 
 function normalizePage(value: unknown) {
   const page = Number(value);
+
   return Number.isFinite(page) && page > 0 ? Math.trunc(page) : 1;
 }
 
@@ -38,7 +41,9 @@ function RootParamsSubscriber() {
     strict: false,
     select: (params) => runPerfSelectorComputation(Number(params.id ?? 0)),
   });
+
   void runPerfSelectorComputation(params);
+
   return null;
 }
 
@@ -47,7 +52,9 @@ function RootSearchSubscriber() {
     strict: false,
     select: (search) => runPerfSelectorComputation(Number(search.page ?? 0)),
   });
+
   void runPerfSelectorComputation(search);
+
   return null;
 }
 
@@ -57,6 +64,7 @@ function LinkPanel() {
       {linkGroups.map((groupIndex) => {
         const itemsId = groupIndex === 0 ? 1 : groupIndex + 2;
         const ctxId = groupIndex + 1;
+
         return (
           <div key={groupIndex}>
             <Link
@@ -162,6 +170,7 @@ const searchRoute = createRoute({
     middlewares: [
       ({ search, next }) => {
         const result = next(search);
+
         return { page: result.page, filter: result.filter };
       },
     ],
@@ -187,7 +196,9 @@ function ItemParamsSubscriber() {
   const params = itemsRoute.useParams({
     select: (params) => runPerfSelectorComputation(params.id),
   });
+
   void runPerfSelectorComputation(params);
+
   return null;
 }
 
@@ -196,7 +207,9 @@ function SearchStateSubscriber() {
     select: (search) =>
       runPerfSelectorComputation(search.page + search.filter.length),
   });
+
   void runPerfSelectorComputation(search);
+
   return null;
 }
 
@@ -205,7 +218,9 @@ function SearchLoaderDepsSubscriber() {
     select: (loaderDeps) =>
       runPerfSelectorComputation(loaderDeps.page + loaderDeps.filter.length),
   });
+
   void runPerfSelectorComputation(loaderDeps);
+
   return null;
 }
 
@@ -214,7 +229,9 @@ function SearchLoaderDataSubscriber() {
     select: (loaderData) =>
       runPerfSelectorComputation(loaderData.seed + loaderData.checksum),
   });
+
   void runPerfSelectorComputation(loaderData);
+
   return null;
 }
 
@@ -222,7 +239,9 @@ function ContextParamsSubscriber() {
   const params = contextRoute.useParams({
     select: (params) => runPerfSelectorComputation(Number(params.id)),
   });
+
   void runPerfSelectorComputation(params);
+
   return null;
 }
 
@@ -230,7 +249,9 @@ function ContextRouteSubscriber() {
   const context = contextRoute.useRouteContext({
     select: (context) => runPerfSelectorComputation(context.sectionSeed),
   });
+
   void runPerfSelectorComputation(context);
+
   return null;
 }
 
@@ -336,7 +357,9 @@ export function mountTestApp(container: Element) {
     ]),
   });
   const reactRoot = createRoot(container);
+
   reactRoot.render(<RouterProvider router={router} />);
+
   return {
     router,
     unmount() {

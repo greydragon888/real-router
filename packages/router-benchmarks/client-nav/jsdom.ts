@@ -18,14 +18,12 @@ setGlobal("document", dom.window.document);
 setGlobal("self", dom.window);
 setGlobal("navigator", dom.window.navigator);
 setGlobal("location", dom.window.location);
-setGlobal("history", dom.window.history);
 setGlobal("HTMLElement", dom.window.HTMLElement);
 setGlobal("Element", dom.window.Element);
 setGlobal("Node", dom.window.Node);
 setGlobal("MouseEvent", dom.window.MouseEvent);
 setGlobal("MutationObserver", dom.window.MutationObserver);
 setGlobal("sessionStorage", dom.window.sessionStorage);
-setGlobal("localStorage", dom.window.localStorage);
 setGlobal("getComputedStyle", dom.window.getComputedStyle.bind(dom.window));
 setGlobal("addEventListener", dom.window.addEventListener.bind(dom.window));
 setGlobal(
@@ -34,17 +32,13 @@ setGlobal(
 );
 setGlobal(
   "requestAnimationFrame",
-  dom.window.requestAnimationFrame?.bind(dom.window) ??
-    ((callback: (time: number) => void) =>
-      setTimeout(() => callback(performance.now()), 16)),
+  dom.window.requestAnimationFrame.bind(dom.window),
 );
 setGlobal(
   "cancelAnimationFrame",
-  dom.window.cancelAnimationFrame?.bind(dom.window) ??
-    ((handle: number) => clearTimeout(handle)),
+  dom.window.cancelAnimationFrame.bind(dom.window),
 );
 
-dom.window.scrollTo = () => {};
-
 export { dom };
+
 export const window = dom.window;

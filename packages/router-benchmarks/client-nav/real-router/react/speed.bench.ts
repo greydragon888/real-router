@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, bench, describe } from "vitest";
+
 import { setup } from "./setup";
 
 describe("Real-Router client-nav", () => {

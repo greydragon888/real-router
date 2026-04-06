@@ -17,7 +17,7 @@
     "bench:client-nav:flame:tanstack": "pnpm bench:client-nav:build:tanstack && NODE_ENV=production node client-nav/tanstack/react/speed.flame.ts",
     "cpu": "ps -Ao %cpu,comm -r | awk '$1 > 10 && !/webstorm/ && !/claude/ && !/WindowServer/ {print $2 \" (\" $1 \"%)\"}' | head -10",
     "type-check": "tsc --noEmit",
-    "lint": "eslint --cache src/ --fix --max-warnings 0"
+    "lint": "eslint --cache src/ client-nav/ --fix --max-warnings 0"
   },
   "dependencies": {
     "mitata": "1.0.34",
@@ -26,7 +26,7 @@
     "@real-router/core": "workspace:^",
     "@real-router/types": "workspace:^",
     "@real-router/react": "workspace:^",
-    "@real-router/browser-plugin": "workspace:^",
+    "@real-router/memory-plugin": "workspace:^",
     "@real-router/search-schema-plugin": "workspace:^",
     "@real-router/lifecycle-plugin": "workspace:^",
     "@tanstack/react-router": "1.168.10",
@@ -41,7 +41,7 @@
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "5.2.0",
-    "jsdom": "26.1.0",
+    "jsdom": "28.1.0",
     "vite": "7.2.0",
     "vitest": "4.1.0"
   }

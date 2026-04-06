@@ -32,6 +32,7 @@ export const SCOPES = [
   "preload-plugin",
   "validation-plugin",
   "search-schema-plugin",
+  "memory-plugin",
   "react",
   "preact",
   "solid",

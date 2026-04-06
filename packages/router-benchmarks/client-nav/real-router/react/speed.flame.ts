@@ -1,5 +1,5 @@
-import { window } from "../../jsdom";
 import { setup } from "./setup";
+import { window } from "../../jsdom";
 
 const DURATION_MS = 10_000;
 const test = setup();

@@ -1,12 +1,7 @@
-import { atom, computed } from "nanostores";
 import { useStore } from "@nanostores/react";
-import { createRoot } from "react-dom/client";
-import { z } from "zod";
 import { createRouter } from "@real-router/core";
-import type { Route } from "@real-router/core";
-import { browserPluginFactory } from "@real-router/browser-plugin";
-import { searchSchemaPlugin } from "@real-router/search-schema-plugin";
 import { lifecyclePluginFactory } from "@real-router/lifecycle-plugin";
+import { memoryPluginFactory } from "@real-router/memory-plugin";
 import {
   RouterProvider,
   RouteView,
@@ -14,11 +9,18 @@ import {
   useRoute,
   useRouteNode,
 } from "@real-router/react";
+import { searchSchemaPlugin } from "@real-router/search-schema-plugin";
+import { atom, computed } from "nanostores";
+import { createRoot } from "react-dom/client";
+import { z } from "zod";
+
 import {
   runPerfSelectorComputation,
   normalizePage,
   noop,
 } from "../../perf-utils";
+
+import type { Route } from "@real-router/core";
 
 const searchSchema = z.object({
   page: z.number().int().positive(),
@@ -78,7 +80,7 @@ function createAppRouter() {
   });
 
   r.usePlugin(
-    browserPluginFactory(),
+    memoryPluginFactory(),
     searchSchemaPlugin({ mode: "production" }),
     lifecyclePluginFactory(),
   );
@@ -102,21 +104,27 @@ const linkGroups = Array.from({ length: 4 }, (_, i) => i);
 function RootParamsSubscriber({ index }: { index: number }) {
   const { route } = useRoute();
   const id = Number(route?.params.id ?? 0);
+
   void runPerfSelectorComputation(runPerfSelectorComputation(id + index));
+
   return null;
 }
 
 function RootSearchSubscriber({ index }: { index: number }) {
   const { route } = useRoute();
   const page = Number(route?.params.page ?? 0);
+
   void runPerfSelectorComputation(runPerfSelectorComputation(page + index));
+
   return null;
 }
 
 function ItemParamsSubscriber({ index }: { index: number }) {
   const { route } = useRouteNode("items");
   const id = Number(route?.params.id ?? 0);
+
   void runPerfSelectorComputation(runPerfSelectorComputation(id + index));
+
   return null;
 }
 
@@ -124,41 +132,51 @@ function SearchStateSubscriber({ index }: { index: number }) {
   const { route } = useRouteNode("search");
   const page = Number(route?.params.page ?? 0);
   const filter = String(route?.params.filter ?? "");
+
   void runPerfSelectorComputation(
     runPerfSelectorComputation(page + filter.length + index),
   );
+
   return null;
 }
 
 function SearchLoaderDepsSubscriber({ index }: { index: number }) {
   const deps = useStore($loaderDeps);
+
   void runPerfSelectorComputation(
     runPerfSelectorComputation(deps.page + deps.filter.length + index),
   );
+
   return null;
 }
 
 function SearchLoaderDataSubscriber({ index }: { index: number }) {
   const data = useStore($loaderData);
+
   void runPerfSelectorComputation(
     runPerfSelectorComputation(data.seed + data.checksum + index),
   );
+
   return null;
 }
 
 function ContextParamsSubscriber({ index }: { index: number }) {
   const { route } = useRouteNode("ctx");
   const id = Number(route?.params.id ?? 0);
+
   void runPerfSelectorComputation(runPerfSelectorComputation(id + index));
+
   return null;
 }
 
 function ContextRouteSubscriber({ index }: { index: number }) {
   const { route } = useRouteNode("ctx");
   const sectionSeed = Number(route?.params.id ?? 0) * 13 + 1;
+
   void runPerfSelectorComputation(
     runPerfSelectorComputation(sectionSeed + index),
   );
+
   return null;
 }
 
@@ -338,7 +356,9 @@ function App({ appRouter }: { appRouter: ReturnType<typeof createAppRouter> }) {
 export function mountTestApp(container: HTMLElement) {
   const router = createAppRouter();
   const reactRoot = createRoot(container);
+
   reactRoot.render(<App appRouter={router} />);
+
   return {
     router,
     unmount() {
