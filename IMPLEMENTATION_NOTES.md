@@ -113,6 +113,8 @@ Root `CHANGELOG.md` is auto-populated from package changelogs:
 - First publish must be manual (`npm publish`) - can't configure Trusted Publisher before package exists
 - Trusted Publisher configured with workflow: `changesets.yml`
 
+**Build optimization:** Release workflow uses `pnpm turbo run build:dist-only --filter='!./examples/**'` and `pnpm turbo run test --filter='!./examples/**'` — packages only, skipping ~90 example apps. Previously used bare `pnpm build` / `pnpm test` which ran the full 218-task pipeline including all examples, adding ~10 minutes to release time.
+
 ### Critical: Use `pnpm publish` NOT `npm publish`
 
 **Problem discovered (Issue #18):** `npm publish` does NOT convert `workspace:^` protocol to actual versions. Packages were published with literal `"@real-router/logger": "workspace:^"` in dependencies, causing `npm install` to fail.
@@ -231,10 +233,11 @@ Enforces conventional commits. Types and scopes defined in `commitlint.config.mj
 `.husky/pre-push` runs (artifact validation, NOT a superset of pre-commit):
 
 - `pnpm lint:duplicates` (jscpd - copy-paste detection)
-- `pnpm turbo run build lint:package lint:types --filter='!./examples/**'` (build + validate .d.ts + validate package.json exports)
+- `pnpm turbo run build:dist-only lint:package lint:types --filter='!./examples/**'` (build + validate .d.ts + validate package.json exports)
 - `pnpm lint:unused` (knip - dead code detection)
+- `pnpm lint:deps` (syncpack - dependency version consistency)
 
-**Rationale:** Pre-commit validates correctness (auto-dedupe + tests + linting). Pre-push validates artifacts (build + type declarations + package exports). CI `pnpm lint:dedupe` remains as a safety net for `--no-verify` bypasses.
+**Rationale:** Pre-commit validates correctness (auto-dedupe + tests + linting). Pre-push validates artifacts (build + type declarations + package exports + dep consistency). `lint:deps` was added after #413 — syncpack errors were previously only caught in CI, allowing version mismatches (solid-js 1.9.5 vs 1.9.12) to slip through.
 
 ## Commit Conventions
 
@@ -271,7 +274,27 @@ Added `release` type for release commits:
 
 ### Consolidated CI
 
-`.github/workflows/ci.yml` — single workflow with parallel jobs: Lint & Type Check, Test (with coverage), Build. Downstream jobs: Coverage (Codecov), SonarCloud, Bundle Size. Gate job: "CI Result" (single required status check).
+`.github/workflows/ci.yml` — single workflow with parallel jobs: Lint & Type Check, Test (with coverage), Build. Downstream jobs: Coverage (Codecov), SonarCloud, Bundle Size, Package Smoke Test. Gate job: "CI Result" (single required status check).
+
+### Package Smoke Test
+
+CI job `smoke` (added after #413 and #418): packs all 22 public packages into tarballs, installs them into an isolated temp project via `npm install`, and verifies every export resolves with `import()`.
+
+**Script:** `scripts/smoke-test-packages.sh`
+
+**Catches:**
+
+- Private packages leaking into dependencies (#413 — `dom-utils` in published deps)
+- Source files shipped in tarball causing Vite resolve failures (#418 — `"development"` condition)
+- Broken export paths, missing dist files
+
+**Skipped packages** (cannot be imported in plain Node.js):
+
+- `@real-router/types` — types-only package, no runtime exports
+- `@real-router/solid` — solid-js runtime requires browser/DOM environment
+- `@real-router/svelte` — `.svelte` files require Svelte compiler
+
+These packages are verified as installed (directory exists) but not imported.
 
 Node.js 24 only (no matrix). Runs on `ubuntu-latest`.
 
@@ -310,16 +333,16 @@ All CI workflows migrated from `pnpm/action-setup@v4` to `pnpm/action-setup@v5` 
 
 ### Workflows
 
-| Workflow             | File                       | Purpose                                                                    |
-| -------------------- | -------------------------- | -------------------------------------------------------------------------- |
-| CI                   | `ci.yml`                   | Full pipeline on PRs: lint, type-check, test, build, coverage, bundle size |
-| Post-Merge Build     | `post-merge.yml`           | Build-only verification on master push                                     |
-| Changesets           | `changesets.yml`           | Versioning and npm publish (triggered by Post-Merge Build success)         |
-| Changeset Check      | `changeset-check.yml`      | Validate changesets on PRs (format, references)                            |
-| CodeQL               | `codeql.yml`               | Security scanning + dependency audit                                       |
-| Dependabot Automerge | `dependabot-automerge.yml` | Auto-merge patch/minor updates                                             |
-| Danger               | `danger.yml`               | Automated PR review checks                                                 |
-| Examples             | `examples.yml`             | Scheduled e2e tests for example apps (Mon & Thu)                           |
+| Workflow             | File                       | Purpose                                                                                |
+| -------------------- | -------------------------- | -------------------------------------------------------------------------------------- |
+| CI                   | `ci.yml`                   | Full pipeline on PRs: lint, type-check, test, build, smoke test, coverage, bundle size |
+| Post-Merge Build     | `post-merge.yml`           | Build-only verification on master push                                                 |
+| Changesets           | `changesets.yml`           | Versioning and npm publish (triggered by Post-Merge Build success)                     |
+| Changeset Check      | `changeset-check.yml`      | Validate changesets on PRs (format, references)                                        |
+| CodeQL               | `codeql.yml`               | Security scanning + dependency audit                                                   |
+| Dependabot Automerge | `dependabot-automerge.yml` | Auto-merge patch/minor updates                                                         |
+| Danger               | `danger.yml`               | Automated PR review checks                                                             |
+| Examples             | `examples.yml`             | Scheduled e2e tests for example apps (Mon & Thu)                                       |
 
 **Removed:** `build.yml`, `sonarcloud.yml`, `coverage.yml`, `size.yml`, `release.yml` (consolidated into `ci.yml` and `changesets.yml`)
 
@@ -407,18 +430,19 @@ ko_fi: greydragon888
 
 ## Quality Tools
 
-| Tool             | Purpose                           | Command                |
-| ---------------- | --------------------------------- | ---------------------- |
-| syncpack         | Dependency version consistency    | `pnpm lint:deps`       |
-| knip             | Dead code detection               | `pnpm lint:unused`     |
-| jscpd            | Copy-paste detection              | `pnpm lint:duplicates` |
-| size-limit       | Bundle size tracking              | `pnpm size`            |
-| arethetypeswrong | TypeScript declaration validation | `pnpm lint:types`      |
-| publint          | Package.json exports validation   | `pnpm lint:package`    |
-| SonarCloud       | Code quality & security           | `pnpm sonar:local`     |
-| CodeQL           | Security vulnerabilities          | GitHub Actions         |
-| Codecov          | Coverage reporting                | GitHub Actions         |
-| Danger           | Automated PR review               | `pnpm danger:local`    |
+| Tool             | Purpose                           | Command                                  |
+| ---------------- | --------------------------------- | ---------------------------------------- |
+| syncpack         | Dependency version consistency    | `pnpm lint:deps`                         |
+| knip             | Dead code detection               | `pnpm lint:unused`                       |
+| jscpd            | Copy-paste detection              | `pnpm lint:duplicates`                   |
+| size-limit       | Bundle size tracking              | `pnpm size`                              |
+| arethetypeswrong | TypeScript declaration validation | `pnpm lint:types`                        |
+| publint          | Package.json exports validation   | `pnpm lint:package` (via publint-filter) |
+| smoke test       | Consumer install + import check   | `bash scripts/smoke-test-packages.sh`    |
+| SonarCloud       | Code quality & security           | `pnpm sonar:local`                       |
+| CodeQL           | Security vulnerabilities          | GitHub Actions                           |
+| Codecov          | Coverage reporting                | GitHub Actions                           |
+| Danger           | Automated PR review               | `pnpm danger:local`                      |
 
 ### jscpd Configuration
 
@@ -452,7 +476,7 @@ Per-workspace configurations in `knip.json`:
 - **Root**: entry scripts, ignores `fast-check` (used but not detected by knip)
 - **`packages/router-benchmarks`**: custom `entry: ["src/**/*.ts"]` to recognize standalone benchmark scripts
 - **`packages/solid`**: ignores `@babel/preset-typescript`, `babel-preset-solid` (build-only deps)
-- **`packages/svelte`**: ignores `@real-router/browser-plugin` (workspace dep used at runtime)
+- **`packages/svelte`**: ignores `@real-router/browser-plugin` (workspace dep used at runtime), `ignore: ["src/dom-utils/**"]` (symlinked files from dom-utils, not direct imports)
 - **`packages/vue`** and **`packages/svelte`**: explicit vitest config paths
 - **`packages/*`** (catch-all): includes stryker config support
 
@@ -704,6 +728,8 @@ uses: actions/checkout@v6
 ### Minimum Release Age (Removed)
 
 Previously used `minimum-release-age=1440` in `.npmrc` to block packages published less than 24 hours ago. Removed due to high maintenance overhead — every dependency update required temporary exclusions in `pnpm-workspace.yaml` with manual cleanup. The `strict-dep-builds=true` setting (pnpm 10) and `pnpm.onlyBuiltDependencies` allowlist now provide the primary supply-chain protection for lifecycle scripts.
+
+**`onlyBuiltDependencies` allowlist:** `core-js`, `esbuild`, `fsevents`, `unrs-resolver`, `vue-demi`. Only these packages are permitted to run post-install scripts. `vue-demi` was added after it started failing in CI with `ERR_PNPM_IGNORED_BUILDS` (pnpm 10 blocks unapproved build scripts by default).
 
 ### Security Overrides
 
@@ -1058,6 +1084,20 @@ Private `dom-utils` package (`"private": true`) — not published to npm, inline
 - **Not per-adapter duplication** — 5 copies of identical code is a maintenance burden. A shared source of truth eliminates drift.
 - **Private, not published** — only one adapter is used at a time, so the code is inlined (no extra npm dependency for users).
 
+### Bundling Strategy Per Adapter (#413)
+
+`dom-utils` is `"private": true` — it must be inlined into each adapter's bundle, never appear in published `dependencies`. The pattern matches how core handles `route-tree` and `event-emitter`:
+
+| Adapter            | Build tool     | How dom-utils is inlined                                                                                |
+| ------------------ | -------------- | ------------------------------------------------------------------------------------------------------- |
+| react, preact, vue | tsdown         | `devDependencies` + `alwaysBundle: ["dom-utils"]`                                                       |
+| solid              | rollup         | `devDependencies` + `nodeResolve` (not in `external` array)                                             |
+| svelte             | svelte-package | `devDependencies` + symlink `src/dom-utils` → `../../dom-utils/src` + `kit.alias` in `svelte.config.js` |
+
+**Svelte specifics:** `svelte-package` is a file-by-file transpiler, not a bundler — it cannot inline dependencies. The symlink places dom-utils source inside svelte's `src/` directory so `svelte-package` processes it as local files. `kit.alias` in `svelte.config.js` rewrites bare `import ... from "dom-utils"` to relative paths. The `resolve_aliases` function in `@sveltejs/package` handles this rewriting for all `.svelte`, `.ts`, and `.js` files.
+
+**Bug #413:** `dom-utils` was originally in `dependencies` (not `devDependencies`) of all 5 adapters, and was NOT listed in `alwaysBundle`. When published, `workspace:^` resolved to `"^0.2.7"` — pointing to a package that doesn't exist on npm. Fixed by moving to `devDependencies` + proper bundling per adapter.
+
 ## Module Resolution: `customConditions` + `development` Export Condition
 
 ### Problem
@@ -1110,7 +1150,13 @@ Packages that imported themselves by published name (e.g., `@real-router/core` i
 
 `"development"` is a custom condition name. Node.js, esbuild, webpack, rollup, and tsdown do **not** recognize it by default. Verified with `pnpm build && pnpm lint:types` (attw --pack).
 
-**Caveat:** Vite **does** recognize `"development"` in dev mode (it's in Vite's default `resolve.conditions`). To prevent external consumers from resolving source files, `src` is excluded from `"files"` in all packages (#418). The `"development"` condition points to `./src/index.ts` which exists on disk (for monorepo dev) but is not included in the npm tarball. publint's `FILE_NOT_PUBLISHED` error for this condition is filtered by `scripts/publint-filter.sh`.
+**Caveat — Vite resolves `"development"` (#418):** Vite includes `"development"` in its default `resolve.conditions` during dev mode. This caused external consumers (outside the monorepo) to resolve `./src/index.ts` instead of `./dist/esm/index.mjs`, hitting bare imports of private packages like `dom-utils`, `route-tree`, `browser-env`.
+
+**Fix:** `src` is excluded from `"files"` in all packages. The `"development"` condition remains in `exports` (required for monorepo dev — Vite and TypeScript both resolve it locally where `src/` exists on disk), but the npm tarball does not contain source files. External consumers see `"development": "./src/index.ts"` → file missing → graceful fallback to `"import": "./dist/esm/index.mjs"`.
+
+**publint:** Reports `FILE_NOT_PUBLISHED` for the `"development"` condition (correct — the file IS intentionally unpublished). publint does not support per-rule ignore, so `scripts/publint-filter.sh` wraps the `publint` CLI and filters out these expected errors. All public packages use `"lint:package": "bash ../../scripts/publint-filter.sh"` instead of bare `publint`.
+
+**Why not rename the condition:** Renaming `"development"` to a custom name (e.g., `"source"`) was attempted but causes a dual-package hazard in Vitest. Vite natively resolves `"development"` for ALL imports uniformly. A custom name would only be resolved by `vite-tsconfig-paths` for top-level imports, while internal imports within packages would fall through to `"import"` (dist) — two module instances, two WeakMaps, broken `getInternals()` registry.
 
 ## Infrastructure Changes (rou3 Migration — historical)
 
