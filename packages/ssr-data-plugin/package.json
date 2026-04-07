@@ -18,8 +18,7 @@
     }
   },
   "files": [
-    "dist",
-    "src"
+    "dist"
   ],
   "repository": {
     "type": "git",
@@ -40,7 +39,7 @@
     "build": "tsdown --config-loader unrun",
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
-    "lint:package": "publint",
+    "lint:package": "bash ../../scripts/publint-filter.sh",
     "lint:types": "attw --pack .",
     "build:dist-only": "tsdown --config-loader unrun"
   },

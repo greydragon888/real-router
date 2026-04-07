@@ -18,8 +18,7 @@
     }
   },
   "files": [
-    "dist",
-    "src"
+    "dist"
   ],
   "repository": {
     "type": "git",
@@ -46,7 +45,7 @@
     "build": "tsdown --config-loader unrun",
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0 --no-error-on-unmatched-pattern",
-    "lint:package": "publint",
+    "lint:package": "bash ../../scripts/publint-filter.sh",
     "lint:types": "attw --pack .",
     "test:properties": "vitest --config vitest.config.properties.mts --run",
     "test:stress": "vitest run --config vitest.config.stress.mts",
