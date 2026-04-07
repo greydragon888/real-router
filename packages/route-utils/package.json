@@ -1,6 +1,6 @@
 {
   "name": "@real-router/route-utils",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "type": "commonjs",
   "description": "Cached read-only query API for route tree structure",
   "main": "./dist/cjs/index.js",

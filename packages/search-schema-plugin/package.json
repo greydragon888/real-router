@@ -1,6 +1,6 @@
 {
   "name": "@real-router/search-schema-plugin",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "commonjs",
   "description": "Runtime search parameter validation via Standard Schema for Real-Router",
   "main": "./dist/cjs/index.js",

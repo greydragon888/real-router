@@ -1,5 +1,11 @@
 # @real-router/fsm
 
+## 0.2.3
+
+### Patch Changes
+
+- [#419](https://github.com/greydragon888/real-router/pull/419) [`31bcf07`](https://github.com/greydragon888/real-router/commit/31bcf07001bcaf57b760715633760dda91d3832c) Thanks [@greydragon888](https://github.com/greydragon888)! - Exclude `src/` from npm tarball to prevent Vite resolving source files ([#418](https://github.com/greydragon888/real-router/issues/418))
+
 ## 0.2.2
 
 ### Patch Changes
