@@ -8,7 +8,6 @@
   "types": "./dist/esm/index.d.mts",
   "exports": {
     ".": {
-      "development": "./src/index.ts",
       "types": {
         "import": "./dist/esm/index.d.mts",
         "require": "./dist/cjs/index.d.ts"
@@ -18,7 +17,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "src"
   ],
   "repository": {
     "type": "git",
@@ -50,7 +50,7 @@
     "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
     "test:mutation": "stryker run",
     "test:mutation:report": "open reports/mutation-report.html",
-    "lint:package": "bash ../../scripts/publint-filter.sh",
+    "lint:package": "publint",
     "lint:types": "attw --pack .",
     "build:dist-only": "tsdown --config-loader unrun"
   },

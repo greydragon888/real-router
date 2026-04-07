@@ -1,6 +1,76 @@
+import { readdirSync, readFileSync, existsSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 import tsconfigPaths from "vite-tsconfig-paths";
 import codspeedPlugin from "@codspeed/vitest-plugin";
+
+/**
+ * Auto-generate resolve aliases from workspace packages.
+ * Maps package names to their src/ entry points so Vitest
+ * runs tests against source (for v8 coverage on src/**).
+ *
+ * Replaces the "development" export condition which was removed
+ * from package.json exports because Vite resolves it by default
+ * and errors for external consumers (#421).
+ */
+function workspaceSourceAliases(): Record<string, string> {
+  const root = dirname(fileURLToPath(import.meta.url));
+  const packagesDir = join(root, "packages");
+  const aliases: Record<string, string> = {};
+
+  for (const dir of readdirSync(packagesDir, { withFileTypes: true })) {
+    if (!dir.isDirectory()) continue;
+
+    const pkgPath = join(packagesDir, dir.name, "package.json");
+    if (!existsSync(pkgPath)) continue;
+
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
+    if (!pkg.exports) continue;
+
+    for (const [subpath, conditions] of Object.entries(pkg.exports)) {
+      if (typeof conditions !== "object" || !conditions) continue;
+      const cond = conditions as Record<string, unknown>;
+
+      // Derive source path from the ESM dist path
+      const importPath = (cond.import as string) || "";
+      const srcFile = importPath
+        .replace(/^\.\/dist\/esm\//, "./src/")
+        .replace(/\.mjs$/, ".ts");
+
+      if (!srcFile.endsWith(".ts")) continue;
+
+      // Try direct file first, then index.ts in directory
+      const directPath = join(packagesDir, dir.name, srcFile);
+      const indexPath = join(
+        packagesDir,
+        dir.name,
+        srcFile.replace(/\.ts$/, "/index.ts"),
+      );
+      const fullSrcPath = existsSync(directPath)
+        ? directPath
+        : existsSync(indexPath)
+          ? indexPath
+          : null;
+
+      if (!fullSrcPath) continue;
+
+      const name =
+        subpath === "." ? pkg.name : `${pkg.name}/${subpath.slice(2)}`;
+      aliases[name] = fullSrcPath;
+    }
+  }
+
+  // Sort by key length descending — longer (more specific) paths first.
+  // Vite alias with string keys matches by prefix, so "@real-router/core"
+  // would intercept "@real-router/core/api" if it comes first.
+  const sorted: Record<string, string> = {};
+  for (const key of Object.keys(aliases).sort((a, b) => b.length - a.length)) {
+    sorted[key] = aliases[key];
+  }
+
+  return sorted;
+}
 
 /**
  * Common Vitest configuration shared across all test types
@@ -24,6 +94,13 @@ export const commonConfig = defineConfig({
   plugins: process.env.CI
     ? [tsconfigPaths(), codspeedPlugin()]
     : [tsconfigPaths()],
+
+  // Resolve workspace packages to source for test coverage.
+  // Without this, Vitest resolves via exports → dist and v8
+  // coverage can't track source files.
+  resolve: {
+    alias: workspaceSourceAliases(),
+  },
 
   /**
    * Cache directory for Vitest

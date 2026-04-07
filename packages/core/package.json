@@ -21,7 +21,6 @@
   },
   "exports": {
     ".": {
-      "development": "./src/index.ts",
       "types": {
         "import": "./dist/esm/index.d.mts",
         "require": "./dist/cjs/index.d.ts"
@@ -30,7 +29,6 @@
       "require": "./dist/cjs/index.js"
     },
     "./api": {
-      "development": "./src/api/index.ts",
       "types": {
         "import": "./dist/esm/api.d.mts",
         "require": "./dist/cjs/api.d.ts"
@@ -39,7 +37,6 @@
       "require": "./dist/cjs/api.js"
     },
     "./utils": {
-      "development": "./src/utils/index.ts",
       "types": {
         "import": "./dist/esm/utils.d.mts",
         "require": "./dist/cjs/utils.d.ts"
@@ -48,7 +45,6 @@
       "require": "./dist/cjs/utils.js"
     },
     "./validation": {
-      "development": "./src/validation.ts",
       "types": {
         "import": "./dist/esm/validation.d.mts",
         "require": "./dist/cjs/validation.d.ts"
@@ -58,7 +54,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "src"
   ],
   "repository": {
     "type": "git",
@@ -94,7 +91,7 @@
     "bench": "NODE_OPTIONS='--expose-gc --max-old-space-size=4096' npx tsx tests/benchmarks/index.ts",
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
-    "lint:package": "bash ../../scripts/publint-filter.sh",
+    "lint:package": "publint",
     "lint:types": "attw --pack .",
     "build:dist-only": "tsdown --config-loader unrun"
   },

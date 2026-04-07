@@ -18,6 +18,7 @@ export default mergeConfig(
       },
     },
     resolve: {
+      // "development" needed for solid-js dev mode exports.
       conditions: ["development", "browser"],
     },
   }),

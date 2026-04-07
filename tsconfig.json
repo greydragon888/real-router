@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    "customConditions": ["development"],
     "types": ["vitest/globals", "node"],
     "target": "ESNext",
     "module": "NodeNext",
