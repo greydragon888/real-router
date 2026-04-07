@@ -437,7 +437,7 @@ ko_fi: greydragon888
 | jscpd            | Copy-paste detection              | `pnpm lint:duplicates`                   |
 | size-limit       | Bundle size tracking              | `pnpm size`                              |
 | arethetypeswrong | TypeScript declaration validation | `pnpm lint:types`                        |
-| publint          | Package.json exports validation   | `pnpm lint:package` (via publint-filter) |
+| publint          | Package.json exports validation   | `pnpm lint:package`                      |
 | smoke test       | Consumer install + import check   | `bash scripts/smoke-test-packages.sh`    |
 | SonarCloud       | Code quality & security           | `pnpm sonar:local`                       |
 | CodeQL           | Security vulnerabilities          | GitHub Actions                           |
@@ -1098,65 +1098,41 @@ Private `dom-utils` package (`"private": true`) — not published to npm, inline
 
 **Bug #413:** `dom-utils` was originally in `dependencies` (not `devDependencies`) of all 5 adapters, and was NOT listed in `alwaysBundle`. When published, `workspace:^` resolved to `"^0.2.7"` — pointing to a package that doesn't exist on npm. Fixed by moving to `devDependencies` + proper bundling per adapter.
 
-## Module Resolution: `customConditions` + `development` Export Condition
+## Module Resolution: Clean Exports + Vitest Source Aliases
 
-### Problem
+### History
 
-Root `tsconfig.json` used manual `paths` mappings to resolve workspace packages to source files for IDE navigation:
+Originally used manual `paths` in tsconfig → replaced with `customConditions: ["development"]` + `"development"` export condition in all packages. The `"development"` condition pointed to `./src/index.ts` for IDE navigation.
 
-```json
-"paths": {
-  "@real-router/core": ["packages/core/src/index.ts"],
-  // ... 13 more mappings
-}
-```
+**Problem (#418, #421):** `"development"` is a well-known condition name. Vite (both v7 and v8) resolves it by default in dev mode. External consumers' Vite would resolve to `./src/index.ts`, hitting bare imports of private packages (`dom-utils`, `route-tree`, etc.). Removing `src` from `files` didn't help — Vite errors instead of falling through when a matched condition points to a missing file. Renaming to a custom condition caused dual-package hazard in Vitest.
 
-Issues: manual sync required, already out-of-sync (`@real-router/rx` and `path-matcher` missing), duplicates info from `exports`.
+**Root cause:** Developer-facing configuration (`"development"` condition for IDE navigation) was placed in the consumer-facing contract (`package.json` exports). This polluted exports with infrastructure concerns.
 
-### Solution
+### Current Solution
 
-TypeScript 5.0+ `customConditions` with `"development"` export condition:
+Clean exports — no `"development"` condition. Same approach as TanStack Router.
 
-**Root tsconfig.json:**
-
-```json
-{ "customConditions": ["development"] }
-```
-
-**Each package.json exports:**
+**Package.json exports (all packages):**
 
 ```json
 "exports": {
   ".": {
-    "development": "./src/index.ts",
-    "types": { ... },
+    "types": { "import": "./dist/esm/index.d.mts", "require": "./dist/cjs/index.d.ts" },
     "import": "./dist/esm/index.mjs",
     "require": "./dist/cjs/index.js"
   }
 }
 ```
 
-`"development"` must be **first** in `exports` — TypeScript picks the first matching condition. In production (Node.js, bundlers), `"development"` is unknown and ignored — resolution falls through to `"types"` / `"import"` / `"require"`.
+**`"files": ["dist", "src"]`** — source shipped for future declaration maps (IDE go-to-definition iteration 2).
 
-### Self-Import Fix
+**Vitest source resolution:** `vitest.config.common.mts` has `workspaceSourceAliases()` — auto-generates `resolve.alias` from `packages/*/package.json` at runtime. Maps package names to `src/` entry points so v8 coverage tracks source files. No manual sync — deterministic from package.json. Aliases sorted by key length (longest first) to prevent prefix-match conflicts (`@real-router/core/api` before `@real-router/core`).
 
-Packages that imported themselves by published name (e.g., `@real-router/core` importing from `"@real-router/core"`) worked with `paths` (TypeScript resolved to source), but broke with `customConditions` during build — esbuild doesn't know `customConditions` and tried resolving via `exports`, pointing to `./dist/esm/index.mjs` which doesn't exist mid-build.
+**Solid exception (#422):** 7 Solid adapter tests (`RouterProvider.test.tsx`) are `.todo()` — babel-preset-solid compiles JSX at transform time, and `resolve.alias` creates dual-module hazard with Solid's `createContext()`. These tests pass when `"development"` condition exists in exports (uniform resolution). Fix tracked in #422.
 
-**Fixed in:** `@real-router/core` (2 files), `@real-router/react` (3 files) — replaced self-imports with relative imports.
+### Self-Import Fix (historical)
 
-**Also fixed:** `import("logger")` → `import("@real-router/logger")` in core test files (bare `logger` alias no longer exists without `paths`).
-
-### Production Safety
-
-`"development"` is a custom condition name. Node.js, esbuild, webpack, rollup, and tsdown do **not** recognize it by default. Verified with `pnpm build && pnpm lint:types` (attw --pack).
-
-**Caveat — Vite resolves `"development"` (#418):** Vite includes `"development"` in its default `resolve.conditions` during dev mode. This caused external consumers (outside the monorepo) to resolve `./src/index.ts` instead of `./dist/esm/index.mjs`, hitting bare imports of private packages like `dom-utils`, `route-tree`, `browser-env`.
-
-**Fix:** `src` is excluded from `"files"` in all packages. The `"development"` condition remains in `exports` (required for monorepo dev — Vite and TypeScript both resolve it locally where `src/` exists on disk), but the npm tarball does not contain source files. External consumers see `"development": "./src/index.ts"` → file missing → graceful fallback to `"import": "./dist/esm/index.mjs"`.
-
-**publint:** Reports `FILE_NOT_PUBLISHED` for the `"development"` condition (correct — the file IS intentionally unpublished). publint does not support per-rule ignore, so `scripts/publint-filter.sh` wraps the `publint` CLI and filters out these expected errors. All public packages use `"lint:package": "bash ../../scripts/publint-filter.sh"` instead of bare `publint`.
-
-**Why not rename the condition:** Renaming `"development"` to a custom name (e.g., `"source"`) was attempted but causes a dual-package hazard in Vitest. Vite natively resolves `"development"` for ALL imports uniformly. A custom name would only be resolved by `vite-tsconfig-paths` for top-level imports, while internal imports within packages would fall through to `"import"` (dist) — two module instances, two WeakMaps, broken `getInternals()` registry.
+Packages that imported themselves by published name broke with `customConditions` during build. Fixed by replacing self-imports with relative imports in `@real-router/core` (2 files) and `@real-router/react` (3 files). This fix remains valid — self-imports are still relative.
 
 ## Infrastructure Changes (rou3 Migration — historical)
 

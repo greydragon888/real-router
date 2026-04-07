@@ -15,7 +15,6 @@
   },
   "exports": {
     ".": {
-      "development": "./src/index.ts",
       "types": {
         "import": "./dist/esm/index.d.mts",
         "require": "./dist/cjs/index.d.ts"
@@ -24,7 +23,6 @@
       "require": "./dist/cjs/index.js"
     },
     "./legacy": {
-      "development": "./src/legacy.ts",
       "types": {
         "import": "./dist/esm/legacy.d.mts",
         "require": "./dist/cjs/legacy.d.ts"
@@ -34,7 +32,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "src"
   ],
   "homepage": "https://github.com/greydragon888/real-router",
   "repository": {
@@ -50,7 +49,7 @@
     "test:stress": "vitest run --config vitest.config.stress.mts",
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts,.tsx src/ tests/ --fix --max-warnings 0",
-    "lint:package": "bash ../../scripts/publint-filter.sh",
+    "lint:package": "publint",
     "lint:types": "attw --pack .",
     "build:dist-only": "tsdown --config-loader unrun"
   },

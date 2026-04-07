@@ -32,7 +32,7 @@ pnpm lint:unused        # Check for unused code (knip)
 - Pinned versions (`save-exact=true` in .npmrc)
 - Workspace packages use `workspace:^` protocol
 - Dual ESM/CJS builds via tsdown (Solid uses rollup + babel-preset-solid, Svelte uses svelte-package)
-- `customConditions: ["development"]` in tsconfig — resolves workspace imports to `src/` via `"development"` export condition in each package.json
+- Vitest uses dynamic `resolve.alias` in `vitest.config.common.mts` to map workspace packages to `src/` for coverage — auto-generated from `package.json`, no manual sync
 - Pre-push hook runs full validation (build + lint:types + lint:package)
 - Pre-commit hook runs tests + knip + jscpd + `lint:e2e` (verifies e2e dirs have spec files)
 - `outputLogs: "errors-only"` in turbo.json for all tasks — silent on success, full output on failure. Use `build:verbose`/`test:verbose` for debugging
@@ -65,7 +65,7 @@ pnpm lint:unused        # Check for unused code (knip)
 When creating a new `packages/*` package, complete every item:
 
 ### Scaffold
-- `package.json` — version **`0.0.1`** (changesets will bump to `0.1.0` on first release), `"type": "commonjs"`, dual ESM/CJS exports with `"development"` condition
+- `package.json` — version **`0.0.1`** (changesets will bump to `0.1.0` on first release), `"type": "commonjs"`, dual ESM/CJS exports (`types` → `import` → `require`)
 - `tsconfig.json` — extends `../../tsconfig.json`, include `src` and `tests`
 - `tsconfig.node.json` — extends `../../tsconfig.node.json`, include `*.mts` and root configs
 - `tsdown.config.mts` — use `createBrowserConfig()` or `createIsomorphicConfig()` from `../../tsdown.base.js`
