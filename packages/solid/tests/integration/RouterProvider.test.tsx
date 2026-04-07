@@ -2,9 +2,14 @@ import { render, screen } from "@solidjs/testing-library";
 import { useContext } from "solid-js";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { RouterProvider, useRouter, useRoute } from "@real-router/solid";
+import {
+  RouterProvider,
+  useRouter,
+  useRoute,
+  RouterContext,
+  RouteContext,
+} from "@real-router/solid";
 
-import { RouterContext, RouteContext } from "../../src/context";
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
 import type { Router } from "@real-router/core";
@@ -21,10 +26,7 @@ describe("RouterProvider - Integration Tests", () => {
   });
 
   describe("Basic Integration", () => {
-    // SKIP: #422 — babel-preset-solid dual-module hazard after removing "development" export condition (#421).
-    // useContext(RouterContext) returns undefined — different module instances between alias-resolved
-    // source and babel-transformed code. Does NOT affect production — only test infrastructure.
-    it.todo("should provide router instance via RouterContext", async () => {
+    it("should provide router instance via RouterContext", async () => {
       await router.start("/users/list");
 
       let capturedRouter: Router | null = null;
@@ -49,8 +51,7 @@ describe("RouterProvider - Integration Tests", () => {
       expect(screen.getByTestId("has-router")).toHaveTextContent("yes");
     });
 
-    // SKIP: #422 — same dual-module hazard as above
-    it.todo("should provide route state via RouteContext", async () => {
+    it("should provide route state via RouteContext", async () => {
       await router.start("/users/list");
 
       let capturedRoute: string | undefined;
@@ -221,8 +222,7 @@ describe("RouterProvider - Integration Tests", () => {
   });
 
   describe("Edge Cases", () => {
-    // SKIP: #422 — same dual-module hazard as above
-    it.todo("should handle router not started", () => {
+    it("should handle router not started", () => {
       let route: string | undefined = "not-set";
 
       function RouteCapture() {
