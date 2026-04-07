@@ -285,7 +285,6 @@ CI job `smoke` (added after #413 and #418): packs all 22 public packages into ta
 **Catches:**
 
 - Private packages leaking into dependencies (#413 — `dom-utils` in published deps)
-- Source files shipped in tarball causing Vite resolve failures (#418 — `"development"` condition)
 - Broken export paths, missing dist files
 
 **Skipped packages** (cannot be imported in plain Node.js):
@@ -461,7 +460,9 @@ Ignores: `*.d.ts`, `*.test.ts`, `*.test.tsx`, `*.bench.ts`, `*.spec.ts`, `*.prop
 
 ### size-limit Configuration
 
-`.size-limit.js` defines per-package limits.
+`.size-limit.js` defines per-package limits. esbuild measures dist bundles as consumers receive them — no custom export conditions.
+
+**Historical:** Previously used `modifyEsbuildConfig: addDevelopmentCondition` to resolve workspace deps to `src/` for granular tree-shaking measurement. Removed after `"development"` condition was dropped from exports (#421). Size measurements now reflect actual consumer bundle sizes. `@real-router/sources` limit increased from 1.5 kB to 1.7 kB (measurement methodology change, not code regression).
 
 React package ignores `react`, `react-dom`, `@real-router/core`, `@real-router/route-utils`, and `@real-router/sources` from size calculation.
 
@@ -564,7 +565,10 @@ build → depends on ^build (upstream packages) + test + test:properties + test:
 test → depends on ^build + lint + type-check
 test:properties → depends on ^build + test + lint + type-check
 test:stress → depends on ^build + test:properties + test + lint + type-check
+type-check → depends on build:dist-only + ^build:dist-only
 ```
+
+**Why type-check needs build:dist-only (#421):** Without `"development"` export condition, `tsc --noEmit` resolves workspace packages via `exports` → dist types (`.d.ts`). Both the package's own dist and all upstream dists must exist. `build:dist-only` (own) handles self-imports in tests; `^build:dist-only` (upstream) handles cross-package imports.
 
 Build only runs after all test tiers pass. `test:properties` (property-based tests via fast-check) and `test:stress` (stress/load tests) run after unit tests.
 
@@ -1124,7 +1128,7 @@ Clean exports — no `"development"` condition. Same approach as TanStack Router
 }
 ```
 
-**`"files": ["dist", "src"]`** — source shipped for future declaration maps (IDE go-to-definition iteration 2).
+**`"files": ["dist", "src"]`** — source shipped for consumer IDE navigation (sourcemaps reference `../../src/` paths) and future declaration maps (#423).
 
 **Vitest source resolution:** `vitest.config.common.mts` has `workspaceSourceAliases()` — auto-generates `resolve.alias` from `packages/*/package.json` at runtime. Maps package names to `src/` entry points so v8 coverage tracks source files. No manual sync — deterministic from package.json. Aliases sorted by key length (longest first) to prevent prefix-match conflicts (`@real-router/core/api` before `@real-router/core`).
 
