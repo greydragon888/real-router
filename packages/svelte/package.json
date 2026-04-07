@@ -1,6 +1,6 @@
 {
   "name": "@real-router/svelte",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "type": "module",
   "description": "Svelte 5 integration for Real-Router",
   "svelte": "./dist/index.js",

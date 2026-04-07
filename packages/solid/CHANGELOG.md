@@ -1,5 +1,13 @@
 # @real-router/solid
 
+## 0.2.7
+
+### Patch Changes
+
+- [#414](https://github.com/greydragon888/real-router/pull/414) [`db93554`](https://github.com/greydragon888/real-router/commit/db93554700e9156b92559662ad1370ad94d0e50b) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix unpublished `dom-utils` leaking into npm dependencies ([#413](https://github.com/greydragon888/real-router/issues/413))
+
+  Moved `dom-utils` from `dependencies` to `devDependencies`. Rollup already inlines `dom-utils` via `nodeResolve`, but the dependency declaration caused `npm install @real-router/solid` to fail with `ETARGET: No matching version found for dom-utils`.
+
 ## 0.2.6
 
 ### Patch Changes
