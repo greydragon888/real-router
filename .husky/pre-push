@@ -7,6 +7,7 @@
 # - lint:types: Validate TypeScript types in dist (arethetypeswrong)
 # - lint:package: Validate package.json exports (publint)
 # - lint:unused: Dead code detection (knip)
+# - lint:deps: Dependency version consistency (syncpack)
 
 set -e
 
@@ -25,5 +26,9 @@ pnpm turbo run build:dist-only lint:package lint:types --filter='!./examples/**'
 # Check for unused code
 echo "🧹 Checking for unused code..."
 pnpm lint:unused
+
+# Check dependency version consistency
+echo "🔗 Checking dependency versions..."
+pnpm lint:deps
 
 echo "✅ All pre-push checks passed! Pushing to remote..."
