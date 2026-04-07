@@ -199,6 +199,39 @@ jobs:
           path: packages/*/dist/
           retention-days: 1
 
+  # Smoke test: pack all public packages, install from tarballs
+  # into an isolated project, verify every export resolves.
+  # Catches: private deps leaking (#413), source files in tarball (#418)
+  smoke:
+    name: Package Smoke Test
+    runs-on: ubuntu-latest
+    needs: [check, build]
+    if: >-
+      always() &&
+      needs.check.outputs.should_run == 'true' &&
+      needs.build.result == 'success'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: pnpm turbo run build:dist-only --filter='!./examples/**'
+
+      - name: Run smoke test
+        run: bash scripts/smoke-test-packages.sh
+
   # ============================================
   # DOWNSTREAM: Coverage, SonarCloud, Bundle Size
   # ============================================
@@ -449,7 +482,7 @@ jobs:
   ci:
     name: CI Result
     runs-on: ubuntu-latest
-    needs: [check, lint, test, build]
+    needs: [check, lint, test, build, smoke]
     if: always()
     steps:
       - name: Determine result
@@ -462,10 +495,11 @@ jobs:
           LINT="${{ needs.lint.result }}"
           TEST="${{ needs.test.result }}"
           BUILD="${{ needs.build.result }}"
+          SMOKE="${{ needs.smoke.result }}"
 
-          echo "lint=$LINT test=$TEST build=$BUILD"
+          echo "lint=$LINT test=$TEST build=$BUILD smoke=$SMOKE"
 
-          if [[ "$LINT" == "success" && "$TEST" == "success" && "$BUILD" == "success" ]]; then
+          if [[ "$LINT" == "success" && "$TEST" == "success" && "$BUILD" == "success" && "$SMOKE" == "success" ]]; then
             echo "✅ All checks passed"
             exit 0
           fi

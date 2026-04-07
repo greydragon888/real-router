@@ -78,5 +78,4 @@ npm-debug.log
 
 # Local scripts and tools
 init-tdd-flow.sh
-scripts/
 tools/
