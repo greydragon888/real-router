@@ -1110,6 +1110,8 @@ Packages that imported themselves by published name (e.g., `@real-router/core` i
 
 `"development"` is a custom condition name. Node.js, esbuild, webpack, rollup, and tsdown do **not** recognize it by default. Verified with `pnpm build && pnpm lint:types` (attw --pack).
 
+**Caveat:** Vite **does** recognize `"development"` in dev mode (it's in Vite's default `resolve.conditions`). To prevent external consumers from resolving source files, `src` is excluded from `"files"` in all packages (#418). The `"development"` condition points to `./src/index.ts` which exists on disk (for monorepo dev) but is not included in the npm tarball. publint's `FILE_NOT_PUBLISHED` error for this condition is filtered by `scripts/publint-filter.sh`.
+
 ## Infrastructure Changes (rou3 Migration — historical)
 
 ### SonarQube Scanner Rename

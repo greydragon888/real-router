@@ -58,8 +58,7 @@
     }
   },
   "files": [
-    "dist",
-    "src"
+    "dist"
   ],
   "repository": {
     "type": "git",
@@ -95,7 +94,7 @@
     "bench": "NODE_OPTIONS='--expose-gc --max-old-space-size=4096' npx tsx tests/benchmarks/index.ts",
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
-    "lint:package": "publint",
+    "lint:package": "bash ../../scripts/publint-filter.sh",
     "lint:types": "attw --pack .",
     "build:dist-only": "tsdown --config-loader unrun"
   },

@@ -84,7 +84,12 @@ export function Link<P extends Params = Params>(
   );
 
   return (
-    <a {...(rest as JSX.HTMLAttributes<HTMLAnchorElement>)} href={href()} class={finalClassName()} onClick={handleClick}>
+    <a
+      {...(rest as JSX.HTMLAttributes<HTMLAnchorElement>)}
+      href={href()}
+      class={finalClassName()}
+      onClick={handleClick}
+    >
       {local.children}
     </a>
   );
