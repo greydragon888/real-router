@@ -82,8 +82,9 @@ export const createConfig = (opts: CreateConfigOptions = {}): UserConfig[] => {
     // Platform
     platform,
 
-    // Generate type definitions
-    dts: true,
+    // Generate type definitions with declaration maps (.d.ts.map)
+    // Maps .d.ts → .ts source for IDE go-to-definition (#423)
+    dts: { sourcemap: true },
 
     // Sourcemaps
     sourcemap,
