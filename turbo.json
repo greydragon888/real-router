@@ -112,7 +112,7 @@
       "cache": true
     },
     "type-check": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build:dist-only"],
       "outputs": [],
       "inputs": [
         "**/*.{ts,tsx,vue,svelte}",
