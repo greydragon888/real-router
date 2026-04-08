@@ -1,4 +1,4 @@
-import { test } from "@fast-check/vitest";
+import { fc, test } from "@fast-check/vitest";
 
 import {
   arbHashPrefix,
@@ -308,6 +308,40 @@ describe("empty-hash fallback: extractHashPath returns '/' when hash has no path
       const path = extractHashPath("#", null);
 
       expect(path).toBe("/");
+    },
+  );
+});
+
+// =============================================================================
+// Search Params: query params survive buildUrl → matchUrl roundtrip
+// =============================================================================
+
+describe("search-params: query params preserved through hash URL matchUrl", () => {
+  test.prop(
+    [
+      arbHashPrefix,
+      fc.constantFrom("1", "10", "42"),
+      fc.constantFrom("asc", "desc", "name"),
+    ],
+    { numRuns: NUM_RUNS.standard },
+  )(
+    "search params in hash URL are parsed correctly by matchUrl",
+    (hashPrefix: string, page: string, sort: string) => {
+      const router = createHashRouter(hashPrefix);
+
+      // Build the base URL and manually append query params
+      // (queryParamsMode: "default" allows undeclared query params in matchUrl)
+      const baseUrl = router.buildUrl("users.list", {});
+      const urlWithParams = `https://example.com${baseUrl}?page=${page}&sort=${sort}`;
+      const state = router.matchUrl(urlWithParams);
+
+      expect(state).toBeDefined();
+      expect(state!.name).toBe("users.list");
+      // queryParamsMode: "default" auto-converts numeric strings to numbers
+      expect(String(state!.params.page as number)).toBe(page);
+      expect(state!.params.sort).toBe(sort);
+
+      router.stop();
     },
   );
 });

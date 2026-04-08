@@ -44,16 +44,16 @@ export function collectSync<T>(obs: RxObservable<T>): T[] {
 // Arbitraries
 // =============================================================================
 
-/** Array of bounded integers (bounded for determinism and performance) */
-export const arbIntArray = fc.array(fc.integer({ min: -100, max: 100 }), {
+/** Array of bounded integers (wider range for edge-case coverage) */
+export const arbIntArray = fc.array(fc.integer({ min: -10_000, max: 10_000 }), {
   minLength: 0,
-  maxLength: 20,
+  maxLength: 50,
 });
 
 /** Non-empty array of bounded integers */
 export const arbNonEmptyIntArray = fc.array(
-  fc.integer({ min: -100, max: 100 }),
-  { minLength: 1, maxLength: 20 },
+  fc.integer({ min: -10_000, max: 10_000 }),
+  { minLength: 1, maxLength: 50 },
 );
 
 /**

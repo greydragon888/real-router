@@ -489,6 +489,64 @@ describe("EventEmitter Property-Based Tests", () => {
     );
   });
 
+  describe("depth tracking — resets after successful emit", () => {
+    test.prop([arbEventName, arbData, arbData], {
+      numRuns: NUM_RUNS.lifecycle,
+    })(
+      "depth counter resets to zero after emit completes",
+      (eventName, data1, data2) => {
+        // eslint-disable-next-line unicorn/prefer-event-target -- custom EventEmitter
+        const emitter = new EventEmitter<TestEventMap>({
+          limits: { maxListeners: 0, warnListeners: 0, maxEventDepth: 1 },
+        });
+        const [listener] = createUniqueListeners(1);
+
+        emitter.on(eventName, listener.fn);
+
+        // First emit — depth goes 0→1→0
+        emitter.emit(eventName, data1);
+
+        expect(listener.getCallCount()).toBe(1);
+
+        // Second emit should succeed (depth is back to 0)
+        emitter.emit(eventName, data2);
+
+        expect(listener.getCallCount()).toBe(2);
+      },
+    );
+  });
+
+  describe("re-registration after off() — listener works after off+on", () => {
+    test.prop([arbEventName, arbData, arbData], {
+      numRuns: NUM_RUNS.lifecycle,
+    })(
+      "listener receives events after off() followed by on()",
+      (eventName, data1, data2) => {
+        const emitter = createTestEmitter();
+        const [listener] = createUniqueListeners(1);
+
+        // Register, emit, verify
+        emitter.on(eventName, listener.fn);
+        emitter.emit(eventName, data1);
+
+        expect(listener.getCallCount()).toBe(1);
+
+        // Unsubscribe
+        emitter.off(eventName, listener.fn);
+        emitter.emit(eventName, data1);
+
+        expect(listener.getCallCount()).toBe(1); // not called again
+
+        // Re-register
+        emitter.on(eventName, listener.fn);
+        emitter.emit(eventName, data2);
+
+        expect(listener.getCallCount()).toBe(2);
+        expect(listener.getLastData()).toBe(data2);
+      },
+    );
+  });
+
   describe("warnListeners — onListenerWarn called at threshold", () => {
     test.prop([arbEventName, arbWarnThreshold], {
       numRuns: NUM_RUNS.standard,

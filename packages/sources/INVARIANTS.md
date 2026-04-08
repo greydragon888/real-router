@@ -142,6 +142,24 @@
 
 ---
 
+## createErrorSource — Error Tracking
+
+| #   | Invariant                                                | Description                                                                                                                                              |
+| --- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Error snapshot version increments monotonically          | Each new error produces a snapshot with a strictly greater `version` than the previous one. Version never decreases or stays the same across errors.      |
+| 2   | Error cleared on TRANSITION_SUCCESS                      | After a successful navigation, `error` is `null`, `toRoute` is `null`, and `fromRoute` is `null`. The error state fully resets on any successful transition. |
+| 3   | Snapshot reference stable between events                 | Calling `getSnapshot()` multiple times without an intervening error event returns the exact same object reference (referential equality).                 |
+| 4   | Destroy is idempotent                                    | Calling `destroy()` N times does not throw and leaves the source consistently torn down.                                                                 |
+
+## createErrorSource — Destroy
+
+| #   | Invariant                                                        | Description                                                                                                                   |
+| --- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Post-destroy listeners not notified on new errors                | After `destroy()`, new navigation errors do not invoke any subscribed listener.                                               |
+| 2   | Post-destroy getSnapshot returns last snapshot before destroy    | `getSnapshot()` returns the snapshot that was current at destroy time, preserving the last known state.                       |
+
+---
+
 ## Test Files
 
 | File                                             | Invariants | Category                                                                                                     |
@@ -150,3 +168,4 @@
 | `tests/property/routeNodeSource.properties.ts`   | 19         | `createRouteNodeSource` node scoping, lazy-connection with reconnection reconciliation, and destroy behavior |
 | `tests/property/activeRouteSource.properties.ts` | 14         | `createActiveRouteSource` boolean tracking, areRoutesRelated filter optimization, and destroy behavior       |
 | `tests/property/transitionSource.properties.ts`  | 16         | `createTransitionSource` state machine transitions, concurrent navigation, and destroy behavior              |
+| `tests/property/errorSource.properties.ts`       | 6          | `createErrorSource` error tracking, version monotonicity, and destroy behavior                               |

@@ -53,7 +53,10 @@ describe("node scoping", () => {
       source.subscribe(() => {});
       await router.navigate(nodeName, paramsForRoute(nodeName));
 
-      expect(source.getSnapshot().route).not.toBeUndefined();
+      const snapshot = source.getSnapshot();
+
+      expect(snapshot.route).not.toBeUndefined();
+      expect(snapshot.route!.name).toBe(nodeName);
 
       router.stop();
     },
@@ -69,7 +72,10 @@ describe("node scoping", () => {
       source.subscribe(() => {});
       await router.navigate(nav.name, nav.params).catch(() => {});
 
-      expect(source.getSnapshot().route).not.toBeUndefined();
+      const snapshot = source.getSnapshot();
+
+      expect(snapshot.route).not.toBeUndefined();
+      expect(snapshot.route!.name).toBe(nav.name);
 
       router.stop();
     },

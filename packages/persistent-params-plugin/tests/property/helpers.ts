@@ -118,6 +118,6 @@ export async function createStartedRouterWithDefaults(
 // =============================================================================
 
 export const NUM_RUNS = {
-  async: 30,
+  async: 50,
   standard: 50,
 } as const;

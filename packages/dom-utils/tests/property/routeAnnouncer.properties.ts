@@ -41,7 +41,7 @@ describe("RouteAnnouncer — Property Tests", () => {
 
         const count = document.querySelectorAll(ANNOUNCER_ATTR).length;
 
-        expect(count).toBeLessThanOrEqual(1);
+        expect(count).toBe(1);
 
         for (const ann of instances) {
           ann.destroy();
@@ -73,6 +73,7 @@ describe("RouteAnnouncer — Property Tests", () => {
           "";
 
         expect(text.length).toBeGreaterThan(0);
+        expect(text).toContain(prefix);
 
         ann.destroy();
         document.body.innerHTML = "";

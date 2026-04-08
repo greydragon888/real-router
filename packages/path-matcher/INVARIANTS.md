@@ -53,4 +53,4 @@
 | File                                    | Invariants | Category                                                                            |
 | --------------------------------------- | ---------- | ----------------------------------------------------------------------------------- |
 | `tests/property/encoding.properties.ts` | 7          | URL parameter encoding/decoding                                                     |
-| `tests/property/matching.properties.ts` | 19         | Segment Trie matching, path building, rejection, hash stripping, encoding roundtrip |
+| `tests/property/matching.properties.ts` | 21         | Segment Trie matching, path building, rejection, hash stripping, encoding roundtrip |

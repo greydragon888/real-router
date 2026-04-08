@@ -7,12 +7,16 @@ import {
   arbArrayItems,
   arbSafeParamValue,
   arbSafeQueryValue,
+  arbSplatValue,
   createArrayMatcher,
   createMixedMatcher,
   createParamMatcher,
   createQueryMatcher,
+  createSplatMatcher,
   NUM_RUNS,
 } from "./helpers";
+import { createRouteTree } from "../../src/builder/createRouteTree";
+import { createMatcher } from "../../src/createMatcher";
 
 describe("Roundtrip Properties", () => {
   describe("buildPath→match", () => {
@@ -27,6 +31,22 @@ describe("Roundtrip Properties", () => {
         expect(result).toBeDefined();
         expect(result!.segments.at(-1)!.fullName).toBe("users.profile");
         expect(result!.params).toStrictEqual({ id });
+      },
+    );
+  });
+
+  describe("splat buildPath→match", () => {
+    const matcher = createSplatMatcher();
+
+    test.prop([arbSplatValue], { numRuns: NUM_RUNS.thorough })(
+      "splat param is preserved through buildPath→match roundtrip",
+      (splatPath: string) => {
+        const path = matcher.buildPath("files.catchAll", { path: splatPath });
+        const result = matcher.match(path);
+
+        expect(result).toBeDefined();
+        expect(result!.segments.at(-1)!.fullName).toBe("files.catchAll");
+        expect(result!.params).toStrictEqual({ path: splatPath });
       },
     );
   });
@@ -73,6 +93,52 @@ describe("Roundtrip Properties", () => {
           // "none" single-item: scalar (no repeated key to trigger array)
           expect(decoded).toBe(items[0]);
         }
+      },
+    );
+  });
+
+  describe("Nested roundtrip: 3+ level deep routes preserve name and params", () => {
+    const deepMatcher = (() => {
+      const tree = createRouteTree("", "", [
+        {
+          name: "org",
+          path: "/org/:orgId",
+          children: [
+            {
+              name: "team",
+              path: "/team/:teamId",
+              children: [
+                {
+                  name: "member",
+                  path: "/member/:memberId",
+                },
+              ],
+            },
+          ],
+        },
+      ]);
+      const m = createMatcher();
+
+      m.registerTree(tree);
+
+      return m;
+    })();
+
+    test.prop([arbSafeParamValue, arbSafeParamValue, arbSafeParamValue], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "3-level nested route roundtrips name and all params",
+      (orgId: string, teamId: string, memberId: string) => {
+        const path = deepMatcher.buildPath("org.team.member", {
+          orgId,
+          teamId,
+          memberId,
+        });
+        const result = deepMatcher.match(path);
+
+        expect(result).toBeDefined();
+        expect(result!.segments.at(-1)!.fullName).toBe("org.team.member");
+        expect(result!.params).toStrictEqual({ orgId, teamId, memberId });
       },
     );
   });

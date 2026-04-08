@@ -48,6 +48,17 @@ const LIMIT_BOUNDS = {
 
 type LimitKey = keyof typeof LIMIT_BOUNDS;
 
+/**
+ * Safe dictionary key arbitrary that excludes __proto__ and constructor.
+ * Used by all dictionary-based arbitraries to avoid prototype pollution.
+ *
+ * fc.dictionary() has built-in __proto__ generation that bypasses key filters,
+ * so we use fc.array(fc.tuple(...)).map(Object.fromEntries) instead.
+ */
+export const safeDictKeyArbitrary = fc
+  .string({ minLength: 1, maxLength: 10 })
+  .filter((key) => key !== "__proto__" && key !== "constructor");
+
 const validQueryParamsArbitrary = fc
   .record({
     arrayFormat: fc.option(fc.constantFrom(...ARRAY_FORMAT_VALUES), {
@@ -137,11 +148,15 @@ export const validOptionsArbitrary = fc
       nil: undefined,
     }),
     defaultParams: fc.option(
-      fc.dictionary(
-        fc.string({ minLength: 1, maxLength: 10 }),
-        fc.oneof(fc.string(), fc.integer(), fc.boolean()),
-        { maxKeys: 3 },
-      ),
+      fc
+        .array(
+          fc.tuple(
+            safeDictKeyArbitrary,
+            fc.oneof(fc.string(), fc.integer(), fc.boolean()),
+          ),
+          { maxLength: 3 },
+        )
+        .map((entries) => Object.fromEntries(entries)),
       { nil: undefined },
     ),
     trailingSlash: fc.option(fc.constantFrom(...TRAILING_SLASH_VALUES), {
@@ -217,17 +232,21 @@ export const outOfBoundsLimitArbitrary = (
   );
 };
 
-export const plainObjectArbitrary = fc.dictionary(
-  fc.string({ minLength: 1, maxLength: 10 }),
-  fc.oneof(
-    fc.string(),
-    fc.integer(),
-    fc.boolean(),
-    fc.constant(null),
-    fc.constant(undefined),
-  ),
-  { maxKeys: 5 },
-);
+export const plainObjectArbitrary = fc
+  .array(
+    fc.tuple(
+      safeDictKeyArbitrary,
+      fc.oneof(
+        fc.string(),
+        fc.integer(),
+        fc.boolean(),
+        fc.constant(null),
+        fc.constant(undefined),
+      ),
+    ),
+    { maxLength: 5 },
+  )
+  .map((entries) => Object.fromEntries(entries));
 
 export const nonObjectNonUndefinedArbitrary = fc.oneof(
   fc.constant(null),
@@ -244,3 +263,222 @@ export const nonPlainObjectArbitrary = fc.constantFrom(
   new Date(),
   /regex/,
 );
+
+// =============================================================================
+// Navigation namespace arbitraries
+// =============================================================================
+
+/**
+ * Generates valid route name strings (non-empty, dot-separated segments).
+ */
+export const validRouteNameArbitrary = fc
+  .array(fc.stringMatching(/^[A-Za-z]\w{0,9}$/), {
+    minLength: 1,
+    maxLength: 3,
+  })
+  .map((segments) => segments.join("."));
+
+/**
+ * Generates values that are NOT strings (for name validation tests).
+ */
+export const nonStringArbitrary = fc.oneof(
+  fc.constant(null),
+  fc.constant(undefined),
+  fc.integer(),
+  fc.boolean(),
+  fc.constant([1, 2]),
+  fc.constant({}),
+  fc.constant(Symbol("test")),
+);
+
+/**
+ * Generates valid params objects (plain objects with string/number/boolean values).
+ */
+export const validParamsArbitrary = fc
+  .array(
+    fc.tuple(
+      safeDictKeyArbitrary,
+      fc.oneof(fc.string(), fc.integer(), fc.boolean()),
+    ),
+    { maxLength: 5 },
+  )
+  .map((entries) => Object.fromEntries(entries));
+
+/**
+ * Generates values that are NOT valid params (not plain objects).
+ */
+export const invalidParamsArbitrary = fc.oneof(
+  fc.constant(null),
+  fc.string(),
+  fc.integer(),
+  fc.boolean(),
+  fc.constant([1, 2]),
+);
+
+/**
+ * Generates valid start paths (starting with "/").
+ */
+export const validStartPathArbitrary = fc
+  .stringMatching(/^\/[a-z/]{0,20}$/)
+  .filter((s) => s.length > 0);
+
+/**
+ * Generates invalid start paths (non-"/" prefix strings).
+ */
+export const invalidStartPathArbitrary = fc
+  .string({ minLength: 1, maxLength: 20 })
+  .filter((s) => !s.startsWith("/") && s !== "");
+
+// =============================================================================
+// EventBus namespace arbitraries
+// =============================================================================
+
+export const VALID_EVENT_NAMES = [
+  "$start",
+  "$stop",
+  "$$start",
+  "$$leaveApprove",
+  "$$cancel",
+  "$$success",
+  "$$error",
+] as const;
+
+export const validEventNameArbitrary = fc.constantFrom(...VALID_EVENT_NAMES);
+
+export const invalidEventNameArbitrary = fc
+  .string({ minLength: 1, maxLength: 20 })
+  .filter((s) => !(VALID_EVENT_NAMES as readonly string[]).includes(s));
+
+// =============================================================================
+// Plugins namespace arbitraries
+// =============================================================================
+
+export const VALID_PLUGIN_KEYS = [
+  "onStart",
+  "onStop",
+  "onTransitionStart",
+  "onTransitionLeaveApprove",
+  "onTransitionSuccess",
+  "onTransitionError",
+  "onTransitionCancel",
+  "teardown",
+] as const;
+
+export const validPluginArbitrary = fc
+  .subarray([...VALID_PLUGIN_KEYS] as string[], { minLength: 1 })
+  .map((keys) => {
+    const plugin: Record<string, () => void> = {};
+
+    for (const key of keys) {
+      plugin[key] = () => {};
+    }
+
+    return plugin;
+  });
+
+export const unknownPluginKeyArbitrary = fc
+  .string({ minLength: 1, maxLength: 20 })
+  .filter(
+    (key) =>
+      !(VALID_PLUGIN_KEYS as readonly string[]).includes(key) &&
+      key !== "__proto__" &&
+      key !== "constructor",
+  );
+
+export const VALID_INTERCEPTOR_METHODS = [
+  "start",
+  "buildPath",
+  "forwardState",
+] as const;
+
+export const validInterceptorMethodArbitrary = fc.constantFrom(
+  ...VALID_INTERCEPTOR_METHODS,
+);
+
+export const invalidInterceptorMethodArbitrary = fc
+  .string({ minLength: 1, maxLength: 20 })
+  .filter((s) => !(VALID_INTERCEPTOR_METHODS as readonly string[]).includes(s));
+
+// =============================================================================
+// Lifecycle namespace arbitraries
+// =============================================================================
+
+/**
+ * Generates valid handler values (boolean or function).
+ */
+export const validHandlerArbitrary = fc.oneof(
+  fc.boolean(),
+  fc.constant(() => true),
+  fc.constant(() => false),
+);
+
+/**
+ * Generates invalid handler values (not boolean and not function).
+ */
+export const invalidHandlerArbitrary = fc.oneof(
+  fc.constant(null),
+  fc.constant(undefined),
+  fc.string(),
+  fc.integer(),
+  fc.constant([1, 2]),
+  fc.constant({}),
+);
+
+// =============================================================================
+// State namespace arbitraries
+// =============================================================================
+
+/**
+ * Generates valid State-like objects for areStatesEqual.
+ */
+export const validStateArbitrary = fc
+  .record({
+    name: fc.string({ minLength: 1, maxLength: 20 }),
+    params: fc.dictionary(
+      fc.string({ minLength: 1, maxLength: 10 }),
+      fc.oneof(fc.string(), fc.integer(), fc.boolean()),
+      { maxKeys: 3 },
+    ),
+    path: fc
+      .string({ minLength: 1, maxLength: 30 })
+      .map((s) => `/${s.replace(/^\//, "")}`),
+    meta: fc.record({
+      id: fc.integer({ min: 1, max: 1000 }),
+      params: fc.dictionary(
+        fc.string({ minLength: 1, maxLength: 10 }),
+        fc.oneof(fc.string(), fc.integer(), fc.boolean()),
+        { maxKeys: 3 },
+      ),
+      options: fc.constant({}),
+      redirected: fc.boolean(),
+      source: fc.constant(undefined),
+    }),
+  })
+  .map((s) => ({
+    ...s,
+    meta: {
+      ...s.meta,
+      navigation: s.name,
+    },
+  }));
+
+// =============================================================================
+// Dependencies namespace arbitraries
+// =============================================================================
+
+/**
+ * Generates valid dependency name strings.
+ */
+export const validDependencyNameArbitrary = fc.string({
+  minLength: 1,
+  maxLength: 20,
+});
+
+// =============================================================================
+// NUM_RUNS constants
+// =============================================================================
+
+export const NUM_RUNS = {
+  standard: 50,
+  thorough: 100,
+} as const;

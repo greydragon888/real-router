@@ -119,7 +119,7 @@ export const arbQueryString: fc.Arbitrary<string> = fc
   .array(
     fc.tuple(
       fc.stringMatching(/^[a-z]{1,6}$/).filter((k) => k !== "id"),
-      fc.stringMatching(/^[a-zA-Z0-9]{1,8}$/),
+      fc.stringMatching(/^[a-zA-Z0-9=]{1,8}$/),
     ),
     { minLength: 1, maxLength: 3 },
   )

@@ -22,6 +22,51 @@ import {
 
 import type { RouteTreeNode } from "../../src/types";
 
+// =============================================================================
+// Shared tree fixture for RouteUtils instance tests
+// =============================================================================
+
+function buildTestTree(): RouteTreeNode {
+  const photo: RouteTreeNode = {
+    fullName: "app.users.profile",
+    children: new Map(),
+    nonAbsoluteChildren: [],
+  };
+  const settings: RouteTreeNode = {
+    fullName: "app.users.settings",
+    children: new Map(),
+    nonAbsoluteChildren: [],
+  };
+  const users: RouteTreeNode = {
+    fullName: "app.users",
+    children: new Map([
+      ["profile", photo],
+      ["settings", settings],
+    ]),
+    nonAbsoluteChildren: [photo, settings],
+  };
+  const dashboard: RouteTreeNode = {
+    fullName: "app.dashboard",
+    children: new Map(),
+    nonAbsoluteChildren: [],
+  };
+  const app: RouteTreeNode = {
+    fullName: "app",
+    children: new Map([
+      ["users", users],
+      ["dashboard", dashboard],
+    ]),
+    nonAbsoluteChildren: [users, dashboard],
+  };
+  const root: RouteTreeNode = {
+    fullName: "",
+    children: new Map([["app", app]]),
+    nonAbsoluteChildren: [app],
+  };
+
+  return root;
+}
+
 describe("routeUtils property-based tests", () => {
   describe("startsWithSegment consistency with single-segment names", () => {
     test.prop([arbRouteName], { numRuns: NUM_RUNS.standard })(
@@ -365,6 +410,67 @@ describe("routeUtils property-based tests", () => {
       expect(() => startsWithSegment(name, segment)).toThrow(RangeError);
       expect(() => endsWithSegment(name, segment)).toThrow(RangeError);
       expect(() => includesSegment(name, segment)).toThrow(RangeError);
+    });
+  });
+
+  // ===================================================================
+  // §12 getChain length invariant
+  // ===================================================================
+
+  describe("getChain length invariant", () => {
+    const testTree = buildTestTree();
+    const utils = new RouteUtils(testTree);
+
+    const KNOWN_ROUTES = [
+      "app",
+      "app.users",
+      "app.users.profile",
+      "app.users.settings",
+      "app.dashboard",
+    ] as const;
+
+    test.prop(
+      [fc.constantFrom(...(KNOWN_ROUTES as unknown as [string, ...string[]]))],
+      { numRuns: NUM_RUNS.standard },
+    )(
+      "chain.length === depth + 1 (number of dot-separated segments)",
+      (name) => {
+        const chain = utils.getChain(name);
+        const depth = name.split(".").length;
+
+        expect(chain).toBeDefined();
+        expect(chain!).toHaveLength(depth);
+      },
+    );
+  });
+
+  // ===================================================================
+  // §13 getSiblings self-exclusion
+  // ===================================================================
+
+  describe("getSiblings self-exclusion", () => {
+    const testTree = buildTestTree();
+    const utils = new RouteUtils(testTree);
+
+    const ROUTES_WITH_SIBLINGS = [
+      "app.users",
+      "app.dashboard",
+      "app.users.profile",
+      "app.users.settings",
+    ] as const;
+
+    test.prop(
+      [
+        fc.constantFrom(
+          ...(ROUTES_WITH_SIBLINGS as unknown as [string, ...string[]]),
+        ),
+      ],
+      { numRuns: NUM_RUNS.standard },
+    )("route's own name is never in its siblings list", (name) => {
+      const siblings = utils.getSiblings(name);
+
+      expect(siblings).toBeDefined();
+      expect(siblings!).not.toContain(name);
     });
   });
 });

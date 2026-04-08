@@ -20,3 +20,4 @@
 | 5   | `buildActiveClassName` returns `undefined` only when no class names exist | If `isActive && activeClassName` → result is always a non-empty string. If `!isActive && !base` → `undefined`. |
 | 6   | `applyLinkA11y` is idempotent                                             | Calling it N times on the same element produces the same result as calling it once.                            |
 | 7   | `applyLinkA11y` preserves existing attributes                             | If `role` or `tabindex` already set, they are never overwritten.                                               |
+| 8   | `buildHref` never throws                                                  | For any `routeName` and `params`, `buildHref` returns `string \| undefined` — errors are caught and logged, never propagated. |

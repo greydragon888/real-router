@@ -3,7 +3,7 @@ import { fc } from "@fast-check/vitest";
 export const NUM_RUNS = { standard: 100, lifecycle: 50, async: 30 } as const;
 
 export const arbSegment: fc.Arbitrary<string> = fc.stringMatching(
-  /^[a-z][a-z0-9_-]{0,9}$/,
+  /^[a-zA-Z][a-zA-Z0-9_-]{0,19}$/,
 );
 
 export const arbRouteName: fc.Arbitrary<string> = fc

@@ -95,8 +95,8 @@ function createAsyncSchema(): StandardSchemaV1 {
 // Arbitraries
 // =============================================================================
 
-const VALIDATED_KEYS = ["a", "b"];
-const EXTRA_KEYS = ["c", "d", "e"];
+const VALIDATED_KEYS = ["a", "b", "c", "d", "e"];
+const EXTRA_KEYS = ["f", "g", "h"];
 const ALL_KEYS = [...VALIDATED_KEYS, ...EXTRA_KEYS];
 const ROUTE_PATH = `/test?${ALL_KEYS.join("&")}`;
 

@@ -213,6 +213,20 @@ export function createMixedMatcher(): ReturnType<typeof createMatcher> {
 }
 
 /**
+ * Matcher with splat param route.
+ *
+ * Tree: root > files(/files) > catchAll(/*path)
+ * Routes: "files", "files.catchAll"
+ */
+export function createSplatMatcher(): ReturnType<typeof createMatcher> {
+  const matcher = createMatcher();
+
+  matcher.registerTree(SPLAT_TREE);
+
+  return matcher;
+}
+
+/**
  * Matcher for array query param testing.
  *
  * Tree: root > items(/items?tags)
@@ -234,6 +248,21 @@ export function createArrayMatcher(
 
   return matcher;
 }
+
+/**
+ * Tree with splat param route.
+ *
+ * Structure: root > files(/files) > catchAll(/*path)
+ * Routes: "files", "files.catchAll"
+ * Params: path (splat)
+ */
+export const SPLAT_TREE: RouteTree = createRouteTree("", "", [
+  {
+    name: "files",
+    path: "/files",
+    children: [{ name: "catchAll", path: "/*path" }],
+  },
+]);
 
 // =============================================================================
 // Valid route names in DEEP_TREE (for getSegmentsByName tests)
@@ -290,6 +319,18 @@ export const arbQueryParamNames: fc.Arbitrary<string[]> = fc
   .filter(
     (names) => new Set(names).size === names.length, // enforce uniqueness
   );
+
+/**
+ * Splat param value: 1–4 path segments joined by "/".
+ * Each segment is a safe alphanumeric string (no slashes or special chars).
+ * Produces values like "docs/readme.md" or "a/b/c".
+ */
+export const arbSplatValue: fc.Arbitrary<string> = fc
+  .array(fc.stringMatching(/^[a-zA-Z0-9_\-.~]{1,10}$/), {
+    minLength: 1,
+    maxLength: 4,
+  })
+  .map((segments) => segments.join("/"));
 
 /**
  * Array of 1–4 safe string items for array query param tests.

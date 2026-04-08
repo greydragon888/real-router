@@ -387,6 +387,69 @@ describe("FSM Action Properties", () => {
   });
 });
 
+describe("FSM forceState Properties", () => {
+  test.prop([arbFSMConfig], { numRuns: NUM_RUNS.standard })(
+    "forceState then getState returns the forced state",
+    (gen) => {
+      const fsm = createFSM(gen);
+
+      for (const state of gen.states) {
+        fsm.forceState(state);
+
+        expect(fsm.getState()).toBe(state);
+      }
+    },
+  );
+
+  test.prop(
+    [
+      arbFSMConfig.chain((gen) =>
+        fc.tuple(
+          fc.constant(gen),
+          fc.constantFrom(...(gen.states as [string, ...string[]])),
+          arbEventSequence(gen.events),
+        ),
+      ),
+    ],
+    { numRuns: NUM_RUNS.lifecycle },
+  )(
+    "forceState updates canSend to reflect the forced state transitions",
+    ([gen, forcedState, events]) => {
+      const fsm = createFSM(gen);
+
+      fsm.forceState(forcedState);
+
+      // canSend should reflect the forced state transitions
+      const transitions = gen.config.transitions[forcedState];
+
+      for (const event of events) {
+        const expected = transitions[event] !== undefined;
+
+        expect(fsm.canSend(event)).toBe(expected);
+      }
+    },
+  );
+});
+
+describe("FSM Action Exception Properties", () => {
+  test.prop([arbFSMConfigWithInitialTransition], {
+    numRuns: NUM_RUNS.lifecycle,
+  })(
+    "action exception propagates through send() and state is updated",
+    (gen) => {
+      const fsm = createFSM(gen);
+
+      fsm.on(gen.config.initial, gen.knownEvent, () => {
+        throw new Error("action error");
+      });
+
+      expect(() => fsm.send(gen.knownEvent)).toThrow("action error");
+      // State should be updated even though action threw
+      expect(fsm.getState()).toBe(gen.knownTo);
+    },
+  );
+});
+
 describe("FSM Edge Case Properties", () => {
   test.prop([arbFSMConfigWithInitialTransition], {
     numRuns: NUM_RUNS.lifecycle,

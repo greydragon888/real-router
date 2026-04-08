@@ -144,6 +144,30 @@ describe("getInvalidKeys", () => {
       }),
     );
   });
+
+  it("Issues without path produce no keys stripped", () => {
+    fc.assert(
+      fc.property(
+        fc.array(arbIssueWithoutPath, { minLength: 1, maxLength: 10 }),
+        arbParams,
+        (issues, params) => {
+          const invalidKeys = getInvalidKeys(issues);
+          const result = omitKeys(params, invalidKeys);
+
+          // No keys stripped — all original keys should survive
+          const cmp = (a: string, b: string): number => a.localeCompare(b);
+
+          expect(Object.keys(result).toSorted(cmp)).toStrictEqual(
+            Object.keys(params).toSorted(cmp),
+          );
+
+          for (const key of Object.keys(params)) {
+            expect(result[key]).toBe(params[key]);
+          }
+        },
+      ),
+    );
+  });
 });
 
 // =============================================================================

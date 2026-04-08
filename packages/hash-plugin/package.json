@@ -43,6 +43,7 @@
   "scripts": {
     "test": "vitest",
     "test:properties": "vitest run --config vitest.config.properties.mts",
+    "test:stress": "vitest --config vitest.config.stress.mts --run",
     "build": "tsdown --config-loader unrun",
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",

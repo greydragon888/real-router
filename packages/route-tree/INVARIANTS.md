@@ -19,7 +19,6 @@
 | 2   | Route preservation                    | `createRouteTree` keeps all top-level routes: `tree.children.size === routes.length`. No routes are silently dropped during tree construction.                                                                                                                                      |
 | 3   | Absolute path normalization           | After tree building, no node's `path` property starts with `~`. The tilde prefix is consumed during normalization and replaced by the `absolute: true` flag.                                                                                                                        |
 | 4   | Absolute path roundtrip               | For randomized trees with absolute path children, `~` is stripped from stored paths AND `routeTreeToDefinitions` → `createRouteTree` roundtrip preserves the `absolute` flag and path for every node.                                                                               |
-| 5   | nodeToDefinition absolute restoration | `nodeToDefinition(node).path` starts with `~` if and only if `node.absolute` is `true`. For absolute nodes, removing the `~` prefix yields `node.path`. For non-absolute nodes, the output path equals `node.path` unchanged. Verified across all 6 fixture trees (18 nodes total). |
 
 ## Computed Caches
 
@@ -48,6 +47,12 @@
 | 1   | Extraction            | Query params declared in a route path (`?param1&param2`) are correctly extracted into `paramMeta.queryParams`. All declared param names must be present and in order.                           |
 | 2   | Path/query separation | The `pathPattern` in `paramMeta` contains only the URL path portion and never includes `?` or anything after it. Correct separation is critical for the Segment Trie to match paths accurately. |
 
+## nodeToDefinition
+
+| #   | Invariant                         | Description                                                                                                                                                                                                                                                                         |
+| --- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | nodeToDefinition absolute restoration | `nodeToDefinition(node).path` starts with `~` if and only if `node.absolute` is `true`. For absolute nodes, removing the `~` prefix yields `node.path`. For non-absolute nodes, the output path equals `node.path` unchanged. Verified across all 6 fixture trees (18 nodes total). |
+
 ## Route Name Validation
 
 | #   | Invariant                 | Description                                                                                                                                                                                                       |
@@ -72,7 +77,7 @@
 | File                                       | Invariants          | Category                                           |
 | ------------------------------------------ | ------------------- | -------------------------------------------------- |
 | `tests/property/roundtrip.properties.ts`   | R1–R4               | buildPath/match integration roundtrips             |
-| `tests/property/tree.properties.ts`        | N1–N5, CC1–CC4, ND1 | createRouteTree normalization + caches + nodeToDef |
+| `tests/property/tree.properties.ts`        | N1–N4, CC1–CC4, ND1 | createRouteTree normalization + caches + nodeToDef |
 | `tests/property/segments.properties.ts`    | S1–S6               | getSegmentsByName correctness                      |
 | `tests/property/queryParams.properties.ts` | Q1–Q2               | Query param extraction and separation              |
 | `tests/property/validation.properties.ts`  | VN1–VN4, VP1–VP5    | Route name and path validation                     |

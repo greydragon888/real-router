@@ -31,6 +31,7 @@
   "scripts": {
     "build": "rimraf dist && tsc -p tsconfig.build.json && rollup -c rollup.config.mjs",
     "test": "vitest",
+    "test:properties": "vitest run --config vitest.config.properties.mts",
     "test:stress": "vitest run --config vitest.config.stress.mts",
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts,.tsx src/ tests/ --fix --max-warnings 0",
