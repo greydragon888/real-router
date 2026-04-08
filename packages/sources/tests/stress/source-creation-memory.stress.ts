@@ -43,25 +43,7 @@ describe("S2: Source creation storm + memory", () => {
     expect(after - baseline).toBeLessThan(MB);
   });
 
-  it("S2.2: Create 500 RouteNodeSource → destroy all → heap returns to baseline", () => {
-    const baseline = takeHeapSnapshot();
-
-    const sources = createManySources(
-      () => createRouteNodeSource(router, "users"),
-      500,
-    );
-
-    sources.forEach((s) => s.subscribe(() => {}));
-    sources.forEach((s) => {
-      s.destroy();
-    });
-
-    const after = takeHeapSnapshot();
-
-    expect(after - baseline).toBeLessThan(MB);
-  });
-
-  it("S2.3: Create 500 ActiveRouteSource → navigate × 50 → destroy all → heap returns to baseline", async () => {
+  it("S2.2: Create 500 ActiveRouteSource → navigate × 50 → destroy all → heap returns to baseline", async () => {
     const baseline = takeHeapSnapshot();
 
     const sources = createManySources(

@@ -191,9 +191,10 @@ export type SubscribeFn = (state: SubscribeState) => void;
 export interface LeaveState {
   route: State;
   nextRoute: State;
+  signal: AbortSignal;
 }
 
-export type LeaveFn = (state: LeaveState) => void;
+export type LeaveFn = (state: LeaveState) => void | Promise<void>;
 
 export interface Listener {
   [key: string]: unknown;

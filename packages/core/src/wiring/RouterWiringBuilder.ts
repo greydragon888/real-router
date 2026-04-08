@@ -203,6 +203,9 @@ export class RouterWiringBuilder<
       clearCanDeactivate: (name: string) => {
         this.routeLifecycle.clearCanDeactivate(name);
       },
+      hasLeaveListeners: () => this.eventBus.hasLeaveListeners(),
+      awaitLeaveListeners: (toState, fromState, signal) =>
+        this.eventBus.awaitLeaveListeners(toState, fromState, signal),
     };
 
     this.navigation.setDependencies(navigationDeps);

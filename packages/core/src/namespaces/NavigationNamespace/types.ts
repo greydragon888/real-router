@@ -97,4 +97,14 @@ export interface NavigationDependencies {
 
   /** Clear canDeactivate guard for a route */
   clearCanDeactivate: (name: string) => void;
+
+  /** Check if any leave listeners are registered */
+  hasLeaveListeners: () => boolean;
+
+  /** Call all leave listeners — returns Promise if any are async, undefined otherwise */
+  awaitLeaveListeners: (
+    toState: State,
+    fromState: State | undefined,
+    signal: AbortSignal,
+  ) => Promise<void> | undefined;
 }

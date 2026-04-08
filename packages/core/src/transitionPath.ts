@@ -14,7 +14,7 @@ type PrimitiveParam = string | number | boolean;
  * Represents a transition path between two router states.
  * Contains information about which route segments need to be activated/deactivated.
  */
-interface TransitionPath {
+export interface TransitionPath {
   /** The common ancestor route segment where paths diverge */
   intersection: string;
   /** Route segments that need to be deactivated (in reverse order) */

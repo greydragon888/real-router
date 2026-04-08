@@ -11,6 +11,7 @@ import type { FSM } from "@real-router/fsm";
 import type {
   EventName,
   LeaveFn,
+  LeaveState,
   NavigationOptions,
   Plugin,
   State,
@@ -19,9 +20,34 @@ import type {
 } from "@real-router/types";
 import type { EventEmitter } from "event-emitter";
 
+function ensureError(value: unknown): Error {
+  /* v8 ignore next -- @preserve: defensive guard — listeners should always throw Error objects */
+  return value instanceof Error ? value : new Error(String(value));
+}
+
+function settleLeavePromises(
+  promises: Promise<void>[],
+  firstSyncError: unknown,
+): Promise<void> {
+  return Promise.allSettled(promises).then((results) => {
+    if (firstSyncError !== undefined) {
+      throw ensureError(firstSyncError);
+    }
+
+    const rejected = results.find(
+      (result): result is PromiseRejectedResult => result.status === "rejected",
+    );
+
+    if (rejected !== undefined) {
+      throw ensureError(rejected.reason);
+    }
+  });
+}
+
 export class EventBusNamespace {
   readonly #fsm: FSM<RouterState, RouterEvent, null, RouterPayloads>;
   readonly #emitter: EventEmitter<RouterEventMap>;
+  readonly #leaveListeners: LeaveFn[] = [];
 
   #currentToState: State | undefined;
   #pendingToState: State | undefined;
@@ -225,18 +251,68 @@ export class EventBusNamespace {
   }
 
   subscribeLeave(listener: LeaveFn): Unsubscribe {
-    return this.#emitter.on(
-      events.TRANSITION_LEAVE_APPROVE,
-      (toState: State, fromState?: State) => {
-        if (fromState !== undefined) {
-          listener({ route: fromState, nextRoute: toState });
+    this.#leaveListeners.push(listener);
+
+    return () => {
+      const idx = this.#leaveListeners.indexOf(listener);
+
+      if (idx !== -1) {
+        this.#leaveListeners.splice(idx, 1);
+      }
+    };
+  }
+
+  hasLeaveListeners(): boolean {
+    return this.#leaveListeners.length > 0;
+  }
+
+  awaitLeaveListeners(
+    toState: State,
+    fromState: State | undefined,
+    signal: AbortSignal,
+  ): Promise<void> | undefined {
+    if (fromState === undefined) {
+      return undefined;
+    }
+
+    const leaveState: LeaveState = {
+      route: fromState,
+      nextRoute: toState,
+      signal,
+    };
+
+    let promises: Promise<void>[] | undefined;
+    let firstSyncError: unknown;
+
+    for (const listener of this.#leaveListeners) {
+      try {
+        const result = listener(leaveState);
+
+        if (result !== undefined && typeof result.then === "function") {
+          promises ??= [];
+          promises.push(result);
         }
-      },
-    );
+      } catch (error: unknown) {
+        if (firstSyncError === undefined) {
+          firstSyncError = error;
+        }
+      }
+    }
+
+    if (promises === undefined) {
+      if (firstSyncError !== undefined) {
+        throw ensureError(firstSyncError);
+      }
+
+      return undefined;
+    }
+
+    return settleLeavePromises(promises, firstSyncError);
   }
 
   clearAll(): void {
     this.#emitter.clearAll();
+    this.#leaveListeners.length = 0;
   }
 
   setLimits(limits: {

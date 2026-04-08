@@ -80,11 +80,11 @@ controller.abort();
 
 ### Events & Plugins
 
-| Method                  | Returns       | Description                                    |
-| ----------------------- | ------------- | ---------------------------------------------- |
-| `subscribe(listener)`   | `Unsubscribe` | Listen to successful transitions               |
-| `subscribeLeave(listener)` | `Unsubscribe` | Subscribe to confirmed route departures        |
-| `usePlugin(...plugins)` | `Unsubscribe` | Register plugin factories                      |
+| Method                     | Returns       | Description                                                                                                                                                   |
+| -------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `subscribe(listener)`      | `Unsubscribe` | Listen to successful transitions                                                                                                                              |
+| `subscribeLeave(listener)` | `Unsubscribe` | Subscribe to confirmed route departures. Listener may return `Promise<void>` to block the pipeline (exit animations). Receives `AbortSignal` for cancellation |
+| `usePlugin(...plugins)`    | `Unsubscribe` | Register plugin factories                                                                                                                                     |
 
 ```typescript
 const unsub = router.subscribe(({ route, previousRoute }) => {
@@ -96,6 +96,11 @@ const unsubLeave = router.subscribeLeave(({ route }) => {
   if (route.name === "products") {
     sessionStorage.setItem("products:scroll", String(window.scrollY));
   }
+});
+
+// Async leave: exit animation blocks navigation until complete
+router.subscribeLeave(async ({ signal }) => {
+  await animateOut(document.querySelector(".page"), { signal });
 });
 ```
 

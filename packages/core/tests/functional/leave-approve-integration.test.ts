@@ -35,7 +35,7 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
   });
 
   describe("RFC §9.4 — pipeline ordering", () => {
-    it("1. full pipeline order: START → deactivate → LEAVE_APPROVE → activate → SUCCESS (invocationCallOrder)", async () => {
+    it("full pipeline order: START → deactivate → LEAVE_APPROVE → activate → SUCCESS (invocationCallOrder)", async () => {
       const onTransitionStart = vi.fn();
       const deactivationGuard = vi.fn().mockReturnValue(true);
       const onLeaveApprove = vi.fn();
@@ -70,7 +70,7 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
       expect(activateOrder).toBeLessThan(successOrder);
     });
 
-    it("2. FSM state: TRANSITION_STARTED → LEAVE_APPROVED → READY across navigation lifecycle", async () => {
+    it("FSM state: TRANSITION_STARTED → LEAVE_APPROVED → READY across navigation lifecycle", async () => {
       const observed = {
         onStart: { isTransitioning: false, isLeaveApproved: false },
         onLeaveApprove: { isTransitioning: false, isLeaveApproved: false },
@@ -115,7 +115,7 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
       expect(observed.onSuccess.isLeaveApproved).toBe(false);
     });
 
-    it("3. usePlugin() onTransitionLeaveApprove hook called with (toState, fromState)", async () => {
+    it("usePlugin() onTransitionLeaveApprove hook called with (toState, fromState)", async () => {
       const onLeaveApprove = vi.fn();
 
       router.usePlugin(() => ({ onTransitionLeaveApprove: onLeaveApprove }));
@@ -129,7 +129,7 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
       );
     });
 
-    it("4. subscribeLeave fires before subscribe: correct payload shapes and invocationCallOrder", async () => {
+    it("subscribeLeave fires before subscribe: correct payload shapes and invocationCallOrder", async () => {
       const leaveListener = vi.fn();
       const successListener = vi.fn();
 
@@ -145,10 +145,16 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
         successListener.mock.invocationCallOrder[0],
       );
 
-      expect(leaveListener).toHaveBeenCalledWith({
-        route: expect.objectContaining({ name: "home" }),
-        nextRoute: expect.objectContaining({ name: "users" }),
-      });
+      expect(leaveListener).toHaveBeenCalledWith(
+        expect.objectContaining({
+          route: expect.objectContaining({ name: "home" }),
+          nextRoute: expect.objectContaining({ name: "users" }),
+        }),
+      );
+
+      const leaveState = leaveListener.mock.calls[0][0];
+
+      expect(leaveState.signal).toBeInstanceOf(AbortSignal);
 
       expect(successListener).toHaveBeenCalledWith({
         route: expect.objectContaining({ name: "users" }),
@@ -159,7 +165,7 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
       unsubSuccess();
     });
 
-    it("5. blocked deactivation: CANNOT_DEACTIVATE → no LEAVE_APPROVE, subscribeLeave NOT called, FSM → READY", async () => {
+    it("blocked deactivation: CANNOT_DEACTIVATE → no LEAVE_APPROVE, subscribeLeave NOT called, FSM → READY", async () => {
       const leaveListener = vi.fn();
 
       lifecycle.addDeactivateGuard("home", () => () => false);
@@ -177,7 +183,7 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
       unsubLeave();
     });
 
-    it("6. zero-guard path: subscribeLeave fires via direct emitLeaveApproveCallback, router.subscribe receives result", async () => {
+    it("zero-guard path: subscribeLeave fires via direct emitLeaveApproveCallback, router.subscribe receives result", async () => {
       const leaveListener = vi.fn();
       const successListener = vi.fn();
 
@@ -187,10 +193,12 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
       const finalState = await router.navigate("users");
 
       expect(leaveListener).toHaveBeenCalledTimes(1);
-      expect(leaveListener).toHaveBeenCalledWith({
-        route: expect.objectContaining({ name: "home" }),
-        nextRoute: expect.objectContaining({ name: "users" }),
-      });
+      expect(leaveListener).toHaveBeenCalledWith(
+        expect.objectContaining({
+          route: expect.objectContaining({ name: "home" }),
+          nextRoute: expect.objectContaining({ name: "users" }),
+        }),
+      );
 
       expect(successListener).toHaveBeenCalledTimes(1);
       expect(finalState.name).toBe("users");
@@ -199,7 +207,7 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
       unsubSuccess();
     });
 
-    it("7. reentrant navigate from subscribeLeave() on no-guards path: original cancelled, reentrant nav succeeds", async () => {
+    it("reentrant navigate from subscribeLeave() on no-guards path: original cancelled, reentrant nav succeeds", async () => {
       let reentrantNavPromise: Promise<unknown> | undefined;
       let fired = false;
 
@@ -225,7 +233,7 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
   });
 
   describe("RFC §8.6 — edge cases", () => {
-    it("8. error thrown in subscribeLeave listener is isolated by EventEmitter: navigation still completes", async () => {
+    it("error thrown in subscribeLeave listener propagates to pipeline: TRANSITION_ERROR, navigation cancelled", async () => {
       const onError = vi.fn();
       const successListener = vi.fn();
 
@@ -240,20 +248,21 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
 
       const unsubSuccess = router.subscribe(successListener);
 
-      const state = await router.navigate("users");
+      await expect(router.navigate("users")).rejects.toThrow(
+        "subscribeLeave threw",
+      );
 
-      expect(state.name).toBe("users");
-      expect(successListener).toHaveBeenCalledTimes(1);
-      expect(onError).not.toHaveBeenCalled();
+      expect(successListener).not.toHaveBeenCalled();
+      expect(onError).toHaveBeenCalledTimes(1);
       expect(router.isActive()).toBe(true);
-      expect(router.isLeaveApproved()).toBe(false);
+      expect(router.getState()?.name).toBe("home");
 
       unsubLeave();
       unsubError();
       unsubSuccess();
     });
 
-    it("9. dispose() during LEAVE_APPROVED: navigation cancelled, router disposed", async () => {
+    it("dispose() during LEAVE_APPROVED: navigation cancelled, router disposed", async () => {
       vi.useFakeTimers();
 
       lifecycle.addDeactivateGuard("home", () => () => true);
@@ -294,7 +303,7 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
       vi.useRealTimers();
     });
 
-    it("10. stop() during LEAVE_APPROVED: navigation cancelled, router stopped", async () => {
+    it("stop() during LEAVE_APPROVED: navigation cancelled, router stopped", async () => {
       vi.useFakeTimers();
 
       lifecycle.addDeactivateGuard("home", () => () => true);
@@ -335,7 +344,7 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
       vi.useRealTimers();
     });
 
-    it("11. navigateToNotFound() bypasses pipeline: subscribeLeave NOT called", () => {
+    it("navigateToNotFound() bypasses pipeline: subscribeLeave NOT called", () => {
       const leaveListener = vi.fn();
 
       const unsubLeave = router.subscribeLeave(leaveListener);
@@ -347,7 +356,7 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
       unsubLeave();
     });
 
-    it("12. cloneRouter() does not copy subscribeLeave listeners from original", async () => {
+    it("cloneRouter() does not copy subscribeLeave listeners from original", async () => {
       const leaveListener = vi.fn();
 
       const unsubLeave = router.subscribeLeave(leaveListener);
@@ -364,7 +373,7 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
       unsubLeave();
     });
 
-    it("13. forceDeactivate: true skips deactivation guard but LEAVE_APPROVE still fires via subscribeLeave", async () => {
+    it("forceDeactivate: true skips deactivation guard but LEAVE_APPROVE still fires via subscribeLeave", async () => {
       const deactivateGuard = vi.fn().mockReturnValue(false);
       const leaveListener = vi.fn();
 
@@ -376,15 +385,17 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
 
       expect(deactivateGuard).not.toHaveBeenCalled();
       expect(leaveListener).toHaveBeenCalledTimes(1);
-      expect(leaveListener).toHaveBeenCalledWith({
-        route: expect.objectContaining({ name: "home" }),
-        nextRoute: expect.objectContaining({ name: "users" }),
-      });
+      expect(leaveListener).toHaveBeenCalledWith(
+        expect.objectContaining({
+          route: expect.objectContaining({ name: "home" }),
+          nextRoute: expect.objectContaining({ name: "users" }),
+        }),
+      );
 
       unsubLeave();
     });
 
-    it("14. activation guard blocks after LEAVE_APPROVE: subscribeLeave WAS called, route unchanged", async () => {
+    it("activation guard blocks after LEAVE_APPROVE: subscribeLeave WAS called, route unchanged", async () => {
       const leaveListener = vi.fn();
 
       const unsubLeave = router.subscribeLeave(leaveListener);
@@ -401,7 +412,7 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
       unsubLeave();
     });
 
-    it("15. async concurrent cancel: first nav cancelled before LEAVE_APPROVE, only second nav fires subscribeLeave", async () => {
+    it("async concurrent cancel: first nav cancelled before LEAVE_APPROVE, only second nav fires subscribeLeave", async () => {
       vi.useFakeTimers();
 
       const leaveListener = vi.fn();
@@ -432,10 +443,12 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
       expect(secondResult.name).toBe("orders");
 
       expect(leaveListener).toHaveBeenCalledTimes(1);
-      expect(leaveListener).toHaveBeenCalledWith({
-        route: expect.objectContaining({ name: "home" }),
-        nextRoute: expect.objectContaining({ name: "orders" }),
-      });
+      expect(leaveListener).toHaveBeenCalledWith(
+        expect.objectContaining({
+          route: expect.objectContaining({ name: "home" }),
+          nextRoute: expect.objectContaining({ name: "orders" }),
+        }),
+      );
 
       unsubLeave();
       vi.useRealTimers();

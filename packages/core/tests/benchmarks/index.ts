@@ -17,10 +17,11 @@ import { fileURLToPath } from "node:url";
 import { run } from "mitata";
 
 // Import all benchmark files (they register benchmarks via summary/bench)
-import "./navigation/basic.bench";
-import "./navigation/options.bench";
-import "./navigation/guards.bench";
-import "./helpers/freezeStateInPlace.bench";
+// import "./navigation/basic.bench";
+// import "./navigation/options.bench";
+// import "./navigation/guards.bench";
+import "./navigation/leave-listeners.bench";
+// import "./helpers/freezeStateInPlace.bench";
 // import "./transitionPath/getTransitionPath.bench";
 // import "./routes/routeQuery/isActiveRoute.bench";
 // import "./routes/routeQuery/shouldUpdateNode.bench";

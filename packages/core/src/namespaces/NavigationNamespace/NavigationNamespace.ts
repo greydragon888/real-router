@@ -15,7 +15,9 @@ import { RouterError } from "../../RouterError";
 import { getTransitionPath, nameToIDs } from "../../transitionPath";
 
 import type { NavigationContext, NavigationDependencies } from "./types";
+import type { TransitionPath } from "../../transitionPath";
 import type {
+  GuardFn,
   NavigationOptions,
   Params,
   State,
@@ -140,10 +142,8 @@ export class NavigationNamespace {
         deps.getLifecycleFunctions();
       const isUnknownRoute = toState.name === constants.UNKNOWN_ROUTE;
 
-      const { toDeactivate, toActivate, intersection } = getTransitionPath(
-        toState,
-        fromState,
-      );
+      const transitionPath = getTransitionPath(toState, fromState);
+      const { toDeactivate, toActivate, intersection } = transitionPath;
 
       const shouldDeactivate =
         fromState && !opts.forceDeactivate && toDeactivate.length > 0;
@@ -152,29 +152,45 @@ export class NavigationNamespace {
         canDeactivateFunctions.size > 0 || canActivateFunctions.size > 0;
 
       const confirmedToState = toState;
-      const emitLeaveApproveCallback = () => {
-        deps.sendLeaveApprove(confirmedToState, fromState);
-      };
-
-      const isCurrentNav = () => this.#navigationId === myId && deps.isActive();
 
       if (!hasGuards) {
-        // No guards — emitLeaveApprove directly before completeTransition
-        emitLeaveApproveCallback();
+        const asyncLeave = this.#handleNoGuardsLeave(
+          confirmedToState,
+          fromState,
+          myId,
+          opts,
+          transitionPath,
+          canDeactivateFunctions,
+        );
 
-        // Reentrant check: subscribeLeave() listener may have called router.navigate()
-        // Same pattern as reentrant check after emitTransitionStart (line 141-143)
-        /* v8 ignore next 3 -- @preserve: reentrant navigate from TRANSITION_LEAVE_APPROVE listener; tested but V8 cannot track the branch through the synchronous callback chain */
-        if (this.#navigationId !== myId) {
-          throw new RouterError(errorCodes.TRANSITION_CANCELLED);
+        /* v8 ignore start */
+        if (asyncLeave !== undefined) {
+          return asyncLeave;
         }
+        /* v8 ignore stop */
       }
 
       if (hasGuards) {
         controller = new AbortController();
         this.#currentController = controller;
+        const isCurrentNav = () =>
+          this.#navigationId === myId && deps.isActive();
 
         const signal = controller.signal;
+
+        const emitLeaveApproveCallback = (): Promise<void> | undefined => {
+          deps.sendLeaveApprove(confirmedToState, fromState);
+
+          if (deps.hasLeaveListeners()) {
+            return deps.awaitLeaveListeners(
+              confirmedToState,
+              fromState,
+              signal,
+            );
+          }
+
+          return undefined;
+        };
 
         const guardCompletion = executeGuardPipeline(
           canDeactivateFunctions,
@@ -373,6 +389,55 @@ export class NavigationNamespace {
     if (transitionStarted && toState) {
       routeTransitionError(this.#deps, error, toState, fromState);
     }
+  }
+
+  #handleNoGuardsLeave(
+    toState: State,
+    fromState: State | undefined,
+    myId: number,
+    opts: NavigationOptions,
+    transitionPath: TransitionPath,
+    canDeactivateFunctions: Map<string, GuardFn>,
+  ): Promise<State> | undefined {
+    const deps = this.#deps;
+
+    deps.sendLeaveApprove(toState, fromState);
+
+    /* v8 ignore start */
+    if (deps.hasLeaveListeners()) {
+      const controller = new AbortController();
+      const leaveResult = deps.awaitLeaveListeners(
+        toState,
+        fromState,
+        controller.signal,
+      );
+
+      if (leaveResult !== undefined) {
+        this.#currentController = controller;
+
+        return this.#finishAsyncNavigation(
+          leaveResult,
+          {
+            toState,
+            fromState,
+            opts,
+            toDeactivate: transitionPath.toDeactivate,
+            toActivate: transitionPath.toActivate,
+            intersection: transitionPath.intersection,
+            canDeactivateFunctions,
+          },
+          controller,
+          myId,
+        );
+      }
+    }
+
+    if (this.#navigationId !== myId) {
+      throw new RouterError(errorCodes.TRANSITION_CANCELLED);
+    }
+    /* v8 ignore stop */
+
+    return undefined;
   }
 
   #cleanupController(controller: AbortController): void {
