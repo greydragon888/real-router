@@ -227,22 +227,25 @@ Guards registered via `getLifecycleApi(router)` run during the transition pipeli
 
 `router.subscribeLeave(listener)` registers a callback that fires when the FSM enters `LEAVE_APPROVED` — after deactivation guards pass and before activation guards run. This is the safe window for side-effects like scroll preservation, fetch abort, and analytics.
 
-| #   | Invariant                     | Description                                                                                                                                    |
-| --- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Non-function throws           | `subscribeLeave(nonFunction)` throws `TypeError` immediately. Only functions are accepted as listeners.                                        |
-| 2   | Callback signature            | Callback receives `{ route: State, nextRoute: State }` where `route` is the current (leaving) route and `nextRoute` is the destination.        |
-| 3   | First navigation skipped      | NOT called on first navigation (no previous route — `fromState` is `undefined`). The leave phase requires an existing route to leave from.     |
-| 4   | navigateToNotFound skipped    | NOT called when navigating via `navigateToNotFound()` — that method bypasses the pipeline entirely and emits no `LEAVE_APPROVED` event.         |
-| 5   | Returns unsubscribe           | Returns a function that removes the listener. After calling it, the callback is not invoked on subsequent navigations.                         |
+| #   | Invariant                      | Description                                                                                                                                                                                              |
+| --- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Non-function throws            | `subscribeLeave(nonFunction)` throws `TypeError` immediately. Only functions are accepted as listeners.                                                                                                  |
+| 2   | Callback signature             | Callback receives `{ route: State, nextRoute: State, signal: AbortSignal }` where `route` is the current (leaving) route, `nextRoute` is the destination, and `signal` enables cooperative cancellation. |
+| 3   | First navigation skipped       | NOT called on first navigation (no previous route — `fromState` is `undefined`). The leave phase requires an existing route to leave from.                                                               |
+| 4   | navigateToNotFound skipped     | NOT called when navigating via `navigateToNotFound()` — that method bypasses the pipeline entirely and emits no `LEAVE_APPROVED` event.                                                                  |
+| 5   | Returns unsubscribe            | Returns a function that removes the listener. After calling it, the callback is not invoked on subsequent navigations.                                                                                   |
+| 6   | Async listener blocks pipeline | A listener returning `Promise<void>` blocks the navigation pipeline until resolved. Activation guards run only after all leave listeners complete.                                                       |
+| 7   | Independent error isolation    | A sync throw or async rejection in one listener does not prevent other listeners from executing. All listeners run; first error is re-thrown.                                                            |
+| 8   | Signal aborted on concurrent   | When a new navigation starts during async leave, the `signal` passed to listeners is aborted via the navigation `AbortController`.                                                                       |
 
 ## isLeaveApproved
 
 `router.isLeaveApproved()` is a synchronous predicate that returns `true` only while the FSM is in the `LEAVE_APPROVED` state.
 
-| #   | Invariant                  | Description                                                                                                                                    |
-| --- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | LEAVE_APPROVED state only  | Returns `true` only when the FSM is in `LEAVE_APPROVED` state — the window between deactivation guards passing and activation guards running.  |
-| 2   | All other states false     | Returns `false` in `IDLE`, `STARTING`, `READY`, `TRANSITION_STARTED`, and `DISPOSED` states.                                                  |
+| #   | Invariant                 | Description                                                                                                                                   |
+| --- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | LEAVE_APPROVED state only | Returns `true` only when the FSM is in `LEAVE_APPROVED` state — the window between deactivation guards passing and activation guards running. |
+| 2   | All other states false    | Returns `false` in `IDLE`, `STARTING`, `READY`, `TRANSITION_STARTED`, and `DISPOSED` states.                                                  |
 
 ## getDependenciesApi (CRUD)
 
@@ -292,10 +295,10 @@ Guards registered via `getLifecycleApi(router)` run during the transition pipeli
 
 `getNavigator(router)` returns a frozen subset of router methods intended for view layers. The navigator is cached per router instance via `WeakMap`.
 
-| #   | Invariant        | Description                                                                                                                               |
-| --- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Cached reference | `getNavigator(router)` returns the same object reference on repeated calls. One frozen navigator per router instance.                     |
-| 2   | Frozen           | `Object.isFrozen(getNavigator(router)) === true`. The navigator cannot be modified after creation.                                        |
+| #   | Invariant        | Description                                                                                                                                                                    |
+| --- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | Cached reference | `getNavigator(router)` returns the same object reference on repeated calls. One frozen navigator per router instance.                                                          |
+| 2   | Frozen           | `Object.isFrozen(getNavigator(router)) === true`. The navigator cannot be modified after creation.                                                                             |
 | 3   | Method identity  | Navigator methods (`navigate`, `getState`, `isActiveRoute`, `canNavigateTo`, `subscribe`, `subscribeLeave`, `isLeaveApproved`) are the same bound references as on the router. |
 | 4   | Expected keys    | The navigator contains exactly the keys: `canNavigateTo`, `getState`, `isActiveRoute`, `isLeaveApproved`, `navigate`, `subscribe`, `subscribeLeave`. No extra properties.      |
 

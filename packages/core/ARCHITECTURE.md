@@ -237,8 +237,9 @@ fsm.on("TRANSITION_STARTED", "CANCEL", (p) =>
            ▼
 ┌──────────────────────┐
 │  LEAVE_APPROVED      │  FSM send(LEAVE_APPROVE) → emit $$leaveApprove
-│                      │    → subscribeLeave() callbacks fire
-│                      │    safe side-effects: scroll save, fetch abort, analytics
+│                      │    → subscribeLeave() callbacks fire (sync or async)
+│                      │    listeners receive { route, nextRoute, signal: AbortSignal }
+│                      │    async listeners block pipeline (Promise.allSettled)
 │                      │    route state has NOT changed yet
 └──────────┬───────────┘
            │
@@ -329,15 +330,15 @@ router.dispose()  ───────────┘      ▼
 
 Plugin hooks are bound to router events via `addEventListener()`:
 
-| Plugin method                | Router event      | When                                          |
-| ---------------------------- | ----------------- | --------------------------------------------- |
-| `onStart`                    | `$start`          | `router.start()` succeeds                     |
-| `onStop`                     | `$stop`           | `router.stop()` called                        |
-| `onTransitionStart`          | `$$start`         | Navigation begins                             |
-| `onTransitionLeaveApprove`   | `$$leaveApprove`  | Deactivation guards passed, before activation |
-| `onTransitionSuccess`        | `$$success`       | Navigation completes                          |
-| `onTransitionError`          | `$$error`         | Navigation fails                              |
-| `onTransitionCancel`         | `$$cancel`        | Navigation cancelled                          |
+| Plugin method              | Router event     | When                                          |
+| -------------------------- | ---------------- | --------------------------------------------- |
+| `onStart`                  | `$start`         | `router.start()` succeeds                     |
+| `onStop`                   | `$stop`          | `router.stop()` called                        |
+| `onTransitionStart`        | `$$start`        | Navigation begins                             |
+| `onTransitionLeaveApprove` | `$$leaveApprove` | Deactivation guards passed, before activation |
+| `onTransitionSuccess`      | `$$success`      | Navigation completes                          |
+| `onTransitionError`        | `$$error`        | Navigation fails                              |
+| `onTransitionCancel`       | `$$cancel`       | Navigation cancelled                          |
 
 **Note:** `onTransitionSuccess` can fire without a preceding `onTransitionStart` — via `navigateToNotFound()`.
 
@@ -440,6 +441,9 @@ Route tree is re-built from definitions (not shared) — each clone has independ
 | `createInterceptable()` fast path       | Empty-array check skips iteration when no interceptors                  |
 | Lazy event listeners                    | No allocation until first subscription                                  |
 | Cached error rejections                 | Pre-allocated `Promise.reject()` for common errors                      |
+| Async leave: no-abort on sync path      | AbortController.abort() skipped when all leave listeners are sync       |
+| Async leave: deferred NavigationContext | `{nav}` object created only in async branch, not on every navigate      |
+| Async leave: `isCurrentNav` scoped      | Closure moved to guards block — not allocated on no-guards path         |
 
 ## Stress Test Coverage
 
