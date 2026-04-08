@@ -68,6 +68,8 @@ omit("page=1&sort=name&limit=10", ["sort", "limit"]);
 
 Detects integers and decimals matching `/^\d+(\.\d+)?$/`. No encoding change needed — numbers are encoded identically regardless of format.
 
+**Note:** Negative numbers (e.g., `-1`, `-42`) are NOT automatically coerced from strings. This is by design — URL query params like `?offset=-10` remain as the string `"-10"`. Use explicit parsing in your application if negative number support is needed.
+
 ```typescript
 parse("page=1&price=12.5&name=abc", { numberFormat: "auto" });
 // → { page: 1, price: 12.5, name: "abc" }

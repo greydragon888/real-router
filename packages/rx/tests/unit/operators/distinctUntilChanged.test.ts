@@ -177,6 +177,33 @@ describe("distinctUntilChanged", () => {
     expect(completeCalls).toStrictEqual([1]);
   });
 
+  it("should propagate comparator error to subscriber's error callback", () => {
+    const errors: unknown[] = [];
+    const values: number[] = [];
+
+    const source = new RxObservable<number>((observer) => {
+      observer.next?.(1);
+      observer.next?.(2);
+
+      return;
+    });
+
+    source
+      .pipe(
+        distinctUntilChanged(() => {
+          throw new Error("comparator threw");
+        }),
+      )
+      .subscribe({
+        next: (value) => values.push(value),
+        error: (error) => errors.push(error),
+      });
+
+    expect(values).toStrictEqual([1]);
+    expect(errors).toHaveLength(1);
+    expect((errors[0] as Error).message).toBe("comparator threw");
+  });
+
   it("should support multiple subscriptions", () => {
     const values1: number[] = [];
     const values2: number[] = [];

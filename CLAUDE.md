@@ -160,6 +160,8 @@ When adding packages or features, keep these root files in sync:
 - [packages/lifecycle-plugin/CLAUDE.md](packages/lifecycle-plugin/CLAUDE.md) — Lifecycle plugin architecture
 - [packages/preload-plugin/CLAUDE.md](packages/preload-plugin/CLAUDE.md) — Preload plugin architecture
 - [packages/memory-plugin/CLAUDE.md](packages/memory-plugin/CLAUDE.md) — Memory plugin architecture
+- [packages/path-matcher/CLAUDE.md](packages/path-matcher/CLAUDE.md) — Segment trie URL matcher, encoding, constraints
+- [packages/route-tree/CLAUDE.md](packages/route-tree/CLAUDE.md) — Route tree builder, matcher factory, validation
 - [packages/dom-utils/.claude/CLAUDE.md](packages/dom-utils/CLAUDE.md) — DOM utilities (route announcer, link helpers)
 - [packages/fsm/CLAUDE.md](packages/fsm/CLAUDE.md) — FSM engine internals
 - [packages/router-benchmarks/CLAUDE.md](packages/router-benchmarks/CLAUDE.md) — Benchmark suite

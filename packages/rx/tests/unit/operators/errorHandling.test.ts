@@ -146,6 +146,110 @@ describe("Operator error handling", () => {
     });
   });
 
+  describe("null and undefined through operators", () => {
+    it("should pass null through map without crash", () => {
+      const values: (string | null)[] = [];
+
+      const source = new RxObservable<string | null>((observer) => {
+        observer.next?.(null);
+        observer.next?.("hello");
+        observer.next?.(null);
+        observer.complete?.();
+
+        return;
+      });
+
+      source
+        .pipe(map((value) => (value === null ? null : value.toUpperCase())))
+        .subscribe({
+          next: (value) => values.push(value),
+        });
+
+      expect(values).toStrictEqual([null, "HELLO", null]);
+    });
+
+    it("should pass undefined through map without crash", () => {
+      const values: (number | undefined)[] = [];
+
+      const source = new RxObservable<number | undefined>((observer) => {
+        observer.next?.(undefined);
+        observer.next?.(42);
+        observer.next?.(undefined);
+        observer.complete?.();
+
+        return;
+      });
+
+      source.pipe(map((value) => value)).subscribe({
+        next: (value) => values.push(value),
+      });
+
+      expect(values).toStrictEqual([undefined, 42, undefined]);
+    });
+
+    it("should pass null through filter without crash", () => {
+      const values: (string | null)[] = [];
+
+      const source = new RxObservable<string | null>((observer) => {
+        observer.next?.(null);
+        observer.next?.("hello");
+        observer.next?.(null);
+        observer.complete?.();
+
+        return;
+      });
+
+      source
+        .pipe(filter((value): value is string | null => value !== "hello"))
+        .subscribe({
+          next: (value) => values.push(value),
+        });
+
+      expect(values).toStrictEqual([null, null]);
+    });
+
+    it("should pass undefined through filter without crash", () => {
+      const values: (number | undefined)[] = [];
+
+      const source = new RxObservable<number | undefined>((observer) => {
+        observer.next?.(undefined);
+        observer.next?.(42);
+        observer.next?.(undefined);
+        observer.complete?.();
+
+        return;
+      });
+
+      source.pipe(filter((): boolean => true)).subscribe({
+        next: (value) => values.push(value),
+      });
+
+      expect(values).toStrictEqual([undefined, 42, undefined]);
+    });
+
+    it("should handle null/undefined through distinctUntilChanged", () => {
+      const values: (string | null | undefined)[] = [];
+
+      const source = new RxObservable<string | null | undefined>((observer) => {
+        observer.next?.(null);
+        observer.next?.(null);
+        observer.next?.(undefined);
+        observer.next?.(undefined);
+        observer.next?.("value");
+        observer.next?.(null);
+        observer.complete?.();
+
+        return;
+      });
+
+      source.pipe(distinctUntilChanged()).subscribe({
+        next: (value) => values.push(value),
+      });
+
+      expect(values).toStrictEqual([null, undefined, "value", null]);
+    });
+  });
+
   describe("distinctUntilChanged error handling", () => {
     it("should propagate error from comparator function", async () => {
       const errors: unknown[] = [];

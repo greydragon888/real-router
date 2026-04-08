@@ -54,6 +54,20 @@ router.usePlugin(searchSchemaPlugin({ mode: "development" }));
 
 > **Schema libraries:** Any library implementing [Standard Schema V1](https://github.com/standard-schema/standard-schema) works — Zod 3.24+, Valibot 1.0+, ArkType. Install and configure your chosen library separately; the plugin has no schema-library dependency.
 
+## TypeScript Support
+
+Import `@real-router/search-schema-plugin` to enable TypeScript support for `searchSchema` on route definitions:
+
+```typescript
+import "@real-router/search-schema-plugin"; // enables Route.searchSchema type
+
+const routes = [
+  { name: "users", path: "/users", searchSchema: z.object({ page: z.number() }) },
+];
+```
+
+This works via [module augmentation](https://www.typescriptlang.org/docs/handbook/declaration-merging.html) — the package extends the `Route` interface from `@real-router/core`.
+
 ## Configuration
 
 | Option    | Type                                    | Default         | Description                                                                                                                                                                                    |

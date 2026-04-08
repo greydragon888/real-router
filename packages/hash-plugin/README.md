@@ -105,6 +105,13 @@ router.buildUrl("home"); // returns hash path
 router.matchUrl("/path"); // returns undefined
 ```
 
+## Advanced Exports
+
+| Export | Description |
+|--------|-------------|
+| `Browser` | Browser interface type (from `browser-env`) — for custom browser implementations |
+| `isState` | Type guard to validate history state structure — `(value: unknown) => value is State` |
+
 ## Documentation
 
 Full documentation: [Wiki — hash-plugin](https://github.com/greydragon888/real-router/wiki/hash-plugin)
