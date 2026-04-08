@@ -1,5 +1,13 @@
 # browser-env
 
+## 0.2.6
+
+### Patch Changes
+
+- Updated dependencies [[`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1), [`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1)]:
+  - @real-router/core@0.46.0
+  - type-guards@0.4.6
+
 ## 0.2.5
 
 ### Patch Changes
