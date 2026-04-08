@@ -16,6 +16,7 @@ import { getTransitionPath, nameToIDs } from "../../transitionPath";
 
 import type { NavigationContext, NavigationDependencies } from "./types";
 import type {
+  GuardFn,
   NavigationOptions,
   Params,
   State,
@@ -152,7 +153,6 @@ export class NavigationNamespace {
         canDeactivateFunctions.size > 0 || canActivateFunctions.size > 0;
 
       const confirmedToState = toState;
-      const isCurrentNav = () => this.#navigationId === myId && deps.isActive();
 
       if (!hasGuards) {
         const asyncLeave = this.#handleNoGuardsLeave(
@@ -160,15 +160,11 @@ export class NavigationNamespace {
           confirmedToState,
           fromState,
           myId,
-          {
-            toState,
-            fromState,
-            opts,
-            toDeactivate,
-            toActivate,
-            intersection,
-            canDeactivateFunctions,
-          },
+          opts,
+          toDeactivate,
+          toActivate,
+          intersection,
+          canDeactivateFunctions,
         );
 
         /* v8 ignore start */
@@ -181,6 +177,8 @@ export class NavigationNamespace {
       if (hasGuards) {
         controller = new AbortController();
         this.#currentController = controller;
+        const isCurrentNav = () =>
+          this.#navigationId === myId && deps.isActive();
 
         const signal = controller.signal;
 
@@ -398,20 +396,22 @@ export class NavigationNamespace {
   }
 
   #handleNoGuardsLeave(
+    // NOSONAR
     deps: NavigationDependencies,
     toState: State,
     fromState: State | undefined,
     myId: number,
-    nav: NavigationContext,
+    opts: NavigationOptions,
+    toDeactivate: string[],
+    toActivate: string[],
+    intersection: string,
+    canDeactivateFunctions: Map<string, GuardFn>,
   ): Promise<State> | undefined {
     deps.sendLeaveApprove(toState, fromState);
 
     /* v8 ignore start */
     if (deps.hasLeaveListeners()) {
       const controller = new AbortController();
-
-      this.#currentController = controller;
-
       const leaveResult = deps.awaitLeaveListeners(
         toState,
         fromState,
@@ -419,10 +419,23 @@ export class NavigationNamespace {
       );
 
       if (leaveResult !== undefined) {
-        return this.#finishAsyncNavigation(leaveResult, nav, controller, myId);
-      }
+        this.#currentController = controller;
 
-      this.#cleanupController(controller);
+        return this.#finishAsyncNavigation(
+          leaveResult,
+          {
+            toState,
+            fromState,
+            opts,
+            toDeactivate,
+            toActivate,
+            intersection,
+            canDeactivateFunctions,
+          },
+          controller,
+          myId,
+        );
+      }
     }
 
     if (this.#navigationId !== myId) {
