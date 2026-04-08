@@ -407,6 +407,24 @@ describe("FSM", () => {
       expect(second).toHaveBeenCalledTimes(1);
     });
 
+    it("should not delete overwritten action when old unsubscribe is called", () => {
+      const fsm = new FSM(lightConfig);
+
+      const first = vi.fn();
+      const second = vi.fn();
+
+      const unsub1 = fsm.on("green", "TIMER", first);
+
+      fsm.on("green", "TIMER", second);
+
+      unsub1();
+
+      fsm.send("TIMER");
+
+      expect(first).not.toHaveBeenCalled();
+      expect(second).toHaveBeenCalledTimes(1);
+    });
+
     it("should receive undefined payload for no-payload events", () => {
       const fsm = new FSM<PayloadState, PayloadEvent, null, PayloadMap>(
         payloadConfig,
