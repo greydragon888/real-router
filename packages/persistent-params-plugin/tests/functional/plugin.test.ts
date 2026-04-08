@@ -475,6 +475,26 @@ describe("Persistent params plugin", () => {
       });
     });
 
+    describe("Empty String Value", () => {
+      it("should persist empty string as a valid param value", async () => {
+        router.usePlugin(persistentParamsPlugin(["mode"]));
+        await router.start("/");
+
+        await router.navigate("route1", { id: "1", mode: "" });
+
+        const state1 = router.getState();
+
+        expect(state1?.params.mode).toBe("");
+
+        await router.navigate("route2", { id: "2" });
+
+        const state2 = router.getState();
+
+        // Empty string should persist across navigations
+        expect(state2?.params.mode).toBe("");
+      });
+    });
+
     describe("Special Characters", () => {
       it("should persist value containing special characters", async () => {
         router.usePlugin(persistentParamsPlugin(["mode"]));
@@ -842,6 +862,29 @@ describe("Persistent params plugin", () => {
         expect(() => {
           router.usePlugin(persistentParamsPlugin(["theme"]));
         }).not.toThrow();
+      });
+
+      it("should use new config after re-init with different params", async () => {
+        const unsubscribe1 = router.usePlugin(
+          persistentParamsPlugin({ mode: "dev" }),
+        );
+
+        await router.start("/");
+        await router.navigate("route1", { id: "1" });
+
+        expect(router.getState()?.path).toBe("/route1/1?mode=dev");
+
+        unsubscribe1();
+
+        router.usePlugin(persistentParamsPlugin({ theme: "dark" }));
+
+        await router.navigate("route2", { id: "2" });
+
+        const state = router.getState();
+
+        // Old param "mode" should no longer be injected; new param "theme" should be
+        expect(state?.path).toBe("/route2/2?theme=dark");
+        expect(state?.params).not.toHaveProperty("mode");
       });
     });
   });

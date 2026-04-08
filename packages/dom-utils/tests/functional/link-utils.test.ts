@@ -67,6 +67,27 @@ describe("shouldNavigate", () => {
 
     expect(shouldNavigate(evt)).toBe(false);
   });
+
+  it("8 — returns true even when event.defaultPrevented is true (caller responsibility)", () => {
+    // shouldNavigate only checks button + modifier keys, not defaultPrevented.
+    // Framework adapters (Link components) check defaultPrevented separately.
+    const div = document.createElement("div");
+
+    div.addEventListener("click", (event) => {
+      event.preventDefault();
+    });
+
+    const evt = new MouseEvent("click", {
+      button: 0,
+      bubbles: true,
+      cancelable: true,
+    });
+
+    div.dispatchEvent(evt);
+
+    expect(evt.defaultPrevented).toBe(true);
+    expect(shouldNavigate(evt)).toBe(true);
+  });
 });
 
 describe("buildHref", () => {
@@ -194,6 +215,15 @@ describe("buildActiveClassName", () => {
   it("7 — returns base class when active but activeClassName is empty string", () => {
     expect(buildActiveClassName(true, "", "nav-link")).toBe("nav-link");
   });
+
+  it("8 — whitespace-only activeClassName is trimmed away when concatenated", () => {
+    // " " is truthy in JS, so the branch enters; .trim() removes trailing whitespace
+    expect(buildActiveClassName(true, " ", "nav-link")).toBe("nav-link");
+  });
+
+  it("9 — whitespace-only baseClassName is preserved when not active", () => {
+    expect(buildActiveClassName(false, "active", " ")).toBe(" ");
+  });
 });
 
 describe("applyLinkA11y", () => {
@@ -253,5 +283,16 @@ describe("applyLinkA11y", () => {
 
     expect(span.getAttribute("role")).toBe("link");
     expect(span.getAttribute("tabindex")).toBe("0");
+  });
+
+  it("7 — sets role and tabindex on a contenteditable element", () => {
+    const div = document.createElement("div");
+
+    div.setAttribute("contenteditable", "true");
+
+    applyLinkA11y(div);
+
+    expect(div.getAttribute("role")).toBe("link");
+    expect(div.getAttribute("tabindex")).toBe("0");
   });
 });

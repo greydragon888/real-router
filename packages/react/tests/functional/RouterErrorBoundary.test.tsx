@@ -12,7 +12,7 @@ import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { Link, RouterErrorBoundary, RouterProvider } from "@real-router/react";
 
-import type { Router, RouterError } from "@real-router/core";
+import type { Router, RouterError, State } from "@real-router/core";
 import type { ReactNode } from "react";
 
 describe("RouterErrorBoundary", () => {
@@ -328,6 +328,65 @@ describe("RouterErrorBoundary", () => {
     expect(screen.getByTestId("outer-fallback").textContent).toBe(
       screen.getByTestId("inner-fallback").textContent,
     );
+  });
+
+  it("unmount cleanup — no error after boundary unmounts", async () => {
+    const lifecycle = getLifecycleApi(router);
+
+    lifecycle.addActivateGuard("dashboard", () => () => false);
+
+    const { unmount } = render(
+      <RouterErrorBoundary
+        fallback={(error) => <div data-testid="fallback">{error.code}</div>}
+      >
+        <div data-testid="children">App</div>
+      </RouterErrorBoundary>,
+      { wrapper },
+    );
+
+    expect(screen.getByTestId("children")).toBeInTheDocument();
+
+    unmount();
+
+    await act(async () => {
+      await router.navigate("dashboard").catch(() => {});
+    });
+
+    expect(screen.queryByTestId("fallback")).not.toBeInTheDocument();
+  });
+
+  it("onError receives correct toRoute and fromRoute names", async () => {
+    const lifecycle = getLifecycleApi(router);
+
+    lifecycle.addActivateGuard("dashboard", () => () => false);
+
+    const onError = vi.fn();
+
+    render(
+      <RouterErrorBoundary
+        fallback={(error) => <div data-testid="fallback">{error.code}</div>}
+        onError={onError}
+      >
+        <div>App</div>
+      </RouterErrorBoundary>,
+      { wrapper },
+    );
+
+    await act(async () => {
+      await router.navigate("dashboard").catch(() => {});
+    });
+
+    expect(onError).toHaveBeenCalledTimes(1);
+
+    const [error, toRoute, fromRoute] = onError.mock.calls[0] as [
+      RouterError,
+      State,
+      State,
+    ];
+
+    expect(error.code).toBe(errorCodes.CANNOT_ACTIVATE);
+    expect(toRoute.name).toBe("dashboard");
+    expect(fromRoute.name).toBe("home");
   });
 
   it("resetError then same cached error", async () => {

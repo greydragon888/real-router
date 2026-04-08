@@ -567,6 +567,75 @@ describe("FSM", () => {
     });
   });
 
+  describe("on() action edge cases", () => {
+    it("should propagate exception from on() action callback through send()", () => {
+      const fsm = new FSM(lightConfig);
+      const error = new Error("action boom");
+
+      fsm.on("green", "TIMER", () => {
+        throw error;
+      });
+
+      expect(() => fsm.send("TIMER")).toThrow(error);
+      // State is already updated before action fires
+      expect(fsm.getState()).toBe("yellow");
+    });
+
+    it("should allow reentrancy — calling send() inside on() action", () => {
+      const fsm = new FSM(lightConfig);
+      const states: string[] = [];
+
+      fsm.on("green", "TIMER", () => {
+        states.push(fsm.getState());
+        // State is already "yellow" at this point, send another TIMER
+        fsm.send("TIMER");
+      });
+
+      fsm.send("TIMER");
+
+      expect(states).toStrictEqual(["yellow"]);
+      expect(fsm.getState()).toBe("red");
+    });
+
+    it("should return valid canSend result inside on() action", () => {
+      const fsm = new FSM(lightConfig);
+      let canSendTimer: boolean | undefined;
+      let canSendReset: boolean | undefined;
+
+      fsm.on("green", "TIMER", () => {
+        // Inside action, state is already "yellow"
+        canSendTimer = fsm.canSend("TIMER");
+        canSendReset = fsm.canSend("RESET");
+      });
+
+      fsm.send("TIMER");
+
+      // yellow has TIMER→red, no RESET
+      expect(canSendTimer).toBe(true);
+      expect(canSendReset).toBe(false);
+    });
+  });
+
+  describe("forceState() edge cases", () => {
+    it("should handle forceState with a state that has empty transitions", () => {
+      const fsm = new FSM<PayloadState, PayloadEvent, null, PayloadMap>(
+        payloadConfig,
+      );
+
+      fsm.forceState("done");
+
+      expect(fsm.getState()).toBe("done");
+      expect(fsm.canSend("FETCH")).toBe(false);
+      expect(fsm.canSend("RESOLVE")).toBe(false);
+
+      // send() should be a no-op
+      const result = fsm.send("FETCH", { url: "/api" });
+
+      expect(result).toBe("done");
+      expect(fsm.getState()).toBe("done");
+    });
+  });
+
   describe("forceState()", () => {
     it("should set state without triggering actions or listeners", () => {
       const fsm = new FSM(lightConfig);

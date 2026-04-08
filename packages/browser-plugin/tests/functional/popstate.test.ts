@@ -395,9 +395,6 @@ describe("Browser Plugin — Popstate", () => {
       await router.start();
     });
 
-    // This is a smoke test - it verifies the plugin doesn't crash when
-    // a transition error occurs during popstate handling
-    // eslint-disable-next-line vitest/expect-expect, sonarjs/assertions-in-tests
     it("recovers from transition error by restoring browser state", async () => {
       const consoleSpy = vi.spyOn(console, "error").mockImplementation(noop);
 
@@ -420,6 +417,10 @@ describe("Browser Plugin — Popstate", () => {
       );
 
       await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Guard error is wrapped in RouterError by core, so popstate handler
+      // does not enter critical recovery. Router remains on previous route.
+      expect(router.getState()?.name).toBe("users.list");
 
       consoleSpy.mockRestore();
     });

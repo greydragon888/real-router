@@ -526,7 +526,7 @@ describe("validateRoute", () => {
   });
 
   describe("mutation testing coverage", () => {
-    it("should accept exactly MAX_ROUTE_NAME_LENGTH (10000) characters (line 191 boundary)", () => {
+    it("should accept exactly MAX_ROUTE_NAME_LENGTH (10000) characters", () => {
       // Test exact boundary: 10000 chars should pass, 10001 should fail
       const exactLengthName = "a".repeat(10_000);
 

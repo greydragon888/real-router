@@ -719,6 +719,73 @@ describe("Search schema plugin", () => {
     });
   });
 
+  describe("Conflicting keys in non-strict merge", () => {
+    it("should override original keys, preserve unknowns, and add new keys from schema", async () => {
+      // Schema returns { x: "override", z: 3 } for any input
+      // In non-strict mode: result = { ...original, ...schema_output }
+      // So: x is overridden, y is preserved (not in schema output), z is added
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          {
+            name: "search",
+            path: "/search?x&y&z",
+            searchSchema: createMockSchema({
+              validate: () => ({
+                value: { x: "override", z: 3 },
+              }),
+            }),
+          },
+        ],
+        { defaultRoute: "home" },
+      );
+
+      router.usePlugin(
+        searchSchemaPlugin({ mode: "production", strict: false }),
+      );
+      await router.start("/");
+
+      await router.navigate("search", { x: 1, y: 2 });
+
+      const state = router.getState();
+
+      expect(state?.params.x).toBe("override"); // overridden by schema
+      expect(state?.params.y).toBe(2); // preserved from original
+      expect(state?.params.z).toBe(3); // added by schema
+    });
+
+    it("should NOT preserve unknowns in strict mode", async () => {
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          {
+            name: "search",
+            path: "/search?x&y&z",
+            searchSchema: createMockSchema({
+              validate: () => ({
+                value: { x: "override", z: 3 },
+              }),
+            }),
+          },
+        ],
+        { defaultRoute: "home" },
+      );
+
+      router.usePlugin(
+        searchSchemaPlugin({ mode: "production", strict: true }),
+      );
+      await router.start("/");
+
+      await router.navigate("search", { x: 1, y: 2 });
+
+      const state = router.getState();
+
+      expect(state?.params.x).toBe("override"); // overridden by schema
+      expect(state?.params).not.toHaveProperty("y"); // stripped in strict mode
+      expect(state?.params.z).toBe(3); // from schema
+    });
+  });
+
   describe("Schema transforming values", () => {
     it("should apply transformed values from schema output", async () => {
       router = createRouter(

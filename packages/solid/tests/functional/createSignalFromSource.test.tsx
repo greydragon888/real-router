@@ -117,4 +117,44 @@ describe("createSignalFromSource", () => {
 
     expect(result()).toBe(false);
   });
+
+  it("should work after subscribe/unsubscribe/subscribe cycle", () => {
+    const { source, emit } = createMockSource(0);
+    const subscribeSpy = vi.spyOn(source, "subscribe");
+
+    // First subscription
+    const { result: result1, cleanup: cleanup1 } = renderHook(() =>
+      createSignalFromSource(source),
+    );
+
+    expect(subscribeSpy).toHaveBeenCalledTimes(1);
+    expect(result1()).toBe(0);
+
+    emit(1);
+
+    expect(result1()).toBe(1);
+
+    // Unsubscribe
+    cleanup1();
+
+    emit(2);
+
+    // Old subscription no longer receives updates
+    expect(result1()).toBe(1);
+
+    // Second subscription — should work independently
+    const { result: result2 } = renderHook(() =>
+      createSignalFromSource(source),
+    );
+
+    expect(subscribeSpy).toHaveBeenCalledTimes(2);
+
+    // Should read current snapshot (2)
+    expect(result2()).toBe(2);
+
+    emit(3);
+
+    // Second subscription receives updates
+    expect(result2()).toBe(3);
+  });
 });

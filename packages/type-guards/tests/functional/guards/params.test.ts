@@ -595,6 +595,19 @@ describe("Params Type Guards", () => {
       expect(isParamsStrict(params)).toBe(true);
     });
 
+    it("rejects arrays of arrays (params values must be primitives)", () => {
+      expect(isParamsStrict({ nested: [["a", "b"], ["c"]] })).toBe(false);
+      expect(
+        isParamsStrict({
+          matrix: [
+            [1, 2],
+            [3, 4],
+          ],
+        }),
+      ).toBe(false);
+      expect(isParamsStrict({ mixed: ["a", ["b"]] })).toBe(false);
+    });
+
     describe("Mutation Testing - inherited properties", () => {
       it("returns false if inherited property has invalid type (kills 'if (false)' mutant)", () => {
         // This test ensures that the 'continue' statement is necessary

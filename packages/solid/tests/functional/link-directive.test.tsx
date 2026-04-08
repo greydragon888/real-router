@@ -483,6 +483,56 @@ describe("link directive", () => {
     });
   });
 
+  describe("known limitation: accessor called once at init", () => {
+    it("should navigate to initial route even after accessor value changes", async () => {
+      vi.spyOn(router, "navigate");
+
+      // The directive calls accessor() once at init. Even if the outer variable
+      // changes, the captured options object retains the initial routeName.
+      let currentRouteName = "one-more-test";
+
+      render(
+        () => (
+          <a use:link={{ routeName: currentRouteName }} data-testid="link">
+            Test
+          </a>
+        ),
+        { wrapper },
+      );
+
+      // Mutate the outer variable after the directive has already captured its value
+      currentRouteName = "about";
+
+      await user.click(screen.getByTestId("link"));
+
+      // The directive still navigates to the INITIAL value ("one-more-test"),
+      // not the updated value ("about"), because accessor() is called once
+      expect(router.navigate).toHaveBeenCalledWith("one-more-test", {}, {});
+      expect(router.navigate).not.toHaveBeenCalledWith("about", {}, {});
+    });
+
+    it("should keep initial href after accessor value changes", () => {
+      let currentRouteName = "one-more-test";
+
+      render(
+        () => (
+          <a use:link={{ routeName: currentRouteName }} data-testid="link">
+            Test
+          </a>
+        ),
+        { wrapper },
+      );
+
+      expect(screen.getByTestId("link")).toHaveAttribute("href", "/test");
+
+      // Change the variable — href should NOT update
+      currentRouteName = "about";
+
+      // href still reflects the initial value
+      expect(screen.getByTestId("link")).toHaveAttribute("href", "/test");
+    });
+  });
+
   describe("cleanup", () => {
     it("should remove event listeners on cleanup", () => {
       const { unmount } = render(

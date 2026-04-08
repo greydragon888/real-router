@@ -179,6 +179,37 @@ describe("Lazy component", () => {
     expect(screen.getByTestId("loaded")).toBeInTheDocument();
   });
 
+  it("should not render loaded component after unmount", async () => {
+    let resolveLoader!: (value: { default: Component }) => void;
+    const loader: LazyLoader = vi.fn(
+      () =>
+        new Promise<{ default: Component }>((resolve) => {
+          resolveLoader = resolve;
+        }),
+    );
+
+    const { unmount } = render(LazyTest, {
+      props: {
+        router,
+        loader,
+        fallback: MockFallbackComponent,
+      },
+    });
+
+    // Fallback is shown while loading
+    expect(screen.getByTestId("fallback")).toBeInTheDocument();
+
+    // Unmount before the loader resolves
+    unmount();
+
+    // Now resolve the loader — the component should be discarded
+    resolveLoader({ default: MockLoadedComponent });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // The loaded component should not appear in the DOM
+    expect(screen.queryByTestId("loaded")).not.toBeInTheDocument();
+  });
+
   it("should discard stale loader error when loader prop changes", async () => {
     let rejectFirst!: (err: Error) => void;
     const firstLoader: LazyLoader = vi.fn(

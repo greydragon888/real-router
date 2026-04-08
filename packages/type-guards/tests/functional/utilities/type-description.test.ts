@@ -74,5 +74,11 @@ describe("Helper Functions", () => {
     it("handles Promise", () => {
       expect(getTypeDescription(Promise.resolve())).toBe("Promise");
     });
+
+    it("returns 'bigint' for BigInt constructor values", () => {
+      expect(getTypeDescription(42n)).toBe("bigint");
+      expect(getTypeDescription(0n)).toBe("bigint");
+      expect(getTypeDescription(9_007_199_254_740_991n)).toBe("bigint");
+    });
   });
 });

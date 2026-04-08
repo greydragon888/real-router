@@ -135,6 +135,102 @@ describe("subscription-fanout stress tests (Vue)", () => {
     expect(rootNodeRenders - rootAfterMount).toBe(30 * 100);
   });
 
+  it("1.3: 30 useRouteNode('users') effects fire only during users navigations", async () => {
+    const effectCounts: number[] = Array.from<number>({ length: 30 }).fill(0);
+
+    const subscribers = Array.from({ length: 30 }, (_, i) => {
+      const index = i;
+
+      return defineComponent({
+        name: `UsersSub${i}`,
+        setup() {
+          const { route } = useRouteNode("users");
+
+          return () => {
+            if (route.value) {
+              effectCounts[index]++;
+            }
+
+            return h("div");
+          };
+        },
+      });
+    });
+
+    mountWithProvider(router, () =>
+      subscribers.map((Sub, i) => h(Sub, { key: i })),
+    );
+
+    await nextTick();
+    await flushPromises();
+
+    // Reset after mount
+    const countsAfterMount = [...effectCounts];
+
+    // Navigate to non-users routes — effects should NOT fire
+    await router.navigate("route1");
+    await nextTick();
+    await flushPromises();
+
+    await router.navigate("route2");
+    await nextTick();
+    await flushPromises();
+
+    await router.navigate("route3");
+    await nextTick();
+    await flushPromises();
+
+    const countsAfterNonUsers = [...effectCounts];
+
+    // No additional renders for non-users navigations
+    for (let i = 0; i < 30; i++) {
+      expect(countsAfterNonUsers[i]).toBe(countsAfterMount[i]);
+    }
+
+    // Navigate to users.list — all 30 effects should fire
+    await router.navigate("users.list");
+    await nextTick();
+    await flushPromises();
+
+    for (let i = 0; i < 30; i++) {
+      expect(effectCounts[i]).toBeGreaterThan(countsAfterNonUsers[i]);
+    }
+
+    const countsAfterUsersList = [...effectCounts];
+
+    // Navigate within users subtree — effects fire again
+    await router.navigate("users.view", { id: "42" });
+    await nextTick();
+    await flushPromises();
+
+    for (let i = 0; i < 30; i++) {
+      expect(effectCounts[i]).toBeGreaterThan(countsAfterUsersList[i]);
+    }
+
+    const countsAfterUsersView = [...effectCounts];
+
+    // Navigate away from users — effects fire (node deactivation)
+    await router.navigate("route5");
+    await nextTick();
+    await flushPromises();
+
+    // After navigating away, the node becomes inactive, so route.value is undefined.
+    // The render still fires but with route.value undefined (no increment due to guard).
+    // Navigate to more non-users routes — should NOT fire
+    await router.navigate("route6");
+    await nextTick();
+    await flushPromises();
+
+    await router.navigate("route7");
+    await nextTick();
+    await flushPromises();
+
+    // effectCounts should not have grown beyond what deactivation caused
+    for (let i = 0; i < 30; i++) {
+      expect(effectCounts[i]).toBe(countsAfterUsersView[i]);
+    }
+  });
+
   it("1.4: mount/unmount 10 components concurrently with navigation — no errors thrown", async () => {
     let errorThrown: unknown = null;
 

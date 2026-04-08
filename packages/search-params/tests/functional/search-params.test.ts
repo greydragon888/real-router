@@ -153,6 +153,26 @@ describe("search-params", () => {
       });
     });
 
+    it("parses key with empty value after = as empty string", () => {
+      expect(parse("key=")).toStrictEqual({ key: "" });
+    });
+
+    it("parses multiple keys with empty values", () => {
+      expect(parse("a=&b=&c=value")).toStrictEqual({
+        a: "",
+        b: "",
+        c: "value",
+      });
+    });
+
+    it("throws URIError for incomplete percent-encoding (%2)", () => {
+      expect(() => parse("key=%2")).toThrow(URIError);
+    });
+
+    it("throws URIError for invalid hex in percent-encoding (%GG)", () => {
+      expect(() => parse("key=%GG")).toThrow(URIError);
+    });
+
     it("handles combined booleanFormat and numberFormat", () => {
       expect(
         parse("enabled=true&disabled=false&count=1&price=12.5&name=abc", {

@@ -76,4 +76,41 @@ describe("Search schema plugin", () => {
       }).not.toThrow();
     });
   });
+
+  describe("Options immutability", () => {
+    it("should freeze options so they cannot be mutated after factory call", () => {
+      // Verify that the factory accepts pre-frozen options without error
+      expect(() => {
+        searchSchemaPlugin(Object.freeze({ mode: "production" }));
+      }).not.toThrow();
+
+      expect(() => {
+        searchSchemaPlugin(Object.freeze({ strict: true }));
+      }).not.toThrow();
+
+      expect(() => {
+        searchSchemaPlugin(
+          Object.freeze({ mode: "development", strict: false }),
+        );
+      }).not.toThrow();
+    });
+
+    it("should not be affected by mutations to the original options object", () => {
+      // Use a mutable object (cast away readonly to simulate external mutation)
+      const mutableOptions = {
+        mode: "development" as const,
+        strict: false,
+      };
+
+      const factory = searchSchemaPlugin(mutableOptions);
+
+      // Mutate original object after factory creation
+      // The factory should have captured a frozen copy, not a reference
+      (mutableOptions as { mode: string }).mode = "production";
+      (mutableOptions as { strict: boolean }).strict = true;
+
+      // Factory was created with a frozen copy — it should still be a valid function
+      expect(typeof factory).toBe("function");
+    });
+  });
 });

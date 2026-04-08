@@ -325,6 +325,32 @@ describe("RouterErrorBoundary", () => {
     );
   });
 
+  it("unsubscribes on unmount", async () => {
+    const lifecycle = getLifecycleApi(router);
+
+    lifecycle.addActivateGuard("dashboard", () => () => false);
+
+    const onError = vi.fn();
+
+    const { unmount } = render(
+      () => (
+        <RouterErrorBoundary
+          fallback={(error) => <div data-testid="fallback">{error.code}</div>}
+          onError={onError}
+        >
+          <div>App</div>
+        </RouterErrorBoundary>
+      ),
+      { wrapper },
+    );
+
+    unmount();
+
+    await router.navigate("dashboard").catch(() => {});
+
+    expect(onError).not.toHaveBeenCalled();
+  });
+
   it("resetError then same cached error", async () => {
     render(
       () => (

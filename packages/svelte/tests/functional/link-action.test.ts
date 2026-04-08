@@ -6,6 +6,7 @@ import {
   createTestRouterWithADefaultRouter,
   renderWithRouter,
 } from "../helpers";
+import LinkActionDoubleTest from "../helpers/LinkActionDoubleTest.svelte";
 import LinkActionTest from "../helpers/LinkActionTest.svelte";
 import LinkActionTestNoProvider from "../helpers/LinkActionTestNoProvider.svelte";
 import LinkActionUpdateTest from "../helpers/LinkActionUpdateTest.svelte";
@@ -343,5 +344,30 @@ describe("createLinkAction", () => {
         props: { params: { name: "one-more-test" } },
       });
     }).toThrow("createLinkAction must be called inside a RouterProvider");
+  });
+
+  it("should support multiple link actions in one component", async () => {
+    vi.spyOn(router, "navigate");
+
+    renderWithRouter(router, LinkActionDoubleTest, {
+      params1: { name: "home" },
+      params2: { name: "about" },
+    });
+
+    const button1 = document.querySelector("[data-testid='btn1']")!;
+    const button2 = document.querySelector("[data-testid='btn2']")!;
+
+    expect(button1).toBeInTheDocument();
+    expect(button2).toBeInTheDocument();
+
+    await userEvent.click(button1);
+
+    expect(router.navigate).toHaveBeenCalledWith("home", {}, {});
+
+    vi.clearAllMocks();
+
+    await userEvent.click(button2);
+
+    expect(router.navigate).toHaveBeenCalledWith("about", {}, {});
   });
 });

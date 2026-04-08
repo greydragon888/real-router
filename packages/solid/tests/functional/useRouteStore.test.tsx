@@ -119,4 +119,41 @@ describe("useRouteStore hook", () => {
     expect(result.route?.name).toBe("items.item");
     expect(result.route?.params.id).toBe("789");
   });
+
+  it("should have reactive previousRoute after navigation", async () => {
+    let effectRunCount = 0;
+
+    // Ensure known starting route
+    await router.navigate("test").catch(() => {});
+
+    renderHook(
+      () => {
+        const state = useRouteStore();
+
+        createEffect(() => {
+          // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+          state.previousRoute?.name;
+          effectRunCount++;
+        });
+      },
+      { wrapper: wrapper(router) },
+    );
+
+    const { result } = renderHook(() => useRouteStore(), {
+      wrapper: wrapper(router),
+    });
+
+    expect(effectRunCount).toBe(1);
+
+    await router.navigate("home").catch(() => {});
+
+    expect(result.route?.name).toBe("home");
+    expect(result.previousRoute?.name).toBe("test");
+    expect(effectRunCount).toBe(2);
+
+    await router.navigate("about").catch(() => {});
+
+    expect(result.previousRoute?.name).toBe("home");
+    expect(effectRunCount).toBe(3);
+  });
 });

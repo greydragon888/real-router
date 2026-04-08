@@ -266,6 +266,27 @@ describe("RouterErrorBoundary", () => {
     });
   });
 
+  describe("unmount cleanup", () => {
+    it("unsubscribes on unmount", async () => {
+      const lifecycle = getLifecycleApi(router);
+
+      lifecycle.addActivateGuard("dashboard", () => () => false);
+
+      const onError = vi.fn();
+
+      const { unmount } = render(ErrorBoundaryWithOnError, {
+        props: { router, onError },
+      });
+
+      unmount();
+
+      await router.navigate("dashboard").catch(() => {});
+      flushSync();
+
+      expect(onError).not.toHaveBeenCalled();
+    });
+  });
+
   describe("nested boundaries", () => {
     it("both show error", async () => {
       const lifecycle = getLifecycleApi(router);

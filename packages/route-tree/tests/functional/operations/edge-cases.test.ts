@@ -21,7 +21,7 @@ describe("New API - edge cases for coverage", () => {
   });
 
   it("should handle consecutive slash paths in matching", () => {
-    // Tests match.ts line 328 - resolveSegment with consumedBefore="/" and childPath="/"
+    // resolveSegment handles consecutive "/" paths (root with "/" child)
     const tree = createRouteTree("", "/", [{ name: "home", path: "/" }]);
 
     const result = matchPath(tree, "/");
@@ -72,6 +72,37 @@ describe("New API - edge cases for coverage", () => {
     // Static route should match before dynamic
     expect(matchPath(tree, "/static")?.name).toBe("static");
     expect(matchPath(tree, "/123")?.name).toBe("dynamic");
+  });
+
+  it("should extract params from deep nested route matches", () => {
+    const tree = createRouteTree("", "", [
+      {
+        name: "level1",
+        path: "/l1/:a",
+        children: [
+          {
+            name: "level2",
+            path: "/l2/:b",
+            children: [{ name: "level3", path: "/l3/:c" }],
+          },
+        ],
+      },
+    ]);
+
+    const deepResult = matchPath(tree, "/l1/x/l2/y/l3/z");
+
+    expect(deepResult?.name).toBe("level1.level2.level3");
+    expect(deepResult?.params).toStrictEqual({ a: "x", b: "y", c: "z" });
+
+    const midResult = matchPath(tree, "/l1/foo/l2/bar");
+
+    expect(midResult?.name).toBe("level1.level2");
+    expect(midResult?.params).toStrictEqual({ a: "foo", b: "bar" });
+
+    const topResult = matchPath(tree, "/l1/only");
+
+    expect(topResult?.name).toBe("level1");
+    expect(topResult?.params).toStrictEqual({ a: "only" });
   });
 
   it("should handle tree with absolute routes", () => {

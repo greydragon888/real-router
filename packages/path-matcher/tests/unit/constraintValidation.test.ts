@@ -67,4 +67,74 @@ describe("validateConstraints", () => {
       validateConstraints({ id: "/" }, patterns, "/users/:id");
     }).toThrow("expected to match '[^/]+'");
   });
+
+  it("coerces non-string param values to string before testing", () => {
+    const patterns = new Map<string, ConstraintPattern>([
+      ["id", { pattern: /^(\d+)$/, constraint: String.raw`<\d+>` }],
+    ]);
+
+    // Number 42 becomes "42" which matches \d+
+    expect(() => {
+      validateConstraints(
+        { id: 42 as unknown },
+        patterns,
+        String.raw`/users/:id<\d+>`,
+      );
+    }).not.toThrow();
+
+    // Boolean true becomes "true" which does not match \d+
+    expect(() => {
+      validateConstraints(
+        { id: true as unknown },
+        patterns,
+        String.raw`/users/:id<\d+>`,
+      );
+    }).toThrow(String.raw`expected to match '\d+'`);
+  });
+
+  it("coerces undefined param to string 'undefined' for constraint check", () => {
+    const patterns = new Map<string, ConstraintPattern>([
+      ["id", { pattern: /^(\d+)$/, constraint: String.raw`<\d+>` }],
+    ]);
+
+    expect(() => {
+      validateConstraints(
+        { id: undefined as unknown },
+        patterns,
+        String.raw`/users/:id<\d+>`,
+      );
+    }).toThrow("got 'undefined'");
+  });
+
+  it("validates only params present in constraint map, ignores extra params", () => {
+    const patterns = new Map<string, ConstraintPattern>([
+      ["id", { pattern: /^(\d+)$/, constraint: String.raw`<\d+>` }],
+    ]);
+
+    // "extra" param has no constraint — should not affect validation
+    expect(() => {
+      validateConstraints(
+        { id: "123", extra: "anything-goes" },
+        patterns,
+        String.raw`/users/:id<\d+>`,
+      );
+    }).not.toThrow();
+  });
+
+  it("strips angle brackets from constraint in error message", () => {
+    const patterns = new Map<string, ConstraintPattern>([
+      [
+        "slug",
+        { pattern: /^([a-z][a-z0-9-]*)$/, constraint: "<[a-z][a-z0-9-]*>" },
+      ],
+    ]);
+
+    expect(() => {
+      validateConstraints(
+        { slug: "123Invalid" },
+        patterns,
+        "/posts/:slug<[a-z][a-z0-9-]*>",
+      );
+    }).toThrow("expected to match '[a-z][a-z0-9-]*'");
+  });
 });

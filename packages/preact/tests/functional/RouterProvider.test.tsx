@@ -1,4 +1,6 @@
-import { act, renderHook, screen } from "@testing-library/preact";
+import { browserPluginFactory } from "@real-router/browser-plugin";
+import { createRouter } from "@real-router/core";
+import { act, render, renderHook, screen } from "@testing-library/preact";
 import { useContext } from "preact/hooks";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
@@ -8,7 +10,7 @@ import { RouteContext, RouterContext } from "../../src/context";
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
 import type { Router } from "@real-router/core";
-import type { ComponentChildren } from "preact";
+import type { ComponentChildren, FunctionComponent } from "preact";
 
 describe("RouterProvider component", () => {
   let router: Router;
@@ -121,5 +123,54 @@ describe("RouterProvider component", () => {
     unmount();
 
     expect(unsubscribeSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("should resubscribe when router instance changes", async () => {
+    const router1 = createRouter(
+      [
+        { name: "home", path: "/" },
+        { name: "about", path: "/about" },
+      ],
+      { defaultRoute: "home" },
+    );
+
+    router1.usePlugin(browserPluginFactory({}));
+    await router1.start("/");
+
+    const router2 = createRouter(
+      [
+        { name: "dashboard", path: "/" },
+        { name: "settings", path: "/settings" },
+      ],
+      { defaultRoute: "dashboard" },
+    );
+
+    router2.usePlugin(browserPluginFactory({}));
+    await router2.start("/");
+
+    const TestChild: FunctionComponent = () => {
+      const routeCtx = useContext(RouteContext);
+
+      return <div data-testid="route-name">{routeCtx?.route?.name}</div>;
+    };
+
+    const { rerender } = render(
+      <RouterProvider router={router1}>
+        <TestChild />
+      </RouterProvider>,
+    );
+
+    expect(screen.getByTestId("route-name")).toHaveTextContent("home");
+
+    rerender(
+      <RouterProvider router={router2}>
+        <TestChild />
+      </RouterProvider>,
+    );
+
+    expect(screen.getByTestId("route-name")).toHaveTextContent("dashboard");
+
+    router1.stop();
+    router2.stop();
   });
 });

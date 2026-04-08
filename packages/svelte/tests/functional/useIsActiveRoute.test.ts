@@ -102,6 +102,60 @@ describe("useIsActiveRoute", () => {
     expect(result.current).toBe(true);
   });
 
+  it("should distinguish routes by query params when ignoreQueryParams is false", async () => {
+    // Navigate to items.item with query param
+    await router.navigate("items.item", { id: "6", page: "1" });
+    flushSync();
+
+    let result: any;
+
+    renderWithRouter(router, ActiveRouteCapture, {
+      routeName: "items.item",
+      routeParams: { id: "6", page: "1" },
+      strict: true,
+      ignoreQueryParams: false,
+      onCapture: (r: unknown) => {
+        result = r;
+      },
+    });
+
+    // Exact match with same query params — should be active
+    expect(result.current).toBe(true);
+
+    // Navigate to the same route but different query params
+    await router.navigate("items.item", { id: "6", page: "2" });
+    flushSync();
+
+    // With ignoreQueryParams=false, different query params → NOT active
+    expect(result.current).toBe(false);
+  });
+
+  it("should ignore query params by default (ignoreQueryParams=true)", async () => {
+    // Navigate to items.item with query param
+    await router.navigate("items.item", { id: "6", page: "1" });
+    flushSync();
+
+    let result: any;
+
+    renderWithRouter(router, ActiveRouteCapture, {
+      routeName: "items.item",
+      routeParams: { id: "6" },
+      ignoreQueryParams: true,
+      onCapture: (r: unknown) => {
+        result = r;
+      },
+    });
+
+    expect(result.current).toBe(true);
+
+    // Navigate to the same route with different query params
+    await router.navigate("items.item", { id: "6", page: "2" });
+    flushSync();
+
+    // With ignoreQueryParams=true, different query params → still active
+    expect(result.current).toBe(true);
+  });
+
   it("should correctly check parent route with nested active route", async () => {
     getRoutesApi(router).add([
       {

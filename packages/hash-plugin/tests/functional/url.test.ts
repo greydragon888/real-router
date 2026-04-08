@@ -164,6 +164,46 @@ describe("Hash Plugin — URL Operations", () => {
     });
   });
 
+  describe("URL Encoding Edge Cases", () => {
+    beforeEach(() => {
+      router.usePlugin(hashPluginFactory({}, mockedBrowser));
+    });
+
+    it("handles spaces in route params (%20)", () => {
+      const url = router.buildUrl("users.view", { id: "John Doe" });
+      const state = router.matchUrl(`https://example.com${url}`);
+
+      expect(state).toBeDefined();
+      expect(state!.params.id).toBe("John Doe");
+    });
+
+    it("handles double-encoded params (%2520)", () => {
+      // Input is literal "hello%20world" — route-node treats input as literal text
+      const url = router.buildUrl("users.view", { id: "hello%20world" });
+      const state = router.matchUrl(`https://example.com${url}`);
+
+      expect(state).toBeDefined();
+      // The input is treated as literal text, so double-encoding occurs
+      expect(state!.params.id).toBe("hello%20world");
+    });
+
+    it("handles special characters in params (@, +, =)", () => {
+      const testCases = [
+        { id: "user@domain.com", label: "@" },
+        { id: "a+b", label: "+" },
+        { id: "key=value", label: "=" },
+      ];
+
+      for (const { id } of testCases) {
+        const url = router.buildUrl("users.view", { id });
+        const state = router.matchUrl(`https://example.com${url}`);
+
+        expect(state).toBeDefined();
+        expect(state!.params.id).toBe(id);
+      }
+    });
+  });
+
   describe("Base Path Normalization", () => {
     it("normalizes base without leading slash", () => {
       router.usePlugin(hashPluginFactory({ base: "app" }, mockedBrowser));

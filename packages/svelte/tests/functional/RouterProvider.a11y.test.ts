@@ -58,6 +58,19 @@ describe("RouterProvider — announceNavigation", () => {
     );
   });
 
+  it("announcer has aria-live='assertive' and aria-atomic='true'", () => {
+    render(RouterProviderAnnounceTest, {
+      props: { router, announceNavigation: true },
+    });
+    flushSync();
+
+    const announcer = document.querySelector(ANNOUNCER_SEL);
+
+    expect(announcer).not.toBeNull();
+    expect(announcer?.getAttribute("aria-live")).toBe("assertive");
+    expect(announcer?.getAttribute("aria-atomic")).toBe("true");
+  });
+
   it("cleanup on unmount — announcer element removed from DOM", () => {
     const { unmount } = render(RouterProviderAnnounceTest, {
       props: { router, announceNavigation: true },

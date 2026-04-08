@@ -18,7 +18,7 @@ import {
   noop,
 } from "../helpers/testUtils";
 
-import type { Router, Unsubscribe } from "@real-router/core";
+import type { Router, State, Unsubscribe } from "@real-router/core";
 import type { Browser } from "browser-env";
 
 let router: Router;
@@ -457,6 +457,193 @@ describe("Browser Plugin — URL", () => {
       const url = router.buildUrl("users.view", { id: simpleParam });
 
       expect(url).toContain("user123");
+    });
+  });
+
+  describe("Hash Preservation Through Navigation", () => {
+    beforeEach(async () => {
+      router.usePlugin(browserPluginFactory({}, mockedBrowser));
+    });
+
+    it("preserves hash when reloading the same route (path unchanged)", async () => {
+      await router.start("/home");
+
+      const replaceStateSpy = vi.spyOn(mockedBrowser, "replaceState");
+
+      // Simulate hash being set on the current location
+      globalThis.history.replaceState(
+        globalThis.history.state,
+        "",
+        "/home#section",
+      );
+
+      // Reload same route — path stays the same, hash should be preserved
+      await router.navigate("home", {}, { reload: true });
+
+      // shouldPreserveHash: fromState.path === toState.path → true
+      expect(replaceStateSpy).toHaveBeenCalled();
+
+      const lastUrl = replaceStateSpy.mock.calls.at(-1)?.[1];
+
+      expect(lastUrl).toContain("#section");
+    });
+
+    it("clears hash when navigating to a different route (path changed)", async () => {
+      await router.start("/home");
+
+      const pushStateSpy = vi.spyOn(mockedBrowser, "pushState");
+
+      // Simulate hash on current location
+      globalThis.history.replaceState(
+        globalThis.history.state,
+        "",
+        "/home#section",
+      );
+
+      // Navigate to a different route (different path)
+      await router.navigate("users.list");
+
+      // shouldPreserveHash: fromState.path !== toState.path → false
+      expect(pushStateSpy).toHaveBeenCalled();
+
+      const lastUrl = pushStateSpy.mock.calls.at(-1)?.[1];
+
+      expect(lastUrl).not.toContain("#section");
+    });
+
+    it("clears hash when navigating to same route name with different path", async () => {
+      await router.start("/users/view/1");
+
+      const pushStateSpy = vi.spyOn(mockedBrowser, "pushState");
+
+      // Simulate hash on current location
+      globalThis.history.replaceState(
+        globalThis.history.state,
+        "",
+        "/users/view/1#section",
+      );
+
+      // Navigate to same route but different param → different path
+      await router.navigate("users.view", { id: "2" });
+
+      // Path changed (/users/view/1 → /users/view/2), hash should be cleared
+      expect(pushStateSpy).toHaveBeenCalled();
+
+      const lastUrl = pushStateSpy.mock.calls.at(-1)?.[1];
+
+      expect(lastUrl).not.toContain("#section");
+    });
+  });
+
+  describe("State persistence through History API", () => {
+    let currentHistoryState: State | undefined;
+
+    beforeEach(async () => {
+      mockedBrowser = createMockedBrowser((state) => {
+        currentHistoryState = state;
+      });
+      currentHistoryState = undefined;
+      router.usePlugin(browserPluginFactory({}, mockedBrowser));
+    });
+
+    it("persists name, params, and path through pushState", async () => {
+      await router.start("/home");
+
+      await router.navigate("users.view", { id: "42" });
+
+      // history.state should contain the core state fields
+      expect(currentHistoryState).toBeDefined();
+      expect(currentHistoryState!.name).toBe("users.view");
+      expect(currentHistoryState!.params).toStrictEqual({ id: "42" });
+      expect(currentHistoryState!.path).toBe("/users/view/42");
+    });
+
+    it("updates history.state on each navigation", async () => {
+      await router.start("/home");
+
+      await router.navigate("users.list");
+
+      expect(currentHistoryState!.name).toBe("users.list");
+      expect(currentHistoryState!.path).toBe("/users/list");
+
+      await router.navigate("users.view", { id: "99" });
+
+      expect(currentHistoryState!.name).toBe("users.view");
+      expect(currentHistoryState!.params.id).toBe("99");
+      expect(currentHistoryState!.path).toBe("/users/view/99");
+    });
+  });
+
+  describe("Nested Parameterized Routes", () => {
+    it("buildUrl and matchUrl with /users/:userId/posts/:postId", () => {
+      const nestedConfig = [
+        {
+          name: "users",
+          path: "/users/:userId",
+          children: [
+            {
+              name: "posts",
+              path: "/posts/:postId",
+            },
+          ],
+        },
+        { name: "home", path: "/home" },
+      ];
+      const nestedRouter = createRouter(nestedConfig, {
+        defaultRoute: "home",
+      });
+
+      nestedRouter.usePlugin(browserPluginFactory({}, mockedBrowser));
+
+      const url = nestedRouter.buildUrl("users.posts", {
+        userId: "42",
+        postId: "99",
+      });
+
+      expect(url).toBe("/users/42/posts/99");
+
+      const state = nestedRouter.matchUrl(
+        "https://example.com/users/42/posts/99",
+      );
+
+      expect(state).toBeDefined();
+      expect(state?.name).toBe("users.posts");
+      expect(state?.params).toStrictEqual({ userId: "42", postId: "99" });
+    });
+
+    it("navigate with two params and verify both in state", async () => {
+      const nestedConfig = [
+        {
+          name: "users",
+          path: "/users/:userId",
+          children: [
+            {
+              name: "posts",
+              path: "/posts/:postId",
+            },
+          ],
+        },
+        { name: "home", path: "/home" },
+      ];
+      const nestedRouter = createRouter(nestedConfig, {
+        defaultRoute: "home",
+      });
+
+      nestedRouter.usePlugin(browserPluginFactory({}, mockedBrowser));
+      await nestedRouter.start("/home");
+
+      await nestedRouter.navigate("users.posts", {
+        userId: "42",
+        postId: "99",
+      });
+
+      const state = nestedRouter.getState();
+
+      expect(state?.name).toBe("users.posts");
+      expect(state?.params.userId).toBe("42");
+      expect(state?.params.postId).toBe("99");
+
+      nestedRouter.stop();
     });
   });
 

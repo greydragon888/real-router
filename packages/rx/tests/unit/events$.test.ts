@@ -182,6 +182,59 @@ describe("events$()", () => {
     expect(events[0].type).toBe("TRANSITION_LEAVE_APPROVE");
   });
 
+  it("should emit TRANSITION_ERROR event when navigation fails", async () => {
+    const events: RouterEvent[] = [];
+
+    await router.start("/");
+
+    events$(router).subscribe({
+      next: (event) => events.push(event),
+    });
+
+    try {
+      await router.navigate("nonexistent.route");
+    } catch {
+      // Expected: ROUTE_NOT_FOUND error
+    }
+
+    const errorEvent = events.find(
+      (event) => event.type === "TRANSITION_ERROR",
+    );
+
+    expect(errorEvent).toBeDefined();
+    expect(errorEvent?.type).toBe("TRANSITION_ERROR");
+    expect(
+      errorEvent?.type === "TRANSITION_ERROR" ? errorEvent.error.code : null,
+    ).toBe("ROUTE_NOT_FOUND");
+  });
+
+  it("should emit TRANSITION_ERROR with correct fromState", async () => {
+    const events: RouterEvent[] = [];
+
+    await router.start("/");
+
+    events$(router).subscribe({
+      next: (event) => events.push(event),
+    });
+
+    try {
+      await router.navigate("nonexistent.route");
+    } catch {
+      // Expected: ROUTE_NOT_FOUND error
+    }
+
+    const errorEvent = events.find(
+      (event) => event.type === "TRANSITION_ERROR",
+    );
+
+    expect(errorEvent).toBeDefined();
+    expect(
+      errorEvent?.type === "TRANSITION_ERROR" && errorEvent.fromState
+        ? errorEvent.fromState.name
+        : null,
+    ).toBe("home");
+  });
+
   it("should emit ROUTER_STOP event on router stop", async () => {
     const events: RouterEvent[] = [];
 

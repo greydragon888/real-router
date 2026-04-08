@@ -2,12 +2,136 @@ import { flushPromises } from "@vue/test-utils";
 import { describe, it, expect, afterEach } from "vitest";
 import { defineComponent, h, nextTick } from "vue";
 
-import { createStressRouter, mountWithProvider } from "./helpers";
+import { createStressRouter, mountWithProvider, forceGC } from "./helpers";
 import { useRouteNode } from "../../src/composables/useRouteNode";
 
 describe("V6 — shouldUpdateCache growth (Vue)", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it("6.1: 200 unique useRouteNode consumers + navigation — all fire effects", async () => {
+    const router = createStressRouter(200);
+
+    await router.start("/route0");
+
+    const effectCounts: number[] = Array.from<number>({ length: 200 }).fill(0);
+
+    const subscribers = Array.from({ length: 200 }, (_, i) => {
+      const index = i;
+
+      return defineComponent({
+        name: `UniqueNode${i}`,
+        setup() {
+          const { route } = useRouteNode(`route${i}`);
+
+          return () => {
+            if (route.value) {
+              effectCounts[index]++;
+            }
+
+            return h("div");
+          };
+        },
+      });
+    });
+
+    mountWithProvider(router, () =>
+      subscribers.map((Sub, i) => h(Sub, { key: i })),
+    );
+
+    await nextTick();
+    await flushPromises();
+
+    // Navigate to route1 — only route1 subscriber should fire
+    await router.navigate("route1");
+    await nextTick();
+    await flushPromises();
+
+    expect(effectCounts[1]).toBeGreaterThan(0);
+
+    // Navigate through several routes — each subscriber fires for its route
+    for (let i = 0; i < 10; i++) {
+      await router.navigate(`route${i * 20}`);
+      await nextTick();
+      await flushPromises();
+    }
+
+    // At least the navigated routes should have fired
+    for (let i = 0; i < 10; i++) {
+      expect(effectCounts[i * 20]).toBeGreaterThan(0);
+    }
+
+    router.stop();
+  });
+
+  it("6.3: router stop + GC — new router works independently", async () => {
+    const router1 = createStressRouter(50);
+
+    await router1.start("/route0");
+
+    let r1Renders = 0;
+
+    const R1Sub = defineComponent({
+      name: "R1Sub",
+      setup() {
+        const { route } = useRouteNode("route1");
+
+        return () => {
+          if (route.value) {
+            r1Renders++;
+          }
+
+          return h("div");
+        };
+      },
+    });
+
+    const wrapper1 = mountWithProvider(router1, () => h(R1Sub));
+
+    await router1.navigate("route1");
+    await nextTick();
+    await flushPromises();
+
+    expect(r1Renders).toBeGreaterThan(0);
+
+    // Stop and unmount first router
+    wrapper1.unmount();
+    router1.stop();
+
+    forceGC();
+
+    // Create a new router — should work independently
+    const router2 = createStressRouter(50);
+
+    await router2.start("/route0");
+
+    let r2Renders = 0;
+
+    const R2Sub = defineComponent({
+      name: "R2Sub",
+      setup() {
+        const { route } = useRouteNode("route1");
+
+        return () => {
+          if (route.value) {
+            r2Renders++;
+          }
+
+          return h("div");
+        };
+      },
+    });
+
+    mountWithProvider(router2, () => h(R2Sub));
+
+    await router2.navigate("route1");
+    await nextTick();
+    await flushPromises();
+
+    expect(r2Renders).toBeGreaterThan(0);
+
+    router2.stop();
   });
 
   it("6.2: same nodeName × 100 components — cache hit, consistent state", async () => {

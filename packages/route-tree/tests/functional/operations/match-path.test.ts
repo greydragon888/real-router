@@ -22,7 +22,7 @@ describe("New API - matchPath", () => {
   });
 
   it("should normalize empty path to /", () => {
-    // Tests line 111 - empty path normalization
+    // Empty path is normalized to "/" for matching
     const tree = createRouteTree("", "", [{ name: "root", path: "/" }]);
 
     const result = matchPath(tree, "");
@@ -31,7 +31,7 @@ describe("New API - matchPath", () => {
   });
 
   it("should match route with slash child", () => {
-    // Tests lines 132-133, 183 - findSlashChild and pushing slash child
+    // Slash child is found and included in match result
     const tree = createRouteTree("", "", [
       {
         name: "section",
@@ -170,7 +170,7 @@ describe("New API - matchPath", () => {
 
   it("should use DEFAULT_CONFIG when only trailingSlashMode is set", () => {
     // trailingSlashMode doesn't affect matchPath, so we use DEFAULT_CONFIG
-    // This tests the second fast path in getMatchConfig (line 222)
+    // trailingSlashMode doesn't affect matchPath, uses DEFAULT_CONFIG fast path
     const tree = createRouteTree("", "", [{ name: "about", path: "/about" }]);
 
     const result = matchPath(tree, "/about", { trailingSlashMode: "always" });
@@ -218,7 +218,7 @@ describe("New API - matchPath", () => {
   });
 
   it("should use cached config for caseSensitive=true + strictTrailingSlash=true", () => {
-    // Tests getFullTestOptions: caseSensitive=true, strictTrailingSlash=true (line 571)
+    // getFullTestOptions: caseSensitive=true, strictTrailingSlash=true branch
     const tree = createRouteTree("", "", [{ name: "about", path: "/about" }]);
 
     const result = matchPath(tree, "/about", {
@@ -229,7 +229,7 @@ describe("New API - matchPath", () => {
   });
 
   it("should use cached config for caseSensitive=false + strictTrailingSlash=true", () => {
-    // Tests getFullTestOptions: caseSensitive=false, strictTrailingSlash=true (line 576)
+    // getFullTestOptions: caseSensitive=false, strictTrailingSlash=true branch
     const tree = createRouteTree("", "", [{ name: "about", path: "/about" }]);
 
     const result = matchPath(tree, "/about", {
@@ -240,7 +240,7 @@ describe("New API - matchPath", () => {
   });
 
   it("should use cached config for caseSensitive=false + strongMatching=false", () => {
-    // Tests getPartialTestOptions: caseSensitive=false, strongMatching=false (line 595)
+    // getPartialTestOptions: caseSensitive=false, strongMatching=false branch
     const tree = createRouteTree("", "", [
       { name: "users", path: "/users/:id" },
     ]);

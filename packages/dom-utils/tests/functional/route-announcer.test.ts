@@ -513,7 +513,34 @@ describe("createRouteAnnouncer", () => {
     router.stop();
   });
 
-  it("23 — re-announces same text after auto-clear timeout resets lastAnnouncedText", async () => {
+  it("23 — multiple h1 elements: announcer uses the first one", async () => {
+    const router = makeRouter();
+    const ann = setupAnnouncer(router);
+
+    await router.start("/");
+    vi.advanceTimersByTime(100);
+
+    const h1First = document.createElement("h1");
+
+    h1First.textContent = "First Heading";
+    document.body.append(h1First);
+
+    const h1Second = document.createElement("h1");
+
+    h1Second.textContent = "Second Heading";
+    document.body.append(h1Second);
+
+    await router.navigate("about");
+
+    expect(getAnnouncerElement()?.textContent).toBe(
+      "Navigated to First Heading",
+    );
+
+    ann.destroy();
+    router.stop();
+  });
+
+  it("24 — re-announces same text after auto-clear timeout resets lastAnnouncedText", async () => {
     const router = makeRouter();
     const ann = setupAnnouncer(router);
 

@@ -22,6 +22,12 @@ describe("normalizeBase", () => {
   it("returns already-normalized base unchanged", () => {
     expect(normalizeBase("/app")).toBe("/app");
   });
+
+  it("handles consecutive slashes (only removes trailing slash)", () => {
+    // normalizeBase does not collapse interior slashes —
+    // it only ensures leading slash and removes one trailing slash
+    expect(normalizeBase("//app//")).toBe("//app/");
+  });
 });
 
 describe("safelyEncodePath", () => {
@@ -49,5 +55,11 @@ describe("safelyEncodePath", () => {
     expect(result).toBe(malformed);
     expect(warnSpy).toHaveBeenCalledTimes(1);
     expect(warnSpy.mock.calls[0][0]).toContain(malformed);
+  });
+
+  it("preserves query string and hash fragment", () => {
+    expect(safelyEncodePath("/users?q=hello&page=1#section")).toBe(
+      "/users?q=hello&page=1#section",
+    );
   });
 });

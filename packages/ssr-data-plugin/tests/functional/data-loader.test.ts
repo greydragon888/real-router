@@ -177,6 +177,129 @@ describe("@real-router/ssr-data-plugin", () => {
     });
   });
 
+  describe("Loader rejection", () => {
+    it("should propagate loader promise rejection through start()", async () => {
+      const loader = vi.fn().mockRejectedValue(new Error("load failed"));
+
+      router.usePlugin(ssrDataPluginFactory({ home: loader }));
+
+      await expect(router.start("/")).rejects.toThrow("load failed");
+    });
+  });
+
+  describe("getRouteData with explicit state argument", () => {
+    it("should return correct data when called with explicit state", async () => {
+      router.usePlugin(
+        ssrDataPluginFactory({
+          home: () => Promise.resolve({ page: "home-data" }),
+        }),
+      );
+      await router.start("/");
+
+      const state = router.getState();
+      const dataWithState = router.getRouteData(state);
+      const dataWithoutState = router.getRouteData();
+
+      expect(dataWithState).toStrictEqual({ page: "home-data" });
+      expect(dataWithState).toStrictEqual(dataWithoutState);
+    });
+  });
+
+  describe("Teardown removes start interceptor", () => {
+    it("should not call loader after unsubscribe on subsequent start()", async () => {
+      const loader = vi.fn().mockResolvedValue("data");
+
+      const unsubscribe = router.usePlugin(
+        ssrDataPluginFactory({ home: loader }),
+      );
+
+      await router.start("/");
+
+      expect(loader).toHaveBeenCalledTimes(1);
+
+      router.stop();
+      unsubscribe();
+      loader.mockClear();
+
+      // Re-create router since start() can only be called once
+      const freshRouter = createRouter(routes, { defaultRoute: "home" });
+
+      await freshRouter.start("/");
+
+      expect(loader).not.toHaveBeenCalled();
+
+      freshRouter.stop();
+    });
+  });
+
+  describe("Data type variations", () => {
+    it("should handle string data", async () => {
+      router.usePlugin(
+        ssrDataPluginFactory({ home: () => Promise.resolve("hello") }),
+      );
+      await router.start("/");
+
+      expect(router.getRouteData()).toBe("hello");
+    });
+
+    it("should handle number data", async () => {
+      router.usePlugin(
+        ssrDataPluginFactory({ home: () => Promise.resolve(42) }),
+      );
+      await router.start("/");
+
+      expect(router.getRouteData()).toBe(42);
+    });
+
+    it("should handle null data", async () => {
+      router.usePlugin(
+        ssrDataPluginFactory({ home: () => Promise.resolve(null) }),
+      );
+      await router.start("/");
+
+      // null is stored in WeakMap, so getRouteData returns null
+      // (indistinguishable from "no data" — but the loader was called)
+      expect(router.getRouteData()).toBeNull();
+    });
+
+    it("should handle array data", async () => {
+      router.usePlugin(
+        ssrDataPluginFactory({
+          home: () => Promise.resolve([1, "two", { three: 3 }]),
+        }),
+      );
+      await router.start("/");
+
+      expect(router.getRouteData()).toStrictEqual([1, "two", { three: 3 }]);
+    });
+
+    it("should handle nested object data", async () => {
+      const nested = { a: { b: { c: [1, 2] } }, d: null };
+
+      router.usePlugin(
+        ssrDataPluginFactory({ home: () => Promise.resolve(nested) }),
+      );
+      await router.start("/");
+
+      expect(router.getRouteData()).toStrictEqual(nested);
+    });
+  });
+
+  describe("Prototype pollution safety", () => {
+    it("should not match keys inherited from prototype", async () => {
+      // Object.hasOwn guards against prototype chain lookups
+      const proto = { home: vi.fn().mockResolvedValue("hacked") };
+      const loaders = Object.create(proto) as DataLoaderMap;
+
+      // "home" exists on prototype but NOT as own property
+      router.usePlugin(ssrDataPluginFactory(loaders));
+      await router.start("/");
+
+      expect(proto.home).not.toHaveBeenCalled();
+      expect(router.getRouteData()).toBeNull();
+    });
+  });
+
   describe("Stress", () => {
     it("handles concurrent clone+start+dispose cycles with per-request isolation", async () => {
       const N = 500;

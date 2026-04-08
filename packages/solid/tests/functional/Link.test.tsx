@@ -370,6 +370,31 @@ describe("Link component", () => {
     });
   });
 
+  it("should navigate on keyboard Enter key", async () => {
+    vi.spyOn(router, "navigate").mockResolvedValue({} as never);
+
+    render(
+      () => (
+        <Link routeName="one-more-test" data-testid="link">
+          Test
+        </Link>
+      ),
+      { wrapper },
+    );
+
+    const link = screen.getByTestId("link");
+
+    // Simulate pressing Enter on the link — browsers fire click on Enter for <a>
+    fireEvent.keyDown(link, { key: "Enter" });
+    fireEvent.click(link, { bubbles: true, cancelable: true });
+
+    expect(router.navigate).toHaveBeenCalledWith(
+      "one-more-test",
+      expect.any(Object),
+      expect.any(Object),
+    );
+  });
+
   it("should render without href and log error for invalid routeName", () => {
     const consoleError = vi
       .spyOn(console, "error")

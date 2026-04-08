@@ -472,6 +472,56 @@ describe("RouteView", () => {
     });
   });
 
+  describe("Deep nesting", () => {
+    it("should render 3-level deep nested RouteView", async () => {
+      const deepRouter = createRouter(
+        [
+          {
+            name: "users",
+            path: "/users",
+            children: [
+              {
+                name: "profile",
+                path: "/profile",
+                children: [{ name: "settings", path: "/settings" }],
+              },
+            ],
+          },
+        ],
+        { defaultRoute: "users" },
+      );
+
+      deepRouter.usePlugin(browserPluginFactory({}));
+      await deepRouter.start("/users/profile/settings");
+
+      render(
+        <RouterProvider router={deepRouter}>
+          <RouteView nodeName="">
+            <RouteView.Match segment="users">
+              <div data-testid="level-1">Users</div>
+              <RouteView nodeName="users">
+                <RouteView.Match segment="profile">
+                  <div data-testid="level-2">Profile</div>
+                  <RouteView nodeName="users.profile">
+                    <RouteView.Match segment="settings">
+                      <div data-testid="level-3">Settings</div>
+                    </RouteView.Match>
+                  </RouteView>
+                </RouteView.Match>
+              </RouteView>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      expect(screen.getByTestId("level-1")).toBeInTheDocument();
+      expect(screen.getByTestId("level-2")).toBeInTheDocument();
+      expect(screen.getByTestId("level-3")).toBeInTheDocument();
+
+      deepRouter.stop();
+    });
+  });
+
   describe("Suspense fallback", () => {
     it("should wrap children in Suspense when fallback is provided", async () => {
       const { lazy } = await import("preact/compat");

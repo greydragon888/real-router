@@ -1,4 +1,5 @@
 import { getRoutesApi } from "@real-router/core/api";
+import { createRouteNodeSource } from "@real-router/sources";
 import { renderHook, act } from "@testing-library/react";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
@@ -638,6 +639,43 @@ describe("useRouteNode", () => {
         route: undefined,
         previousRoute: "users.edit",
       });
+    });
+  });
+
+  describe("SSR snapshot", () => {
+    it("should return same value from getServerSnapshot as getSnapshot when router is not started", () => {
+      // createRouteNodeSource returns a source where getSnapshot is used as both
+      // getSnapshot and getServerSnapshot (third arg to useSyncExternalStore).
+      // When the router is not started, both must return the same value —
+      // otherwise React throws a hydration mismatch error.
+      const source = createRouteNodeSource(router, "");
+
+      const clientSnapshot = source.getSnapshot();
+      // The hook passes store.getSnapshot as the third argument (getServerSnapshot)
+      // so they are the same function reference. Verify the value is consistent.
+      const serverSnapshot = source.getSnapshot();
+
+      expect(serverSnapshot).toBe(clientSnapshot);
+      expect(serverSnapshot.route).toBeUndefined();
+      expect(serverSnapshot.previousRoute).toBeUndefined();
+
+      source.destroy();
+    });
+
+    it("should return same value from getServerSnapshot as getSnapshot after router starts", async () => {
+      await router.start();
+
+      const source = createRouteNodeSource(router, "");
+
+      const clientSnapshot = source.getSnapshot();
+      // The hook passes store.getSnapshot as getServerSnapshot (third arg),
+      // so they are the same function — verify the snapshot is referentially stable.
+      const serverSnapshot = source.getSnapshot();
+
+      expect(serverSnapshot).toBe(clientSnapshot);
+      expect(serverSnapshot.route).toBeDefined();
+
+      source.destroy();
     });
   });
 });

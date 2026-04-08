@@ -363,6 +363,33 @@ describe("RouterErrorBoundary", () => {
     );
   });
 
+  it("unsubscribes on unmount", async () => {
+    const lifecycle = getLifecycleApi(router);
+
+    lifecycle.addActivateGuard("dashboard", () => () => false);
+
+    const onError = vi.fn();
+
+    const wrapper = mountWithProvider(router, () =>
+      h(
+        RouterErrorBoundary,
+        {
+          fallback: (error: RouterError) =>
+            h("div", { "data-testid": "fallback" }, error.code),
+          onError,
+        },
+        { default: () => h("div", "App") },
+      ),
+    );
+
+    wrapper.unmount();
+
+    await router.navigate("dashboard").catch(() => {});
+    await flushPromises();
+
+    expect(onError).not.toHaveBeenCalled();
+  });
+
   it("resetError then same cached error", async () => {
     const wrapper = mountWithProvider(router, () =>
       h(

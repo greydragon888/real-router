@@ -823,6 +823,70 @@ describe("RouteView", () => {
       expect((restoredInput as HTMLInputElement).value).toBe("typed");
     });
 
+    it("should reset hasBeenActivatedRef on unmount/remount — keepAlive state is NOT preserved", async () => {
+      let renderCount = 0;
+
+      const StatefulComponent: FC = () => {
+        renderCount++;
+
+        return <div data-testid="stateful">Render #{renderCount}</div>;
+      };
+
+      await router.start("/users/list");
+
+      // Mount RouteView with keepAlive
+      const { unmount } = render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="users">
+            <RouteView.Match segment="list" keepAlive>
+              <StatefulComponent />
+            </RouteView.Match>
+            <RouteView.Match segment="view">
+              <div data-testid="view">View</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      expect(screen.getByTestId("stateful")).toBeVisible();
+
+      // Navigate away — keepAlive hides the component
+      await act(async () => {
+        await router.navigate("users.view", { id: "1" });
+      });
+
+      expect(screen.getByTestId("stateful")).not.toBeVisible();
+
+      // Unmount the entire RouteView tree
+      unmount();
+
+      // Navigate to a different segment for later test
+      await act(async () => {
+        await router.navigate("users.view", { id: "2" });
+      });
+
+      renderCount = 0;
+
+      // Remount RouteView — hasBeenActivatedRef is a fresh Set
+      render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="users">
+            <RouteView.Match segment="list" keepAlive>
+              <StatefulComponent />
+            </RouteView.Match>
+            <RouteView.Match segment="view">
+              <div data-testid="view">View</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      // We're on "users.view", so "list" keepAlive was never activated in this mount
+      // — it should NOT be rendered (not even hidden)
+      expect(screen.queryByTestId("stateful")).not.toBeInTheDocument();
+      expect(screen.getByTestId("view")).toBeVisible();
+    });
+
     it("should work with multiple RouteView at same level independently", async () => {
       await router.start("/users/list");
 
@@ -861,6 +925,56 @@ describe("RouteView", () => {
     });
   });
 
+  describe("Deep nesting", () => {
+    it("should render 3-level deep nested RouteView", async () => {
+      const deepRouter = createRouter(
+        [
+          {
+            name: "users",
+            path: "/users",
+            children: [
+              {
+                name: "profile",
+                path: "/profile",
+                children: [{ name: "settings", path: "/settings" }],
+              },
+            ],
+          },
+        ],
+        { defaultRoute: "users" },
+      );
+
+      deepRouter.usePlugin(browserPluginFactory({}));
+      await deepRouter.start("/users/profile/settings");
+
+      render(
+        <RouterProvider router={deepRouter}>
+          <RouteView nodeName="">
+            <RouteView.Match segment="users">
+              <div data-testid="level-1">Users</div>
+              <RouteView nodeName="users">
+                <RouteView.Match segment="profile">
+                  <div data-testid="level-2">Profile</div>
+                  <RouteView nodeName="users.profile">
+                    <RouteView.Match segment="settings">
+                      <div data-testid="level-3">Settings</div>
+                    </RouteView.Match>
+                  </RouteView>
+                </RouteView.Match>
+              </RouteView>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      expect(screen.getByTestId("level-1")).toBeInTheDocument();
+      expect(screen.getByTestId("level-2")).toBeInTheDocument();
+      expect(screen.getByTestId("level-3")).toBeInTheDocument();
+
+      deepRouter.stop();
+    });
+  });
+
   describe("Suspense fallback", () => {
     it("should wrap children in Suspense when fallback is provided", async () => {
       const LazyComponent = lazy(() =>
@@ -885,6 +999,55 @@ describe("RouteView", () => {
       );
 
       expect(screen.getByTestId("fallback")).toBeInTheDocument();
+    });
+
+    it("should wrap children in Suspense inside Activity when both keepAlive and fallback are provided", async () => {
+      const LazyComponent = lazy(() =>
+        Promise.resolve({
+          default: () => <div data-testid="lazy-keep">Lazy Keep</div>,
+        }),
+      );
+
+      await router.start("/users/list");
+
+      render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="users">
+            <RouteView.Match
+              segment="list"
+              keepAlive
+              fallback={<div data-testid="spinner">Loading...</div>}
+            >
+              <LazyComponent />
+            </RouteView.Match>
+            <RouteView.Match segment="view">
+              <div data-testid="view">View</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      // Initially shows fallback inside Activity while lazy loads
+      expect(screen.getByTestId("spinner")).toBeInTheDocument();
+
+      // After lazy resolves, content is shown
+      await expect(screen.findByTestId("lazy-keep")).resolves.toBeVisible();
+
+      // Navigate away — content is hidden via Activity
+      await act(async () => {
+        await router.navigate("users.view", { id: "1" });
+      });
+
+      expect(screen.getByTestId("lazy-keep")).toBeInTheDocument();
+      expect(screen.getByTestId("lazy-keep")).not.toBeVisible();
+      expect(screen.getByTestId("view")).toBeVisible();
+
+      // Navigate back — content is visible again (preserved)
+      await act(async () => {
+        await router.navigate("users.list");
+      });
+
+      expect(screen.getByTestId("lazy-keep")).toBeVisible();
     });
 
     it("should not wrap children in Suspense when fallback is not provided", async () => {

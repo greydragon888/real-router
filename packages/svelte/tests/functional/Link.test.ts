@@ -62,6 +62,21 @@ describe("Link component", () => {
       expect(link.classList.contains("active")).toBe(true);
     });
 
+    it("should apply default 'active' class when no activeClassName prop is provided", async () => {
+      renderWithRouter(router, Link, {
+        routeName: "one-more-test",
+      });
+
+      const link = document.querySelector("a")!;
+
+      expect(link.classList.contains("active")).toBe(false);
+
+      await userEvent.click(link);
+      flushSync();
+
+      expect(link.classList.contains("active")).toBe(true);
+    });
+
     it("should add active class based on activeStrict", async () => {
       await router.navigate("items.item", { id: 6 });
 

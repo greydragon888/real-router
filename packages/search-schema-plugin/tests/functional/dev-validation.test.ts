@@ -141,6 +141,15 @@ describe("Search schema plugin", () => {
       consoleSpy.mockRestore();
     });
 
+    /**
+     * Async schema asymmetry (by design):
+     * - Dev-time validation (usePlugin / add interceptor) silently skips async schemas
+     *   because it cannot block router startup with an await.
+     * - Runtime forwardState throws TypeError on async schemas because forwardState
+     *   is synchronous — a Promise return breaks the interceptor chain.
+     *
+     * See forwardState.test.ts "Async schema rejection" for the runtime counterpart.
+     */
     it("should silently skip async schema during defaultParams validation", () => {
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 

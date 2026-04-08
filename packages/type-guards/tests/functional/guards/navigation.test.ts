@@ -78,6 +78,16 @@ describe("Router Type Guards", () => {
       expect(isNavigationOptions({ signal: true } as any)).toBe(false);
     });
 
+    it("accepts object with unknown extra fields (only known fields are validated)", () => {
+      expect(isNavigationOptions({ replace: true, invalidField: 123 })).toBe(
+        true,
+      );
+      expect(
+        isNavigationOptions({ reload: false, extra: "string", count: 42 }),
+      ).toBe(true);
+      expect(isNavigationOptions({ unknownOnly: [1, 2, 3] })).toBe(true);
+    });
+
     it("validates all fields are optional", () => {
       // All fields undefined (absent)
       expect(isNavigationOptions({})).toBe(true);

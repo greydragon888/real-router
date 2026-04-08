@@ -1,4 +1,5 @@
 import { createRouter } from "@real-router/core";
+import { getLifecycleApi } from "@real-router/core/api";
 import { screen, render, act, fireEvent } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
@@ -397,11 +398,13 @@ describe("Link component", () => {
       expect(screen.getByTestId("link")).toHaveTextContent("Updated Text");
     });
 
-    it("should handle routeOptions updates", () => {
+    it("should handle routeOptions updates", async () => {
+      vi.spyOn(router, "navigate").mockResolvedValue({} as never);
+
       const { rerender } = render(
         <Link
           routeName="one-more-test"
-          routeOptions={{ reload: false }}
+          routeOptions={{ replace: true }}
           data-testid="link"
         >
           Test
@@ -410,6 +413,16 @@ describe("Link component", () => {
       );
 
       expect(screen.getByTestId("link")).toBeInTheDocument();
+
+      await user.click(screen.getByTestId("link"));
+
+      expect(router.navigate).toHaveBeenCalledWith(
+        "one-more-test",
+        expect.any(Object),
+        expect.objectContaining({ replace: true }),
+      );
+
+      vi.mocked(router.navigate).mockClear();
 
       rerender(
         <Link
@@ -421,7 +434,96 @@ describe("Link component", () => {
         </Link>,
       );
 
-      expect(screen.getByTestId("link")).toBeInTheDocument();
+      await user.click(screen.getByTestId("link"));
+
+      expect(router.navigate).toHaveBeenCalledWith(
+        "one-more-test",
+        expect.any(Object),
+        expect.objectContaining({ reload: true }),
+      );
+    });
+  });
+
+  describe("default activeClassName", () => {
+    it("should apply default 'active' class without explicit activeClassName prop", async () => {
+      render(
+        <Link routeName="one-more-test" data-testid="link">
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      expect(screen.getByTestId("link")).not.toHaveClass("active");
+
+      await user.click(screen.getByTestId("link"));
+
+      expect(router.getState()?.name).toStrictEqual("one-more-test");
+      expect(screen.getByTestId("link")).toHaveClass("active");
+    });
+  });
+
+  describe("event handlers", () => {
+    it("should call onMouseOver callback", () => {
+      const onMouseOverMock = vi.fn();
+
+      render(
+        <Link routeName="test" onMouseOver={onMouseOverMock} data-testid="link">
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      fireEvent.mouseOver(screen.getByTestId("link"));
+
+      expect(onMouseOverMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("aria attribute forwarding", () => {
+    it("should forward aria-label to the rendered anchor", () => {
+      render(
+        <Link routeName="test" aria-label="Go home" data-testid="link">
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      expect(screen.getByTestId("link")).toHaveAttribute(
+        "aria-label",
+        "Go home",
+      );
+    });
+  });
+
+  describe("navigation to blocked route", () => {
+    it("should not throw unhandled rejection when navigating to blocked route", async () => {
+      const lifecycle = getLifecycleApi(router);
+
+      lifecycle.addActivateGuard("home", () => () => false);
+
+      const unhandledRejection = vi.fn();
+
+      globalThis.addEventListener("unhandledrejection", unhandledRejection);
+
+      render(
+        <Link routeName="home" data-testid="link">
+          Go Home
+        </Link>,
+        { wrapper },
+      );
+
+      fireEvent.click(screen.getByTestId("link"));
+
+      // Give time for any unhandled rejection to surface
+      await act(async () => {
+        await new Promise((resolve) => {
+          setTimeout(resolve, 50);
+        });
+      });
+
+      expect(unhandledRejection).not.toHaveBeenCalled();
+
+      globalThis.removeEventListener("unhandledrejection", unhandledRejection);
     });
   });
 

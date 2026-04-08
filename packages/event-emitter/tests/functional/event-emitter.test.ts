@@ -681,6 +681,192 @@ describe("EventEmitter", () => {
   });
 
   // ===========================================================================
+  // onListenerError edge cases
+  // ===========================================================================
+
+  describe("onListenerError edge cases", () => {
+    it("should propagate error when onListenerError callback itself throws", () => {
+      const emitter = createEmitter({
+        onListenerError: () => {
+          throw new Error("error handler boom");
+        },
+      });
+
+      emitter.on("reset", () => {
+        throw new Error("listener boom");
+      });
+
+      expect(() => {
+        emitter.emit("reset");
+      }).toThrow("error handler boom");
+    });
+
+    it("should propagate error when onListenerError throws (single listener fast path)", () => {
+      const emitter = createEmitter({
+        onListenerError: () => {
+          throw new Error("error handler boom");
+        },
+      });
+
+      emitter.on("reset", () => {
+        throw new Error("listener boom");
+      });
+
+      // Single listener uses fast path (#emitFast with set.size === 1)
+      expect(emitter.listenerCount("reset")).toBe(1);
+      expect(() => {
+        emitter.emit("reset");
+      }).toThrow("error handler boom");
+    });
+
+    it("should propagate error when onListenerError throws with depth tracking", () => {
+      const emitter = createEmitter({
+        limits: { maxListeners: 0, warnListeners: 0, maxEventDepth: 5 },
+        onListenerError: () => {
+          throw new Error("error handler boom");
+        },
+      });
+
+      emitter.on("reset", () => {
+        throw new Error("listener boom");
+      });
+
+      expect(() => {
+        emitter.emit("reset");
+      }).toThrow("error handler boom");
+    });
+  });
+
+  // ===========================================================================
+  // warnListeners === maxListeners boundary
+  // ===========================================================================
+
+  describe("warnListeners === maxListeners boundary", () => {
+    it("should not warn when listener count equals maxListeners (at exact limit, no warning)", () => {
+      const onListenerWarn = vi.fn();
+      const emitter = createEmitter({
+        limits: { maxListeners: 3, warnListeners: 3, maxEventDepth: 0 },
+        onListenerWarn,
+      });
+
+      emitter.on("click", vi.fn()); // 1st — set.size was 0
+      emitter.on("click", vi.fn()); // 2nd — set.size was 1
+      emitter.on("click", vi.fn()); // 3rd — set.size was 2, warn fires (size === warnListeners)
+
+      // warn is called when set.size === warnListeners (i.e., when adding the (warnListeners+1)th)
+      // With warnListeners = 3, warn fires at 4th add, but maxListeners = 3 will throw at 4th
+      // So with limit 3 and warn 3, warn never fires before the limit check
+      expect(onListenerWarn).not.toHaveBeenCalled();
+    });
+
+    it("should warn at exact warnListeners boundary then throw at maxListeners", () => {
+      const onListenerWarn = vi.fn();
+      const emitter = createEmitter({
+        limits: { maxListeners: 4, warnListeners: 2, maxEventDepth: 0 },
+        onListenerWarn,
+      });
+
+      emitter.on("click", vi.fn()); // 1st — size was 0
+      emitter.on("click", vi.fn()); // 2nd — size was 1
+
+      expect(onListenerWarn).not.toHaveBeenCalled();
+
+      emitter.on("click", vi.fn()); // 3rd — size was 2 === warnListeners → warn fires
+
+      expect(onListenerWarn).toHaveBeenCalledTimes(1);
+      expect(onListenerWarn).toHaveBeenCalledWith("click", 2);
+
+      emitter.on("click", vi.fn()); // 4th — at maxListeners, but set.size was 3 !== warnListeners
+
+      expect(onListenerWarn).toHaveBeenCalledTimes(1); // still only 1 warn
+
+      // 5th — throws
+      expect(() => emitter.on("click", vi.fn())).toThrow("Listener limit");
+    });
+  });
+
+  // ===========================================================================
+  // setLimits() inside listener callback
+  // ===========================================================================
+
+  describe("setLimits() inside listener callback", () => {
+    it("should allow setLimits() to be called inside a listener callback", () => {
+      const emitter = createEmitter();
+
+      emitter.on("reset", () => {
+        emitter.setLimits({
+          maxListeners: 1,
+          warnListeners: 0,
+          maxEventDepth: 0,
+        });
+      });
+
+      emitter.emit("reset");
+
+      // After emit, limits are changed — new registration should throw
+      expect(() => {
+        emitter.on("click", vi.fn());
+        emitter.on("click", vi.fn());
+      }).toThrow("Listener limit");
+    });
+
+    it("should allow setLimits(maxEventDepth) inside listener with depth tracking enabled", () => {
+      const emitter = createEmitter({
+        limits: { maxListeners: 0, warnListeners: 0, maxEventDepth: 5 },
+      });
+
+      emitter.on("reset", () => {
+        emitter.setLimits({
+          maxListeners: 0,
+          warnListeners: 0,
+          maxEventDepth: 10,
+        });
+      });
+
+      // Should not throw — setLimits inside listener is fine
+      emitter.emit("reset");
+
+      expect(emitter.listenerCount("reset")).toBe(1);
+    });
+  });
+
+  // ===========================================================================
+  // clearAll() then re-add listeners up to max
+  // ===========================================================================
+
+  describe("clearAll() then re-add listeners", () => {
+    it("should allow re-adding listeners up to max after clearAll()", () => {
+      const emitter = createEmitter({
+        limits: { maxListeners: 2, warnListeners: 0, maxEventDepth: 0 },
+      });
+
+      emitter.on("click", vi.fn());
+      emitter.on("click", vi.fn());
+
+      expect(() => emitter.on("click", vi.fn())).toThrow("Listener limit");
+
+      emitter.clearAll();
+
+      // Should be able to add up to max again
+      const cb1 = vi.fn();
+      const cb2 = vi.fn();
+
+      emitter.on("click", cb1);
+      emitter.on("click", cb2);
+
+      expect(emitter.listenerCount("click")).toBe(2);
+
+      emitter.emit("click", 1, 2);
+
+      expect(cb1).toHaveBeenCalledWith(1, 2);
+      expect(cb2).toHaveBeenCalledWith(1, 2);
+
+      // 3rd should still throw
+      expect(() => emitter.on("click", vi.fn())).toThrow("Listener limit");
+    });
+  });
+
+  // ===========================================================================
   // validateCallback()
   // ===========================================================================
 

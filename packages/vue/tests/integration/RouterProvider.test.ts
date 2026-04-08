@@ -1,3 +1,5 @@
+import { browserPluginFactory } from "@real-router/browser-plugin";
+import { createRouter } from "@real-router/core";
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 import { defineComponent, h, inject } from "vue";
@@ -213,6 +215,85 @@ describe("RouterProvider - Integration Tests", () => {
       await flushPromises();
 
       expect(wrapper.find("[data-testid='route']").text()).toBe("about");
+    });
+  });
+
+  describe("Nested Provider Isolation", () => {
+    it("should isolate nested RouterProviders with different routers", async () => {
+      const router1 = createTestRouterWithADefaultRouter();
+      const router2Routes = [
+        { name: "alpha", path: "/alpha" },
+        { name: "beta", path: "/beta" },
+      ];
+      const router2 = createRouter(router2Routes, {
+        defaultRoute: "alpha",
+      });
+
+      router2.usePlugin(browserPluginFactory({}));
+
+      await router1.start("/");
+      await router2.start("/alpha");
+
+      let router2RenderCount = 0;
+
+      const Router2Consumer = defineComponent({
+        setup() {
+          const { route } = useRoute();
+
+          return () => {
+            router2RenderCount++;
+
+            return h(
+              "span",
+              { "data-testid": "r2-route" },
+              route.value?.name ?? "none",
+            );
+          };
+        },
+      });
+
+      const wrapper = mount(
+        defineComponent({
+          setup: () => () =>
+            h(
+              RouterProvider,
+              { router: router1 },
+              {
+                default: () =>
+                  h(
+                    RouterProvider,
+                    { router: router2 },
+                    {
+                      default: () => h(Router2Consumer),
+                    },
+                  ),
+              },
+            ),
+        }),
+      );
+
+      await flushPromises();
+
+      const countAfterMount = router2RenderCount;
+
+      expect(wrapper.find("[data-testid='r2-route']").text()).toBe("alpha");
+
+      // Navigate router1 — router2 consumers should NOT update
+      await router1.navigate("about");
+      await flushPromises();
+
+      expect(router2RenderCount).toBe(countAfterMount);
+      expect(wrapper.find("[data-testid='r2-route']").text()).toBe("alpha");
+
+      // Navigate router2 — router2 consumers should update
+      await router2.navigate("beta");
+      await flushPromises();
+
+      expect(router2RenderCount).toBeGreaterThan(countAfterMount);
+      expect(wrapper.find("[data-testid='r2-route']").text()).toBe("beta");
+
+      router1.stop();
+      router2.stop();
     });
   });
 

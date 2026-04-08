@@ -65,6 +65,44 @@ describe("v-link directive", () => {
         getDirectiveRouter();
       }).not.toThrow();
     });
+
+    it("should throw when v-link mounted without RouterProvider (no router set)", () => {
+      // Force _router to null to simulate missing RouterProvider
+      setDirectiveRouter(null as unknown as Router);
+
+      const element = document.createElement("div");
+      const binding = { value: { name: "home" } };
+
+      expect(() => {
+        (vLink as any).mounted!(element, binding as any);
+      }).toThrow(
+        "v-link directive requires a RouterProvider ancestor. Make sure RouterProvider is mounted.",
+      );
+
+      // Restore router for other tests
+      setDirectiveRouter(router);
+    });
+
+    it("should throw when v-link updated without RouterProvider (no router set)", () => {
+      // First mount with a valid router
+      const element = document.createElement("div");
+      const binding = { value: { name: "home" } };
+
+      setDirectiveRouter(router);
+      (vLink as any).mounted!(element, binding as any);
+
+      // Then simulate RouterProvider removal
+      setDirectiveRouter(null as unknown as Router);
+
+      expect(() => {
+        (vLink as any).updated!(element, binding as any);
+      }).toThrow(
+        "v-link directive requires a RouterProvider ancestor. Make sure RouterProvider is mounted.",
+      );
+
+      // Restore router for other tests
+      setDirectiveRouter(router);
+    });
   });
 
   describe("directive lifecycle", () => {
@@ -337,6 +375,71 @@ describe("v-link directive", () => {
 
       const keyEvent = new KeyboardEvent("keydown", {
         key: "Space",
+        bubbles: true,
+      });
+
+      element.dispatchEvent(keyEvent);
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(router.navigate).not.toHaveBeenCalled();
+    });
+
+    it("should not navigate on Ctrl+click", async () => {
+      vi.spyOn(router, "navigate");
+
+      const element = document.createElement("div");
+      const binding = { value: { name: "one-more-test" } };
+
+      setDirectiveRouter(router);
+      (vLink as any).mounted!(element, binding as any);
+
+      const clickEvent = new MouseEvent("click", {
+        bubbles: true,
+        button: 0,
+        ctrlKey: true,
+      });
+
+      element.dispatchEvent(clickEvent);
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(router.navigate).not.toHaveBeenCalled();
+    });
+
+    it("should not navigate on Meta+click", async () => {
+      vi.spyOn(router, "navigate");
+
+      const element = document.createElement("div");
+      const binding = { value: { name: "one-more-test" } };
+
+      setDirectiveRouter(router);
+      (vLink as any).mounted!(element, binding as any);
+
+      const clickEvent = new MouseEvent("click", {
+        bubbles: true,
+        button: 0,
+        metaKey: true,
+      });
+
+      element.dispatchEvent(clickEvent);
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(router.navigate).not.toHaveBeenCalled();
+    });
+
+    it("should not navigate on Space key on non-button div", async () => {
+      vi.spyOn(router, "navigate");
+
+      const element = document.createElement("div");
+      const binding = { value: { name: "one-more-test" } };
+
+      setDirectiveRouter(router);
+      (vLink as any).mounted!(element, binding as any);
+
+      const keyEvent = new KeyboardEvent("keydown", {
+        key: " ",
         bubbles: true,
       });
 

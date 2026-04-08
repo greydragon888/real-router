@@ -9,7 +9,7 @@ import { createRouteTree } from "../../../src/builder/createRouteTree";
 
 describe("strictTrailingSlash behavior", () => {
   it("should NOT strip trailing slash when strictTrailingSlash=true on leaf node", () => {
-    // Tests line 642-644: when strictTrailingSlash=true, consumedPath.replace should NOT happen
+    // strictTrailingSlash=true prevents consumedPath trailing slash removal
     const tree = createRouteTree("", "", [
       { name: "users", path: "/users/" }, // Path defined with trailing slash
     ]);
@@ -22,7 +22,7 @@ describe("strictTrailingSlash behavior", () => {
   });
 
   it("should strip trailing slash when strictTrailingSlash=false (default) on leaf node", () => {
-    // Tests line 642-644: when strictTrailingSlash=false, trailing slash is stripped
+    // strictTrailingSlash=false allows trailing slash to be stripped on leaf nodes
     const tree = createRouteTree("", "", [{ name: "users", path: "/users/" }]);
 
     // With strictTrailingSlash=false, /users should match /users/
@@ -41,8 +41,8 @@ describe("strictTrailingSlash behavior", () => {
     expect(result).toBeNull();
   });
 
-  it("should NOT strip leading slash from remaining when strictTrailingSlash=true (line 664)", () => {
-    // Tests line 664-666: when strictTrailingSlash=true, remainingPath should keep "/"
+  it("should NOT strip leading slash from remaining when strictTrailingSlash=true", () => {
+    // strictTrailingSlash=true preserves leading slash in remainingPath
     // Create nested route where parent matches and child has trailing slash behavior
     const tree = createRouteTree("", "", [
       {
@@ -68,8 +68,8 @@ describe("strictTrailingSlash behavior", () => {
     expect(resultDefault?.name).toBe("api.users");
   });
 
-  it("should NOT remove trailing slash from remaining path when strictTrailingSlash=true (line 678)", () => {
-    // Tests line 677-684: when strictTrailingSlash=true, remainingPath="/" should stay as "/"
+  it("should NOT remove trailing slash from remaining path when strictTrailingSlash=true", () => {
+    // strictTrailingSlash=true keeps remainingPath="/" as-is
     const tree = createRouteTree("", "", [
       {
         name: "section",
@@ -123,13 +123,12 @@ describe("strictTrailingSlash behavior", () => {
 });
 
 // =============================================================================
-// isLeafNode behavior (match.ts lines 619, 643, 665)
+// isLeafNode behavior in matching
 // =============================================================================
 
 describe("isLeafNode behavior in matching", () => {
-  it("should apply full match for leaf nodes (line 619)", () => {
-    // Tests line 619: if (node.children.length === 0)
-    // Leaf nodes should try full match first
+  it("should apply full match for leaf nodes", () => {
+    // Leaf nodes (no children) use full match
     const tree = createRouteTree("", "", [
       { name: "leaf", path: "/leaf" }, // No children = leaf
     ]);
@@ -137,8 +136,8 @@ describe("isLeafNode behavior in matching", () => {
     expect(matchPath(tree, "/leaf")?.name).toBe("leaf");
   });
 
-  it("should apply partial match for non-leaf nodes (line 619)", () => {
-    // Tests line 619: non-leaf nodes use partial match
+  it("should apply partial match for non-leaf nodes", () => {
+    // Non-leaf nodes use partial match to allow children to match the rest
     const tree = createRouteTree("", "", [
       {
         name: "parent",
@@ -151,8 +150,8 @@ describe("isLeafNode behavior in matching", () => {
     expect(matchPath(tree, "/parent/child")?.name).toBe("parent.child");
   });
 
-  it("should strip trailing slash from consumedPath for leaf with strictTrailingSlash=false (line 643)", () => {
-    // Tests line 643-644: consumedPath trailing slash removal for leaf nodes
+  it("should strip trailing slash from consumedPath for leaf with strictTrailingSlash=false", () => {
+    // consumedPath trailing slash removal applies to leaf nodes only
     // This is critical for matching /route/ with path="/route/"
     const tree = createRouteTree("", "", [
       { name: "item", path: "/item/" }, // Leaf with trailing slash
@@ -164,8 +163,8 @@ describe("isLeafNode behavior in matching", () => {
     expect(result?.name).toBe("item");
   });
 
-  it("should NOT strip trailing slash for non-leaf even with strictTrailingSlash=false (line 643)", () => {
-    // Tests line 643: isLeafNode condition - non-leaf should NOT strip
+  it("should NOT strip trailing slash for non-leaf even with strictTrailingSlash=false", () => {
+    // isLeafNode condition: non-leaf nodes do not strip trailing slash
     const tree = createRouteTree("", "", [
       {
         name: "parent",
@@ -182,8 +181,8 @@ describe("isLeafNode behavior in matching", () => {
     expect(result?.name).toBe("parent.child");
   });
 
-  it("should handle remainingPath replacement for leaf with query (line 665)", () => {
-    // Tests line 665-666: remainingPath leading slash replacement for leaf
+  it("should handle remainingPath replacement for leaf with query", () => {
+    // remainingPath leading slash is replaced with "?" for leaf nodes
     const tree = createRouteTree("", "", [{ name: "search", path: "/search" }]);
 
     // Query params after path
@@ -195,8 +194,8 @@ describe("isLeafNode behavior in matching", () => {
     expect(result?.params.q).toBe("test");
   });
 
-  it("should NOT replace leading slash in remainingPath for non-leaf (line 665)", () => {
-    // Tests line 665: isLeafNode condition - non-leaf should NOT replace
+  it("should NOT replace leading slash in remainingPath for non-leaf", () => {
+    // isLeafNode condition: non-leaf nodes do not replace leading slash
     const tree = createRouteTree("", "", [
       {
         name: "api",
@@ -221,8 +220,7 @@ describe("isLeafNode behavior in matching", () => {
 
 describe("queryParamsMode strict behavior", () => {
   it("should reject extra query params when queryParamsMode=strict", () => {
-    // Tests line 519: config.queryParamsMode !== "strict"
-    // When strict, extra query params should cause match to fail
+    // When queryParamsMode=strict, extra query params should cause match to fail
     const tree = createRouteTree("", "", [
       { name: "route", path: "/route?expected" },
     ]);
@@ -256,8 +254,8 @@ describe("queryParamsMode strict behavior", () => {
     expect(result?.params).toStrictEqual({ q: "test", page: "1" });
   });
 
-  it("should reject path with only query params remaining when queryParamsMode=strict (line 518)", () => {
-    // Tests hasOnlyQueryParamsRemaining returning false for strict mode
+  it("should reject path with only query params remaining when queryParamsMode=strict", () => {
+    // hasOnlyQueryParamsRemaining returns false in strict mode
     const tree = createRouteTree("", "", [{ name: "api", path: "/api" }]);
 
     // In strict mode, extra query params should fail
@@ -277,13 +275,12 @@ describe("queryParamsMode strict behavior", () => {
 });
 
 // =============================================================================
-// Default Value Mutation Tests (lines 529-532)
+// Default Value Mutation Tests
 // =============================================================================
 
 describe("default value mutations", () => {
-  it("should use strongMatching=true by default (line 531)", () => {
-    // Tests line 531: strongMatching defaults to true
-    // strongMatching=true means partial matches must be delimited
+  it("should use strongMatching=true by default", () => {
+    // strongMatching defaults to true — partial matches must be delimited
     const tree = createRouteTree("", "", [
       { name: "users", path: "/users/:id" },
     ]);
@@ -303,8 +300,8 @@ describe("default value mutations", () => {
     expect(resultWeak?.params.id).toBe("123");
   });
 
-  it("should use strictTrailingSlash=false by default (line 530)", () => {
-    // Tests line 530: strictTrailingSlash defaults to false
+  it("should use strictTrailingSlash=false by default", () => {
+    // strictTrailingSlash defaults to false — /about matches /about/
     const tree = createRouteTree("", "", [{ name: "about", path: "/about/" }]);
 
     // Default (false) allows /about to match /about/
@@ -320,8 +317,8 @@ describe("default value mutations", () => {
     expect(resultStrict).toBeNull();
   });
 
-  it("should use queryParamsMode=default by default (line 529)", () => {
-    // Tests line 529: queryParamsMode defaults to "default"
+  it("should use queryParamsMode=default by default", () => {
+    // queryParamsMode defaults to "default" — extra query params are parsed
     const tree = createRouteTree("", "", [{ name: "page", path: "/page" }]);
 
     // Default mode parses extra query params
@@ -332,12 +329,12 @@ describe("default value mutations", () => {
 });
 
 // =============================================================================
-// isLeafNode Mutation Tests (lines 436, 619)
+// isLeafNode Mutation Tests
 // =============================================================================
 
 describe("isLeafNode behavior", () => {
-  it("should treat node without children as leaf (line 436)", () => {
-    // Tests line 436: child.children.length === 0
+  it("should treat node without children as leaf", () => {
+    // Nodes without children are treated as leaf nodes
     const tree = createRouteTree("", "", [
       { name: "leaf", path: "/leaf" }, // No children = leaf node
     ]);
@@ -348,7 +345,7 @@ describe("isLeafNode behavior", () => {
     expect(result?.name).toBe("leaf");
   });
 
-  it("should treat node with children as non-leaf (line 436)", () => {
+  it("should treat node with children as non-leaf", () => {
     // Tests that isLeafNode=false when there are children
     const tree = createRouteTree("", "", [
       {
@@ -370,8 +367,8 @@ describe("isLeafNode behavior", () => {
     expect(childResult?.name).toBe("parent.child");
   });
 
-  it("should use full match for leaf nodes (line 619)", () => {
-    // Tests line 619: node.children.length === 0 triggers full match path
+  it("should use full match for leaf nodes", () => {
+    // Leaf nodes (no children) trigger the full match path
     const tree = createRouteTree("", "", [{ name: "exact", path: "/exact" }]);
 
     // Full match should match exactly
@@ -398,12 +395,12 @@ describe("isLeafNode behavior", () => {
 });
 
 // =============================================================================
-// hasDynamicFirstSegment Mutation Tests (lines 67-70)
+// hasDynamicFirstSegment Mutation Tests
 // =============================================================================
 
 describe("hasDynamicFirstSegment edge cases", () => {
   it("should detect dynamic route starting with colon", () => {
-    // Tests line 67: firstChar === ":"
+    // Dynamic route starting with ":" is detected by hasDynamicFirstSegment
     const tree = createRouteTree("", "", [
       { name: "static", path: "/users" },
       { name: "dynamic", path: "/:id" }, // starts with ":"
@@ -417,7 +414,7 @@ describe("hasDynamicFirstSegment edge cases", () => {
   });
 
   it("should detect dynamic route starting with asterisk (splat)", () => {
-    // Tests line 68: firstChar === "*"
+    // Splat route starting with "*" is detected by hasDynamicFirstSegment
     const tree = createRouteTree("", "", [
       { name: "static", path: "/files" },
       { name: "catch", path: "/*path" }, // starts with "*"
@@ -430,7 +427,7 @@ describe("hasDynamicFirstSegment edge cases", () => {
   });
 
   it("should detect route with regex constraint starting with parenthesis", () => {
-    // Tests line 70: path.charAt(start) === "("
+    // Constraint route with parenthesized regex is detected as dynamic
     // Regex constraint in path
     const tree = createRouteTree("", "", [
       { name: "static", path: "/static" },
@@ -444,8 +441,8 @@ describe("hasDynamicFirstSegment edge cases", () => {
     expect(matchSegments(tree, "/abc")).toBeNull();
   });
 
-  it("should handle empty path correctly (line 69)", () => {
-    // Tests line 69: firstChar === ""
+  it("should handle empty path correctly", () => {
+    // Empty first char after "/" indicates an index/slash child
     // This happens when path has no content or is just "/"
     const tree = createRouteTree("", "", [
       {
@@ -466,12 +463,12 @@ describe("hasDynamicFirstSegment edge cases", () => {
 });
 
 // =============================================================================
-// staticIndex Optimization Tests (lines 367, 374, 404)
+// staticIndex Optimization Tests
 // =============================================================================
 
 describe("staticIndex optimization", () => {
-  it("should use static index when available (line 367 - staticIndex.size > 0)", () => {
-    // Tests line 367: staticIndex.size === 0 branch (false)
+  it("should use static index when available", () => {
+    // When static children exist, staticIndex is used for O(1) lookup
     const tree = createRouteTree("", "", [
       {
         name: "api",
@@ -489,8 +486,8 @@ describe("staticIndex optimization", () => {
     expect(result?.segments[1].name).toBe("users");
   });
 
-  it("should skip static matching and use dynamic when no static index (line 374)", () => {
-    // Tests line 374: skipStatic = false passed to tryMatchAnyChild
+  it("should skip static matching and use dynamic when no static index", () => {
+    // No static children means dynamic route is tried directly
     const tree = createRouteTree("", "", [
       {
         name: "parent",
@@ -508,8 +505,7 @@ describe("staticIndex optimization", () => {
     expect(result?.params.id).toBe("123");
   });
 
-  it("should set skipStatic=true when static index has candidates (line 404)", () => {
-    // Tests line 404: skipStatic = true passed to tryMatchAnyChild
+  it("should set skipStatic=true when static index has candidates", () => {
     // After static index lookup fails, dynamic routes are tried with skipStatic=true
     const tree = createRouteTree("", "", [
       {
@@ -535,9 +531,8 @@ describe("staticIndex optimization", () => {
 // =============================================================================
 
 describe("additional edge cases for mutation coverage", () => {
-  it("should handle remaining path with query after trailing slash (line 665)", () => {
-    // Tests line 665: remainingPath.replace(LEADING_SLASH_QUERY, "?")
-    // When remaining path is "/?query", it should become "?query"
+  it("should handle remaining path with query after trailing slash", () => {
+    // remainingPath "/?query" is normalized to "?query" for leaf nodes
     const tree = createRouteTree("", "", [{ name: "api", path: "/api" }]);
 
     // Path with trailing slash AND query params
@@ -548,8 +543,8 @@ describe("additional edge cases for mutation coverage", () => {
     expect(result?.params.extra).toBe("value");
   });
 
-  it("should handle segment.slice(consumedPath.length) vs segment (line 669)", () => {
-    // Tests line 669: getSearch uses segment.slice(consumedPath.length), not whole segment
+  it("should handle segment.slice(consumedPath.length) vs segment for query extraction", () => {
+    // getSearch uses segment.slice(consumedPath.length) to extract query from remaining path
     // This matters when consumedPath differs from the full segment
     const tree = createRouteTree("", "", [
       { name: "users", path: "/users/:id?tab" },
@@ -564,8 +559,8 @@ describe("additional edge cases for mutation coverage", () => {
     expect(result?.params.extra).toBe("value");
   });
 
-  it("should handle isRoot correctly when matching at root level (line 288)", () => {
-    // Tests line 288: isRoot = nodes.length === 1 && nodes[0].name === ""
+  it("should handle isRoot correctly when matching at root level", () => {
+    // isRoot is true when nodes.length === 1 and root node has empty name
     const tree = createRouteTree("", "", [{ name: "home", path: "/" }]);
 
     // Matching at root "/" with root node
@@ -593,8 +588,8 @@ describe("additional edge cases for mutation coverage", () => {
     expect(result?.params.globalParam).toBe("1");
   });
 
-  it("should handle absolute segment matching (line 153)", () => {
-    // Tests line 153: matchedSegments[0]?.absolute
+  it("should handle absolute segment matching", () => {
+    // Absolute paths (~/path) are matched at the root level
     const tree = createRouteTree("", "", [
       {
         name: "app",
@@ -609,8 +604,8 @@ describe("additional edge cases for mutation coverage", () => {
     expect(result?.name).toBe("app.absolute");
   });
 
-  it("should handle queryPos < end in extractFirstPathSegment (line 48)", () => {
-    // Tests line 48: queryPos !== -1 && (end === -1 || queryPos < end)
+  it("should handle queryPos < end in extractFirstPathSegment", () => {
+    // When "?" appears before "/" in remaining path, query takes precedence
     // This handles paths where "?" appears before "/"
     const tree = createRouteTree("", "", [
       {

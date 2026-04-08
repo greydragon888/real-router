@@ -588,6 +588,145 @@ describe("@real-router/logger-plugin", () => {
     });
   });
 
+  describe("usePerformanceMarks:false", () => {
+    let perfMarkSpy: ReturnType<typeof vi.spyOn>;
+    let perfMeasureSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      perfMarkSpy = vi.spyOn(performance, "mark");
+      perfMeasureSpy = vi.spyOn(performance, "measure");
+    });
+
+    it("should NOT call performance.mark when usePerformanceMarks is false (default)", async () => {
+      router.usePlugin(loggerPluginFactory({ usePerformanceMarks: false }));
+      await router.start("/");
+      perfMarkSpy.mockClear();
+      perfMeasureSpy.mockClear();
+
+      await router.navigate("users");
+
+      expect(perfMarkSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("router:transition"),
+      );
+      expect(perfMeasureSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("router:transition"),
+      );
+    });
+
+    it("should NOT call performance.mark on error when usePerformanceMarks is false", async () => {
+      router.usePlugin(loggerPluginFactory({ usePerformanceMarks: false }));
+      await router.start("/");
+      perfMarkSpy.mockClear();
+      perfMeasureSpy.mockClear();
+
+      try {
+        await router.navigate("nonexistent");
+      } catch {
+        // Expected error
+      }
+
+      expect(perfMarkSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("router:transition"),
+      );
+    });
+  });
+
+  describe("Multiple error codes", () => {
+    it("should log CANNOT_ACTIVATE error code", async () => {
+      lifecycle.addActivateGuard("users", () => () => false);
+      router.usePlugin(loggerPluginFactory());
+      await router.start("/");
+      errorSpy.mockClear();
+
+      try {
+        await router.navigate("users");
+      } catch {
+        // Expected error
+      }
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("CANNOT_ACTIVATE"),
+        expect.any(Object),
+      );
+    });
+
+    it("should log CANNOT_DEACTIVATE error code", async () => {
+      lifecycle.addDeactivateGuard("home", () => () => false);
+      router.usePlugin(loggerPluginFactory());
+      await router.start("/");
+      errorSpy.mockClear();
+
+      try {
+        await router.navigate("users");
+      } catch {
+        // Expected error
+      }
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("CANNOT_DEACTIVATE"),
+        expect.any(Object),
+      );
+    });
+
+    it("should log SAME_STATES error code when navigating to same state", async () => {
+      router.usePlugin(loggerPluginFactory());
+      await router.start("/");
+      errorSpy.mockClear();
+
+      try {
+        await router.navigate("home");
+      } catch {
+        // Expected SAME_STATES error
+      }
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("SAME_STATES"),
+        expect.any(Object),
+      );
+    });
+  });
+
+  describe("Unknown options key", () => {
+    it("should not throw when factory receives unknown options key", () => {
+      expect(() => {
+        loggerPluginFactory({
+          level: "all",
+          // @ts-expect-error — testing unknown key at runtime
+          unknownKey: true,
+        });
+      }).not.toThrow();
+    });
+
+    it("should not throw when factory receives multiple unknown options keys", () => {
+      expect(() => {
+        loggerPluginFactory({
+          // @ts-expect-error — testing unknown keys at runtime
+          foo: "bar",
+          baz: 123,
+        });
+      }).not.toThrow();
+    });
+  });
+
+  describe("Params diff with complex nested objects", () => {
+    it("should detect diff when nested object references change", async () => {
+      router.usePlugin(loggerPluginFactory({ showParamsDiff: true }));
+      await router.start("/");
+
+      await router.navigate("users.view", { id: "123" });
+      loggerSpy.mockClear();
+
+      await router.navigate("users.view", { id: "456" });
+
+      const calls = loggerSpy.mock.calls.map(
+        (call: unknown[]) => call[0] as string,
+      );
+      const hasDiff = calls.some((msg: string) => msg.includes("Changed:"));
+
+      expect(hasDiff).toBe(true);
+    });
+  });
+
   describe("Stress Testing", () => {
     it("should handle 100 transitions without errors", async () => {
       router.usePlugin(loggerPluginFactory());

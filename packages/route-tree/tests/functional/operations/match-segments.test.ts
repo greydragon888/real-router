@@ -67,7 +67,7 @@ describe("matchSegments with static index", () => {
     expect(result!.segments[1].name).toBe("settings");
   });
 
-  it("should return null when nested dynamic children do not match (line 350)", () => {
+  it("should return null when nested dynamic children do not match", () => {
     // Parent with only dynamic children (staticIndex.size === 0)
     // The dynamic children won't match the remaining path
     const tree = createRouteTree("", "", [
@@ -87,7 +87,7 @@ describe("matchSegments with static index", () => {
     expect(result).toBeNull();
   });
 
-  it("should return null when static index matches but route fails and no dynamic fallback (line 395)", () => {
+  it("should return null when static index matches but route fails and no dynamic fallback", () => {
     // Tree where static index finds candidates but none fully match
     // AND there are no dynamic routes to fall back to
     const tree = createRouteTree("", "", [
@@ -195,7 +195,7 @@ describe("matchSegments with static index", () => {
     expect(result!.segments[1].name).toBe("search");
   });
 
-  it("should try multiple static candidates when first doesn't match (line 368 false branch)", () => {
+  it("should try multiple static candidates when first doesn't match", () => {
     // Routes with same first segment "api" but different full paths
     // Segment trie handles matching priority
     const tree = createRouteTree("", "", [
@@ -217,7 +217,7 @@ describe("matchSegments with static index", () => {
     expect(result!.segments[1].name).toBe("api-v2");
   });
 
-  it("should handle URL where query appears before next slash (line 48 queryPos < end)", () => {
+  it("should handle URL where query appears before next slash", () => {
     // URL like /parent/search?a/b=1 where "?" appears before "/" in remaining path
     // This tests the queryPos < end branch in extractFirstPathSegment
     const tree = createRouteTree("", "", [
@@ -236,7 +236,7 @@ describe("matchSegments with static index", () => {
     expect(result!.segments[1].name).toBe("search");
   });
 
-  it("should handle route paths without leading slash (line 63 start = 0)", () => {
+  it("should handle route paths without leading slash", () => {
     // Route with path "*" (no leading slash) - tests hasDynamicFirstSegment branch
     const tree = createRouteTree("", "", [
       {

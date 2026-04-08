@@ -195,7 +195,7 @@ describe("mutation testing coverage - buildTree", () => {
 });
 
 describe("mutation testing coverage - computeCaches", () => {
-  describe("staticPath computation (line 210)", () => {
+  describe("staticPath computation", () => {
     it("should return null for routes with urlParams only", () => {
       const tree = createRouteTree("", "", [
         { name: "user", path: "/user/:id" },

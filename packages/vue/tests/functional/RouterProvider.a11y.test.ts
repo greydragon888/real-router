@@ -65,6 +65,80 @@ describe("RouterProvider — announceNavigation", () => {
     );
   });
 
+  it("announcer textContent matches 'Navigated to {route name}'", async () => {
+    mount(
+      defineComponent({
+        setup: () => () =>
+          h(
+            RouterProvider,
+            { router, announceNavigation: true },
+            { default: () => h("div") },
+          ),
+      }),
+    );
+
+    vi.advanceTimersByTime(100);
+
+    // First navigation is skipped (initial navigation flag)
+    await router.navigate("about");
+    // Second navigation triggers the announcement
+    await router.navigate("home");
+
+    expect(document.querySelector(ANNOUNCER_SEL)?.textContent).toBe(
+      "Navigated to home",
+    );
+  });
+
+  it("announcer textContent uses h1 text when present", async () => {
+    const h1 = document.createElement("h1");
+
+    h1.textContent = "About Page";
+    document.body.append(h1);
+
+    mount(
+      defineComponent({
+        setup: () => () =>
+          h(
+            RouterProvider,
+            { router, announceNavigation: true },
+            { default: () => h("div") },
+          ),
+      }),
+    );
+
+    vi.advanceTimersByTime(100);
+
+    // First navigation is skipped (initial navigation flag)
+    await router.navigate("about");
+    // Second navigation triggers the announcement — h1 is present
+    await router.navigate("home");
+
+    expect(document.querySelector(ANNOUNCER_SEL)?.textContent).toBe(
+      "Navigated to About Page",
+    );
+
+    h1.remove();
+  });
+
+  it("announcer has aria-live='assertive' and aria-atomic='true'", () => {
+    mount(
+      defineComponent({
+        setup: () => () =>
+          h(
+            RouterProvider,
+            { router, announceNavigation: true },
+            { default: () => h("div") },
+          ),
+      }),
+    );
+
+    const announcer = document.querySelector(ANNOUNCER_SEL);
+
+    expect(announcer).not.toBeNull();
+    expect(announcer?.getAttribute("aria-live")).toBe("assertive");
+    expect(announcer?.getAttribute("aria-atomic")).toBe("true");
+  });
+
   it("cleanup on unmount — announcer element removed from DOM", () => {
     const wrapper = mount(
       defineComponent({

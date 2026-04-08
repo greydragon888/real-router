@@ -783,6 +783,90 @@ describe("Logger", () => {
     });
   });
 
+  describe("callback async error handling", () => {
+    it("should fire-and-forget when callback returns rejected Promise", () => {
+      const asyncCallback: LogCallback = vi
+        .fn()
+        .mockRejectedValue(new Error("async boom"));
+
+      logger.configure({ callback: asyncCallback });
+
+      // Should not throw — rejected promise is fire-and-forget
+      expect(() => {
+        logger.log("Router", "test");
+      }).not.toThrow();
+
+      expect(asyncCallback).toHaveBeenCalled();
+      // Console should still receive the message
+      expect(console.log).toHaveBeenCalledWith("[Router] test");
+    });
+  });
+
+  describe("recursive callback", () => {
+    it("should not infinite loop when logger.log is called inside callback", () => {
+      let callCount = 0;
+
+      const recursiveCallback: LogCallback = () => {
+        callCount++;
+        if (callCount <= 3) {
+          // This will call the callback again, but eventually stops
+          // because each nested call increments callCount
+          logger.log("Inner", "recursive");
+        }
+      };
+
+      logger.configure({ callback: recursiveCallback });
+      logger.log("Outer", "start");
+
+      // Should terminate — callback calls logger.log which calls callback again,
+      // but callCount guard prevents infinite recursion
+      expect(callCount).toBe(4); // initial + 3 recursive calls
+    });
+  });
+
+  describe("non-string context and message", () => {
+    it("should handle number as context", () => {
+      // @ts-expect-error — testing runtime behavior with non-string
+      logger.log(42, "message");
+
+      expect(console.log).toHaveBeenCalledWith("[42] message");
+    });
+
+    it("should handle null as context", () => {
+      // @ts-expect-error — testing runtime behavior with null
+      logger.log(null, "message");
+
+      // null is falsy, so empty context path
+      expect(console.log).toHaveBeenCalledWith("message");
+    });
+
+    it("should handle undefined as context", () => {
+      // @ts-expect-error — testing runtime behavior with undefined
+      logger.log(undefined, "message");
+
+      // undefined is falsy, so empty context path
+      expect(console.log).toHaveBeenCalledWith("message");
+    });
+
+    it("should handle number as message", () => {
+      // @ts-expect-error — testing runtime behavior with non-string
+      logger.log("Router", 123);
+
+      expect(console.log).toHaveBeenCalledWith("[Router] 123");
+    });
+
+    it("should forward non-string values through callback", () => {
+      const callback = vi.fn();
+
+      logger.configure({ callback });
+
+      // @ts-expect-error — testing runtime behavior with non-string
+      logger.log(42, 123);
+
+      expect(callback).toHaveBeenCalledWith("log", 42, 123);
+    });
+  });
+
   describe("switching between levels", () => {
     it("should correctly switch from none to other levels", () => {
       const callback = vi.fn();

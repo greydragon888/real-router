@@ -100,6 +100,50 @@ describe("params-diff utilities", () => {
       });
     });
 
+    it("should detect diff with complex nested objects (shallow comparison)", () => {
+      const from: Params = {
+        filter: { status: "active", role: "admin" },
+        sort: { field: "name", order: "asc" },
+      };
+      const to: Params = {
+        filter: { status: "active", role: "admin" },
+        sort: { field: "date", order: "desc" },
+      };
+
+      const diff = getParamsDiff(from, to);
+
+      // Both filter and sort are different references, detected as changed
+      expect(diff).toStrictEqual({
+        changed: {
+          filter: {
+            from: { status: "active", role: "admin" },
+            to: { status: "active", role: "admin" },
+          },
+          sort: {
+            from: { field: "name", order: "asc" },
+            to: { field: "date", order: "desc" },
+          },
+        },
+        added: {},
+        removed: {},
+      });
+    });
+
+    it("should detect diff when array values change reference", () => {
+      const from: Params = { tags: ["a", "b"] };
+      const to: Params = { tags: ["a", "b", "c"] };
+
+      const diff = getParamsDiff(from, to);
+
+      expect(diff).toStrictEqual({
+        changed: {
+          tags: { from: ["a", "b"], to: ["a", "b", "c"] },
+        },
+        added: {},
+        removed: {},
+      });
+    });
+
     it("should perform shallow comparison only", () => {
       const from: Params = { user: { id: "123" } };
       const to: Params = { user: { id: "123" } };
