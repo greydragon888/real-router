@@ -1,5 +1,12 @@
 # @real-router/core
 
+## 0.45.3
+
+### Patch Changes
+
+- Updated dependencies [[`15e7758`](https://github.com/greydragon888/real-router/commit/15e7758ed2ef4536bf332ac30cdace880951acea)]:
+  - @real-router/fsm@0.3.0
+
 ## 0.45.2
 
 ### Patch Changes
