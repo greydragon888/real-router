@@ -111,10 +111,16 @@ export class FSM<
       this.#actions.set(from, stateActions);
     }
 
-    stateActions.set(event, action as (payload: unknown) => void);
+    const capturedAction = action as (payload: unknown) => void;
+
+    stateActions.set(event, capturedAction);
 
     return () => {
-      this.#actions?.get(from)?.delete(event);
+      const stateMap = this.#actions?.get(from);
+
+      if (stateMap?.get(event) === capturedAction) {
+        stateMap.delete(event);
+      }
     };
   }
 
