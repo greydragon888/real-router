@@ -166,9 +166,9 @@ export function executeGuardPipeline( // NOSONAR
   if (leaveResult !== undefined) {
     return finishAfterAsyncLeave(
       leaveResult,
-      activateGuards,
+      /* v8 ignore next -- @preserve: false-branch unreachable — navigateToNotFound bypasses guards pipeline */
+      shouldActivate ? activateGuards : undefined,
       toActivate,
-      shouldActivate,
       toState,
       fromState,
       signal,
@@ -193,9 +193,8 @@ export function executeGuardPipeline( // NOSONAR
 
 async function finishAfterAsyncLeave(
   leaveCompletion: Promise<void>,
-  activateGuards: Map<string, GuardFn>,
+  activateGuards: Map<string, GuardFn> | undefined,
   toActivate: string[],
-  shouldActivate: boolean,
   toState: State,
   fromState: State | undefined,
   signal: AbortSignal,
@@ -208,7 +207,7 @@ async function finishAfterAsyncLeave(
   }
 
   /* v8 ignore next -- @preserve: false-branch unreachable — navigateToNotFound bypasses guards pipeline */
-  if (shouldActivate) {
+  if (activateGuards !== undefined) {
     const pending = runGuards(
       activateGuards,
       toActivate,

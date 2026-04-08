@@ -15,6 +15,7 @@ import { RouterError } from "../../RouterError";
 import { getTransitionPath, nameToIDs } from "../../transitionPath";
 
 import type { NavigationContext, NavigationDependencies } from "./types";
+import type { TransitionPath } from "../../transitionPath";
 import type {
   GuardFn,
   NavigationOptions,
@@ -141,10 +142,8 @@ export class NavigationNamespace {
         deps.getLifecycleFunctions();
       const isUnknownRoute = toState.name === constants.UNKNOWN_ROUTE;
 
-      const { toDeactivate, toActivate, intersection } = getTransitionPath(
-        toState,
-        fromState,
-      );
+      const transitionPath = getTransitionPath(toState, fromState);
+      const { toDeactivate, toActivate, intersection } = transitionPath;
 
       const shouldDeactivate =
         fromState && !opts.forceDeactivate && toDeactivate.length > 0;
@@ -156,14 +155,11 @@ export class NavigationNamespace {
 
       if (!hasGuards) {
         const asyncLeave = this.#handleNoGuardsLeave(
-          deps,
           confirmedToState,
           fromState,
           myId,
           opts,
-          toDeactivate,
-          toActivate,
-          intersection,
+          transitionPath,
           canDeactivateFunctions,
         );
 
@@ -396,17 +392,15 @@ export class NavigationNamespace {
   }
 
   #handleNoGuardsLeave(
-    // NOSONAR
-    deps: NavigationDependencies,
     toState: State,
     fromState: State | undefined,
     myId: number,
     opts: NavigationOptions,
-    toDeactivate: string[],
-    toActivate: string[],
-    intersection: string,
+    transitionPath: TransitionPath,
     canDeactivateFunctions: Map<string, GuardFn>,
   ): Promise<State> | undefined {
+    const deps = this.#deps;
+
     deps.sendLeaveApprove(toState, fromState);
 
     /* v8 ignore start */
@@ -427,9 +421,9 @@ export class NavigationNamespace {
             toState,
             fromState,
             opts,
-            toDeactivate,
-            toActivate,
-            intersection,
+            toDeactivate: transitionPath.toDeactivate,
+            toActivate: transitionPath.toActivate,
+            intersection: transitionPath.intersection,
             canDeactivateFunctions,
           },
           controller,

@@ -20,13 +20,18 @@ import type {
 } from "@real-router/types";
 import type { EventEmitter } from "event-emitter";
 
+function ensureError(value: unknown): Error {
+  /* v8 ignore next -- @preserve: defensive guard — listeners should always throw Error objects */
+  return value instanceof Error ? value : new Error(String(value));
+}
+
 function settleLeavePromises(
   promises: Promise<void>[],
   firstSyncError: unknown,
 ): Promise<void> {
   return Promise.allSettled(promises).then((results) => {
     if (firstSyncError !== undefined) {
-      throw firstSyncError as Error;
+      throw ensureError(firstSyncError);
     }
 
     const rejected = results.find(
@@ -34,7 +39,7 @@ function settleLeavePromises(
     );
 
     if (rejected !== undefined) {
-      throw rejected.reason as Error;
+      throw ensureError(rejected.reason);
     }
   });
 }
@@ -296,7 +301,7 @@ export class EventBusNamespace {
 
     if (promises === undefined) {
       if (firstSyncError !== undefined) {
-        throw firstSyncError as Error;
+        throw ensureError(firstSyncError);
       }
 
       return undefined;
