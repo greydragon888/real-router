@@ -16,10 +16,14 @@ function makeGuards(entries: [string, GuardFn][]): Map<string, GuardFn> {
 }
 
 describe("guardPhase — emitLeaveApprove callback", () => {
-  let emitLeaveApprove: ReturnType<typeof vi.fn> & (() => void);
+  let emitLeaveApprove: ReturnType<typeof vi.fn> &
+    (() => Promise<void> | undefined);
 
   beforeEach(() => {
-    emitLeaveApprove = vi.fn() as ReturnType<typeof vi.fn> & (() => void);
+    emitLeaveApprove = vi.fn().mockReturnValue(undefined) as ReturnType<
+      typeof vi.fn
+    > &
+      (() => Promise<void> | undefined);
   });
 
   it("called once after sync deactivation, before activation (call order verified)", () => {

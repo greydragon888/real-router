@@ -78,7 +78,7 @@ async function finishAsyncPipeline( // NOSONAR
   fromState: State | undefined,
   signal: AbortSignal,
   isActive: () => boolean,
-  emitLeaveApprove: () => void,
+  emitLeaveApprove: () => Promise<void> | undefined,
 ): Promise<void> {
   await deactivateCompletion;
 
@@ -86,7 +86,16 @@ async function finishAsyncPipeline( // NOSONAR
     throw new RouterError(errorCodes.TRANSITION_CANCELLED);
   }
 
-  emitLeaveApprove();
+  const leaveResult = emitLeaveApprove();
+
+  if (leaveResult !== undefined) {
+    await leaveResult;
+
+    /* v8 ignore next 3 -- @preserve: V8 cannot track cancellation check through async leave continuation after Promise.allSettled */
+    if (!isActive()) {
+      throw new RouterError(errorCodes.TRANSITION_CANCELLED);
+    }
+  }
 
   if (shouldActivate) {
     const pending = runGuards(
@@ -120,7 +129,7 @@ export function executeGuardPipeline( // NOSONAR
   fromState: State | undefined,
   signal: AbortSignal,
   isActive: () => boolean,
-  emitLeaveApprove: () => void,
+  emitLeaveApprove: () => Promise<void> | undefined,
 ): Promise<void> | undefined {
   if (shouldDeactivate) {
     const pending = runGuards(
@@ -152,7 +161,20 @@ export function executeGuardPipeline( // NOSONAR
     throw new RouterError(errorCodes.TRANSITION_CANCELLED);
   }
 
-  emitLeaveApprove();
+  const leaveResult = emitLeaveApprove();
+
+  if (leaveResult !== undefined) {
+    return finishAfterAsyncLeave(
+      leaveResult,
+      activateGuards,
+      toActivate,
+      shouldActivate,
+      toState,
+      fromState,
+      signal,
+      isActive,
+    );
+  }
 
   if (shouldActivate) {
     return runGuards(
@@ -167,6 +189,44 @@ export function executeGuardPipeline( // NOSONAR
   }
 
   return undefined;
+}
+
+async function finishAfterAsyncLeave(
+  leaveCompletion: Promise<void>,
+  activateGuards: Map<string, GuardFn>,
+  toActivate: string[],
+  shouldActivate: boolean,
+  toState: State,
+  fromState: State | undefined,
+  signal: AbortSignal,
+  isActive: () => boolean,
+): Promise<void> {
+  await leaveCompletion;
+
+  if (!isActive()) {
+    throw new RouterError(errorCodes.TRANSITION_CANCELLED);
+  }
+
+  /* v8 ignore next -- @preserve: false-branch unreachable — navigateToNotFound bypasses guards pipeline */
+  if (shouldActivate) {
+    const pending = runGuards(
+      activateGuards,
+      toActivate,
+      errorCodes.CANNOT_ACTIVATE,
+      toState,
+      fromState,
+      signal,
+      isActive,
+    );
+
+    if (pending !== undefined) {
+      await pending;
+    }
+
+    if (!isActive()) {
+      throw new RouterError(errorCodes.TRANSITION_CANCELLED);
+    }
+  }
 }
 
 function runGuards(

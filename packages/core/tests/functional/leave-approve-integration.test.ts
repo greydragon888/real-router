@@ -145,10 +145,16 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
         successListener.mock.invocationCallOrder[0],
       );
 
-      expect(leaveListener).toHaveBeenCalledWith({
-        route: expect.objectContaining({ name: "home" }),
-        nextRoute: expect.objectContaining({ name: "users" }),
-      });
+      expect(leaveListener).toHaveBeenCalledWith(
+        expect.objectContaining({
+          route: expect.objectContaining({ name: "home" }),
+          nextRoute: expect.objectContaining({ name: "users" }),
+        }),
+      );
+
+      const leaveState = leaveListener.mock.calls[0][0];
+
+      expect(leaveState.signal).toBeInstanceOf(AbortSignal);
 
       expect(successListener).toHaveBeenCalledWith({
         route: expect.objectContaining({ name: "users" }),
@@ -187,10 +193,12 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
       const finalState = await router.navigate("users");
 
       expect(leaveListener).toHaveBeenCalledTimes(1);
-      expect(leaveListener).toHaveBeenCalledWith({
-        route: expect.objectContaining({ name: "home" }),
-        nextRoute: expect.objectContaining({ name: "users" }),
-      });
+      expect(leaveListener).toHaveBeenCalledWith(
+        expect.objectContaining({
+          route: expect.objectContaining({ name: "home" }),
+          nextRoute: expect.objectContaining({ name: "users" }),
+        }),
+      );
 
       expect(successListener).toHaveBeenCalledTimes(1);
       expect(finalState.name).toBe("users");
@@ -225,7 +233,7 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
   });
 
   describe("RFC §8.6 — edge cases", () => {
-    it("8. error thrown in subscribeLeave listener is isolated by EventEmitter: navigation still completes", async () => {
+    it("8. error thrown in subscribeLeave listener propagates to pipeline: TRANSITION_ERROR, navigation cancelled", async () => {
       const onError = vi.fn();
       const successListener = vi.fn();
 
@@ -240,13 +248,14 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
 
       const unsubSuccess = router.subscribe(successListener);
 
-      const state = await router.navigate("users");
+      await expect(router.navigate("users")).rejects.toThrow(
+        "subscribeLeave threw",
+      );
 
-      expect(state.name).toBe("users");
-      expect(successListener).toHaveBeenCalledTimes(1);
-      expect(onError).not.toHaveBeenCalled();
+      expect(successListener).not.toHaveBeenCalled();
+      expect(onError).toHaveBeenCalledTimes(1);
       expect(router.isActive()).toBe(true);
-      expect(router.isLeaveApproved()).toBe(false);
+      expect(router.getState()?.name).toBe("home");
 
       unsubLeave();
       unsubError();
@@ -376,10 +385,12 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
 
       expect(deactivateGuard).not.toHaveBeenCalled();
       expect(leaveListener).toHaveBeenCalledTimes(1);
-      expect(leaveListener).toHaveBeenCalledWith({
-        route: expect.objectContaining({ name: "home" }),
-        nextRoute: expect.objectContaining({ name: "users" }),
-      });
+      expect(leaveListener).toHaveBeenCalledWith(
+        expect.objectContaining({
+          route: expect.objectContaining({ name: "home" }),
+          nextRoute: expect.objectContaining({ name: "users" }),
+        }),
+      );
 
       unsubLeave();
     });
@@ -432,10 +443,12 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
       expect(secondResult.name).toBe("orders");
 
       expect(leaveListener).toHaveBeenCalledTimes(1);
-      expect(leaveListener).toHaveBeenCalledWith({
-        route: expect.objectContaining({ name: "home" }),
-        nextRoute: expect.objectContaining({ name: "orders" }),
-      });
+      expect(leaveListener).toHaveBeenCalledWith(
+        expect.objectContaining({
+          route: expect.objectContaining({ name: "home" }),
+          nextRoute: expect.objectContaining({ name: "orders" }),
+        }),
+      );
 
       unsubLeave();
       vi.useRealTimers();

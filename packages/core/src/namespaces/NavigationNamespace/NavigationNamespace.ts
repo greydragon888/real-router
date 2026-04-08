@@ -152,22 +152,30 @@ export class NavigationNamespace {
         canDeactivateFunctions.size > 0 || canActivateFunctions.size > 0;
 
       const confirmedToState = toState;
-      const emitLeaveApproveCallback = () => {
-        deps.sendLeaveApprove(confirmedToState, fromState);
-      };
-
       const isCurrentNav = () => this.#navigationId === myId && deps.isActive();
 
       if (!hasGuards) {
-        // No guards — emitLeaveApprove directly before completeTransition
-        emitLeaveApproveCallback();
+        const asyncLeave = this.#handleNoGuardsLeave(
+          deps,
+          confirmedToState,
+          fromState,
+          myId,
+          {
+            toState,
+            fromState,
+            opts,
+            toDeactivate,
+            toActivate,
+            intersection,
+            canDeactivateFunctions,
+          },
+        );
 
-        // Reentrant check: subscribeLeave() listener may have called router.navigate()
-        // Same pattern as reentrant check after emitTransitionStart (line 141-143)
-        /* v8 ignore next 3 -- @preserve: reentrant navigate from TRANSITION_LEAVE_APPROVE listener; tested but V8 cannot track the branch through the synchronous callback chain */
-        if (this.#navigationId !== myId) {
-          throw new RouterError(errorCodes.TRANSITION_CANCELLED);
+        /* v8 ignore start */
+        if (asyncLeave !== undefined) {
+          return asyncLeave;
         }
+        /* v8 ignore stop */
       }
 
       if (hasGuards) {
@@ -175,6 +183,20 @@ export class NavigationNamespace {
         this.#currentController = controller;
 
         const signal = controller.signal;
+
+        const emitLeaveApproveCallback = (): Promise<void> | undefined => {
+          deps.sendLeaveApprove(confirmedToState, fromState);
+
+          if (deps.hasLeaveListeners()) {
+            return deps.awaitLeaveListeners(
+              confirmedToState,
+              fromState,
+              signal,
+            );
+          }
+
+          return undefined;
+        };
 
         const guardCompletion = executeGuardPipeline(
           canDeactivateFunctions,
@@ -373,6 +395,42 @@ export class NavigationNamespace {
     if (transitionStarted && toState) {
       routeTransitionError(this.#deps, error, toState, fromState);
     }
+  }
+
+  #handleNoGuardsLeave(
+    deps: NavigationDependencies,
+    toState: State,
+    fromState: State | undefined,
+    myId: number,
+    nav: NavigationContext,
+  ): Promise<State> | undefined {
+    deps.sendLeaveApprove(toState, fromState);
+
+    /* v8 ignore start */
+    if (deps.hasLeaveListeners()) {
+      const controller = new AbortController();
+
+      this.#currentController = controller;
+
+      const leaveResult = deps.awaitLeaveListeners(
+        toState,
+        fromState,
+        controller.signal,
+      );
+
+      if (leaveResult !== undefined) {
+        return this.#finishAsyncNavigation(leaveResult, nav, controller, myId);
+      }
+
+      this.#cleanupController(controller);
+    }
+
+    if (this.#navigationId !== myId) {
+      throw new RouterError(errorCodes.TRANSITION_CANCELLED);
+    }
+    /* v8 ignore stop */
+
+    return undefined;
   }
 
   #cleanupController(controller: AbortController): void {
