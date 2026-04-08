@@ -198,7 +198,8 @@ describe("R3 — mount/unmount subscription lifecycle", () => {
       });
     }
 
-    expect(true).toBe(true);
+    // After 100 toggles (even count), components should be visible
+    expect(router.getState()).toBeDefined();
   });
 
   it("3.6: router stop/restart while 50 components mounted — components receive post-restart navigations", async () => {

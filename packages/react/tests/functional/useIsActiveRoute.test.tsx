@@ -318,7 +318,7 @@ describe("useIsActiveRoute", () => {
       }
 
       // Should not cause errors or memory leaks
-      expect(result.current).toBeDefined();
+      expect(result.current).toBeTypeOf("boolean");
     });
   });
 

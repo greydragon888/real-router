@@ -3,6 +3,7 @@ import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import {
   Link,
+  RouterErrorBoundary,
   useRouteNode,
   useRoute,
   useNavigator,
@@ -35,7 +36,8 @@ describe("legacy entry point (@real-router/react/legacy)", () => {
 
   describe("exports availability", () => {
     it("should export all components", () => {
-      expect(Link).toBeDefined();
+      expect(Link).toBeTypeOf("object");
+      expect(RouterErrorBoundary).toBeTypeOf("function");
     });
 
     it("should not export RouteView (React 19.2+ only)", async () => {
@@ -45,12 +47,12 @@ describe("legacy entry point (@real-router/react/legacy)", () => {
     });
 
     it("should export all hooks", () => {
-      expect(useRouteNode).toBeDefined();
-      expect(useRoute).toBeDefined();
-      expect(useNavigator).toBeDefined();
-      expect(useRouter).toBeDefined();
-      expect(useRouteUtils).toBeDefined();
-      expect(useRouterTransition).toBeDefined();
+      expect(useRouteNode).toBeTypeOf("function");
+      expect(useRoute).toBeTypeOf("function");
+      expect(useNavigator).toBeTypeOf("function");
+      expect(useRouter).toBeTypeOf("function");
+      expect(useRouteUtils).toBeTypeOf("function");
+      expect(useRouterTransition).toBeTypeOf("function");
     });
 
     it("should not export raw context objects", async () => {
@@ -62,7 +64,7 @@ describe("legacy entry point (@real-router/react/legacy)", () => {
     });
 
     it("should export RouterProvider", () => {
-      expect(RouterProvider).toBeDefined();
+      expect(RouterProvider).toBeTypeOf("function");
     });
 
     it("should export LinkProps type", () => {
@@ -99,7 +101,7 @@ describe("legacy entry point (@real-router/react/legacy)", () => {
       });
 
       expect(result.current.route?.name).toBe("test");
-      expect(result.current.navigator).toBeDefined();
+      expect(result.current.navigator).toBeTypeOf("object");
     });
   });
 

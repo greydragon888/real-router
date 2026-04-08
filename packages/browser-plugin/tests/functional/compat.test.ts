@@ -114,9 +114,18 @@ describe("Browser Plugin — Compatibility", () => {
         unsubscribe();
       }
 
-      // If there are memory leaks, this test will eventually
-      // fail or cause slowdowns in the test suite
-      expect(true).toBe(true);
+      // Verify the last cycle left a clean state
+      const finalRouter = createRouter(routerConfig);
+      const finalUnsub = finalRouter.usePlugin(
+        browserPluginFactory({}, mockedBrowser),
+      );
+
+      await finalRouter.start();
+
+      expect(finalRouter.getState()?.name).toBeDefined();
+
+      finalRouter.stop();
+      finalUnsub();
     });
   });
 

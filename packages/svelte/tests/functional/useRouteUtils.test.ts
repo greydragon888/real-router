@@ -31,6 +31,9 @@ describe("useRouteUtils composable", () => {
     });
 
     expect(result).toBeInstanceOf(RouteUtils);
+    expect(result.getChain).toBeTypeOf("function");
+    expect(result.getSiblings).toBeTypeOf("function");
+    expect(result.isDescendantOf).toBeTypeOf("function");
   });
 
   it("should have working getChain method", () => {
@@ -74,6 +77,33 @@ describe("useRouteUtils composable", () => {
 
     expect(result.isDescendantOf("users.list", "users")).toBe(true);
     expect(result.isDescendantOf("users", "items")).toBe(false);
+  });
+
+  it("should return different RouteUtils instances for different routers", async () => {
+    const router2 = createTestRouterWithADefaultRouter();
+
+    await router2.start();
+
+    let result1: any;
+    let result2: any;
+
+    renderWithRouter(router, RouteUtilsCapture, {
+      onCapture: (r: unknown) => {
+        result1 = r;
+      },
+    });
+
+    renderWithRouter(router2, RouteUtilsCapture, {
+      onCapture: (r: unknown) => {
+        result2 = r;
+      },
+    });
+
+    expect(result1).toBeInstanceOf(RouteUtils);
+    expect(result2).toBeInstanceOf(RouteUtils);
+    expect(result1).not.toBe(result2);
+
+    router2.stop();
   });
 
   it("should return undefined for unknown routes", () => {

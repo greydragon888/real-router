@@ -85,4 +85,42 @@ describe("createHistoryFallbackBrowser", () => {
 
     expect(warnSpy).toHaveBeenCalledTimes(1);
   });
+
+  it("pushState completes without side effects", () => {
+    const browser = createHistoryFallbackBrowser("ctx");
+
+    // Call pushState and verify it does nothing (no history change)
+    browser.pushState({ name: "a", params: {}, path: "/a" }, "/a");
+
+    // In SSR fallback, pushState is a no-op — no state change observable
+    expect(browser.getHash()).toBe("");
+  });
+
+  it("replaceState completes without side effects", () => {
+    const browser = createHistoryFallbackBrowser("ctx");
+
+    // Call replaceState and verify it does nothing (no history change)
+    browser.replaceState({ name: "a", params: {}, path: "/a" }, "/a");
+
+    // In SSR fallback, replaceState is a no-op — no state change observable
+    expect(browser.getHash()).toBe("");
+  });
+
+  it("getHash always returns empty string regardless of calls", () => {
+    const browser = createHistoryFallbackBrowser("ctx");
+
+    expect(browser.getHash()).toBe("");
+    expect(browser.getHash()).toBe("");
+  });
+
+  it("addPopstateListener cleanup function is a no-op", () => {
+    const browser = createHistoryFallbackBrowser("ctx");
+    const listener = vi.fn();
+    const cleanup = browser.addPopstateListener(listener);
+
+    cleanup();
+    cleanup(); // calling twice should not throw
+
+    expect(listener).not.toHaveBeenCalled();
+  });
 });

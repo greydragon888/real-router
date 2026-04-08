@@ -1,13 +1,5 @@
 import { renderHook } from "@solidjs/testing-library";
-import {
-  describe,
-  beforeEach,
-  afterEach,
-  it,
-  expect,
-  vi,
-  expectTypeOf,
-} from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { RouterProvider, useNavigator } from "@real-router/solid";
 
@@ -37,11 +29,11 @@ describe("useNavigator hook", () => {
       wrapper: wrapper(router),
     });
 
-    expect(result).toBeDefined();
-    expect(result.navigate).toBeDefined();
-    expect(result.getState).toBeDefined();
-    expect(result.isActiveRoute).toBeDefined();
-    expect(result.subscribe).toBeDefined();
+    expect(result).toBeTypeOf("object");
+    expect(result.navigate).toBeTypeOf("function");
+    expect(result.getState).toBeTypeOf("function");
+    expect(result.isActiveRoute).toBeTypeOf("function");
+    expect(result.subscribe).toBeTypeOf("function");
   });
 
   it("should have working navigate method", async () => {
@@ -60,8 +52,8 @@ describe("useNavigator hook", () => {
     });
     const state = result.getState();
 
-    expect(state).toBeDefined();
-    expect(state?.name).toBeDefined();
+    expect(state).not.toBeNull();
+    expect(state!.name).toBeTypeOf("string");
   });
 
   it("should have working isActiveRoute method", () => {
@@ -70,20 +62,28 @@ describe("useNavigator hook", () => {
     });
     const state = result.getState();
 
-    expect(result.isActiveRoute(state?.name ?? "")).toBe(true);
+    expect(state).not.toBeNull();
+    expect(result.isActiveRoute(state!.name)).toBe(true);
   });
 
-  // eslint-disable-next-line vitest/expect-expect
-  it("should have working subscribe method", () => {
+  it("should have working subscribe method", async () => {
     const { result } = renderHook(() => useNavigator(), {
       wrapper: wrapper(router),
     });
     const callback = vi.fn();
     const unsubscribe = result.subscribe(callback);
 
-    expectTypeOf(unsubscribe).toBeFunction();
+    await result.navigate("about");
+
+    expect(callback).toHaveBeenCalled();
+
+    const callCount = callback.mock.calls.length;
 
     unsubscribe();
+
+    await result.navigate("home");
+
+    expect(callback).toHaveBeenCalledTimes(callCount);
   });
 
   it("should throw error if used outside RouterProvider", () => {

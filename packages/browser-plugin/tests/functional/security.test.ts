@@ -259,7 +259,7 @@ describe("Browser Plugin — Security", () => {
       // URL API should handle or reject this
       // Either it works (browser sanitizes) or returns undefined (rejected)
       // Both outcomes are acceptable - no crash
-      expect(typeof state).toBeDefined(); // No crash
+      expect(state === undefined || typeof state.name === "string").toBe(true);
 
       consoleSpy.mockRestore();
     });
@@ -308,8 +308,8 @@ describe("Browser Plugin — Security", () => {
       // Should complete quickly (< 100ms) even with long URL
       expect(duration).toBeLessThan(100);
 
-      // Result doesn't matter as long as it doesn't hang
-      expect(typeof state).toBeDefined();
+      // Result: either a state object or undefined — both acceptable
+      expect(state === undefined || typeof state.name === "string").toBe(true);
     });
   });
 

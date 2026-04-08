@@ -304,7 +304,7 @@ describe("useIsActiveRoute", () => {
         rerender({ routeName: routes[currentIndex] });
       }
 
-      expect(result.current).toBeDefined();
+      expect(result.current).toBeTypeOf("boolean");
     });
   });
 

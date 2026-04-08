@@ -1,3 +1,4 @@
+import { createRouter } from "@real-router/core";
 import { RouteUtils } from "@real-router/route-utils";
 import { renderHook } from "@testing-library/react";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
@@ -33,6 +34,9 @@ describe("useRouteUtils hook", () => {
     });
 
     expect(result.current).toBeInstanceOf(RouteUtils);
+    expect(result.current.getChain).toBeTypeOf("function");
+    expect(result.current.getSiblings).toBeTypeOf("function");
+    expect(result.current.isDescendantOf).toBeTypeOf("function");
   });
 
   it("should return same instance on re-render (WeakMap cache)", () => {
@@ -86,6 +90,30 @@ describe("useRouteUtils hook", () => {
 
     expect(result.current.getChain("nonexistent")).toBeUndefined();
     expect(result.current.getSiblings("nonexistent")).toBeUndefined();
+  });
+
+  it("should return different instances for different routers", async () => {
+    const router2 = createRouter(
+      [
+        { name: "alpha", path: "/alpha" },
+        { name: "beta", path: "/beta" },
+      ],
+      { defaultRoute: "alpha" },
+    );
+
+    await router2.start("/alpha");
+
+    const { result: result1 } = renderHook(() => useRouteUtils(), {
+      wrapper: wrapper(router),
+    });
+
+    const { result: result2 } = renderHook(() => useRouteUtils(), {
+      wrapper: wrapper(router2),
+    });
+
+    expect(result1.current).not.toBe(result2.current);
+
+    router2.stop();
   });
 
   it("should throw error if used outside RouterProvider", () => {

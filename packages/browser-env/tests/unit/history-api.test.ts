@@ -43,7 +43,8 @@ describe("history-api", () => {
     expect(removeSpy).toHaveBeenCalledWith("popstate", fn);
   });
 
-  it("getHash returns globalThis.location.hash", () => {
-    expect(getHash()).toBe(globalThis.location.hash);
+  it("getHash returns current location hash", () => {
+    // jsdom location.hash is "" by default
+    expect(getHash()).toBe("");
   });
 });

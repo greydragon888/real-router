@@ -112,6 +112,42 @@ describe("useRouterTransition", () => {
     expect(result.current.fromRoute).toBeNull();
   });
 
+  it("should set isLeaveApproved to true after deactivation guards pass", async () => {
+    const lifecycle = getLifecycleApi(router);
+    let resolveGuard!: (value: boolean) => void;
+
+    lifecycle.addActivateGuard("dashboard", () => () => {
+      return new Promise<boolean>((resolve) => {
+        resolveGuard = resolve;
+      });
+    });
+
+    let result: any;
+
+    renderWithRouter(router, TransitionCapture, {
+      onCapture: (r: unknown) => {
+        result = r;
+      },
+    });
+
+    expect(result.current.isLeaveApproved).toBe(false);
+
+    const navPromise = router.navigate("dashboard");
+
+    await Promise.resolve();
+    flushSync();
+
+    expect(result.current.isTransitioning).toBe(true);
+    expect(result.current.isLeaveApproved).toBe(true);
+
+    resolveGuard(true);
+    await navPromise;
+    flushSync();
+
+    expect(result.current.isTransitioning).toBe(false);
+    expect(result.current.isLeaveApproved).toBe(false);
+  });
+
   it("SSR: always returns IDLE_SNAPSHOT", () => {
     const freshRouter = createRouter([{ name: "home", path: "/" }]);
     let result: any;

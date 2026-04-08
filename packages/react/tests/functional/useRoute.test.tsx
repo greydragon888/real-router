@@ -32,11 +32,11 @@ describe("useRoute hook", () => {
       wrapper: wrapper(router),
     });
 
-    expect(result.current.navigator).toBeDefined();
-    expect(result.current.navigator.navigate).toBeDefined();
-    expect(result.current.navigator.getState).toBeDefined();
-    expect(result.current.navigator.isActiveRoute).toBeDefined();
-    expect(result.current.navigator.subscribe).toBeDefined();
+    expect(result.current.navigator).toBeTypeOf("object");
+    expect(result.current.navigator.navigate).toBeTypeOf("function");
+    expect(result.current.navigator.getState).toBeTypeOf("function");
+    expect(result.current.navigator.isActiveRoute).toBeTypeOf("function");
+    expect(result.current.navigator.subscribe).toBeTypeOf("function");
   });
 
   it("should return current route", async () => {
@@ -55,7 +55,25 @@ describe("useRoute hook", () => {
     expect(result.current.route?.name).toStrictEqual("items");
   });
 
+  it("should return previousRoute after navigation", async () => {
+    // Ensure we start on a known route
+    await router.navigate("test");
+
+    const { result } = renderHook(() => useRoute(), {
+      wrapper: wrapper(router),
+    });
+
+    expect(result.current.route?.name).toStrictEqual("test");
+
+    await act(async () => {
+      await router.navigate("home");
+    });
+
+    expect(result.current.route?.name).toStrictEqual("home");
+    expect(result.current.previousRoute?.name).toStrictEqual("test");
+  });
+
   it("should throw error if router instance was not passed to provider", () => {
-    expect(() => renderHook(() => useRoute())).toThrow();
+    expect(() => renderHook(() => useRoute())).toThrow("Provider");
   });
 });

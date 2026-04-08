@@ -285,11 +285,15 @@ describe("preload-plugin — touch", () => {
 
     const anchor = createAnchor("/");
 
+    const consoleSpy = vi.spyOn(console, "error");
+
     fireTouchStart(anchor);
     await waitForTimer(TOUCH_PRELOAD_DELAY);
 
-    expect(true).toBe(true);
+    // No preload function on route — should not error
+    expect(consoleSpy).not.toHaveBeenCalled();
 
+    consoleSpy.mockRestore();
     router.stop();
   });
 

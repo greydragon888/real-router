@@ -60,11 +60,15 @@ describe("preload-plugin — hover", () => {
 
     const anchor = createAnchor("/");
 
+    const consoleSpy = vi.spyOn(console, "error");
+
     fireMouseOver(anchor);
     await waitForTimer(65);
 
-    expect(true).toBe(true);
+    // No preload function on route — should not error
+    expect(consoleSpy).not.toHaveBeenCalled();
 
+    consoleSpy.mockRestore();
     router.stop();
   });
 
@@ -319,6 +323,98 @@ describe("preload-plugin — hover", () => {
     await waitForTimer(65);
 
     expect(preloadFn).toHaveBeenCalledTimes(1);
+
+    router.stop();
+  });
+
+  it("triggers preload immediately with delay:0", async () => {
+    const preloadFn = vi.fn().mockResolvedValue(undefined);
+    const { router } = createTestRouter([
+      { name: "home", path: "/", preload: preloadFn },
+    ]);
+
+    setupMatchUrl(router);
+    cleanup = router.usePlugin(preloadPluginFactory({ delay: 0 }));
+    await router.start("/");
+
+    const anchor = createAnchor("/");
+
+    fireMouseOver(anchor);
+
+    // With delay 0, setTimeout(fn, 0) fires on next tick
+    await waitForTimer(1);
+
+    expect(preloadFn).toHaveBeenCalledTimes(1);
+
+    router.stop();
+  });
+
+  it("does not preload the same route after it was already preloaded on prior hover", async () => {
+    const preloadFn = vi.fn().mockResolvedValue(undefined);
+    const { router } = createTestRouter([
+      { name: "home", path: "/", preload: preloadFn },
+    ]);
+
+    setupMatchUrl(router);
+    cleanup = router.usePlugin(preloadPluginFactory());
+    await router.start("/");
+
+    const anchor = createAnchor("/");
+
+    // First hover triggers preload
+    fireMouseOver(anchor);
+    await waitForTimer(65);
+
+    expect(preloadFn).toHaveBeenCalledTimes(1);
+
+    // Move away from anchor
+    const div = document.createElement("div");
+
+    document.body.append(div);
+    fireMouseOver(div);
+
+    // Re-hover the same anchor — preload fires again (no dedup)
+    fireMouseOver(anchor);
+    await waitForTimer(65);
+
+    expect(preloadFn).toHaveBeenCalledTimes(2);
+
+    router.stop();
+  });
+
+  it("handles rapid successive hovers on different anchors correctly", async () => {
+    const preloadA = vi.fn().mockResolvedValue(undefined);
+    const preloadB = vi.fn().mockResolvedValue(undefined);
+    const preloadC = vi.fn().mockResolvedValue(undefined);
+    const { router } = createTestRouter([
+      { name: "home", path: "/", preload: preloadA },
+      { name: "about", path: "/about", preload: preloadB },
+      {
+        name: "users",
+        path: "/users",
+        children: [{ name: "view", path: "/:id", preload: preloadC }],
+      },
+    ]);
+
+    setupMatchUrl(router);
+    cleanup = router.usePlugin(preloadPluginFactory());
+    await router.start("/");
+
+    const anchorA = createAnchor("/");
+    const anchorB = createAnchor("/about");
+    const anchorC = createAnchor("/users/1");
+
+    // Rapid succession: A -> B -> C within the delay window
+    fireMouseOver(anchorA);
+    fireMouseOver(anchorB);
+    fireMouseOver(anchorC);
+
+    await waitForTimer(65);
+
+    // Only the last hover target (C) should trigger preload
+    expect(preloadA).not.toHaveBeenCalled();
+    expect(preloadB).not.toHaveBeenCalled();
+    expect(preloadC).toHaveBeenCalledTimes(1);
 
     router.stop();
   });

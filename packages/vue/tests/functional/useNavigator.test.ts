@@ -43,11 +43,11 @@ describe("useNavigator composable", () => {
   it("should return navigator with 4 methods", () => {
     const { result } = mountWithRouter(router, () => useNavigator());
 
-    expect(result).toBeDefined();
-    expect(result.navigate).toBeDefined();
-    expect(result.getState).toBeDefined();
-    expect(result.isActiveRoute).toBeDefined();
-    expect(result.subscribe).toBeDefined();
+    expect(result).toBeTypeOf("object");
+    expect(result.navigate).toBeTypeOf("function");
+    expect(result.getState).toBeTypeOf("function");
+    expect(result.isActiveRoute).toBeTypeOf("function");
+    expect(result.subscribe).toBeTypeOf("function");
   });
 
   it("should have working navigate method", async () => {
@@ -62,25 +62,34 @@ describe("useNavigator composable", () => {
     const { result } = mountWithRouter(router, () => useNavigator());
     const state = result.getState();
 
-    expect(state).toBeDefined();
-    expect(state?.name).toBeDefined();
+    expect(state).not.toBeNull();
+    expect(state!.name).toBeTypeOf("string");
   });
 
   it("should have working isActiveRoute method", () => {
     const { result } = mountWithRouter(router, () => useNavigator());
     const state = result.getState();
 
-    expect(result.isActiveRoute(state?.name ?? "")).toBe(true);
+    expect(state).not.toBeNull();
+    expect(result.isActiveRoute(state!.name)).toBe(true);
   });
 
-  it("should have working subscribe method and return unsubscribe fn", () => {
+  it("should have working subscribe method and return unsubscribe fn", async () => {
     const { result } = mountWithRouter(router, () => useNavigator());
     const callback = vi.fn();
     const unsubscribe = result.subscribe(callback);
 
-    expect(unsubscribe).toBeDefined();
+    await result.navigate("about");
+
+    expect(callback).toHaveBeenCalled();
+
+    const callCount = callback.mock.calls.length;
 
     unsubscribe();
+
+    await result.navigate("home");
+
+    expect(callback).toHaveBeenCalledTimes(callCount);
   });
 
   it("should throw error if used outside RouterProvider", () => {

@@ -1,4 +1,5 @@
 import { renderHook } from "@solidjs/testing-library";
+import { createEffect } from "solid-js";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import { RouterProvider, useRoute } from "@real-router/solid";
@@ -47,7 +48,53 @@ describe("useRoute hook", () => {
     expect(result().route?.name).toStrictEqual("items");
   });
 
+  it("should update previousRoute after navigation", async () => {
+    const { result } = renderHook(() => useRoute(), {
+      wrapper: wrapper(router),
+    });
+
+    // Navigate to a known route first
+    await router.navigate("home");
+
+    expect(result().route?.name).toStrictEqual("home");
+
+    await router.navigate("items");
+
+    expect(result().route?.name).toStrictEqual("items");
+    expect(result().previousRoute?.name).toStrictEqual("home");
+  });
+
   it("should throw error if router instance was not passed to provider", () => {
     expect(() => renderHook(() => useRoute())).toThrow();
+  });
+
+  it("should fire effects the correct number of times on navigations", async () => {
+    let effectRunCount = 0;
+
+    // Ensure known starting route
+    await router.navigate("test").catch(() => {});
+
+    renderHook(
+      () => {
+        const routeState = useRoute();
+
+        createEffect(() => {
+          // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+          routeState().route?.name;
+          effectRunCount++;
+        });
+      },
+      { wrapper: wrapper(router) },
+    );
+
+    expect(effectRunCount).toBe(1);
+
+    await router.navigate("home");
+
+    expect(effectRunCount).toBe(2);
+
+    await router.navigate("about");
+
+    expect(effectRunCount).toBe(3);
   });
 });
