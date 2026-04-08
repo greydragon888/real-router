@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-04-08]
+
+### @real-router/fsm@0.3.0
+
+### Minor Changes
+
+- [#429](https://github.com/greydragon888/real-router/pull/429) [`15e7758`](https://github.com/greydragon888/real-router/commit/15e7758ed2ef4536bf332ac30cdace880951acea) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(fsm): on() unsubscribe no longer deletes overwritten action ([#427](https://github.com/greydragon888/real-router/issues/427))
+
+### @real-router/core@0.45.3
+
+### Patch Changes
+
+- Updated dependencies [[`15e7758`](https://github.com/greydragon888/real-router/commit/15e7758ed2ef4536bf332ac30cdace880951acea)]:
+  - @real-router/fsm@0.3.0
+
 ## [2026-04-07]
 
 ### @real-router/browser-plugin@0.11.6
