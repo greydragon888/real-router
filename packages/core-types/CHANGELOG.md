@@ -1,5 +1,11 @@
 # @real-router/types
 
+## 0.32.0
+
+### Minor Changes
+
+- [#432](https://github.com/greydragon888/real-router/pull/432) [`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `signal: AbortSignal` to `LeaveState` and extend `LeaveFn` return type to `void | Promise<void>` ([#391](https://github.com/greydragon888/real-router/issues/391))
+
 ## 0.31.2
 
 ### Patch Changes

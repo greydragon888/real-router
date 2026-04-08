@@ -7,6 +7,167 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-04-08]
 
+### @real-router/core@0.46.0
+
+### Minor Changes
+
+- [#432](https://github.com/greydragon888/real-router/pull/432) [`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1) Thanks [@greydragon888](https://github.com/greydragon888)! - Support async `subscribeLeave` listeners for exit animations and View Transitions ([#391](https://github.com/greydragon888/real-router/issues/391))
+
+  Leave listeners move from EventEmitter to separate array with `Promise.allSettled` error handling. Independent listeners survive each other's failures. `AbortSignal` enables cooperative cancellation on concurrent navigation.
+
+### Patch Changes
+
+- [#432](https://github.com/greydragon888/real-router/pull/432) [`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1) Thanks [@greydragon888](https://github.com/greydragon888)! - Optimize navigate hot path for async leave overhead ([#391](https://github.com/greydragon888/real-router/issues/391))
+
+  Skip `AbortController.abort()` on sync leave path, defer `NavigationContext` to async branch, move `isCurrentNav` closure to guards block. Benchmarks vs master: 0 listeners −29%, 1 sync listener −7%, 3 sync listeners −11%.
+
+- Updated dependencies [[`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1)]:
+  - @real-router/types@0.32.0
+
+### @real-router/types@0.32.0
+
+### Minor Changes
+
+- [#432](https://github.com/greydragon888/real-router/pull/432) [`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `signal: AbortSignal` to `LeaveState` and extend `LeaveFn` return type to `void | Promise<void>` ([#391](https://github.com/greydragon888/real-router/issues/391))
+
+### @real-router/browser-plugin@0.11.7
+
+### Patch Changes
+
+- Updated dependencies [[`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1), [`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1)]:
+  - @real-router/core@0.46.0
+
+### @real-router/hash-plugin@0.2.14
+
+### Patch Changes
+
+- Updated dependencies [[`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1), [`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1)]:
+  - @real-router/core@0.46.0
+
+### @real-router/lifecycle-plugin@0.1.4
+
+### Patch Changes
+
+- Updated dependencies [[`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1), [`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1)]:
+  - @real-router/core@0.46.0
+
+### @real-router/logger-plugin@0.4.4
+
+### Patch Changes
+
+- Updated dependencies [[`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1), [`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1)]:
+  - @real-router/core@0.46.0
+
+### @real-router/memory-plugin@0.1.3
+
+### Patch Changes
+
+- Updated dependencies [[`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1), [`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1)]:
+  - @real-router/core@0.46.0
+
+### @real-router/persistent-params-plugin@0.1.52
+
+### Patch Changes
+
+- Updated dependencies [[`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1), [`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1)]:
+  - @real-router/core@0.46.0
+
+### @real-router/preact@0.2.10
+
+### Patch Changes
+
+- Updated dependencies [[`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1), [`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1)]:
+  - @real-router/core@0.46.0
+  - @real-router/sources@0.4.4
+  - @real-router/route-utils@0.1.14
+
+### @real-router/preload-plugin@0.1.4
+
+### Patch Changes
+
+- Updated dependencies [[`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1), [`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1)]:
+  - @real-router/core@0.46.0
+
+### @real-router/react@0.14.10
+
+### Patch Changes
+
+- Updated dependencies [[`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1), [`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1)]:
+  - @real-router/core@0.46.0
+  - @real-router/sources@0.4.4
+  - @real-router/route-utils@0.1.14
+
+### @real-router/route-utils@0.1.14
+
+### Patch Changes
+
+- Updated dependencies [[`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1)]:
+  - @real-router/types@0.32.0
+
+### @real-router/rx@0.2.4
+
+### Patch Changes
+
+- Updated dependencies [[`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1), [`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1)]:
+  - @real-router/core@0.46.0
+
+### @real-router/search-schema-plugin@0.1.3
+
+### Patch Changes
+
+- Updated dependencies [[`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1), [`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1)]:
+  - @real-router/core@0.46.0
+
+### @real-router/solid@0.2.10
+
+### Patch Changes
+
+- Updated dependencies [[`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1), [`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1)]:
+  - @real-router/core@0.46.0
+  - @real-router/sources@0.4.4
+  - @real-router/route-utils@0.1.14
+
+### @real-router/sources@0.4.4
+
+### Patch Changes
+
+- Updated dependencies [[`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1), [`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1)]:
+  - @real-router/core@0.46.0
+  - @real-router/route-utils@0.1.14
+
+### @real-router/ssr-data-plugin@0.1.10
+
+### Patch Changes
+
+- Updated dependencies [[`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1), [`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1)]:
+  - @real-router/core@0.46.0
+
+### @real-router/svelte@0.2.10
+
+### Patch Changes
+
+- Updated dependencies [[`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1), [`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1)]:
+  - @real-router/core@0.46.0
+  - @real-router/sources@0.4.4
+  - @real-router/route-utils@0.1.14
+
+### @real-router/validation-plugin@0.4.4
+
+### Patch Changes
+
+- Updated dependencies [[`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1), [`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1)]:
+  - @real-router/core@0.46.0
+
+### @real-router/vue@0.3.5
+
+### Patch Changes
+
+- Updated dependencies [[`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1), [`f5f2abc`](https://github.com/greydragon888/real-router/commit/f5f2abc7fd525b2eb0cea1b3e701059ee75cc3f1)]:
+  - @real-router/core@0.46.0
+  - @real-router/sources@0.4.4
+  - @real-router/route-utils@0.1.14
+
+
 ### @real-router/fsm@0.3.0
 
 ### Minor Changes
