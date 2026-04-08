@@ -35,7 +35,7 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
   });
 
   describe("RFC §9.4 — pipeline ordering", () => {
-    it("1. full pipeline order: START → deactivate → LEAVE_APPROVE → activate → SUCCESS (invocationCallOrder)", async () => {
+    it("full pipeline order: START → deactivate → LEAVE_APPROVE → activate → SUCCESS (invocationCallOrder)", async () => {
       const onTransitionStart = vi.fn();
       const deactivationGuard = vi.fn().mockReturnValue(true);
       const onLeaveApprove = vi.fn();
@@ -70,7 +70,7 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
       expect(activateOrder).toBeLessThan(successOrder);
     });
 
-    it("2. FSM state: TRANSITION_STARTED → LEAVE_APPROVED → READY across navigation lifecycle", async () => {
+    it("FSM state: TRANSITION_STARTED → LEAVE_APPROVED → READY across navigation lifecycle", async () => {
       const observed = {
         onStart: { isTransitioning: false, isLeaveApproved: false },
         onLeaveApprove: { isTransitioning: false, isLeaveApproved: false },
@@ -115,7 +115,7 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
       expect(observed.onSuccess.isLeaveApproved).toBe(false);
     });
 
-    it("3. usePlugin() onTransitionLeaveApprove hook called with (toState, fromState)", async () => {
+    it("usePlugin() onTransitionLeaveApprove hook called with (toState, fromState)", async () => {
       const onLeaveApprove = vi.fn();
 
       router.usePlugin(() => ({ onTransitionLeaveApprove: onLeaveApprove }));
@@ -129,7 +129,7 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
       );
     });
 
-    it("4. subscribeLeave fires before subscribe: correct payload shapes and invocationCallOrder", async () => {
+    it("subscribeLeave fires before subscribe: correct payload shapes and invocationCallOrder", async () => {
       const leaveListener = vi.fn();
       const successListener = vi.fn();
 
@@ -165,7 +165,7 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
       unsubSuccess();
     });
 
-    it("5. blocked deactivation: CANNOT_DEACTIVATE → no LEAVE_APPROVE, subscribeLeave NOT called, FSM → READY", async () => {
+    it("blocked deactivation: CANNOT_DEACTIVATE → no LEAVE_APPROVE, subscribeLeave NOT called, FSM → READY", async () => {
       const leaveListener = vi.fn();
 
       lifecycle.addDeactivateGuard("home", () => () => false);
@@ -183,7 +183,7 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
       unsubLeave();
     });
 
-    it("6. zero-guard path: subscribeLeave fires via direct emitLeaveApproveCallback, router.subscribe receives result", async () => {
+    it("zero-guard path: subscribeLeave fires via direct emitLeaveApproveCallback, router.subscribe receives result", async () => {
       const leaveListener = vi.fn();
       const successListener = vi.fn();
 
@@ -207,7 +207,7 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
       unsubSuccess();
     });
 
-    it("7. reentrant navigate from subscribeLeave() on no-guards path: original cancelled, reentrant nav succeeds", async () => {
+    it("reentrant navigate from subscribeLeave() on no-guards path: original cancelled, reentrant nav succeeds", async () => {
       let reentrantNavPromise: Promise<unknown> | undefined;
       let fired = false;
 
@@ -233,7 +233,7 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
   });
 
   describe("RFC §8.6 — edge cases", () => {
-    it("8. error thrown in subscribeLeave listener propagates to pipeline: TRANSITION_ERROR, navigation cancelled", async () => {
+    it("error thrown in subscribeLeave listener propagates to pipeline: TRANSITION_ERROR, navigation cancelled", async () => {
       const onError = vi.fn();
       const successListener = vi.fn();
 
@@ -262,7 +262,7 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
       unsubSuccess();
     });
 
-    it("9. dispose() during LEAVE_APPROVED: navigation cancelled, router disposed", async () => {
+    it("dispose() during LEAVE_APPROVED: navigation cancelled, router disposed", async () => {
       vi.useFakeTimers();
 
       lifecycle.addDeactivateGuard("home", () => () => true);
@@ -303,7 +303,7 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
       vi.useRealTimers();
     });
 
-    it("10. stop() during LEAVE_APPROVED: navigation cancelled, router stopped", async () => {
+    it("stop() during LEAVE_APPROVED: navigation cancelled, router stopped", async () => {
       vi.useFakeTimers();
 
       lifecycle.addDeactivateGuard("home", () => () => true);
@@ -344,7 +344,7 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
       vi.useRealTimers();
     });
 
-    it("11. navigateToNotFound() bypasses pipeline: subscribeLeave NOT called", () => {
+    it("navigateToNotFound() bypasses pipeline: subscribeLeave NOT called", () => {
       const leaveListener = vi.fn();
 
       const unsubLeave = router.subscribeLeave(leaveListener);
@@ -356,7 +356,7 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
       unsubLeave();
     });
 
-    it("12. cloneRouter() does not copy subscribeLeave listeners from original", async () => {
+    it("cloneRouter() does not copy subscribeLeave listeners from original", async () => {
       const leaveListener = vi.fn();
 
       const unsubLeave = router.subscribeLeave(leaveListener);
@@ -373,7 +373,7 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
       unsubLeave();
     });
 
-    it("13. forceDeactivate: true skips deactivation guard but LEAVE_APPROVE still fires via subscribeLeave", async () => {
+    it("forceDeactivate: true skips deactivation guard but LEAVE_APPROVE still fires via subscribeLeave", async () => {
       const deactivateGuard = vi.fn().mockReturnValue(false);
       const leaveListener = vi.fn();
 
@@ -395,7 +395,7 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
       unsubLeave();
     });
 
-    it("14. activation guard blocks after LEAVE_APPROVE: subscribeLeave WAS called, route unchanged", async () => {
+    it("activation guard blocks after LEAVE_APPROVE: subscribeLeave WAS called, route unchanged", async () => {
       const leaveListener = vi.fn();
 
       const unsubLeave = router.subscribeLeave(leaveListener);
@@ -412,7 +412,7 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
       unsubLeave();
     });
 
-    it("15. async concurrent cancel: first nav cancelled before LEAVE_APPROVE, only second nav fires subscribeLeave", async () => {
+    it("async concurrent cancel: first nav cancelled before LEAVE_APPROVE, only second nav fires subscribeLeave", async () => {
       vi.useFakeTimers();
 
       const leaveListener = vi.fn();
