@@ -1,6 +1,5 @@
 import { RouterError } from "@real-router/core";
-
-import { extractPath } from "./url-utils";
+import { extractPath } from "browser-env";
 
 import type { NavigationBrowser, NavigationMeta } from "./types";
 import type { Router } from "@real-router/core";

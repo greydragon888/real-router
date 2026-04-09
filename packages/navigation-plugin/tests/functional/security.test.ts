@@ -1,8 +1,8 @@
 import { createRouter } from "@real-router/core";
+import { urlToPath } from "browser-env";
 import { describe, expect, it } from "vitest";
 
 import { navigationPluginFactory } from "../../src/factory";
-import { urlToPath } from "../../src/url-utils";
 import { MockNavigation } from "../helpers/mockNavigation";
 import {
   createMockNavigationBrowser,
@@ -32,25 +32,25 @@ describe("Cross-Origin Filtering", () => {
 
 describe("Protocol Validation", () => {
   it("urlToPath rejects ftp:// protocol", () => {
-    expect(urlToPath("ftp://files.example.com/doc", "")).toBeNull();
+    expect(urlToPath("ftp://files.example.com/doc", "", "test")).toBeNull();
   });
 
   it("urlToPath rejects javascript: protocol", () => {
-    expect(urlToPath("javascript:alert(1)", "")).toBeNull();
+    expect(urlToPath("javascript:alert(1)", "", "test")).toBeNull();
   });
 
   it("urlToPath rejects data: protocol", () => {
-    expect(urlToPath("data:text/html,<h1>hi</h1>", "")).toBeNull();
+    expect(urlToPath("data:text/html,<h1>hi</h1>", "", "test")).toBeNull();
   });
 
   it("urlToPath accepts http:// protocol", () => {
-    const result = urlToPath("http://localhost/users", "");
+    const result = urlToPath("http://localhost/users", "", "test");
 
     expect(result).toBe("/users");
   });
 
   it("urlToPath accepts https:// protocol", () => {
-    const result = urlToPath("https://example.com/users", "");
+    const result = urlToPath("https://example.com/users", "", "test");
 
     expect(result).toBe("/users");
   });

@@ -5,9 +5,11 @@ import {
   createReplaceHistoryState,
   shouldReplaceHistory,
   updateBrowserState,
+  buildUrl,
+  urlToPath,
 } from "browser-env";
 
-import { buildUrl, urlToPath } from "./url-utils";
+import { LOGGER_CONTEXT } from "./constants";
 
 import type { BrowserPluginOptions } from "./types";
 import type {
@@ -53,7 +55,7 @@ export class BrowserPlugin {
     this.#removeExtensions = api.extendRouter({
       buildUrl: pluginBuildUrl,
       matchUrl: (url: string) => {
-        const path = urlToPath(url, options.base);
+        const path = urlToPath(url, options.base, LOGGER_CONTEXT);
 
         return path ? api.matchPath(path) : undefined;
       },

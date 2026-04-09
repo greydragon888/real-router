@@ -36,3 +36,5 @@ export {
 } from "./plugin-utils";
 
 export { safeParseUrl } from "./url-parsing";
+
+export { extractPath, buildUrl, urlToPath } from "./url-utils";

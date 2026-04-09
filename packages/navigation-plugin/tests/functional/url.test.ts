@@ -1,9 +1,9 @@
 import { createRouter } from "@real-router/core";
+import { buildUrl, extractPath, urlToPath } from "browser-env";
 import { describe, expect, it } from "vitest";
 
 import { navigationPluginFactory } from "../../src/factory";
 import { createNavigationFallbackBrowser } from "../../src/ssr-fallback";
-import { buildUrl, extractPath, urlToPath } from "../../src/url-utils";
 import { MockNavigation } from "../helpers/mockNavigation";
 import {
   createMockNavigationBrowser,
@@ -40,27 +40,43 @@ describe("buildUrl", () => {
 
 describe("urlToPath", () => {
   it("parses absolute URL and extracts path with search", () => {
-    const result = urlToPath("http://localhost/users?page=1", "");
+    const result = urlToPath(
+      "http://localhost/users?page=1",
+      "",
+      "navigation-plugin",
+    );
 
     expect(result).toBe("/users?page=1");
   });
 
   it("returns null for invalid URL", () => {
-    const result = urlToPath("not-a-valid-url-at-all://broken", "");
+    const result = urlToPath(
+      "not-a-valid-url-at-all://broken",
+      "",
+      "navigation-plugin",
+    );
 
     expect(result).toBeNull();
   });
 
   it("returns null for non-HTTP URL (ftp://)", () => {
-    expect(urlToPath("ftp://files.example.com/doc", "")).toBeNull();
+    expect(
+      urlToPath("ftp://files.example.com/doc", "", "navigation-plugin"),
+    ).toBeNull();
   });
 
   it("returns null for non-HTTP URL (javascript:)", () => {
-    expect(urlToPath("javascript:alert(1)", "")).toBeNull();
+    expect(
+      urlToPath("javascript:alert(1)", "", "navigation-plugin"),
+    ).toBeNull();
   });
 
   it("handles URL with base path correctly", () => {
-    const result = urlToPath("http://localhost/app/users?tab=active", "/app");
+    const result = urlToPath(
+      "http://localhost/app/users?tab=active",
+      "/app",
+      "navigation-plugin",
+    );
 
     expect(result).toBe("/users?tab=active");
   });

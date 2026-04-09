@@ -1,6 +1,4 @@
-import { safelyEncodePath } from "browser-env";
-
-import { extractPath } from "./url-utils";
+import { safelyEncodePath, extractPath } from "browser-env";
 
 import type { NavigationBrowser } from "./types";
 

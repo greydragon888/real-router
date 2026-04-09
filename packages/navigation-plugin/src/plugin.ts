@@ -1,6 +1,12 @@
 import { UNKNOWN_ROUTE } from "@real-router/core";
-import { shouldReplaceHistory } from "browser-env";
+import {
+  shouldReplaceHistory,
+  buildUrl,
+  extractPath,
+  urlToPath,
+} from "browser-env";
 
+import { LOGGER_CONTEXT } from "./constants";
 import {
   peekBack,
   peekForward,
@@ -17,7 +23,6 @@ import {
   createStartInterceptor,
   createReplaceHistoryState,
 } from "./plugin-utils";
-import { buildUrl, extractPath, urlToPath } from "./url-utils";
 
 import type {
   NavigationBrowser,
@@ -92,7 +97,7 @@ export class NavigationPlugin {
     this.#removeExtensions = api.extendRouter({
       buildUrl: pluginBuildUrl,
       matchUrl: (url: string) => {
-        const path = urlToPath(url, options.base);
+        const path = urlToPath(url, options.base, LOGGER_CONTEXT);
 
         return path ? api.matchPath(path) : undefined;
       },
