@@ -33,6 +33,7 @@ export const SCOPES = [
   "validation-plugin",
   "search-schema-plugin",
   "memory-plugin",
+  "navigation-plugin",
   "react",
   "preact",
   "solid",

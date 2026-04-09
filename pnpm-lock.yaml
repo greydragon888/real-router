@@ -3208,6 +3208,19 @@ importers:
         specifier: workspace:^
         version: link:../core
 
+  packages/navigation-plugin:
+    dependencies:
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../core
+    devDependencies:
+      browser-env:
+        specifier: workspace:^
+        version: link:../browser-env
+      jsdom:
+        specifier: 28.1.0
+        version: 28.1.0
+
   packages/path-matcher: {}
 
   packages/persistent-params-plugin:
