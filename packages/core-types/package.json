@@ -39,8 +39,7 @@
   "scripts": {
     "build": "tsdown --config-loader unrun",
     "type-check": "tsc --noEmit",
-    "lint": "eslint --cache --ext .ts src/ --fix --max-warnings 0",
-    "build:dist-only": "tsdown --config-loader unrun"
+    "lint": "eslint --cache --ext .ts src/ --fix --max-warnings 0"
   },
   "sideEffects": false
 }

@@ -37,8 +37,7 @@
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts,.tsx src/ tests/ --fix --max-warnings 0",
     "lint:package": "publint",
-    "lint:types": "attw --pack .",
-    "build:dist-only": "rimraf dist && tsc -p tsconfig.build.json && rollup -c rollup.config.mjs"
+    "lint:types": "attw --pack ."
   },
   "keywords": [
     "router",

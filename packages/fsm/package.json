@@ -49,8 +49,7 @@
     "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
     "lint:package": "publint",
     "lint:types": "attw --pack .",
-    "bench": "NODE_OPTIONS='--expose-gc --max-old-space-size=4096' npx tsx tests/benchmarks/index.ts",
-    "build:dist-only": "tsdown --config-loader unrun"
+    "bench": "NODE_OPTIONS='--expose-gc --max-old-space-size=4096' npx tsx tests/benchmarks/index.ts"
   },
   "sideEffects": false
 }

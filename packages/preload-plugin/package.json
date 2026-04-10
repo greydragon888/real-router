@@ -50,7 +50,6 @@
     "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
     "lint:package": "publint",
     "lint:types": "attw --pack .",
-    "build:dist-only": "tsdown --config-loader unrun",
     "test:properties": "vitest --config vitest.config.properties.mts --run"
   },
   "sideEffects": false,

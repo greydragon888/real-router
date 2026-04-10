@@ -32,26 +32,34 @@ function workspaceSourceAliases(): Record<string, string> {
       if (typeof conditions !== "object" || !conditions) continue;
       const cond = conditions as Record<string, unknown>;
 
-      // Derive source path from the ESM dist path
+      // Prefer the new "@real-router/source" custom condition if present,
+      // otherwise fall back to deriving from the ESM dist path.
+      const sourceCondition = cond["@real-router/source"];
       const importPath = (cond.import as string) || "";
-      const srcFile = importPath
-        .replace(/^\.\/dist\/esm\//, "./src/")
-        .replace(/\.mjs$/, ".ts");
 
-      if (!srcFile.endsWith(".ts")) continue;
+      let srcFileCandidates: string[] = [];
+      if (typeof sourceCondition === "string") {
+        srcFileCandidates = [sourceCondition];
+      } else if (importPath) {
+        const stripped = importPath
+          .replace(/^\.\/dist\/esm\//, "./src/")
+          .replace(/\.mjs$/, "");
+        srcFileCandidates = [
+          `${stripped}.ts`,
+          `${stripped}.tsx`,
+          `${stripped}/index.ts`,
+          `${stripped}/index.tsx`,
+        ];
+      }
 
-      // Try direct file first, then index.ts in directory
-      const directPath = join(packagesDir, dir.name, srcFile);
-      const indexPath = join(
-        packagesDir,
-        dir.name,
-        srcFile.replace(/\.ts$/, "/index.ts"),
-      );
-      const fullSrcPath = existsSync(directPath)
-        ? directPath
-        : existsSync(indexPath)
-          ? indexPath
-          : null;
+      let fullSrcPath: string | null = null;
+      for (const candidate of srcFileCandidates) {
+        const absolute = join(packagesDir, dir.name, candidate);
+        if (existsSync(absolute)) {
+          fullSrcPath = absolute;
+          break;
+        }
+      }
 
       if (!fullSrcPath) continue;
 

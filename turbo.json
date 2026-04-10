@@ -33,19 +33,6 @@
       "outputLogs": "errors-only",
       "cache": true
     },
-    "build:dist-only": {
-      "dependsOn": ["^build:dist-only"],
-      "outputs": ["dist/**"],
-      "inputs": [
-        "src/**/*.{ts,tsx,vue,svelte}",
-        "tsdown.config.*",
-        "tsconfig.json",
-        "package.json"
-      ],
-      "env": ["NODE_ENV"],
-      "outputLogs": "errors-only",
-      "cache": true
-    },
     "test:e2e": {
       "dependsOn": ["^build"],
       "outputs": [],
@@ -112,7 +99,7 @@
       "cache": true
     },
     "type-check": {
-      "dependsOn": ["build:dist-only", "^build:dist-only"],
+      "dependsOn": [],
       "outputs": [],
       "inputs": [
         "**/*.{ts,tsx,vue,svelte}",
@@ -125,13 +112,13 @@
       "cache": true
     },
     "lint:package": {
-      "dependsOn": ["build:dist-only"],
+      "dependsOn": ["build"],
       "outputs": [],
       "inputs": ["dist/**", "package.json"],
       "cache": true
     },
     "lint:types": {
-      "dependsOn": ["build:dist-only"],
+      "dependsOn": ["build"],
       "outputs": [],
       "inputs": ["dist/**", "package.json"],
       "cache": true
