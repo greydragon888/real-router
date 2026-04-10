@@ -2,7 +2,7 @@
 
 > Simple, powerful, view-agnostic, modular and extensible router
 
-pnpm monorepo with 31 packages + 75 example applications. Run `pnpm install` after cloning.
+pnpm monorepo with 30 packages + bare `shared/` sources (symlinked into adapters' `src/dom-utils`) + 75 example applications. Run `pnpm install` after cloning.
 
 ## Rules
 
@@ -163,7 +163,6 @@ When adding packages or features, keep these root files in sync:
 - [packages/navigation-plugin/CLAUDE.md](packages/navigation-plugin/CLAUDE.md) — Navigation API plugin architecture
 - [packages/path-matcher/CLAUDE.md](packages/path-matcher/CLAUDE.md) — Segment trie URL matcher, encoding, constraints
 - [packages/route-tree/CLAUDE.md](packages/route-tree/CLAUDE.md) — Route tree builder, matcher factory, validation
-- [packages/dom-utils/.claude/CLAUDE.md](packages/dom-utils/CLAUDE.md) — DOM utilities (route announcer, link helpers)
 - [packages/fsm/CLAUDE.md](packages/fsm/CLAUDE.md) — FSM engine internals
 - [packages/router-benchmarks/CLAUDE.md](packages/router-benchmarks/CLAUDE.md) — Benchmark suite
 - [MCP Servers Guide](.claude/mcp-guide.md)

@@ -1,9 +1,9 @@
 import { getNavigator } from "@real-router/core";
 import { createRouteSource } from "@real-router/sources";
-import { createRouteAnnouncer } from "dom-utils";
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 
 import { NavigatorContext, RouteContext, RouterContext } from "./context";
+import { createRouteAnnouncer } from "./dom-utils/index.js";
 
 import type { Router } from "@real-router/core";
 import type { FC, ReactNode } from "react";

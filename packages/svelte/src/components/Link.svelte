@@ -1,7 +1,11 @@
 <script lang="ts">
   import { useIsActiveRoute } from "../composables/useIsActiveRoute.svelte";
   import { useRouter } from "../composables/useRouter.svelte";
-  import { shouldNavigate, buildHref, buildActiveClassName } from "dom-utils";
+  import {
+    shouldNavigate,
+    buildHref,
+    buildActiveClassName,
+  } from "../dom-utils/index.js";
 
   import type { NavigationOptions, Params } from "@real-router/core";
   import type { Snippet } from "svelte";

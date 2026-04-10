@@ -390,6 +390,17 @@ pnpm lint:e2e         # Verify e2e directories have spec files
 pnpm lint:unused      # Check for unused code (knip)
 ```
 
+### Windows: enable symlinks
+
+The repo uses git-tracked symlinks to share source files across framework adapters (`packages/*/src/dom-utils` → `shared/dom-utils/` — see [IMPLEMENTATION_NOTES.md](IMPLEMENTATION_NOTES.md) for the rationale). Unix/macOS/Linux contributors need no extra setup. Windows contributors need a one-time configuration:
+
+```bash
+# 1. Enable symlink support in git (one-time, global)
+git config --global core.symlinks true
+```
+
+Additionally, enable [Developer Mode](https://learn.microsoft.com/en-us/windows/apps/get-started/developer-mode-features-and-debugging) in Windows Settings, or run git from an elevated shell. After enabling both, re-clone the repo (or run `git checkout` on an existing clone) to materialize the symlinks. Without this, `pnpm install`, `pnpm build`, and `pnpm test` fail with "file not found" errors for paths under `src/dom-utils/`.
+
 See [CONTRIBUTING.md](CONTRIBUTING.md) for full development setup, coding standards, and PR guidelines.
 
 ## Contributing

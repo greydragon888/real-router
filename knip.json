@@ -19,18 +19,34 @@
       "project": ["src/**/*.{ts,tsx}", "client-nav/**/*.{ts,tsx}"],
       "ignoreDependencies": ["@tanstack/router-core"]
     },
+    "packages/react": {
+      "project": ["src/**/*.{ts,tsx}"],
+      "ignore": ["src/dom-utils/**"],
+      "vitest": {
+        "config": ["vitest.config.mts", "vitest.config.*.mts"]
+      }
+    },
+    "packages/preact": {
+      "project": ["src/**/*.{ts,tsx}"],
+      "ignore": ["src/dom-utils/**"],
+      "vitest": {
+        "config": ["vitest.config.mts", "vitest.config.*.mts"]
+      }
+    },
+    "packages/vue": {
+      "project": ["src/**/*.ts"],
+      "ignore": ["src/dom-utils/**"],
+      "vitest": {
+        "config": ["vitest.config.mts"]
+      }
+    },
     "packages/solid": {
       "project": ["src/**/*.{ts,tsx}"],
+      "ignore": ["src/dom-utils/**"],
       "vitest": {
         "config": ["vitest.config.mts"]
       },
       "ignoreDependencies": ["@babel/preset-typescript", "babel-preset-solid"]
-    },
-    "packages/vue": {
-      "project": ["src/**/*.ts"],
-      "vitest": {
-        "config": ["vitest.config.mts"]
-      }
     },
     "packages/svelte": {
       "project": ["src/**/*.{ts,svelte,svelte.ts}"],
@@ -39,6 +55,13 @@
         "config": ["vitest.config.mts"]
       },
       "ignoreDependencies": ["@real-router/browser-plugin"]
+    },
+    "packages/dom-utils": {
+      "entry": ["tests/**/*.{ts,tsx}"],
+      "project": ["tests/**/*.ts"],
+      "vitest": {
+        "config": ["vitest.config.mts", "vitest.config.*.mts"]
+      }
     },
     "packages/*": {
       "project": ["src/**/*.{ts,tsx}"],

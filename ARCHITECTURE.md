@@ -42,13 +42,14 @@ real-router/
 │   ├── route-utils/               # Route tree queries and segment testing
 │   ├── logger/                    # Isomorphic structured logging
 │   ├── fsm/                       # Finite state machine engine (internal, published by accident)
-│   ├── dom-utils/                 # Shared DOM utilities for adapters: route announcer, link helpers (internal)
 │   ├── browser-env/               # Shared browser abstractions for plugins (internal)
 │   ├── event-emitter/             # Generic typed event emitter (internal)
 │   ├── route-tree/                # Route tree building, validation, matcher facade (internal)
 │   ├── path-matcher/              # Segment Trie URL matching and path building (internal)
 │   ├── search-params/             # Query string handling (internal)
 │   └── type-guards/               # Runtime type validation (internal)
+├── shared/                         # Bare source files shared across adapters via src/ symlinks
+│   └── dom-utils/                 # Shared DOM utilities for adapters: route announcer, link helpers
 ├── examples/
 │   ├── shared/                    # Shared store, API, abilities, styles
 │   ├── react/    (17 examples)    # React 19.2+ examples + 9 e2e suites
@@ -62,7 +63,9 @@ real-router/
 
 **Public packages** (published to npm): `core`, `core-types`, `react`, `preact`, `solid`, `vue`, `svelte`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `lifecycle-plugin`, `preload-plugin`, `memory-plugin`, `navigation-plugin`, `validation-plugin`, `search-schema-plugin`, `route-utils`, `logger`
 
-**Internal packages** (bundled into consumers, not on npm): `route-tree`, `path-matcher`, `search-params`, `type-guards`, `event-emitter`, `browser-env`, `dom-utils`
+**Internal packages** (bundled into consumers, not on npm): `route-tree`, `path-matcher`, `search-params`, `type-guards`, `event-emitter`, `browser-env`
+
+**Shared sources** (bundled via per-package `src/dom-utils` symlinks, not a package): `shared/dom-utils`
 
 ## Package Dependencies
 
@@ -126,38 +129,37 @@ graph TD
     SOURCES -->|dep| ROUTEUTILS
     SOURCES -->|dep| CORE
 
-    DOMUTILS["dom-utils<br/>(internal)"]
-    DOMUTILS -->|dep| CORE
+    DOMUTILS["shared/dom-utils<br/>(shared sources)"]
 
     REACT["react<br/>(main + /legacy)"]
     REACT -->|dep| CORE
     REACT -->|dep| SOURCES
     REACT -->|dep| ROUTEUTILS
-    REACT -->|dep| DOMUTILS
+    REACT -.->|symlink| DOMUTILS
 
     PREACT["preact"]
     PREACT -->|dep| CORE
     PREACT -->|dep| SOURCES
     PREACT -->|dep| ROUTEUTILS
-    PREACT -->|dep| DOMUTILS
+    PREACT -.->|symlink| DOMUTILS
 
     SOLID["solid"]
     SOLID -->|dep| CORE
     SOLID -->|dep| SOURCES
     SOLID -->|dep| ROUTEUTILS
-    SOLID -->|dep| DOMUTILS
+    SOLID -.->|symlink| DOMUTILS
 
     VUE["vue"]
     VUE -->|dep| CORE
     VUE -->|dep| SOURCES
     VUE -->|dep| ROUTEUTILS
-    VUE -->|dep| DOMUTILS
+    VUE -.->|symlink| DOMUTILS
 
     SVELTE["svelte"]
     SVELTE -->|dep| CORE
     SVELTE -->|dep| SOURCES
     SVELTE -->|dep| ROUTEUTILS
-    SVELTE -->|dep| DOMUTILS
+    SVELTE -.->|symlink| DOMUTILS
 
     RX -->|dep| CORE
 
