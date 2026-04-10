@@ -98,6 +98,13 @@ export const commonConfig = defineConfig({
   // Resolve workspace packages to source for test coverage.
   // Without this, Vitest resolves via exports → dist and v8
   // coverage can't track source files.
+  //
+  // NOTE (Этап 2 RFC): Vitest condition-based resolution with custom
+  // "@real-router/source" condition will be added here once we identify a
+  // condition list that doesn't interfere with external packages (preact,
+  // react, vue, svelte) which use non-standard condition orderings. For now
+  // we keep the alias-based approach and rely on the tsconfig's customConditions
+  // for TypeScript-side resolution. See .claude/rfc-custom-export-condition-root-fix-ru.md
   resolve: {
     alias: workspaceSourceAliases(),
   },

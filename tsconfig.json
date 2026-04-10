@@ -4,6 +4,7 @@
     "target": "ESNext",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "customConditions": ["@real-router/source"],
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "strict": true,
