@@ -567,10 +567,12 @@ build → depends on ^build (upstream packages) + test + test:properties + test:
 test → depends on ^build + lint + type-check
 test:properties → depends on ^build + test + lint + type-check
 test:stress → depends on ^build + test:properties + test + lint + type-check
-type-check → depends on build:dist-only + ^build:dist-only
+type-check → no dependencies (reads src directly via customConditions, #431)
+lint:package → depends on build (publint validates exports paths in dist)
+lint:types → depends on build (attw validates .d.ts across module variants)
 ```
 
-**Why type-check needs build:dist-only (#421):** Without `"development"` export condition, `tsc --noEmit` resolves workspace packages via `exports` → dist types (`.d.ts`). Both the package's own dist and all upstream dists must exist. `build:dist-only` (own) handles self-imports in tests; `^build:dist-only` (upstream) handles cross-package imports.
+**Why type-check has no dependencies:** After the `@real-router/source` custom export condition was added (#431 root fix), monorepo `tsc --noEmit` resolves workspace packages directly to `src/*.ts` via `tsconfig.json` `customConditions`. No `dist/` is required. See "Custom `@real-router/source` Export Condition" below for the full saga.
 
 Build only runs after all test tiers pass. `test:properties` (property-based tests via fast-check) and `test:stress` (stress/load tests) run after unit tests.
 
@@ -638,11 +640,13 @@ pnpm test:verbose       # Tests with full output
 "**/*.{ts,tsx,vue,svelte}"
 ```
 
-### `build:dist-only` Task
+### `build:dist-only` Task (Removed in #431 Root Fix)
 
-**Problem:** CI bundle size comparison ran `pnpm build` on the base branch, which triggers the full pipeline (type-check → lint → test → build) due to `build`'s `dependsOn`. This wasted CI time since only `dist/` output is needed for size comparison.
+**Historical context:** This task was introduced (#403) as a "fast build without tests" for CI bundle size comparison, then spread as a workaround for flaky CI after #421 removed the `"development"` export condition and forced `type-check` to read `dist/` artifacts. It turned into a core part of the flake pattern — parallel `tsdown` invocations on the same `dist/` directory created a race condition exposed by #431.
 
-**Solution:** New `build:dist-only` task that only depends on `^build:dist-only` (upstream packages), skipping tests and linting. Used exclusively in the CI size comparison workflow.
+**Removed in Stage 3 of the #431 root fix.** Replaced by the `@real-router/source` custom export condition that lets `tsc` read `src/*.ts` directly in the monorepo. See "Custom `@real-router/source` Export Condition" below.
+
+Previously:
 
 ```json
 "build:dist-only": {
@@ -651,6 +655,86 @@ pnpm test:verbose       # Tests with full output
    "inputs": ["src/**/*.{ts,tsx,vue,svelte}", "tsdown.config.*", "tsconfig.json", "package.json"]
 }
 ```
+
+### Custom `@real-router/source` Export Condition
+
+**Problem:** After #421 removed the `"development"` export condition (because Vite auto-activates it at dev time and broke external consumers via resolution of missing `src/`), monorepo `tsc` was forced to resolve workspace types via `exports` → `dist/*.d.ts`. This created a chain of cascading failures:
+
+1. **Race condition:** `type-check.dependsOn: ["build:dist-only"]` and `test.dependsOn: ["^build"]` both triggered `tsdown` on the same `dist/` directory in parallel. `tsdown` cleans `dist/` before writing, creating a window where downstream `type-check` would see missing files.
+
+2. **Incomplete `.d.ts` generation (#425):** tsdown + rolldown RC (pre-1.0) had gaps in declaration generation. Monorepo `tsc` started seeing these gaps directly instead of reading the richer original `src` types.
+
+3. **Remote-cache staleness (#431):** turbo's remote cache served stale `dist/` artifacts for packages whose own `src/` hadn't changed, even when their workspace dependencies' `src/` had. Downstream `type-check` then ran against a `dist/` that didn't match the current source graph.
+
+All three of these caused flaky CI across the `#413 → #414 → #418 → #419 → #421 → #423 → #424 → #425` saga that started with #413 (April 6, 2026) and manifested as the first red build on April 8.
+
+**Solution:** Use a custom scoped export condition `@real-router/source` that external tools (Vite, Webpack, Node.js) don't activate automatically. Enable it explicitly in:
+
+- Root `tsconfig.json` via `compilerOptions.customConditions: ["@real-router/source"]`
+- `vitest.config.common.mts` via the `workspaceSourceAliases()` helper (which prefers the condition if present in exports)
+
+Example from `packages/core/package.json`:
+
+```jsonc
+{
+  "exports": {
+    ".": {
+      "@real-router/source": "./src/index.ts",
+      "types": {
+        "import": "./dist/esm/index.d.mts",
+        "require": "./dist/cjs/index.d.ts",
+      },
+      "import": "./dist/esm/index.mjs",
+      "require": "./dist/cjs/index.js",
+    },
+  },
+}
+```
+
+For `tsc` in the monorepo with `customConditions: ["@real-router/source"]`:
+
+- Resolution enters conditional exports
+- First-match `@real-router/source` wins → reads `./src/index.ts` directly
+- No `dist/` lookup, no dependency on `tsdown` having run
+
+For external consumers (Vite, Webpack, Node.js, etc.):
+
+- They don't know about `@real-router/source` — skip it
+- Fall through to the standard `import` / `require` / `types` keys
+- Resolve via `dist/` exactly as before — published package behavior is unchanged
+
+**Why "development" wasn't viable:** Vite automatically activates the `"development"` condition in dev mode, so any package shipping `"development": "./src/..."` would have Vite trying to load `src/*.ts` from the installed tarball. This broke external Vite consumers even when they didn't want source resolution.
+
+**Why a custom scoped name is safe:** Standard export conditions (`import`, `require`, `browser`, `node`, `default`, `development`, `production`) are reserved by tooling and may be auto-activated. Custom names like `@real-router/source` — prefixed with a package-like scope — are only activated when a tool explicitly lists them. TypeScript `customConditions` supports this since 5.0.
+
+**Rejected alternatives:**
+
+- Strip `"development"` at publish time — requires a pre-publish transform hook, brittle and hidden magic
+- Wait for `tsdown`/`rolldown` to stabilize `.d.ts` generation — no upstream timeline, out of our control
+- Keep `"development"` and add `resolve.conditions` override to external consumer configs — pushes burden to users
+- Rename to a standard condition like `"development"` — Vite breaks external consumers, #418 all over again
+
+**Staged rollout (4 commits on the fix branch):**
+
+1. **Stage 1 — POC:** Added `@real-router/source` to `@real-router/types` only, plus `customConditions` in root `tsconfig.json`. Validated with `rm -rf packages/core-types/dist && tsc --noEmit` from a downstream package. Vitest side deliberately untouched during POC.
+
+2. **Stage 2 — Mass migration:** Added `@real-router/source` to all 28 packages that publish an `exports` field (27 with the condition plus `@real-router/types` from Stage 1). `svelte` was intentionally excluded — `svelte-package` build emits a non-standard exports shape using a `"svelte"` condition instead of `import`/`require`, and `.svelte` source files aren't directly readable by `tsc`. `svelte` is a leaf adapter in the monorepo (nothing imports it), so the race condition doesn't affect it.
+
+3. **Stage 3 — Task graph cleanup:** Removed the `build:dist-only` task entirely, reset `type-check.dependsOn` to `[]`, moved `lint:package` and `lint:types` to depend on `build`, removed `build:dist-only` scripts from all package.json files, and updated every workflow and hook to use `build`. Also fixed a long-hidden bug in `workspaceSourceAliases()` that failed to generate aliases for `@real-router/solid` because it only tried `.ts` while solid uses `.tsx`.
+
+4. **Stage 4 — Documentation and changesets:** This section plus changeset files per public package.
+
+**Trade-off analysis:**
+
+- **Monorepo `tsc` overhead:** Now reads `src/*.ts` directly (larger AST, more files), adds a few seconds to cold type-check. Acceptable — the source types are richer and correct.
+- **Vitest alias generation:** `workspaceSourceAliases()` continues to handle Vitest runtime resolution. Adding `@real-router/source` to Vitest `resolve.conditions` globally was attempted but broke `preact` tests (dual-package hazard from condition order interference with `preact/hooks`). Left as future work — alias is sufficient.
+- **`svelte` coverage:** Not migrated, but it's a leaf adapter. Its `type-check` still reads its own `src` and uses `svelte-check` which has its own resolution logic.
+
+**Related issues closed by this fix:**
+
+- **#431** — Flaky CI `type-check` from stale `dist/`. Structurally impossible now that `type-check` doesn't depend on `dist/`.
+- **#425** — Incomplete `.d.ts` from tsdown+rolldown RC. No longer affects monorepo `tsc`. Still affects external consumers until tsdown/rolldown stabilize, but that's out of our hands.
+- **#403** — Build:dist-only optimization. Removed along with the task; CI bundle size workflow now uses the unified `build` task with cache hits from the Test job.
 
 ### `test:e2e` Task
 
