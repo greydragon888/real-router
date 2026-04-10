@@ -15,6 +15,7 @@
   },
   "exports": {
     ".": {
+      "@real-router/source": "./src/index.ts",
       "types": {
         "import": "./dist/esm/index.d.mts",
         "require": "./dist/cjs/index.d.ts"
@@ -23,6 +24,7 @@
       "require": "./dist/cjs/index.js"
     },
     "./legacy": {
+      "@real-router/source": "./src/legacy.ts",
       "types": {
         "import": "./dist/esm/legacy.d.mts",
         "require": "./dist/cjs/legacy.d.ts"

@@ -8,6 +8,7 @@
   "types": "./dist/cjs/index.d.ts",
   "exports": {
     ".": {
+      "@real-router/source": "./src/index.tsx",
       "types": {
         "import": "./dist/esm/index.d.mts",
         "require": "./dist/cjs/index.d.ts"
