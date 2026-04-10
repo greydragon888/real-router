@@ -652,6 +652,54 @@ pnpm test:verbose       # Tests with full output
 }
 ```
 
+### `build:dist-only` Cache Key Correctness (#431)
+
+**Problem:** `dependsOn: ["^build:dist-only"]` controls execution order but **not** cache key computation. With per-package scoped inputs, a package's cache hash includes only its own `src/` — never its workspace dependencies' sources. Turbo documentation confirms:
+
+> `dependsOn` specifies task execution order and dependencies but doesn't automatically feed upstream task outputs into downstream task hashes.
+
+Tracked upstream as [vercel/turborepo#3969](https://github.com/vercel/turborepo/issues/3969) (per-task transitive input hashing).
+
+Flaky CI scenario:
+
+1. PR changes `packages/fsm/src/fsm.ts`
+2. `fsm:build:dist-only` — cache miss, rebuilds ✅
+3. `core:build:dist-only` — remote **cache hit** (core/src/ unchanged) → restores stale `dist/` built against old fsm types
+4. `search-schema-plugin:type-check` uses stale core `.d.ts` → `TS7006: Parameter implicitly has 'any' type`
+
+Alternative manifestation: rolldown `UNRESOLVED_IMPORT` when `core:build:dist-only` has a cache miss but inlines a stale `route-tree/dist/esm/index.mjs` (cache hit) via `alwaysBundle: ["event-emitter", "route-tree"]` in `packages/core/tsdown.config.mts`. Both variants resolve on CI re-run once remote cache is repopulated with fresh artifacts from the failed run's sibling jobs — classic "fails once, passes on retry" symptom.
+
+**Solution:** Use `$TURBO_ROOT$` to include **all** workspace package sources (and the symlinked shared sources introduced by #437) in the `build:dist-only` input glob. Every `src/` change in any package invalidates `build:dist-only` for every package — the cost of correctness.
+
+```json
+// Before
+"inputs": [
+  "src/**/*.{ts,tsx,vue,svelte}",
+  "tsdown.config.*",
+  "tsconfig.json",
+  "package.json"
+]
+
+// After
+"inputs": [
+  "$TURBO_ROOT$/packages/*/src/**/*.{ts,tsx,vue,svelte}",
+  "$TURBO_ROOT$/shared/**/*.{ts,tsx}",
+  "tsdown.config.*",
+  "tsconfig.json",
+  "package.json"
+]
+```
+
+**Why `shared/**`:** #437 migrated `dom-utils`and`browser-env`from workspace packages to a`shared/` directory consumed via git-tracked symlinks (`packages/_/src/{dom-utils,browser-env} → ../../../shared/_`). Turbo hashes symlinked files through the consumer's glob, but explicit `shared/\*\*` makes the dependency unambiguous and protects against future symlink-resolution edge cases.
+
+**Tradeoff:** Any `src/` change in any package (or in `shared/`) invalidates `build:dist-only` for all packages. Cache hit rate drops in exchange for correctness. With 31 packages / ~20K LOC, cold-cache overhead is acceptable. For 300+ packages, per-package transitive input lists (generated from each package's dependency graph) would be the more scalable approach.
+
+**Rejected alternatives:**
+
+- **Disable remote cache for this task** — turbo has no per-task remote-cache toggle; removing `TURBO_TOKEN` would lose all cache benefits.
+- **`--force` flag** — not a per-task flag; would defeat the cache entirely.
+- **Wait for upstream fix** (`vercel/turborepo#3969`) — open since 2023, no timeline.
+
 ### `test:e2e` Task
 
 New turbo task for Playwright e2e tests in example applications:
