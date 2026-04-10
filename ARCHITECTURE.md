@@ -36,6 +36,7 @@ real-router/
 │   ├── lifecycle-plugin/          # Route-level lifecycle hooks: onEnter, onStay, onLeave
 │   ├── preload-plugin/           # Preload on navigation intent (hover, touch) via event delegation
 │   ├── memory-plugin/             # In-memory history stack: back/forward/go without browser History API
+│   ├── navigation-plugin/         # Navigation API browser synchronization + route-level history
 │   ├── validation-plugin/         # Opt-in argument validation (DX-only, 100% tree-shakeable)
 │   ├── search-schema-plugin/     # Runtime search param validation via Standard Schema (Zod, Valibot, ArkType)
 │   ├── route-utils/               # Route tree queries and segment testing
@@ -59,7 +60,7 @@ real-router/
 │   │   └── ssg/                   # Static site generation with Vite
 ```
 
-**Public packages** (published to npm): `core`, `core-types`, `react`, `preact`, `solid`, `vue`, `svelte`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `lifecycle-plugin`, `preload-plugin`, `memory-plugin`, `validation-plugin`, `search-schema-plugin`, `route-utils`, `logger`
+**Public packages** (published to npm): `core`, `core-types`, `react`, `preact`, `solid`, `vue`, `svelte`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `lifecycle-plugin`, `preload-plugin`, `memory-plugin`, `navigation-plugin`, `validation-plugin`, `search-schema-plugin`, `route-utils`, `logger`
 
 **Internal packages** (bundled into consumers, not on npm): `route-tree`, `path-matcher`, `search-params`, `type-guards`, `event-emitter`, `browser-env`, `dom-utils`
 
@@ -102,6 +103,7 @@ graph TD
         RX["rx"]
         LP["logger-plugin"]
         PPP["persistent-params-plugin"]
+        NP["navigation-plugin"]
         ROUTEUTILS["route-utils"]
     end
 
@@ -113,6 +115,10 @@ graph TD
     HP -->|dep| CORE
     HP -.->|bundles| TG
     HP -.->|bundles| BE
+
+    NP -->|dep| CORE
+    NP -.->|bundles| TG
+    NP -.->|bundles| BE
 
     LP -->|dep| CORE
     LP -->|dep| LOG

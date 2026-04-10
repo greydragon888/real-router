@@ -16,7 +16,7 @@ import {
   createPluginRouter,
 } from "./helpers";
 
-describe("Browser Plugin URL Invariants", () => {
+describe("Navigation Plugin URL Invariants", () => {
   describe("URL Roundtrip (no base)", () => {
     const router = createPluginRouter("");
 

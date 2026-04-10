@@ -3,11 +3,11 @@ import {
   createSafeBrowser,
   normalizeBase,
   safelyEncodePath,
+  extractPath,
 } from "browser-env";
 
 import { defaultOptions, source } from "./constants";
 import { BrowserPlugin } from "./plugin";
-import { extractPath } from "./url-utils";
 import { validateOptions } from "./validation";
 
 import type { BrowserPluginOptions } from "./types";
