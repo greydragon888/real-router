@@ -1,7 +1,11 @@
 import { createRouter } from "@real-router/core";
-import { buildUrl, extractPath, urlToPath } from "browser-env";
 import { describe, expect, it } from "vitest";
 
+import {
+  buildUrl,
+  extractPath,
+  urlToPath,
+} from "../../src/browser-env/index.js";
 import { navigationPluginFactory } from "../../src/factory";
 import { createNavigationFallbackBrowser } from "../../src/ssr-fallback";
 import { MockNavigation } from "../helpers/mockNavigation";

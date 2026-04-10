@@ -1,8 +1,8 @@
 // Integration tests for browserPlugin with synthetic plugins
 // Uses mock plugins to test various edge cases and scenarios
 
+import { browserPluginFactory } from "@real-router/browser-plugin";
 import { createRouter } from "@real-router/core";
-import { createSafeBrowser } from "browser-env";
 import {
   describe,
   beforeAll,
@@ -13,8 +13,7 @@ import {
   expect,
 } from "vitest";
 
-import { browserPluginFactory } from "@real-router/browser-plugin";
-
+import { createSafeBrowser } from "../../src/browser-env/index.js";
 import {
   createTrackingPlugin,
   createStateModifierPlugin,
@@ -24,8 +23,8 @@ import {
   createAsyncPlugin,
 } from "../helpers/mockPlugins";
 
+import type { Browser } from "../../src/browser-env/index.js";
 import type { Router, State, Unsubscribe } from "@real-router/core";
-import type { Browser } from "browser-env";
 
 const noop = (): void => undefined;
 

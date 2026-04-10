@@ -1,13 +1,16 @@
-import { isBrowserEnvironment } from "./detect";
+import { isBrowserEnvironment } from "./detect.js";
 import {
   pushState,
   replaceState,
   addPopstateListener,
   getHash,
-} from "./history-api";
-import { createWarnOnce, createHistoryFallbackBrowser } from "./ssr-fallback";
+} from "./history-api.js";
+import {
+  createWarnOnce,
+  createHistoryFallbackBrowser,
+} from "./ssr-fallback.js";
 
-import type { Browser } from "./types";
+import type { Browser } from "./types.js";
 
 export function createSafeBrowser(
   getLocation: () => string,

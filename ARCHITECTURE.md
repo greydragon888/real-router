@@ -42,14 +42,15 @@ real-router/
 │   ├── route-utils/               # Route tree queries and segment testing
 │   ├── logger/                    # Isomorphic structured logging
 │   ├── fsm/                       # Finite state machine engine (internal, published by accident)
-│   ├── browser-env/               # Shared browser abstractions for plugins (internal)
 │   ├── event-emitter/             # Generic typed event emitter (internal)
 │   ├── route-tree/                # Route tree building, validation, matcher facade (internal)
 │   ├── path-matcher/              # Segment Trie URL matching and path building (internal)
 │   ├── search-params/             # Query string handling (internal)
 │   └── type-guards/               # Runtime type validation (internal)
-├── shared/                         # Bare source files shared across adapters via src/ symlinks
-│   └── dom-utils/                 # Shared DOM utilities for adapters: route announcer, link helpers
+├── shared/                         # Bare source files shared across packages via src/ symlinks (minimal workspace entry)
+│   ├── package.json               # Minimal: name, type:commonjs, devDeps on @real-router/core + type-guards
+│   ├── dom-utils/                 # Shared DOM utilities for adapters: route announcer, link helpers
+│   └── browser-env/               # Shared browser abstractions for URL plugins: history API, popstate, SSR fallback
 ├── examples/
 │   ├── shared/                    # Shared store, API, abilities, styles
 │   ├── react/    (17 examples)    # React 19.2+ examples + 9 e2e suites
@@ -63,9 +64,9 @@ real-router/
 
 **Public packages** (published to npm): `core`, `core-types`, `react`, `preact`, `solid`, `vue`, `svelte`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `lifecycle-plugin`, `preload-plugin`, `memory-plugin`, `navigation-plugin`, `validation-plugin`, `search-schema-plugin`, `route-utils`, `logger`
 
-**Internal packages** (bundled into consumers, not on npm): `route-tree`, `path-matcher`, `search-params`, `type-guards`, `event-emitter`, `browser-env`
+**Internal packages** (bundled into consumers, not on npm): `route-tree`, `path-matcher`, `search-params`, `type-guards`, `event-emitter`
 
-**Shared sources** (bundled via per-package `src/dom-utils` symlinks, not a package): `shared/dom-utils`
+**Shared sources** (bundled via per-package `src/*` symlinks; `shared/` is a minimal workspace entry with no source files of its own, only a `package.json` declaring workspace devDeps for transitive resolution): `shared/dom-utils`, `shared/browser-env`
 
 ## Package Dependencies
 
@@ -84,7 +85,6 @@ graph TD
         TG[type-guards] -->|dep| TYPES
         RT[route-tree] -->|dep| PM
         RT -->|dep| SP
-        BE[browser-env] -->|dep| CORE
     end
 
     subgraph core [Core]
@@ -110,26 +110,27 @@ graph TD
         ROUTEUTILS["route-utils"]
     end
 
+    BROWSERENV["shared/browser-env<br/>(shared sources)"]
+    DOMUTILS["shared/dom-utils<br/>(shared sources)"]
+
     BP -->|dep| CORE
     BP -->|dep| LOG
     BP -.->|bundles| TG
-    BP -.->|bundles| BE
+    BP -.->|symlink| BROWSERENV
 
     HP -->|dep| CORE
     HP -.->|bundles| TG
-    HP -.->|bundles| BE
+    HP -.->|symlink| BROWSERENV
 
     NP -->|dep| CORE
     NP -.->|bundles| TG
-    NP -.->|bundles| BE
+    NP -.->|symlink| BROWSERENV
 
     LP -->|dep| CORE
     LP -->|dep| LOG
 
     SOURCES -->|dep| ROUTEUTILS
     SOURCES -->|dep| CORE
-
-    DOMUTILS["shared/dom-utils<br/>(shared sources)"]
 
     REACT["react<br/>(main + /legacy)"]
     REACT -->|dep| CORE
@@ -405,14 +406,15 @@ These are deliberately designed constraints. Violating them will break the syste
 **ALLOWED:**
 
 - Consumer packages depend on `core` and `core-types`
-- Consumer packages bundle internal packages as needed (`type-guards`, `browser-env`)
+- Consumer packages bundle internal packages as needed (`type-guards`)
+- Consumer packages import shared sources via git-tracked symlinks (`src/dom-utils` → `shared/dom-utils`, `src/browser-env` → `shared/browser-env`)
 - Foundation packages depend on each other (`route-tree` → `path-matcher`, `search-params`)
-- `browser-env` is the **only** package that touches `window`, `history`, `addEventListener`
+- `shared/browser-env` is the **only** location that touches `window`, `history`, `addEventListener` (enforced by convention, not by package boundary)
 
 **FORBIDDEN:**
 
 - Foundation packages must not depend on `core`
-  - Exception: `browser-env` depends on `core` for `Router`, `PluginApi`, `RouterError` types
+  - Exception: `shared/browser-env` files import `Router`, `PluginApi`, `RouterError` types from `@real-router/core` — resolved via the consumer's `node_modules` when accessed through the symlink
 - Consumer packages must not depend on each other's internals
 - No package may bypass the plugin system to mutate router state directly
 - No circular dependencies between packages

@@ -63,6 +63,36 @@
         "config": ["vitest.config.mts", "vitest.config.*.mts"]
       }
     },
+    "packages/browser-env": {
+      "entry": ["tests/**/*.{ts,tsx}"],
+      "project": ["tests/**/*.ts"],
+      "ignoreDependencies": ["type-guards"],
+      "vitest": {
+        "config": ["vitest.config.mts", "vitest.config.*.mts"]
+      }
+    },
+    "packages/browser-plugin": {
+      "project": ["src/**/*.ts"],
+      "ignore": ["src/browser-env/**"],
+      "vitest": {
+        "config": ["vitest.config.mts", "vitest.config.*.mts"]
+      }
+    },
+    "packages/hash-plugin": {
+      "project": ["src/**/*.ts"],
+      "ignore": ["src/browser-env/**"],
+      "vitest": {
+        "config": ["vitest.config.mts", "vitest.config.*.mts"]
+      }
+    },
+    "packages/navigation-plugin": {
+      "project": ["src/**/*.ts"],
+      "ignore": ["src/browser-env/**"],
+      "ignoreDependencies": ["type-guards"],
+      "vitest": {
+        "config": ["vitest.config.mts", "vitest.config.*.mts"]
+      }
+    },
     "packages/*": {
       "project": ["src/**/*.{ts,tsx}"],
       "vitest": {

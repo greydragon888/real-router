@@ -3124,9 +3124,6 @@ importers:
       '@testing-library/jest-dom':
         specifier: 6.9.1
         version: 6.9.1
-      browser-env:
-        specifier: workspace:^
-        version: link:../browser-env
       jsdom:
         specifier: 28.1.0
         version: 28.1.0
@@ -3178,9 +3175,6 @@ importers:
       '@testing-library/jest-dom':
         specifier: 6.9.1
         version: 6.9.1
-      browser-env:
-        specifier: workspace:^
-        version: link:../browser-env
       jsdom:
         specifier: 28.1.0
         version: 28.1.0
@@ -3214,12 +3208,12 @@ importers:
         specifier: workspace:^
         version: link:../core
     devDependencies:
-      browser-env:
-        specifier: workspace:^
-        version: link:../browser-env
       jsdom:
         specifier: 28.1.0
         version: 28.1.0
+      type-guards:
+        specifier: workspace:^
+        version: link:../type-guards
 
   packages/path-matcher: {}
 
@@ -3625,6 +3619,15 @@ importers:
       vue:
         specifier: 3.5.13
         version: 3.5.13(typescript@6.0.2)
+
+  shared:
+    devDependencies:
+      '@real-router/core':
+        specifier: workspace:*
+        version: link:../packages/core
+      type-guards:
+        specifier: workspace:*
+        version: link:../packages/type-guards
 
 packages:
 

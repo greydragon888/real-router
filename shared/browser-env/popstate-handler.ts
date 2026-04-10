@@ -1,8 +1,8 @@
 import { RouterError } from "@real-router/core";
 
-import { getRouteFromEvent } from "./popstate-utils";
+import { getRouteFromEvent } from "./popstate-utils.js";
 
-import type { Browser, SharedFactoryState } from "./types";
+import type { Browser, SharedFactoryState } from "./types.js";
 import type { Params, Plugin, Router } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
 

@@ -1,3 +1,4 @@
+import { browserPluginFactory } from "@real-router/browser-plugin";
 import { createRouter } from "@real-router/core";
 import {
   describe,
@@ -9,8 +10,6 @@ import {
   expect,
 } from "vitest";
 
-import { browserPluginFactory } from "@real-router/browser-plugin";
-
 import {
   createMockedBrowser,
   routerConfig,
@@ -18,8 +17,8 @@ import {
   noop,
 } from "../helpers/testUtils";
 
+import type { Browser } from "../../src/browser-env/index.js";
 import type { Router, State, Unsubscribe } from "@real-router/core";
-import type { Browser } from "browser-env";
 
 let router: Router;
 let mockedBrowser: Browser;

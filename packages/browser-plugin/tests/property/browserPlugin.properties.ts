@@ -1,5 +1,4 @@
 import { fc, test } from "@fast-check/vitest";
-import { extractPath } from "browser-env";
 import { describe, expect } from "vitest";
 
 import {
@@ -15,6 +14,7 @@ import {
   arbNonMatchingPath,
   createPluginRouter,
 } from "./helpers";
+import { extractPath } from "../../src/browser-env/index.js";
 
 describe("Browser Plugin URL Invariants", () => {
   describe("URL Roundtrip (no base)", () => {

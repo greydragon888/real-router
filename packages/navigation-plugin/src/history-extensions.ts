@@ -1,4 +1,4 @@
-import { extractPath } from "browser-env";
+import { extractPath } from "./browser-env/index.js";
 
 import type { NavigationBrowser } from "./types";
 import type { State } from "@real-router/core";

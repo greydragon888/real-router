@@ -1,5 +1,5 @@
+import { browserPluginFactory } from "@real-router/browser-plugin";
 import { createRouter } from "@real-router/core";
-import { createSafeBrowser } from "browser-env";
 import {
   describe,
   it,
@@ -10,8 +10,6 @@ import {
   vi,
 } from "vitest";
 
-import { browserPluginFactory } from "@real-router/browser-plugin";
-
 import {
   createStressRouter,
   makePopstateState,
@@ -19,6 +17,7 @@ import {
   noop,
   routeConfig,
 } from "./helpers";
+import { createSafeBrowser } from "../../src/browser-env/index.js";
 
 import type { Router } from "@real-router/core";
 

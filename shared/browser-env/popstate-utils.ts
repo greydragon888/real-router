@@ -1,6 +1,6 @@
 import { isStateStrict as isState } from "type-guards";
 
-import type { Browser } from "./types";
+import type { Browser } from "./types.js";
 import type { State, Params } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
 

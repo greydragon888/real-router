@@ -2,7 +2,9 @@
 
 > Simple, powerful, view-agnostic, modular and extensible router
 
-pnpm monorepo with 30 packages + bare `shared/` sources (symlinked into adapters' `src/dom-utils`) + 75 example applications. Run `pnpm install` after cloning.
+pnpm monorepo with 29 packages + bare `shared/` sources (symlinked into consumers' `src/dom-utils` and `src/browser-env`) + 75 example applications. Run `pnpm install` after cloning.
+
+`shared/` is a minimal workspace entry (name, type, devDeps) with no source files of its own, required for `type-guards` resolution during bundling via symlinks. See IMPLEMENTATION_NOTES.md section "Shared Sources via Symlinks" for details.
 
 ## Rules
 
@@ -151,6 +153,7 @@ When adding packages or features, keep these root files in sync:
 - [packages/vue/CLAUDE.md](packages/vue/CLAUDE.md) — Vue 3 integration architecture
 - [packages/svelte/CLAUDE.md](packages/svelte/CLAUDE.md) — Svelte 5 integration architecture
 - [packages/browser-plugin/CLAUDE.md](packages/browser-plugin/CLAUDE.md) — Browser plugin architecture
+- [packages/navigation-plugin/CLAUDE.md](packages/navigation-plugin/CLAUDE.md) — Navigation API plugin architecture
 - [packages/hash-plugin/CLAUDE.md](packages/hash-plugin/CLAUDE.md) — Hash plugin architecture
 - [packages/logger-plugin/CLAUDE.md](packages/logger-plugin/CLAUDE.md) — Logger plugin architecture
 - [packages/persistent-params-plugin/CLAUDE.md](packages/persistent-params-plugin/CLAUDE.md) — Persistent params plugin architecture

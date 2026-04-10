@@ -1,5 +1,5 @@
 import { createRouter } from "@real-router/core";
-import { createSafeBrowser, safelyEncodePath } from "browser-env";
+import { hashPluginFactory } from "@real-router/hash-plugin";
 import {
   describe,
   it,
@@ -10,8 +10,6 @@ import {
   vi,
 } from "vitest";
 
-import { hashPluginFactory } from "@real-router/hash-plugin";
-
 import {
   createStressRouter,
   makePopstateState,
@@ -19,6 +17,10 @@ import {
   noop,
   routeConfig,
 } from "./helpers";
+import {
+  createSafeBrowser,
+  safelyEncodePath,
+} from "../../src/browser-env/index.js";
 import { createHashPrefixRegex, extractHashPath } from "../../src/hash-utils";
 
 import type { Router } from "@real-router/core";

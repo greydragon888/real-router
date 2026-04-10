@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 
 import { navigationPluginFactory } from "../../src/factory";
 
-vi.mock(import("browser-env"), async (importOriginal) => {
+vi.mock(import("../../src/browser-env/index.js"), async (importOriginal) => {
   const actual = await importOriginal();
 
   return {
