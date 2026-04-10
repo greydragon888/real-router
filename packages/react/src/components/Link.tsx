@@ -1,7 +1,11 @@
-import { shouldNavigate, buildHref, buildActiveClassName } from "dom-utils";
 import { memo, useCallback, useMemo } from "react";
 
 import { EMPTY_PARAMS, EMPTY_OPTIONS } from "../constants";
+import {
+  shouldNavigate,
+  buildHref,
+  buildActiveClassName,
+} from "../dom-utils/index.js";
 import { useIsActiveRoute } from "../hooks/useIsActiveRoute";
 import { useRouter } from "../hooks/useRouter";
 import { useStableValue } from "../hooks/useStableValue";

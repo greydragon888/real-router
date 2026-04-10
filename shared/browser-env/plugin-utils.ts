@@ -1,6 +1,6 @@
-import { updateBrowserState } from "./popstate-utils";
+import { updateBrowserState } from "./popstate-utils.js";
 
-import type { Browser } from "./types";
+import type { Browser } from "./types.js";
 import type {
   NavigationOptions,
   Params,

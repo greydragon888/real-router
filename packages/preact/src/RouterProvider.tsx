@@ -1,9 +1,9 @@
 import { getNavigator } from "@real-router/core";
 import { createRouteSource } from "@real-router/sources";
-import { createRouteAnnouncer } from "dom-utils";
 import { useEffect, useMemo } from "preact/hooks";
 
 import { NavigatorContext, RouteContext, RouterContext } from "./context";
+import { createRouteAnnouncer } from "./dom-utils/index.js";
 import { useSyncExternalStore } from "./useSyncExternalStore";
 
 import type { Router } from "@real-router/core";

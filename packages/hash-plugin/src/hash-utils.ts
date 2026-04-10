@@ -1,7 +1,6 @@
 // packages/hash-plugin/src/hash-utils.ts
 
-import { safeParseUrl } from "browser-env";
-
+import { safeParseUrl } from "./browser-env/index.js";
 import { LOGGER_CONTEXT } from "./constants";
 
 function escapeRegExp(str: string): string {

@@ -2,24 +2,7 @@
   "name": "dom-utils",
   "version": "0.2.8",
   "private": true,
-  "description": "Shared DOM utilities for Real-Router framework adapters",
-  "main": "./dist/cjs/index.js",
-  "module": "./dist/esm/index.mjs",
-  "types": "./dist/esm/index.d.mts",
-  "exports": {
-    ".": {
-      "types": {
-        "import": "./dist/esm/index.d.mts",
-        "require": "./dist/cjs/index.d.ts"
-      },
-      "import": "./dist/esm/index.mjs",
-      "require": "./dist/cjs/index.js"
-    }
-  },
-  "files": [
-    "dist",
-    "src"
-  ],
+  "description": "Tests for shared/dom-utils — source files live in /shared/dom-utils (src is a symlink)",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/greydragon888/real-router.git"
@@ -31,14 +14,11 @@
   },
   "license": "MIT",
   "scripts": {
-    "build": "tsdown --config-loader unrun",
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
     "test": "vitest run",
-    "test:properties": "vitest run --config vitest.config.properties.mts",
-    "build:dist-only": "tsdown --config-loader unrun"
+    "test:properties": "vitest run --config vitest.config.properties.mts"
   },
-  "sideEffects": false,
   "dependencies": {
     "@real-router/core": "workspace:^"
   },

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { getNavigator } from "@real-router/core";
   import { createRouteSource } from "@real-router/sources";
-  import { createRouteAnnouncer } from "dom-utils";
+  import { createRouteAnnouncer } from "./dom-utils/index.js";
   import { setContext } from "svelte";
 
   import { createReactiveSource } from "./createReactiveSource.svelte";

@@ -2,7 +2,9 @@
 
 > Simple, powerful, view-agnostic, modular and extensible router
 
-pnpm monorepo with 31 packages + 75 example applications. Run `pnpm install` after cloning.
+pnpm monorepo with 29 packages + bare `shared/` sources (symlinked into consumers' `src/dom-utils` and `src/browser-env`) + 75 example applications. Run `pnpm install` after cloning.
+
+`shared/` is a minimal workspace entry (name, type, devDeps) with no source files of its own, required for `type-guards` resolution during bundling via symlinks. See IMPLEMENTATION_NOTES.md section "Shared Sources via Symlinks" for details.
 
 ## Rules
 
@@ -151,6 +153,7 @@ When adding packages or features, keep these root files in sync:
 - [packages/vue/CLAUDE.md](packages/vue/CLAUDE.md) — Vue 3 integration architecture
 - [packages/svelte/CLAUDE.md](packages/svelte/CLAUDE.md) — Svelte 5 integration architecture
 - [packages/browser-plugin/CLAUDE.md](packages/browser-plugin/CLAUDE.md) — Browser plugin architecture
+- [packages/navigation-plugin/CLAUDE.md](packages/navigation-plugin/CLAUDE.md) — Navigation API plugin architecture
 - [packages/hash-plugin/CLAUDE.md](packages/hash-plugin/CLAUDE.md) — Hash plugin architecture
 - [packages/logger-plugin/CLAUDE.md](packages/logger-plugin/CLAUDE.md) — Logger plugin architecture
 - [packages/persistent-params-plugin/CLAUDE.md](packages/persistent-params-plugin/CLAUDE.md) — Persistent params plugin architecture
@@ -163,7 +166,6 @@ When adding packages or features, keep these root files in sync:
 - [packages/navigation-plugin/CLAUDE.md](packages/navigation-plugin/CLAUDE.md) — Navigation API plugin architecture
 - [packages/path-matcher/CLAUDE.md](packages/path-matcher/CLAUDE.md) — Segment trie URL matcher, encoding, constraints
 - [packages/route-tree/CLAUDE.md](packages/route-tree/CLAUDE.md) — Route tree builder, matcher factory, validation
-- [packages/dom-utils/.claude/CLAUDE.md](packages/dom-utils/CLAUDE.md) — DOM utilities (route announcer, link helpers)
 - [packages/fsm/CLAUDE.md](packages/fsm/CLAUDE.md) — FSM engine internals
 - [packages/router-benchmarks/CLAUDE.md](packages/router-benchmarks/CLAUDE.md) — Benchmark suite
 - [MCP Servers Guide](.claude/mcp-guide.md)

@@ -1,7 +1,6 @@
 import { createRouter } from "@real-router/core";
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
-
 import { hashPluginFactory } from "@real-router/hash-plugin";
+import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import {
   noop,
@@ -10,8 +9,8 @@ import {
   createMockedBrowser,
 } from "../helpers/testUtils";
 
+import type { Browser } from "../../src/browser-env/index.js";
 import type { Router } from "@real-router/core";
-import type { Browser } from "browser-env";
 
 let router: Router;
 let mockedBrowser: Browser;

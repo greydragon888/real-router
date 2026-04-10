@@ -1,0 +1,10 @@
+{
+  "name": "@real-router/shared-sources",
+  "version": "0.0.0",
+  "private": true,
+  "type": "commonjs",
+  "devDependencies": {
+    "@real-router/core": "workspace:*",
+    "type-guards": "workspace:*"
+  }
+}

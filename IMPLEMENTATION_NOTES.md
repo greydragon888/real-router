@@ -429,19 +429,19 @@ ko_fi: greydragon888
 
 ## Quality Tools
 
-| Tool             | Purpose                           | Command                                  |
-| ---------------- | --------------------------------- | ---------------------------------------- |
-| syncpack         | Dependency version consistency    | `pnpm lint:deps`                         |
-| knip             | Dead code detection               | `pnpm lint:unused`                       |
-| jscpd            | Copy-paste detection              | `pnpm lint:duplicates`                   |
-| size-limit       | Bundle size tracking              | `pnpm size`                              |
-| arethetypeswrong | TypeScript declaration validation | `pnpm lint:types`                        |
-| publint          | Package.json exports validation   | `pnpm lint:package`                      |
-| smoke test       | Consumer install + import check   | `bash scripts/smoke-test-packages.sh`    |
-| SonarCloud       | Code quality & security           | `pnpm sonar:local`                       |
-| CodeQL           | Security vulnerabilities          | GitHub Actions                           |
-| Codecov          | Coverage reporting                | GitHub Actions                           |
-| Danger           | Automated PR review               | `pnpm danger:local`                      |
+| Tool             | Purpose                           | Command                               |
+| ---------------- | --------------------------------- | ------------------------------------- |
+| syncpack         | Dependency version consistency    | `pnpm lint:deps`                      |
+| knip             | Dead code detection               | `pnpm lint:unused`                    |
+| jscpd            | Copy-paste detection              | `pnpm lint:duplicates`                |
+| size-limit       | Bundle size tracking              | `pnpm size`                           |
+| arethetypeswrong | TypeScript declaration validation | `pnpm lint:types`                     |
+| publint          | Package.json exports validation   | `pnpm lint:package`                   |
+| smoke test       | Consumer install + import check   | `bash scripts/smoke-test-packages.sh` |
+| SonarCloud       | Code quality & security           | `pnpm sonar:local`                    |
+| CodeQL           | Security vulnerabilities          | GitHub Actions                        |
+| Codecov          | Coverage reporting                | GitHub Actions                        |
+| Danger           | Automated PR review               | `pnpm danger:local`                   |
 
 ### jscpd Configuration
 
@@ -456,7 +456,7 @@ ko_fi: greydragon888
 }
 ```
 
-Ignores: `*.d.ts`, `*.test.ts`, `*.test.tsx`, `*.bench.ts`, `*.spec.ts`, `*.properties.ts`, `packages/router-benchmarks/**`, `packages/preact/src/**`, `packages/hash-plugin/src/**`
+Ignores: `*.d.ts`, `*.test.ts`, `*.test.tsx`, `*.bench.ts`, `*.spec.ts`, `*.properties.ts`, `packages/router-benchmarks/**`, `packages/preact/src/**`, `packages/hash-plugin/src/**`, `packages/*/src/dom-utils/**`, `packages/dom-utils/src/**` (last two are symlinks to `shared/dom-utils/` — see #437 section; without the ignore jscpd would report 6 false-positive duplicates).
 
 ### size-limit Configuration
 
@@ -476,8 +476,10 @@ Per-workspace configurations in `knip.json`:
 
 - **Root**: entry scripts, ignores `fast-check` (used but not detected by knip)
 - **`packages/router-benchmarks`**: custom `entry: ["src/**/*.ts"]` to recognize standalone benchmark scripts
-- **`packages/solid`**: ignores `@babel/preset-typescript`, `babel-preset-solid` (build-only deps)
-- **`packages/svelte`**: ignores `@real-router/browser-plugin` (workspace dep used at runtime), `ignore: ["src/dom-utils/**"]` (symlinked files from dom-utils, not direct imports)
+- **`packages/react`**, **`packages/preact`**, **`packages/vue`**, **`packages/solid`**, **`packages/svelte`**: each lists `"ignore": ["src/dom-utils/**"]` to skip the symlinked shared sources (see #437 section)
+- **`packages/solid`**: additionally ignores `@babel/preset-typescript`, `babel-preset-solid` (build-only deps)
+- **`packages/svelte`**: additionally ignores `@real-router/browser-plugin` (workspace dep used at runtime)
+- **`packages/dom-utils`**: `entry: ["tests/**/*.{ts,tsx}"]`, `project: ["tests/**/*.ts"]` — src is a symlink, not analyzed
 - **`packages/vue`** and **`packages/svelte`**: explicit vitest config paths
 - **`packages/*`** (catch-all): includes stryker config support
 
@@ -1070,37 +1072,148 @@ Framework compilers generate code that v8 coverage tracks but tests can't reach:
 | React   | None                          | tsdown preserves original code                          |
 | Preact  | None                          | tsdown preserves original code                          |
 
-## dom-utils: Private Shared DOM Package
+## Shared Sources via Symlinks: `shared/dom-utils/` and `shared/browser-env/` (#437)
 
 ### Problem
 
-All 5 framework adapters (React, Preact, Solid, Vue, Svelte) duplicated identical DOM utilities: `shouldNavigate` (modifier key check), `buildHref` (buildUrl/buildPath fallback), `buildActiveClassName` (CSS class concatenation), `applyLinkA11y` (role/tabindex on non-interactive elements). ~180 lines of copy-paste.
+Two groups of code were shared across multiple packages via full workspace packages:
 
-Additionally, a11y route announcements (#337) required a `createRouteAnnouncer` function consumed by all adapters.
+1. **`dom-utils`** — 5 framework adapters (React, Preact, Solid, Vue, Svelte) needed identical DOM helpers: `shouldNavigate`, `buildHref`, `buildActiveClassName`, `applyLinkA11y`, `createRouteAnnouncer` (WCAG route announcements, #337). ~200 LOC.
+
+2. **`browser-env`** — 3 URL plugins (browser-plugin, hash-plugin, navigation-plugin) needed identical browser API wrappers: History API, popstate handling, SSR fallback, URL parsing, plugin utilities. ~520 LOC.
+
+Original approach (pre-#437): both lived as `"private": true` workspace packages with their own `tsdown.config.mts`, `vitest.config.mts`, `tsconfig.json`, `tsconfig.node.json`, `CLAUDE.md`, `ARCHITECTURE.md`, `README.md`, `INVARIANTS.md`, `CHANGELOG.md`. Bundled into consumers via three different mechanisms: tsdown `alwaysBundle`, rollup `nodeResolve`, and a svelte-specific symlink + `kit.alias` rewrite. Problems:
+
+- Full package infrastructure duplicated for each shared helper (~10 files per package)
+- Three different bundling strategies across consumers — fragile (#413 root cause)
+- Each consumer had `"dom-utils"` / `"browser-env"` in devDependencies plus bundle-time config
+- Turbo cache nodes for `dom-utils:build` and `browser-env:build` — any change invalidated all downstream builds
+- Svelte already used a committed symlink workaround for `dom-utils` — the pattern was inconsistent across adapters
 
 ### Solution
 
-Private `dom-utils` package (`"private": true`) — not published to npm, inlined into each adapter's bundle at build time. No duplication since users import only one adapter.
+Source files live in `shared/` at the repo root. Each consumer has a git-tracked symlink inside its `src/` pointing to the corresponding `shared/*` directory. Imports use local-looking relative paths (`from "./dom-utils/index.js"`, `from "../browser-env/index.js"`).
 
-### Why
+```
+shared/
+├── package.json                  # Minimal workspace entry: name, type, devDeps on core + type-guards
+├── dom-utils/
+│   ├── index.ts
+│   ├── link-utils.ts
+│   └── route-announcer.ts
+└── browser-env/
+    ├── index.ts
+    ├── detect.ts
+    ├── history-api.ts
+    ├── popstate-handler.ts
+    ├── popstate-utils.ts
+    ├── safe-browser.ts
+    ├── ssr-fallback.ts
+    ├── plugin-utils.ts
+    ├── url-parsing.ts
+    ├── url-utils.ts
+    ├── utils.ts
+    ├── validation.ts
+    └── types.ts
 
-- **Not `@real-router/core/utils`** — `buildHref` uses `router.buildUrl()` which is injected by `browser-plugin` via `extendRouter()`. Core doesn't know about this method. DOM dependency also disqualifies core.
-- **Not per-adapter duplication** — 5 copies of identical code is a maintenance burden. A shared source of truth eliminates drift.
-- **Private, not published** — only one adapter is used at a time, so the code is inlined (no extra npm dependency for users).
+packages/react/src/dom-utils               → ../../../shared/dom-utils      (symlink, git-tracked)
+packages/preact/src/dom-utils              → ../../../shared/dom-utils      (symlink)
+packages/vue/src/dom-utils                 → ../../../shared/dom-utils      (symlink)
+packages/solid/src/dom-utils               → ../../../shared/dom-utils      (symlink)
+packages/svelte/src/dom-utils              → ../../../shared/dom-utils      (symlink)
+packages/dom-utils/src                     → ../../shared/dom-utils         (tests-only wrapper)
 
-### Bundling Strategy Per Adapter (#413)
+packages/browser-plugin/src/browser-env    → ../../../shared/browser-env    (symlink, git-tracked)
+packages/hash-plugin/src/browser-env       → ../../../shared/browser-env    (symlink)
+packages/navigation-plugin/src/browser-env → ../../../shared/browser-env    (symlink)
+packages/browser-env/src                   → ../../shared/browser-env       (tests-only wrapper)
+```
 
-`dom-utils` is `"private": true` — it must be inlined into each adapter's bundle, never appear in published `dependencies`. The pattern matches how core handles `route-tree` and `event-emitter`:
+All tooling follows symlinks transparently and sees shared files as if they live locally inside each consumer's `src/`:
 
-| Adapter            | Build tool     | How dom-utils is inlined                                                                                |
-| ------------------ | -------------- | ------------------------------------------------------------------------------------------------------- |
-| react, preact, vue | tsdown         | `devDependencies` + `alwaysBundle: ["dom-utils"]`                                                       |
-| solid              | rollup         | `devDependencies` + `nodeResolve` (not in `external` array)                                             |
-| svelte             | svelte-package | `devDependencies` + symlink `src/dom-utils` → `../../dom-utils/src` + `kit.alias` in `svelte.config.js` |
+- **tsdown** (react, preact, vue, browser-plugin, hash-plugin, navigation-plugin) — follows symlinks, bundles inline. No `alwaysBundle` entry for shared names (relative imports bundle by default). `type-guards` stays in `alwaysBundle` because it's still a real workspace package used by `shared/browser-env`.
+- **rollup + babel-preset-solid** (solid) — follows symlinks; `tsconfig.build.json` keeps `rootDir: "./src"` because tsc sees files at their virtual path inside `src/dom-utils/`.
+- **svelte-package** (svelte) — follows symlinks, compiles `.svelte.ts` files as local sources. No `kit.alias` needed.
 
-**Svelte specifics:** `svelte-package` is a file-by-file transpiler, not a bundler — it cannot inline dependencies. The symlink places dom-utils source inside svelte's `src/` directory so `svelte-package` processes it as local files. `kit.alias` in `svelte.config.js` rewrites bare `import ... from "dom-utils"` to relative paths. The `resolve_aliases` function in `@sveltejs/package` handles this rewriting for all `.svelte`, `.ts`, and `.js` files.
+### Minimal `shared/package.json`
 
-**Bug #413:** `dom-utils` was originally in `dependencies` (not `devDependencies`) of all 5 adapters, and was NOT listed in `alwaysBundle`. When published, `workspace:^` resolved to `"^0.2.7"` — pointing to a package that doesn't exist on npm. Fixed by moving to `devDependencies` + proper bundling per adapter.
+`shared/` IS a workspace package, but intentionally minimal: no source files of its own (those live in `dom-utils/` and `browser-env/` subdirs), no build script, no tsdown config, no docs, no tests, no changesets. Only the fields required for transitive dependency resolution:
+
+```json
+{
+  "name": "@real-router/shared-sources",
+  "version": "0.0.0",
+  "private": true,
+  "type": "commonjs",
+  "devDependencies": {
+    "@real-router/core": "workspace:*",
+    "type-guards": "workspace:*"
+  }
+}
+```
+
+**Why it's a workspace entry at all:** some shared files import `type-guards` (e.g., `shared/browser-env/popstate-utils.ts` uses `isStateStrict`). When rolldown processes these files via a consumer's symlink, the import is transitively listed under `alwaysBundle: ["type-guards"]` in the consumer's tsdown config — meaning rolldown must **resolve and inline** the module. Resolution starts from the file's real filesystem location (`shared/browser-env/*.ts`), walking up through `node_modules` directories. Without `shared/node_modules/type-guards`, rolldown cannot find it and fails with `UNRESOLVED_IMPORT`. Adding `shared/` to `pnpm-workspace.yaml` with `type-guards` as a devDep makes pnpm create the `shared/node_modules/type-guards` symlink, giving rolldown a resolution anchor.
+
+**Why `@real-router/core` is also listed** even though it's a scoped package treated as external by rolldown: for consistency, and so tsc's type resolution sees the same module instance from any location. Prevents subtle dual-package hazards during incremental rebuilds.
+
+**Why `"type": "commonjs"`:** without it, TypeScript walks up to the root `package.json` (`"type": "module"`). Shared files would get ESM type resolution while consumers (all `"type": "commonjs"`) would see CJS types, creating a dual-package hazard where `Router` from `dist/esm/` and `Router` from `dist/cjs/` become nominally different types with conflicting `#private` fields.
+
+**What's deliberately missing:**
+
+- No `main`/`module`/`exports` — not a published package, not imported by name. Consumers reach into `shared/` only through the symlinks.
+- No `scripts` — no build, no tests, no lint target. The package is inert from Turbo's perspective.
+- No runtime `dependencies` — all deps are devDeps because shared files are inlined into consumers' bundles, not shipped as a separate artifact. Prevents accidental publication of `@real-router/shared-sources` as a real package.
+
+### Scoped vs unscoped dependency resolution (why both cases are needed)
+
+`@real-router/core` and `type-guards` are handled differently by rolldown despite both being workspace packages:
+
+- `@real-router/core` is in each consumer's runtime `dependencies`. rolldown marks it as **external** — the specifier stays in the output bundle as a peer import. No resolution needed at build time.
+- `type-guards` is listed in each consumer's `alwaysBundle` tsdown config. rolldown must **resolve and inline** it into the output bundle. Resolution requires `type-guards` to be findable from the importing file's real path via pnpm's `node_modules`.
+
+This asymmetry is why `dom-utils` **appears** to work without workspace deps on `shared/` (its only foreign import is `@real-router/core`, treated as external), but `browser-env` **requires** `type-guards` to be resolvable from `shared/`'s location (inlined). The shared-as-workspace-entry pattern covers both cases uniformly, and is the canonical setup.
+
+### Why each consumer's `src/<shared>` is a symlink (not relative imports)
+
+- **Uniform pattern across all consumers** — previously Svelte was the only package with a symlink. Now every consumer uses the same pattern.
+- **Clean local imports** — `from "./browser-env/index.js"` reads as a local directory. No ugly `../../../../shared/browser-env/...` chains.
+- **No Solid `rootDir` expansion** — tsc sees the symlinked file at its virtual path (`packages/solid/src/dom-utils/*.ts`), which is inside `rootDir: "./src"`. Accesing via relative path would put files outside rootDir and require widening it (tried in an earlier prototype, rejected).
+- **Identical DX across all 8 consumers** — browser-plugin, hash-plugin, navigation-plugin, react, preact, vue, solid, svelte all work the same way.
+
+### `packages/dom-utils/` and `packages/browser-env/` as tests-only wrappers
+
+Both packages are retained as minimal wrappers to host existing tests. Each has:
+
+- `package.json` — minimal: name (kept for backward compat), test scripts, deps on `@real-router/core` and (for browser-env) `type-guards` to satisfy the test runner
+- `tsconfig.json` — includes `src` and `tests`
+- `vitest.config.mts` + `vitest.config.properties.mts` — existing test runners
+- `src` — symlink to `../../shared/<name>` (tests still import via `../../src` unchanged — no test file diff)
+- `tests/` — unchanged
+
+Full test migration to a dedicated location (e.g., `tests/shared/`) is a **deferred follow-up**. Doing it now would mean restructuring vitest workspace, turbo tasks, CI configs, and pre-commit hooks — out of scope for #437.
+
+### Windows symlink requirement
+
+Git-tracked symlinks work on Unix/macOS/Linux out of the box. Windows contributors need `git config --global core.symlinks true` plus Developer Mode (or elevated shell). This was already required for Svelte's pre-#437 symlink. #437 scales it from 1 symlink to 10 (5 dom-utils consumers + 3 browser-env consumers + 2 tests-only wrappers). See README "Development" section.
+
+### Tooling configuration
+
+**knip** (`knip.json`):
+
+- Each consumer workspace (8 entries: react, preact, vue, solid, svelte, browser-plugin, hash-plugin, navigation-plugin) lists `"ignore": ["src/dom-utils/**"]` or `"src/browser-env/**"` to skip symlinked directories from dead-code analysis
+- `packages/dom-utils` and `packages/browser-env` use tests-only project patterns
+- `packages/browser-env` and `packages/navigation-plugin` add `type-guards` to `ignoreDependencies` — knip doesn't see the transitive import through the symlinked `shared/browser-env/popstate-utils.ts` and would otherwise flag it as unused
+
+**jscpd** (`.jscpd.json`): ignores `packages/*/src/dom-utils/**`, `packages/dom-utils/src/**`, `packages/*/src/browser-env/**`, `packages/browser-env/src/**` — without these, jscpd follows symlinks and reports the same shared files as duplicates across every symlinked location.
+
+**vitest coverage**: shared code is tracked by the file's real path (`shared/**/*.ts`), not the symlinked virtual path. The global include pattern `packages/*/src/**/*.ts` does not match `shared/**`, so shared code is currently excluded from per-package 100% coverage enforcement. This is accepted as a trade-off — test migration for shared code is the deferred follow-up.
+
+### History
+
+- **#413** — `dom-utils` as workspace package leaked into published `dependencies`. Fixed by moving to `devDependencies` + tsdown `alwaysBundle`. Smoke test added (`scripts/smoke-test-packages.sh`).
+- **#437** (two commits on the same branch):
+  - First commit — migrated `dom-utils` from workspace package to `shared/dom-utils/` with symlinks for all 5 framework adapters. Eliminated package infrastructure. Initially used a minimal `shared/package.json` without workspace deps (worked because `@real-router/core` is external-treated, so no resolution was needed).
+  - Second commit — migrated `browser-env` the same way for all 3 URL plugins. Hit a `type-guards` resolution failure because `alwaysBundle` requires the package to be resolvable from `shared/`'s physical location, not just marked external. Fix: added `shared/` to `pnpm-workspace.yaml` and put `@real-router/core` + `type-guards` as workspace devDeps. This retroactively became the canonical shape for `shared/package.json` — it's stricter than strictly necessary for `dom-utils` alone, but uniform across both migrations.
 
 ## Module Resolution: Clean Exports + Vitest Source Aliases
 

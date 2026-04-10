@@ -1,5 +1,6 @@
 import { createRouter } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
+import { hashPluginFactory } from "@real-router/hash-plugin";
 import {
   describe,
   beforeAll,
@@ -10,12 +11,10 @@ import {
   expect,
 } from "vitest";
 
-import { hashPluginFactory } from "@real-router/hash-plugin";
-
 import { noop, routerConfig, createMockedBrowser } from "../helpers/testUtils";
 
+import type { Browser } from "../../src/browser-env/index.js";
 import type { Router, State } from "@real-router/core";
-import type { Browser } from "browser-env";
 
 let router: Router;
 let mockedBrowser: Browser;

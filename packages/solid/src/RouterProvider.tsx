@@ -1,10 +1,10 @@
 import { getNavigator } from "@real-router/core";
 import { createRouteSource } from "@real-router/sources";
-import { createRouteAnnouncer } from "dom-utils";
 import { createSelector, onCleanup, onMount } from "solid-js";
 
 import { RouterContext, RouteContext } from "./context";
 import { createSignalFromSource } from "./createSignalFromSource";
+import { createRouteAnnouncer } from "./dom-utils/index.js";
 
 import type { Router } from "@real-router/core";
 import type { ParentProps, JSX } from "solid-js";

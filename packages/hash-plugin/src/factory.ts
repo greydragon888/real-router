@@ -1,18 +1,18 @@
 import { getPluginApi } from "@real-router/core/api";
+
 import {
   createSafeBrowser,
   normalizeBase,
   safelyEncodePath,
-} from "browser-env";
-
+} from "./browser-env/index.js";
 import { defaultOptions, source } from "./constants";
 import { createHashPrefixRegex, extractHashPath } from "./hash-utils";
 import { HashPlugin } from "./plugin";
 import { validateOptions } from "./validation";
 
+import type { Browser, SharedFactoryState } from "./browser-env/index.js";
 import type { HashPluginOptions } from "./types";
 import type { PluginFactory, Router } from "@real-router/core";
-import type { Browser, SharedFactoryState } from "browser-env";
 
 export function hashPluginFactory(
   opts?: Partial<HashPluginOptions>,

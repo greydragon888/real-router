@@ -1,4 +1,4 @@
-import { safeParseUrl } from "./url-parsing";
+import { safeParseUrl } from "./url-parsing.js";
 
 export function extractPath(pathname: string, base: string): string {
   if (base && pathname.startsWith(base)) {

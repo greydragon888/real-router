@@ -1,11 +1,11 @@
 import { UNKNOWN_ROUTE } from "@real-router/core";
+
 import {
   shouldReplaceHistory,
   buildUrl,
   extractPath,
   urlToPath,
-} from "browser-env";
-
+} from "./browser-env/index.js";
 import { LOGGER_CONTEXT } from "./constants";
 import {
   peekBack,

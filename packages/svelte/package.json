@@ -59,7 +59,6 @@
   },
   "devDependencies": {
     "@real-router/browser-plugin": "workspace:^",
-    "dom-utils": "workspace:^",
     "@sveltejs/package": "2.5.7",
     "@sveltejs/vite-plugin-svelte": "6.2.4",
     "@testing-library/jest-dom": "6.9.1",

@@ -67,7 +67,6 @@
   },
   "devDependencies": {
     "@babel/core": "7.29.0",
-    "dom-utils": "workspace:^",
     "@babel/preset-typescript": "7.28.5",
     "@real-router/browser-plugin": "workspace:^",
     "@rollup/plugin-babel": "7.0.0",

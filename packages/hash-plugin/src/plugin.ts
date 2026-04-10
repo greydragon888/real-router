@@ -5,10 +5,10 @@ import {
   createReplaceHistoryState,
   shouldReplaceHistory,
   updateBrowserState,
-} from "browser-env";
-
+} from "./browser-env/index.js";
 import { hashUrlToPath } from "./hash-utils";
 
+import type { Browser, SharedFactoryState } from "./browser-env/index.js";
 import type { HashPluginOptions } from "./types";
 import type {
   NavigationOptions,
@@ -18,7 +18,6 @@ import type {
   Plugin,
 } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
-import type { Browser, SharedFactoryState } from "browser-env";
 
 export class HashPlugin {
   readonly #router: Router;

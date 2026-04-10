@@ -1,8 +1,10 @@
-import { createSafeBrowser, safelyEncodePath } from "browser-env";
-
+import {
+  createSafeBrowser,
+  safelyEncodePath,
+} from "../../src/browser-env/index.js";
 import { createHashPrefixRegex, extractHashPath } from "../../src/hash-utils";
 
-import type { Browser } from "browser-env";
+import type { Browser } from "../../src/browser-env/index.js";
 
 export type OnStateChangeFn = (state: unknown) => void;
 

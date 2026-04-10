@@ -1,4 +1,4 @@
-import type { HistoryBrowser } from "./types";
+import type { HistoryBrowser } from "./types.js";
 import type { State } from "@real-router/core";
 
 export const pushState = (state: State, path: string): void => {

@@ -2,24 +2,7 @@
   "name": "browser-env",
   "version": "0.2.6",
   "private": true,
-  "description": "Shared browser API abstractions for Real-Router",
-  "main": "./dist/cjs/index.js",
-  "module": "./dist/esm/index.mjs",
-  "types": "./dist/esm/index.d.mts",
-  "exports": {
-    ".": {
-      "types": {
-        "import": "./dist/esm/index.d.mts",
-        "require": "./dist/cjs/index.d.ts"
-      },
-      "import": "./dist/esm/index.mjs",
-      "require": "./dist/cjs/index.js"
-    }
-  },
-  "files": [
-    "dist",
-    "src"
-  ],
+  "description": "Tests for shared/browser-env — source files live in /shared/browser-env (src is a symlink)",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/greydragon888/real-router.git"
@@ -31,14 +14,11 @@
   },
   "license": "MIT",
   "scripts": {
-    "build": "tsdown --config-loader unrun",
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
     "test": "vitest run",
-    "test:properties": "vitest --config vitest.config.properties.mts --run",
-    "build:dist-only": "tsdown --config-loader unrun"
+    "test:properties": "vitest --config vitest.config.properties.mts --run"
   },
-  "sideEffects": false,
   "dependencies": {
     "@real-router/core": "workspace:^",
     "type-guards": "workspace:^"

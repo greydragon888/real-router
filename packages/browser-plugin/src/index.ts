@@ -10,7 +10,7 @@ export { browserPluginFactory } from "./factory";
 // Types
 export type { BrowserPluginOptions } from "./types";
 
-export type { Browser } from "browser-env";
+export type { Browser } from "./browser-env/index.js";
 
 // Type guards
 export { isStateStrict as isState } from "type-guards";

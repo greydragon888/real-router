@@ -57,7 +57,7 @@
     "@real-router/core": "workspace:^"
   },
   "devDependencies": {
-    "browser-env": "workspace:^",
-    "jsdom": "28.1.0"
+    "jsdom": "28.1.0",
+    "type-guards": "workspace:^"
   }
 }

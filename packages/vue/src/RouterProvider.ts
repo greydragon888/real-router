@@ -1,6 +1,5 @@
 import { getNavigator } from "@real-router/core";
 import { createRouteSource } from "@real-router/sources";
-import { createRouteAnnouncer } from "dom-utils";
 import {
   defineComponent,
   onMounted,
@@ -12,6 +11,7 @@ import {
 
 import { NavigatorKey, RouteKey, RouterKey } from "./context";
 import { setDirectiveRouter } from "./directives/vLink";
+import { createRouteAnnouncer } from "./dom-utils/index.js";
 
 import type { Router } from "@real-router/core";
 import type { PropType } from "vue";

@@ -1,4 +1,4 @@
-import type { HistoryBrowser } from "./types";
+import type { HistoryBrowser } from "./types.js";
 
 const NOOP = (): void => {};
 

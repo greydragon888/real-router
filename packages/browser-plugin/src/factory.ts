@@ -1,18 +1,18 @@
 import { getPluginApi } from "@real-router/core/api";
+
 import {
   createSafeBrowser,
   normalizeBase,
   safelyEncodePath,
   extractPath,
-} from "browser-env";
-
+} from "./browser-env/index.js";
 import { defaultOptions, source } from "./constants";
 import { BrowserPlugin } from "./plugin";
 import { validateOptions } from "./validation";
 
+import type { Browser, SharedFactoryState } from "./browser-env/index.js";
 import type { BrowserPluginOptions } from "./types";
 import type { PluginFactory, Router } from "@real-router/core";
-import type { Browser, SharedFactoryState } from "browser-env";
 
 export function browserPluginFactory(
   opts?: Partial<BrowserPluginOptions>,

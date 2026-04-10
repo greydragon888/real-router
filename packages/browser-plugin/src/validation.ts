@@ -1,5 +1,4 @@
-import { createOptionsValidator } from "browser-env";
-
+import { createOptionsValidator } from "./browser-env/index.js";
 import { LOGGER_CONTEXT, defaultOptions } from "./constants";
 
 import type { BrowserPluginOptions } from "./types";

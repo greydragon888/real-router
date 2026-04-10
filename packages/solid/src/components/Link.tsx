@@ -1,10 +1,14 @@
 import { createActiveRouteSource } from "@real-router/sources";
-import { shouldNavigate, buildHref, buildActiveClassName } from "dom-utils";
 import { createMemo, mergeProps, splitProps, useContext } from "solid-js";
 
 import { EMPTY_PARAMS, EMPTY_OPTIONS } from "../constants";
 import { RouterContext } from "../context";
 import { createSignalFromSource } from "../createSignalFromSource";
+import {
+  shouldNavigate,
+  buildHref,
+  buildActiveClassName,
+} from "../dom-utils/index.js";
 import { useRouter } from "../hooks/useRouter";
 
 import type { LinkProps } from "../types";
