@@ -32,9 +32,9 @@ function workspaceSourceAliases(): Record<string, string> {
       if (typeof conditions !== "object" || !conditions) continue;
       const cond = conditions as Record<string, unknown>;
 
-      // Prefer the new "@real-router/source" custom condition if present,
+      // Prefer the new "@real-router/internal-source" custom condition if present,
       // otherwise fall back to deriving from the ESM dist path.
-      const sourceCondition = cond["@real-router/source"];
+      const sourceCondition = cond["@real-router/internal-source"];
       const importPath = (cond.import as string) || "";
 
       let srcFileCandidates: string[] = [];
@@ -108,7 +108,7 @@ export const commonConfig = defineConfig({
   // coverage can't track source files.
   //
   // NOTE (Этап 2 RFC): Vitest condition-based resolution with custom
-  // "@real-router/source" condition will be added here once we identify a
+  // "@real-router/internal-source" condition will be added here once we identify a
   // condition list that doesn't interfere with external packages (preact,
   // react, vue, svelte) which use non-standard condition orderings. For now
   // we keep the alias-based approach and rely on the tsconfig's customConditions
