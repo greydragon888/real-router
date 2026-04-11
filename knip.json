@@ -93,6 +93,13 @@
         "config": ["vitest.config.mts", "vitest.config.*.mts"]
       }
     },
+    "packages/persistent-params-plugin": {
+      "project": ["src/**/*.ts"],
+      "ignoreDependencies": ["@real-router/types"],
+      "vitest": {
+        "config": ["vitest.config.mts", "vitest.config.*.mts"]
+      }
+    },
     "packages/ssr-data-plugin": {
       "project": ["src/**/*.ts"],
       "ignoreDependencies": ["@real-router/types"],

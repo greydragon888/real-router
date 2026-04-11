@@ -13,8 +13,9 @@
 - `addInterceptor("buildPath", ...)` — injects persistent params into every `router.buildPath()` call
 - `addInterceptor("forwardState", ...)` — injects persistent params into every state built during navigation
 - `api.setRootPath(...)` — extends the root path with query param placeholders so the core's path builder knows about the persistent params
-- Plugin hook (`onTransitionSuccess`) — reads committed state to update stored param values
-- Plugin hook (`teardown`) — removes interceptors and restores the original root path
+- `api.claimContextNamespace("persistentParams")` — claims exclusive write access to `state.context.persistentParams`
+- Plugin hook (`onTransitionSuccess`) — reads committed state to update stored param values, then publishes snapshot to `state.context.persistentParams` via `claim.write()`
+- Plugin hook (`teardown`) — removes interceptors, releases the context claim via `claim.release()`, and restores the original root path
 
 ## Package Structure
 
@@ -22,6 +23,7 @@
 persistent-params-plugin/
 ├── src/
 │   ├── index.ts           — Public API (exports factory + PersistentParamsConfig type)
+│   │                        Module augmentation: StateContext.persistentParams on @real-router/types
 │   ├── factory.ts         — persistentParamsPluginFactory (validation, initialParams, paramNamesSet, closure)
 │   ├── plugin.ts          — PersistentParamsPlugin class (interceptors, state updates, teardown)
 │   ├── param-utils.ts     — Pure param utilities (extractOwnParams, mergeParams)
@@ -43,14 +45,17 @@ index.ts
             └── validation.ts
 
 types.ts  ← imported by factory.ts, validation.ts
+
+index.ts also declares module augmentation on @real-router/types (StateContext)
 ```
 
 External dependencies:
 
-| Dependency          | What it provides                                             | Used in                   |
-| ------------------- | ------------------------------------------------------------ | ------------------------- |
-| `@real-router/core` | `getPluginApi`, types (`PluginApi`, `Params`, `State`, etc.) | `factory.ts`, `plugin.ts` |
-| `type-guards`       | `isPrimitiveValue` — rejects NaN, Infinity, objects, arrays  | `validation.ts`           |
+| Dependency           | What it provides                                             | Used in                   |
+| -------------------- | ------------------------------------------------------------ | ------------------------- |
+| `@real-router/core`  | `getPluginApi`, types (`PluginApi`, `Params`, `State`, etc.) | `factory.ts`, `plugin.ts` |
+| `@real-router/types` | `StateContext` interface (module augmentation target)         | `index.ts`                |
+| `type-guards`        | `isPrimitiveValue` — rejects NaN, Infinity, objects, arrays  | `validation.ts`           |
 
 ## Factory + Class Pattern
 
@@ -78,6 +83,7 @@ persistentParamsPluginFactory(params)   ← factory.ts
                 └── new PersistentParamsPlugin(api, initialParams, clonedSet, api.getRootPath())
                             │
                             │  Constructor:
+                            │  - api.claimContextNamespace("persistentParams")
                             │  - api.setRootPath(originalRootPath + "?" + paramNames.join("&"))
                             │  - api.addInterceptor("buildPath", ...)
                             │  - api.addInterceptor("forwardState", ...)
@@ -128,9 +134,9 @@ export function persistentParamsPluginFactory(
 }
 ```
 
-### Constructor: Interceptor Registration with Rollback
+### Constructor: Context Claim and Interceptor Registration with Rollback
 
-The constructor registers both interceptors and calls `setRootPath` inside a `try/catch`. If any step throws, already-registered interceptors are removed and `setRootPath` is restored before re-throwing:
+The constructor claims the `"persistentParams"` context namespace, then registers both interceptors and calls `setRootPath` inside a `try/catch`. If any step throws, already-registered interceptors are removed and `setRootPath` is restored before re-throwing:
 
 ```typescript
 // plugin.ts constructor (simplified)
@@ -198,7 +204,7 @@ router.navigate(name, params, opts)
 
 Both interceptors call `#withPersistentParams`, which is the single merge point. The `undefined`-removal side effect (deleting from `paramNamesSet` and `#persistentParams`) happens here, before the state is committed.
 
-### onTransitionSuccess: updating stored params
+### onTransitionSuccess: updating stored params and publishing to state context
 
 ```
 Transition committed → onTransitionSuccess(toState)
@@ -215,10 +221,14 @@ Transition committed → onTransitionSuccess(toState)
         │     value !== #persistentParams[key]?
         │       YES: copy #persistentParams, set newParams[key] = value
         │
-        └── if any change: #persistentParams = Object.freeze(newParams)
+        ├── if any change: #persistentParams = Object.freeze(newParams)
+        │
+        └── claim.write(toState, #persistentParams)
+              → publishes snapshot to state.context.persistentParams
+              → runs before subscriber callbacks
 ```
 
-`onTransitionSuccess` is the source of truth for what gets stored. The interceptors inject params optimistically; `onTransitionSuccess` confirms what the core actually committed.
+`onTransitionSuccess` is the source of truth for what gets stored. The interceptors inject params optimistically; `onTransitionSuccess` confirms what the core actually committed and publishes the final snapshot to `state.context.persistentParams` for downstream consumers.
 
 ### Full navigation sequence
 
@@ -241,7 +251,9 @@ router.navigate("route2", { id: "2" })
         │
         ▼
   onTransitionSuccess({ params: { id: "2", mode: "dev" } })
-        └── #persistentParams stays { mode: "dev" } (no change)
+        ├── #persistentParams stays { mode: "dev" } (no change)
+        └── claim.write(toState, { mode: "dev" })
+              → state.context.persistentParams = { mode: "dev" }
 ```
 
 ## Teardown Lifecycle
@@ -258,6 +270,9 @@ unsubscribe() or router.dispose()
         ├── #removeForwardStateInterceptor()
         │     └── pure array.splice — cannot throw
         │
+        ├── #claim.release()
+        │     └── releases "persistentParams" context namespace
+        │
         └── try { api.setRootPath(#originalRootPath) }
               catch { /* swallow silently */ }
 ```
@@ -266,9 +281,9 @@ unsubscribe() or router.dispose()
 
 During `router.dispose()`, the FSM enters the `DISPOSED` state before plugin teardown runs. `setRootPath` calls `throwIfDisposed()` internally and throws `RouterError(ROUTER_DISPOSED)`. Restoring the root path on a destroyed router is unnecessary, so the error is swallowed. This branch is excluded from coverage (`v8 ignore`) because it requires a disposed router to trigger.
 
-**Why interceptor removal cannot throw:**
+**Why interceptor removal and claim release cannot throw:**
 
-`addInterceptor` returns a function that splices the interceptor out of an internal array. Array mutation is synchronous and infallible. No external state is involved.
+`addInterceptor` returns a function that splices the interceptor out of an internal array. Array mutation is synchronous and infallible. `claim.release()` deletes the namespace from the internal claim records map — also synchronous and infallible. No external state is involved.
 
 ## Validation
 

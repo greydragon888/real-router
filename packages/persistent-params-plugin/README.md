@@ -103,6 +103,32 @@ const unsubscribe = router.usePlugin(persistentParamsPluginFactory(["mode"]));
 unsubscribe();
 ```
 
+## State Context: `state.context.persistentParams`
+
+The plugin publishes a snapshot of the current persistent params to `state.context.persistentParams` after each successful transition. This lets components distinguish persistent params from route-specific params.
+
+```typescript
+import { createRouter } from "@real-router/core";
+import { persistentParamsPluginFactory } from "@real-router/persistent-params-plugin";
+
+const router = createRouter(routes);
+router.usePlugin(persistentParamsPluginFactory({ lang: "en", theme: "light" }));
+
+router.subscribe(({ route, previousRoute }) => {
+  const { params, context } = route;
+
+  // params contains BOTH route-specific and persistent params merged together
+  console.log(params);              // { id: "42", lang: "en", theme: "light" }
+
+  // context.persistentParams contains ONLY the persistent params
+  console.log(context.persistentParams); // { lang: "en", theme: "light" }
+});
+```
+
+**Timing:** Written in `onTransitionSuccess` (before subscriber callbacks fire). Always reflects the latest committed values.
+
+**Type:** Importing `@real-router/persistent-params-plugin` augments `StateContext` with `persistentParams?: Params`, providing full type safety.
+
 ## Documentation
 
 Full documentation: [Wiki — persistent-params-plugin](https://github.com/greydragon888/real-router/wiki/persistent-params-plugin)
