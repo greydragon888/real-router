@@ -83,10 +83,10 @@ describe("@real-router/ssr-data-plugin", () => {
       const loader = vi.fn().mockResolvedValue({ title: "Home" });
 
       router.usePlugin(ssrDataPluginFactory({ home: loader }));
-      await router.start("/");
+      const state = await router.start("/");
 
       expect(loader).toHaveBeenCalledTimes(1);
-      expect(router.getRouteData()).toStrictEqual({ title: "Home" });
+      expect(state.context.data).toStrictEqual({ title: "Home" });
     });
 
     it("should pass route params to the loader", async () => {
@@ -104,10 +104,10 @@ describe("@real-router/ssr-data-plugin", () => {
       const loader = vi.fn().mockResolvedValue("data");
 
       router.usePlugin(ssrDataPluginFactory({ "users.profile": loader }));
-      await router.start("/");
+      const state = await router.start("/");
 
       expect(loader).not.toHaveBeenCalled();
-      expect(router.getRouteData()).toBeNull();
+      expect(state.context.data).toBeUndefined();
     });
   });
 
@@ -119,47 +119,52 @@ describe("@real-router/ssr-data-plugin", () => {
       await router.start("/");
       loader.mockClear();
 
-      await router.navigate("users.list");
+      const state = await router.navigate("users.list");
 
       expect(loader).not.toHaveBeenCalled();
-      expect(router.getRouteData()).toBeNull();
+      expect(state.context.data).toBeUndefined();
     });
   });
 
-  describe("getRouteData()", () => {
+  describe("state.context.data", () => {
     it("should return loaded data for current state", async () => {
       router.usePlugin(
         ssrDataPluginFactory({
           home: () => Promise.resolve({ page: "home" }),
         }),
       );
-      await router.start("/");
+      const state = await router.start("/");
 
-      expect(router.getRouteData()).toStrictEqual({ page: "home" });
+      expect(state.context.data).toStrictEqual({ page: "home" });
     });
 
-    it("should return null when no loader matched the route", async () => {
+    it("should be undefined when no loader matched the route", async () => {
       router.usePlugin(
         ssrDataPluginFactory({
           "users.profile": () => Promise.resolve("profile-data"),
         }),
       );
-      await router.start("/");
+      const state = await router.start("/");
 
-      expect(router.getRouteData()).toBeNull();
+      expect(state.context.data).toBeUndefined();
     });
 
-    it("should return null when router has no state", () => {
+    it("should return correct data when reading from getState()", async () => {
       router.usePlugin(
-        ssrDataPluginFactory({ home: () => Promise.resolve("data") }),
+        ssrDataPluginFactory({
+          home: () => Promise.resolve({ page: "home-data" }),
+        }),
       );
+      await router.start("/");
 
-      expect(router.getRouteData()).toBeNull();
+      const state = router.getState()!;
+
+      expect(state.context.data).toStrictEqual({ page: "home-data" });
     });
   });
 
   describe("Teardown", () => {
-    it("should clean up interceptor and extension on unsubscribe", async () => {
+    it("should clean up interceptor on unsubscribe", async () => {
       const loader = vi.fn().mockResolvedValue("data");
 
       const unsubscribe = router.usePlugin(
@@ -169,11 +174,9 @@ describe("@real-router/ssr-data-plugin", () => {
       await router.start("/");
 
       expect(loader).toHaveBeenCalledTimes(1);
-      expect(router.getRouteData()).toBe("data");
+      expect(router.getState()!.context.data).toBe("data");
 
       unsubscribe();
-
-      expect(router).not.toHaveProperty("getRouteData");
     });
   });
 
@@ -184,24 +187,6 @@ describe("@real-router/ssr-data-plugin", () => {
       router.usePlugin(ssrDataPluginFactory({ home: loader }));
 
       await expect(router.start("/")).rejects.toThrow("load failed");
-    });
-  });
-
-  describe("getRouteData with explicit state argument", () => {
-    it("should return correct data when called with explicit state", async () => {
-      router.usePlugin(
-        ssrDataPluginFactory({
-          home: () => Promise.resolve({ page: "home-data" }),
-        }),
-      );
-      await router.start("/");
-
-      const state = router.getState();
-      const dataWithState = router.getRouteData(state);
-      const dataWithoutState = router.getRouteData();
-
-      expect(dataWithState).toStrictEqual({ page: "home-data" });
-      expect(dataWithState).toStrictEqual(dataWithoutState);
     });
   });
 
@@ -221,7 +206,6 @@ describe("@real-router/ssr-data-plugin", () => {
       unsubscribe();
       loader.mockClear();
 
-      // Re-create router since start() can only be called once
       const freshRouter = createRouter(routes, { defaultRoute: "home" });
 
       await freshRouter.start("/");
@@ -237,29 +221,27 @@ describe("@real-router/ssr-data-plugin", () => {
       router.usePlugin(
         ssrDataPluginFactory({ home: () => Promise.resolve("hello") }),
       );
-      await router.start("/");
+      const state = await router.start("/");
 
-      expect(router.getRouteData()).toBe("hello");
+      expect(state.context.data).toBe("hello");
     });
 
     it("should handle number data", async () => {
       router.usePlugin(
         ssrDataPluginFactory({ home: () => Promise.resolve(42) }),
       );
-      await router.start("/");
+      const state = await router.start("/");
 
-      expect(router.getRouteData()).toBe(42);
+      expect(state.context.data).toBe(42);
     });
 
     it("should handle null data", async () => {
       router.usePlugin(
         ssrDataPluginFactory({ home: () => Promise.resolve(null) }),
       );
-      await router.start("/");
+      const state = await router.start("/");
 
-      // null is stored in WeakMap, so getRouteData returns null
-      // (indistinguishable from "no data" — but the loader was called)
-      expect(router.getRouteData()).toBeNull();
+      expect(state.context.data).toBeNull();
     });
 
     it("should handle array data", async () => {
@@ -268,9 +250,9 @@ describe("@real-router/ssr-data-plugin", () => {
           home: () => Promise.resolve([1, "two", { three: 3 }]),
         }),
       );
-      await router.start("/");
+      const state = await router.start("/");
 
-      expect(router.getRouteData()).toStrictEqual([1, "two", { three: 3 }]);
+      expect(state.context.data).toStrictEqual([1, "two", { three: 3 }]);
     });
 
     it("should handle nested object data", async () => {
@@ -279,24 +261,22 @@ describe("@real-router/ssr-data-plugin", () => {
       router.usePlugin(
         ssrDataPluginFactory({ home: () => Promise.resolve(nested) }),
       );
-      await router.start("/");
+      const state = await router.start("/");
 
-      expect(router.getRouteData()).toStrictEqual(nested);
+      expect(state.context.data).toStrictEqual(nested);
     });
   });
 
   describe("Prototype pollution safety", () => {
     it("should not match keys inherited from prototype", async () => {
-      // Object.hasOwn guards against prototype chain lookups
       const proto = { home: vi.fn().mockResolvedValue("hacked") };
       const loaders = Object.create(proto) as DataLoaderMap;
 
-      // "home" exists on prototype but NOT as own property
       router.usePlugin(ssrDataPluginFactory(loaders));
-      await router.start("/");
+      const state = await router.start("/");
 
       expect(proto.home).not.toHaveBeenCalled();
-      expect(router.getRouteData()).toBeNull();
+      expect(state.context.data).toBeUndefined();
     });
   });
 
@@ -313,8 +293,8 @@ describe("@real-router/ssr-data-plugin", () => {
           const clone = cloneRouter(base);
 
           clone.usePlugin(ssrDataPluginFactory(loaders));
-          await clone.start(`/users/${i}`);
-          const data = clone.getRouteData();
+          const state = await clone.start(`/users/${i}`);
+          const data = state.context.data;
 
           clone.dispose();
 

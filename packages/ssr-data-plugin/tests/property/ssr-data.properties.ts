@@ -90,27 +90,27 @@ describe("loader arguments: loader receives correct route params", () => {
 });
 
 // =============================================================================
-// Data Retrieval: getRouteData returns loader result
+// Data Retrieval: state.context.data returns loader result
 // =============================================================================
 
-describe("data retrieval: getRouteData returns loader result after start()", () => {
+describe("data retrieval: state.context.data returns loader result after start()", () => {
   test.prop([arbLoaderData], { numRuns: NUM_RUNS.thorough })(
-    "getRouteData returns exactly the loader resolved value",
+    "state.context.data returns exactly the loader resolved value",
     async (data) => {
       const { router } = createSsrDataRouter({
         home: async () => data,
       });
 
-      await router.start("/");
+      const state = await router.start("/");
 
-      expect(router.getRouteData()).toStrictEqual(data);
+      expect(state.context.data).toStrictEqual(data);
 
       router.stop();
     },
   );
 
   test.prop([arbSimpleRouteName], { numRuns: NUM_RUNS.standard })(
-    "getRouteData returns null when route has no loader",
+    "state.context.data is undefined when route has no loader",
     async (routeName) => {
       // Register loader for a route we won't navigate to
       const { router } = createSsrDataRouter({
@@ -123,9 +123,9 @@ describe("data retrieval: getRouteData returns loader result after start()", () 
       };
       const path = pathMap[routeName] ?? `/${routeName}`;
 
-      await router.start(path);
+      const state = await router.start(path);
 
-      expect(router.getRouteData()).toBeNull();
+      expect(state.context.data).toBeUndefined();
 
       router.stop();
     },
@@ -133,24 +133,22 @@ describe("data retrieval: getRouteData returns loader result after start()", () 
 });
 
 // =============================================================================
-// Teardown: removes getRouteData extension
+// Teardown: unsubscribe releases claim
 // =============================================================================
 
-describe("teardown: removes start interceptor", () => {
+describe("teardown: unsubscribe completes without error", () => {
   test.prop([arbParamValue], { numRuns: NUM_RUNS.standard })(
-    "getRouteData is removed after unsubscribe",
+    "unsubscribe after start does not throw",
     async (id) => {
       const { router, unsubscribe } = createSsrDataRouter({
         "users.profile": async () => ({ id }),
       });
 
-      await router.start(`/users/${id}`);
+      const state = await router.start(`/users/${id}`);
 
-      expect(router.getRouteData()).toStrictEqual({ id });
+      expect(state.context.data).toStrictEqual({ id });
 
       unsubscribe();
-
-      expect(router).not.toHaveProperty("getRouteData");
 
       router.stop();
     },

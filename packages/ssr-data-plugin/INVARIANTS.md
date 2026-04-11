@@ -19,17 +19,17 @@
 
 | #   | Invariant                                                  | Description                                                                                                                                                                                    |
 | --- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | `getRouteData()` returns loader result after `start()`     | After `start()` completes, `getRouteData()` returns exactly the value resolved by the loader. Confirms the data store correctly maps state to data across arbitrary loader return values.       |
-| 2   | `getRouteData()` returns `null` for unmatched routes       | When the started route has no loader, `getRouteData()` returns `null`. Verifies the data store does not leak data from previous navigations or other routes.                                    |
+| 1   | `state.context.data` contains loader result after `start()` | After `start()` completes, `state.context.data` contains exactly the value resolved by the loader. Confirms `claim.write()` correctly stores data on the state context across arbitrary loader return values. |
+| 2   | `state.context.data` is `undefined` for unmatched routes    | When the started route has no loader, `state.context.data` is `undefined`. Verifies the claim does not leak data from previous navigations or other routes.                                                  |
 
 ## Teardown
 
 | #   | Invariant                                                  | Description                                                                                                                                                                                    |
 | --- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Teardown removes `getRouteData` extension                  | After `unsubscribe()`, the `getRouteData` method is removed from the router instance. Prevents stale data access after plugin removal.                                                         |
+| 1   | Teardown releases `"data"` namespace claim                 | After `unsubscribe()`, the `"data"` namespace claim is released. Prevents stale data writes and frees the namespace for other plugins.                                                         |
 
 ## Test Files
 
 | File                                         | Invariants | Category                                                 |
 | -------------------------------------------- | ---------- | -------------------------------------------------------- |
-| `tests/property/ssr-data.properties.ts`      | 6          | Loader invocation, loader arguments, data retrieval, teardown |
+| `tests/property/ssr-data.properties.ts`      | 6          | Loader invocation, loader arguments, state.context.data retrieval, teardown |

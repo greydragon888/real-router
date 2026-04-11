@@ -3532,6 +3532,9 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
+      '@real-router/types':
+        specifier: workspace:^
+        version: link:../core-types
 
   packages/svelte:
     dependencies:

@@ -43,9 +43,9 @@ describe("D1 -- Data Loader Stress", () => {
       const clone = cloneRouter(base);
 
       clone.usePlugin(ssrDataPluginFactory(loaders));
-      await clone.start(`/users/${i}`);
+      const state = await clone.start(`/users/${i}`);
 
-      const data = clone.getRouteData() as { userId: string };
+      const data = state.context.data as { userId: string };
 
       expect(data).toBeDefined();
       expect(data.userId).toBe(String(i));
@@ -65,8 +65,8 @@ describe("D1 -- Data Loader Stress", () => {
         const clone = cloneRouter(base);
 
         clone.usePlugin(ssrDataPluginFactory(loaders));
-        await clone.start(`/users/${i}`);
-        const data = clone.getRouteData();
+        const state = await clone.start(`/users/${i}`);
+        const data = state.context.data;
 
         clone.dispose();
 
@@ -103,9 +103,9 @@ describe("D1 -- Data Loader Stress", () => {
       const clone = cloneRouter(base);
 
       clone.usePlugin(ssrDataPluginFactory(loaders));
-      await clone.start(path);
+      const state = await clone.start(path);
 
-      const data = clone.getRouteData();
+      const data = state.context.data;
 
       expect(data).toBeDefined();
 
@@ -118,7 +118,7 @@ describe("D1 -- Data Loader Stress", () => {
     expect(aboutLoader.mock.calls.length).toBeGreaterThanOrEqual(66);
   });
 
-  it("D1.4 -- 100 usePlugin/unsubscribe cycles: getRouteData removed after each unsubscribe", async () => {
+  it("D1.4 -- 100 usePlugin/unsubscribe cycles: unsubscribe completes without error", async () => {
     const router: Router = createRouter(routes, { defaultRoute: "home" });
     const loaders: DataLoaderMap = {
       home: () => Promise.resolve("data"),
@@ -127,14 +127,12 @@ describe("D1 -- Data Loader Stress", () => {
     for (let i = 0; i < 100; i++) {
       const unsub = router.usePlugin(ssrDataPluginFactory(loaders));
 
-      await router.start("/");
+      const state = await router.start("/");
 
-      expect(router.getRouteData()).toBe("data");
+      expect(state.context.data).toBe("data");
 
       router.stop();
       unsub();
-
-      expect(router).not.toHaveProperty("getRouteData");
     }
   });
 });
