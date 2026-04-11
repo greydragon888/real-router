@@ -88,7 +88,7 @@
     "packages/navigation-plugin": {
       "project": ["src/**/*.ts"],
       "ignore": ["src/browser-env/**"],
-      "ignoreDependencies": ["type-guards"],
+      "ignoreDependencies": ["type-guards", "@real-router/types"],
       "vitest": {
         "config": ["vitest.config.mts", "vitest.config.*.mts"]
       }

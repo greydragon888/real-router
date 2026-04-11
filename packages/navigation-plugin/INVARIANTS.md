@@ -274,7 +274,7 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 - `router.getState().name === "users.list"`
 - `router.peekBack()` returns `users.view`
 - `router.peekForward()` returns `undefined`
-- Navigation meta has `navigationType: "traverse"`
+- `state.context.navigation` has `navigationType: "traverse"` and `direction: "back"`
 
 **Why it matters:** Enables jumping directly to a previous occurrence without stepping through intermediate entries.
 
@@ -304,16 +304,16 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 ### C1. Meta Attachment on Success
 **Category:** NavigationMeta  
 **Testable:** Example-based  
-**Description:** Every successful transition must have meta attached to the resulting state.
+**Description:** Every successful transition must have meta attached to the resulting state via `state.context.navigation`.
 
 **Precondition:**
 - Call `router.navigate("users.list")`
 - Transition succeeds
 
 **Postcondition:**
-- `router.getNavigationMeta(state)` returns a `NavigationMeta` object
-- Meta has `navigationType` and `userInitiated` fields
-- Meta is stored in `metaByState` WeakMap
+- `state.context.navigation` is a frozen `NavigationMeta` object
+- Meta has `navigationType`, `userInitiated`, `direction`, and `sourceElement` fields
+- Meta is written via `claim.write(state, Object.freeze(meta))`
 
 **Why it matters:** Enables tracking navigation type and origin for every state.
 
@@ -340,16 +340,16 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 ### C3. pendingMeta Lifecycle
 **Category:** NavigationMeta  
 **Testable:** Example-based  
-**Description:** `pendingMeta` must follow a strict lifecycle: set → consumed in onTransitionSuccess → cleared.
+**Description:** `pendingMeta` must follow a strict lifecycle: set → written to `toState.context.navigation` in `onTransitionStart` → written again in `onTransitionSuccess` → cleared.
 
 **Precondition:**
 - Call `router.navigate("users.list")`
 
 **Postcondition:**
 - Before transition: `pendingMeta` is `undefined`
-- During transition (in guards): `getNavigationMeta()` returns `pendingMeta`
+- During transition (in guards): `toState.context.navigation` contains the frozen pendingMeta (for browser-initiated navigation)
 - After `onTransitionSuccess`: `pendingMeta` is cleared to `undefined`
-- `metaByState` contains the meta for the new state
+- `toState.context.navigation` contains the frozen meta
 
 **Why it matters:** Prevents meta from leaking between transitions.
 
@@ -418,8 +418,8 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 
 **Postcondition:**
 - `meta.info === { source: "link" }`
-- Info is available in guards via `getNavigationMeta()`
-- Info is available in subscribe callbacks via `getNavigationMeta(state)`
+- Info is available in guards via `toState.context.navigation`
+- Info is available in subscribe callbacks via `state.context.navigation`
 
 **Why it matters:** Enables passing context through navigate events.
 
@@ -540,7 +540,7 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 ### E3. teardown Cleanup Completeness
 **Category:** Lifecycle  
 **Testable:** Example-based  
-**Description:** `teardown` must clean up all resources: listener, start interceptor, and extensions.
+**Description:** `teardown` must clean up all resources: listener, start interceptor, extensions, and context namespace claim.
 
 **Precondition:**
 - Plugin is fully initialized and running
@@ -550,6 +550,7 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 - Navigate listener is removed
 - Start interceptor is removed
 - Router extensions are removed
+- Context namespace claim is released (`claim.release()`)
 - All cleanup functions are called
 
 **Why it matters:** Ensures complete cleanup when plugin is disposed.
@@ -722,21 +723,21 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 
 ---
 
-### H2. Meta WeakMap Cleanup
+### H2. Meta Lifecycle on State Context
 **Category:** State Consistency  
 **Testable:** Example-based  
-**Description:** States that are garbage collected must have their meta cleaned up automatically.
+**Description:** Navigation meta lives on `state.context.navigation` and is garbage collected with the state.
 
 **Precondition:**
 - Navigate to state S1
-- Store reference to S1
+- `S1.context.navigation` contains frozen NavigationMeta
 - Navigate to state S2
 - Delete reference to S1
 
 **Postcondition:**
-- S1 is garbage collected
-- Meta for S1 is automatically cleaned up (WeakMap)
-- No memory leak from meta storage
+- S1 and its context (including navigation meta) are garbage collected together
+- No separate storage to leak (meta is on the state object itself)
+- `claim.release()` in teardown frees the namespace for reuse
 
 **Why it matters:** Prevents memory leaks from accumulated meta objects.
 
@@ -764,7 +765,7 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 ### I2. Plugin Disposal Order
 **Category:** Integration  
 **Testable:** Example-based  
-**Description:** Cleanup must happen in correct order: listener → interceptor → extensions.
+**Description:** Cleanup must happen in correct order: listener → interceptor → extensions → claim release.
 
 **Precondition:**
 - Plugin is fully initialized
@@ -773,6 +774,7 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 - `teardown()` removes listener first
 - Then removes start interceptor
 - Then removes extensions
+- Then releases context namespace claim
 - All cleanup functions are called
 
 **Why it matters:** Prevents use-after-free errors.
@@ -916,7 +918,7 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 | G2. Base Path Building | URL | PBT | High |
 | G3. URL Parsing Robustness | URL | PBT | High |
 | H1. NavigationHistoryState Completeness | State | Example | High |
-| H2. Meta WeakMap Cleanup | State | Example | Medium |
+| H2. Meta Lifecycle on State Context | State | Example | Medium |
 | I1. Plugin Initialization Order | Integration | Example | High |
 | I2. Plugin Disposal Order | Integration | Example | High |
 | I3. Compatibility | Integration | Example | Medium |

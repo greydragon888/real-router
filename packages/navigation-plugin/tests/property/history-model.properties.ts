@@ -265,7 +265,7 @@ class AssertMetaExistsCommand implements fc.AsyncCommand<
     const state = r.router.getState();
 
     if (state) {
-      const meta = r.router.getNavigationMeta(state);
+      const meta = state.context.navigation;
 
       expect(meta).toBeDefined();
       expect(meta!.navigationType).toBeDefined();

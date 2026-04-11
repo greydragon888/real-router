@@ -265,7 +265,7 @@ describe("createNavigateHandler — direct", () => {
       browser: {} as NavigationBrowser,
       isSyncingFromRouter: () => false,
       setSyncing: vi.fn(),
-      setPendingMeta: vi.fn(),
+      setCapturedMeta: vi.fn(),
       base: "",
       transitionOptions: { source: "navigate", replace: true as const },
     });
@@ -509,7 +509,7 @@ describe("Error Recovery", () => {
       browser: mockBrowser,
       isSyncingFromRouter: () => false,
       setSyncing: mockSyncing,
-      setPendingMeta: vi.fn(),
+      setCapturedMeta: vi.fn(),
       base: "",
       transitionOptions: { source: "navigate", replace: true as const },
     });

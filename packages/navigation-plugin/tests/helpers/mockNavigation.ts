@@ -95,7 +95,7 @@ export class MockNavigateEvent extends Event implements NavigateEvent {
   readonly downloadRequest: string | null = null;
   readonly formData: FormData | null = null;
   readonly hasUAVisualTransition: boolean = false;
-  readonly sourceElement: Element | null = null;
+  readonly sourceElement: Element | null;
 
   private _interceptHandlers: NavigationInterceptHandler[] = [];
   private _abortController: AbortController;
@@ -108,6 +108,7 @@ export class MockNavigateEvent extends Event implements NavigateEvent {
     info: unknown;
     hashChange: boolean;
     abortController: AbortController;
+    sourceElement?: Element | null;
   }) {
     super("navigate", { cancelable: true, bubbles: false });
     this.navigationType = options.navigationType;
@@ -118,6 +119,7 @@ export class MockNavigateEvent extends Event implements NavigateEvent {
     this.hashChange = options.hashChange;
     this._abortController = options.abortController;
     this.signal = options.abortController.signal;
+    this.sourceElement = options.sourceElement ?? null;
   }
 
   intercept(options?: NavigationInterceptOptions): void {

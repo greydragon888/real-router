@@ -45,9 +45,11 @@ export interface NavigationSharedState {
   removeNavigateListener: (() => void) | undefined;
 }
 
+export type NavigationDirection = "forward" | "back" | "unknown";
+
 /**
- * Navigation metadata attached to State via WeakMap.
- * Available in guards (via pendingMeta) and subscribe callbacks (via metaByState).
+ * Navigation metadata attached to State via state.context.navigation.
+ * Available in subscribe callbacks and components after transition completes.
  */
 export interface NavigationMeta {
   /** Type of navigation: push, replace, traverse, or reload */
@@ -56,4 +58,8 @@ export interface NavigationMeta {
   userInitiated: boolean;
   /** Ephemeral info passed via navigation.navigate({ info }) — lost on page reload */
   info?: unknown;
+  /** Direction of navigation in the history stack */
+  direction: NavigationDirection;
+  /** The DOM element that initiated the navigation (e.g., anchor tag), or null for programmatic */
+  sourceElement: Element | null;
 }

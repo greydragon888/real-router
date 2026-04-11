@@ -62,11 +62,14 @@ export class NavigationPlugin {
   readonly #browser: NavigationBrowser;
   readonly #removeStartInterceptor: () => void;
   readonly #removeExtensions: () => void;
+  readonly #claim: {
+    write: (state: State, value: NavigationMeta) => void;
+    release: () => void;
+  };
   readonly #lifecycle: Pick<Plugin, "onStart" | "onStop" | "teardown">;
 
   #isSyncingFromRouter = false;
-  readonly #metaByState = new WeakMap<State, NavigationMeta>();
-  #pendingMeta: NavigationMeta | undefined;
+  #capturedMeta: NavigationMeta | undefined;
   #pendingTraverseKey: string | undefined;
 
   constructor(
@@ -86,6 +89,7 @@ export class NavigationPlugin {
     this.#options = options;
     this.#browser = browser;
 
+    this.#claim = api.claimContextNamespace("navigation");
     this.#removeStartInterceptor = createStartInterceptor(api, browser);
 
     const pluginBuildUrl = (route: string, params?: Params) => {
@@ -119,13 +123,6 @@ export class NavigationPlugin {
       getRouteVisitCount: (routeName: string) =>
         getRouteVisitCount(browser, api, options.base, routeName),
       traverseToLast: (routeName: string) => this.traverseToLast(routeName),
-      getNavigationMeta: (state?: State): NavigationMeta | undefined => {
-        if (!state) {
-          return this.#pendingMeta;
-        }
-
-        return this.#metaByState.get(state);
-      },
       canGoBack: () => canGoBack(browser),
       canGoForward: () => canGoForward(browser),
       canGoBackTo: (routeName: string) =>
@@ -140,8 +137,8 @@ export class NavigationPlugin {
       setSyncing: (syncing) => {
         this.#isSyncingFromRouter = syncing;
       },
-      setPendingMeta: (meta) => {
-        this.#pendingMeta = meta;
+      setCapturedMeta: (meta) => {
+        this.#capturedMeta = meta;
       },
       base: options.base,
       transitionOptions,
@@ -153,6 +150,9 @@ export class NavigationPlugin {
       handler,
       removeStartInterceptor: this.#removeStartInterceptor,
       removeExtensions: this.#removeExtensions,
+      releaseClaim: () => {
+        this.#claim.release();
+      },
     });
   }
 
@@ -184,9 +184,14 @@ export class NavigationPlugin {
       throw new Error(`No matching route for entry URL "${entry.url}"`);
     }
 
-    this.#pendingMeta = {
+    /* v8 ignore next -- @preserve: currentEntry always exists when traverseToLast is callable (after start) */
+    const currentIndex = this.#browser.currentEntry?.index ?? -1;
+
+    this.#capturedMeta = {
       navigationType: "traverse",
       userInitiated: false,
+      direction: entry.index > currentIndex ? "forward" : "back",
+      sourceElement: null,
     };
     this.#pendingTraverseKey = entry.key;
 
@@ -197,24 +202,34 @@ export class NavigationPlugin {
     return {
       ...this.#lifecycle,
 
+      onTransitionStart: (toState: State) => {
+        if (this.#capturedMeta) {
+          this.#claim.write(toState, this.#capturedMeta);
+        }
+      },
+
       onTransitionSuccess: (
         toState: State,
         fromState: State | undefined,
         navOptions: NavigationOptions,
       ) => {
-        if (!this.#pendingMeta) {
-          this.#pendingMeta = {
-            navigationType: deriveNavigationType(
-              navOptions,
-              toState,
-              fromState,
-            ),
+        if (!this.#capturedMeta) {
+          const navigationType = deriveNavigationType(
+            navOptions,
+            toState,
+            fromState,
+          );
+
+          this.#capturedMeta = {
+            navigationType,
             userInitiated: false,
+            direction: navigationType === "push" ? "forward" : "unknown",
+            sourceElement: null,
           };
         }
 
-        this.#metaByState.set(toState, this.#pendingMeta);
-        this.#pendingMeta = undefined;
+        this.#claim.write(toState, Object.freeze(this.#capturedMeta));
+        this.#capturedMeta = undefined;
 
         this.#isSyncingFromRouter = true;
 
@@ -254,12 +269,12 @@ export class NavigationPlugin {
       },
 
       onTransitionCancel: () => {
-        this.#pendingMeta = undefined;
+        this.#capturedMeta = undefined;
         this.#pendingTraverseKey = undefined;
       },
 
       onTransitionError: () => {
-        this.#pendingMeta = undefined;
+        this.#capturedMeta = undefined;
         this.#pendingTraverseKey = undefined;
       },
     };
@@ -271,6 +286,7 @@ interface NavigateLifecycleDeps {
   handler: (event: NavigateEvent) => void;
   removeStartInterceptor: () => void;
   removeExtensions: () => void;
+  releaseClaim: () => void;
   shared: NavigationSharedState;
 }
 
@@ -293,6 +309,7 @@ function createNavigateLifecycle(deps: NavigateLifecycleDeps): Plugin {
       deps.shared.removeNavigateListener = undefined;
       deps.removeStartInterceptor();
       deps.removeExtensions();
+      deps.releaseClaim();
     },
   };
 }

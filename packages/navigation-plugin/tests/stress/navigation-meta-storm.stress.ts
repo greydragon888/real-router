@@ -32,7 +32,7 @@ describe("N8: Navigation meta storm", () => {
     }
 
     for (const state of states) {
-      const meta = router.getNavigationMeta(state);
+      const meta = state!.context.navigation;
 
       expect(meta).toBeDefined();
       expect(meta!.userInitiated).toBe(false);
@@ -64,7 +64,7 @@ describe("N8: Navigation meta storm", () => {
 
       expect(state).toBeDefined();
 
-      const meta = router.getNavigationMeta(state);
+      const meta = state?.context.navigation;
 
       expect(meta).toBeDefined();
       expect(meta!.navigationType).toBe("traverse");
@@ -99,7 +99,7 @@ describe("N8: Navigation meta storm", () => {
     for (const { state, type } of results) {
       expect(state).toBeDefined();
 
-      const meta = router.getNavigationMeta(state);
+      const meta = state?.context.navigation;
 
       expect(meta).toBeDefined();
 

@@ -2,7 +2,11 @@ import { RouterError } from "@real-router/core";
 
 import { extractPath } from "./browser-env/index.js";
 
-import type { NavigationBrowser, NavigationMeta } from "./types";
+import type {
+  NavigationBrowser,
+  NavigationDirection,
+  NavigationMeta,
+} from "./types";
 import type { Router } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
 
@@ -12,13 +16,25 @@ interface NavigateHandlerDeps {
   browser: NavigationBrowser;
   isSyncingFromRouter: () => boolean;
   setSyncing: (value: boolean) => void;
-  setPendingMeta: (meta: NavigationMeta) => void;
+  setCapturedMeta: (meta: NavigationMeta) => void;
   base: string;
   transitionOptions: {
     source: string;
     replace: true;
     forceDeactivate?: boolean;
   };
+}
+
+function computeDirection(
+  navigationType: NavigationMeta["navigationType"],
+  destinationIndex: number,
+  currentIndex: number,
+): NavigationDirection {
+  if (navigationType === "traverse") {
+    return destinationIndex > currentIndex ? "forward" : "back";
+  }
+
+  return navigationType === "push" ? "forward" : "unknown";
 }
 
 export function createNavigateHandler(deps: NavigateHandlerDeps) {
@@ -49,11 +65,19 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
       extractPath(destinationUrl.pathname, base) + destinationUrl.search;
     const matchedState = api.matchPath(path);
 
-    // Set pendingMeta BEFORE event.intercept() — available in guards via getNavigationMeta()
-    deps.setPendingMeta({
-      navigationType: event.navigationType as NavigationMeta["navigationType"],
+    const navType = event.navigationType as NavigationMeta["navigationType"];
+    const currentIndex = browser.currentEntry?.index ?? -1;
+
+    deps.setCapturedMeta({
+      navigationType: navType,
       userInitiated: event.userInitiated,
       info: event.info,
+      direction: computeDirection(
+        navType,
+        event.destination.index,
+        currentIndex,
+      ),
+      sourceElement: event.sourceElement ?? null,
     });
 
     if (matchedState) {

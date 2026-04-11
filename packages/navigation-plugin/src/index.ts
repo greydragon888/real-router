@@ -8,7 +8,14 @@ export type {
   NavigationPluginOptions,
   NavigationBrowser,
   NavigationMeta,
+  NavigationDirection,
 } from "./types";
+
+declare module "@real-router/types" {
+  interface StateContext {
+    navigation?: import("./types").NavigationMeta;
+  }
+}
 
 declare module "@real-router/core" {
   interface Router {
@@ -25,9 +32,6 @@ declare module "@real-router/core" {
     getVisitedRoutes: () => string[];
     getRouteVisitCount: (routeName: string) => number;
     traverseToLast: (routeName: string) => Promise<State>;
-    getNavigationMeta: (
-      state?: State,
-    ) => import("./types").NavigationMeta | undefined;
     canGoBack: () => boolean;
     canGoForward: () => boolean;
     canGoBackTo: (routeName: string) => boolean;

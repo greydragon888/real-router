@@ -89,7 +89,6 @@ router.replaceHistoryState("users", { id: "456" });
 | `getVisitedRoutes()`            | `string[]`                    | Unique route names across all history entries   |
 | `getRouteVisitCount(routeName)` | `number`                      | How many history entries match the route        |
 | `traverseToLast(routeName)`     | `Promise<State>`              | Navigate to the last history entry for a route  |
-| `getNavigationMeta(state?)`     | `NavigationMeta \| undefined` | Navigation metadata (type, userInitiated, info) |
 | `canGoBack()`                   | `boolean`                     | Whether there's a previous history entry        |
 | `canGoForward()`                | `boolean`                     | Whether there's a next history entry            |
 | `canGoBackTo(routeName)`        | `boolean`                     | Whether any previous entry matches the route    |
@@ -133,28 +132,6 @@ const count = router.getRouteVisitCount("products.view");
 await router.traverseToLast("users.list");
 ```
 
-#### `getNavigationMeta`
-
-```typescript
-// In a guard — get metadata about the in-progress navigation
-const lifecycle = getLifecycleApi(router);
-lifecycle.addActivateGuard("checkout", () => () => {
-  const meta = router.getNavigationMeta(); // no arg = pending navigation
-  if (meta?.userInitiated) {
-    // user clicked back/forward or a link
-  }
-  return true;
-});
-
-// After navigation — get metadata for a completed state
-router.subscribe((state) => {
-  const meta = router.getNavigationMeta(state);
-  console.log(meta?.navigationType); // "push" | "replace" | "traverse" | "reload"
-  console.log(meta?.userInitiated); // true if user clicked back/forward/link
-  console.log(meta?.info); // data passed via navigation.navigate({ info })
-});
-```
-
 #### `canGoBack` / `canGoForward` / `canGoBackTo`
 
 ```typescript
@@ -167,6 +144,63 @@ if (router.canGoBackTo("users.list")) {
   showBackToListButton();
 }
 ```
+
+## Navigation Metadata
+
+Navigation metadata is available on `state.context.navigation` after each transition. The plugin writes it via the claim-based State Context API, and it is frozen (`Object.freeze`) for mutation protection.
+
+```typescript
+// In subscribe callbacks
+router.subscribe((state) => {
+  const meta = state.context.navigation;
+  console.log(meta?.navigationType); // "push" | "replace" | "traverse" | "reload"
+  console.log(meta?.userInitiated);  // true if user clicked back/forward/link
+  console.log(meta?.direction);      // "forward" | "back" | "unknown"
+  console.log(meta?.sourceElement);  // the DOM element that initiated the nav, or null
+  console.log(meta?.info);           // data passed via navigation.navigate({ info })
+});
+```
+
+In guards during browser-initiated navigation, meta is available on `toState.context.navigation` (written in `onTransitionStart`):
+
+```typescript
+import { getLifecycleApi } from "@real-router/core/api";
+
+const lifecycle = getLifecycleApi(router);
+lifecycle.addActivateGuard("checkout", () => (toState) => {
+  const meta = toState.context.navigation;
+  if (meta?.userInitiated) {
+    // user clicked back/forward or a link
+  }
+  return true;
+});
+```
+
+In framework components, access via the route's context:
+
+```typescript
+// React example
+const { route } = useRoute();
+const meta = route.context.navigation;
+```
+
+### NavigationMeta
+
+| Field             | Type                                               | Description                                            |
+| ----------------- | -------------------------------------------------- | ------------------------------------------------------ |
+| `navigationType`  | `"push" \| "replace" \| "traverse" \| "reload"`   | Type of navigation                                     |
+| `userInitiated`   | `boolean`                                          | Whether the user clicked back/forward/link              |
+| `direction`       | `"forward" \| "back" \| "unknown"`                 | Direction in the history stack                          |
+| `sourceElement`   | `Element \| null`                                  | DOM element that initiated the navigation, or null      |
+| `info`            | `unknown`                                          | Ephemeral data from `navigation.navigate({ info })`    |
+
+### NavigationDirection
+
+```typescript
+type NavigationDirection = "forward" | "back" | "unknown";
+```
+
+Exported from the package for use in type annotations.
 
 ### `buildUrl` vs `buildPath`
 
