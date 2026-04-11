@@ -432,4 +432,44 @@ describe("Browser Plugin — Lifecycle", () => {
       );
     });
   });
+
+  describe("state.context.browser", () => {
+    beforeEach(async () => {
+      unsubscribe = router.usePlugin(browserPluginFactory({}, mockedBrowser));
+    });
+
+    it('source is "navigate" for programmatic navigation', async () => {
+      await router.start();
+
+      const state = await router.navigate("users.list");
+
+      expect(state.context.browser).toStrictEqual({ source: "navigate" });
+    });
+
+    it('source is "navigate" for first start()', async () => {
+      const state = await router.start();
+
+      expect(state.context.browser?.source).toBe("navigate");
+    });
+
+    it("context.browser is frozen", async () => {
+      const state = await router.start();
+
+      expect(Object.isFrozen(state.context.browser)).toBe(true);
+    });
+
+    it("is available in subscribe callback", async () => {
+      await router.start();
+
+      let contextBrowser: unknown;
+
+      router.subscribe(({ route }) => {
+        contextBrowser = route.context.browser;
+      });
+
+      await router.navigate("users.list");
+
+      expect(contextBrowser).toStrictEqual({ source: "navigate" });
+    });
+  });
 });

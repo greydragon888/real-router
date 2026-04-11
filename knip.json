@@ -74,6 +74,7 @@
     "packages/browser-plugin": {
       "project": ["src/**/*.ts"],
       "ignore": ["src/browser-env/**"],
+      "ignoreDependencies": ["@real-router/types"],
       "vitest": {
         "config": ["vitest.config.mts", "vitest.config.*.mts"]
       }
@@ -89,6 +90,13 @@
       "project": ["src/**/*.ts"],
       "ignore": ["src/browser-env/**"],
       "ignoreDependencies": ["type-guards", "@real-router/types"],
+      "vitest": {
+        "config": ["vitest.config.mts", "vitest.config.*.mts"]
+      }
+    },
+    "packages/memory-plugin": {
+      "project": ["src/**/*.ts"],
+      "ignoreDependencies": ["@real-router/types"],
       "vitest": {
         "config": ["vitest.config.mts", "vitest.config.*.mts"]
       }

@@ -54,6 +54,7 @@
   },
   "sideEffects": false,
   "dependencies": {
-    "@real-router/core": "workspace:^"
+    "@real-router/core": "workspace:^",
+    "@real-router/types": "workspace:^"
   }
 }

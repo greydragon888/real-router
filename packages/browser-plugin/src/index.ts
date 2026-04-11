@@ -8,7 +8,11 @@ import type { Params, State } from "@real-router/core";
 export { browserPluginFactory } from "./factory";
 
 // Types
-export type { BrowserPluginOptions } from "./types";
+export type {
+  BrowserPluginOptions,
+  BrowserContext,
+  BrowserSource,
+} from "./types";
 
 export type { Browser } from "./browser-env/index.js";
 
@@ -19,6 +23,12 @@ export { isStateStrict as isState } from "type-guards";
  * Module augmentation for real-router.
  * Extends Router interface with browser plugin methods.
  */
+declare module "@real-router/types" {
+  interface StateContext {
+    browser?: import("./types").BrowserContext;
+  }
+}
+
 declare module "@real-router/core" {
   interface Router {
     /**
