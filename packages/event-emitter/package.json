@@ -8,6 +8,7 @@
   "types": "./dist/esm/index.d.mts",
   "exports": {
     ".": {
+      "@real-router/internal-source": "./src/index.ts",
       "types": {
         "import": "./dist/esm/index.d.mts",
         "require": "./dist/cjs/index.d.ts"
@@ -36,8 +37,7 @@
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
     "test": "vitest run",
-    "test:properties": "vitest --config vitest.config.properties.mts --run",
-    "build:dist-only": "tsdown --config-loader unrun"
+    "test:properties": "vitest --config vitest.config.properties.mts --run"
   },
   "sideEffects": false
 }

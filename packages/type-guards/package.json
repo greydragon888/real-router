@@ -8,6 +8,7 @@
   "types": "./dist/esm/index.d.mts",
   "exports": {
     ".": {
+      "@real-router/internal-source": "./src/index.ts",
       "types": {
         "import": "./dist/esm/index.d.mts",
         "require": "./dist/cjs/index.d.ts"
@@ -44,8 +45,7 @@
     "test:properties": "vitest run --config vitest.config.properties.mts",
     "test:mutation": "stryker run",
     "test:mutation:report": "open reports/mutation-report.html",
-    "bench": "NODE_OPTIONS='--expose-gc --max-old-space-size=4096' npx tsx tests/benchmarks/index.ts",
-    "build:dist-only": "tsdown --config-loader unrun"
+    "bench": "NODE_OPTIONS='--expose-gc --max-old-space-size=4096' npx tsx tests/benchmarks/index.ts"
   },
   "sideEffects": false,
   "dependencies": {

@@ -190,7 +190,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build
-        run: pnpm turbo run build:dist-only --filter='...[${{ needs.check.outputs.turbo_base || 'origin/master' }}]' --filter='!./examples/**'
+        run: pnpm turbo run build --filter='...[${{ needs.check.outputs.turbo_base || 'origin/master' }}]' --filter='!./examples/**'
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7
@@ -227,7 +227,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build packages
-        run: pnpm turbo run build:dist-only --filter='!./examples/**'
+        run: pnpm turbo run build --filter='!./examples/**'
 
       - name: Run smoke test
         run: bash scripts/smoke-test-packages.sh
@@ -341,7 +341,7 @@ jobs:
           echo "${output:-[]}" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      # ── Base sizes: build:dist-only (no tests) ──
+      # ── Base sizes: use PR's turbo.json (build task is guaranteed to exist) ──
       - name: Save turbo.json from PR
         run: cp turbo.json /tmp/turbo.json.pr
 
@@ -351,14 +351,14 @@ jobs:
           ref: ${{ github.base_ref }}
           clean: false
 
-      - name: Restore turbo.json from PR (has build:dist-only task)
+      - name: Restore turbo.json from PR
         run: cp /tmp/turbo.json.pr turbo.json
 
       - name: Install base dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build base branch (dist only, no tests)
-        run: pnpm turbo run build:dist-only --filter='./packages/*'
+      - name: Build base branch
+        run: pnpm turbo run build --filter='./packages/*'
 
       - name: Get base sizes
         id: base_sizes

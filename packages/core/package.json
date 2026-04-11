@@ -21,6 +21,7 @@
   },
   "exports": {
     ".": {
+      "@real-router/internal-source": "./src/index.ts",
       "types": {
         "import": "./dist/esm/index.d.mts",
         "require": "./dist/cjs/index.d.ts"
@@ -29,6 +30,7 @@
       "require": "./dist/cjs/index.js"
     },
     "./api": {
+      "@real-router/internal-source": "./src/api/index.ts",
       "types": {
         "import": "./dist/esm/api.d.mts",
         "require": "./dist/cjs/api.d.ts"
@@ -37,6 +39,7 @@
       "require": "./dist/cjs/api.js"
     },
     "./utils": {
+      "@real-router/internal-source": "./src/utils/index.ts",
       "types": {
         "import": "./dist/esm/utils.d.mts",
         "require": "./dist/cjs/utils.d.ts"
@@ -45,6 +48,7 @@
       "require": "./dist/cjs/utils.js"
     },
     "./validation": {
+      "@real-router/internal-source": "./src/validation.ts",
       "types": {
         "import": "./dist/esm/validation.d.mts",
         "require": "./dist/cjs/validation.d.ts"
@@ -92,8 +96,7 @@
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
     "lint:package": "publint",
-    "lint:types": "attw --pack .",
-    "build:dist-only": "tsdown --config-loader unrun"
+    "lint:types": "attw --pack ."
   },
   "sideEffects": false,
   "dependencies": {

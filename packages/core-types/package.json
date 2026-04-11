@@ -6,6 +6,7 @@
   "types": "./dist/esm/index.d.mts",
   "exports": {
     ".": {
+      "@real-router/internal-source": "./src/index.ts",
       "types": {
         "import": "./dist/esm/index.d.mts",
         "require": "./dist/cjs/index.d.ts"
@@ -38,8 +39,7 @@
   "scripts": {
     "build": "tsdown --config-loader unrun",
     "type-check": "tsc --noEmit",
-    "lint": "eslint --cache --ext .ts src/ --fix --max-warnings 0",
-    "build:dist-only": "tsdown --config-loader unrun"
+    "lint": "eslint --cache --ext .ts src/ --fix --max-warnings 0"
   },
   "sideEffects": false
 }

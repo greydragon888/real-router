@@ -30,8 +30,7 @@
     "test:properties": "vitest run --config vitest.config.properties.mts",
     "test:stress": "vitest run --config vitest.config.stress.mts",
     "type-check": "svelte-check --tsconfig ./tsconfig.json",
-    "lint": "eslint --cache src/ tests/ --fix --max-warnings 0",
-    "build:dist-only": "svelte-package -i src -o dist"
+    "lint": "eslint --cache src/ tests/ --fix --max-warnings 0"
   },
   "keywords": [
     "router",

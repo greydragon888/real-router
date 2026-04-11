@@ -397,7 +397,7 @@ export default tsEslint.config(
         createTypeScriptImportResolver({
           alwaysTryTypes: true,
           conditionNames: [
-            "development",
+            "@real-router/internal-source",
             "types",
             "import",
             "esm2020",

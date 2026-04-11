@@ -15,6 +15,7 @@
   },
   "exports": {
     ".": {
+      "@real-router/internal-source": "./src/index.ts",
       "types": {
         "import": "./dist/esm/index.d.mts",
         "require": "./dist/cjs/index.d.ts"
@@ -23,6 +24,7 @@
       "require": "./dist/cjs/index.js"
     },
     "./legacy": {
+      "@real-router/internal-source": "./src/legacy.ts",
       "types": {
         "import": "./dist/esm/legacy.d.mts",
         "require": "./dist/cjs/legacy.d.ts"
@@ -51,8 +53,7 @@
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts,.tsx src/ tests/ --fix --max-warnings 0",
     "lint:package": "publint",
-    "lint:types": "attw --pack .",
-    "build:dist-only": "tsdown --config-loader unrun"
+    "lint:types": "attw --pack ."
   },
   "keywords": [
     "router",

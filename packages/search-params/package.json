@@ -8,6 +8,7 @@
   "types": "./dist/esm/index.d.mts",
   "exports": {
     ".": {
+      "@real-router/internal-source": "./src/index.ts",
       "types": {
         "import": "./dist/esm/index.d.mts",
         "require": "./dist/cjs/index.d.ts"
@@ -50,8 +51,7 @@
     "test:mutation": "stryker run",
     "bench": "NODE_OPTIONS='--expose-gc --max-old-space-size=4096' npx tsx tests/benchmarks/index.ts",
     "type-check": "tsc --noEmit",
-    "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
-    "build:dist-only": "tsdown --config-loader unrun"
+    "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0"
   },
   "sideEffects": false
 }

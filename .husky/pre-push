@@ -18,10 +18,8 @@ echo "📋 Checking for code duplication..."
 pnpm lint:duplicates
 
 # Build packages and validate published artifacts
-# Uses build:dist-only instead of build to avoid pulling example dependents
-# (build depends on test/test:properties/test:stress which pull examples via ^build)
 echo "📦 Building packages..."
-pnpm turbo run build:dist-only lint:package lint:types --filter='!./examples/**'
+pnpm turbo run build lint:package lint:types --filter='!./examples/**'
 
 # Check for unused code
 echo "🧹 Checking for unused code..."

@@ -32,26 +32,34 @@ function workspaceSourceAliases(): Record<string, string> {
       if (typeof conditions !== "object" || !conditions) continue;
       const cond = conditions as Record<string, unknown>;
 
-      // Derive source path from the ESM dist path
+      // Prefer the new "@real-router/internal-source" custom condition if present,
+      // otherwise fall back to deriving from the ESM dist path.
+      const sourceCondition = cond["@real-router/internal-source"];
       const importPath = (cond.import as string) || "";
-      const srcFile = importPath
-        .replace(/^\.\/dist\/esm\//, "./src/")
-        .replace(/\.mjs$/, ".ts");
 
-      if (!srcFile.endsWith(".ts")) continue;
+      let srcFileCandidates: string[] = [];
+      if (typeof sourceCondition === "string") {
+        srcFileCandidates = [sourceCondition];
+      } else if (importPath) {
+        const stripped = importPath
+          .replace(/^\.\/dist\/esm\//, "./src/")
+          .replace(/\.mjs$/, "");
+        srcFileCandidates = [
+          `${stripped}.ts`,
+          `${stripped}.tsx`,
+          `${stripped}/index.ts`,
+          `${stripped}/index.tsx`,
+        ];
+      }
 
-      // Try direct file first, then index.ts in directory
-      const directPath = join(packagesDir, dir.name, srcFile);
-      const indexPath = join(
-        packagesDir,
-        dir.name,
-        srcFile.replace(/\.ts$/, "/index.ts"),
-      );
-      const fullSrcPath = existsSync(directPath)
-        ? directPath
-        : existsSync(indexPath)
-          ? indexPath
-          : null;
+      let fullSrcPath: string | null = null;
+      for (const candidate of srcFileCandidates) {
+        const absolute = join(packagesDir, dir.name, candidate);
+        if (existsSync(absolute)) {
+          fullSrcPath = absolute;
+          break;
+        }
+      }
 
       if (!fullSrcPath) continue;
 
@@ -98,6 +106,13 @@ export const commonConfig = defineConfig({
   // Resolve workspace packages to source for test coverage.
   // Without this, Vitest resolves via exports → dist and v8
   // coverage can't track source files.
+  //
+  // NOTE (Этап 2 RFC): Vitest condition-based resolution with custom
+  // "@real-router/internal-source" condition will be added here once we identify a
+  // condition list that doesn't interfere with external packages (preact,
+  // react, vue, svelte) which use non-standard condition orderings. For now
+  // we keep the alias-based approach and rely on the tsconfig's customConditions
+  // for TypeScript-side resolution. See .claude/rfc-custom-export-condition-root-fix-ru.md
   resolve: {
     alias: workspaceSourceAliases(),
   },

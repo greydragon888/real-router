@@ -146,14 +146,10 @@ jobs:
             echo "has_unpublished=false" >> $GITHUB_OUTPUT
           fi
 
-      # Build and test before publishing (packages only, skip examples)
+      # Build (includes tests via dependsOn) before publishing
       - name: Build packages
         if: steps.unpublished.outputs.has_unpublished == 'true'
-        run: pnpm turbo run build:dist-only --filter='!./examples/**'
-
-      - name: Run tests
-        if: steps.unpublished.outputs.has_unpublished == 'true'
-        run: pnpm turbo run test --filter='!./examples/**'
+        run: pnpm turbo run build --filter='!./examples/**'
 
       # Publish with OIDC Trusted Publishing
       # changeset publish automatically:
