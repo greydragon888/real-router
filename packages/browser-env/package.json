@@ -1,6 +1,6 @@
 {
   "name": "browser-env",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "private": true,
   "description": "Tests for shared/browser-env — source files live in /shared/browser-env (src is a symlink)",
   "repository": {

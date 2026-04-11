@@ -1,6 +1,6 @@
 {
   "name": "@real-router/ssr-data-plugin",
-  "version": "0.1.10",
+  "version": "0.2.0",
   "type": "commonjs",
   "description": "SSR per-route data loading plugin for Real-Router",
   "main": "./dist/cjs/index.js",
