@@ -155,6 +155,7 @@ export const arbState: fc.Arbitrary<State> = fc
     name: r.name,
     params: r.params,
     path: r.path,
+    context: {},
   }));
 
 // =============================================================================

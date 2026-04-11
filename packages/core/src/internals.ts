@@ -90,6 +90,7 @@ export interface RouterInternals<
   readonly clearState: () => void;
   readonly setState: (state: State) => void;
   readonly routerExtensions: { keys: string[] }[];
+  readonly contextClaimRecords: Set<string>;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- existential type: stores RouterInternals for all Dependencies types

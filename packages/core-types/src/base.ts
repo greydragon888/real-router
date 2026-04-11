@@ -29,11 +29,57 @@ export interface TransitionMeta {
   };
 }
 
+/**
+ * Empty interface extended by plugins via module augmentation to declare
+ * typed `state.context.<namespace>` fields.
+ *
+ * @description
+ * Plugins add typed context namespaces by augmenting this interface:
+ *
+ * ```typescript
+ * declare module "@real-router/types" {
+ *   interface StateContext {
+ *     navigation: { direction: "forward" | "back" | "navigate" };
+ *   }
+ * }
+ * ```
+ *
+ * After augmentation, `state.context.navigation` becomes typed. The intersection
+ * with `Record<string, unknown>` in {@link State.context} keeps the type open,
+ * so plugins that don't augment can still write arbitrary namespaces.
+ *
+ * @see {@link State.context}
+ * @see {@link ContextNamespaceClaim}
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- extended via module augmentation
+export interface StateContext {}
+
 export interface State<P extends Params = Params> {
   name: string;
   params: P;
   path: string;
   transition?: TransitionMeta | undefined;
+  /**
+   * Plugin-extensible per-route data, attached by plugins via
+   * `PluginApi.claimContextNamespace()` + `claim.write(state, value)`.
+   *
+   * @description
+   * Required field — always present as at least `{}` on every State created by
+   * the router (via `makeState`, `navigateToNotFound`, or `cloneRouter`).
+   *
+   * Typed extensions come from plugins augmenting {@link StateContext} through
+   * module augmentation. The intersection with `Record<string, unknown>` allows
+   * untyped namespaces (inline plugins, tests, or plugins that skip augmentation)
+   * to write without compile errors.
+   *
+   * The `context` object itself is **not frozen** — this is intentional, so
+   * plugins can attach data without cloning state. Core structural fields
+   * (`name`, `params`, `path`, `transition`) remain immutable via shallow
+   * `Object.freeze(state)`.
+   *
+   * @see {@link StateContext}
+   */
+  context: StateContext & Record<string, unknown>;
 }
 
 export interface StateMetaInput<P extends Params = Params> {

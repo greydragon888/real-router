@@ -44,10 +44,11 @@ export function updateBrowserState(
   replace: boolean,
   browser: Browser,
 ): void {
-  const historyState = {
+  const historyState: State = {
     name: state.name,
     params: state.params,
     path: state.path,
+    context: {},
   };
 
   if (replace) {

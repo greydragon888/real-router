@@ -6,8 +6,18 @@ import { executeGuardPipeline } from "../../../../src/namespaces/NavigationNames
 
 import type { GuardFn, State } from "@real-router/types";
 
-const TO_STATE: State = { name: "users", path: "/users", params: {} };
-const FROM_STATE: State = { name: "home", path: "/home", params: {} };
+const TO_STATE: State = {
+  name: "users",
+  path: "/users",
+  params: {},
+  context: {},
+};
+const FROM_STATE: State = {
+  name: "home",
+  path: "/home",
+  params: {},
+  context: {},
+};
 const SIGNAL: AbortSignal = new AbortController().signal;
 const ALWAYS_ACTIVE = () => true;
 

@@ -62,6 +62,7 @@ function makeState(name: string, params: Record<string, string> = {}): State {
     name,
     params,
     path: `/${name.replaceAll(".", "/")}`,
+    context: {},
   };
 }
 

@@ -176,7 +176,7 @@ describe("RouterError Constants Properties", () => {
   describe("errorCodes backward compatibility", () => {
     it("errorCodes contains exact number of codes", () => {
       // If this number changes, it may break backward compatibility
-      const expectedCount = 11;
+      const expectedCount = 12;
       const actualCount = Object.keys(errorCodes).length;
 
       expect(actualCount).toBe(expectedCount);
@@ -196,6 +196,7 @@ describe("RouterError Constants Properties", () => {
         TRANSITION_CANCELLED: "CANCELLED",
         ROUTER_DISPOSED: "DISPOSED",
         PLUGIN_CONFLICT: "PLUGIN_CONFLICT",
+        CONTEXT_NAMESPACE_ALREADY_CLAIMED: "CONTEXT_NAMESPACE_ALREADY_CLAIMED",
       };
 
       for (const [key, expectedValue] of Object.entries(expectedMapping)) {

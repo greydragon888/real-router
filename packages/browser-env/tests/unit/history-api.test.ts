@@ -14,7 +14,7 @@ describe("history-api", () => {
 
   it("pushState delegates to globalThis.history.pushState", () => {
     const spy = vi.spyOn(globalThis.history, "pushState");
-    const state = { name: "home", params: {}, path: "/" };
+    const state = { name: "home", params: {}, path: "/", context: {} };
 
     pushState(state, "/");
 
@@ -23,7 +23,7 @@ describe("history-api", () => {
 
   it("replaceState delegates to globalThis.history.replaceState", () => {
     const spy = vi.spyOn(globalThis.history, "replaceState");
-    const state = { name: "home", params: {}, path: "/" };
+    const state = { name: "home", params: {}, path: "/", context: {} };
 
     replaceState(state, "/");
 

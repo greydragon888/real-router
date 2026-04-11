@@ -48,7 +48,10 @@ describe("createHistoryFallbackBrowser", () => {
     const browser = createHistoryFallbackBrowser("ctx");
 
     expect(() => {
-      browser.pushState({ name: "a", params: {}, path: "/a" }, "/a");
+      browser.pushState(
+        { name: "a", params: {}, path: "/a", context: {} },
+        "/a",
+      );
     }).not.toThrow();
   });
 
@@ -56,7 +59,10 @@ describe("createHistoryFallbackBrowser", () => {
     const browser = createHistoryFallbackBrowser("ctx");
 
     expect(() => {
-      browser.replaceState({ name: "a", params: {}, path: "/a" }, "/a");
+      browser.replaceState(
+        { name: "a", params: {}, path: "/a", context: {} },
+        "/a",
+      );
     }).not.toThrow();
   });
 
@@ -80,8 +86,11 @@ describe("createHistoryFallbackBrowser", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const browser = createHistoryFallbackBrowser("ctx");
 
-    browser.pushState({ name: "a", params: {}, path: "/a" }, "/a");
-    browser.replaceState({ name: "a", params: {}, path: "/a" }, "/a");
+    browser.pushState({ name: "a", params: {}, path: "/a", context: {} }, "/a");
+    browser.replaceState(
+      { name: "a", params: {}, path: "/a", context: {} },
+      "/a",
+    );
 
     expect(warnSpy).toHaveBeenCalledTimes(1);
   });
@@ -90,7 +99,7 @@ describe("createHistoryFallbackBrowser", () => {
     const browser = createHistoryFallbackBrowser("ctx");
 
     // Call pushState and verify it does nothing (no history change)
-    browser.pushState({ name: "a", params: {}, path: "/a" }, "/a");
+    browser.pushState({ name: "a", params: {}, path: "/a", context: {} }, "/a");
 
     // In SSR fallback, pushState is a no-op — no state change observable
     expect(browser.getHash()).toBe("");
@@ -100,7 +109,10 @@ describe("createHistoryFallbackBrowser", () => {
     const browser = createHistoryFallbackBrowser("ctx");
 
     // Call replaceState and verify it does nothing (no history change)
-    browser.replaceState({ name: "a", params: {}, path: "/a" }, "/a");
+    browser.replaceState(
+      { name: "a", params: {}, path: "/a", context: {} },
+      "/a",
+    );
 
     // In SSR fallback, replaceState is a no-op — no state change observable
     expect(browser.getHash()).toBe("");

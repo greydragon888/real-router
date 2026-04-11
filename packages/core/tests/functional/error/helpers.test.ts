@@ -11,11 +11,7 @@ import type { Params, State } from "@real-router/types";
 describe("deepFreezeState", () => {
   describe("basic functionality", () => {
     it("should freeze a simple state object", () => {
-      const state: State = {
-        name: "home",
-        path: "/",
-        params: {},
-      };
+      const state: State = { name: "home", path: "/", params: {}, context: {} };
 
       const frozen = deepFreezeState(state);
 
@@ -32,6 +28,7 @@ describe("deepFreezeState", () => {
         name: "user",
         path: "/users/123",
         params: { id: "123", tab: "profile" },
+        context: {},
       };
 
       const frozen = deepFreezeState(state);
@@ -46,11 +43,7 @@ describe("deepFreezeState", () => {
     });
 
     it("should freeze state with meta", () => {
-      const state: State = {
-        name: "home",
-        path: "/",
-        params: {},
-      };
+      const state: State = { name: "home", path: "/", params: {}, context: {} };
 
       const frozen = deepFreezeState(state);
 
@@ -73,6 +66,7 @@ describe("deepFreezeState", () => {
             },
           },
         },
+        context: {},
       };
 
       const frozen = deepFreezeState(state);
@@ -96,6 +90,7 @@ describe("deepFreezeState", () => {
         params: {
           items: [{ id: 1 }, { id: 2 }, { id: 3 }],
         },
+        context: {},
       };
 
       const frozen = deepFreezeState(state);
@@ -125,6 +120,7 @@ describe("deepFreezeState", () => {
             },
           },
         },
+        context: {},
       };
 
       const frozen = deepFreezeState(state);
@@ -148,6 +144,7 @@ describe("deepFreezeState", () => {
         name: "circular",
         path: "/circular",
         params: { value: 1 },
+        context: {},
       };
 
       // Create circular reference
@@ -170,6 +167,7 @@ describe("deepFreezeState", () => {
         params: {
           a: { value: "a" },
         },
+        context: {},
       };
 
       // Create circular reference: a -> b -> a
@@ -198,6 +196,7 @@ describe("deepFreezeState", () => {
         params: {
           items: [{ id: 1 }],
         },
+        context: {},
       };
 
       // Create circular reference in array
@@ -224,6 +223,7 @@ describe("deepFreezeState", () => {
           obj1: { name: "obj1" },
           obj2: { name: "obj2" },
         },
+        context: {},
       };
 
       // Create multiple circular references
@@ -293,6 +293,7 @@ describe("deepFreezeState", () => {
         name: "empty",
         path: "/empty",
         params: {},
+        context: {},
       };
 
       const frozen = deepFreezeState(state);
@@ -305,6 +306,7 @@ describe("deepFreezeState", () => {
         name: "null-param",
         path: "/null",
         params: { value: null as any },
+        context: {},
       };
 
       const frozen = deepFreezeState(state);
@@ -318,6 +320,7 @@ describe("deepFreezeState", () => {
         name: "undefined-param",
         path: "/undefined",
         params: { value: undefined },
+        context: {},
       };
 
       const frozen = deepFreezeState(state);
@@ -337,6 +340,7 @@ describe("deepFreezeState", () => {
           nullVal: null as any,
           undefVal: undefined,
         },
+        context: {},
       };
 
       const frozen = deepFreezeState(state);
@@ -352,6 +356,7 @@ describe("deepFreezeState", () => {
         name: "empty-array",
         path: "/empty-array",
         params: { items: [] },
+        context: {},
       };
 
       const frozen = deepFreezeState(state);
@@ -370,6 +375,7 @@ describe("deepFreezeState", () => {
         name: "large",
         path: "/large",
         params: { items: largeArray },
+        context: {},
       };
 
       const frozen = deepFreezeState(state);
@@ -391,6 +397,7 @@ describe("deepFreezeState", () => {
         name: "test",
         path: "/test",
         params: { id: "123" },
+        context: {},
       };
 
       const frozen = deepFreezeState(state);
@@ -405,6 +412,7 @@ describe("deepFreezeState", () => {
         name: "test",
         path: "/test",
         params: { id: "123" },
+        context: {},
       };
 
       const frozen = deepFreezeState(state);
@@ -419,6 +427,7 @@ describe("deepFreezeState", () => {
         name: "test",
         path: "/test",
         params: { nested: { value: "original" } },
+        context: {},
       };
 
       const frozen = deepFreezeState(state);
@@ -433,6 +442,7 @@ describe("deepFreezeState", () => {
         name: "test",
         path: "/test",
         params: {},
+        context: {},
       };
 
       const frozen = deepFreezeState(state);
@@ -447,6 +457,7 @@ describe("deepFreezeState", () => {
         name: "test",
         path: "/test",
         params: { items: [1, 2, 3] },
+        context: {},
       };
 
       const frozen = deepFreezeState(state);
@@ -467,6 +478,7 @@ describe("deepFreezeState", () => {
         name: "test",
         path: "/test",
         params: { source: "navigation" },
+        context: {},
       };
 
       const frozen = deepFreezeState(state);
@@ -483,6 +495,7 @@ describe("deepFreezeState", () => {
         name: "test",
         path: "/test",
         params: {},
+        context: {},
       };
 
       (state.params as Record<string, unknown>).ref = state.params;
@@ -501,48 +514,44 @@ describe("deepFreezeState", () => {
 // Note: getTypeDescription is an internal function and not exported
 // It's tested indirectly through error messages in deepFreezeState
 
-describe("freezeStateInPlace", () => {
+describe("freezeStateInPlace (shallow)", () => {
   describe("basic functionality", () => {
-    it("should freeze state IN PLACE (same reference)", () => {
-      const state: State = {
-        name: "home",
-        path: "/",
-        params: {},
-      };
+    it("returns same reference and freezes only the top-level State object", () => {
+      const state: State = { name: "home", path: "/", params: {}, context: {} };
 
       const frozen = freezeStateInPlace(state);
 
-      // Key difference from deepFreezeState: returns same object
       expect(frozen).toBe(state);
       expect(Object.isFrozen(frozen)).toBe(true);
-      expect(Object.isFrozen(frozen.params)).toBe(true);
     });
 
-    it("should freeze state with params in place", () => {
+    it("does NOT freeze nested params — producers freeze at creation", () => {
       const state: State = {
         name: "user",
         path: "/users/123",
         params: { id: "123", tab: "profile" },
+        context: {},
       };
 
       const frozen = freezeStateInPlace(state);
 
-      expect(frozen).toBe(state);
-      expect(Object.isFrozen(frozen)).toBe(true);
-      expect(Object.isFrozen(frozen.params)).toBe(true);
-
-      // Verify immutability
-      expect(() => {
-        frozen.name = "changed";
-      }).toThrow();
+      expect(Object.isFrozen(frozen.params)).toBe(false);
     });
 
-    it("should not freeze internal meta (meta is internal, no need to freeze)", () => {
-      const state: State = {
-        name: "home",
-        path: "/",
-        params: {},
-      };
+    it("leaves state.context unfrozen so plugins can publish data via claim.write", () => {
+      const state: State = { name: "home", path: "/", params: {}, context: {} };
+
+      freezeStateInPlace(state);
+
+      expect(Object.isFrozen(state.context)).toBe(false);
+      expect(() => {
+        state.context.custom = "written by plugin";
+      }).not.toThrow();
+      expect(state.context.custom).toBe("written by plugin");
+    });
+
+    it("does not freeze internal meta (meta uses WeakMap, not a State field)", () => {
+      const state: State = { name: "home", path: "/", params: {}, context: {} };
 
       setStateMetaParams(state, { source: "browser" });
 
@@ -558,190 +567,46 @@ describe("freezeStateInPlace", () => {
     });
   });
 
-  describe("nested objects", () => {
-    it("should freeze deeply nested params in place", () => {
-      const state: State = {
-        name: "test",
-        path: "/test",
-        params: {
-          level1: {
-            level2: {
-              level3: {
-                value: "deep",
-              },
-            },
-          },
-        },
-      };
-
-      const frozen = freezeStateInPlace(state);
-
-      expect(frozen).toBe(state);
-      expect(Object.isFrozen(frozen.params)).toBe(true);
-      expect(Object.isFrozen(frozen.params.level1 as Params)).toBe(true);
-      expect(
-        Object.isFrozen((frozen.params.level1 as Params).level2 as Params),
-      ).toBe(true);
-      expect(
-        Object.isFrozen(
-          ((frozen.params.level1 as Params).level2 as Params).level3 as Params,
-        ),
-      ).toBe(true);
-    });
-
-    it("should freeze params with arrays in place", () => {
-      const state: State = {
-        name: "list",
-        path: "/list",
-        params: {
-          items: [{ id: 1 }, { id: 2 }, { id: 3 }],
-        },
-      };
-
-      const frozen = freezeStateInPlace(state);
-
-      const items = frozen.params.items as Params[];
-
-      expect(frozen).toBe(state);
-      expect(Object.isFrozen(items)).toBe(true);
-      expect(Object.isFrozen(items[0])).toBe(true);
-      expect(Object.isFrozen(items[1])).toBe(true);
-      expect(Object.isFrozen(items[2])).toBe(true);
-    });
-  });
-
-  describe("already frozen objects", () => {
-    it("should skip already frozen objects efficiently", () => {
-      const state: State = {
-        name: "test",
-        path: "/test",
-        params: {},
-      };
-
-      // Pre-freeze the object
-      Object.freeze(state.params);
-
-      const frozen = freezeStateInPlace(state);
-
-      // Should complete without error
-      expect(frozen).toBe(state);
-      expect(Object.isFrozen(frozen)).toBe(true);
-      expect(Object.isFrozen(frozen.params)).toBe(true);
-    });
-
-    it("should handle partially frozen nested objects", () => {
-      const state: State = {
-        name: "test",
-        path: "/test",
-        params: {
-          frozen: Object.freeze({ value: 1 }),
-          unfrozen: { value: 2 },
-        },
-      };
-
-      const frozen = freezeStateInPlace(state);
-
-      expect(frozen).toBe(state);
-      expect(Object.isFrozen(frozen.params.frozen)).toBe(true);
-      expect(Object.isFrozen(frozen.params.unfrozen)).toBe(true);
-    });
-  });
-
   describe("edge cases", () => {
-    it("should handle null state by returning it", () => {
+    it("handles null state by returning it", () => {
       const result = freezeStateInPlace(null as unknown as State);
 
       expect(result).toBeNull();
     });
 
-    it("should handle undefined state by returning it", () => {
+    it("handles undefined state by returning it", () => {
       const result = freezeStateInPlace(undefined as unknown as State);
 
       expect(result).toBeUndefined();
     });
 
-    it("should return same state immediately when already frozen (fast path line 155)", () => {
+    it("is a no-op on already-frozen state (second call returns same reference)", () => {
       const state: State = {
         name: "cached",
         path: "/cached",
         params: { id: "123" },
+        context: {},
       };
 
-      // First call freezes and caches
       const first = freezeStateInPlace(state);
 
       expect(first).toBe(state);
       expect(Object.isFrozen(first)).toBe(true);
 
-      // Second call hits fast path (frozenRoots.has(state) returns true)
       const second = freezeStateInPlace(state);
 
       expect(second).toBe(state);
       expect(second).toBe(first);
     });
-
-    it("should handle state with empty params", () => {
-      const state: State = {
-        name: "empty",
-        path: "/empty",
-        params: {},
-      };
-
-      const frozen = freezeStateInPlace(state);
-
-      expect(frozen).toBe(state);
-      expect(Object.isFrozen(frozen.params)).toBe(true);
-    });
-
-    it("should handle params with null values", () => {
-      const state: State = {
-        name: "null-param",
-        path: "/null",
-        params: { value: null as any },
-      };
-
-      const frozen = freezeStateInPlace(state);
-
-      expect(frozen).toBe(state);
-      expect(Object.isFrozen(frozen.params)).toBe(true);
-      expect(frozen.params.value).toBeNull();
-    });
-
-    it("should handle params with undefined values", () => {
-      const state: State = {
-        name: "undefined-param",
-        path: "/undefined",
-        params: { value: undefined },
-      };
-
-      const frozen = freezeStateInPlace(state);
-
-      expect(frozen).toBe(state);
-      expect(Object.isFrozen(frozen.params)).toBe(true);
-      expect(frozen.params.value).toBeUndefined();
-    });
-
-    it("should handle empty arrays in params", () => {
-      const state: State = {
-        name: "empty-array",
-        path: "/empty-array",
-        params: { items: [] },
-      };
-
-      const frozen = freezeStateInPlace(state);
-
-      expect(frozen).toBe(state);
-      expect(Object.isFrozen(frozen.params.items)).toBe(true);
-      expect(frozen.params.items).toHaveLength(0);
-    });
   });
 
-  describe("immutability verification", () => {
-    it("should prevent modification of frozen state", () => {
+  describe("top-level immutability verification", () => {
+    it("prevents reassignment of State fields (name, path, params, transition, context)", () => {
       const state: State = {
         name: "test",
         path: "/test",
         params: { id: "123" },
+        context: {},
       };
 
       const frozen = freezeStateInPlace(state);
@@ -749,51 +614,13 @@ describe("freezeStateInPlace", () => {
       expect(() => {
         frozen.name = "modified";
       }).toThrow();
-    });
-
-    it("should prevent modification of frozen params", () => {
-      const state: State = {
-        name: "test",
-        path: "/test",
-        params: { id: "123" },
-      };
-
-      const frozen = freezeStateInPlace(state);
 
       expect(() => {
-        frozen.params.id = "456";
-      }).toThrow();
-    });
-
-    it("should prevent adding new properties to frozen objects", () => {
-      const state: State = {
-        name: "test",
-        path: "/test",
-        params: {},
-      };
-
-      const frozen = freezeStateInPlace(state);
-
-      expect(() => {
-        frozen.params.newProp = "added";
-      }).toThrow();
-    });
-
-    it("should prevent modification of frozen arrays", () => {
-      const state: State = {
-        name: "test",
-        path: "/test",
-        params: { items: [1, 2, 3] },
-      };
-
-      const frozen = freezeStateInPlace(state);
-
-      expect(() => {
-        (frozen.params.items as number[]).push(4);
+        (frozen as unknown as { path: string }).path = "/new";
       }).toThrow();
 
       expect(() => {
-        (frozen.params.items as number[])[0] = 999;
+        (frozen as unknown as { context: unknown }).context = { other: 1 };
       }).toThrow();
     });
   });

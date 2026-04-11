@@ -14,7 +14,7 @@ describe("RouterError", () => {
   });
 
   it("should set message, segment, redirect and custom fields", () => {
-    const redirect = { name: "home", path: "/", params: {} };
+    const redirect = { name: "home", path: "/", params: {}, context: {} };
     const err = new RouterError("ERR_CODE", {
       message: "Custom message",
       segment: "users",
@@ -188,7 +188,7 @@ describe("RouterError", () => {
     });
 
     it("should include redirect when present", () => {
-      const redirect = { name: "home", path: "/", params: {} };
+      const redirect = { name: "home", path: "/", params: {}, context: {} };
       const err = new RouterError("ERR", { redirect });
 
       const json = err.toJSON();
@@ -220,7 +220,12 @@ describe("RouterError", () => {
     });
 
     it("should serialize all fields together", () => {
-      const redirect = { name: "admin", path: "/admin", params: { id: "1" } };
+      const redirect = {
+        name: "admin",
+        path: "/admin",
+        params: { id: "1" },
+        context: {},
+      };
       const err = new RouterError("FORBIDDEN", {
         message: "Access denied",
         segment: "admin",
@@ -246,7 +251,7 @@ describe("RouterError", () => {
 
   describe("redirect deep freeze", () => {
     it("should freeze redirect state when accessed via getter", () => {
-      const redirect = { name: "home", path: "/", params: {} };
+      const redirect = { name: "home", path: "/", params: {}, context: {} };
       const err = new RouterError("ERR", { redirect });
 
       const frozenRedirect = err.redirect;

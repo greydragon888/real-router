@@ -1,5 +1,4 @@
 import { errorCodes, constants } from "../../../constants";
-import { freezeStateInPlace } from "../../../helpers";
 import { RouterError } from "../../../RouterError";
 
 import type { NavigationDependencies, NavigationContext } from "../types";
@@ -20,14 +19,19 @@ function buildTransitionMeta(
   toActivate: string[],
   intersection: string,
 ): TransitionMeta {
+  Object.freeze(toDeactivate);
+  Object.freeze(toActivate);
+
+  const segments = Object.freeze({
+    deactivated: toDeactivate,
+    activated: toActivate,
+    intersection,
+  });
+
   const meta: MutableTransitionMeta = {
     phase: "activating",
     reason: "success",
-    segments: {
-      deactivated: toDeactivate,
-      activated: toActivate,
-      intersection,
-    },
+    segments,
   };
 
   if (fromState?.name !== undefined) {
@@ -42,7 +46,7 @@ function buildTransitionMeta(
     meta.redirected = opts.redirected;
   }
 
-  return meta;
+  return Object.freeze(meta);
 }
 
 function stripSignal({
@@ -88,7 +92,7 @@ export function completeTransition(
     intersection,
   );
 
-  const finalState = freezeStateInPlace(toState);
+  const finalState = Object.freeze(toState);
 
   deps.setState(finalState);
 

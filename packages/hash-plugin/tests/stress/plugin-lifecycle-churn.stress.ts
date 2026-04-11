@@ -1,5 +1,4 @@
 import { createRouter } from "@real-router/core";
-import { hashPluginFactory } from "@real-router/hash-plugin";
 import {
   describe,
   it,
@@ -9,6 +8,8 @@ import {
   afterAll,
   vi,
 } from "vitest";
+
+import { hashPluginFactory } from "@real-router/hash-plugin";
 
 import {
   createStressRouter,

@@ -77,6 +77,7 @@ export function createMockRouter(): {
         name: routeName,
         params: {},
         path: `/${routeName}`,
+        context: {},
       };
 
       for (const cb of callbacks) {

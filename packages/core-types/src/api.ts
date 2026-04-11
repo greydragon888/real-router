@@ -9,6 +9,7 @@ import type {
   Params,
   State,
   SimpleState,
+  StateContext,
   StateMetaInput,
   Unsubscribe,
 } from "./base";
@@ -46,6 +47,46 @@ export type InterceptorFn<M extends keyof InterceptableMethodMap> = (
   next: InterceptableMethodMap[M],
   ...args: Parameters<InterceptableMethodMap[M]>
 ) => ReturnType<InterceptableMethodMap[M]>;
+
+/**
+ * Writer object returned by {@link PluginApi.claimContextNamespace}. Holds
+ * exclusive ownership of a single `state.context.<namespace>` key for the
+ * lifetime of the owning plugin.
+ *
+ * @description
+ * A plugin obtains a claim by calling `api.claimContextNamespace("ns")` at
+ * registration, then publishes per-navigation data via {@link write} from a
+ * lifecycle hook (typically `onTransitionSuccess`) or from an interceptor.
+ * The plugin must call {@link release} in its `teardown()` so another plugin
+ * can reclaim the same namespace.
+ *
+ * The core runtime enforces one invariant: a namespace can be held by at most
+ * one claim at a time. Double-claiming throws `CONTEXT_NAMESPACE_ALREADY_CLAIMED`.
+ *
+ * @example
+ * ```typescript
+ * const navigationPlugin: PluginFactory = (router) => {
+ *   const api = getPluginApi(router);
+ *   const claim = api.claimContextNamespace("navigation");
+ *
+ *   return {
+ *     onTransitionSuccess(toState, fromState) {
+ *       claim.write(toState, { direction: detectDirection(fromState, toState) });
+ *     },
+ *     teardown() {
+ *       claim.release();
+ *     },
+ *   };
+ * };
+ * ```
+ *
+ * @see {@link PluginApi.claimContextNamespace}
+ * @see {@link State.context}
+ */
+export interface ContextNamespaceClaim<T = unknown> {
+  write: (state: State, value: T) => void;
+  release: () => void;
+}
 
 /**
  * Plugin API — for plugins and infrastructure packages.
@@ -91,6 +132,14 @@ export interface PluginApi {
   ) => Unsubscribe;
 
   extendRouter: (extensions: Record<string, unknown>) => Unsubscribe;
+
+  claimContextNamespace: {
+    // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents -- StateContext is an empty interface extended via module augmentation, so `keyof StateContext & string` is `never` at baseline and resolves to the augmented keys when plugins extend it
+    <K extends keyof StateContext & string>(
+      namespace: K,
+    ): ContextNamespaceClaim<StateContext[K]>;
+    (namespace: string): ContextNamespaceClaim;
+  };
 
   getRouteConfig: (name: string) => Record<string, unknown> | undefined;
 }

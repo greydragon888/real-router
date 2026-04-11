@@ -331,6 +331,7 @@ describe("segmentTesters", () => {
       name: "admin.users.profile.edit",
       params: { userId: "123" },
       path: "/admin/users/123/profile/edit",
+      context: {},
     };
 
     it("should work with complex route hierarchies", () => {

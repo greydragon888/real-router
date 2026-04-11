@@ -49,6 +49,7 @@ describe("areStatesEqual Properties", () => {
         name: state.name,
         params: { ...state.params, ...extraParams },
         path: state.path,
+        context: {},
       };
 
       const equalStrict = router.areStatesEqual(state, s2, false);

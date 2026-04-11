@@ -26,6 +26,7 @@ function createState(
     name,
     params,
     path,
+    context: {},
   };
 
   if (metaParams) {

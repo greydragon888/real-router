@@ -12,6 +12,7 @@ export type {
 export type {
   Params,
   State,
+  StateContext,
   StateMetaInput,
   SimpleState,
   NavigationOptions,
@@ -69,6 +70,7 @@ export type {
   LifecycleApi,
   InterceptableMethodMap,
   InterceptorFn,
+  ContextNamespaceClaim,
 } from "./api";
 
 // Note: RouterError type is a forward declaration matching the class in real-router package

@@ -17,6 +17,7 @@ export function makeMinimalState(name: string, path: string): State {
     name,
     params: {},
     path,
+    context: {},
   };
 }
 
@@ -183,4 +184,5 @@ export const arbFullState: fc.Arbitrary<State> = fc
     name,
     params,
     path,
+    context: {},
   }));

@@ -16,8 +16,18 @@ function createEventBus(): EventBusNamespace {
   return new EventBusNamespace({ routerFSM, emitter });
 }
 
-const TO_STATE: State = { name: "users", path: "/users", params: {} };
-const FROM_STATE: State = { name: "home", path: "/home", params: {} };
+const TO_STATE: State = {
+  name: "users",
+  path: "/users",
+  params: {},
+  context: {},
+};
+const FROM_STATE: State = {
+  name: "home",
+  path: "/home",
+  params: {},
+  context: {},
+};
 
 describe("core/observable/subscribeLeave", () => {
   let bus: EventBusNamespace;

@@ -1,7 +1,6 @@
 // Integration tests for browserPlugin with synthetic plugins
 // Uses mock plugins to test various edge cases and scenarios
 
-import { browserPluginFactory } from "@real-router/browser-plugin";
 import { createRouter } from "@real-router/core";
 import {
   describe,
@@ -12,6 +11,8 @@ import {
   it,
   expect,
 } from "vitest";
+
+import { browserPluginFactory } from "@real-router/browser-plugin";
 
 import { createSafeBrowser } from "../../src/browser-env/index.js";
 import {

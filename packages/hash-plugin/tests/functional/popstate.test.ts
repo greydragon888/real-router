@@ -1,6 +1,5 @@
 import { createRouter } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
-import { hashPluginFactory } from "@real-router/hash-plugin";
 import {
   describe,
   beforeAll,
@@ -10,6 +9,8 @@ import {
   it,
   expect,
 } from "vitest";
+
+import { hashPluginFactory } from "@real-router/hash-plugin";
 
 import { noop, routerConfig, createMockedBrowser } from "../helpers/testUtils";
 
@@ -54,6 +55,7 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
         name: "users.view",
         params: { id: "1" },
         path: "/users/view/1",
+        context: {},
       };
 
       globalThis.dispatchEvent(
@@ -167,12 +169,14 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
         name: "users.view",
         params: { id: "1" },
         path: "/users/view/1",
+        context: {},
       };
 
       const state2: State = {
         name: "users.list",
         params: {},
         path: "/users/list",
+        context: {},
       };
 
       globalThis.dispatchEvent(
@@ -212,18 +216,21 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
         name: "users.view",
         params: { id: "1" },
         path: "/users/view/1",
+        context: {},
       };
 
       const state2: State = {
         name: "users.view",
         params: { id: "2" },
         path: "/users/view/2",
+        context: {},
       };
 
       const state3: State = {
         name: "users.list",
         params: {},
         path: "/users/list",
+        context: {},
       };
 
       globalThis.dispatchEvent(
@@ -308,6 +315,7 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
         name: "home",
         params: {},
         path: "/home",
+        context: {},
       };
 
       globalThis.dispatchEvent(
@@ -342,6 +350,7 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
         name: "home",
         params: {},
         path: "/home",
+        context: {},
       };
 
       globalThis.dispatchEvent(

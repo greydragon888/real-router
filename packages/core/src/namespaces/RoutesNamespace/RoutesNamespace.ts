@@ -403,6 +403,7 @@ export class RoutesNamespace<
         name,
         params: effectiveParams,
         path: "",
+        context: {},
       };
 
       return this.#deps.areStatesEqual(

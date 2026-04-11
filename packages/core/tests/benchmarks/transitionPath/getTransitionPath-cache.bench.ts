@@ -34,6 +34,7 @@ function makeState(
     name,
     params,
     path: `/${name.replaceAll(".", "/")}`,
+    context: {},
   };
 
   setStateMetaParams(state, metaParams);

@@ -54,6 +54,7 @@ describe("core/routes", () => {
             name: "home",
             params: {},
             path: "/home",
+            context: {},
           };
 
           expect(() => {
@@ -67,6 +68,7 @@ describe("core/routes", () => {
             name: "home",
             params: {},
             path: "/home",
+            context: {},
           };
 
           expect(() => {
@@ -90,6 +92,7 @@ describe("core/routes", () => {
             name: "home",
             params: {},
             path: "/home",
+            context: {},
           };
 
           expect(() => {
@@ -103,11 +106,13 @@ describe("core/routes", () => {
             name: "sign-in",
             params: {},
             path: "/sign-in",
+            context: {},
           };
           const fromState = {
             name: "home",
             params: {},
             path: "/home",
+            context: {},
           };
 
           expect(() => {
@@ -133,6 +138,7 @@ describe("core/routes", () => {
           name: "home",
           params: {},
           path: "/home",
+          context: {},
         };
 
         // home is active, so predicateHome should return true for intersection
@@ -149,12 +155,14 @@ describe("core/routes", () => {
           name: "home",
           params: {},
           path: "/home",
+          context: {},
         };
 
         const state2 = {
           name: "sign-in",
           params: {},
           path: "/sign-in",
+          context: {},
         };
 
         // Should work with different state objects
