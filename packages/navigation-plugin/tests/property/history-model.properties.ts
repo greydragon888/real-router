@@ -402,6 +402,31 @@ class AssertCanGoBackToImpliesCanGoBackCommand implements fc.AsyncCommand<
   }
 }
 
+/**
+ * B13: canGoBackTo(r) === true → hasVisited(r) === true
+ * A route cannot be in back history if it was never visited.
+ */
+class AssertCanGoBackToImpliesHasVisitedCommand implements fc.AsyncCommand<
+  HistoryModel,
+  HistoryReal
+> {
+  check(m: Readonly<HistoryModel>) {
+    return m.started;
+  }
+
+  async run(_m: HistoryModel, r: HistoryReal) {
+    for (const routeName of LEAF_ROUTE_NAMES) {
+      if (r.router.canGoBackTo(routeName)) {
+        expect(r.router.hasVisited(routeName)).toBe(true);
+      }
+    }
+  }
+
+  toString() {
+    return "assertCanGoBackToImpliesHasVisited()";
+  }
+}
+
 // =============================================================================
 // Test
 // =============================================================================
@@ -426,6 +451,7 @@ const allCommands = [
   fc.constant(new AssertNavigationTypeCommand()),
   fc.constant(new AssertCanGoBackPeekConsistencyCommand()),
   fc.constant(new AssertCanGoBackToImpliesCanGoBackCommand()),
+  fc.constant(new AssertCanGoBackToImpliesHasVisitedCommand()),
 ];
 
 describe("Navigation Plugin History Model", () => {

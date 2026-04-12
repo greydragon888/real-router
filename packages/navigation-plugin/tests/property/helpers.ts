@@ -27,7 +27,7 @@ import type { Route, Router } from "@real-router/core";
 // =============================================================================
 
 export const NUM_RUNS = {
-  fast: 100,
+  fast: 200,
   standard: 500,
 } as const;
 

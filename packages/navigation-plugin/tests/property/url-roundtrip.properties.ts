@@ -250,5 +250,27 @@ describe("Navigation Plugin URL Invariants", () => {
 
       expect(twice).toBe(once);
     });
+
+    test.prop([arbRawBase], { numRuns: NUM_RUNS.standard })(
+      "G5: normalizeBase of non-empty input starts with /",
+      (base) => {
+        const result = normalizeBase(base);
+
+        fc.pre(result.length > 0);
+
+        expect(result.startsWith("/")).toBe(true);
+      },
+    );
+
+    test.prop([arbRawBase], { numRuns: NUM_RUNS.standard })(
+      "G5: normalizeBase of non-empty input does not end with /",
+      (base) => {
+        const result = normalizeBase(base);
+
+        fc.pre(result.length > 0);
+
+        expect(result.endsWith("/")).toBe(false);
+      },
+    );
   });
 });

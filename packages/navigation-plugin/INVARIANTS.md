@@ -300,6 +300,21 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 
 ---
 
+### B13. canGoBackTo Implies hasVisited
+**Category:** History Extensions  
+**Testable:** PBT-testable (model-based)  
+**Description:** `canGoBackTo(routeName)` returning `true` implies `hasVisited(routeName)` is also `true`. The converse does not hold — a route may have been visited but only in forward history or as the current entry.
+
+**Precondition:**
+- Any navigation history sequence
+
+**Postcondition:**
+- For every route `r`: `canGoBackTo(r) === true` → `hasVisited(r) === true`
+
+**Why it matters:** Ensures logical consistency between history query functions. A route cannot be reachable via back navigation if it was never visited.
+
+---
+
 ## C. NavigationMeta Invariants
 
 ### C1. Meta Attachment on Success
@@ -722,6 +737,38 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 - `reload && same path` → `true`
 
 **Why it matters:** Crash on specific input combinations (#447) — `replace: false` with `fromState: undefined` causes TypeError. The `??` operator treats `false` differently from `undefined`, bypassing the null guard.
+
+---
+
+### G5. normalizeBase Structural Guarantees
+**Category:** URL Handling  
+**Testable:** PBT-testable  
+**Description:** `normalizeBase(base)` for non-empty input must produce a string that starts with `/` and does not end with `/`.
+
+**Precondition:**
+- `base` is a non-empty string
+
+**Postcondition:**
+- `normalizeBase(base)` starts with `/`
+- `normalizeBase(base)` does not end with `/`
+
+**Why it matters:** Downstream functions (`extractPath`, `buildUrl`) assume normalized base has a leading slash and no trailing slash. Violation causes double-slash URLs or incorrect path stripping.
+
+---
+
+### G6. computeDirection Reflexivity
+**Category:** URL Handling  
+**Testable:** PBT-testable  
+**Description:** `computeDirection("traverse", i, i)` must return `"unknown"` when destination and current indices are equal.
+
+**Precondition:**
+- `navigationType` is `"traverse"`
+- `destinationIndex === currentIndex`
+
+**Postcondition:**
+- Returns `"unknown"` (not `"forward"` or `"back"`)
+
+**Why it matters:** Traversing to the current entry has no direction. Returning `"back"` is semantically incorrect and misleads subscribers relying on `direction` for UI transitions (#448).
 
 ---
 

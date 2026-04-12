@@ -182,7 +182,7 @@ describe("Navigation Plugin — NavigationMeta", () => {
       expect(metaInGuard?.userInitiated).toBe(false);
     });
 
-    it("meta is undefined in guard during programmatic navigation", async () => {
+    it("meta is undefined in activation guard during programmatic navigation", async () => {
       await router.start();
 
       const lifecycle = getLifecycleApi(router);
