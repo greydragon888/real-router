@@ -12,7 +12,7 @@ describe("shouldUpdateNode Properties", () => {
 
       await router.navigate("admin.settings");
       const toState = router.getState()!;
-      const { deactivated, activated } = toState.transition!.segments;
+      const { deactivated, activated } = toState.transition.segments;
 
       for (const segment of [...deactivated, ...activated]) {
         expect(router.shouldUpdateNode(segment)(toState, fromState)).toBe(true);
@@ -53,7 +53,7 @@ describe("shouldUpdateNode Properties", () => {
     const toState = router.getState()!;
     const fromState = router.getPreviousState()!;
 
-    expect(toState.transition!.segments.intersection).toBe("users");
+    expect(toState.transition.segments.intersection).toBe("users");
     expect(router.shouldUpdateNode("users")(toState, fromState)).toBe(true);
 
     router.stop();

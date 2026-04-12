@@ -348,17 +348,15 @@ describe("State.context", () => {
     });
 
     it("transition.segments is frozen", () => {
-      expect(Object.isFrozen(state.transition!.segments)).toBe(true);
+      expect(Object.isFrozen(state.transition.segments)).toBe(true);
     });
 
     it("transition.segments.activated is frozen", () => {
-      expect(Object.isFrozen(state.transition!.segments.activated)).toBe(true);
+      expect(Object.isFrozen(state.transition.segments.activated)).toBe(true);
     });
 
     it("transition.segments.deactivated is frozen", () => {
-      expect(Object.isFrozen(state.transition!.segments.deactivated)).toBe(
-        true,
-      );
+      expect(Object.isFrozen(state.transition.segments.deactivated)).toBe(true);
     });
   });
 

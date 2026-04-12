@@ -30,17 +30,17 @@ describe("shouldReplaceHistory", () => {
       const toState = makeState("/a");
       const fromState = makeState("/b");
 
-      expect(
-        shouldReplaceHistory({ replace: true }, toState, fromState),
-      ).toBe(true);
+      expect(shouldReplaceHistory({ replace: true }, toState, fromState)).toBe(
+        true,
+      );
     });
 
     it("returns true when replace:true even with fromState undefined", () => {
       const toState = makeState("/a");
 
-      expect(
-        shouldReplaceHistory({ replace: true }, toState, undefined),
-      ).toBe(true);
+      expect(shouldReplaceHistory({ replace: true }, toState, undefined)).toBe(
+        true,
+      );
     });
   });
 
@@ -48,17 +48,15 @@ describe("shouldReplaceHistory", () => {
     it("returns true when replace is undefined and fromState is undefined", () => {
       const toState = makeState("/a");
 
-      expect(
-        shouldReplaceHistory({}, toState, undefined),
-      ).toBe(true);
+      expect(shouldReplaceHistory({}, toState, undefined)).toBe(true);
     });
 
     it("returns false when replace:false and fromState is undefined (no crash)", () => {
       const toState = makeState("/a");
 
-      expect(
-        shouldReplaceHistory({ replace: false }, toState, undefined),
-      ).toBe(false);
+      expect(shouldReplaceHistory({ replace: false }, toState, undefined)).toBe(
+        false,
+      );
     });
   });
 
