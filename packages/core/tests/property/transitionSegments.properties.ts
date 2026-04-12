@@ -41,7 +41,7 @@ describe("navigate() → transition.segments Properties", () => {
       await router.navigate(toRoute, getParamsForRoute(toRoute));
 
       const { deactivated, activated, intersection } =
-        router.getState()!.transition!.segments;
+        router.getState()!.transition.segments;
 
       const fromParts = fromRoute.split(".");
       const toParts = toRoute.split(".");
@@ -72,7 +72,7 @@ describe("navigate() → transition.segments Properties", () => {
       );
       await router.navigate(toRoute, getParamsForRoute(toRoute));
 
-      const { intersection } = router.getState()!.transition!.segments;
+      const { intersection } = router.getState()!.transition.segments;
 
       if (intersection) {
         expect(fromRoute.startsWith(intersection)).toBe(true);
@@ -97,7 +97,7 @@ describe("navigate() → transition.segments Properties", () => {
       );
       await router.navigate(toRoute, getParamsForRoute(toRoute));
 
-      const { deactivated } = router.getState()!.transition!.segments;
+      const { deactivated } = router.getState()!.transition.segments;
 
       for (let i = 0; i < deactivated.length - 1; i++) {
         expect(deactivated[i].length).toBeGreaterThanOrEqual(
@@ -123,7 +123,7 @@ describe("navigate() → transition.segments Properties", () => {
       );
       await router.navigate(toRoute, getParamsForRoute(toRoute));
 
-      const { activated } = router.getState()!.transition!.segments;
+      const { activated } = router.getState()!.transition.segments;
 
       for (let i = 0; i < activated.length - 1; i++) {
         expect(activated[i].length).toBeLessThanOrEqual(
@@ -137,7 +137,7 @@ describe("navigate() → transition.segments Properties", () => {
 
   it("first navigation: deactivated is empty", async () => {
     const router = await createStartedRouter("/users/abc");
-    const { deactivated } = router.getState()!.transition!.segments;
+    const { deactivated } = router.getState()!.transition.segments;
 
     expect(deactivated).toStrictEqual([]);
 

@@ -53,6 +53,7 @@ export function shouldReplaceHistory(
 ): boolean {
   return (
     (navOptions.replace ?? !fromState) ||
-    (!!navOptions.reload && toState.path === fromState.path)
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- fromState is NOT narrowed when replace is false (#447)
+    (!!navOptions.reload && toState.path === fromState?.path)
   );
 }
