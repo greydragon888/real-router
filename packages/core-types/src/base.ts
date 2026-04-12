@@ -58,7 +58,7 @@ export interface State<P extends Params = Params> {
   name: string;
   params: P;
   path: string;
-  transition?: TransitionMeta | undefined;
+  transition: TransitionMeta;
   /**
    * Plugin-extensible per-route data, attached by plugins via
    * `PluginApi.claimContextNamespace()` + `claim.write(state, value)`.

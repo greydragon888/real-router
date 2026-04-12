@@ -1,11 +1,10 @@
 import type { HistoryBrowser } from "./types.js";
-import type { State } from "@real-router/core";
 
-export const pushState = (state: State, path: string): void => {
+export const pushState = (state: unknown, path: string): void => {
   globalThis.history.pushState(state, "", path);
 };
 
-export const replaceState = (state: State, path: string): void => {
+export const replaceState = (state: unknown, path: string): void => {
   globalThis.history.replaceState(state, "", path);
 };
 

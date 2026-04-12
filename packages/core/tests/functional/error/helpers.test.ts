@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 
+import { DEFAULT_TRANSITION } from "../../../src/constants";
 import { deepFreezeState, freezeStateInPlace } from "../../../src/helpers";
 import {
   getStateMetaParams,
@@ -11,7 +12,13 @@ import type { Params, State } from "@real-router/types";
 describe("deepFreezeState", () => {
   describe("basic functionality", () => {
     it("should freeze a simple state object", () => {
-      const state: State = { name: "home", path: "/", params: {}, context: {} };
+      const state: State = {
+        name: "home",
+        path: "/",
+        params: {},
+        transition: DEFAULT_TRANSITION,
+        context: {},
+      };
 
       const frozen = deepFreezeState(state);
 
@@ -28,6 +35,7 @@ describe("deepFreezeState", () => {
         name: "user",
         path: "/users/123",
         params: { id: "123", tab: "profile" },
+        transition: DEFAULT_TRANSITION,
         context: {},
       };
 
@@ -43,7 +51,13 @@ describe("deepFreezeState", () => {
     });
 
     it("should freeze state with meta", () => {
-      const state: State = { name: "home", path: "/", params: {}, context: {} };
+      const state: State = {
+        name: "home",
+        path: "/",
+        params: {},
+        transition: DEFAULT_TRANSITION,
+        context: {},
+      };
 
       const frozen = deepFreezeState(state);
 
@@ -66,6 +80,7 @@ describe("deepFreezeState", () => {
             },
           },
         },
+        transition: DEFAULT_TRANSITION,
         context: {},
       };
 
@@ -90,6 +105,7 @@ describe("deepFreezeState", () => {
         params: {
           items: [{ id: 1 }, { id: 2 }, { id: 3 }],
         },
+        transition: DEFAULT_TRANSITION,
         context: {},
       };
 
@@ -120,6 +136,7 @@ describe("deepFreezeState", () => {
             },
           },
         },
+        transition: DEFAULT_TRANSITION,
         context: {},
       };
 
@@ -144,6 +161,7 @@ describe("deepFreezeState", () => {
         name: "circular",
         path: "/circular",
         params: { value: 1 },
+        transition: DEFAULT_TRANSITION,
         context: {},
       };
 
@@ -167,6 +185,7 @@ describe("deepFreezeState", () => {
         params: {
           a: { value: "a" },
         },
+        transition: DEFAULT_TRANSITION,
         context: {},
       };
 
@@ -196,6 +215,7 @@ describe("deepFreezeState", () => {
         params: {
           items: [{ id: 1 }],
         },
+        transition: DEFAULT_TRANSITION,
         context: {},
       };
 
@@ -223,6 +243,7 @@ describe("deepFreezeState", () => {
           obj1: { name: "obj1" },
           obj2: { name: "obj2" },
         },
+        transition: DEFAULT_TRANSITION,
         context: {},
       };
 
@@ -293,6 +314,7 @@ describe("deepFreezeState", () => {
         name: "empty",
         path: "/empty",
         params: {},
+        transition: DEFAULT_TRANSITION,
         context: {},
       };
 
@@ -306,6 +328,7 @@ describe("deepFreezeState", () => {
         name: "null-param",
         path: "/null",
         params: { value: null as any },
+        transition: DEFAULT_TRANSITION,
         context: {},
       };
 
@@ -320,6 +343,7 @@ describe("deepFreezeState", () => {
         name: "undefined-param",
         path: "/undefined",
         params: { value: undefined },
+        transition: DEFAULT_TRANSITION,
         context: {},
       };
 
@@ -340,6 +364,7 @@ describe("deepFreezeState", () => {
           nullVal: null as any,
           undefVal: undefined,
         },
+        transition: DEFAULT_TRANSITION,
         context: {},
       };
 
@@ -356,6 +381,7 @@ describe("deepFreezeState", () => {
         name: "empty-array",
         path: "/empty-array",
         params: { items: [] },
+        transition: DEFAULT_TRANSITION,
         context: {},
       };
 
@@ -375,6 +401,7 @@ describe("deepFreezeState", () => {
         name: "large",
         path: "/large",
         params: { items: largeArray },
+        transition: DEFAULT_TRANSITION,
         context: {},
       };
 
@@ -397,6 +424,7 @@ describe("deepFreezeState", () => {
         name: "test",
         path: "/test",
         params: { id: "123" },
+        transition: DEFAULT_TRANSITION,
         context: {},
       };
 
@@ -412,6 +440,7 @@ describe("deepFreezeState", () => {
         name: "test",
         path: "/test",
         params: { id: "123" },
+        transition: DEFAULT_TRANSITION,
         context: {},
       };
 
@@ -427,6 +456,7 @@ describe("deepFreezeState", () => {
         name: "test",
         path: "/test",
         params: { nested: { value: "original" } },
+        transition: DEFAULT_TRANSITION,
         context: {},
       };
 
@@ -442,6 +472,7 @@ describe("deepFreezeState", () => {
         name: "test",
         path: "/test",
         params: {},
+        transition: DEFAULT_TRANSITION,
         context: {},
       };
 
@@ -457,6 +488,7 @@ describe("deepFreezeState", () => {
         name: "test",
         path: "/test",
         params: { items: [1, 2, 3] },
+        transition: DEFAULT_TRANSITION,
         context: {},
       };
 
@@ -478,6 +510,7 @@ describe("deepFreezeState", () => {
         name: "test",
         path: "/test",
         params: { source: "navigation" },
+        transition: DEFAULT_TRANSITION,
         context: {},
       };
 
@@ -495,6 +528,7 @@ describe("deepFreezeState", () => {
         name: "test",
         path: "/test",
         params: {},
+        transition: DEFAULT_TRANSITION,
         context: {},
       };
 
@@ -517,7 +551,13 @@ describe("deepFreezeState", () => {
 describe("freezeStateInPlace (shallow)", () => {
   describe("basic functionality", () => {
     it("returns same reference and freezes only the top-level State object", () => {
-      const state: State = { name: "home", path: "/", params: {}, context: {} };
+      const state: State = {
+        name: "home",
+        path: "/",
+        params: {},
+        transition: DEFAULT_TRANSITION,
+        context: {},
+      };
 
       const frozen = freezeStateInPlace(state);
 
@@ -530,6 +570,7 @@ describe("freezeStateInPlace (shallow)", () => {
         name: "user",
         path: "/users/123",
         params: { id: "123", tab: "profile" },
+        transition: DEFAULT_TRANSITION,
         context: {},
       };
 
@@ -539,7 +580,13 @@ describe("freezeStateInPlace (shallow)", () => {
     });
 
     it("leaves state.context unfrozen so plugins can publish data via claim.write", () => {
-      const state: State = { name: "home", path: "/", params: {}, context: {} };
+      const state: State = {
+        name: "home",
+        path: "/",
+        params: {},
+        transition: DEFAULT_TRANSITION,
+        context: {},
+      };
 
       freezeStateInPlace(state);
 
@@ -551,7 +598,13 @@ describe("freezeStateInPlace (shallow)", () => {
     });
 
     it("does not freeze internal meta (meta uses WeakMap, not a State field)", () => {
-      const state: State = { name: "home", path: "/", params: {}, context: {} };
+      const state: State = {
+        name: "home",
+        path: "/",
+        params: {},
+        transition: DEFAULT_TRANSITION,
+        context: {},
+      };
 
       setStateMetaParams(state, { source: "browser" });
 
@@ -585,6 +638,7 @@ describe("freezeStateInPlace (shallow)", () => {
         name: "cached",
         path: "/cached",
         params: { id: "123" },
+        transition: DEFAULT_TRANSITION,
         context: {},
       };
 
@@ -606,6 +660,7 @@ describe("freezeStateInPlace (shallow)", () => {
         name: "test",
         path: "/test",
         params: { id: "123" },
+        transition: DEFAULT_TRANSITION,
         context: {},
       };
 

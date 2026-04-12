@@ -15,6 +15,8 @@ import { bench, boxplot, summary } from "mitata";
 
 import { createRouter } from "@real-router/core";
 
+import { DEFAULT_TRANSITION } from "../../../../src/constants";
+
 import type { Route, Router, State } from "@real-router/core";
 
 // ============================================================================
@@ -62,6 +64,7 @@ function makeState(name: string, params: Record<string, string> = {}): State {
     name,
     params,
     path: `/${name.replaceAll(".", "/")}`,
+    transition: DEFAULT_TRANSITION,
     context: {},
   };
 }

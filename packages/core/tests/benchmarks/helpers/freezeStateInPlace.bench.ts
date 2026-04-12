@@ -10,6 +10,7 @@
 
 import { bench, boxplot, do_not_optimize, summary } from "mitata";
 
+import { DEFAULT_TRANSITION } from "../../../src/constants";
 import { freezeStateInPlace } from "../../../src/helpers";
 import { setStateMetaParams } from "../../../src/stateMetaStore";
 
@@ -26,6 +27,7 @@ function createState(
     name,
     params,
     path,
+    transition: DEFAULT_TRANSITION,
     context: {},
   };
 

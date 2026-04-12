@@ -6,6 +6,16 @@ import type { Browser } from "../../src";
 import type { NavigationOptions, Params, State } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
 
+const STUB_TRANSITION = Object.freeze({
+  phase: "activating",
+  reason: "success",
+  segments: Object.freeze({
+    deactivated: Object.freeze([]),
+    activated: Object.freeze([]),
+    intersection: "",
+  }),
+}) as unknown as State["transition"];
+
 export const NUM_RUNS = {
   fast: 100,
   standard: 500,
@@ -17,6 +27,7 @@ export function makeMinimalState(name: string, path: string): State {
     name,
     params: {},
     path,
+    transition: STUB_TRANSITION,
     context: {},
   };
 }
@@ -143,10 +154,10 @@ export function createSpyBrowser(): SpyBrowser {
   const calls: SpyCall[] = [];
 
   return {
-    pushState(state: State, url: string) {
+    pushState(state: unknown, url: string) {
       calls.push({ method: "pushState", state, url });
     },
-    replaceState(state: State, url: string) {
+    replaceState(state: unknown, url: string) {
       calls.push({ method: "replaceState", state, url });
     },
     addPopstateListener: () => () => {},
@@ -184,5 +195,6 @@ export const arbFullState: fc.Arbitrary<State> = fc
     name,
     params,
     path,
+    transition: STUB_TRANSITION,
     context: {},
   }));

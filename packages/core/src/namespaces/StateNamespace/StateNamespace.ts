@@ -1,7 +1,7 @@
 // packages/core/src/namespaces/StateNamespace/StateNamespace.ts
 
 import { areParamValuesEqual } from "./helpers";
-import { EMPTY_PARAMS } from "../../constants";
+import { DEFAULT_TRANSITION, EMPTY_PARAMS } from "../../constants";
 import { freezeStateInPlace } from "../../helpers";
 import { setStateMetaParams } from "../../stateMetaStore";
 
@@ -132,12 +132,13 @@ export class StateNamespace {
       mergedParams = Object.freeze({ ...params }) as P;
     }
 
-    const state: State<P> = {
+    const state = {
       name,
       params: mergedParams,
       path: path ?? this.#deps.buildPath(name, params),
       context: {},
-    };
+      ...(!skipFreeze && { transition: DEFAULT_TRANSITION }),
+    } as State<P>;
 
     if (meta) {
       setStateMetaParams(state, meta as unknown as Params);

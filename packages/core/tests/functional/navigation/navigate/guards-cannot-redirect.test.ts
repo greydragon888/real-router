@@ -3,6 +3,7 @@ import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 import { RouterError, errorCodes } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
 
+import { DEFAULT_TRANSITION } from "../../../../src/constants";
 import { createTestRouter } from "../../../helpers";
 
 import type { Router } from "@real-router/core";
@@ -38,6 +39,7 @@ describe("router.navigate() - guards cannot redirect", () => {
               name: "orders.pending",
               params: {},
               path: "/orders/pending",
+              transition: DEFAULT_TRANSITION,
               context: {},
             },
           });
@@ -83,6 +85,7 @@ describe("router.navigate() - guards cannot redirect", () => {
               name: "sign-in",
               params: {},
               path: "/sign-in",
+              transition: DEFAULT_TRANSITION,
               context: {},
             },
           });
@@ -125,6 +128,7 @@ describe("router.navigate() - guards cannot redirect", () => {
                   name: "sign-in",
                   params: {},
                   path: "/sign-in",
+                  transition: DEFAULT_TRANSITION,
                   context: {},
                 },
               });
@@ -237,6 +241,7 @@ describe("router.navigate() - guards cannot redirect", () => {
             name: "sign-in",
             params: {},
             path: "/sign-in",
+            transition: DEFAULT_TRANSITION,
             context: {},
           },
         });
@@ -350,6 +355,7 @@ describe("router.navigate() - guards cannot redirect", () => {
               name: "orders",
               params: {},
               path: "/orders",
+              transition: DEFAULT_TRANSITION,
               context: {},
             },
           });

@@ -6,6 +6,7 @@ import type {
   ErrorCodeToValueMap,
   ErrorCodeKeys,
   ErrorCodeValues,
+  TransitionMeta,
 } from "@real-router/types";
 
 export type ConstantsKeys = "UNKNOWN_ROUTE";
@@ -86,3 +87,15 @@ export const DEFAULT_LIMITS = {
 } as const;
 
 export const EMPTY_PARAMS: Readonly<Record<string, never>> = Object.freeze({});
+
+const FROZEN_EMPTY_SEGMENTS = Object.freeze({
+  deactivated: Object.freeze([]) as unknown as string[],
+  activated: Object.freeze([]) as unknown as string[],
+  intersection: "",
+});
+
+export const DEFAULT_TRANSITION = Object.freeze({
+  phase: "activating",
+  reason: "success",
+  segments: FROZEN_EMPTY_SEGMENTS,
+}) as TransitionMeta;

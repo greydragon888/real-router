@@ -1,3 +1,4 @@
+import { DEFAULT_TRANSITION } from "../../src/constants";
 import { setStateMetaParams } from "../../src/stateMetaStore";
 
 import type { Params, State } from "@real-router/core";
@@ -27,6 +28,7 @@ export const makeState = (
     name,
     path: `/${name.replaceAll(".", "/")}`,
     params,
+    transition: DEFAULT_TRANSITION,
     context: {},
   };
 

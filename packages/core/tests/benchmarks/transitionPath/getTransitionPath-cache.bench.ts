@@ -16,6 +16,7 @@
 
 import { bench, boxplot, run, summary } from "mitata";
 
+import { DEFAULT_TRANSITION } from "../../../src/constants";
 import { setStateMetaParams } from "../../../src/stateMetaStore";
 import { getTransitionPath } from "../../../src/transitionPath";
 
@@ -34,6 +35,7 @@ function makeState(
     name,
     params,
     path: `/${name.replaceAll(".", "/")}`,
+    transition: DEFAULT_TRANSITION,
     context: {},
   };
 

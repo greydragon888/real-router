@@ -166,12 +166,6 @@ export default [
 
   // ── Internal (bundled into consumers) ─────────────────────────────
   {
-    name: "dom-utils (ESM)",
-    path: "packages/dom-utils/dist/esm/index.mjs",
-    limit: "1 kB",
-    ignore: ["@real-router/core"],
-  },
-  {
     name: "route-tree (ESM)",
     path: "packages/route-tree/dist/esm/index.mjs",
     limit: "6.5 kB",
@@ -180,12 +174,6 @@ export default [
     name: "path-matcher (ESM)",
     path: "packages/path-matcher/dist/esm/index.mjs",
     limit: "3.5 kB",
-  },
-  {
-    name: "browser-env (ESM)",
-    path: "packages/browser-env/dist/esm/index.mjs",
-    limit: "2 kB",
-    ignore: ["@real-router/core"],
   },
   {
     name: "search-params (ESM)",

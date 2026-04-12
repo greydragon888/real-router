@@ -1,6 +1,7 @@
 import { EventEmitter } from "event-emitter";
 import { describe, it, expect, beforeEach } from "vitest";
 
+import { DEFAULT_TRANSITION } from "../../../src/constants";
 import { createRouterFSM } from "../../../src/fsm/routerFSM";
 import { EventBusNamespace } from "../../../src/namespaces/EventBusNamespace/EventBusNamespace";
 import { RouterError } from "../../../src/RouterError";
@@ -20,12 +21,14 @@ const TO_STATE: State = {
   name: "users",
   path: "/users",
   params: {},
+  transition: DEFAULT_TRANSITION,
   context: {},
 };
 const FROM_STATE: State = {
   name: "home",
   path: "/home",
   params: {},
+  transition: DEFAULT_TRANSITION,
   context: {},
 };
 

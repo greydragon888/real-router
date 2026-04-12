@@ -28,6 +28,7 @@ import type {
   ForwardToCallback,
   Params,
   Router,
+  TransitionMeta,
 } from "@real-router/types";
 import type { RouteDefinition, RouteTree } from "route-tree";
 
@@ -250,6 +251,7 @@ function replaceRoutes<
   routes: Route<Dependencies>[],
   ctx: RouterInternals<Dependencies>,
   currentPath: string | undefined,
+  previousTransition: TransitionMeta | undefined,
 ): void {
   // Step 2: Clear route data (WITHOUT tree rebuild)
   clearRouteData(store);
@@ -276,12 +278,16 @@ function replaceRoutes<
   // Step 5: One tree rebuild
   store.treeOperations.commitTreeChanges(store);
 
-  // Step 6: Revalidate state
+  // Step 6: Revalidate state (preserve transition from previous state)
   if (currentPath !== undefined) {
     const revalidated = ctx.matchPath(currentPath, ctx.getOptions());
 
     if (revalidated) {
-      ctx.setState(revalidated);
+      ctx.setState({
+        ...revalidated,
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- previousTransition is guaranteed defined: currentPath is only set when getState() returned a state, which always has transition
+        transition: previousTransition!,
+      });
     } else {
       ctx.clearState();
     }
@@ -565,9 +571,15 @@ export function getRoutesApi<
       ctx.validator?.routes.validateAddRouteArgs(routeArray);
       ctx.validator?.routes.validateRoutes(routeArray, store);
 
-      const currentPath = router.getState()?.path;
+      const currentState = router.getState();
 
-      replaceRoutes(store, routeArray, ctx, currentPath);
+      replaceRoutes(
+        store,
+        routeArray,
+        ctx,
+        currentState?.path,
+        currentState?.transition,
+      );
     },
   };
 }

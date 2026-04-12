@@ -225,7 +225,6 @@ describe("Browser-env Properties", () => {
           name: state.name,
           params: state.params,
           path: state.path,
-          context: {},
         });
       },
     );
