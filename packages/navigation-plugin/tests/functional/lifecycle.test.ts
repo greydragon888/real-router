@@ -298,6 +298,30 @@ describe("Navigation Plugin — Lifecycle", () => {
 
       expect(router.getState()?.name).toBe("index");
     });
+
+    it("router state remains unchanged when guard blocks browser-initiated navigation", async () => {
+      router = createRouter(routerConfig, {
+        defaultRoute: "home",
+        queryParamsMode: "default",
+      });
+      unsubscribe = router.usePlugin(
+        navigationPluginFactory({ forceDeactivate: false }, browser),
+      );
+      await router.start();
+      await router.navigate("users.list");
+
+      getLifecycleApi(router).addDeactivateGuard(
+        "users.list",
+        () => () => false,
+      );
+
+      mockNav.navigate("http://localhost/home");
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Guard blocks navigation — router state stays at users.list
+      // (In real Navigation API, URL also auto-rolls back via event.intercept() rejection)
+      expect(router.getState()!.name).toBe("users.list");
+    });
   });
 
   describe("Plugin Lifecycle — Listener Management", () => {

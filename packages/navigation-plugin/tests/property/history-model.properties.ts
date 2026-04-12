@@ -4,6 +4,7 @@ import { describe, expect } from "vitest";
 
 import {
   LEAF_ROUTE_NAMES,
+  NUM_RUNS,
   PARAM_ROUTE_NAME,
   arbLeafRoute,
   arbIdParam,
@@ -360,6 +361,47 @@ class AssertNavigationTypeCommand implements fc.AsyncCommand<
   }
 }
 
+class AssertCanGoBackPeekConsistencyCommand implements fc.AsyncCommand<
+  HistoryModel,
+  HistoryReal
+> {
+  check(m: Readonly<HistoryModel>) {
+    return m.started;
+  }
+
+  async run(_m: HistoryModel, r: HistoryReal) {
+    const back = r.router.canGoBack();
+    const peeked = r.router.peekBack();
+
+    expect(back).toBe(peeked !== undefined);
+  }
+
+  toString() {
+    return "assertCanGoBackPeekConsistency()";
+  }
+}
+
+class AssertCanGoBackToImpliesCanGoBackCommand implements fc.AsyncCommand<
+  HistoryModel,
+  HistoryReal
+> {
+  check(m: Readonly<HistoryModel>) {
+    return m.started;
+  }
+
+  async run(_m: HistoryModel, r: HistoryReal) {
+    for (const routeName of LEAF_ROUTE_NAMES) {
+      if (r.router.canGoBackTo(routeName)) {
+        expect(r.router.canGoBack()).toBe(true);
+      }
+    }
+  }
+
+  toString() {
+    return "assertCanGoBackToImpliesCanGoBack()";
+  }
+}
+
 // =============================================================================
 // Test
 // =============================================================================
@@ -382,11 +424,13 @@ const allCommands = [
   fc.constant(new AssertMetaExistsCommand()),
   fc.constant(new AssertFindLastEntryForRouteCommand()),
   fc.constant(new AssertNavigationTypeCommand()),
+  fc.constant(new AssertCanGoBackPeekConsistencyCommand()),
+  fc.constant(new AssertCanGoBackToImpliesCanGoBackCommand()),
 ];
 
 describe("Navigation Plugin History Model", () => {
   test.prop([fc.commands(allCommands, { size: "+1" })], {
-    numRuns: 100,
+    numRuns: NUM_RUNS.fast,
   })(
     "history extensions stay consistent under random navigation sequences",
     async (cmds) => {

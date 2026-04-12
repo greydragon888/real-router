@@ -39,7 +39,7 @@ import type {
 } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
 
-function deriveNavigationType(
+export function deriveNavigationType(
   navOptions: NavigationOptions,
   toState: State,
   fromState: State | undefined,

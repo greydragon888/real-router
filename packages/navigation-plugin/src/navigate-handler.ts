@@ -25,7 +25,7 @@ interface NavigateHandlerDeps {
   };
 }
 
-function computeDirection(
+export function computeDirection(
   navigationType: NavigationMeta["navigationType"],
   destinationIndex: number,
   currentIndex: number,

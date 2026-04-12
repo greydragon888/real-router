@@ -705,6 +705,26 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 
 ---
 
+### G4. shouldReplaceHistory Domain Completeness
+**Category:** URL Handling  
+**Testable:** PBT-testable  
+**Description:** `shouldReplaceHistory(navOptions, toState, fromState)` must return a boolean for any valid input combination without throwing.
+
+**Precondition:**
+- `navOptions.replace` can be `true`, `false`, or `undefined`
+- `navOptions.reload` can be `true`, `false`, or `undefined`
+- `fromState` can be `State` or `undefined`
+
+**Postcondition:**
+- Always returns `boolean` (never throws)
+- `replace: true` → always `true`
+- `fromState === undefined` (initial navigation) → always `true` (regardless of replace/reload values)
+- `reload && same path` → `true`
+
+**Why it matters:** Crash on specific input combinations (#447) — `replace: false` with `fromState: undefined` causes TypeError. The `??` operator treats `false` differently from `undefined`, bypassing the null guard.
+
+---
+
 ## H. State Consistency Invariants
 
 ### H1. NavigationHistoryState Completeness
@@ -918,6 +938,7 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 | G1. Base Path Stripping | URL | PBT | High |
 | G2. Base Path Building | URL | PBT | High |
 | G3. URL Parsing Robustness | URL | PBT | High |
+| G4. shouldReplaceHistory Domain Completeness | URL | PBT | Critical |
 | H1. NavigationHistoryState Completeness | State | Example | High |
 | H2. Meta Lifecycle on State Context | State | Example | Medium |
 | I1. Plugin Initialization Order | Integration | Example | High |

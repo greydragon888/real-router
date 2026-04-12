@@ -8,13 +8,19 @@ import {
   arbIdParam,
   arbLeafRoute,
   arbNormalizedBase,
+  arbRawBase,
   arbUnsafeIdParam,
   arbQueryString,
   arbUrlPath,
   arbNonMatchingPath,
   createPluginRouter,
 } from "./helpers";
-import { extractPath } from "../../src/browser-env/index.js";
+import {
+  buildUrl,
+  extractPath,
+  normalizeBase,
+  safelyEncodePath,
+} from "../../src/browser-env/index.js";
 
 describe("Navigation Plugin URL Invariants", () => {
   describe("URL Roundtrip (no base)", () => {
@@ -216,5 +222,33 @@ describe("Navigation Plugin URL Invariants", () => {
         expect(state).toBeUndefined();
       },
     );
+  });
+
+  describe("Primitive Function Invariants", () => {
+    test.prop([arbUrlPath, arbNormalizedBase], { numRuns: NUM_RUNS.standard })(
+      "extractPath(buildUrl(path, base), base) === path (primitive roundtrip)",
+      (path, base) => {
+        expect(extractPath(buildUrl(path, base), base)).toBe(path);
+      },
+    );
+
+    test.prop([arbRawBase], { numRuns: NUM_RUNS.standard })(
+      "normalizeBase is idempotent",
+      (base) => {
+        const once = normalizeBase(base);
+        const twice = normalizeBase(once);
+
+        expect(twice).toBe(once);
+      },
+    );
+
+    test.prop([fc.stringMatching(/^\/[a-zA-Z0-9/._-]{0,30}$/)], {
+      numRuns: NUM_RUNS.standard,
+    })("safelyEncodePath is idempotent", (path) => {
+      const once = safelyEncodePath(path);
+      const twice = safelyEncodePath(once);
+
+      expect(twice).toBe(once);
+    });
   });
 });
