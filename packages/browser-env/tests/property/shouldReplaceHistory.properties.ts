@@ -66,4 +66,40 @@ describe("shouldReplaceHistory Properties", () => {
       },
     );
   });
+
+  describe("G4: domain completeness — never throws for any valid input", () => {
+    test.prop(
+      [arbNavigationOptions, arbState, fc.option(arbState, { nil: undefined })],
+      { numRuns: NUM_RUNS.standard },
+    )(
+      "returns boolean for all (replace, reload, fromState) combinations",
+      (
+        navOptions: NavigationOptions,
+        toState: State,
+        fromState: State | undefined,
+      ) => {
+        const result = shouldReplaceHistory(navOptions, toState, fromState);
+
+        expect(typeof result).toBe("boolean");
+      },
+    );
+
+    test.prop(
+      [
+        fc.record({
+          replace: fc.constantFrom(true, false, undefined),
+          reload: fc.constantFrom(true, false, undefined),
+        }),
+        arbState,
+      ],
+      { numRuns: NUM_RUNS.standard },
+    )(
+      "fromState=undefined never crashes regardless of replace/reload values",
+      (navOptions: NavigationOptions, toState: State) => {
+        const result = shouldReplaceHistory(navOptions, toState, undefined);
+
+        expect(typeof result).toBe("boolean");
+      },
+    );
+  });
 });
