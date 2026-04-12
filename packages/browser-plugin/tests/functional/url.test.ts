@@ -154,20 +154,14 @@ describe("Browser Plugin — URL", () => {
         });
       });
 
-      it("handles base path where stripped path needs leading slash (line 174)", async () => {
+      it("does not strip base when match is not at segment boundary", async () => {
         router = createRouter(routerConfig, { defaultRoute: "home" });
-        // Base matches exactly, stripped path will be empty or not start with /
         router.usePlugin(browserPluginFactory({ base: "/app" }));
 
-        // When base is exactly stripped, pathname becomes "users/list" (no leading /)
-        // The code adds "/" prefix when stripped doesn't start with "/"
+        // "/appusers/list" should NOT match base "/app" — not a segment boundary
         const state = router.matchUrl("https://example.com/appusers/list");
 
-        // This path doesn't match after stripping because it becomes "users/list" not "/users/list"
-        // Actually let me reconsider - /appusers/list with base /app would strip to "users/list"
-        // which needs a leading slash added
-        expect(state).toBeDefined();
-        // Or it might be undefined if route doesn't match - but the branch is exercised
+        expect(state).toBeUndefined();
       });
     });
   });
