@@ -2,7 +2,6 @@ import { fc, test } from "@fast-check/vitest";
 import { getPluginApi } from "@real-router/core/api";
 import { describe, expect } from "vitest";
 
-import { findLastEntryForRoute } from "../../src/history-extensions";
 import {
   LEAF_ROUTE_NAMES,
   PARAM_ROUTE_NAME,
@@ -10,11 +9,13 @@ import {
   arbIdParam,
   createPluginRouterWithMock,
 } from "./helpers";
+import { findLastEntryForRoute } from "../../src/history-extensions";
 
-import type { NavigationBrowser } from "../../src/types";
+import type { NavigationBrowser } from "../../src";
 import type { MockNavigation } from "../helpers/mockNavigation";
 import type { Router } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
+
 
 // =============================================================================
 // Model
@@ -301,6 +302,7 @@ class AssertFindLastEntryForRouteCommand implements fc.AsyncCommand<
       for (let i = m.stack.length - 1; i >= 0; i--) {
         if (i !== m.cursor && m.stack[i] === routeName) {
           expectedIndex = i;
+
           break;
         }
       }
