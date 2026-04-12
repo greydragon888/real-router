@@ -16,7 +16,6 @@ import type { MockNavigation } from "../helpers/mockNavigation";
 import type { Router } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
 
-
 // =============================================================================
 // Model
 // =============================================================================
