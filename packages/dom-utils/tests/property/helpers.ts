@@ -73,12 +73,12 @@ export function createMockRouter(): {
   return {
     router: mockRouter as unknown as Router,
     trigger(routeName: string): void {
-      const route: State = {
+      const route = {
         name: routeName,
         params: {},
         path: `/${routeName}`,
         context: {},
-      };
+      } as State;
 
       for (const cb of callbacks) {
         cb({ route });
