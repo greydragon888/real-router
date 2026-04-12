@@ -30,6 +30,24 @@ describe("extractPath", () => {
   it("returns original path when base is empty", () => {
     expect(extractPath("/users/list", "")).toBe("/users/list");
   });
+
+  it("does not strip partial segment match", () => {
+    expect(extractPath("/application/users", "/app")).toBe(
+      "/application/users",
+    );
+  });
+
+  it("does not strip when base is prefix of segment", () => {
+    expect(extractPath("/app-v2/users", "/app")).toBe("/app-v2/users");
+  });
+
+  it("strips exact segment match", () => {
+    expect(extractPath("/app/users", "/app")).toBe("/users");
+  });
+
+  it("returns / for exact base match", () => {
+    expect(extractPath("/app", "/app")).toBe("/");
+  });
 });
 
 describe("buildUrl", () => {

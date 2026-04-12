@@ -1,7 +1,7 @@
 import { safeParseUrl } from "./url-parsing.js";
 
 export function extractPath(pathname: string, base: string): string {
-  if (base && pathname.startsWith(base)) {
+  if (base && (pathname === base || pathname.startsWith(base + "/"))) {
     const stripped = pathname.slice(base.length);
 
     return stripped.startsWith("/") ? stripped : `/${stripped}`;
