@@ -5,6 +5,226 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-04-12]
+
+### @real-router/types@0.34.0
+
+### Minor Changes
+
+- [#445](https://github.com/greydragon888/real-router/pull/445) [`cd12f8a`](https://github.com/greydragon888/real-router/commit/cd12f8a5046e95dff8d162b9264076684a838b38) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `StateContext` and `ContextNamespaceClaim` interfaces, make `State.context` required ([#434](https://github.com/greydragon888/real-router/issues/434))
+
+  New `StateContext` empty interface for plugin-extensible route data via module augmentation:
+
+  ```typescript
+  declare module "@real-router/types" {
+    interface StateContext {
+      navigation: { direction: "forward" | "back" | "navigate" };
+    }
+  }
+
+  // Now typed:
+  route.context.navigation?.direction;
+  ```
+
+  New `ContextNamespaceClaim<T>` interface — returned by `PluginApi.claimContextNamespace()`, exposes `write(state, value)` and `release()` methods. Plugins use it to publish per-navigation data to `state.context.<namespace>` with collision detection.
+
+  `State.context` is now a **required** (non-optional) field of type `StateContext & Record<string, unknown>`. Always present as `{}` at minimum on every state — created by `makeState`, `navigateToNotFound`, and `cloneRouter`. The intersection with `Record<string, unknown>` keeps the type open so inline plugins and tests can write arbitrary namespaces without augmenting the interface.
+
+  **Breaking change (pre-1.0):** Code that manually constructs `State` objects (test fixtures, mock states) must now include `context: {}`.
+
+### @real-router/core@0.48.0
+
+### Minor Changes
+
+- [#445](https://github.com/greydragon888/real-router/pull/445) [`cd12f8a`](https://github.com/greydragon888/real-router/commit/cd12f8a5046e95dff8d162b9264076684a838b38) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `PluginApi.claimContextNamespace()` and shallow-freeze refactor ([#434](https://github.com/greydragon888/real-router/issues/434))
+
+  New `claimContextNamespace(namespace)` helper on `PluginApi` — follows the same architectural model as the existing `extendRouter()` API: closure-based ownership, manual `release()` in plugin teardown, dispose safety net for forgotten releases. Uses `Set<string>` for O(1) conflict detection, registration, release, and safety-net clear.
+
+  ```typescript
+  const myPlugin: PluginFactory = (router) => {
+    const api = getPluginApi(router);
+    const claim = api.claimContextNamespace("navigation");
+
+    return {
+      onTransitionSuccess(toState, fromState) {
+        claim.write(toState, {
+          direction: detectDirection(fromState, toState),
+        });
+      },
+      teardown() {
+        claim.release();
+      },
+    };
+  };
+
+  // Later, in components:
+  route.context.navigation?.direction;
+  ```
+
+  `claim.write(state, value)` is a literal one-line property assignment — zero overhead on the hot path (no validator dispatch, no optional chain, no runtime checks). `claim.release()` is naturally idempotent via `Set.delete`.
+
+  Core enforces one runtime invariant: `CONTEXT_NAMESPACE_ALREADY_CLAIMED` — a namespace can be held by at most one active claim. Double-claiming throws a `RouterError` with this code. Orphaned claims (plugin forgot to release in teardown) are cleaned up by the dispose safety net.
+
+  **Freeze pipeline refactored from recursive to targeted shallow freezing.** Previously, `freezeStateInPlace()` deep-froze every nested object on every navigation. Now the producers of each nested structure freeze at creation time (`params` in `makeState`, `segments`/`transition` in `buildTransitionMeta`, `deactivated`/`activated` arrays), and the final step is a single shallow `Object.freeze(state)`. `state.context` is **intentionally not frozen** so plugins can publish data after state creation. `deepFreezeState()` is unchanged (still used by `RouterError.redirect`).
+
+  **New error code:** `CONTEXT_NAMESPACE_ALREADY_CLAIMED`.
+
+  **Plugin authors:** if you want to protect your payload from subscriber mutation, freeze it yourself at the call site (`claim.write(state, Object.freeze(payload))`). Same model as `extendRouter()`.
+
+### Patch Changes
+
+- Updated dependencies [[`cd12f8a`](https://github.com/greydragon888/real-router/commit/cd12f8a5046e95dff8d162b9264076684a838b38)]:
+  - @real-router/types@0.34.0
+
+### @real-router/browser-plugin@0.12.1
+
+### Patch Changes
+
+- Updated dependencies [[`cd12f8a`](https://github.com/greydragon888/real-router/commit/cd12f8a5046e95dff8d162b9264076684a838b38), [`cd12f8a`](https://github.com/greydragon888/real-router/commit/cd12f8a5046e95dff8d162b9264076684a838b38)]:
+  - @real-router/core@0.48.0
+  - @real-router/types@0.34.0
+
+### @real-router/hash-plugin@0.3.1
+
+### Patch Changes
+
+- Updated dependencies [[`cd12f8a`](https://github.com/greydragon888/real-router/commit/cd12f8a5046e95dff8d162b9264076684a838b38)]:
+  - @real-router/core@0.48.0
+
+### @real-router/lifecycle-plugin@0.2.1
+
+### Patch Changes
+
+- Updated dependencies [[`cd12f8a`](https://github.com/greydragon888/real-router/commit/cd12f8a5046e95dff8d162b9264076684a838b38)]:
+  - @real-router/core@0.48.0
+
+### @real-router/logger-plugin@0.5.1
+
+### Patch Changes
+
+- Updated dependencies [[`cd12f8a`](https://github.com/greydragon888/real-router/commit/cd12f8a5046e95dff8d162b9264076684a838b38)]:
+  - @real-router/core@0.48.0
+
+### @real-router/memory-plugin@0.2.1
+
+### Patch Changes
+
+- Updated dependencies [[`cd12f8a`](https://github.com/greydragon888/real-router/commit/cd12f8a5046e95dff8d162b9264076684a838b38), [`cd12f8a`](https://github.com/greydragon888/real-router/commit/cd12f8a5046e95dff8d162b9264076684a838b38)]:
+  - @real-router/core@0.48.0
+  - @real-router/types@0.34.0
+
+### @real-router/navigation-plugin@0.2.1
+
+### Patch Changes
+
+- Updated dependencies [[`cd12f8a`](https://github.com/greydragon888/real-router/commit/cd12f8a5046e95dff8d162b9264076684a838b38), [`cd12f8a`](https://github.com/greydragon888/real-router/commit/cd12f8a5046e95dff8d162b9264076684a838b38)]:
+  - @real-router/core@0.48.0
+  - @real-router/types@0.34.0
+
+### @real-router/persistent-params-plugin@0.2.1
+
+### Patch Changes
+
+- Updated dependencies [[`cd12f8a`](https://github.com/greydragon888/real-router/commit/cd12f8a5046e95dff8d162b9264076684a838b38), [`cd12f8a`](https://github.com/greydragon888/real-router/commit/cd12f8a5046e95dff8d162b9264076684a838b38)]:
+  - @real-router/core@0.48.0
+  - @real-router/types@0.34.0
+
+### @real-router/preact@0.3.1
+
+### Patch Changes
+
+- Updated dependencies [[`cd12f8a`](https://github.com/greydragon888/real-router/commit/cd12f8a5046e95dff8d162b9264076684a838b38)]:
+  - @real-router/core@0.48.0
+  - @real-router/sources@0.5.1
+  - @real-router/route-utils@0.2.1
+
+### @real-router/preload-plugin@0.2.1
+
+### Patch Changes
+
+- Updated dependencies [[`cd12f8a`](https://github.com/greydragon888/real-router/commit/cd12f8a5046e95dff8d162b9264076684a838b38)]:
+  - @real-router/core@0.48.0
+
+### @real-router/react@0.15.1
+
+### Patch Changes
+
+- Updated dependencies [[`cd12f8a`](https://github.com/greydragon888/real-router/commit/cd12f8a5046e95dff8d162b9264076684a838b38)]:
+  - @real-router/core@0.48.0
+  - @real-router/sources@0.5.1
+  - @real-router/route-utils@0.2.1
+
+### @real-router/route-utils@0.2.1
+
+### Patch Changes
+
+- Updated dependencies [[`cd12f8a`](https://github.com/greydragon888/real-router/commit/cd12f8a5046e95dff8d162b9264076684a838b38)]:
+  - @real-router/types@0.34.0
+
+### @real-router/rx@0.3.1
+
+### Patch Changes
+
+- Updated dependencies [[`cd12f8a`](https://github.com/greydragon888/real-router/commit/cd12f8a5046e95dff8d162b9264076684a838b38)]:
+  - @real-router/core@0.48.0
+
+### @real-router/search-schema-plugin@0.2.1
+
+### Patch Changes
+
+- Updated dependencies [[`cd12f8a`](https://github.com/greydragon888/real-router/commit/cd12f8a5046e95dff8d162b9264076684a838b38)]:
+  - @real-router/core@0.48.0
+
+### @real-router/solid@0.3.1
+
+### Patch Changes
+
+- Updated dependencies [[`cd12f8a`](https://github.com/greydragon888/real-router/commit/cd12f8a5046e95dff8d162b9264076684a838b38)]:
+  - @real-router/core@0.48.0
+  - @real-router/sources@0.5.1
+  - @real-router/route-utils@0.2.1
+
+### @real-router/sources@0.5.1
+
+### Patch Changes
+
+- Updated dependencies [[`cd12f8a`](https://github.com/greydragon888/real-router/commit/cd12f8a5046e95dff8d162b9264076684a838b38)]:
+  - @real-router/core@0.48.0
+  - @real-router/route-utils@0.2.1
+
+### @real-router/ssr-data-plugin@0.2.1
+
+### Patch Changes
+
+- Updated dependencies [[`cd12f8a`](https://github.com/greydragon888/real-router/commit/cd12f8a5046e95dff8d162b9264076684a838b38), [`cd12f8a`](https://github.com/greydragon888/real-router/commit/cd12f8a5046e95dff8d162b9264076684a838b38)]:
+  - @real-router/core@0.48.0
+  - @real-router/types@0.34.0
+
+### @real-router/svelte@0.2.13
+
+### Patch Changes
+
+- Updated dependencies [[`cd12f8a`](https://github.com/greydragon888/real-router/commit/cd12f8a5046e95dff8d162b9264076684a838b38)]:
+  - @real-router/core@0.48.0
+  - @real-router/sources@0.5.1
+  - @real-router/route-utils@0.2.1
+
+### @real-router/validation-plugin@0.5.1
+
+### Patch Changes
+
+- Updated dependencies [[`cd12f8a`](https://github.com/greydragon888/real-router/commit/cd12f8a5046e95dff8d162b9264076684a838b38)]:
+  - @real-router/core@0.48.0
+
+### @real-router/vue@0.4.1
+
+### Patch Changes
+
+- Updated dependencies [[`cd12f8a`](https://github.com/greydragon888/real-router/commit/cd12f8a5046e95dff8d162b9264076684a838b38)]:
+  - @real-router/core@0.48.0
+  - @real-router/sources@0.5.1
+  - @real-router/route-utils@0.2.1
+
 ## [2026-04-11]
 
 ### @real-router/browser-plugin@0.12.0
