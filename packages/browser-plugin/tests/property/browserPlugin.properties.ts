@@ -211,7 +211,10 @@ describe("Browser Plugin URL Invariants", () => {
             fc.stringMatching(/^\/[a-z]{1,4}$/),
             fc.stringMatching(/^[a-z]{1,6}$/),
           )
-          .map(([base, suffix]) => ({ base, pathname: `${base}${suffix}/page` })),
+          .map(([base, suffix]) => ({
+            base,
+            pathname: `${base}${suffix}/page`,
+          })),
       ],
       { numRuns: NUM_RUNS.standard },
     )(
