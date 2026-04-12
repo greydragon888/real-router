@@ -5,7 +5,7 @@ import type { Params, State } from "@real-router/core";
 
 export { createTestRouter } from "./testRouters";
 
-export function omitMeta(
+export function pickRouteIdentity(
   obj?: State,
 ): Pick<State, "name" | "params" | "path"> | undefined {
   if (!obj) {

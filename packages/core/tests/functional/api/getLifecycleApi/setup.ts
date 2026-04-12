@@ -11,7 +11,7 @@ export const noop = (): void => undefined;
  * Re-export commonly used helpers
  */
 
-export { createTestRouter, omitMeta } from "../../../helpers";
+export { createTestRouter, pickRouteIdentity } from "../../../helpers";
 
 /**
  * Re-export Router type

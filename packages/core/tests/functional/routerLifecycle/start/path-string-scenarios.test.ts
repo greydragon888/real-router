@@ -3,7 +3,7 @@ import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 import { constants, errorCodes, events } from "@real-router/core";
 import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 
-import { createTestRouter, omitMeta } from "../../../helpers";
+import { createTestRouter, pickRouteIdentity } from "../../../helpers";
 
 import type { Router } from "@real-router/core";
 import type { LifecycleApi } from "@real-router/core/api";
@@ -43,7 +43,9 @@ describe("router.start() - path string scenarios", () => {
 
       const currentState = router.getState();
 
-      expect(omitMeta(currentState)).toStrictEqual(omitMeta(state));
+      expect(pickRouteIdentity(currentState)).toStrictEqual(
+        pickRouteIdentity(state),
+      );
     });
 
     it("should handle path with query parameters", async () => {

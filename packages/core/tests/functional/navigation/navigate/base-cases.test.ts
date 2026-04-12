@@ -2,7 +2,7 @@ import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { getPluginApi } from "@real-router/core/api";
 
-import { createTestRouter, omitMeta } from "../../../helpers";
+import { createTestRouter, pickRouteIdentity } from "../../../helpers";
 
 import type { Router } from "@real-router/core";
 
@@ -24,7 +24,7 @@ describe("router.navigate() - base cases", () => {
   it("should be able to navigate to routes", async () => {
     await router.navigate("users.view", { id: 123 });
 
-    expect(omitMeta(router.getState())).toStrictEqual({
+    expect(pickRouteIdentity(router.getState())).toStrictEqual({
       name: "users.view",
       params: { id: 123 },
       path: "/users/view/123",

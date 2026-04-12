@@ -3,7 +3,7 @@ import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 import { constants, errorCodes, events } from "@real-router/core";
 import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 
-import { createTestRouter, omitMeta } from "../../../helpers";
+import { createTestRouter, pickRouteIdentity } from "../../../helpers";
 
 import type { Router } from "@real-router/core";
 import type { LifecycleApi } from "@real-router/core/api";
@@ -45,7 +45,9 @@ describe("router.start() - state object scenarios", () => {
       // Verify state matches current router state
       const currentState = router.getState();
 
-      expect(omitMeta(currentState)).toStrictEqual(omitMeta(state));
+      expect(pickRouteIdentity(currentState)).toStrictEqual(
+        pickRouteIdentity(state),
+      );
     });
 
     it("should emit TRANSITION_SUCCESS with replace: true option", async () => {
@@ -81,7 +83,9 @@ describe("router.start() - state object scenarios", () => {
       expect(currentState?.name).toBe("orders.pending");
       expect(currentState?.path).toBe("/orders/pending");
 
-      expect(omitMeta(currentState)).toStrictEqual(omitMeta(state));
+      expect(pickRouteIdentity(currentState)).toStrictEqual(
+        pickRouteIdentity(state),
+      );
     });
 
     it("should handle transition with path parameters", async () => {
@@ -555,7 +559,7 @@ describe("router.start() - state object scenarios", () => {
         const [toState, fromState, error] =
           transitionErrorListener.mock.calls[0];
 
-        expect(omitMeta(toState)).toStrictEqual(startState);
+        expect(pickRouteIdentity(toState)).toStrictEqual(startState);
         expect(fromState).toBeUndefined();
         expect(error).toBeDefined();
       });
