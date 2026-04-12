@@ -41,11 +41,11 @@ export const createMockedBrowser = (
   return {
     ...safeBrowser,
     pushState: (state, url) => {
-      onStateChange(state);
+      onStateChange(state as State | undefined);
       safeBrowser.pushState(state, url);
     },
     replaceState: (state, url) => {
-      onStateChange(state);
+      onStateChange(state as State | undefined);
       safeBrowser.replaceState(state, url);
     },
   };

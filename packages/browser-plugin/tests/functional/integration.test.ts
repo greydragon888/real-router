@@ -43,11 +43,11 @@ const createMockedBrowser = (): Browser => {
   return {
     ...safeBrowser,
     pushState: (state, url) => {
-      currentHistoryState = state;
+      currentHistoryState = state as State;
       safeBrowser.pushState(state, url);
     },
     replaceState: (state, url) => {
-      currentHistoryState = state;
+      currentHistoryState = state as State;
       safeBrowser.replaceState(state, url);
     },
   };
