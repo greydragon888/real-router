@@ -20,8 +20,8 @@ export function entryToState(
     return undefined;
   }
 
-  const pathname = new URL(entry.url).pathname;
-  const path = extractPath(pathname, base);
+  const url = new URL(entry.url);
+  const path = extractPath(url.pathname, base) + url.search;
 
   return api.matchPath(path) ?? undefined;
 }

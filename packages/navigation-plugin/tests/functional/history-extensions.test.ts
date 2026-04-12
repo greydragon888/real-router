@@ -267,8 +267,10 @@ describe("Navigation Plugin — History Extensions", () => {
       unsubscribe = router.usePlugin(navigationPluginFactory({}, browser));
       await router.start();
 
+      // With query string preserved in entryToState (#449), strict mode
+      // rejects ?undeclared=1 during entry matching — no entry is found
       await expect(router.traverseToLast("users.list")).rejects.toThrow(
-        "No matching route",
+        "No history entry",
       );
     });
 
@@ -291,6 +293,28 @@ describe("Navigation Plugin — History Extensions", () => {
 
       await expect(router.traverseToLast("users.list")).rejects.toThrow(
         'No matching route for entry URL "null"',
+      );
+    });
+
+    it("throws when entry URL exists but does not match any route", async () => {
+      await router.start();
+      await router.navigate("users.list");
+      await router.navigate("home");
+
+      const entries = browser.entries();
+      const userListEntry = entries[1];
+      const entryWithUnknownUrl = Object.assign(
+        Object.create(Object.getPrototypeOf(userListEntry)),
+        userListEntry,
+        { url: "http://localhost/no-such-route" },
+      );
+
+      vi.spyOn(historyExtensions, "findLastEntryForRoute").mockReturnValue(
+        entryWithUnknownUrl as NavigationHistoryEntry,
+      );
+
+      await expect(router.traverseToLast("users.list")).rejects.toThrow(
+        "No matching route",
       );
     });
   });
@@ -460,6 +484,56 @@ describe("Navigation Plugin — History Extensions", () => {
       vi.spyOn(browser, "entries").mockReturnValue(entriesWithNull);
 
       expect(router.canGoBackTo("users.list")).toBe(true);
+    });
+  });
+
+  describe("entryToState — query string preservation (#449)", () => {
+    it("hasVisited recognizes entries with query params", async () => {
+      mockNav.navigate("http://localhost/users/list?tab=active");
+
+      await router.start();
+
+      expect(router.hasVisited("users.list")).toBe(true);
+    });
+
+    it("getVisitedRoutes includes routes reached via URLs with query params", async () => {
+      mockNav.navigate("http://localhost/users/list?tab=active");
+
+      await router.start();
+
+      const visited = router.getVisitedRoutes();
+
+      expect(visited).toContain("users.list");
+    });
+
+    it("getRouteVisitCount counts entries with query params", async () => {
+      mockNav.navigate("http://localhost/users/list?tab=active");
+      mockNav.navigate("http://localhost/users/list?tab=inactive");
+
+      await router.start();
+
+      expect(router.getRouteVisitCount("users.list")).toBe(2);
+    });
+
+    it("canGoBackTo finds routes in back entries with query params", async () => {
+      mockNav.navigate("http://localhost/users/list?tab=active");
+      mockNav.navigate("http://localhost/home");
+
+      await router.start();
+
+      expect(router.canGoBackTo("users.list")).toBe(true);
+    });
+
+    it("peekBack returns state for entry with query params in URL", async () => {
+      mockNav.navigate("http://localhost/users/list?tab=active");
+      mockNav.navigate("http://localhost/home");
+
+      await router.start();
+
+      const prev = router.peekBack();
+
+      expect(prev).toBeDefined();
+      expect(prev!.name).toBe("users.list");
     });
   });
 });

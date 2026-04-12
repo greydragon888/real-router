@@ -228,6 +228,8 @@ export class NavigationPlugin {
           };
         }
 
+        const { navigationType } = this.#capturedMeta;
+
         this.#claim.write(toState, Object.freeze(this.#capturedMeta));
         this.#capturedMeta = undefined;
 
@@ -252,11 +254,7 @@ export class NavigationPlugin {
           if (toState.name === UNKNOWN_ROUTE) {
             this.#browser.updateCurrentEntry({ state: historyState });
           } else {
-            const replace = shouldReplaceHistory(
-              navOptions,
-              toState,
-              fromState,
-            );
+            const replace = navigationType !== "push";
 
             this.#browser.navigate(finalUrl, {
               state: historyState,
