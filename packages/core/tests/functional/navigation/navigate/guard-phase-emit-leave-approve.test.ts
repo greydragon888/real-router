@@ -2,12 +2,25 @@ import { describe, beforeEach, it, expect, vi } from "vitest";
 
 import { errorCodes } from "@real-router/core";
 
+import { DEFAULT_TRANSITION } from "../../../../src/constants";
 import { executeGuardPipeline } from "../../../../src/namespaces/NavigationNamespace/transition/guardPhase";
 
 import type { GuardFn, State } from "@real-router/types";
 
-const TO_STATE: State = { name: "users", path: "/users", params: {} };
-const FROM_STATE: State = { name: "home", path: "/home", params: {} };
+const TO_STATE: State = {
+  name: "users",
+  path: "/users",
+  params: {},
+  transition: DEFAULT_TRANSITION,
+  context: {},
+};
+const FROM_STATE: State = {
+  name: "home",
+  path: "/home",
+  params: {},
+  transition: DEFAULT_TRANSITION,
+  context: {},
+};
 const SIGNAL: AbortSignal = new AbortController().signal;
 const ALWAYS_ACTIVE = () => true;
 

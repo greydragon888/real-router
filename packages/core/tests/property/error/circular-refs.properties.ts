@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 
 import { RouterError } from "@real-router/core";
 
+import { DEFAULT_TRANSITION } from "../../../src/constants";
+
 import type { Params, State } from "@real-router/types";
 
 describe("RouterError Circular References Properties", () => {
@@ -18,6 +20,8 @@ describe("RouterError Circular References Properties", () => {
         name: "test",
         path: "/test",
         params,
+        transition: DEFAULT_TRANSITION,
+        context: {},
       };
 
       // deepFreezeState should handle circular references via structuredClone
@@ -42,6 +46,8 @@ describe("RouterError Circular References Properties", () => {
         name: "route",
         path: "/route",
         params,
+        transition: DEFAULT_TRANSITION,
+        context: {},
       };
 
       const err = new RouterError("ERR", { redirect: state });
@@ -66,6 +72,8 @@ describe("RouterError Circular References Properties", () => {
         name: "test",
         path: "/test",
         params,
+        transition: DEFAULT_TRANSITION,
+        context: {},
       };
 
       const err = new RouterError("ERR", { redirect: state });
@@ -91,6 +99,8 @@ describe("RouterError Circular References Properties", () => {
           obj1: obj1 as Params,
           obj2: obj2 as Params,
         },
+        transition: DEFAULT_TRANSITION,
+        context: {},
       };
 
       const err = new RouterError("ERR", { redirect: state });
@@ -118,6 +128,8 @@ describe("RouterError Circular References Properties", () => {
         params: {
           data: level1 as Params,
         },
+        transition: DEFAULT_TRANSITION,
+        context: {},
       };
 
       const err = new RouterError("ERR", { redirect: state });
@@ -146,6 +158,8 @@ describe("RouterError Circular References Properties", () => {
         name: "test",
         path: "/test",
         params,
+        transition: DEFAULT_TRANSITION,
+        context: {},
       };
 
       const err = new RouterError("ERR", { redirect: state });
@@ -207,6 +221,8 @@ describe("RouterError Circular References Properties", () => {
         name: "test",
         path: "/test",
         params: { empty: empty as Params },
+        transition: DEFAULT_TRANSITION,
+        context: {},
       };
 
       const err = new RouterError("ERR", { redirect: state });
@@ -223,6 +239,8 @@ describe("RouterError Circular References Properties", () => {
         name: "test",
         path: "/test",
         params: { arr: arr as Params[] },
+        transition: DEFAULT_TRANSITION,
+        context: {},
       };
 
       const err = new RouterError("ERR", { redirect: state });
@@ -236,6 +254,8 @@ describe("RouterError Circular References Properties", () => {
         name: "test",
         path: "/test",
         params: { nullValue: null },
+        transition: DEFAULT_TRANSITION,
+        context: {},
       };
 
       const err = new RouterError("ERR", { redirect: state });

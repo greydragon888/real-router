@@ -12,9 +12,11 @@ Contains no navigation business logic — only URL synchronization and navigate 
 **Integration points with the core:**
 
 - `addInterceptor("start", ...)` — makes `path` in `router.start()` optional
-- `extendRouter()` — formally registers all 13 extensions on the router instance with conflict detection and automatic cleanup
-- `declare module "@real-router/core"` — adds compile-time types for the above methods to the `Router` interface
-- Plugin hooks (`onStart`, `onStop`, `onTransitionSuccess`, `onTransitionCancel`, `onTransitionError`, `teardown`) — react to router events
+- `extendRouter()` — formally registers all 12 extensions on the router instance with conflict detection and automatic cleanup
+- `claimContextNamespace("navigation")` — claims the `navigation` namespace on `state.context` for writing `NavigationMeta`
+- `declare module "@real-router/types"` — augments `StateContext` with `navigation?: NavigationMeta`
+- `declare module "@real-router/core"` — adds compile-time types for extension methods to the `Router` interface
+- Plugin hooks (`onStart`, `onStop`, `onTransitionStart`, `onTransitionSuccess`, `onTransitionCancel`, `onTransitionError`, `teardown`) — react to router events
 
 ## Package Structure
 
@@ -24,15 +26,15 @@ navigation-plugin/
 │   ├── index.ts               — Public API + module augmentation
 │   ├── factory.ts             — navigationPluginFactory (validation, normalization, instance creation)
 │   ├── plugin.ts              — NavigationPlugin class (runtime behavior)
-│   ├── types.ts               — Types (NavigationPluginOptions, NavigationBrowser, NavigationMeta, NavigationHistoryState, NavigationSharedState)
+│   ├── types.ts               — Types (NavigationPluginOptions, NavigationBrowser, NavigationMeta, NavigationDirection, NavigationSharedState)
 │   ├── history-extensions.ts  — Navigation API history extensions (peekBack, peekForward, hasVisited, etc.)
 │   ├── navigate-handler.ts    — Navigate event handler (createNavigateHandler, recoverFromNavigateError)
 │   ├── navigation-browser.ts  — NavigationBrowser implementation (wraps globalThis.navigation)
 │   ├── plugin-utils.ts        — createStartInterceptor, createReplaceHistoryState
 │   ├── ssr-fallback.ts        — createNavigationFallbackBrowser (no-op fallback for SSR)
-│   ├── url-utils.ts           — Pure URL utility functions (extractPath, buildUrl, urlToPath)
 │   ├── validation.ts          — Options validation (delegates to browser-env)
-│   └── constants.ts           — Constants (defaultOptions, source, LOGGER_CONTEXT)
+│   ├── constants.ts           — Constants (defaultOptions, source, LOGGER_CONTEXT)
+│   └── browser-env/           — Symlink → shared/browser-env (extractPath, buildUrl, urlToPath, shouldReplaceHistory, etc.)
 ```
 
 ## Module Dependency Graph
@@ -42,15 +44,14 @@ index.ts
     └── factory.ts
             ├── plugin.ts
             │       ├── history-extensions.ts
-            │       │       └── url-utils.ts
+            │       │       └── browser-env (extractPath)
             │       ├── navigate-handler.ts
-            │       │       └── url-utils.ts
+            │       │       └── browser-env (extractPath)
             │       ├── plugin-utils.ts
-            │       ├── url-utils.ts
-            │       │       └── constants.ts
+            │       ├── constants.ts
             │       └── browser-env (shouldReplaceHistory)
             ├── navigation-browser.ts
-            │       └── url-utils.ts
+            │       └── browser-env (safelyEncodePath, extractPath)
             ├── ssr-fallback.ts
             │       └── browser-env (createWarnOnce)
             ├── validation.ts
@@ -63,10 +64,11 @@ types.ts  ← imported by factory.ts, plugin.ts, navigate-handler.ts, navigation
 
 External dependencies:
 
-| Dependency          | What it provides                                                                                                                                | Used in                                                                                   |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `@real-router/core` | `getPluginApi`, types (`Router`, `PluginApi`, `State`, `Plugin`, etc.)                                                                          | `factory.ts`, `plugin.ts`, `navigate-handler.ts`, `index.ts`                              |
-| `browser-env`       | `normalizeBase`, `safelyEncodePath`, `safeParseUrl`, `shouldReplaceHistory`, `isBrowserEnvironment`, `createWarnOnce`, `createOptionsValidator` | `factory.ts`, `navigation-browser.ts`, `ssr-fallback.ts`, `url-utils.ts`, `validation.ts` |
+| Dependency           | What it provides                                                                                                                                | Used in                                                                                   |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `@real-router/core`  | `getPluginApi`, types (`Router`, `PluginApi`, `State`, `Plugin`, etc.)                                                                          | `factory.ts`, `plugin.ts`, `navigate-handler.ts`, `index.ts`                              |
+| `@real-router/types` | `StateContext` interface (for module augmentation)                                                                                               | `index.ts`                                                                                |
+| `browser-env`        | `normalizeBase`, `safelyEncodePath`, `safeParseUrl`, `shouldReplaceHistory`, `isBrowserEnvironment`, `createWarnOnce`, `createOptionsValidator` | `factory.ts`, `navigation-browser.ts`, `ssr-fallback.ts`, `url-utils.ts`, `validation.ts` |
 
 ## Factory + Class Pattern
 
@@ -93,7 +95,7 @@ navigationPluginFactory(opts?, browser?)   ← factory.ts
                             │
                             │  Constructor:
                             │  - registers start interceptor
-                            │  - calls api.extendRouter({buildUrl, matchUrl, replaceHistoryState, ...10 exclusive})
+                            │  - calls api.extendRouter({buildUrl, matchUrl, replaceHistoryState, ...9 exclusive})
                             │  - creates navigate event handler and lifecycle
                             │
                             └── .getPlugin()  → Plugin { onStart, onStop, ... }
@@ -111,28 +113,23 @@ navigationPluginFactory(opts?, browser?)   ← factory.ts
 ```typescript
 // factory.ts
 export function navigationPluginFactory(opts?, browser?): PluginFactory {
-  validateOptions(opts);
-  const options = { ...defaultOptions, ...opts };
-  options.base = normalizeBase(options.base);
-
   if (!browser && isBrowserEnvironment() && !("navigation" in globalThis)) {
     throw new Error(
       "[navigation-plugin] Navigation API is not supported. Use @real-router/browser-plugin instead.",
     );
   }
 
-  const resolvedBrowser =
-    browser ??
-    (isBrowserEnvironment()
-      ? createNavigationBrowser(options.base)
-      : createNavigationFallbackBrowser("navigation-plugin"));
+  validateOptions(opts);
+  const options = { ...defaultOptions, ...opts };
+  options.base = normalizeBase(options.base);
 
+  const resolvedBrowser = browser ?? createBrowser(options.base);
   const transitionOptions = { forceDeactivate, source, replace: true as const };
   const shared: NavigationSharedState = { removeNavigateListener: undefined };
 
   return function navigationPlugin(routerBase) {
     const plugin = new NavigationPlugin(
-      routerBase,
+      routerBase as Router,
       getPluginApi(routerBase),
       options,
       resolvedBrowser,
@@ -142,6 +139,14 @@ export function navigationPluginFactory(opts?, browser?): PluginFactory {
 
     return plugin.getPlugin();
   };
+}
+
+function createBrowser(base: string): NavigationBrowser {
+  if ("navigation" in globalThis) {
+    return createNavigationBrowser(base);
+  }
+
+  return createNavigationFallbackBrowser("navigation-plugin");
 }
 ```
 
@@ -200,16 +205,23 @@ If provided, it passes it through as-is.
 
 ## Router Augmentation
 
-### Two Layers
+### Three Layers
 
-Router extension involves two layers:
+Router extension involves three layers:
 
-1. **Compile-time types** — `declare module "@real-router/core"` in `index.ts` augments the `Router` interface so TypeScript knows about all 13 new methods.
-2. **Runtime registration** — `api.extendRouter({...})` in `plugin.ts` adds the actual methods to the router instance with conflict detection and automatic cleanup.
+1. **State Context types** — `declare module "@real-router/types"` in `index.ts` augments the `StateContext` interface so TypeScript knows about `state.context.navigation`.
+2. **Router method types** — `declare module "@real-router/core"` in `index.ts` augments the `Router` interface so TypeScript knows about all 12 extension methods.
+3. **Runtime registration** — `api.extendRouter({...})` in `plugin.ts` adds the extension methods; `api.claimContextNamespace("navigation")` claims the context namespace for writing `NavigationMeta`.
 
 ### Type Augmentation (index.ts)
 
 ```typescript
+declare module "@real-router/types" {
+  interface StateContext {
+    navigation?: NavigationMeta;
+  }
+}
+
 declare module "@real-router/core" {
   interface Router {
     buildUrl: (name: string, params?: Params) => string;
@@ -225,7 +237,6 @@ declare module "@real-router/core" {
     getVisitedRoutes: () => string[];
     getRouteVisitCount: (routeName: string) => number;
     traverseToLast: (routeName: string) => Promise<State>;
-    getNavigationMeta: (state?: State) => NavigationMeta | undefined;
     canGoBack: () => boolean;
     canGoForward: () => boolean;
     canGoBackTo: (routeName: string) => boolean;
@@ -234,10 +245,12 @@ declare module "@real-router/core" {
 }
 ```
 
-### Runtime Registration via extendRouter (plugin.ts)
+### Runtime Registration via extendRouter + claimContextNamespace (plugin.ts)
 
 ```typescript
 // plugin.ts, constructor
+this.#claim = api.claimContextNamespace("navigation");
+
 this.#removeExtensions = api.extendRouter({
   buildUrl: pluginBuildUrl,
   matchUrl: (url: string) => {
@@ -258,8 +271,6 @@ this.#removeExtensions = api.extendRouter({
   getRouteVisitCount: (routeName) =>
     getRouteVisitCount(browser, api, options.base, routeName),
   traverseToLast: (routeName) => this.traverseToLast(routeName),
-  getNavigationMeta: (state?) =>
-    state ? this.#metaByState.get(state) : this.#pendingMeta,
   canGoBack: () => canGoBack(browser),
   canGoForward: () => canGoForward(browser),
   canGoBackTo: (routeName) =>
@@ -268,6 +279,8 @@ this.#removeExtensions = api.extendRouter({
 ```
 
 `extendRouter()` validates that no property with the same name already exists on the router (throws `PLUGIN_CONFLICT` if it does), adds the properties, and returns an unsubscribe function that removes them.
+
+`claimContextNamespace("navigation")` returns `{ write, release }` — the plugin calls `claim.write(state, meta)` to attach frozen `NavigationMeta` to `state.context.navigation`, and `claim.release()` in `teardown` to free the namespace.
 
 ## Plugin Lifecycle
 
@@ -278,11 +291,12 @@ router.usePlugin(navigationPluginFactory(opts))
   navigationPlugin(router)  ← called by the core
         │
         ├── new NavigationPlugin(...)
+        │     ├── api.claimContextNamespace("navigation") → stores #claim
         │     ├── Registers start interceptor
-        │     └── api.extendRouter({buildUrl, matchUrl, replaceHistoryState, ...10 exclusive})
+        │     └── api.extendRouter({buildUrl, matchUrl, replaceHistoryState, ...9 exclusive})
         │           → stores returned unsubscribe as #removeExtensions
         │
-        └── plugin.getPlugin() → { onStart, onStop, onTransitionSuccess, onTransitionCancel, onTransitionError, teardown }
+        └── plugin.getPlugin() → { onStart, onStop, onTransitionStart, onTransitionSuccess, onTransitionCancel, onTransitionError, teardown }
 
 router.start()
         │
@@ -291,17 +305,25 @@ router.start()
         ├── Removes previous navigate listener (if any, via shared.removeNavigateListener)
         └── Registers new navigate listener
 
+router.navigate() → transition starts
+        │
+        ▼
+  Plugin.onTransitionStart(toState)
+        └── If #capturedMeta exists: claim.write(toState, Object.freeze(#capturedMeta))
+            (makes meta available in guards via toState.context.navigation)
+
 router.navigate() → success
         │
         ▼
   Plugin.onTransitionSuccess()
+        ├── claim.write(toState, Object.freeze(meta)) — final meta on state
         └── navigation.navigate() or navigation.updateCurrentEntry() or navigation.traverseTo()
 
 router.navigate() → cancelled or error
         │
         ▼
   Plugin.onTransitionCancel() / Plugin.onTransitionError()
-        └── Clears #pendingMeta and #pendingTraverseKey
+        └── Clears #capturedMeta and #pendingTraverseKey
 
 router.stop()
         │
@@ -315,7 +337,8 @@ unsubscribe() or router.dispose()
   Plugin.teardown()
         ├── Removes navigate listener
         ├── Unregisters start interceptor (#removeStartInterceptor)
-        └── Removes router extensions (#removeExtensions)
+        ├── Removes router extensions (#removeExtensions)
+        └── Releases context namespace claim (#claim.release())
 ```
 
 ## Data Flow: Navigation
@@ -329,8 +352,8 @@ router.navigate(name, params, opts)
         ▼
   Plugin.onTransitionSuccess(toState, fromState, navOptions)
         │
-        ├── Derive or use #pendingMeta (navigationType, userInitiated, info)
-        │     └── Store in #metaByState WeakMap
+        ├── Derive or use #capturedMeta (navigationType, userInitiated, info, direction, sourceElement)
+        │     └── claim.write(toState, Object.freeze(meta)) → state.context.navigation
         │
         ├── url = router.buildUrl(toState.name, toState.params)
         │         └── router.buildPath() + buildUrl(path, base)
@@ -370,8 +393,8 @@ User clicks back/forward/link, or navigation.navigate() fires
         │
         ├── Parse destination URL → path
         │
-        ├── Set #pendingMeta BEFORE event.intercept()
-        │     (available in guards via getNavigationMeta())
+        ├── Set #capturedMeta BEFORE event.intercept()
+        │     (written to toState.context.navigation in onTransitionStart, available in guards)
         │
         ├── matchedState = api.matchPath(path)
         │
@@ -418,9 +441,10 @@ Without base:
 Uses `String.startsWith()` + `String.slice()` — no regex needed for base path stripping.
 The result is normalized to always start with `/`.
 
-**`urlToPath(url, base)`**:
+**`urlToPath(url, base, context)`**:
 
 Delegates URL parsing to `safeParseUrl` from `browser-env` (validates protocol, handles errors).
+The `context` string is passed to `safeParseUrl` for warning messages.
 Preserves search params: the result is `extractPath(pathname, base) + search`.
 Returns `null` for invalid URLs — calling code handles `null` explicitly.
 
@@ -428,43 +452,45 @@ Returns `null` for invalid URLs — calling code handles `null` explicitly.
 
 Simple concatenation: `base + path`.
 
-## NavigationMeta Storage
+## NavigationMeta Storage (Claim-Based API)
 
-Navigation metadata is stored in two places:
-
-```
-#pendingMeta: NavigationMeta | undefined
-  — Set before event.intercept() in navigate handler (available in guards)
-  — Set in onTransitionSuccess when no pending meta exists (router-initiated navigation)
-  — Cleared after storing in #metaByState, or on cancel/error
-
-#metaByState: WeakMap<State, NavigationMeta>
-  — Set in onTransitionSuccess after transition completes
-  — Keyed by State object (GC-friendly, no manual cleanup)
-  — Accessed via getNavigationMeta(state)
-```
-
-### pendingMeta Flow
+Navigation metadata is delivered to `state.context.navigation` via the claim-based State Context API:
 
 ```
-Navigate event fires
-  → setPendingMeta({ navigationType, userInitiated, info })  ← from event fields
+#claim = api.claimContextNamespace("navigation")
+  — claim.write(state, meta) attaches frozen NavigationMeta to state.context.navigation
+  — claim.release() frees the namespace (called in teardown)
+
+#capturedMeta: NavigationMeta | undefined
+  — Set before event.intercept() in navigate handler
+  — Written to toState in onTransitionStart (available in guards)
+  — Written again in onTransitionSuccess (final meta on state)
+  — Cleared after writing, or on cancel/error
+```
+
+### capturedMeta Flow
+
+```
+Navigate event fires (browser-initiated)
+  → setCapturedMeta({ navigationType, userInitiated, info, direction, sourceElement })  ← from event fields
   → event.intercept({ handler: async () => router.navigate(...) })
-  → guards run → getNavigationMeta() returns #pendingMeta
-  → onTransitionSuccess → #metaByState.set(toState, #pendingMeta)
-  → #pendingMeta = undefined
+  → onTransitionStart(toState) → claim.write(toState, Object.freeze(#capturedMeta))
+  → guards run → toState.context.navigation available
+  → onTransitionSuccess → claim.write(toState, Object.freeze(#capturedMeta))
+  → #capturedMeta = undefined
 ```
 
 For router-initiated navigation (no navigate event):
 
 ```
 router.navigate() called
+  → onTransitionStart → #capturedMeta is undefined → no write
   → onTransitionSuccess
-  → #pendingMeta is undefined → derive from navOptions:
+  → #capturedMeta is undefined → derive from navOptions:
       reload && same path → "reload"
       shouldReplaceHistory → "replace"
       otherwise → "push"
-  → #metaByState.set(toState, derivedMeta)
+  → claim.write(toState, Object.freeze(derivedMeta))
 ```
 
 ## History Extensions
@@ -490,7 +516,7 @@ URL matching is always authoritative — it reflects the current route config.
 
 ### traverseToLast
 
-`traverseToLast(routeName)` finds the last history entry matching the route (excluding the current entry to avoid `SAME_STATES`), sets `#pendingMeta` and `#pendingTraverseKey`, then calls `router.navigate()`. On `onTransitionSuccess`, the plugin calls `browser.traverseTo(key)` instead of `browser.navigate()`.
+`traverseToLast(routeName)` finds the last history entry matching the route (excluding the current entry to avoid `SAME_STATES`), sets `#capturedMeta` and `#pendingTraverseKey`, then calls `router.navigate()`. On `onTransitionSuccess`, the plugin calls `browser.traverseTo(key)` instead of `browser.navigate()`.
 
 ## NavigationSharedState
 
@@ -529,7 +555,8 @@ The same flag is set in `onTransitionSuccess` around all `browser.navigate()` / 
 | -------------------------------- | ----------------------- | ------------------------------------------------------ |
 | `String.startsWith` + `slice`    | `url-utils.ts`          | No regex needed for base path stripping                |
 | Navigation API serialization     | Browser (native)        | No deferred queue needed — browser handles concurrency |
-| `WeakMap<State, NavigationMeta>` | `plugin.ts`             | GC-friendly metadata storage — no manual cleanup       |
+| `state.context.navigation`       | `plugin.ts`             | Metadata lives on state — no separate storage needed   |
+| `Object.freeze(meta)`           | `plugin.ts`             | Subscriber mutation protection without copies           |
 | `entryToState` via URL matching  | `history-extensions.ts` | Always authoritative — no stale state issues           |
 | `createNavigationBrowser()` once | `factory.ts`            | Environment check and browser wrapping don't repeat    |
 | `isSyncingFromRouter` flag       | `plugin.ts`             | Blocks navigate event re-entry without a queue         |

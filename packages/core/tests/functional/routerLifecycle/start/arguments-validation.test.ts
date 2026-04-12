@@ -3,7 +3,7 @@ import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 import { constants, errorCodes, events } from "@real-router/core";
 import { getPluginApi } from "@real-router/core/api";
 
-import { createTestRouter, omitMeta } from "../../../helpers";
+import { createTestRouter, pickRouteIdentity } from "../../../helpers";
 
 import type { Router } from "@real-router/core";
 
@@ -291,7 +291,9 @@ describe("router state check", () => {
 
       const currentState = router.getState();
 
-      expect(omitMeta(currentState)).toStrictEqual(omitMeta(initialState));
+      expect(pickRouteIdentity(currentState)).toStrictEqual(
+        pickRouteIdentity(initialState),
+      );
       expect(currentState?.name).toBe("users.list");
     });
   });

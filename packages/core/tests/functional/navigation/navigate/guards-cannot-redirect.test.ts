@@ -3,6 +3,7 @@ import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 import { RouterError, errorCodes } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
 
+import { DEFAULT_TRANSITION } from "../../../../src/constants";
 import { createTestRouter } from "../../../helpers";
 
 import type { Router } from "@real-router/core";
@@ -38,6 +39,8 @@ describe("router.navigate() - guards cannot redirect", () => {
               name: "orders.pending",
               params: {},
               path: "/orders/pending",
+              transition: DEFAULT_TRANSITION,
+              context: {},
             },
           });
         });
@@ -78,7 +81,13 @@ describe("router.navigate() - guards cannot redirect", () => {
       it("should return error when canActivate throws redirect error", async () => {
         lifecycle.addActivateGuard("profile", () => () => {
           throw new RouterError(errorCodes.CANNOT_ACTIVATE, {
-            redirect: { name: "sign-in", params: {}, path: "/sign-in" },
+            redirect: {
+              name: "sign-in",
+              params: {},
+              path: "/sign-in",
+              transition: DEFAULT_TRANSITION,
+              context: {},
+            },
           });
         });
 
@@ -115,7 +124,13 @@ describe("router.navigate() - guards cannot redirect", () => {
           return new Promise((_resolve, reject) => {
             setTimeout(() => {
               const error = new RouterError(errorCodes.CANNOT_ACTIVATE, {
-                redirect: { name: "sign-in", params: {}, path: "/sign-in" },
+                redirect: {
+                  name: "sign-in",
+                  params: {},
+                  path: "/sign-in",
+                  transition: DEFAULT_TRANSITION,
+                  context: {},
+                },
               });
 
               reject(error);
@@ -222,7 +237,13 @@ describe("router.navigate() - guards cannot redirect", () => {
 
       lifecycle.addDeactivateGuard("users", () => () => {
         throw new RouterError(errorCodes.CANNOT_DEACTIVATE, {
-          redirect: { name: "sign-in", params: {}, path: "/sign-in" },
+          redirect: {
+            name: "sign-in",
+            params: {},
+            path: "/sign-in",
+            transition: DEFAULT_TRANSITION,
+            context: {},
+          },
         });
       });
 
@@ -330,7 +351,13 @@ describe("router.navigate() - guards cannot redirect", () => {
 
         getLifecycleApi(freshRouter).addActivateGuard("users", () => () => {
           throw new RouterError(errorCodes.CANNOT_ACTIVATE, {
-            redirect: { name: "orders", params: {}, path: "/orders" },
+            redirect: {
+              name: "orders",
+              params: {},
+              path: "/orders",
+              transition: DEFAULT_TRANSITION,
+              context: {},
+            },
           });
         });
 

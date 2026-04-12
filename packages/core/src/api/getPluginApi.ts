@@ -4,7 +4,13 @@ import { getInternals } from "../internals";
 import { RouterError } from "../RouterError";
 
 import type { PluginApi } from "./types";
-import type { DefaultDependencies, Params, Router } from "@real-router/types";
+import type {
+  ContextNamespaceClaim,
+  DefaultDependencies,
+  Params,
+  Router,
+  State,
+} from "@real-router/types";
 
 export function getPluginApi<
   Dependencies extends DefaultDependencies = DefaultDependencies,
@@ -163,5 +169,25 @@ export function getPluginApi<
         }
       };
     },
+    claimContextNamespace: ((namespace: string) => {
+      throwIfDisposed(ctx.isDisposed);
+
+      if (ctx.contextClaimRecords.has(namespace)) {
+        throw new RouterError(errorCodes.CONTEXT_NAMESPACE_ALREADY_CLAIMED, {
+          message: `Cannot claim context namespace: "${namespace}" is already claimed by another plugin`,
+        });
+      }
+
+      ctx.contextClaimRecords.add(namespace);
+
+      return {
+        write(state: State, value: unknown) {
+          (state.context as Record<string, unknown>)[namespace] = value;
+        },
+        release() {
+          ctx.contextClaimRecords.delete(namespace);
+        },
+      } satisfies ContextNamespaceClaim;
+    }) as PluginApi["claimContextNamespace"],
   };
 }

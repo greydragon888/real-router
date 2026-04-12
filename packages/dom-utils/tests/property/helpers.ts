@@ -2,6 +2,16 @@ import { fc } from "@fast-check/vitest";
 
 import type { Router, State } from "@real-router/core";
 
+const STUB_TRANSITION = Object.freeze({
+  phase: "activating",
+  reason: "success",
+  segments: Object.freeze({
+    deactivated: Object.freeze([]),
+    activated: Object.freeze([]),
+    intersection: "",
+  }),
+}) as unknown as State["transition"];
+
 export const NUM_RUNS = {
   standard: 100,
 } as const;
@@ -77,6 +87,8 @@ export function createMockRouter(): {
         name: routeName,
         params: {},
         path: `/${routeName}`,
+        transition: STUB_TRANSITION,
+        context: {},
       };
 
       for (const cb of callbacks) {

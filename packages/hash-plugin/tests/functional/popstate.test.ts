@@ -1,6 +1,5 @@
 import { createRouter } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
-import { hashPluginFactory } from "@real-router/hash-plugin";
 import {
   describe,
   beforeAll,
@@ -11,10 +10,22 @@ import {
   expect,
 } from "vitest";
 
+import { hashPluginFactory } from "@real-router/hash-plugin";
+
 import { noop, routerConfig, createMockedBrowser } from "../helpers/testUtils";
 
 import type { Browser } from "../../src/browser-env/index.js";
 import type { Router, State } from "@real-router/core";
+
+const STUB_TRANSITION = Object.freeze({
+  phase: "activating",
+  reason: "success",
+  segments: Object.freeze({
+    deactivated: Object.freeze([]),
+    activated: Object.freeze([]),
+    intersection: "",
+  }),
+}) as unknown as State["transition"];
 
 let router: Router;
 let mockedBrowser: Browser;
@@ -54,6 +65,8 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
         name: "users.view",
         params: { id: "1" },
         path: "/users/view/1",
+        transition: STUB_TRANSITION,
+        context: {},
       };
 
       globalThis.dispatchEvent(
@@ -167,12 +180,16 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
         name: "users.view",
         params: { id: "1" },
         path: "/users/view/1",
+        transition: STUB_TRANSITION,
+        context: {},
       };
 
       const state2: State = {
         name: "users.list",
         params: {},
         path: "/users/list",
+        transition: STUB_TRANSITION,
+        context: {},
       };
 
       globalThis.dispatchEvent(
@@ -212,18 +229,24 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
         name: "users.view",
         params: { id: "1" },
         path: "/users/view/1",
+        transition: STUB_TRANSITION,
+        context: {},
       };
 
       const state2: State = {
         name: "users.view",
         params: { id: "2" },
         path: "/users/view/2",
+        transition: STUB_TRANSITION,
+        context: {},
       };
 
       const state3: State = {
         name: "users.list",
         params: {},
         path: "/users/list",
+        transition: STUB_TRANSITION,
+        context: {},
       };
 
       globalThis.dispatchEvent(
@@ -308,6 +331,8 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
         name: "home",
         params: {},
         path: "/home",
+        transition: STUB_TRANSITION,
+        context: {},
       };
 
       globalThis.dispatchEvent(
@@ -342,6 +367,8 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
         name: "home",
         params: {},
         path: "/home",
+        transition: STUB_TRANSITION,
+        context: {},
       };
 
       globalThis.dispatchEvent(

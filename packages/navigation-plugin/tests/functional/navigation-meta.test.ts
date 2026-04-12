@@ -34,86 +34,85 @@ describe("Navigation Plugin — NavigationMeta", () => {
   });
 
   describe("NavigationMeta for programmatic navigation (router to browser)", () => {
-    it('getNavigationMeta(state) returns meta with navigationType "push" for programmatic navigate', async () => {
+    it('state.context.navigation returns meta with navigationType "push" for programmatic navigate', async () => {
       await router.start();
 
       const state = await router.navigate("users.list");
-      const meta = router.getNavigationMeta(state);
 
-      expect(meta).toStrictEqual({
+      expect(state.context.navigation).toStrictEqual({
         navigationType: "push",
         userInitiated: false,
+        direction: "forward",
+        sourceElement: null,
       });
     });
 
-    it('getNavigationMeta(state) returns meta with navigationType "replace" for replace navigation', async () => {
+    it('state.context.navigation returns meta with navigationType "replace" for replace navigation', async () => {
       await router.start();
 
       const state = await router.navigate("users.list", {}, { replace: true });
-      const meta = router.getNavigationMeta(state);
 
-      expect(meta).toStrictEqual({
+      expect(state.context.navigation).toStrictEqual({
         navigationType: "replace",
         userInitiated: false,
+        direction: "unknown",
+        sourceElement: null,
       });
     });
 
-    it('getNavigationMeta(state) returns meta with navigationType "reload" for reload navigation', async () => {
+    it('state.context.navigation returns meta with navigationType "reload" for reload navigation', async () => {
       await router.start();
       await router.navigate("users.list");
 
       const state = await router.navigate("users.list", {}, { reload: true });
-      const meta = router.getNavigationMeta(state);
 
-      expect(meta).toStrictEqual({
+      expect(state.context.navigation).toStrictEqual({
         navigationType: "reload",
         userInitiated: false,
+        direction: "unknown",
+        sourceElement: null,
       });
     });
 
-    it("getNavigationMeta(state) returns userInitiated: false for programmatic navigation", async () => {
+    it("state.context.navigation returns userInitiated: false for programmatic navigation", async () => {
       await router.start();
 
       const state = await router.navigate("users.list");
-      const meta = router.getNavigationMeta(state);
 
-      expect(meta?.userInitiated).toBe(false);
+      expect(state.context.navigation?.userInitiated).toBe(false);
     });
 
-    it('getNavigationMeta(state) returns meta with navigationType "replace" for first navigation (no fromState)', async () => {
+    it('state.context.navigation returns meta with navigationType "replace" for first navigation (no fromState)', async () => {
       const state = await router.start();
-      const meta = router.getNavigationMeta(state);
 
-      expect(meta?.navigationType).toBe("replace");
+      expect(state.context.navigation?.navigationType).toBe("replace");
     });
   });
 
   describe("NavigationMeta for browser-initiated navigation (browser to router)", () => {
-    it('getNavigationMeta(state) returns navigationType from navigate event (e.g., "traverse" for back button)', async () => {
+    it('state.context.navigation returns navigationType from navigate event (e.g., "traverse" for back button)', async () => {
       await router.start();
       await router.navigate("users.list");
 
       await mockNav.goBack();
 
       const state = router.getState()!;
-      const meta = router.getNavigationMeta(state);
 
-      expect(meta?.navigationType).toBe("traverse");
+      expect(state.context.navigation?.navigationType).toBe("traverse");
     });
 
-    it("getNavigationMeta(state) returns userInitiated: true for back button navigation", async () => {
+    it("state.context.navigation returns userInitiated: true for back button navigation", async () => {
       await router.start();
       await router.navigate("users.list");
 
       await mockNav.goBack();
 
       const state = router.getState()!;
-      const meta = router.getNavigationMeta(state);
 
-      expect(meta?.userInitiated).toBe(true);
+      expect(state.context.navigation?.userInitiated).toBe(true);
     });
 
-    it("getNavigationMeta(state) includes info from navigate event", async () => {
+    it("state.context.navigation includes info from navigate event", async () => {
       await router.start();
 
       const { finished } = mockNav.navigate("http://localhost/users/list", {
@@ -123,21 +122,53 @@ describe("Navigation Plugin — NavigationMeta", () => {
       await finished;
 
       const state = router.getState()!;
-      const meta = router.getNavigationMeta(state);
 
-      expect(meta?.info).toStrictEqual({ reason: "test-info" });
+      expect(state.context.navigation?.info).toStrictEqual({
+        reason: "test-info",
+      });
+    });
+
+    it('state.context.navigation returns direction "back" for goBack()', async () => {
+      await router.start();
+      await router.navigate("users.list");
+
+      await mockNav.goBack();
+
+      const state = router.getState()!;
+
+      expect(state.context.navigation?.direction).toBe("back");
+    });
+
+    it('state.context.navigation returns direction "forward" for goForward()', async () => {
+      await router.start();
+      await router.navigate("users.list");
+
+      await mockNav.goBack();
+      await mockNav.goForward();
+
+      const state = router.getState()!;
+
+      expect(state.context.navigation?.direction).toBe("forward");
+    });
+
+    it("state.context.navigation returns sourceElement null for programmatic navigation", async () => {
+      await router.start();
+
+      const state = await router.navigate("users.list");
+
+      expect(state.context.navigation?.sourceElement).toBeNull();
     });
   });
 
-  describe("getNavigationMeta() without state argument — pendingMeta in guards", () => {
-    it("returns pendingMeta during browser-initiated navigation (before transition completes)", async () => {
+  describe("state.context.navigation in guards — capturedMeta written in onTransitionStart", () => {
+    it("meta is available in activation guard during browser-initiated navigation", async () => {
       await router.start();
 
       const lifecycle = getLifecycleApi(router);
       let metaInGuard: NavigationMeta | undefined;
 
-      lifecycle.addActivateGuard("users.list", () => () => {
-        metaInGuard = router.getNavigationMeta();
+      lifecycle.addActivateGuard("users.list", () => (toState) => {
+        metaInGuard = toState.context.navigation;
 
         return true;
       });
@@ -151,15 +182,26 @@ describe("Navigation Plugin — NavigationMeta", () => {
       expect(metaInGuard?.userInitiated).toBe(false);
     });
 
-    it("returns undefined when no navigation is in progress", async () => {
+    it("meta is undefined in activation guard during programmatic navigation", async () => {
       await router.start();
 
-      expect(router.getNavigationMeta()).toBeUndefined();
+      const lifecycle = getLifecycleApi(router);
+      let metaInGuard: NavigationMeta | undefined;
+
+      lifecycle.addActivateGuard("users.list", () => (toState) => {
+        metaInGuard = toState.context.navigation;
+
+        return true;
+      });
+
+      await router.navigate("users.list");
+
+      expect(metaInGuard).toBeUndefined();
     });
   });
 
   describe("NavigationMeta cleanup on cancel/error", () => {
-    it("pendingMeta cleared on guard rejection (onTransitionError)", async () => {
+    it("capturedMeta cleared on guard rejection (onTransitionError)", async () => {
       await router.start();
       await router.navigate("users.list");
 
@@ -171,10 +213,12 @@ describe("Navigation Plugin — NavigationMeta", () => {
         code: errorCodes.CANNOT_DEACTIVATE,
       });
 
-      expect(router.getNavigationMeta()).toBeUndefined();
+      const state = router.getState()!;
+
+      expect(state.name).toBe("users.list");
     });
 
-    it("pendingMeta cleared on guard throw (onTransitionError)", async () => {
+    it("capturedMeta cleared on guard throw (onTransitionError)", async () => {
       await router.start();
 
       const lifecycle = getLifecycleApi(router);
@@ -184,11 +228,9 @@ describe("Navigation Plugin — NavigationMeta", () => {
       });
 
       await expect(router.navigate("users.list")).rejects.toThrow();
-
-      expect(router.getNavigationMeta()).toBeUndefined();
     });
 
-    it("pendingMeta cleared on transition cancel (superseding navigation)", async () => {
+    it("capturedMeta cleared on transition cancel (superseding navigation)", async () => {
       await router.start();
 
       const lifecycle = getLifecycleApi(router);
@@ -207,7 +249,7 @@ describe("Navigation Plugin — NavigationMeta", () => {
 
       await router.navigate("home");
 
-      expect(router.getNavigationMeta()).toBeUndefined();
+      expect(router.getState()!.name).toBe("home");
 
       resolveGuard(true);
     });
@@ -225,7 +267,7 @@ describe("Navigation Plugin — NavigationMeta", () => {
         code: errorCodes.CANNOT_DEACTIVATE,
       });
 
-      expect(router.getNavigationMeta()).toBeUndefined();
+      expect(router.getState()!.name).toBe("home");
     });
   });
 
@@ -236,7 +278,7 @@ describe("Navigation Plugin — NavigationMeta", () => {
       let subscribeMeta: NavigationMeta | undefined;
 
       router.subscribe(({ route }) => {
-        subscribeMeta = router.getNavigationMeta(route);
+        subscribeMeta = route.context.navigation;
       });
 
       await router.navigate("users.list");
@@ -253,7 +295,7 @@ describe("Navigation Plugin — NavigationMeta", () => {
 
       const state = await router.navigate("users.list", {}, { reload: true });
 
-      expect(router.getNavigationMeta(state)?.navigationType).toBe("reload");
+      expect(state.context.navigation?.navigationType).toBe("reload");
     });
 
     it('maps replace option to "replace"', async () => {
@@ -261,7 +303,7 @@ describe("Navigation Plugin — NavigationMeta", () => {
 
       const state = await router.navigate("users.list", {}, { replace: true });
 
-      expect(router.getNavigationMeta(state)?.navigationType).toBe("replace");
+      expect(state.context.navigation?.navigationType).toBe("replace");
     });
 
     it('maps normal navigation to "push"', async () => {
@@ -269,13 +311,91 @@ describe("Navigation Plugin — NavigationMeta", () => {
 
       const state = await router.navigate("users.list");
 
-      expect(router.getNavigationMeta(state)?.navigationType).toBe("push");
+      expect(state.context.navigation?.navigationType).toBe("push");
     });
 
     it('maps first navigation (no fromState) to "replace"', async () => {
       const state = await router.start();
 
-      expect(router.getNavigationMeta(state)?.navigationType).toBe("replace");
+      expect(state.context.navigation?.navigationType).toBe("replace");
+    });
+  });
+
+  describe("direction for programmatic navigation", () => {
+    it('direction is "forward" for push navigation', async () => {
+      await router.start();
+
+      const state = await router.navigate("users.list");
+
+      expect(state.context.navigation?.direction).toBe("forward");
+    });
+
+    it('direction is "unknown" for replace navigation', async () => {
+      await router.start();
+
+      const state = await router.navigate("users.list", {}, { replace: true });
+
+      expect(state.context.navigation?.direction).toBe("unknown");
+    });
+
+    it('direction is "unknown" for reload navigation', async () => {
+      await router.start();
+      await router.navigate("users.list");
+
+      const state = await router.navigate("users.list", {}, { reload: true });
+
+      expect(state.context.navigation?.direction).toBe("unknown");
+    });
+  });
+
+  describe("direction for browser-initiated navigation", () => {
+    it('direction is "unknown" for browser replace navigation', async () => {
+      await router.start();
+
+      const { finished } = mockNav.navigate("http://localhost/users/list", {
+        history: "replace",
+      });
+
+      await finished;
+
+      const state = router.getState()!;
+
+      expect(state.context.navigation?.direction).toBe("unknown");
+    });
+  });
+
+  describe("direction for traverseToLast", () => {
+    it('direction is "back" when traversing to earlier entry', async () => {
+      await router.start();
+      await router.navigate("users.list");
+      await router.navigate("home");
+
+      const state = await router.traverseToLast("users.list");
+
+      expect(state.context.navigation?.direction).toBe("back");
+    });
+
+    it('direction is "forward" when traversing to later entry', async () => {
+      await router.start();
+      await router.navigate("users.list");
+      await router.navigate("home");
+
+      await mockNav.goBack();
+      await mockNav.goBack();
+
+      const state = await router.traverseToLast("home");
+
+      expect(state.context.navigation?.direction).toBe("forward");
+    });
+  });
+
+  describe("NavigationMeta is frozen", () => {
+    it("meta object is frozen after write", async () => {
+      await router.start();
+
+      const state = await router.navigate("users.list");
+
+      expect(Object.isFrozen(state.context.navigation)).toBe(true);
     });
   });
 });

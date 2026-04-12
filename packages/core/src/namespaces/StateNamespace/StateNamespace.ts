@@ -1,7 +1,7 @@
 // packages/core/src/namespaces/StateNamespace/StateNamespace.ts
 
 import { areParamValuesEqual } from "./helpers";
-import { EMPTY_PARAMS } from "../../constants";
+import { DEFAULT_TRANSITION, EMPTY_PARAMS } from "../../constants";
 import { freezeStateInPlace } from "../../helpers";
 import { setStateMetaParams } from "../../stateMetaStore";
 
@@ -97,7 +97,15 @@ export class StateNamespace {
   // =========================================================================
 
   /**
-   * Creates a frozen state object for a route.
+   * Creates a state object for a route.
+   *
+   * `params` is frozen at creation so it is always immutable, even when
+   * `skipFreeze=true` is passed to defer the outer `Object.freeze(state)` call.
+   * This keeps params-freezing invariants independent of transition-pipeline
+   * mutation (e.g. `completeTransition` attaching `state.transition`).
+   *
+   * `context` is initialized as a fresh empty object — intentionally NOT frozen
+   * so plugins can publish data via `claim.write(state, value)` after creation.
    */
   makeState<P extends Params = Params>(
     name: string,
@@ -114,18 +122,23 @@ export class StateNamespace {
     let mergedParams: P;
 
     if (hasDefaultParams) {
-      mergedParams = { ...defaultParamsConfig[name], ...params } as P;
+      mergedParams = Object.freeze({
+        ...defaultParamsConfig[name],
+        ...params,
+      }) as P;
     } else if (!params || params === EMPTY_PARAMS) {
       mergedParams = EMPTY_PARAMS as P;
     } else {
-      mergedParams = { ...params };
+      mergedParams = Object.freeze({ ...params }) as P;
     }
 
-    const state: State<P> = {
+    const state = {
       name,
       params: mergedParams,
       path: path ?? this.#deps.buildPath(name, params),
-    };
+      context: {},
+      ...(!skipFreeze && { transition: DEFAULT_TRANSITION }),
+    } as State<P>;
 
     if (meta) {
       setStateMetaParams(state, meta as unknown as Params);

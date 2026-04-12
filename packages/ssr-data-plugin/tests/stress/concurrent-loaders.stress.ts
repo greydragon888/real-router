@@ -55,8 +55,8 @@ describe("D3 -- Concurrent Loaders Stress", () => {
         const clone = cloneRouter(base);
 
         clone.usePlugin(ssrDataPluginFactory(loaders));
-        await clone.start(paths[pathIndex]);
-        const data = clone.getRouteData();
+        const state = await clone.start(paths[pathIndex]);
+        const data = state.context.data;
 
         clone.dispose();
 
@@ -89,8 +89,8 @@ describe("D3 -- Concurrent Loaders Stress", () => {
         const clone = cloneRouter(base);
 
         clone.usePlugin(ssrDataPluginFactory(loaders));
-        await clone.start(`/users/${i}`);
-        const data = clone.getRouteData() as { id: string; order: number };
+        const state = await clone.start(`/users/${i}`);
+        const data = state.context.data as { id: string; order: number };
 
         clone.dispose();
 
@@ -107,7 +107,7 @@ describe("D3 -- Concurrent Loaders Stress", () => {
     expect(callCount).toBe(100);
   });
 
-  it("D3.3 -- 100 concurrent starts with routes having no loader: getRouteData returns null", async () => {
+  it("D3.3 -- 100 concurrent starts with routes having no loader: data is undefined", async () => {
     const base = createRouter(routes, { defaultRoute: "home" });
     const loaders: DataLoaderMap = {
       // Only profile has a loader
@@ -123,8 +123,8 @@ describe("D3 -- Concurrent Loaders Stress", () => {
         // Half go to home (no loader), half to profile (has loader)
         const path = i % 2 === 0 ? "/" : `/users/${i}`;
 
-        await clone.start(path);
-        const data = clone.getRouteData();
+        const state = await clone.start(path);
+        const data = state.context.data;
 
         clone.dispose();
 
@@ -138,7 +138,7 @@ describe("D3 -- Concurrent Loaders Stress", () => {
     expect(
       withLoader.every((r) => r.data !== null && r.data !== undefined),
     ).toBe(true);
-    expect(withoutLoader.every((r) => r.data === null)).toBe(true);
+    expect(withoutLoader.every((r) => r.data === undefined)).toBe(true);
   });
 
   it("D3.4 -- 50 factories with different loaders on same base router: isolation maintained", async () => {
@@ -153,8 +153,8 @@ describe("D3 -- Concurrent Loaders Stress", () => {
         const clone = cloneRouter(base);
 
         clone.usePlugin(ssrDataPluginFactory(loaders));
-        await clone.start("/");
-        const data = clone.getRouteData() as { factoryId: number };
+        const state = await clone.start("/");
+        const data = state.context.data as { factoryId: number };
 
         clone.dispose();
 

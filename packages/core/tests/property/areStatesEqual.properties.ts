@@ -2,6 +2,7 @@ import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 
 import { createFixtureRouter, arbState, arbParams, NUM_RUNS } from "./helpers";
+import { DEFAULT_TRANSITION } from "../../src/constants";
 
 import type { Params, State } from "@real-router/core";
 
@@ -49,6 +50,8 @@ describe("areStatesEqual Properties", () => {
         name: state.name,
         params: { ...state.params, ...extraParams },
         path: state.path,
+        transition: DEFAULT_TRANSITION,
+        context: {},
       };
 
       const equalStrict = router.areStatesEqual(state, s2, false);

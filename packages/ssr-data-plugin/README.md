@@ -15,7 +15,7 @@ const data = await loadRouteData(state.name, state.params); // manual
 // With plugin:
 router.usePlugin(ssrDataPluginFactory(loaders));
 const state = await router.start(url);
-const data = router.getRouteData(); // loaded automatically
+const data = state.context.data; // loaded automatically
 ```
 
 ## Installation
@@ -24,7 +24,7 @@ const data = router.getRouteData(); // loaded automatically
 npm install @real-router/ssr-data-plugin
 ```
 
-**Peer dependency:** `@real-router/core`
+**Peer dependencies:** `@real-router/core`, `@real-router/types`
 
 ## Quick Start
 
@@ -46,7 +46,7 @@ const router = cloneRouter(baseRouter, { isAuthenticated: true });
 router.usePlugin(ssrDataPluginFactory(loaders));
 
 const state = await router.start(url);
-const data = router.getRouteData(); // data loaded by matching loader
+const data = state.context.data; // data loaded by matching loader
 
 const html = renderToString(<App />);
 router.dispose();
@@ -66,27 +66,25 @@ const loaders: DataLoaderMap = {
 };
 ```
 
-Routes without a matching loader produce no data — `getRouteData()` returns `null`.
+Routes without a matching loader produce no data — `state.context.data` is `undefined`.
 
-## Router Extension
+## Accessing Data
 
-The plugin extends the router instance with one method via [`extendRouter()`](https://github.com/greydragon888/real-router/wiki/plugin-architecture):
-
-| Method                 | Returns   | Description                                |
-| ---------------------- | --------- | ------------------------------------------ |
-| `getRouteData(state?)` | `unknown` | Get loaded data for current or given state |
+After `await router.start(url)`, data is available on the returned state's context:
 
 ```typescript
-router.getRouteData(); // data for current state
-router.getRouteData(state); // data for a specific state
+const state = await router.start(url);
+const data = state.context.data; // loaded data, or undefined if no loader matched
 ```
+
+The plugin claims the `"data"` namespace on `state.context` via the [claim-based API](https://github.com/greydragon888/real-router/wiki/plugin-architecture). Module augmentation on `@real-router/types` provides type safety for `state.context.data`.
 
 ## SSR-Only by Design
 
 This plugin intercepts `start()` only — not `navigate()`. In SSR, the flow is:
 
 ```
-cloneRouter → usePlugin → start(url) → data loaded → renderToString → getRouteData()
+cloneRouter → usePlugin → start(url) → data loaded → state.context.data → renderToString
 ```
 
 Client-side navigation and data fetching is the application's responsibility (React Query, Suspense, `useEffect`, etc.).
@@ -96,7 +94,7 @@ Client-side navigation and data fetching is the application's responsibility (Re
 ```typescript
 const unsubscribe = router.usePlugin(ssrDataPluginFactory(loaders));
 
-// Later — removes getRouteData and stops data loading
+// Later — releases "data" namespace claim and stops data loading
 unsubscribe();
 ```
 

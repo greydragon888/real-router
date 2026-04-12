@@ -13,6 +13,10 @@ export class PersistentParamsPlugin {
   readonly #originalRootPath: string;
   readonly #removeBuildPathInterceptor: () => void;
   readonly #removeForwardStateInterceptor: () => void;
+  readonly #claim: {
+    write: (state: State, value: Readonly<Params>) => void;
+    release: () => void;
+  };
 
   #persistentParams: Readonly<Params>;
 
@@ -26,6 +30,7 @@ export class PersistentParamsPlugin {
     this.#persistentParams = persistentParams;
     this.#paramNamesSet = paramNamesSet;
     this.#originalRootPath = originalRootPath;
+    this.#claim = api.claimContextNamespace("persistentParams");
 
     let removeBuildPath: (() => void) | undefined;
     let removeForwardState: (() => void) | undefined;
@@ -129,11 +134,14 @@ export class PersistentParamsPlugin {
     if (newParams) {
       this.#persistentParams = Object.freeze(newParams);
     }
+
+    this.#claim.write(toState, this.#persistentParams);
   }
 
   #teardown(): void {
     this.#removeBuildPathInterceptor();
     this.#removeForwardStateInterceptor();
+    this.#claim.release();
 
     /* v8 ignore start -- @preserve: setRootPath throws RouterError(ROUTER_DISPOSED) during router.dispose() */
     try {

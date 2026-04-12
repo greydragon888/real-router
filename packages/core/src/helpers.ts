@@ -109,65 +109,30 @@ export function deepFreezeState<T extends State>(state: T): T {
   return clonedState;
 }
 
-// WeakSet to track already frozen root objects for O(1) re-freeze check
-const frozenRoots = new WeakSet<object>();
-
-// Module-scope recursive freeze function - better JIT optimization, no allocation per call
-function freezeRecursive(obj: unknown): void {
-  // Skip primitives, null
-  if (obj === null || typeof obj !== "object") {
-    return;
-  }
-
-  // Skip already frozen objects (handles potential shared refs)
-  if (Object.isFrozen(obj)) {
-    return;
-  }
-
-  // Freeze the object/array
-  Object.freeze(obj);
-
-  // Iterate without Object.values() allocation
-  if (Array.isArray(obj)) {
-    for (const item of obj) {
-      freezeRecursive(item);
-    }
-  } else {
-    for (const key in obj) {
-      freezeRecursive((obj as Record<string, unknown>)[key]);
-    }
-  }
-}
-
 /**
- * Freezes State object in-place without cloning.
- * Optimized for hot paths where state is known to be a fresh object.
+ * Shallow-freezes a State object in place.
  *
- * IMPORTANT: Only use this when you know the state is a fresh object
- * that hasn't been exposed to external code yet (e.g., from makeState()).
+ * Freezes only the top-level State object (blocks reassignment of `name`,
+ * `params`, `path`, `transition`, `context`). Nested objects (`params`,
+ * `transition`, `transition.segments`, `transition.segments.{deactivated,activated}`)
+ * are expected to be **already frozen at creation time** by their producers:
  *
- * @param state - The State object to freeze (must be a fresh object)
- * @returns The same state object, now frozen
+ * - `params` frozen in `makeState()` / `navigateToNotFound()`
+ * - `transition`, `segments`, `deactivated`, `activated` frozen in
+ *   `buildTransitionMeta()` (or inline in `navigateToNotFound()`)
+ *
+ * `state.context` is **intentionally not frozen** — plugins write to it via
+ * `claim.write(state, value)` after state creation.
+ *
  * @internal
  */
 export function freezeStateInPlace<T extends State>(state: T): T {
-  // Early return for null/undefined - state from makeState() is never null
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- defensive guard against external misuse
   if (!state) {
     return state;
   }
 
-  // Fast path: already processed root object - O(1) check
-  if (frozenRoots.has(state)) {
-    return state;
-  }
-
-  freezeRecursive(state);
-
-  // Mark root as processed for future calls
-  frozenRoots.add(state);
-
-  return state;
+  return Object.freeze(state);
 }
 
 /**

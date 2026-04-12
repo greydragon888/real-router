@@ -1074,4 +1074,69 @@ describe("Persistent params plugin", () => {
       expect(state2?.path).toBe("/route/2?mode=dev");
     });
   });
+
+  describe("state.context.persistentParams", () => {
+    it("should publish persistent params snapshot to state.context after navigation", async () => {
+      router.usePlugin(persistentParamsPlugin({ lang: "en" }));
+      await router.start("/");
+
+      const state = await router.navigate("route1", {
+        id: "1",
+        lang: "fr",
+      });
+
+      expect(state.context.persistentParams).toStrictEqual({ lang: "fr" });
+    });
+
+    it("should publish initial params on first navigation", async () => {
+      router.usePlugin(persistentParamsPlugin({ mode: "dark" }));
+      const state = await router.start("/");
+
+      expect(state.context.persistentParams).toStrictEqual({ mode: "dark" });
+    });
+
+    it("should reflect updated params after subsequent navigation", async () => {
+      router.usePlugin(persistentParamsPlugin(["mode"]));
+      await router.start("/");
+
+      await router.navigate("route1", { id: "1", mode: "dev" });
+      const state = await router.navigate("route2", { id: "2" });
+
+      expect(state.context.persistentParams).toStrictEqual({ mode: "dev" });
+    });
+
+    it("should reflect removal when param set to undefined", async () => {
+      router.usePlugin(persistentParamsPlugin({ lang: "en" }));
+      await router.start("/");
+
+      const state = await router.navigate("route1", {
+        id: "1",
+        lang: undefined,
+      });
+
+      expect(state.context.persistentParams).toStrictEqual({});
+    });
+
+    it("should be frozen", async () => {
+      router.usePlugin(persistentParamsPlugin({ lang: "en" }));
+      const state = await router.start("/");
+
+      expect(Object.isFrozen(state.context.persistentParams)).toBe(true);
+    });
+
+    it("should be available in subscribe callback", async () => {
+      router.usePlugin(persistentParamsPlugin({ mode: "light" }));
+      await router.start("/");
+
+      let contextParams: unknown;
+
+      router.subscribe(({ route }) => {
+        contextParams = route.context.persistentParams;
+      });
+
+      await router.navigate("route1", { id: "1", mode: "dark" });
+
+      expect(contextParams).toStrictEqual({ mode: "dark" });
+    });
+  });
 });

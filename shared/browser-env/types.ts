@@ -1,8 +1,6 @@
-import type { State } from "@real-router/core";
-
 export interface HistoryBrowser {
-  pushState: (state: State, path: string) => void;
-  replaceState: (state: State, path: string) => void;
+  pushState: (state: unknown, path: string) => void;
+  replaceState: (state: unknown, path: string) => void;
   addPopstateListener: (fn: (evt: PopStateEvent) => void) => () => void;
   getHash: () => string;
 }

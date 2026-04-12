@@ -327,10 +327,22 @@ describe("segmentTesters", () => {
   });
 
   describe("real-world usage patterns", () => {
+    const STUB_TRANSITION = Object.freeze({
+      phase: "activating",
+      reason: "success",
+      segments: Object.freeze({
+        deactivated: Object.freeze([]),
+        activated: Object.freeze([]),
+        intersection: "",
+      }),
+    }) as unknown as State["transition"];
+
     const state: State = {
       name: "admin.users.profile.edit",
       params: { userId: "123" },
       path: "/admin/users/123/profile/edit",
+      transition: STUB_TRANSITION,
+      context: {},
     };
 
     it("should work with complex route hierarchies", () => {

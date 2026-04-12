@@ -83,6 +83,13 @@
 | 3   | Primitive values accepted     | `validateParamValue` does not throw for `string`, finite `number`, `boolean`, or `undefined`.                    |
 | 4   | Non-primitive values rejected | `validateParamValue` throws `TypeError` for `null`, arrays, objects, `NaN`, and `±Infinity`.                     |
 
+## State Context
+
+| #   | Invariant                                              | Description                                                                                                                                                                                                       |
+| --- | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | state.context.persistentParams reflects stored snapshot | After every successful transition, `state.context.persistentParams` deep-equals the plugin's internal `#persistentParams` snapshot. It contains only the currently tracked persistent params, not route-specific params. |
+| 2   | state.context.persistentParams is a subset of state.params | Every key in `state.context.persistentParams` also exists in `state.params` with the same value. The context snapshot is always a subset of the full merged params.                                                 |
+
 ## Test Files
 
 | File                                            | Invariants | Category                                                                                    |

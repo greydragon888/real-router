@@ -1,5 +1,6 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
+import { DEFAULT_TRANSITION } from "../../../src/constants";
 import { getTransitionPath } from "../../../src/transitionPath";
 import { makeState, createTestRouter } from "../../helpers";
 
@@ -54,6 +55,8 @@ describe("core/routes", () => {
             name: "home",
             params: {},
             path: "/home",
+            transition: DEFAULT_TRANSITION,
+            context: {},
           };
 
           expect(() => {
@@ -67,6 +70,8 @@ describe("core/routes", () => {
             name: "home",
             params: {},
             path: "/home",
+            transition: DEFAULT_TRANSITION,
+            context: {},
           };
 
           expect(() => {
@@ -90,6 +95,8 @@ describe("core/routes", () => {
             name: "home",
             params: {},
             path: "/home",
+            transition: DEFAULT_TRANSITION,
+            context: {},
           };
 
           expect(() => {
@@ -103,11 +110,15 @@ describe("core/routes", () => {
             name: "sign-in",
             params: {},
             path: "/sign-in",
+            transition: DEFAULT_TRANSITION,
+            context: {},
           };
           const fromState = {
             name: "home",
             params: {},
             path: "/home",
+            transition: DEFAULT_TRANSITION,
+            context: {},
           };
 
           expect(() => {
@@ -133,6 +144,8 @@ describe("core/routes", () => {
           name: "home",
           params: {},
           path: "/home",
+          transition: DEFAULT_TRANSITION,
+          context: {},
         };
 
         // home is active, so predicateHome should return true for intersection
@@ -149,12 +162,16 @@ describe("core/routes", () => {
           name: "home",
           params: {},
           path: "/home",
+          transition: DEFAULT_TRANSITION,
+          context: {},
         };
 
         const state2 = {
           name: "sign-in",
           params: {},
           path: "/sign-in",
+          transition: DEFAULT_TRANSITION,
+          context: {},
         };
 
         // Should work with different state objects

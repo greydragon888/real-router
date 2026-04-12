@@ -73,8 +73,8 @@ describe("D2 -- Loader Error Handling Under Stress", () => {
         const clone = cloneRouter(base);
 
         clone.usePlugin(ssrDataPluginFactory(loaders));
-        await clone.start(`/users/${i}`);
-        const data = clone.getRouteData();
+        const state = await clone.start(`/users/${i}`);
+        const data = state.context.data;
 
         clone.dispose();
 
@@ -106,8 +106,8 @@ describe("D2 -- Loader Error Handling Under Stress", () => {
         const clone = cloneRouter(base);
 
         clone.usePlugin(ssrDataPluginFactory(loaders));
-        await clone.start("/");
-        const data = clone.getRouteData();
+        const state = await clone.start("/");
+        const data = state.context.data;
 
         clone.dispose();
 

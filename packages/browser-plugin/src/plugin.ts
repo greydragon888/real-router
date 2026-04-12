@@ -8,10 +8,10 @@ import {
   buildUrl,
   urlToPath,
 } from "./browser-env/index.js";
-import { LOGGER_CONTEXT } from "./constants";
+import { LOGGER_CONTEXT, source as POPSTATE_SOURCE } from "./constants";
 
 import type { Browser, SharedFactoryState } from "./browser-env/index.js";
-import type { BrowserPluginOptions } from "./types";
+import type { BrowserContext, BrowserPluginOptions } from "./types";
 import type {
   NavigationOptions,
   Params,
@@ -26,6 +26,10 @@ export class BrowserPlugin {
   readonly #browser: Browser;
   readonly #removeStartInterceptor: () => void;
   readonly #removeExtensions: () => void;
+  readonly #claim: {
+    write: (state: State, value: BrowserContext) => void;
+    release: () => void;
+  };
   readonly #lifecycle: Pick<Plugin, "onStart" | "onStop" | "teardown">;
 
   constructor(
@@ -42,6 +46,7 @@ export class BrowserPlugin {
   ) {
     this.#router = router;
     this.#browser = browser;
+    this.#claim = api.claimContextNamespace("browser");
 
     this.#removeStartInterceptor = createStartInterceptor(api, browser);
 
@@ -84,6 +89,7 @@ export class BrowserPlugin {
       cleanup: () => {
         this.#removeStartInterceptor();
         this.#removeExtensions();
+        this.#claim.release();
       },
     });
   }
@@ -113,6 +119,14 @@ export class BrowserPlugin {
           : url;
 
         updateBrowserState(toState, finalUrl, replaceHistory, this.#browser);
+
+        const isPopstate =
+          (navOptions as Record<string, unknown>).source === POPSTATE_SOURCE;
+
+        this.#claim.write(
+          toState,
+          Object.freeze({ source: isPopstate ? "popstate" : "navigate" }),
+        );
       },
     };
   }

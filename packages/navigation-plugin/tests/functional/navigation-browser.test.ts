@@ -1,7 +1,9 @@
+import { createRouter } from "@real-router/core";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import { navigationPluginFactory } from "../../src/factory";
 import { createNavigationBrowser } from "../../src/navigation-browser";
+import { routerConfig } from "../helpers/testUtils";
 
 import type { NavigationBrowser } from "../../src/types";
 
@@ -224,7 +226,12 @@ describe("navigationPluginFactory — Navigation API available", () => {
 
   it("creates plugin without explicit browser when Navigation API exists", () => {
     const factory = navigationPluginFactory();
+    const router = createRouter(routerConfig);
 
-    expect(typeof factory).toBe("function");
+    router.usePlugin(factory);
+
+    expect(router.buildUrl("home")).toBe("/home");
+
+    router.stop();
   });
 });

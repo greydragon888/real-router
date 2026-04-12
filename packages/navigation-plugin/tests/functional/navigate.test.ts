@@ -91,22 +91,26 @@ describe("Navigation Plugin — Navigate", () => {
     });
 
     it("skips events with canIntercept: false", async () => {
-      const currentState = router.getState()?.name;
+      expect(router.getState()!.name).toBe("index");
 
       // Cross-origin navigate → canIntercept: false
       mockNav.navigate("https://other-origin.com/path");
       await new Promise((resolve) => setTimeout(resolve, 0));
 
-      expect(router.getState()?.name).toBe(currentState);
+      expect(router.getState()!.name).toBe("index");
     });
 
     it("skips events when router is not active", async () => {
+      expect(router.getState()!.name).toBe("index");
+
       router.stop();
+      const stateAfterStop = router.getState();
 
       mockNav.navigate("http://localhost/users/list");
       await new Promise((resolve) => setTimeout(resolve, 0));
 
-      expect(router.getState()?.name).not.toBe("users.list");
+      // Navigate event must not change state after stop()
+      expect(router.getState()).toBe(stateAfterStop);
     });
 
     it("skips events when isSyncingFromRouter is true (no infinite loops)", async () => {
@@ -265,7 +269,7 @@ describe("createNavigateHandler — direct", () => {
       browser: {} as NavigationBrowser,
       isSyncingFromRouter: () => false,
       setSyncing: vi.fn(),
-      setPendingMeta: vi.fn(),
+      setCapturedMeta: vi.fn(),
       base: "",
       transitionOptions: { source: "navigate", replace: true as const },
     });
@@ -509,7 +513,7 @@ describe("Error Recovery", () => {
       browser: mockBrowser,
       isSyncingFromRouter: () => false,
       setSyncing: mockSyncing,
-      setPendingMeta: vi.fn(),
+      setCapturedMeta: vi.fn(),
       base: "",
       transitionOptions: { source: "navigate", replace: true as const },
     });

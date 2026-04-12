@@ -2139,6 +2139,78 @@ Adding `github.event_name == 'pull_request'` to each job makes the file harder t
 
 Coverage and SonarCloud depend on test job artifacts. Without test, there are no coverage files to upload. Codecov updates baseline from PR merge commits — no separate push upload needed.
 
+## State Context — Plugin-Extensible Route Data via Claim-Based API
+
+### Problem
+
+Plugins stored per-route data in `WeakMap<State, T>` — parallel storage next to State. This meant no reactivity, no data locality, and each plugin inventing its own WeakMap. Consumers accessed plugin data via global methods (`router.getNavigationMeta(state)`) instead of route properties. Five plugins independently implemented the same pattern: allocate a WeakMap, set data during transition, expose a getter. The data lived outside the State object, invisible to framework adapters and to `JSON.stringify` debugging.
+
+### Solution
+
+New `state.context` field — required, mutable, present on every State object. Claim-based API mirrors the `extendRouter()` pattern:
+
+```typescript
+// Plugin registration
+const claim = api.claimContextNamespace("navigation");
+
+// During transition — O(1) property assignment
+claim.write(state, { direction: "forward", userInitiated: true });
+
+// Teardown
+claim.release();
+```
+
+**Collision detection:** `claimContextNamespace` tracks claimed keys in a `Set<string>`. Duplicate claims throw immediately — O(1) lookup, caught at registration time, not at runtime.
+
+**Freeze pipeline refactored:** Recursive `deepFreezeState()` replaced with targeted shallow freezes. Core freezes `state` and `state.context` (the container). Plugin authors are responsible for freezing their own payloads — they know the shape, core does not. This avoids freezing third-party objects with non-configurable properties and removes the `structuredClone` overhead from the hot path.
+
+### Why
+
+- **Data locality** — plugin data lives on the State object itself. No WeakMap indirection, no parallel storage. `state.context.navigation.direction` is a property read.
+- **Framework adapter access** — adapters expose `route.context` directly. React: `useRoute().context.navigation.direction`. Vue: `route.value.context.ssr.loaderData`. No extra hooks, no separate subscriptions.
+- **TypeScript DX** — module augmentation on `@real-router/types` `StateContext` interface. Each plugin augments its own namespace. Consumers get full autocompletion on `state.context.*`.
+- **Zero hot-path overhead** — `claim.write(state, value)` is a literal property assignment (`state.context[namespace] = value`). No proxy, no observable wrapper, no clone.
+
+### Before
+
+```typescript
+// navigation-plugin — WeakMap storage, global getter
+const metaMap = new WeakMap<State, NavigationMeta>();
+
+// During transition
+metaMap.set(toState, { direction: "forward", userInitiated: true });
+
+// Consumer access — must import and call a global method
+const meta = router.getNavigationMeta(router.getState());
+```
+
+### After
+
+```typescript
+// navigation-plugin — claim-based, data on state
+const claim = api.claimContextNamespace("navigation");
+
+// During transition — direct property assignment
+claim.write(toState, { direction: "forward", userInitiated: true });
+
+// Consumer access — property read on route
+const direction = route.context.navigation.direction;
+```
+
+### Migrated plugins
+
+| Plugin                     | Context namespace    | Data                                             |
+| -------------------------- | -------------------- | ------------------------------------------------ |
+| `navigation-plugin`        | `navigation`         | direction, sourceElement, userInitiated           |
+| `ssr-data-plugin`          | `ssr`                | loader data                                      |
+| `persistent-params-plugin` | `persistentParams`   | persistent params snapshot                        |
+| `browser-plugin`           | `browser`            | popstate/navigate source                         |
+| `memory-plugin`            | `memory`             | direction, historyIndex                          |
+
+### Not migrated
+
+`hash-plugin` (low-priority analog of browser-plugin), `search-schema-plugin`, `preload-plugin`, `validation-plugin`, `lifecycle-plugin`, `logger-plugin` — none of these produce data consumed by UI. They either transform inputs (search-schema, validation), orchestrate side-effects (lifecycle, preload), or observe without writing (logger, hash).
+
 ## Leading Zeros in `numberFormat: "auto"` (search-params)
 
 ### Problem

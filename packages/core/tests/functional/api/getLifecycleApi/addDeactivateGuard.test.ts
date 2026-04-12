@@ -5,7 +5,7 @@ import {
   createLifecycleTestRouter,
   errorCodes,
   noop,
-  omitMeta,
+  pickRouteIdentity,
   type Router,
 } from "./setup";
 import { getLifecycleApi } from "../../../../src/api";
@@ -35,7 +35,7 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
       expect(error?.segment).toStrictEqual("users.list");
     }
 
-    expect(omitMeta(router.getState())).toStrictEqual({
+    expect(pickRouteIdentity(router.getState())).toStrictEqual({
       name: "users.list",
       params: {},
       path: "/users/list",
@@ -45,7 +45,7 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
 
     await router.navigate("users");
 
-    expect(omitMeta(router.getState())).toStrictEqual({
+    expect(pickRouteIdentity(router.getState())).toStrictEqual({
       name: "users",
       params: {},
       path: "/users",

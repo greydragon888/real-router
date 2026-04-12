@@ -1,4 +1,3 @@
-import { browserPluginFactory } from "@real-router/browser-plugin";
 import { createRouter } from "@real-router/core";
 import {
   describe,
@@ -9,6 +8,8 @@ import {
   afterAll,
   vi,
 } from "vitest";
+
+import { browserPluginFactory } from "@real-router/browser-plugin";
 
 import {
   createStressRouter,

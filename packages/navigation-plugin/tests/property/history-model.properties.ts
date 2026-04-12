@@ -1,17 +1,21 @@
 import { fc, test } from "@fast-check/vitest";
+import { getPluginApi } from "@real-router/core/api";
 import { describe, expect } from "vitest";
 
 import {
   LEAF_ROUTE_NAMES,
+  NUM_RUNS,
   PARAM_ROUTE_NAME,
   arbLeafRoute,
   arbIdParam,
   createPluginRouterWithMock,
 } from "./helpers";
+import { findLastEntryForRoute } from "../../src/history-extensions";
 
-import type { NavigationBrowser } from "../../src/types";
+import type { NavigationBrowser } from "../../src";
 import type { MockNavigation } from "../helpers/mockNavigation";
 import type { Router } from "@real-router/core";
+import type { PluginApi } from "@real-router/core/api";
 
 // =============================================================================
 // Model
@@ -32,6 +36,7 @@ interface HistoryReal {
   router: Router;
   mockNav: MockNavigation;
   browser: NavigationBrowser;
+  api: PluginApi;
 }
 
 // =============================================================================
@@ -265,7 +270,7 @@ class AssertMetaExistsCommand implements fc.AsyncCommand<
     const state = r.router.getState();
 
     if (state) {
-      const meta = r.router.getNavigationMeta(state);
+      const meta = state.context.navigation;
 
       expect(meta).toBeDefined();
       expect(meta!.navigationType).toBeDefined();
@@ -275,6 +280,150 @@ class AssertMetaExistsCommand implements fc.AsyncCommand<
 
   toString() {
     return "assertMetaExists()";
+  }
+}
+
+class AssertFindLastEntryForRouteCommand implements fc.AsyncCommand<
+  HistoryModel,
+  HistoryReal
+> {
+  check(m: Readonly<HistoryModel>) {
+    return m.started;
+  }
+
+  async run(m: HistoryModel, r: HistoryReal) {
+    const entries = r.browser.entries();
+    const currentKey = r.browser.currentEntry?.key;
+
+    for (const routeName of LEAF_ROUTE_NAMES) {
+      // Model: find last index != cursor where stack[i] === routeName
+      let expectedIndex = -1;
+
+      for (let i = m.stack.length - 1; i >= 0; i--) {
+        if (i !== m.cursor && m.stack[i] === routeName) {
+          expectedIndex = i;
+
+          break;
+        }
+      }
+
+      const result = findLastEntryForRoute(
+        entries,
+        routeName,
+        r.api,
+        "",
+        currentKey,
+      );
+
+      if (expectedIndex === -1) {
+        expect(result).toBeUndefined();
+      } else {
+        expect(result).toBeDefined();
+      }
+    }
+  }
+
+  toString() {
+    return "assertFindLastEntryForRoute()";
+  }
+}
+
+class AssertNavigationTypeCommand implements fc.AsyncCommand<
+  HistoryModel,
+  HistoryReal
+> {
+  check(m: Readonly<HistoryModel>) {
+    return m.started;
+  }
+
+  async run(_m: HistoryModel, r: HistoryReal) {
+    const state = r.router.getState();
+
+    if (!state) {
+      return;
+    }
+
+    const meta = state.context.navigation;
+
+    expect(meta).toBeDefined();
+
+    const validTypes = ["push", "replace", "traverse", "reload"];
+
+    expect(validTypes).toContain(meta!.navigationType);
+
+    const validDirections = ["forward", "back", "unknown"];
+
+    expect(validDirections).toContain(meta!.direction);
+  }
+
+  toString() {
+    return "assertNavigationType()";
+  }
+}
+
+class AssertCanGoBackPeekConsistencyCommand implements fc.AsyncCommand<
+  HistoryModel,
+  HistoryReal
+> {
+  check(m: Readonly<HistoryModel>) {
+    return m.started;
+  }
+
+  async run(_m: HistoryModel, r: HistoryReal) {
+    const back = r.router.canGoBack();
+    const peeked = r.router.peekBack();
+
+    expect(back).toBe(peeked !== undefined);
+  }
+
+  toString() {
+    return "assertCanGoBackPeekConsistency()";
+  }
+}
+
+class AssertCanGoBackToImpliesCanGoBackCommand implements fc.AsyncCommand<
+  HistoryModel,
+  HistoryReal
+> {
+  check(m: Readonly<HistoryModel>) {
+    return m.started;
+  }
+
+  async run(_m: HistoryModel, r: HistoryReal) {
+    for (const routeName of LEAF_ROUTE_NAMES) {
+      if (r.router.canGoBackTo(routeName)) {
+        expect(r.router.canGoBack()).toBe(true);
+      }
+    }
+  }
+
+  toString() {
+    return "assertCanGoBackToImpliesCanGoBack()";
+  }
+}
+
+/**
+ * B13: canGoBackTo(r) === true → hasVisited(r) === true
+ * A route cannot be in back history if it was never visited.
+ */
+class AssertCanGoBackToImpliesHasVisitedCommand implements fc.AsyncCommand<
+  HistoryModel,
+  HistoryReal
+> {
+  check(m: Readonly<HistoryModel>) {
+    return m.started;
+  }
+
+  async run(_m: HistoryModel, r: HistoryReal) {
+    for (const routeName of LEAF_ROUTE_NAMES) {
+      if (r.router.canGoBackTo(routeName)) {
+        expect(r.router.hasVisited(routeName)).toBe(true);
+      }
+    }
+  }
+
+  toString() {
+    return "assertCanGoBackToImpliesHasVisited()";
   }
 }
 
@@ -298,15 +447,21 @@ const allCommands = [
   fc.constant(new AssertVisitedCommand()),
   fc.constant(new AssertCanGoBackToCommand()),
   fc.constant(new AssertMetaExistsCommand()),
+  fc.constant(new AssertFindLastEntryForRouteCommand()),
+  fc.constant(new AssertNavigationTypeCommand()),
+  fc.constant(new AssertCanGoBackPeekConsistencyCommand()),
+  fc.constant(new AssertCanGoBackToImpliesCanGoBackCommand()),
+  fc.constant(new AssertCanGoBackToImpliesHasVisitedCommand()),
 ];
 
 describe("Navigation Plugin History Model", () => {
   test.prop([fc.commands(allCommands, { size: "+1" })], {
-    numRuns: 100,
+    numRuns: NUM_RUNS.fast,
   })(
     "history extensions stay consistent under random navigation sequences",
     async (cmds) => {
       const { router, mockNav, browser } = createPluginRouterWithMock();
+      const api = getPluginApi(router);
 
       const initialRoute = "index";
 
@@ -319,7 +474,7 @@ describe("Navigation Plugin History Model", () => {
           started: true,
           currentParams: {},
         },
-        real: { router, mockNav, browser },
+        real: { router, mockNav, browser, api },
       });
 
       await fc.asyncModelRun(setup, cmds);

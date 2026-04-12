@@ -7,7 +7,7 @@ import {
   rebuildTreeInPlace,
   resetStore,
 } from "./routesStore";
-import { constants } from "../../constants";
+import { constants, DEFAULT_TRANSITION } from "../../constants";
 import { getTransitionPath } from "../../transitionPath";
 
 import type { RoutesStore } from "./routesStore";
@@ -107,7 +107,7 @@ export class RoutesNamespace<
         );
       }
 
-      if (toState.transition?.reload) {
+      if (toState.transition.reload) {
         return true;
       }
 
@@ -403,6 +403,8 @@ export class RoutesNamespace<
         name,
         params: effectiveParams,
         path: "",
+        transition: DEFAULT_TRANSITION,
+        context: {},
       };
 
       return this.#deps.areStatesEqual(

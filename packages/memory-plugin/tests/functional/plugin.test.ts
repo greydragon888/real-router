@@ -543,4 +543,85 @@ describe("Memory plugin", () => {
       expect(router.canGoForward()).toBe(true);
     });
   });
+
+  describe("state.context.memory", () => {
+    beforeEach(async () => {
+      router.usePlugin(memoryPluginFactory());
+    });
+
+    it('direction is "navigate" for programmatic navigation', async () => {
+      await router.start("/");
+
+      const state = await router.navigate("users");
+
+      expect(state.context.memory).toStrictEqual({
+        direction: "navigate",
+        historyIndex: 1,
+      });
+    });
+
+    it('direction is "navigate" and historyIndex 0 on start', async () => {
+      const state = await router.start("/");
+
+      expect(state.context.memory).toStrictEqual({
+        direction: "navigate",
+        historyIndex: 0,
+      });
+    });
+
+    it('direction is "back" after back()', async () => {
+      await router.start("/");
+      await router.navigate("users");
+
+      await waitForTransition(router, () => {
+        router.back();
+      });
+
+      const state = router.getState()!;
+
+      expect(state.context.memory?.direction).toBe("back");
+      expect(state.context.memory?.historyIndex).toBe(0);
+    });
+
+    it('direction is "forward" after forward()', async () => {
+      await router.start("/");
+      await router.navigate("users");
+
+      await waitForTransition(router, () => {
+        router.back();
+      });
+
+      await waitForTransition(router, () => {
+        router.forward();
+      });
+
+      const state = router.getState()!;
+
+      expect(state.context.memory?.direction).toBe("forward");
+      expect(state.context.memory?.historyIndex).toBe(1);
+    });
+
+    it("context.memory is frozen", async () => {
+      const state = await router.start("/");
+
+      expect(Object.isFrozen(state.context.memory)).toBe(true);
+    });
+
+    it("is available in subscribe callback", async () => {
+      await router.start("/");
+
+      let contextMemory: unknown;
+
+      router.subscribe(({ route }) => {
+        contextMemory = route.context.memory;
+      });
+
+      await router.navigate("users");
+
+      expect(contextMemory).toStrictEqual({
+        direction: "navigate",
+        historyIndex: 1,
+      });
+    });
+  });
 });

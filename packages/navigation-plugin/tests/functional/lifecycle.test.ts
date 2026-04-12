@@ -298,6 +298,30 @@ describe("Navigation Plugin — Lifecycle", () => {
 
       expect(router.getState()?.name).toBe("index");
     });
+
+    it("router state remains unchanged when guard blocks browser-initiated navigation", async () => {
+      router = createRouter(routerConfig, {
+        defaultRoute: "home",
+        queryParamsMode: "default",
+      });
+      unsubscribe = router.usePlugin(
+        navigationPluginFactory({ forceDeactivate: false }, browser),
+      );
+      await router.start();
+      await router.navigate("users.list");
+
+      getLifecycleApi(router).addDeactivateGuard(
+        "users.list",
+        () => () => false,
+      );
+
+      mockNav.navigate("http://localhost/home");
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Guard blocks navigation — router state stays at users.list
+      // (In real Navigation API, URL also auto-rolls back via event.intercept() rejection)
+      expect(router.getState()!.name).toBe("users.list");
+    });
   });
 
   describe("Plugin Lifecycle — Listener Management", () => {
@@ -389,6 +413,30 @@ describe("Navigation Plugin — Lifecycle", () => {
       expect(() => {
         router.replaceHistoryState("definitely.nonexistent.route");
       }).toThrow("[real-router] Cannot replace state");
+    });
+  });
+
+  describe("Hash Fragment Preservation", () => {
+    beforeEach(async () => {
+      unsubscribe = router.usePlugin(navigationPluginFactory({}, browser));
+    });
+
+    it("preserves hash when navigating to the same path", async () => {
+      mockNav.navigate("http://localhost/home#section", { history: "replace" });
+      await router.start();
+
+      await router.navigate("home", {}, { reload: true });
+
+      expect(mockNav.currentUrl).toContain("#section");
+    });
+
+    it("clears hash when navigating to a different path", async () => {
+      mockNav.navigate("http://localhost/home#section", { history: "replace" });
+      await router.start();
+
+      await router.navigate("users.list");
+
+      expect(mockNav.currentUrl).not.toContain("#section");
     });
   });
 

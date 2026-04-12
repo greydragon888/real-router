@@ -3120,6 +3120,9 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
+      '@real-router/types':
+        specifier: workspace:^
+        version: link:../core-types
     devDependencies:
       '@testing-library/jest-dom':
         specifier: 6.9.1
@@ -3201,12 +3204,18 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
+      '@real-router/types':
+        specifier: workspace:^
+        version: link:../core-types
 
   packages/navigation-plugin:
     dependencies:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
+      '@real-router/types':
+        specifier: workspace:^
+        version: link:../core-types
     devDependencies:
       jsdom:
         specifier: 28.1.0
@@ -3222,6 +3231,9 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
+      '@real-router/types':
+        specifier: workspace:^
+        version: link:../core-types
     devDependencies:
       type-guards:
         specifier: workspace:^
@@ -3529,6 +3541,9 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
+      '@real-router/types':
+        specifier: workspace:^
+        version: link:../core-types
 
   packages/svelte:
     dependencies:

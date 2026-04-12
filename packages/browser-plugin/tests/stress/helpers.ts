@@ -1,10 +1,11 @@
-import { browserPluginFactory } from "@real-router/browser-plugin";
 import { createRouter } from "@real-router/core";
+
+import { browserPluginFactory } from "@real-router/browser-plugin";
 
 import { createSafeBrowser } from "../../src/browser-env/index.js";
 
 import type { Browser } from "../../src/browser-env/index.js";
-import type { Router, State, Unsubscribe } from "@real-router/core";
+import type { Router, Unsubscribe } from "@real-router/core";
 
 export const noop = (): void => undefined;
 
@@ -41,10 +42,10 @@ export function createStressRouter(options?: {
 
   const browser: Browser = {
     ...safeBrowser,
-    pushState: (state: State, url: string) => {
+    pushState: (state: unknown, url: string) => {
       safeBrowser.pushState(state, url);
     },
-    replaceState: (state: State, url: string) => {
+    replaceState: (state: unknown, url: string) => {
       safeBrowser.replaceState(state, url);
     },
   };

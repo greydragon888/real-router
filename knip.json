@@ -74,6 +74,7 @@
     "packages/browser-plugin": {
       "project": ["src/**/*.ts"],
       "ignore": ["src/browser-env/**"],
+      "ignoreDependencies": ["@real-router/types"],
       "vitest": {
         "config": ["vitest.config.mts", "vitest.config.*.mts"]
       }
@@ -88,7 +89,28 @@
     "packages/navigation-plugin": {
       "project": ["src/**/*.ts"],
       "ignore": ["src/browser-env/**"],
-      "ignoreDependencies": ["type-guards"],
+      "ignoreDependencies": ["type-guards", "@real-router/types"],
+      "vitest": {
+        "config": ["vitest.config.mts", "vitest.config.*.mts"]
+      }
+    },
+    "packages/memory-plugin": {
+      "project": ["src/**/*.ts"],
+      "ignoreDependencies": ["@real-router/types"],
+      "vitest": {
+        "config": ["vitest.config.mts", "vitest.config.*.mts"]
+      }
+    },
+    "packages/persistent-params-plugin": {
+      "project": ["src/**/*.ts"],
+      "ignoreDependencies": ["@real-router/types"],
+      "vitest": {
+        "config": ["vitest.config.mts", "vitest.config.*.mts"]
+      }
+    },
+    "packages/ssr-data-plugin": {
+      "project": ["src/**/*.ts"],
+      "ignoreDependencies": ["@real-router/types"],
       "vitest": {
         "config": ["vitest.config.mts", "vitest.config.*.mts"]
       }

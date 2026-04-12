@@ -341,6 +341,10 @@ Multiple interceptors per method execute in **LIFO** order (last-registered wrap
 
 Plugins extend the router instance with new properties via `extendRouter()` on `PluginApi`. Throws `RouterError(PLUGIN_CONFLICT)` if any key already exists (atomic validation). Extensions are tracked in `RouterInternals.routerExtensions` and cleaned up on unsubscribe or `dispose()`.
 
+### Context Namespace Claims
+
+Plugins publish per-route data via `claimContextNamespace()` on `PluginApi`. Each plugin claims a unique namespace key at registration time (O(1) collision detection via `Set<string>`), receives a `{ write, release }` object, and publishes data to `state.context.<namespace>` from lifecycle hooks. Mirrors the `extendRouter()` ownership model: closure-based tracking, manual `release()` in `teardown()`, dispose safety net for orphaned claims. Five plugins use this: navigation (`direction`, `sourceElement`), ssr-data (`data`), persistent-params (`persistentParams`), browser (`source`), memory (`direction`, `historyIndex`).
+
 ### Validator Slot
 
 `@real-router/validation-plugin` uses a unique extension mechanism — not interceptors, not event listeners, but a **nullable validator slot** in `RouterInternals`:
@@ -421,7 +425,7 @@ These are deliberately designed constraints. Violating them will break the syste
 
 ### Extension Boundaries
 
-- Plugins extend the router **only** via `extendRouter()` — never by mutating the router prototype or internals
+- Plugins extend the router **only** via `extendRouter()` and publish per-route data **only** via `claimContextNamespace()` — never by mutating the router prototype or internals
 - Interceptors wrap methods **only** from `InterceptableMethodMap` — the set is fixed at compile time
 - Guards registered via route config are tracked separately from guards registered via `addActivateGuard()` — `replace()` clears only definition-sourced guards
 

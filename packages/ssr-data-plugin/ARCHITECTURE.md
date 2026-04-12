@@ -4,15 +4,17 @@
 
 ## Overview
 
-`@real-router/ssr-data-plugin` loads per-route data during SSR by intercepting `router.start()`. After route resolution, the matching loader runs and its result is stored in a `WeakMap<State, unknown>`, accessible via `router.getRouteData()`.
+`@real-router/ssr-data-plugin` loads per-route data during SSR by intercepting `router.start()`. After route resolution, the matching loader runs and its result is written to `state.context.data` via the claim-based API, accessible on the returned state object.
 
 **Core role:** A stateless interceptor that bridges route resolution and data loading on the server. Contains no rendering, serialization, or framework logic.
 
 **Integration points with the core:**
 
+- `api.claimContextNamespace("data")` — claims exclusive ownership of `state.context.data`
 - `addInterceptor("start", ...)` — wraps `start()` to load data after route resolution
-- `api.extendRouter({ getRouteData })` — exposes data retrieval on the router instance
-- Plugin hook (`teardown`) — removes interceptor and extension
+- `claim.write(state, data)` — writes loader result to the state's context
+- `claim.release()` — releases the namespace claim on teardown
+- Plugin hook (`teardown`) — removes interceptor and releases claim
 
 ## Package Structure
 
@@ -20,7 +22,7 @@
 ssr-data-plugin/
 ├── src/
 │   ├── index.ts        — Public API (exports factory + types) + module augmentation
-│   ├── factory.ts      — ssrDataPluginFactory (validation, interceptor, extension)
+│   ├── factory.ts      — ssrDataPluginFactory (validation, interceptor, claim-based context)
 │   ├── validation.ts   — validateLoaders (factory-time validation)
 │   ├── types.ts        — DataLoaderFn, DataLoaderMap
 │   └── constants.ts    — ERROR_PREFIX, LOGGER_CONTEXT
@@ -38,9 +40,10 @@ index.ts
 
 External dependencies:
 
-| Dependency          | What it provides                                           | Used in      |
-| ------------------- | ---------------------------------------------------------- | ------------ |
-| `@real-router/core` | `getPluginApi`, types (`State`, `PluginFactory`, `Plugin`) | `factory.ts` |
+| Dependency           | What it provides                                           | Used in      |
+| -------------------- | ---------------------------------------------------------- | ------------ |
+| `@real-router/core`  | `getPluginApi`, types (`PluginFactory`, `Plugin`)          | `factory.ts` |
+| `@real-router/types` | `StateContext` (module augmentation target)                 | `index.ts`   |
 
 ## Factory Pattern
 
@@ -57,16 +60,17 @@ ssrDataPluginFactory(loaders)                ← factory.ts
                 │  Called by router.usePlugin():
                 │
                 ├── api = getPluginApi(router)
-                ├── dataStore = new WeakMap<State, unknown>()
+                ├── claim = api.claimContextNamespace("data")
                 ├── api.addInterceptor("start", ...)
-                ├── api.extendRouter({ getRouteData })
+                │       └── claim.write(state, data)
                 └── return { teardown }
+                        └── claim.release()
 ```
 
 **Why a closure instead of a class?**
 
-- No mutable state — `dataStore` is a `WeakMap` that only grows via `set()`, never needs reassignment
-- No cross-method coordination — the interceptor and `getRouteData` share only the `WeakMap` reference
+- No mutable state — `claim` is the only binding, used for `write()` and `release()`
+- No cross-method coordination — the interceptor uses `claim.write()`, teardown uses `claim.release()`
 - Fewer files, fewer abstractions — proportional to the plugin's complexity
 
 ## Data Flow
@@ -84,7 +88,7 @@ router.start(url)
         │
         ├── Object.hasOwn(loaders, state.name)?
         │     YES: data = await loaders[state.name](state.params)
-        │           dataStore.set(state, data)
+        │           claim.write(state, data)    ← writes to state.context.data
         │     NO:  skip (no data for this route)
         │
         └── return state
@@ -92,19 +96,14 @@ router.start(url)
 
 The interceptor runs **after** route resolution. If guards block the navigation, `next()` rejects and the loader never runs.
 
-### getRouteData()
+### Accessing data
 
 ```
-router.getRouteData(state?)
-        │
-        ├── s = state ?? router.getState()
-        │
-        ├── s is null? → return null (router not started)
-        │
-        └── dataStore.get(s) ?? null
+const state = await router.start(url);
+state.context.data    ← loader result, or undefined if no loader matched
 ```
 
-Returns `null` for both "no state" and "no data for this state" cases.
+Data lives directly on the state object's context. No separate retrieval method needed.
 
 ## SSR Usage Flow
 
@@ -113,19 +112,18 @@ Returns `null` for both "no state" and "no data for this state" cases.
 const router = cloneRouter(baseRouter, deps);
 router.usePlugin(ssrDataPluginFactory(loaders));
                                                     ← factory validates loaders (once)
-                                                    ← usePlugin registers interceptor + extension
+                                                    ← usePlugin claims "data" namespace + registers interceptor
 
 const state = await router.start(url);
                                                     ← interceptor: next(url) → state resolved
-                                                    ← loader runs → dataStore.set(state, data)
+                                                    ← loader runs → claim.write(state, data)
 
-const data = router.getRouteData();
-                                                    ← dataStore.get(router.getState()) → data
+const data = state.context.data;
+                                                    ← data lives on state.context, no separate lookup
 
 const html = renderToString(<App />);
 router.dispose();
-                                                    ← teardown: removes interceptor + extension
-                                                    ← WeakMap entries eligible for GC
+                                                    ← teardown: removes interceptor + releases claim
 ```
 
 ## Teardown Lifecycle
@@ -139,8 +137,8 @@ unsubscribe() or router.dispose()
         ├── removeStartInterceptor()
         │     └── array.splice — cannot throw
         │
-        └── removeExtensions()
-              └── deletes getRouteData from router instance
+        └── claim.release()
+              └── releases "data" namespace, allowing other plugins to claim it
 ```
 
 Both operations are synchronous and infallible. No try/catch needed (unlike `persistent-params-plugin` which calls `setRootPath` during teardown).
@@ -156,16 +154,17 @@ Both operations are synchronous and infallible. No try/catch needed (unlike `per
 
 Throws `TypeError` with `[@real-router/ssr-data-plugin]` prefix on violation.
 
-No runtime validation — loaders are trusted after factory-time check. Loader return values are stored as-is in the `WeakMap`.
+No runtime validation — loaders are trusted after factory-time check. Loader return values are written as-is to `state.context.data` via `claim.write()`.
 
 ## Design Decisions
 
-### WeakMap<State, unknown> for storage
+### Claim-based API for state.context.data
 
-- States are frozen objects — valid WeakMap keys
-- Automatic GC: when a State is no longer referenced (after `dispose()` or next navigation), its data is collected
-- No manual cleanup, no memory leaks, no stale data
-- O(1) lookup by state reference
+- `api.claimContextNamespace("data")` ensures exclusive ownership — no other plugin can write to the same namespace
+- `claim.write(state, data)` writes loader result directly to `state.context.data`
+- Data lives on the state object itself — no external store, no lookup by reference
+- `claim.release()` on teardown frees the namespace for other plugins
+- Module augmentation on `@real-router/types` provides type safety for `state.context.data`
 
 ### Object.hasOwn for loader lookup
 
@@ -183,13 +182,13 @@ Caching is intentionally omitted:
 
 One stress test validates the core SSR invariant: **per-request isolation under concurrency**.
 
-500 parallel `cloneRouter` → `usePlugin` → `start(/users/{i})` → `getRouteData()` → `dispose()` cycles run simultaneously via `Promise.all`. Each request receives a unique URL and must retrieve its own data — no cross-request leakage.
+500 parallel `cloneRouter` → `usePlugin` → `start(/users/{i})` → `state.context.data` → `dispose()` cycles run simultaneously via `Promise.all`. Each request receives a unique URL and must retrieve its own data — no cross-request leakage.
 
 This tests:
 
 | Concern                     | What could go wrong                                        |
 | --------------------------- | ---------------------------------------------------------- |
-| WeakMap isolation           | Shared WeakMap between clones would mix data               |
+| Claim isolation             | Shared claim between clones would mix data                 |
 | Interceptor registration    | Clone reuses parent's interceptor chain instead of own     |
 | Teardown under load         | `dispose()` of one clone corrupts another's state          |
 | Loader dispatch correctness | Wrong `state.name` → wrong loader called under concurrency |

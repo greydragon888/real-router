@@ -63,7 +63,7 @@ export function validateCountThresholds(
 
 export function validatePluginKeys(plugin: unknown): void {
   for (const key in plugin as Record<string, unknown>) {
-    if (!(key === "teardown" || key in PLUGIN_EVENTS_MAP)) {
+    if (!(key === "teardown" || Object.hasOwn(PLUGIN_EVENTS_MAP, key))) {
       throw new TypeError(
         `[router.usePlugin] Unknown property '${key}'. Plugin must only contain event handlers and optional teardown.`,
       );

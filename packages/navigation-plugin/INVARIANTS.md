@@ -92,6 +92,7 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 - `entryToState(entry, api, base)` returns `{ name: "users.view", params: { id: "123" }, path: "/users/123", ... }`
 - If entry URL doesn't match any route, returns `undefined`
 - Base path is correctly stripped before matching
+- Search params from entry URL are ignored — matching is by pathname only
 
 **Why it matters:** History queries depend on accurate URL→state mapping.
 
@@ -274,7 +275,7 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 - `router.getState().name === "users.list"`
 - `router.peekBack()` returns `users.view`
 - `router.peekForward()` returns `undefined`
-- Navigation meta has `navigationType: "traverse"`
+- `state.context.navigation` has `navigationType: "traverse"` and `direction: "back"`
 
 **Why it matters:** Enables jumping directly to a previous occurrence without stepping through intermediate entries.
 
@@ -299,21 +300,36 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 
 ---
 
+### B13. canGoBackTo Implies hasVisited
+**Category:** History Extensions  
+**Testable:** PBT-testable (model-based)  
+**Description:** `canGoBackTo(routeName)` returning `true` implies `hasVisited(routeName)` is also `true`. The converse does not hold — a route may have been visited but only in forward history or as the current entry.
+
+**Precondition:**
+- Any navigation history sequence
+
+**Postcondition:**
+- For every route `r`: `canGoBackTo(r) === true` → `hasVisited(r) === true`
+
+**Why it matters:** Ensures logical consistency between history query functions. A route cannot be reachable via back navigation if it was never visited.
+
+---
+
 ## C. NavigationMeta Invariants
 
 ### C1. Meta Attachment on Success
 **Category:** NavigationMeta  
 **Testable:** Example-based  
-**Description:** Every successful transition must have meta attached to the resulting state.
+**Description:** Every successful transition must have meta attached to the resulting state via `state.context.navigation`.
 
 **Precondition:**
 - Call `router.navigate("users.list")`
 - Transition succeeds
 
 **Postcondition:**
-- `router.getNavigationMeta(state)` returns a `NavigationMeta` object
-- Meta has `navigationType` and `userInitiated` fields
-- Meta is stored in `metaByState` WeakMap
+- `state.context.navigation` is a frozen `NavigationMeta` object
+- Meta has `navigationType`, `userInitiated`, `direction`, and `sourceElement` fields
+- Meta is written via `claim.write(state, Object.freeze(meta))`
 
 **Why it matters:** Enables tracking navigation type and origin for every state.
 
@@ -340,16 +356,16 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 ### C3. pendingMeta Lifecycle
 **Category:** NavigationMeta  
 **Testable:** Example-based  
-**Description:** `pendingMeta` must follow a strict lifecycle: set → consumed in onTransitionSuccess → cleared.
+**Description:** `pendingMeta` must follow a strict lifecycle: set → written to `toState.context.navigation` in `onTransitionStart` → written again in `onTransitionSuccess` → cleared.
 
 **Precondition:**
 - Call `router.navigate("users.list")`
 
 **Postcondition:**
 - Before transition: `pendingMeta` is `undefined`
-- During transition (in guards): `getNavigationMeta()` returns `pendingMeta`
+- During transition (in guards): `toState.context.navigation` contains the frozen pendingMeta (for browser-initiated navigation)
 - After `onTransitionSuccess`: `pendingMeta` is cleared to `undefined`
-- `metaByState` contains the meta for the new state
+- `toState.context.navigation` contains the frozen meta
 
 **Why it matters:** Prevents meta from leaking between transitions.
 
@@ -418,8 +434,8 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 
 **Postcondition:**
 - `meta.info === { source: "link" }`
-- Info is available in guards via `getNavigationMeta()`
-- Info is available in subscribe callbacks via `getNavigationMeta(state)`
+- Info is available in guards via `toState.context.navigation`
+- Info is available in subscribe callbacks via `state.context.navigation`
 
 **Why it matters:** Enables passing context through navigate events.
 
@@ -540,7 +556,7 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 ### E3. teardown Cleanup Completeness
 **Category:** Lifecycle  
 **Testable:** Example-based  
-**Description:** `teardown` must clean up all resources: listener, start interceptor, and extensions.
+**Description:** `teardown` must clean up all resources: listener, start interceptor, extensions, and context namespace claim.
 
 **Precondition:**
 - Plugin is fully initialized and running
@@ -550,6 +566,7 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 - Navigate listener is removed
 - Start interceptor is removed
 - Router extensions are removed
+- Context namespace claim is released (`claim.release()`)
 - All cleanup functions are called
 
 **Why it matters:** Ensures complete cleanup when plugin is disposed.
@@ -703,6 +720,58 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 
 ---
 
+### G4. shouldReplaceHistory Domain Completeness
+**Category:** URL Handling  
+**Testable:** PBT-testable  
+**Description:** `shouldReplaceHistory(navOptions, toState, fromState)` must return a boolean for any valid input combination without throwing.
+
+**Precondition:**
+- `navOptions.replace` can be `true`, `false`, or `undefined`
+- `navOptions.reload` can be `true`, `false`, or `undefined`
+- `fromState` can be `State` or `undefined`
+
+**Postcondition:**
+- Always returns `boolean` (never throws)
+- `replace: true` → always `true`
+- `fromState === undefined` (initial navigation) → always `true` (regardless of replace/reload values)
+- `reload && same path` → `true`
+
+**Why it matters:** Crash on specific input combinations (#447) — `replace: false` with `fromState: undefined` causes TypeError. The `??` operator treats `false` differently from `undefined`, bypassing the null guard.
+
+---
+
+### G5. normalizeBase Structural Guarantees
+**Category:** URL Handling  
+**Testable:** PBT-testable  
+**Description:** `normalizeBase(base)` for non-empty input must produce a string that starts with `/` and does not end with `/`.
+
+**Precondition:**
+- `base` is a non-empty string
+
+**Postcondition:**
+- `normalizeBase(base)` starts with `/`
+- `normalizeBase(base)` does not end with `/`
+
+**Why it matters:** Downstream functions (`extractPath`, `buildUrl`) assume normalized base has a leading slash and no trailing slash. Violation causes double-slash URLs or incorrect path stripping.
+
+---
+
+### G6. computeDirection Reflexivity
+**Category:** URL Handling  
+**Testable:** PBT-testable  
+**Description:** `computeDirection("traverse", i, i)` must return `"unknown"` when destination and current indices are equal.
+
+**Precondition:**
+- `navigationType` is `"traverse"`
+- `destinationIndex === currentIndex`
+
+**Postcondition:**
+- Returns `"unknown"` (not `"forward"` or `"back"`)
+
+**Why it matters:** Traversing to the current entry has no direction. Returning `"back"` is semantically incorrect and misleads subscribers relying on `direction` for UI transitions (#448).
+
+---
+
 ## H. State Consistency Invariants
 
 ### H1. NavigationHistoryState Completeness
@@ -722,21 +791,21 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 
 ---
 
-### H2. Meta WeakMap Cleanup
+### H2. Meta Lifecycle on State Context
 **Category:** State Consistency  
 **Testable:** Example-based  
-**Description:** States that are garbage collected must have their meta cleaned up automatically.
+**Description:** Navigation meta lives on `state.context.navigation` and is garbage collected with the state.
 
 **Precondition:**
 - Navigate to state S1
-- Store reference to S1
+- `S1.context.navigation` contains frozen NavigationMeta
 - Navigate to state S2
 - Delete reference to S1
 
 **Postcondition:**
-- S1 is garbage collected
-- Meta for S1 is automatically cleaned up (WeakMap)
-- No memory leak from meta storage
+- S1 and its context (including navigation meta) are garbage collected together
+- No separate storage to leak (meta is on the state object itself)
+- `claim.release()` in teardown frees the namespace for reuse
 
 **Why it matters:** Prevents memory leaks from accumulated meta objects.
 
@@ -764,7 +833,7 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 ### I2. Plugin Disposal Order
 **Category:** Integration  
 **Testable:** Example-based  
-**Description:** Cleanup must happen in correct order: listener → interceptor → extensions.
+**Description:** Cleanup must happen in correct order: listener → interceptor → extensions → claim release.
 
 **Precondition:**
 - Plugin is fully initialized
@@ -773,6 +842,7 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 - `teardown()` removes listener first
 - Then removes start interceptor
 - Then removes extensions
+- Then releases context namespace claim
 - All cleanup functions are called
 
 **Why it matters:** Prevents use-after-free errors.
@@ -915,8 +985,9 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 | G1. Base Path Stripping | URL | PBT | High |
 | G2. Base Path Building | URL | PBT | High |
 | G3. URL Parsing Robustness | URL | PBT | High |
+| G4. shouldReplaceHistory Domain Completeness | URL | PBT | Critical |
 | H1. NavigationHistoryState Completeness | State | Example | High |
-| H2. Meta WeakMap Cleanup | State | Example | Medium |
+| H2. Meta Lifecycle on State Context | State | Example | Medium |
 | I1. Plugin Initialization Order | Integration | Example | High |
 | I2. Plugin Disposal Order | Integration | Example | High |
 | I3. Compatibility | Integration | Example | Medium |

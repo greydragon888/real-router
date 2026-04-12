@@ -252,6 +252,7 @@ export class Router<
         this.#state.set(state);
       },
       routerExtensions: [],
+      contextClaimRecords: new Set(),
     });
 
     // =========================================================================
@@ -453,6 +454,9 @@ export class Router<
     }
 
     ctx.routerExtensions.length = 0;
+
+    // Safety net: release context namespace claims plugins failed to release in teardown
+    ctx.contextClaimRecords.clear();
 
     this.#routes.clearRoutes();
     this.#routeLifecycle.clearAll();

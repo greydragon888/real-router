@@ -1,6 +1,5 @@
 import { createRouter, errorCodes } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
-import { hashPluginFactory } from "@real-router/hash-plugin";
 import {
   describe,
   beforeAll,
@@ -10,6 +9,8 @@ import {
   it,
   expect,
 } from "vitest";
+
+import { hashPluginFactory } from "@real-router/hash-plugin";
 
 import {
   noop,

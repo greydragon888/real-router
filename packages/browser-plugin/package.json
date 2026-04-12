@@ -55,7 +55,8 @@
   },
   "sideEffects": false,
   "dependencies": {
-    "@real-router/core": "workspace:^"
+    "@real-router/core": "workspace:^",
+    "@real-router/types": "workspace:^"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "6.9.1",

@@ -7,6 +7,8 @@ import {
   getRoutesApi,
 } from "@real-router/core/api";
 
+import { DEFAULT_TRANSITION } from "../../src/constants";
+
 import type { Route, Router, State, Params } from "@real-router/core";
 
 // =============================================================================
@@ -155,6 +157,8 @@ export const arbState: fc.Arbitrary<State> = fc
     name: r.name,
     params: r.params,
     path: r.path,
+    transition: DEFAULT_TRANSITION,
+    context: {},
   }));
 
 // =============================================================================

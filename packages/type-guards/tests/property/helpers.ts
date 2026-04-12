@@ -116,6 +116,16 @@ export const invalidParamsArbitrary = fc.dictionary(
 // Arbitraries for State types
 // ============================================================================
 
+const STUB_TRANSITION = Object.freeze({
+  phase: "activating",
+  reason: "success",
+  segments: Object.freeze({
+    deactivated: Object.freeze([]),
+    activated: Object.freeze([]),
+    intersection: "",
+  }),
+}) as unknown as State["transition"];
+
 /**
  * Generator for minimal valid State
  * Note: uses valid route names and paths since isState now validates via isRequiredFields
@@ -124,6 +134,8 @@ export const stateMinimalArbitrary: fc.Arbitrary<State> = fc.record({
   name: validRouteNameArbitrary,
   path: validRoutePathArbitrary,
   params: paramsSimpleArbitrary,
+  transition: fc.constant(STUB_TRANSITION),
+  context: fc.constant({} as State["context"]),
 });
 
 /**
@@ -134,6 +146,8 @@ export const stateFullArbitrary = fc.record({
   name: validRouteNameArbitrary,
   path: validRoutePathArbitrary,
   params: paramsWithArraysArbitrary,
+  transition: fc.constant(STUB_TRANSITION),
+  context: fc.constant({} as State["context"]),
   extra: fc.option(fc.string(), { nil: undefined }),
 }) as fc.Arbitrary<State>;
 

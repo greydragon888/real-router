@@ -1,6 +1,6 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { createTestRouter, omitMeta } from "../../../helpers";
+import { createTestRouter, pickRouteIdentity } from "../../../helpers";
 
 import type { Router } from "@real-router/core";
 
@@ -24,7 +24,7 @@ describe("router.navigate() - query params", () => {
 
     const state = router.getState();
 
-    expect(omitMeta(state)).toMatchObject({
+    expect(pickRouteIdentity(state)).toMatchObject({
       name: "users.view",
       path: "/users/view/123?q=search&page=2",
     });

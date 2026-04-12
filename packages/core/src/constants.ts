@@ -6,6 +6,7 @@ import type {
   ErrorCodeToValueMap,
   ErrorCodeKeys,
   ErrorCodeValues,
+  TransitionMeta,
 } from "@real-router/types";
 
 export type ConstantsKeys = "UNKNOWN_ROUTE";
@@ -35,6 +36,7 @@ export const errorCodes: ErrorCodeToValueMap = Object.freeze({
   TRANSITION_CANCELLED: "CANCELLED", // Navigation cancelled by user or new navigation
   ROUTER_DISPOSED: "DISPOSED", // Router has been disposed
   PLUGIN_CONFLICT: "PLUGIN_CONFLICT", // Plugin tried to extend router with already-existing property
+  CONTEXT_NAMESPACE_ALREADY_CLAIMED: "CONTEXT_NAMESPACE_ALREADY_CLAIMED", // Plugin tried to claim a context namespace already owned by another plugin
 });
 
 /**
@@ -85,3 +87,15 @@ export const DEFAULT_LIMITS = {
 } as const;
 
 export const EMPTY_PARAMS: Readonly<Record<string, never>> = Object.freeze({});
+
+const FROZEN_EMPTY_SEGMENTS = Object.freeze({
+  deactivated: Object.freeze([]) as unknown as string[],
+  activated: Object.freeze([]) as unknown as string[],
+  intersection: "",
+});
+
+export const DEFAULT_TRANSITION = Object.freeze({
+  phase: "activating",
+  reason: "success",
+  segments: FROZEN_EMPTY_SEGMENTS,
+}) as TransitionMeta;

@@ -10,7 +10,7 @@ import {
 import { completeTransition } from "./transition/completeTransition";
 import { routeTransitionError } from "./transition/errorHandling";
 import { executeGuardPipeline } from "./transition/guardPhase";
-import { errorCodes, constants } from "../../constants";
+import { EMPTY_PARAMS, errorCodes, constants } from "../../constants";
 import { RouterError } from "../../RouterError";
 import { getTransitionPath, nameToIDs } from "../../transitionPath";
 
@@ -310,9 +310,10 @@ export class NavigationNamespace {
 
     const state: State = {
       name: constants.UNKNOWN_ROUTE,
-      params: {} as Params,
+      params: EMPTY_PARAMS as Params,
       path,
       transition: transitionMeta,
+      context: {},
     };
 
     Object.freeze(state);

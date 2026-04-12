@@ -3,7 +3,7 @@ import { describe, afterEach, beforeEach, it, expect, beforeAll } from "vitest";
 import { createRouter } from "@real-router/core";
 import { getPluginApi } from "@real-router/core/api";
 
-import { createTestRouter, omitMeta } from "../helpers";
+import { createTestRouter, pickRouteIdentity } from "../helpers";
 
 import type { Router } from "@real-router/core";
 
@@ -65,7 +65,7 @@ describe("core/utils", () => {
 
     it("should decode path params on match", () => {
       expect(
-        omitMeta(
+        pickRouteIdentity(
           getPluginApi(router).matchPath<{ one: string; two: string }>(
             "/encoded/hello/123",
           ),
@@ -86,7 +86,7 @@ describe("core/utils", () => {
       const neverRouter = createTestRouter({ trailingSlash: "never" });
 
       expect(
-        omitMeta(getPluginApi(neverRouter).matchPath("/profile")),
+        pickRouteIdentity(getPluginApi(neverRouter).matchPath("/profile")),
       ).toStrictEqual({
         name: "profile.me",
         params: {},
@@ -98,7 +98,7 @@ describe("core/utils", () => {
       const alwaysRouter = createTestRouter({ trailingSlash: "always" });
 
       expect(
-        omitMeta(getPluginApi(alwaysRouter).matchPath("/profile")),
+        pickRouteIdentity(getPluginApi(alwaysRouter).matchPath("/profile")),
       ).toStrictEqual({
         name: "profile.me",
         params: {},

@@ -1,4 +1,9 @@
-import type { HistoryEntry, MemoryPluginOptions } from "./types";
+import type {
+  HistoryEntry,
+  MemoryContext,
+  MemoryDirection,
+  MemoryPluginOptions,
+} from "./types";
 import type {
   NavigationOptions,
   Plugin,
@@ -14,13 +19,19 @@ export class MemoryPlugin {
   readonly #maxHistory: number;
   readonly #entries: HistoryEntry[] = [];
   readonly #removeExtensions: () => void;
+  readonly #claim: {
+    write: (state: State, value: MemoryContext) => void;
+    release: () => void;
+  };
   #index = -1;
   #navigatingFromHistory = false;
+  #pendingDirection: MemoryDirection = "navigate";
   #goGeneration = 0;
 
   constructor(router: Router, api: PluginApi, options: MemoryPluginOptions) {
     this.#router = router;
     this.#maxHistory = options.maxHistoryLength ?? DEFAULT_MAX_HISTORY;
+    this.#claim = api.claimContextNamespace("memory");
 
     this.#removeExtensions = api.extendRouter({
       back: () => {
@@ -45,6 +56,14 @@ export class MemoryPlugin {
         opts: NavigationOptions,
       ) => {
         if (this.#navigatingFromHistory) {
+          this.#claim.write(
+            toState,
+            Object.freeze({
+              direction: this.#pendingDirection,
+              historyIndex: this.#index,
+            }),
+          );
+
           return;
         }
 
@@ -68,6 +87,14 @@ export class MemoryPlugin {
             this.#index = Math.max(0, this.#index - overflow);
           }
         }
+
+        this.#claim.write(
+          toState,
+          Object.freeze({
+            direction: "navigate" as const,
+            historyIndex: this.#index,
+          }),
+        );
       },
 
       onStop: () => {
@@ -76,6 +103,7 @@ export class MemoryPlugin {
 
       teardown: () => {
         this.#removeExtensions();
+        this.#claim.release();
         this.#clear();
       },
     };
@@ -104,6 +132,7 @@ export class MemoryPlugin {
     const previousIndex = this.#index;
     const generation = ++this.#goGeneration;
 
+    this.#pendingDirection = delta > 0 ? "forward" : "back";
     this.#navigatingFromHistory = true;
     this.#index = targetIndex;
 

@@ -27,7 +27,7 @@ import type { Route, Router } from "@real-router/core";
 // =============================================================================
 
 export const NUM_RUNS = {
-  fast: 100,
+  fast: 200,
   standard: 500,
 } as const;
 
@@ -92,11 +92,11 @@ export const arbIdParam: fc.Arbitrary<{ id: string }> = fc.record({
  * Used in P3/P4 (base inclusion and roundtrip) where we want a clean,
  * predictable base without testing normalization itself.
  */
-export const arbNormalizedBase: fc.Arbitrary<string> = fc.constantFrom(
-  "",
-  "/app",
-  "/sub",
-  "/nested/base",
+export const arbNormalizedBase: fc.Arbitrary<string> = fc.oneof(
+  fc.constant(""),
+  fc
+    .array(fc.stringMatching(/^[a-z]{1,6}$/), { minLength: 1, maxLength: 3 })
+    .map((segs) => `/${segs.join("/")}`),
 );
 
 /**
@@ -108,6 +108,14 @@ export const arbBaseSegment: fc.Arbitrary<string> = fc.constantFrom(
   "/app",
   "/sub",
   "/base",
+);
+
+export const arbRawBase: fc.Arbitrary<string> = fc.oneof(
+  fc.constant(""),
+  fc.stringMatching(/^\/[a-z]{1,8}$/),
+  fc.stringMatching(/^[a-z]{1,8}$/),
+  fc.stringMatching(/^\/[a-z]{1,8}\/$/),
+  fc.stringMatching(/^\/[a-z]{1,4}\/[a-z]{1,4}$/),
 );
 
 // --- P2c: URL-unsafe character params ---
@@ -136,9 +144,12 @@ const arbPathSegment: fc.Arbitrary<string> = fc.stringMatching(
   /^[a-z0-9][a-z0-9_-]{0,9}$/,
 );
 
-export const arbUrlPath: fc.Arbitrary<string> = fc
-  .array(arbPathSegment, { minLength: 1, maxLength: 3 })
-  .map((segments) => `/${segments.join("/")}`);
+export const arbUrlPath: fc.Arbitrary<string> = fc.oneof(
+  fc.constant("/"),
+  fc
+    .array(arbPathSegment, { minLength: 1, maxLength: 3 })
+    .map((segments) => `/${segments.join("/")}`),
+);
 
 // --- non-matching paths (guaranteed to miss all fixture routes) ---
 

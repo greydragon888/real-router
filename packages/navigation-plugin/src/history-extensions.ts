@@ -94,11 +94,15 @@ export function getRouteVisitCount(
   base: string,
   routeName: string,
 ): number {
-  return browser.entries().filter((entry) => {
-    const state = entryToState(entry, api, base);
+  let count = 0;
 
-    return state?.name === routeName;
-  }).length;
+  for (const entry of browser.entries()) {
+    if (entryToState(entry, api, base)?.name === routeName) {
+      count++;
+    }
+  }
+
+  return count;
 }
 
 /**

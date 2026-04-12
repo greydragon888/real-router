@@ -46,6 +46,9 @@
     "lint:types": "attw --pack ."
   },
   "sideEffects": false,
+  "dependencies": {
+    "@real-router/types": "workspace:^"
+  },
   "peerDependencies": {
     "@real-router/core": "workspace:^"
   }

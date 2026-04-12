@@ -1,10 +1,13 @@
+import { DEFAULT_TRANSITION } from "../../src/constants";
 import { setStateMetaParams } from "../../src/stateMetaStore";
 
 import type { Params, State } from "@real-router/core";
 
 export { createTestRouter } from "./testRouters";
 
-export function omitMeta(obj?: State): State | undefined {
+export function pickRouteIdentity(
+  obj?: State,
+): Pick<State, "name" | "params" | "path"> | undefined {
   if (!obj) {
     return;
   }
@@ -25,6 +28,8 @@ export const makeState = (
     name,
     path: `/${name.replaceAll(".", "/")}`,
     params,
+    transition: DEFAULT_TRANSITION,
+    context: {},
   };
 
   setStateMetaParams(state, metaParams);
