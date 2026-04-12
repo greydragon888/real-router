@@ -21,15 +21,18 @@ import type { PluginApi } from "@real-router/core/api";
 // Model
 // =============================================================================
 
+interface StackEntry {
+  name: string;
+  params: Record<string, string>;
+}
+
 interface HistoryModel {
-  /** Route names in the history stack (ordered) */
-  stack: string[];
+  /** Route names and params in the history stack (ordered) */
+  stack: StackEntry[];
   /** Current position in the stack */
   cursor: number;
   /** Whether the router has been started */
   started: boolean;
-  /** Current route params (for SAME_STATES prevention) */
-  currentParams: Record<string, string>;
 }
 
 interface HistoryReal {
@@ -54,13 +57,15 @@ class NavigateCommand implements fc.AsyncCommand<HistoryModel, HistoryReal> {
       return false;
     }
 
-    if (m.stack[m.cursor] !== this.routeName) {
+    const current = m.stack[m.cursor];
+
+    if (current.name !== this.routeName) {
       return true;
     }
 
     // Same route — check if params differ
     if (this.params) {
-      return this.params.id !== m.currentParams.id;
+      return this.params.id !== current.params.id;
     }
 
     // Same leaf route, same params — skip to prevent SAME_STATES
@@ -71,9 +76,11 @@ class NavigateCommand implements fc.AsyncCommand<HistoryModel, HistoryReal> {
     await r.router.navigate(this.routeName, this.params ?? {});
 
     m.stack = m.stack.slice(0, m.cursor + 1);
-    m.stack.push(this.routeName);
+    m.stack.push({
+      name: this.routeName,
+      params: this.params ? { ...this.params } : {},
+    });
     m.cursor = m.stack.length - 1;
-    m.currentParams = this.params ? { ...this.params } : {};
   }
 
   toString() {
@@ -92,7 +99,6 @@ class BackCommand implements fc.AsyncCommand<HistoryModel, HistoryReal> {
     await r.mockNav.goBack();
     await new Promise((resolve) => setTimeout(resolve, 10));
     m.cursor--;
-    m.currentParams = {};
   }
 
   toString() {
@@ -109,7 +115,6 @@ class ForwardCommand implements fc.AsyncCommand<HistoryModel, HistoryReal> {
     await r.mockNav.goForward();
     await new Promise((resolve) => setTimeout(resolve, 10));
     m.cursor++;
-    m.currentParams = {};
   }
 
   toString() {
@@ -168,7 +173,7 @@ class AssertPeekBackCommand implements fc.AsyncCommand<
 
     if (m.cursor > 0) {
       expect(peeked).toBeDefined();
-      expect(peeked!.name).toBe(m.stack[m.cursor - 1]);
+      expect(peeked!.name).toBe(m.stack[m.cursor - 1].name);
     } else {
       expect(peeked).toBeUndefined();
     }
@@ -192,7 +197,7 @@ class AssertPeekForwardCommand implements fc.AsyncCommand<
 
     if (m.cursor < m.stack.length - 1) {
       expect(peeked).toBeDefined();
-      expect(peeked!.name).toBe(m.stack[m.cursor + 1]);
+      expect(peeked!.name).toBe(m.stack[m.cursor + 1].name);
     } else {
       expect(peeked).toBeUndefined();
     }
@@ -212,7 +217,7 @@ class AssertVisitedCommand implements fc.AsyncCommand<
   }
 
   async run(m: HistoryModel, r: HistoryReal) {
-    const uniqueRoutes = [...new Set(m.stack)];
+    const uniqueRoutes = [...new Set(m.stack.map((entry) => entry.name))];
     const visited = r.router.getVisitedRoutes();
 
     for (const route of uniqueRoutes) {
@@ -224,7 +229,7 @@ class AssertVisitedCommand implements fc.AsyncCommand<
     );
 
     for (const route of uniqueRoutes) {
-      const expected = m.stack.filter((name) => name === route).length;
+      const expected = m.stack.filter((entry) => entry.name === route).length;
 
       expect(r.router.getRouteVisitCount(route)).toBe(expected);
     }
@@ -244,10 +249,10 @@ class AssertCanGoBackToCommand implements fc.AsyncCommand<
   }
 
   async run(m: HistoryModel, r: HistoryReal) {
-    const backEntries = new Set(m.stack.slice(0, m.cursor));
+    const backNames = new Set(m.stack.slice(0, m.cursor).map((entry) => entry.name));
 
     for (const routeName of LEAF_ROUTE_NAMES) {
-      const expected = backEntries.has(routeName);
+      const expected = backNames.has(routeName);
 
       expect(r.router.canGoBackTo(routeName)).toBe(expected);
     }
@@ -300,7 +305,7 @@ class AssertFindLastEntryForRouteCommand implements fc.AsyncCommand<
       let expectedIndex = -1;
 
       for (let i = m.stack.length - 1; i >= 0; i--) {
-        if (i !== m.cursor && m.stack[i] === routeName) {
+        if (i !== m.cursor && m.stack[i].name === routeName) {
           expectedIndex = i;
 
           break;
@@ -469,10 +474,9 @@ describe("Navigation Plugin History Model", () => {
 
       const setup = (): { model: HistoryModel; real: HistoryReal } => ({
         model: {
-          stack: [initialRoute],
+          stack: [{ name: initialRoute, params: {} }],
           cursor: 0,
           started: true,
-          currentParams: {},
         },
         real: { router, mockNav, browser, api },
       });
