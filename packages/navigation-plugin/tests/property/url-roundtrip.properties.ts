@@ -209,6 +209,28 @@ describe("Navigation Plugin URL Invariants", () => {
         expect(result).toStrictEqual(path);
       },
     );
+
+    test.prop(
+      [
+        fc
+          .tuple(
+            fc.stringMatching(/^\/[a-z]{1,4}$/),
+            fc.stringMatching(/^[a-z]{1,6}$/),
+          )
+          .map(([base, suffix]) => ({
+            base,
+            pathname: `${base}${suffix}/page`,
+          })),
+      ],
+      { numRuns: NUM_RUNS.standard },
+    )(
+      "extractPath never strips a partial segment prefix (#446)",
+      ({ base, pathname }) => {
+        const result = extractPath(pathname, base);
+
+        expect(result).toBe(pathname);
+      },
+    );
   });
 
   describe("matchUrl — non-matching URLs", () => {
