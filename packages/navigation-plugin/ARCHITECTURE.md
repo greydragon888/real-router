@@ -114,28 +114,23 @@ navigationPluginFactory(opts?, browser?)   ← factory.ts
 ```typescript
 // factory.ts
 export function navigationPluginFactory(opts?, browser?): PluginFactory {
-  validateOptions(opts);
-  const options = { ...defaultOptions, ...opts };
-  options.base = normalizeBase(options.base);
-
   if (!browser && isBrowserEnvironment() && !("navigation" in globalThis)) {
     throw new Error(
       "[navigation-plugin] Navigation API is not supported. Use @real-router/browser-plugin instead.",
     );
   }
 
-  const resolvedBrowser =
-    browser ??
-    (isBrowserEnvironment()
-      ? createNavigationBrowser(options.base)
-      : createNavigationFallbackBrowser("navigation-plugin"));
+  validateOptions(opts);
+  const options = { ...defaultOptions, ...opts };
+  options.base = normalizeBase(options.base);
 
+  const resolvedBrowser = browser ?? createBrowser(options.base);
   const transitionOptions = { forceDeactivate, source, replace: true as const };
   const shared: NavigationSharedState = { removeNavigateListener: undefined };
 
   return function navigationPlugin(routerBase) {
     const plugin = new NavigationPlugin(
-      routerBase,
+      routerBase as Router,
       getPluginApi(routerBase),
       options,
       resolvedBrowser,
@@ -145,6 +140,14 @@ export function navigationPluginFactory(opts?, browser?): PluginFactory {
 
     return plugin.getPlugin();
   };
+}
+
+function createBrowser(base: string): NavigationBrowser {
+  if ("navigation" in globalThis) {
+    return createNavigationBrowser(base);
+  }
+
+  return createNavigationFallbackBrowser("navigation-plugin");
 }
 ```
 

@@ -92,6 +92,7 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 - `entryToState(entry, api, base)` returns `{ name: "users.view", params: { id: "123" }, path: "/users/123", ... }`
 - If entry URL doesn't match any route, returns `undefined`
 - Base path is correctly stripped before matching
+- Search params from entry URL are ignored — matching is by pathname only
 
 **Why it matters:** History queries depend on accurate URL→state mapping.
 

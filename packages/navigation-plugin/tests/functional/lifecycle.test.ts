@@ -392,6 +392,30 @@ describe("Navigation Plugin — Lifecycle", () => {
     });
   });
 
+  describe("Hash Fragment Preservation", () => {
+    beforeEach(async () => {
+      unsubscribe = router.usePlugin(navigationPluginFactory({}, browser));
+    });
+
+    it("preserves hash when navigating to the same path", async () => {
+      mockNav.navigate("http://localhost/home#section", { history: "replace" });
+      await router.start();
+
+      await router.navigate("home", {}, { reload: true });
+
+      expect(mockNav.currentUrl).toContain("#section");
+    });
+
+    it("clears hash when navigating to a different path", async () => {
+      mockNav.navigate("http://localhost/home#section", { history: "replace" });
+      await router.start();
+
+      await router.navigate("users.list");
+
+      expect(mockNav.currentUrl).not.toContain("#section");
+    });
+  });
+
   describe("Validation Edge Cases", () => {
     it("skips validation when opts is undefined", () => {
       expect(() => navigationPluginFactory(undefined, browser)).not.toThrow();
