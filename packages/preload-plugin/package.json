@@ -45,12 +45,12 @@
   },
   "scripts": {
     "test": "vitest",
-    "build": "tsdown --config-loader unrun",
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
     "lint:package": "publint",
     "lint:types": "attw --pack .",
-    "test:properties": "vitest --config vitest.config.properties.mts --run"
+    "test:properties": "vitest --config vitest.config.properties.mts --run",
+    "bundle": "tsdown --config-loader unrun"
   },
   "sideEffects": false,
   "dependencies": {

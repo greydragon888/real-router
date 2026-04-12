@@ -16,8 +16,9 @@ pnpm monorepo with 29 packages + bare `shared/` sources (symlinked into consumer
 ## Key Commands
 
 ```bash
-pnpm build              # Build all packages (errors-only output)
+pnpm build              # Full validation + build (type-check → lint → test → bundle)
 pnpm build:verbose      # Build with full output (debugging)
+pnpm bundle             # Bundle only (tsdown/rollup/svelte-package, no validation)
 pnpm test -- --run      # Run tests once (errors-only output)
 pnpm test:verbose       # Tests with full output (debugging)
 pnpm lint               # ESLint
@@ -69,7 +70,7 @@ pnpm lint:unused        # Check for unused code (knip)
 When creating a new `packages/*` package, complete every item:
 
 ### Scaffold
-- `package.json` — version **`0.0.1`** (changesets will bump to `0.1.0` on first release), `"type": "commonjs"`, dual ESM/CJS exports (`types` → `import` → `require`)
+- `package.json` — version **`0.0.1`** (changesets will bump to `0.1.0` on first release), `"type": "commonjs"`, dual ESM/CJS exports (`types` → `import` → `require`), `"bundle"` script (not `"build"` — turbo `build` task is an orchestrator with no own command)
 - `tsconfig.json` — extends `../../tsconfig.json`, include `src` and `tests`
 - `tsconfig.node.json` — extends `../../tsconfig.node.json`, include `*.mts` and root configs
 - `tsdown.config.mts` — use `createBrowserConfig()` or `createIsomorphicConfig()` from `../../tsdown.base.js`

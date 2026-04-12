@@ -46,11 +46,11 @@
   "scripts": {
     "test": "vitest",
     "test:properties": "vitest run --config vitest.config.properties.mts",
-    "build": "tsdown --config-loader unrun",
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
     "lint:package": "publint",
-    "lint:types": "attw --pack ."
+    "lint:types": "attw --pack .",
+    "bundle": "tsdown --config-loader unrun"
   },
   "sideEffects": false,
   "dependencies": {
