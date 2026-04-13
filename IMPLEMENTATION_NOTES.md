@@ -272,9 +272,17 @@ Added `release` type for release commits:
 
 ## CI Pipeline
 
-### Consolidated CI
+### Single Pipeline Architecture
 
-`.github/workflows/ci.yml` — single workflow with parallel jobs: Lint & Type Check, Test (with coverage), Build. Downstream jobs: Coverage (Codecov), SonarCloud, Bundle Size, Package Smoke Test. Gate job: "CI Result" (single required status check).
+`.github/workflows/ci.yml` — single workflow with a unified `Pipeline` job that replaces the former parallel Lint & Type Check + Test + Build jobs. Downstream jobs: Coverage (Codecov), SonarCloud, Bundle Size, Package Smoke Test. Gate job: "CI Result" (single required status check).
+
+Pipeline runs two turbo invocations in one VM:
+1. `turbo run test test:properties test:stress -- --coverage` — full validation (type-check → lint → test), vitest receives `--coverage` via turbo passthrough
+2. `turbo run bundle` — only tsdown/rollup/svelte-package, deps cached from step 1
+
+**Why not parallel jobs:** Parallel lint and test jobs caused a turbo remote cache race condition — both ran `type-check` simultaneously, neither could read the other's cache. Merging into one job eliminates the race and saves one VM's billing time.
+
+**Why two turbo invocations:** `turbo run build -- --coverage` passes `--coverage` to `build` scripts (tsdown), not to `test` scripts (vitest). Separate invocations ensure vitest gets `--coverage` and bundle step gets cache hits from step 1.
 
 ### Package Smoke Test
 
@@ -302,10 +310,12 @@ Node.js 24 only (no matrix). Runs on `ubuntu-latest`.
 CI uses turbo `--filter` with git diff syntax for incremental builds:
 
 ```yaml
-# Dynamic base: push uses github.event.before, PR uses origin/master fallback
-pnpm turbo run lint type-check --filter='...[$TURBO_BASE]' --filter='!./examples/**'
-pnpm turbo run test --filter='...[$TURBO_BASE]' --filter='!./examples/**' -- --coverage
-pnpm turbo run build --filter='...[$TURBO_BASE]' --filter='!./examples/**'
+# Pipeline job — two turbo invocations:
+pnpm turbo run test test:properties test:stress --filter='...[$TURBO_BASE]' --filter='!./examples/**' -- --coverage
+pnpm turbo run bundle --filter='...[$TURBO_BASE]' --filter='!./examples/**'
+
+# Smoke job — all packages, cache from pipeline:
+pnpm turbo run bundle --filter='./packages/*'
 ```
 
 `$TURBO_BASE` is computed by the `check` job: `github.event.before` for push events, `origin/master` for PRs.
@@ -334,7 +344,7 @@ All CI workflows migrated from `pnpm/action-setup@v4` to `pnpm/action-setup@v5` 
 
 | Workflow             | File                       | Purpose                                                                                |
 | -------------------- | -------------------------- | -------------------------------------------------------------------------------------- |
-| CI                   | `ci.yml`                   | Full pipeline on PRs: lint, type-check, test, build, smoke test, coverage, bundle size |
+| CI                   | `ci.yml`                   | Single Pipeline job on PRs: test + bundle, then smoke test, coverage, bundle size      |
 | Post-Merge Build     | `post-merge.yml`           | Build-only verification on master push                                                 |
 | Changesets           | `changesets.yml`           | Versioning and npm publish (triggered by Post-Merge Build success)                     |
 | Changeset Check      | `changeset-check.yml`      | Validate changesets on PRs (format, references)                                        |
@@ -353,7 +363,7 @@ Bundle Size job (in `ci.yml`) compares bundle sizes between PR and base branch:
 - Shows per-package sizes and total
 - Warns if size limit exceeded
 
-**Optimization:** PR sizes use dist artifacts downloaded from the prepare job (no rebuild). Base branch uses `build:dist-only` task (skips tests/lint). The PR's `turbo.json` is saved before checking out base and restored after — ensures `build:dist-only` task definition is available even on older base branches.
+**Optimization:** PR sizes use dist artifacts downloaded from the Pipeline job (no rebuild). Base branch uses `bundle` task (only tsdown, skips tests/lint). The PR's `turbo.json` is saved before checking out base and restored after — ensures `bundle` task definition is available even on older base branches.
 
 ### Security Scanning
 
@@ -505,7 +515,7 @@ Uses syncpack v14 (Rust rewrite). `syncpack.config.mjs` enforces:
 
 ## Turbo Configuration
 
-Uses turbo v2.9.1.
+Uses turbo v2.9.5.
 
 **v2.9 migration:** Adopted `futureFlags` for the new global configuration schema:
 
@@ -514,7 +524,8 @@ Uses turbo v2.9.1.
   "globalConfiguration": true,
   "errorsOnlyShowHash": true,
   "affectedUsingTaskInputs": true,
-  "watchUsingTaskInputs": true
+  "watchUsingTaskInputs": true,
+  "filterUsingTasks": true
 }
 ```
 
@@ -563,18 +574,23 @@ Uses turbo v2.9.1.
 ### Build Dependency Chain
 
 ```
-build → depends on ^build (upstream packages) + test + test:properties + test:stress
-test → depends on ^build + lint + type-check
-test:properties → depends on ^build + test + lint + type-check
-test:stress → depends on ^build + test:properties + test + lint + type-check
+bundle → depends on ^bundle (upstream packages only, no test/lint)
+build  → depends on bundle + test + test:properties + test:stress (orchestrator, no own command)
+test → depends on ^bundle + lint + type-check
+test:properties → depends on ^bundle + test + lint + type-check
+test:stress → depends on ^bundle + test:properties + test + lint + type-check
 type-check → no dependencies (reads src directly via customConditions, #431)
-lint:package → depends on build (publint validates exports paths in dist)
-lint:types → depends on build (attw validates .d.ts across module variants)
+lint:package → depends on bundle (publint validates exports paths in dist)
+lint:types → depends on bundle (attw validates .d.ts across module variants)
 ```
 
-**Why type-check has no dependencies:** After the `@real-router/internal-source` custom export condition was added (#431 root fix), monorepo `tsc --noEmit` resolves workspace packages directly to `src/*.ts` via `tsconfig.json` `customConditions`. No `dist/` is required. See "Custom `@real-router/internal-source` Export Condition" below for the full saga.
+**`bundle` vs `build`:** `bundle` is a lightweight task that only runs the bundler (tsdown/rollup/svelte-package) and upstream `^bundle`. `build` is an orchestrator with `Command = <NONEXISTENT>` (no script in package.json) that depends on `bundle` + all test tiers. turbo runs all dependencies, skips the non-existent command, and records cache. This allows `turbo run bundle` to produce dist/ without running tests.
 
-Build only runs after all test tiers pass. `test:properties` (property-based tests via fast-check) and `test:stress` (stress/load tests) run after unit tests.
+**Cache sharing:** `turbo run build` triggers `bundle` as a dependency → caches `bundle:*`. Subsequent `turbo run bundle` gets cache hits. CI Pipeline uses this: step 1 (test) triggers `^bundle` for upstream, step 2 (`turbo run bundle`) gets cache hits for upstream and only runs bundle for leaf affected packages.
+
+**Why `^bundle` instead of `^build`:** Test/lint tasks only need upstream `dist/` (for import resolution), not upstream test results. Depending on `^build` would run upstream tests before downstream tests — unnecessary serialization. Upstream tests run via their own `turbo run build` in pre-push hooks and CI.
+
+**Why type-check has no dependencies:** After the `@real-router/internal-source` custom export condition was added (#431 root fix), monorepo `tsc --noEmit` resolves workspace packages directly to `src/*.ts` via `tsconfig.json` `customConditions`. No `dist/` is required. See "Custom `@real-router/internal-source` Export Condition" below for the full saga.
 
 ### Input Patterns Performance
 
@@ -640,21 +656,30 @@ pnpm test:verbose       # Tests with full output
 "**/*.{ts,tsx,vue,svelte}"
 ```
 
-### `build:dist-only` Task (Removed in #431 Root Fix)
+### `build:dist-only` → `bundle` Task Evolution
 
-**Historical context:** This task was introduced (#403) as a "fast build without tests" for CI bundle size comparison, then spread as a workaround for flaky CI after #421 removed the `"development"` export condition and forced `type-check` to read `dist/` artifacts. It turned into a core part of the flake pattern — parallel `tsdown` invocations on the same `dist/` directory created a race condition exposed by #431.
+**Phase 1 — `build:dist-only` (#403):** Introduced as a "fast build without tests" for CI bundle size comparison. Became a workaround for flaky CI after #421 forced `type-check` to read `dist/` artifacts. Created a race condition with parallel `tsdown` invocations exposed by #431.
 
-**Removed in Stage 3 of the #431 root fix.** Replaced by the `@real-router/internal-source` custom export condition that lets `tsc` read `src/*.ts` directly in the monorepo. See "Custom `@real-router/internal-source` Export Condition" below.
+**Phase 2 — Removed (#431 root fix):** `build:dist-only` removed entirely. `@real-router/internal-source` custom export condition let `tsc` read `src/*.ts` directly. See "Custom `@real-router/internal-source` Export Condition" below.
 
-Previously:
+**Phase 3 — `bundle` task (current):** Re-introduced as `bundle` with a cleaner design. Unlike the old `build:dist-only` (which was a parallel copy of `build`), `bundle` is the **canonical build step** — `build` depends on it:
 
 ```json
-"build:dist-only": {
-  "dependsOn": ["^build:dist-only"],
+"bundle": {
+  "dependsOn": ["^bundle"],
   "outputs": ["dist/**"],
-   "inputs": ["src/**/*.{ts,tsx,vue,svelte}", "tsdown.config.*", "tsconfig.json", "package.json"]
+  "inputs": ["src/**/*.{ts,tsx,vue,svelte}", "tsdown.config.*", "tsconfig.json", "package.json"]
+},
+"build": {
+  "dependsOn": ["bundle", "test", "test:properties", "test:stress"],
+  "inputs": [],
+  "outputs": []
 }
 ```
+
+Package.json scripts: `"bundle": "tsdown"` (no `"build"` script — turbo handles `<NONEXISTENT>` by running dependencies and recording cache). Cache sharing: `turbo run build` caches `bundle:*`, subsequent `turbo run bundle` gets hits.
+
+Used in CI: smoke test and bundle-size run `turbo run bundle` (~32 tasks) instead of `turbo run build` (~161 tasks with full test graph).
 
 ### Custom `@real-router/internal-source` Export Condition
 
@@ -749,7 +774,7 @@ For external consumers (Vite, Webpack, Node.js, etc.):
 
 - **#431** — Flaky CI `type-check` from stale `dist/`. Structurally impossible now that `type-check` doesn't depend on `dist/`.
 - **#425** — Incomplete `.d.ts` from tsdown+rolldown RC. No longer affects monorepo `tsc`. Still affects external consumers until tsdown/rolldown stabilize, but that's out of our hands.
-- **#403** — Build:dist-only optimization. Removed along with the task; CI bundle size workflow now uses the unified `build` task with cache hits from the Test job.
+- **#403** — Build:dist-only optimization. Evolved into the `bundle` task — lightweight bundling without test dependencies. CI bundle size and smoke test use `turbo run bundle` instead of `turbo run build`.
 
 ### `test:e2e` Task
 
@@ -757,7 +782,7 @@ New turbo task for Playwright e2e tests in example applications:
 
 ```json
 "test:e2e": {
-  "dependsOn": ["^build"],
+  "dependsOn": ["^bundle"],
   "inputs": [
     "src/**/*.{ts,tsx,vue,svelte}",
     "e2e/**/*.{ts,tsx}",
@@ -769,7 +794,7 @@ New turbo task for Playwright e2e tests in example applications:
 }
 ```
 
-Depends on `^build` to ensure packages are compiled before examples run e2e tests.
+Depends on `^bundle` to ensure packages are compiled before examples run e2e tests. Uses `^bundle` (not `^build`) — e2e tests only need dist/, not upstream test validation.
 
 ## macOS Development Setup
 
@@ -2103,8 +2128,8 @@ Rename task scripts in examples so turbo cannot find them:
 
 - `"test": "vitest run"` → `"test:unit": "vitest run"` in 30 example package.json files
 - `pnpm turbo run test` no longer finds `test` script in examples → `<NONEXISTENT>` → skipped
-- Pre-push uses `build:dist-only` instead of `build` (examples don't have `build:dist-only`)
-- `lint:package`/`lint:types` dependsOn changed from `build` to `build:dist-only`
+- Examples don't have `bundle` script, so `turbo run bundle` skips them automatically
+- `lint:package`/`lint:types` dependsOn changed to `bundle` (only need dist/, not full validation)
 
 ### Why not `--filter-deep`
 
@@ -2128,8 +2153,8 @@ Push to master (after PR merge) re-ran the full CI pipeline: Test ~8min + Lint ~
 
 Split into two workflow files:
 
-- `ci.yml` — `on: pull_request` only. Full CI: check → test + lint → build → coverage, sonarcloud, bundle-size → CI Result gate.
-- `post-merge.yml` — `on: push: branches: [master]`. Only `build:dist-only` via turbo (remote cache makes most tasks cache hit). No test, no lint, no coverage.
+- `ci.yml` — `on: pull_request` only. Single Pipeline job (test + bundle) → downstream: smoke, coverage, sonarcloud, bundle-size → CI Result gate.
+- `post-merge.yml` — `on: push: branches: [master]`. Only `bundle` via turbo (remote cache makes most tasks cache hit). No test, no lint, no coverage.
 
 ### Why not conditions in one file
 
@@ -2254,8 +2279,8 @@ Full CI pipeline (lint, type-check, test, build, coverage, bundle size, SonarClo
 
 Split into two workflows:
 
-- **`ci.yml`** (`on: pull_request`) — full pipeline: lint, type-check, test, build, coverage, bundle size
-- **`post-merge.yml`** (`on: push` to master) — build-only verification (~30s)
+- **`ci.yml`** (`on: pull_request`) — single Pipeline job (test + bundle), then downstream: smoke, coverage, bundle size
+- **`post-merge.yml`** (`on: push` to master) — bundle-only verification (~30s)
 
 ### Why this matters
 

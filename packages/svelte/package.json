@@ -25,12 +25,12 @@
     "url": "https://github.com/greydragon888/real-router/issues"
   },
   "scripts": {
-    "build": "svelte-package -i src -o dist",
     "test": "vitest",
     "test:properties": "vitest run --config vitest.config.properties.mts",
     "test:stress": "vitest run --config vitest.config.stress.mts",
     "type-check": "svelte-check --tsconfig ./tsconfig.json",
-    "lint": "eslint --cache src/ tests/ --fix --max-warnings 0"
+    "lint": "eslint --cache src/ tests/ --fix --max-warnings 0",
+    "bundle": "svelte-package -i src -o dist"
   },
   "keywords": [
     "router",

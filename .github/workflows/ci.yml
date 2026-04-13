@@ -8,7 +8,7 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# Turbo Remote Cache - shared across all parallel jobs
+# Turbo Remote Cache - shared across all jobs
 env:
   TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
   TURBO_TEAM: ${{ vars.TURBO_TEAM }}
@@ -68,11 +68,14 @@ jobs:
           fi
 
   # ============================================
-  # PARALLEL: Lint & Test run concurrently
+  # PIPELINE: Single job — test + bundle
+  # Replaces parallel lint/test + sequential build.
+  # turbo run test triggers lint + type-check as deps.
+  # turbo run bundle produces dist/ (cache-shared with build).
   # ============================================
 
-  lint:
-    name: Lint & Type Check
+  pipeline:
+    name: Pipeline
     runs-on: ubuntu-latest
     needs: [check]
     if: needs.check.outputs.should_run == 'true'
@@ -98,44 +101,30 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Lint & Type Check
-        run: pnpm turbo run lint type-check --filter='...[${{ needs.check.outputs.turbo_base || 'origin/master' }}]' --filter='!./examples/**'
+      # Full validation: type-check → lint → test → test:properties → test:stress
+      # ^bundle for upstream packages runs bundle (tsdown) as a dependency.
+      # vitest receives --coverage via turbo passthrough.
+      - name: Test with coverage
+        run: >-
+          pnpm turbo run test test:properties test:stress
+          --filter='...[${{ needs.check.outputs.turbo_base || 'origin/master' }}]'
+          --filter='!./examples/**'
+          -- --coverage
+
+      # Bundle affected packages (tsdown/rollup/svelte-package).
+      # bundle:upstream → cache hit from test step (^bundle already executed).
+      # bundle:affected-leaf → tsdown runs fresh.
+      - name: Bundle
+        run: >-
+          pnpm turbo run bundle
+          --filter='...[${{ needs.check.outputs.turbo_base || 'origin/master' }}]'
+          --filter='!./examples/**'
 
       - name: Check dependency consistency
         run: pnpm lint:deps
 
       - name: Check for duplicate dependencies
         run: pnpm lint:dedupe
-
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    needs: [check]
-    if: needs.check.outputs.should_run == 'true'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Fetch master for Turbo comparison
-        if: github.event_name == 'pull_request'
-        run: git fetch origin master:master
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v5
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Test with Coverage
-        run: pnpm turbo run test --filter='...[${{ needs.check.outputs.turbo_base || 'origin/master' }}]' --filter='!./examples/**' -- --coverage
 
       - name: Fix coverage paths
         run: |
@@ -153,45 +142,6 @@ jobs:
           path: packages/*/coverage/
           retention-days: 1
 
-  # ============================================
-  # SEQUENTIAL: Build runs after lint + test
-  # Gets full Turbo Remote Cache hits from both
-  # ============================================
-
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-    needs: [check, lint, test]
-    if: >-
-      always() &&
-      needs.check.outputs.should_run == 'true' &&
-      needs.lint.result == 'success' &&
-      needs.test.result == 'success'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Fetch master for Turbo comparison
-        if: github.event_name == 'pull_request'
-        run: git fetch origin master:master
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v5
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build
-        run: pnpm turbo run build --filter='...[${{ needs.check.outputs.turbo_base || 'origin/master' }}]' --filter='!./examples/**'
-
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7
         with:
@@ -199,17 +149,21 @@ jobs:
           path: packages/*/dist/
           retention-days: 1
 
+  # ============================================
+  # DOWNSTREAM: Smoke, Coverage, SonarCloud, Bundle Size
+  # ============================================
+
   # Smoke test: pack all public packages, install from tarballs
   # into an isolated project, verify every export resolves.
-  # Catches: private deps leaking (#413), source files in tarball (#418)
+  # Uses `bundle` (not `build`) — no test/lint overhead.
   smoke:
     name: Package Smoke Test
     runs-on: ubuntu-latest
-    needs: [check, build]
+    needs: [check, pipeline]
     if: >-
       always() &&
       needs.check.outputs.should_run == 'true' &&
-      needs.build.result == 'success'
+      needs.pipeline.result == 'success'
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -226,19 +180,18 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build packages
-        run: pnpm turbo run build --filter='!./examples/**'
+      # bundle (not build) — only tsdown, no test/lint/type-check.
+      # Affected + upstream → remote cache from pipeline.
+      # Non-affected → remote cache from previous CI runs.
+      - name: Bundle all packages
+        run: pnpm turbo run bundle --filter='./packages/*'
 
       - name: Run smoke test
         run: bash scripts/smoke-test-packages.sh
 
-  # ============================================
-  # DOWNSTREAM: Coverage, SonarCloud, Bundle Size
-  # ============================================
-
   coverage:
     name: Coverage (Codecov)
-    needs: [check, test]
+    needs: [check, pipeline]
     if: needs.check.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -265,7 +218,7 @@ jobs:
 
   sonarcloud:
     name: SonarCloud
-    needs: [check, test]
+    needs: [check, pipeline]
     if: needs.check.outputs.should_run == 'true' && github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
@@ -304,14 +257,14 @@ jobs:
 
   bundle-size:
     name: Bundle Size
-    needs: [check, build]
+    needs: [check, pipeline]
     if: needs.check.outputs.should_run == 'true' && github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: write
     steps:
-      # ── PR sizes: reuse dist artifacts from build job ──
+      # ── PR sizes: reuse dist artifacts from pipeline job ──
       - name: Checkout PR
         uses: actions/checkout@v6
 
@@ -358,7 +311,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build base branch
-        run: pnpm turbo run build --filter='./packages/*'
+        run: pnpm turbo run bundle --filter='./packages/*'
 
       - name: Get base sizes
         id: base_sizes
@@ -482,7 +435,7 @@ jobs:
   ci:
     name: CI Result
     runs-on: ubuntu-latest
-    needs: [check, lint, test, build, smoke]
+    needs: [check, pipeline, smoke]
     if: always()
     steps:
       - name: Determine result
@@ -492,14 +445,12 @@ jobs:
             exit 0
           fi
 
-          LINT="${{ needs.lint.result }}"
-          TEST="${{ needs.test.result }}"
-          BUILD="${{ needs.build.result }}"
+          PIPELINE="${{ needs.pipeline.result }}"
           SMOKE="${{ needs.smoke.result }}"
 
-          echo "lint=$LINT test=$TEST build=$BUILD smoke=$SMOKE"
+          echo "pipeline=$PIPELINE smoke=$SMOKE"
 
-          if [[ "$LINT" == "success" && "$TEST" == "success" && "$BUILD" == "success" && "$SMOKE" == "success" ]]; then
+          if [[ "$PIPELINE" == "success" && "$SMOKE" == "success" ]]; then
             echo "✅ All checks passed"
             exit 0
           fi
