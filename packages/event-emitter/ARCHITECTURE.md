@@ -13,7 +13,7 @@
 ```
 event-emitter/
 ├── src/
-│   ├── EventEmitter.ts    — Main class (265 lines)
+│   ├── EventEmitter.ts    — Main class: emit, on, off, depth tracking, limits
 │   ├── types.ts           — EventEmitterLimits, EventEmitterOptions, Unsubscribe
 │   └── index.ts           — Public API exports
 ```
