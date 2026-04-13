@@ -15,7 +15,7 @@ import { createStressRouter, noop, routeConfig } from "./helpers";
 
 import type { Unsubscribe } from "@real-router/core";
 
-describe("H4 -- Hash Prefix Switching Under Load", () => {
+describe("Hash Prefix Switching Under Load", () => {
   beforeAll(() => {
     vi.spyOn(console, "warn").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
@@ -30,7 +30,7 @@ describe("H4 -- Hash Prefix Switching Under Load", () => {
     (console.error as unknown as { mockRestore?: () => void }).mockRestore?.();
   });
 
-  it("H4.1 -- 50 cycles with hashPrefix '!': all URLs use #!/ format", async () => {
+  it("50 cycles with hashPrefix '!': all URLs use #!/ format", async () => {
     const result = createStressRouter({ hashPrefix: "!" });
 
     const { router, browser, unsubscribe } = result;
@@ -55,7 +55,7 @@ describe("H4 -- Hash Prefix Switching Under Load", () => {
     unsubscribe();
   });
 
-  it("H4.2 -- 20 router instances with different prefixes: each produces correct URL format", async () => {
+  it("20 router instances with different prefixes: each produces correct URL format", async () => {
     const prefixes = ["", "!", "~", ".", "/"];
     let completed = 0;
 
@@ -86,7 +86,7 @@ describe("H4 -- Hash Prefix Switching Under Load", () => {
     expect(completed).toBe(20);
   });
 
-  it("H4.3 -- 100 navigate with base + hashPrefix combo: URLs always formatted correctly", async () => {
+  it("100 navigate with base + hashPrefix combo: URLs always formatted correctly", async () => {
     const result = createStressRouter({ base: "/app", hashPrefix: "!" });
 
     const { router, browser, unsubscribe } = result;
@@ -111,7 +111,7 @@ describe("H4 -- Hash Prefix Switching Under Load", () => {
     unsubscribe();
   });
 
-  it("H4.4 -- rapid factory creation with different prefixes: 50 factories, no leaks or errors", async () => {
+  it("rapid factory creation with different prefixes: 50 factories, no leaks or errors", async () => {
     const unsubscribes: Unsubscribe[] = [];
     let completed = 0;
 

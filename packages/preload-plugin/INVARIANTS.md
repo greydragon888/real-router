@@ -25,9 +25,41 @@
 | 1   | Mouseover within threshold on same target is suppressed | A `mouseover` event that shares the same `target` as a preceding `touchstart` and occurs within 2500ms of it is classified as a ghost event. Prevents duplicate preload triggers on touch devices that emit synthetic mouse events. |
 | 2   | Mouseover after threshold on same target is not suppressed | A `mouseover` event that shares the same `target` as a preceding `touchstart` but occurs 2500ms or later after it is not classified as a ghost event. Ensures the suppression window does not persist indefinitely. |
 | 3   | Mouseover on different target is never suppressed | A `mouseover` event whose `target` differs from the preceding `touchstart` target is never classified as a ghost event, regardless of timing. Ghost suppression is target-scoped, not global. |
+| 4   | Negative timestamp delta never suppresses mouseover | When `mouseover.timeStamp < touchstart.timeStamp` (possible with synthetic events or clock skew), the delta is negative and the event is never suppressed. Guards against false positive ghost detection. |
+| 5   | No prior touch never suppresses mouseover         | When no `touchstart` has been recorded (`lastTouchTimeStamp` is `NaN`), any `mouseover` event passes through unsuppressed. `NaN` arithmetic naturally short-circuits the comparison. |
+
+## Timer Safety
+
+| #   | Invariant                                         | Description                                                                                                                                                                               |
+| --- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | At most one hover timer active at any time        | When a new `mouseover` fires on a different anchor, the previous hover timer is always cleared via `#cancelHover()` before a new one is scheduled. Prevents duplicate preload triggers.     |
+| 2   | At most one touch timer active at any time        | When a new `touchstart` fires, the previous touch timer is always cleared via `#cancelTouch()` before a new one is scheduled. Prevents duplicate preload triggers on rapid taps.           |
+| 3   | All timers cleared on stop and teardown           | `router.stop()` and `teardown()` both call `#cleanup()` which cancels all pending hover and touch timers. No timer fires after the plugin is deactivated.                                  |
+
+## Compiled Preloads Cache
+
+| #   | Invariant                                         | Description                                                                                                                                                                               |
+| --- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Cache size is monotonically non-decreasing        | `#compiledPreloads` entries are only added via `Map.set()`, never deleted. Cache size can only grow or stay the same.                                                                       |
+| 2   | Each route name compiled at most once             | `#compiledPreloads.get(name)` is checked before calling `config.preload(router, getDep)`. The factory function runs exactly once per route name for the lifetime of the plugin instance.    |
+
+## Fire-and-Forget Safety
+
+| #   | Invariant                                         | Description                                                                                                                                                                               |
+| --- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Preload errors never propagate                    | Every `preload.fn(params)` call is followed by `.catch(() => {})`. Rejected promises are silently swallowed and never surface as unhandled rejections.                                     |
+| 2   | Preload return values are discarded               | The `Promise` returned by `preload.fn()` is not `await`ed or stored. The plugin does not inspect, cache, or act upon the resolved value.                                                  |
+
+## DOM Traversal — #findAnchor
+
+| #   | Invariant                                         | Description                                                                                                                                                                               |
+| --- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Element type guard                                | Non-Element targets (Document, Text, null) return `null` via `instanceof Element` check. Prevents `TypeError` when `closest()` is called on non-Element EventTargets.                      |
+| 2   | Closest anchor traversal                          | Returns nearest `<a href>` ancestor or `null` if none exists. Uses `Element.closest("a[href]")` — standard DOM traversal.                                                                 |
 
 ## Test Files
 
-| File                                          | Invariants | Category                                                |
-| --------------------------------------------- | ---------- | ------------------------------------------------------- |
-| `tests/property/preload.properties.ts`        | 9          | Factory options merge, network detection, ghost events  |
+| File                                          | Invariants | Category                                                                          |
+| --------------------------------------------- | ---------- | --------------------------------------------------------------------------------- |
+| `tests/property/preload.properties.ts`        | 16         | Factory options merge, network detection, ghost events, fire-and-forget           |
+| `tests/functional/lifecycle.test.ts`           | —          | Timer safety (#3), cache compilation, delay coercion (functional coverage)        |

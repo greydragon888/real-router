@@ -1,20 +1,21 @@
-import type { LifecycleHook } from "./types";
+import type { LifecycleHookFactory } from "./types";
+import type { DefaultDependencies } from "@real-router/core";
 
 export { lifecyclePluginFactory } from "./factory";
 
 /**
  * Module augmentation for real-router.
- * Extends Route interface with lifecycle hooks.
+ * Extends Route interface with lifecycle hook factories.
  */
 declare module "@real-router/core" {
-  interface Route {
-    /** Called when this route segment is newly activated (entered). */
-    onEnter?: LifecycleHook;
-    /** Called when this route segment stays active but params changed. */
-    onStay?: LifecycleHook;
-    /** Called when this route segment is deactivated (left). */
-    onLeave?: LifecycleHook;
+  interface Route<Dependencies extends DefaultDependencies> {
+    /** Factory that returns a hook called when this route segment is newly activated (entered). */
+    onEnter?: LifecycleHookFactory<Dependencies>;
+    /** Factory that returns a hook called when this route segment stays active but params changed. */
+    onStay?: LifecycleHookFactory<Dependencies>;
+    /** Factory that returns a hook called when this route segment is deactivated (left). */
+    onLeave?: LifecycleHookFactory<Dependencies>;
   }
 }
 
-export type { LifecycleHook } from "./types";
+export type { LifecycleHook, LifecycleHookFactory } from "./types";

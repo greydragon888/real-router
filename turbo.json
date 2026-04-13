@@ -20,8 +20,8 @@
     "env": ["BENCH_ROUTER", "BENCH_NO_VALIDATE", "BENCH_SECTIONS"]
   },
   "tasks": {
-    "build": {
-      "dependsOn": ["^build", "test", "test:properties", "test:stress"],
+    "bundle": {
+      "dependsOn": ["^bundle"],
       "outputs": ["dist/**"],
       "inputs": [
         "src/**/*.{ts,tsx,vue,svelte}",
@@ -33,8 +33,14 @@
       "outputLogs": "errors-only",
       "cache": true
     },
+    "build": {
+      "dependsOn": ["bundle", "test", "test:properties", "test:stress"],
+      "inputs": [],
+      "outputs": [],
+      "cache": true
+    },
     "test:e2e": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^bundle"],
       "outputs": [],
       "inputs": [
         "src/**/*.{ts,tsx,vue,svelte}",
@@ -48,7 +54,7 @@
       "cache": true
     },
     "test:stress": {
-      "dependsOn": ["^build", "test:properties", "test", "lint", "type-check"],
+      "dependsOn": ["^bundle", "test:properties", "test", "lint", "type-check"],
       "outputs": [],
       "inputs": [
         "tests/stress/**/*.{ts,tsx}",
@@ -59,7 +65,7 @@
       "cache": true
     },
     "test:properties": {
-      "dependsOn": ["^build", "test", "lint", "type-check"],
+      "dependsOn": ["^bundle", "test", "lint", "type-check"],
       "outputs": [],
       "inputs": [
         "tests/property/**/*.{ts,tsx}",
@@ -70,7 +76,7 @@
       "cache": true
     },
     "test": {
-      "dependsOn": ["^build", "lint", "type-check"],
+      "dependsOn": ["^bundle", "lint", "type-check"],
       "outputs": ["coverage/**"],
       "inputs": [
         "src/**/*.{ts,tsx}",
@@ -86,7 +92,7 @@
       "cache": true
     },
     "lint": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^bundle"],
       "outputs": [],
       "inputs": [
         "**/*.{ts,tsx,js,jsx}",
@@ -112,13 +118,13 @@
       "cache": true
     },
     "lint:package": {
-      "dependsOn": ["build"],
+      "dependsOn": ["bundle"],
       "outputs": [],
       "inputs": ["dist/**", "package.json"],
       "cache": true
     },
     "lint:types": {
-      "dependsOn": ["build"],
+      "dependsOn": ["bundle"],
       "outputs": [],
       "inputs": ["dist/**", "package.json"],
       "cache": true

@@ -1,6 +1,7 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { preloadPluginFactory } from "../../src";
+import { TOUCH_PRELOAD_DELAY } from "../../src/constants";
 import {
   createAnchor,
   createTestRouter,
@@ -9,8 +10,6 @@ import {
   setupMatchUrl,
   waitForTimer,
 } from "../helpers/testUtils";
-
-const TOUCH_PRELOAD_DELAY = 100;
 
 describe("preload-plugin — touch", () => {
   let cleanup: (() => void) | undefined;
@@ -29,7 +28,7 @@ describe("preload-plugin — touch", () => {
   it("triggers preload after TOUCH_PRELOAD_DELAY on touchstart over matching anchor", async () => {
     const preloadFn = vi.fn().mockResolvedValue(undefined);
     const { router } = createTestRouter([
-      { name: "home", path: "/", preload: preloadFn },
+      { name: "home", path: "/", preload: () => preloadFn },
     ]);
 
     setupMatchUrl(router);
@@ -52,7 +51,7 @@ describe("preload-plugin — touch", () => {
   it("cancels preload when touchmove exceeds scroll threshold", async () => {
     const preloadFn = vi.fn().mockResolvedValue(undefined);
     const { router } = createTestRouter([
-      { name: "home", path: "/", preload: preloadFn },
+      { name: "home", path: "/", preload: () => preloadFn },
     ]);
 
     setupMatchUrl(router);
@@ -74,7 +73,7 @@ describe("preload-plugin — touch", () => {
   it("does not cancel preload on micro-jitter (touchmove within threshold)", async () => {
     const preloadFn = vi.fn().mockResolvedValue(undefined);
     const { router } = createTestRouter([
-      { name: "home", path: "/", preload: preloadFn },
+      { name: "home", path: "/", preload: () => preloadFn },
     ]);
 
     setupMatchUrl(router);
@@ -93,12 +92,34 @@ describe("preload-plugin — touch", () => {
     router.stop();
   });
 
+  it("does not cancel preload when touchmove equals scroll threshold exactly", async () => {
+    const preloadFn = vi.fn().mockResolvedValue(undefined);
+    const { router } = createTestRouter([
+      { name: "home", path: "/", preload: () => preloadFn },
+    ]);
+
+    setupMatchUrl(router);
+    cleanup = router.usePlugin(preloadPluginFactory());
+    await router.start("/");
+
+    const anchor = createAnchor("/");
+
+    fireTouchStart(anchor, 100);
+    fireTouchMove(anchor, 110); // deltaY === 10, exactly at threshold (> not >=)
+
+    await waitForTimer(TOUCH_PRELOAD_DELAY);
+
+    expect(preloadFn).toHaveBeenCalledTimes(1);
+
+    router.stop();
+  });
+
   it("cancels first preload when second touchstart fires on different anchor", async () => {
     const preloadA = vi.fn().mockResolvedValue(undefined);
     const preloadB = vi.fn().mockResolvedValue(undefined);
     const { router } = createTestRouter([
-      { name: "home", path: "/", preload: preloadA },
-      { name: "about", path: "/about", preload: preloadB },
+      { name: "home", path: "/", preload: () => preloadA },
+      { name: "about", path: "/about", preload: () => preloadB },
     ]);
 
     setupMatchUrl(router);
@@ -122,7 +143,7 @@ describe("preload-plugin — touch", () => {
   it("suppresses mouseover as ghost event when fired within 2500ms after touchstart on same target", async () => {
     const preloadFn = vi.fn().mockResolvedValue(undefined);
     const { router } = createTestRouter([
-      { name: "home", path: "/", preload: preloadFn },
+      { name: "home", path: "/", preload: () => preloadFn },
     ]);
 
     setupMatchUrl(router);
@@ -149,7 +170,7 @@ describe("preload-plugin — touch", () => {
   it("does not suppress mouseover when fired on a different target than touchstart", async () => {
     const preloadFn = vi.fn().mockResolvedValue(undefined);
     const { router } = createTestRouter([
-      { name: "home", path: "/", preload: preloadFn },
+      { name: "home", path: "/", preload: () => preloadFn },
     ]);
 
     setupMatchUrl(router);
@@ -189,7 +210,7 @@ describe("preload-plugin — touch", () => {
   it("does not suppress mouseover when fired after 2500ms since touchstart", async () => {
     const preloadFn = vi.fn().mockResolvedValue(undefined);
     const { router } = createTestRouter([
-      { name: "home", path: "/", preload: preloadFn },
+      { name: "home", path: "/", preload: () => preloadFn },
     ]);
 
     setupMatchUrl(router);
@@ -218,7 +239,7 @@ describe("preload-plugin — touch", () => {
   it("touchmove with no pending touch timer is a no-op", async () => {
     const preloadFn = vi.fn().mockResolvedValue(undefined);
     const { router } = createTestRouter([
-      { name: "home", path: "/", preload: preloadFn },
+      { name: "home", path: "/", preload: () => preloadFn },
     ]);
 
     setupMatchUrl(router);
@@ -238,7 +259,7 @@ describe("preload-plugin — touch", () => {
   it("touchstart on non-anchor element records last touch but does not preload", async () => {
     const preloadFn = vi.fn().mockResolvedValue(undefined);
     const { router } = createTestRouter([
-      { name: "home", path: "/", preload: preloadFn },
+      { name: "home", path: "/", preload: () => preloadFn },
     ]);
 
     setupMatchUrl(router);
@@ -259,7 +280,7 @@ describe("preload-plugin — touch", () => {
   it("touchstart on anchor with no matching route does not preload", async () => {
     const preloadFn = vi.fn().mockResolvedValue(undefined);
     const { router } = createTestRouter([
-      { name: "home", path: "/", preload: preloadFn },
+      { name: "home", path: "/", preload: () => preloadFn },
     ]);
 
     setupMatchUrl(router);
@@ -302,7 +323,30 @@ describe("preload-plugin — touch", () => {
       .fn()
       .mockRejectedValue(new Error("touch preload error"));
     const { router } = createTestRouter([
-      { name: "home", path: "/", preload: preloadFn },
+      { name: "home", path: "/", preload: () => preloadFn },
+    ]);
+
+    setupMatchUrl(router);
+    cleanup = router.usePlugin(preloadPluginFactory());
+    await router.start("/");
+
+    const anchor = createAnchor("/");
+    const consoleSpy = vi.spyOn(console, "error");
+
+    fireTouchStart(anchor);
+    await waitForTimer(TOUCH_PRELOAD_DELAY);
+
+    expect(preloadFn).toHaveBeenCalledTimes(1);
+    expect(consoleSpy).not.toHaveBeenCalled();
+
+    consoleSpy.mockRestore();
+    router.stop();
+  });
+
+  it("handles touchstart with empty touches array gracefully", async () => {
+    const preloadFn = vi.fn().mockResolvedValue(undefined);
+    const { router } = createTestRouter([
+      { name: "home", path: "/", preload: () => preloadFn },
     ]);
 
     setupMatchUrl(router);
@@ -311,9 +355,37 @@ describe("preload-plugin — touch", () => {
 
     const anchor = createAnchor("/");
 
-    fireTouchStart(anchor);
+    anchor.dispatchEvent(
+      new TouchEvent("touchstart", { touches: [], bubbles: true }),
+    );
     await waitForTimer(TOUCH_PRELOAD_DELAY);
 
+    expect(preloadFn).not.toHaveBeenCalled();
+
+    router.stop();
+  });
+
+  it("handles touchmove with empty touches array gracefully", async () => {
+    const preloadFn = vi.fn().mockResolvedValue(undefined);
+    const { router } = createTestRouter([
+      { name: "home", path: "/", preload: () => preloadFn },
+    ]);
+
+    setupMatchUrl(router);
+    cleanup = router.usePlugin(preloadPluginFactory());
+    await router.start("/");
+
+    const anchor = createAnchor("/");
+
+    fireTouchStart(anchor, 100);
+
+    anchor.dispatchEvent(
+      new TouchEvent("touchmove", { touches: [], bubbles: true }),
+    );
+
+    await waitForTimer(TOUCH_PRELOAD_DELAY);
+
+    // touchmove with empty touches is ignored — timer still fires
     expect(preloadFn).toHaveBeenCalledTimes(1);
 
     router.stop();
@@ -322,7 +394,7 @@ describe("preload-plugin — touch", () => {
   it("handles touchstart where target has no closest method", async () => {
     const preloadFn = vi.fn().mockResolvedValue(undefined);
     const { router } = createTestRouter([
-      { name: "home", path: "/", preload: preloadFn },
+      { name: "home", path: "/", preload: () => preloadFn },
     ]);
 
     setupMatchUrl(router);

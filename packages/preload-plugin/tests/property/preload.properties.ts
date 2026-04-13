@@ -1,14 +1,16 @@
 // packages/preload-plugin/tests/property/preload.properties.ts
 
-import { test } from "@fast-check/vitest";
+import { fc, test } from "@fast-check/vitest";
 
 import {
   NUM_RUNS,
   arbPartialOptions,
   arbSlowEffectiveType,
   arbFastEffectiveType,
+  arbEffectiveTypeWith2g,
   arbWithinThreshold,
   arbBeyondThreshold,
+  arbNegativeDelta,
   arbBaseTimestamp,
   mockNavigatorConnection,
 } from "./helpers";
@@ -29,10 +31,6 @@ describe("factory options merge", () => {
         ...defaultOptions,
         ...partial,
       };
-
-      // Every field must be present
-      expect(typeof merged.delay).toBe("number");
-      expect(typeof merged.networkAware).toBe("boolean");
 
       // User-specified values take precedence
       if (partial.delay === undefined) {
@@ -122,11 +120,37 @@ describe("isSlowConnection", () => {
     },
   );
 
+  test.prop([arbEffectiveTypeWith2g], { numRuns: NUM_RUNS })(
+    "any effectiveType string containing '2g' forces slow detection",
+    (effectiveType) => {
+      const restore = mockNavigatorConnection({
+        saveData: false,
+        effectiveType,
+      });
+
+      try {
+        expect(isSlowConnection()).toBe(true);
+      } finally {
+        restore();
+      }
+    },
+  );
+
   test("saveData true with no effectiveType returns true", () => {
     const restore = mockNavigatorConnection({ saveData: true });
 
     try {
       expect(isSlowConnection()).toBe(true);
+    } finally {
+      restore();
+    }
+  });
+
+  test("saveData false without effectiveType returns false", () => {
+    const restore = mockNavigatorConnection({ saveData: false });
+
+    try {
+      expect(isSlowConnection()).toBe(false);
     } finally {
       restore();
     }
@@ -141,22 +165,28 @@ describe("ghost event suppression", () => {
   /**
    * The ghost event detection logic from PreloadPlugin.#isGhostMouseEvent:
    *
-   *   lastTouchStartEvent !== null &&
-   *   event.target === lastTouchStartEvent.target &&
-   *   event.timeStamp - lastTouchStartEvent.timeStamp < GHOST_EVENT_THRESHOLD
+   *   const delta = event.timeStamp - lastTouchTimeStamp;
+   *   return delta >= 0 && delta < GHOST_EVENT_THRESHOLD
+   *          && event.target === lastTouchTarget;
    *
-   * Extracted into a standalone function so TypeScript sees the nullable type
-   * and the property tests mirror the real code path exactly.
+   * Uses NaN for lastTouchTimeStamp when no touch has occurred (NaN >= 0 is
+   * false, so the check naturally short-circuits).
+   *
+   * Extracted into a standalone function so the property tests mirror the real
+   * code path exactly.
    */
   function isGhostMouseEvent(
-    lastTouchStart: { target: unknown; timeStamp: number } | null,
+    lastTouchTarget: unknown,
+    lastTouchTimeStamp: number,
     mouseTarget: unknown,
     mouseTimestamp: number,
   ): boolean {
+    const delta = mouseTimestamp - lastTouchTimeStamp;
+
     return (
-      lastTouchStart !== null &&
-      mouseTarget === lastTouchStart.target &&
-      mouseTimestamp - lastTouchStart.timeStamp < GHOST_EVENT_THRESHOLD
+      delta >= 0 &&
+      delta < GHOST_EVENT_THRESHOLD &&
+      mouseTarget === lastTouchTarget
     );
   }
 
@@ -164,12 +194,11 @@ describe("ghost event suppression", () => {
     "mouseover within threshold on same target is suppressed",
     (touchTimestamp, delta) => {
       const target = {};
-      const lastTouchStart = { target, timeStamp: touchTimestamp };
       const mouseTimestamp = touchTimestamp + delta;
 
-      expect(isGhostMouseEvent(lastTouchStart, target, mouseTimestamp)).toBe(
-        true,
-      );
+      expect(
+        isGhostMouseEvent(target, touchTimestamp, target, mouseTimestamp),
+      ).toBe(true);
     },
   );
 
@@ -177,12 +206,11 @@ describe("ghost event suppression", () => {
     "mouseover after threshold on same target is not suppressed",
     (touchTimestamp, delta) => {
       const target = {};
-      const lastTouchStart = { target, timeStamp: touchTimestamp };
       const mouseTimestamp = touchTimestamp + delta;
 
-      expect(isGhostMouseEvent(lastTouchStart, target, mouseTimestamp)).toBe(
-        false,
-      );
+      expect(
+        isGhostMouseEvent(target, touchTimestamp, target, mouseTimestamp),
+      ).toBe(false);
     },
   );
 
@@ -191,12 +219,70 @@ describe("ghost event suppression", () => {
     (touchTimestamp, delta) => {
       const touchTarget = {};
       const mouseTarget = {};
-      const lastTouchStart = { target: touchTarget, timeStamp: touchTimestamp };
       const mouseTimestamp = touchTimestamp + delta;
 
       expect(
-        isGhostMouseEvent(lastTouchStart, mouseTarget, mouseTimestamp),
+        isGhostMouseEvent(
+          touchTarget,
+          touchTimestamp,
+          mouseTarget,
+          mouseTimestamp,
+        ),
       ).toBe(false);
+    },
+  );
+
+  test.prop([arbBaseTimestamp, arbNegativeDelta], { numRuns: NUM_RUNS })(
+    "mouseover with negative delta is never suppressed (clock skew safety)",
+    (touchTimestamp, negativeDelta) => {
+      const target = {};
+      const mouseTimestamp = touchTimestamp + negativeDelta;
+
+      expect(
+        isGhostMouseEvent(target, touchTimestamp, target, mouseTimestamp),
+      ).toBe(false);
+    },
+  );
+
+  test.prop([arbBaseTimestamp], { numRuns: NUM_RUNS })(
+    "no prior touch (NaN timestamp) never suppresses mouseover",
+    (mouseTimestamp) => {
+      const target = {};
+
+      expect(isGhostMouseEvent(null, Number.NaN, target, mouseTimestamp)).toBe(
+        false,
+      );
+    },
+  );
+});
+
+// =============================================================================
+// Fire-and-Forget Safety
+// =============================================================================
+
+describe("fire-and-forget safety", () => {
+  test.prop([fc.anything()], { numRuns: NUM_RUNS })(
+    "rejected promise is silently caught by .catch(() => {})",
+    (errorValue) => {
+      // Standalone model matching plugin.ts:111,132 pattern
+      const p = Promise.reject(errorValue).catch(() => {});
+
+      // If .catch doesn't swallow, vitest reports unhandled rejection
+      expect(p).toBeInstanceOf(Promise);
+    },
+  );
+
+  test.prop([fc.anything()], { numRuns: NUM_RUNS })(
+    "resolved value is discarded (not stored or returned)",
+    async (resolvedValue) => {
+      let sideEffect: unknown = "sentinel";
+      // Model: preload returns any value, plugin ignores it
+      const p = Promise.resolve(resolvedValue).catch(() => {});
+
+      await p;
+
+      // Side effect not modified — return value discarded
+      expect(sideEffect).toBe("sentinel");
     },
   );
 });

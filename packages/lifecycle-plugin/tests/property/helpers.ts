@@ -100,23 +100,23 @@ export function createLifecycleRouter(hooks: HookSpies): Router {
     {
       name: "home",
       path: "/",
-      onEnter: hooks.onEnter,
-      onLeave: hooks.onLeave,
-      onStay: hooks.onStay,
+      onEnter: () => hooks.onEnter,
+      onLeave: () => hooks.onLeave,
+      onStay: () => hooks.onStay,
     },
     {
       name: "about",
       path: "/about",
-      onEnter: hooks.onEnter,
-      onLeave: hooks.onLeave,
-      onStay: hooks.onStay,
+      onEnter: () => hooks.onEnter,
+      onLeave: () => hooks.onLeave,
+      onStay: () => hooks.onStay,
     },
     {
       name: "contact",
       path: "/contact",
-      onEnter: hooks.onEnter,
-      onLeave: hooks.onLeave,
-      onStay: hooks.onStay,
+      onEnter: () => hooks.onEnter,
+      onLeave: () => hooks.onLeave,
+      onStay: () => hooks.onStay,
     },
     {
       name: "users",
@@ -125,9 +125,9 @@ export function createLifecycleRouter(hooks: HookSpies): Router {
         {
           name: "view",
           path: "/:id",
-          onEnter: hooks.onEnter,
-          onLeave: hooks.onLeave,
-          onStay: hooks.onStay,
+          onEnter: () => hooks.onEnter,
+          onLeave: () => hooks.onLeave,
+          onStay: () => hooks.onStay,
         },
       ],
     },
@@ -154,30 +154,30 @@ export function createOrderTrackingRouter(): {
     {
       name: "home",
       path: "/",
-      onEnter: () => {
+      onEnter: () => () => {
         callOrder.push("onEnter:home");
       },
-      onLeave: () => {
+      onLeave: () => () => {
         callOrder.push("onLeave:home");
       },
     },
     {
       name: "about",
       path: "/about",
-      onEnter: () => {
+      onEnter: () => () => {
         callOrder.push("onEnter:about");
       },
-      onLeave: () => {
+      onLeave: () => () => {
         callOrder.push("onLeave:about");
       },
     },
     {
       name: "contact",
       path: "/contact",
-      onEnter: () => {
+      onEnter: () => () => {
         callOrder.push("onEnter:contact");
       },
-      onLeave: () => {
+      onLeave: () => () => {
         callOrder.push("onLeave:contact");
       },
     },

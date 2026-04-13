@@ -37,8 +37,21 @@
 | --- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | Teardown removes all hooks                              | After `unsubscribe()`, no lifecycle hooks fire on subsequent navigations. Verifies that plugin teardown is complete and does not leak event listeners.                                        |
 
+## Mutual Exclusion
+
+| #   | Invariant                                               | Description                                                                                                                                                                                  |
+| --- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `onEnter` and `onStay` are mutually exclusive           | For any successful transition, exactly one of `onEnter` or `onStay` fires — never both. Route change → `onEnter`; same route with param change → `onStay`.                                  |
+| 2   | `onLeave` does not fire with `onStay`                   | Same-route navigation (param change) does not trigger `onLeave`. `onLeave` only fires when `toState.name !== fromState.name`.                                                                |
+
+## Compilation
+
+| #   | Invariant                                               | Description                                                                                                                                                                                  |
+| --- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Hook factory is invoked once per route+hook             | `compileHook` calls the factory exactly once; the compiled hook is cached and reused across subsequent navigations to the same route.                                                         |
+
 ## Test Files
 
 | File                                          | Invariants | Category                                                     |
 | --------------------------------------------- | ---------- | ------------------------------------------------------------ |
-| `tests/property/lifecycle.properties.ts`      | 10         | onEnter dispatch, onLeave dispatch, onStay dispatch, ordering, teardown |
+| `tests/property/lifecycle.properties.ts`      | 13         | onEnter dispatch, onLeave dispatch, onStay dispatch, ordering, teardown, mutual exclusion, compilation |

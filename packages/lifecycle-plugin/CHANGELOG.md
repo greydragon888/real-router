@@ -1,5 +1,28 @@
 # @real-router/lifecycle-plugin
 
+## 0.3.0
+
+### Minor Changes
+
+- [#456](https://github.com/greydragon888/real-router/pull/456) [`8989831`](https://github.com/greydragon888/real-router/commit/8989831062090cf6e94788a0acdc8a0cee54e0b5) Thanks [@greydragon888](https://github.com/greydragon888)! - Add DI access to lifecycle hooks via factory pattern ([#439](https://github.com/greydragon888/real-router/issues/439))
+
+  **Breaking Change:** `onEnter`, `onStay`, `onLeave` in route config are now factory functions `(router, getDependency) => hook` instead of plain hooks `(toState, fromState) => void`.
+
+  **Migration:**
+
+  ```diff
+  - onEnter: (toState) => { console.log(toState.name); }
+  + onEnter: () => (toState) => { console.log(toState.name); }
+  ```
+
+  With DI:
+
+  ```typescript
+  onEnter: (_router, getDep) => (toState) => {
+    getDep("analytics").track(toState.name);
+  };
+  ```
+
 ## 0.2.1
 
 ### Patch Changes

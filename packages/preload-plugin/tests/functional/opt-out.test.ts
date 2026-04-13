@@ -27,7 +27,7 @@ describe("preload-plugin — opt-out", () => {
   it("skips preload on hover when anchor has data-no-preload attribute", async () => {
     const preloadFn = vi.fn().mockResolvedValue(undefined);
     const { router } = createTestRouter([
-      { name: "home", path: "/", preload: preloadFn },
+      { name: "home", path: "/", preload: () => preloadFn },
     ]);
 
     setupMatchUrl(router);
@@ -47,7 +47,7 @@ describe("preload-plugin — opt-out", () => {
   it("skips preload on touchstart when anchor has data-no-preload attribute", async () => {
     const preloadFn = vi.fn().mockResolvedValue(undefined);
     const { router } = createTestRouter([
-      { name: "home", path: "/", preload: preloadFn },
+      { name: "home", path: "/", preload: () => preloadFn },
     ]);
 
     setupMatchUrl(router);
@@ -67,7 +67,7 @@ describe("preload-plugin — opt-out", () => {
   it("preloads normally when anchor does not have data-no-preload attribute", async () => {
     const preloadFn = vi.fn().mockResolvedValue(undefined);
     const { router } = createTestRouter([
-      { name: "home", path: "/", preload: preloadFn },
+      { name: "home", path: "/", preload: () => preloadFn },
     ]);
 
     setupMatchUrl(router);

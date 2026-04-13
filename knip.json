@@ -12,12 +12,12 @@
         ".changeset/*.md"
       ],
       "project": ["*.{ts,mts,js,mjs}"],
-      "ignoreDependencies": ["fast-check"]
+      "ignoreDependencies": []
     },
     "packages/router-benchmarks": {
       "entry": ["src/**/*.ts", "client-nav/**/*.{ts,tsx}"],
       "project": ["src/**/*.{ts,tsx}", "client-nav/**/*.{ts,tsx}"],
-      "ignoreDependencies": ["@tanstack/router-core"]
+      "ignoreDependencies": []
     },
     "packages/react": {
       "project": ["src/**/*.{ts,tsx}"],
@@ -128,6 +128,6 @@
   "ignoreWorkspaces": ["examples/**"],
   "ignore": [],
   "ignoreDependencies": ["@stryker-mutator/api", "jsdom"],
-  "ignoreBinaries": ["tree", "tsx", "open", "ps", "awk", "playwright"],
+  "ignoreBinaries": ["tree", "tsx", "open", "ps", "awk"],
   "ignoreExportsUsedInFile": true
 }

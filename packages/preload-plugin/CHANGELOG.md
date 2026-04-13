@@ -1,5 +1,28 @@
 # @real-router/preload-plugin
 
+## 0.3.0
+
+### Minor Changes
+
+- [#456](https://github.com/greydragon888/real-router/pull/456) [`8989831`](https://github.com/greydragon888/real-router/commit/8989831062090cf6e94788a0acdc8a0cee54e0b5) Thanks [@greydragon888](https://github.com/greydragon888)! - Add DI access to preload hook via factory pattern ([#439](https://github.com/greydragon888/real-router/issues/439))
+
+  **Breaking Change:** `preload` in route config is now a factory function `(router, getDependency) => preloadFn` instead of a plain function `(params) => Promise<unknown>`.
+
+  **Migration:**
+
+  ```diff
+  - preload: (params) => fetch(`/api/${params.id}`)
+  + preload: () => (params) => fetch(`/api/${params.id}`)
+  ```
+
+  With DI:
+
+  ```typescript
+  preload: (_router, getDep) => (params) => {
+    return getDep("apiClient").prefetch(params.id);
+  };
+  ```
+
 ## 0.2.1
 
 ### Patch Changes

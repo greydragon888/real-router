@@ -53,31 +53,31 @@ export const routes: Route[] = [
       {
         name: "list",
         path: "/list",
-        preload: async () => {
+        preload: () => async () => {
           const data = await api.getProducts();
 
           store.set("products.list", data);
         },
-        onEnter: () => {
+        onEnter: () => () => {
           loadData("products.list", (signal) => api.getProducts(signal));
         },
-        onLeave: abortPending,
+        onLeave: () => abortPending,
       },
       {
         name: "detail",
         path: "/:id",
-        preload: async (params: Params) => {
+        preload: () => async (params: Params) => {
           const data = await api.getProduct(String(params.id));
 
           store.set("products.detail", data);
         },
-        onEnter: (toState) => {
+        onEnter: () => (toState) => {
           const id =
             typeof toState.params.id === "string" ? toState.params.id : "";
 
           loadData("products.detail", (signal) => api.getProduct(id, signal));
         },
-        onLeave: abortPending,
+        onLeave: () => abortPending,
       },
     ],
   },

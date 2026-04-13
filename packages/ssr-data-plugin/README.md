@@ -32,10 +32,11 @@ npm install @real-router/ssr-data-plugin
 import { createRouter } from "@real-router/core";
 import { cloneRouter } from "@real-router/core/api";
 import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
+import type { DataLoaderFactoryMap } from "@real-router/ssr-data-plugin";
 
-const loaders = {
-  "users.profile": async (params) => fetchUser(params.id),
-  "users.list": async () => fetchUsers(),
+const loaders: DataLoaderFactoryMap = {
+  "users.profile": () => async (params) => fetchUser(params.id),
+  "users.list": () => async () => fetchUsers(),
 };
 
 // Base router — created once
@@ -54,15 +55,15 @@ router.dispose();
 
 ## Configuration
 
-Loaders are keyed by **route name** (not path). Each loader receives route `params` and returns a `Promise`:
+Loaders are keyed by **route name** (not path). Each value is a **factory function** `(router, getDependency) => loaderFn` that receives the router instance and a dependency getter. The factory runs once at plugin registration; the returned loader is cached. Each loader receives route `params` and returns a `Promise`:
 
 ```typescript
-import type { DataLoaderMap } from "@real-router/ssr-data-plugin";
+import type { DataLoaderFactoryMap } from "@real-router/ssr-data-plugin";
 
-const loaders: DataLoaderMap = {
-  home: async () => ({ featured: await fetchFeatured() }),
-  "users.profile": async (params) => ({ user: await fetchUser(params.id) }),
-  "users.list": async () => ({ users: await fetchUsers() }),
+const loaders: DataLoaderFactoryMap = {
+  home: () => async () => ({ featured: await fetchFeatured() }),
+  "users.profile": () => async (params) => ({ user: await fetchUser(params.id) }),
+  "users.list": () => async () => ({ users: await fetchUsers() }),
 };
 ```
 

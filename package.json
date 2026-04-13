@@ -6,6 +6,7 @@
   "scripts": {
     "build": "turbo run build",
     "build:verbose": "turbo run build --output-logs=full",
+    "bundle": "turbo run bundle",
     "test": "turbo run test",
     "test:verbose": "turbo run test --output-logs=full",
     "test:stress": "turbo run test:stress",
@@ -131,7 +132,7 @@
     "overrides": {
       "@types/node": "$@types/node",
       "@isaacs/brace-expansion": "5.0.1",
-      "axios": ">=1.13.5",
+      "axios": ">=1.15.0",
       "qs": ">=6.14.2",
       "rollup": ">=4.59.0",
       "minimatch@3": "~3.1.4",

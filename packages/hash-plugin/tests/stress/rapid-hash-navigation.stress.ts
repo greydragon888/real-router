@@ -16,7 +16,7 @@ import type { Router, Unsubscribe } from "@real-router/core";
 let router: Router;
 let unsubscribe: Unsubscribe;
 
-describe("H1 -- Rapid Hash Navigation", () => {
+describe("Rapid Hash Navigation", () => {
   beforeAll(() => {
     vi.spyOn(console, "warn").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
@@ -35,7 +35,7 @@ describe("H1 -- Rapid Hash Navigation", () => {
     vi.restoreAllMocks();
   });
 
-  it("H1.1 -- 200 sequential navigate() calls: final state correct", async () => {
+  it("200 sequential navigate() calls: final state correct", async () => {
     const result = createStressRouter();
 
     router = result.router;
@@ -52,7 +52,7 @@ describe("H1 -- Rapid Hash Navigation", () => {
     expect(router.getState()?.name).toBe("users.list");
   });
 
-  it("H1.2 -- 200 navigate() calls: pushState called for each", async () => {
+  it("200 navigate() calls: pushState called for each", async () => {
     const result = createStressRouter();
 
     router = result.router;
@@ -73,7 +73,7 @@ describe("H1 -- Rapid Hash Navigation", () => {
     expect(pushStateSpy).toHaveBeenCalledTimes(200);
   });
 
-  it("H1.3 -- 200 navigate with replace: replaceState called for each", async () => {
+  it("200 navigate with replace: replaceState called for each", async () => {
     const result = createStressRouter();
 
     router = result.router;
@@ -95,7 +95,7 @@ describe("H1 -- Rapid Hash Navigation", () => {
     expect(router.getState()?.name).toBe("users.list");
   });
 
-  it("H1.4 -- 100 navigate with params: all URLs use hash format", async () => {
+  it("100 navigate with params: all URLs use hash format", async () => {
     const result = createStressRouter();
 
     router = result.router;
@@ -121,7 +121,7 @@ describe("H1 -- Rapid Hash Navigation", () => {
     expect(router.getState()?.params).toStrictEqual({ id: "99" });
   });
 
-  it("H1.5 -- 100 replaceHistoryState calls: state unchanged, URL updated", async () => {
+  it("100 replaceHistoryState calls: state unchanged, URL updated", async () => {
     const result = createStressRouter();
 
     router = result.router;
@@ -144,7 +144,7 @@ describe("H1 -- Rapid Hash Navigation", () => {
     expect(router.getState()).toStrictEqual(initialState);
   });
 
-  it("H1.6 -- 100 navigate with base path: all URLs prefixed correctly", async () => {
+  it("100 navigate with base path: all URLs prefixed correctly", async () => {
     const result = createStressRouter({ base: "/app" });
 
     router = result.router;

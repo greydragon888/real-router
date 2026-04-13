@@ -45,13 +45,13 @@
   },
   "homepage": "https://github.com/greydragon888/real-router",
   "scripts": {
-    "build": "tsdown --config-loader unrun",
     "test": "vitest run",
     "test:properties": "vitest --config vitest.config.properties.mts --run",
     "test:mutation": "stryker run",
     "bench": "NODE_OPTIONS='--expose-gc --max-old-space-size=4096' npx tsx tests/benchmarks/index.ts",
     "type-check": "tsc --noEmit",
-    "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0"
+    "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
+    "bundle": "tsdown --config-loader unrun"
   },
   "sideEffects": false
 }
