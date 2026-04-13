@@ -1,5 +1,13 @@
 # @real-router/navigation-plugin
 
+## 0.2.3
+
+### Patch Changes
+
+- [#458](https://github.com/greydragon888/real-router/pull/458) [`0b58799`](https://github.com/greydragon888/real-router/commit/0b5879966d2ea68e9ad18add8622cfe3cae2a940) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `computeDirection` returning "back" for traverse with equal indices ([#448](https://github.com/greydragon888/real-router/issues/448))
+
+  `computeDirection("traverse", i, i)` now correctly returns `"unknown"` instead of `"back"` when destination and current indices are equal.
+
 ## 0.2.2
 
 ### Patch Changes
