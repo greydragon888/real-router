@@ -8,7 +8,7 @@ import type { Router } from "@real-router/core";
 
 const noop = (): void => undefined;
 
-describe("L2 -- Lifecycle Plugin Churn", () => {
+describe("Lifecycle Plugin Churn", () => {
   beforeAll(() => {
     vi.spyOn(console, "warn").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
@@ -18,7 +18,7 @@ describe("L2 -- Lifecycle Plugin Churn", () => {
     vi.restoreAllMocks();
   });
 
-  it("L2.1 -- 100 usePlugin/unsubscribe cycles: hooks fire only while plugin active", async () => {
+  it("100 usePlugin/unsubscribe cycles: hooks fire only while plugin active", async () => {
     const enterCalls: number[] = [];
     const onEnter: LifecycleHook = () => {
       enterCalls.push(1);
@@ -27,7 +27,7 @@ describe("L2 -- Lifecycle Plugin Churn", () => {
     const router = createRouter(
       [
         { name: "home", path: "/" },
-        { name: "about", path: "/about", onEnter },
+        { name: "about", path: "/about", onEnter: () => onEnter },
       ],
       { defaultRoute: "home" },
     );
@@ -48,7 +48,7 @@ describe("L2 -- Lifecycle Plugin Churn", () => {
     router.stop();
   });
 
-  it("L2.2 -- 50 full router create+plugin+navigate+dispose cycles: no crashes", async () => {
+  it("50 full router create+plugin+navigate+dispose cycles: no crashes", async () => {
     let completed = 0;
 
     for (let i = 0; i < 50; i++) {
@@ -57,8 +57,8 @@ describe("L2 -- Lifecycle Plugin Churn", () => {
 
       const router = createRouter(
         [
-          { name: "home", path: "/", onLeave },
-          { name: "about", path: "/about", onEnter },
+          { name: "home", path: "/", onLeave: () => onLeave },
+          { name: "about", path: "/about", onEnter: () => onEnter },
         ],
         { defaultRoute: "home" },
       );
@@ -79,7 +79,7 @@ describe("L2 -- Lifecycle Plugin Churn", () => {
     expect(completed).toBe(50);
   });
 
-  it("L2.3 -- multiple plugins on same router: hooks fire once per plugin instance", async () => {
+  it("multiple plugins on same router: hooks fire once per plugin instance", async () => {
     const enterCallsA: number[] = [];
     const enterCallsB: number[] = [];
 
@@ -93,7 +93,7 @@ describe("L2 -- Lifecycle Plugin Churn", () => {
     const router = createRouter(
       [
         { name: "home", path: "/" },
-        { name: "about", path: "/about", onEnter: onEnterA },
+        { name: "about", path: "/about", onEnter: () => onEnterA },
       ],
       { defaultRoute: "home" },
     );
@@ -120,7 +120,7 @@ describe("L2 -- Lifecycle Plugin Churn", () => {
     const routerB = createRouter(
       [
         { name: "home", path: "/" },
-        { name: "about", path: "/about", onEnter: onEnterB },
+        { name: "about", path: "/about", onEnter: () => onEnterB },
       ],
       { defaultRoute: "home" },
     );
@@ -140,7 +140,7 @@ describe("L2 -- Lifecycle Plugin Churn", () => {
     routerB.stop();
   });
 
-  it("L2.4 -- 100 start/stop cycles with lifecycle hooks: hooks only fire while active", async () => {
+  it("100 start/stop cycles with lifecycle hooks: hooks only fire while active", async () => {
     let enterCount = 0;
     const onEnter: LifecycleHook = () => {
       enterCount++;
@@ -149,7 +149,7 @@ describe("L2 -- Lifecycle Plugin Churn", () => {
     const router: Router = createRouter(
       [
         { name: "home", path: "/" },
-        { name: "about", path: "/about", onEnter },
+        { name: "about", path: "/about", onEnter: () => onEnter },
       ],
       { defaultRoute: "home" },
     );
@@ -167,5 +167,34 @@ describe("L2 -- Lifecycle Plugin Churn", () => {
     expect(enterCount).toBe(100);
 
     router.dispose();
+  });
+
+  it("single factory result used across 50 router instances", async () => {
+    const pluginFactory = lifecyclePluginFactory();
+    let totalEnterCalls = 0;
+
+    for (let i = 0; i < 50; i++) {
+      const onEnter: LifecycleHook = () => {
+        totalEnterCalls++;
+      };
+
+      const r = createRouter(
+        [
+          { name: "home", path: "/" },
+          { name: "about", path: "/about", onEnter: () => onEnter },
+        ],
+        { defaultRoute: "home" },
+      );
+
+      r.usePlugin(pluginFactory);
+
+      await r.start("/");
+      await r.navigate("about");
+
+      r.stop();
+      r.dispose();
+    }
+
+    expect(totalEnterCalls).toBe(50);
   });
 });

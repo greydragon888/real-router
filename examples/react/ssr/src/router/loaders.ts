@@ -1,7 +1,7 @@
-import type { DataLoaderMap } from "@real-router/ssr-data-plugin";
+import type { DataLoaderFactoryMap } from "@real-router/ssr-data-plugin";
 
-export const loaders: DataLoaderMap = {
-  "users.list": () =>
+export const loaders: DataLoaderFactoryMap = {
+  "users.list": () => () =>
     Promise.resolve({
       users: [
         { id: "1", name: "Alice" },
@@ -9,7 +9,7 @@ export const loaders: DataLoaderMap = {
         { id: "3", name: "Charlie" },
       ],
     }),
-  "users.profile": (params) => {
+  "users.profile": () => (params) => {
     const id = params.id as string;
 
     return Promise.resolve({

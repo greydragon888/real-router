@@ -15,8 +15,8 @@ router.subscribe(({ route, previousRoute }) => {
 });
 
 // With plugin — declarative, per-route:
-{ name: "dashboard", path: "/dashboard", onEnter: () => trackPageView("dashboard") }
-{ name: "editor", path: "/editor", onLeave: () => saveEditorState() }
+{ name: "dashboard", path: "/dashboard", onEnter: () => () => trackPageView("dashboard") }
+{ name: "editor", path: "/editor", onLeave: () => () => saveEditorState() }
 ```
 
 ## Installation
@@ -37,17 +37,17 @@ const routes = [
   {
     name: "home",
     path: "/",
-    onLeave: (toState, fromState) => {
+    onLeave: () => (toState, fromState) => {
       console.log("Leaving home for", toState.name);
     },
   },
   {
     name: "users.view",
     path: "/users/:id",
-    onEnter: (toState) => {
+    onEnter: () => (toState) => {
       analytics.track("user_profile_viewed", { userId: toState.params.id });
     },
-    onStay: (toState, fromState) => {
+    onStay: () => (toState, fromState) => {
       console.log("User changed:", fromState.params.id, "→", toState.params.id);
     },
   },
@@ -67,7 +67,18 @@ await router.start("/");
 | `onStay`  | Same route, params changed | Refresh data, update UI    |
 | `onLeave` | Route is left              | Cleanup timers, save state |
 
-All hooks receive `(toState: State, fromState: State | undefined) => void`.
+Each hook field is a **factory function** `(router, getDependency) => (toState, fromState?) => void`. The factory runs once per route; the returned callback is cached and invoked on each matching transition. When you don't need DI, omit the factory params:
+
+```typescript
+// Without DI — ignore factory params:
+onEnter: () => (toState) => { console.log("entered", toState.name); }
+
+// With DI — access router and dependencies:
+onEnter: (router, getDependency) => (toState) => {
+  const analytics = getDependency("analytics");
+  analytics.track("page_viewed", { route: toState.name });
+}
+```
 
 ### Execution order
 
@@ -81,7 +92,7 @@ All hooks receive `(toState: State, fromState: State | undefined) => void`.
 {
   name: "product",
   path: "/products/:id",
-  onEnter: (toState) => {
+  onEnter: () => (toState) => {
     analytics.track("product_viewed", { productId: toState.params.id });
   },
 }
@@ -93,7 +104,7 @@ All hooks receive `(toState: State, fromState: State | undefined) => void`.
 {
   name: "editor",
   path: "/editor/:docId",
-  onLeave: () => {
+  onLeave: () => () => {
     autosaveTimer.clear();
     webSocket.disconnect();
   },
@@ -106,7 +117,7 @@ All hooks receive `(toState: State, fromState: State | undefined) => void`.
 {
   name: "search",
   path: "/search?q",
-  onStay: (toState) => {
+  onStay: () => (toState) => {
     searchStore.setQuery(toState.params.q);
   },
 }
