@@ -199,7 +199,7 @@ jobs:
 
       - name: Comment on PR
         if: steps.validate.outputs.has_issues == 'true'
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const prNumber = context.issue.number;
@@ -318,7 +318,7 @@ jobs:
 
       - name: Remove outdated comment
         if: steps.validate.outputs.has_changesets == 'true' && steps.validate.outputs.has_issues == 'false'
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const prNumber = context.issue.number;
