@@ -25,6 +25,7 @@ export const SCOPES = [
   "helpers",
   "browser-plugin",
   "hash-plugin",
+  "lifecycle-plugin",
   "logger",
   "logger-plugin",
   "persistent-params-plugin",
