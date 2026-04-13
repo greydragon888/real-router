@@ -34,9 +34,9 @@ const routes: Route[] = [
     path: "/items/:id",
     decodeParams: (p) => ({ ...p, id: normalizePage(p.id) }),
     encodeParams: (p) => ({ ...p, id: `${p.id}` }),
-    onEnter: noop,
-    onStay: noop,
-    onLeave: noop,
+    onEnter: () => noop,
+    onStay: () => noop,
+    onLeave: () => noop,
     children: [{ name: "details", path: "/details" }],
   },
   {
