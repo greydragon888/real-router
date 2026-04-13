@@ -24,7 +24,7 @@ ssr-data-plugin/
 │   ├── index.ts        — Public API (exports factory + types) + module augmentation
 │   ├── factory.ts      — ssrDataPluginFactory (validation, interceptor, claim-based context)
 │   ├── validation.ts   — validateLoaders (factory-time validation)
-│   ├── types.ts        — DataLoaderFn, DataLoaderMap
+│   ├── types.ts        — DataLoaderFn, DataLoaderFnFactory, DataLoaderFactoryMap
 │   └── constants.ts    — ERROR_PREFIX, LOGGER_CONTEXT
 ```
 
@@ -61,10 +61,14 @@ ssrDataPluginFactory(loaders)                ← factory.ts
                 │
                 ├── api = getPluginApi(router)
                 ├── claim = api.claimContextNamespace("data")
+                ├── try: compile factories → compiledLoaders Map
+                │       └── factory(router, getDependency) per entry
+                │       └── typeof check on each returned loader
+                │   catch: claim.release() + rethrow
                 ├── api.addInterceptor("start", ...)
                 │       └── claim.write(state, data)
                 └── return { teardown }
-                        └── claim.release()
+                        └── removeStartInterceptor() + claim.release()
 ```
 
 **Why a closure instead of a class?**
@@ -86,10 +90,10 @@ router.start(url)
         ├── state = await next(path)
         │     └── core resolves route: guards → state change → State object
         │
-        ├── Object.hasOwn(loaders, state.name)?
-        │     YES: data = await loaders[state.name](state.params)
-        │           claim.write(state, data)    ← writes to state.context.data
-        │     NO:  skip (no data for this route)
+        ├── loader = compiledLoaders.get(state.name)
+        │     found: data = await loader(state.params)
+        │            claim.write(state, data)    ← writes to state.context.data
+        │     not found: skip (no data for this route)
         │
         └── return state
 ```
@@ -154,7 +158,7 @@ Both operations are synchronous and infallible. No try/catch needed (unlike `per
 
 Throws `TypeError` with `[@real-router/ssr-data-plugin]` prefix on violation.
 
-No runtime validation — loaders are trusted after factory-time check. Loader return values are written as-is to `state.context.data` via `claim.write()`.
+Factory-time validation checks the `loaders` object. Plugin-registration-time validation (in the compilation loop) checks that each factory returns a function. Loader return values are written as-is to `state.context.data` via `claim.write()`.
 
 ## Design Decisions
 
@@ -166,9 +170,9 @@ No runtime validation — loaders are trusted after factory-time check. Loader r
 - `claim.release()` on teardown frees the namespace for other plugins
 - Module augmentation on `@real-router/types` provides type safety for `state.context.data`
 
-### Object.hasOwn for loader lookup
+### Prototype safety via Object.entries
 
-`Object.hasOwn(loaders, state.name)` prevents prototype chain leakage. If `loaders` inherits properties (e.g., `toString`), they won't be treated as route loaders.
+Prototype safety is ensured at two levels: `Object.entries(loaders)` at compilation time only iterates own enumerable properties (inherited prototype keys are excluded), and `compiledLoaders.get(state.name)` at runtime looks up only compiled entries. If `loaders` inherits properties (e.g., `toString`), they won't be compiled as route loaders.
 
 ### No caching layer
 
@@ -177,6 +181,31 @@ Caching is intentionally omitted:
 - SSR routers are short-lived (per-request `cloneRouter` → `dispose`)
 - Caching across requests requires application-level concerns (cache invalidation, TTL, per-user data)
 - Loaders can implement their own caching internally
+
+### Error-safe compilation
+
+The compilation loop is wrapped in `try/catch`. If any loader factory throws during `factory(router, getDependency)`, or if the returned value is not a function:
+
+- `claim.release()` is called to free the `"data"` namespace
+- The error is re-thrown to the `usePlugin()` caller
+- No interceptor is registered (it runs after the loop)
+
+This prevents permanently blocking the namespace when a factory has a bug.
+
+### DI Access via getDependency
+
+Loader factories follow the same DI pattern as `GuardFnFactory` and `LifecycleHookFactory`:
+
+```typescript
+const loaders: DataLoaderFactoryMap = {
+  "users.profile": (router, getDependency) => async (params) => {
+    const db = getDependency("db");
+    return db.query("SELECT * FROM users WHERE id = ?", params.id);
+  },
+};
+```
+
+The factory receives `(router, getDependency)` once at `usePlugin()` time. The returned loader is cached in a `Map` and reused on every `start()` call. This mirrors the lazy compilation pattern used by `lifecycle-plugin` and `preload-plugin`, except ssr-data-plugin compiles eagerly (all factories at registration, not on first use).
 
 ## Stress Test Coverage
 
@@ -193,7 +222,7 @@ This tests:
 | Teardown under load         | `dispose()` of one clone corrupts another's state          |
 | Loader dispatch correctness | Wrong `state.name` → wrong loader called under concurrency |
 
-Property-based tests are not used — the invariants are simple boolean conditions fully covered by unit tests. The stress test covers the one dimension unit tests cannot: concurrent access patterns that mirror real SSR server load.
+Property-based tests (13 invariants in `tests/property/`) complement functional and stress tests — see INVARIANTS.md for the full list. The stress test covers the one dimension unit tests cannot: concurrent access patterns that mirror real SSR server load.
 
 ## Related Documents
 

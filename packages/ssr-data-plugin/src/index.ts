@@ -1,4 +1,8 @@
-export type { DataLoaderMap, DataLoaderFn } from "./types";
+export type {
+  DataLoaderFn,
+  DataLoaderFactoryMap,
+  DataLoaderFnFactory,
+} from "./types";
 
 export { ssrDataPluginFactory } from "./factory";
 

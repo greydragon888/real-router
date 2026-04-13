@@ -2,6 +2,15 @@
 
 > SSR per-route data loading via `start()` interceptor
 
+## Exports
+
+| Export                   | Kind     | Description                                                        |
+| ------------------------ | -------- | ------------------------------------------------------------------ |
+| `ssrDataPluginFactory`   | function | Plugin factory — pass loaders map, returns `PluginFactory`         |
+| `DataLoaderFn`           | type     | Compiled loader signature: `(params) => Promise<unknown>`          |
+| `DataLoaderFnFactory`    | type     | Factory signature: `(router, getDependency) => DataLoaderFn`       |
+| `DataLoaderFactoryMap`   | type     | Record of loader factories — pass to `ssrDataPluginFactory()`      |
+
 ## How It Works
 
 1. `ssrDataPluginFactory(loaders)` validates loaders at factory call time, returns `PluginFactory`
@@ -22,12 +31,12 @@ Intercepts only `start()`, not `navigate()`. Rationale:
 
 ```typescript
 ssrDataPluginFactory({
-  "home": (params) => fetchHomeData(),
-  "users.profile": (params) => fetchUser(params.id),
+  "home": () => () => fetchHomeData(),
+  "users.profile": () => async (params) => fetchUser(params.id),
 })
 ```
 
-Loaders keyed by route name. Each receives `Params`, returns `Promise<unknown>`. Uses `Object.hasOwn` for lookup — no prototype chain leakage.
+Loaders keyed by route name. Each value is a factory `(router, getDependency) => (params) => Promise<unknown>`. Factory runs once at `usePlugin()` time; the returned loader is cached. Uses `Object.entries()` at compilation time and `Map.get()` at runtime — no prototype chain leakage.
 
 Validation at factory time: rejects `null`, non-objects, non-function values with `TypeError`.
 
@@ -37,8 +46,8 @@ Validation at factory time: rejects `null`, non-objects, non-function values wit
 src/
 ├── factory.ts     — ssrDataPluginFactory: validates loaders, intercepts start(), claims "data" namespace
 ├── validation.ts  — validateLoaders: factory-time validation (non-null object, function values)
-├── types.ts       — DataLoaderFn, DataLoaderMap
-├── constants.ts   — LOGGER_CONTEXT, ERROR_PREFIX
+├── types.ts       — DataLoaderFn, DataLoaderFnFactory, DataLoaderFactoryMap
+├── constants.ts   — ERROR_PREFIX (LOGGER_CONTEXT — internal)
 └── index.ts       — Public exports + module augmentation (@real-router/types for StateContext)
 ```
 
@@ -52,7 +61,7 @@ src/
 - **Works:** SSR render — server does `await start()`, then reads `state.context.data`
 - **Does NOT work:** `router.subscribe(state => state.context.data)` — data is `undefined` in subscribe callback
 
-This is by design for SSR. Identical to the previous `getRouteData()` timing.
+This is by design for SSR.
 
 ### No caching
 

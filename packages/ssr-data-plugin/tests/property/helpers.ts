@@ -5,7 +5,7 @@ import { createRouter } from "@real-router/core";
 
 import { ssrDataPluginFactory } from "../../src";
 
-import type { DataLoaderMap } from "../../src";
+import type { DataLoaderFactoryMap } from "../../src";
 import type { Route, Router } from "@real-router/core";
 
 // =============================================================================
@@ -54,8 +54,16 @@ export const arbLoaderData = fc.oneof(
   fc.integer(),
   fc.boolean(),
   fc.constant(null),
+  fc.constant(undefined),
   fc.dictionary(fc.string({ minLength: 1, maxLength: 5 }), fc.string()),
   fc.array(fc.integer(), { minLength: 0, maxLength: 5 }),
+  fc.record({
+    nested: fc.dictionary(
+      fc.string({ minLength: 1, maxLength: 3 }),
+      fc.integer(),
+    ),
+    list: fc.array(fc.string(), { minLength: 0, maxLength: 3 }),
+  }),
 );
 
 // =============================================================================
@@ -66,7 +74,7 @@ export const arbLoaderData = fc.oneof(
  * Creates a router with the ssr-data plugin installed.
  * Returns the router and the unsubscribe function.
  */
-export function createSsrDataRouter(loaders: DataLoaderMap): {
+export function createSsrDataRouter(loaders: DataLoaderFactoryMap): {
   router: Router;
   unsubscribe: () => void;
 } {
