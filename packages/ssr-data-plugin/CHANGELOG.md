@@ -1,5 +1,33 @@
 # ssr-data-plugin
 
+## 0.3.0
+
+### Minor Changes
+
+- [#456](https://github.com/greydragon888/real-router/pull/456) [`8989831`](https://github.com/greydragon888/real-router/commit/8989831062090cf6e94788a0acdc8a0cee54e0b5) Thanks [@greydragon888](https://github.com/greydragon888)! - Add DI access to data loaders via factory pattern ([#439](https://github.com/greydragon888/real-router/issues/439))
+
+  **Breaking Change:** `DataLoaderMap` is replaced by `DataLoaderFactoryMap`. Loaders are now factory functions `(router, getDependency) => loaderFn` instead of plain functions `(params) => Promise<unknown>`.
+
+  **Migration:**
+
+  ```diff
+  - const loaders: DataLoaderMap = {
+  -   "users.profile": (params) => fetchUser(params.id),
+  + const loaders: DataLoaderFactoryMap = {
+  +   "users.profile": () => (params) => fetchUser(params.id),
+    };
+  ```
+
+  With DI:
+
+  ```typescript
+  const loaders: DataLoaderFactoryMap = {
+    "users.profile": (_router, getDep) => (params) => {
+      return getDep("db").query("SELECT * FROM users WHERE id = ?", params.id);
+    },
+  };
+  ```
+
 ## 0.2.1
 
 ### Patch Changes
