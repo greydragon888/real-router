@@ -249,7 +249,9 @@ class AssertCanGoBackToCommand implements fc.AsyncCommand<
   }
 
   async run(m: HistoryModel, r: HistoryReal) {
-    const backNames = new Set(m.stack.slice(0, m.cursor).map((entry) => entry.name));
+    const backNames = new Set(
+      m.stack.slice(0, m.cursor).map((entry) => entry.name),
+    );
 
     for (const routeName of LEAF_ROUTE_NAMES) {
       const expected = backNames.has(routeName);

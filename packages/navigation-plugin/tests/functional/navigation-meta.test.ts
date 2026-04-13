@@ -348,6 +348,21 @@ describe("Navigation Plugin — NavigationMeta", () => {
     });
   });
 
+  describe("direction for traverse with equal indices", () => {
+    it('direction is "unknown" when traversing to the current entry (equal indices)', async () => {
+      await router.start();
+
+      const currentKey = mockNav.currentEntry!.key;
+      const result = mockNav.traverseTo(currentKey);
+
+      await result.finished;
+
+      const state = router.getState()!;
+
+      expect(state.context.navigation?.direction).toBe("unknown");
+    });
+  });
+
   describe("direction for browser-initiated navigation", () => {
     it('direction is "unknown" for browser replace navigation', async () => {
       await router.start();
