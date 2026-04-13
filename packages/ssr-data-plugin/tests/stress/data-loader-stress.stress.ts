@@ -4,7 +4,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 
 import { ssrDataPluginFactory } from "../../src";
 
-import type { DataLoaderMap } from "../../src";
+import type { DataLoaderFactoryMap } from "../../src";
 import type { Router } from "@real-router/core";
 
 const noop = (): void => undefined;
@@ -22,7 +22,7 @@ const routes = [
   { name: "about", path: "/about" },
 ];
 
-describe("D1 -- Data Loader Stress", () => {
+describe("Data Loader Stress", () => {
   beforeAll(() => {
     vi.spyOn(console, "warn").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
@@ -32,10 +32,10 @@ describe("D1 -- Data Loader Stress", () => {
     vi.restoreAllMocks();
   });
 
-  it("D1.1 -- 200 sequential start() calls with loader: each returns correct data", async () => {
+  it("200 sequential start() calls with loader: each returns correct data", async () => {
     const base = createRouter(routes, { defaultRoute: "home" });
-    const loaders: DataLoaderMap = {
-      "users.profile": (params) =>
+    const loaders: DataLoaderFactoryMap = {
+      "users.profile": () => (params) =>
         Promise.resolve({ userId: params.id, ts: Date.now() }),
     };
 
@@ -47,17 +47,16 @@ describe("D1 -- Data Loader Stress", () => {
 
       const data = state.context.data as { userId: string };
 
-      expect(data).toBeDefined();
       expect(data.userId).toBe(String(i));
 
       clone.dispose();
     }
   });
 
-  it("D1.2 -- 500 concurrent clone+start+dispose: per-request isolation preserved", async () => {
+  it("500 concurrent clone+start+dispose: per-request isolation preserved", async () => {
     const base = createRouter(routes, { defaultRoute: "home" });
-    const loaders: DataLoaderMap = {
-      "users.profile": (params) => Promise.resolve({ id: params.id }),
+    const loaders: DataLoaderFactoryMap = {
+      "users.profile": () => (params) => Promise.resolve({ id: params.id }),
     };
 
     const results = await Promise.all(
@@ -79,7 +78,7 @@ describe("D1 -- Data Loader Stress", () => {
     }
   });
 
-  it("D1.3 -- 200 start() with multiple loaders: correct loader invoked per route", async () => {
+  it("200 start() with multiple loaders: correct loader invoked per route", async () => {
     const homeLoader = vi.fn().mockResolvedValue({ page: "home" });
     const profileLoader = vi
       .fn()
@@ -88,10 +87,10 @@ describe("D1 -- Data Loader Stress", () => {
       );
     const aboutLoader = vi.fn().mockResolvedValue({ page: "about" });
 
-    const loaders: DataLoaderMap = {
-      home: homeLoader,
-      "users.profile": profileLoader,
-      about: aboutLoader,
+    const loaders: DataLoaderFactoryMap = {
+      home: () => homeLoader,
+      "users.profile": () => profileLoader,
+      about: () => aboutLoader,
     };
 
     const base = createRouter(routes, { defaultRoute: "home" });
@@ -107,7 +106,13 @@ describe("D1 -- Data Loader Stress", () => {
 
       const data = state.context.data;
 
-      expect(data).toBeDefined();
+      const expectedByPath: Record<string, unknown> = {
+        "/": { page: "home" },
+        "/users/42": { user: "42" },
+        "/about": { page: "about" },
+      };
+
+      expect(data).toStrictEqual(expectedByPath[path]);
 
       clone.dispose();
     }
@@ -118,10 +123,10 @@ describe("D1 -- Data Loader Stress", () => {
     expect(aboutLoader.mock.calls.length).toBeGreaterThanOrEqual(66);
   });
 
-  it("D1.4 -- 100 usePlugin/unsubscribe cycles: unsubscribe completes without error", async () => {
+  it("100 usePlugin/unsubscribe cycles: unsubscribe completes without error", async () => {
     const router: Router = createRouter(routes, { defaultRoute: "home" });
-    const loaders: DataLoaderMap = {
-      home: () => Promise.resolve("data"),
+    const loaders: DataLoaderFactoryMap = {
+      home: () => () => Promise.resolve("data"),
     };
 
     for (let i = 0; i < 100; i++) {
@@ -134,5 +139,59 @@ describe("D1 -- Data Loader Stress", () => {
       router.stop();
       unsub();
     }
+  });
+
+  it("1000 clone+start+dispose cycles: no memory leak via WeakRef", async () => {
+    const base = createRouter(routes, { defaultRoute: "home" });
+    const loaders: DataLoaderFactoryMap = {
+      "users.profile": () => (params) => Promise.resolve({ id: params.id }),
+    };
+
+    const refs: WeakRef<object>[] = [];
+
+    for (let i = 0; i < 1000; i++) {
+      const clone = cloneRouter(base);
+
+      clone.usePlugin(ssrDataPluginFactory(loaders));
+      const state = await clone.start(`/users/${i}`);
+
+      refs.push(new WeakRef(state));
+
+      clone.dispose();
+    }
+
+    globalThis.gc?.();
+
+    // Allow some time for GC
+    await new Promise((r) => {
+      setTimeout(r, 50);
+    });
+    globalThis.gc?.();
+
+    const alive = refs.filter((r) => r.deref() !== undefined).length;
+
+    // At least 80% should be collected (GC is non-deterministic)
+    expect(alive).toBeLessThan(200);
+  });
+
+  it("200 rapid usePlugin/unsubscribe without start: no errors", async () => {
+    const router: Router = createRouter(routes, { defaultRoute: "home" });
+    const loaders: DataLoaderFactoryMap = {
+      home: () => () => Promise.resolve("data"),
+    };
+
+    for (let i = 0; i < 200; i++) {
+      const unsub = router.usePlugin(ssrDataPluginFactory(loaders));
+
+      unsub();
+    }
+
+    // Verify router still works after rapid plugin churn
+    router.usePlugin(ssrDataPluginFactory(loaders));
+    const state = await router.start("/");
+
+    expect(state.context.data).toBe("data");
+
+    router.stop();
   });
 });

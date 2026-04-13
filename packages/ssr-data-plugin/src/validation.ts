@@ -1,11 +1,15 @@
 import { ERROR_PREFIX } from "./constants";
 
-import type { DataLoaderMap } from "./types";
+import type { DataLoaderFactoryMap } from "./types";
 
 export function validateLoaders(
   loaders: unknown,
-): asserts loaders is DataLoaderMap {
-  if (loaders === null || typeof loaders !== "object") {
+): asserts loaders is DataLoaderFactoryMap {
+  if (
+    loaders === null ||
+    typeof loaders !== "object" ||
+    Array.isArray(loaders)
+  ) {
     throw new TypeError(`${ERROR_PREFIX} loaders must be a non-null object`);
   }
 

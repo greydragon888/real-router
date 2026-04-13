@@ -14,7 +14,11 @@ export function preloadPluginFactory(
     ...opts,
   };
 
-  return function preloadPlugin(routerBase) {
+  if (!Number.isFinite(options.delay) || options.delay < 0) {
+    options.delay = 0;
+  }
+
+  return function preloadPlugin(routerBase, getDependency) {
     if (typeof document === "undefined") {
       return {};
     }
@@ -23,6 +27,7 @@ export function preloadPluginFactory(
       routerBase as Router,
       getPluginApi(routerBase),
       options,
+      getDependency,
     );
 
     return plugin.getPlugin();

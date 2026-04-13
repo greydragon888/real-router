@@ -1,26 +1,47 @@
 import { getPluginApi } from "@real-router/core/api";
 
-import type { LifecycleHook } from "./types";
+import type { LifecycleHook, LifecycleHookFactory } from "./types";
 import type { PluginFactory, State } from "@real-router/core";
-import type { PluginApi } from "@real-router/core/api";
 
-function createInvokeHook(api: PluginApi) {
-  return (
+function createPlugin(
+  ...args: Parameters<PluginFactory>
+): ReturnType<PluginFactory> {
+  const [router, getDependency] = args;
+  const api = getPluginApi(router);
+  const compiledHooks = new Map<
+    string,
+    { hook: LifecycleHook; factory: LifecycleHookFactory }
+  >();
+
+  function compileHook(
     hookName: "onEnter" | "onStay" | "onLeave",
     routeName: string,
-    toState: State,
-    fromState: State | undefined,
-  ): void => {
-    const hook = api.getRouteConfig(routeName)?.[hookName];
+  ): LifecycleHook | undefined {
+    const key = `${hookName}:${routeName}`;
+    const config = api.getRouteConfig(routeName);
+    const factory =
+      typeof config?.[hookName] === "function"
+        ? (config[hookName] as LifecycleHookFactory)
+        : undefined;
 
-    if (typeof hook === "function") {
-      (hook as LifecycleHook)(toState, fromState);
+    if (!factory) {
+      compiledHooks.delete(key);
+
+      return undefined;
     }
-  };
-}
 
-function createPlugin(router: Parameters<PluginFactory>[0]) {
-  const invokeHook = createInvokeHook(getPluginApi(router));
+    const cached = compiledHooks.get(key);
+
+    if (cached?.factory === factory) {
+      return cached.hook;
+    }
+
+    const hook = factory(router, getDependency);
+
+    compiledHooks.set(key, { hook, factory });
+
+    return hook;
+  }
 
   return {
     onTransitionLeaveApprove: (
@@ -28,15 +49,15 @@ function createPlugin(router: Parameters<PluginFactory>[0]) {
       fromState: State | undefined,
     ) => {
       if (fromState && toState.name !== fromState.name) {
-        invokeHook("onLeave", fromState.name, toState, fromState);
+        compileHook("onLeave", fromState.name)?.(toState, fromState);
       }
     },
 
     onTransitionSuccess: (toState: State, fromState: State | undefined) => {
       if (toState.name === fromState?.name) {
-        invokeHook("onStay", toState.name, toState, fromState);
+        compileHook("onStay", toState.name)?.(toState, fromState);
       } else {
-        invokeHook("onEnter", toState.name, toState, fromState);
+        compileHook("onEnter", toState.name)?.(toState, fromState);
       }
     },
   };

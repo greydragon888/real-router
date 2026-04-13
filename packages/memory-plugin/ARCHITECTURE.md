@@ -13,10 +13,10 @@
 ```
 memory-plugin/
 ├── src/
-│   ├── factory.ts  — memoryPluginFactory: validates maxHistoryLength, freezes options, returns PluginFactory (29 lines)
-│   ├── plugin.ts   — MemoryPlugin class: history array + index management, extendRouter, getPlugin() (115 lines)
-│   ├── types.ts    — MemoryPluginOptions, HistoryEntry interfaces (11 lines)
-│   └── index.ts    — Public exports + Router module augmentation (13 lines)
+│   ├── factory.ts  — memoryPluginFactory: validates maxHistoryLength, freezes options, returns PluginFactory
+│   ├── plugin.ts   — MemoryPlugin class: history array + index management, extendRouter, getPlugin()
+│   ├── types.ts    — MemoryPluginOptions, HistoryEntry interfaces
+│   └── index.ts    — Public exports + Router module augmentation
 ```
 
 ## Dependencies

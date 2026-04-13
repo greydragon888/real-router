@@ -221,7 +221,7 @@ wiring/ (construction-time, Builder+Director pattern)
     └── wireRouter             — calls wire methods in correct order
 ```
 
-Router.ts is a thin facade (~640 lines). All business logic lives in namespaces. Standalone API functions in `api/` access router internals via a `WeakMap<Router, RouterInternals>` registry — this enables tree-shaking.
+Router.ts is a thin facade — validates inputs and delegates to namespaces. All business logic lives in namespaces. Standalone API functions in `api/` access router internals via a `WeakMap<Router, RouterInternals>` registry — this enables tree-shaking.
 
 ## Router FSM
 

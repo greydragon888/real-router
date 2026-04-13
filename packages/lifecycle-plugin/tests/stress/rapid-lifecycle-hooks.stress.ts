@@ -11,14 +11,14 @@ import {
 
 import { lifecyclePluginFactory } from "../../src";
 
-import type { LifecycleHook } from "../../src";
+import type { LifecycleHook, LifecycleHookFactory } from "../../src";
 import type { Router } from "@real-router/core";
 
 const noop = (): void => undefined;
 
 let router: Router;
 
-describe("L1 -- Rapid Lifecycle Hook Invocation", () => {
+describe("Rapid Lifecycle Hook Invocation", () => {
   beforeAll(() => {
     vi.spyOn(console, "warn").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
@@ -32,7 +32,7 @@ describe("L1 -- Rapid Lifecycle Hook Invocation", () => {
     vi.restoreAllMocks();
   });
 
-  it("L1.1 -- 200 navigations: onEnter fires for each route change", async () => {
+  it("200 navigations: onEnter fires for each route change", async () => {
     const enterCalls: string[] = [];
     const onEnterHome: LifecycleHook = (toState) => {
       enterCalls.push(toState.name);
@@ -43,8 +43,8 @@ describe("L1 -- Rapid Lifecycle Hook Invocation", () => {
 
     router = createRouter(
       [
-        { name: "home", path: "/", onEnter: onEnterHome },
-        { name: "about", path: "/about", onEnter: onEnterAbout },
+        { name: "home", path: "/", onEnter: () => onEnterHome },
+        { name: "about", path: "/about", onEnter: () => onEnterAbout },
       ],
       { defaultRoute: "home" },
     );
@@ -63,7 +63,7 @@ describe("L1 -- Rapid Lifecycle Hook Invocation", () => {
     expect(router.getState()?.name).toBe("home");
   });
 
-  it("L1.2 -- 200 navigations: onLeave fires for each route departure", async () => {
+  it("200 navigations: onLeave fires for each route departure", async () => {
     const leaveCalls: string[] = [];
     const onLeaveHome: LifecycleHook = (_toState, fromState) => {
       leaveCalls.push(fromState!.name);
@@ -74,8 +74,8 @@ describe("L1 -- Rapid Lifecycle Hook Invocation", () => {
 
     router = createRouter(
       [
-        { name: "home", path: "/", onLeave: onLeaveHome },
-        { name: "about", path: "/about", onLeave: onLeaveAbout },
+        { name: "home", path: "/", onLeave: () => onLeaveHome },
+        { name: "about", path: "/about", onLeave: () => onLeaveAbout },
       ],
       { defaultRoute: "home" },
     );
@@ -93,7 +93,7 @@ describe("L1 -- Rapid Lifecycle Hook Invocation", () => {
     expect(leaveCalls).toHaveLength(200);
   });
 
-  it("L1.3 -- 200 same-route navigations with param changes: onStay fires each time", async () => {
+  it("200 same-route navigations with param changes: onStay fires each time", async () => {
     const stayCalls: string[] = [];
     const onStay: LifecycleHook = (toState) => {
       stayCalls.push(toState.params.id as string);
@@ -102,7 +102,7 @@ describe("L1 -- Rapid Lifecycle Hook Invocation", () => {
     router = createRouter(
       [
         { name: "home", path: "/" },
-        { name: "users.view", path: "/users/:id", onStay },
+        { name: "users.view", path: "/users/:id", onStay: () => onStay },
       ],
       { defaultRoute: "home" },
     );
@@ -120,7 +120,7 @@ describe("L1 -- Rapid Lifecycle Hook Invocation", () => {
     expect(router.getState()?.params).toStrictEqual({ id: "200" });
   });
 
-  it("L1.4 -- 100 navigations: onLeave fires before onEnter in every pair", async () => {
+  it("100 navigations: onLeave fires before onEnter in every pair", async () => {
     const callOrder: string[] = [];
     const onLeaveHome: LifecycleHook = () => {
       callOrder.push("leave:home");
@@ -137,12 +137,17 @@ describe("L1 -- Rapid Lifecycle Hook Invocation", () => {
 
     router = createRouter(
       [
-        { name: "home", path: "/", onLeave: onLeaveHome, onEnter: onEnterHome },
+        {
+          name: "home",
+          path: "/",
+          onLeave: () => onLeaveHome,
+          onEnter: () => onEnterHome,
+        },
         {
           name: "about",
           path: "/about",
-          onLeave: onLeaveAbout,
-          onEnter: onEnterAbout,
+          onLeave: () => onLeaveAbout,
+          onEnter: () => onEnterAbout,
         },
       ],
       { defaultRoute: "home" },
@@ -168,7 +173,7 @@ describe("L1 -- Rapid Lifecycle Hook Invocation", () => {
     }
   });
 
-  it("L1.5 -- 100 navigations with throwing hooks: errors logged, transitions complete", async () => {
+  it("100 navigations with throwing hooks: errors logged, transitions complete", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(noop);
 
     let enterCount = 0;
@@ -181,7 +186,7 @@ describe("L1 -- Rapid Lifecycle Hook Invocation", () => {
     router = createRouter(
       [
         { name: "home", path: "/" },
-        { name: "about", path: "/about", onEnter: throwingEnter },
+        { name: "about", path: "/about", onEnter: () => throwingEnter },
       ],
       { defaultRoute: "home" },
     );
@@ -196,6 +201,35 @@ describe("L1 -- Rapid Lifecycle Hook Invocation", () => {
 
     expect(enterCount).toBe(100);
     expect(errorSpy).toHaveBeenCalled();
+    expect(router.getState()?.name).toBe("home");
+  });
+
+  it("100 navigations with throwing hook factory: factory retried each time", async () => {
+    let factoryCallCount = 0;
+    const throwingFactory: LifecycleHookFactory = () => {
+      factoryCallCount++;
+
+      throw new Error(`factory error ${factoryCallCount}`);
+    };
+
+    router = createRouter(
+      [
+        { name: "home", path: "/" },
+        { name: "about", path: "/about", onEnter: throwingFactory },
+      ],
+      { defaultRoute: "home" },
+    );
+    router.usePlugin(lifecyclePluginFactory());
+
+    await router.start("/");
+
+    for (let i = 0; i < 100; i++) {
+      await router.navigate("about");
+      await router.navigate("home");
+    }
+
+    // Factory throws → hook not cached → factory retried each navigation to "about"
+    expect(factoryCallCount).toBe(100);
     expect(router.getState()?.name).toBe("home");
   });
 });

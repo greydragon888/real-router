@@ -91,24 +91,24 @@ export const privateRoutes: Route<AppDependencies>[] = [
         path: "/list?page&sort",
         defaultParams: { page: 1, sort: "name" },
         searchSchema: productsListSchema,
-        preload: async () => {
+        preload: () => async () => {
           const data = await api.getProducts();
 
           store.set("products.list", data);
         },
-        onEnter: () => {
+        onEnter: () => () => {
           loadRoute("products.list", () => api.getProducts());
         },
       },
       {
         name: "detail",
         path: "/:id",
-        preload: async (params: Params) => {
+        preload: () => async (params: Params) => {
           const data = await api.getProduct(String(params.id));
 
           store.set("products.detail", data);
         },
-        onEnter: (toState) => {
+        onEnter: () => (toState) => {
           const id =
             typeof toState.params.id === "string" ? toState.params.id : "";
 

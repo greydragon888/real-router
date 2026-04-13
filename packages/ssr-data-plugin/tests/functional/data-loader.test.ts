@@ -1,10 +1,10 @@
 import { createRouter } from "@real-router/core";
-import { cloneRouter } from "@real-router/core/api";
+import { cloneRouter, getPluginApi } from "@real-router/core/api";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { ssrDataPluginFactory } from "../../src";
 
-import type { DataLoaderMap } from "../../src";
+import type { DataLoaderFactoryMap } from "../../src";
 import type { Router } from "@real-router/core";
 
 const routes = [
@@ -33,7 +33,7 @@ describe("@real-router/ssr-data-plugin", () => {
   describe("Validation", () => {
     it("should reject null loaders", () => {
       expect(() =>
-        ssrDataPluginFactory(null as unknown as DataLoaderMap),
+        ssrDataPluginFactory(null as unknown as DataLoaderFactoryMap),
       ).toThrow(
         "[@real-router/ssr-data-plugin] loaders must be a non-null object",
       );
@@ -41,7 +41,7 @@ describe("@real-router/ssr-data-plugin", () => {
 
     it("should reject non-object loaders", () => {
       expect(() =>
-        ssrDataPluginFactory("invalid" as unknown as DataLoaderMap),
+        ssrDataPluginFactory("invalid" as unknown as DataLoaderFactoryMap),
       ).toThrow(
         "[@real-router/ssr-data-plugin] loaders must be a non-null object",
       );
@@ -49,7 +49,7 @@ describe("@real-router/ssr-data-plugin", () => {
 
     it("should reject undefined loaders", () => {
       expect(() =>
-        ssrDataPluginFactory(undefined as unknown as DataLoaderMap),
+        ssrDataPluginFactory(undefined as unknown as DataLoaderFactoryMap),
       ).toThrow(
         "[@real-router/ssr-data-plugin] loaders must be a non-null object",
       );
@@ -58,7 +58,7 @@ describe("@real-router/ssr-data-plugin", () => {
     it("should reject non-function loader values", () => {
       expect(() =>
         ssrDataPluginFactory({
-          home: "not-a-function" as unknown as DataLoaderMap["string"],
+          home: "not-a-function" as unknown as DataLoaderFactoryMap["string"],
         }),
       ).toThrow(
         '[@real-router/ssr-data-plugin] loader for route "home" must be a function',
@@ -68,7 +68,7 @@ describe("@real-router/ssr-data-plugin", () => {
     it("should accept valid loaders", () => {
       expect(() =>
         ssrDataPluginFactory({
-          home: () => Promise.resolve("data"),
+          home: () => () => Promise.resolve("data"),
         }),
       ).not.toThrow();
     });
@@ -82,7 +82,7 @@ describe("@real-router/ssr-data-plugin", () => {
     it("should load data on start for matching route", async () => {
       const loader = vi.fn().mockResolvedValue({ title: "Home" });
 
-      router.usePlugin(ssrDataPluginFactory({ home: loader }));
+      router.usePlugin(ssrDataPluginFactory({ home: () => loader }));
       const state = await router.start("/");
 
       expect(loader).toHaveBeenCalledTimes(1);
@@ -92,7 +92,7 @@ describe("@real-router/ssr-data-plugin", () => {
     it("should pass route params to the loader", async () => {
       const loader = vi.fn().mockResolvedValue({ name: "Alice" });
 
-      router.usePlugin(ssrDataPluginFactory({ "users.profile": loader }));
+      router.usePlugin(ssrDataPluginFactory({ "users.profile": () => loader }));
       await router.start("/users/42");
 
       expect(loader).toHaveBeenCalledWith(
@@ -100,10 +100,22 @@ describe("@real-router/ssr-data-plugin", () => {
       );
     });
 
+    it("should call loader on every start() (no caching)", async () => {
+      const loader = vi.fn().mockResolvedValue("data");
+
+      router.usePlugin(ssrDataPluginFactory({ home: () => loader }));
+
+      await router.start("/");
+      router.stop();
+      await router.start("/");
+
+      expect(loader).toHaveBeenCalledTimes(2);
+    });
+
     it("should not load data on start when no loader matches", async () => {
       const loader = vi.fn().mockResolvedValue("data");
 
-      router.usePlugin(ssrDataPluginFactory({ "users.profile": loader }));
+      router.usePlugin(ssrDataPluginFactory({ "users.profile": () => loader }));
       const state = await router.start("/");
 
       expect(loader).not.toHaveBeenCalled();
@@ -115,7 +127,7 @@ describe("@real-router/ssr-data-plugin", () => {
     it("should not load data on navigate", async () => {
       const loader = vi.fn().mockResolvedValue("data");
 
-      router.usePlugin(ssrDataPluginFactory({ "users.list": loader }));
+      router.usePlugin(ssrDataPluginFactory({ "users.list": () => loader }));
       await router.start("/");
       loader.mockClear();
 
@@ -130,7 +142,7 @@ describe("@real-router/ssr-data-plugin", () => {
     it("should return loaded data for current state", async () => {
       router.usePlugin(
         ssrDataPluginFactory({
-          home: () => Promise.resolve({ page: "home" }),
+          home: () => () => Promise.resolve({ page: "home" }),
         }),
       );
       const state = await router.start("/");
@@ -141,7 +153,7 @@ describe("@real-router/ssr-data-plugin", () => {
     it("should be undefined when no loader matched the route", async () => {
       router.usePlugin(
         ssrDataPluginFactory({
-          "users.profile": () => Promise.resolve("profile-data"),
+          "users.profile": () => () => Promise.resolve("profile-data"),
         }),
       );
       const state = await router.start("/");
@@ -152,7 +164,7 @@ describe("@real-router/ssr-data-plugin", () => {
     it("should return correct data when reading from getState()", async () => {
       router.usePlugin(
         ssrDataPluginFactory({
-          home: () => Promise.resolve({ page: "home-data" }),
+          home: () => () => Promise.resolve({ page: "home-data" }),
         }),
       );
       await router.start("/");
@@ -168,7 +180,7 @@ describe("@real-router/ssr-data-plugin", () => {
       const loader = vi.fn().mockResolvedValue("data");
 
       const unsubscribe = router.usePlugin(
-        ssrDataPluginFactory({ home: loader }),
+        ssrDataPluginFactory({ home: () => loader }),
       );
 
       await router.start("/");
@@ -177,6 +189,26 @@ describe("@real-router/ssr-data-plugin", () => {
       expect(router.getState()!.context.data).toBe("data");
 
       unsubscribe();
+      router.stop();
+      loader.mockClear();
+
+      const state = await router.start("/");
+
+      expect(loader).not.toHaveBeenCalled();
+      expect(state.context.data).toBeUndefined();
+    });
+
+    it("should release namespace claim on unsubscribe", async () => {
+      const unsubscribe = router.usePlugin(
+        ssrDataPluginFactory({ home: () => () => Promise.resolve("data") }),
+      );
+
+      await router.start("/");
+      unsubscribe();
+
+      expect(() =>
+        getPluginApi(router).claimContextNamespace("data"),
+      ).not.toThrow();
     });
   });
 
@@ -184,18 +216,18 @@ describe("@real-router/ssr-data-plugin", () => {
     it("should propagate loader promise rejection through start()", async () => {
       const loader = vi.fn().mockRejectedValue(new Error("load failed"));
 
-      router.usePlugin(ssrDataPluginFactory({ home: loader }));
+      router.usePlugin(ssrDataPluginFactory({ home: () => loader }));
 
       await expect(router.start("/")).rejects.toThrow("load failed");
     });
   });
 
   describe("Teardown removes start interceptor", () => {
-    it("should not call loader after unsubscribe on subsequent start()", async () => {
+    it("should not call loader after stop+unsubscribe on subsequent start()", async () => {
       const loader = vi.fn().mockResolvedValue("data");
 
       const unsubscribe = router.usePlugin(
-        ssrDataPluginFactory({ home: loader }),
+        ssrDataPluginFactory({ home: () => loader }),
       );
 
       await router.start("/");
@@ -206,20 +238,17 @@ describe("@real-router/ssr-data-plugin", () => {
       unsubscribe();
       loader.mockClear();
 
-      const freshRouter = createRouter(routes, { defaultRoute: "home" });
-
-      await freshRouter.start("/");
+      const state = await router.start("/");
 
       expect(loader).not.toHaveBeenCalled();
-
-      freshRouter.stop();
+      expect(state.context.data).toBeUndefined();
     });
   });
 
   describe("Data type variations", () => {
     it("should handle string data", async () => {
       router.usePlugin(
-        ssrDataPluginFactory({ home: () => Promise.resolve("hello") }),
+        ssrDataPluginFactory({ home: () => () => Promise.resolve("hello") }),
       );
       const state = await router.start("/");
 
@@ -228,7 +257,7 @@ describe("@real-router/ssr-data-plugin", () => {
 
     it("should handle number data", async () => {
       router.usePlugin(
-        ssrDataPluginFactory({ home: () => Promise.resolve(42) }),
+        ssrDataPluginFactory({ home: () => () => Promise.resolve(42) }),
       );
       const state = await router.start("/");
 
@@ -237,7 +266,7 @@ describe("@real-router/ssr-data-plugin", () => {
 
     it("should handle null data", async () => {
       router.usePlugin(
-        ssrDataPluginFactory({ home: () => Promise.resolve(null) }),
+        ssrDataPluginFactory({ home: () => () => Promise.resolve(null) }),
       );
       const state = await router.start("/");
 
@@ -247,7 +276,7 @@ describe("@real-router/ssr-data-plugin", () => {
     it("should handle array data", async () => {
       router.usePlugin(
         ssrDataPluginFactory({
-          home: () => Promise.resolve([1, "two", { three: 3 }]),
+          home: () => () => Promise.resolve([1, "two", { three: 3 }]),
         }),
       );
       const state = await router.start("/");
@@ -259,7 +288,7 @@ describe("@real-router/ssr-data-plugin", () => {
       const nested = { a: { b: { c: [1, 2] } }, d: null };
 
       router.usePlugin(
-        ssrDataPluginFactory({ home: () => Promise.resolve(nested) }),
+        ssrDataPluginFactory({ home: () => () => Promise.resolve(nested) }),
       );
       const state = await router.start("/");
 
@@ -267,15 +296,136 @@ describe("@real-router/ssr-data-plugin", () => {
     });
   });
 
+  describe("subscribe() timing (documenting limitation)", () => {
+    it("state.context.data is undefined in subscribe callback (by design)", async () => {
+      let subscribeData: unknown = "sentinel";
+
+      router.subscribe(({ route }) => {
+        subscribeData = route.context.data;
+      });
+
+      router.usePlugin(
+        ssrDataPluginFactory({
+          home: () => () => Promise.resolve("loaded"),
+        }),
+      );
+
+      const state = await router.start("/");
+
+      expect(subscribeData).toBeUndefined();
+      expect(state.context.data).toBe("loaded");
+    });
+  });
+
+  describe("Factory compilation errors", () => {
+    it("should release claim when factory throws during compilation", () => {
+      const factory = ssrDataPluginFactory({
+        home: () => {
+          throw new Error("factory crash");
+        },
+      });
+
+      expect(() => router.usePlugin(factory)).toThrow("factory crash");
+
+      expect(() =>
+        getPluginApi(router).claimContextNamespace("data"),
+      ).not.toThrow();
+    });
+
+    it("should throw when factory returns non-function", () => {
+      const factory = ssrDataPluginFactory({
+        home: (() =>
+          "not-a-function") as unknown as DataLoaderFactoryMap[string],
+      });
+
+      expect(() => router.usePlugin(factory)).toThrow(
+        '[@real-router/ssr-data-plugin] factory for route "home" must return a function',
+      );
+    });
+
+    it("should release claim when factory returns non-function", () => {
+      const factory = ssrDataPluginFactory({
+        home: (() => 42) as unknown as DataLoaderFactoryMap[string],
+      });
+
+      expect(() => router.usePlugin(factory)).toThrow();
+
+      expect(() =>
+        getPluginApi(router).claimContextNamespace("data"),
+      ).not.toThrow();
+    });
+  });
+
+  describe("Validation — arrays", () => {
+    it("should reject array loaders", () => {
+      expect(() =>
+        ssrDataPluginFactory([] as unknown as DataLoaderFactoryMap),
+      ).toThrow(
+        "[@real-router/ssr-data-plugin] loaders must be a non-null object",
+      );
+    });
+  });
+
+  describe("getDependency integration", () => {
+    it("should pass working getDependency to loader factory", async () => {
+      const mockDatabase = { query: vi.fn().mockReturnValue("result") };
+      const depRouter = createRouter(
+        routes,
+        { defaultRoute: "home" },
+        { db: mockDatabase },
+      );
+
+      depRouter.usePlugin(
+        ssrDataPluginFactory({
+          home: (_router, getDep) => {
+            const database = (getDep as (k: string) => typeof mockDatabase)(
+              "db",
+            );
+
+            return async () => database.query("SELECT 1");
+          },
+        }),
+      );
+
+      const state = await depRouter.start("/");
+
+      expect(state.context.data).toBe("result");
+      expect(mockDatabase.query).toHaveBeenCalledWith("SELECT 1");
+
+      depRouter.stop();
+    });
+
+    it("should pass router instance to loader factory", async () => {
+      let receivedRouter: unknown;
+
+      router.usePlugin(
+        ssrDataPluginFactory({
+          home: (r) => {
+            receivedRouter = r;
+
+            return async () => "data";
+          },
+        }),
+      );
+
+      await router.start("/");
+
+      expect(receivedRouter).toBe(router);
+    });
+  });
+
   describe("Prototype pollution safety", () => {
     it("should not match keys inherited from prototype", async () => {
-      const proto = { home: vi.fn().mockResolvedValue("hacked") };
-      const loaders = Object.create(proto) as DataLoaderMap;
+      const factory = vi
+        .fn()
+        .mockReturnValue(vi.fn().mockResolvedValue("hacked"));
+      const proto = { home: factory };
+      const loaders = Object.create(proto) as DataLoaderFactoryMap;
 
       router.usePlugin(ssrDataPluginFactory(loaders));
       const state = await router.start("/");
 
-      expect(proto.home).not.toHaveBeenCalled();
+      expect(factory).not.toHaveBeenCalled();
       expect(state.context.data).toBeUndefined();
     });
   });
@@ -284,8 +434,8 @@ describe("@real-router/ssr-data-plugin", () => {
     it("handles concurrent clone+start+dispose cycles with per-request isolation", async () => {
       const N = 500;
       const base = createRouter(routes, { defaultRoute: "home" });
-      const loaders: DataLoaderMap = {
-        "users.profile": (params) => Promise.resolve({ id: params.id }),
+      const loaders: DataLoaderFactoryMap = {
+        "users.profile": () => (params) => Promise.resolve({ id: params.id }),
       };
 
       const results = await Promise.all(

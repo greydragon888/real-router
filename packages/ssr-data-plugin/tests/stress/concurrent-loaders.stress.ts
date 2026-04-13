@@ -4,7 +4,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 
 import { ssrDataPluginFactory } from "../../src";
 
-import type { DataLoaderMap } from "../../src";
+import type { DataLoaderFactoryMap } from "../../src";
 
 const noop = (): void => undefined;
 
@@ -22,7 +22,7 @@ const routes = [
   { name: "settings", path: "/settings" },
 ];
 
-describe("D3 -- Concurrent Loaders Stress", () => {
+describe("Concurrent Loaders Stress", () => {
   beforeAll(() => {
     vi.spyOn(console, "warn").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
@@ -32,13 +32,13 @@ describe("D3 -- Concurrent Loaders Stress", () => {
     vi.restoreAllMocks();
   });
 
-  it("D3.1 -- 200 concurrent starts across 4 different routes: each gets correct data", async () => {
+  it("200 concurrent starts across 4 different routes: each gets correct data", async () => {
     const base = createRouter(routes, { defaultRoute: "home" });
-    const loaders: DataLoaderMap = {
-      home: () => Promise.resolve({ page: "home" }),
-      "users.profile": (params) => Promise.resolve({ userId: params.id }),
-      about: () => Promise.resolve({ page: "about" }),
-      settings: () => Promise.resolve({ page: "settings" }),
+    const loaders: DataLoaderFactoryMap = {
+      home: () => () => Promise.resolve({ page: "home" }),
+      "users.profile": () => (params) => Promise.resolve({ userId: params.id }),
+      about: () => () => Promise.resolve({ page: "about" }),
+      settings: () => () => Promise.resolve({ page: "settings" }),
     };
 
     const paths = ["/", "/users/42", "/about", "/settings"];
@@ -69,12 +69,12 @@ describe("D3 -- Concurrent Loaders Stress", () => {
     }
   });
 
-  it("D3.2 -- 100 concurrent starts with shared loader state: no cross-contamination", async () => {
+  it("100 concurrent starts with shared loader state: no cross-contamination", async () => {
     const base = createRouter(routes, { defaultRoute: "home" });
     let callCount = 0;
 
-    const loaders: DataLoaderMap = {
-      "users.profile": (params) => {
+    const loaders: DataLoaderFactoryMap = {
+      "users.profile": () => (params) => {
         callCount++;
 
         return Promise.resolve({
@@ -107,11 +107,11 @@ describe("D3 -- Concurrent Loaders Stress", () => {
     expect(callCount).toBe(100);
   });
 
-  it("D3.3 -- 100 concurrent starts with routes having no loader: data is undefined", async () => {
+  it("100 concurrent starts with routes having no loader: data is undefined", async () => {
     const base = createRouter(routes, { defaultRoute: "home" });
-    const loaders: DataLoaderMap = {
+    const loaders: DataLoaderFactoryMap = {
       // Only profile has a loader
-      "users.profile": (params) => Promise.resolve({ id: params.id }),
+      "users.profile": () => (params) => Promise.resolve({ id: params.id }),
     };
 
     const results = await Promise.all(
@@ -135,19 +135,22 @@ describe("D3 -- Concurrent Loaders Stress", () => {
     const withLoader = results.filter((r) => r.hasLoader);
     const withoutLoader = results.filter((r) => !r.hasLoader);
 
-    expect(
-      withLoader.every((r) => r.data !== null && r.data !== undefined),
-    ).toBe(true);
-    expect(withoutLoader.every((r) => r.data === undefined)).toBe(true);
+    for (const r of withLoader) {
+      expect(r.data).toStrictEqual({ id: expect.any(String) });
+    }
+
+    for (const r of withoutLoader) {
+      expect(r.data).toBeUndefined();
+    }
   });
 
-  it("D3.4 -- 50 factories with different loaders on same base router: isolation maintained", async () => {
+  it("50 factories with different loaders on same base router: isolation maintained", async () => {
     const base = createRouter(routes, { defaultRoute: "home" });
 
     const results = await Promise.all(
       Array.from({ length: 50 }, async (_, i) => {
-        const loaders: DataLoaderMap = {
-          home: () => Promise.resolve({ factoryId: i }),
+        const loaders: DataLoaderFactoryMap = {
+          home: () => () => Promise.resolve({ factoryId: i }),
         };
 
         const clone = cloneRouter(base);
@@ -164,6 +167,31 @@ describe("D3 -- Concurrent Loaders Stress", () => {
 
     for (let i = 0; i < 50; i++) {
       expect(results[i].factoryId).toBe(i);
+    }
+  });
+
+  it("100 concurrent clone+start+unsubscribe+dispose: full lifecycle", async () => {
+    const base = createRouter(routes, { defaultRoute: "home" });
+    const loaders: DataLoaderFactoryMap = {
+      home: () => () => Promise.resolve({ page: "home" }),
+    };
+
+    const results = await Promise.all(
+      Array.from({ length: 100 }, async () => {
+        const clone = cloneRouter(base);
+        const unsub = clone.usePlugin(ssrDataPluginFactory(loaders));
+        const state = await clone.start("/");
+        const data = state.context.data;
+
+        unsub();
+        clone.dispose();
+
+        return data;
+      }),
+    );
+
+    for (const data of results) {
+      expect(data).toStrictEqual({ page: "home" });
     }
   });
 });

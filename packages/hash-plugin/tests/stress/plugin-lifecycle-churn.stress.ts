@@ -26,7 +26,7 @@ import { createHashPrefixRegex, extractHashPath } from "../../src/hash-utils";
 
 import type { Router } from "@real-router/core";
 
-describe("H3 -- Hash Plugin Lifecycle Churn", () => {
+describe("Hash Plugin Lifecycle Churn", () => {
   beforeAll(() => {
     vi.spyOn(console, "warn").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
@@ -41,7 +41,7 @@ describe("H3 -- Hash Plugin Lifecycle Churn", () => {
     (console.error as unknown as { mockRestore?: () => void }).mockRestore?.();
   });
 
-  it("H3.1 -- 100 start/stop cycles: 0 active popstate listeners after final stop", async () => {
+  it("100 start/stop cycles: 0 active popstate listeners after final stop", async () => {
     const { router, dispatchPopstate, unsubscribe } = createStressRouter();
 
     for (let i = 0; i < 100; i++) {
@@ -61,7 +61,7 @@ describe("H3 -- Hash Plugin Lifecycle Churn", () => {
     unsubscribe();
   });
 
-  it("H3.2 -- 50 cycles: start -> navigate x5 -> stop: state correct before each stop", async () => {
+  it("50 cycles: start -> navigate x5 -> stop: state correct before each stop", async () => {
     const { router, unsubscribe } = createStressRouter();
 
     let stateBeforeLastStop: string | undefined;
@@ -84,7 +84,7 @@ describe("H3 -- Hash Plugin Lifecycle Churn", () => {
     unsubscribe();
   });
 
-  it("H3.3 -- HMR simulation: shared factory reused 20x with hash plugin", async () => {
+  it("HMR simulation: shared factory reused 20x with hash plugin", async () => {
     const prefixRegex = createHashPrefixRegex("");
     const safeBrowser = createSafeBrowser(
       () =>
@@ -121,7 +121,7 @@ describe("H3 -- Hash Plugin Lifecycle Churn", () => {
     expect(lastRouter!.getState()).toStrictEqual(stateBeforePopstate);
   });
 
-  it("H3.4 -- 50 full create+plugin+start+navigate+dispose cycles: no crashes", async () => {
+  it("50 full create+plugin+start+navigate+dispose cycles: no crashes", async () => {
     let completed = 0;
 
     for (let i = 0; i < 50; i++) {
@@ -138,7 +138,7 @@ describe("H3 -- Hash Plugin Lifecycle Churn", () => {
     expect(completed).toBe(50);
   });
 
-  it("H3.5 -- start -> popstate storm x10 -> stop -> start -> clean popstate: no deferred carryover", async () => {
+  it("start -> popstate storm x10 -> stop -> start -> clean popstate: no deferred carryover", async () => {
     const { router, dispatchPopstate, unsubscribe } = createStressRouter();
 
     await router.start();

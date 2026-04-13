@@ -13,19 +13,19 @@
 ```
 rx/
 ├── src/
-│   ├── RxObservable.ts                — Observable class (281 lines)
-│   ├── state$.ts                      — State stream factory (36 lines)
-│   ├── events$.ts                     — Event stream factory (115 lines)
-│   ├── observable.ts                  — TC39 Observable wrapper (28 lines)
+│   ├── RxObservable.ts                — Observable class: subscribe(), pipe(), [Symbol.asyncIterator]()
+│   ├── state$.ts                      — State stream factory
+│   ├── events$.ts                     — Event stream factory (all router events)
+│   ├── observable.ts                  — TC39 Observable wrapper for RxJS interop
 │   ├── types.ts                       — Observer, Subscription, Operator types
 │   ├── index.ts                       — Public API exports
 │   └── operators/
-│       ├── createOperator.ts          — Operator factories (37 lines)
-│       ├── map.ts                     — Value transformation (15 lines)
-│       ├── filter.ts                  — Value filtering (21 lines)
-│       ├── distinctUntilChanged.ts    — Deduplication (40 lines)
-│       ├── debounceTime.ts            — Timer-based debounce (70 lines)
-│       ├── takeUntil.ts              — Notifier-based completion (99 lines)
+│       ├── createOperator.ts          — Shared operator factory
+│       ├── map.ts                     — Value transformation
+│       ├── filter.ts                  — Value filtering
+│       ├── distinctUntilChanged.ts    — Consecutive deduplication
+│       ├── debounceTime.ts            — Timer-based debounce
+│       ├── takeUntil.ts              — Notifier-based completion
 │       └── index.ts                   — Operator exports
 ```
 

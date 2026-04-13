@@ -22,11 +22,11 @@ logger-plugin/
 │   ├── constants.ts                   — LOGGER_CONTEXT, ERROR_PREFIX, DEFAULT_CONFIG
 │   ├── index.ts                       — Public API exports (loggerPluginFactory + types)
 │   └── internal/
-│       ├── console-groups.ts          — Console group manager (74 lines)
-│       ├── formatting.ts             — Route name, timing, label formatting (56 lines)
-│       ├── params-diff.ts            — Shallow params diff + logging (91 lines)
-│       ├── performance-marks.ts      — Performance API wrapper (67 lines)
-│       └── timing.ts                 — Monotonic time provider (52 lines)
+│       ├── console-groups.ts          — GroupManager (closure): open/close with duplicate guard
+│       ├── formatting.ts             — Route name, timing, label formatting
+│       ├── params-diff.ts            — Shallow params diff + formatted logging
+│       ├── performance-marks.ts      — PerformanceTracker: mark/measure with env detection
+│       └── timing.ts                 — now() provider: performance.now() or monotonic Date.now() fallback
 ```
 
 ## Dependencies

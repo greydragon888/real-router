@@ -1,9 +1,10 @@
 import { createRouter } from "@real-router/core";
+import { getRoutesApi } from "@real-router/core/api";
 import { describe, afterEach, it, expect, vi } from "vitest";
 
 import { lifecyclePluginFactory } from "../../src";
 
-import type { LifecycleHook } from "../../src";
+import type { LifecycleHook, LifecycleHookFactory } from "../../src";
 import type { Router } from "@real-router/core";
 
 describe("@real-router/lifecycle-plugin", () => {
@@ -20,7 +21,7 @@ describe("@real-router/lifecycle-plugin", () => {
 
       router = createRouter(
         [
-          { name: "home", path: "/", onEnter },
+          { name: "home", path: "/", onEnter: () => onEnter },
           { name: "about", path: "/about" },
         ],
         { defaultRoute: "home" },
@@ -41,7 +42,7 @@ describe("@real-router/lifecycle-plugin", () => {
       router = createRouter(
         [
           { name: "home", path: "/" },
-          { name: "about", path: "/about", onEnter },
+          { name: "about", path: "/about", onEnter: () => onEnter },
         ],
         { defaultRoute: "home" },
       );
@@ -61,7 +62,7 @@ describe("@real-router/lifecycle-plugin", () => {
 
       router = createRouter(
         [
-          { name: "home", path: "/", onEnter },
+          { name: "home", path: "/", onEnter: () => onEnter },
           { name: "about", path: "/about" },
         ],
         { defaultRoute: "home" },
@@ -83,7 +84,7 @@ describe("@real-router/lifecycle-plugin", () => {
 
       router = createRouter(
         [
-          { name: "home", path: "/", onLeave },
+          { name: "home", path: "/", onLeave: () => onLeave },
           { name: "about", path: "/about" },
         ],
         { defaultRoute: "home" },
@@ -105,7 +106,7 @@ describe("@real-router/lifecycle-plugin", () => {
       router = createRouter(
         [
           { name: "home", path: "/" },
-          { name: "about", path: "/about", onLeave },
+          { name: "about", path: "/about", onLeave: () => onLeave },
         ],
         { defaultRoute: "home" },
       );
@@ -120,9 +121,12 @@ describe("@real-router/lifecycle-plugin", () => {
     it("should not fire onLeave on initial router.start()", async () => {
       const onLeave = vi.fn();
 
-      router = createRouter([{ name: "home", path: "/", onLeave }], {
-        defaultRoute: "home",
-      });
+      router = createRouter(
+        [{ name: "home", path: "/", onLeave: () => onLeave }],
+        {
+          defaultRoute: "home",
+        },
+      );
       router.usePlugin(lifecyclePluginFactory());
 
       await router.start("/");
@@ -138,7 +142,7 @@ describe("@real-router/lifecycle-plugin", () => {
       router = createRouter(
         [
           { name: "home", path: "/" },
-          { name: "users.view", path: "/users/:id", onStay },
+          { name: "users.view", path: "/users/:id", onStay: () => onStay },
         ],
         { defaultRoute: "home" },
       );
@@ -161,7 +165,7 @@ describe("@real-router/lifecycle-plugin", () => {
 
       router = createRouter(
         [
-          { name: "home", path: "/", onStay },
+          { name: "home", path: "/", onStay: () => onStay },
           { name: "about", path: "/about" },
         ],
         { defaultRoute: "home" },
@@ -177,9 +181,12 @@ describe("@real-router/lifecycle-plugin", () => {
     it("should not fire onStay on initial router.start()", async () => {
       const onStay = vi.fn();
 
-      router = createRouter([{ name: "home", path: "/", onStay }], {
-        defaultRoute: "home",
-      });
+      router = createRouter(
+        [{ name: "home", path: "/", onStay: () => onStay }],
+        {
+          defaultRoute: "home",
+        },
+      );
       router.usePlugin(lifecyclePluginFactory());
 
       await router.start("/");
@@ -200,8 +207,8 @@ describe("@real-router/lifecycle-plugin", () => {
 
       router = createRouter(
         [
-          { name: "home", path: "/", onLeave },
-          { name: "about", path: "/about", onEnter },
+          { name: "home", path: "/", onLeave: () => onLeave },
+          { name: "about", path: "/about", onEnter: () => onEnter },
         ],
         { defaultRoute: "home" },
       );
@@ -225,8 +232,10 @@ describe("@real-router/lifecycle-plugin", () => {
           {
             name: "users",
             path: "/users",
-            onEnter: parentEnter,
-            children: [{ name: "view", path: "/:id", onEnter: childEnter }],
+            onEnter: () => parentEnter,
+            children: [
+              { name: "view", path: "/:id", onEnter: () => childEnter },
+            ],
           },
         ],
         { defaultRoute: "home" },
@@ -250,8 +259,10 @@ describe("@real-router/lifecycle-plugin", () => {
           {
             name: "users",
             path: "/users",
-            onLeave: parentLeave,
-            children: [{ name: "view", path: "/:id", onLeave: childLeave }],
+            onLeave: () => parentLeave,
+            children: [
+              { name: "view", path: "/:id", onLeave: () => childLeave },
+            ],
           },
         ],
         { defaultRoute: "home" },
@@ -278,7 +289,7 @@ describe("@real-router/lifecycle-plugin", () => {
       router = createRouter(
         [
           { name: "home", path: "/" },
-          { name: "about", path: "/about", onEnter: throwingEnter },
+          { name: "about", path: "/about", onEnter: () => throwingEnter },
         ],
         { defaultRoute: "home" },
       );
@@ -296,8 +307,43 @@ describe("@real-router/lifecycle-plugin", () => {
     });
   });
 
+  describe("onLeave with failing activation guard", () => {
+    it("should fire onLeave even when activation guard rejects", async () => {
+      const onLeave = vi.fn();
+      const onEnter = vi.fn();
+
+      router = createRouter(
+        [
+          { name: "home", path: "/", onLeave: () => onLeave },
+          {
+            name: "guarded",
+            path: "/guarded",
+            onEnter: () => onEnter,
+            canActivate: () => () => false,
+          },
+        ],
+        { defaultRoute: "home" },
+      );
+      router.usePlugin(lifecyclePluginFactory());
+
+      await router.start("/");
+
+      try {
+        await router.navigate("guarded");
+      } catch {
+        // activation guard blocks — CANNOT_ACTIVATE
+      }
+
+      expect(onLeave).toHaveBeenCalledTimes(1);
+      expect(onEnter).not.toHaveBeenCalled();
+      expect(router.getState()?.name).toBe("home");
+    });
+  });
+
   describe("edge cases", () => {
     it("should handle routes without lifecycle hooks", async () => {
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
       router = createRouter(
         [
           { name: "home", path: "/" },
@@ -311,9 +357,14 @@ describe("@real-router/lifecycle-plugin", () => {
       await router.navigate("about");
 
       expect(router.getState()?.name).toBe("about");
+      expect(errorSpy).not.toHaveBeenCalled();
+
+      errorSpy.mockRestore();
     });
 
     it("should handle same-route navigation without onStay hook", async () => {
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
       router = createRouter(
         [
           { name: "home", path: "/" },
@@ -328,9 +379,14 @@ describe("@real-router/lifecycle-plugin", () => {
       await router.navigate("users.view", { id: "2" });
 
       expect(router.getState()?.params).toStrictEqual({ id: "2" });
+      expect(errorSpy).not.toHaveBeenCalled();
+
+      errorSpy.mockRestore();
     });
 
     it("should ignore non-function values in hook fields", async () => {
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
       router = createRouter(
         [
           { name: "home", path: "/" },
@@ -344,6 +400,145 @@ describe("@real-router/lifecycle-plugin", () => {
       await router.navigate("about");
 
       expect(router.getState()?.name).toBe("about");
+      expect(errorSpy).not.toHaveBeenCalled();
+
+      errorSpy.mockRestore();
+    });
+  });
+
+  describe("factory pattern", () => {
+    it("should pass router and getDependency to hook factory", async () => {
+      const factorySpy = vi.fn(
+        (_router: unknown, _getDep: unknown) =>
+          (_toState: unknown, _fromState: unknown) => {},
+      );
+
+      const depRouter = createRouter(
+        [
+          {
+            name: "home",
+            path: "/",
+            onEnter: factorySpy as LifecycleHookFactory,
+          },
+          { name: "about", path: "/about" },
+        ],
+        { defaultRoute: "home" },
+        { foo: "bar" },
+      );
+
+      router = depRouter as Router;
+      depRouter.usePlugin(lifecyclePluginFactory());
+
+      await depRouter.start("/");
+
+      expect(factorySpy).toHaveBeenCalledExactlyOnceWith(
+        depRouter,
+        expect.any(Function),
+      );
+
+      const getDep = factorySpy.mock.calls[0][1] as (key: string) => unknown;
+
+      expect(getDep("foo")).toBe("bar");
+    });
+
+    it("should cache compiled hook and call factory only once per route+hook", async () => {
+      const factorySpy = vi.fn(() => vi.fn());
+
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          {
+            name: "users.view",
+            path: "/users/:id",
+            onStay: factorySpy as LifecycleHookFactory,
+          },
+        ],
+        { defaultRoute: "home" },
+      );
+      router.usePlugin(lifecyclePluginFactory());
+
+      await router.start("/");
+      await router.navigate("users.view", { id: "1" });
+      await router.navigate("users.view", { id: "2" });
+      await router.navigate("users.view", { id: "3" });
+
+      // Factory called once, compiled hook reused for subsequent navigations
+      expect(factorySpy).toHaveBeenCalledTimes(1);
+      expect(factorySpy.mock.results[0].value).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("cache invalidation on replaceRoutes", () => {
+    it("should use new onEnter hook after replaceRoutes()", async () => {
+      const onEnterV1 = vi.fn();
+      const onEnterV2 = vi.fn();
+
+      router = createRouter(
+        [
+          { name: "home", path: "/", onEnter: () => onEnterV1 },
+          { name: "about", path: "/about" },
+        ],
+        { defaultRoute: "home" },
+      );
+      router.usePlugin(lifecyclePluginFactory());
+      await router.start("/about");
+
+      // Navigate to home: V1 onEnter fires
+      await router.navigate("home");
+
+      expect(onEnterV1).toHaveBeenCalledTimes(1);
+      expect(onEnterV2).not.toHaveBeenCalled();
+
+      // Replace routes with new onEnter factory
+      const routesApi = getRoutesApi(router);
+
+      routesApi.replace([
+        { name: "home", path: "/", onEnter: () => onEnterV2 },
+        { name: "about", path: "/about" },
+      ]);
+
+      // Navigate again: V2 onEnter should fire (cache invalidated)
+      await router.navigate("about");
+      await router.navigate("home");
+
+      expect(onEnterV1).toHaveBeenCalledTimes(1);
+      expect(onEnterV2).toHaveBeenCalledTimes(1);
+    });
+
+    it("should use new onLeave hook after replaceRoutes()", async () => {
+      const onLeaveV1 = vi.fn();
+      const onLeaveV2 = vi.fn();
+
+      router = createRouter(
+        [
+          { name: "home", path: "/", onLeave: () => onLeaveV1 },
+          { name: "about", path: "/about" },
+        ],
+        { defaultRoute: "home" },
+      );
+      router.usePlugin(lifecyclePluginFactory());
+      await router.start("/");
+
+      // Navigate away from home: V1 onLeave fires
+      await router.navigate("about");
+
+      expect(onLeaveV1).toHaveBeenCalledTimes(1);
+      expect(onLeaveV2).not.toHaveBeenCalled();
+
+      // Replace routes with new onLeave factory
+      const routesApi = getRoutesApi(router);
+
+      routesApi.replace([
+        { name: "home", path: "/", onLeave: () => onLeaveV2 },
+        { name: "about", path: "/about" },
+      ]);
+
+      // Navigate home then away again: V2 onLeave should fire
+      await router.navigate("home");
+      await router.navigate("about");
+
+      expect(onLeaveV1).toHaveBeenCalledTimes(1);
+      expect(onLeaveV2).toHaveBeenCalledTimes(1);
     });
   });
 });

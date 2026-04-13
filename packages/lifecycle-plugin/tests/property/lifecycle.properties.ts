@@ -1,5 +1,6 @@
 import { test } from "@fast-check/vitest";
 import { createRouter } from "@real-router/core";
+import { vi } from "vitest";
 
 import {
   arbDistinctRouteNamePair,
@@ -12,6 +13,7 @@ import {
 } from "./helpers";
 import { lifecyclePluginFactory } from "../../src";
 
+import type { LifecycleHookFactory } from "../../src";
 import type { Route } from "@real-router/core";
 
 // =============================================================================
@@ -229,23 +231,23 @@ describe("teardown: removes all hooks", () => {
         {
           name: "home",
           path: "/",
-          onEnter: hooks.onEnter,
-          onLeave: hooks.onLeave,
-          onStay: hooks.onStay,
+          onEnter: () => hooks.onEnter,
+          onLeave: () => hooks.onLeave,
+          onStay: () => hooks.onStay,
         },
         {
           name: "about",
           path: "/about",
-          onEnter: hooks.onEnter,
-          onLeave: hooks.onLeave,
-          onStay: hooks.onStay,
+          onEnter: () => hooks.onEnter,
+          onLeave: () => hooks.onLeave,
+          onStay: () => hooks.onStay,
         },
         {
           name: "contact",
           path: "/contact",
-          onEnter: hooks.onEnter,
-          onLeave: hooks.onLeave,
-          onStay: hooks.onStay,
+          onEnter: () => hooks.onEnter,
+          onLeave: () => hooks.onLeave,
+          onStay: () => hooks.onStay,
         },
       ];
 
@@ -266,6 +268,126 @@ describe("teardown: removes all hooks", () => {
       expect(hooks.onEnter.calls).toHaveLength(0);
       expect(hooks.onLeave.calls).toHaveLength(0);
       expect(hooks.onStay.calls).toHaveLength(0);
+
+      router.stop();
+    },
+  );
+});
+
+// =============================================================================
+// Mutual Exclusion: onEnter XOR onStay
+// =============================================================================
+
+describe("mutual exclusion: exactly one of onEnter/onStay fires per transition", () => {
+  test.prop([arbDistinctRouteNamePair], { numRuns: NUM_RUNS.standard })(
+    "onEnter fires and onStay does not on route change",
+    async ([fromRoute, toRoute]) => {
+      const hooks = createHookSpies();
+      const router = createLifecycleRouter(hooks);
+
+      await router.start(`/${fromRoute === "home" ? "" : fromRoute}`);
+      hooks.onEnter.calls.length = 0;
+      hooks.onStay.calls.length = 0;
+
+      await router.navigate(toRoute);
+
+      const enterCalls = hooks.onEnter.calls.filter(
+        (c) => c.toName === toRoute,
+      );
+      const stayCalls = hooks.onStay.calls;
+
+      // Exactly one onEnter, zero onStay
+      expect(enterCalls).toHaveLength(1);
+      expect(stayCalls).toHaveLength(0);
+
+      router.stop();
+    },
+  );
+
+  test.prop([arbDistinctIdPair], { numRuns: NUM_RUNS.standard })(
+    "onStay fires and onEnter does not on same-route param change",
+    async ([id1, id2]) => {
+      const hooks = createHookSpies();
+      const router = createLifecycleRouter(hooks);
+
+      await router.start("/");
+      await router.navigate("users.view", { id: id1 });
+      hooks.onEnter.calls.length = 0;
+      hooks.onStay.calls.length = 0;
+
+      await router.navigate("users.view", { id: id2 });
+
+      const enterCalls = hooks.onEnter.calls;
+      const stayCalls = hooks.onStay.calls;
+
+      // Exactly one onStay, zero onEnter
+      expect(stayCalls).toHaveLength(1);
+      expect(enterCalls).toHaveLength(0);
+
+      router.stop();
+    },
+  );
+});
+
+// =============================================================================
+// Mutual Exclusion: onLeave does not fire with onStay
+// =============================================================================
+
+describe("mutual exclusion: onLeave does not fire on same-route navigation", () => {
+  test.prop([arbDistinctIdPair], { numRuns: NUM_RUNS.standard })(
+    "onLeave does not fire when onStay fires",
+    async ([id1, id2]) => {
+      const hooks = createHookSpies();
+      const router = createLifecycleRouter(hooks);
+
+      await router.start("/");
+      await router.navigate("users.view", { id: id1 });
+      hooks.onLeave.calls.length = 0;
+      hooks.onStay.calls.length = 0;
+
+      await router.navigate("users.view", { id: id2 });
+
+      expect(hooks.onStay.calls).toHaveLength(1);
+      expect(hooks.onLeave.calls).toHaveLength(0);
+
+      router.stop();
+    },
+  );
+});
+
+// =============================================================================
+// Compilation Referential Stability
+// =============================================================================
+
+describe("compilation: factory called once, hook reused", () => {
+  test.prop([arbDistinctIdPair], { numRuns: NUM_RUNS.standard })(
+    "hook factory is invoked once; compiled hook is reused across navigations",
+    async ([id1, id2]) => {
+      const compiledHook = vi.fn();
+      const factorySpy = vi.fn(() => compiledHook);
+
+      const router = createRouter(
+        [
+          { name: "home", path: "/" },
+          {
+            name: "users.view",
+            path: "/users/:id",
+            onStay: factorySpy as LifecycleHookFactory,
+          },
+        ],
+        { defaultRoute: "home" },
+      );
+
+      router.usePlugin(lifecyclePluginFactory());
+
+      await router.start("/");
+      await router.navigate("users.view", { id: id1 });
+      await router.navigate("users.view", { id: id2 });
+
+      // Factory called exactly once (on first onStay trigger)
+      expect(factorySpy).toHaveBeenCalledTimes(1);
+      // Compiled hook called once (id1 → id2 triggers onStay)
+      expect(compiledHook).toHaveBeenCalledTimes(1);
 
       router.stop();
     },

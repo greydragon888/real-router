@@ -13,9 +13,10 @@
 ```
 lifecycle-plugin/
 ├── src/
-│   ├── factory.ts    — createInvokeHook, createPlugin, lifecyclePluginFactory (47 lines)
-│   ├── types.ts      — LifecycleHook type (10 lines)
-│   └── index.ts      — Public exports + Route module augmentation (20 lines)
+│   ├── factory.ts    — compileHook (lazy compile + cache with factory invalidation),
+│   │                   createPlugin, lifecyclePluginFactory
+│   ├── types.ts      — LifecycleHook, LifecycleHookFactory types
+│   └── index.ts      — Public exports + Route module augmentation
 ```
 
 ## Dependencies
@@ -29,9 +30,9 @@ graph LR
     CORE -.->|provides| TYPES["State"]
 
     subgraph plugin [Plugin Instance]
-        LH["onTransitionLeaveApprove"] --> IH[invokeHook]
-        SH["onTransitionSuccess"] --> IH
-        IH --> GRC["api.getRouteConfig()"]
+        LH["onTransitionLeaveApprove"] --> CH[compileHook]
+        SH["onTransitionSuccess"] --> CH
+        CH --> GRC["api.getRouteConfig()"]
     end
 ```
 
@@ -50,29 +51,41 @@ Navigation: home → users.view
 onTransitionLeaveApprove(toState, fromState)
     │
     ├── toState.name !== fromState.name?
-    │   ├── YES → getRouteConfig("home")?.onLeave → call if function
+    │   ├── YES → compileHook("onLeave", "home") → call if resolved
     │   └── NO  → skip (same route = onStay, handled later)
     │
     ▼
 onTransitionSuccess(toState, fromState)
     │
     ├── toState.name === fromState.name?
-    │   ├── YES → getRouteConfig("users.view")?.onStay → call if function
-    │   └── NO  → getRouteConfig("users.view")?.onEnter → call if function
+    │   ├── YES → compileHook("onStay", "users.view") → call if resolved
+    │   └── NO  → compileHook("onEnter", "users.view") → call if resolved
 ```
 
-### Partial Application Pattern
+### Lazy Compile + Cache Pattern
 
 ```typescript
-createInvokeHook(api: PluginApi)
-    └── returns (hookName, routeName, toState, fromState) => void
-         │
-         ├── api.getRouteConfig(routeName)?.[hookName]
-         ├── typeof check (skip non-functions)
-         └── call hook(toState, fromState)
+compileHook(hookName: "onEnter" | "onStay" | "onLeave", routeName: string)
+    │
+    ├── Cache key: `${hookName}:${routeName}`
+    │
+    ├── api.getRouteConfig(routeName)?.[hookName] → factory reference
+    │   ├── no factory → delete stale cache entry, return undefined
+    │   ├── cache hit + factory === cached.factory → return cached.hook
+    │   └── cache miss or factory changed → compile new hook
+    │
+    ├── Call factory: factory(router, getDependency) → LifecycleHook
+    ├── Cache { hook, factory } in compiledHooks Map
+    └── Return compiled hook
 ```
 
-`api` is captured once via closure in `createPlugin`. Each hook invocation passes only the variable parts.
+`router`, `getDependency`, `api`, and `compiledHooks` Map are captured once via closure in `createPlugin`. The compiled hook is reused on subsequent navigations as long as the factory reference stays the same.
+
+### Factory Reference Cache Invalidation
+
+The `compiledHooks` Map stores `{ hook, factory }` pairs. On every `compileHook()` call, the current factory reference from `getRouteConfig()` is compared against the cached `factory` via `===`. If the reference changed (e.g., after `getRoutesApi(router).replace(newRoutes)`), the old compiled hook is discarded and the new factory is compiled. This ensures HMR and dynamic route replacement work without plugin reinstallation.
+
+Cost: one `getRouteConfig()` call per hook invocation (simple property lookup on `routeCustomFields`). The previous approach called `getRouteConfig()` only on cache miss but could not detect stale factories after `replaceRoutes()`.
 
 ### Route Custom Fields
 
@@ -108,4 +121,5 @@ Errors from user-defined hooks propagate to the EventEmitter, which logs them to
 
 - [core CLAUDE.md](../core/CLAUDE.md) — Core package architecture (PluginFactory, getRouteConfig)
 - [core routesStore.ts](../core/src/namespaces/RoutesNamespace/routesStore.ts) — Custom fields extraction (line 205-222)
+- [preload-plugin ARCHITECTURE.md](../preload-plugin/ARCHITECTURE.md) — Same getRouteConfig + factory reference cache pattern
 - [ARCHITECTURE.md](../../ARCHITECTURE.md) — System-level architecture
