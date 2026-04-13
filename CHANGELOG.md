@@ -5,6 +5,82 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-04-13]
+
+### @real-router/lifecycle-plugin@0.3.0
+
+### Minor Changes
+
+- [#456](https://github.com/greydragon888/real-router/pull/456) [`8989831`](https://github.com/greydragon888/real-router/commit/8989831062090cf6e94788a0acdc8a0cee54e0b5) Thanks [@greydragon888](https://github.com/greydragon888)! - Add DI access to lifecycle hooks via factory pattern ([#439](https://github.com/greydragon888/real-router/issues/439))
+
+  **Breaking Change:** `onEnter`, `onStay`, `onLeave` in route config are now factory functions `(router, getDependency) => hook` instead of plain hooks `(toState, fromState) => void`.
+
+  **Migration:**
+
+  ```diff
+  - onEnter: (toState) => { console.log(toState.name); }
+  + onEnter: () => (toState) => { console.log(toState.name); }
+  ```
+
+  With DI:
+
+  ```typescript
+  onEnter: (_router, getDep) => (toState) => {
+    getDep("analytics").track(toState.name);
+  };
+  ```
+
+### @real-router/preload-plugin@0.3.0
+
+### Minor Changes
+
+- [#456](https://github.com/greydragon888/real-router/pull/456) [`8989831`](https://github.com/greydragon888/real-router/commit/8989831062090cf6e94788a0acdc8a0cee54e0b5) Thanks [@greydragon888](https://github.com/greydragon888)! - Add DI access to preload hook via factory pattern ([#439](https://github.com/greydragon888/real-router/issues/439))
+
+  **Breaking Change:** `preload` in route config is now a factory function `(router, getDependency) => preloadFn` instead of a plain function `(params) => Promise<unknown>`.
+
+  **Migration:**
+
+  ```diff
+  - preload: (params) => fetch(`/api/${params.id}`)
+  + preload: () => (params) => fetch(`/api/${params.id}`)
+  ```
+
+  With DI:
+
+  ```typescript
+  preload: (_router, getDep) => (params) => {
+    return getDep("apiClient").prefetch(params.id);
+  };
+  ```
+
+### @real-router/ssr-data-plugin@0.3.0
+
+### Minor Changes
+
+- [#456](https://github.com/greydragon888/real-router/pull/456) [`8989831`](https://github.com/greydragon888/real-router/commit/8989831062090cf6e94788a0acdc8a0cee54e0b5) Thanks [@greydragon888](https://github.com/greydragon888)! - Add DI access to data loaders via factory pattern ([#439](https://github.com/greydragon888/real-router/issues/439))
+
+  **Breaking Change:** `DataLoaderMap` is replaced by `DataLoaderFactoryMap`. Loaders are now factory functions `(router, getDependency) => loaderFn` instead of plain functions `(params) => Promise<unknown>`.
+
+  **Migration:**
+
+  ```diff
+  - const loaders: DataLoaderMap = {
+  -   "users.profile": (params) => fetchUser(params.id),
+  + const loaders: DataLoaderFactoryMap = {
+  +   "users.profile": () => (params) => fetchUser(params.id),
+    };
+  ```
+
+  With DI:
+
+  ```typescript
+  const loaders: DataLoaderFactoryMap = {
+    "users.profile": (_router, getDep) => (params) => {
+      return getDep("db").query("SELECT * FROM users WHERE id = ?", params.id);
+    },
+  };
+  ```
+
 ## [2026-04-12]
 
 ### @real-router/browser-plugin@0.12.2
