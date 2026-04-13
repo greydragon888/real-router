@@ -31,6 +31,10 @@ export function computeDirection(
   currentIndex: number,
 ): NavigationDirection {
   if (navigationType === "traverse") {
+    if (destinationIndex === currentIndex) {
+      return "unknown";
+    }
+
     return destinationIndex > currentIndex ? "forward" : "back";
   }
 

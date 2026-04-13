@@ -54,6 +54,13 @@ describe("computeDirection Properties", () => {
     );
   });
 
+  test.prop([arbIndex], { numRuns: NUM_RUNS.fast })(
+    "traverse direction is unknown for equal indices",
+    (index) => {
+      expect(computeDirection("traverse", index, index)).toBe("unknown");
+    },
+  );
+
   test.prop([arbIndex, arbIndex], { numRuns: NUM_RUNS.fast })(
     "push direction is always forward",
     (destination, curr) => {
