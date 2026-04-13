@@ -99,7 +99,7 @@ describe("preload-plugin — network", () => {
 
       const preloadFn = vi.fn().mockResolvedValue(undefined);
       const { router } = createTestRouter([
-        { name: "home", path: "/", preload: preloadFn },
+        { name: "home", path: "/", preload: () => preloadFn },
       ]);
 
       setupMatchUrl(router);
@@ -121,7 +121,7 @@ describe("preload-plugin — network", () => {
 
       const preloadFn = vi.fn().mockResolvedValue(undefined);
       const { router } = createTestRouter([
-        { name: "home", path: "/", preload: preloadFn },
+        { name: "home", path: "/", preload: () => preloadFn },
       ]);
 
       setupMatchUrl(router);
@@ -143,7 +143,7 @@ describe("preload-plugin — network", () => {
 
       const preloadFn = vi.fn().mockResolvedValue(undefined);
       const { router } = createTestRouter([
-        { name: "home", path: "/", preload: preloadFn },
+        { name: "home", path: "/", preload: () => preloadFn },
       ]);
 
       setupMatchUrl(router);
@@ -165,7 +165,7 @@ describe("preload-plugin — network", () => {
 
       const preloadFn = vi.fn().mockResolvedValue(undefined);
       const { router } = createTestRouter([
-        { name: "home", path: "/", preload: preloadFn },
+        { name: "home", path: "/", preload: () => preloadFn },
       ]);
 
       setupMatchUrl(router);
@@ -187,7 +187,7 @@ describe("preload-plugin — network", () => {
 
       const preloadFn = vi.fn().mockResolvedValue(undefined);
       const { router } = createTestRouter([
-        { name: "home", path: "/", preload: preloadFn },
+        { name: "home", path: "/", preload: () => preloadFn },
       ]);
 
       setupMatchUrl(router);
@@ -209,7 +209,7 @@ describe("preload-plugin — network", () => {
 
       const preloadFn = vi.fn().mockResolvedValue(undefined);
       const { router } = createTestRouter([
-        { name: "home", path: "/", preload: preloadFn },
+        { name: "home", path: "/", preload: () => preloadFn },
       ]);
 
       setupMatchUrl(router);
@@ -231,7 +231,7 @@ describe("preload-plugin — network", () => {
 
       const preloadFn = vi.fn().mockResolvedValue(undefined);
       const { router } = createTestRouter([
-        { name: "home", path: "/", preload: preloadFn },
+        { name: "home", path: "/", preload: () => preloadFn },
       ]);
 
       setupMatchUrl(router);

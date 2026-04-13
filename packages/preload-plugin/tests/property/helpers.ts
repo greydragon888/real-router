@@ -67,6 +67,18 @@ export const arbFastEffectiveType: fc.Arbitrary<string> = fc.constantFrom(
   "4g",
 );
 
+/**
+ * Arbitrary: any string that contains "2g" as a substring.
+ * Tests that `.includes("2g")` works for non-standard effectiveType values.
+ */
+export const arbEffectiveTypeWith2g: fc.Arbitrary<string> = fc
+  .tuple(
+    fc.string({ maxLength: 5, unit: "grapheme" }),
+    fc.constantFrom("2g", "slow-2g"),
+    fc.string({ maxLength: 5, unit: "grapheme" }),
+  )
+  .map(([prefix, core, suffix]) => prefix + core + suffix);
+
 // =============================================================================
 // Arbitraries — Ghost Event Timing
 // =============================================================================
@@ -81,6 +93,12 @@ export const arbWithinThreshold: fc.Arbitrary<number> = fc.integer({
 export const arbBeyondThreshold: fc.Arbitrary<number> = fc.integer({
   min: 2500,
   max: 10_000,
+});
+
+/** Arbitrary: timestamp delta below zero (clock skew / synthetic events). */
+export const arbNegativeDelta: fc.Arbitrary<number> = fc.integer({
+  min: -10_000,
+  max: -1,
 });
 
 /** Arbitrary: base timestamp for touch events. */

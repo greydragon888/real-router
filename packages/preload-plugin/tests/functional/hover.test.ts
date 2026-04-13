@@ -27,7 +27,7 @@ describe("preload-plugin — hover", () => {
   it("triggers preload after delay on hover over matching anchor", async () => {
     const preloadFn = vi.fn().mockResolvedValue(undefined);
     const { router } = createTestRouter([
-      { name: "home", path: "/", preload: preloadFn },
+      { name: "home", path: "/", preload: () => preloadFn },
       { name: "about", path: "/about" },
     ]);
 
@@ -75,7 +75,7 @@ describe("preload-plugin — hover", () => {
   it("does not trigger preload when href does not match any route", async () => {
     const preloadFn = vi.fn().mockResolvedValue(undefined);
     const { router } = createTestRouter([
-      { name: "home", path: "/", preload: preloadFn },
+      { name: "home", path: "/", preload: () => preloadFn },
     ]);
 
     setupMatchUrl(router);
@@ -95,7 +95,7 @@ describe("preload-plugin — hover", () => {
   it("cancels preload when mouse leaves before delay expires", async () => {
     const preloadFn = vi.fn().mockResolvedValue(undefined);
     const { router } = createTestRouter([
-      { name: "home", path: "/", preload: preloadFn },
+      { name: "home", path: "/", preload: () => preloadFn },
     ]);
 
     setupMatchUrl(router);
@@ -122,8 +122,8 @@ describe("preload-plugin — hover", () => {
     const preloadA = vi.fn().mockResolvedValue(undefined);
     const preloadB = vi.fn().mockResolvedValue(undefined);
     const { router } = createTestRouter([
-      { name: "home", path: "/", preload: preloadA },
-      { name: "about", path: "/about", preload: preloadB },
+      { name: "home", path: "/", preload: () => preloadA },
+      { name: "about", path: "/about", preload: () => preloadB },
     ]);
 
     setupMatchUrl(router);
@@ -147,7 +147,7 @@ describe("preload-plugin — hover", () => {
   it("does not restart timer when hovering the same anchor twice", async () => {
     const preloadFn = vi.fn().mockResolvedValue(undefined);
     const { router } = createTestRouter([
-      { name: "home", path: "/", preload: preloadFn },
+      { name: "home", path: "/", preload: () => preloadFn },
     ]);
 
     setupMatchUrl(router);
@@ -169,7 +169,7 @@ describe("preload-plugin — hover", () => {
   it("does not trigger preload when hovering a non-anchor element", async () => {
     const preloadFn = vi.fn().mockResolvedValue(undefined);
     const { router } = createTestRouter([
-      { name: "home", path: "/", preload: preloadFn },
+      { name: "home", path: "/", preload: () => preloadFn },
     ]);
 
     setupMatchUrl(router);
@@ -190,7 +190,7 @@ describe("preload-plugin — hover", () => {
   it("silently catches errors thrown by preload function", async () => {
     const preloadFn = vi.fn().mockRejectedValue(new Error("preload error"));
     const { router } = createTestRouter([
-      { name: "home", path: "/", preload: preloadFn },
+      { name: "home", path: "/", preload: () => preloadFn },
     ]);
 
     setupMatchUrl(router);
@@ -198,19 +198,22 @@ describe("preload-plugin — hover", () => {
     await router.start("/");
 
     const anchor = createAnchor("/");
+    const consoleSpy = vi.spyOn(console, "error");
 
     fireMouseOver(anchor);
     await waitForTimer(65);
 
     expect(preloadFn).toHaveBeenCalledTimes(1);
+    expect(consoleSpy).not.toHaveBeenCalled();
 
+    consoleSpy.mockRestore();
     router.stop();
   });
 
   it("supports custom delay option", async () => {
     const preloadFn = vi.fn().mockResolvedValue(undefined);
     const { router } = createTestRouter([
-      { name: "home", path: "/", preload: preloadFn },
+      { name: "home", path: "/", preload: () => preloadFn },
     ]);
 
     setupMatchUrl(router);
@@ -239,7 +242,7 @@ describe("preload-plugin — hover", () => {
       {
         name: "users",
         path: "/users",
-        children: [{ name: "view", path: "/:id", preload: preloadFn }],
+        children: [{ name: "view", path: "/:id", preload: () => preloadFn }],
       },
     ]);
 
@@ -260,7 +263,7 @@ describe("preload-plugin — hover", () => {
   it("handles hover on document where target has no closest method", async () => {
     const preloadFn = vi.fn().mockResolvedValue(undefined);
     const { router } = createTestRouter([
-      { name: "home", path: "/", preload: preloadFn },
+      { name: "home", path: "/", preload: () => preloadFn },
     ]);
 
     setupMatchUrl(router);
@@ -278,7 +281,7 @@ describe("preload-plugin — hover", () => {
   it("clears pending timer when target has no closest method during active hover", async () => {
     const preloadFn = vi.fn().mockResolvedValue(undefined);
     const { router } = createTestRouter([
-      { name: "home", path: "/", preload: preloadFn },
+      { name: "home", path: "/", preload: () => preloadFn },
     ]);
 
     setupMatchUrl(router);
@@ -301,7 +304,7 @@ describe("preload-plugin — hover", () => {
   it("resets currentAnchor when target has no closest method without pending timer", async () => {
     const preloadFn = vi.fn().mockResolvedValue(undefined);
     const { router } = createTestRouter([
-      { name: "home", path: "/", preload: preloadFn },
+      { name: "home", path: "/", preload: () => preloadFn },
     ]);
 
     setupMatchUrl(router);
@@ -330,7 +333,7 @@ describe("preload-plugin — hover", () => {
   it("triggers preload immediately with delay:0", async () => {
     const preloadFn = vi.fn().mockResolvedValue(undefined);
     const { router } = createTestRouter([
-      { name: "home", path: "/", preload: preloadFn },
+      { name: "home", path: "/", preload: () => preloadFn },
     ]);
 
     setupMatchUrl(router);
@@ -352,7 +355,7 @@ describe("preload-plugin — hover", () => {
   it("does not preload the same route after it was already preloaded on prior hover", async () => {
     const preloadFn = vi.fn().mockResolvedValue(undefined);
     const { router } = createTestRouter([
-      { name: "home", path: "/", preload: preloadFn },
+      { name: "home", path: "/", preload: () => preloadFn },
     ]);
 
     setupMatchUrl(router);
@@ -387,12 +390,12 @@ describe("preload-plugin — hover", () => {
     const preloadB = vi.fn().mockResolvedValue(undefined);
     const preloadC = vi.fn().mockResolvedValue(undefined);
     const { router } = createTestRouter([
-      { name: "home", path: "/", preload: preloadA },
-      { name: "about", path: "/about", preload: preloadB },
+      { name: "home", path: "/", preload: () => preloadA },
+      { name: "about", path: "/about", preload: () => preloadB },
       {
         name: "users",
         path: "/users",
-        children: [{ name: "view", path: "/:id", preload: preloadC }],
+        children: [{ name: "view", path: "/:id", preload: () => preloadC }],
       },
     ]);
 
@@ -419,17 +422,136 @@ describe("preload-plugin — hover", () => {
     router.stop();
   });
 
+  it("silently skips preload when preload factory throws", async () => {
+    const { router } = createTestRouter([
+      {
+        name: "home",
+        path: "/",
+        preload: () => {
+          throw new Error("factory error");
+        },
+      },
+    ]);
+
+    setupMatchUrl(router);
+    cleanup = router.usePlugin(preloadPluginFactory());
+    await router.start("/");
+
+    const anchor = createAnchor("/");
+    const consoleSpy = vi.spyOn(console, "error");
+
+    fireMouseOver(anchor);
+    await waitForTimer(65);
+
+    expect(consoleSpy).not.toHaveBeenCalled();
+
+    consoleSpy.mockRestore();
+    router.stop();
+  });
+
+  it("retries preload factory on next hover if it previously threw", async () => {
+    let callCount = 0;
+    const preloadFn = vi.fn().mockResolvedValue(undefined);
+    const { router } = createTestRouter([
+      {
+        name: "home",
+        path: "/",
+        preload: () => {
+          callCount++;
+
+          if (callCount === 1) {
+            throw new Error("first-time factory error");
+          }
+
+          return preloadFn;
+        },
+      },
+    ]);
+
+    setupMatchUrl(router);
+    cleanup = router.usePlugin(preloadPluginFactory());
+    await router.start("/");
+
+    const anchor = createAnchor("/");
+    const div = document.createElement("div");
+
+    document.body.append(div);
+
+    // First hover: factory throws, preload skipped, not cached
+    fireMouseOver(anchor);
+    await waitForTimer(65);
+
+    expect(callCount).toBe(1);
+    expect(preloadFn).not.toHaveBeenCalled();
+
+    // Move away to reset currentAnchor
+    fireMouseOver(div);
+
+    // Second hover: factory retried, succeeds this time
+    fireMouseOver(anchor);
+    await waitForTimer(65);
+
+    expect(callCount).toBe(2);
+    expect(preloadFn).toHaveBeenCalledTimes(1);
+
+    router.stop();
+  });
+
+  it("preload factory compiled once per route (cache hit on second hover)", async () => {
+    let factoryCallCount = 0;
+    const preloadFn = vi.fn().mockResolvedValue(undefined);
+    const { router } = createTestRouter([
+      {
+        name: "home",
+        path: "/",
+        preload: () => {
+          factoryCallCount++;
+
+          return preloadFn;
+        },
+      },
+    ]);
+
+    setupMatchUrl(router);
+    cleanup = router.usePlugin(preloadPluginFactory());
+    await router.start("/");
+
+    const anchor = createAnchor("/");
+    const div = document.createElement("div");
+
+    document.body.append(div);
+
+    // First hover: factory called, result cached
+    fireMouseOver(anchor);
+    await waitForTimer(65);
+
+    expect(factoryCallCount).toBe(1);
+    expect(preloadFn).toHaveBeenCalledTimes(1);
+
+    // Move away
+    fireMouseOver(div);
+
+    // Second hover: factory NOT called (cache hit), preload called again
+    fireMouseOver(anchor);
+    await waitForTimer(65);
+
+    expect(factoryCallCount).toBe(1);
+    expect(preloadFn).toHaveBeenCalledTimes(2);
+
+    router.stop();
+  });
+
   it("does not start a second router with the same factory (independent factories)", async () => {
     const preloadFn = vi.fn().mockResolvedValue(undefined);
 
     const router1 = createRouter(
-      [{ name: "home", path: "/", preload: preloadFn }],
+      [{ name: "home", path: "/", preload: () => preloadFn }],
       {
         defaultRoute: "home",
       },
     );
     const router2 = createRouter(
-      [{ name: "home", path: "/", preload: preloadFn }],
+      [{ name: "home", path: "/", preload: () => preloadFn }],
       {
         defaultRoute: "home",
       },

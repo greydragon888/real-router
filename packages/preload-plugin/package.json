@@ -50,11 +50,13 @@
     "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
     "lint:package": "publint",
     "lint:types": "attw --pack .",
-    "test:properties": "vitest --config vitest.config.properties.mts --run"
+    "test:properties": "vitest --config vitest.config.properties.mts --run",
+    "test:stress": "vitest --config vitest.config.stress.mts --run"
   },
   "sideEffects": false,
   "dependencies": {
-    "@real-router/core": "workspace:^"
+    "@real-router/core": "workspace:^",
+    "@real-router/types": "workspace:^"
   },
   "devDependencies": {
     "jsdom": "28.1.0"
