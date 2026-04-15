@@ -36,7 +36,7 @@ export default {
       "logger-plugin",
       "persistent-params-plugin",
       "react",
-      "router-benchmarks",
+      "benchmarks",
     ].map((name) => ({ name })),
   },
   allowEmptyScopes: true,

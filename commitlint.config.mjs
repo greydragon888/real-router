@@ -45,7 +45,7 @@ export const SCOPES = [
   "route-utils",
   "sources",
   "dom-utils",
-  "router-benchmarks",
+  "benchmarks",
   "deps",
   "config",
   "ci",

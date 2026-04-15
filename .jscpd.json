@@ -16,7 +16,7 @@
     "**/*.bench.ts",
     "**/*.spec.ts",
     "**/*.properties.ts",
-    "packages/router-benchmarks/**",
+    "benchmarks/**",
     "packages/preact/src/**",
     "packages/hash-plugin/src/**",
     "packages/*/src/dom-utils/**",

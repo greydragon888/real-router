@@ -134,7 +134,7 @@ Custom **Segment Trie** matcher — O(segments) traversal, O(1) for static route
 | React     | **2.6x fewer allocations** |
 | Vue       | **1.5x fewer allocations** |
 
-> Benchmark: [packages/router-benchmarks/client-nav](packages/router-benchmarks/client-nav) — identical workload, JSDOM, production builds, `--expose-gc`
+> Benchmark: [benchmarks/vs-tanstack](benchmarks/vs-tanstack) — identical workload, JSDOM, production builds, `--expose-gc`
 
 <details>
 <summary><b>Benchmarks vs router5 and router6 (core-level)</b></summary>

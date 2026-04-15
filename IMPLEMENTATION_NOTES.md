@@ -466,7 +466,7 @@ ko_fi: greydragon888
 }
 ```
 
-Ignores: `*.d.ts`, `*.test.ts`, `*.test.tsx`, `*.bench.ts`, `*.spec.ts`, `*.properties.ts`, `packages/router-benchmarks/**`, `packages/preact/src/**`, `packages/hash-plugin/src/**`, `packages/*/src/dom-utils/**`, `packages/dom-utils/src/**` (last two are symlinks to `shared/dom-utils/` — see #437 section; without the ignore jscpd would report 6 false-positive duplicates).
+Ignores: `*.d.ts`, `*.test.ts`, `*.test.tsx`, `*.bench.ts`, `*.spec.ts`, `*.properties.ts`, `benchmarks/**`, `packages/preact/src/**`, `packages/hash-plugin/src/**`, `packages/*/src/dom-utils/**`, `packages/dom-utils/src/**` (last two are symlinks to `shared/dom-utils/` — see #437 section; without the ignore jscpd would report 6 false-positive duplicates).
 
 ### size-limit Configuration
 
@@ -485,7 +485,7 @@ Global `ignoreDependencies`: `@stryker-mutator/api`, `jsdom` (test infrastructur
 Per-workspace configurations in `knip.json`:
 
 - **Root**: entry scripts, ignores `fast-check` (used but not detected by knip)
-- **`packages/router-benchmarks`**: custom `entry: ["src/**/*.ts"]` to recognize standalone benchmark scripts
+- **`benchmarks`** (now at root level, excluded via `ignoreWorkspaces`): was `packages/router-benchmarks` with custom `entry: ["src/**/*.ts"]`; `src/` renamed to `core/`
 - **`packages/react`**, **`packages/preact`**, **`packages/vue`**, **`packages/solid`**, **`packages/svelte`**: each lists `"ignore": ["src/dom-utils/**"]` to skip the symlinked shared sources (see #437 section)
 - **`packages/solid`**: additionally ignores `@babel/preset-typescript`, `babel-preset-solid` (build-only deps)
 - **`packages/svelte`**: additionally ignores `@real-router/browser-plugin` (workspace dep used at runtime)
@@ -1392,7 +1392,7 @@ Script updated: `sonar-scanner` → `sonar` in `package.json` scripts.
 
 ### Core Package Exports
 
-Removed `"./dist/*": "./dist/*"` wildcard export from `packages/core/package.json`. This was used by `router-benchmarks` to load compiled dist directly. Replaced with direct require of `@real-router/core/dist/cjs/index.js`.
+Removed `"./dist/*": "./dist/*"` wildcard export from `packages/core/package.json`. This was used by `router-benchmarks` (now at `benchmarks/`) to load compiled dist directly. Replaced with direct require of `@real-router/core/dist/cjs/index.js`.
 
 ### Vitest: Removed `clearMocks`
 
@@ -1441,7 +1441,7 @@ Added to pre-commit hook to catch missing specs before push.
 
 ### knip: Router Benchmarks Entry
 
-Added `packages/router-benchmarks` workspace to `knip.json` with `entry: ["src/**/*.ts"]` to recognize standalone benchmark scripts (like `isolated-anomalies.ts`) that are not imported from `index.ts`.
+Added `packages/router-benchmarks` (now at `benchmarks/`, `src/` renamed to `core/`) workspace to `knip.json` with `entry: ["src/**/*.ts"]` to recognize standalone benchmark scripts (like `isolated-anomalies.ts`) that are not imported from `index.ts`. Later moved to `ignoreWorkspaces` when benchmarks were relocated to root level.
 
 ## FSM Package
 

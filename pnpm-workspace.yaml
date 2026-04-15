@@ -3,3 +3,4 @@ packages:
   - "shared"
   - "examples/*"
   - "examples/*/*"
+  - "benchmarks"

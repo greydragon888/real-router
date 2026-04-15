@@ -188,6 +188,109 @@ importers:
         specifier: 4.1.0
         version: 4.1.0(@types/node@25.5.0)(@vitest/ui@4.1.0)(jsdom@28.1.0)(vite@7.3.2(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
 
+  benchmarks:
+    dependencies:
+      '@nanostores/react':
+        specifier: 0.8.4
+        version: 0.8.4(nanostores@0.11.4)(react@19.2.0)
+      '@nanostores/solid':
+        specifier: 1.1.1
+        version: 1.1.1(nanostores@0.11.4)(solid-js@1.9.12)
+      '@nanostores/vue':
+        specifier: 1.1.0
+        version: 1.1.0(nanostores@0.11.4)(vue@3.5.13(typescript@6.0.2))
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../packages/core
+      '@real-router/lifecycle-plugin':
+        specifier: workspace:^
+        version: link:../packages/lifecycle-plugin
+      '@real-router/memory-plugin':
+        specifier: workspace:^
+        version: link:../packages/memory-plugin
+      '@real-router/react':
+        specifier: workspace:^
+        version: link:../packages/react
+      '@real-router/search-schema-plugin':
+        specifier: workspace:^
+        version: link:../packages/search-schema-plugin
+      '@real-router/solid':
+        specifier: workspace:^
+        version: link:../packages/solid
+      '@real-router/types':
+        specifier: workspace:^
+        version: link:../packages/core-types
+      '@real-router/vue':
+        specifier: workspace:^
+        version: link:../packages/vue
+      '@tanstack/react-router':
+        specifier: 1.168.10
+        version: 1.168.10(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
+      '@tanstack/solid-router':
+        specifier: 1.168.9
+        version: 1.168.9(solid-js@1.9.12)
+      '@tanstack/vue-router':
+        specifier: 1.168.9
+        version: 1.168.9(vue@3.5.13(typescript@6.0.2))
+      mitata:
+        specifier: 1.0.34
+        version: 1.0.34
+      nanostores:
+        specifier: 0.11.4
+        version: 0.11.4
+      react:
+        specifier: 19.2.0
+        version: 19.2.0
+      react-dom:
+        specifier: 19.2.0
+        version: 19.2.0(react@19.2.0)
+      router5:
+        specifier: 8.0.1
+        version: 8.0.1
+      router6:
+        specifier: 1.0.2
+        version: 1.0.2
+      solid-js:
+        specifier: 1.9.12
+        version: 1.9.12
+      vue:
+        specifier: 3.5.13
+        version: 3.5.13(typescript@6.0.2)
+      zod:
+        specifier: 3.24.4
+        version: 3.24.4
+    devDependencies:
+      '@tanstack/router-core':
+        specifier: 1.168.9
+        version: 1.168.9
+      '@types/react':
+        specifier: 19.2.14
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: 19.2.3
+        version: 19.2.3(@types/react@19.2.14)
+      '@vitejs/plugin-react':
+        specifier: 5.2.0
+        version: 5.2.0(vite@7.3.2(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
+      '@vitejs/plugin-vue':
+        specifier: 6.0.5
+        version: 6.0.5(vite@7.3.2(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))(vue@3.5.13(typescript@6.0.2))
+      '@vitejs/plugin-vue-jsx':
+        specifier: 5.1.5
+        version: 5.1.5(vite@7.3.2(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))(vue@3.5.13(typescript@6.0.2))
+      jsdom:
+        specifier: 28.1.0
+        version: 28.1.0
+      vite:
+        specifier: 7.3.2
+        version: 7.3.2(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)
+      vite-plugin-solid:
+        specifier: 2.11.11
+        version: 2.11.11(@testing-library/jest-dom@6.9.1)(solid-js@1.9.12)(vite@7.3.2(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
+      vitest:
+        specifier: 4.1.0
+        version: 4.1.0(@types/node@25.5.0)(@vitest/ui@4.1.0)(jsdom@28.1.0)(vite@7.3.2(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
+
   examples/preact:
     dependencies:
       '@real-router/preact':
@@ -3350,109 +3453,6 @@ importers:
       route-tree:
         specifier: workspace:^
         version: link:../route-tree
-
-  packages/router-benchmarks:
-    dependencies:
-      '@nanostores/react':
-        specifier: 0.8.4
-        version: 0.8.4(nanostores@0.11.4)(react@19.2.0)
-      '@nanostores/solid':
-        specifier: 1.1.1
-        version: 1.1.1(nanostores@0.11.4)(solid-js@1.9.12)
-      '@nanostores/vue':
-        specifier: 1.1.0
-        version: 1.1.0(nanostores@0.11.4)(vue@3.5.13(typescript@6.0.2))
-      '@real-router/core':
-        specifier: workspace:^
-        version: link:../core
-      '@real-router/lifecycle-plugin':
-        specifier: workspace:^
-        version: link:../lifecycle-plugin
-      '@real-router/memory-plugin':
-        specifier: workspace:^
-        version: link:../memory-plugin
-      '@real-router/react':
-        specifier: workspace:^
-        version: link:../react
-      '@real-router/search-schema-plugin':
-        specifier: workspace:^
-        version: link:../search-schema-plugin
-      '@real-router/solid':
-        specifier: workspace:^
-        version: link:../solid
-      '@real-router/types':
-        specifier: workspace:^
-        version: link:../core-types
-      '@real-router/vue':
-        specifier: workspace:^
-        version: link:../vue
-      '@tanstack/react-router':
-        specifier: 1.168.10
-        version: 1.168.10(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
-      '@tanstack/solid-router':
-        specifier: 1.168.9
-        version: 1.168.9(solid-js@1.9.12)
-      '@tanstack/vue-router':
-        specifier: 1.168.9
-        version: 1.168.9(vue@3.5.13(typescript@6.0.2))
-      mitata:
-        specifier: 1.0.34
-        version: 1.0.34
-      nanostores:
-        specifier: 0.11.4
-        version: 0.11.4
-      react:
-        specifier: 19.2.0
-        version: 19.2.0
-      react-dom:
-        specifier: 19.2.0
-        version: 19.2.0(react@19.2.0)
-      router5:
-        specifier: 8.0.1
-        version: 8.0.1
-      router6:
-        specifier: 1.0.2
-        version: 1.0.2
-      solid-js:
-        specifier: 1.9.12
-        version: 1.9.12
-      vue:
-        specifier: 3.5.13
-        version: 3.5.13(typescript@6.0.2)
-      zod:
-        specifier: 3.24.4
-        version: 3.24.4
-    devDependencies:
-      '@tanstack/router-core':
-        specifier: 1.168.9
-        version: 1.168.9
-      '@types/react':
-        specifier: 19.2.14
-        version: 19.2.14
-      '@types/react-dom':
-        specifier: 19.2.3
-        version: 19.2.3(@types/react@19.2.14)
-      '@vitejs/plugin-react':
-        specifier: 5.2.0
-        version: 5.2.0(vite@7.3.2(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
-      '@vitejs/plugin-vue':
-        specifier: 6.0.5
-        version: 6.0.5(vite@7.3.2(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))(vue@3.5.13(typescript@6.0.2))
-      '@vitejs/plugin-vue-jsx':
-        specifier: 5.1.5
-        version: 5.1.5(vite@7.3.2(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))(vue@3.5.13(typescript@6.0.2))
-      jsdom:
-        specifier: 28.1.0
-        version: 28.1.0
-      vite:
-        specifier: 7.3.2
-        version: 7.3.2(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)
-      vite-plugin-solid:
-        specifier: 2.11.11
-        version: 2.11.11(@testing-library/jest-dom@6.9.1)(solid-js@1.9.12)(vite@7.3.2(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
-      vitest:
-        specifier: 4.1.0
-        version: 4.1.0(@types/node@25.5.0)(@vitest/ui@4.1.0)(jsdom@28.1.0)(vite@7.3.2(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
 
   packages/rx:
     dependencies:
@@ -12112,7 +12112,7 @@ snapshots:
       sirv: 3.0.2
       tinyglobby: 0.2.15
       tinyrainbow: 3.1.0
-      vitest: 4.1.0(@types/node@25.5.0)(@vitest/ui@4.1.0)(jsdom@26.1.0)(vite@7.3.2(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
+      vitest: 4.1.0(@types/node@25.5.0)(@vitest/ui@4.1.0)(jsdom@28.1.0)(vite@7.3.2(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
 
   '@vitest/utils@4.1.0':
     dependencies:

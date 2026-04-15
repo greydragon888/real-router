@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": true,
+    "tsBuildInfoFile": "./.tsbuildinfo",
+    "incremental": false
+  },
+  "files": ["./jsdom.d.ts"],
+  "include": ["./**/*.ts", "./**/*.tsx"],
+  "exclude": ["./real-router/solid/**", "./tanstack/solid/**", "./tanstack/vue/app.tsx"]
+}

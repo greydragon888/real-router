@@ -109,6 +109,7 @@ jobs:
           pnpm turbo run test test:properties test:stress
           --filter='...[${{ needs.check.outputs.turbo_base || 'origin/master' }}]'
           --filter='!./examples/**'
+          --filter='!./benchmarks'
           -- --coverage
 
       # Bundle affected packages (tsdown/rollup/svelte-package).
@@ -119,6 +120,7 @@ jobs:
           pnpm turbo run bundle
           --filter='...[${{ needs.check.outputs.turbo_base || 'origin/master' }}]'
           --filter='!./examples/**'
+          --filter='!./benchmarks'
 
       - name: Check dependency consistency
         run: pnpm lint:deps

@@ -835,7 +835,7 @@ export default tsEslint.config(
     files: [
       "**/*.bench.ts",
       "**/*.mitata.ts",
-      "**/router-benchmarks/src/**/*.ts",
+      "**/benchmarks/core/**/*.ts",
       "**/tests/benchmarks/**/*.ts",
     ],
     rules: {

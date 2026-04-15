@@ -27,7 +27,7 @@
 /packages/type-guards/ @greydragon888
 
 # Benchmarks
-/packages/router-benchmarks/ @greydragon888
+/benchmarks/ @greydragon888
 
 # Documentation
 *.md @greydragon888
