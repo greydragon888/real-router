@@ -7,8 +7,12 @@
 ## Installation
 
 ```bash
-npm install @real-router/preact @real-router/core @real-router/browser-plugin
+npm install @real-router/preact @real-router/core
 ```
+
+`@real-router/core` is the only hard dependency. Add `@real-router/browser-plugin`
+(or `hash-plugin` / `navigation-plugin` / `memory-plugin`) when you need History
+API integration — the Quick Start below uses it.
 
 **Peer dependency:** `preact` >= 10.0.0
 
@@ -56,14 +60,14 @@ function App() {
 
 ## Hooks
 
-| Hook                    | Returns                                   | Re-renders                              |
-| ----------------------- | ----------------------------------------- | --------------------------------------- |
-| `useRouter()`           | `Router`                                  | Never                                   |
-| `useNavigator()`        | `Navigator`                               | Never (stable ref, safe to destructure) |
-| `useRoute()`            | `{ navigator, route, previousRoute }`     | Every navigation                        |
-| `useRouteNode(name)`    | `{ navigator, route, previousRoute }`     | Only when node activates/deactivates    |
-| `useRouteUtils()`       | `RouteUtils`                              | Never                                   |
-| `useRouterTransition()` | `{ isTransitioning, toRoute, fromRoute }` | On transition start/end                 |
+| Hook                    | Returns                                                    | Re-renders                              |
+| ----------------------- | ---------------------------------------------------------- | --------------------------------------- |
+| `useRouter()`           | `Router`                                                   | Never                                   |
+| `useNavigator()`        | `Navigator`                                                | Never (stable ref, safe to destructure) |
+| `useRoute()`            | `{ navigator, route, previousRoute }`                      | Every navigation                        |
+| `useRouteNode(name)`    | `{ navigator, route, previousRoute }`                      | Only when node activates/deactivates    |
+| `useRouteUtils()`       | `RouteUtils`                                               | Never                                   |
+| `useRouterTransition()` | `{ isTransitioning, isLeaveApproved, toRoute, fromRoute }` | On transition start/end                 |
 
 ```tsx
 // useRouteNode — re-renders only when "users.*" changes
@@ -136,10 +140,11 @@ Declarative route matching. Renders the first matching `<RouteView.Match>` child
 
 #### `RouteView.Match` props
 
-| Prop       | Type                | Description                                                                 |
-| ---------- | ------------------- | --------------------------------------------------------------------------- |
-| `segment`  | `string`            | Route segment to match                                                      |
-| `fallback` | `ComponentChildren` | Shown while children suspend. Wraps children in `<Suspense>` when provided. |
+| Prop       | Type                | Description                                                                   |
+| ---------- | ------------------- | ----------------------------------------------------------------------------- |
+| `segment`  | `string`            | Route segment to match                                                        |
+| `exact`    | `boolean`           | When `true`, matches only the exact route (not descendants). Default: `false` |
+| `fallback` | `ComponentChildren` | Shown while children suspend. Wraps children in `<Suspense>` when provided.   |
 
 #### Lazy loading with `fallback` (experimental)
 
@@ -157,6 +162,24 @@ const LazyDashboard = lazy(() => import("./Dashboard"));
 </RouteView>;
 ```
 
+### Advanced exports
+
+For custom integrations (e.g., writing your own hook on top of the router
+context), the low-level contexts are also exported:
+
+```tsx
+import {
+  RouterContext, // Raw Router instance
+  NavigatorContext, // Navigator (stable ref)
+  RouteContext, // { navigator, route, previousRoute }
+  type RouteViewProps,
+  type RouteViewMatchProps,
+  type RouteViewNotFoundProps,
+} from "@real-router/preact";
+```
+
+Most apps should prefer the `use*` hooks above over consuming contexts directly.
+
 ### `<RouterErrorBoundary>`
 
 Declarative error handling for navigation errors. Shows a fallback **alongside** children (not instead of) when a guard rejects or a route is not found.
@@ -170,7 +193,13 @@ import { RouterErrorBoundary } from "@real-router/preact";
       {error.code} <button onClick={resetError}>Dismiss</button>
     </div>
   )}
-  onError={(error) => analytics.track("nav_error", { code: error.code })}
+  onError={(error, toRoute, fromRoute) =>
+    analytics.track("nav_error", {
+      code: error.code,
+      to: toRoute?.name,
+      from: fromRoute?.name,
+    })
+  }
 >
   <Link routeName="protected">Go to Protected</Link>
 </RouterErrorBoundary>;

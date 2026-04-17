@@ -180,6 +180,71 @@ describe("useRouterTransition stress (Preact)", () => {
     router.stop();
   });
 
+  it("7.5: concurrent navigations with guards of varying duration — correct final state", async () => {
+    const durations = [10, 20, 30, 40, 50];
+    const routeNames = durations.map((_, i) => `guarded${i}`);
+    const validRoutes = new Set(["start", ...routeNames]);
+
+    const router = createRouter(
+      [
+        { name: "start", path: "/start" },
+        ...routeNames.map((name) => ({ name, path: `/${name}` })),
+      ],
+      { defaultRoute: "start" },
+    );
+
+    await router.start("/start");
+
+    const lifecycle = getLifecycleApi(router);
+
+    const makeTimedGuardFactory = (duration: number) => {
+      const guard = () =>
+        new Promise<boolean>((resolve) => {
+          setTimeout(() => {
+            resolve(true);
+          }, duration);
+        });
+
+      return () => guard;
+    };
+
+    for (const [i, duration] of durations.entries()) {
+      lifecycle.addActivateGuard(
+        routeNames[i],
+        makeTimedGuardFactory(duration),
+      );
+    }
+
+    let snapshot = { isTransitioning: false };
+
+    const Consumer = makeTransitionConsumer((t) => {
+      snapshot = t;
+    });
+
+    render(
+      <RouterProvider router={router}>
+        <Consumer />
+      </RouterProvider>,
+    );
+
+    await act(async () => {
+      const promises = routeNames.map((name) =>
+        router.navigate(name).catch(() => {}),
+      );
+
+      await Promise.all(promises);
+    });
+
+    expect(snapshot.isTransitioning).toBe(false);
+
+    const finalStateName = router.getState()?.name;
+
+    expect(finalStateName).toBeDefined();
+    expect(validRoutes.has(finalStateName!)).toBe(true);
+
+    router.stop();
+  });
+
   it("7.4: navigate + cancel pattern × 50 — isTransitioning never stuck", async () => {
     const router = createRouter(
       [

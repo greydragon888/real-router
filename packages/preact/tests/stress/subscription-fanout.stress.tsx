@@ -8,6 +8,8 @@ import {
   createStressRouter,
   navigateSequentially,
   roundRobinRoutes,
+  takeHeapSnapshot,
+  MB,
 } from "./helpers";
 
 import type { Router } from "@real-router/core";
@@ -16,6 +18,23 @@ import type { FunctionComponent } from "preact";
 const DUPLICATE_LITERAL = 5;
 const OUTSIDE_ROUTES = ["route0", "route1", "route2", "route3", "route4"];
 const USERS_LIST_ROUTE = "users.list";
+
+const makeCountingConsumer = (
+  renderCounts: number[],
+  i: number,
+  prefix: string,
+): FunctionComponent => {
+  const C: FunctionComponent = () => {
+    useRouteNode(`route${i}`);
+    renderCounts[i]++;
+
+    return <div />;
+  };
+
+  C.displayName = `${prefix}${i}`;
+
+  return C;
+};
 
 describe("subscription-fanout stress tests", () => {
   let router: Router;
@@ -33,18 +52,9 @@ describe("subscription-fanout stress tests", () => {
   it("1.1: 50 useRouteNode on different nodes + 100 navigations — each re-renders only when its node is navigated to", async () => {
     const renderCounts: number[] = Array.from<number>({ length: 50 }).fill(0);
 
-    const subscribers = Array.from({ length: 50 }, (_, i) => {
-      const Sub: FunctionComponent = () => {
-        useRouteNode(`route${i}`);
-        renderCounts[i]++;
-
-        return <div />;
-      };
-
-      Sub.displayName = `Sub${i}`;
-
-      return Sub;
-    });
+    const subscribers = Array.from({ length: 50 }, (_, i) =>
+      makeCountingConsumer(renderCounts, i, "Sub"),
+    );
 
     render(
       <RouterProvider router={router}>
@@ -233,6 +243,46 @@ describe("subscription-fanout stress tests", () => {
     }
 
     expect(errorThrown).toBeNull();
+  });
+
+  it("10000 navigate cycles — subscriptions do not accumulate", async () => {
+    const renderCounts: number[] = Array.from<number>({ length: 10 }).fill(0);
+
+    const consumers = Array.from({ length: 10 }, (_, i) =>
+      makeCountingConsumer(renderCounts, i, "MemLeakConsumer"),
+    );
+
+    render(
+      <RouterProvider router={router}>
+        {consumers.map((Consumer, i) => (
+          <Consumer key={i} />
+        ))}
+      </RouterProvider>,
+    );
+
+    await act(async () => {
+      await router.navigate("users.list");
+    });
+
+    const routeNames = Array.from({ length: 10 }, (_, i) => `route${i}`);
+    const sequence = roundRobinRoutes(routeNames, 10_000);
+
+    const heapBefore = takeHeapSnapshot();
+
+    await navigateSequentially(
+      router,
+      sequence.map((name) => ({ name })),
+    );
+
+    const heapAfter = takeHeapSnapshot();
+
+    expect(heapAfter - heapBefore).toBeLessThan(50 * MB);
+
+    renderCounts.forEach((count) => {
+      expect(count).toBeGreaterThan(0);
+    });
+
+    expect(router.getState()?.name).toBe("route9");
   });
 
   it("1.5: dynamic nodeName changes 100 times — correct state for current nodeName, no errors", async () => {

@@ -1,3 +1,5 @@
+import { useMemo } from "preact/hooks";
+
 import { Match, NotFound } from "./components";
 import { buildRenderList, collectElements } from "./helpers";
 import { useRouteNode } from "../../hooks/useRouteNode";
@@ -11,13 +13,20 @@ function RouteViewRoot({
 }: Readonly<RouteViewProps>): VNode | null {
   const { route } = useRouteNode(nodeName);
 
+  // Cache the flattened Match/NotFound list across renders with unchanged
+  // children. children only differs when the parent re-renders with a new
+  // node, so this memoises the steady-state traversal.
+  const elements = useMemo(() => {
+    const collected: VNode[] = [];
+
+    collectElements(children, collected);
+
+    return collected;
+  }, [children]);
+
   if (!route) {
     return null;
   }
-
-  const elements: VNode[] = [];
-
-  collectElements(children, elements);
 
   const { rendered } = buildRenderList(elements, route.name, nodeName);
 

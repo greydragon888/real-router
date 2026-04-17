@@ -4,12 +4,12 @@
  * Property-based tests for areLinkPropsEqual (Preact Link memo comparator).
  *
  * areLinkPropsEqual is NOT exported — we replicate the logic here.
- * The function uses === for primitives and JSON.stringify for objects.
+ * The function uses === for primitives and shallowEqual for routeParams/routeOptions.
  *
  * Invariants:
  * 1. Reflexivity: areLinkPropsEqual(p, p) === true
  * 2. Symmetry: areLinkPropsEqual(a, b) === areLinkPropsEqual(b, a)
- * 3. Structural equality: identical fields → true (even for fresh objects)
+ * 3. Structural equality (flat): identical primitive fields → true (even for fresh objects)
  * 4. Sensitivity: differing any field → false
  */
 
@@ -17,6 +17,7 @@ import { fc, test } from "@fast-check/vitest";
 import { describe, expect } from "vitest";
 
 import { NUM_RUNS, arbRouteName, arbParams } from "./helpers";
+import { shallowEqual } from "../../src/dom-utils/index.js";
 
 // =============================================================================
 // Inline replica of areLinkPropsEqual (not exported from Preact adapter)
@@ -50,8 +51,8 @@ function areLinkPropsEqual(
     prev.target === next.target &&
     prev.style === next.style &&
     prev.children === next.children &&
-    JSON.stringify(prev.routeParams) === JSON.stringify(next.routeParams) &&
-    JSON.stringify(prev.routeOptions) === JSON.stringify(next.routeOptions)
+    shallowEqual(prev.routeParams, next.routeParams) &&
+    shallowEqual(prev.routeOptions, next.routeOptions)
   );
 }
 

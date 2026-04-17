@@ -37,7 +37,7 @@ describe("RouterProvider component", () => {
     expect(result.current).toStrictEqual(router);
   });
 
-  it("should render chile component", () => {
+  it("should render child component", () => {
     renderHook(() => useContext(RouterContext), {
       wrapper: () => (
         <RouterProvider router={router}>

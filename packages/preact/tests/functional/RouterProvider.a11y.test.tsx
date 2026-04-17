@@ -1,3 +1,5 @@
+import { browserPluginFactory } from "@real-router/browser-plugin";
+import { createRouter } from "@real-router/core";
 import { act, render } from "@testing-library/preact";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
@@ -61,8 +63,10 @@ describe("RouterProvider — announceNavigation", () => {
       await router.navigate("home");
     });
 
-    expect(document.querySelector(ANNOUNCER_SEL)?.textContent).toContain(
-      "Navigated to",
+    // Final navigation is "home" → announcer text should reflect the last
+    // route, not a prior one. Last wins.
+    expect(document.querySelector(ANNOUNCER_SEL)?.textContent).toBe(
+      "Navigated to home",
     );
   });
 
@@ -92,5 +96,55 @@ describe("RouterProvider — announceNavigation", () => {
     unmount();
 
     expect(document.querySelector(ANNOUNCER_SEL)).toBeNull();
+  });
+
+  it("should handle internal route prefix @@ in announcer", async () => {
+    const notFoundRouter = createRouter(
+      [
+        { name: "test", path: "/" },
+        { name: "other", path: "/other" },
+        { name: "@@notfound", path: "/notfound" },
+      ],
+      {
+        defaultRoute: "test",
+        allowNotFound: true,
+      },
+    );
+
+    notFoundRouter.usePlugin(browserPluginFactory({}));
+    await notFoundRouter.start("/");
+
+    render(
+      <RouterProvider router={notFoundRouter} announceNavigation>
+        <div />
+      </RouterProvider>,
+    );
+
+    expect(document.querySelector(ANNOUNCER_SEL)).not.toBeNull();
+
+    await act(() => {
+      vi.advanceTimersByTime(100);
+    });
+
+    // The announcer skips the first post-mount navigation as "initial" —
+    // do a warm-up navigation first, then the real assertion.
+    await act(async () => {
+      await notFoundRouter.navigate("other");
+    });
+
+    await act(async () => {
+      await notFoundRouter.navigate("@@notfound");
+    });
+
+    const announcerText = document.querySelector(ANNOUNCER_SEL)?.textContent;
+
+    // Internal "@@notfound" route name is filtered → falls back to the
+    // pathname ("/notfound"). Prefix must still be present, and the
+    // internal "@@" marker must not leak into the announcement.
+    expect(announcerText).toBe("Navigated to /notfound");
+    expect(announcerText).not.toContain("@@");
+
+    notFoundRouter.stop();
+    document.querySelector(ANNOUNCER_SEL)?.remove();
   });
 });

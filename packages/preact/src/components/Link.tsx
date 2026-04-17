@@ -6,10 +6,10 @@ import {
   shouldNavigate,
   buildHref,
   buildActiveClassName,
+  shallowEqual,
 } from "../dom-utils/index.js";
 import { useIsActiveRoute } from "../hooks/useIsActiveRoute";
 import { useRouter } from "../hooks/useRouter";
-import { useStableValue } from "../hooks/useStableValue";
 
 import type { LinkProps } from "../types";
 import type { FunctionComponent, JSX } from "preact";
@@ -28,8 +28,8 @@ function areLinkPropsEqual(
     prev.target === next.target &&
     prev.style === next.style &&
     prev.children === next.children &&
-    JSON.stringify(prev.routeParams) === JSON.stringify(next.routeParams) &&
-    JSON.stringify(prev.routeOptions) === JSON.stringify(next.routeOptions)
+    shallowEqual(prev.routeParams, next.routeParams) &&
+    shallowEqual(prev.routeOptions, next.routeOptions)
   );
 }
 
@@ -49,19 +49,21 @@ export const Link: FunctionComponent<LinkProps> = memo(
   }) => {
     const router = useRouter();
 
-    const stableParams = useStableValue(routeParams);
-    const stableOptions = useStableValue(routeOptions);
+    // memo + areLinkPropsEqual guarantees that on bail-out the component does
+    // not render; on render, routeParams/routeOptions changed reference (true
+    // change caught by shallowEqual), so they're safe to use directly in hook
+    // deps without useStableValue.
 
     const isActive = useIsActiveRoute(
       routeName,
-      stableParams,
+      routeParams,
       activeStrict,
       ignoreQueryParams,
     );
 
     const href = useMemo(
-      () => buildHref(router, routeName, stableParams),
-      [router, routeName, stableParams],
+      () => buildHref(router, routeName, routeParams),
+      [router, routeName, routeParams],
     );
 
     const handleClick = useCallback(
@@ -79,9 +81,9 @@ export const Link: FunctionComponent<LinkProps> = memo(
         }
 
         evt.preventDefault();
-        router.navigate(routeName, stableParams, stableOptions).catch(() => {});
+        router.navigate(routeName, routeParams, routeOptions).catch(() => {});
       },
-      [onClick, target, router, routeName, stableParams, stableOptions],
+      [onClick, target, router, routeName, routeParams, routeOptions],
     );
 
     const finalClassName = useMemo(

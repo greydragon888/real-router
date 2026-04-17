@@ -320,6 +320,75 @@ describe("R3 — mount/unmount subscription lifecycle", () => {
     expect(router.getState()?.name).toBe("route1");
   });
 
+  it("3.10: navigate during component unmount — no errors, router state consistent", async () => {
+    let errorThrown: unknown = null;
+
+    const consumers = Array.from({ length: 20 }, (_, i) => {
+      const Consumer: FunctionComponent = () => {
+        useRouteNode(`route${i % 10}`);
+
+        return <div />;
+      };
+
+      Consumer.displayName = `TeardownConsumer${i}`;
+
+      return Consumer;
+    });
+
+    const mountConsumers = () =>
+      render(
+        <RouterProvider router={router}>
+          {consumers.map((Consumer, i) => (
+            <Consumer key={i} />
+          ))}
+        </RouterProvider>,
+      );
+
+    let { unmount } = mountConsumers();
+
+    try {
+      for (let i = 0; i < 50; i++) {
+        unmount();
+        void router.navigate(`route${i % 10}`);
+        ({ unmount } = mountConsumers());
+
+        await act(async () => {
+          await Promise.resolve();
+          await Promise.resolve();
+        });
+      }
+    } catch (error) {
+      errorThrown = error;
+    }
+
+    expect(errorThrown).toBeNull();
+    expect(router.getState()).toBeDefined();
+
+    let lastRoute: string | null = null;
+
+    const UpdateConsumer: FunctionComponent = () => {
+      const { route } = useRouteNode("");
+
+      lastRoute = route?.name ?? null;
+
+      return <div />;
+    };
+
+    unmount();
+
+    render(
+      <RouterProvider router={router}>
+        <UpdateConsumer />
+      </RouterProvider>,
+    );
+
+    await act(async () => {
+      await router.navigate("route1");
+    });
+
+    expect(lastRoute).toBe("route1");
+  });
+
   it("3.9: mount/unmount useRouterTransition x 200 cycles — no crashes, transitions work after cycles", async () => {
     const TransitionConsumer: FunctionComponent = () => {
       useRouterTransition();

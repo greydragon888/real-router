@@ -40,8 +40,11 @@ src/
 ├── context.ts                  # Three Preact contexts (RouterContext, RouteContext, NavigatorContext)
 ├── types.ts                    # RouteState, RouteContext, LinkProps
 ├── constants.ts                # EMPTY_PARAMS, EMPTY_OPTIONS (frozen singletons)
-├── utils.ts                    # shouldNavigate() — click filtering
 ├── useSyncExternalStore.ts     # Polyfill — Preact has no native useSyncExternalStore
+├── dom-utils/                  # Symlink → shared/dom-utils/ (shared across all framework adapters)
+│   ├── index.ts                # Barrel re-exports
+│   ├── link-utils.ts           # shouldNavigate, buildHref, buildActiveClassName, applyLinkA11y
+│   └── route-announcer.ts      # createRouteAnnouncer — WCAG aria-live announcements
 ├── hooks/
 │   ├── useRouter.tsx           # Router instance from context (never re-renders)
 │   ├── useRoute.tsx            # Full route state from context (every navigation)
@@ -49,7 +52,7 @@ src/
 │   ├── useRouteNode.tsx        # Node-scoped subscription via useSyncExternalStore polyfill
 │   ├── useIsActiveRoute.tsx    # Active state subscription (internal — used by Link)
 │   ├── useRouteUtils.tsx       # RouteUtils from route tree (never re-renders)
-│   ├── useRouterTransition.tsx # Transition lifecycle (isTransitioning, toRoute, fromRoute)
+│   ├── useRouterTransition.tsx # Transition lifecycle (isTransitioning, isLeaveApproved, toRoute, fromRoute)
 │   ├── useRouterError.tsx    # Internal — error subscription (used by RouterErrorBoundary)
 │   └── useStableValue.tsx      # JSON-based reference stabilization
 └── components/

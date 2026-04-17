@@ -11,6 +11,9 @@ import { useEffect, useState } from "preact/hooks";
  * `useState(getSnapshot)` (render) and `useEffect` (commit).
  * We synchronize by calling `setValue(getSnapshot())` before
  * subscribing in the effect.
+ *
+ * The updater uses `Object.is` to bail out when the snapshot
+ * is referentially stable, preventing redundant re-renders.
  */
 export function useSyncExternalStore<T>(
   subscribe: (onStoreChange: () => void) => () => void,
@@ -20,12 +23,17 @@ export function useSyncExternalStore<T>(
   const [value, setValue] = useState(getSnapshot);
 
   useEffect(() => {
-    // Synchronize before subscribing to handle race condition
-    setValue(getSnapshot());
+    const sync = (): void => {
+      setValue((prev) => {
+        const next = getSnapshot();
 
-    return subscribe(() => {
-      setValue(getSnapshot());
-    });
+        return Object.is(prev, next) ? prev : next;
+      });
+    };
+
+    sync();
+
+    return subscribe(sync);
   }, [subscribe, getSnapshot]);
 
   return value;

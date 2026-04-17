@@ -221,13 +221,13 @@ describe("RouterErrorBoundary", () => {
 
     const [error, toRoute, fromRoute] = onError.mock.calls[0] as [
       RouterError,
-      unknown,
-      unknown,
+      State,
+      State,
     ];
 
     expect(error.code).toBe(errorCodes.CANNOT_ACTIVATE);
-    expect(toRoute).not.toBeNull();
-    expect(fromRoute).not.toBeNull();
+    expect(toRoute.name).toBe("dashboard");
+    expect(fromRoute.name).toBe("home");
   });
 
   it("onError not called on re-render", async () => {
