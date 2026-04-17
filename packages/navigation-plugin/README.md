@@ -258,8 +258,11 @@ The plugin is SSR-safe. In a non-browser environment it falls back to no-ops via
 // Server-side — no errors, methods return safe defaults
 router.usePlugin(navigationPluginFactory());
 router.buildUrl("home"); // returns path without base
-router.matchUrl("/path"); // returns undefined
+router.matchUrl("/home"); // returns State — matchUrl is pure and works in SSR
+router.matchUrl("/does-not-exist"); // returns undefined when no route matches
 ```
+
+`matchUrl` is environment-agnostic — it delegates to `api.matchPath()` over the route tree. What the SSR fallback disables is the **browser-side side effects**: `navigate`, `replaceState`, `traverseTo`, `addNavigateListener` all become no-ops (with a one-time warn). `buildUrl` / `matchUrl` remain fully functional.
 
 ## Documentation
 

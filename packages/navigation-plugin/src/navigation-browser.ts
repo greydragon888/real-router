@@ -17,10 +17,7 @@ export function createNavigationBrowser(base: string): NavigationBrowser {
     getHash: () => globalThis.location.hash,
 
     navigate: (url, options) => {
-      nav.navigate(url, {
-        state: options.state,
-        history: options.history,
-      });
+      nav.navigate(url, options);
     },
 
     replaceState: (state, url) => {

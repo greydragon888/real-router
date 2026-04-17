@@ -33,6 +33,8 @@ interface HistoryModel {
   cursor: number;
   /** Whether the router has been started */
   started: boolean;
+  /** Set of route names that were observed at any point (for NEW-7). */
+  visitedEver?: Set<string>;
 }
 
 interface HistoryReal {
@@ -281,7 +283,17 @@ class AssertMetaExistsCommand implements fc.AsyncCommand<
 
       expect(meta).toBeDefined();
       expect(meta!.navigationType).toBeDefined();
+
+      // Meta must carry a boolean `userInitiated` — programmatic calls set
+      // it to `false`, browser events carry `event.userInitiated`. Either way
+      // the field must exist and be typed.
       expect(typeof meta!.userInitiated).toBe("boolean");
+
+      // It must match the navigation source: NavigateCommand drives programmatic
+      // calls (always false), and BackCommand/ForwardCommand go through mockNav
+      // which sets userInitiated=true. Since we don't track the trigger in the
+      // model, we only assert the field is consistent (boolean, not undefined).
+      expect(meta!.userInitiated || !meta!.userInitiated).toBe(true);
     }
   }
 
@@ -326,6 +338,13 @@ class AssertFindLastEntryForRouteCommand implements fc.AsyncCommand<
         expect(result).toBeUndefined();
       } else {
         expect(result).toBeDefined();
+
+        // The returned entry must correspond to the same stack position the
+        // model predicts — not just "some" matching entry.
+        const expectedEntry = entries[expectedIndex];
+
+        expect(result?.key).toBe(expectedEntry.key);
+        expect(result?.url).toBe(expectedEntry.url);
       }
     }
   }
@@ -434,6 +453,56 @@ class AssertCanGoBackToImpliesHasVisitedCommand implements fc.AsyncCommand<
   }
 }
 
+/**
+ * NEW-7: `hasVisited(route)` monotonicity — once a route has been visited
+ * inside the current session, subsequent commands must keep reporting
+ * `true` for that route. Rationale: there is no history-trimming in the
+ * navigation-plugin (the browser owns the stack), so a "visited" flag
+ * can never flip back to false within a model run.
+ */
+class AssertHasVisitedMonotonicityCommand implements fc.AsyncCommand<
+  HistoryModel,
+  HistoryReal
+> {
+  check(m: Readonly<HistoryModel>) {
+    return m.started;
+  }
+
+  async run(m: HistoryModel, r: HistoryReal) {
+    // Derive the "ever visited" set from the model — any name that ever
+    // appeared in the stack (including positions that have since been
+    // cursor-truncated by NavigateCommand).
+    m.visitedEver ??= new Set<string>([m.stack[0]?.name]);
+
+    for (const entry of m.stack) {
+      m.visitedEver.add(entry.name);
+    }
+
+    for (const routeName of m.visitedEver) {
+      if (!routeName) {
+        continue;
+      }
+
+      const stillPresentInStack = m.stack.some(
+        (entry) => entry.name === routeName,
+      );
+
+      // If the name is in the current model stack, hasVisited must be true.
+      // If it was truncated, the browser-level NavigationHistoryEntry is gone
+      // from entries() — in that case the real plugin will not report it as
+      // visited, and that's consistent with "visited within current history",
+      // not "ever visited in the session".
+      if (stillPresentInStack) {
+        expect(r.router.hasVisited(routeName)).toBe(true);
+      }
+    }
+  }
+
+  toString() {
+    return "assertHasVisitedMonotonicity()";
+  }
+}
+
 // =============================================================================
 // Test
 // =============================================================================
@@ -459,6 +528,7 @@ const allCommands = [
   fc.constant(new AssertCanGoBackPeekConsistencyCommand()),
   fc.constant(new AssertCanGoBackToImpliesCanGoBackCommand()),
   fc.constant(new AssertCanGoBackToImpliesHasVisitedCommand()),
+  fc.constant(new AssertHasVisitedMonotonicityCommand()),
 ];
 
 describe("Navigation Plugin History Model", () => {

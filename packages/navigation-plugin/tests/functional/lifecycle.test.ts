@@ -272,8 +272,8 @@ describe("Navigation Plugin — Lifecycle", () => {
     it("supports navigate callback (Promise resolves with State)", async () => {
       const state = await router.navigate("users.list", {}, {});
 
-      expect(state).toBeDefined();
       expect(state.name).toBe("users.list");
+      expect(state.path).toBe("/users/list");
     });
   });
 
@@ -437,6 +437,18 @@ describe("Navigation Plugin — Lifecycle", () => {
       await router.navigate("users.list");
 
       expect(mockNav.currentUrl).not.toContain("#section");
+    });
+
+    it("G-1: preserves hash on initial navigation (fromState === undefined)", async () => {
+      // Start fresh so there is no previous state at all.
+      mockNav.navigate("http://localhost/home#section", { history: "replace" });
+
+      await router.start();
+
+      // After the first resolved navigation, the URL recorded by
+      // onTransitionSuccess must include the hash because `!fromState`
+      // short-circuits `shouldPreserveHash` to true.
+      expect(mockNav.currentUrl).toContain("#section");
     });
   });
 

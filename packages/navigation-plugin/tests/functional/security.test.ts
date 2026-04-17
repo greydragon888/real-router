@@ -1,5 +1,5 @@
 import { createRouter } from "@real-router/core";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { urlToPath } from "../../src/browser-env/index.js";
 import { navigationPluginFactory } from "../../src/factory";
@@ -70,7 +70,7 @@ describe("replaceHistoryState Validation", () => {
     }).toThrow('Cannot replace state: route "nonexistent.route" is not found');
   });
 
-  it("sets isSyncingFromRouter during replaceState", async () => {
+  it("replaceHistoryState does not re-enter the router via the navigate-event loop", async () => {
     const mock = new MockNavigation("http://localhost/home");
     const browser = createMockNavigationBrowser(mock);
     const router = createRouter(routerConfig);
@@ -78,12 +78,19 @@ describe("replaceHistoryState Validation", () => {
     router.usePlugin(navigationPluginFactory({ base: "" }, browser));
     await router.start("/home");
 
+    const navigateSpy = vi.spyOn(router, "navigate");
     const stateBefore = withoutMeta(router.getState()!);
 
     router.replaceHistoryState("users.list");
 
     await new Promise((resolve) => setTimeout(resolve, 10));
 
+    // The router state must be unchanged — replaceHistoryState only rewrites
+    // browser history. If `isSyncingFromRouter` were not set during the
+    // internal `browser.navigate({ history: "replace" })`, the navigate event
+    // would fire, the handler would re-enter router.navigate, and the state
+    // would change.
+    expect(navigateSpy).not.toHaveBeenCalled();
     expect(withoutMeta(router.getState()!)).toStrictEqual(stateBefore);
   });
 });

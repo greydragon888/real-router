@@ -65,6 +65,77 @@ describe("Navigation Plugin — History Extensions", () => {
 
       expect(router.peekBack()).toBeUndefined();
     });
+
+    it("G-2: URL matching wins over entry.getState() when they disagree", () => {
+      router.stop();
+      unsubscribe?.();
+
+      // The stale state (say, the route was renamed since this entry was stored)
+      // declares a completely different name/path than the URL would match.
+      const staleState = {
+        name: "deleted.route",
+        params: {},
+        path: "/deleted/route",
+      };
+      const currentEntry = {
+        index: 1,
+        key: "k1",
+        url: "http://localhost/home",
+        getState: () => staleState,
+      };
+      const backEntry = {
+        index: 0,
+        key: "k0",
+        url: "http://localhost/users/list",
+        getState: () => staleState,
+      };
+
+      const staleBrowser: NavigationBrowser = {
+        ...browser,
+        currentEntry: currentEntry as unknown as NavigationHistoryEntry,
+        entries: () =>
+          [backEntry, currentEntry] as unknown as NavigationHistoryEntry[],
+      };
+
+      router = createRouter(routerConfig, { defaultRoute: "home" });
+      unsubscribe = router.usePlugin(navigationPluginFactory({}, staleBrowser));
+
+      // If `entry.getState()` were trusted, peekBack would return deleted.route
+      // (which no longer exists in the route tree). URL matching resolves to
+      // users.list — that's the invariant: URL wins.
+      const result = router.peekBack();
+
+      expect(result?.name).toBe("users.list");
+      expect(result?.name).not.toBe("deleted.route");
+    });
+
+    it("returns undefined when previous entry URL is malformed (safeParseUrl returns null)", () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      router.stop();
+      unsubscribe?.();
+
+      // eslint-disable-next-line sonarjs/no-clear-text-protocols -- test payload: plugin must tolerate http/ftp URLs without throwing
+      const currentEntry = { index: 1, key: "k1", url: "http://x/home" };
+      // eslint-disable-next-line sonarjs/no-clear-text-protocols -- test payload: malformed ftp URL triggers safeParseUrl null path
+      const malformedEntry = { index: 0, key: "k0", url: "ftp://x/bad" };
+
+      const malformedBrowser: NavigationBrowser = {
+        ...browser,
+        currentEntry: currentEntry as unknown as NavigationHistoryEntry,
+        entries: () =>
+          [malformedEntry, currentEntry] as unknown as NavigationHistoryEntry[],
+      };
+
+      router = createRouter(routerConfig, { defaultRoute: "home" });
+      unsubscribe = router.usePlugin(
+        navigationPluginFactory({}, malformedBrowser),
+      );
+
+      expect(router.peekBack()).toBeUndefined();
+
+      warnSpy.mockRestore();
+    });
   });
 
   describe("peekForward", () => {
@@ -316,6 +387,32 @@ describe("Navigation Plugin — History Extensions", () => {
       await expect(router.traverseToLast("users.list")).rejects.toThrow(
         "No matching route",
       );
+    });
+
+    it("throws when entry URL is a non-HTTP protocol (safeParseUrl returns null)", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      await router.start();
+      await router.navigate("users.list");
+      await router.navigate("home");
+
+      const entries = browser.entries();
+      const userListEntry = entries[1];
+      const entryWithBadProtocol = Object.assign(
+        Object.create(Object.getPrototypeOf(userListEntry)),
+        userListEntry,
+        { url: "ftp://example.com/evil" },
+      );
+
+      vi.spyOn(historyExtensions, "findLastEntryForRoute").mockReturnValue(
+        entryWithBadProtocol as NavigationHistoryEntry,
+      );
+
+      await expect(router.traverseToLast("users.list")).rejects.toThrow(
+        "No matching route",
+      );
+
+      warnSpy.mockRestore();
     });
   });
 

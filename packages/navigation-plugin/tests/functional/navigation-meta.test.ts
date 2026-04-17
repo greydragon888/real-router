@@ -227,7 +227,9 @@ describe("Navigation Plugin — NavigationMeta", () => {
         throw new Error("guard error");
       });
 
-      await expect(router.navigate("users.list")).rejects.toThrow();
+      await expect(router.navigate("users.list")).rejects.toMatchObject({
+        code: errorCodes.CANNOT_ACTIVATE,
+      });
     });
 
     it("capturedMeta cleared on transition cancel (superseding navigation)", async () => {
@@ -251,7 +253,16 @@ describe("Navigation Plugin — NavigationMeta", () => {
 
       expect(router.getState()!.name).toBe("home");
 
+      // The next navigation must see a freshly-derived `context.navigation`
+      // (not leaked from the cancelled users.list attempt).
       resolveGuard(true);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      await router.navigate("users.view", { id: "7" });
+
+      expect(router.getState()!.context.navigation).toMatchObject({
+        navigationType: "push",
+      });
     });
 
     it("pendingTraverseKey cleared on cancel/error", async () => {

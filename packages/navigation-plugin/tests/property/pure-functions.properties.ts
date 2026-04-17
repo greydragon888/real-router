@@ -92,15 +92,6 @@ describe("deriveNavigationType Properties", () => {
   )(
     "always returns a valid navigation type (closure)",
     (opts, toState, fromState) => {
-      // Known bug #447: shouldReplaceHistory throws when replace=false, fromState=undefined, reload=true
-      fc.pre(
-        !(
-          opts.replace === false &&
-          fromState === undefined &&
-          opts.reload === true
-        ),
-      );
-
       const result = deriveNavigationType(opts, toState, fromState);
 
       expect(["reload", "replace", "push"]).toContain(result);
@@ -115,15 +106,6 @@ describe("shouldReplaceHistory Properties (cross-partition)", () => {
   )(
     "never throws for any valid input combination",
     (opts, toState, fromState) => {
-      // Known bug #447: shouldReplaceHistory throws when replace=false, fromState=undefined, reload=true
-      fc.pre(
-        !(
-          opts.replace === false &&
-          fromState === undefined &&
-          opts.reload === true
-        ),
-      );
-
       expect(() =>
         shouldReplaceHistory(opts, toState, fromState),
       ).not.toThrow();
@@ -134,15 +116,6 @@ describe("shouldReplaceHistory Properties (cross-partition)", () => {
     [arbNavOptions, arbState, fc.option(arbState, { nil: undefined })],
     { numRuns: NUM_RUNS.standard },
   )("always returns boolean", (opts, toState, fromState) => {
-    // Known bug #447: shouldReplaceHistory throws when replace=false, fromState=undefined, reload=true
-    fc.pre(
-      !(
-        opts.replace === false &&
-        fromState === undefined &&
-        opts.reload === true
-      ),
-    );
-
     const result = shouldReplaceHistory(opts, toState, fromState);
 
     expect(typeof result).toBe("boolean");
