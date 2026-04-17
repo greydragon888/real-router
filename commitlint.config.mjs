@@ -40,6 +40,7 @@ export const SCOPES = [
   "solid",
   "vue",
   "svelte",
+  "angular",
   "rx",
   "event-emitter",
   "route-utils",
