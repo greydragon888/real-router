@@ -1,5 +1,33 @@
 # @real-router/preact
 
+## 0.4.0
+
+### Minor Changes
+
+- [#468](https://github.com/greydragon888/real-router/pull/468) [`5dddc5c`](https://github.com/greydragon888/real-router/commit/5dddc5c364efa265124c217c60a04b860f8d716b) Thanks [@greydragon888](https://github.com/greydragon888)! - Replace JSON-based deep equality with `shallowEqual` in Link memo comparator ([#462](https://github.com/greydragon888/real-router/issues/462))
+
+  `Link`'s `areLinkPropsEqual` previously called `JSON.stringify` on `routeParams` and `routeOptions` twice per comparator invocation. Replaced with `shallowEqual` (Object.is per key, order-insensitive) — ~20× speed-up on the comparator hot path.
+  - `shallowEqual` exported from `@real-router/preact` dom-utils barrel (via `shared/dom-utils/link-utils.ts`)
+  - `Link.tsx` additionally drops `useStableValue` for `routeParams`/`routeOptions` — the memo bail-out already catches stable references, so the extra serialization per render was redundant
+  - Correctness improvements:
+    - `{id: 1n}` vs `{id: 1n}` now correctly treated as equal (`Object.is` handles BigInt)
+    - `{a: undefined}` vs `{}` now correctly treated as NOT equal
+    - Circular references and Symbol keys no longer trigger fallback paths
+  - Trade-off: nested objects/arrays in `routeParams` with equal content but different references now trigger a re-render. Stabilize via `useMemo` if needed — standard Preact pattern. In practice `routeParams` is almost always a flat `Record<string, primitive>`.
+
+  No public API change; gotcha documentation in `CLAUDE.md` updated.
+
+- [#468](https://github.com/greydragon888/real-router/pull/468) [`5dddc5c`](https://github.com/greydragon888/real-router/commit/5dddc5c364efa265124c217c60a04b860f8d716b) Thanks [@greydragon888](https://github.com/greydragon888)! - Audit-driven hardening of @real-router/preact ([#462](https://github.com/greydragon888/real-router/issues/462))
+  - **Hot path:** `useSyncExternalStore` now bails out on referentially-stable snapshots via `Object.is` inside the setter — prevents redundant re-renders when the upstream source emits the same snapshot (idempotent navigations, out-of-node updates)
+  - **`<RouteView>`:** memoize the flattened `Match`/`NotFound` element list on `children` identity. Steady-state navigations skip the `collectElements` traversal; only re-traverse when the parent re-renders with a new `children` node
+  - **`<RouteView>`:** `isSegmentMatch` now early-returns `false` for empty-string `fullSegmentName` — prevents a literal route named `""` from matching against `activeStrict=false` prefix logic
+  - **`useStableValue`:** rewritten as a pure `useRef` pattern with order-insensitive recursive JSON serialization via `stableSerialize`. Gracefully falls back to identity (`Object.is`) comparison when serialization throws (BigInt, circular refs, Symbol, function). Previously threw on BigInt and treated key-order permutations as different values
+  - **Stress coverage:** new suites for factory reuse across router instances, `replaceHistoryState` during active transitions, route deletion mid-session, mount/unmount lifecycle, subscription fan-out, and transition-hook stress
+  - **Property tests:** shared `routeView.properties.ts` updated to exercise the real helpers; `link.properties.ts` uses the production `shouldNavigate`/`buildHref`/`buildActiveClassName` exports instead of inline replicas
+  - **Docs:** README / ARCHITECTURE / CLAUDE brought back in sync with source
+
+  No public API change.
+
 ## 0.3.1
 
 ### Patch Changes

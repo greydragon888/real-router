@@ -1,6 +1,6 @@
 {
   "name": "@real-router/vue",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "type": "commonjs",
   "description": "Vue 3 integration for Real-Router",
   "main": "./dist/cjs/index.js",
