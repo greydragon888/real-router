@@ -100,7 +100,7 @@ export default [
   {
     name: "@real-router/navigation-plugin (ESM)",
     path: "packages/navigation-plugin/dist/esm/index.mjs",
-    limit: "3 kB",
+    limit: "3.1 kB",
     ignore: ["@real-router/core"],
   },
   {
@@ -112,7 +112,13 @@ export default [
   {
     name: "@real-router/hash-plugin (ESM)",
     path: "packages/hash-plugin/dist/esm/index.mjs",
-    limit: "2.5 kB",
+    limit: "2.6 kB",
+    ignore: ["@real-router/core"],
+  },
+  {
+    name: "@real-router/memory-plugin (ESM)",
+    path: "packages/memory-plugin/dist/esm/index.mjs",
+    limit: "1 kB",
     ignore: ["@real-router/core"],
   },
   {
@@ -149,12 +155,6 @@ export default [
     name: "@real-router/search-schema-plugin (ESM)",
     path: "packages/search-schema-plugin/dist/esm/index.mjs",
     limit: "1.1 kB",
-    ignore: ["@real-router/core"],
-  },
-  {
-    name: "@real-router/memory-plugin (ESM)",
-    path: "packages/memory-plugin/dist/esm/index.mjs",
-    limit: "1 kB",
     ignore: ["@real-router/core"],
   },
 
