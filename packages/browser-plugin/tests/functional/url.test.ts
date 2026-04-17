@@ -410,15 +410,14 @@ describe("Browser Plugin — URL", () => {
       expect(url).toContain("test%26debug%3Dtrue");
     });
 
-    it("prevents double encoding", async () => {
-      // Test that already encoded characters don't get double-encoded
+    it("treats already-percent-encoded input as literal (double-encoding is by design)", async () => {
+      // route-node treats param values as literal strings — a `%` in the input gets encoded.
+      // If the caller needs the raw byte, they should pass the decoded value.
       const url = router.buildUrl("users.view", {
         id: "already%20encoded",
       });
 
-      // Should not become %2520 (double encoded)
-      expect(url).toContain("already%2520encoded"); // Actually, route-node WILL double-encode
-      // This is correct behavior - the input is treated as literal text
+      expect(url).toContain("already%2520encoded");
     });
 
     it("matches and decodes special characters correctly", async () => {
@@ -526,6 +525,26 @@ describe("Browser Plugin — URL", () => {
       const lastUrl = pushStateSpy.mock.calls.at(-1)?.[1];
 
       expect(lastUrl).not.toContain("#section");
+    });
+
+    it("preserves hash on replaceHistoryState", async () => {
+      await router.start("/home");
+
+      globalThis.history.replaceState(
+        globalThis.history.state,
+        "",
+        "/home#section",
+      );
+
+      const replaceStateSpy = vi.spyOn(mockedBrowser, "replaceState");
+
+      router.replaceHistoryState("users.view", { id: "7" });
+
+      expect(replaceStateSpy).toHaveBeenCalled();
+
+      const lastUrl = replaceStateSpy.mock.calls.at(-1)?.[1];
+
+      expect(lastUrl).toContain("#section");
     });
   });
 

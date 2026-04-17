@@ -239,4 +239,61 @@ describe("Browser Plugin URL Invariants", () => {
       },
     );
   });
+
+  describe("getRouteFromEvent (via popstate)", () => {
+    test.prop([arbLeafRoute], { numRuns: NUM_RUNS.fast })(
+      "popstate with isState-valid history.state restores the expected route",
+      async (name) => {
+        const router = createPluginRouter("");
+
+        try {
+          await router.start();
+
+          const validHistoryState = {
+            name,
+            params: {},
+            path: router.buildPath(name),
+          };
+
+          globalThis.dispatchEvent(
+            new PopStateEvent("popstate", { state: validHistoryState }),
+          );
+
+          await new Promise((resolve) => setTimeout(resolve, 0));
+
+          expect(router.getState()?.name).toBe(name);
+        } finally {
+          router.stop();
+        }
+      },
+    );
+
+    test.prop([arbIdParam], { numRuns: NUM_RUNS.fast })(
+      "popstate with parameterized history.state passes params through unchanged",
+      async (params) => {
+        const router = createPluginRouter("");
+
+        try {
+          await router.start();
+
+          const validHistoryState = {
+            name: PARAM_ROUTE_NAME,
+            params,
+            path: router.buildPath(PARAM_ROUTE_NAME, params),
+          };
+
+          globalThis.dispatchEvent(
+            new PopStateEvent("popstate", { state: validHistoryState }),
+          );
+
+          await new Promise((resolve) => setTimeout(resolve, 0));
+
+          expect(router.getState()?.name).toBe(PARAM_ROUTE_NAME);
+          expect(router.getState()?.params.id).toBe(params.id);
+        } finally {
+          router.stop();
+        }
+      },
+    );
+  });
 });

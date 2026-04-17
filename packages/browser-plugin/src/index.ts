@@ -1,6 +1,4 @@
-// packages/browser-plugin/modules/index.ts
 /* eslint-disable @typescript-eslint/method-signature-style -- method syntax required for declaration merging overload (property syntax causes TS2717) */
-// Public API exports for browser-plugin
 
 import type { Params, State } from "@real-router/core";
 
@@ -47,11 +45,7 @@ declare module "@real-router/core" {
      * Replaces current history state without triggering navigation.
      * Added by browser plugin.
      */
-    replaceHistoryState: (
-      name: string,
-      params?: Params,
-      title?: string,
-    ) => void;
+    replaceHistoryState: (name: string, params?: Params) => void;
 
     start(path?: string): Promise<State>;
   }

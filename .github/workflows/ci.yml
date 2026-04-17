@@ -103,14 +103,23 @@ jobs:
 
       # Full validation: type-check → lint → test → test:properties → test:stress
       # ^bundle for upstream packages runs bundle (tsdown) as a dependency.
-      # vitest receives --coverage via turbo passthrough.
+      #
+      # Coverage is enabled in `vitest.config.unit.mts` (coverage.enabled: true)
+      # and disabled in property/stress configs (coverage.enabled: false).
+      # Passing `-- --coverage` here overrides `enabled: false` for property/
+      # stress tasks, which then run with vitest's default reporter set (html,
+      # clover, json) — no lcov — and their `clean: true` default wipes the
+      # lcov.info that `test` produced a moment earlier. The resulting coverage/
+      # directory ends up without lcov.info, which in turn makes SonarCloud see
+      # 0% coverage on any new source lines in those packages. Don't add the
+      # `-- --coverage` passthrough back — each config controls its own
+      # coverage.enabled.
       - name: Test with coverage
         run: >-
           pnpm turbo run test test:properties test:stress
           --filter='...[${{ needs.check.outputs.turbo_base || 'origin/master' }}]'
           --filter='!./examples/**'
           --filter='!./benchmarks'
-          -- --coverage
 
       # Bundle affected packages (tsdown/rollup/svelte-package).
       # bundle:upstream → cache hit from test step (^bundle already executed).

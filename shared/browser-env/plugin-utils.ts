@@ -23,6 +23,7 @@ export function createReplaceHistoryState(
   router: Router,
   browser: Browser,
   buildUrl: (name: string, params?: Params) => string,
+  preserveHash = true,
 ): (name: string, params?: Params) => void {
   return (name: string, params: Params = {}) => {
     const state = api.buildState(name, params);
@@ -42,7 +43,10 @@ export function createReplaceHistoryState(
       },
     );
 
-    updateBrowserState(builtState, buildUrl(name, params), true, browser);
+    const hash = preserveHash ? browser.getHash() : "";
+    const url = buildUrl(name, params) + hash;
+
+    updateBrowserState(builtState, url, true, browser);
   };
 }
 

@@ -27,13 +27,15 @@ export function hashPluginFactory(
   const prefixRegex = createHashPrefixRegex(options.hashPrefix);
   const resolvedBrowser =
     browser ??
-    createSafeBrowser(
-      () =>
-        safelyEncodePath(
-          extractHashPath(globalThis.location.hash, prefixRegex),
-        ) + globalThis.location.search,
-      "hash-plugin",
-    );
+    createSafeBrowser(() => {
+      const hashPath = safelyEncodePath(
+        extractHashPath(globalThis.location.hash, prefixRegex),
+      );
+
+      return hashPath.includes("?")
+        ? hashPath
+        : hashPath + globalThis.location.search;
+    }, "hash-plugin");
 
   const transitionOptions = {
     forceDeactivate: options.forceDeactivate,

@@ -733,26 +733,29 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 **Postcondition:**
 - Always returns `boolean` (never throws)
 - `replace: true` → always `true`
-- `fromState === undefined` (initial navigation) → always `true` (regardless of replace/reload values)
+- `fromState === undefined` + `replace` nullish (undefined) → `true` (initial navigation replaces by default)
+- `fromState === undefined` + `replace: false` (explicit override) → `false` (user asks for push on first nav)
 - `reload && same path` → `true`
 
-**Why it matters:** Crash on specific input combinations (#447) — `replace: false` with `fromState: undefined` causes TypeError. The `??` operator treats `false` differently from `undefined`, bypassing the null guard.
+**Why it matters:** Guard must be total over the entire `(replace, reload, fromState)` domain. Regression #447 made `replace: false` + `fromState: undefined` throw; the `??` fix made it return `false`, which is the explicit user choice.
 
 ---
 
-### G5. normalizeBase Structural Guarantees
+### G5. normalizeBase Canonical Form
 **Category:** URL Handling  
 **Testable:** PBT-testable  
-**Description:** `normalizeBase(base)` for non-empty input must produce a string that starts with `/` and does not end with `/`.
+**Description:** `normalizeBase(base)` returns a canonical string: either empty, or starts with `/`, does not end with `/`, and contains no run of two or more consecutive `/` characters.
 
 **Precondition:**
-- `base` is a non-empty string
+- `base` is any string
 
 **Postcondition:**
-- `normalizeBase(base)` starts with `/`
-- `normalizeBase(base)` does not end with `/`
+- `normalizeBase(base)` is either `""` or starts with `/`
+- `normalizeBase(base)` does not end with `/` (unless result is `""`)
+- `normalizeBase(base)` does not match `/{2,}` anywhere in the string
+- `normalizeBase(normalizeBase(base)) === normalizeBase(base)` (idempotency)
 
-**Why it matters:** Downstream functions (`extractPath`, `buildUrl`) assume normalized base has a leading slash and no trailing slash. Violation causes double-slash URLs or incorrect path stripping.
+**Why it matters:** Downstream functions (`extractPath`, `buildUrl`) assume canonical base. Violation causes double-slash URLs (e.g. `buildUrl("/x", "//") → "///x"`) that can redirect `pushState` to a different origin.
 
 ---
 

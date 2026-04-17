@@ -253,28 +253,21 @@ describe("Browser Plugin — Security", () => {
     it("handles URLs with null bytes gracefully", async () => {
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
 
-      // URL with null byte (potential for bypassing filters)
-      const state = router.matchUrl("http://example.com/home\u0000.evil");
-
-      // URL API should handle or reject this
-      // Either it works (browser sanitizes) or returns undefined (rejected)
-      // Both outcomes are acceptable - no crash
-      expect(state === undefined || typeof state.name === "string").toBe(true);
+      // URL with null byte (potential for bypassing filters).
+      // URL API either sanitizes or rejects — neither should crash.
+      expect(() =>
+        router.matchUrl("http://example.com/home\u0000.evil"),
+      ).not.toThrow();
 
       consoleSpy.mockRestore();
     });
 
-    it("handles URL homograph attacks (Unicode lookalikes)", async () => {
+    it("handles URL homograph attacks (Unicode lookalikes) without throwing", async () => {
       // Using Cyrillic 'а' (U+0430) instead of Latin 'a' (U+0061)
-      // This is a real security concern for phishing
-      const state = router.matchUrl("https://exаmple.com/users/list");
-
-      // URL API handles homograph attacks correctly:
-      // - Either normalizes to punycode
-      // - Or treats as separate domain
-      // Either way, matchUrl should work or fail gracefully (no crash expected)
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      expect(state === undefined || state !== undefined).toBe(true); // Test that no crash occurred
+      // This is a real security concern for phishing — but matchUrl only needs to not throw.
+      expect(() =>
+        router.matchUrl("https://exаmple.com/users/list"),
+      ).not.toThrow();
     });
 
     it("prevents URL parameter injection via specially crafted URLs", async () => {
@@ -308,8 +301,10 @@ describe("Browser Plugin — Security", () => {
       // Should complete quickly (< 100ms) even with long URL
       expect(duration).toBeLessThan(100);
 
-      // Result: either a state object or undefined — both acceptable
-      expect(state === undefined || typeof state.name === "string").toBe(true);
+      // The dynamic segment is unconstrained, so the route matches.
+      expect(state).toBeDefined();
+      expect(state?.name).toBe("users.view");
+      expect(state?.params.id).toBe("a".repeat(10_000));
     });
   });
 

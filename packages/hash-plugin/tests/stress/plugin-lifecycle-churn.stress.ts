@@ -86,13 +86,15 @@ describe("Hash Plugin Lifecycle Churn", () => {
 
   it("HMR simulation: shared factory reused 20x with hash plugin", async () => {
     const prefixRegex = createHashPrefixRegex("");
-    const safeBrowser = createSafeBrowser(
-      () =>
-        safelyEncodePath(
-          extractHashPath(globalThis.location.hash, prefixRegex),
-        ) + globalThis.location.search,
-      "hash-plugin",
-    );
+    const safeBrowser = createSafeBrowser(() => {
+      const hashPath = safelyEncodePath(
+        extractHashPath(globalThis.location.hash, prefixRegex),
+      );
+
+      return hashPath.includes("?")
+        ? hashPath
+        : hashPath + globalThis.location.search;
+    }, "hash-plugin");
 
     const factory = hashPluginFactory({}, safeBrowser);
 

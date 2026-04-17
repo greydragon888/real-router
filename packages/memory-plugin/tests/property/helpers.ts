@@ -8,7 +8,7 @@ import type { Router, Route } from "@real-router/core";
 export const NUM_RUNS = {
   standard: 100,
   lifecycle: 50,
-  async: 30,
+  async: 100,
 } as const;
 
 const ROUTES: Route[] = [
@@ -24,16 +24,24 @@ export const arbRouteName: fc.Arbitrary<string> = fc.constantFrom(
   ...ROUTE_NAMES,
 );
 
+/**
+ * Arbitrary: route name + params. Generates a fresh `id` per run using
+ * `fc.chain`, so shrinking can explore the `id` space independently.
+ *
+ * Earlier versions called `fc.sample(...)` inside `.map()`, which baked a
+ * single `id` into the arbitrary at construction time — every run shared
+ * the same `id`, killing shrinker coverage.
+ */
 export const arbRouteWithParams: fc.Arbitrary<{
   name: string;
   params: Record<string, string>;
-}> = arbRouteName.map((name) => ({
-  name,
-  params:
-    name === "user"
-      ? { id: String(fc.sample(fc.integer({ min: 1, max: 100 }), 1)[0]) }
-      : {},
-}));
+}> = arbRouteName.chain((name) =>
+  name === "user"
+    ? fc
+        .integer({ min: 1, max: 100 })
+        .map((id) => ({ name, params: { id: String(id) } }))
+    : fc.constant({ name, params: {} as Record<string, string> }),
+);
 
 export type Action =
   | { type: "navigate"; name: string; params: Record<string, string> }
@@ -68,6 +76,7 @@ export const arbActionSequence: fc.Arbitrary<Action[]> = fc.array(arbAction, {
 
 export const arbMaxHistory: fc.Arbitrary<number> = fc.oneof(
   fc.constant(0),
+  fc.constant(1),
   fc.integer({ min: 2, max: 10 }),
 );
 

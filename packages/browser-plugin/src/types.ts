@@ -1,5 +1,3 @@
-// packages/browser-plugin/src/types.ts
-
 /**
  * Browser plugin configuration.
  */

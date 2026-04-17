@@ -1,3 +1,17 @@
+/**
+ * Shared Vitest configuration for the monorepo.
+ *
+ * Listed in `turbo.json#global.inputs`, so this file's hash participates
+ * in every task's cache key. Touch the cache-bust marker below to
+ * invalidate the remote turbo cache across all packages.
+ *
+ * Cache bust: 2026-04-18 — regenerate `lcov.info` for jsdom-environment
+ * packages (browser-plugin, hash-plugin, memory-plugin, navigation-plugin,
+ * browser-env, angular, preact, react, solid, svelte, vue) whose remote
+ * turbo cache entries lacked the LCOV reporter output, causing SonarCloud
+ * to report 0% coverage on new code in those packages (#470).
+ */
+
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";

@@ -56,7 +56,7 @@ The plugin extends the router instance with three methods via [`extendRouter()`]
 | -------------------------------------------- | -------------------- | ------------------------------------------------ |
 | `buildUrl(name, params?)`                    | `string`             | Build full URL with base path                    |
 | `matchUrl(url)`                              | `State \| undefined` | Parse URL to router state                        |
-| `replaceHistoryState(name, params?, title?)` | `void`               | Update browser URL without triggering navigation |
+| `replaceHistoryState(name, params?)`         | `void`               | Update browser URL without triggering navigation |
 
 ```typescript
 router.buildUrl("users", { id: "123" });

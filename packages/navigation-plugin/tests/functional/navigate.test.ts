@@ -103,14 +103,17 @@ describe("Navigation Plugin — Navigate", () => {
     it("skips events when router is not active", async () => {
       expect(router.getState()!.name).toBe("index");
 
+      const navigateSpy = vi.spyOn(router, "navigate");
+
       router.stop();
-      const stateAfterStop = router.getState();
 
       mockNav.navigate("http://localhost/users/list");
       await new Promise((resolve) => setTimeout(resolve, 0));
 
-      // Navigate event must not change state after stop()
-      expect(router.getState()).toBe(stateAfterStop);
+      // After stop(), the handler's early-return (router.isActive()=false)
+      // must prevent any re-entry into router.navigate — no matter what
+      // the downstream navigate event tries to do.
+      expect(navigateSpy).not.toHaveBeenCalled();
     });
 
     it("skips events when isSyncingFromRouter is true (no infinite loops)", async () => {
@@ -118,11 +121,11 @@ describe("Navigation Plugin — Navigate", () => {
 
       await router.navigate("users.list");
 
-      // router.navigate was called once by us.
-      // onTransitionSuccess fires browser.navigate → mock fires navigate event
-      // → handler sees isSyncingFromRouter=true → skips.
-      // So router.navigate is called exactly once.
+      // Exactly one user-initiated navigation — the navigate-event loop
+      // fired by onTransitionSuccess is short-circuited by isSyncingFromRouter=true,
+      // so router.navigate is not re-entered.
       expect(navigateSpy).toHaveBeenCalledTimes(1);
+      expect(navigateSpy.mock.calls[0][0]).toBe("users.list");
     });
   });
 
@@ -172,13 +175,16 @@ describe("Navigation Plugin — Navigate", () => {
     });
 
     it("no infinite loop: router → browser navigate → handler skipped (isSyncingFromRouter)", async () => {
+      const navigateSpy = vi.spyOn(router, "navigate");
       const subscribeSpy = vi.fn();
 
       router.subscribe(subscribeSpy);
 
       await router.navigate("users.list");
 
-      // Only one state change should have occurred (index → users.list)
+      // Exactly one user-initiated navigation AND one subscriber fire —
+      // the re-entrant navigate event from onTransitionSuccess must be gated.
+      expect(navigateSpy).toHaveBeenCalledTimes(1);
       expect(subscribeSpy).toHaveBeenCalledTimes(1);
       expect(router.getState()?.name).toBe("users.list");
     });
@@ -253,35 +259,88 @@ describe("Navigation Plugin — Navigate", () => {
 });
 
 describe("createNavigateHandler — direct", () => {
-  it("skips event when router is not active", () => {
-    const mockIntercept = vi.fn();
-    const handler = createNavigateHandler({
-      router: {
-        isActive: () => false,
-        navigate: vi.fn(),
-        navigateToNotFound: vi.fn(),
-        navigateToDefault: vi.fn(),
-      } as unknown as Router,
-      api: {
-        getOptions: () => ({ allowNotFound: true }),
-        matchPath: vi.fn(),
-      } as unknown as Parameters<typeof createNavigateHandler>[0]["api"],
-      browser: {} as NavigationBrowser,
-      isSyncingFromRouter: () => false,
-      setSyncing: vi.fn(),
-      setCapturedMeta: vi.fn(),
-      base: "",
-      transitionOptions: { source: "navigate", replace: true as const },
-    });
-
-    handler({
+  const makeEvent = (overrides: Partial<NavigateEvent> = {}): NavigateEvent =>
+    ({
       canIntercept: true,
-      destination: { url: "http://localhost/users" },
-      intercept: mockIntercept,
+      destination: {
+        url: "http://localhost/users",
+      } as NavigateEvent["destination"],
+      intercept: vi.fn(),
       signal: new AbortController().signal,
-    } as unknown as NavigateEvent);
+      navigationType: "push",
+      userInitiated: false,
+      sourceElement: null,
+      ...overrides,
+    }) as unknown as NavigateEvent;
 
-    expect(mockIntercept).not.toHaveBeenCalled();
+  const makeHandlerDeps = (
+    overrides?: Partial<Parameters<typeof createNavigateHandler>[0]>,
+  ): Parameters<typeof createNavigateHandler>[0] => ({
+    router: {
+      isActive: () => true,
+      navigate: vi.fn(),
+      navigateToNotFound: vi.fn(),
+      navigateToDefault: vi.fn(),
+    } as unknown as Router,
+    api: {
+      getOptions: () => ({ allowNotFound: true }),
+      matchPath: vi.fn(),
+    } as unknown as Parameters<typeof createNavigateHandler>[0]["api"],
+    browser: {} as NavigationBrowser,
+    isSyncingFromRouter: () => false,
+    setSyncing: vi.fn(),
+    setCapturedMeta: vi.fn(),
+    base: "",
+    transitionOptions: { source: "navigate", replace: true as const },
+    ...overrides,
+  });
+
+  it("skips event when router is not active", () => {
+    const setCapturedMeta = vi.fn();
+    const handler = createNavigateHandler(
+      makeHandlerDeps({
+        router: {
+          isActive: () => false,
+          navigate: vi.fn(),
+          navigateToNotFound: vi.fn(),
+          navigateToDefault: vi.fn(),
+        } as unknown as Router,
+        setCapturedMeta,
+      }),
+    );
+    const event = makeEvent();
+
+    handler(event);
+
+    expect(event.intercept).not.toHaveBeenCalled();
+    expect(setCapturedMeta).not.toHaveBeenCalled();
+  });
+
+  it("skips event when canIntercept is false", () => {
+    const setCapturedMeta = vi.fn();
+    const handler = createNavigateHandler(makeHandlerDeps({ setCapturedMeta }));
+    const event = makeEvent({ canIntercept: false });
+
+    handler(event);
+
+    expect(event.intercept).not.toHaveBeenCalled();
+    expect(setCapturedMeta).not.toHaveBeenCalled();
+  });
+
+  it("skips event when isSyncingFromRouter() returns true", () => {
+    const setCapturedMeta = vi.fn();
+    const handler = createNavigateHandler(
+      makeHandlerDeps({
+        isSyncingFromRouter: () => true,
+        setCapturedMeta,
+      }),
+    );
+    const event = makeEvent();
+
+    handler(event);
+
+    expect(event.intercept).not.toHaveBeenCalled();
+    expect(setCapturedMeta).not.toHaveBeenCalled();
   });
 });
 

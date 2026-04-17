@@ -8,7 +8,7 @@ import {
   buildUrl,
   urlToPath,
 } from "./browser-env/index.js";
-import { LOGGER_CONTEXT, source as POPSTATE_SOURCE } from "./constants";
+import { LOGGER_CONTEXT, POPSTATE_SOURCE } from "./constants";
 
 import type { Browser, SharedFactoryState } from "./browser-env/index.js";
 import type { BrowserContext, BrowserPluginOptions } from "./types";
@@ -21,9 +21,13 @@ import type {
 } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
 
+const FROZEN_POPSTATE: BrowserContext = Object.freeze({ source: "popstate" });
+const FROZEN_NAVIGATE: BrowserContext = Object.freeze({ source: "navigate" });
+
+/** @internal — instantiated by `browserPluginFactory`; not part of the public API. */
 export class BrowserPlugin {
-  readonly #router: Router;
   readonly #browser: Browser;
+  readonly #base: string;
   readonly #removeStartInterceptor: () => void;
   readonly #removeExtensions: () => void;
   readonly #claim: {
@@ -44,8 +48,8 @@ export class BrowserPlugin {
     },
     shared: SharedFactoryState,
   ) {
-    this.#router = router;
     this.#browser = browser;
+    this.#base = options.base;
     this.#claim = api.claimContextNamespace("browser");
 
     this.#removeStartInterceptor = createStartInterceptor(api, browser);
@@ -77,9 +81,8 @@ export class BrowserPlugin {
       browser,
       allowNotFound: api.getOptions().allowNotFound,
       transitionOptions,
-      loggerContext: "browser-plugin",
-      buildUrl: (name: string, params?: Params) =>
-        router.buildUrl(name, params),
+      loggerContext: LOGGER_CONTEXT,
+      buildUrl: pluginBuildUrl,
     });
 
     this.#lifecycle = createPopstateLifecycle({
@@ -109,14 +112,13 @@ export class BrowserPlugin {
           fromState,
         );
 
-        const url = this.#router.buildUrl(toState.name, toState.params);
+        const url = buildUrl(toState.path, this.#base);
 
         const shouldPreserveHash =
           !fromState || fromState.path === toState.path;
 
-        const finalUrl = shouldPreserveHash
-          ? url + this.#browser.getHash()
-          : url;
+        const hash = shouldPreserveHash ? this.#browser.getHash() : "";
+        const finalUrl = hash ? url + hash : url;
 
         updateBrowserState(toState, finalUrl, replaceHistory, this.#browser);
 
@@ -125,7 +127,7 @@ export class BrowserPlugin {
 
         this.#claim.write(
           toState,
-          Object.freeze({ source: isPopstate ? "popstate" : "navigate" }),
+          isPopstate ? FROZEN_POPSTATE : FROZEN_NAVIGATE,
         );
       },
     };

@@ -78,6 +78,41 @@ describe("Hash Plugin — Lifecycle & Configuration", async () => {
 
       testRouter.stop();
     });
+
+    it("default getLocation prefers inner hash query over outer search", async () => {
+      // Outer ?outer=1 must be ignored because the hash already has its own query.
+      globalThis.history.replaceState({}, "", "/?outer=1#/users/list?page=2");
+
+      const testRouter = createRouter(routerConfig, {
+        defaultRoute: "home",
+        queryParamsMode: "default",
+      });
+
+      testRouter.usePlugin(hashPluginFactory());
+      await testRouter.start();
+
+      expect(testRouter.getState()?.name).toBe("users.list");
+      expect(testRouter.getState()?.params).toStrictEqual({ page: 2 });
+
+      testRouter.stop();
+    });
+
+    it("rejects hashPrefix containing '/'", () => {
+      expect(() => hashPluginFactory({ hashPrefix: "/" })).toThrow(/slash/);
+      expect(() => hashPluginFactory({ hashPrefix: "!/" })).toThrow(/slash/);
+    });
+
+    it("rejects hashPrefix containing '#'", () => {
+      expect(() => hashPluginFactory({ hashPrefix: "#" })).toThrow(/'#'/);
+    });
+
+    it("rejects hashPrefix containing '?'", () => {
+      expect(() => hashPluginFactory({ hashPrefix: "?" })).toThrow(/'\?'/);
+    });
+
+    it("rejects hashPrefix with control characters", () => {
+      expect(() => hashPluginFactory({ hashPrefix: "!\n" })).toThrow(/control/);
+    });
   });
 
   describe("Start Interceptor", () => {
@@ -98,13 +133,14 @@ describe("Hash Plugin — Lifecycle & Configuration", async () => {
       expect(router.getState()?.name).toBe("users.list");
     });
 
-    it("router.start() navigates to default when hash is empty", async () => {
+    it("router.start() navigates to index route when hash is empty", async () => {
       globalThis.history.replaceState({}, "", "/");
       router.usePlugin(hashPluginFactory({}, mockedBrowser));
 
       await router.start();
 
-      expect(router.getState()).toBeDefined();
+      // routerConfig declares { name: "index", path: "/" } — empty hash resolves to "/".
+      expect(router.getState()?.name).toBe("index");
     });
   });
 
@@ -207,7 +243,7 @@ describe("Hash Plugin — Lifecycle & Configuration", async () => {
     });
 
     it("replaces history with correct state and URL", () => {
-      router.replaceHistoryState("users.view", { id: "123" }, "User View");
+      router.replaceHistoryState("users.view", { id: "123" });
 
       expect(currentHistoryState).toBeDefined();
       expect(withoutMeta(currentHistoryState!)).toStrictEqual({
@@ -242,6 +278,26 @@ describe("Hash Plugin — Lifecycle & Configuration", async () => {
         expect.objectContaining({ name: "home" }),
         "#/home",
       );
+    });
+
+    it("does NOT preserve old hash when replacing state (the hash IS the route)", () => {
+      // Hash IS the route in hash-plugin — preserveHash must be false,
+      // so old hash fragment must not be carried over into the new URL.
+      globalThis.history.replaceState({}, "", "/#/users/list");
+
+      const replaceStateSpy = vi.spyOn(mockedBrowser, "replaceState");
+
+      router.replaceHistoryState("home");
+
+      expect(replaceStateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "home" }),
+        "#/home",
+      );
+
+      const [, url] = replaceStateSpy.mock.calls[0];
+
+      expect(url).not.toContain("users/list");
+      expect(url.split("#")).toHaveLength(2);
     });
   });
 
@@ -317,6 +373,7 @@ describe("Hash Plugin — Lifecycle & Configuration", async () => {
       await router.start();
 
       expect(() => router.stop()).not.toThrow();
+      expect(router.isActive()).toBe(false);
     });
 
     it("teardown removes extensions and listener", async () => {
@@ -373,7 +430,9 @@ describe("Hash Plugin — Lifecycle & Configuration", async () => {
 
         await ssrRouter.start();
 
-        expect(ssrRouter.getState()).toBeDefined();
+        // SSR getLocation returns "" which resolves via core to the "/" path,
+        // matching the { name: "index", path: "/" } route in the fixture.
+        expect(ssrRouter.getState()?.name).toBe("index");
 
         await ssrRouter.navigate("users.list");
 

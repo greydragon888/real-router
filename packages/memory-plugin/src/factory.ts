@@ -8,14 +8,19 @@ import type { PluginFactory, Plugin, Router } from "@real-router/core";
 export function memoryPluginFactory(
   options: MemoryPluginOptions = {},
 ): PluginFactory {
-  if (
-    options.maxHistoryLength !== undefined &&
-    (typeof options.maxHistoryLength !== "number" ||
-      options.maxHistoryLength < 0)
-  ) {
-    throw new TypeError(
-      `[memory-plugin] Invalid maxHistoryLength: expected non-negative number, got ${String(options.maxHistoryLength)}.`,
-    );
+  if (options.maxHistoryLength !== undefined) {
+    const length = options.maxHistoryLength;
+
+    if (
+      typeof length !== "number" ||
+      !Number.isFinite(length) ||
+      !Number.isInteger(length) ||
+      length < 0
+    ) {
+      throw new TypeError(
+        `[memory-plugin] Invalid maxHistoryLength: expected non-negative integer, got ${String(length)}.`,
+      );
+    }
   }
 
   const frozenOptions: MemoryPluginOptions = Object.freeze({ ...options });

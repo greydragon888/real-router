@@ -37,7 +37,11 @@ export function hashUrlToPath(
 ): string | null {
   const parsedUrl = safeParseUrl(url, LOGGER_CONTEXT);
 
-  return parsedUrl
-    ? extractHashPath(parsedUrl.hash, prefixRegex) + parsedUrl.search
-    : null;
+  if (!parsedUrl) {
+    return null;
+  }
+
+  const hashPath = extractHashPath(parsedUrl.hash, prefixRegex);
+
+  return hashPath.includes("?") ? hashPath : hashPath + parsedUrl.search;
 }

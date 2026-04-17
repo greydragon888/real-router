@@ -46,6 +46,7 @@
   "scripts": {
     "test": "vitest",
     "test:properties": "vitest --config vitest.config.properties.mts --run",
+    "test:stress": "vitest --config vitest.config.stress.mts --run",
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
     "lint:package": "publint",

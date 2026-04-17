@@ -277,6 +277,7 @@ Added `release` type for release commits:
 `.github/workflows/ci.yml` — single workflow with a unified `Pipeline` job that replaces the former parallel Lint & Type Check + Test + Build jobs. Downstream jobs: Coverage (Codecov), SonarCloud, Bundle Size, Package Smoke Test. Gate job: "CI Result" (single required status check).
 
 Pipeline runs two turbo invocations in one VM:
+
 1. `turbo run test test:properties test:stress -- --coverage` — full validation (type-check → lint → test), vitest receives `--coverage` via turbo passthrough
 2. `turbo run bundle` — only tsdown/rollup/svelte-package, deps cached from step 1
 
@@ -342,16 +343,16 @@ All CI workflows migrated from `pnpm/action-setup@v4` to `pnpm/action-setup@v5` 
 
 ### Workflows
 
-| Workflow             | File                       | Purpose                                                                                |
-| -------------------- | -------------------------- | -------------------------------------------------------------------------------------- |
-| CI                   | `ci.yml`                   | Single Pipeline job on PRs: test + bundle, then smoke test, coverage, bundle size      |
-| Post-Merge Build     | `post-merge.yml`           | Build-only verification on master push                                                 |
-| Changesets           | `changesets.yml`           | Versioning and npm publish (triggered by Post-Merge Build success)                     |
-| Changeset Check      | `changeset-check.yml`      | Validate changesets on PRs (format, references)                                        |
-| CodeQL               | `codeql.yml`               | Security scanning + dependency audit                                                   |
-| Dependabot Automerge | `dependabot-automerge.yml` | Auto-merge patch/minor updates                                                         |
-| Danger               | `danger.yml`               | Automated PR review checks                                                             |
-| Examples             | `examples.yml`             | Scheduled e2e tests for example apps (Mon & Thu)                                       |
+| Workflow             | File                       | Purpose                                                                           |
+| -------------------- | -------------------------- | --------------------------------------------------------------------------------- |
+| CI                   | `ci.yml`                   | Single Pipeline job on PRs: test + bundle, then smoke test, coverage, bundle size |
+| Post-Merge Build     | `post-merge.yml`           | Build-only verification on master push                                            |
+| Changesets           | `changesets.yml`           | Versioning and npm publish (triggered by Post-Merge Build success)                |
+| Changeset Check      | `changeset-check.yml`      | Validate changesets on PRs (format, references)                                   |
+| CodeQL               | `codeql.yml`               | Security scanning + dependency audit                                              |
+| Dependabot Automerge | `dependabot-automerge.yml` | Auto-merge patch/minor updates                                                    |
+| Danger               | `danger.yml`               | Automated PR review checks                                                        |
+| Examples             | `examples.yml`             | Scheduled e2e tests for example apps (Mon & Thu)                                  |
 
 **Removed:** `build.yml`, `sonarcloud.yml`, `coverage.yml`, `size.yml`, `release.yml` (consolidated into `ci.yml` and `changesets.yml`)
 
@@ -2224,13 +2225,13 @@ const direction = route.context.navigation.direction;
 
 ### Migrated plugins
 
-| Plugin                     | Context namespace    | Data                                             |
-| -------------------------- | -------------------- | ------------------------------------------------ |
-| `navigation-plugin`        | `navigation`         | direction, sourceElement, userInitiated           |
-| `ssr-data-plugin`          | `ssr`                | loader data                                      |
-| `persistent-params-plugin` | `persistentParams`   | persistent params snapshot                        |
-| `browser-plugin`           | `browser`            | popstate/navigate source                         |
-| `memory-plugin`            | `memory`             | direction, historyIndex                          |
+| Plugin                     | Context namespace  | Data                                    |
+| -------------------------- | ------------------ | --------------------------------------- |
+| `navigation-plugin`        | `navigation`       | direction, sourceElement, userInitiated |
+| `ssr-data-plugin`          | `ssr`              | loader data                             |
+| `persistent-params-plugin` | `persistentParams` | persistent params snapshot              |
+| `browser-plugin`           | `browser`          | popstate/navigate source                |
+| `memory-plugin`            | `memory`           | direction, historyIndex                 |
 
 ### Not migrated
 

@@ -86,12 +86,25 @@ export const arbIdParam: fc.Arbitrary<{ id: string }> = fc.record({
  * These are the values that `normalizeBase()` would produce.
  * Used in P3/P4 (base inclusion and roundtrip) where we want a clean,
  * predictable base without testing normalization itself.
+ *
+ * Expanded beyond simple letters to include URL-safe punctuation
+ * (`.`, `-`, `_`, digits) and multi-segment paths — all of which
+ * appear in real-world deployments (`/app.v2`, `/my-app`, `/v2/api`).
  */
-export const arbNormalizedBase: fc.Arbitrary<string> = fc.constantFrom(
-  "",
-  "/app",
-  "/sub",
-  "/nested/base",
+export const arbNormalizedBase: fc.Arbitrary<string> = fc.oneof(
+  fc.constant(""),
+  fc.constantFrom(
+    "/app",
+    "/sub",
+    "/nested/base",
+    "/app.v2",
+    "/my-app",
+    "/v2",
+    "/api/v3",
+    "/a1/b2/c3",
+    "/under_score",
+    "/mixed-name.v1",
+  ),
 );
 
 /**

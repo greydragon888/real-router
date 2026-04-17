@@ -3,7 +3,7 @@ import { UNKNOWN_ROUTE } from "@real-router/core";
 import {
   shouldReplaceHistory,
   buildUrl,
-  extractPath,
+  extractPathFromAbsoluteUrl,
   urlToPath,
 } from "./browser-env/index.js";
 import { LOGGER_CONTEXT } from "./constants";
@@ -175,10 +175,13 @@ export class NavigationPlugin {
       throw new Error(`No matching route for entry URL "${entry.url}"`);
     }
 
-    const parsedUrl = new URL(entry.url);
-    const path =
-      extractPath(parsedUrl.pathname, this.#options.base) + parsedUrl.search;
-    const matchedState = this.#api.matchPath(path);
+    const path = extractPathFromAbsoluteUrl(
+      entry.url,
+      this.#options.base,
+      LOGGER_CONTEXT,
+    );
+
+    const matchedState = path ? this.#api.matchPath(path) : undefined;
 
     if (!matchedState) {
       throw new Error(`No matching route for entry URL "${entry.url}"`);
@@ -239,12 +242,11 @@ export class NavigationPlugin {
           this.#browser.traverseTo(this.#pendingTraverseKey);
           this.#pendingTraverseKey = undefined;
         } else {
-          const url = this.#router.buildUrl(toState.name, toState.params);
+          const url = buildUrl(toState.path, this.#options.base);
           const shouldPreserveHash =
             !fromState || fromState.path === toState.path;
-          const finalUrl = shouldPreserveHash
-            ? url + this.#browser.getHash()
-            : url;
+          const hash = shouldPreserveHash ? this.#browser.getHash() : "";
+          const finalUrl = hash ? url + hash : url;
           const historyState = {
             name: toState.name,
             params: toState.params,

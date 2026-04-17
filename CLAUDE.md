@@ -32,10 +32,10 @@ shared/
 
 ### Symlink Consumers
 
-| Shared path | Symlink alias in consumer | Consumer packages |
-|---|---|---|
-| `shared/browser-env/` | `src/browser-env` | `browser-plugin`, `hash-plugin`, `navigation-plugin` |
-| `shared/dom-utils/` | `src/dom-utils` | `preact`, `react`, `solid`, `svelte`, `vue` |
+| Shared path           | Symlink alias in consumer | Consumer packages                                    |
+| --------------------- | ------------------------- | ---------------------------------------------------- |
+| `shared/browser-env/` | `src/browser-env`         | `browser-plugin`, `hash-plugin`, `navigation-plugin` |
+| `shared/dom-utils/`   | `src/dom-utils`           | `preact`, `react`, `solid`, `svelte`, `vue`          |
 
 **Any edit to `shared/browser-env/utils.ts` or `shared/dom-utils/link-utils.ts` propagates instantly to every consumer via its symlink** — verify with `pnpm build` across all affected packages.
 
@@ -88,7 +88,7 @@ pnpm lint:unused        # Check for unused code (knip)
 
 - **Main workflow:** `changesets.yml` — publishing via npm OIDC Trusted Publishing
 - **Manual workflow:** `release.yml` — for emergency releases
-- Trusted Publisher configured for all @real-router/* packages with workflow `changesets.yml`
+- Trusted Publisher configured for all @real-router/\* packages with workflow `changesets.yml`
 - New packages must be published manually first (`npm publish`), then configure Trusted Publisher
 
 ## Versioning
@@ -106,6 +106,7 @@ pnpm lint:unused        # Check for unused code (knip)
 When creating a new `packages/*` package, complete every item:
 
 ### Scaffold
+
 - `package.json` — version **`0.0.1`** (changesets will bump to `0.1.0` on first release), `"type": "commonjs"`, dual ESM/CJS exports (`types` → `import` → `require`), `"bundle"` script (not `"build"` — turbo `build` task is an orchestrator with no own command)
 - `tsconfig.json` — extends `../../tsconfig.json`, include `src` and `tests`
 - `tsconfig.node.json` — extends `../../tsconfig.node.json`, include `*.mts` and root configs
@@ -114,11 +115,13 @@ When creating a new `packages/*` package, complete every item:
 - `eslint.config.mjs` — re-export `../../eslint.config.mjs`
 
 ### Documentation (mandatory for every package)
+
 - `CLAUDE.md` — Exports table, module structure diagram, gotchas section
 - `README.md` — Quick Start, API reference tables, code examples per feature
 - `ARCHITECTURE.md` — Source Structure diagram, key design decisions, data flow
 
 ### Tests
+
 - Functional tests (`tests/functional/`) — 100% coverage required
 - **Property-based tests** — evaluate whether the package has invariants that benefit from generative testing (pure functions, encode/decode symmetry, idempotent operations, ordering guarantees). If yes:
   - Create `vitest.config.properties.mts`, `tests/property/` directory
@@ -129,17 +132,20 @@ When creating a new `packages/*` package, complete every item:
   - Add `"test:stress"` script to `package.json`
 
 ### Changesets
+
 - Create changeset file(s) per [.changeset/README.md](.changeset/README.md) rules
 - One file per affected public package, `minor` bump for new packages (pre-1.0)
 - If the new package required core changes — separate changeset for core
 
 ### Monorepo integration
+
 - Run `pnpm install` to register workspace package
 - Update `CLAUDE.md` — package count (line 5), See Also link
 - Update `ARCHITECTURE.md` — Package Map tree, Public packages list, Mermaid diagram node + deps
 - Verify `pnpm build` passes (207+ tasks, 0 failures)
 
 ### Wiki (separate repo: `real-router.wiki/`)
+
 - Create dedicated page for the new package (API, examples, configuration)
 - Update `_Sidebar.md` — add link to the new page
 - Update existing pages affected by the new package (e.g., `Route.md` if new route config fields, `plugin-architecture.md` if new plugin pattern)
@@ -149,36 +155,42 @@ When creating a new `packages/*` package, complete every item:
 When adding packages or features, keep these root files in sync:
 
 ### ARCHITECTURE.md
+
 - Update **Package Map** directory tree, **Public packages** list, **Mermaid diagram** (add nodes + deps), and **Layer Rules** diagram
 - **Invariants** section documents constraints that break the system if violated — not features
 - Mermaid diagrams must remain valid (test rendering)
 
 ### IMPLEMENTATION_NOTES.md
+
 - **Problem → Solution → Why** format for every decision record
 - Include **Before/After** code examples where applicable
 - **Never delete** historical decisions — they explain "why it's this way"
 - New build strategies, tooling changes, and infrastructure decisions go here
 
 ### README.md
+
 - **Framework Integration** table must list all adapter packages
 - **Quick Start** shows core + one framework example only (keep concise)
 - Link to **wiki** for detailed docs — README is an overview, not a manual
 - Update "Framework-agnostic" feature bullet when adapters change
 
 ### CLAUDE.md (this file)
+
 - Keep **package count** on line 5 accurate
 - **See Also** must link to every package's CLAUDE.md
 - **Non-Obvious Conventions** — only things that are hard to guess from code alone
 
 ### Package-level docs (per adapter)
+
 - **ARCHITECTURE.md** — Source Structure diagram, key design decisions, data flow
 - **CLAUDE.md** — Exports table, composables/hooks table, gotchas
 - **README.md** — Quick Start, API tables, code examples per feature
 
 ### Wiki (separate repo: `real-router.wiki/`)
+
 - **Integration Guide** per framework (Preact/Solid/Vue/Svelte/Angular-Integration.md) — kept in sync with adapter features
 - **Per-API pages** (RouterProvider, Link, RouteView, useRouter, etc.) — include import alternatives for all frameworks
-- **_Sidebar.md** — links to all integration guides
+- **\_Sidebar.md** — links to all integration guides
 - Move features from **Planned Features** → implemented sections when shipped
 
 ## See Also

@@ -500,17 +500,22 @@ All history extensions in `history-extensions.ts` use `entryToState()` to conver
 ```typescript
 function entryToState(entry, api, base): State | undefined {
   if (!entry?.url) return undefined;
-  const pathname = new URL(entry.url).pathname;
-  const path = extractPath(pathname, base);
-  return api.matchPath(path) ?? undefined;
+  const path = extractPathFromAbsoluteUrl(entry.url, base, LOGGER_CONTEXT);
+  // Returns null for malformed URLs (non-HTTP protocol, parse error) —
+  // never throws, even if a mock emits garbage into `entry.url`.
+  return path ? api.matchPath(path) ?? undefined : undefined;
 }
 ```
+
+Search params are **preserved** — `extractPathFromAbsoluteUrl` returns `pathname + search`, which is needed for strict `queryParamsMode` matching (#449). An entry like `/users?filter=active` is matched against routes declaring `?filter`; entries with undeclared search params fail the match.
 
 **Why URL matching instead of `entry.getState()`?**
 
 - Entries before plugin init have no state
 - Entries after `router.replace(routes)` may have stale state
 - Entries from other SPAs on the same origin have foreign state
+
+**Why `safeParseUrl` instead of raw `new URL()`?** The Navigation API spec guarantees absolute URLs, but mocks, shims, and non-spec test harnesses can emit anything into `entry.url`. `safeParseUrl` rejects non-`http(s)` protocols and catches parse errors, so `entryToState` is total over any input.
 
 URL matching is always authoritative — it reflects the current route config.
 

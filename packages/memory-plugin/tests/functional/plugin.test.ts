@@ -60,6 +60,24 @@ describe("Memory plugin", () => {
       ).toThrow(TypeError);
     });
 
+    it("should throw TypeError for NaN maxHistoryLength", () => {
+      expect(() =>
+        memoryPluginFactory({ maxHistoryLength: Number.NaN }),
+      ).toThrow(TypeError);
+    });
+
+    it("should throw TypeError for Infinity maxHistoryLength", () => {
+      expect(() =>
+        memoryPluginFactory({ maxHistoryLength: Number.POSITIVE_INFINITY }),
+      ).toThrow(TypeError);
+    });
+
+    it("should throw TypeError for fractional maxHistoryLength", () => {
+      expect(() => memoryPluginFactory({ maxHistoryLength: 0.5 })).toThrow(
+        TypeError,
+      );
+    });
+
     it("should not limit history when maxHistoryLength is zero", async () => {
       router.usePlugin(memoryPluginFactory({ maxHistoryLength: 0 }));
       await router.start("/");
@@ -75,12 +93,16 @@ describe("Memory plugin", () => {
     router.usePlugin(memoryPluginFactory());
     await router.start("/");
 
-    expect(typeof router.back).toBe("function");
-    expect(typeof router.forward).toBe("function");
-    expect(typeof router.go).toBe("function");
-    expect(typeof router.canGoBack).toBe("function");
-    expect(typeof router.canGoForward).toBe("function");
-
+    // Smoke test via actual invocation — TS contract already guarantees types.
+    expect(() => {
+      router.back();
+    }).not.toThrow();
+    expect(() => {
+      router.forward();
+    }).not.toThrow();
+    expect(() => {
+      router.go(0);
+    }).not.toThrow();
     expect(router.canGoBack()).toBe(false);
     expect(router.canGoForward()).toBe(false);
   });
@@ -253,11 +275,9 @@ describe("Memory plugin", () => {
 
     await router.navigate("users");
 
-    try {
-      await router.navigate("settings");
-    } catch {
-      // Guard blocked navigation — expected
-    }
+    await expect(router.navigate("settings")).rejects.toMatchObject({
+      code: "CANNOT_ACTIVATE",
+    });
 
     expect(router.getState()?.name).toBe("users");
     expect(router.canGoForward()).toBe(false);
@@ -425,12 +445,49 @@ describe("Memory plugin", () => {
       await router.navigate("users");
 
       const stateBefore = router.getState();
+      const navigateSpy = vi.spyOn(router, "navigate");
 
       router.go(0);
 
       expect(router.getState()).toBe(stateBefore);
+      expect(navigateSpy).not.toHaveBeenCalled();
       expect(router.canGoBack()).toBe(true);
       expect(router.canGoForward()).toBe(false);
+    });
+
+    it.each([
+      ["NaN", Number.NaN],
+      ["Infinity", Number.POSITIVE_INFINITY],
+      ["-Infinity", Number.NEGATIVE_INFINITY],
+      ["0.5", 0.5],
+      ["-1.7", -1.7],
+    ])("should no-op for go(%s) without throwing", async (_label, delta) => {
+      router.usePlugin(memoryPluginFactory());
+      await router.start("/");
+
+      await router.navigate("users");
+
+      const stateBefore = router.getState();
+      const navigateSpy = vi.spyOn(router, "navigate");
+
+      expect(() => {
+        router.go(delta);
+      }).not.toThrow();
+
+      expect(router.getState()).toBe(stateBefore);
+      expect(navigateSpy).not.toHaveBeenCalled();
+    });
+
+    it("should be idempotent on repeated teardown", async () => {
+      const unsubscribe = router.usePlugin(memoryPluginFactory());
+
+      await router.start("/");
+      await router.navigate("users");
+
+      expect(() => {
+        unsubscribe();
+        unsubscribe();
+      }).not.toThrow();
     });
 
     it("should truncate forward history when navigating after back()", async () => {

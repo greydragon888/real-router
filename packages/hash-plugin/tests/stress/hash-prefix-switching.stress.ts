@@ -56,7 +56,7 @@ describe("Hash Prefix Switching Under Load", () => {
   });
 
   it("20 router instances with different prefixes: each produces correct URL format", async () => {
-    const prefixes = ["", "!", "~", ".", "/"];
+    const prefixes = ["", "!", "~", ".", "@"];
     let completed = 0;
 
     for (const prefix of prefixes) {

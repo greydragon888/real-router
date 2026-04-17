@@ -7,6 +7,8 @@ import {
   arbParamValue,
   arbUnsafeIdParam,
   arbBase,
+  arbRawBase,
+  arbStringParams,
   createHashRouter,
   NUM_RUNS,
 } from "./helpers";
@@ -359,6 +361,174 @@ describe("rejection: matchUrl returns undefined for unmatched hash path", () => 
       const state = router.matchUrl(url);
 
       expect(state).toBeUndefined();
+
+      router.stop();
+    },
+  );
+});
+
+// =============================================================================
+// Determinism: buildUrl is a pure function
+// =============================================================================
+
+describe("determinism: repeated buildUrl calls produce identical output", () => {
+  test.prop([arbBase, arbHashPrefix, arbSimpleRouteName], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "same (name, params) inputs produce same URL",
+    (base: string, hashPrefix: string, routeName: string) => {
+      const router = createHashRouter(hashPrefix, base);
+      const url1 = router.buildUrl(routeName, {});
+      const url2 = router.buildUrl(routeName, {});
+
+      expect(url1).toBe(url2);
+
+      router.stop();
+    },
+  );
+});
+
+// =============================================================================
+// Path suffix: buildUrl ends with buildPath
+// =============================================================================
+
+describe("path suffix: buildUrl always ends with buildPath", () => {
+  test.prop([arbBase, arbHashPrefix, arbSimpleRouteName, arbParamValue], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "buildUrl(name, params).endsWith(buildPath(name, params))",
+    (base: string, hashPrefix: string, routeName: string, idValue: string) => {
+      const router = createHashRouter(hashPrefix, base);
+      const params = routeName === "users.list" ? { id: idValue } : {};
+      const url = router.buildUrl(routeName, params);
+      const path = router.buildPath(routeName, params);
+
+      expect(url.endsWith(path)).toBe(true);
+
+      router.stop();
+    },
+  );
+});
+
+// =============================================================================
+// Leading-slash invariant: extractHashPath on well-formed hash always starts with '/'
+// =============================================================================
+
+describe("leading-slash invariant: extracted path starts with '/'", () => {
+  test.prop([arbHashPrefix, arbSimpleRouteName], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "extractHashPath on hash produced by buildUrl always starts with '/'",
+    (hashPrefix: string, routeName: string) => {
+      const regex = createHashPrefixRegex(hashPrefix);
+      const router = createHashRouter(hashPrefix);
+      const url = router.buildUrl(routeName, {});
+      // buildUrl is "${base}#${prefix}${path}" — with empty base here,
+      // the full URL starts with '#' so the hash is the URL itself.
+      const hash = url.slice(url.indexOf("#"));
+      const path = extractHashPath(hash, regex);
+
+      expect(path.startsWith("/")).toBe(true);
+
+      router.stop();
+    },
+  );
+});
+
+// =============================================================================
+// Injectivity: distinct route names yield distinct URLs
+// =============================================================================
+
+describe("injectivity: distinct routes produce distinct URLs", () => {
+  test.prop([arbBase, arbHashPrefix], { numRuns: NUM_RUNS.standard })(
+    "buildUrl('home') !== buildUrl('users.list')",
+    (base: string, hashPrefix: string) => {
+      const router = createHashRouter(hashPrefix, base);
+
+      expect(router.buildUrl("home", {})).not.toBe(
+        router.buildUrl("users.list", {}),
+      );
+
+      router.stop();
+    },
+  );
+});
+
+// =============================================================================
+// Arbitrary multi-key query params roundtrip
+// =============================================================================
+
+describe("multi-key query params survive matchUrl parsing", () => {
+  test.prop([arbHashPrefix, arbStringParams], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "arbitrary query dictionary is parsed correctly",
+    (hashPrefix: string, params: Record<string, string>) => {
+      const router = createHashRouter(hashPrefix);
+      const base = router.buildUrl("users.list", {});
+      const query = new URLSearchParams(params).toString();
+      const state = router.matchUrl(`https://example.com${base}?${query}`);
+
+      expect(state).toBeDefined();
+      expect(state!.name).toBe("users.list");
+
+      for (const [key, value] of Object.entries(params)) {
+        // queryParamsMode: "default" may coerce numeric strings to numbers.
+        const actual = state!.params[key];
+
+        expect(
+          actual === undefined ? "" : String(actual as string | number),
+        ).toBe(value);
+      }
+
+      router.stop();
+    },
+  );
+});
+
+// =============================================================================
+// Query collision: inner hash query takes precedence over outer search
+// =============================================================================
+
+describe("base normalization: non-canonical base survives roundtrip", () => {
+  test.prop([arbRawBase, arbHashPrefix, arbSimpleRouteName], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "non-normalized base (trailing slash, missing leading slash) works via matchUrl",
+    (base: string, hashPrefix: string, routeName: string) => {
+      const router = createHashRouter(hashPrefix, base);
+      const url = router.buildUrl(routeName, {});
+      const state = router.matchUrl(`https://example.com${url}`);
+
+      expect(state).toBeDefined();
+      expect(state!.name).toBe(routeName);
+
+      router.stop();
+    },
+  );
+});
+
+describe("query collision: inner hash query is source of truth", () => {
+  test.prop(
+    [
+      arbHashPrefix,
+      fc.constantFrom("1", "10", "42"),
+      fc.constantFrom("asc", "desc"),
+    ],
+    { numRuns: NUM_RUNS.standard },
+  )(
+    "outer ?... is ignored when hash has its own query",
+    (hashPrefix: string, page: string, sort: string) => {
+      const router = createHashRouter(hashPrefix);
+      const url = `https://example.com/?outer=1#${hashPrefix}/users/list?page=${page}&sort=${sort}`;
+      const state = router.matchUrl(url);
+
+      expect(state).toBeDefined();
+      expect(state!.name).toBe("users.list");
+      expect(state!.path).toBe("/users/list");
+      expect(String(state!.params.page as number)).toBe(page);
+      expect(state!.params.sort).toBe(sort);
+      expect(state!.params.outer).toBeUndefined();
 
       router.stop();
     },

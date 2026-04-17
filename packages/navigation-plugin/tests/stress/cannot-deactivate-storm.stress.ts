@@ -72,7 +72,13 @@ describe("N4 — Cannot Deactivate Storm", () => {
     await waitForTransitions();
 
     expect(router.getState()).toBeDefined();
+    // At least one navigate event reached the guard — MockNavigation may
+    // deduplicate identical consecutive events (same URL), but the counter
+    // must move. Upper bound is the event count.
     expect(counter).toBeGreaterThan(0);
+    expect(counter).toBeLessThanOrEqual(50);
+    // Router state must not have been corrupted by the storm.
+    expect(["home", "users.list"]).toContain(router.getState()?.name);
   });
 
   it("4.3 — 50 navigate events with TypeError: error recovery calls browser.navigate", async () => {

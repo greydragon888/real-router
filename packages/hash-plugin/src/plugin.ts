@@ -60,6 +60,7 @@ export class HashPlugin {
         router,
         browser,
         pluginBuildUrl,
+        false,
       ),
     });
 

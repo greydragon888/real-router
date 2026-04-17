@@ -18,7 +18,14 @@ export {
 
 export { getRouteFromEvent, updateBrowserState } from "./popstate-utils.js";
 
-export { createOptionsValidator } from "./validation.js";
+export {
+  createOptionsValidator,
+  safeBaseRule,
+  safeHashPrefixRule,
+  nonNegativeIntegerRule,
+} from "./validation.js";
+
+export type { OptionRule, OptionRules } from "./validation.js";
 
 export { createSafeBrowser } from "./safe-browser.js";
 
@@ -40,4 +47,9 @@ export {
 
 export { safeParseUrl } from "./url-parsing.js";
 
-export { extractPath, buildUrl, urlToPath } from "./url-utils.js";
+export {
+  extractPath,
+  buildUrl,
+  urlToPath,
+  extractPathFromAbsoluteUrl,
+} from "./url-utils.js";

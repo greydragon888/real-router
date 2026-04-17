@@ -54,13 +54,7 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
   const { allowNotFound } = api.getOptions();
 
   return function handleNavigateEvent(event: NavigateEvent): void {
-    if (!event.canIntercept) {
-      return;
-    }
-    if (isSyncingFromRouter()) {
-      return;
-    }
-    if (!router.isActive()) {
+    if (!event.canIntercept || isSyncingFromRouter() || !router.isActive()) {
       return;
     }
 
@@ -84,20 +78,25 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
       sourceElement: event.sourceElement ?? null,
     });
 
+    const withRecovery = async (run: () => Promise<unknown>): Promise<void> => {
+      try {
+        await run();
+      } catch (error) {
+        if (!(error instanceof RouterError)) {
+          recoverFromNavigateError(error, router, browser, setSyncing);
+        }
+      }
+    };
+
     if (matchedState) {
       event.intercept({
-        handler: async () => {
-          try {
-            await router.navigate(matchedState.name, matchedState.params, {
+        handler: () =>
+          withRecovery(() =>
+            router.navigate(matchedState.name, matchedState.params, {
               ...transitionOptions,
               signal: event.signal,
-            });
-          } catch (error) {
-            if (!(error instanceof RouterError)) {
-              recoverFromNavigateError(error, router, browser, setSyncing);
-            }
-          }
-        },
+            }),
+          ),
       });
     } else if (allowNotFound) {
       event.intercept({
@@ -107,15 +106,7 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
       });
     } else {
       event.intercept({
-        handler: async () => {
-          try {
-            await router.navigateToDefault();
-          } catch (error) {
-            if (!(error instanceof RouterError)) {
-              recoverFromNavigateError(error, router, browser, setSyncing);
-            }
-          }
-        },
+        handler: () => withRecovery(() => router.navigateToDefault()),
       });
     }
   };

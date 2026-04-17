@@ -1,4 +1,4 @@
-import { createOptionsValidator } from "./browser-env/index.js";
+import { createOptionsValidator, safeBaseRule } from "./browser-env/index.js";
 import { LOGGER_CONTEXT, defaultOptions } from "./constants";
 
 import type { BrowserPluginOptions } from "./types";
@@ -6,4 +6,5 @@ import type { BrowserPluginOptions } from "./types";
 export const validateOptions = createOptionsValidator<BrowserPluginOptions>(
   defaultOptions,
   LOGGER_CONTEXT,
+  { base: safeBaseRule },
 );
