@@ -23,10 +23,31 @@ describe("normalizeBase", () => {
     expect(normalizeBase("/app")).toBe("/app");
   });
 
-  it("handles consecutive slashes (only removes trailing slash)", () => {
-    // normalizeBase does not collapse interior slashes —
-    // it only ensures leading slash and removes one trailing slash
-    expect(normalizeBase("//app//")).toBe("//app/");
+  it("collapses consecutive slashes to one", () => {
+    expect(normalizeBase("//app//")).toBe("/app");
+  });
+
+  it("collapses interior runs of slashes", () => {
+    expect(normalizeBase("/a///b////c")).toBe("/a/b/c");
+  });
+
+  it("collapses a lone '/' to empty string", () => {
+    expect(normalizeBase("/")).toBe("");
+  });
+
+  it("collapses repeated slashes down to empty string", () => {
+    expect(normalizeBase("//")).toBe("");
+    expect(normalizeBase("///")).toBe("");
+  });
+
+  it("is idempotent", () => {
+    const cases = ["/app", "//app//", "app", "", "/", "//a//b//"];
+
+    for (const c of cases) {
+      const once = normalizeBase(c);
+
+      expect(normalizeBase(once)).toBe(once);
+    }
   });
 });
 

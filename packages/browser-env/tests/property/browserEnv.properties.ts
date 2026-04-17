@@ -25,6 +25,7 @@ import {
   getRouteFromEvent,
 } from "../../src/popstate-utils";
 import { safeParseUrl } from "../../src/url-parsing";
+import { buildUrl, extractPath, urlToPath } from "../../src/url-utils";
 
 import type { Params } from "@real-router/core";
 
@@ -74,6 +75,103 @@ describe("Browser-env Properties", () => {
     test("normalizeBase('') === ''", () => {
       expect(normalizeBase("")).toStrictEqual("");
     });
+  });
+
+  describe("normalizeBase — no multi-slash in result", () => {
+    test.prop([arbBasePath], { numRuns: NUM_RUNS.thorough })(
+      "result does not contain '/{2,}'",
+      (base: string) => {
+        const result = normalizeBase(base);
+
+        expect(result).not.toMatch(/\/{2,}/);
+      },
+    );
+
+    test.prop(
+      [
+        fc.oneof(
+          fc.constant("//"),
+          fc.constant("///"),
+          fc.constant("//app//sub//"),
+          fc.constant("/a///b////c"),
+        ),
+      ],
+      { numRuns: NUM_RUNS.fast },
+    )("handles hand-picked multi-slash inputs", (base: string) => {
+      const result = normalizeBase(base);
+
+      expect(result).not.toMatch(/\/{2,}/);
+    });
+  });
+
+  describe("extractPath — idempotency and leading slash guarantee", () => {
+    test.prop([fc.string({ maxLength: 30 }), arbBasePath], {
+      numRuns: NUM_RUNS.thorough,
+    })("result always starts with '/'", (pathname: string, rawBase: string) => {
+      const base = normalizeBase(rawBase);
+      const result = extractPath(pathname, base);
+
+      expect(result.startsWith("/")).toBe(true);
+    });
+
+    test.prop([fc.string({ maxLength: 30 }), arbBasePath], {
+      numRuns: NUM_RUNS.thorough,
+    })("extractPath is idempotent", (pathname: string, rawBase: string) => {
+      const base = normalizeBase(rawBase);
+      const once = extractPath(pathname, base);
+      const twice = extractPath(once, base);
+
+      expect(twice).toStrictEqual(once);
+    });
+  });
+
+  describe("buildUrl — no double slash with normalized base", () => {
+    test.prop([arbUrlPath, arbBasePath], { numRuns: NUM_RUNS.thorough })(
+      "buildUrl(path, normalizeBase(base)) never contains '//'",
+      (path: string, rawBase: string) => {
+        const base = normalizeBase(rawBase);
+        const url = buildUrl(path, base);
+
+        expect(url).not.toMatch(/\/{2,}/);
+      },
+    );
+
+    test.prop([arbUrlPath, arbBasePath], { numRuns: NUM_RUNS.standard })(
+      "length-additivity when path starts with '/'",
+      (path: string, rawBase: string) => {
+        const base = normalizeBase(rawBase);
+
+        expect(buildUrl(path, base)).toHaveLength(path.length + base.length);
+      },
+    );
+
+    test.prop([arbUrlPath, arbBasePath], { numRuns: NUM_RUNS.standard })(
+      "extractPath(buildUrl(path, base), base) === path",
+      (path: string, rawBase: string) => {
+        const base = normalizeBase(rawBase);
+        const url = buildUrl(path, base);
+
+        expect(extractPath(url, base)).toStrictEqual(path);
+      },
+    );
+  });
+
+  describe("urlToPath — total over valid HTTP URLs", () => {
+    const arbAbsoluteUrl = fc
+      .tuple(arbUrlPath, arbSearchString, arbHashString)
+      .map(
+        ([path, search, hash]) => `https://example.com${path}${search}${hash}`,
+      );
+
+    test.prop([arbAbsoluteUrl], { numRuns: NUM_RUNS.standard })(
+      "returns non-null string starting with '/'",
+      (url: string) => {
+        const result = urlToPath(url, "", "property-test");
+
+        expect(result).not.toBeNull();
+        expect(result?.startsWith("/")).toBe(true);
+      },
+    );
   });
 
   describe("safelyEncodePath — idempotency", () => {
