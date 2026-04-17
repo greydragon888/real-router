@@ -11,7 +11,7 @@ import type {
 } from "./components";
 import type { JSX } from "solid-js";
 
-function isSegmentMatch(
+export function isSegmentMatch(
   routeName: string,
   fullSegmentName: string,
   exact: boolean,
@@ -66,7 +66,7 @@ export function buildRenderList(
   elements: RouteViewMarker[],
   routeName: string,
   nodeName: string,
-): { rendered: JSX.Element[]; activeMatchFound: boolean } {
+): JSX.Element[] {
   let notFoundChildren: JSX.Element | null = null;
   let activeMatchFound = false;
   const rendered: JSX.Element[] = [];
@@ -77,23 +77,25 @@ export function buildRenderList(
       continue;
     }
 
+    if (activeMatchFound) {
+      continue;
+    }
+
     const { segment, exact, fallback } = child;
     const fullSegmentName = nodeName ? `${nodeName}.${segment}` : segment;
-    const isActive =
-      !activeMatchFound && isSegmentMatch(routeName, fullSegmentName, exact);
 
-    if (isActive) {
-      activeMatchFound = true;
-      const matchContent = child.children;
-      const content =
-        fallback === undefined ? (
-          matchContent
-        ) : (
-          <Suspense fallback={fallback}>{matchContent}</Suspense>
-        );
-
-      rendered.push(content);
+    if (!isSegmentMatch(routeName, fullSegmentName, exact)) {
+      continue;
     }
+
+    activeMatchFound = true;
+    rendered.push(
+      fallback === undefined ? (
+        child.children
+      ) : (
+        <Suspense fallback={fallback}>{child.children}</Suspense>
+      ),
+    );
   }
 
   if (
@@ -104,5 +106,5 @@ export function buildRenderList(
     rendered.push(notFoundChildren);
   }
 
-  return { rendered, activeMatchFound };
+  return rendered;
 }

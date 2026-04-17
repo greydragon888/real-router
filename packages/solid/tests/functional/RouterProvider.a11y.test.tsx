@@ -54,8 +54,8 @@ describe("RouterProvider — announceNavigation", () => {
     await router.navigate("about");
     await router.navigate("home");
 
-    expect(document.querySelector(ANNOUNCER_SEL)?.textContent).toContain(
-      "Navigated to",
+    expect(document.querySelector(ANNOUNCER_SEL)?.textContent).toMatch(
+      /^Navigated to\s+/,
     );
   });
 
@@ -85,5 +85,37 @@ describe("RouterProvider — announceNavigation", () => {
     unmount();
 
     expect(document.querySelector(ANNOUNCER_SEL)).toBeNull();
+  });
+
+  // Regression test for audit bug R1 (section 5.9): rapid navigations that
+  // arrive during the 100ms Safari-ready window previously were dropped
+  // silently. Phase 3 fix queues the latest pending text; when isReady flips,
+  // the queued announcement fires once.
+  it("rapid navigation before Safari-ready delay is announced via pending queue", async () => {
+    render(() => (
+      <RouterProvider router={router} announceNavigation>
+        <h1>Home</h1>
+      </RouterProvider>
+    ));
+
+    const announcer = document.querySelector(ANNOUNCER_SEL);
+
+    expect(announcer).not.toBeNull();
+
+    // Within the Safari-ready window (<100ms), navigate twice. Each navigation
+    // lands in the rAF handler with isReady=false and should overwrite the
+    // pending text, not flush it to the DOM yet.
+    vi.advanceTimersByTime(50);
+
+    await router.navigate("about");
+    await router.navigate("home");
+
+    // isReady is still false — announcer has not received any text yet.
+    expect(announcer?.textContent).toBe("");
+
+    // Advance past SAFARI_READY_DELAY (100ms). The pending queue fires once.
+    vi.advanceTimersByTime(100);
+
+    expect(announcer?.textContent).toContain("Navigated to");
   });
 });

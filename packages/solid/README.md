@@ -90,6 +90,17 @@ function UserProfile() {
 
 Signal-based hooks (`useRoute`, `useRouteNode`) remain available for simpler use cases.
 
+### Primitives
+
+Two low-level bridges convert `@real-router/sources` `RouterSource<T>` instances into Solid reactive primitives. Use them when you build custom hooks on top of `@real-router/sources`:
+
+| Primitive                | Returns            | Description                                                   |
+| ------------------------ | ------------------ | ------------------------------------------------------------- |
+| `createSignalFromSource` | `Accessor<T>`      | Bridges a source to a Solid signal. Calls `onCleanup`.        |
+| `createStoreFromSource`  | `T` (Solid store)  | Bridges a source to a Solid store via `createStore + reconcile`. |
+
+Both must be called inside a reactive owner (component body or `createRoot`).
+
 ```tsx
 // useRouteNode — updates only when "users.*" changes
 function UsersLayout() {

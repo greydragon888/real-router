@@ -2,11 +2,12 @@ import { createRouter, errorCodes } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
 import { render, screen, waitFor } from "@solidjs/testing-library";
 import { fireEvent } from "@testing-library/dom";
+import { createSignal } from "solid-js";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { Link, RouterErrorBoundary, RouterProvider } from "@real-router/solid";
 
-import type { Router, RouterError } from "@real-router/core";
+import type { Router, RouterError, State } from "@real-router/core";
 import type { JSX } from "solid-js";
 
 describe("RouterErrorBoundary", () => {
@@ -231,13 +232,13 @@ describe("RouterErrorBoundary", () => {
 
     const [error, toRoute, fromRoute] = onError.mock.calls[0] as [
       RouterError,
-      unknown,
-      unknown,
+      State | null,
+      State | null,
     ];
 
     expect(error.code).toBe(errorCodes.CANNOT_ACTIVATE);
-    expect(toRoute).not.toBeNull();
-    expect(fromRoute).not.toBeNull();
+    expect(toRoute?.name).toBe("dashboard");
+    expect(fromRoute?.name).toBe("home");
   });
 
   it("onError not called without error", () => {
@@ -256,6 +257,57 @@ describe("RouterErrorBoundary", () => {
     );
 
     expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("picks up onError reassignment after mount", async () => {
+    const lifecycle = getLifecycleApi(router);
+
+    lifecycle.addActivateGuard("dashboard", () => () => false);
+    lifecycle.addActivateGuard("settings", () => () => false);
+
+    const firstOnError = vi.fn();
+    const secondOnError = vi.fn();
+    const [handler, setHandler] = createSignal(firstOnError);
+
+    render(
+      () => (
+        <RouterErrorBoundary
+          fallback={(error) => <div data-testid="fallback">{error.code}</div>}
+          onError={handler()}
+        >
+          <div>App</div>
+        </RouterErrorBoundary>
+      ),
+      { wrapper },
+    );
+
+    await router.navigate("dashboard").catch(() => {});
+
+    await waitFor(() => {
+      expect(firstOnError).toHaveBeenCalled();
+    });
+
+    const firstOnErrorCallsBeforeSwap = firstOnError.mock.calls.length;
+
+    setHandler(() => secondOnError);
+
+    await router.navigate("settings").catch(() => {});
+
+    await waitFor(() => {
+      expect(secondOnError).toHaveBeenCalled();
+    });
+
+    // After reassignment, new navigation errors land on secondOnError — the
+    // latest one must be SAME_STATES-free and carry the CANNOT_ACTIVATE code
+    // for "settings".
+    const lastCall = secondOnError.mock.calls.at(-1);
+    const [error] = lastCall as [RouterError];
+
+    expect(error.code).toBe(errorCodes.CANNOT_ACTIVATE);
+
+    // firstOnError must NOT receive the post-swap navigation error. Its call
+    // count must not grow past what it had before the handler swap.
+    expect(firstOnError).toHaveBeenCalledTimes(firstOnErrorCallsBeforeSwap);
   });
 
   it("works with Link", async () => {

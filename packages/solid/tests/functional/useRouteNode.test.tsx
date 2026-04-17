@@ -108,7 +108,9 @@ describe("useRouteNode", () => {
   });
 
   it("should throw error if router instance was not passed to provider", () => {
-    expect(() => renderHook(() => useRouteNode(""))).toThrow();
+    expect(() => renderHook(() => useRouteNode(""))).toThrow(
+      "useRouter must be used within a RouterProvider",
+    );
   });
 
   describe("shouldUpdateNode behavior", () => {
@@ -330,6 +332,33 @@ describe("useRouteNode", () => {
         route: undefined,
         previousRoute: "users.edit",
       });
+    });
+
+    // Documents gotcha #5 "previousRoute is Global" from packages/solid/CLAUDE.md:
+    //   Navigation: users.list → items → users.view
+    //   useRouteNode("users")().previousRoute === items  (NOT users.list!)
+    // previousRoute tracks the last visited route globally, not the last
+    // route within the subscribed node's subtree.
+    it("previousRoute is global — reflects last visited route even across nodes", async () => {
+      const { result } = renderHook(() => useRouteNode("users"), {
+        wrapper: wrapper(router),
+      });
+
+      await router.start();
+
+      await router.navigate("users.list");
+
+      expect(result().route?.name).toBe("users.list");
+
+      await router.navigate("items");
+
+      expect(result().route).toBeUndefined();
+      expect(result().previousRoute?.name).toBe("users.list");
+
+      await router.navigate("users.view", { id: "42" });
+
+      expect(result().route?.name).toBe("users.view");
+      expect(result().previousRoute?.name).toBe("items");
     });
   });
 });

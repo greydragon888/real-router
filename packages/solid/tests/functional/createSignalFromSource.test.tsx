@@ -1,4 +1,5 @@
 import { renderHook } from "@solidjs/testing-library";
+import { createRoot } from "solid-js";
 import { describe, it, expect, vi } from "vitest";
 
 import { createSignalFromSource } from "@real-router/solid";
@@ -156,5 +157,56 @@ describe("createSignalFromSource", () => {
 
     // Second subscription receives updates
     expect(result2()).toBe(3);
+  });
+
+  // Documents gotcha #6 "createSignalFromSource Ownership" from
+  // packages/solid/CLAUDE.md:
+  //   createSignalFromSource calls onCleanup — it must be called inside a
+  //   reactive owner (component, createRoot, etc.). Don't call it at module
+  //   level.
+  // Without an owner, Solid's onCleanup logs a dev-mode warning because there
+  // is no scope that can dispose the subscription.
+  it("warns when called outside reactive owner — uses onCleanup", () => {
+    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { source } = createMockSource(0);
+
+    createSignalFromSource(source);
+
+    // Pin down the exact signal — this is Solid's onCleanup ownership warning.
+    expect(consoleWarn).toHaveBeenCalledTimes(1);
+    expect(consoleWarn).toHaveBeenCalledWith(
+      expect.stringContaining("cleanups created outside a `createRoot`"),
+    );
+
+    consoleWarn.mockRestore();
+  });
+
+  // Complements gotcha #6: the createRoot owner correctly disposes the
+  // subscription when dispose() is called, preventing leaks.
+  it("disposes subscription when createRoot owner is disposed", () => {
+    const { source, emit } = createMockSource(0);
+    const subscribeSpy = vi.spyOn(source, "subscribe");
+
+    let readValue: (() => number) | undefined;
+
+    const dispose = createRoot((disposeFn) => {
+      readValue = createSignalFromSource(source);
+
+      return disposeFn;
+    });
+
+    expect(subscribeSpy).toHaveBeenCalledTimes(1);
+    expect(readValue?.()).toBe(0);
+
+    emit(1);
+
+    expect(readValue?.()).toBe(1);
+
+    dispose();
+
+    emit(42);
+
+    // After dispose, the signal no longer receives updates — listener removed.
+    expect(readValue?.()).toBe(1);
   });
 });

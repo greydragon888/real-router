@@ -3,8 +3,7 @@
 /**
  * Property-based tests for isRouteActive from Solid RouterProvider.
  *
- * isRouteActive is NOT exported — we replicate the logic here.
- * The function checks if a route matches by exact name or ancestor prefix.
+ * Tests the production function directly via internal export.
  *
  * Invariants:
  * 1. Exact match: isRouteActive("users", "users") === true
@@ -18,20 +17,7 @@ import { fc, test } from "@fast-check/vitest";
 import { describe, expect } from "vitest";
 
 import { NUM_RUNS, arbSegmentName, arbDottedName } from "./helpers";
-
-// =============================================================================
-// Inline replica of isRouteActive (not exported from RouterProvider)
-// =============================================================================
-
-function isRouteActive(
-  linkRouteName: string,
-  currentRouteName: string,
-): boolean {
-  return (
-    currentRouteName === linkRouteName ||
-    currentRouteName.startsWith(`${linkRouteName}.`)
-  );
-}
+import { isRouteActive } from "../../src/RouterProvider";
 
 // =============================================================================
 // Tests

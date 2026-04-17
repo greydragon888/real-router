@@ -2,6 +2,7 @@ import { browserPluginFactory } from "@real-router/browser-plugin";
 import { createRouter } from "@real-router/core";
 import { getRoutesApi } from "@real-router/core/api";
 import { render, screen, waitFor } from "@solidjs/testing-library";
+import { onCleanup } from "solid-js";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import { RouteView, RouterProvider } from "@real-router/solid";
@@ -326,6 +327,50 @@ describe("RouteView", () => {
       expect(RouteView.Match.displayName).toBe("RouteView.Match");
       expect(RouteView.NotFound.displayName).toBe("RouteView.NotFound");
     });
+
+    // Audit section 5.2: markers are identified by local Symbol, not Symbol.for().
+    // An object forged with `Symbol.for("RouteView.Match")` must NOT pass
+    // collectElements' marker check.
+    it("rejects spoofed marker built via Symbol.for()", async () => {
+      await router.start("/users/list");
+
+      const spoofedMatch = {
+        $$type: Symbol.for("RouteView.Match"),
+        segment: "users",
+        exact: false,
+        fallback: undefined,
+        children: <div data-testid="spoofed">SPOOFED</div>,
+      };
+
+      const { container } = render(() => (
+        <RouterProvider router={router}>
+          <RouteView nodeName="">{spoofedMatch as unknown as null}</RouteView>
+        </RouterProvider>
+      ));
+
+      expect(screen.queryByTestId("spoofed")).not.toBeInTheDocument();
+      expect(container.innerHTML).toBe("");
+    });
+
+    it("rejects spoofed NotFound marker built via Symbol.for()", async () => {
+      await router.start("/definitely-not-a-route");
+
+      const spoofedNotFound = {
+        $$type: Symbol.for("RouteView.NotFound"),
+        children: <div data-testid="spoofed-nf">SPOOFED-NF</div>,
+      };
+
+      const { container } = render(() => (
+        <RouterProvider router={router}>
+          <RouteView nodeName="">
+            {spoofedNotFound as unknown as null}
+          </RouteView>
+        </RouterProvider>
+      ));
+
+      expect(screen.queryByTestId("spoofed-nf")).not.toBeInTheDocument();
+      expect(container.innerHTML).toBe("");
+    });
   });
 
   describe("State", () => {
@@ -374,6 +419,44 @@ describe("RouteView", () => {
       ));
 
       expect(container.innerHTML).toBe("");
+    });
+
+    // Edge case from audit section 5.3: collectElements recursively descends
+    // into arrays (e.g. produced by .map()). Arrays mixed with null entries
+    // are a common JSX pattern — verify both markers still participate.
+    it("collectElements handles nested array of markers from map() with conditional null", async () => {
+      await router.start("/");
+
+      const routeDefs: ({ segment: string; testId: string } | null)[] = [
+        { segment: "users", testId: "users" },
+        null,
+        { segment: "items", testId: "items" },
+        null,
+      ];
+
+      render(() => (
+        <RouterProvider router={router}>
+          <RouteView nodeName="">
+            {routeDefs.map((def) =>
+              def ? (
+                <RouteView.Match segment={def.segment}>
+                  <div data-testid={def.testId}>{def.segment}</div>
+                </RouteView.Match>
+              ) : null,
+            )}
+          </RouteView>
+        </RouterProvider>
+      ));
+
+      await router.navigate("users.list");
+
+      expect(screen.getByTestId("users")).toBeInTheDocument();
+      expect(screen.queryByTestId("items")).not.toBeInTheDocument();
+
+      await router.navigate("items");
+
+      expect(screen.getByTestId("items")).toBeInTheDocument();
+      expect(screen.queryByTestId("users")).not.toBeInTheDocument();
     });
   });
 
@@ -474,6 +557,57 @@ describe("RouteView", () => {
       expect(screen.getByTestId("level-3")).toBeInTheDocument();
 
       deepRouter.stop();
+    });
+  });
+
+  // Documents gotcha #9 "No keepAlive" from packages/solid/CLAUDE.md:
+  //   RouteView renders only the active match. On navigation, the previous
+  //   component disposes completely — state is lost.
+  describe("No keepAlive (gotcha #9)", () => {
+    it("disposes inactive match — onCleanup fires when navigating away", async () => {
+      await router.start("/users/list");
+
+      let userPageCleanupCount = 0;
+
+      function UsersPage() {
+        onCleanup(() => {
+          userPageCleanupCount++;
+        });
+
+        return <div data-testid="users">Users</div>;
+      }
+
+      render(() => (
+        <RouterProvider router={router}>
+          <RouteView nodeName="">
+            <RouteView.Match segment="users">
+              <UsersPage />
+            </RouteView.Match>
+            <RouteView.Match segment="items">
+              <div data-testid="items">Items</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>
+      ));
+
+      expect(screen.getByTestId("users")).toBeInTheDocument();
+      expect(userPageCleanupCount).toBe(0);
+
+      await router.navigate("items");
+
+      await waitFor(() => {
+        expect(screen.queryByTestId("users")).not.toBeInTheDocument();
+      });
+
+      expect(userPageCleanupCount).toBe(1);
+
+      await router.navigate("users.list");
+
+      await waitFor(() => {
+        expect(screen.getByTestId("users")).toBeInTheDocument();
+      });
+
+      expect(userPageCleanupCount).toBe(1);
     });
   });
 
