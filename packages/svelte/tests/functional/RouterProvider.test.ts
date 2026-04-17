@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/svelte";
 import { flushSync } from "svelte";
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import {
   createTestRouterWithADefaultRouter,
@@ -68,9 +68,19 @@ describe("RouterProvider component", () => {
   });
 
   it("should call unsubscribe on unmount", () => {
-    const unsubscribe = vi.fn();
+    const unsubscribeSpy = vi.fn();
+    const realSubscribe = router.subscribe.bind(router);
 
-    vi.spyOn(router, "subscribe").mockImplementation(() => unsubscribe);
+    // Wrap the real subscribe so the subscription stays functional, but the
+    // returned unsubscribe is observable.
+    vi.spyOn(router, "subscribe").mockImplementation((listener) => {
+      const realUnsub = realSubscribe(listener);
+
+      return () => {
+        unsubscribeSpy();
+        realUnsub();
+      };
+    });
 
     const { unmount } = renderWithRouter(router, RouterCapture, {
       onCapture: () => {},
@@ -80,17 +90,23 @@ describe("RouterProvider component", () => {
 
     unmount();
 
-    expect(unsubscribe).toHaveBeenCalledTimes(1);
+    expect(unsubscribeSpy).toHaveBeenCalledTimes(1);
   });
 
-  it("should not resubscribe on rerender with same router", () => {
-    vi.spyOn(router, "subscribe");
+  it("should not resubscribe on rerender with same router", async () => {
+    const subscribeSpy = vi.spyOn(router, "subscribe");
 
-    renderWithRouter(router, RouterCapture, {
+    const { rerender } = renderWithRouter(router, RouterCapture, {
       onCapture: () => {},
     });
 
-    expect(router.subscribe).toHaveBeenCalledTimes(1);
+    expect(subscribeSpy).toHaveBeenCalledTimes(1);
+
+    // Rerender with the same router prop — subscribe must not be called again.
+    await rerender({ onCapture: () => {} });
+    flushSync();
+
+    expect(subscribeSpy).toHaveBeenCalledTimes(1);
   });
 
   it("should provide previousRoute.current through real RouterProvider", async () => {

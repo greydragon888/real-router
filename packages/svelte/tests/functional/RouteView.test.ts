@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/svelte";
 import { flushSync } from "svelte";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
+import { getActiveSegment } from "../../src/components/RouteView.svelte";
 import { createTestRouterWithADefaultRouter } from "../helpers";
 import RouteViewBasicTest from "../helpers/RouteViewBasicTest.svelte";
 import RouteViewNestedTest from "../helpers/RouteViewNestedTest.svelte";
@@ -101,6 +102,64 @@ describe("RouteView", () => {
 
       expect(screen.queryByTestId("users-list")).toBeNull();
       expect(screen.queryByTestId("users-view")).toBeNull();
+    });
+  });
+
+  describe("getActiveSegment (pure helper)", () => {
+    it("returns the matching segment for a top-level node", () => {
+      expect(
+        getActiveSegment("users.list", "", { users: () => {}, home: () => {} }),
+      ).toBe("users");
+    });
+
+    it("returns the matching segment for a nested node", () => {
+      expect(
+        getActiveSegment("users.list", "users", {
+          list: () => {},
+          view: () => {},
+        }),
+      ).toBe("list");
+    });
+
+    it("returns empty string when no segment matches", () => {
+      expect(
+        getActiveSegment("about", "", { home: () => {}, users: () => {} }),
+      ).toBe("");
+    });
+
+    it("returns empty string for an empty routeName", () => {
+      expect(getActiveSegment("", "", { home: () => {} })).toBe("");
+    });
+
+    it("treats hyphens as part of the segment, not as boundaries", () => {
+      // "one-more-test" must NOT match snippet "one"
+      expect(getActiveSegment("one-more-test", "", { one: () => {} })).toBe("");
+    });
+
+    it("matches a segment that itself contains hyphens", () => {
+      expect(
+        getActiveSegment("users-extra.list", "users-extra", {
+          list: () => {},
+        }),
+      ).toBe("list");
+    });
+
+    it("is case-sensitive", () => {
+      expect(getActiveSegment("users.list", "", { Users: () => {} })).toBe("");
+    });
+
+    // Critical: a snippet named "notFound" must NEVER be picked as a regular
+    // segment match — it is reserved for the UNKNOWN_ROUTE fallback. Even if a
+    // route is literally named "notFound", the snippet must not be returned
+    // from getActiveSegment.
+    it("never returns 'notFound' even when the route name matches it exactly", () => {
+      expect(getActiveSegment("notFound", "", { notFound: () => {} })).toBe("");
+    });
+
+    it("never returns 'notFound' for a child route under a 'notFound' parent", () => {
+      expect(
+        getActiveSegment("notFound.detail", "", { notFound: () => {} }),
+      ).toBe("");
     });
   });
 });

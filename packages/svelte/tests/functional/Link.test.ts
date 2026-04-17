@@ -30,7 +30,6 @@ describe("Link component", () => {
 
     const link = document.querySelector("a")!;
 
-    expect(link).toBeInTheDocument();
     expect(link.getAttribute("href")).toBe("/test");
   });
 
@@ -175,10 +174,32 @@ describe("Link component", () => {
 
     const link = document.querySelector("a")!;
 
-    expect(link).toBeInTheDocument();
     expect(link.hasAttribute("href")).toBe(false);
     expect(consoleError).toHaveBeenCalledWith(
-      expect.stringContaining("@@nonexistent-route"),
+      expect.stringMatching(
+        /Route ".*@@nonexistent-route.*" is not defined\. The element will render without an href attribute\./,
+      ),
+    );
+
+    consoleError.mockRestore();
+  });
+
+  // Documents buildHref behavior when routeName is an empty string.
+  // router.buildPath("") throws in core, buildHref catches it and returns undefined
+  // while logging a console.error. Consumers that pass routeName="" should expect
+  // an anchor without href — this test locks the contract.
+  it("should render without href and log error for empty routeName", () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
+    renderWithRouter(router, Link, { routeName: "" });
+
+    const link = document.querySelector("a")!;
+
+    expect(link.hasAttribute("href")).toBe(false);
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining('Route ""'),
     );
 
     consoleError.mockRestore();

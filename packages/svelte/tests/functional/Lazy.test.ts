@@ -25,12 +25,11 @@ describe("Lazy component", () => {
   });
 
   it("should render fallback while loading", () => {
+    let resolveLoader!: (value: { default: Component }) => void;
     const loader: LazyLoader = vi.fn(
-      (): Promise<{ default: Component }> =>
-        new Promise((resolve) => {
-          setTimeout(() => {
-            resolve({ default: MockLoadedComponent });
-          }, 100);
+      () =>
+        new Promise<{ default: Component }>((resolve) => {
+          resolveLoader = resolve;
         }),
     );
 
@@ -44,6 +43,9 @@ describe("Lazy component", () => {
 
     expect(screen.getByTestId("fallback")).toBeInTheDocument();
     expect(screen.queryByTestId("loaded")).not.toBeInTheDocument();
+
+    // cleanup pending promise
+    resolveLoader({ default: MockLoadedComponent });
   });
 
   it("should render loaded component after loading completes", async () => {
@@ -59,11 +61,13 @@ describe("Lazy component", () => {
       },
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    flushSync();
+    await vi.waitFor(() => {
+      flushSync();
+
+      expect(screen.getByTestId("loaded")).toBeInTheDocument();
+    });
 
     expect(screen.queryByTestId("fallback")).not.toBeInTheDocument();
-    expect(screen.getByTestId("loaded")).toBeInTheDocument();
   });
 
   it("should handle loader errors gracefully", async () => {
@@ -78,11 +82,19 @@ describe("Lazy component", () => {
       },
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    flushSync();
+    await vi.waitFor(() => {
+      flushSync();
 
-    expect(screen.getByText(/Error loading component/)).toBeInTheDocument();
-    expect(screen.getByText(/Failed to load component/)).toBeInTheDocument();
+      // Exact rendered string from Lazy.svelte: "Error loading component: <message>".
+      // No regex — the full literal is asserted to catch formatting regressions.
+      expect(screen.getByText(/Error loading component: /)).toBeInTheDocument();
+    });
+
+    const errorLine = screen.getByText(/Error loading component: /);
+
+    expect(errorLine.textContent).toBe(
+      "Error loading component: Failed to load component",
+    );
   });
 
   it("should call loader function on mount", () => {
@@ -102,12 +114,11 @@ describe("Lazy component", () => {
   });
 
   it("should not render fallback if no fallback provided", () => {
+    let resolveLoader!: (value: { default: Component }) => void;
     const loader: LazyLoader = vi.fn(
-      (): Promise<{ default: Component }> =>
-        new Promise((resolve) => {
-          setTimeout(() => {
-            resolve({ default: MockLoadedComponent });
-          }, 100);
+      () =>
+        new Promise<{ default: Component }>((resolve) => {
+          resolveLoader = resolve;
         }),
     );
 
@@ -119,25 +130,8 @@ describe("Lazy component", () => {
     });
 
     expect(screen.queryByTestId("fallback")).not.toBeInTheDocument();
-  });
 
-  it("should render loaded component successfully", async () => {
-    const loader: LazyLoader = vi.fn(() =>
-      Promise.resolve({ default: MockLoadedComponent }),
-    );
-
-    render(LazyTest, {
-      props: {
-        router,
-        loader,
-        fallback: MockFallbackComponent,
-      },
-    });
-
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    flushSync();
-
-    expect(screen.getByTestId("loaded")).toBeInTheDocument();
+    resolveLoader({ default: MockLoadedComponent });
   });
 
   it("should discard stale loader result when loader prop changes", async () => {
@@ -164,15 +158,15 @@ describe("Lazy component", () => {
       fallback: MockFallbackComponent,
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    flushSync();
+    await vi.waitFor(() => {
+      flushSync();
 
-    // Second loader resolved → "loaded" shown
-    expect(screen.getByTestId("loaded")).toBeInTheDocument();
+      expect(screen.getByTestId("loaded")).toBeInTheDocument();
+    });
 
     // Now resolve the stale first loader — should be ignored
     resolveFirst({ default: MockFallbackComponent });
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await Promise.resolve();
     flushSync();
 
     // Still showing second loader's component, not first
@@ -204,7 +198,7 @@ describe("Lazy component", () => {
 
     // Now resolve the loader — the component should be discarded
     resolveLoader({ default: MockLoadedComponent });
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await Promise.resolve();
 
     // The loaded component should not appear in the DOM
     expect(screen.queryByTestId("loaded")).not.toBeInTheDocument();
@@ -234,14 +228,15 @@ describe("Lazy component", () => {
       fallback: MockFallbackComponent,
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    flushSync();
+    await vi.waitFor(() => {
+      flushSync();
 
-    expect(screen.getByTestId("loaded")).toBeInTheDocument();
+      expect(screen.getByTestId("loaded")).toBeInTheDocument();
+    });
 
     // Now reject the stale first loader — should be ignored
     rejectFirst(new Error("stale error"));
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await Promise.resolve();
     flushSync();
 
     // Still showing second loader's component, no error
@@ -249,5 +244,60 @@ describe("Lazy component", () => {
     expect(
       screen.queryByText(/Error loading component/),
     ).not.toBeInTheDocument();
+  });
+
+  it("should show error when loader resolves without a default export", async () => {
+    const loader = vi.fn(
+      () =>
+        // Bypass type check to simulate broken module shape
+        Promise.resolve({}) as Promise<{ default: Component }>,
+    );
+
+    render(LazyTest, {
+      props: {
+        router,
+        loader,
+        fallback: MockFallbackComponent,
+      },
+    });
+
+    await vi.waitFor(() => {
+      flushSync();
+
+      expect(
+        screen.getByText(/resolved without a `default` export/),
+      ).toBeInTheDocument();
+    });
+
+    const errorLine = screen.getByText(/resolved without a `default` export/);
+
+    // Exact message from Lazy.svelte — locks the contract. A slight change in
+    // copy (e.g. "without a default export") will no longer silently pass.
+    expect(errorLine.textContent).toBe(
+      "Error loading component: [real-router] Lazy loader resolved without a `default` export.",
+    );
+
+    expect(screen.queryByTestId("loaded")).not.toBeInTheDocument();
+  });
+
+  it("should wrap non-Error rejections into Error instances", async () => {
+    const loader = vi.fn(() =>
+      // Reject with a plain string — exercises `err instanceof Error ? … : new Error(String(err))`
+      Promise.reject("string failure"),
+    );
+
+    render(LazyTest, {
+      props: {
+        router,
+        loader,
+        fallback: MockFallbackComponent,
+      },
+    });
+
+    await vi.waitFor(() => {
+      flushSync();
+
+      expect(screen.getByText(/string failure/)).toBeInTheDocument();
+    });
   });
 });

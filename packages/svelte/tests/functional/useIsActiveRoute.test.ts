@@ -23,12 +23,12 @@ describe("useIsActiveRoute", () => {
   });
 
   it("should check if route is active", () => {
-    let result: any;
+    let result!: { readonly current: boolean };
 
     renderWithRouter(router, ActiveRouteCapture, {
       routeName: "users.view",
       routeParams: { id: "123" },
-      onCapture: (r: unknown) => {
+      onCapture: (r: { readonly current: boolean }) => {
         result = r;
       },
     });
@@ -37,13 +37,13 @@ describe("useIsActiveRoute", () => {
   });
 
   it("should handle non-strict mode", () => {
-    let result: any;
+    let result!: { readonly current: boolean };
 
     renderWithRouter(router, ActiveRouteCapture, {
       routeName: "users",
       routeParams: {},
       strict: false,
-      onCapture: (r: unknown) => {
+      onCapture: (r: { readonly current: boolean }) => {
         result = r;
       },
     });
@@ -52,13 +52,13 @@ describe("useIsActiveRoute", () => {
   });
 
   it("should handle strict mode", () => {
-    let result: any;
+    let result!: { readonly current: boolean };
 
     renderWithRouter(router, ActiveRouteCapture, {
       routeName: "users",
       routeParams: {},
       strict: true,
-      onCapture: (r: unknown) => {
+      onCapture: (r: { readonly current: boolean }) => {
         result = r;
       },
     });
@@ -67,12 +67,12 @@ describe("useIsActiveRoute", () => {
   });
 
   it("should update when route changes", async () => {
-    let result: any;
+    let result!: { readonly current: boolean };
 
     renderWithRouter(router, ActiveRouteCapture, {
       routeName: "users.view",
       routeParams: { id: "123" },
-      onCapture: (r: unknown) => {
+      onCapture: (r: { readonly current: boolean }) => {
         result = r;
       },
     });
@@ -89,12 +89,12 @@ describe("useIsActiveRoute", () => {
     router.stop();
     await router.start("/users/list");
 
-    let result: any;
+    let result!: { readonly current: boolean };
 
     renderWithRouter(router, ActiveRouteCapture, {
       routeName: "users.list",
       routeParams: {},
-      onCapture: (r: unknown) => {
+      onCapture: (r: { readonly current: boolean }) => {
         result = r;
       },
     });
@@ -107,14 +107,14 @@ describe("useIsActiveRoute", () => {
     await router.navigate("items.item", { id: "6", page: "1" });
     flushSync();
 
-    let result: any;
+    let result!: { readonly current: boolean };
 
     renderWithRouter(router, ActiveRouteCapture, {
       routeName: "items.item",
       routeParams: { id: "6", page: "1" },
       strict: true,
       ignoreQueryParams: false,
-      onCapture: (r: unknown) => {
+      onCapture: (r: { readonly current: boolean }) => {
         result = r;
       },
     });
@@ -135,13 +135,13 @@ describe("useIsActiveRoute", () => {
     await router.navigate("items.item", { id: "6", page: "1" });
     flushSync();
 
-    let result: any;
+    let result!: { readonly current: boolean };
 
     renderWithRouter(router, ActiveRouteCapture, {
       routeName: "items.item",
       routeParams: { id: "6" },
       ignoreQueryParams: true,
-      onCapture: (r: unknown) => {
+      onCapture: (r: { readonly current: boolean }) => {
         result = r;
       },
     });
@@ -174,26 +174,26 @@ describe("useIsActiveRoute", () => {
     await router.navigate("settings.profile.edit");
     flushSync();
 
-    let nonStrictResult: any;
+    let nonStrictResult!: { readonly current: boolean };
 
     renderWithRouter(router, ActiveRouteCapture, {
       routeName: "settings",
       routeParams: {},
       strict: false,
-      onCapture: (r: unknown) => {
+      onCapture: (r: { readonly current: boolean }) => {
         nonStrictResult = r;
       },
     });
 
     expect(nonStrictResult.current).toBe(true);
 
-    let strictResult: any;
+    let strictResult!: { readonly current: boolean };
 
     renderWithRouter(router, ActiveRouteCapture, {
       routeName: "settings",
       routeParams: {},
       strict: true,
-      onCapture: (r: unknown) => {
+      onCapture: (r: { readonly current: boolean }) => {
         strictResult = r;
       },
     });

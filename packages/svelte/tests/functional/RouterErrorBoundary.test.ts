@@ -13,6 +13,11 @@ import ErrorBoundaryWithOnError from "../helpers/ErrorBoundaryWithOnError.svelte
 import ErrorCapture from "../helpers/ErrorCapture.svelte";
 
 import type { Router, RouterError, State } from "@real-router/core";
+import type { RouterErrorSnapshot } from "@real-router/sources";
+
+interface ErrorState {
+  readonly current: RouterErrorSnapshot;
+}
 
 describe("RouterErrorBoundary", () => {
   let router: Router;
@@ -32,11 +37,11 @@ describe("RouterErrorBoundary", () => {
 
   describe("useRouterError", () => {
     it("error === null initially", () => {
-      let result: any;
+      let result!: ErrorState;
 
       renderWithRouter(router, ErrorCapture, {
         onCapture: (r: unknown) => {
-          result = r;
+          result = r as ErrorState;
         },
       });
 
@@ -49,19 +54,21 @@ describe("RouterErrorBoundary", () => {
 
       lifecycle.addActivateGuard("dashboard", () => () => false);
 
-      let result: any;
+      let result!: ErrorState;
 
       renderWithRouter(router, ErrorCapture, {
         onCapture: (r: unknown) => {
-          result = r;
+          result = r as ErrorState;
         },
       });
 
       await router.navigate("dashboard").catch(() => {});
       flushSync();
 
-      expect(result.current.error).not.toBeNull();
-      expect(result.current.error.code).toBe(errorCodes.CANNOT_ACTIVATE);
+      const err = result.current.error;
+
+      expect(err).not.toBeNull();
+      expect(err!.code).toBe(errorCodes.CANNOT_ACTIVATE);
       expect(result.current.version).toBe(1);
     });
 
@@ -70,11 +77,11 @@ describe("RouterErrorBoundary", () => {
 
       lifecycle.addActivateGuard("dashboard", () => () => false);
 
-      let result: any;
+      let result!: ErrorState;
 
       renderWithRouter(router, ErrorCapture, {
         onCapture: (r: unknown) => {
-          result = r;
+          result = r as ErrorState;
         },
       });
 
@@ -264,6 +271,43 @@ describe("RouterErrorBoundary", () => {
 
       expect(onError).not.toHaveBeenCalled();
     });
+
+    // Documents the contract: a throwing onError must NOT bubble out and break
+    // the boundary or surrounding reactivity. The error from onError is logged
+    // and the fallback still renders.
+    it("does not propagate when onError throws — fallback still shown and console.error invoked", async () => {
+      const lifecycle = getLifecycleApi(router);
+
+      lifecycle.addActivateGuard("dashboard", () => () => false);
+
+      const onError = vi.fn(() => {
+        throw new Error("kaboom in onError");
+      });
+
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
+      expect(() => {
+        render(ErrorBoundaryWithOnError, { props: { router, onError } });
+      }).not.toThrow();
+
+      await router.navigate("dashboard").catch(() => {});
+      flushSync();
+
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId("fallback")).toHaveTextContent(
+        errorCodes.CANNOT_ACTIVATE,
+      );
+      expect(consoleError).toHaveBeenCalledWith(
+        expect.stringContaining("RouterErrorBoundary onError handler threw"),
+        expect.objectContaining({
+          message: "kaboom in onError",
+        }),
+      );
+
+      consoleError.mockRestore();
+    });
   });
 
   describe("unmount cleanup", () => {
@@ -298,10 +342,11 @@ describe("RouterErrorBoundary", () => {
       await router.navigate("dashboard").catch(() => {});
       flushSync();
 
-      expect(screen.getByTestId("outer-fallback")).toBeInTheDocument();
-      expect(screen.getByTestId("inner-fallback")).toBeInTheDocument();
       expect(screen.getByTestId("outer-fallback")).toHaveTextContent(
-        screen.getByTestId("inner-fallback").textContent,
+        errorCodes.CANNOT_ACTIVATE,
+      );
+      expect(screen.getByTestId("inner-fallback")).toHaveTextContent(
+        errorCodes.CANNOT_ACTIVATE,
       );
     });
   });

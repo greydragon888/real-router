@@ -9,26 +9,33 @@
     fallback?: Component | undefined;
   } = $props();
 
-  let LoadedComponent = $state<Component | null>(null);
-  let error = $state<Error | null>(null);
-  let loading = $state(true);
+  type LazyState =
+    | { status: "loading" }
+    | { status: "ready"; component: Component }
+    | { status: "error"; error: Error };
+
+  let state = $state<LazyState>({ status: "loading" });
 
   $effect(() => {
-    loading = true;
-    error = null;
-    LoadedComponent = null;
+    state = { status: "loading" };
     let active = true;
 
     loader()
       .then((module) => {
         if (!active) return;
-        LoadedComponent = module.default;
-        loading = false;
+        if (!module || typeof module.default === "undefined") {
+          throw new Error(
+            "[real-router] Lazy loader resolved without a `default` export.",
+          );
+        }
+        state = { status: "ready", component: module.default };
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
         if (!active) return;
-        error = err;
-        loading = false;
+        state = {
+          status: "error",
+          error: err instanceof Error ? err : new Error(String(err)),
+        };
       });
 
     return () => {
@@ -37,11 +44,12 @@
   });
 </script>
 
-{#if loading && fallback}
+{#if state.status === "loading" && fallback}
   {@const Fallback = fallback}
   <Fallback />
-{:else if error}
-  <p>Error loading component: {error.message}</p>
-{:else if LoadedComponent}
+{:else if state.status === "error"}
+  <p>Error loading component: {state.error.message}</p>
+{:else if state.status === "ready"}
+  {@const LoadedComponent = state.component}
   <LoadedComponent />
 {/if}

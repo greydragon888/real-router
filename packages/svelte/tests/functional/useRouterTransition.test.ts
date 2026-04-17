@@ -36,7 +36,7 @@ describe("useRouterTransition", () => {
     expect(result.current.isTransitioning).toBe(false);
   });
 
-  it("isTransitioning === true upon TRANSITION_START", async () => {
+  it("isTransitioning toggles true upon TRANSITION_START and back to false after the guard resolves", async () => {
     const lifecycle = getLifecycleApi(router);
     let resolveGuard!: (value: boolean) => void;
 
@@ -54,15 +54,18 @@ describe("useRouterTransition", () => {
       },
     });
 
-    void router.navigate("dashboard");
+    const navPromise = router.navigate("dashboard");
+
     await Promise.resolve();
     flushSync();
 
     expect(result.current.isTransitioning).toBe(true);
 
     resolveGuard(true);
-    await Promise.resolve();
+    await navPromise;
     flushSync();
+
+    expect(result.current.isTransitioning).toBe(false);
   });
 
   it("isTransitioning === false upon TRANSITION_SUCCESS", async () => {

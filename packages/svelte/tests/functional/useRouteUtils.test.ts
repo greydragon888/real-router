@@ -21,26 +21,36 @@ describe("useRouteUtils composable", () => {
     router.stop();
   });
 
-  it("should return a RouteUtils instance", () => {
-    let result: any;
+  it("should return a RouteUtils instance with the expected method surface", () => {
+    let result!: RouteUtils;
 
     renderWithRouter(router, RouteUtilsCapture, {
-      onCapture: (r: unknown) => {
+      onCapture: (r: RouteUtils) => {
         result = r;
       },
     });
 
+    // instanceof alone is too weak — it would still pass if the class had
+    // been hollowed out. Assert the method surface is wired up AND that each
+    // method actually runs for a known-good route, so a regression that drops
+    // or stubs a method can't sneak past.
     expect(result).toBeInstanceOf(RouteUtils);
-    expect(result.getChain).toBeTypeOf("function");
-    expect(result.getSiblings).toBeTypeOf("function");
-    expect(result.isDescendantOf).toBeTypeOf("function");
+    expect(typeof result.getChain).toBe("function");
+    expect(typeof result.getSiblings).toBe("function");
+    expect(typeof result.isDescendantOf).toBe("function");
+
+    expect(result.getChain("users.list")).toStrictEqual([
+      "users",
+      "users.list",
+    ]);
+    expect(result.isDescendantOf("users.list", "users")).toBe(true);
   });
 
   it("should have working getChain method", () => {
-    let result: any;
+    let result!: RouteUtils;
 
     renderWithRouter(router, RouteUtilsCapture, {
-      onCapture: (r: unknown) => {
+      onCapture: (r: RouteUtils) => {
         result = r;
       },
     });
@@ -51,10 +61,10 @@ describe("useRouteUtils composable", () => {
   });
 
   it("should have working getSiblings method", () => {
-    let result: any;
+    let result!: RouteUtils;
 
     renderWithRouter(router, RouteUtilsCapture, {
-      onCapture: (r: unknown) => {
+      onCapture: (r: RouteUtils) => {
         result = r;
       },
     });
@@ -67,10 +77,10 @@ describe("useRouteUtils composable", () => {
   });
 
   it("should have working isDescendantOf method", () => {
-    let result: any;
+    let result!: RouteUtils;
 
     renderWithRouter(router, RouteUtilsCapture, {
-      onCapture: (r: unknown) => {
+      onCapture: (r: RouteUtils) => {
         result = r;
       },
     });
@@ -107,10 +117,10 @@ describe("useRouteUtils composable", () => {
   });
 
   it("should return undefined for unknown routes", () => {
-    let result: any;
+    let result!: RouteUtils;
 
     renderWithRouter(router, RouteUtilsCapture, {
-      onCapture: (r: unknown) => {
+      onCapture: (r: RouteUtils) => {
         result = r;
       },
     });

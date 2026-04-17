@@ -1,6 +1,7 @@
 <script lang="ts">
   import { useIsActiveRoute } from "../composables/useIsActiveRoute.svelte";
   import { useRouter } from "../composables/useRouter.svelte";
+  import { EMPTY_OPTIONS, EMPTY_PARAMS, NOOP } from "../constants";
   import {
     shouldNavigate,
     buildHref,
@@ -12,8 +13,8 @@
 
   let {
     routeName,
-    routeParams = {} as Params,
-    routeOptions = {} as NavigationOptions,
+    routeParams = EMPTY_PARAMS,
+    routeOptions = EMPTY_OPTIONS,
     class: className = undefined,
     activeClassName = "active",
     activeStrict = false,
@@ -64,7 +65,7 @@
     }
 
     evt.preventDefault();
-    router.navigate(routeName, routeParams, routeOptions).catch(() => {});
+    router.navigate(routeName, routeParams, routeOptions).catch(NOOP);
   }
 </script>
 

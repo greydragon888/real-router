@@ -27,7 +27,9 @@ dist/
 ├── index.d.ts        # Type declarations
 ├── components/
 │   ├── Link.svelte
-│   └── RouteView.svelte
+│   ├── RouteView.svelte
+│   ├── Lazy.svelte
+│   └── RouterErrorBoundary.svelte
 ├── composables/
 │   ├── useRouter.svelte.js
 │   ├── useNavigator.svelte.js
@@ -35,7 +37,8 @@ dist/
 │   ├── useRouteNode.svelte.js
 │   ├── useRouteUtils.svelte.js
 │   ├── useRouterTransition.svelte.js
-│   └── useIsActiveRoute.svelte.js
+│   ├── useIsActiveRoute.svelte.js
+│   └── useRouterError.svelte.js
 └── RouterProvider.svelte
 ```
 
@@ -48,10 +51,12 @@ src/
 ├── index.ts                              # Single entry point
 ├── RouterProvider.svelte                 # Context provider — wires router to Svelte tree
 ├── context.ts                            # Three string context keys (ROUTER_KEY, NAVIGATOR_KEY, ROUTE_KEY)
-├── createReactiveSource.svelte.ts        # Reactive bridge — createSubscriber from svelte/reactivity
-├── types.ts                              # RouteContext, LinkProps
 ├── constants.ts                          # EMPTY_PARAMS, EMPTY_OPTIONS (frozen singletons)
-├── utils.ts                              # shouldNavigate() — click filtering
+├── createReactiveSource.svelte.ts        # Reactive bridge — createSubscriber from svelte/reactivity
+├── createRouteContext.svelte.ts          # Helper — builds RouteContext from a reactive source (RouterProvider + useRouteNode)
+├── types.ts                              # RouteContext, LinkProps
+├── dom-utils/                            # Symlink → ../../shared/dom-utils
+│                                         # shouldNavigate, buildHref, buildActiveClassName, applyLinkA11y, createRouteAnnouncer
 ├── composables/
 │   ├── useRouter.svelte.ts               # Router instance from getContext (never reactive)
 │   ├── useNavigator.svelte.ts            # Navigator from getContext (never reactive)
@@ -60,11 +65,14 @@ src/
 │   ├── useIsActiveRoute.svelte.ts        # Active state subscription (internal — used by Link)
 │   ├── useRouteUtils.svelte.ts
 │   ├── useRouterTransition.svelte.ts
-│   └── useRouterError.svelte.ts        # Internal — error subscription (used by RouterErrorBoundary)
+│   └── useRouterError.svelte.ts          # Internal — error subscription (used by RouterErrorBoundary)
+├── actions/
+│   └── link.svelte.ts                    # createLinkAction factory (use:link directive)
 └── components/
-    ├── Link.svelte                        # Navigation link with $derived href/class, active state
-    ├── RouterErrorBoundary.svelte          # Declarative navigation error handling
-    └── RouteView.svelte                   # Declarative route matching via named snippets
+    ├── Link.svelte                       # Navigation link with $derived href/class, active state
+    ├── RouteView.svelte                  # Declarative route matching via named snippets
+    ├── Lazy.svelte                       # Lazy-loaded route content with fallback
+    └── RouterErrorBoundary.svelte        # Declarative navigation error handling
 ```
 
 **File extension conventions:**
@@ -278,7 +286,7 @@ tests/
 
 ## Stress Test Coverage
 
-29 stress tests across 8 files in `tests/stress/` validate behavior under extreme conditions:
+38 stress tests across 12 files in `tests/stress/` validate behavior under extreme conditions:
 
 | Category                | Tests (file count) | Test count | What they verify                                                                                                                                                                                |
 | ----------------------- | ------------------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -286,10 +294,14 @@ tests/
 | Subscription fanout     | 1 file             | 4 tests    | 30 useRouteNode on different nodes — $effect fires only when node active; 15 useRoute + 15 useRouteNode('') — all update; 30 useRouteNode('users') — granular scoping; concurrent mount/unmount |
 | Link mass rendering     | 1 file             | 4 tests    | 100 Links mount — correct DOM; active class toggle; 50 round-robin navigations; active state after sequential navigations                                                                       |
 | Link action             | 1 file             | 4 tests    | 50 createLinkAction elements — a11y attributes (role, tabindex); mount/unmount × 50 cycles — bounded heap (destroy cleanup); click navigation after mass mount; repeated action creation        |
-| Deep tree context       | 1 file             | 3 tests    | 30-deep useRouteNode — only relevant nodes re-render; useRouter — 0 re-renders; wide tree 25 leaves — all re-render; nested RouterProviders — isolated                                          |
+| Deep tree context       | 1 file             | 3 tests    | 30-deep useRouteNode — only relevant nodes re-render; useRouter — 0 re-renders; nested RouterProviders — isolated                                                                               |
 | Transition hook         | 1 file             | 4 tests    | 50 async guard cycles — isTransitioning true→false; 50 concurrent — last wins; 20 consumers — consistent; navigate + cancel × 50 — never stuck                                                  |
 | shouldUpdateCache       | 1 file             | 4 tests    | 200 unique node names — cache scales; 100 same-node — cache hit; router stop + GC + new router; 2 routers × 50 nodes — isolated                                                                 |
 | Combined SPA            | 1 file             | 3 tests    | 30 Links + 10 useRouteNode consumers + 100 navs; 50 Links + correct final active state; mount/unmount/remount with root consumer                                                                |
+| Lazy loading            | 1 file             | 3 tests    | 30 Lazy components mount + immediate unmount before loader resolves — discarded results, no setState-after-unmount; 100 mount/unmount cycles — bounded heap; many concurrent loads all reach `ready` |
+| RouterErrorBoundary     | 1 file             | 3 tests    | 50 trigger→recover cycles with throwing onError — boundary stays alive, every throw caught and logged via console.error; 200 mount/unmount cycles — bounded heap; throwing onError doesn't break later reactivity |
+| Teardown race           | 1 file             | 2 tests    | Click 100 Links and immediately unmount — no unhandled promise rejections; 50 mount→click→unmount iterations — `.catch(noop)` keeps the loop clean                                              |
+| Long-run leak           | 1 file             | 1 test     | 5000 navigations across 5 routes with 20 mounted consumers — heap delta after warmup stays bounded                                                                                              |
 
 ## See Also
 

@@ -1,6 +1,26 @@
+<script lang="ts" module>
+  import { startsWithSegment } from "@real-router/route-utils";
+
+  export function getActiveSegment(
+    routeName: string,
+    node: string,
+    snippets: Record<string, unknown>,
+  ): string {
+    const prefix = node ? `${node}.` : "";
+
+    for (const segment in snippets) {
+      if (segment === "notFound") continue;
+      if (startsWithSegment(routeName, prefix + segment)) {
+        return segment;
+      }
+    }
+
+    return "";
+  }
+</script>
+
 <script lang="ts">
   import { UNKNOWN_ROUTE } from "@real-router/core";
-  import { startsWithSegment } from "@real-router/route-utils";
 
   import { useRouteNode } from "../composables/useRouteNode.svelte";
 
@@ -17,29 +37,14 @@
   } = $props();
 
   const routeContext = useRouteNode(nodeName);
-
-  function getActiveSegment(
-    routeName: string,
-    node: string,
-    snippets: Record<string, unknown>,
-  ): string {
-    for (const segment of Object.keys(snippets)) {
-      const fullSegmentName = node ? `${node}.${segment}` : segment;
-
-      if (startsWithSegment(routeName, fullSegmentName)) {
-        return segment;
-      }
-    }
-
-    return "";
-  }
 </script>
 
 {#if routeContext.route.current}
   {@const route = routeContext.route.current}
   {@const segment = getActiveSegment(route.name, nodeName, segmentSnippets)}
-  {#if segment && segmentSnippets[segment]}
-    {@render (segmentSnippets[segment] as Snippet)()}
+  {#if segment}
+    {@const snippet = segmentSnippets[segment] as Snippet}
+    {@render snippet()}
   {:else if route.name === UNKNOWN_ROUTE && notFound}
     {@render notFound()}
   {/if}
