@@ -317,7 +317,66 @@ describe("useIsActiveRoute", () => {
         rerender({ routeName: routes[currentIndex] });
       }
 
-      // Should not cause errors or memory leaks
+      // Anchor on a known-inactive name to verify no memory corruption:
+      // the hook must still return false (boolean) for a non-matching route.
+      rerender({ routeName: "definitely-nonexistent-route" });
+
+      expect(result.current).toBe(false);
+    });
+  });
+
+  describe("useStableValue fallback: non-serializable params", () => {
+    it("should not throw when params contain non-serializable values (identity fallback)", async () => {
+      const circular: Record<string, unknown> = {};
+
+      circular.self = circular;
+
+      // Circular reference: JSON.stringify throws → useStableValue falls back
+      // to identity comparison. Hook must still produce a boolean without crashing.
+      const { result } = renderHook(
+        () =>
+          useIsActiveRoute(
+            "users.view",
+            circular as unknown as Record<string, string>,
+          ),
+        { wrapper: (props) => wrapper({ ...props, router }) },
+      );
+
+      expect(result.current).toBeTypeOf("boolean");
+    });
+
+    it("should keep stable reference across re-renders when same non-serializable value is passed", () => {
+      const bigintParams = { id: 1n } as unknown as Record<string, string>;
+
+      const { result, rerender } = renderHook(
+        () => useIsActiveRoute("users.view", bigintParams),
+        { wrapper: (props) => wrapper({ ...props, router }) },
+      );
+
+      const first = result.current;
+
+      rerender();
+      rerender();
+
+      // Same identity — stableRef.current reused via Object.is fallback.
+      expect(result.current).toBe(first);
+    });
+
+    it("should update stableRef when non-serializable value changes identity", () => {
+      let params: Record<string, unknown> = { id: 1n };
+
+      const { result, rerender } = renderHook(
+        () => useIsActiveRoute("users.view", params as Record<string, string>),
+        { wrapper: (props) => wrapper({ ...props, router }) },
+      );
+
+      // First render establishes initial stableRef for BigInt params.
+      expect(result.current).toBeTypeOf("boolean");
+
+      // New object, still non-serializable → catch branch must update stableRef.current.
+      params = { id: 2n };
+      rerender();
+
       expect(result.current).toBeTypeOf("boolean");
     });
   });

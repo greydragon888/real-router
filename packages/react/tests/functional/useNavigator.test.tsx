@@ -32,7 +32,18 @@ describe("useNavigator hook", () => {
       wrapper: wrapper(router),
     });
 
-    expect(result.current).toBeTypeOf("object");
+    const keys = Object.keys(result.current).toSorted((a, b) =>
+      a.localeCompare(b),
+    );
+
+    expect(keys).toStrictEqual(
+      expect.arrayContaining([
+        "navigate",
+        "getState",
+        "isActiveRoute",
+        "subscribe",
+      ]),
+    );
     expect(result.current.navigate).toBeTypeOf("function");
     expect(result.current.getState).toBeTypeOf("function");
     expect(result.current.isActiveRoute).toBeTypeOf("function");
@@ -57,6 +68,7 @@ describe("useNavigator hook", () => {
 
     expect(state).not.toBeNull();
     expect(state!.name).toBeTypeOf("string");
+    expect(state!.name.length).toBeGreaterThan(0);
   });
 
   it("should have working isActiveRoute method", () => {

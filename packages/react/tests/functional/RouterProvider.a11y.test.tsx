@@ -62,7 +62,7 @@ describe("RouterProvider — announceNavigation", () => {
     });
 
     expect(document.querySelector(ANNOUNCER_SEL)?.textContent).toContain(
-      "Navigated to",
+      "Navigated to home",
     );
   });
 

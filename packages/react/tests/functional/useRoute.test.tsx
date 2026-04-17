@@ -32,7 +32,18 @@ describe("useRoute hook", () => {
       wrapper: wrapper(router),
     });
 
-    expect(result.current.navigator).toBeTypeOf("object");
+    const keys = Object.keys(result.current.navigator).toSorted((a, b) =>
+      a.localeCompare(b),
+    );
+
+    expect(keys).toStrictEqual(
+      expect.arrayContaining([
+        "navigate",
+        "getState",
+        "isActiveRoute",
+        "subscribe",
+      ]),
+    );
     expect(result.current.navigator.navigate).toBeTypeOf("function");
     expect(result.current.navigator.getState).toBeTypeOf("function");
     expect(result.current.navigator.isActiveRoute).toBeTypeOf("function");
@@ -74,6 +85,8 @@ describe("useRoute hook", () => {
   });
 
   it("should throw error if router instance was not passed to provider", () => {
-    expect(() => renderHook(() => useRoute())).toThrow("Provider");
+    expect(() => renderHook(() => useRoute())).toThrow(
+      "useRoute must be used within a RouteProvider",
+    );
   });
 });

@@ -14,16 +14,24 @@ export function useRouteNode(nodeName: string): RouteContext {
     [router, nodeName],
   );
 
-  const { route, previousRoute } = useSyncExternalStore(
+  // Use snapshot reference directly. createRouteNodeSource via stabilizeState
+  // returns the SAME snapshot when the node-relevant state did not change,
+  // so memoization on `[navigator, snapshot]` preserves identity for consumers.
+  const snapshot = useSyncExternalStore(
     store.subscribe,
     store.getSnapshot,
     store.getSnapshot, // SSR: router returns same state on server and client
   );
 
-  const navigator = useMemo(() => getNavigator(router), [router]);
+  // getNavigator is WeakMap-cached in core; additional useMemo is redundant.
+  const navigator = getNavigator(router);
 
   return useMemo(
-    (): RouteContext => ({ navigator, route, previousRoute }),
-    [navigator, route, previousRoute],
+    (): RouteContext => ({
+      navigator,
+      route: snapshot.route,
+      previousRoute: snapshot.previousRoute,
+    }),
+    [navigator, snapshot],
   );
 }

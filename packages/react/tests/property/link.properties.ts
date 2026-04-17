@@ -7,6 +7,7 @@ import {
   NUM_RUNS,
   type Primitive,
 } from "./helpers";
+import { shallowEqual } from "../../src/dom-utils/index.js";
 
 // =============================================================================
 // areLinkPropsEqual — replicated from src/components/Link.tsx
@@ -43,8 +44,8 @@ function areLinkPropsEqual(
     prev.target === next.target &&
     prev.style === next.style &&
     prev.children === next.children &&
-    JSON.stringify(prev.routeParams) === JSON.stringify(next.routeParams) &&
-    JSON.stringify(prev.routeOptions) === JSON.stringify(next.routeOptions)
+    shallowEqual(prev.routeParams, next.routeParams) &&
+    shallowEqual(prev.routeOptions, next.routeOptions)
   );
 }
 

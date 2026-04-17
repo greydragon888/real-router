@@ -178,6 +178,109 @@ describe("Link component", () => {
       expect(screen.getByTestId("link")).not.toHaveClass("active");
     });
 
+    it("should re-render when routeParams contain different non-serializable values (BigInt)", () => {
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      const bigintParams1 = { id: 1n } as unknown as Record<string, string>;
+      const bigintParams2 = { id: 2n } as unknown as Record<string, string>;
+
+      const { rerender } = render(
+        <Link
+          routeName="items.item"
+          routeParams={bigintParams1}
+          activeClassName="active"
+          data-testid="link"
+        >
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      // Different BigInt values → Object.is(1n, 2n) === false → rerender.
+      rerender(
+        <Link
+          routeName="items.item"
+          routeParams={bigintParams2}
+          activeClassName="active"
+          data-testid="link"
+        >
+          Test
+        </Link>,
+      );
+
+      expect(screen.getByTestId("link")).toBeInTheDocument();
+
+      consoleError.mockRestore();
+    });
+
+    it("should re-render when routeParams toggles between undefined and defined", () => {
+      const { rerender } = render(
+        <Link
+          routeName="items.item"
+          activeClassName="active"
+          data-testid="link"
+        >
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      // undefined → defined: shallowEqual hits `!a || !b` branch → false → rerender.
+      rerender(
+        <Link
+          routeName="items.item"
+          routeParams={{ id: "7" }}
+          activeClassName="active"
+          data-testid="link"
+        >
+          Test
+        </Link>,
+      );
+
+      expect(screen.getByTestId("link")).toBeInTheDocument();
+
+      // defined → undefined: same asymmetric branch on the other side.
+      rerender(
+        <Link
+          routeName="items.item"
+          activeClassName="active"
+          data-testid="link"
+        >
+          Test
+        </Link>,
+      );
+
+      expect(screen.getByTestId("link")).toBeInTheDocument();
+    });
+
+    it("should default ignoreQueryParams=true when prop omitted (gotcha)", async () => {
+      const linkRouteName = "items.item";
+      const linkRouteParams = { id: 6 };
+
+      render(
+        <Link
+          routeName={linkRouteName}
+          routeParams={linkRouteParams}
+          activeClassName="active"
+          data-testid="link"
+        >
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      // Navigate with extra query params — default behavior ignores them.
+      await act(() =>
+        router.navigate(linkRouteName, {
+          ...linkRouteParams,
+          page: "2",
+        }),
+      );
+
+      expect(screen.getByTestId("link")).toHaveClass("active");
+    });
+
     it("should add active class based on activeStrict", async () => {
       const activeClassName = "active";
       const parentRouteName = "items";
@@ -235,7 +338,7 @@ describe("Link component", () => {
 
       await user.click(screen.getByTestId("link"));
 
-      expect(onClickMock).toHaveBeenCalled();
+      expect(onClickMock).toHaveBeenCalledTimes(1);
     });
 
     it("should prevent navigation on non-left click", async () => {
@@ -257,7 +360,7 @@ describe("Link component", () => {
       // Middle click
       fireEvent.click(screen.getByTestId("link"), { button: 1 });
 
-      expect(onClickMock).toHaveBeenCalled();
+      expect(onClickMock).toHaveBeenCalledTimes(1);
 
       expect(router.navigate).not.toHaveBeenCalled();
       expect(router.getState()?.name).toStrictEqual(currentRouteName);
@@ -498,12 +601,15 @@ describe("Link component", () => {
   describe("navigation to blocked route", () => {
     it("should not throw unhandled rejection when navigating to blocked route", async () => {
       const lifecycle = getLifecycleApi(router);
+      const guard = vi.fn(() => () => false);
 
-      lifecycle.addActivateGuard("home", () => () => false);
+      lifecycle.addActivateGuard("home", guard);
 
       const unhandledRejection = vi.fn();
 
       globalThis.addEventListener("unhandledrejection", unhandledRejection);
+
+      const initialState = router.getState();
 
       render(
         <Link routeName="home" data-testid="link">
@@ -522,6 +628,8 @@ describe("Link component", () => {
       });
 
       expect(unhandledRejection).not.toHaveBeenCalled();
+      expect(guard).toHaveBeenCalled();
+      expect(router.getState()?.name).toBe(initialState?.name);
 
       globalThis.removeEventListener("unhandledrejection", unhandledRejection);
     });
@@ -542,7 +650,13 @@ describe("Link component", () => {
     expect(screen.getByTestId("link")).toBeInTheDocument();
     expect(screen.getByTestId("link")).not.toHaveAttribute("href");
     expect(consoleError).toHaveBeenCalledWith(
-      expect.stringContaining("@@nonexistent-route"),
+      expect.stringMatching(/@@nonexistent-route/),
+    );
+
+    const callArg = consoleError.mock.calls[0]?.[0] as unknown;
+
+    expect(typeof callArg === "string" ? callArg : "").toMatch(
+      /@@nonexistent-route/,
     );
 
     consoleError.mockRestore();

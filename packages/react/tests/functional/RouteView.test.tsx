@@ -183,6 +183,23 @@ describe("RouteView", () => {
       expect(screen.queryByTestId("users")).not.toBeInTheDocument();
       expect(container.innerHTML).toBe("");
     });
+
+    it("should never match a Match with empty segment string (safety: early return)", async () => {
+      await router.start("/users/list");
+
+      const { container } = render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="">
+            <RouteView.Match segment="">
+              <div data-testid="empty-match">Empty</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      expect(screen.queryByTestId("empty-match")).not.toBeInTheDocument();
+      expect(container.innerHTML).toBe("");
+    });
   });
 
   describe("NotFound", () => {
@@ -656,7 +673,9 @@ describe("RouteView", () => {
       const setupAfterMount = setup.mock.calls.length;
       const cleanupAfterMount = cleanup.mock.calls.length;
 
-      expect(setupAfterMount).toBeGreaterThan(0);
+      // StrictMode may double-invoke effects: expect 1 (no StrictMode) or 2 (with StrictMode).
+      expect(setupAfterMount).toBeGreaterThanOrEqual(1);
+      expect(setupAfterMount).toBeLessThanOrEqual(2);
 
       await act(async () => {
         await router.navigate("users.view", { id: "1" });

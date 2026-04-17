@@ -336,4 +336,37 @@ describe("link-mass-rendering stress tests", () => {
 
     expect(screen.getByTestId("link-0")).toHaveClass("active");
   });
+
+  it("2.8: 2000 Links mount + one navigation — bounded fanout, no O(N²) regression", async () => {
+    const LINK_COUNT = 2000;
+
+    const renderCounts: number[] = Array.from<number>({
+      length: LINK_COUNT,
+    }).fill(0);
+    const wrappers = makeActiveWrappers(renderCounts, LINK_COUNT);
+
+    render(
+      <RouterProvider router={router}>
+        {wrappers.map((W, i) => (
+          <W key={i} />
+        ))}
+      </RouterProvider>,
+    );
+
+    const afterMount = [...renderCounts];
+
+    const t0 = performance.now();
+
+    await navigateSequentially(router, [{ name: "route1" }]);
+
+    const elapsed = performance.now() - t0;
+
+    // Each Link subscribes independently; one navigation => at most one rerender per Link.
+    for (let i = 0; i < LINK_COUNT; i++) {
+      expect(renderCounts[i] - afterMount[i]).toBeLessThanOrEqual(1);
+    }
+
+    // Soft bound: 2000 Link fanout + one navigate must stay under 5s even on slow CI.
+    expect(elapsed).toBeLessThan(5000);
+  });
 });

@@ -215,4 +215,117 @@ describe("R7 — useRouterTransition stress", () => {
 
     router.stop();
   });
+
+  it("7.5: router.stop() mid-transition — no unhandled rejections, no React warnings", async () => {
+    const router = createRouter(
+      [
+        { name: "home", path: "/" },
+        { name: "slow", path: "/slow" },
+      ],
+      { defaultRoute: "home" },
+    );
+
+    await router.start("/");
+
+    const lifecycle = getLifecycleApi(router);
+
+    lifecycle.addActivateGuard(
+      "slow",
+      () => () =>
+        new Promise<boolean>((resolve) => {
+          setTimeout(() => {
+            resolve(true);
+          }, 50);
+        }),
+    );
+
+    let unhandledRejection = false;
+
+    const rejectionHandler = (): void => {
+      unhandledRejection = true;
+    };
+
+    globalThis.addEventListener("unhandledrejection", rejectionHandler);
+
+    const Consumer = makeTransitionConsumer(() => {});
+    const { unmount } = render(
+      <RouterProvider router={router}>
+        <Consumer />
+      </RouterProvider>,
+    );
+
+    // Start transition (pending guard). Do NOT await.
+    const navPromise = router.navigate("slow").catch(() => {});
+
+    // Immediately tear down mid-transition.
+    router.stop();
+    unmount();
+
+    await navPromise;
+
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 100);
+    });
+
+    expect(unhandledRejection).toBe(false);
+
+    globalThis.removeEventListener("unhandledrejection", rejectionHandler);
+  });
+
+  it("7.6: concurrent navigations with async guards of mixed duration — no zombie isTransitioning", async () => {
+    const router = createRouter(
+      [
+        { name: "home", path: "/" },
+        { name: "fast", path: "/fast" },
+        { name: "slow", path: "/slow" },
+        { name: "medium", path: "/medium" },
+      ],
+      { defaultRoute: "home" },
+    );
+
+    await router.start("/");
+
+    const lifecycle = getLifecycleApi(router);
+
+    const makeDelayedGuard = (delayMs: number) => () => () =>
+      new Promise<boolean>((resolve) => {
+        setTimeout(() => {
+          resolve(true);
+        }, delayMs);
+      });
+
+    lifecycle.addActivateGuard("fast", makeDelayedGuard(10));
+    lifecycle.addActivateGuard("medium", makeDelayedGuard(40));
+    lifecycle.addActivateGuard("slow", makeDelayedGuard(80));
+
+    let snapshot = { isTransitioning: false };
+
+    const Consumer = makeTransitionConsumer((t) => {
+      snapshot = t;
+    });
+
+    render(
+      <RouterProvider router={router}>
+        <Consumer />
+      </RouterProvider>,
+    );
+
+    // Fire all three concurrently — slow first, then faster ones.
+    // Last navigate wins: "medium" (started last, resolves before slow).
+    await act(async () => {
+      void router.navigate("slow").catch(() => {});
+      void router.navigate("fast").catch(() => {});
+      void router.navigate("medium").catch(() => {});
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 150);
+      });
+    });
+
+    // The final landing route is deterministic (last-write-wins); isTransitioning
+    // must settle to false regardless of guard interleaving.
+    expect(snapshot.isTransitioning).toBe(false);
+    expect(router.getState()?.name).toBe("medium");
+
+    router.stop();
+  });
 });

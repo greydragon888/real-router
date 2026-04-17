@@ -1,7 +1,7 @@
 import { getRoutesApi } from "@real-router/core/api";
 import { createRouteNodeSource } from "@real-router/sources";
 import { renderHook, act } from "@testing-library/react";
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { RouterProvider, useRouteNode } from "@real-router/react";
 
@@ -31,7 +31,8 @@ describe("useRouteNode", () => {
       wrapper: (props) => wrapper({ ...props, router }),
     });
 
-    expect(result.current.navigator).toBeDefined();
+    expect(result.current.navigator.navigate).toBeTypeOf("function");
+    expect(result.current.navigator.getState).toBeTypeOf("function");
     expect(result.current.route).toStrictEqual(undefined);
     expect(result.current.previousRoute).toStrictEqual(undefined);
   });
@@ -119,7 +120,6 @@ describe("useRouteNode", () => {
       await router.navigate("users.list");
     });
 
-    // ИСПРАВИТЬ: узел "users" теперь обновляется при первом входе
     expect(result.current.route?.name).toBe("users.list");
 
     await act(async () => {
@@ -132,7 +132,6 @@ describe("useRouteNode", () => {
       await router.navigate("home");
     });
 
-    // ИСПРАВИТЬ: узел "users" теперь обновляется при выходе
     expect(result.current.route).toBeUndefined();
   });
 
@@ -171,7 +170,9 @@ describe("useRouteNode", () => {
   });
 
   it("should throw error if router instance was not passed to provider", () => {
-    expect(() => renderHook(() => useRouteNode(""))).toThrow();
+    expect(() => renderHook(() => useRouteNode(""))).toThrow(
+      "useRouter must be used within a RouterProvider",
+    );
   });
 
   describe("shouldUpdateNode behavior", () => {
@@ -259,7 +260,7 @@ describe("useRouteNode", () => {
 
       expect(result.current.route).toBeUndefined();
       expect(result.current.previousRoute).toBeUndefined();
-      expect(result.current.navigator).toBeDefined();
+      expect(result.current.navigator.navigate).toBeTypeOf("function");
     });
 
     it("should handle root node when navigating to non-existent route", async () => {
@@ -272,17 +273,19 @@ describe("useRouteNode", () => {
       });
 
       const initialRoute = result.current.route;
+      const errorHandler = vi.fn<(err: unknown) => void>();
 
-      // Try to navigate to non-existent route
       await act(async () => {
-        try {
-          await router.navigate("non-existent-route");
-        } catch {
-          // Navigation should fail, but root node should handle it gracefully
-        }
+        await router.navigate("non-existent-route").catch(errorHandler);
       });
 
-      // Root node should still have the previous valid route
+      // Navigation MUST reject — otherwise the whole premise of "handle gracefully" is bogus.
+      expect(errorHandler).toHaveBeenCalledTimes(1);
+      expect(errorHandler).toHaveBeenCalledWith(
+        expect.objectContaining({ code: expect.any(String) }),
+      );
+
+      // Root node keeps the previous valid route after the failed transition.
       expect(result.current.route).toBe(initialRoute);
     });
 
@@ -639,6 +642,36 @@ describe("useRouteNode", () => {
         route: undefined,
         previousRoute: "users.edit",
       });
+    });
+
+    it("should return global previousRoute, not node-scoped previousRoute (gotcha)", async () => {
+      const { result } = renderHook(() => useRouteNode("users"), {
+        wrapper: (props) => wrapper({ ...props, router }),
+      });
+
+      await act(async () => {
+        await router.start();
+      });
+
+      // Navigate: users.list → items → users.view
+      // The gotcha: previousRoute should be "items" (global), not "users.list" (node-scoped)
+
+      // Step 1: Navigate to users.list
+      await act(() => router.navigate("users.list"));
+
+      expect(result.current.route?.name).toBe("users.list");
+
+      // Step 2: Navigate to items (users node becomes inactive)
+      await act(() => router.navigate("items"));
+
+      expect(result.current.route).toBeUndefined();
+
+      // Step 3: Navigate to users.view (users node becomes active again)
+      await act(() => router.navigate("users.view", { id: "123" }));
+
+      expect(result.current.route?.name).toBe("users.view");
+      // previousRoute should be "items" (global previous), NOT "users.list"
+      expect(result.current.previousRoute?.name).toBe("items");
     });
   });
 

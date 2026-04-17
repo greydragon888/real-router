@@ -43,6 +43,8 @@ describe("legacy entry point (@real-router/react/legacy)", () => {
     it("should not export RouteView (React 19.2+ only)", async () => {
       const legacyModule = await import("@real-router/react/legacy");
 
+      // Positive anchor: verify legacy module actually loaded.
+      expect(legacyModule).toHaveProperty("RouterProvider");
       expect(legacyModule).not.toHaveProperty("RouteView");
     });
 
@@ -58,6 +60,8 @@ describe("legacy entry point (@real-router/react/legacy)", () => {
     it("should not export raw context objects", async () => {
       const legacyModule = await import("@real-router/react/legacy");
 
+      // Positive anchor: verify legacy module actually loaded.
+      expect(legacyModule).toHaveProperty("RouterProvider");
       expect(legacyModule).not.toHaveProperty("RouterContext");
       expect(legacyModule).not.toHaveProperty("RouteContext");
       expect(legacyModule).not.toHaveProperty("NavigatorContext");
@@ -78,6 +82,8 @@ describe("legacy entry point (@real-router/react/legacy)", () => {
     it("should not export RouteView types", async () => {
       const legacyModule = await import("@real-router/react/legacy");
 
+      // Positive anchor: verify legacy module actually loaded.
+      expect(legacyModule).toHaveProperty("RouterProvider");
       expect(legacyModule).not.toHaveProperty("RouteView");
     });
   });

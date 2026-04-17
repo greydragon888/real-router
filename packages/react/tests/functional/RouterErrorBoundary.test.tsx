@@ -219,13 +219,13 @@ describe("RouterErrorBoundary", () => {
 
     const [error, toRoute, fromRoute] = onError.mock.calls[0] as [
       RouterError,
-      unknown,
-      unknown,
+      State,
+      State,
     ];
 
     expect(error.code).toBe(errorCodes.CANNOT_ACTIVATE);
-    expect(toRoute).not.toBeNull();
-    expect(fromRoute).not.toBeNull();
+    expect(toRoute.name).toBe("dashboard");
+    expect(fromRoute.name).toBe("home");
   });
 
   it("onError not called on re-render", async () => {
@@ -414,8 +414,10 @@ describe("RouterErrorBoundary", () => {
       expect(screen.getByTestId("fallback")).toBeInTheDocument();
     });
 
-    expect(screen.getByTestId("fallback").textContent).toContain(
-      errorCodes.SAME_STATES,
+    // textContent starts with the error code; sibling Dismiss button text
+    // appears after it, so anchor the match at the start.
+    expect(screen.getByTestId("fallback").textContent).toMatch(
+      new RegExp(`^${errorCodes.SAME_STATES}`),
     );
 
     fireEvent.click(screen.getByTestId("dismiss"));
@@ -430,8 +432,8 @@ describe("RouterErrorBoundary", () => {
       expect(screen.getByTestId("fallback")).toBeInTheDocument();
     });
 
-    expect(screen.getByTestId("fallback").textContent).toContain(
-      errorCodes.SAME_STATES,
+    expect(screen.getByTestId("fallback").textContent).toMatch(
+      new RegExp(`^${errorCodes.SAME_STATES}`),
     );
   });
 });

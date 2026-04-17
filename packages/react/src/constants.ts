@@ -1,4 +1,4 @@
-// packages/react/modules/constants.ts
+// packages/react/src/constants.ts
 
 /**
  * Stable empty object for default params
