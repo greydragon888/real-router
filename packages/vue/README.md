@@ -337,26 +337,38 @@ Auto-resets on next successful navigation. Works with both `<Link>` and imperati
 
 Low-level directive for adding navigation to any element. Automatically handles click events, keyboard navigation (Enter key), and cursor styling.
 
+In templates the directive is bound the usual way:
+
+```vue
+<a v-link="{ name: 'users.profile', params: { id: '123' } }">
+  User Profile
+</a>
+```
+
+In render functions, Vue's `h()` does NOT accept directives as raw `"v-link"` props. Use `withDirectives` to attach the directive to a VNode:
+
 ```typescript
+import { defineComponent, h, withDirectives } from "vue";
 import { vLink } from "@real-router/vue";
 
-h("a", {
-  "v-link": { name: "users.profile", params: { id: "123" } },
+const Profile = defineComponent({
+  setup: () => () =>
+    withDirectives(
+      h("a", null, "User Profile"),
+      [[vLink, { name: "users.profile", params: { id: "123" } }]],
+    ),
 });
+```
 
-h("button", {
-  "v-link": { name: "home" },
-});
+Or register globally on the app and use the directive name in compiled templates:
 
-h("div", {
-  "v-link": {
-    name: "settings",
-    params: {},
-    options: { replace: true },
-  },
-  role: "link",
-  tabindex: "0",
-});
+```typescript
+import { createApp } from "vue";
+import { vLink } from "@real-router/vue";
+
+const app = createApp(App);
+app.directive("link", vLink);
+// In templates: <a v-link="{ name: 'home' }">Home</a>
 ```
 
 In a template:

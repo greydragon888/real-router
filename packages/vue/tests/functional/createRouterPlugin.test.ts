@@ -159,4 +159,83 @@ describe("createRouterPlugin", () => {
 
     app.unmount();
   });
+
+  it("should call app.onUnmount with unsubscribe when available", () => {
+    const onUnmountSpy = vi.fn();
+
+    const TestComponent = defineComponent({
+      setup: () => () => h("div"),
+    });
+
+    const app = createApp(TestComponent);
+
+    (app as any).onUnmount = onUnmountSpy;
+
+    app.use(createRouterPlugin(router));
+    app.mount(document.createElement("div"));
+
+    expect(onUnmountSpy).toHaveBeenCalledTimes(1);
+    expect(onUnmountSpy).toHaveBeenCalledWith(expect.any(Function));
+
+    app.unmount();
+  });
+
+  it("should not throw when app.onUnmount is unavailable", () => {
+    const TestComponent = defineComponent({
+      setup: () => () => h("div"),
+    });
+
+    const app = createApp(TestComponent);
+
+    delete (app as any).onUnmount;
+
+    expect(() => {
+      app.use(createRouterPlugin(router));
+      app.mount(document.createElement("div"));
+    }).not.toThrow();
+
+    app.unmount();
+  });
+
+  it("should stop receiving updates after unsubscribe is called", async () => {
+    const onUnmountCallbacks: (() => void)[] = [];
+
+    let capturedRouteName: string | undefined;
+
+    const TestComponent = defineComponent({
+      setup() {
+        const routeContext = inject(RouteKey);
+
+        return () => {
+          capturedRouteName = routeContext?.route.value?.name;
+
+          return h("div");
+        };
+      },
+    });
+
+    await router.start("/");
+
+    const app = createApp(TestComponent);
+
+    (app as any).onUnmount = (fn: () => void) => {
+      onUnmountCallbacks.push(fn);
+    };
+
+    app.use(createRouterPlugin(router));
+    app.mount(document.createElement("div"));
+
+    expect(onUnmountCallbacks).toHaveLength(1);
+    expect(capturedRouteName).toBe("test");
+
+    const unsub = onUnmountCallbacks[0];
+
+    unsub();
+
+    await router.navigate("home");
+
+    expect(capturedRouteName).toBe("test");
+
+    app.unmount();
+  });
 });

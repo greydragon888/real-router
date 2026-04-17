@@ -70,7 +70,10 @@ describe("RouterErrorBoundary", () => {
       ),
     );
 
-    await router.navigate("dashboard").catch(() => {});
+    await expect(router.navigate("dashboard")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_ACTIVATE,
+    });
+
     await flushPromises();
 
     expect(wrapper.find("[data-testid='children']").exists()).toBe(true);
@@ -93,7 +96,10 @@ describe("RouterErrorBoundary", () => {
       ),
     );
 
-    await router.navigate("dashboard").catch(() => {});
+    await expect(router.navigate("dashboard")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_ACTIVATE,
+    });
+
     await flushPromises();
 
     expect(wrapper.find("[data-testid='fallback']").text()).toBe(
@@ -119,7 +125,10 @@ describe("RouterErrorBoundary", () => {
       ),
     );
 
-    await router.navigate("dashboard").catch(() => {});
+    await expect(router.navigate("dashboard")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_ACTIVATE,
+    });
+
     await flushPromises();
 
     expect(wrapper.find("[data-testid='fallback']").exists()).toBe(true);
@@ -156,7 +165,10 @@ describe("RouterErrorBoundary", () => {
       ),
     );
 
-    await router.navigate("dashboard").catch(() => {});
+    await expect(router.navigate("dashboard")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_ACTIVATE,
+    });
+
     await flushPromises();
 
     expect(wrapper.find("[data-testid='fallback']").exists()).toBe(true);
@@ -192,7 +204,10 @@ describe("RouterErrorBoundary", () => {
       ),
     );
 
-    await router.navigate("dashboard").catch(() => {});
+    await expect(router.navigate("dashboard")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_ACTIVATE,
+    });
+
     await flushPromises();
 
     expect(wrapper.find("[data-testid='fallback']").exists()).toBe(true);
@@ -202,7 +217,10 @@ describe("RouterErrorBoundary", () => {
 
     expect(wrapper.find("[data-testid='fallback']").exists()).toBe(false);
 
-    await router.navigate("settings").catch(() => {});
+    await expect(router.navigate("settings")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_ACTIVATE,
+    });
+
     await flushPromises();
 
     expect(wrapper.find("[data-testid='fallback']").exists()).toBe(true);
@@ -227,7 +245,10 @@ describe("RouterErrorBoundary", () => {
       ),
     );
 
-    await router.navigate("dashboard").catch(() => {});
+    await expect(router.navigate("dashboard")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_ACTIVATE,
+    });
+
     await flushPromises();
 
     expect(onError).toHaveBeenCalledTimes(1);
@@ -280,7 +301,10 @@ describe("RouterErrorBoundary", () => {
 
     const wrapper = mountWithProvider(router, () => h(TestWrapper));
 
-    await router.navigate("dashboard").catch(() => {});
+    await expect(router.navigate("dashboard")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_ACTIVATE,
+    });
+
     await flushPromises();
 
     expect(onError).toHaveBeenCalledTimes(1);
@@ -353,7 +377,10 @@ describe("RouterErrorBoundary", () => {
       ),
     );
 
-    await router.navigate("dashboard").catch(() => {});
+    await expect(router.navigate("dashboard")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_ACTIVATE,
+    });
+
     await flushPromises();
 
     expect(wrapper.find("[data-testid='outer-fallback']").exists()).toBe(true);
@@ -384,7 +411,10 @@ describe("RouterErrorBoundary", () => {
 
     wrapper.unmount();
 
-    await router.navigate("dashboard").catch(() => {});
+    await expect(router.navigate("dashboard")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_ACTIVATE,
+    });
+
     await flushPromises();
 
     expect(onError).not.toHaveBeenCalled();
@@ -411,7 +441,10 @@ describe("RouterErrorBoundary", () => {
       ),
     );
 
-    await router.navigate("home").catch(() => {});
+    await expect(router.navigate("home")).rejects.toMatchObject({
+      code: errorCodes.SAME_STATES,
+    });
+
     await flushPromises();
 
     expect(wrapper.find("[data-testid='fallback']").exists()).toBe(true);
@@ -424,7 +457,10 @@ describe("RouterErrorBoundary", () => {
 
     expect(wrapper.find("[data-testid='fallback']").exists()).toBe(false);
 
-    await router.navigate("home").catch(() => {});
+    await expect(router.navigate("home")).rejects.toMatchObject({
+      code: errorCodes.SAME_STATES,
+    });
+
     await flushPromises();
 
     expect(wrapper.find("[data-testid='fallback']").exists()).toBe(true);

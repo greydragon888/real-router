@@ -168,6 +168,28 @@ describe("useRouteNode", () => {
     expect(result.previousRoute.value?.name).toBe("home");
   });
 
+  it("previousRoute is global — reflects last route, not last route within the node", async () => {
+    await router.start("/users/list");
+
+    const { result } = mountWithRouter(router, () => useRouteNode("users"));
+
+    await flushPromises();
+
+    expect(result.route.value?.name).toBe("users.list");
+
+    await router.navigate("items");
+    await flushPromises();
+
+    expect(result.route.value).toBeUndefined();
+    expect(result.previousRoute.value?.name).toBe("users.list");
+
+    await router.navigate("users.view", { id: "1" });
+    await flushPromises();
+
+    expect(result.route.value?.name).toBe("users.view");
+    expect(result.previousRoute.value?.name).toBe("items");
+  });
+
   it("should handle deeply nested node correctly", async () => {
     getRoutesApi(router).add([
       {
@@ -202,5 +224,52 @@ describe("useRouteNode", () => {
     await flushPromises();
 
     expect(result.route.value?.name).toBe("admin.settings.security");
+  });
+
+  describe("scope ownership (onScopeDispose contract)", () => {
+    it("subscription releases when component unmounts", async () => {
+      // Confirms useRouteNode wires onScopeDispose to the source unsubscribe.
+      // After unmount, navigation must not fire callbacks into the disposed
+      // setup scope. Indirectly tests the contract: calling outside a scope
+      // would leak, which is the gotcha CLAUDE.md warns about.
+      let captureCount = 0;
+
+      const App = defineComponent({
+        setup() {
+          const ctx = useRouteNode("");
+
+          // Read .value to register the dependency on the source.
+          if (ctx.route.value) {
+            captureCount++;
+          }
+
+          return () => h("div");
+        },
+      });
+
+      const wrapper = mount(
+        defineComponent({
+          setup: () => () =>
+            h(RouterProvider, { router }, { default: () => h(App) }),
+        }),
+      );
+
+      await router.start();
+      await router.navigate("home");
+      await flushPromises();
+
+      const beforeUnmount = captureCount;
+
+      wrapper.unmount();
+
+      // After unmount the App's scope is disposed → snapshot updates from the
+      // router source must NOT trigger setup re-evaluation (component is gone).
+      await router.navigate("about");
+      await flushPromises();
+
+      // captureCount only increments inside setup; after unmount setup is
+      // not re-invoked → count is unchanged regardless of navigation.
+      expect(captureCount).toBe(beforeUnmount);
+    });
   });
 });

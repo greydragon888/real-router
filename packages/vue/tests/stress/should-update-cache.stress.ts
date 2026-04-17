@@ -2,7 +2,13 @@ import { flushPromises } from "@vue/test-utils";
 import { describe, it, expect, afterEach } from "vitest";
 import { defineComponent, h, nextTick } from "vue";
 
-import { createStressRouter, mountWithProvider, forceGC } from "./helpers";
+import {
+  createStressRouter,
+  forceGC,
+  MB,
+  mountWithProvider,
+  takeHeapSnapshot,
+} from "./helpers";
 import { useRouteNode } from "../../src/composables/useRouteNode";
 
 describe("V6 — shouldUpdateCache growth (Vue)", () => {
@@ -270,5 +276,45 @@ describe("V6 — shouldUpdateCache growth (Vue)", () => {
 
     router1.stop();
     router2.stop();
+  });
+
+  it("6.5: createRouterPlugin × 100 apps without onUnmount — bounded heap (no listener accumulation when GC eligible)", async () => {
+    const { createApp, defineComponent, h } = await import("vue");
+    const { createRouterPlugin } =
+      await import("../../src/createRouterPlugin.js");
+
+    const heapBefore = takeHeapSnapshot();
+
+    for (let i = 0; i < 100; i++) {
+      const router = createStressRouter(10);
+
+      await router.start("/route0");
+
+      const app = createApp(
+        defineComponent({
+          setup: () => () => h("div"),
+        }),
+      );
+
+      // Vue 3.3-3.4 compatibility path: no app.onUnmount available.
+      // The router subscription should be cleaned up on app.unmount() via
+      // GC of the router (which the test exercises via router.stop()).
+      delete (app as unknown as { onUnmount?: unknown }).onUnmount;
+
+      app.use(createRouterPlugin(router));
+
+      const container = document.createElement("div");
+
+      app.mount(container);
+      app.unmount();
+      router.stop();
+    }
+
+    forceGC();
+
+    const heapAfter = takeHeapSnapshot();
+
+    // 100 apps × ~few KB router state should comfortably stay under threshold.
+    expect(heapAfter - heapBefore).toBeLessThan(50 * MB);
   });
 });

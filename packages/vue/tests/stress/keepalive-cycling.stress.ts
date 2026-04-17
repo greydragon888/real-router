@@ -237,7 +237,10 @@ describe("keepAlive cycling stress tests (Vue)", () => {
       totalRegularRenders += regularCounters[i].getRenderCount();
     }
 
-    expect(totalRegularRenders).toBeGreaterThanOrEqual(0);
+    // Regular (non-keepAlive) Match components mount on activation. Across
+    // 200 navs through 15 segments, the regular ones (10..14) activate at
+    // navs 9, 24, 39, ... — at least 13 mounts each → ≥ 13 renders total.
+    expect(totalRegularRenders).toBeGreaterThan(0);
 
     wrapper.unmount();
     router.stop();
@@ -321,6 +324,77 @@ describe("keepAlive cycling stress tests (Vue)", () => {
     expect(domCountAfterMoreNavs).toBe(domCountAfterActivation);
 
     wrapper.unmount();
+    router.stop();
+  });
+
+  it("4.5: Suspense + defineAsyncComponent — fallback prop renders synchronously-resolving lazy content", async () => {
+    // Smoke test for Match `fallback` + defineAsyncComponent without rapid
+    // navigation. Vue 3.5's <Suspense> + JSDOM is known to throw on
+    // mid-transition unmount/move, so this test only verifies the basic
+    // wiring (single navigation → lazy resolves → DOM has content).
+    // Stress under rapid navigation belongs in Playwright e2e.
+    const { defineAsyncComponent } = await import("vue");
+
+    const router = createRouter(
+      [
+        { name: "home", path: "/" },
+        { name: "lazy", path: "/lazy" },
+      ],
+      { defaultRoute: "home" },
+    );
+
+    await router.start("/");
+
+    const Lazy = defineAsyncComponent(() =>
+      Promise.resolve(
+        defineComponent({
+          setup: () => () =>
+            h("div", { "data-testid": "lazy-content" }, "Lazy"),
+        }),
+      ),
+    );
+
+    const App = defineComponent({
+      setup() {
+        return () =>
+          h(
+            RouterProvider,
+            { router },
+            {
+              default: () =>
+                h(
+                  RouteView,
+                  { nodeName: "" },
+                  {
+                    default: () =>
+                      h(
+                        RouteView.Match,
+                        {
+                          segment: "lazy",
+                          fallback: () =>
+                            h("div", { "data-testid": "fallback" }, "Loading"),
+                        },
+                        { default: () => h(Lazy) },
+                      ),
+                  },
+                ),
+            },
+          );
+      },
+    });
+
+    const { mount } = await import("@vue/test-utils");
+    const wrapper = mount(App);
+
+    await router.navigate("lazy");
+    await nextTick();
+    await flushPromises();
+    // Extra microtask flush for Suspense resolution.
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    await flushPromises();
+
+    expect(wrapper.find("[data-testid='lazy-content']").exists()).toBe(true);
+
     router.stop();
   });
 });

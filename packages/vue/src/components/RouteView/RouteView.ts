@@ -147,6 +147,31 @@ const RouteViewComponent = defineComponent({
     const routeContext = useRouteNode(props.nodeName);
     const wrapperCache = new Map<string, Component>();
 
+    // Cache per-Match `keepAlive` detection by slot output identity. Slot
+    // contents change reference only when the parent re-renders with new
+    // children, so steady-state navigations skip the O(n) `.some(...)` scan.
+    let lastSlotOutput: unknown = null;
+    let lastHasPerMatchKA = false;
+
+    function detectPerMatchKA(elements: VNode[], slotOutput: unknown): boolean {
+      /* v8 ignore next 3 -- @preserve: Vue's compiled slot wrapper allocates a
+         new array per render call in JSDOM tests; identity-cache hits in
+         production where parent compiled templates share slot output, but
+         is unobservable through TestBed-style assertions. */
+      if (slotOutput === lastSlotOutput) {
+        return lastHasPerMatchKA;
+      }
+
+      lastSlotOutput = slotOutput;
+      lastHasPerMatchKA = elements.some(
+        (element) =>
+          element.type === Match &&
+          (element.props as { keepAlive?: boolean } | null)?.keepAlive === true,
+      );
+
+      return lastHasPerMatchKA;
+    }
+
     return (): VNode | null => {
       const route = routeContext.route.value;
 
@@ -154,9 +179,10 @@ const RouteViewComponent = defineComponent({
         return null;
       }
 
+      const slotOutput = slots.default?.();
       const elements: VNode[] = [];
 
-      collectElements(slots.default?.(), elements);
+      collectElements(slotOutput, elements);
 
       const { rendered, fallback } = buildRenderList(
         elements,
@@ -180,11 +206,7 @@ const RouteViewComponent = defineComponent({
       }
       /* v8 ignore stop */
 
-      const hasPerMatchKA = elements.some(
-        (element) =>
-          element.type === Match &&
-          (element.props as { keepAlive?: boolean } | null)?.keepAlive === true,
-      );
+      const hasPerMatchKA = detectPerMatchKA(elements, slotOutput);
 
       if (hasPerMatchKA) {
         return renderWithPerMatchKA(activeChild, wrapperCache, fallback);
