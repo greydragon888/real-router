@@ -43,12 +43,15 @@ export function createStressRouter(options?: {
   const hashPrefix = options?.hashPrefix ?? "";
   const prefixRegex = createHashPrefixRegex(hashPrefix);
 
-  const safeBrowser = createSafeBrowser(
-    () =>
-      safelyEncodePath(extractHashPath(globalThis.location.hash, prefixRegex)) +
-      globalThis.location.search,
-    "hash-plugin",
-  );
+  const safeBrowser = createSafeBrowser(() => {
+    const hashPath = safelyEncodePath(
+      extractHashPath(globalThis.location.hash, prefixRegex),
+    );
+
+    return hashPath.includes("?")
+      ? hashPath
+      : hashPath + globalThis.location.search;
+  }, "hash-plugin");
 
   const browser: Browser = {
     ...safeBrowser,

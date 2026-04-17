@@ -147,7 +147,7 @@ describe("Hash Plugin — URL Operations", () => {
         });
       });
 
-      it("reuses pre-computed regexp on repeated matchUrl calls", () => {
+      it("handles multiple matchUrl calls with different hash paths", () => {
         router.usePlugin(
           hashPluginFactory(
             { hashPrefix: "!" },
@@ -160,6 +160,42 @@ describe("Hash Plugin — URL Operations", () => {
 
         expect(first!.name).toBe("home");
         expect(second!.name).toBe("users.list");
+      });
+    });
+
+    describe("matchUrl query param source of truth", () => {
+      beforeEach(() => {
+        router.usePlugin(hashPluginFactory({}, mockedBrowser));
+      });
+
+      it("uses query inside hash, ignores outer search when both present", () => {
+        // Outer ?a=1 must NOT be merged with hash-internal query — that was B2.
+        const state = router.matchUrl(
+          "https://example.com/?a=1#/users/list?page=2",
+        );
+
+        expect(state).toBeDefined();
+        expect(state!.name).toBe("users.list");
+        expect(state!.params).toStrictEqual({ page: 2 });
+        expect(state!.params.a).toBeUndefined();
+      });
+
+      it("falls back to outer search when hash has no query", () => {
+        const state = router.matchUrl(
+          "https://example.com/?page=3#/users/list",
+        );
+
+        expect(state).toBeDefined();
+        expect(state!.params).toStrictEqual({ page: 3 });
+      });
+
+      it("produces a well-formed path (no double '?') when collision happens", () => {
+        // Even the getLocation-style consumer must not double-append.
+        const state = router.matchUrl(
+          "https://example.com/?a=1#/users/list?page=2",
+        );
+
+        expect(state?.path).toBe("/users/list");
       });
     });
   });

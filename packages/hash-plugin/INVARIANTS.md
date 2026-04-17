@@ -71,8 +71,44 @@
 | --- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | `matchUrl` returns `undefined` for hash path matching no route | When the hash URL contains a valid prefix but the path segment doesn't match any defined route, `matchUrl` returns `undefined`. Prevents phantom route matches. |
 
+## Determinism
+
+| #   | Invariant                              | Description                                                                                                                                          |
+| --- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `buildUrl(name, params)` is pure       | Repeated calls with identical `(name, params)` across arbitrary `base` and `hashPrefix` return identical strings. No hidden state affects the output. |
+
+## Path Suffix
+
+| #   | Invariant                               | Description                                                                                                                                                                                  |
+| --- | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `buildUrl` ends with `buildPath`        | `buildUrl(name, params).endsWith(buildPath(name, params))` holds for any base/hashPrefix. Confirms the plugin only prepends `${base}#${hashPrefix}` and never rewrites the underlying path. |
+
+## Leading-slash Safety
+
+| #   | Invariant                                           | Description                                                                                                                                                                                                                |
+| --- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `extractHashPath` on `buildUrl` output starts `/`   | Because `safeHashPrefixRule` rejects prefixes containing `/`, the path extracted by `extractHashPath` from any hash produced by `buildUrl` always begins with `/`. Prevents silent match failures of the form `"foo"` → `undefined`. |
+
+## Injectivity
+
+| #   | Invariant                                        | Description                                                                                                                                                                              |
+| --- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Distinct route names produce distinct URLs       | `buildUrl("home") !== buildUrl("users.list")` across arbitrary `base` and `hashPrefix`. A sanity check that URL construction actually depends on the route name and is not a constant. |
+
+## Query Source of Truth
+
+| #   | Invariant                                                   | Description                                                                                                                                                                                                                                                                                              |
+| --- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Inner hash query wins over outer `?...`                      | When a URL contains both an outer query (`?a=1` before `#`) and an inner query (`?b=2` inside the hash path), `matchUrl` uses only the inner query. Prevents malformed `?b=2?a=1` paths and cross-origin query pollution of route state. |
+
+## Multi-Key Query Roundtrip
+
+| #   | Invariant                                                        | Description                                                                                                                                                                                                                   |
+| --- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Arbitrary query dictionary is parsed correctly by `matchUrl`     | An arbitrary `Record<string, string>` appended to the built URL survives `matchUrl`, exposing all keys in `state.params`. Verifies that query parsing handles multiple keys, not just the canonical `id` path parameter. |
+
 ## Test Files
 
-| File                                      | Invariants | Category                                                                                                                                               |
-| ----------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `tests/property/hashPlugin.properties.ts` | 19         | URL roundtrip, hash prefix inclusion, prefix stripping, regex escaping, default prefix, parameter encoding, unsafe encoding, base, fallback, rejection |
+| File                                      | Invariants | Category                                                                                                                                                                                                                                    |
+| ----------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tests/property/hashPlugin.properties.ts` | 25         | URL roundtrip, hash prefix inclusion, prefix stripping, regex escaping, default prefix, parameter encoding, unsafe encoding, base, fallback, rejection, determinism, path suffix, leading-slash, injectivity, query collision, multi-key query |

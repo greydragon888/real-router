@@ -37,11 +37,7 @@ declare module "@real-router/core" {
      * Replaces current history state without triggering navigation.
      * Added by hash plugin.
      */
-    replaceHistoryState: (
-      name: string,
-      params?: Params,
-      title?: string,
-    ) => void;
+    replaceHistoryState: (name: string, params?: Params) => void;
 
     start(path?: string): Promise<State>;
   }

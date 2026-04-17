@@ -94,7 +94,8 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
 
       globalThis.dispatchEvent(new PopStateEvent("popstate", { state: null }));
 
-      expect(navigateSpy).toHaveBeenCalled();
+      expect(navigateSpy).toHaveBeenCalledTimes(1);
+      expect(navigateSpy).toHaveBeenCalledWith("/nonexistent");
     });
 
     it("navigates to default when allowNotFound is false and hash does not match any route", async () => {
@@ -114,7 +115,7 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
 
       globalThis.dispatchEvent(new PopStateEvent("popstate", { state: null }));
 
-      expect(navigateSpy).toHaveBeenCalled();
+      expect(navigateSpy).toHaveBeenCalledTimes(1);
 
       restrictedRouter.stop();
     });
@@ -139,21 +140,35 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
       consoleSpy.mockRestore();
     });
 
-    it("handles popstate with meta missing params field", async () => {
+    it("ignores popstate state missing required params field", async () => {
+      const stateBefore = router.getState();
+
       globalThis.dispatchEvent(
         new PopStateEvent("popstate", {
           state: {
-            name: "home",
-            params: {},
-            path: "/home",
-            meta: { id: 5 },
+            name: "users.view",
+            path: "/users/view/1",
           },
         }),
       );
 
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      expect(router.getState()?.name).toBe("home");
+      expect(router.getState()).toStrictEqual(stateBefore);
+    });
+
+    it("ignores popstate state missing required name field", async () => {
+      const stateBefore = router.getState();
+
+      globalThis.dispatchEvent(
+        new PopStateEvent("popstate", {
+          state: { params: {}, path: "/home" },
+        }),
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(router.getState()).toStrictEqual(stateBefore);
     });
   });
 
@@ -289,6 +304,8 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
 
       expect(names).toContain("users.view");
       expect(names).toContain("users.list");
+      // Last deferred event (state3 = users.list) must be the final transition.
+      expect(names.at(-1)).toBe("users.list");
     });
   });
 
@@ -345,7 +362,10 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
         expect.stringContaining("Critical error"),
         expect.any(TypeError),
       );
-      expect(replaceStateSpy).toHaveBeenCalled();
+      expect(replaceStateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "users.list" }),
+        "#/users/list",
+      );
 
       consoleSpy.mockRestore();
     });
@@ -411,6 +431,7 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
       router.usePlugin(hashPluginFactory({}, mockedBrowser));
       await router.start();
 
+      const stateBefore = router.getState();
       const maliciousState = {
         name: "home",
         params: {},
@@ -423,7 +444,7 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
 
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      expect(router.getState()).toBeDefined();
+      expect(router.getState()).toStrictEqual(stateBefore);
     });
   });
 });
