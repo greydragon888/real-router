@@ -128,4 +128,26 @@ describe("useIsActiveRoute", () => {
 
     expect(strict.value).toBe(false);
   });
+
+  it("ignoreQueryParams=true (default) — query params do not affect active state", async () => {
+    router.stop();
+    await router.start("/users/list?page=2");
+
+    const { result } = mountWithRouter(router, () =>
+      useIsActiveRoute("users.list", {}),
+    );
+
+    expect(result.value).toBe(true);
+  });
+
+  it("ignoreQueryParams=false — query param mismatch makes route inactive", async () => {
+    router.stop();
+    await router.start("/users/list?page=2");
+
+    const { result } = mountWithRouter(router, () =>
+      useIsActiveRoute("users.list", { page: "3" }, false, false),
+    );
+
+    expect(result.value).toBe(false);
+  });
 });

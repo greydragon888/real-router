@@ -1,0 +1,64 @@
+{
+  "name": "@real-router/angular",
+  "version": "0.0.1",
+  "type": "commonjs",
+  "description": "Angular 21 integration for Real-Router",
+  "exports": {
+    ".": {
+      "@real-router/internal-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/fesm2022/real-router-angular.mjs"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "homepage": "https://github.com/greydragon888/real-router",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/greydragon888/real-router.git"
+  },
+  "scripts": {
+    "test": "vitest",
+    "test:stress": "vitest -c vitest.config.stress.mts",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint --cache src/ tests/ --fix --max-warnings 0",
+    "prebundle": "rm -rf src/dom-utils && cp -r ../../shared/dom-utils src/dom-utils && perl -pi -e 's/\\.js\"/\"/g' src/dom-utils/*.ts",
+    "bundle": "ng-packagr -p ng-package.json -c tsconfig.lib.json"
+  },
+  "keywords": [
+    "router",
+    "angular",
+    "signals",
+    "standalone",
+    "zoneless",
+    "real-router"
+  ],
+  "author": {
+    "name": "Oleg Ivanov",
+    "email": "greydragon888@gmail.com",
+    "url": "https://github.com/greydragon888"
+  },
+  "license": "MIT",
+  "sideEffects": false,
+  "dependencies": {
+    "@real-router/core": "workspace:^",
+    "@real-router/route-utils": "workspace:^",
+    "@real-router/sources": "workspace:^"
+  },
+  "devDependencies": {
+    "@analogjs/vitest-angular": "2.4.7",
+    "@angular/common": "21.2.8",
+    "@angular/compiler": "21.2.8",
+    "@angular/compiler-cli": "21.2.8",
+    "@angular/core": "21.2.8",
+    "@angular/platform-browser": "21.2.8",
+    "ng-packagr": "21.2.2",
+    "typescript": "6.0.2"
+  },
+  "peerDependencies": {
+    "@angular/common": ">=21.0.0",
+    "@angular/core": ">=21.0.0"
+  }
+}

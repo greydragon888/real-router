@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 
 import { Match, NotFound } from "./components";
 import { buildRenderList, collectElements } from "./helpers";
@@ -12,15 +12,25 @@ function RouteViewRoot({
   children,
 }: Readonly<RouteViewProps>): ReactElement | null {
   const { route } = useRouteNode(nodeName);
-  const hasBeenActivatedRef = useRef<Set<string>>(new Set());
+  const hasBeenActivatedRef = useRef<Set<string> | null>(null);
+
+  // eslint-disable-next-line @eslint-react/refs -- lazy init: assign once when null to avoid `new Set()` allocation on every render
+  hasBeenActivatedRef.current ??= new Set();
+
+  // Skip the Children.toArray + collectElements traversal when children
+  // reference is unchanged. children only changes when the parent re-renders
+  // with a new ReactNode, so this caches the steady-state.
+  const elements = useMemo(() => {
+    const collected: ReactElement[] = [];
+
+    collectElements(children, collected);
+
+    return collected;
+  }, [children]);
 
   if (!route) {
     return null;
   }
-
-  const elements: ReactElement[] = [];
-
-  collectElements(children, elements);
 
   const { rendered } = buildRenderList(
     elements,

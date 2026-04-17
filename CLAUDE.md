@@ -2,9 +2,44 @@
 
 > Simple, powerful, view-agnostic, modular and extensible router
 
-pnpm monorepo with 28 packages + `benchmarks/` + bare `shared/` sources (symlinked into consumers' `src/dom-utils` and `src/browser-env`) + 75 example applications. Run `pnpm install` after cloning.
+pnpm monorepo with 31 packages + `benchmarks/` + bare `shared/` sources (symlinked into consumers' `src/dom-utils` and `src/browser-env`, except `packages/angular` which uses a git-tracked copy) + 75 example applications. Run `pnpm install` after cloning.
 
-`shared/` is a minimal workspace entry (name, type, devDeps) with no source files of its own, required for `type-guards` resolution during bundling via symlinks. See IMPLEMENTATION_NOTES.md section "Shared Sources via Symlinks" for details.
+`shared/` is a minimal workspace entry (name, type, devDeps) with no `src/` of its own — it owns sibling directories `shared/browser-env/` and `shared/dom-utils/` that are git-tracked symlink targets. This entry is required for `type-guards` resolution during bundling via symlinks. See IMPLEMENTATION_NOTES.md section "Shared Sources via Symlinks" for details.
+
+### Shared Sources Tree
+
+```
+shared/
+├── browser-env/          # History API + URL primitives — for plugin packages
+│   ├── detect.ts         # isBrowserEnvironment()
+│   ├── history-api.ts    # pushState, replaceState, addPopstateListener, getHash
+│   ├── plugin-utils.ts   # createStartInterceptor, createReplaceHistoryState, shouldReplaceHistory
+│   ├── popstate-handler.ts  # createPopstateHandler, createPopstateLifecycle
+│   ├── popstate-utils.ts # getRouteFromEvent, updateBrowserState
+│   ├── safe-browser.ts   # createSafeBrowser
+│   ├── ssr-fallback.ts   # createWarnOnce, createHistoryFallbackBrowser
+│   ├── types.ts          # HistoryBrowser, Browser, SharedFactoryState
+│   ├── url-parsing.ts    # safeParseUrl
+│   ├── url-utils.ts      # extractPath, buildUrl, urlToPath
+│   ├── utils.ts          # normalizeBase, safelyEncodePath
+│   ├── validation.ts     # createOptionsValidator
+│   └── index.ts          # barrel
+└── dom-utils/            # DOM helpers — for framework adapters
+    ├── link-utils.ts     # shouldNavigate, buildHref, buildActiveClassName, applyLinkA11y
+    ├── route-announcer.ts  # createRouteAnnouncer (a11y aria-live region)
+    └── index.ts          # barrel
+```
+
+### Symlink Consumers
+
+| Shared path | Symlink alias in consumer | Consumer packages |
+|---|---|---|
+| `shared/browser-env/` | `src/browser-env` | `browser-plugin`, `hash-plugin`, `navigation-plugin` |
+| `shared/dom-utils/` | `src/dom-utils` | `preact`, `react`, `solid`, `svelte`, `vue` |
+
+**Any edit to `shared/browser-env/utils.ts` or `shared/dom-utils/link-utils.ts` propagates instantly to every consumer via its symlink** — verify with `pnpm build` across all affected packages.
+
+`packages/angular/src/dom-utils` is **not** a symlink — it is a git-tracked copy, re-materialized from `shared/dom-utils/` by the `prebundle` npm script before every build (ng-packagr does not follow symlinks the same way tsdown does). **When editing `shared/dom-utils/*.ts`, also update `packages/angular/src/dom-utils/*.ts`** — or run `pnpm -F @real-router/angular bundle` to sync the copy. Verify with `readlink packages/angular/src/dom-utils`; returns empty.
 
 ## Rules
 
@@ -31,7 +66,8 @@ pnpm lint:unused        # Check for unused code (knip)
 
 ## Non-Obvious Conventions
 
-- 100% test coverage required (enforced in vitest.config). Framework adapters may have slightly lower thresholds for branches/functions due to compiler-generated phantom code (Solid: babel-preset-solid, Vue: defineComponent, Svelte: compiler transforms)
+- 100% test coverage required (enforced in vitest.config). Framework adapters may have slightly lower thresholds for branches/functions due to compiler-generated phantom code (Solid: babel-preset-solid, Vue: defineComponent, Svelte: compiler transforms, Angular: JIT TestBed does not bind signal `input()` so `contentChildren`/directive callbacks are unreachable without AOT — threshold 94/84/94/94)
+- Angular adapter is built with **ng-packagr** (not tsdown) — produces FESM2022 ESM-only (no CJS), partial-Ivy compilation linked by the consumer
 - Pinned versions (`save-exact=true` in .npmrc)
 - Workspace packages use `workspace:^` protocol
 - Dual ESM/CJS builds via tsdown (Solid uses rollup + babel-preset-solid, Svelte uses svelte-package)
@@ -140,7 +176,7 @@ When adding packages or features, keep these root files in sync:
 - **README.md** — Quick Start, API tables, code examples per feature
 
 ### Wiki (separate repo: `real-router.wiki/`)
-- **Integration Guide** per framework (Preact/Solid/Vue/Svelte-Integration.md) — kept in sync with adapter features
+- **Integration Guide** per framework (Preact/Solid/Vue/Svelte/Angular-Integration.md) — kept in sync with adapter features
 - **Per-API pages** (RouterProvider, Link, RouteView, useRouter, etc.) — include import alternatives for all frameworks
 - **_Sidebar.md** — links to all integration guides
 - Move features from **Planned Features** → implemented sections when shipped
@@ -155,6 +191,7 @@ When adding packages or features, keep these root files in sync:
 - [packages/solid/CLAUDE.md](packages/solid/CLAUDE.md) — Solid.js integration architecture
 - [packages/vue/CLAUDE.md](packages/vue/CLAUDE.md) — Vue 3 integration architecture
 - [packages/svelte/CLAUDE.md](packages/svelte/CLAUDE.md) — Svelte 5 integration architecture
+- [packages/angular/CLAUDE.md](packages/angular/CLAUDE.md) — Angular 21+ integration architecture
 - [packages/browser-plugin/CLAUDE.md](packages/browser-plugin/CLAUDE.md) — Browser plugin architecture
 - [packages/navigation-plugin/CLAUDE.md](packages/navigation-plugin/CLAUDE.md) — Navigation API plugin architecture
 - [packages/hash-plugin/CLAUDE.md](packages/hash-plugin/CLAUDE.md) — Hash plugin architecture

@@ -7,9 +7,9 @@ import type { Params } from "@real-router/core";
 
 export function useIsActiveRoute(
   routeName: string,
-  params?: Params,
-  strict = false,
-  ignoreQueryParams = true,
+  params: Params | undefined,
+  strict: boolean,
+  ignoreQueryParams: boolean,
 ): { readonly current: boolean } {
   const router = useRouter();
 

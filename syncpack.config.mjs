@@ -12,7 +12,13 @@ export default {
     "types",
     "exports",
   ],
-  source: ["package.json", "packages/*/package.json", "benchmarks/package.json"],
+  source: [
+    "package.json",
+    "packages/*/package.json",
+    "benchmarks/package.json",
+    "!packages/*/dist/**",
+    "!packages/*/coverage/**",
+  ],
   semverGroups: [
     {
       label: "Ignore local package versions",

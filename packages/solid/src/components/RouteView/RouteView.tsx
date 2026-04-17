@@ -1,4 +1,4 @@
-import { children as resolveChildren } from "solid-js";
+import { children as resolveChildren, createMemo } from "solid-js";
 
 import { Match, NotFound } from "./components";
 import { buildRenderList, collectElements } from "./helpers";
@@ -13,6 +13,14 @@ function RouteViewRoot(props: Readonly<RouteViewProps>): JSX.Element {
 
   const resolved = resolveChildren(() => props.children);
 
+  const elements = createMemo(() => {
+    const arr: RouteViewMarker[] = [];
+
+    collectElements(resolved(), arr);
+
+    return arr;
+  });
+
   return (
     <>
       {(() => {
@@ -22,24 +30,16 @@ function RouteViewRoot(props: Readonly<RouteViewProps>): JSX.Element {
           return null;
         }
 
-        const elements: RouteViewMarker[] = [];
-
-        collectElements(resolved(), elements);
-
-        const { rendered } = buildRenderList(
-          elements,
+        const rendered = buildRenderList(
+          elements(),
           state.route.name,
           props.nodeName,
         );
 
-        if (rendered.length > 0) {
-          return rendered;
-        }
-
-        return null;
+        return rendered.length > 0 ? rendered : null;
       })()}
     </>
-  ) as unknown as JSX.Element;
+  );
 }
 
 RouteViewRoot.displayName = "RouteView";

@@ -295,6 +295,48 @@ describe("Link - Performance Tests", { tags: ["performance"] }, () => {
       expect(screen.getByTestId("link")).toBeInTheDocument();
     });
 
+    it("should bail out memo when routeParams have reordered keys (key-order insensitive comparator)", async () => {
+      // Parent re-renders inline routeParams with shuffled key order. memo
+      // must consider them equal and skip re-rendering Link.
+      const Parent = () => {
+        const [tick, setTick] = useState(0);
+        const params =
+          tick % 2 === 0
+            ? { id: "1", a: "x", b: "y" }
+            : { b: "y", a: "x", id: "1" };
+
+        return (
+          <div>
+            <button
+              onClick={() => {
+                setTick((c) => c + 1);
+              }}
+            >
+              Tick
+            </button>
+            <Link
+              routeName="users.view"
+              routeParams={params}
+              data-testid="link"
+            >
+              Link
+            </Link>
+          </div>
+        );
+      };
+
+      render(<Parent />, { wrapper });
+
+      const hrefBefore = screen.getByTestId("link").getAttribute("href");
+
+      // Snapshot of DOM (memo bail-out can't be verified via Profiler because
+      // withProfiler wraps memo(Link) in a non-memoized shell that always
+      // re-renders with parent — see "Memoization" describe above).
+      await user.click(screen.getByText("Tick"));
+
+      expect(screen.getByTestId("link").getAttribute("href")).toBe(hrefBefore);
+    });
+
     it("should detect when complex params change", () => {
       const { component, rerender } = renderProfiledLink({
         routeName: "users.view",

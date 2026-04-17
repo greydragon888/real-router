@@ -1,3 +1,4 @@
+import { getNavigator } from "@real-router/core";
 import { getRoutesApi } from "@real-router/core/api";
 import { flushSync } from "svelte";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
@@ -32,7 +33,7 @@ describe("useRouteNode", () => {
       },
     });
 
-    expect(result!.navigator).toBeDefined();
+    expect(result!.navigator).toBe(getNavigator(router));
     expect(result!.route.current).toStrictEqual(undefined);
     expect(result!.previousRoute.current).toStrictEqual(undefined);
   });
@@ -220,5 +221,39 @@ describe("useRouteNode", () => {
         onCapture: () => {},
       }),
     ).toThrow();
+  });
+
+  // Documents gotcha #9 from CLAUDE.md: previousRoute is GLOBAL, not node-scoped.
+  // After navigating users.list → items → users.view, previousRoute observed by
+  // useRouteNode("users") must equal "items" (the last global route), NOT "users.list".
+  it("should expose the global previous route, not the previous route within the node scope", async () => {
+    let result: RouteContext | undefined;
+
+    renderWithRouter(router, RouteNodeCapture, {
+      nodeName: "users",
+      onCapture: (r: RouteContext) => {
+        result = r;
+      },
+    });
+
+    await router.start();
+    await router.navigate("users.list");
+    flushSync();
+
+    expect(result!.route.current?.name).toBe("users.list");
+
+    await router.navigate("items");
+    flushSync();
+
+    // Node "users" deactivated; previous remains the last route the node observed.
+    expect(result!.route.current).toBeUndefined();
+
+    await router.navigate("users.view", { id: "42" });
+    flushSync();
+
+    // Critical: previousRoute reflects the global previous route ("items"),
+    // NOT the previous "users.*" route ("users.list").
+    expect(result!.route.current?.name).toBe("users.view");
+    expect(result!.previousRoute.current?.name).toBe("items");
   });
 });

@@ -1,17 +1,17 @@
-// packages/react/modules/hooks/useRouteUtils.tsx
-
 import { getPluginApi } from "@real-router/core/api";
 import { getRouteUtils } from "@real-router/route-utils";
 
 import { useRouter } from "./useRouter";
 
+import type { Router } from "@real-router/core";
 import type { RouteUtils } from "@real-router/route-utils";
+
+const routeUtilsCache = new WeakMap<Router, RouteUtils>();
 
 /**
  * Returns a pre-computed {@link RouteUtils} instance for the current router.
  *
- * Internally retrieves the route tree via `getPluginApi` and delegates
- * to `getRouteUtils`, which caches instances per tree reference (WeakMap).
+ * Cached per router reference — no plugin/tree lookups on re-render.
  *
  * @returns RouteUtils instance with pre-computed chains and siblings
  *
@@ -32,5 +32,12 @@ import type { RouteUtils } from "@real-router/route-utils";
 export const useRouteUtils = (): RouteUtils => {
   const router = useRouter();
 
-  return getRouteUtils(getPluginApi(router).getTree());
+  let utils = routeUtilsCache.get(router);
+
+  if (!utils) {
+    utils = getRouteUtils(getPluginApi(router).getTree());
+    routeUtilsCache.set(router, utils);
+  }
+
+  return utils;
 };

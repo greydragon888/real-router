@@ -9,11 +9,47 @@ import {
   buildHref,
   buildActiveClassName,
 } from "../dom-utils/index.js";
-import { useRouter } from "../hooks/useRouter";
 
 import type { LinkProps } from "../types";
-import type { Params } from "@real-router/core";
+import type { Params, Router } from "@real-router/core";
+import type { RouterSource } from "@real-router/sources";
 import type { JSX } from "solid-js";
+
+// Slow-path source cache: shared per-router, keyed by routeName + params + flags.
+// Captured slow-path values are stable per Link (props captured at init), so the
+// cache key is guaranteed stable for the lifetime of any consumer.
+const activeSourceCache = new WeakMap<
+  Router,
+  Map<string, RouterSource<boolean>>
+>();
+
+function getOrCreateActiveSource(
+  router: Router,
+  routeName: string,
+  routeParams: Params,
+  activeStrict: boolean,
+  ignoreQueryParams: boolean,
+): RouterSource<boolean> {
+  let perRouter = activeSourceCache.get(router);
+
+  if (!perRouter) {
+    perRouter = new Map();
+    activeSourceCache.set(router, perRouter);
+  }
+
+  const key = `${routeName}|${JSON.stringify(routeParams)}|${activeStrict}|${ignoreQueryParams}`;
+  let source = perRouter.get(key);
+
+  if (!source) {
+    source = createActiveRouteSource(router, routeName, routeParams, {
+      strict: activeStrict,
+      ignoreQueryParams,
+    });
+    perRouter.set(key, source);
+  }
+
+  return source;
+}
 
 export function Link<P extends Params = Params>(
   props: Readonly<LinkProps<P>>,
@@ -42,11 +78,15 @@ export function Link<P extends Params = Params>(
     "children",
   ]);
 
-  const router = useRouter();
   const ctx = useContext(RouterContext);
 
+  if (!ctx) {
+    throw new Error("Link must be used within a RouterProvider");
+  }
+
+  const router = ctx.router;
+
   const useFastPath =
-    ctx?.routeSelector &&
     !local.activeStrict &&
     local.ignoreQueryParams &&
     local.routeParams === EMPTY_PARAMS;
@@ -54,10 +94,13 @@ export function Link<P extends Params = Params>(
   const isActive = useFastPath
     ? () => ctx.routeSelector(local.routeName)
     : createSignalFromSource(
-        createActiveRouteSource(router, local.routeName, local.routeParams, {
-          strict: local.activeStrict,
-          ignoreQueryParams: local.ignoreQueryParams,
-        }),
+        getOrCreateActiveSource(
+          router,
+          local.routeName,
+          local.routeParams,
+          local.activeStrict,
+          local.ignoreQueryParams,
+        ),
       );
 
   const href = createMemo(() =>

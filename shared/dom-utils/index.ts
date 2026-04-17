@@ -4,6 +4,7 @@ export {
   shouldNavigate,
   buildHref,
   buildActiveClassName,
+  shallowEqual,
   applyLinkA11y,
 } from "./link-utils.js";
 

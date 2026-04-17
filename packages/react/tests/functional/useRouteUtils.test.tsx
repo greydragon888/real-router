@@ -34,9 +34,6 @@ describe("useRouteUtils hook", () => {
     });
 
     expect(result.current).toBeInstanceOf(RouteUtils);
-    expect(result.current.getChain).toBeTypeOf("function");
-    expect(result.current.getSiblings).toBeTypeOf("function");
-    expect(result.current.isDescendantOf).toBeTypeOf("function");
   });
 
   it("should return same instance on re-render (WeakMap cache)", () => {

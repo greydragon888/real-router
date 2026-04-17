@@ -13,6 +13,10 @@ function isSegmentMatch(
   fullSegmentName: string,
   exact: boolean,
 ): boolean {
+  if (fullSegmentName === "") {
+    return false;
+  }
+
   if (exact) {
     return routeName === fullSegmentName;
   }

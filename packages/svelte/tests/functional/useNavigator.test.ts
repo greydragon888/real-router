@@ -1,3 +1,4 @@
+import { getNavigator } from "@real-router/core";
 import { render } from "@testing-library/svelte";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
@@ -7,42 +8,43 @@ import {
 } from "../helpers";
 import NavigatorCapture from "../helpers/NavigatorCapture.svelte";
 
-import type { Router } from "@real-router/core";
+import type { Navigator, Router } from "@real-router/core";
 
 describe("useNavigator composable", () => {
   let router: Router;
 
   beforeEach(async () => {
     router = createTestRouterWithADefaultRouter();
-    await router.start();
+    // Force the initial URL to "/" so getState() reliably returns "test" — without
+    // this, state leaks between tests via the JSDOM window location.
+    await router.start("/");
   });
 
   afterEach(() => {
     router.stop();
   });
 
-  it("should return navigator with 4 methods", () => {
-    let result: any;
+  it("should return the same navigator instance as getNavigator(router)", () => {
+    let result!: Navigator;
 
     renderWithRouter(router, NavigatorCapture, {
       onCapture: (r: unknown) => {
-        result = r;
+        result = r as Navigator;
       },
     });
 
-    expect(result).toBeTypeOf("object");
-    expect(result.navigate).toBeTypeOf("function");
-    expect(result.getState).toBeTypeOf("function");
-    expect(result.isActiveRoute).toBeTypeOf("function");
-    expect(result.subscribe).toBeTypeOf("function");
+    // Identity check subsumes the four toBeTypeOf assertions that used to live
+    // here. The dedicated "should have working …" tests below exercise each
+    // method behaviorally, which is a stronger guarantee than typeof==="function".
+    expect(result).toBe(getNavigator(router));
   });
 
   it("should have working navigate method", async () => {
-    let result: any;
+    let result!: Navigator;
 
     renderWithRouter(router, NavigatorCapture, {
       onCapture: (r: unknown) => {
-        result = r;
+        result = r as Navigator;
       },
     });
 
@@ -52,41 +54,39 @@ describe("useNavigator composable", () => {
   });
 
   it("should have working getState method", () => {
-    let result: any;
+    let result!: Navigator;
 
     renderWithRouter(router, NavigatorCapture, {
       onCapture: (r: unknown) => {
-        result = r;
+        result = r as Navigator;
       },
     });
 
     const state = result.getState();
 
     expect(state).not.toBeNull();
-    expect(state!.name).toBeTypeOf("string");
+    expect(state!.name).toBe("test");
   });
 
   it("should have working isActiveRoute method", () => {
-    let result: any;
+    let result!: Navigator;
 
     renderWithRouter(router, NavigatorCapture, {
       onCapture: (r: unknown) => {
-        result = r;
+        result = r as Navigator;
       },
     });
 
-    const state = result.getState();
-
-    expect(state).not.toBeNull();
-    expect(result.isActiveRoute(state!.name)).toBe(true);
+    expect(result.isActiveRoute("test")).toBe(true);
+    expect(result.isActiveRoute("items")).toBe(false);
   });
 
   it("should have working subscribe method and return unsubscribe fn", async () => {
-    let result: any;
+    let result!: Navigator;
 
     renderWithRouter(router, NavigatorCapture, {
       onCapture: (r: unknown) => {
-        result = r;
+        result = r as Navigator;
       },
     });
 

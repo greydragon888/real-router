@@ -1,4 +1,4 @@
-// packages/react/modules/context.ts
+// packages/react/src/context.ts
 
 import { createContext } from "react";
 

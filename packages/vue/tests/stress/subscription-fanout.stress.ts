@@ -65,11 +65,13 @@ describe("subscription-fanout stress tests (Vue)", () => {
       sequence.map((name) => ({ name })),
     );
 
+    // 100 navs round-robin over 50 routes → each route activates exactly 2x.
+    // Each activation calls render → renderCounts[i] increments by 2 (the
+    // deactivation render also fires, but is gated by `if (route.value)`).
     for (let i = 0; i < 50; i++) {
       const delta = renderCounts[i] - countsAfterMount[i];
 
-      expect(delta).toBeGreaterThanOrEqual(2);
-      expect(delta).toBeLessThanOrEqual(10);
+      expect(delta).toBe(2);
     }
   });
 

@@ -3,8 +3,7 @@
 /**
  * Property-based smoke tests for isSegmentMatch logic in Solid RouteView.
  *
- * isSegmentMatch is NOT exported — we replicate the logic here.
- * It delegates to startsWithSegment from @real-router/route-utils for non-exact.
+ * Tests the production function directly via internal export.
  *
  * Invariants:
  * 1. Exact match: isSegmentMatch(name, name, true) === true
@@ -14,26 +13,10 @@
  */
 
 import { fc, test } from "@fast-check/vitest";
-import { startsWithSegment } from "@real-router/route-utils";
 import { describe, expect } from "vitest";
 
 import { NUM_RUNS, arbSegmentName, arbDottedName } from "./helpers";
-
-// =============================================================================
-// Inline replica of isSegmentMatch (not exported)
-// =============================================================================
-
-function isSegmentMatch(
-  routeName: string,
-  fullSegmentName: string,
-  exact: boolean,
-): boolean {
-  if (exact) {
-    return routeName === fullSegmentName;
-  }
-
-  return startsWithSegment(routeName, fullSegmentName);
-}
+import { isSegmentMatch } from "../../src/components/RouteView/helpers";
 
 // =============================================================================
 // Tests

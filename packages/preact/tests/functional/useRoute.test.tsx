@@ -40,8 +40,6 @@ describe("useRoute hook", () => {
   });
 
   it("should return current route", async () => {
-    vi.spyOn(router, "subscribe");
-
     const { result } = renderHook(() => useRoute(), {
       wrapper: wrapper(router),
     });

@@ -462,6 +462,84 @@ describe("RouteView", () => {
       expect(wrapper.find("[data-testid='about']").exists()).toBe(false);
     });
 
+    it("should support Match wrapped in nested Fragments (Fragment-in-Fragment)", async () => {
+      await router.start("/users/list");
+
+      const wrapper = mountRouteView(
+        router,
+        h(
+          RouteView,
+          { nodeName: "" },
+          {
+            default: () =>
+              h(Fragment, [
+                h(Fragment, [
+                  h(Fragment, [
+                    h(
+                      RouteView.Match,
+                      { segment: "users" },
+                      {
+                        default: () =>
+                          h("div", { "data-testid": "deeply-nested" }, "Deep"),
+                      },
+                    ),
+                  ]),
+                ]),
+              ]),
+          },
+        ),
+      );
+
+      expect(wrapper.find("[data-testid='deeply-nested']").exists()).toBe(true);
+    });
+
+    it("should ignore Match wrapped in custom component (vnode.type !== Match)", async () => {
+      // Documents a known limitation: collectElements walks vnodes by their
+      // `type` field. Match wrapped in any user-defined component is not
+      // discoverable — the wrapper's render output is not inspected at the
+      // static walk. Direct Match siblings still work.
+      const WrapperComp = defineComponent({
+        name: "WrapperComp",
+        setup: () => () =>
+          h(
+            RouteView.Match,
+            { segment: "users" },
+            {
+              default: () =>
+                h("div", { "data-testid": "wrapped-match" }, "Wrapped"),
+            },
+          ),
+      });
+
+      await router.start("/users/list");
+
+      const wrapper = mountRouteView(
+        router,
+        h(
+          RouteView,
+          { nodeName: "" },
+          {
+            default: () => [
+              h(WrapperComp),
+              h(
+                RouteView.Match,
+                { segment: "users" },
+                {
+                  default: () => h("div", { "data-testid": "users" }, "Users"),
+                },
+              ),
+            ],
+          },
+        ),
+      );
+
+      expect(wrapper.find("[data-testid='users']").exists()).toBe(true);
+      // Documents the limitation — wrapped Match is invisible to RouteView.
+      expect(wrapper.find("[data-testid='wrapped-match']").exists()).toBe(
+        false,
+      );
+    });
+
     it("should return null for empty RouteView", async () => {
       await router.start("/users/list");
 
@@ -945,6 +1023,61 @@ describe("RouteView", () => {
       );
 
       expect(wrapper.find("[data-testid='users']").exists()).toBe(true);
+    });
+
+    it("should display fallback while async component resolves, then real content", async () => {
+      const { defineAsyncComponent, nextTick } = await import("vue");
+
+      let resolveAsync!: (
+        component: ReturnType<typeof defineComponent>,
+      ) => void;
+      const asyncComponentPromise = new Promise<
+        ReturnType<typeof defineComponent>
+      >((resolve) => {
+        resolveAsync = resolve;
+      });
+
+      const LazyContent = defineAsyncComponent(() => asyncComponentPromise);
+
+      await router.start("/users/list");
+
+      const wrapper = mountRouteView(
+        router,
+        h(
+          RouteView,
+          { nodeName: "" },
+          {
+            default: () =>
+              h(
+                RouteView.Match,
+                {
+                  segment: "users",
+                  fallback: () =>
+                    h("div", { "data-testid": "fallback" }, "Loading..."),
+                },
+                { default: () => h(LazyContent) },
+              ),
+          },
+        ),
+      );
+
+      // Before async resolves: Suspense renders the fallback.
+      await nextTick();
+
+      expect(wrapper.find("[data-testid='fallback']").exists()).toBe(true);
+
+      // Resolve the async component → fallback replaced with real content.
+      resolveAsync(
+        defineComponent({
+          setup: () => () =>
+            h("div", { "data-testid": "lazy-loaded" }, "Real content"),
+        }),
+      );
+      await flushPromises();
+      await nextTick();
+
+      expect(wrapper.find("[data-testid='fallback']").exists()).toBe(false);
+      expect(wrapper.find("[data-testid='lazy-loaded']").exists()).toBe(true);
     });
 
     it("should render fallback as VNode when provided", async () => {

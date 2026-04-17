@@ -1,6 +1,6 @@
 import { flushPromises } from "@vue/test-utils";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { h, nextTick } from "vue";
+import { defineComponent, h, nextTick, ref } from "vue";
 
 import {
   createStressRouter,
@@ -193,5 +193,67 @@ describe("link-mass-rendering stress tests (Vue)", () => {
     await flushPromises();
 
     expect(link.classes()).toContain("active");
+  });
+
+  it("2.6: 100 Links with dynamic routeName — active class tracks prop changes", async () => {
+    const currentTarget = ref("route0");
+
+    const App = defineComponent({
+      name: "DynamicLinks",
+      setup() {
+        return () =>
+          Array.from({ length: 100 }, (_, i) =>
+            h(
+              Link,
+              {
+                key: i,
+                routeName: i === 0 ? currentTarget.value : `route${i}`,
+                activeClassName: "active",
+                "data-testid": `link-${i}`,
+              },
+              { default: () => `Link ${i}` },
+            ),
+          );
+      },
+    });
+
+    const wrapper = mountWithProvider(router, () => h(App));
+
+    await nextTick();
+    await flushPromises();
+
+    expect(wrapper.find("[data-testid='link-0']").classes()).toContain(
+      "active",
+    );
+
+    for (let i = 1; i <= 50; i++) {
+      const routeName = `route${i}`;
+
+      currentTarget.value = routeName;
+
+      await router.navigate(routeName);
+      await nextTick();
+      await flushPromises();
+
+      expect(wrapper.find("[data-testid='link-0']").classes()).toContain(
+        "active",
+      );
+    }
+
+    currentTarget.value = "route99";
+    await nextTick();
+    await flushPromises();
+
+    expect(wrapper.find("[data-testid='link-0']").classes()).not.toContain(
+      "active",
+    );
+
+    await router.navigate("route99");
+    await nextTick();
+    await flushPromises();
+
+    expect(wrapper.find("[data-testid='link-0']").classes()).toContain(
+      "active",
+    );
   });
 });

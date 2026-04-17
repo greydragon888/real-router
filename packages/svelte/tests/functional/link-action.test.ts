@@ -6,10 +6,12 @@ import {
   createTestRouterWithADefaultRouter,
   renderWithRouter,
 } from "../helpers";
+import LinkActionAnchorTest from "../helpers/LinkActionAnchorTest.svelte";
 import LinkActionDoubleTest from "../helpers/LinkActionDoubleTest.svelte";
 import LinkActionTest from "../helpers/LinkActionTest.svelte";
 import LinkActionTestNoProvider from "../helpers/LinkActionTestNoProvider.svelte";
 import LinkActionUpdateTest from "../helpers/LinkActionUpdateTest.svelte";
+import LinkActionWithPresetAttributes from "../helpers/LinkActionWithPresetAttrs.svelte";
 
 import type { Router } from "@real-router/core";
 
@@ -35,92 +37,38 @@ describe("createLinkAction", () => {
 
     const button = document.querySelector("button")!;
 
-    expect(button).toBeInTheDocument();
-
     await userEvent.click(button);
 
     expect(router.navigate).toHaveBeenCalledWith("one-more-test", {}, {});
   });
 
-  it("should respect modifier keys (shouldNavigate)", () => {
-    vi.spyOn(router, "navigate");
+  it.each([
+    { label: "ctrl", modifiers: { ctrlKey: true } },
+    { label: "meta", modifiers: { metaKey: true } },
+    { label: "alt", modifiers: { altKey: true } },
+    { label: "shift", modifiers: { shiftKey: true } },
+  ] as const)(
+    "should not navigate when $label modifier is pressed",
+    ({ modifiers }) => {
+      vi.spyOn(router, "navigate");
 
-    renderWithRouter(router, LinkActionTest, {
-      params: { name: "one-more-test" },
-      element: "button",
-    });
+      renderWithRouter(router, LinkActionTest, {
+        params: { name: "one-more-test" },
+        element: "button",
+      });
 
-    const button = document.querySelector("button")!;
-    const event = new MouseEvent("click", {
-      bubbles: true,
-      cancelable: true,
-      ctrlKey: true,
-    });
+      const button = document.querySelector("button")!;
+      const event = new MouseEvent("click", {
+        bubbles: true,
+        cancelable: true,
+        ...modifiers,
+      });
 
-    button.dispatchEvent(event);
+      button.dispatchEvent(event);
 
-    expect(router.navigate).not.toHaveBeenCalled();
-  });
-
-  it("should respect meta key", () => {
-    vi.spyOn(router, "navigate");
-
-    renderWithRouter(router, LinkActionTest, {
-      params: { name: "one-more-test" },
-      element: "button",
-    });
-
-    const button = document.querySelector("button")!;
-    const event = new MouseEvent("click", {
-      bubbles: true,
-      cancelable: true,
-      metaKey: true,
-    });
-
-    button.dispatchEvent(event);
-
-    expect(router.navigate).not.toHaveBeenCalled();
-  });
-
-  it("should respect alt key", () => {
-    vi.spyOn(router, "navigate");
-
-    renderWithRouter(router, LinkActionTest, {
-      params: { name: "one-more-test" },
-      element: "button",
-    });
-
-    const button = document.querySelector("button")!;
-    const event = new MouseEvent("click", {
-      bubbles: true,
-      cancelable: true,
-      altKey: true,
-    });
-
-    button.dispatchEvent(event);
-
-    expect(router.navigate).not.toHaveBeenCalled();
-  });
-
-  it("should respect shift key", () => {
-    vi.spyOn(router, "navigate");
-
-    renderWithRouter(router, LinkActionTest, {
-      params: { name: "one-more-test" },
-      element: "button",
-    });
-
-    const button = document.querySelector("button")!;
-    const event = new MouseEvent("click", {
-      bubbles: true,
-      cancelable: true,
-      shiftKey: true,
-    });
-
-    button.dispatchEvent(event);
-
-    expect(router.navigate).not.toHaveBeenCalled();
-  });
+      expect(router.navigate).not.toHaveBeenCalled();
+    },
+  );
 
   it("should set a11y attributes on non-interactive elements", () => {
     const { container } = renderWithRouter(router, LinkActionTest, {
@@ -130,38 +78,43 @@ describe("createLinkAction", () => {
 
     const div = container.querySelector("div")!;
 
-    expect(div).toBeDefined();
     expect(div.getAttribute("role")).toBe("link");
     expect(div.getAttribute("tabindex")).toBe("0");
   });
 
-  it("should not override existing role attribute", () => {
-    const { container } = renderWithRouter(router, LinkActionTest, {
-      params: { name: "one-more-test" },
-      element: "div",
-    });
+  it("should preserve role attribute that was already on the element before mount", () => {
+    const { container } = renderWithRouter(
+      router,
+      LinkActionWithPresetAttributes,
+      {
+        params: { name: "one-more-test" },
+      },
+    );
 
     const div = container.querySelector("div")!;
 
-    div.setAttribute("role", "button");
-
+    // The element had role="button" before the action ran — action must not overwrite it.
     expect(div.getAttribute("role")).toBe("button");
   });
 
-  it("should not override existing tabindex attribute", () => {
-    const { container } = renderWithRouter(router, LinkActionTest, {
-      params: { name: "one-more-test" },
-      element: "div",
-    });
+  it("should preserve tabindex attribute that was already on the element before mount", () => {
+    const { container } = renderWithRouter(
+      router,
+      LinkActionWithPresetAttributes,
+      {
+        params: { name: "one-more-test" },
+      },
+    );
 
     const div = container.querySelector("div")!;
 
-    div.setAttribute("tabindex", "1");
-
-    expect(div.getAttribute("tabindex")).toBe("1");
+    // The element had tabindex="2" before the action ran — action must not overwrite it.
+    expect(div.getAttribute("tabindex")).toBe("2");
   });
 
-  it("should not set a11y attributes on anchor elements", () => {
+  it("should not set a11y attributes on anchor elements but still navigate on click", async () => {
+    vi.spyOn(router, "navigate");
+
     renderWithRouter(router, LinkActionTest, {
       params: { name: "one-more-test" },
       element: "a",
@@ -171,6 +124,10 @@ describe("createLinkAction", () => {
 
     expect(anchor.getAttribute("role")).toBeNull();
     expect(anchor.getAttribute("tabindex")).toBeNull();
+
+    await userEvent.click(anchor);
+
+    expect(router.navigate).toHaveBeenCalledWith("one-more-test", {}, {});
   });
 
   it("should not set a11y attributes on button elements", () => {
@@ -252,6 +209,33 @@ describe("createLinkAction", () => {
     div.dispatchEvent(event);
 
     expect(router.navigate).toHaveBeenCalledWith("one-more-test", {}, {});
+  });
+
+  // Documents WAI-ARIA semantics: role="link" activates on Enter only,
+  // unlike role="button" which also accepts Space. applyLinkA11y sets role="link",
+  // so Space MUST NOT trigger navigation. If this behavior changes to accept Space,
+  // that is a breaking a11y change and this test should be updated intentionally.
+  it("should NOT navigate on Space key (WAI-ARIA role=link accepts Enter only)", () => {
+    vi.spyOn(router, "navigate");
+
+    const { container } = renderWithRouter(router, LinkActionTest, {
+      params: { name: "one-more-test" },
+      element: "div",
+    });
+
+    const div = container.querySelector("div")!;
+
+    div.focus();
+
+    const event = new KeyboardEvent("keydown", {
+      key: " ",
+      bubbles: true,
+      cancelable: true,
+    });
+
+    div.dispatchEvent(event);
+
+    expect(router.navigate).not.toHaveBeenCalled();
   });
 
   it("should remove event listeners on destroy", async () => {
@@ -343,7 +327,7 @@ describe("createLinkAction", () => {
       render(LinkActionTestNoProvider, {
         props: { params: { name: "one-more-test" } },
       });
-    }).toThrow("createLinkAction must be called inside a RouterProvider");
+    }).toThrow("createLinkAction must be used within a RouterProvider");
   });
 
   it("should support multiple link actions in one component", async () => {
@@ -357,9 +341,6 @@ describe("createLinkAction", () => {
     const button1 = document.querySelector("[data-testid='btn1']")!;
     const button2 = document.querySelector("[data-testid='btn2']")!;
 
-    expect(button1).toBeInTheDocument();
-    expect(button2).toBeInTheDocument();
-
     await userEvent.click(button1);
 
     expect(router.navigate).toHaveBeenCalledWith("home", {}, {});
@@ -369,5 +350,49 @@ describe("createLinkAction", () => {
     await userEvent.click(button2);
 
     expect(router.navigate).toHaveBeenCalledWith("about", {}, {});
+  });
+
+  it("should not navigate when anchor has target=_blank", async () => {
+    vi.spyOn(router, "navigate");
+
+    renderWithRouter(router, LinkActionAnchorTest, {
+      params: { name: "one-more-test" },
+      target: "_blank",
+    });
+
+    const anchor = document.querySelector("a")!;
+
+    // Use a real click event to trigger the click handler — userEvent on _blank
+    // anchors triggers JSDOM "Not implemented: navigation" warnings.
+    const event = new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+    });
+
+    anchor.dispatchEvent(event);
+
+    // Default not prevented — browser handles it (opens new tab).
+    expect(event.defaultPrevented).toBe(false);
+    expect(router.navigate).not.toHaveBeenCalled();
+  });
+
+  it("should still navigate when anchor has no target", async () => {
+    vi.spyOn(router, "navigate");
+
+    renderWithRouter(router, LinkActionAnchorTest, {
+      params: { name: "one-more-test" },
+    });
+
+    const anchor = document.querySelector("a")!;
+
+    const event = new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+    });
+
+    anchor.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(router.navigate).toHaveBeenCalledWith("one-more-test", {}, {});
   });
 });

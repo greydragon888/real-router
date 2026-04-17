@@ -167,7 +167,14 @@ describe("mount/unmount subscription lifecycle (Vue)", () => {
       await nextTick();
     }
 
-    expect(true).toBe(true);
+    // After 100 toggles: router still functional (stack didn't crash) and
+    // navigation works. This replaces the previous expect(true).toBe(true)
+    // tautology with a real liveness check.
+    await router.navigate("route1");
+    await nextTick();
+    await flushPromises();
+
+    expect(router.getState()?.name).toBe("route1");
   });
 
   it("3.5: router stop/restart while 50 components mounted — components receive post-restart navigations", async () => {
@@ -249,13 +256,13 @@ describe("mount/unmount subscription lifecycle (Vue)", () => {
     wrapper.unmount();
   });
 
-  it("3.7: mount/unmount useRouterTransition × 200 cycles — no crashes", () => {
+  it("3.7: mount/unmount useRouterTransition × 200 cycles — no crashes, post-cycle transition works", () => {
     const TransitionConsumer = defineComponent({
       name: "TransitionConsumer",
       setup() {
-        useRouterTransition();
+        const transition = useRouterTransition();
 
-        return () => h("div");
+        return () => h("div", String(transition.value.isTransitioning));
       },
     });
 
@@ -265,6 +272,91 @@ describe("mount/unmount subscription lifecycle (Vue)", () => {
       wrapper.unmount();
     }
 
-    expect(true).toBe(true);
+    const wrapper = mountWithProvider(router, () => h(TransitionConsumer));
+
+    expect(wrapper.text()).toBe("false");
+
+    wrapper.unmount();
+  });
+
+  it("3.8: navigate during teardown — no errors, router state consistent", async () => {
+    const NodeConsumer = defineComponent({
+      name: "NodeConsumer",
+      setup() {
+        const { route } = useRouteNode("route0");
+
+        return () => h("div", route.value?.name ?? "none");
+      },
+    });
+
+    for (let cycle = 0; cycle < 50; cycle++) {
+      const wrapper = mountWithProvider(router, () =>
+        Array.from({ length: 10 }, (_, i) => h(NodeConsumer, { key: i })),
+      );
+
+      void router.navigate(`route${(cycle % 49) + 1}`);
+      wrapper.unmount();
+
+      await nextTick();
+      await flushPromises();
+    }
+
+    expect(router.getState()).toBeDefined();
+
+    const wrapper = mountWithProvider(router, () => h(NodeConsumer));
+
+    await nextTick();
+    await flushPromises();
+
+    wrapper.unmount();
+  });
+
+  it("3.9: 10000 navigate cycles — bounded heap, no listener accumulation", async () => {
+    const NodeConsumer = defineComponent({
+      name: "NodeConsumer",
+      setup() {
+        const { route } = useRouteNode("");
+
+        return () => h("div", route.value?.name ?? "none");
+      },
+    });
+
+    const wrapper = mountWithProvider(router, () => h(NodeConsumer));
+
+    const heapBefore = takeHeapSnapshot();
+
+    for (let i = 0; i < 10_000; i++) {
+      await router.navigate(`route${(i % 49) + 1}`);
+    }
+
+    await nextTick();
+    await flushPromises();
+
+    const heapAfter = takeHeapSnapshot();
+
+    expect(heapAfter - heapBefore).toBeLessThan(100 * MB);
+
+    expect(router.getState()?.name).toBeDefined();
+
+    wrapper.unmount();
+  });
+
+  it("3.10: rapid router.start/stop × 100 (no navigations between) — bounded heap, navigation works after", async () => {
+    const heapBefore = takeHeapSnapshot();
+
+    for (let cycle = 0; cycle < 100; cycle++) {
+      router.stop();
+      await router.start("/route0");
+    }
+
+    const heapAfter = takeHeapSnapshot();
+
+    // Each start/stop round-trip should not leak FSM/event-bus state.
+    expect(heapAfter - heapBefore).toBeLessThan(50 * MB);
+
+    // Final router is healthy: navigation still resolves.
+    await router.navigate("route1");
+
+    expect(router.getState()?.name).toBe("route1");
   });
 });

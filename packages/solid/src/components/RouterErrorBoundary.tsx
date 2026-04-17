@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal } from "solid-js";
+import { createEffect, createMemo, createSignal, Show } from "solid-js";
 
 import { useRouterError } from "../hooks/useRouterError";
 
@@ -43,11 +43,9 @@ export function RouterErrorBoundary(
   return (
     <>
       {props.children}
-      {(() => {
-        const error = visibleError();
-
-        return error ? props.fallback(error, resetError) : null;
-      })()}
+      <Show when={visibleError()}>
+        {(error) => props.fallback(error(), resetError)}
+      </Show>
     </>
   );
 }

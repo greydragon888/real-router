@@ -142,6 +142,7 @@ Navigation link with automatic active state detection. Uses `$derived` for href 
 | `activeStrict`      | `boolean`           | `false`     | Exact match only (no ancestor matching) |
 | `ignoreQueryParams` | `boolean`           | `true`      | Query params don't affect active state  |
 | `target`            | `string`            | `undefined` | Link target (`_blank`, etc.)            |
+| `onclick`           | `(evt: MouseEvent) => void` | `undefined` | Custom click handler. Runs **before** the navigation logic — call `evt.preventDefault()` to suppress navigation. |
 
 All other props are spread onto the `<a>` element.
 
@@ -206,7 +207,13 @@ Declarative error handling for navigation errors. Shows a fallback **alongside**
 </script>
 
 <RouterErrorBoundary
-  onError={(error) => analytics.track("nav_error", { code: error.code })}
+  onError={(error, toRoute, fromRoute) =>
+    analytics.track("nav_error", {
+      code: error.code,
+      to: toRoute?.name,
+      from: fromRoute?.name,
+    })
+  }
 >
   {#snippet fallback(error, resetError)}
     <div class="toast">
@@ -219,6 +226,8 @@ Declarative error handling for navigation errors. Shows a fallback **alongside**
 ```
 
 Auto-resets on next successful navigation. Works with both `<Link>` and imperative `router.navigate()`.
+
+**`onError` signature:** `(error, toRoute, fromRoute) => void`. Receives the `RouterError`, the attempted destination (`State | null`), and the previously active route (`State | null`). A throwing `onError` is caught by the boundary, logged via `console.error`, and never breaks reactivity.
 
 ## Actions
 
@@ -363,9 +372,9 @@ Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 
 ## Examples
 
-15 runnable examples — each is a standalone Vite app. Run: `cd examples/svelte/basic && pnpm dev`
+16 runnable examples — each is a standalone Vite app. Run: `cd examples/svelte/basic && pnpm dev`
 
-[basic](../../examples/svelte/basic) · [nested-routes](../../examples/svelte/nested-routes) · [auth-guards](../../examples/svelte/auth-guards) · [data-loading](../../examples/svelte/data-loading) · [lazy-loading](../../examples/svelte/lazy-loading) · [async-guards](../../examples/svelte/async-guards) · [hash-routing](../../examples/svelte/hash-routing) · [persistent-params](../../examples/svelte/persistent-params) · [error-handling](../../examples/svelte/error-handling) · [dynamic-routes](../../examples/svelte/dynamic-routes) · [link-action](../../examples/svelte/link-action) · [lazy-loading-svelte](../../examples/svelte/lazy-loading-svelte) · [snippets-routing](../../examples/svelte/snippets-routing) · [reactive-source](../../examples/svelte/reactive-source) · [combined](../../examples/svelte/combined)
+[basic](../../examples/svelte/basic) · [nested-routes](../../examples/svelte/nested-routes) · [auth-guards](../../examples/svelte/auth-guards) · [data-loading](../../examples/svelte/data-loading) · [lazy-loading](../../examples/svelte/lazy-loading) · [async-guards](../../examples/svelte/async-guards) · [hash-routing](../../examples/svelte/hash-routing) · [persistent-params](../../examples/svelte/persistent-params) · [error-handling](../../examples/svelte/error-handling) · [dynamic-routes](../../examples/svelte/dynamic-routes) · [link-action](../../examples/svelte/link-action) · [lazy-loading-svelte](../../examples/svelte/lazy-loading-svelte) · [snippets-routing](../../examples/svelte/snippets-routing) · [reactive-source](../../examples/svelte/reactive-source) · [search-schema](../../examples/svelte/search-schema) · [combined](../../examples/svelte/combined)
 
 ## Related Packages
 

@@ -80,4 +80,38 @@ describe("isSegmentMatch — Property Tests (Preact RouteView)", () => {
       },
     );
   });
+
+  describe("Invariant 5: Shared prefix without segment boundary does not match", () => {
+    test.prop([arbSegmentName, arbSegmentName], { numRuns: NUM_RUNS.standard })(
+      "isSegmentMatch('usersAdmin', 'users', false) === false",
+      (a, b) => {
+        fc.pre(a !== b && !a.includes(".") && !b.includes("."));
+
+        const routeName = `${a}${b}`;
+
+        // Guard: suffix must not accidentally make it a boundary match.
+        fc.pre(!routeName.startsWith(`${a}.`));
+
+        expect(isSegmentMatch(routeName, a, false)).toBe(false);
+      },
+    );
+  });
+
+  describe("Invariant 6: Empty-string edge cases are well-defined", () => {
+    test("isSegmentMatch('', '', true) === true (exact self-match of empty)", () => {
+      expect(isSegmentMatch("", "", true)).toBe(true);
+    });
+
+    test("isSegmentMatch('users', '', true) === false (empty segment, non-empty name)", () => {
+      expect(isSegmentMatch("users", "", true)).toBe(false);
+    });
+
+    test("isSegmentMatch('', 'users', true) === false (non-empty segment, empty name)", () => {
+      expect(isSegmentMatch("", "users", true)).toBe(false);
+    });
+
+    test("isSegmentMatch('', 'users', false) === false (non-empty segment, empty name)", () => {
+      expect(isSegmentMatch("", "users", false)).toBe(false);
+    });
+  });
 });

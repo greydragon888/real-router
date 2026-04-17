@@ -1,6 +1,6 @@
 import { mount } from "@vue/test-utils";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
-import { defineComponent, h } from "vue";
+import { defineComponent, h, ref } from "vue";
 
 import { RouterProvider } from "../../src/RouterProvider";
 import { createTestRouterWithADefaultRouter } from "../helpers";
@@ -137,6 +137,35 @@ describe("RouterProvider — announceNavigation", () => {
     expect(announcer).not.toBeNull();
     expect(announcer?.getAttribute("aria-live")).toBe("assertive");
     expect(announcer?.getAttribute("aria-atomic")).toBe("true");
+  });
+
+  it("announceNavigation prop toggle — announcer is created/destroyed reactively", async () => {
+    const enabled = ref(false);
+
+    const wrapper = mount(
+      defineComponent({
+        setup: () => () =>
+          h(
+            RouterProvider,
+            { router, announceNavigation: enabled.value },
+            { default: () => h("div") },
+          ),
+      }),
+    );
+
+    expect(document.querySelector(ANNOUNCER_SEL)).toBeNull();
+
+    enabled.value = true;
+    await wrapper.vm.$nextTick();
+
+    expect(document.querySelector(ANNOUNCER_SEL)).not.toBeNull();
+
+    enabled.value = false;
+    await wrapper.vm.$nextTick();
+
+    expect(document.querySelector(ANNOUNCER_SEL)).toBeNull();
+
+    wrapper.unmount();
   });
 
   it("cleanup on unmount — announcer element removed from DOM", () => {

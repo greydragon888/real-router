@@ -81,15 +81,18 @@ describe("useRoute composable", () => {
     ).toThrow();
   });
 
-  it("should not trigger effect when nested property is mutated (shallowRef behavior)", async () => {
+  it("shallowRef tracks identity: re-assigning the same frozen snapshot does NOT fire effects", async () => {
     let effectCount = 0;
+    let routeRef: ReturnType<typeof useRoute>["route"] | undefined;
 
     const App = defineComponent({
       setup() {
-        const { route } = useRoute();
+        const ctx = useRoute();
+
+        routeRef = ctx.route;
 
         watchSyncEffect(() => {
-          if (route.value) {
+          if (ctx.route.value) {
             effectCount++;
           }
         });
@@ -109,29 +112,30 @@ describe("useRoute composable", () => {
 
     const countAfterMount = effectCount;
 
-    // Navigate to get a route with params
     await router.navigate("items.item", { id: 6 });
     await flushPromises();
 
     const countAfterNavigation = effectCount;
+    const currentSnapshot = routeRef!.value;
 
     expect(countAfterNavigation).toBeGreaterThan(countAfterMount);
+    expect(currentSnapshot).toBeDefined();
 
-    // Re-assign the same snapshot back to the shallowRef —
-    // since shallowRef tracks identity, same reference means NO effect fires.
-    // This verifies the "shallow" semantics: only reference changes trigger updates.
-    // (Route state objects are frozen so we can't mutate nested props directly,
-    // but the key behavior is that shallowRef compares by identity, not deep equality.)
+    // CORE shallowRef invariant: writing the SAME reference back must NOT
+    // fire watchers. Vue's `triggerRef` would fire even on identity, so we
+    // assign via the public `.value` setter to verify reactivity skips no-ops.
+    (routeRef!.value as unknown) = currentSnapshot;
     await flushPromises();
 
-    // Effect count should NOT have increased — no new navigation, same reference
     expect(effectCount).toBe(countAfterNavigation);
 
-    // Navigate to same route with same params — router deduplicates, no ref change
-    await router.navigate("items.item", { id: 6 }).catch(() => {});
+    // And: re-rendering with a *new* shallow object containing the same
+    // nested data DOES trigger — proving deep-equality is NOT used.
+    const cloned = { ...currentSnapshot! };
+
+    (routeRef!.value as unknown) = cloned;
     await flushPromises();
 
-    // shallowRef did not trigger because reference did not change
-    expect(effectCount).toBe(countAfterNavigation);
+    expect(effectCount).toBe(countAfterNavigation + 1);
   });
 });

@@ -25,12 +25,13 @@ describe("useRouteNode", () => {
     router.stop();
   });
 
-  it("should return the router", () => {
+  it("should return initial context before router starts", () => {
     const { result } = renderHook(() => useRouteNode(""), {
       wrapper: (props) => wrapper({ ...props, router }),
     });
 
-    expect(result.current.navigator).toBeDefined();
+    expect(result.current.navigator).toBeTypeOf("object");
+    expect(result.current.navigator.navigate).toBeTypeOf("function");
     expect(result.current.route).toStrictEqual(undefined);
     expect(result.current.previousRoute).toStrictEqual(undefined);
   });
@@ -519,6 +520,35 @@ describe("useRouteNode", () => {
   });
 
   describe("previousRoute edge cases", () => {
+    it("should return global previousRoute, not node-scoped (gotcha)", async () => {
+      const { result } = renderHook(() => useRouteNode("users"), {
+        wrapper: (props) => wrapper({ ...props, router }),
+      });
+
+      await act(async () => {
+        await router.start();
+      });
+
+      await act(async () => {
+        await router.navigate("users.list");
+      });
+
+      expect(result.current.route?.name).toBe("users.list");
+
+      await act(async () => {
+        await router.navigate("items");
+      });
+
+      expect(result.current.route).toBeUndefined();
+
+      await act(async () => {
+        await router.navigate("users.view", { id: "1" });
+      });
+
+      expect(result.current.route?.name).toBe("users.view");
+      expect(result.current.previousRoute?.name).toBe("items");
+    });
+
     it("should have correct previousRoute on first navigation", async () => {
       const { result } = renderHook(() => useRouteNode("users"), {
         wrapper: (props) => wrapper({ ...props, router }),

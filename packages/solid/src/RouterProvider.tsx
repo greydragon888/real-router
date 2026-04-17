@@ -14,7 +14,7 @@ export interface RouteProviderProps {
   announceNavigation?: boolean;
 }
 
-function isRouteActive(
+export function isRouteActive(
   linkRouteName: string,
   currentRouteName: string,
 ): boolean {

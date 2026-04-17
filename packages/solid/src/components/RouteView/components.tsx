@@ -1,9 +1,11 @@
 import type { MatchProps, NotFoundProps } from "./types";
 import type { JSX } from "solid-js";
 
-export const MATCH_MARKER = Symbol.for("RouteView.Match");
+// Local (non-global) Symbols — Symbol.for() would expose markers to spoofing
+// via the global Symbol registry. See Gotchas section "RouteView Marker Objects".
+export const MATCH_MARKER = Symbol("RouteView.Match");
 
-export const NOT_FOUND_MARKER = Symbol.for("RouteView.NotFound");
+export const NOT_FOUND_MARKER = Symbol("RouteView.NotFound");
 
 export interface MatchMarker {
   $$type: typeof MATCH_MARKER;
@@ -21,7 +23,7 @@ export interface NotFoundMarker {
 export type RouteViewMarker = MatchMarker | NotFoundMarker;
 
 export function Match(props: MatchProps): JSX.Element {
-  const result = {
+  const result: MatchMarker = {
     $$type: MATCH_MARKER,
     segment: props.segment,
     exact: props.exact ?? false,
@@ -29,21 +31,25 @@ export function Match(props: MatchProps): JSX.Element {
     get children(): JSX.Element {
       return props.children;
     },
-  } as MatchMarker;
+  };
 
+  // Marker object is identified by $$type Symbol in RouteView/helpers.tsx,
+  // not rendered as JSX. Cast required because JSX.Element does not include
+  // arbitrary marker shapes.
   return result as unknown as JSX.Element;
 }
 
 Match.displayName = "RouteView.Match";
 
 export function NotFound(props: NotFoundProps): JSX.Element {
-  const result = {
+  const result: NotFoundMarker = {
     $$type: NOT_FOUND_MARKER,
     get children(): JSX.Element {
       return props.children;
     },
-  } as NotFoundMarker;
+  };
 
+  // See Match for the marker-pattern rationale.
   return result as unknown as JSX.Element;
 }
 

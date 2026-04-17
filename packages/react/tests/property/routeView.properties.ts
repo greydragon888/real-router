@@ -12,6 +12,10 @@ function isSegmentMatch(
   fullSegmentName: string,
   exact: boolean,
 ): boolean {
+  if (fullSegmentName === "") {
+    return false;
+  }
+
   if (exact) {
     return routeName === fullSegmentName;
   }
@@ -80,6 +84,26 @@ describe("dot-boundary: segment matching respects dot boundaries", () => {
       if (suffix.length > 0 && !suffix.startsWith(".")) {
         expect(isSegmentMatch(routeName, base, false)).toBe(false);
       }
+    },
+  );
+});
+
+// =============================================================================
+// Empty segment: fullSegmentName="" must never match (early return)
+// =============================================================================
+
+describe('empty segment: fullSegmentName="" always returns false', () => {
+  test.prop([arbDottedName], { numRuns: NUM_RUNS.thorough })(
+    "exact=false with empty segment never matches any routeName",
+    (routeName: string) => {
+      expect(isSegmentMatch(routeName, "", false)).toBe(false);
+    },
+  );
+
+  test.prop([arbDottedName], { numRuns: NUM_RUNS.thorough })(
+    "exact=true with empty segment never matches any routeName",
+    (routeName: string) => {
+      expect(isSegmentMatch(routeName, "", true)).toBe(false);
     },
   );
 });

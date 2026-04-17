@@ -13,7 +13,7 @@
 npm install @real-router/react @real-router/core @real-router/browser-plugin
 ```
 
-**Peer dependency:** `react` >= 18.0.0
+**Peer dependency:** main entry requires `react` >= 19.2.0 (uses `<Activity>`); `@real-router/react/legacy` works with `react` >= 18.0.0.
 
 ## Entry Points
 
@@ -51,10 +51,10 @@ function App() {
         <Link routeName="users">Users</Link>
       </nav>
       <RouteView nodeName="">
-        <RouteView.Match routeName="home">
+        <RouteView.Match segment="home">
           <HomePage />
         </RouteView.Match>
-        <RouteView.Match routeName="users">
+        <RouteView.Match segment="users">
           <UsersPage />
         </RouteView.Match>
         <RouteView.NotFound>
@@ -68,14 +68,14 @@ function App() {
 
 ## Hooks
 
-| Hook                    | Returns                                   | Re-renders                              |
-| ----------------------- | ----------------------------------------- | --------------------------------------- |
-| `useRouter()`           | `Router`                                  | Never                                   |
-| `useNavigator()`        | `Navigator`                               | Never (stable ref, safe to destructure) |
-| `useRoute()`            | `{ router, route, previousRoute }`        | Every navigation                        |
-| `useRouteNode(name)`    | `{ router, route, previousRoute }`        | Only when node activates/deactivates    |
-| `useRouteUtils()`       | `RouteUtils`                              | Never                                   |
-| `useRouterTransition()` | `{ isTransitioning, toRoute, fromRoute }` | On transition start/end                 |
+| Hook                    | Returns                                                    | Re-renders                              |
+| ----------------------- | ---------------------------------------------------------- | --------------------------------------- |
+| `useRouter()`           | `Router`                                                   | Never                                   |
+| `useNavigator()`        | `Navigator`                                                | Never (stable ref, safe to destructure) |
+| `useRoute()`            | `{ navigator, route, previousRoute }`                      | Every navigation                        |
+| `useRouteNode(name)`    | `{ navigator, route, previousRoute }`                      | Only when node activates/deactivates    |
+| `useRouteUtils()`       | `RouteUtils`                                               | Never                                   |
+| `useRouterTransition()` | `{ isTransitioning, isLeaveApproved, toRoute, fromRoute }` | On transition start/end                 |
 
 ```tsx
 // useRouteNode — re-renders only when "users.*" changes
@@ -149,6 +149,7 @@ Declarative route matching with optional `keepAlive` — preserves component sta
 | Prop        | Type        | Description                                                                 |
 | ----------- | ----------- | --------------------------------------------------------------------------- |
 | `segment`   | `string`    | Route segment to match                                                      |
+| `exact`     | `boolean`   | Exact match only — no descendants. Defaults to `false`.                     |
 | `keepAlive` | `boolean`   | Preserve state via React `<Activity>` (React 19.2+)                         |
 | `fallback`  | `ReactNode` | Shown while children suspend. Wraps children in `<Suspense>` when provided. |
 

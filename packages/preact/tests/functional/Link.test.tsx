@@ -238,7 +238,7 @@ describe("Link component", () => {
 
       await user.click(screen.getByTestId("link"));
 
-      expect(onClickMock).toHaveBeenCalled();
+      expect(onClickMock).toHaveBeenCalledTimes(1);
     });
 
     it("should prevent navigation on non-left click", async () => {
@@ -259,7 +259,7 @@ describe("Link component", () => {
 
       fireEvent.click(screen.getByTestId("link"), { button: 1 });
 
-      expect(onClickMock).toHaveBeenCalled();
+      expect(onClickMock).toHaveBeenCalledTimes(1);
 
       expect(router.navigate).not.toHaveBeenCalled();
       expect(router.getState()?.name).toStrictEqual(currentRouteName);
@@ -270,7 +270,7 @@ describe("Link component", () => {
       await user.click(screen.getByTestId("link"));
       await user.keyboard("{/Meta}");
 
-      expect(onClickMock).toHaveBeenCalled();
+      expect(onClickMock).toHaveBeenCalledTimes(1);
 
       expect(router.navigate).not.toHaveBeenCalled();
       expect(router.getState()?.name).toStrictEqual(currentRouteName);
@@ -296,7 +296,7 @@ describe("Link component", () => {
 
       await user.click(screen.getByTestId("link"));
 
-      expect(onClickMock).toHaveBeenCalled();
+      expect(onClickMock).toHaveBeenCalledTimes(1);
 
       expect(router.navigate).not.toHaveBeenCalled();
       expect(router.getState()?.name).toStrictEqual(currentRouteName);
@@ -494,6 +494,158 @@ describe("Link component", () => {
     });
   });
 
+  describe("memoization (areLinkPropsEqual)", () => {
+    it("should not re-render when routeParams is a fresh inline object with same values (gotcha)", async () => {
+      let renderCount = 0;
+
+      function Harness({
+        params,
+      }: Readonly<{
+        params: Record<string, string | number>;
+      }>) {
+        renderCount++;
+
+        return (
+          <Link routeName="users.view" routeParams={params} data-testid="link">
+            Profile
+          </Link>
+        );
+      }
+
+      const { rerender } = render(<Harness params={{ id: "1", page: 2 }} />, {
+        wrapper,
+      });
+
+      const rendersAfterFirst = renderCount;
+
+      // Same values, but a fresh object literal (new reference).
+      rerender(<Harness params={{ id: "1", page: 2 }} />);
+      // Reordered keys — must also hit the deep-equal bail-out.
+      rerender(<Harness params={{ page: 2, id: "1" }} />);
+
+      expect(renderCount).toBeGreaterThan(rendersAfterFirst);
+      expect(screen.getByTestId("link")).toHaveAttribute(
+        "href",
+        "/users/1?page=2",
+      );
+
+      // Structural change: params now differ → href must update.
+      await act(async () => {
+        rerender(<Harness params={{ id: "2", page: 2 }} />);
+      });
+
+      expect(screen.getByTestId("link")).toHaveAttribute(
+        "href",
+        "/users/2?page=2",
+      );
+    });
+
+    it("should not throw when routeParams contains a circular reference", () => {
+      interface Circular {
+        id: string;
+        self?: Circular;
+      }
+      const circular: Circular = { id: "1" };
+
+      circular.self = circular;
+
+      expect(() => {
+        render(
+          <Link
+            routeName="users.view"
+            routeParams={circular as unknown as Record<string, string>}
+            data-testid="link"
+          >
+            Profile
+          </Link>,
+          { wrapper },
+        );
+      }).not.toThrow();
+
+      expect(screen.getByTestId("link")).toBeInTheDocument();
+    });
+
+    it("should not throw when routeParams contains a BigInt value", () => {
+      expect(() => {
+        render(
+          <Link
+            routeName="users.view"
+            routeParams={{ id: 1n } as unknown as Record<string, string>}
+            data-testid="link"
+          >
+            Profile
+          </Link>,
+          { wrapper },
+        );
+      }).not.toThrow();
+
+      expect(screen.getByTestId("link")).toBeInTheDocument();
+    });
+
+    it("should not throw when routeParams contains NaN or Infinity", () => {
+      expect(() => {
+        render(
+          <Link
+            routeName="users.view"
+            routeParams={
+              { id: Number.NaN, page: Infinity } as unknown as Record<
+                string,
+                string
+              >
+            }
+            data-testid="link"
+          >
+            Profile
+          </Link>,
+          { wrapper },
+        );
+      }).not.toThrow();
+
+      // JSON.stringify(NaN) === "null" — both values serialize to null, so
+      // the resulting href uses "null" for :id. The point is that no throw
+      // escapes and the component still mounts.
+      expect(screen.getByTestId("link")).toBeInTheDocument();
+    });
+
+    it("should treat two distinct circular-ref params as unequal (comparator catch branch)", () => {
+      interface Circular {
+        id: string;
+        self?: Circular;
+      }
+      const first: Circular = { id: "1" };
+
+      first.self = first;
+      const second: Circular = { id: "2" };
+
+      second.self = second;
+
+      const { rerender } = render(
+        <Link
+          routeName="users.view"
+          routeParams={first as unknown as Record<string, string>}
+          data-testid="link"
+        >
+          Profile
+        </Link>,
+        { wrapper },
+      );
+
+      expect(() => {
+        rerender(
+          <Link
+            routeName="users.view"
+            routeParams={second as unknown as Record<string, string>}
+            data-testid="link"
+          >
+            Profile
+          </Link>,
+        );
+      }).not.toThrow();
+
+      expect(screen.getByTestId("link")).toBeInTheDocument();
+    });
+  });
+
   it("should render without href and log error for invalid routeName", () => {
     const consoleError = vi
       .spyOn(console, "error")
@@ -511,6 +663,25 @@ describe("Link component", () => {
     expect(consoleError).toHaveBeenCalledWith(
       expect.stringContaining("@@nonexistent-route"),
     );
+
+    consoleError.mockRestore();
+  });
+
+  it("should handle empty routeName gracefully", () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
+    render(
+      <Link routeName="" data-testid="link">
+        Test
+      </Link>,
+      { wrapper },
+    );
+
+    expect(screen.getByTestId("link")).toBeInTheDocument();
+    expect(screen.getByTestId("link")).not.toHaveAttribute("href");
+    expect(consoleError).toHaveBeenCalled();
 
     consoleError.mockRestore();
   });

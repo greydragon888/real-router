@@ -17,23 +17,36 @@ describe("useNavigator hook", () => {
 
   beforeEach(async () => {
     router = createTestRouterWithADefaultRouter();
-    await router.start();
+    // Explicit "/" — JSDOM shares window.location across tests, so an
+    // unprefixed router.start() can pick up a path left by a previous test.
+    await router.start("/");
   });
 
   afterEach(() => {
     router.stop();
   });
 
-  it("should return navigator with 4 methods", () => {
+  it("should expose all documented methods with proper behavior", () => {
     const { result } = renderHook(() => useNavigator(), {
       wrapper: wrapper(router),
     });
 
-    expect(result).toBeTypeOf("object");
-    expect(result.navigate).toBeTypeOf("function");
-    expect(result.getState).toBeTypeOf("function");
-    expect(result.isActiveRoute).toBeTypeOf("function");
-    expect(result.subscribe).toBeTypeOf("function");
+    // Each method is verified by actual behavior, not typeof.
+    expect(result.getState()?.name).toBe("test");
+    expect(result.isActiveRoute("test")).toBe(true);
+    expect(result.isLeaveApproved()).toBe(false);
+
+    const unsubscribe = result.subscribe(() => {});
+
+    expect(unsubscribe).toBeTypeOf("function");
+
+    unsubscribe();
+
+    const unsubscribeLeave = result.subscribeLeave(() => {});
+
+    expect(unsubscribeLeave).toBeTypeOf("function");
+
+    unsubscribeLeave();
   });
 
   it("should have working navigate method", async () => {
@@ -52,18 +65,16 @@ describe("useNavigator hook", () => {
     });
     const state = result.getState();
 
-    expect(state).not.toBeNull();
-    expect(state!.name).toBeTypeOf("string");
+    expect(state?.name).toBe("test");
   });
 
   it("should have working isActiveRoute method", () => {
     const { result } = renderHook(() => useNavigator(), {
       wrapper: wrapper(router),
     });
-    const state = result.getState();
 
-    expect(state).not.toBeNull();
-    expect(result.isActiveRoute(state!.name)).toBe(true);
+    expect(result.isActiveRoute("test")).toBe(true);
+    expect(result.isActiveRoute("about")).toBe(false);
   });
 
   it("should have working subscribe method", async () => {
@@ -75,15 +86,19 @@ describe("useNavigator hook", () => {
 
     await result.navigate("about");
 
-    expect(callback).toHaveBeenCalled();
-
-    const callCount = callback.mock.calls.length;
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(callback).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        route: expect.objectContaining({ name: "about" }),
+      }),
+    );
 
     unsubscribe();
 
     await result.navigate("home");
 
-    expect(callback).toHaveBeenCalledTimes(callCount);
+    // After unsubscribe callback count stays frozen at 1.
+    expect(callback).toHaveBeenCalledTimes(1);
   });
 
   it("should throw error if used outside RouterProvider", () => {

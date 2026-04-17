@@ -1,32 +1,27 @@
-import { getNavigator } from "@real-router/core";
-import { createRouteSource } from "@real-router/sources";
-import { shallowRef } from "vue";
-
 import { NavigatorKey, RouteKey, RouterKey } from "./context";
-import { setDirectiveRouter } from "./directives/vLink";
+import { pushDirectiveRouter } from "./directives/vLink";
+import { setupRouteProvision } from "./setupRouteProvision";
 
 import type { Router } from "@real-router/core";
-import type { Plugin } from "vue";
+import type { App, Plugin } from "vue";
 
 export function createRouterPlugin(router: Router): Plugin<[]> {
   return {
     install(app): void {
-      const navigator = getNavigator(router);
+      const releaseDirective = pushDirectiveRouter(router);
 
-      setDirectiveRouter(router);
+      const { navigator, route, previousRoute, unsubscribe } =
+        setupRouteProvision(router);
 
-      const source = createRouteSource(router);
-      const initialSnapshot = source.getSnapshot();
-
-      const route = shallowRef(initialSnapshot.route);
-      const previousRoute = shallowRef(initialSnapshot.previousRoute);
-
-      source.subscribe(() => {
-        const snapshot = source.getSnapshot();
-
-        route.value = snapshot.route;
-        previousRoute.value = snapshot.previousRoute;
-      });
+      // Vue 3.5+ exposes app.onUnmount for plugin cleanup.
+      // On older versions (3.3–3.4), the subscription is cleaned up
+      // when the router is garbage-collected (same as vue-router).
+      if ("onUnmount" in app) {
+        (app as App & { onUnmount: (fn: () => void) => void }).onUnmount(() => {
+          releaseDirective();
+          unsubscribe();
+        });
+      }
 
       app.provide(RouterKey, router);
       app.provide(NavigatorKey, navigator);

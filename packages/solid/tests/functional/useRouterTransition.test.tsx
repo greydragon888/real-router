@@ -30,12 +30,19 @@ describe("useRouterTransition", () => {
     router.stop();
   });
 
-  it("isTransitioning === false initially", () => {
+  it("snapshot is IDLE initially (all fields cleared)", () => {
     const { result } = renderHook(() => useRouterTransition(), {
       wrapper: wrapper(router),
     });
 
-    expect(result().isTransitioning).toBe(false);
+    expect(result()).toStrictEqual(
+      expect.objectContaining({
+        isTransitioning: false,
+        toRoute: null,
+        fromRoute: null,
+        isLeaveApproved: false,
+      }),
+    );
   });
 
   it("isTransitioning === true upon TRANSITION_START", async () => {

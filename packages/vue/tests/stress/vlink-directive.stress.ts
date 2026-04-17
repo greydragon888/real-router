@@ -133,7 +133,15 @@ describe("v-link directive stress tests (Vue)", () => {
       await nextTick();
     }
 
-    expect(true).toBe(true);
+    // After 100 prop updates the directive still navigates the latest route —
+    // confirms detach/reattach in updated() did not break the click handler.
+    const finalRoute = `route${routeIndexRef.current}`;
+
+    await wrapper.find("[data-testid='dynamic-vlink']").trigger("click");
+    await nextTick();
+    await flushPromises();
+
+    expect(router.getState()?.name).toBe(finalRoute);
 
     wrapper.unmount();
   });

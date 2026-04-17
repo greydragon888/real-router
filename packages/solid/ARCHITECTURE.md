@@ -7,7 +7,7 @@
 ```
 @real-router/solid
 ├── @real-router/core         # Router instance, Navigator, State types
-├── @real-router/sources      # Subscription layer (createRouteSource, createRouteNodeSource, createActiveRouteSource, createErrorSource)
+├── @real-router/sources      # Subscription layer (createRouteSource, createRouteNodeSource, createActiveRouteSource, createTransitionSource, createErrorSource)
 └── @real-router/route-utils  # Route tree queries (getRouteUtils, getChain, getSiblings)
 ```
 
@@ -40,16 +40,23 @@ src/
 ├── context.ts                  # Two Solid contexts (RouterContext, RouteContext)
 ├── types.ts                    # RouteState, LinkProps
 ├── constants.ts                # EMPTY_PARAMS, EMPTY_OPTIONS (frozen singletons)
-├── utils.ts                    # shouldNavigate() — click filtering
+├── dom-utils/                  # Symlink → shared/dom-utils/ (see root CLAUDE.md)
+│   ├── link-utils.ts           # shouldNavigate, buildHref, buildActiveClassName, applyLinkA11y
+│   ├── route-announcer.ts      # createRouteAnnouncer (a11y aria-live region)
+│   └── index.ts                # barrel
 ├── createSignalFromSource.ts   # Signal bridge — converts RouterSource to Solid Accessor
+├── createStoreFromSource.ts    # Store bridge — converts RouterSource to Solid store (reconcile)
 ├── hooks/
 │   ├── useRouter.tsx           # Router + Navigator from context (never reactive)
 │   ├── useNavigator.tsx        # Navigator from context (never reactive)
 │   ├── useRoute.tsx            # Full route state Accessor from context (every navigation)
 │   ├── useRouteNode.tsx        # Node-scoped subscription via createSignalFromSource
+│   ├── useRouteNodeStore.tsx   # Same node-scoped subscription, store-based
+│   ├── useRouteStore.tsx       # Full route state as store (reconcile)
 │   ├── useRouteUtils.tsx       # RouteUtils from route tree (never reactive)
 │   ├── useRouterTransition.tsx # Transition lifecycle Accessor (isTransitioning, toRoute, fromRoute)
-│   └── useRouterError.tsx    # Internal — error subscription (used by RouterErrorBoundary)
+│   ├── useRouterError.tsx      # Internal — error subscription (used by RouterErrorBoundary)
+│   └── sharedNodeSource.ts     # Shared WeakMap cache for createRouteNodeSource (used by useRouteNode + useRouteNodeStore)
 └── components/
     ├── Link.tsx                # Reactive link with classList-based active state
     ├── RouterErrorBoundary.tsx  # Declarative navigation error handling
@@ -95,19 +102,19 @@ Two contexts serve different purposes:
 
 ```
 RouterProvider
-├── RouterContext.Provider     value={{ router, navigator }}   # Stable — never changes
-│   └── RouteContext.Provider  value={routeSignal}             # Reactive Accessor — updates on navigation
+├── RouterContext.Provider     value={{ router, navigator, routeSelector }}  # Stable — never changes
+│   └── RouteContext.Provider  value={routeSignal}                           # Reactive Accessor — updates on navigation
 │       └── {children}
 ```
 
 **Why two contexts, not three:**
 
-Solid's fine-grained reactivity makes a separate `NavigatorContext` unnecessary. The navigator is a stable value derived from the router at provider initialization — it doesn't need its own context because reading it never triggers reactive tracking. Both `router` and `navigator` live together in `RouterContext` as a plain object.
+Solid's fine-grained reactivity makes a separate `NavigatorContext` unnecessary. The navigator is a stable value derived from the router at provider initialization — it doesn't need its own context because reading it never triggers reactive tracking. Both `router` and `navigator` live together in `RouterContext` as a plain object, along with `routeSelector` — a `createSelector`-backed predicate that powers Link's fast-path (O(1) active-route detection).
 
-| Context         | Value                                      | Reactive?                          | Consumers                                                           |
-| --------------- | ------------------------------------------ | ---------------------------------- | ------------------------------------------------------------------- |
-| `RouterContext` | `{ router: Router, navigator: Navigator }` | No — stable object reference       | `useRouter`, `useNavigator`, `useRouteUtils`, `useRouterTransition` |
-| `RouteContext`  | `Accessor<RouteState>`                     | Yes — signal updates on navigation | `useRoute`                                                          |
+| Context         | Value                                                                                | Reactive?                                                                                       | Consumers                                                                               |
+| --------------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `RouterContext` | `{ router: Router, navigator: Navigator, routeSelector: (name: string) => boolean }` | No — stable object reference; `routeSelector` internally tracks reactively via `createSelector` | `useRouter`, `useNavigator`, `useRouteUtils`, `useRouterTransition`, `Link` (fast path) |
+| `RouteContext`  | `Accessor<RouteState>`                                                               | Yes — signal updates on navigation                                                              | `useRoute`                                                                              |
 
 ## Subscription Patterns
 
@@ -122,12 +129,27 @@ useNavigator()  — reads RouterContext → returns Navigator, never reactive
 ### Signal-Based (via createSignalFromSource)
 
 ```
-useRouteNode(name)      — createRouteNodeSource(router, name)     → Accessor<RouteState>
-useRouterTransition()   — createTransitionSource(router)          → Accessor<RouterTransitionSnapshot>
-Link (internal)         — createActiveRouteSource(router, ...)    → Accessor<boolean>
-useRouterError()  [internal]  — createErrorSource(router) with WeakMap cache
-RouterProvider          — createRouteSource(router)               → Accessor<RouteState>
+useRouteNode(name)            — createRouteNodeSource(router, name)     → Accessor<RouteState>            [WeakMap cached]
+useRouteNodeStore(name)       — createRouteNodeSource(router, name)     → Store<RouteState>               [WeakMap cached]
+useRouterTransition()         — createTransitionSource(router)          → Accessor<RouterTransitionSnapshot> [WeakMap cached]
+useRouterError()  [internal]  — createErrorSource(router)               → Accessor<RouterErrorSnapshot>   [WeakMap cached]
+Link (slow path, internal)    — createActiveRouteSource(router, ...)    → Accessor<boolean>               [WeakMap cached]
+RouterProvider                — createRouteSource(router)               → Accessor<RouteState>
 ```
+
+### WeakMap Source Cache
+
+Source instances are shared per-router via module-level `WeakMap` caches. N consumers of `useRouteNode("users")` on the same router share ONE source — one router subscription, not N. Detailed cache shapes:
+
+| Hook / Component          | Cache shape                                                       | Rationale                                                                                                                                                       |
+| ------------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `useRouteNode(name)`      | `WeakMap<Router, Map<nodeName, RouterSource<RouteNodeSnapshot>>>` | Shared subscription per (router, nodeName)                                                                                                                      |
+| `useRouteNodeStore(name)` | `WeakMap<Router, Map<nodeName, RouterSource<RouteNodeSnapshot>>>` | Same cache shape as useRouteNode                                                                                                                                |
+| `useRouterTransition()`   | `WeakMap<Router, RouterSource<RouterTransitionSnapshot>>`         | One eager source per router                                                                                                                                     |
+| `useRouterError()`        | `WeakMap<Router, RouterSource<RouterErrorSnapshot>>`              | One eager source per router                                                                                                                                     |
+| Link (slow path)          | `WeakMap<Router, Map<compositeKey, RouterSource<boolean>>>`       | `compositeKey = ${routeName}\|${JSON.stringify(routeParams)}\|${activeStrict}\|${ignoreQueryParams}` — stable because slow-path props are captured at Link init |
+
+Routers are used as WeakMap keys, so per-router state is released automatically when the router is GC'd — no explicit teardown needed. Lazy sources (`createRouteNodeSource`, `createActiveRouteSource`, `createRouteSource`) disconnect from the router when their last listener unsubscribes; upon re-subscription, they reconcile their snapshot so signals never observe stale values (enforced by `createSignalFromSource` re-reading `getSnapshot()` after subscribe).
 
 ## Component Architecture
 
@@ -238,18 +260,23 @@ tests/
 
 ## Stress Test Coverage
 
-41 stress tests across 9 files in `tests/stress/` validate behavior under extreme conditions:
+46 stress tests across 13 files in `tests/stress/` validate behavior under extreme conditions:
 
-| Category                | Tests (file count) | Test count | What they verify                                                                                                                                                                                                             |
-| ----------------------- | ------------------ | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Mount/unmount lifecycle | 1 file             | 7 tests    | useRouteNode/useRoute/Link/useRouterTransition × 200 mount/unmount cycles — bounded heap; 50 components remount + re-subscribe; conditional toggle × 100 with onCleanup tracking; router stop/restart                        |
-| Subscription fanout     | 1 file             | 5 tests    | 30 useRouteNode on different nodes — signals track correctly; 20 useRoute + 30 useRouteNode('') — all update; 50 useRouteNode('users') — granular scoping; concurrent mount/unmount; cleanup on unmount (50 onCleanup calls) |
-| Link mass rendering     | 1 file             | 5 tests    | 200 Links mount — no render loops; active class toggle; 50 round-robin navigations; deep routeParams; 50 rapid clicks; dynamic routeName × 100                                                                               |
-| Link directive          | 1 file             | 3 tests    | 100 use:link elements — a11y attributes (role, tabindex); mount/unmount × 50 cycles — bounded heap + onCleanup fires; activeClassName toggle; click navigation; 50 rapid clicks; `<a>` href + no a11y override               |
-| Store granularity       | 1 file             | 5 tests    | useRouteStore — route.name effect fires only on name changes; route.params.id — only on id changes; useRouteNodeStore — scoped + granular; 20 consumers tracking different properties; 10 nodes × 50 navs — isolated         |
-| Deep tree context       | 1 file             | 4 tests    | 30-deep useRouteNode — only relevant nodes re-render; useRouter — 0 re-renders; wide tree 25 leaves — all re-render; nested RouterProviders — isolated                                                                       |
-| Transition hook         | 1 file             | 4 tests    | 50 async guard cycles — isTransitioning true→false; 50 concurrent — last wins; 20 consumers — consistent; navigate + cancel × 50 — never stuck                                                                               |
-| Combined SPA            | 1 file             | 4 tests    | Full app with RouteView + Links + useRouteNode + 200 navs; transition progress; remount after unmount; RouteView match correctness × 100                                                                                     |
+| Category                 | Tests (file count) | Test count | What they verify                                                                                                                                                                                                                                                                        |
+| ------------------------ | ------------------ | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mount/unmount lifecycle  | 1 file             | 8 tests    | useRouteNode/useRoute/Link/useRouterTransition × 200 mount/unmount cycles — bounded heap; 50 components remount + re-subscribe; conditional toggle × 100 with onCleanup tracking; router stop/restart; **R10 — 50 start/stop cycles without navigations — subscriptions released (S1)** |
+| Subscription fanout      | 1 file             | 5 tests    | 30 useRouteNode on different nodes — signals track correctly; 20 useRoute + 30 useRouteNode('') — all update; 50 useRouteNode('users') — granular scoping; concurrent mount/unmount; cleanup on unmount (50 onCleanup calls)                                                            |
+| Link mass rendering      | 1 file             | 5 tests    | 200 Links mount — no render loops; active class toggle; 50 round-robin navigations; deep routeParams; 50 rapid clicks; dynamic routeName × 100                                                                                                                                          |
+| Link directive           | 1 file             | 3 tests    | 100 use:link elements — a11y attributes (role, tabindex); mount/unmount × 50 cycles — bounded heap + onCleanup fires; activeClassName toggle; click navigation; 50 rapid clicks; `<a>` href + no a11y override                                                                          |
+| Store granularity        | 1 file             | 5 tests    | useRouteStore — route.name effect fires only on name changes; route.params.id — only on id changes; useRouteNodeStore — scoped + granular; 20 consumers tracking different properties; 10 nodes × 50 navs — isolated                                                                    |
+| Deep tree context        | 1 file             | 4 tests    | 30-deep useRouteNode — only relevant nodes re-render; useRouter — 0 re-renders; wide tree 25 leaves — all re-render; nested RouterProviders — isolated                                                                                                                                  |
+| Transition hook          | 1 file             | 4 tests    | 50 async guard cycles — isTransitioning true→false; 50 concurrent — last wins; 20 consumers — consistent; navigate + cancel × 50 — never stuck                                                                                                                                          |
+| Combined SPA             | 1 file             | 4 tests    | Full app with RouteView + Links + useRouteNode + 200 navs; transition progress; remount after unmount; RouteView match correctness × 100                                                                                                                                                |
+| Cache growth             | 1 file             | 4 tests    | 200 unique `useRouteNode(name)` — all fire effects, no crash; same nodeName × 100 components — cache hit, consistent signal state; router stop + GC → new router works; 2 routers × 50 nodeNames — isolated caches, no cross-talk                                                       |
+| Navigate during teardown | 1 file             | 1 test     | **T1 (S2)** — navigate fires during component unmount — no zombie setState warnings                                                                                                                                                                                                     |
+| Navigate memory leak     | 1 file             | 1 test     | **M1 (S3)** — 10000 mount/unmount Link cycles (slow path) — bounded heap (< 100 MB growth)                                                                                                                                                                                              |
+| Factory reuse            | 1 file             | 1 test     | **F1 (S4)** — 100 router instances × mount → unmount → stop — heap stable (< 50 MB growth, WeakMap cache entries GC-collected)                                                                                                                                                          |
+| Long-lived subscription  | 1 file             | 1 test     | **L1** — 10000 `router.navigate()` on a single mounted `useRoute`/`useRouteNode` pair — every root effect fires, `users` node stays silent, bounded heap (< 50 MB) — probes that router-internal listener arrays don't grow per-navigation                                              |
 
 ## See Also
 

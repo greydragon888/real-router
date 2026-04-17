@@ -26,6 +26,7 @@ real-router/
 │   ├── solid/                     # Solid.js integration (hooks, components, directives)
 │   ├── vue/                       # Vue 3 integration (composables, components, directives)
 │   ├── svelte/                    # Svelte 5 integration (composables, components, actions)
+│   ├── angular/                   # Angular 21+ integration (signals, inject* functions, components, directives, zoneless)
 │   ├── sources/                   # Subscription layer for UI bindings (useSyncExternalStore)
 │   ├── rx/                        # Reactive Observable API (state$, events$, operators)
 │   ├── browser-plugin/            # Browser History API synchronization
@@ -62,7 +63,7 @@ real-router/
 │   │   └── ssg/                   # Static site generation with Vite
 ```
 
-**Public packages** (published to npm): `core`, `core-types`, `react`, `preact`, `solid`, `vue`, `svelte`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `lifecycle-plugin`, `preload-plugin`, `memory-plugin`, `navigation-plugin`, `validation-plugin`, `search-schema-plugin`, `route-utils`, `logger`
+**Public packages** (published to npm): `core`, `core-types`, `react`, `preact`, `solid`, `vue`, `svelte`, `angular`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `lifecycle-plugin`, `preload-plugin`, `memory-plugin`, `navigation-plugin`, `validation-plugin`, `search-schema-plugin`, `route-utils`, `logger`
 
 **Internal packages** (bundled into consumers, not on npm): `route-tree`, `path-matcher`, `search-params`, `type-guards`, `event-emitter`
 
@@ -162,6 +163,12 @@ graph TD
     SVELTE -->|dep| ROUTEUTILS
     SVELTE -.->|symlink| DOMUTILS
 
+    ANGULAR["angular"]
+    ANGULAR -->|dep| CORE
+    ANGULAR -->|dep| SOURCES
+    ANGULAR -->|dep| ROUTEUTILS
+    ANGULAR -.->|copy| DOMUTILS
+
     RX -->|dep| CORE
 
     PPP -->|dep| CORE
@@ -188,7 +195,7 @@ graph TD
     ROUTEUTILS -->|dep| TYPES
 ```
 
-Solid arrows = runtime `dependencies`. Dashed arrows = bundled at build time (consumer's bundle includes the internal package).
+Solid arrows = runtime `dependencies`. Dashed arrows = bundled at build time (consumer's bundle includes the internal package). The `angular` adapter uses a git-tracked **copy** of `shared/dom-utils/` (not a symlink) because ng-packagr does not follow symlinks the same way tsdown does — `prebundle` re-materializes the copy before every build.
 
 ## Core Architecture
 
@@ -395,7 +402,7 @@ These are deliberately designed constraints. Violating them will break the syste
 ┌──────────────────────────────────────────────────────────────────┐
 │                     Consumer Packages                            │
 ├──────────────────────────────────────────────────────────────────┤
-│ react │ preact │ solid │ vue │ svelte │ browser-plugin │ ... │
+│ react │ preact │ solid │ vue │ svelte │ angular │ browser-plugin │
 ├──────────────────────────────────────────────────────────────────┤
 │                           Core                                   │
 ├──────────────────────────────────────────────────────────────────┤

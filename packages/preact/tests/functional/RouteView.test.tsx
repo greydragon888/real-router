@@ -1,7 +1,7 @@
 import { browserPluginFactory } from "@real-router/browser-plugin";
 import { createRouter } from "@real-router/core";
 import { getRoutesApi } from "@real-router/core/api";
-import { render, screen, act } from "@testing-library/preact";
+import { render, screen, act, fireEvent } from "@testing-library/preact";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import { RouteView, RouterProvider } from "@real-router/preact";
@@ -86,6 +86,23 @@ describe("RouteView", () => {
       );
 
       expect(screen.queryByTestId("users-exact")).not.toBeInTheDocument();
+      expect(container.innerHTML).toBe("");
+    });
+
+    it("should not match when the segment prop is empty (guard against boundary edge case)", async () => {
+      await router.start("/users/list");
+
+      const { container } = render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="">
+            <RouteView.Match segment="">
+              <div data-testid="empty-match">Empty</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      expect(screen.queryByTestId("empty-match")).not.toBeInTheDocument();
       expect(container.innerHTML).toBe("");
     });
 
@@ -469,6 +486,64 @@ describe("RouteView", () => {
       });
 
       expect(screen.queryByTestId("list")).not.toBeInTheDocument();
+    });
+
+    it("should lose component state when Match changes (no keepAlive)", async () => {
+      const { useState } = await import("preact/hooks");
+
+      const CounterComponent = () => {
+        const [count, setCount] = useState(0);
+
+        return (
+          <div>
+            <div data-testid="counter">{count}</div>
+            <button
+              data-testid="increment"
+              onClick={() => {
+                setCount(count + 1);
+              }}
+            >
+              Increment
+            </button>
+          </div>
+        );
+      };
+
+      await router.start("/users/list");
+
+      render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="">
+            <RouteView.Match segment="users">
+              <CounterComponent />
+            </RouteView.Match>
+            <RouteView.Match segment="about">
+              <div data-testid="about">About</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      expect(screen.getByTestId("counter")).toHaveTextContent("0");
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("increment"));
+      });
+
+      expect(screen.getByTestId("counter")).toHaveTextContent("1");
+
+      await act(async () => {
+        await router.navigate("about");
+      });
+
+      expect(screen.queryByTestId("counter")).not.toBeInTheDocument();
+      expect(screen.getByTestId("about")).toBeInTheDocument();
+
+      await act(async () => {
+        await router.navigate("users.list");
+      });
+
+      expect(screen.getByTestId("counter")).toHaveTextContent("0");
     });
   });
 

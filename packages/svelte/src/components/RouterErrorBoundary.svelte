@@ -32,12 +32,20 @@
   }
 
   $effect(() => {
-    if (snapshot.current.error) {
-      const { error, toRoute, fromRoute } = snapshot.current;
-      untrack(() => {
+    const snap = snapshot.current;
+    if (!snap.error) return;
+
+    const { error, toRoute, fromRoute } = snap;
+    untrack(() => {
+      try {
         onError?.(error, toRoute, fromRoute);
-      });
-    }
+      } catch (callbackError) {
+        console.error(
+          "[real-router] RouterErrorBoundary onError handler threw:",
+          callbackError,
+        );
+      }
+    });
   });
 </script>
 

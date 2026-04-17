@@ -224,7 +224,9 @@ describe("useRouteNodeStore hook", () => {
   });
 
   it("should throw error if router instance was not passed to provider", () => {
-    expect(() => renderHook(() => useRouteNodeStore("users"))).toThrow();
+    expect(() => renderHook(() => useRouteNodeStore("users"))).toThrow(
+      "useRouter must be used within a RouterProvider",
+    );
   });
 
   it("should handle root node subscription", async () => {

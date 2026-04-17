@@ -1,3 +1,4 @@
+import { getNavigator } from "@real-router/core";
 import { render } from "@testing-library/svelte";
 import { flushSync } from "svelte";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
@@ -32,11 +33,7 @@ describe("useRoute composable", () => {
       },
     });
 
-    expect(result!.navigator).toBeTypeOf("object");
-    expect(result!.navigator.navigate).toBeTypeOf("function");
-    expect(result!.navigator.getState).toBeTypeOf("function");
-    expect(result!.navigator.isActiveRoute).toBeTypeOf("function");
-    expect(result!.navigator.subscribe).toBeTypeOf("function");
+    expect(result!.navigator).toBe(getNavigator(router));
   });
 
   it("should return current route", async () => {
@@ -164,14 +161,20 @@ describe("useRoute composable", () => {
 
     const snapshot = result!.route.current;
 
-    // State should be frozen — mutations should throw in strict mode or be ignored
-    expect(snapshot?.name).toBe("home");
+    expect(snapshot).not.toBeNull();
+    expect(snapshot).not.toBeUndefined();
+    expect(snapshot!.name).toBe("home");
+
+    // Primary invariant: snapshot is actually frozen.
+    expect(Object.isFrozen(snapshot)).toBe(true);
+
+    // Derived invariant in strict mode: write throws.
     expect(() => {
       (snapshot as unknown as Record<string, unknown>).name = "mutated";
-    }).toThrow();
+    }).toThrow(TypeError);
 
     // After the failed mutation, the value should be unchanged
-    expect(result!.route.current?.name).toBe("home");
+    expect(result!.route.current!.name).toBe("home");
   });
 
   it("should throw error if router instance was not passed to provider", () => {

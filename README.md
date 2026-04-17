@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![npm](https://img.shields.io/npm/v/@real-router/core.svg?style=flat-square&logo=npm)](https://www.npmjs.com/package/@real-router/core)
 [![npm downloads](https://img.shields.io/npm/dm/@real-router/core.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/core)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6.0-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](http://makeapullrequest.com)
 [![Engineered with Claude Code](https://img.shields.io/badge/Engineered%20with-Claude%20Code-5865F2?style=flat-square&logo=anthropic&logoColor=white)](https://claude.com/claude-code)
 
@@ -163,7 +163,7 @@ Custom **Segment Trie** matcher — O(segments) traversal, O(1) for static route
 
 ### Key Features
 
-- **Framework-agnostic** — React, Preact, Solid, Vue, Svelte, or vanilla JS
+- **Framework-agnostic** — React, Preact, Solid, Vue, Svelte, Angular, or vanilla JS
 - **Universal** — client-side, server-side rendering ([SSR example](examples/react/ssr)), and static site generation ([SSG example](examples/react/ssg))
 - **Named nested routes** — dot-notation hierarchy (`users.profile`)
 - **Lifecycle guards** — `canActivate` / `canDeactivate` per route or globally
@@ -275,6 +275,7 @@ function App() {
 | [`@real-router/solid`](packages/solid)   | [![npm](https://img.shields.io/npm/v/@real-router/solid.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/solid)   | Solid.js (signals, `RouteView`, `Link`, store-based state)         |
 | [`@real-router/vue`](packages/vue)       | [![npm](https://img.shields.io/npm/v/@real-router/vue.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/vue)       | Vue 3 (composables, `RouteView`, `Link`, `KeepAlive`, `v-link`)    |
 | [`@real-router/svelte`](packages/svelte) | [![npm](https://img.shields.io/npm/v/@real-router/svelte.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/svelte) | Svelte 5 (runes, `RouteView` with snippets, `Lazy`, `use:link`)    |
+| [`@real-router/angular`](packages/angular) | [![npm](https://img.shields.io/npm/v/@real-router/angular.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/angular) | Angular 21+ (signals, `inject*` functions, `<route-view>`, `realLink` directive, zoneless) |
 
 ### Plugins
 
@@ -321,9 +322,9 @@ Full documentation is available in the [Wiki](https://github.com/greydragon888/r
 
 - [RouterProvider](https://github.com/greydragon888/real-router/wiki/RouterProvider) · [RouteView](https://github.com/greydragon888/real-router/wiki/RouteView) · [Link](https://github.com/greydragon888/real-router/wiki/Link) · [useRouter](https://github.com/greydragon888/real-router/wiki/useRouter) · [useRoute](https://github.com/greydragon888/real-router/wiki/useRoute) · [useRouteNode](https://github.com/greydragon888/real-router/wiki/useRouteNode) · [useNavigator](https://github.com/greydragon888/real-router/wiki/useNavigator)
 
-### Preact / Solid / Vue / Svelte
+### Preact / Solid / Vue / Svelte / Angular
 
-- [Preact Integration](https://github.com/greydragon888/real-router/wiki/Preact-Integration) · [Solid Integration](https://github.com/greydragon888/real-router/wiki/Solid-Integration) · [Vue Integration](https://github.com/greydragon888/real-router/wiki/Vue-Integration) · [Svelte Integration](https://github.com/greydragon888/real-router/wiki/Svelte-Integration)
+- [Preact Integration](https://github.com/greydragon888/real-router/wiki/Preact-Integration) · [Solid Integration](https://github.com/greydragon888/real-router/wiki/Solid-Integration) · [Vue Integration](https://github.com/greydragon888/real-router/wiki/Vue-Integration) · [Svelte Integration](https://github.com/greydragon888/real-router/wiki/Svelte-Integration) · [Angular Integration](https://github.com/greydragon888/real-router/wiki/Angular-Integration)
 
 ### Plugins
 

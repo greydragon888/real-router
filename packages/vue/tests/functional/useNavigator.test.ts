@@ -40,14 +40,49 @@ describe("useNavigator composable", () => {
     router.stop();
   });
 
-  it("should return navigator with 4 methods", () => {
+  it("should return navigator with full method surface", () => {
     const { result } = mountWithRouter(router, () => useNavigator());
 
-    expect(result).toBeTypeOf("object");
-    expect(result.navigate).toBeTypeOf("function");
-    expect(result.getState).toBeTypeOf("function");
-    expect(result.isActiveRoute).toBeTypeOf("function");
-    expect(result.subscribe).toBeTypeOf("function");
+    expect(
+      Object.keys(result).toSorted((a, b) => a.localeCompare(b)),
+    ).toStrictEqual([
+      "canNavigateTo",
+      "getState",
+      "isActiveRoute",
+      "isLeaveApproved",
+      "navigate",
+      "subscribe",
+      "subscribeLeave",
+    ]);
+  });
+
+  it("subscribeLeave fires on confirmed departure (LEAVE_APPROVED)", async () => {
+    const { result } = mountWithRouter(router, () => useNavigator());
+    const leaveCallback = vi.fn();
+
+    const unsub = result.subscribeLeave(leaveCallback);
+
+    await result.navigate("about");
+
+    expect(leaveCallback).toHaveBeenCalledTimes(1);
+
+    const [event] = leaveCallback.mock.calls[0] as [
+      { route: { name: string }; nextRoute: { name: string } },
+    ];
+
+    expect(event.route.name).toBe("test");
+    expect(event.nextRoute.name).toBe("about");
+
+    unsub();
+    await result.navigate("home");
+
+    expect(leaveCallback).toHaveBeenCalledTimes(1);
+  });
+
+  it("isLeaveApproved is false outside transitions", () => {
+    const { result } = mountWithRouter(router, () => useNavigator());
+
+    expect(result.isLeaveApproved()).toBe(false);
   });
 
   it("should have working navigate method", async () => {

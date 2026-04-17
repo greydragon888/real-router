@@ -1,15 +1,6 @@
-import { getContext } from "svelte";
-
-import { NAVIGATOR_KEY } from "../context";
+import { NAVIGATOR_KEY, getContextOrThrow } from "../context";
 
 import type { Navigator } from "@real-router/core";
 
-export const useNavigator = (): Navigator => {
-  const navigator = getContext<Navigator | undefined>(NAVIGATOR_KEY);
-
-  if (!navigator) {
-    throw new Error("useNavigator must be used within a RouterProvider");
-  }
-
-  return navigator;
-};
+export const useNavigator = (): Navigator =>
+  getContextOrThrow<Navigator>(NAVIGATOR_KEY, "useNavigator");

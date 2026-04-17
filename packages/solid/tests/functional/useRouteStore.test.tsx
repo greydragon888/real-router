@@ -19,7 +19,8 @@ describe("useRouteStore hook", () => {
   beforeEach(async () => {
     router = createTestRouterWithADefaultRouter();
 
-    await router.start();
+    // Explicit "/" — JSDOM shares window.location across tests.
+    await router.start("/");
   });
 
   afterEach(() => {
@@ -48,65 +49,65 @@ describe("useRouteStore hook", () => {
   });
 
   it("should throw error if router instance was not passed to provider", () => {
-    expect(() => renderHook(() => useRouteStore())).toThrow();
+    expect(() => renderHook(() => useRouteStore())).toThrow(
+      "useRouter must be used within a RouterProvider",
+    );
   });
 
   it("should have deep granular reactivity on params", async () => {
-    let effectRunCount = 0;
+    const observedIds: (string | number | undefined)[] = [];
 
     renderHook(
       () => {
         const state = useRouteStore();
 
         createEffect(() => {
-          // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-          state.route?.params.id;
-          effectRunCount++;
+          observedIds.push(state.route?.params.id as string | undefined);
         });
       },
       { wrapper: wrapper(router) },
     );
 
-    expect(effectRunCount).toBe(1);
+    // Initial run: no id (router started on "test").
+    expect(observedIds).toStrictEqual([undefined]);
 
     await router.navigate("items.item", { id: "123" }).catch(() => {});
 
-    expect(effectRunCount).toBe(2);
+    expect(observedIds).toStrictEqual([undefined, "123"]);
 
     await router.navigate("items.item", { id: "456" }).catch(() => {});
 
-    expect(effectRunCount).toBe(3);
+    expect(observedIds).toStrictEqual([undefined, "123", "456"]);
   });
 
   it("should have deep granular reactivity on route name", async () => {
-    let effectRunCount = 0;
+    const observedNames: (string | undefined)[] = [];
 
     renderHook(
       () => {
         const state = useRouteStore();
 
         createEffect(() => {
-          // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-          state.route?.name;
-          effectRunCount++;
+          observedNames.push(state.route?.name);
         });
       },
       { wrapper: wrapper(router) },
     );
 
-    expect(effectRunCount).toBe(1);
+    expect(observedNames).toStrictEqual(["test"]);
 
     await router.navigate("items").catch(() => {});
 
-    expect(effectRunCount).toBe(2);
+    expect(observedNames).toStrictEqual(["test", "items"]);
 
     await router.navigate("items.item", { id: "123" }).catch(() => {});
 
-    expect(effectRunCount).toBe(3);
+    expect(observedNames).toStrictEqual(["test", "items", "items.item"]);
 
+    // Only params change — effect reads state.route?.name, so it must NOT run.
     await router.navigate("items.item", { id: "456" }).catch(() => {});
 
-    expect(effectRunCount).toBe(3);
+    expect(observedNames).toStrictEqual(["test", "items", "items.item"]);
   });
 
   it("should access nested properties without function calls", async () => {

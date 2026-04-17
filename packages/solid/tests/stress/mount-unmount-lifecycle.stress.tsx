@@ -245,6 +245,31 @@ describe("R3 — mount/unmount subscription lifecycle", () => {
 
     freshRouter.stop();
   });
+
+  // Scenario S1 from audit section 7.2: rapid start/stop cycles without any
+  // navigations between them simulate server-side HMR and repeated SSR
+  // initialization. Verifies that the router's internal state resets cleanly
+  // and that no per-cycle listeners accumulate.
+  it("R10 — 50 start/stop cycles without navigations — subscriptions released", async () => {
+    // beforeEach already started the router; stop before the cycle loop.
+    router.stop();
+
+    const heapBefore = takeHeapSnapshot();
+
+    for (let i = 0; i < 50; i++) {
+      await router.start("/route0");
+      router.stop();
+    }
+
+    const heapAfter = takeHeapSnapshot();
+
+    expect(heapAfter - heapBefore).toBeLessThan(20 * MB);
+
+    await router.start("/route0");
+    await router.navigate("route1");
+
+    expect(router.getState()?.name).toBe("route1");
+  });
 });
 
 function NodeConsumer(): JSX.Element {

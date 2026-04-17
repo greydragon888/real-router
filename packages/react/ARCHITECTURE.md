@@ -49,7 +49,10 @@ src/
 ├── context.ts                  # Three React contexts (RouterContext, RouteContext, NavigatorContext)
 ├── types.ts                    # RouteState, RouteContext, LinkProps
 ├── constants.ts                # EMPTY_PARAMS, EMPTY_OPTIONS (frozen singletons)
-├── utils.ts                    # shouldNavigate() — click filtering
+├── dom-utils/                  # Shared DOM helpers (symlink → shared/dom-utils/)
+│   ├── link-utils.ts           # shouldNavigate, buildHref, buildActiveClassName, applyLinkA11y
+│   ├── route-announcer.ts      # createRouteAnnouncer (WCAG aria-live)
+│   └── index.ts
 ├── hooks/
 │   ├── useRouter.tsx           # Router instance from context (never re-renders)
 │   ├── useRoute.tsx            # Full route state from context (every navigation)
@@ -58,7 +61,7 @@ src/
 │   ├── useIsActiveRoute.tsx    # Active state subscription (internal — used by Link)
 │   ├── useRouteUtils.tsx       # RouteUtils from route tree (never re-renders)
 │   ├── useRouterTransition.tsx # Transition lifecycle (isTransitioning, toRoute, fromRoute)
-│   ├── useRouterError.tsx    # Internal — error subscription (used by RouterErrorBoundary)
+│   ├── useRouterError.tsx      # Internal — error subscription (used by RouterErrorBoundary)
 │   └── useStableValue.tsx      # JSON-based reference stabilization
 └── components/
     ├── Link.tsx                # memo'd link with custom areLinkPropsEqual + active state
@@ -71,6 +74,16 @@ src/
             ├── components.tsx  # Match, NotFound marker components
             └── helpers.tsx     # collectElements, buildRenderList, isSegmentMatch
 ```
+
+### Shared DOM Utilities (`dom-utils/`)
+
+The `dom-utils/` directory is a symlink to `shared/dom-utils/` — identical helpers used by all framework adapters:
+
+- **`shouldNavigate(evt)`** — click filtering (button 0, no modifier keys)
+- **`buildHref(router, routeName, routeParams)`** — URL generation with buildUrl/buildPath fallback
+- **`buildActiveClassName(isActive, activeClassName, baseClassName)`** — class string composition
+- **`applyLinkA11y(element)`** — adds `role="link"` + `tabindex="0"` to non-interactive elements. Not used by React's `<Link>` (always renders `<a>`), but used by Svelte/Solid/Vue/Angular directive-based navigation. Exported for consumers building custom navigation components on non-anchor elements.
+- **`createRouteAnnouncer(router, options?)`** — WCAG screen reader announcements via `aria-live` region
 
 ## Context Architecture
 
@@ -137,7 +150,7 @@ RouterErrorBoundary
 └── Renders: children + fallback(error, resetError) via Fragment
 ```
 
-**Custom comparator (`areLinkPropsEqual`):** Explicitly compares all Link-specific props — `JSON.stringify` for `routeParams` and `routeOptions` (objects), strict equality (`===`) for primitives (`routeName`, `className`, `activeClassName`, `activeStrict`, `ignoreQueryParams`, `onClick`, `target`, `children`). Prevents re-renders from inline object literals `<Link routeParams={{ id: 123 }} />`.
+**Custom comparator (`areLinkPropsEqual`):** Explicitly compares all Link-specific props — `deepEqual` (`Object.is` fast-path → key-order-insensitive `stableSerialize` → identity fallback on serialization failure) for `routeParams` and `routeOptions` (objects), strict equality (`===`) for primitives (`routeName`, `className`, `activeClassName`, `activeStrict`, `ignoreQueryParams`, `onClick`, `target`, `style`, `children`). Prevents re-renders from inline object literals `<Link routeParams={{ id: 123 }} />` and from reordered keys (`{a, b}` ≡ `{b, a}`). Falls back gracefully on BigInt / circular / Symbol values.
 
 **RouteView.Match with `fallback`:** When `fallback` prop is provided, `Match` wraps its children in a `<Suspense>` boundary with that fallback. Use this with `React.lazy()` to code-split route components. Works seamlessly with `keepAlive` — the `<Activity>` wrapper preserves the entire `<Suspense>` boundary including the fallback state.
 
@@ -148,8 +161,8 @@ RouterErrorBoundary
 | Optimization                 | Location               | Mechanism                                                                   |
 | ---------------------------- | ---------------------- | --------------------------------------------------------------------------- |
 | Node-scoped subscriptions    | `useRouteNode`         | `shouldUpdateNode()` from `@real-router/sources` filters irrelevant changes |
-| JSON reference stabilization | `useStableValue`       | `JSON.stringify` memoization prevents new-object-per-render dependencies    |
-| Custom memo comparator       | `Link`                 | `areLinkPropsEqual`: JSON for params/options, `===` for primitives          |
+| JSON reference stabilization | `useStableValue`       | Ref-based: serialize once via key-order-insensitive `stableSerialize`, cache result, identity fallback on BigInt/circular |
+| Custom memo comparator       | `Link`                 | `areLinkPropsEqual`: deepEqual via `stableSerialize` for params/options, `===` for primitives + `style` + `children` |
 | Frozen singletons            | `constants.ts`         | `EMPTY_PARAMS`, `EMPTY_OPTIONS` avoid allocation for default props          |
 | WeakMap caching              | `@real-router/sources` | Per-router selector functions cached, auto-evicted on GC                    |
 | Memoized navigator           | `RouterProvider`       | `getNavigator(router)` via `useMemo` — stable reference                     |
@@ -202,7 +215,7 @@ tests/
 
 ### Performance Tests
 
-6 performance test suites in `tests/performance/` verify render budgets via `vitest-react-profiler`:
+11 performance test suites in `tests/performance/` verify render budgets via `vitest-react-profiler`:
 
 | Component / Hook        | What is verified                                                                                                                                                                                                                                                     |
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -211,21 +224,27 @@ tests/
 | **RouteView**           | Sibling isolation (navigation doesn't re-render siblings); only matched child renders; keepAlive lazy activation (never-visited children have 0 renders); hidden keepAlive children don't re-render on sibling navigation; hide/show cycle meets ≤2 re-render budget |
 | **useRoute**            | Re-renders on every navigation (no filtering); linear render count (N navigations = N re-renders); stable navigator ref across re-renders                                                                                                                            |
 | **useRouteNode**        | Re-renders only when node activates/deactivates; skips unrelated navigations (0 re-renders); skips sibling node navigations; root node re-renders on all changes                                                                                                     |
-| **useRouterTransition** | Sync navigation: 0 extra re-renders (no TRANSITION_START); async navigation: exactly 2 re-renders per transition (start + end); N async transitions = 2N re-renders (linear scaling); `navigateToNotFound()` causes 0 re-renders                                     |
+| **useRouterTransition** | Sync navigation: 0 extra re-renders (no TRANSITION_START); async navigation: exactly 2 re-renders per transition (start + end); N async transitions = 2N re-renders (linear scaling); `navigateToNotFound()` causes 0 re-renders; subscription lifecycle has no listener leak across mount/unmount cycles (H12 regression)                                     |
+| **useRouter / useNavigator / useRouteUtils** | Contract: 0 re-renders on any navigation (gotcha-locked tests); identity stable across rerenders; navigator method references stable; `useRouteUtils` returns same `RouteUtils` instance across renders (WeakMap cache) |
+| **useIsActiveRoute**    | Recreates source only when JSON-equal `routeParams` differ (key-order insensitive); re-renders only on active-state transition |
+| **structuralSharing**   | `BaseSource.getSnapshot()` returns same reference for path-stable navigations (no tearing) |
 
 ## Stress Test Coverage
 
-43 stress tests across 8 files in `tests/stress/` validate behavior under extreme conditions:
+62 stress tests across 11 files in `tests/stress/` validate behavior under extreme conditions:
 
 | Category                | Tests (file count) | Test count | What they verify                                                                                                                                                                                        |
 | ----------------------- | ------------------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Mount/unmount lifecycle | 1 file             | 9 tests    | useRouteNode/useRoute/Link/useRouterTransition × 200 mount/unmount cycles — bounded heap; 50 components remount + re-subscribe; conditional toggle × 100; router stop/restart; dynamic nodeName changes |
+| Mount/unmount lifecycle | 1 file             | 14 tests   | useRouteNode/useRoute/Link/useRouterTransition × 200 mount/unmount cycles — bounded heap; 50 components remount + re-subscribe; conditional toggle × 100; router stop/restart; dynamic nodeName changes; 10000 navigate cycles heap-bounded; 200 router instances disposed — full WeakMap cache cleanup (useRouterError/useRouterTransition/useRouteUtils/shouldUpdateCache); navigate-during-teardown × 50 with concurrent races — no unhandled rejections, heap bounded |
 | Subscription fanout     | 1 file             | 5 tests    | 50 useRouteNode on different nodes — only relevant re-render; 20 useRoute + 30 useRouteNode('') — all update; 50 useRouteNode('users') — granular scoping; concurrent mount/unmount; cleanup on unmount |
 | Link mass rendering     | 1 file             | 7 tests    | 200 Links mount — no render loops; active class toggle; 50 round-robin navigations; deep routeParams; 50 rapid clicks — 0 unhandled rejections; dynamic routeName × 100                                 |
 | Deep tree context       | 1 file             | 4 tests    | 30-deep useRouteNode — only relevant nodes re-render; useRouter — 0 re-renders; wide tree 25 leaves — all re-render; nested RouterProviders — isolated                                                  |
 | shouldUpdateCache       | 1 file             | 4 tests    | 200 unique node names — cache scales; 100 same-node — cache hit; router stop + GC + new router; 2 routers × 50 nodes — isolated                                                                         |
-| Transition hook         | 1 file             | 4 tests    | 50 async guard cycles — isTransitioning true→false; 50 concurrent — last wins; 20 consumers — consistent; navigate + cancel × 50 — never stuck                                                          |
+| Transition hook         | 1 file             | 6 tests    | 50 async guard cycles — isTransitioning true→false; 50 concurrent — last wins; 20 consumers — consistent; navigate + cancel × 50 — never stuck; router.stop() mid-transition — no unhandled rejections; concurrent guards w/ mixed durations — last-write-wins, no zombie isTransitioning |
 | RouteView keepAlive     | 1 file             | 6 tests    | 5 Activity segments × 200 navs — state preserved; non-keepAlive unmount; mixed modes; DOM stability                                                                                                     |
+| Dynamic routes          | 1 file             | 4 tests    | `addRoute`/`removeRoute`/`clearRoutes` mid-session; useRouteNode on mutated tree; Link href updates after route mutation                                                                                  |
+| Suspense transition     | 1 file             | 3 tests    | Suspense fallback during pending lazy load; keepAlive + Suspense × 20 round-trips; nested Suspense                                                                                                        |
+| RouterErrorBoundary     | 1 file             | 4 tests    | 100 rapid guard rejections — heap bounded, all errors reach onError; resetError × 100 — boundary re-arms cleanly; mount/unmount × 100 with interleaved errors — no unhandled rejections; 3 concurrent boundaries share snapshot (global event) — linear render scaling |
 | Combined SPA            | 1 file             | 4 tests    | Full app with RouteView + Links + useRouteNode + 200 navs; transition progress; keepAlive tabs; remount; RouteView match correctness × 100                                                              |
 
 ## See Also

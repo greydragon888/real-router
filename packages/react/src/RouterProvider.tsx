@@ -37,22 +37,32 @@ export const RouterProvider: FC<RouteProviderProps> = ({
   // subscribe connects to router on first listener, unsubscribes on last.
   // This is Strict Mode safe — no useEffect cleanup needed.
   const store = useMemo(() => createRouteSource(router), [router]);
-  const { route, previousRoute } = useSyncExternalStore(
+  // Use snapshot reference directly. createRouteSource via stabilizeState
+  // returns the SAME snapshot reference when route.path is unchanged, so
+  // useMemo below sees stable deps for idempotent navigations and
+  // RouteContext consumers do not re-render.
+  const snapshot = useSyncExternalStore(
     store.subscribe,
     store.getSnapshot,
     store.getSnapshot, // SSR: router returns same state on server and client
   );
 
   const routeContextValue = useMemo(
-    () => ({ navigator, route, previousRoute }),
-    [navigator, route, previousRoute],
+    () => ({
+      navigator,
+      route: snapshot.route,
+      previousRoute: snapshot.previousRoute,
+    }),
+    [navigator, snapshot],
   );
 
   return (
-    <RouterContext value={router}>
-      <NavigatorContext value={navigator}>
-        <RouteContext value={routeContextValue}>{children}</RouteContext>
-      </NavigatorContext>
-    </RouterContext>
+    <RouterContext.Provider value={router}>
+      <NavigatorContext.Provider value={navigator}>
+        <RouteContext.Provider value={routeContextValue}>
+          {children}
+        </RouteContext.Provider>
+      </NavigatorContext.Provider>
+    </RouterContext.Provider>
   );
 };

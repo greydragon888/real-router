@@ -229,6 +229,34 @@ describe(
         expect(capturedRouter).toBe(router);
       });
 
+      it("RouteContext value reference is stable when route.path is unchanged (H1)", async () => {
+        await router.start("/users/list");
+
+        let captured: object | null = null;
+
+        const RouteCapture: FC = () => {
+          captured = use(RouteContext) as object | null;
+
+          return null;
+        };
+
+        render(
+          <RouterProvider router={router}>
+            <RouteCapture />
+          </RouterProvider>,
+        );
+
+        const first = captured;
+
+        // Idempotent navigation: same path, same params — stabilizeState
+        // returns same route reference, so RouteContext value should be reused.
+        await act(async () => {
+          await router.navigate("users.list").catch(() => {});
+        });
+
+        expect(captured).toBe(first);
+      });
+
       it("should update RouteContext on navigation", async () => {
         await router.start("/users/list");
 

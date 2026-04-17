@@ -8,9 +8,17 @@ export function createSignalFromSource<T>(
 ): Accessor<T> {
   const [value, setValue] = createSignal<T>(source.getSnapshot());
 
+  const sync = (): T => source.getSnapshot();
+
   const unsubscribe = source.subscribe(() => {
-    setValue(() => source.getSnapshot());
+    setValue(sync);
   });
+
+  // Re-read after subscribe: lazy sources reconcile their snapshot in
+  // onFirstSubscribe (when reused after disconnect via cache). Listener is not
+  // notified for that internal update, so we must sync the signal manually.
+  // No-op when snapshot is unchanged (signal equality check).
+  setValue(sync);
 
   onCleanup(() => {
     unsubscribe();

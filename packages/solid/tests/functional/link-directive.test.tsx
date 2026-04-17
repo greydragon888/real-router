@@ -558,4 +558,26 @@ describe("link directive", () => {
       );
     });
   });
+
+  // Documents gotcha #14 "use:link Requires useRouter Context" from
+  // packages/solid/CLAUDE.md:
+  //   The link directive calls useRouter() internally, so it must be used
+  //   inside a component that has access to the router context.
+  describe("RouterProvider requirement", () => {
+    it("throws when rendered without RouterProvider", () => {
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
+      expect(() =>
+        render(() => (
+          <a use:link={{ routeName: "home" }} data-testid="link">
+            Home
+          </a>
+        )),
+      ).toThrow("useRouter must be used within a RouterProvider");
+
+      consoleError.mockRestore();
+    });
+  });
 });

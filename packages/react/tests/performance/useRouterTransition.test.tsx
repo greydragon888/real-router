@@ -249,6 +249,54 @@ describe(
       });
     });
 
+    describe("Subscription lifecycle (H12 leak regression)", () => {
+      it("does not retain subscription after all consumers unmount", async () => {
+        await router.start("/");
+
+        // Mount/unmount many consumers; the WeakMap-cached transition source
+        // is shared per-router, but `BaseSource.onLastUnsubscribe` should
+        // disconnect the underlying router subscription so no listener leaks.
+        for (let i = 0; i < 50; i++) {
+          const { unmount } = profileHook(() => useRouterTransition(), {
+            renderOptions: { wrapper },
+          });
+
+          unmount();
+        }
+
+        // Smoke check: a fresh consumer still receives correct snapshot
+        // (source was reconnected on next mount).
+        const { result } = profileHook(() => useRouterTransition(), {
+          renderOptions: { wrapper },
+        });
+
+        expect(result.current.isTransitioning).toBe(false);
+      });
+
+      it("returns the same source instance across mount cycles (WeakMap cache)", async () => {
+        await router.start("/");
+
+        const snapshots: object[] = [];
+
+        for (let i = 0; i < 5; i++) {
+          const { result, unmount } = profileHook(() => useRouterTransition(), {
+            renderOptions: { wrapper },
+          });
+
+          snapshots.push(result.current);
+          unmount();
+        }
+
+        // All snapshots reference the same object (BaseSource.getSnapshot is
+        // stable until updateSnapshot is called).
+        const first = snapshots[0];
+
+        for (const snap of snapshots) {
+          expect(snap).toBe(first);
+        }
+      });
+    });
+
     describe("Sequential Async Transitions", () => {
       it("should scale linearly: N async transitions = 2N re-renders", async () => {
         const asyncRouter = createRouter([

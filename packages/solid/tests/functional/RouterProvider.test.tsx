@@ -1,6 +1,6 @@
 import { renderHook, render, screen } from "@solidjs/testing-library";
 import { useContext } from "solid-js";
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import {
   RouterProvider,
@@ -85,14 +85,20 @@ describe("RouterProvider component", () => {
     expect(unsubscribe).toHaveBeenCalledTimes(1);
   });
 
-  it("should provide navigator via RouterContext", () => {
+  it("should provide navigator via RouterContext", async () => {
     const { result } = renderHook(() => useContext(RouterContext), {
       wrapper,
     });
 
-    expect(result?.navigator).toBeDefined();
-    expect(result?.navigator.navigate).toBeDefined();
-    expect(result?.navigator.getState).toBeDefined();
+    // Navigator is a functional object — verify behavior, not just presence.
+    const navigator = result!.navigator;
+
+    expect(navigator.getState()?.name).toBe("test");
+    expect(navigator.isActiveRoute("test")).toBe(true);
+
+    await navigator.navigate("one-more-test");
+
+    expect(navigator.getState()?.name).toBe("one-more-test");
   });
 
   it("should render without children", () => {
@@ -102,7 +108,7 @@ describe("RouterProvider component", () => {
       </RouterProvider>
     ));
 
-    expect(container).toBeDefined();
+    expect(container.innerHTML).toBe("");
   });
 
   it("should render multiple children", () => {

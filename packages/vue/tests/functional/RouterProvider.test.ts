@@ -1,6 +1,6 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
-import { defineComponent, h, inject } from "vue";
+import { defineComponent, h, inject, ref } from "vue";
 
 import { RouterKey, RouteKey } from "../../src/context";
 import { RouterProvider } from "../../src/RouterProvider";
@@ -126,16 +126,33 @@ describe("RouterProvider component", () => {
     expect(unsubscribe).toHaveBeenCalledTimes(1);
   });
 
-  it("should not resubscribe on rerender with same router", () => {
+  it("should not resubscribe on rerender with same router", async () => {
     vi.spyOn(router, "subscribe");
 
-    mount(
+    const tick = ref(0);
+
+    const wrapper = mount(
       defineComponent({
         setup: () => () =>
-          h(RouterProvider, { router }, { default: () => h("div") }),
+          h(
+            RouterProvider,
+            { router },
+            { default: () => h("div", `tick=${tick.value}`) },
+          ),
       }),
     );
 
+    expect(router.subscribe).toHaveBeenCalledTimes(1);
+
+    // Force a parent re-render by mutating a reactive ref the render function
+    // depends on. Without a real rerender the original test was a tautology
+    // (it only verified mount-time subscribe count).
+    tick.value++;
+    await wrapper.vm.$nextTick();
+    tick.value++;
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.text()).toContain("tick=2");
     expect(router.subscribe).toHaveBeenCalledTimes(1);
   });
 });

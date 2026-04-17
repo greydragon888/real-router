@@ -67,14 +67,18 @@ describe("useIsActiveRoute", () => {
       { wrapper: (props) => wrapper({ ...props, router }) },
     );
 
-    const initialCheckCount = checkCount;
+    // Baseline: captured after the first render so we know the spy fired at
+    // least once during mount. An unrelated navigation must not increase it.
+    const checksAfterInitialRender = checkCount;
+
+    expect(checksAfterInitialRender).toBeGreaterThan(0);
 
     await act(async () => {
       await router.navigate("home");
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
-    expect(checkCount).toBe(initialCheckCount);
+    expect(checkCount).toBe(checksAfterInitialRender);
     expect(result.current).toBe(false);
   });
 
@@ -287,24 +291,30 @@ describe("useIsActiveRoute", () => {
     });
 
     it("should handle dynamic routeName changes", () => {
-      const routes = ["users.list", "home", "about", "test"];
-      let currentIndex = 0;
+      // Current route is "users.view" (beforeEach started at /users/123).
+      // Each row: [routeName prop, expected isActive for "users.view"].
+      const cases: [string, boolean][] = [
+        ["users", true], // ancestor match (strict=false default)
+        ["users.view", true], // exact match
+        ["users.list", false], // sibling route
+        ["home", false], // unrelated route
+        ["about", false], // unrelated route
+      ];
 
       const { result, rerender } = renderHook(
         ({ routeName }: { routeName: string }) =>
-          useIsActiveRoute(routeName, {}),
+          useIsActiveRoute(routeName, { id: "123" }),
         {
           wrapper: (props) => wrapper({ ...props, router }),
-          initialProps: { routeName: routes[currentIndex] },
+          initialProps: { routeName: cases[0][0] },
         },
       );
 
-      for (let i = 0; i < 100; i++) {
-        currentIndex = (currentIndex + 1) % routes.length;
-        rerender({ routeName: routes[currentIndex] });
-      }
+      for (const [routeName, expected] of cases) {
+        rerender({ routeName });
 
-      expect(result.current).toBeTypeOf("boolean");
+        expect(result.current, `routeName=${routeName}`).toBe(expected);
+      }
     });
   });
 

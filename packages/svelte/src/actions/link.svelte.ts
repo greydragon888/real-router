@@ -1,7 +1,7 @@
-import { getContext } from "svelte";
 import type { ActionReturn } from "svelte/action";
 import type { Router, Params, NavigationOptions } from "@real-router/core";
-import { ROUTER_KEY } from "../context";
+import { ROUTER_KEY, getContextOrThrow } from "../context";
+import { EMPTY_OPTIONS, EMPTY_PARAMS, NOOP } from "../constants";
 import { shouldNavigate, applyLinkA11y } from "../dom-utils/index.js";
 
 export interface LinkActionParams {
@@ -9,6 +9,11 @@ export interface LinkActionParams {
   params?: Params;
   options?: NavigationOptions;
 }
+
+type LinkAction = (
+  node: HTMLElement,
+  params: LinkActionParams,
+) => ActionReturn<LinkActionParams>;
 
 /**
  * Factory function that captures router context during component initialization.
@@ -28,15 +33,8 @@ export interface LinkActionParams {
  * <a use:link={{ name: 'users', params: { id: '123' } }}>User Profile</a>
  * ```
  */
-export function createLinkAction(): (
-  node: HTMLElement,
-  params: LinkActionParams,
-) => ActionReturn<LinkActionParams> {
-  const router = getContext<Router | undefined>(ROUTER_KEY);
-
-  if (!router) {
-    throw new Error("createLinkAction must be called inside a RouterProvider");
-  }
+export function createLinkAction(): LinkAction {
+  const router = getContextOrThrow<Router>(ROUTER_KEY, "createLinkAction");
 
   return function link(
     node: HTMLElement,
@@ -46,31 +44,31 @@ export function createLinkAction(): (
 
     applyLinkA11y(node);
 
-    function handleClick(evt: MouseEvent) {
-      if (!shouldNavigate(evt)) return;
-      evt.preventDefault();
-      // router is guaranteed to exist due to check in factory
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      router!
+    function navigate() {
+      router
         .navigate(
           currentParams.name,
-          currentParams.params ?? {},
-          currentParams.options ?? {},
+          currentParams.params ?? EMPTY_PARAMS,
+          currentParams.options ?? EMPTY_OPTIONS,
         )
-        .catch(() => {});
+        .catch(NOOP);
+    }
+
+    function handleClick(evt: MouseEvent) {
+      if (!shouldNavigate(evt)) return;
+      if (
+        node instanceof HTMLAnchorElement &&
+        node.getAttribute("target") === "_blank"
+      ) {
+        return;
+      }
+      evt.preventDefault();
+      navigate();
     }
 
     function handleKeyDown(evt: KeyboardEvent) {
       if (evt.key === "Enter" && !(node instanceof HTMLButtonElement)) {
-        // router is guaranteed to exist due to check in factory
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        router!
-          .navigate(
-            currentParams.name,
-            currentParams.params ?? {},
-            currentParams.options ?? {},
-          )
-          .catch(() => {});
+        navigate();
       }
     }
 

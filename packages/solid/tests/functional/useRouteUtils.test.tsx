@@ -31,9 +31,6 @@ describe("useRouteUtils hook", () => {
     });
 
     expect(result).toBeInstanceOf(RouteUtils);
-    expect(result.getChain).toBeTypeOf("function");
-    expect(result.getSiblings).toBeTypeOf("function");
-    expect(result.isDescendantOf).toBeTypeOf("function");
   });
 
   it("should have working getChain method", () => {

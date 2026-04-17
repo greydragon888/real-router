@@ -1,7 +1,7 @@
 import { createRouter } from "@real-router/core";
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
-import { defineComponent, h } from "vue";
+import { defineComponent, h, ref } from "vue";
 
 import { Link } from "../../src/components/Link";
 import { RouterProvider } from "../../src/RouterProvider";
@@ -103,6 +103,43 @@ describe("Link component", () => {
       expect(router.navigate).not.toHaveBeenCalled();
     });
 
+    it("should navigate on synthetic touch-derived click (button=0, no modifiers)", async () => {
+      // Touch events synthesize click with button=0 and no modifier keys —
+      // shouldNavigate must accept them. Documents that touch flow works.
+      vi.spyOn(router, "navigate");
+
+      const wrapper = mountLink(router, { routeName: "one-more-test" });
+
+      await wrapper.find("a").trigger("click", {
+        button: 0,
+        metaKey: false,
+        altKey: false,
+        ctrlKey: false,
+        shiftKey: false,
+      });
+
+      expect(router.navigate).toHaveBeenCalledWith(
+        "one-more-test",
+        expect.any(Object),
+        expect.any(Object),
+      );
+    });
+
+    it("should render undefined href and log error for empty routeName", () => {
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
+      const wrapper = mountLink(router, { routeName: "" });
+
+      expect(wrapper.find("a").attributes("href")).toBeUndefined();
+      expect(consoleError).toHaveBeenCalledWith(
+        expect.stringContaining(`Route ""`),
+      );
+
+      consoleError.mockRestore();
+    });
+
     it("should not navigate when target is _blank", async () => {
       vi.spyOn(router, "navigate");
 
@@ -114,6 +151,113 @@ describe("Link component", () => {
       await wrapper.find("a").trigger("click");
 
       expect(router.navigate).not.toHaveBeenCalled();
+    });
+
+    it("should invoke ALL handlers when attrs.onClick is an array (Vue template multi-handler)", async () => {
+      const handler1 = vi.fn();
+      const handler2 = vi.fn();
+
+      vi.spyOn(router, "navigate");
+
+      const wrapper = mount(
+        defineComponent({
+          setup: () => () =>
+            h(
+              RouterProvider,
+              { router },
+              {
+                default: () =>
+                  h(
+                    Link as any,
+                    {
+                      routeName: "one-more-test",
+                      // Vue's compiled template emits this shape for multiple
+                      // @click handlers. Previously, Link silently dropped it
+                      // (typeof !== 'function' check) — bug from review.
+                      onClick: [handler1, handler2],
+                    },
+                    { default: () => "Test" },
+                  ),
+              },
+            ),
+        }),
+      );
+
+      await wrapper.find("a").trigger("click");
+
+      expect(handler1).toHaveBeenCalledTimes(1);
+      expect(handler2).toHaveBeenCalledTimes(1);
+      // Navigation still happens because none of the handlers preventDefault.
+      expect(router.navigate).toHaveBeenCalled();
+    });
+
+    it("should stop array handlers and skip navigation if one preventDefaults", async () => {
+      const handler1 = vi.fn((evt: Event) => {
+        evt.preventDefault();
+      });
+      const handler2 = vi.fn();
+
+      vi.spyOn(router, "navigate");
+
+      const wrapper = mount(
+        defineComponent({
+          setup: () => () =>
+            h(
+              RouterProvider,
+              { router },
+              {
+                default: () =>
+                  h(
+                    Link as any,
+                    {
+                      routeName: "one-more-test",
+                      onClick: [handler1, handler2],
+                    },
+                    { default: () => "Test" },
+                  ),
+              },
+            ),
+        }),
+      );
+
+      await wrapper.find("a").trigger("click");
+
+      expect(handler1).toHaveBeenCalledTimes(1);
+      // Second handler is skipped after defaultPrevented (matches single-handler behavior).
+      expect(handler2).not.toHaveBeenCalled();
+      expect(router.navigate).not.toHaveBeenCalled();
+    });
+
+    it("should ignore non-function entries inside onClick array gracefully", async () => {
+      const handler = vi.fn();
+
+      vi.spyOn(router, "navigate");
+
+      const wrapper = mount(
+        defineComponent({
+          setup: () => () =>
+            h(
+              RouterProvider,
+              { router },
+              {
+                default: () =>
+                  h(
+                    Link as any,
+                    {
+                      routeName: "one-more-test",
+                      onClick: [null, handler, undefined],
+                    },
+                    { default: () => "Test" },
+                  ),
+              },
+            ),
+        }),
+      );
+
+      await wrapper.find("a").trigger("click");
+
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(router.navigate).toHaveBeenCalled();
     });
 
     it("should call onClick callback from attrs", async () => {
@@ -194,7 +338,12 @@ describe("Link component", () => {
   });
 
   describe("Props and Updates", () => {
-    it("should update children when props change", () => {
+    it("should update active state when routeName prop changes", async () => {
+      await router.navigate("one-more-test");
+      await flushPromises();
+
+      const currentRouteName = ref("one-more-test");
+
       const wrapper = mount(
         defineComponent({
           setup: () => () =>
@@ -205,17 +354,28 @@ describe("Link component", () => {
                 default: () =>
                   h(
                     Link,
-                    { routeName: "one-more-test" },
                     {
-                      default: () => "Original Text",
+                      routeName: currentRouteName.value,
+                      activeClassName: "active",
                     },
+                    { default: () => "Link" },
                   ),
               },
             ),
         }),
       );
 
-      expect(wrapper.find("a").text()).toBe("Original Text");
+      expect(wrapper.find("a").classes()).toContain("active");
+
+      currentRouteName.value = "items";
+      await flushPromises();
+
+      expect(wrapper.find("a").classes()).not.toContain("active");
+
+      await router.navigate("items");
+      await flushPromises();
+
+      expect(wrapper.find("a").classes()).toContain("active");
     });
   });
 

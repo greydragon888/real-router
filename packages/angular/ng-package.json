@@ -1,0 +1,12 @@
+{
+  "$schema": "https://raw.githubusercontent.com/ng-packagr/ng-packagr/main/src/ng-package.schema.json",
+  "lib": {
+    "entryFile": "src/index.ts"
+  },
+  "dest": "dist",
+  "allowedNonPeerDependencies": [
+    "@real-router/core",
+    "@real-router/sources",
+    "@real-router/route-utils"
+  ]
+}
