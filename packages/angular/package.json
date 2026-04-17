@@ -24,7 +24,7 @@
     "test:stress": "vitest -c vitest.config.stress.mts",
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache src/ tests/ --fix --max-warnings 0",
-    "prebundle": "rm -rf src/dom-utils && cp -r ../../shared/dom-utils src/dom-utils && sed -i '' 's/\\.js\"/\"/g' src/dom-utils/*.ts",
+    "prebundle": "rm -rf src/dom-utils && cp -r ../../shared/dom-utils src/dom-utils && perl -pi -e 's/\\.js\"/\"/g' src/dom-utils/*.ts",
     "bundle": "ng-packagr -p ng-package.json -c tsconfig.lib.json"
   },
   "keywords": [
