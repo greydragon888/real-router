@@ -34,20 +34,27 @@ Vue Router:       URL  →  component: View   (router decides what to render)
 Real-Router:      URL  →  { name, params }  (you decide what to do)
 ```
 
+**The router tells you where. You decide what.**
+
 This is not a minor API difference — it's a fundamentally different architecture.\
-The router becomes a **data provider**: it tells you _where_ the user is, and you decide what to do with that information — render a page, load data, set a title, track analytics, or ignore it entirely.
+The router is a **lifecycle manager**, not a data layer.\
+It tells you when transitions happen; what to do with that — render a page, load data, set a title, track analytics, or ignore it entirely — is your decision.
 
 > Built from scratch with TypeScript-first design. Independent project inspired by [router5](https://github.com/router5/router5)'s declarative philosophy, not a fork.
 
-> **Pre-1.0**: Core API and plugin interfaces are stable. Minor versions preserve backward compatibility. See [Roadmap](https://github.com/greydragon888/real-router/issues/296) for the path to 1.0 and [Quality & Testing](#quality--testing) for reliability guarantees.
+> **Pre-1.0**: Core API and plugin interfaces are stable. Minor versions preserve backward compatibility. The high release count reflects monorepo-wide coordinated publishing — one change in core triggers version bumps across all ~30 dependent packages. See [Roadmap](https://github.com/greydragon888/real-router/issues/296) for the path to 1.0 and [Quality & Testing](#quality--testing) for reliability guarantees.
 
 ## Why Real-Router?
 
-### One-Way Data Flow
+Your routing logic lives in one place — route config plus a plugin or two. 
+Adding a page means adding a config entry; changing auth means touching one module.
+
+### One-Way Data Flow in UI
 
 Other routers push data fetching into components — `useParams()` + `useEffect()` + `fetch()` is imperative boilerplate that every page repeats.
 
-Real-Router inverts this: routing state arrives as external data, plugins handle data loading, titles, analytics outside the component tree. Components just render what they receive.
+Real-Router inverts this: routing state arrives as external data, plugins handle data loading, titles, analytics outside the component tree. 
+Components just render what they receive.
 
 ### Declarative Route Config
 
@@ -62,28 +69,53 @@ TanStack Router:   beforeLoad + loader + head per route file, scattered across f
 Real-Router:       guards + data + titles + any router related logic in one config object → generic plugins
 ```
 
-Guards control access, custom fields drive data loading, titles, and any other concern through generic plugins:
+With [`@real-router/lifecycle-plugin`](packages/lifecycle-plugin), data loading, titles, and cleanup live next to the route they belong to — no wrapper components, no HOCs, no scattered `useEffect` in pages:
+
+```typescript
+import { lifecyclePluginFactory } from "@real-router/lifecycle-plugin";
+
+router.usePlugin(lifecyclePluginFactory());
+
+const routes = [
+  {
+    name: "users",
+    path: "/users",
+    canActivate: authGuard,
+    onEnter: (state) => {
+      store.users.load(state.params)
+    },
+    children: [
+      {
+        name: "profile",
+        path: "/:id",
+        onEnter: (state) => {
+          document.title = `User ${state.params.id}`;
+          store.users.loadOne(state.params.id);
+        },
+      },
+    ],
+  },
+];
+```
+
+One config, one place. Adding a new page = one config entry. See [Recipes](https://github.com/greydragon888/real-router/wiki/recipes) for full examples.
+
+#### Writing your own plugin when lifecycle-plugin isn't enough
+
+For custom transition phases, cross-route coordination, or domain-specific concerns, you can write a generic plugin that reads your own fields from route config:
 
 ```typescript
 const routes = [
   {
     name: "users",
     path: "/users",
-    canActivate: authGuard, // access control (guard)
-    title: "Users", // custom field → title plugin
-    loadData: (p, api) => api.getUsers(p), // custom field → data plugin
-    children: [
-      {
-        name: "profile",
-        path: "/:id",
-      },
-    ],
+    loadData: (p, api) => api.getUsers(p), // custom field → your plugin
   },
 ];
 
-// Generic plugin — reads custom fields, no hardcoded route names
 const dataPlugin: PluginFactory = (router, getDep) => {
   const { getRouteConfig } = getPluginApi(router);
+
   return {
     onTransitionSuccess: (toState) => {
       const route = getRouteConfig(toState.name);
@@ -94,27 +126,81 @@ const dataPlugin: PluginFactory = (router, getDep) => {
 };
 ```
 
-Adding a new page = one config entry. No plugin code changes. See [Recipes](https://github.com/greydragon888/real-router/wiki/recipes) for full examples.
+The plugin reads custom fields from any route — no hardcoded route names, works across the entire config.
 
 ### Runtime Route Management
+
+Swap entire route trees in one call — auth flows, feature flags, A/B experiments.
 
 Full CRUD for routes at runtime — add, remove, update, replace, clear.\
 No other router offers `update()` for modifying guards, redirects, or defaults of individual routes without remove+add.\
 `replace()` is atomic with state revalidation — designed for HMR and dynamic feature flags.
 
+The most direct demonstration is an auth-driven tree swap:
+
+```typescript
+import { getRoutesApi } from "@real-router/core/api";
+
+async function login(credentials) {
+  await api.login(credentials);
+
+  const routes = getRoutesApi(router);
+  routes.clear();
+  routes.add(privateRoutes);
+  router.navigate("dashboard");
+}
+
+async function logout() {
+  await api.logout();
+
+  const routes = getRoutesApi(router);
+  routes.clear();
+  routes.add(publicRoutes);
+  router.navigate("auth");
+}
+```
+
+In URL→Component routers, private routes exist in the tree regardless of auth state — something must match them and decide to redirect. Real-Router takes a different path: when the user isn't authenticated, private routes aren't in the tree at all. Nothing to match, nothing to mount. An entire class of auth-related edge cases disappears by construction.
+
+> This is a client-side state consistency pattern, not a security boundary. Data authorization still belongs on the server (auth middleware, RLS, scoped tokens). The router keeps the client tree consistent with auth state; it doesn't protect data.
+
+### Capability-Based API
+
+Different consumers see different surfaces:
+
+- **Application code** uses the router directly — `navigate`, `subscribe`, `usePlugin`, etc.
+- **UI components** get `Navigator` — a frozen object with only the methods components actually need (`navigate`, `getState`, `isActiveRoute`, `canNavigateTo`, `subscribe`, `subscribeLeave`, `isLeaveApproved`). No way to accidentally call `dispose()` or mutate routes.
+- **Plugin authors** explicitly import `getPluginApi(router)` to access interceptors, state context claims, and internals. These are gated behind a separate import — invisible to everyone else.
+
+Most applications never encounter plugin APIs. Most components never see dangerous methods. The right surface at the right layer.
+
+One practical payoff — RBAC-aware menus without a second permission table:
+
+```tsx
+// canNavigateTo runs the same guards navigate would —
+// so your menu shows only what the current user is actually allowed to reach.
+const visibleItems = menuItems.filter(item =>
+  navigator.canNavigateTo(item.route)
+);
+```
+
+No separate permission table to keep in sync with route guards. One source of truth, used both to decide what to show and what to let through.
+
 ### Minimal Runtime Footprint
 
-Platform-agnostic core — no DOM, no React, no History API in the routing layer.
-All platform concerns live in plugins.
+The core is platform-agnostic — no DOM, no History API, no framework dependencies in the routing layer. 
+It works in any JavaScript runtime, not just browsers: SSR, SSG, Service Workers, edge functions, React Native — all without special modes or framework-specific adapters. 
+Swap the platform plugin, reuse everything else.
 
-This means SSR works naturally: `cloneRouter()` per request, `start(url)` to resolve, `dispose()` to clean up — no special SSR mode, no framework-specific adapters. Data loading plugs in via interceptors without touching the transition pipeline. SSG is the same loop at build time — `getStaticPaths()` enumerates routes, `cloneRouter()` + `renderToString()` per URL. See the [SSR example](examples/react/ssr) and [SSG example](examples/react/ssg).
-
-Result: **minimal allocations per navigation**, optimized independently from the external API.
-See [Recipes](https://github.com/greydragon888/real-router/wiki/recipes) for plugin patterns: data lifecycle, analytics, scroll restoration.
+SSR works naturally: `cloneRouter()` per request, `start(url)` to resolve, `dispose()` to clean up. 
+Data loading plugs in via interceptors without touching the transition pipeline. 
+SSG is the same loop at build time — `getStaticPaths()` enumerates routes, `cloneRouter()` + `renderToString()` per URL. 
+See the [SSR example](examples/react/ssr) and [SSG example](examples/react/ssg).
 
 ### Performance
 
-Custom **Segment Trie** matcher — O(segments) traversal, O(1) for static routes.
+Navigation stays fast as your route tree grows — from 10 routes to 1000, the cost per navigation barely moves. 
+The Segment Trie matcher traverses in O(segments), not O(routes).
 
 **1.7–2.5x faster and 1.5–3x lighter** than TanStack Router in full client-side navigation benchmarks (10-step loop, 56 subscribers per page):
 
@@ -189,12 +275,20 @@ const routes = [
   {
     name: "users",
     path: "/users",
-    children: [{ name: "profile", path: "/:id" }],
+    children: [
+      { 
+        name: "profile", 
+        path: "/:id" 
+      }
+    ],
   },
 ];
 
 const router = createRouter(routes);
-router.usePlugin(browserPluginFactory());
+router.usePlugin(
+  browserPluginFactory(),
+  __DEV__ && validationPlugin(),
+);
 
 await router.start();
 await router.navigate("users.profile", { id: "123" });
@@ -348,7 +442,7 @@ Many runnable examples across the most popular frameworks — each is a standalo
 | Error handling          | [error-handling](examples/react/error-handling)                                                                | [error-handling](examples/preact/error-handling)       | [error-handling](examples/solid/error-handling)                                                                                                                       | [error-handling](examples/vue/error-handling)                                                                                                     | [error-handling](examples/svelte/error-handling)                                                                                                                                                                 |
 | Dynamic routes          | [dynamic-routes](examples/react/dynamic-routes)                                                                | [dynamic-routes](examples/preact/dynamic-routes)       | [dynamic-routes](examples/solid/dynamic-routes)                                                                                                                       | [dynamic-routes](examples/vue/dynamic-routes)                                                                                                     | [dynamic-routes](examples/svelte/dynamic-routes)                                                                                                                                                                 |
 | Combined (all features) | [combined](examples/react/combined)                                                                            | [combined](examples/preact/combined)                   | [combined](examples/solid/combined)                                                                                                                                   | [combined](examples/vue/combined)                                                                                                                 | [combined](examples/svelte/combined)                                                                                                                                                                             |
-| **Framework-specific**  | [keepAlive](examples/react/keep-alive), [legacy-entry](examples/react/legacy-entry), [hmr](examples/react/hmr) | —                                                      | [store-based-state](examples/solid/store-based-state), [use-link-directive](examples/solid/use-link-directive), [signal-primitives](examples/solid/signal-primitives) | [plugin-installation](examples/vue/plugin-installation), [v-link-directive](examples/vue/v-link-directive), [keep-alive](examples/vue/keep-alive) | [link-action](examples/svelte/link-action), [lazy-loading-svelte](examples/svelte/lazy-loading-svelte), [snippets-routing](examples/svelte/snippets-routing), [reactive-source](examples/svelte/reactive-source) |
+| **Framework-specific**  | [keepAlive](examples/react/keepAlive), [legacy-entry](examples/react/legacy-entry), [hmr](examples/react/hmr) | —                                                      | [store-based-state](examples/solid/store-based-state), [use-link-directive](examples/solid/use-link-directive), [signal-primitives](examples/solid/signal-primitives) | [plugin-installation](examples/vue/plugin-installation), [v-link-directive](examples/vue/v-link-directive), [keep-alive](examples/vue/keep-alive) | [link-action](examples/svelte/link-action), [lazy-loading-svelte](examples/svelte/lazy-loading-svelte), [snippets-routing](examples/svelte/snippets-routing), [reactive-source](examples/svelte/reactive-source) |
 
 | **Server rendering** | [ssr](examples/react/ssr) — Express + Vite SSR, [ssg](examples/react/ssg) — Static site generation |
 
@@ -370,9 +464,9 @@ Real-Router treats testing as a first-class engineering concern, not an aftertho
 
 - **100% code coverage** — enforced in CI across all packages, no exceptions
 - **Static analysis** — SonarCloud quality gate on every PR: zero bugs, zero vulnerabilities, zero code smells
-- **Property-based testing** — [fast-check](https://fast-check.dev/) generates thousands of random inputs to verify invariants that hand-written tests miss (URL encoding, parameter serialization, route tree operations)
-- **Stress testing** — 310 dedicated stress tests across core and all framework adapters: thousands of concurrent navigations, guard removal mid-execution, route CRUD under load, heap snapshots confirming zero memory leaks, mount/unmount lifecycle validation, subscription fanout granularity, and full SPA simulations
-- **Playwright e2e testing** — 522 end-to-end test cases across 41 Playwright suites covering all 5 framework adapters (React, Preact, Solid, Vue, Svelte). Tests verify real browser behavior: navigation, guards, data loading, error handling, hash routing, nested routes, dynamic routes, and async guards
+- **Property-based testing** — 1000+ property tests via [fast-check](https://fast-check.dev/) across 29 packages, each running hundreds of generated inputs to verify invariants that hand-written tests miss (URL encoding, parameter serialization, route tree operations, reactive subscription ordering)
+- **Stress testing** — 500+ dedicated stress tests across core, plugins, and all 6 framework adapters: thousands of concurrent navigations, guard removal mid-execution, route CRUD under load, heap snapshots confirming zero memory leaks, mount/unmount lifecycle validation, subscription fanout granularity, and full SPA simulations
+- **Playwright e2e testing** — 700+ end-to-end test cases across 50+ Playwright suites covering 5 framework adapters (React, Preact, Solid, Vue, Svelte). Tests verify real browser behavior: navigation, guards, data loading, error handling, hash routing, nested routes, dynamic routes, and async guards
 - **Mutation testing** — [Stryker](https://stryker-mutator.io/) mutates source code and verifies that tests catch every mutation, ensuring test suite quality beyond line coverage
 
 ## Development
