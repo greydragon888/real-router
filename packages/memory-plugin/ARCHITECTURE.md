@@ -33,10 +33,10 @@ graph LR
         OTS["onTransitionSuccess"] --> PUSH[push / replace entry]
         OS["onStop"] --> CLEAR[clear entries]
         TD["teardown"] --> RM[removeExtensions + clear]
-        GO["#go(delta)"] --> NAV["router.navigate()"]
-        NAV --> THEN[".then() → update #index"]
-        NAV --> CATCH[".catch() → index unchanged"]
-        NAV --> FIN[".finally() → reset flag"]
+        GO["#go(delta)"] --> IDXSYNC["#index = targetIndex (optimistic)"]
+        IDXSYNC --> NAV["router.navigate()"]
+        NAV --> CATCH[".catch() → revert #index if generation matches"]
+        NAV --> FIN[".finally() → reset flag if generation matches"]
     end
 ```
 
@@ -77,18 +77,23 @@ back() / forward() / go(delta)
         │
         ├── delta === 0? → return (no-op)
         │
+        ├── guard: delta === 0 || !Number.isFinite(delta) || !Number.isInteger(delta) → return
         ├── targetIndex = #index + delta
         ├── targetIndex out of bounds? → return (no-op)
         │
+        ├── entry.path === currentState.path? → #index = targetIndex, return (short-circuit)
+        │
+        ├── previousIndex = #index
+        ├── generation = ++#goGeneration
         ├── #navigatingFromHistory = true
+        ├── #index = targetIndex  (optimistic sync update)
         │
         └── router.navigate(entry.name, entry.params, { replace: true })
-            ├── .then()    → #index = targetIndex
-            ├── .catch()   → (guard blocked — index stays unchanged)
-            └── .finally() → #navigatingFromHistory = false
+            ├── .catch()   → if (generation === #goGeneration) #index = previousIndex
+            └── .finally() → if (generation === #goGeneration) #navigatingFromHistory = false
 ```
 
-The `navigatingFromHistory` flag prevents `onTransitionSuccess` from recording the replayed navigation as a new history entry.
+The `navigatingFromHistory` flag prevents `onTransitionSuccess` from recording the replayed navigation as a new history entry. The `#goGeneration` guard ensures that only the latest in-flight `#go` call can revert the index or clear the flag — older superseded calls no-op on settle.
 
 ## Data Flow
 
@@ -114,12 +119,14 @@ router.back()
     #go(-1)
     │
     #navigatingFromHistory = true
+    #index = targetIndex           (optimistic sync update)
+    generation = ++#goGeneration
     │
     router.navigate(entry.name, entry.params, { replace: true })
     │
-    ├── SUCCESS → .then() → #index = targetIndex
-    └── BLOCKED → .catch() → #index unchanged
-                  .finally() → #navigatingFromHistory = false
+    ├── SUCCESS → .finally() → if (generation === #goGeneration) #navigatingFromHistory = false
+    └── BLOCKED → .catch()   → if (generation === #goGeneration) #index = previousIndex
+                  .finally() → if (generation === #goGeneration) #navigatingFromHistory = false
 ```
 
 ### Guard blocks back navigation
@@ -129,14 +136,15 @@ router.back()
     │
     #go(-1)
     │
+    #index = targetIndex    (optimistic)
     router.navigate(...)
     │
     CANNOT_ACTIVATE (guard returns false)
     │
-    .catch() → index stays at current position
+    .catch()   → #index = previousIndex (revert)
     .finally() → #navigatingFromHistory = false
 
-canGoBack() still returns true — position unchanged
+canGoBack() reflects the reverted position
 ```
 
 ## Design Decisions
@@ -149,9 +157,13 @@ Plugin extensions registered via `extendRouter()` must be synchronous per the co
 
 Navigating back or forward replays an existing history entry. Using `replace: true` prevents `onTransitionSuccess` from pushing a duplicate entry (even with the `navigatingFromHistory` guard in place, this is the correct semantic: the history position changes, not the history length).
 
-### Why `#index` updates in `.then()` not synchronously
+### Why `#index` updates optimistically with revert-on-catch
 
-Guards can block navigation. If `#index` updated synchronously before the navigate promise settled, a blocked navigation would leave the index pointing at the wrong entry. Updating in `.then()` ensures `canGoBack()`/`canGoForward()` always reflect the actual committed router state.
+`#go(delta)` updates `#index` **synchronously** before firing `router.navigate()` and reverts it in `.catch()` when the navigation fails. This is the **optimistic update pattern** — callers that inspect `canGoBack()`/`canGoForward()` immediately after `router.back()` see the expected post-navigation position instead of the stale pre-call state.
+
+A `#goGeneration` counter protects against superseded reverts: if a second `#go()` runs before the first settles, it bumps the generation, so the first `.catch()` finds a mismatch and skips the revert. The optimistic target from the second call wins, matching what `canGoBack()` should report.
+
+Historical note: earlier versions updated `#index` in `.then()`, which meant `canGoBack()` reported stale values during in-flight navigations. The switch to optimistic + revert happened in [#410](https://github.com/greydragon888/real-router/pull/410) to fix index desync on blocked guards (#294).
 
 ### Why `go(0)` is a no-op
 

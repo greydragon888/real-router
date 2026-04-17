@@ -32,6 +32,8 @@ await router.start("/");
 await router.navigate("users", { id: "1" });
 await router.navigate("users", { id: "2" });
 
+// Fire-and-forget: each call schedules a navigation and returns immediately.
+// Subscribe to state changes to detect completion.
 router.back(); // navigate to users/1
 router.forward(); // navigate to users/2
 router.go(-2); // navigate to home

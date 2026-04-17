@@ -14,6 +14,7 @@ import type { PluginApi } from "@real-router/core/api";
 
 const DEFAULT_MAX_HISTORY = 1000;
 
+/** @internal — instantiated by `memoryPluginFactory`; not part of the public API. */
 export class MemoryPlugin {
   readonly #router: Router;
   readonly #maxHistory: number;
@@ -27,6 +28,7 @@ export class MemoryPlugin {
   #navigatingFromHistory = false;
   #pendingDirection: MemoryDirection = "navigate";
   #goGeneration = 0;
+  #disposed = false;
 
   constructor(router: Router, api: PluginApi, options: MemoryPluginOptions) {
     this.#router = router;
@@ -56,13 +58,7 @@ export class MemoryPlugin {
         opts: NavigationOptions,
       ) => {
         if (this.#navigatingFromHistory) {
-          this.#claim.write(
-            toState,
-            Object.freeze({
-              direction: this.#pendingDirection,
-              historyIndex: this.#index,
-            }),
-          );
+          this.#writeMemoryContext(toState, this.#pendingDirection);
 
           return;
         }
@@ -76,7 +72,7 @@ export class MemoryPlugin {
         if (opts.replace && this.#index >= 0) {
           this.#entries[this.#index] = entry;
         } else {
-          this.#entries.splice(this.#index + 1);
+          this.#entries.length = this.#index + 1;
           this.#entries.push(entry);
           this.#index = this.#entries.length - 1;
 
@@ -88,13 +84,7 @@ export class MemoryPlugin {
           }
         }
 
-        this.#claim.write(
-          toState,
-          Object.freeze({
-            direction: "navigate" as const,
-            historyIndex: this.#index,
-          }),
-        );
+        this.#writeMemoryContext(toState, "navigate");
       },
 
       onStop: () => {
@@ -102,6 +92,12 @@ export class MemoryPlugin {
       },
 
       teardown: () => {
+        /* v8 ignore next 3 -- @preserve: core's unsubscribe() already guards via `unsubscribed` flag; this idempotency check covers router.dispose() + unsubscribe() ordering edge cases */
+        if (this.#disposed) {
+          return;
+        }
+
+        this.#disposed = true;
         this.#removeExtensions();
         this.#claim.release();
         this.#clear();
@@ -109,8 +105,15 @@ export class MemoryPlugin {
     };
   }
 
+  #writeMemoryContext(toState: State, direction: MemoryDirection): void {
+    this.#claim.write(
+      toState,
+      Object.freeze({ direction, historyIndex: this.#index }),
+    );
+  }
+
   #go(delta: number): void {
-    if (delta === 0) {
+    if (delta === 0 || !Number.isFinite(delta) || !Number.isInteger(delta)) {
       return;
     }
 
