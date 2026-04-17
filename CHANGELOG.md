@@ -5,6 +5,144 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-04-17]
+
+### @real-router/angular@0.1.0
+
+### Minor Changes
+
+- [#468](https://github.com/greydragon888/real-router/pull/468) [`5dddc5c`](https://github.com/greydragon888/real-router/commit/5dddc5c364efa265124c217c60a04b860f8d716b) Thanks [@greydragon888](https://github.com/greydragon888)! - Initial Angular 21 adapter for Real-Router ([#462](https://github.com/greydragon888/real-router/issues/462))
+
+  New package `@real-router/angular` — signal-based, zoneless-compatible bindings for Angular 21+. Built with ng-packagr (partial Ivy compilation, FESM2022 ESM-only output).
+
+  **Public API:**
+  - `provideRealRouter(router)` — environment providers for DI
+  - Injection tokens: `ROUTER`, `NAVIGATOR`, `ROUTE`
+  - `inject*` functions: `injectRouter`, `injectNavigator`, `injectRoute`, `injectRouteNode`, `injectRouteUtils`, `injectRouterTransition`, `injectIsActiveRoute`
+  - Components: `RouteView`, `RouterErrorBoundary`, `NavigationAnnouncer`
+  - Directives: `RouteMatch`, `RouteNotFound`, `RealLink`, `RealLinkActive`
+  - `sourceToSignal(source)` — bridge for RouterSource to Angular Signal
+
+  **Features:**
+  - Signal-first reactive state via `sourceToSignal` (no RxJS dependency)
+  - Declarative route matching with `<route-view>` + `ng-template routeMatch="..."` / `ng-template routeNotFound`
+  - WCAG-compliant navigation announcements via `NavigationAnnouncer` component
+  - Link shipped with `shallowEqual`-based props equality from day 1 (same hot-path optimization as the other adapters)
+  - Shared `dom-utils` (link utilities, route announcer) materialized from `shared/dom-utils/` via `prebundle` script — ng-packagr does not follow symlinks the same way tsdown does
+
+  **Coverage threshold 94/84/94/94 (statements/branches/functions/lines)** — JIT TestBed does not bind signal `input()` in templates, so directive callbacks and `contentChildren` paths are unreachable without AOT. See `packages/angular/CLAUDE.md` for the full list of lines excluded from JIT coverage.
+
+  **Peer dependencies:** `@angular/core >= 21.0.0`, `@angular/common >= 21.0.0`.
+
+### @real-router/preact@0.4.0
+
+### Minor Changes
+
+- [#468](https://github.com/greydragon888/real-router/pull/468) [`5dddc5c`](https://github.com/greydragon888/real-router/commit/5dddc5c364efa265124c217c60a04b860f8d716b) Thanks [@greydragon888](https://github.com/greydragon888)! - Replace JSON-based deep equality with `shallowEqual` in Link memo comparator ([#462](https://github.com/greydragon888/real-router/issues/462))
+
+  `Link`'s `areLinkPropsEqual` previously called `JSON.stringify` on `routeParams` and `routeOptions` twice per comparator invocation. Replaced with `shallowEqual` (Object.is per key, order-insensitive) — ~20× speed-up on the comparator hot path.
+  - `shallowEqual` exported from `@real-router/preact` dom-utils barrel (via `shared/dom-utils/link-utils.ts`)
+  - `Link.tsx` additionally drops `useStableValue` for `routeParams`/`routeOptions` — the memo bail-out already catches stable references, so the extra serialization per render was redundant
+  - Correctness improvements:
+    - `{id: 1n}` vs `{id: 1n}` now correctly treated as equal (`Object.is` handles BigInt)
+    - `{a: undefined}` vs `{}` now correctly treated as NOT equal
+    - Circular references and Symbol keys no longer trigger fallback paths
+  - Trade-off: nested objects/arrays in `routeParams` with equal content but different references now trigger a re-render. Stabilize via `useMemo` if needed — standard Preact pattern. In practice `routeParams` is almost always a flat `Record<string, primitive>`.
+
+  No public API change; gotcha documentation in `CLAUDE.md` updated.
+
+- [#468](https://github.com/greydragon888/real-router/pull/468) [`5dddc5c`](https://github.com/greydragon888/real-router/commit/5dddc5c364efa265124c217c60a04b860f8d716b) Thanks [@greydragon888](https://github.com/greydragon888)! - Audit-driven hardening of @real-router/preact ([#462](https://github.com/greydragon888/real-router/issues/462))
+  - **Hot path:** `useSyncExternalStore` now bails out on referentially-stable snapshots via `Object.is` inside the setter — prevents redundant re-renders when the upstream source emits the same snapshot (idempotent navigations, out-of-node updates)
+  - **`<RouteView>`:** memoize the flattened `Match`/`NotFound` element list on `children` identity. Steady-state navigations skip the `collectElements` traversal; only re-traverse when the parent re-renders with a new `children` node
+  - **`<RouteView>`:** `isSegmentMatch` now early-returns `false` for empty-string `fullSegmentName` — prevents a literal route named `""` from matching against `activeStrict=false` prefix logic
+  - **`useStableValue`:** rewritten as a pure `useRef` pattern with order-insensitive recursive JSON serialization via `stableSerialize`. Gracefully falls back to identity (`Object.is`) comparison when serialization throws (BigInt, circular refs, Symbol, function). Previously threw on BigInt and treated key-order permutations as different values
+  - **Stress coverage:** new suites for factory reuse across router instances, `replaceHistoryState` during active transitions, route deletion mid-session, mount/unmount lifecycle, subscription fan-out, and transition-hook stress
+  - **Property tests:** shared `routeView.properties.ts` updated to exercise the real helpers; `link.properties.ts` uses the production `shouldNavigate`/`buildHref`/`buildActiveClassName` exports instead of inline replicas
+  - **Docs:** README / ARCHITECTURE / CLAUDE brought back in sync with source
+
+  No public API change.
+
+### @real-router/react@0.16.0
+
+### Minor Changes
+
+- [#468](https://github.com/greydragon888/real-router/pull/468) [`5dddc5c`](https://github.com/greydragon888/real-router/commit/5dddc5c364efa265124c217c60a04b860f8d716b) Thanks [@greydragon888](https://github.com/greydragon888)! - Replace JSON-based deep equality with `shallowEqual` in Link memo comparator ([#462](https://github.com/greydragon888/real-router/issues/462))
+
+  `Link`'s `areLinkPropsEqual` previously called `stableSerialize` (JSON.stringify with sorted keys) on `routeParams` and `routeOptions` twice per comparator invocation — ~850 ns per Link per parent re-render. Replaced with `shallowEqual` (Object.is per key, order-insensitive) — ~40 ns, a ~20× speed-up on the comparator hot path.
+  - `shallowEqual` exported from `@real-router/react` dom-utils barrel (via `shared/dom-utils/link-utils.ts`)
+  - Correctness improvements alongside the speed-up:
+    - `{id: 1n}` vs `{id: 1n}` now correctly treated as equal (`Object.is` handles BigInt)
+    - `{a: undefined}` vs `{}` now correctly treated as NOT equal (previous JSON-based path treated them as equal, masking structural differences)
+    - Circular references and Symbol keys no longer trigger fallback paths
+  - Trade-off: nested objects/arrays in `routeParams` with equal content but different references now trigger a re-render. Stabilize via `useMemo` if needed — standard React pattern. In practice `routeParams` is almost always a flat `Record<string, primitive>`.
+
+  No public API change; gotcha documentation in `CLAUDE.md` updated.
+
+- [#468](https://github.com/greydragon888/real-router/pull/468) [`5dddc5c`](https://github.com/greydragon888/real-router/commit/5dddc5c364efa265124c217c60a04b860f8d716b) Thanks [@greydragon888](https://github.com/greydragon888)! - Audit-driven hardening of @real-router/react ([#462](https://github.com/greydragon888/real-router/issues/462))
+  - **Hot path:** cache `createTransitionSource` per router via `WeakMap` — `useRouterTransition` no longer recreates the source on every render/router-ref change
+  - **Hot path:** cache `RouteUtils` per router via `WeakMap` in `useRouteUtils` — drops repeated `getPluginApi().getTree()` lookups on re-render
+  - **Hot path:** `RouterProvider` / `useRouteNode` now keep the raw `useSyncExternalStore` snapshot as the memo dependency instead of destructuring `{ route, previousRoute }`. `stabilizeState` guarantees the snapshot identity is preserved across idempotent navigations — consumers no longer re-render when the route did not change
+  - **Hot path:** `useRouteNode` drops the redundant `useMemo` wrapper around `getNavigator(router)` — `getNavigator` is already WeakMap-cached in core
+  - **`<RouteView>`:** memoize the flattened `Match`/`NotFound` element list on `children` identity. Steady-state navigations skip the `Children.toArray` + `collectElements` traversal; only re-traverse when the parent re-renders with a new `children` node. `ref` is lazy-initialized to avoid per-render `new Set()` allocation
+  - **`<RouteView>`:** `isSegmentMatch` now early-returns `false` for empty-string `fullSegmentName` — prevents a literal route named `""` from matching against `activeStrict=false` prefix logic
+  - **`useStableValue`:** rewritten as a pure `useRef` pattern with order-insensitive recursive JSON serialization via `stableSerialize`. Gracefully falls back to identity (`Object.is`) comparison when serialization throws (BigInt, circular refs, Symbol, function). Previously threw on BigInt and treated key-order permutations as different values
+  - **Stress coverage:** new suites for dynamic routes, error boundary teardown, Suspense + transition, link-mass-rendering, mount/unmount lifecycle, transition-hook stress
+  - **Performance tests:** new coverage for `useIsActiveRoute`, `useNavigator`, `useRouteUtils`, `useRouter` to lock in the WeakMap/cache invariants
+  - **Property tests:** shared `linkUtils.properties.ts` now exercises the real `dom-utils` exports (`shouldNavigate`, `buildActiveClassName`, etc.) instead of inline replicas
+  - **Docs:** README / ARCHITECTURE / CLAUDE brought back in sync with source — gotcha table updated to reflect the new stable-snapshot behavior
+
+  No public API change.
+
+### @real-router/solid@0.4.0
+
+### Minor Changes
+
+- [#468](https://github.com/greydragon888/real-router/pull/468) [`5dddc5c`](https://github.com/greydragon888/real-router/commit/5dddc5c364efa265124c217c60a04b860f8d716b) Thanks [@greydragon888](https://github.com/greydragon888)! - Audit-driven hardening of @real-router/solid ([#462](https://github.com/greydragon888/real-router/issues/462))
+  - Share the `createRouteNodeSource` WeakMap cache between `useRouteNode` and `useRouteNodeStore` via a new internal `sharedNodeSource` helper.
+  - Export internal `isRouteActive` / `isSegmentMatch` helpers so property-based tests exercise the production functions instead of inline replicas.
+  - Replace the inline IIFE in `<RouterErrorBoundary>` with a `<Show>` boundary.
+  - Drop redundant `String(...)` wrappers from the Link slow-path cache key (no behavioral change).
+  - Document the `createRouteAnnouncer` options, Safari-ready delay, and the full `RouterContext` shape (`{ router, navigator, routeSelector }`) in CLAUDE.md and the Wiki integration guide.
+  - Expand test coverage: gotcha [#2](https://github.com/greydragon888/real-router/issues/2) (Never Destructure Props), gotcha [#9](https://github.com/greydragon888/real-router/issues/9) (No keepAlive disposal), every click modifier for `shouldNavigate`, Navigator surface (`subscribeLeave`, `isLeaveApproved`), `RouterErrorBoundary` `onError` reassignment, and a new 10 000-navigation long-lived subscription stress test (L1).
+  - **Security fix**: `RouteView.Match` / `RouteView.NotFound` markers now use local `Symbol()` instead of `Symbol.for()`. The global-registry Symbol was spoofable — any object with `$$type: Symbol.for("RouteView.Match")` would pass the marker check inside `RouteView`. Added regression tests rejecting spoofed markers.
+  - Gotcha-coverage negative tests: `activeStrict=true` ancestor rejection ([#10](https://github.com/greydragon888/real-router/issues/10)), `useFastPath` decision frozen at init ([#13](https://github.com/greydragon888/real-router/issues/13)).
+  - `buildActiveClassName` in `shared/dom-utils/link-utils.ts` now deduplicates tokens via a shared `parseTokens` helper; new dedupe/merge tests in `packages/dom-utils`.
+  - New stress tests: `RouteView` lazy-component switching with Suspense, Link modifier-keys under load, async-guards race (fast navigate during slow guard), `replaceHistoryState` during an active transition, and `getRoutesApi.remove()` mid-session with mounted Links (including 50-link burst removal).
+  - Fix Wiki examples: `use:link` directive value must be an accessor function (`() => ({ ... })`), not an options object — documented behavior clarified in `Solid-Integration.md`.
+
+### @real-router/svelte@0.3.0
+
+### Minor Changes
+
+- [#468](https://github.com/greydragon888/real-router/pull/468) [`5dddc5c`](https://github.com/greydragon888/real-router/commit/5dddc5c364efa265124c217c60a04b860f8d716b) Thanks [@greydragon888](https://github.com/greydragon888)! - Audit-driven hardening of @real-router/svelte ([#462](https://github.com/greydragon888/real-router/issues/462))
+  - **Hot path:** introduce `src/constants.ts` (`EMPTY_PARAMS`, `EMPTY_OPTIONS`) and use them as defaults in `<Link>` and `createLinkAction` to remove per-render / per-click `{}` allocations
+  - **Hot path:** extract `createRouteContext` helper used by `RouterProvider` and `useRouteNode` — eliminates the per-access object allocation of the previous double-getter pattern; each consumer now gets a stable `route` / `previousRoute` view
+  - **`<Lazy>`:** validate that `loader()` resolves to an object with a `default` export — silent empty renders are replaced with a clear error message; non-Error rejections are wrapped into `Error` instances; status modeled as a discriminated union
+  - **`createLinkAction`:** honor `target="_blank"` on anchor elements (consistent with `<Link>`); deduplicate the navigate path between click and Enter handlers; remove `eslint-disable @typescript-eslint/no-non-null-assertion` via locally-narrowed `router`
+  - **`<RouteView>`:** the snippet name `notFound` is now strictly reserved for the `UNKNOWN_ROUTE` fallback — even a literal route named `notFound` will not pick the snippet as a regular segment match. Hoisted `getActiveSegment` to module scope as a pure function with `for…in` iteration and pre-computed segment prefix
+  - **`<RouterErrorBoundary>`:** `onError` callbacks that throw are now caught, logged via `console.error`, and never break downstream reactivity
+  - **Tests:** ~24 assertion-quality fixes across functional tests; new negative test for gotcha "previousRoute is global"; new `getActiveSegment` unit tests covering the `notFound` collision; property tests now exercise the real `dom-utils` exports instead of inline replicas
+  - **Stress:** +9 stress tests in 4 new files — `lazy-loading.stress.ts`, `error-boundary.stress.ts`, `teardown-race.stress.ts`, `long-run-leak.stress.ts` (38 stress tests in 12 files total)
+  - **Docs:** README/CLAUDE/ARCHITECTURE/wiki brought back in sync with the source: `RouterErrorBoundary` listed in every API table; `onError` signature documented as `(error, toRoute, fromRoute)`; example count corrected (16 examples); ARCHITECTURE.md source structure no longer references non-existent files
+
+### @real-router/vue@0.5.0
+
+### Minor Changes
+
+- [#468](https://github.com/greydragon888/real-router/pull/468) [`5dddc5c`](https://github.com/greydragon888/real-router/commit/5dddc5c364efa265124c217c60a04b860f8d716b) Thanks [@greydragon888](https://github.com/greydragon888)! - Audit-driven hardening of @real-router/vue ([#462](https://github.com/greydragon888/real-router/issues/462))
+  - **Nested `<RouterProvider>`:** the `v-link` directive now uses a router stack (LIFO) instead of a single `_router` global. Inner providers push on mount and release on unmount, restoring the outer router for `v-link` instances still mounted in the parent scope. Previously, nested providers left the directive pointing at a torn-down router. New `pushDirectiveRouter(router): () => void` is the preferred API; `setDirectiveRouter(...)` is kept for tests and replaces the top of the stack
+  - **`<RouterProvider>` `announceNavigation`:** now reactive. Toggling the prop at runtime creates/destroys the announcer accordingly. Previously the prop was read only inside `onMounted`, so post-mount toggles silently no-op'd
+  - **`<Link>`:** set `inheritAttrs: false` and manually invoke `attrs.onClick` inside `handleClick`. Vue's compiled templates pass multiple `@click` handlers as an _array_; the previous implementation only invoked function values and silently dropped array cases, leading to double-invocation when attrs fall-through combined with the explicit `onClick`. Arrays are iterated and the loop exits early on `preventDefault()`
+  - **`<Link>`:** `isActive` now drives a local `shallowRef` backed by `createActiveRouteSource` with `flush: "sync"`. Resubscription happens only when `routeName` / `routeParams` / `activeStrict` / `ignoreQueryParams` actually change — the prior `useIsActiveRoute` composable resubscribed on any reactive read inside the source factory
+  - **`v-link` directive:** validates the binding value before attaching handlers. Missing `value` or missing `name: string` logs a descriptive error and skips wiring — prevents crashes inside click/keydown handlers. Single `handlers` WeakMap replaces two parallel click/keydown maps
+  - **`<RouteView>`:** cache per-Match `keepAlive` detection by slot output identity. Steady-state navigations skip the O(n) `elements.some(...)` scan when the parent has not re-rendered the default slot
+  - **`useRouteNode`:** derive `route`/`previousRoute` as `computed` over the source snapshot instead of mirroring through two `shallowRef`s with a sync `watch`. Consumers now see a stable reference when the underlying source emits the same snapshot (idempotent or out-of-node navigation)
+  - **`RouteContext` types:** `route` / `previousRoute` are now typed as `Readonly<Ref<State | undefined>>` instead of `ShallowRef<State | undefined>`. `useRoute` still returns `shallowRef`-backed values, while `useRouteNode` returns `computed`-derived ones — both satisfy the new `Readonly<Ref>` contract. Consumers that only read `.value` are unaffected
+  - **Shared `setupRouteProvision`:** extracted between `RouterProvider` and `createRouterPlugin` so both paths share identical subscription lifecycle. `createRouterPlugin` now cleans up via Vue 3.5's `app.onUnmount` when available (falls back to GC on older 3.3–3.4)
+  - **Stress coverage:** expanded suites for keepalive cycling, link mass rendering, mount/unmount lifecycle, subscription fan-out, `shouldUpdate` cache, transition-hook stress, v-link directive stress
+
+  No runtime behavior change for the documented public API aside from the nested-provider fix and the `announceNavigation` reactivity fix.
+
 ## [2026-04-13]
 
 ### @real-router/navigation-plugin@0.2.3

@@ -1,6 +1,6 @@
 {
   "name": "@real-router/angular",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "type": "commonjs",
   "description": "Angular 21 integration for Real-Router",
   "exports": {
