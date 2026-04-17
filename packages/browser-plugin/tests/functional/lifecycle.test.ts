@@ -292,18 +292,25 @@ describe("Browser Plugin — Lifecycle", () => {
       await router.start();
     });
 
-    it("preserves hash on initial navigation", async () => {
+    it("writes the preserved hash into the pushState/replaceState URL on initial navigation", async () => {
       router.stop();
       unsubscribe?.();
 
       globalThis.location.hash = "#section";
 
+      const pushSpy = vi.spyOn(mockedBrowser, "pushState");
+      const replaceSpy = vi.spyOn(mockedBrowser, "replaceState");
+
       router.usePlugin(browserPluginFactory({}, mockedBrowser));
+      await router.start();
 
-      const state = await router.start();
+      const calls = [...pushSpy.mock.calls, ...replaceSpy.mock.calls];
 
-      expect(state).toBeDefined();
-      expect(globalThis.location.hash).toBe("#section");
+      expect(calls.length).toBeGreaterThan(0);
+
+      const urls = calls.map(([, url]) => url);
+
+      expect(urls.some((url) => url.includes("#section"))).toBe(true);
     });
 
     it("handles forceDeactivate: false", async () => {
@@ -388,7 +395,7 @@ describe("Browser Plugin — Lifecycle", () => {
     });
 
     it("replaces history with correct state and URL", async () => {
-      router.replaceHistoryState("users.view", { id: "123" }, "User View");
+      router.replaceHistoryState("users.view", { id: "123" });
 
       expect(currentHistoryState).toBeDefined();
       expect(withoutMeta(currentHistoryState!)).toStrictEqual({

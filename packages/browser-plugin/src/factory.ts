@@ -6,7 +6,7 @@ import {
   safelyEncodePath,
   extractPath,
 } from "./browser-env/index.js";
-import { defaultOptions, source } from "./constants";
+import { defaultOptions, POPSTATE_SOURCE } from "./constants";
 import { BrowserPlugin } from "./plugin";
 import { validateOptions } from "./validation";
 
@@ -37,8 +37,11 @@ export function browserPluginFactory(
       "browser-plugin",
     );
 
-  const forceDeactivate = options.forceDeactivate;
-  const transitionOptions = { forceDeactivate, source, replace: true as const };
+  const transitionOptions = {
+    forceDeactivate: options.forceDeactivate,
+    source: POPSTATE_SOURCE,
+    replace: true as const,
+  };
 
   const shared: SharedFactoryState = { removePopStateListener: undefined };
 

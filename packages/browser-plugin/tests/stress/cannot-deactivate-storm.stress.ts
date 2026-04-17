@@ -107,8 +107,8 @@ describe("B4 — Cannot Deactivate Storm", () => {
     vi.spyOn(router, "navigate").mockRejectedValue(
       new TypeError("Navigate throws"),
     );
-    vi.spyOn(router, "buildUrl").mockImplementation(() => {
-      throw new Error("BuildUrl throws");
+    vi.spyOn(router, "buildPath").mockImplementation(() => {
+      throw new Error("BuildPath throws");
     });
 
     for (let i = 0; i < 20; i++) {

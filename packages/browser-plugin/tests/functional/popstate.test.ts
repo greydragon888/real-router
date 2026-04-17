@@ -129,7 +129,7 @@ describe("Browser Plugin — Popstate", () => {
       consoleSpy.mockRestore();
     });
 
-    it("restores state on CANNOT_DEACTIVATE", async () => {
+    it("skips state restore on popstate with null state (isNewState = true)", async () => {
       await router.navigate("users.list");
 
       getLifecycleApi(router).addDeactivateGuard(
@@ -139,10 +139,10 @@ describe("Browser Plugin — Popstate", () => {
 
       vi.spyOn(mockedBrowser, "replaceState");
 
-      // Popstate WITHOUT state (isNewState = true)
+      // Popstate WITHOUT state (e.g., user typed a new URL) — isNewState = true.
       globalThis.dispatchEvent(new PopStateEvent("popstate", { state: null }));
 
-      // Should NOT restore (because isNewState = true)
+      // Should NOT call replaceState because there's no previous history entry to restore to.
       expect(mockedBrowser.replaceState).not.toHaveBeenCalled();
     });
   });
@@ -354,7 +354,7 @@ describe("Browser Plugin — Popstate", () => {
         new TypeError("Critical navigate error"),
       );
 
-      vi.spyOn(router, "buildUrl").mockImplementation(() => {
+      vi.spyOn(router, "buildPath").mockImplementation(() => {
         throw new Error("Recovery error");
       });
 

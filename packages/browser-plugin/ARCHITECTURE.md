@@ -25,7 +25,7 @@ browser-plugin/
 │   ├── factory.ts         — browserPluginFactory (validation, normalization, instance creation)
 │   ├── plugin.ts          — BrowserPlugin class (runtime behavior)
 │   ├── types.ts           — Types (BrowserPluginOptions)
-│   ├── url-utils.ts       — Pure URL utility functions (extractPath, buildUrl, urlToPath)
+│   ├── browser-env/       — Symlink → shared/browser-env (extractPath, buildUrl, urlToPath, popstate, validation, …)
 │   ├── validation.ts      — Options validation (delegates to browser-env)
 │   └── constants.ts       — Constants (defaultOptions, source, LOGGER_CONTEXT)
 ```
@@ -36,24 +36,21 @@ browser-plugin/
 index.ts
     └── factory.ts
             ├── plugin.ts
-            │       ├── url-utils.ts
-            │       │       └── constants.ts
-            │       └── browser-env (shared abstractions)
+            │       └── browser-env (shared abstractions: URL utils, popstate, validation)
             ├── validation.ts
             │       └── constants.ts
-            ├── constants.ts
-            └── url-utils.ts
+            └── constants.ts
 
 types.ts  ← imported by factory.ts, plugin.ts, validation.ts
 ```
 
 External dependencies:
 
-| Dependency          | What it provides                                                        | Used in                                                    |
-| ------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------- |
-| `@real-router/core` | `getPluginApi`, types (`Router`, `PluginApi`, `State`, etc.)            | `factory.ts`, `plugin.ts`, `index.ts`                      |
-| `browser-env`       | Browser abstraction, popstate handling, validation, URL parsing helpers | `factory.ts`, `plugin.ts`, `validation.ts`, `url-utils.ts` |
-| `type-guards`       | `isStateStrict` (`history.state` validation)                            | `index.ts` (re-exported as `isState`)                      |
+| Dependency          | What it provides                                                         | Used in                                           |
+| ------------------- | ------------------------------------------------------------------------ | ------------------------------------------------- |
+| `@real-router/core` | `getPluginApi`, types (`Router`, `PluginApi`, `State`, etc.)             | `factory.ts`, `plugin.ts`, `index.ts`             |
+| `browser-env`       | Browser abstraction, popstate handling, validation, URL parsing, URL utils | `factory.ts`, `plugin.ts`, `validation.ts`       |
+| `type-guards`       | `isStateStrict` (`history.state` validation)                             | `index.ts` (re-exported as `isState`)             |
 
 ## Factory + Class Pattern
 
@@ -260,7 +257,7 @@ interface BrowserPluginOptions {
 
 Options are validated at runtime via `validateOptions()` in `validation.ts`, which delegates to `createOptionsValidator` from `browser-env`.
 
-Pure functions in `url-utils.ts` accept `base: string` directly rather than the full options object — the calling code in `plugin.ts` already works with validated `Required<BrowserPluginOptions>` and passes the specific values needed.
+Pure URL functions (`extractPath`, `buildUrl`, `urlToPath`) live in `browser-env/url-utils.ts` (symlink). They accept `base: string` directly rather than the full options object — the calling code in `plugin.ts` already works with validated `Required<BrowserPluginOptions>` and passes the specific values needed.
 
 Types shared between browser-plugin and hash-plugin (`Browser`, `SharedFactoryState`, etc.) live in `browser-env`.
 
@@ -369,9 +366,9 @@ See [browser-env/ARCHITECTURE.md](../browser-env/ARCHITECTURE.md) for implementa
 
 ## URL Utilities
 
-### url-utils.ts — pure functions
+### browser-env/url-utils.ts — pure functions
 
-All functions in `url-utils.ts` are pure (no side effects, no direct access to globals).
+All functions in `browser-env/url-utils.ts` (symlink → `shared/browser-env/`) are pure (no side effects, no direct access to globals).
 
 **`extractPath(pathname, base)`**:
 
@@ -488,7 +485,7 @@ The hash fragment (`#section`) is always preserved when navigating to the same p
 
 | Optimization                        | Location       | Effect                                                |
 | ----------------------------------- | -------------- | ----------------------------------------------------- |
-| `String.startsWith` + `slice`       | `url-utils.ts` | No regex needed for base path stripping               |
+| `String.startsWith` + `slice`       | `browser-env/url-utils.ts` | No regex needed for base path stripping   |
 | `isTransitioning` flag              | `browser-env`  | Blocks concurrent popstate processing without a queue |
 | Last-write-wins for deferred events | `browser-env`  | Intermediate states are skipped without accumulation  |
 | `historyState` as a subset of State | `browser-env`  | Less data stored in `history.state`                   |
