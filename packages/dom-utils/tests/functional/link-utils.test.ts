@@ -183,6 +183,56 @@ describe("buildHref", () => {
 
     consoleError.mockRestore();
   });
+
+  it("7 — preserves hash fragment returned by buildUrl", () => {
+    const router = {
+      buildUrl: vi.fn().mockReturnValue("/docs#section-a"),
+      buildPath: vi.fn(),
+    } as unknown as Router;
+
+    expect(buildHref(router, "docs", {})).toBe("/docs#section-a");
+  });
+
+  it("8 — preserves query params returned by buildUrl", () => {
+    const router = {
+      buildUrl: vi.fn().mockReturnValue("/users?sort=asc&page=2"),
+      buildPath: vi.fn(),
+    } as unknown as Router;
+
+    expect(buildHref(router, "users", {})).toBe("/users?sort=asc&page=2");
+  });
+
+  it("9 — does NOT strip trailing slash or normalize paths", () => {
+    // buildHref is a pass-through — it returns whatever buildUrl/buildPath
+    // produced. Trailing-slash policy is owned by the core router's options.
+    const router = {
+      buildPath: vi.fn().mockReturnValue("/users/"),
+    } as unknown as Router;
+
+    expect(buildHref(router, "users", {})).toBe("/users/");
+  });
+
+  it("10 — forwards numeric params to buildUrl verbatim", () => {
+    const router = {
+      buildUrl: vi.fn().mockReturnValue("/items/42"),
+      buildPath: vi.fn(),
+    } as unknown as Router;
+
+    buildHref(router, "items.item", { id: 42 });
+
+    expect(router.buildUrl).toHaveBeenCalledWith("items.item", { id: 42 });
+  });
+
+  it("11 — forwards Unicode params to buildUrl verbatim", () => {
+    const router = {
+      buildUrl: vi.fn().mockReturnValue("/users/%D0%B8%D0%B2%D0%B0%D0%BD"),
+      buildPath: vi.fn(),
+    } as unknown as Router;
+
+    buildHref(router, "users.view", { id: "иван" });
+
+    expect(router.buildUrl).toHaveBeenCalledWith("users.view", { id: "иван" });
+  });
 });
 
 describe("buildActiveClassName", () => {
@@ -223,6 +273,27 @@ describe("buildActiveClassName", () => {
 
   it("9 — whitespace-only baseClassName is preserved when not active", () => {
     expect(buildActiveClassName(false, "active", " ")).toBe(" ");
+  });
+
+  it("10 — deduplicates tokens when active class is already present in base", () => {
+    // If the author pre-applied "active" to the base class, the token should
+    // not be duplicated after activation.
+    expect(buildActiveClassName(true, "active", "nav-link active")).toBe(
+      "nav-link active",
+    );
+  });
+
+  it("11 — merges multi-token activeClassName with base and preserves order", () => {
+    expect(buildActiveClassName(true, "active highlighted", "nav-link")).toBe(
+      "nav-link active highlighted",
+    );
+  });
+
+  it("12 — collapses duplicate tokens within the base class", () => {
+    // parseTokens splits on any whitespace — tabs, multiple spaces, newlines.
+    expect(buildActiveClassName(true, "active", "nav-link\tactive")).toBe(
+      "nav-link active",
+    );
   });
 });
 
@@ -294,5 +365,17 @@ describe("applyLinkA11y", () => {
 
     expect(div.getAttribute("role")).toBe("link");
     expect(div.getAttribute("tabindex")).toBe("0");
+  });
+
+  it("8 — no-op on null element (defensive guard for non-TS consumers)", () => {
+    expect(() => {
+      applyLinkA11y(null);
+    }).not.toThrow();
+  });
+
+  it("9 — no-op on undefined element (defensive guard for non-TS consumers)", () => {
+    expect(() => {
+      applyLinkA11y(undefined);
+    }).not.toThrow();
   });
 });

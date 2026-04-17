@@ -10,7 +10,7 @@ export function shouldNavigate(evt: MouseEvent): boolean {
   );
 }
 
-type BuildUrlFn = (name: string, params: Params) => string;
+type BuildUrlFn = (name: string, params: Params) => string | undefined;
 
 export function buildHref(
   router: Router,
@@ -21,7 +21,11 @@ export function buildHref(
     const buildUrl = router.buildUrl as BuildUrlFn | undefined;
 
     if (buildUrl) {
-      return buildUrl(routeName, routeParams);
+      const url = buildUrl(routeName, routeParams);
+
+      if (url !== undefined) {
+        return url;
+      }
     }
 
     return router.buildPath(routeName, routeParams);
@@ -34,31 +38,84 @@ export function buildHref(
   }
 }
 
+function parseTokens(value: string | undefined): string[] {
+  return value ? (value.match(/\S+/g) ?? []) : [];
+}
+
 export function buildActiveClassName(
   isActive: boolean,
   activeClassName: string | undefined,
   baseClassName: string | undefined,
 ): string | undefined {
   if (isActive && activeClassName) {
-    return baseClassName
-      ? `${baseClassName} ${activeClassName}`.trim()
-      : activeClassName;
+    const activeTokens = parseTokens(activeClassName);
+
+    if (activeTokens.length === 0) {
+      return baseClassName ?? undefined;
+    }
+    if (!baseClassName) {
+      return activeTokens.join(" ");
+    }
+
+    const baseTokens = parseTokens(baseClassName);
+    const seen = new Set(baseTokens);
+
+    for (const token of activeTokens) {
+      if (!seen.has(token)) {
+        seen.add(token);
+        baseTokens.push(token);
+      }
+    }
+
+    return baseTokens.join(" ");
   }
 
   return baseClassName ?? undefined;
 }
 
-export function applyLinkA11y(element: HTMLElement): void {
+export function shallowEqual(
+  prev: object | undefined,
+  next: object | undefined,
+): boolean {
+  if (Object.is(prev, next)) {
+    return true;
+  }
+  if (!prev || !next) {
+    return false;
+  }
+
+  const prevKeys = Object.keys(prev);
+
+  if (prevKeys.length !== Object.keys(next).length) {
+    return false;
+  }
+
+  const prevRecord = prev as Record<string, unknown>;
+  const nextRecord = next as Record<string, unknown>;
+
+  for (const key of prevKeys) {
+    if (!Object.is(prevRecord[key], nextRecord[key])) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+export function applyLinkA11y(element: HTMLElement | null | undefined): void {
+  if (!element) {
+    return;
+  }
   if (
     element instanceof HTMLAnchorElement ||
     element instanceof HTMLButtonElement
   ) {
     return;
   }
-  if (!element.getAttribute("role")) {
+  if (!element.hasAttribute("role")) {
     element.setAttribute("role", "link");
   }
-  if (!element.getAttribute("tabindex")) {
+  if (!element.hasAttribute("tabindex")) {
     element.setAttribute("tabindex", "0");
   }
 }
