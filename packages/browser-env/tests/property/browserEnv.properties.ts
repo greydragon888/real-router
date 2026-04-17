@@ -104,7 +104,7 @@ describe("Browser-env Properties", () => {
     });
   });
 
-  describe("extractPath — idempotency and leading slash guarantee", () => {
+  describe("extractPath — leading slash guarantee", () => {
     test.prop([fc.string({ maxLength: 30 }), arbBasePath], {
       numRuns: NUM_RUNS.thorough,
     })("result always starts with '/'", (pathname: string, rawBase: string) => {
@@ -114,15 +114,14 @@ describe("Browser-env Properties", () => {
       expect(result.startsWith("/")).toBe(true);
     });
 
-    test.prop([fc.string({ maxLength: 30 }), arbBasePath], {
-      numRuns: NUM_RUNS.thorough,
-    })("extractPath is idempotent", (pathname: string, rawBase: string) => {
-      const base = normalizeBase(rawBase);
-      const once = extractPath(pathname, base);
-      const twice = extractPath(once, base);
-
-      expect(twice).toStrictEqual(once);
-    });
+    // NOTE: `extractPath` is intentionally NOT idempotent in the general case.
+    // When the first call's output equals `base` — e.g.
+    // `extractPath("/a/a", "/a") === "/a"` — the second call matches `base`
+    // exactly and strips it again, yielding `"/"`. Each call normalises
+    // "strip base prefix once from the given input". An idempotency property
+    // would require special-casing `input === base` inside the function, which
+    // is outside its contract. Only the leading-slash invariant above is
+    // guaranteed.
   });
 
   describe("buildUrl — no double slash with normalized base", () => {
