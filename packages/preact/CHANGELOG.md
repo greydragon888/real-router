@@ -1,5 +1,26 @@
 # @real-router/preact
 
+## 0.5.0
+
+### Minor Changes
+
+- [#479](https://github.com/greydragon888/real-router/pull/479) [`1107380`](https://github.com/greydragon888/real-router/commit/11073804666e724008847c6b34b20b445f1d6f39) Thanks [@greydragon888](https://github.com/greydragon888)! - Add generic type parameter to `useRoute<P>()` / `RouteContext<P>` ([#464](https://github.com/greydragon888/real-router/issues/464))
+
+  `useRoute<P>()` now accepts an optional generic so `route.params` is typed without `as` casts at the call site. The generic is erased at compile time — no runtime change. `RouteContext<P>` is likewise generic, defaulting to `Params`.
+
+  ```typescript
+  type SearchParams = { q: string; sort: string } & Params;
+
+  const { route } = useRoute<SearchParams>();
+
+  route?.params.q; // typed as string — no cast needed
+  ```
+
+### Patch Changes
+
+- Updated dependencies [[`1107380`](https://github.com/greydragon888/real-router/commit/11073804666e724008847c6b34b20b445f1d6f39)]:
+  - @real-router/sources@0.7.0
+
 ## 0.4.1
 
 ### Patch Changes

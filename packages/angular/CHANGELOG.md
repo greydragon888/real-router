@@ -1,5 +1,25 @@
 # @real-router/angular
 
+## 0.2.0
+
+### Minor Changes
+
+- [#479](https://github.com/greydragon888/real-router/pull/479) [`1107380`](https://github.com/greydragon888/real-router/commit/11073804666e724008847c6b34b20b445f1d6f39) Thanks [@greydragon888](https://github.com/greydragon888)! - Add generic type parameter to `injectRoute<P>()` / `RouteSignals<P>` ([#464](https://github.com/greydragon888/real-router/issues/464))
+
+  `injectRoute<P>()` now accepts an optional generic so `routeState().route?.params` is typed without `as` casts. `RouteSignals<P>` is likewise generic, defaulting to `Params`. Runtime is unchanged — the cast happens once inside the function.
+
+  ```typescript
+  type SearchParams = { q: string; sort: string } & Params;
+
+  const route = injectRoute<SearchParams>();
+  const q = route.routeState().route?.params.q; // typed as string
+  ```
+
+### Patch Changes
+
+- Updated dependencies [[`1107380`](https://github.com/greydragon888/real-router/commit/11073804666e724008847c6b34b20b445f1d6f39)]:
+  - @real-router/sources@0.7.0
+
 ## 0.1.1
 
 ### Patch Changes
