@@ -356,6 +356,146 @@ describe("mutual exclusion: onLeave does not fire on same-route navigation", () 
 });
 
 // =============================================================================
+// Hook Dispatch — onNavigate
+// =============================================================================
+
+describe("hook dispatch: onNavigate fires on every successful navigation", () => {
+  test.prop([arbDistinctRouteNamePair], { numRuns: NUM_RUNS.standard })(
+    "onNavigate fires exactly once for the target route on entry",
+    async ([fromRoute, toRoute]) => {
+      const onNavigate = vi.fn();
+      const routes: Route[] = [
+        { name: "home", path: "/", onNavigate: () => onNavigate },
+        { name: "about", path: "/about", onNavigate: () => onNavigate },
+        { name: "contact", path: "/contact", onNavigate: () => onNavigate },
+      ];
+      const router = createRouter(routes, { defaultRoute: "home" });
+
+      router.usePlugin(lifecyclePluginFactory());
+
+      await router.start(`/${fromRoute === "home" ? "" : fromRoute}`);
+      onNavigate.mockClear();
+
+      await router.navigate(toRoute);
+
+      const callsForTarget = onNavigate.mock.calls.filter(
+        ([toState]) => toState.name === toRoute,
+      );
+
+      expect(callsForTarget).toHaveLength(1);
+
+      router.stop();
+    },
+  );
+
+  test.prop([arbDistinctIdPair], { numRuns: NUM_RUNS.standard })(
+    "onNavigate fires on same-route param change when onStay is absent",
+    async ([id1, id2]) => {
+      const onNavigate = vi.fn();
+      const routes: Route[] = [
+        { name: "home", path: "/" },
+        {
+          name: "users.view",
+          path: "/users/:id",
+          onNavigate: () => onNavigate,
+        },
+      ];
+      const router = createRouter(routes, { defaultRoute: "home" });
+
+      router.usePlugin(lifecyclePluginFactory());
+
+      await router.start("/");
+      await router.navigate("users.view", { id: id1 });
+      onNavigate.mockClear();
+
+      await router.navigate("users.view", { id: id2 });
+
+      expect(onNavigate).toHaveBeenCalledTimes(1);
+
+      router.stop();
+    },
+  );
+});
+
+// =============================================================================
+// onNavigate Priority — onEnter/onStay win when defined
+// =============================================================================
+
+describe("onNavigate priority: specific hooks override onNavigate", () => {
+  test.prop([arbDistinctRouteNamePair], { numRuns: NUM_RUNS.standard })(
+    "onEnter wins over onNavigate on entry",
+    async ([fromRoute, toRoute]) => {
+      const onEnter = vi.fn();
+      const onNavigate = vi.fn();
+      const routes: Route[] = [
+        { name: "home", path: "/" },
+        {
+          name: "about",
+          path: "/about",
+          onEnter: () => onEnter,
+          onNavigate: () => onNavigate,
+        },
+        {
+          name: "contact",
+          path: "/contact",
+          onEnter: () => onEnter,
+          onNavigate: () => onNavigate,
+        },
+      ];
+      const router = createRouter(routes, { defaultRoute: "home" });
+
+      router.usePlugin(lifecyclePluginFactory());
+
+      await router.start(`/${fromRoute === "home" ? "" : fromRoute}`);
+      onEnter.mockClear();
+      onNavigate.mockClear();
+
+      await router.navigate(toRoute);
+
+      if (toRoute !== "home") {
+        expect(onEnter).toHaveBeenCalledTimes(1);
+      }
+
+      expect(onNavigate).not.toHaveBeenCalled();
+
+      router.stop();
+    },
+  );
+
+  test.prop([arbDistinctIdPair], { numRuns: NUM_RUNS.standard })(
+    "onStay wins over onNavigate on same-route param change",
+    async ([id1, id2]) => {
+      const onStay = vi.fn();
+      const onNavigate = vi.fn();
+      const routes: Route[] = [
+        { name: "home", path: "/" },
+        {
+          name: "users.view",
+          path: "/users/:id",
+          onStay: () => onStay,
+          onNavigate: () => onNavigate,
+        },
+      ];
+      const router = createRouter(routes, { defaultRoute: "home" });
+
+      router.usePlugin(lifecyclePluginFactory());
+
+      await router.start("/");
+      await router.navigate("users.view", { id: id1 });
+      onStay.mockClear();
+      onNavigate.mockClear();
+
+      await router.navigate("users.view", { id: id2 });
+
+      expect(onStay).toHaveBeenCalledTimes(1);
+      expect(onNavigate).not.toHaveBeenCalled();
+
+      router.stop();
+    },
+  );
+});
+
+// =============================================================================
 // Compilation Referential Stability
 // =============================================================================
 

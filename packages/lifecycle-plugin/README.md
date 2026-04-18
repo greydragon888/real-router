@@ -5,17 +5,17 @@
 [![bundle size](https://deno.bundlejs.com/?q=@real-router/lifecycle-plugin&treeshake=[*]&badge=detailed)](https://bundlejs.com/?q=@real-router/lifecycle-plugin&treeshake=[*])
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](../../LICENSE)
 
-> Route-level lifecycle hooks for [Real-Router](https://github.com/greydragon888/real-router). Add `onEnter`, `onStay`, `onLeave` callbacks directly to route definitions.
+> Route-level lifecycle hooks for [Real-Router](https://github.com/greydragon888/real-router). Add `onNavigate`, `onEnter`, `onStay`, `onLeave` callbacks directly to route definitions.
 
 ```typescript
 // Without plugin — scattered subscribe() calls with route checks:
 router.subscribe(({ route, previousRoute }) => {
-  if (route.name === "dashboard") trackPageView("dashboard");
+  if (route.name === "catalog") loadServices(route.params);
   if (previousRoute?.name === "editor") saveEditorState();
 });
 
 // With plugin — declarative, per-route:
-{ name: "dashboard", path: "/dashboard", onEnter: () => () => trackPageView("dashboard") }
+{ name: "catalog", path: "/catalog?q&sort", onNavigate: () => (s) => loadServices(s.params) }
 { name: "editor", path: "/editor", onLeave: () => () => saveEditorState() }
 ```
 
@@ -35,20 +35,26 @@ import { lifecyclePluginFactory } from "@real-router/lifecycle-plugin";
 
 const routes = [
   {
-    name: "home",
-    path: "/",
-    onLeave: () => (toState, fromState) => {
-      console.log("Leaving home for", toState.name);
+    name: "services.catalog",
+    path: "/catalog?q&sort&dir",
+    // Fires on entry AND on param-change — recommended default
+    onNavigate: () => (toState) => {
+      loadServices(toState.params);
     },
   },
   {
-    name: "users.view",
-    path: "/users/:id",
+    name: "chat",
+    path: "/chat/:roomId",
+    // Entry-specific behavior overrides onNavigate for entry;
+    // param changes fall back to onNavigate.
     onEnter: () => (toState) => {
-      analytics.track("user_profile_viewed", { userId: toState.params.id });
+      chatSocket.connect(toState.params.roomId);
     },
-    onStay: () => (toState, fromState) => {
-      console.log("User changed:", fromState.params.id, "→", toState.params.id);
+    onNavigate: () => (toState) => {
+      loadMessages(toState.params.roomId);
+    },
+    onLeave: () => () => {
+      chatSocket.disconnect();
     },
   },
 ];
@@ -59,13 +65,18 @@ router.usePlugin(lifecyclePluginFactory());
 await router.start("/");
 ```
 
+> **Start with `onNavigate`.** It covers the most common case — running the same logic whenever the route is the navigation target (data loading, analytics, UI reset). Use `onEnter` or `onStay` only when entry and param-change require different behavior.
+
 ## Hook Reference
 
-| Hook      | Fires when                 | Typical use case           |
-| --------- | -------------------------- | -------------------------- |
-| `onEnter` | Route is entered           | Analytics, data prefetch   |
-| `onStay`  | Same route, params changed | Refresh data, update UI    |
-| `onLeave` | Route is left              | Cleanup timers, save state |
+| Hook         | Fires when                            | Typical use case                            |
+| ------------ | ------------------------------------- | ------------------------------------------- |
+| `onNavigate` | Route is entered OR params changed    | Data loading, analytics, UI reset (default) |
+| `onEnter`    | Route is entered                      | Entry-only setup (open socket, scroll top)  |
+| `onStay`     | Same route, params changed            | Stay-only logic (incremental updates)       |
+| `onLeave`    | Route is left                         | Cleanup timers, save state                  |
+
+**Priority:** `onEnter` / `onStay` take precedence over `onNavigate` for their case. `onNavigate` acts as a fallback — it fires only when the case-specific hook is not defined. You can mix them: share common logic in `onNavigate`, override per case with `onEnter` / `onStay`.
 
 Each hook field is a **factory function** `(router, getDependency) => (toState, fromState?) => void`. The factory runs once per route; the returned callback is cached and invoked on each matching transition. When you don't need DI, omit the factory params:
 
@@ -85,6 +96,19 @@ onEnter: (router, getDependency) => (toState) => {
 `onLeave` fires first (at leave-approve phase), then `onEnter` or `onStay` (at transition success).
 
 ## Use Cases
+
+### Data loading (onNavigate — recommended default)
+
+```typescript
+{
+  name: "services.catalog",
+  path: "/catalog?q&sort&dir",
+  onNavigate: () => (toState) => {
+    // Fires on entry from another route AND on filter/sort param changes
+    loadServices(toState.params);
+  },
+}
+```
 
 ### Analytics tracking
 

@@ -25,6 +25,15 @@
 | 1   | `onStay` fires when params change on the same route     | Navigating to the same route with different params calls `onStay` exactly once. Confirms that same-route param changes are correctly classified as "stay" events.                             |
 | 2   | `onStay` does not fire when route changes               | Navigating to a different route does not call `onStay`. Prevents false stay events on cross-route transitions.                                                                               |
 
+## Hook Dispatch — onNavigate
+
+| #   | Invariant                                                 | Description                                                                                                                                                                                  |
+| --- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `onNavigate` fires on entry when `onEnter` is absent      | Navigating from one route to a target that declares only `onNavigate` calls it exactly once on entry. Confirms `onNavigate` acts as a fallback for the entry case.                           |
+| 2   | `onNavigate` fires on param-change when `onStay` is absent | Navigating to the same route with different params calls `onNavigate` exactly once when `onStay` is not defined. Confirms `onNavigate` acts as a fallback for the stay case.                 |
+| 3   | `onEnter` takes precedence over `onNavigate` on entry     | When both are defined, only `onEnter` fires on entry — `onNavigate` stays silent. Prevents double-firing of shared side-effects when case-specific overrides exist.                          |
+| 4   | `onStay` takes precedence over `onNavigate` on param-change | When both are defined, only `onStay` fires on same-route param change — `onNavigate` stays silent. Prevents double-firing of shared side-effects when case-specific overrides exist.         |
+
 ## Hook Ordering
 
 | #   | Invariant                                               | Description                                                                                                                                                                                  |
@@ -54,4 +63,4 @@
 
 | File                                          | Invariants | Category                                                     |
 | --------------------------------------------- | ---------- | ------------------------------------------------------------ |
-| `tests/property/lifecycle.properties.ts`      | 13         | onEnter dispatch, onLeave dispatch, onStay dispatch, ordering, teardown, mutual exclusion, compilation |
+| `tests/property/lifecycle.properties.ts`      | 17         | onEnter dispatch, onLeave dispatch, onStay dispatch, onNavigate dispatch + priority, ordering, teardown, mutual exclusion, compilation |

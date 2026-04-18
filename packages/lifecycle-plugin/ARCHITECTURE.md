@@ -4,7 +4,7 @@
 
 ## Overview
 
-`@real-router/lifecycle-plugin` is a **route-level lifecycle hooks plugin** for the router. It adds `onEnter`, `onStay`, `onLeave` callbacks to route definitions — declarative side-effects that fire on navigation events.
+`@real-router/lifecycle-plugin` is a **route-level lifecycle hooks plugin** for the router. It adds `onEnter`, `onStay`, `onLeave`, `onNavigate` callbacks to route definitions — declarative side-effects that fire on navigation events.
 
 **Key role:** Bridges the gap between global plugin hooks (fire for every transition) and route guards (control flow). Lifecycle hooks are per-route side-effects — analytics, data prefetch, cleanup — without `subscribe()` boilerplate.
 
@@ -58,14 +58,16 @@ onTransitionLeaveApprove(toState, fromState)
 onTransitionSuccess(toState, fromState)
     │
     ├── toState.name === fromState.name?
-    │   ├── YES → compileHook("onStay", "users.view") → call if resolved
-    │   └── NO  → compileHook("onEnter", "users.view") → call if resolved
+    │   ├── YES → compileHook("onStay", "users.view") ?? compileHook("onNavigate", "users.view") → call if resolved
+    │   └── NO  → compileHook("onEnter", "users.view") ?? compileHook("onNavigate", "users.view") → call if resolved
 ```
+
+`onNavigate` is consulted only when the case-specific hook (`onStay` or `onEnter`) is not defined for the target route. If both are defined, the specific hook wins and `onNavigate` does not fire for that case.
 
 ### Lazy Compile + Cache Pattern
 
 ```typescript
-compileHook(hookName: "onEnter" | "onStay" | "onLeave", routeName: string)
+compileHook(hookName: "onEnter" | "onStay" | "onLeave" | "onNavigate", routeName: string)
     │
     ├── Cache key: `${hookName}:${routeName}`
     │
@@ -89,7 +91,7 @@ Cost: one `getRouteConfig()` call per hook invocation (simple property lookup on
 
 ### Route Custom Fields
 
-Custom fields are extracted automatically by core's `registerSingleRouteHandlers` in `routesStore.ts`. Standard fields (`name`, `path`, `children`, `canActivate`, `canDeactivate`, `forwardTo`, `encodeParams`, `decodeParams`, `defaultParams`) are excluded. Everything else — including `onEnter`, `onStay`, `onLeave` — lands in `routeCustomFields[routeName]`.
+Custom fields are extracted automatically by core's `registerSingleRouteHandlers` in `routesStore.ts`. Standard fields (`name`, `path`, `children`, `canActivate`, `canDeactivate`, `forwardTo`, `encodeParams`, `decodeParams`, `defaultParams`) are excluded. Everything else — including `onEnter`, `onStay`, `onLeave`, `onNavigate` — lands in `routeCustomFields[routeName]`.
 
 ## Design Decisions
 
@@ -108,6 +110,15 @@ Hooks fire only for `toState.name` / `fromState.name`, not for all segments in `
 - Simpler mental model — one route, one hook call
 - No loops, no Set allocations — just a property lookup
 - Parent route hooks would fire on every child navigation, which is rarely desired
+
+### Why `onNavigate` as fallback, not additional
+
+`onNavigate` is the most common pattern: run the same side-effect on both route entry and same-route param change (data loading, analytics, UI reset). Two design options were considered:
+
+1. **Additive** — fire `onNavigate` in addition to `onEnter` / `onStay` when both are defined.
+2. **Fallback** — fire `onNavigate` only when the case-specific hook (`onEnter` or `onStay`) is absent.
+
+The fallback design wins: it lets users mix shared logic (`onNavigate`) with case-specific overrides (`onEnter` to connect WebSocket, `onStay` falls back to `onNavigate` to reload data). The additive design would double-fire effects when users declare both, forcing defensive guards inside hooks.
 
 ### Why no configuration
 

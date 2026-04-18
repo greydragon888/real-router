@@ -14,7 +14,7 @@ function createPlugin(
   >();
 
   function compileHook(
-    hookName: "onEnter" | "onStay" | "onLeave",
+    hookName: "onEnter" | "onStay" | "onLeave" | "onNavigate",
     routeName: string,
   ): LifecycleHook | undefined {
     const key = `${hookName}:${routeName}`;
@@ -55,9 +55,15 @@ function createPlugin(
 
     onTransitionSuccess: (toState: State, fromState: State | undefined) => {
       if (toState.name === fromState?.name) {
-        compileHook("onStay", toState.name)?.(toState, fromState);
+        (
+          compileHook("onStay", toState.name) ??
+          compileHook("onNavigate", toState.name)
+        )?.(toState, fromState);
       } else {
-        compileHook("onEnter", toState.name)?.(toState, fromState);
+        (
+          compileHook("onEnter", toState.name) ??
+          compileHook("onNavigate", toState.name)
+        )?.(toState, fromState);
       }
     },
   };

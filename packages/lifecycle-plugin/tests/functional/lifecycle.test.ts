@@ -195,6 +195,212 @@ describe("@real-router/lifecycle-plugin", () => {
     });
   });
 
+  describe("onNavigate", () => {
+    it("should fire onNavigate on initial router.start()", async () => {
+      const onNavigate = vi.fn();
+
+      router = createRouter(
+        [
+          { name: "home", path: "/", onNavigate: () => onNavigate },
+          { name: "about", path: "/about" },
+        ],
+        { defaultRoute: "home" },
+      );
+      router.usePlugin(lifecyclePluginFactory());
+
+      await router.start("/");
+
+      expect(onNavigate).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ name: "home" }),
+        undefined,
+      );
+    });
+
+    it("should fire onNavigate when entering a route (no onEnter defined)", async () => {
+      const onNavigate = vi.fn();
+
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          { name: "about", path: "/about", onNavigate: () => onNavigate },
+        ],
+        { defaultRoute: "home" },
+      );
+      router.usePlugin(lifecyclePluginFactory());
+
+      await router.start("/");
+      await router.navigate("about");
+
+      expect(onNavigate).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ name: "about" }),
+        expect.objectContaining({ name: "home" }),
+      );
+    });
+
+    it("should fire onNavigate on same-route param change (no onStay defined)", async () => {
+      const onNavigate = vi.fn();
+
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          {
+            name: "users.view",
+            path: "/users/:id",
+            onNavigate: () => onNavigate,
+          },
+        ],
+        { defaultRoute: "home" },
+      );
+      router.usePlugin(lifecyclePluginFactory());
+
+      await router.start("/");
+      await router.navigate("users.view", { id: "1" });
+      onNavigate.mockClear();
+
+      await router.navigate("users.view", { id: "2" });
+
+      expect(onNavigate).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ name: "users.view", params: { id: "2" } }),
+        expect.objectContaining({ name: "users.view", params: { id: "1" } }),
+      );
+    });
+
+    it("should fire onNavigate for both enter and stay cases", async () => {
+      const onNavigate = vi.fn();
+
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          {
+            name: "users.view",
+            path: "/users/:id",
+            onNavigate: () => onNavigate,
+          },
+        ],
+        { defaultRoute: "home" },
+      );
+      router.usePlugin(lifecyclePluginFactory());
+
+      await router.start("/");
+      await router.navigate("users.view", { id: "1" });
+      await router.navigate("users.view", { id: "2" });
+      await router.navigate("home");
+      await router.navigate("users.view", { id: "3" });
+
+      expect(onNavigate).toHaveBeenCalledTimes(3);
+    });
+
+    it("should not fire onNavigate on the route being left", async () => {
+      const onNavigate = vi.fn();
+
+      router = createRouter(
+        [
+          { name: "home", path: "/", onNavigate: () => onNavigate },
+          { name: "about", path: "/about" },
+        ],
+        { defaultRoute: "home" },
+      );
+      router.usePlugin(lifecyclePluginFactory());
+
+      await router.start("/");
+      onNavigate.mockClear();
+
+      await router.navigate("about");
+
+      expect(onNavigate).not.toHaveBeenCalled();
+    });
+
+    it("should prefer onEnter over onNavigate on entry", async () => {
+      const onEnter = vi.fn();
+      const onNavigate = vi.fn();
+
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          {
+            name: "about",
+            path: "/about",
+            onEnter: () => onEnter,
+            onNavigate: () => onNavigate,
+          },
+        ],
+        { defaultRoute: "home" },
+      );
+      router.usePlugin(lifecyclePluginFactory());
+
+      await router.start("/");
+      await router.navigate("about");
+
+      expect(onEnter).toHaveBeenCalledTimes(1);
+      expect(onNavigate).not.toHaveBeenCalled();
+    });
+
+    it("should prefer onStay over onNavigate on same-route param change", async () => {
+      const onStay = vi.fn();
+      const onNavigate = vi.fn();
+
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          {
+            name: "users.view",
+            path: "/users/:id",
+            onStay: () => onStay,
+            onNavigate: () => onNavigate,
+          },
+        ],
+        { defaultRoute: "home" },
+      );
+      router.usePlugin(lifecyclePluginFactory());
+
+      await router.start("/");
+      await router.navigate("users.view", { id: "1" });
+      onStay.mockClear();
+      onNavigate.mockClear();
+
+      await router.navigate("users.view", { id: "2" });
+
+      expect(onStay).toHaveBeenCalledTimes(1);
+      expect(onNavigate).not.toHaveBeenCalled();
+    });
+
+    it("should act as fallback only for the case that is not defined (hybrid)", async () => {
+      const onEnter = vi.fn();
+      const onNavigate = vi.fn();
+
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          {
+            name: "chat",
+            path: "/chat/:roomId",
+            onEnter: () => onEnter,
+            onNavigate: () => onNavigate,
+          },
+        ],
+        { defaultRoute: "home" },
+      );
+      router.usePlugin(lifecyclePluginFactory());
+
+      await router.start("/");
+
+      // Entry: onEnter wins
+      await router.navigate("chat", { roomId: "a" });
+
+      expect(onEnter).toHaveBeenCalledTimes(1);
+      expect(onNavigate).not.toHaveBeenCalled();
+
+      // Param change: no onStay, falls back to onNavigate
+      await router.navigate("chat", { roomId: "b" });
+
+      expect(onEnter).toHaveBeenCalledTimes(1);
+      expect(onNavigate).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ name: "chat", params: { roomId: "b" } }),
+        expect.objectContaining({ name: "chat", params: { roomId: "a" } }),
+      );
+    });
+  });
+
   describe("ordering", () => {
     it("should fire onLeave before onEnter", async () => {
       const callOrder: string[] = [];
