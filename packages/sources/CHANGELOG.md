@@ -1,5 +1,26 @@
 # @real-router/sources
 
+## 0.6.0
+
+### Minor Changes
+
+- [#474](https://github.com/greydragon888/real-router/pull/474) [`d6c1b39`](https://github.com/greydragon888/real-router/commit/d6c1b39e7c2b6c427be062b13ba3eb633eadc7c3) Thanks [@greydragon888](https://github.com/greydragon888)! - feat: add `createActiveNameSelector(router)` — per-router cached O(1) active-name checker ([#467](https://github.com/greydragon888/real-router/issues/467))
+
+  One shared `router.subscribe` handle across any number of distinct route-name consumers (vs one subscription per name via `createActiveRouteSource`). Framework adapters can adopt this for `Link` fast-paths when params/strict/ignoreQueryParams are at defaults. Based on the `routeSelector` pattern from `@real-router/solid`, now available framework-agnostic.
+
+  API: `{ subscribe(routeName, listener), isActive(routeName), destroy }`. New `ActiveNameSelector` type exported.
+
+- [#474](https://github.com/greydragon888/real-router/pull/474) [`d6c1b39`](https://github.com/greydragon888/real-router/commit/d6c1b39e7c2b6c427be062b13ba3eb633eadc7c3) Thanks [@greydragon888](https://github.com/greydragon888)! - feat: per-router caching for all sources + helpers for adapters ([#467](https://github.com/greydragon888/real-router/issues/467))
+  - `getErrorSource(router)` and `getTransitionSource(router)` — cached factories for shared eager sources. Multiple consumers (mount/unmount cycles) reuse one instance; external `destroy()` is a no-op on the cached wrapper, so adapters with eager teardown (Angular `sourceToSignal`) are safe by default.
+  - `createRouteNodeSource(router, nodeName)` now caches per `(router, nodeName)` pair — N consumers of the same node share one router subscription instead of creating N.
+  - `createActiveRouteSource(router, name, params?, options?)` now caches per `(router, name, canonicalJson(params), options)`. Key-order-insensitive (`{ a:1, b:2 }` and `{ b:2, a:1 }` hit the same entry). `Symbol`/`BigInt` params fall back to creating a fresh uncached source.
+  - New exports: `DEFAULT_ACTIVE_OPTIONS`, `normalizeActiveOptions(opts?)`, `canonicalJson(value)`.
+  - Removed internal `shouldUpdateCache` helper — `createRouteNodeSource` now caches the `shouldUpdateNode` closure itself as part of the source cache.
+
+- [#474](https://github.com/greydragon888/real-router/pull/474) [`d6c1b39`](https://github.com/greydragon888/real-router/commit/d6c1b39e7c2b6c427be062b13ba3eb633eadc7c3) Thanks [@greydragon888](https://github.com/greydragon888)! - feat: add `createDismissableError(router)` — per-router cached source wrapping `getErrorSource` with integrated dismissed-version state ([#467](https://github.com/greydragon888/real-router/issues/467))
+
+  Consolidates the `dismissedVersion`/`visibleError`/`resetError` pattern that was duplicated across all 6 `RouterErrorBoundary` adapters. Snapshot shape: `{ error, toRoute, fromRoute, version, resetError }`. `destroy()` is a no-op (cached wrapper). New `DismissableErrorSnapshot` type exported.
+
 ## 0.5.1
 
 ### Patch Changes
