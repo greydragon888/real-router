@@ -310,7 +310,7 @@ describe("@real-router/lifecycle-plugin", () => {
       expect(onNavigate).not.toHaveBeenCalled();
     });
 
-    it("should prefer onEnter over onNavigate on entry", async () => {
+    it("should fire onEnter and onNavigate together on entry when both are defined", async () => {
       const onEnter = vi.fn();
       const onNavigate = vi.fn();
 
@@ -332,10 +332,10 @@ describe("@real-router/lifecycle-plugin", () => {
       await router.navigate("about");
 
       expect(onEnter).toHaveBeenCalledTimes(1);
-      expect(onNavigate).not.toHaveBeenCalled();
+      expect(onNavigate).toHaveBeenCalledTimes(1);
     });
 
-    it("should prefer onStay over onNavigate on same-route param change", async () => {
+    it("should fire onStay and onNavigate together on same-route param change when both are defined", async () => {
       const onStay = vi.fn();
       const onNavigate = vi.fn();
 
@@ -361,10 +361,10 @@ describe("@real-router/lifecycle-plugin", () => {
       await router.navigate("users.view", { id: "2" });
 
       expect(onStay).toHaveBeenCalledTimes(1);
-      expect(onNavigate).not.toHaveBeenCalled();
+      expect(onNavigate).toHaveBeenCalledTimes(1);
     });
 
-    it("should act as fallback only for the case that is not defined (hybrid)", async () => {
+    it("should dispatch onEnter/onStay and onNavigate orthogonally (hybrid)", async () => {
       const onEnter = vi.fn();
       const onNavigate = vi.fn();
 
@@ -384,17 +384,18 @@ describe("@real-router/lifecycle-plugin", () => {
 
       await router.start("/");
 
-      // Entry: onEnter wins
+      // Entry: both fire (onEnter for setup, onNavigate for shared logic)
       await router.navigate("chat", { roomId: "a" });
 
       expect(onEnter).toHaveBeenCalledTimes(1);
-      expect(onNavigate).not.toHaveBeenCalled();
+      expect(onNavigate).toHaveBeenCalledTimes(1);
 
-      // Param change: no onStay, falls back to onNavigate
+      // Param change: no onStay defined, only onNavigate fires
       await router.navigate("chat", { roomId: "b" });
 
       expect(onEnter).toHaveBeenCalledTimes(1);
-      expect(onNavigate).toHaveBeenCalledExactlyOnceWith(
+      expect(onNavigate).toHaveBeenCalledTimes(2);
+      expect(onNavigate).toHaveBeenLastCalledWith(
         expect.objectContaining({ name: "chat", params: { roomId: "b" } }),
         expect.objectContaining({ name: "chat", params: { roomId: "a" } }),
       );

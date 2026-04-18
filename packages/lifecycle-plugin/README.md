@@ -45,8 +45,8 @@ const routes = [
   {
     name: "chat",
     path: "/chat/:roomId",
-    // Entry-specific behavior overrides onNavigate for entry;
-    // param changes fall back to onNavigate.
+    // Orthogonal: onEnter covers entry-only setup, onNavigate covers
+    // every navigation (including entry). Both fire on entry.
     onEnter: () => (toState) => {
       chatSocket.connect(toState.params.roomId);
     },
@@ -65,18 +65,18 @@ router.usePlugin(lifecyclePluginFactory());
 await router.start("/");
 ```
 
-> **Start with `onNavigate`.** It covers the most common case — running the same logic whenever the route is the navigation target (data loading, analytics, UI reset). Use `onEnter` or `onStay` only when entry and param-change require different behavior.
+> **Start with `onNavigate`.** It covers the most common case — running the same logic whenever the route is the navigation target (data loading, analytics, UI reset). Add `onEnter` or `onStay` for extra case-specific logic.
 
 ## Hook Reference
 
-| Hook         | Fires when                            | Typical use case                            |
-| ------------ | ------------------------------------- | ------------------------------------------- |
-| `onNavigate` | Route is entered OR params changed    | Data loading, analytics, UI reset (default) |
-| `onEnter`    | Route is entered                      | Entry-only setup (open socket, scroll top)  |
-| `onStay`     | Same route, params changed            | Stay-only logic (incremental updates)       |
-| `onLeave`    | Route is left                         | Cleanup timers, save state                  |
+| Hook         | Fires when                              | Typical use case                            |
+| ------------ | --------------------------------------- | ------------------------------------------- |
+| `onNavigate` | Any successful navigation to the route  | Data loading, analytics, UI reset (default) |
+| `onEnter`    | Route is entered                        | Entry-only setup (open socket, scroll top)  |
+| `onStay`     | Same route, params changed              | Stay-only logic (incremental updates)       |
+| `onLeave`    | Route is left                           | Cleanup timers, save state                  |
 
-**Priority:** `onEnter` / `onStay` take precedence over `onNavigate` for their case. `onNavigate` acts as a fallback — it fires only when the case-specific hook is not defined. You can mix them: share common logic in `onNavigate`, override per case with `onEnter` / `onStay`.
+**Orthogonal dispatch:** `onEnter` / `onStay` / `onNavigate` fire independently based on their own conditions. On entry, `onEnter` **and** `onNavigate` fire. On param-change, `onStay` **and** `onNavigate` fire. Each hook is composable — declaring one never silences another.
 
 Each hook field is a **factory function** `(router, getDependency) => (toState, fromState?) => void`. The factory runs once per route; the returned callback is cached and invoked on each matching transition. When you don't need DI, omit the factory params:
 

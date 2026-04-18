@@ -58,11 +58,13 @@ onTransitionLeaveApprove(toState, fromState)
 onTransitionSuccess(toState, fromState)
     │
     ├── toState.name === fromState.name?
-    │   ├── YES → compileHook("onStay", "users.view") ?? compileHook("onNavigate", "users.view") → call if resolved
-    │   └── NO  → compileHook("onEnter", "users.view") ?? compileHook("onNavigate", "users.view") → call if resolved
+    │   ├── YES → compileHook("onStay", "users.view") → call if resolved
+    │   └── NO  → compileHook("onEnter", "users.view") → call if resolved
+    │
+    └── compileHook("onNavigate", "users.view") → call if resolved (orthogonal — always consulted)
 ```
 
-`onNavigate` is consulted only when the case-specific hook (`onStay` or `onEnter`) is not defined for the target route. If both are defined, the specific hook wins and `onNavigate` does not fire for that case.
+`onNavigate` fires independently of `onEnter` / `onStay` — if both are defined, both fire. Each hook is dispatched based on its own condition.
 
 ### Lazy Compile + Cache Pattern
 
@@ -111,14 +113,21 @@ Hooks fire only for `toState.name` / `fromState.name`, not for all segments in `
 - No loops, no Set allocations — just a property lookup
 - Parent route hooks would fire on every child navigation, which is rarely desired
 
-### Why `onNavigate` as fallback, not additional
+### Why `onNavigate` is orthogonal, not a fallback
 
-`onNavigate` is the most common pattern: run the same side-effect on both route entry and same-route param change (data loading, analytics, UI reset). Two design options were considered:
+`onNavigate` covers the most common pattern: run the same side-effect whenever the route is the navigation target (data loading, analytics, UI reset). Two design options were considered:
 
-1. **Additive** — fire `onNavigate` in addition to `onEnter` / `onStay` when both are defined.
-2. **Fallback** — fire `onNavigate` only when the case-specific hook (`onEnter` or `onStay`) is absent.
+1. **Orthogonal** — fire `onNavigate` on every success, independently of `onEnter` / `onStay`.
+2. **Fallback** — fire `onNavigate` only when the case-specific hook (`onEnter` or `onStay`) is absent for the current case.
 
-The fallback design wins: it lets users mix shared logic (`onNavigate`) with case-specific overrides (`onEnter` to connect WebSocket, `onStay` falls back to `onNavigate` to reload data). The additive design would double-fire effects when users declare both, forcing defensive guards inside hooks.
+The orthogonal design wins:
+
+- **Matches the real-world hybrid example.** Chat route: `onEnter` connects the WebSocket, `onNavigate` loads messages. Under fallback semantics, `onNavigate` would not fire on entry (since `onEnter` is defined), forcing the user to duplicate `loadMessages` inside `onEnter` — exactly the duplication `onNavigate` was introduced to eliminate.
+- **Mirrors global plugin hooks.** `onTransitionStart` and `onTransitionSuccess` coexist — neither silences the other. Route-level hooks follow the same model.
+- **Simpler mental model.** Each hook fires based on its own condition. No priority rules, no fallback chains, no hidden interactions.
+- **Composable.** Declaring `onEnter` alongside `onNavigate` cannot silently break the latter during refactors.
+
+The only failure mode of orthogonal dispatch is the user declaring the same function in both `onEnter` and `onNavigate` — a user error; the fix is to keep only `onNavigate`.
 
 ### Why no configuration
 

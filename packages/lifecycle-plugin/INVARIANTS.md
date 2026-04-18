@@ -27,12 +27,12 @@
 
 ## Hook Dispatch — onNavigate
 
-| #   | Invariant                                                 | Description                                                                                                                                                                                  |
-| --- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | `onNavigate` fires on entry when `onEnter` is absent      | Navigating from one route to a target that declares only `onNavigate` calls it exactly once on entry. Confirms `onNavigate` acts as a fallback for the entry case.                           |
-| 2   | `onNavigate` fires on param-change when `onStay` is absent | Navigating to the same route with different params calls `onNavigate` exactly once when `onStay` is not defined. Confirms `onNavigate` acts as a fallback for the stay case.                 |
-| 3   | `onEnter` takes precedence over `onNavigate` on entry     | When both are defined, only `onEnter` fires on entry — `onNavigate` stays silent. Prevents double-firing of shared side-effects when case-specific overrides exist.                          |
-| 4   | `onStay` takes precedence over `onNavigate` on param-change | When both are defined, only `onStay` fires on same-route param change — `onNavigate` stays silent. Prevents double-firing of shared side-effects when case-specific overrides exist.         |
+| #   | Invariant                                                       | Description                                                                                                                                                                                  |
+| --- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `onNavigate` fires on entry regardless of `onEnter`             | Navigating to a target that declares `onNavigate` calls it exactly once on entry. Fires alongside `onEnter` when both are defined — hooks are orthogonal.                                    |
+| 2   | `onNavigate` fires on param-change regardless of `onStay`       | Navigating to the same route with different params calls `onNavigate` exactly once. Fires alongside `onStay` when both are defined — hooks are orthogonal.                                   |
+| 3   | `onEnter` and `onNavigate` both fire on entry when both defined | Each hook fires based on its own condition — declaring `onEnter` does not silence `onNavigate`. Enables hybrid declarations (entry-specific setup + shared navigation logic).               |
+| 4   | `onStay` and `onNavigate` both fire on param-change when both defined | Each hook fires based on its own condition — declaring `onStay` does not silence `onNavigate`. Enables hybrid declarations (stay-specific update + shared navigation logic).             |
 
 ## Hook Ordering
 
@@ -63,4 +63,4 @@
 
 | File                                          | Invariants | Category                                                     |
 | --------------------------------------------- | ---------- | ------------------------------------------------------------ |
-| `tests/property/lifecycle.properties.ts`      | 17         | onEnter dispatch, onLeave dispatch, onStay dispatch, onNavigate dispatch + priority, ordering, teardown, mutual exclusion, compilation |
+| `tests/property/lifecycle.properties.ts`      | 17         | onEnter dispatch, onLeave dispatch, onStay dispatch, onNavigate dispatch + orthogonality, ordering, teardown, mutual exclusion, compilation |

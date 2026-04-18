@@ -418,17 +418,22 @@ describe("hook dispatch: onNavigate fires on every successful navigation", () =>
 });
 
 // =============================================================================
-// onNavigate Priority — onEnter/onStay win when defined
+// onNavigate Orthogonality — fires alongside onEnter/onStay
 // =============================================================================
 
-describe("onNavigate priority: specific hooks override onNavigate", () => {
+describe("onNavigate orthogonality: fires alongside specific hooks", () => {
   test.prop([arbDistinctRouteNamePair], { numRuns: NUM_RUNS.standard })(
-    "onEnter wins over onNavigate on entry",
+    "onEnter and onNavigate both fire on entry when both are defined",
     async ([fromRoute, toRoute]) => {
       const onEnter = vi.fn();
       const onNavigate = vi.fn();
       const routes: Route[] = [
-        { name: "home", path: "/" },
+        {
+          name: "home",
+          path: "/",
+          onEnter: () => onEnter,
+          onNavigate: () => onNavigate,
+        },
         {
           name: "about",
           path: "/about",
@@ -452,18 +457,15 @@ describe("onNavigate priority: specific hooks override onNavigate", () => {
 
       await router.navigate(toRoute);
 
-      if (toRoute !== "home") {
-        expect(onEnter).toHaveBeenCalledTimes(1);
-      }
-
-      expect(onNavigate).not.toHaveBeenCalled();
+      expect(onEnter).toHaveBeenCalledTimes(1);
+      expect(onNavigate).toHaveBeenCalledTimes(1);
 
       router.stop();
     },
   );
 
   test.prop([arbDistinctIdPair], { numRuns: NUM_RUNS.standard })(
-    "onStay wins over onNavigate on same-route param change",
+    "onStay and onNavigate both fire on same-route param change when both are defined",
     async ([id1, id2]) => {
       const onStay = vi.fn();
       const onNavigate = vi.fn();
@@ -488,7 +490,7 @@ describe("onNavigate priority: specific hooks override onNavigate", () => {
       await router.navigate("users.view", { id: id2 });
 
       expect(onStay).toHaveBeenCalledTimes(1);
-      expect(onNavigate).not.toHaveBeenCalled();
+      expect(onNavigate).toHaveBeenCalledTimes(1);
 
       router.stop();
     },
