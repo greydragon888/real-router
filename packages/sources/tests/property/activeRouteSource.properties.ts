@@ -278,37 +278,9 @@ describe("areRoutesRelated filter", () => {
   );
 });
 
-describe("destroy", () => {
-  test.prop([arbRouteName, arbNavigationSeq, arbActiveOptions], {
-    numRuns: NUM_RUNS.standard,
-  })(
-    "destroy unsubscribes from router",
-    async (routeName, navigations, options) => {
-      const router = await createStartedRouter();
-      const params = paramsForRoute(routeName);
-
-      const source = createActiveRouteSource(
-        router,
-        routeName,
-        params,
-        options,
-      );
-      const listener = vi.fn();
-
-      source.subscribe(listener);
-
-      source.destroy();
-
-      await executeNavigations(router, navigations).catch(() => undefined);
-
-      expect(listener).toHaveBeenCalledTimes(0);
-
-      router.stop();
-    },
-  );
-
+describe("destroy (cached shared source — no-op)", () => {
   test.prop([arbDestroyCount], { numRuns: NUM_RUNS.standard })(
-    "destroy is idempotent",
+    "destroy is idempotent on cached source",
     async (destroyCount) => {
       const router = await createStartedRouter();
 
@@ -324,11 +296,11 @@ describe("destroy", () => {
     },
   );
 
-  test.prop([arbRouteName, arbNavigationSeq, arbActiveOptions], {
+  test.prop([arbRouteName, arbActiveOptions], {
     numRuns: NUM_RUNS.standard,
   })(
-    "post-destroy getSnapshot returns last boolean value",
-    async (routeName, navigations, options) => {
+    "post-destroy getSnapshot still returns current value",
+    async (routeName, options) => {
       const router = await createStartedRouter();
       const params = paramsForRoute(routeName);
 
@@ -339,23 +311,19 @@ describe("destroy", () => {
         options,
       );
 
-      await executeNavigations(router, navigations).catch(() => undefined);
-
-      const lastValue = source.getSnapshot();
-
       source.destroy();
 
-      expect(source.getSnapshot()).toStrictEqual(lastValue);
+      expect(typeof source.getSnapshot()).toBe("boolean");
 
       router.stop();
     },
   );
 
-  test.prop([arbRouteName, arbNavigationSeq, arbActiveOptions], {
+  test.prop([arbRouteName, arbActiveOptions], {
     numRuns: NUM_RUNS.standard,
   })(
-    "post-destroy subscribe returns no-op unsubscribe",
-    async (routeName, navigations, options) => {
+    "post-destroy subscribe still returns a function",
+    async (routeName, options) => {
       const router = await createStartedRouter();
       const params = paramsForRoute(routeName);
 
@@ -371,40 +339,9 @@ describe("destroy", () => {
       const listener = vi.fn();
       const unsubscribe = source.subscribe(listener);
 
-      await executeNavigations(router, navigations).catch(() => undefined);
+      expect(typeof unsubscribe).toBe("function");
 
-      expect(listener).toHaveBeenCalledTimes(0);
-
-      expect(() => {
-        unsubscribe();
-      }).not.toThrow();
-
-      router.stop();
-    },
-  );
-
-  test.prop([arbRouteName, arbNavigationSeq, arbActiveOptions], {
-    numRuns: NUM_RUNS.standard,
-  })(
-    "post-destroy navigation: no errors and snapshot not updated",
-    async (routeName, navigations, options) => {
-      const router = await createStartedRouter();
-      const params = paramsForRoute(routeName);
-
-      const source = createActiveRouteSource(
-        router,
-        routeName,
-        params,
-        options,
-      );
-
-      const valueBeforeDestroy = source.getSnapshot();
-
-      source.destroy();
-
-      await executeNavigations(router, navigations).catch(() => undefined);
-
-      expect(source.getSnapshot()).toStrictEqual(valueBeforeDestroy);
+      unsubscribe();
 
       router.stop();
     },

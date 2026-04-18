@@ -29,11 +29,18 @@ export class BaseSource<T> {
       return () => {};
     }
 
-    if (this.#listeners.size === 0 && this.#onFirstSubscribe) {
+    const wasFirst = this.#listeners.size === 0;
+
+    // Add listener BEFORE onFirstSubscribe so that if the reconciliation in
+    // onFirstSubscribe calls updateSnapshot(), this listener receives the
+    // notification. Critical for useSyncExternalStore in adapters — without
+    // this the post-reconnection snapshot is missed and consumers render
+    // stale data. (See Preact RouteView nested remount test.)
+    this.#listeners.add(listener);
+
+    if (wasFirst && this.#onFirstSubscribe) {
       this.#onFirstSubscribe();
     }
-
-    this.#listeners.add(listener);
 
     return () => {
       this.#listeners.delete(listener);

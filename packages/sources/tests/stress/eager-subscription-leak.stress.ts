@@ -4,6 +4,7 @@ import {
   createRouteSource,
   createActiveRouteSource,
   createTransitionSource,
+  getTransitionSource,
 } from "@real-router/sources";
 
 import {
@@ -16,7 +17,7 @@ import {
 
 import type { Router } from "@real-router/core";
 
-describe("S3. Eager subscription leak detection", () => {
+describe("S3. Eager subscription — shared cached sources do not leak", () => {
   let router: Router;
 
   beforeEach(async () => {
@@ -28,13 +29,16 @@ describe("S3. Eager subscription leak detection", () => {
     router.stop();
   });
 
-  it("S3.1: 200 ActiveRouteSource without destroy accumulates heap; heap recovers after destroy", async () => {
-    const heapBeforeCreate = takeHeapSnapshot();
+  it("S3.1: createActiveRouteSource × 200 with same args returns shared instance — heap stable", async () => {
+    const heapBefore = takeHeapSnapshot();
 
     const sources = createManySources(
       () => createActiveRouteSource(router, "home"),
       200,
     );
+
+    // All 200 references point to the same shared cached instance.
+    expect(sources.every((s) => s === sources[0])).toBe(true);
 
     const routes = ["users.list", "about", "admin.dashboard", "home"];
 
@@ -42,26 +46,16 @@ describe("S3. Eager subscription leak detection", () => {
       await router.navigate(routes[i % routes.length]);
     }
 
-    const heapWithLiveSources = takeHeapSnapshot();
-
-    expect(heapWithLiveSources).toBeGreaterThan(heapBeforeCreate);
-
-    for (const s of sources) {
-      s.destroy();
-    }
-
     sources.length = 0;
 
-    // Extra GC passes: one pass inside takeHeapSnapshot is not always enough
-    // for V8 to fully reclaim generational heap across 200 destroyed sources
     forceGC();
     forceGC();
-    const heapAfterDestroy = takeHeapSnapshot();
+    const heapAfter = takeHeapSnapshot();
 
-    expect(heapAfterDestroy).toBeLessThan(heapWithLiveSources);
+    expect(heapAfter - heapBefore).toBeLessThan(MB);
   });
 
-  it("S3.2: 200 ActiveRouteSource destroyed immediately: heap stable during 100 navigations", async () => {
+  it("S3.2: createActiveRouteSource destroy() is a no-op — heap stable during 100 navigations", async () => {
     const sources = createManySources(
       () => createActiveRouteSource(router, "home"),
       200,
@@ -85,16 +79,14 @@ describe("S3. Eager subscription leak detection", () => {
     expect(delta).toBeLessThan(MB);
   });
 
-  it("S3.3: 200 TransitionSource without destroy accumulates heap; heap recovers after destroy", async () => {
-    // Extra GC to flush residual garbage from prior tests — stabilizes baseline
+  it("S3.3: getTransitionSource × 200 returns shared instance — heap stable", async () => {
     forceGC();
     forceGC();
-    const heapBeforeCreate = takeHeapSnapshot();
+    const heapBefore = takeHeapSnapshot();
 
-    const sources = createManySources(
-      () => createTransitionSource(router),
-      200,
-    );
+    const sources = createManySources(() => getTransitionSource(router), 200);
+
+    expect(sources.every((s) => s === sources[0])).toBe(true);
 
     const routes = ["users.list", "about", "admin.dashboard", "home"];
 
@@ -102,29 +94,17 @@ describe("S3. Eager subscription leak detection", () => {
       await router.navigate(routes[i % routes.length]);
     }
 
-    const heapWithLiveSources = takeHeapSnapshot();
-
-    expect(heapWithLiveSources).toBeGreaterThan(heapBeforeCreate);
-
-    for (const s of sources) {
-      s.destroy();
-    }
-
     sources.length = 0;
 
-    // Extra GC passes: same fix as S3.1
     forceGC();
     forceGC();
-    const heapAfterDestroy = takeHeapSnapshot();
+    const heapAfter = takeHeapSnapshot();
 
-    expect(heapAfterDestroy).toBeLessThan(heapWithLiveSources);
+    expect(heapAfter - heapBefore).toBeLessThan(MB);
   });
 
-  it("S3.4: 100 TransitionSource destroyed immediately: heap stable during 100 navigations", async () => {
-    const sources = createManySources(
-      () => createTransitionSource(router),
-      100,
-    );
+  it("S3.4: getTransitionSource destroy() no-op — heap stable during 100 navigations", async () => {
+    const sources = createManySources(() => getTransitionSource(router), 100);
 
     for (const s of sources) {
       s.destroy();
@@ -144,7 +124,7 @@ describe("S3. Eager subscription leak detection", () => {
     expect(delta).toBeLessThan(MB);
   });
 
-  it("S3.5: lazy RouteSource auto-cleanup vs eager ActiveRouteSource leak: heap returns to baseline after destroy", async () => {
+  it("S3.5: lazy RouteSource auto-cleanup + eager ActiveRouteSource cached share — heap bounded", async () => {
     const heapBaseline = takeHeapSnapshot();
 
     const routeSources = createManySources(() => createRouteSource(router), 50);
@@ -154,6 +134,7 @@ describe("S3. Eager subscription leak detection", () => {
       u();
     }
 
+    // 50 cached refs to the same shared active source.
     const activeSources = createManySources(
       () => createActiveRouteSource(router, "home"),
       50,
@@ -172,5 +153,13 @@ describe("S3. Eager subscription leak detection", () => {
     const heapAfterDestroy = takeHeapSnapshot();
 
     expect(heapAfterDestroy).toBeLessThan(heapBaseline + MB);
+  });
+
+  it("S3.6: non-cached createTransitionSource still exposes working destroy()", () => {
+    const source = createTransitionSource(router);
+
+    expect(() => {
+      source.destroy();
+    }).not.toThrow();
   });
 });

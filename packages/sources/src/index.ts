@@ -13,6 +13,16 @@ export { createRouteNodeSource } from "./createRouteNodeSource";
 
 export { createActiveRouteSource } from "./createActiveRouteSource";
 
-export { createTransitionSource } from "./createTransitionSource";
+export {
+  createTransitionSource,
+  getTransitionSource,
+} from "./createTransitionSource";
 
-export { createErrorSource } from "./createErrorSource";
+export { createErrorSource, getErrorSource } from "./createErrorSource";
+
+export {
+  DEFAULT_ACTIVE_OPTIONS,
+  normalizeActiveOptions,
+} from "./normalizeActiveOptions";
+
+export { canonicalJson } from "./canonicalJson";

@@ -168,7 +168,7 @@ describe("createRouteNodeSources", () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
-  it("destroy: unsubscribes from router", async () => {
+  it("destroy: is a no-op on shared cached source (listener still receives updates)", async () => {
     const source = createRouteNodeSource(router, "users");
     const listener = vi.fn();
 
@@ -177,7 +177,8 @@ describe("createRouteNodeSources", () => {
     source.destroy();
     await router.navigate("users");
 
-    expect(listener).not.toHaveBeenCalled();
+    // Shared cached source ignores external destroy() — updates still flow.
+    expect(listener).toHaveBeenCalledTimes(1);
   });
 
   it("destroy: idempotent", () => {
@@ -190,7 +191,7 @@ describe("createRouteNodeSources", () => {
     }).not.toThrow();
   });
 
-  it("post-destroy: getSnapshot still returns last snapshot", async () => {
+  it("post-destroy: getSnapshot still returns up-to-date snapshot", async () => {
     const source = createRouteNodeSource(router, "users");
 
     source.subscribe(() => {});
@@ -206,7 +207,7 @@ describe("createRouteNodeSources", () => {
     expect(source.getSnapshot()).toBe(lastSnapshot);
   });
 
-  it("post-destroy: subscribe returns no-op unsubscribe (no errors)", () => {
+  it("post-destroy: subscribe still works (shared source survives external teardown)", async () => {
     const source = createRouteNodeSource(router, "users");
 
     source.destroy();
@@ -214,10 +215,11 @@ describe("createRouteNodeSources", () => {
     const listener = vi.fn();
     const unsubscribe = source.subscribe(listener);
 
-    expect(listener).not.toHaveBeenCalled();
-    expect(() => {
-      unsubscribe();
-    }).not.toThrow();
+    await router.navigate("users");
+
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    unsubscribe();
   });
 
   it("stabilizeState: snapshot ref preserved on second reload to same path within node", async () => {
