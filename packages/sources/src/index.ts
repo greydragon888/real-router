@@ -5,6 +5,7 @@ export type {
   ActiveRouteSourceOptions,
   RouterTransitionSnapshot,
   RouterErrorSnapshot,
+  DismissableErrorSnapshot,
 } from "./types.js";
 
 export { createRouteSource } from "./createRouteSource";
@@ -19,6 +20,8 @@ export {
 } from "./createTransitionSource";
 
 export { createErrorSource, getErrorSource } from "./createErrorSource";
+
+export { createDismissableError } from "./createDismissableError";
 
 export {
   DEFAULT_ACTIVE_OPTIONS,

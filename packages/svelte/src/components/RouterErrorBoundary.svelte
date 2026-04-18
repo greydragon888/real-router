@@ -1,7 +1,9 @@
 <script lang="ts">
+  import { createDismissableError } from "@real-router/sources";
   import { untrack } from "svelte";
 
-  import { useRouterError } from "../composables/useRouterError.svelte";
+  import { useRouter } from "../composables/useRouter.svelte";
+  import { createReactiveSource } from "../createReactiveSource.svelte";
 
   import type { RouterError, State } from "@real-router/core";
   import type { Snippet } from "svelte";
@@ -18,18 +20,8 @@
 
   let { children, fallback, onError }: Props = $props();
 
-  const snapshot = useRouterError();
-  let dismissedVersion = $state(-1);
-
-  const visibleError = $derived(
-    snapshot.current.version > dismissedVersion
-      ? snapshot.current.error
-      : null,
-  );
-
-  function resetError(): void {
-    dismissedVersion = snapshot.current.version;
-  }
+  const router = useRouter();
+  const snapshot = createReactiveSource(createDismissableError(router));
 
   $effect(() => {
     const snap = snapshot.current;
@@ -50,6 +42,6 @@
 </script>
 
 {@render children?.()}
-{#if visibleError}
-  {@render fallback(visibleError, resetError)}
+{#if snapshot.current.error}
+  {@render fallback(snapshot.current.error, snapshot.current.resetError)}
 {/if}

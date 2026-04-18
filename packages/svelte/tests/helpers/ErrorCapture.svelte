@@ -1,9 +1,13 @@
 <script lang="ts">
-  import { useRouterError } from "../../src/composables/useRouterError.svelte";
+  import { getErrorSource } from "@real-router/sources";
+
+  import { useRouter } from "../../src/composables/useRouter.svelte";
+  import { createReactiveSource } from "../../src/createReactiveSource.svelte";
 
   let { onCapture }: { onCapture: (result: unknown) => void } = $props();
 
-  const snapshot = useRouterError();
+  const router = useRouter();
+  const snapshot = createReactiveSource(getErrorSource(router));
 
   onCapture(snapshot);
 </script>

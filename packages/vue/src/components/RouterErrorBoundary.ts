@@ -1,6 +1,8 @@
-import { defineComponent, h, ref, watch, computed, Fragment } from "vue";
+import { createDismissableError } from "@real-router/sources";
+import { defineComponent, h, watch, Fragment } from "vue";
 
-import { useRouterError } from "../composables/useRouterError";
+import { useRouter } from "../composables/useRouter";
+import { useRefFromSource } from "../useRefFromSource";
 
 import type { RouterError, State } from "@real-router/core";
 import type { VNode, PropType } from "vue";
@@ -26,8 +28,8 @@ export const RouterErrorBoundary = defineComponent({
     },
   },
   setup(props, { slots }) {
-    const snapshot = useRouterError();
-    const dismissedVersion = ref(-1);
+    const router = useRouter();
+    const snapshot = useRefFromSource(createDismissableError(router));
 
     watch(
       () => snapshot.value.version,
@@ -43,20 +45,10 @@ export const RouterErrorBoundary = defineComponent({
       { immediate: true },
     );
 
-    const visibleError = computed(() =>
-      snapshot.value.version > dismissedVersion.value
-        ? snapshot.value.error
-        : null,
-    );
-
-    const resetError = () => {
-      dismissedVersion.value = snapshot.value.version;
-    };
-
     return () => {
       const children = slots.default?.() ?? [];
-      const errorVNode = visibleError.value
-        ? props.fallback(visibleError.value, resetError)
+      const errorVNode = snapshot.value.error
+        ? props.fallback(snapshot.value.error, snapshot.value.resetError)
         : null;
 
       return h(Fragment, null, [...children, errorVNode]);

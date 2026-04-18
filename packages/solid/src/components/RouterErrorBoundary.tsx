@@ -1,6 +1,8 @@
-import { createEffect, createMemo, createSignal, Show } from "solid-js";
+import { createDismissableError } from "@real-router/sources";
+import { createEffect, Show } from "solid-js";
 
-import { useRouterError } from "../hooks/useRouterError";
+import { createSignalFromSource } from "../createSignalFromSource";
+import { useRouter } from "../hooks/useRouter";
 
 import type { RouterError, State } from "@real-router/core";
 import type { JSX } from "solid-js";
@@ -21,8 +23,8 @@ export interface RouterErrorBoundaryProps {
 export function RouterErrorBoundary(
   props: RouterErrorBoundaryProps,
 ): JSX.Element {
-  const snapshot = useRouterError();
-  const [dismissedVersion, setDismissedVersion] = createSignal(-1);
+  const router = useRouter();
+  const snapshot = createSignalFromSource(createDismissableError(router));
 
   createEffect(() => {
     const snap = snapshot();
@@ -32,19 +34,11 @@ export function RouterErrorBoundary(
     }
   });
 
-  const visibleError = createMemo(() => {
-    const snap = snapshot();
-
-    return snap.version > dismissedVersion() ? snap.error : null;
-  });
-
-  const resetError = () => setDismissedVersion(snapshot().version);
-
   return (
     <>
       {props.children}
-      <Show when={visibleError()}>
-        {(error) => props.fallback(error(), resetError)}
+      <Show when={snapshot().error}>
+        {(error) => props.fallback(error(), snapshot().resetError)}
       </Show>
     </>
   );
