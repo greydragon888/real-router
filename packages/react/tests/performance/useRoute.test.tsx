@@ -321,6 +321,27 @@ describe("useRoute - Performance Tests", { tags: ["performance"] }, () => {
       expect(ProfiledHook.getRenderCount()).toBeGreaterThanOrEqual(1);
     });
 
+    // navigate to current route rejects
+    // with SAME_STATES — no TRANSITION_SUCCESS emitted, snapshot
+    // identity preserved by stabilizeState, useMemo([navigator, snapshot])
+    // returns the same RouteContext value → 0 re-renders.
+    it("should NOT re-render when navigating to current route", async () => {
+      await router.start("/users/list");
+
+      const { ProfiledHook } = profileHook(() => useRoute(), {
+        renderOptions: { wrapper },
+      });
+
+      expect(ProfiledHook).toHaveRenderedTimes(1);
+
+      await act(async () => {
+        // SAME_STATES rejection — router does not emit TRANSITION_SUCCESS
+        await router.navigate("users.list").catch(() => {});
+      });
+
+      expect(ProfiledHook).toHaveRenderedTimes(1);
+    });
+
     it("should handle rapid route changes correctly", async () => {
       await router.start("/");
 
