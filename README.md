@@ -202,25 +202,27 @@ See the [SSR example](examples/react/ssr) and [SSG example](examples/react/ssg).
 Navigation stays fast as your route tree grows — from 10 routes to 1000, the cost per navigation barely moves.
 The Segment Trie matcher traverses in O(segments), not O(routes).
 
-**1.7–2.5x faster and 1.5–3x lighter** than TanStack Router in full client-side navigation benchmarks (10-step loop, 56 subscribers per page):
+**2.3–14× faster and 2.3–9.5× fewer allocations** than TanStack Router in full client-side navigation benchmarks (10-step loop, JSDOM, Vite production build):
 
-**Speed** (ops/sec, higher is better):
+**Speed** (relative to TanStack Router, higher is better):
 
 | Framework | vs TanStack Router |
 | --------- | ------------------ |
-| Solid     | **2.5x faster**    |
-| Vue       | **2.1x faster**    |
-| React     | **1.7x faster**    |
+| React     | **~14× faster**    |
+| Solid     | **~13× faster**    |
+| Vue       |  **~2.3× faster**  |
 
-**Memory per navigation** (heap bytes, lower is better):
+**Memory per navigation** (relative to TanStack Router, lower is better):
 
-| Framework | vs TanStack Router         |
-| --------- | -------------------------- |
-| Solid     | **3.0x fewer allocations** |
-| React     | **2.6x fewer allocations** |
-| Vue       | **1.5x fewer allocations** |
+| Framework | vs TanStack Router           |
+| --------- | ---------------------------- |
+| React     | **~9.5× fewer allocations**  |
+| Solid     | **~7.7× fewer allocations**  |
+| Vue       | **~2.3× fewer allocations**  |
 
-> Benchmark: [benchmarks/vs-tanstack](benchmarks/vs-tanstack) — identical workload, JSDOM, production builds, `--expose-gc`
+> Benchmark: [benchmarks/vs-tanstack](benchmarks/vs-tanstack) — identical workload, JSDOM, Vite production build, `--expose-gc`. Absolute hz/heap numbers are machine-dependent; ratios reported here are stable across runs. Full report with raw numbers: [2026-04-18-report.md](benchmarks/.bench-results/vs-tanstack/2026-04-18-report.md).
+>
+> **Note on Vue:** the smaller speed ratio (~2.3× vs ~14×/13× for React/Solid) reflects Vue runtime overhead, not router overhead. On this workload (44 route-state subscribers rendering `null`) Vue proxy access + scheduler dominate navigation time for both routers. Three targeted Vue-adapter rewrites were attempted and reverted after measuring only noise-level gains — see [packages/vue/ARCHITECTURE.md § Vue Runtime Floor](packages/vue/ARCHITECTURE.md#vue-runtime-floor-vs-tanstack-benchmark).
 
 <details>
 <summary><b>Benchmarks vs router5 and router6 (core-level)</b></summary>
@@ -388,7 +390,7 @@ function App() {
 
 | Package                                            | Version                                                                                                                                       | Description                                                                  |
 | -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| [`@real-router/sources`](packages/sources)         | [![npm](https://img.shields.io/npm/v/@real-router/sources.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/sources)         | Reactive subscription sources for UI bindings — per-router cached `getTransitionSource`/`getErrorSource` + canonical params cache |
+| [`@real-router/sources`](packages/sources)         | [![npm](https://img.shields.io/npm/v/@real-router/sources.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/sources)         | Reactive subscription sources for UI bindings — per-router cached `getTransitionSource` / `createDismissableError` / `createActiveNameSelector` + canonical params cache |
 | [`@real-router/rx`](packages/rx)                   | [![npm](https://img.shields.io/npm/v/@real-router/rx.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/rx)                   | Observable API: `state$`, `events$`, operators, TC39 Observable              |
 | [`@real-router/route-utils`](packages/route-utils) | [![npm](https://img.shields.io/npm/v/@real-router/route-utils.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/route-utils) | Route tree queries: `getRouteUtils`, segment testers, `areRoutesRelated`     |
 | [`@real-router/logger`](packages/logger)           | [![npm](https://img.shields.io/npm/v/@real-router/logger.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/logger)           | Structured logging utility                                                   |

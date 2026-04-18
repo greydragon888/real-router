@@ -7,7 +7,7 @@
 ```
 @real-router/vue
 ├── @real-router/core         # Router instance, Navigator, State types
-├── @real-router/sources      # Subscription layer (createRouteSource, createRouteNodeSource, createActiveRouteSource, createErrorSource)
+├── @real-router/sources      # Subscription layer (createRouteSource, createRouteNodeSource, createActiveRouteSource, getTransitionSource, createDismissableError)
 └── @real-router/route-utils  # Route tree queries (getRouteUtils, getChain, getSiblings)
 ```
 
@@ -49,8 +49,7 @@ src/
 │   ├── useRouteNode.ts         # Node-scoped subscription via useRefFromSource
 │   ├── useIsActiveRoute.ts     # Active state subscription (internal — used by Link)
 │   ├── useRouteUtils.ts        # RouteUtils from route tree (never reactive)
-│   ├── useRouterTransition.ts  # Transition lifecycle ShallowRef (isTransitioning, toRoute, fromRoute)
-│   └── useRouterError.ts     # Internal — error subscription (used by RouterErrorBoundary)
+│   └── useRouterTransition.ts  # Transition lifecycle ShallowRef (isTransitioning, toRoute, fromRoute)
 └── components/
     ├── Link.ts                 # defineComponent + h('a'), computed href/class, active state
     ├── RouterErrorBoundary.ts   # Declarative navigation error handling
@@ -131,7 +130,7 @@ useNavigator()  — reads NavigatorKey → returns Navigator, never reactive
 useRouteNode(name)      — cached createRouteNodeSource(router, name)     → { navigator, route: ShallowRef, previousRoute: ShallowRef }
 useRouterTransition()   — cached getTransitionSource(router)             → ShallowRef<RouterTransitionSnapshot>
 useIsActiveRoute(...)   — cached createActiveRouteSource(router, ...)    → ShallowRef<boolean>
-useRouterError()        — cached getErrorSource(router) [internal]
+RouterErrorBoundary     — cached createDismissableError(router)          → ShallowRef<DismissableErrorSnapshot>
 RouterProvider          — createRouteSource(router)                      → updates route/previousRoute ShallowRefs
 ```
 
@@ -148,9 +147,9 @@ Link (defineComponent + h('a'))
 └── onClick → router.navigate(...).catch(() => {})
 
 RouterErrorBoundary (defineComponent)
-├── useRouterError() — error subscription via createErrorSource (internal, cached)
-├── dismissedVersion state — tracks manually dismissed errors (version-based)
-├── watch(version) — calls props.onError on new errors (immediate: true)
+├── useRefFromSource(createDismissableError(router)) — shared per-router source
+│     (integrated dismissedVersion + resetError — no local state)
+├── watch(snapshot.value.version) — calls props.onError on new errors (immediate: true)
 └── Renders: default slot + fallback(error, resetError) via Fragment
 ```
 
@@ -185,11 +184,33 @@ Vue's proxy-based reactivity eliminates most of the optimization work needed in 
 | Stable object references  | `canonicalJson` in sources          | Same — in `@real-router/sources`                               |
 | Stable callbacks          | `useCallback`                       | Not needed — closures are stable in setup()                    |
 | Node-scoped subscriptions | Cached `createRouteNodeSource`      | Same — in `@real-router/sources`                               |
-| Shared eager sources      | `getTransitionSource`/`getErrorSource` | Same — in `@real-router/sources`                            |
+| Shared eager sources      | `getTransitionSource` / `createDismissableError` | Same — in `@real-router/sources`                  |
 | Frozen singletons         | `EMPTY_PARAMS`, `EMPTY_OPTIONS`     | Same — avoids allocation for default props                     |
 | keepAlive wrapper cache   | N/A                                 | `Map<string, Component>` per RouteView instance, `markRaw`     |
 
 The main performance primitive is `useRefFromSource`: it creates a `shallowRef` that only updates when the underlying source emits, and Vue's scheduler batches DOM updates automatically.
+
+### Vue Runtime Floor (vs-tanstack Benchmark)
+
+The `vs-tanstack` benchmark (`benchmarks/vs-tanstack/real-router/vue`) exercises a 10-step navigation loop with 44 route-state subscribers (`useRoute`/`useRouteNode`/nanostores), each rendering `null`. On this workload Real-Router's Vue adapter is ~**6× slower in absolute terms** than React/Solid despite sharing the same `@real-router/sources` router layer.
+
+**Root cause is Vue runtime, not adapter overhead.** Empirically verified via three targeted rewrites (all reverted after negative results — see `benchmarks/.bench-results/vs-tanstack/2026-04-18-report.md`):
+
+| Hypothesis                                                   | Predicted gain | Measured Δ     | Verdict    |
+| ------------------------------------------------------------ | -------------: | -------------: | ---------- |
+| Replace `computed()` in `useRouteNode` with direct `shallowRef` writes | 10–15 %        | +0.6 %          | Within noise (RME ±0.9 %) |
+| Replace `watch([...])` dep-array getter with `watchEffect` in `Link` |  3– 5 %        | +0.35 %         | Within noise |
+| Eliminate `Object.keys(attrs)` rest-spread in `Link.render`   |  3– 5 %        | +0.36 %         | Within noise |
+
+The proposed micro-optimizations are valid in principle, but V8 JIT on a 10-second hot benchmark inlines/elides them below the measurement floor. The dominant cost on this workload is:
+
+1. Vue **proxy-based prop access** on every tracked getter (`.value`, `props.*`) — JS-level overhead that no adapter rewrite can avoid.
+2. Vue **scheduler** batching 44 effects per navigation with its own bookkeeping.
+3. **Render-phase VNode creation** for 44 components that return `null` — no DOM work, but the framework still walks the render graph.
+
+When the TanStack Router adapter uses `useParams({ select })` the workload is similar — TanStack-Vue is only ~2.2× faster than TanStack-React in absolute terms, confirming that the ceiling is Vue-runtime rather than router-agnostic. Against TanStack-Vue, Real-Router still wins (~2.3×), but the gap is compressed compared to React/Solid (~14×/13×) because router overhead is no longer the bottleneck.
+
+**Takeaway for consumers:** for Vue apps with many small route-state subscribers, expect absolute navigation time to be dominated by Vue runtime, not by the router. Real-Router retains the architectural wins (node-scoped subscriptions, fewer allocations — see `heapUsed` results in the benchmark report), but they appear as absolute memory reduction rather than as a large hz ratio.
 
 ## Data Flow
 

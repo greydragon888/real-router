@@ -6,18 +6,20 @@
 
 ```
 src/
-├── BaseSource.ts              — Internal Set-based listener management + destroy safety
-├── createRouteSource.ts       — Full route state source with lazy-connection pattern (non-cached)
-├── createRouteNodeSource.ts   — Node-scoped source with lazy-connection + per-(router, nodeName) cache
-├── createActiveRouteSource.ts — Boolean active-route source with per-(router, name, params, opts) cache
-├── createTransitionSource.ts  — Transition lifecycle + cached getTransitionSource wrapper
-├── createErrorSource.ts       — Error lifecycle + cached getErrorSource wrapper
-├── canonicalJson.ts           — Key-order-stable JSON serialization (cache keys for active-route)
-├── normalizeActiveOptions.ts  — DEFAULT_ACTIVE_OPTIONS + normalizeActiveOptions helper
-├── computeSnapshot.ts         — Same-reference snapshot optimization for route nodes
-├── stabilizeState.ts          — Path-based State ref stabilization (not exported)
-├── types.ts                   — Public type definitions
-└── index.ts                   — Public exports
+├── BaseSource.ts                — Internal Set-based listener management + destroy safety
+├── createRouteSource.ts         — Full route state source with lazy-connection pattern (non-cached)
+├── createRouteNodeSource.ts     — Node-scoped source with lazy-connection + per-(router, nodeName) cache
+├── createActiveRouteSource.ts   — Boolean active-route source with per-(router, name, params, opts) cache
+├── createTransitionSource.ts    — Transition lifecycle + cached getTransitionSource wrapper
+├── createErrorSource.ts         — Error lifecycle + cached getErrorSource wrapper
+├── createDismissableError.ts    — Derived source: getErrorSource wrapped with dismissedVersion state
+├── createActiveNameSelector.ts  — Shared O(1) active-name selector (Solid-style routeSelector port)
+├── canonicalJson.ts             — Key-order-stable JSON serialization (cache keys for active-route)
+├── normalizeActiveOptions.ts    — DEFAULT_ACTIVE_OPTIONS + normalizeActiveOptions helper
+├── computeSnapshot.ts           — Same-reference snapshot optimization for route nodes
+├── stabilizeState.ts            — Path-based State ref stabilization (not exported)
+├── types.ts                     — Public type definitions
+└── index.ts                     — Public exports
 ```
 
 ## Per-Router Cache Strategy
@@ -31,6 +33,8 @@ Most factories return a cached instance keyed by router and, where applicable, b
 | `createActiveRouteSource` | `WeakMap<Router, Map<compositeKey, src>>` | until router GC |
 | `getTransitionSource` | `WeakMap<Router, src>` | until router GC |
 | `getErrorSource` | `WeakMap<Router, src>` | until router GC |
+| `createDismissableError` | `WeakMap<Router, src>` | until router GC |
+| `createActiveNameSelector` | `WeakMap<Router, selector>` | until router GC |
 | `createTransitionSource` / `createErrorSource` | none (advanced-use) | owner-driven; `destroy()` tears down |
 
 **Composite key for `createActiveRouteSource`:** `` `${routeName}|${canonicalJson(params)}|${strict}|${ignoreQueryParams}` ``. Key-order-insensitive via `canonicalJson` — `{a:1, b:2}` and `{b:2, a:1}` hit the same entry.
@@ -120,6 +124,27 @@ Path-based State reference stabilization. Compares `prev.path` with `next.path`.
 ### `normalizeActiveOptions`
 
 Returns a fully-defaulted options object from a partial input. `DEFAULT_ACTIVE_OPTIONS` is a frozen constant. Used internally by `createActiveRouteSource` and re-exported for adapter code that builds its own cache keys.
+
+### `createDismissableError`
+
+Composition over `getErrorSource`. Wraps the per-router error source with an additional `dismissedVersion: number` state. Snapshot fields: `error, toRoute, fromRoute, version, resetError`.
+
+- `error` (and `toRoute`/`fromRoute`) are exposed as `null` when `underlying.version <= dismissedVersion`.
+- `resetError()` captures current underlying `version` into `dismissedVersion`, then calls `updateSnapshot` to notify all subscribers. Passed inside the snapshot (not as a separate export) so that framework reactive bridges propagate it naturally.
+- The wrapper is eager-lazy: the internal `BaseSource` subscribes to `getErrorSource` in `onFirstSubscribe` and disconnects in `onLastUnsubscribe`. No external `destroy()` needed.
+
+Consolidates the dismissal state pattern that was duplicated across all 6 adapter `RouterErrorBoundary` components.
+
+### `createActiveNameSelector`
+
+Shared selector providing O(1) active-name checks with ONE `router.subscribe` for any number of distinct `routeName` listeners. Internal state:
+
+- `listenersByName: Map<string, Set<() => void>>` — multi-map of subscribers.
+- `activeByName: Map<string, boolean>` — cached previous-active diff input.
+
+On each router transition, iterates over subscribed names; for each uses `areRoutesRelated` pre-filter, then diffs `prevActive` vs recomputed `nextActive`, notifies only names whose status actually flipped. Lazy-connected: no router subscription until first listener; disconnects on last.
+
+Framework-agnostic port of the `routeSelector` pattern from `@real-router/solid`'s `RouterProvider`. Currently internal to adapters that choose the fast-path; wider integration in Link components deferred to opt-in migration.
 
 ## Dependencies
 

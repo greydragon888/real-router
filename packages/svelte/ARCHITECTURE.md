@@ -7,7 +7,7 @@
 ```
 @real-router/svelte
 ├── @real-router/core         # Router instance, Navigator, State types
-├── @real-router/sources      # Subscription layer (createRouteSource, createRouteNodeSource, createActiveRouteSource, createErrorSource)
+├── @real-router/sources      # Subscription layer (createRouteSource, createRouteNodeSource, createActiveRouteSource, getTransitionSource, createDismissableError)
 └── @real-router/route-utils  # Route tree queries (getRouteUtils, getChain, getSiblings)
 ```
 
@@ -37,8 +37,7 @@ dist/
 │   ├── useRouteNode.svelte.js
 │   ├── useRouteUtils.svelte.js
 │   ├── useRouterTransition.svelte.js
-│   ├── useIsActiveRoute.svelte.js
-│   └── useRouterError.svelte.js
+│   └── useIsActiveRoute.svelte.js
 └── RouterProvider.svelte
 ```
 
@@ -64,8 +63,7 @@ src/
 │   ├── useRouteNode.svelte.ts            # Node-scoped subscription via createReactiveSource
 │   ├── useIsActiveRoute.svelte.ts        # Active state subscription (internal — used by Link)
 │   ├── useRouteUtils.svelte.ts
-│   ├── useRouterTransition.svelte.ts
-│   └── useRouterError.svelte.ts          # Internal — error subscription (used by RouterErrorBoundary)
+│   └── useRouterTransition.svelte.ts
 ├── actions/
 │   └── link.svelte.ts                    # createLinkAction factory (use:link directive)
 └── components/
@@ -172,7 +170,7 @@ useNavigator()  — reads NAVIGATOR_KEY → returns Navigator, never reactive
 useRouteNode(name)      — cached createRouteNodeSource(router, name)     → { navigator, route: { current }, previousRoute: { current } }
 useRouterTransition()   — cached getTransitionSource(router)             → { current: RouterTransitionSnapshot }
 useIsActiveRoute(...)   — cached createActiveRouteSource(router, ...)    → { current: boolean }
-useRouterError()        — cached getErrorSource(router) [internal]
+RouterErrorBoundary     — cached createDismissableError(router)          → { current: DismissableErrorSnapshot }
 RouterProvider          — createRouteSource(router)                      → updates route/previousRoute .current getters
 ```
 
@@ -190,8 +188,8 @@ Link (.svelte)
     └── {@render children?.()}
 
 RouterErrorBoundary (.svelte)
-├── useRouterError() — error subscription via createErrorSource (internal, cached)
-├── dismissedVersion state — tracks manually dismissed errors (version-based)
+├── createReactiveSource(createDismissableError(router)) — shared per-router source
+│     (integrated dismissedVersion + resetError — no local state)
 ├── fallback snippet — {#snippet fallback(error, resetError)} passed by caller
 └── Renders: {@render children?.()} + {@render fallback?.(error, resetError)}
 ```
@@ -243,7 +241,7 @@ Svelte's compiler-driven reactivity eliminates most of the optimization work nee
 | Stable object references  | `canonicalJson` in sources                | Same — in `@real-router/sources`                                         |
 | Stable callbacks          | `useCallback`                             | Not needed — no re-renders                                               |
 | Node-scoped subscriptions | Cached `createRouteNodeSource`            | Same — in `@real-router/sources`                                         |
-| Shared eager sources      | `getTransitionSource`/`getErrorSource`    | Same — in `@real-router/sources`                                         |
+| Shared eager sources      | `getTransitionSource` / `createDismissableError` | Same — in `@real-router/sources`                                  |
 | Frozen singletons         | `EMPTY_PARAMS`, `EMPTY_OPTIONS`           | Same — avoids allocation for default props                               |
 
 The main performance primitive is `createReactiveSource`: it creates a lazy `{ current }` getter that only subscribes when read in a reactive context, and Svelte's scheduler batches DOM updates automatically.

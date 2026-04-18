@@ -7,7 +7,7 @@
 ```
 @real-router/preact
 ├── @real-router/core         # Router instance, Navigator, State types
-├── @real-router/sources      # Subscription layer (createRouteSource, createRouteNodeSource, createActiveRouteSource, createErrorSource)
+├── @real-router/sources      # Subscription layer (createRouteSource, createRouteNodeSource, createActiveRouteSource, getTransitionSource, createDismissableError)
 └── @real-router/route-utils  # Route tree queries (getRouteUtils, getChain, getSiblings)
 ```
 
@@ -52,8 +52,7 @@ src/
 │   ├── useRouteNode.tsx        # Node-scoped subscription (cached createRouteNodeSource from sources)
 │   ├── useIsActiveRoute.tsx    # Active state subscription (cached createActiveRouteSource)
 │   ├── useRouteUtils.tsx       # RouteUtils from route tree (never re-renders)
-│   ├── useRouterTransition.tsx # Transition lifecycle (cached getTransitionSource)
-│   └── useRouterError.tsx      # Internal — error subscription (cached getErrorSource)
+│   └── useRouterTransition.tsx # Transition lifecycle (cached getTransitionSource)
 └── components/
     ├── Link.tsx                # memo'd link with custom areLinkPropsEqual + active state
     ├── RouterErrorBoundary.tsx  # Declarative navigation error handling
@@ -123,7 +122,7 @@ useNavigator()  — reads NavigatorContext → never re-renders
 useRouteNode(name)              — cached createRouteNodeSource(router, name)
 useRouterTransition()           — cached getTransitionSource(router)
 useIsActiveRoute(name, params)  — cached createActiveRouteSource(router, name, params, opts) [internal]
-useRouterError()                — cached getErrorSource(router) [internal]
+RouterErrorBoundary             — cached createDismissableError(router) with integrated resetError
 RouterProvider                  — createRouteSource(router) (per-provider instance)
 ```
 
@@ -137,8 +136,8 @@ Link (memo + areLinkPropsEqual)
 └── onClick → void router.navigate(...)   # fire-and-forget
 
 RouterErrorBoundary
-├── useRouterError() — error subscription via getErrorSource (internal, shared per-router)
-├── dismissedVersion state — tracks manually dismissed errors (version-based)
+├── useSyncExternalStore polyfill over createDismissableError(router) — shared per-router source
+│     (integrated dismissedVersion + resetError — no local state)
 ├── onErrorRef — useRef for callback stability (avoids closure churn)
 └── Renders: children + fallback(error, resetError) via Fragment
 ```
@@ -155,7 +154,7 @@ RouterErrorBoundary
 | -------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------- |
 | Node-scoped subscriptions        | `useRouteNode`                           | Cached `createRouteNodeSource(router, nodeName)` — N consumers share one router subscription |
 | Canonical params cache           | `useIsActiveRoute`                       | `createActiveRouteSource` hashes params via `canonicalJson` — key-order-insensitive          |
-| Shared transition/error sources  | `useRouterTransition`, `useRouterError`  | `getTransitionSource`/`getErrorSource` — one eager router subscription per router            |
+| Shared transition/error sources  | `useRouterTransition`, `RouterErrorBoundary` | `getTransitionSource` / `createDismissableError` — one eager router subscription per router |
 | Custom memo comparator           | `Link`                                   | `areLinkPropsEqual`: `shallowEqual` for params/options, `===` for primitives                 |
 | Frozen singletons                | `constants.ts`                           | `EMPTY_PARAMS`, `EMPTY_OPTIONS` avoid allocation for default props                           |
 | WeakMap caching (sources level)  | `@real-router/sources`                   | Per-router caches auto-evicted on router GC                                                  |

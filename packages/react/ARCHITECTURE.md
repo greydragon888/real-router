@@ -7,7 +7,7 @@
 ```
 @real-router/react
 ├── @real-router/core         # Router instance, Navigator, State types
-├── @real-router/sources      # Subscription layer (createRouteSource, createRouteNodeSource, createActiveRouteSource, createTransitionSource, createErrorSource)
+├── @real-router/sources      # Subscription layer (createRouteSource, createRouteNodeSource, createActiveRouteSource, getTransitionSource, createDismissableError)
 └── @real-router/route-utils  # Route tree queries (getRouteUtils, getChain, getSiblings)
 ```
 
@@ -60,8 +60,7 @@ src/
 │   ├── useRouteNode.tsx        # Node-scoped subscription (cached createRouteNodeSource from sources)
 │   ├── useIsActiveRoute.tsx    # Active state subscription (cached createActiveRouteSource)
 │   ├── useRouteUtils.tsx       # RouteUtils from route tree (never re-renders)
-│   ├── useRouterTransition.tsx # Transition lifecycle (cached getTransitionSource)
-│   └── useRouterError.tsx      # Internal — error subscription (cached getErrorSource)
+│   └── useRouterTransition.tsx # Transition lifecycle (cached getTransitionSource)
 └── components/
     ├── Link.tsx                # memo'd link with custom areLinkPropsEqual + active state
     ├── RouterErrorBoundary.tsx  # Declarative navigation error handling
@@ -122,9 +121,9 @@ These three hooks use `useContext()` — works in both React 18 and 19. (`use()`
 
 ```
 useRouteNode(name)              — createRouteNodeSource(router, name)
-useRouterTransition()           — createTransitionSource(router)
+useRouterTransition()           — getTransitionSource(router)
 useIsActiveRoute(name, params)  — createActiveRouteSource(router, name, params, opts)  [internal]
-useRouterError()  [internal]        — createErrorSource(router) with WeakMap cache
+RouterErrorBoundary             — createDismissableError(router) with integrated resetError
 RouterProvider                  — createRouteSource(router)
 ```
 
@@ -142,8 +141,8 @@ Link (memo + areLinkPropsEqual)
 └── onClick → void router.navigate(...)   # fire-and-forget
 
 RouterErrorBoundary
-├── useRouterError() — error subscription via getErrorSource (internal, shared per-router)
-├── dismissedVersion state — tracks manually dismissed errors (version-based)
+├── useSyncExternalStore over createDismissableError(router) — shared per-router source
+│     (integrated dismissedVersion + resetError — no local state)
 ├── onErrorRef — useRef for callback stability (avoids closure churn)
 └── Renders: children + fallback(error, resetError) via Fragment
 ```
@@ -160,7 +159,7 @@ RouterErrorBoundary
 | --------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------- |
 | Node-scoped subscriptions         | `useRouteNode`          | Cached `createRouteNodeSource(router, nodeName)` — N consumers share one router subscription       |
 | Canonical params cache            | `useIsActiveRoute`      | `createActiveRouteSource` hashes params via `canonicalJson` — `{a:1,b:2}` ≡ `{b:2,a:1}`             |
-| Shared transition/error sources   | `useRouterTransition`, `useRouterError` | `getTransitionSource`/`getErrorSource` — one eager router subscription per router  |
+| Shared transition/error sources   | `useRouterTransition`, `RouterErrorBoundary` | `getTransitionSource` / `createDismissableError` — one eager router subscription per router |
 | Custom memo comparator            | `Link`                  | `areLinkPropsEqual`: `shallowEqual` (Object.is per key) for params/options, `===` for primitives   |
 | Frozen singletons                 | `constants.ts`          | `EMPTY_PARAMS`, `EMPTY_OPTIONS` avoid allocation for default props                                 |
 | WeakMap caching (sources level)   | `@real-router/sources`  | Per-router caches auto-evicted on router GC                                                        |
@@ -190,9 +189,9 @@ router emits TRANSITION_SUCCESS
     │       └──► if changed: useSyncExternalStore triggers re-render
     │               └──► Link active CSS updates (via internal useIsActiveRoute)
     │
-    └──► createErrorSource.subscribe callback → error snapshot { error, toRoute, fromRoute, version }
+    └──► createDismissableError.subscribe callback → { error, toRoute, fromRoute, version, resetError }
             └──► useSyncExternalStore triggers RouterErrorBoundary re-render
-                    └──► if error && version > dismissedVersion: render fallback alongside children
+                    └──► if snapshot.error: render fallback(error, snapshot.resetError) alongside children
 ```
 
 ## Testing Strategy
@@ -234,7 +233,7 @@ tests/
 
 | Category                | Tests (file count) | Test count | What they verify                                                                                                                                                                                        |
 | ----------------------- | ------------------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Mount/unmount lifecycle | 1 file             | 14 tests   | useRouteNode/useRoute/Link/useRouterTransition × 200 mount/unmount cycles — bounded heap; 50 components remount + re-subscribe; conditional toggle × 100; router stop/restart; dynamic nodeName changes; 10000 navigate cycles heap-bounded; 200 router instances disposed — full WeakMap cache cleanup (useRouterError/useRouterTransition/useRouteUtils/shouldUpdateCache); navigate-during-teardown × 50 with concurrent races — no unhandled rejections, heap bounded |
+| Mount/unmount lifecycle | 1 file             | 14 tests   | useRouteNode/useRoute/Link/useRouterTransition × 200 mount/unmount cycles — bounded heap; 50 components remount + re-subscribe; conditional toggle × 100; router stop/restart; dynamic nodeName changes; 10000 navigate cycles heap-bounded; 200 router instances disposed — full WeakMap cache cleanup (createDismissableError/getTransitionSource/useRouteUtils/shouldUpdateCache); navigate-during-teardown × 50 with concurrent races — no unhandled rejections, heap bounded |
 | Subscription fanout     | 1 file             | 5 tests    | 50 useRouteNode on different nodes — only relevant re-render; 20 useRoute + 30 useRouteNode('') — all update; 50 useRouteNode('users') — granular scoping; concurrent mount/unmount; cleanup on unmount |
 | Link mass rendering     | 1 file             | 7 tests    | 200 Links mount — no render loops; active class toggle; 50 round-robin navigations; deep routeParams; 50 rapid clicks — 0 unhandled rejections; dynamic routeName × 100                                 |
 | Deep tree context       | 1 file             | 4 tests    | 30-deep useRouteNode — only relevant nodes re-render; useRouter — 0 re-renders; wide tree 25 leaves — all re-render; nested RouterProviders — isolated                                                  |
