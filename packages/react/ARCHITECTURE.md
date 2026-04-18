@@ -57,12 +57,11 @@ src/
 │   ├── useRouter.tsx           # Router instance from context (never re-renders)
 │   ├── useRoute.tsx            # Full route state from context (every navigation)
 │   ├── useNavigator.tsx        # Navigator from context (never re-renders)
-│   ├── useRouteNode.tsx        # Node-scoped subscription via useSyncExternalStore
-│   ├── useIsActiveRoute.tsx    # Active state subscription (internal — used by Link)
+│   ├── useRouteNode.tsx        # Node-scoped subscription (cached createRouteNodeSource from sources)
+│   ├── useIsActiveRoute.tsx    # Active state subscription (cached createActiveRouteSource)
 │   ├── useRouteUtils.tsx       # RouteUtils from route tree (never re-renders)
-│   ├── useRouterTransition.tsx # Transition lifecycle (isTransitioning, toRoute, fromRoute)
-│   ├── useRouterError.tsx      # Internal — error subscription (used by RouterErrorBoundary)
-│   └── useStableValue.tsx      # JSON-based reference stabilization
+│   ├── useRouterTransition.tsx # Transition lifecycle (cached getTransitionSource)
+│   └── useRouterError.tsx      # Internal — error subscription (cached getErrorSource)
 └── components/
     ├── Link.tsx                # memo'd link with custom areLinkPropsEqual + active state
     ├── RouterErrorBoundary.tsx  # Declarative navigation error handling
@@ -138,19 +137,18 @@ These subscribe to `@real-router/sources` stores. The source creates a `{ subscr
 ```
 Link (memo + areLinkPropsEqual)
 ├── useRouter() — router instance from context (never re-renders)
-├── useStableValue() — stabilizes routeParams/routeOptions objects
-├── useIsActiveRoute() — subscription for active/inactive CSS (internal hook)
+├── useIsActiveRoute() — subscription for active/inactive CSS (internal hook, cached source)
 ├── href = router.buildUrl() || router.buildPath()
 └── onClick → void router.navigate(...)   # fire-and-forget
 
 RouterErrorBoundary
-├── useRouterError() — error subscription via createErrorSource (internal, cached)
+├── useRouterError() — error subscription via getErrorSource (internal, shared per-router)
 ├── dismissedVersion state — tracks manually dismissed errors (version-based)
 ├── onErrorRef — useRef for callback stability (avoids closure churn)
 └── Renders: children + fallback(error, resetError) via Fragment
 ```
 
-**Custom comparator (`areLinkPropsEqual`):** Explicitly compares all Link-specific props — `deepEqual` (`Object.is` fast-path → key-order-insensitive `stableSerialize` → identity fallback on serialization failure) for `routeParams` and `routeOptions` (objects), strict equality (`===`) for primitives (`routeName`, `className`, `activeClassName`, `activeStrict`, `ignoreQueryParams`, `onClick`, `target`, `style`, `children`). Prevents re-renders from inline object literals `<Link routeParams={{ id: 123 }} />` and from reordered keys (`{a, b}` ≡ `{b, a}`). Falls back gracefully on BigInt / circular / Symbol values.
+**Custom comparator (`areLinkPropsEqual`):** Explicitly compares all Link-specific props — `shallowEqual` (`Object.is` per key, order-insensitive) for `routeParams` and `routeOptions`, strict equality (`===`) for primitives (`routeName`, `className`, `activeClassName`, `activeStrict`, `ignoreQueryParams`, `onClick`, `target`, `style`, `children`). Prevents re-renders from inline object literals `<Link routeParams={{ id: 123 }} />`. Nested objects in params aren't deep-compared — consumers stabilize with `useMemo` if needed.
 
 **RouteView.Match with `fallback`:** When `fallback` prop is provided, `Match` wraps its children in a `<Suspense>` boundary with that fallback. Use this with `React.lazy()` to code-split route components. Works seamlessly with `keepAlive` — the `<Activity>` wrapper preserves the entire `<Suspense>` boundary including the fallback state.
 
@@ -158,14 +156,15 @@ RouterErrorBoundary
 
 ## Performance Optimizations
 
-| Optimization                 | Location               | Mechanism                                                                   |
-| ---------------------------- | ---------------------- | --------------------------------------------------------------------------- |
-| Node-scoped subscriptions    | `useRouteNode`         | `shouldUpdateNode()` from `@real-router/sources` filters irrelevant changes |
-| JSON reference stabilization | `useStableValue`       | Ref-based: serialize once via key-order-insensitive `stableSerialize`, cache result, identity fallback on BigInt/circular |
-| Custom memo comparator       | `Link`                 | `areLinkPropsEqual`: deepEqual via `stableSerialize` for params/options, `===` for primitives + `style` + `children` |
-| Frozen singletons            | `constants.ts`         | `EMPTY_PARAMS`, `EMPTY_OPTIONS` avoid allocation for default props          |
-| WeakMap caching              | `@real-router/sources` | Per-router selector functions cached, auto-evicted on GC                    |
-| Memoized navigator           | `RouterProvider`       | `getNavigator(router)` via `useMemo` — stable reference                     |
+| Optimization                      | Location                | Mechanism                                                                                          |
+| --------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------- |
+| Node-scoped subscriptions         | `useRouteNode`          | Cached `createRouteNodeSource(router, nodeName)` — N consumers share one router subscription       |
+| Canonical params cache            | `useIsActiveRoute`      | `createActiveRouteSource` hashes params via `canonicalJson` — `{a:1,b:2}` ≡ `{b:2,a:1}`             |
+| Shared transition/error sources   | `useRouterTransition`, `useRouterError` | `getTransitionSource`/`getErrorSource` — one eager router subscription per router  |
+| Custom memo comparator            | `Link`                  | `areLinkPropsEqual`: `shallowEqual` (Object.is per key) for params/options, `===` for primitives   |
+| Frozen singletons                 | `constants.ts`          | `EMPTY_PARAMS`, `EMPTY_OPTIONS` avoid allocation for default props                                 |
+| WeakMap caching (sources level)   | `@real-router/sources`  | Per-router caches auto-evicted on router GC                                                        |
+| Memoized navigator                | `RouterProvider`        | `getNavigator(router)` via `useMemo` — stable reference                                            |
 
 ## Data Flow
 
@@ -220,13 +219,13 @@ tests/
 | Component / Hook        | What is verified                                                                                                                                                                                                                                                     |
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **RouterProvider**      | 1 mount per init; 1 re-render per navigation; memo'd children without context skip re-renders; RouterContext consumers skip re-renders (stable ref); RouteContext consumers re-render on navigation                                                                  |
-| **Link**                | 1 mount; memo skips parent re-renders; 100 links meet budget (100 mounts, 0 updates); active class toggles exactly 1 re-render; unrelated navigations skip re-render; `useStableValue` prevents re-render on identical inline objects                                |
+| **Link**                | 1 mount; memo skips parent re-renders; 100 links meet budget (100 mounts, 0 updates); active class toggles exactly 1 re-render; unrelated navigations skip re-render; shared cached `createActiveRouteSource` prevents re-renders on identical param shapes |
 | **RouteView**           | Sibling isolation (navigation doesn't re-render siblings); only matched child renders; keepAlive lazy activation (never-visited children have 0 renders); hidden keepAlive children don't re-render on sibling navigation; hide/show cycle meets ≤2 re-render budget |
 | **useRoute**            | Re-renders on every navigation (no filtering); linear render count (N navigations = N re-renders); stable navigator ref across re-renders                                                                                                                            |
 | **useRouteNode**        | Re-renders only when node activates/deactivates; skips unrelated navigations (0 re-renders); skips sibling node navigations; root node re-renders on all changes                                                                                                     |
 | **useRouterTransition** | Sync navigation: 0 extra re-renders (no TRANSITION_START); async navigation: exactly 2 re-renders per transition (start + end); N async transitions = 2N re-renders (linear scaling); `navigateToNotFound()` causes 0 re-renders; subscription lifecycle has no listener leak across mount/unmount cycles (H12 regression)                                     |
 | **useRouter / useNavigator / useRouteUtils** | Contract: 0 re-renders on any navigation (gotcha-locked tests); identity stable across rerenders; navigator method references stable; `useRouteUtils` returns same `RouteUtils` instance across renders (WeakMap cache) |
-| **useIsActiveRoute**    | Recreates source only when JSON-equal `routeParams` differ (key-order insensitive); re-renders only on active-state transition |
+| **useIsActiveRoute**    | Reuses cached source for canonical-equal `routeParams` (key-order insensitive via `canonicalJson`); re-renders only on active-state transition |
 | **structuralSharing**   | `BaseSource.getSnapshot()` returns same reference for path-stable navigations (no tearing) |
 
 ## Stress Test Coverage

@@ -27,7 +27,7 @@ real-router/
 │   ├── vue/                       # Vue 3 integration (composables, components, directives)
 │   ├── svelte/                    # Svelte 5 integration (composables, components, actions)
 │   ├── angular/                   # Angular 21+ integration (signals, inject* functions, components, directives, zoneless)
-│   ├── sources/                   # Subscription layer for UI bindings (useSyncExternalStore)
+│   ├── sources/                   # Subscription layer for UI bindings: cached getTransitionSource / getErrorSource, canonicalJson params
 │   ├── rx/                        # Reactive Observable API (state$, events$, operators)
 │   ├── browser-plugin/            # Browser History API synchronization
 │   ├── hash-plugin/               # Hash-based routing (#/path)

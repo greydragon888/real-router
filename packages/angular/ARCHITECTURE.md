@@ -132,11 +132,13 @@ injectNavigator()  — reads NAVIGATOR token → returns Navigator, never reacti
 ### Signal-Based (via sourceToSignal)
 
 ```
-injectRouteNode(name)       — createRouteNodeSource(router, name)    → RouteSignals
-injectRouterTransition()    — createTransitionSource(router)         → Signal<RouterTransitionSnapshot>
-injectIsActiveRoute(...)    — createActiveRouteSource(router, ...)   → Signal<boolean>
-provideRealRouter (ROUTE)   — createRouteSource(router)              → Signal<RouteSnapshot>
+injectRouteNode(name)       — cached createRouteNodeSource(router, name)    → RouteSignals
+injectRouterTransition()    — cached getTransitionSource(router)            → Signal<RouterTransitionSnapshot>
+injectIsActiveRoute(...)    — cached createActiveRouteSource(router, ...)   → Signal<boolean>
+provideRealRouter (ROUTE)   — createRouteSource(router)                     → Signal<RouteSnapshot>
 ```
+
+**`sourceToSignal.destroy()` safety:** `sourceToSignal` calls `source.destroy()` in `DestroyRef.onDestroy`. For cached sources from `@real-router/sources` (`getTransitionSource`, `getErrorSource`, cached `createRouteNodeSource`, cached `createActiveRouteSource`), the returned wrapper has a no-op `destroy()` — so multiple components can safely share the same cached source without tearing it down on the first unmount. For non-cached sources (`createRouteSource`, `createTransitionSource`, `createErrorSource` called directly), `destroy()` performs real teardown.
 
 ## Component Architecture
 
@@ -165,7 +167,7 @@ Template renders `<ng-container [ngTemplateOutlet]="activeTemplate()">` — only
 RouterErrorBoundary (@Component, selector: router-error-boundary)
 ├── errorTemplate = input<TemplateRef<ErrorContext>>()     # optional error template
 ├── onError = output<{ error, toRoute, fromRoute }>()      # event emitter
-├── snapshot = sourceToSignal(createErrorSource(router))   # Signal<RouterErrorSnapshot>
+├── snapshot = sourceToSignal(getErrorSource(router))      # Signal<RouterErrorSnapshot>, shared per-router
 ├── dismissedVersion = signal(-1)                          # tracks manually dismissed errors
 ├── visibleError = computed(() => snap.version > dismissedVersion ? snap.error : null)
 ├── errorContext = computed<ErrorContext>(() => ({ $implicit: error, resetError }))

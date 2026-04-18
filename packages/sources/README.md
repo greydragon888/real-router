@@ -38,13 +38,17 @@ const unsubscribe = source.subscribe(() => {
 
 ## Source Factories
 
-| Factory                                                 | Snapshot                                  | Updates when                                        |
-| ------------------------------------------------------- | ----------------------------------------- | --------------------------------------------------- |
-| `createRouteSource(router)`                             | `{ route, previousRoute }`                | Every navigation                                    |
-| `createRouteNodeSource(router, node)`                   | `{ route, previousRoute }`                | Only when node activates/deactivates                |
-| `createActiveRouteSource(router, name, params?, opts?)` | `boolean`                                 | Route active status changes                         |
-| `createTransitionSource(router)`                        | `{ isTransitioning, toRoute, fromRoute }` | Transition start/end/cancel/error                   |
-| `createErrorSource(router)`                             | `{ error, toRoute, fromRoute, version }`  | Navigation error (guard rejection, route not found) |
+| Factory                                                 | Snapshot                                  | Cache                                         |
+| ------------------------------------------------------- | ----------------------------------------- | --------------------------------------------- |
+| `createRouteSource(router)`                             | `{ route, previousRoute }`                | not cached                                    |
+| `createRouteNodeSource(router, node)`                   | `{ route, previousRoute }`                | per-router + per-nodeName                     |
+| `createActiveRouteSource(router, name, params?, opts?)` | `boolean`                                 | per-router + canonical-args                   |
+| `createTransitionSource(router)`                        | `{ isTransitioning, toRoute, fromRoute }` | not cached (advanced)                         |
+| `getTransitionSource(router)`                           | same as above                             | **per-router** — recommended for integrations |
+| `createErrorSource(router)`                             | `{ error, toRoute, fromRoute, version }`  | not cached (advanced)                         |
+| `getErrorSource(router)`                                | same as above                             | **per-router** — recommended for integrations |
+
+Plus utilities: `DEFAULT_ACTIVE_OPTIONS`, `normalizeActiveOptions(opts?)`, `canonicalJson(value)`.
 
 All factories return a `RouterSource<T>`:
 
@@ -52,15 +56,21 @@ All factories return a `RouterSource<T>`:
 interface RouterSource<T> {
   subscribe(listener: () => void): () => void; // useSyncExternalStore-compatible
   getSnapshot(): T; // current value, synchronous
-  destroy(): void; // teardown, remove router subscription
+  destroy(): void; // no-op for cached wrappers; real teardown for create*
 }
 ```
+
+### Cached vs non-cached factories
+
+Cached factories (`createRouteNodeSource`, `createActiveRouteSource`, `getTransitionSource`, `getErrorSource`) share a single source across all consumers of the same router. Multiple `subscribe`/`unsubscribe` pairs on the same instance share one router subscription. `destroy()` on the returned wrapper is a **no-op** — the underlying source lives as long as the router (the `WeakMap` entry releases on router GC).
+
+Non-cached factories (`createRouteSource`, `createTransitionSource`, `createErrorSource`) return a fresh instance every call with real teardown on `destroy()` — use when you need an isolated source.
 
 ### Lazy vs Eager Subscription
 
 - `createRouteSource`, `createRouteNodeSource`, `createActiveRouteSource` — **lazy**: subscribe to the router on first listener, unsubscribe when all removed
-- `createTransitionSource` — **eager**: subscribes immediately (needs to track `TRANSITION_START`)
-- `createErrorSource` — **eager**: subscribes immediately (needs to track `TRANSITION_ERROR`)
+- `createTransitionSource` / `getTransitionSource` — **eager**: subscribes immediately (needs to track `TRANSITION_START`)
+- `createErrorSource` / `getErrorSource` — **eager**: subscribes immediately (needs to track `TRANSITION_ERROR`)
 
 ### `createActiveRouteSource` Options
 
@@ -70,6 +80,8 @@ const source = createActiveRouteSource(router, "users", undefined, {
   ignoreQueryParams: true, // default: true
 });
 ```
+
+Params are hashed with `canonicalJson()`, so `{a: 1, b: 2}` and `{b: 2, a: 1}` hit the same cache entry. `BigInt`/`Symbol`/circular refs fall back to a fresh non-cached source.
 
 ## Usage Examples
 
@@ -106,9 +118,11 @@ unsubscribe(); // automatically unsubscribes from router
 ### Transition Tracking
 
 ```typescript
-import { createTransitionSource } from "@real-router/sources";
+import { getTransitionSource } from "@real-router/sources";
 
-const source = createTransitionSource(router);
+// getTransitionSource — per-router cached. Safe to call destroy() multiple
+// times; shared across all consumers in the same process.
+const source = getTransitionSource(router);
 
 source.subscribe(() => {
   const { isTransitioning, toRoute, fromRoute } = source.getSnapshot();
@@ -123,9 +137,9 @@ source.subscribe(() => {
 ### Error Tracking
 
 ```typescript
-import { createErrorSource } from "@real-router/sources";
+import { getErrorSource } from "@real-router/sources";
 
-const source = createErrorSource(router);
+const source = getErrorSource(router);
 
 source.subscribe(() => {
   const { error, toRoute } = source.getSnapshot();

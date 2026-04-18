@@ -70,7 +70,7 @@ src/
 | External store subscription | `useSyncExternalStore` (native)    | Custom polyfill (`useState` + `useEffect`) | `createSignalFromSource` (`createSignal` + `onCleanup`) | `useRefFromSource` (`shallowRef` + `onScopeDispose`) |
 | Hook/composable return      | Values (`RouteState`)              | Values (`RouteState`)                      | Accessors (`Accessor<RouteState>`)                      | `{ navigator, route: Ref, previousRoute: Ref }`      |
 | `memo()`                    | Required for optimization          | Required for optimization                  | Not needed — components run once                        | Not needed — Vue tracks ref dependencies             |
-| `useStableValue`            | JSON-based reference stabilization | JSON-based reference stabilization         | Not needed                                              | Not needed                                           |
+| Params stabilization        | `canonicalJson` in sources         | `canonicalJson` in sources                 | `canonicalJson` in sources                              | `canonicalJson` in sources                           |
 | Active class on Link        | `className` string concat          | `className` string concat                  | `classList` object                                      | `class` string concat                                |
 | `keepAlive` / Activity      | React 19.2+                        | Not available                              | Not available                                           | Vue native `<KeepAlive>` (all versions)              |
 | Context mechanism           | `createContext` + Provider         | `createContext` + Provider                 | `createContext` + Provider                              | `provide` / `inject` + `InjectionKey`                |
@@ -128,12 +128,14 @@ useNavigator()  — reads NavigatorKey → returns Navigator, never reactive
 ### Ref-Based (via useRefFromSource)
 
 ```
-useRouteNode(name)      — createRouteNodeSource(router, name)     → { navigator, route: ShallowRef, previousRoute: ShallowRef }
-useRouterTransition()   — createTransitionSource(router)          → ShallowRef<RouterTransitionSnapshot>
-useIsActiveRoute(...)   — createActiveRouteSource(router, ...)    → ShallowRef<boolean>
-useRouterError()  [internal]  — createErrorSource(router) with WeakMap cache
-RouterProvider          — createRouteSource(router)               → updates route/previousRoute ShallowRefs
+useRouteNode(name)      — cached createRouteNodeSource(router, name)     → { navigator, route: ShallowRef, previousRoute: ShallowRef }
+useRouterTransition()   — cached getTransitionSource(router)             → ShallowRef<RouterTransitionSnapshot>
+useIsActiveRoute(...)   — cached createActiveRouteSource(router, ...)    → ShallowRef<boolean>
+useRouterError()        — cached getErrorSource(router) [internal]
+RouterProvider          — createRouteSource(router)                      → updates route/previousRoute ShallowRefs
 ```
+
+All source caches live in `@real-router/sources` — no local WeakMaps in this adapter.
 
 ## Component Architecture
 
@@ -180,11 +182,11 @@ Vue's proxy-based reactivity eliminates most of the optimization work needed in 
 | Optimization              | React/Preact                        | Vue                                                            |
 | ------------------------- | ----------------------------------- | -------------------------------------------------------------- |
 | Prevent re-renders        | `memo()` + comparators              | Not needed — Vue tracks ref dependencies automatically         |
-| Stable object references  | `useStableValue` (JSON memoization) | Not needed — `shallowRef` tracks reference, not deep equality  |
+| Stable object references  | `canonicalJson` in sources          | Same — in `@real-router/sources`                               |
 | Stable callbacks          | `useCallback`                       | Not needed — closures are stable in setup()                    |
-| Node-scoped subscriptions | `shouldUpdateNode()` filter         | `shouldUpdateNode()` filter (same — in `@real-router/sources`) |
+| Node-scoped subscriptions | Cached `createRouteNodeSource`      | Same — in `@real-router/sources`                               |
+| Shared eager sources      | `getTransitionSource`/`getErrorSource` | Same — in `@real-router/sources`                            |
 | Frozen singletons         | `EMPTY_PARAMS`, `EMPTY_OPTIONS`     | Same — avoids allocation for default props                     |
-| WeakMap caching           | Per-router selector functions       | Same — in `@real-router/sources`                               |
 | keepAlive wrapper cache   | N/A                                 | `Map<string, Component>` per RouteView instance, `markRaw`     |
 
 The main performance primitive is `useRefFromSource`: it creates a `shallowRef` that only updates when the underlying source emits, and Vue's scheduler batches DOM updates automatically.

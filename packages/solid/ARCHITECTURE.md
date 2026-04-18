@@ -50,13 +50,12 @@ src/
 │   ├── useRouter.tsx           # Router + Navigator from context (never reactive)
 │   ├── useNavigator.tsx        # Navigator from context (never reactive)
 │   ├── useRoute.tsx            # Full route state Accessor from context (every navigation)
-│   ├── useRouteNode.tsx        # Node-scoped subscription via createSignalFromSource
-│   ├── useRouteNodeStore.tsx   # Same node-scoped subscription, store-based
+│   ├── useRouteNode.tsx        # Node-scoped subscription (cached createRouteNodeSource from sources)
+│   ├── useRouteNodeStore.tsx   # Same cached node source, store-based
 │   ├── useRouteStore.tsx       # Full route state as store (reconcile)
 │   ├── useRouteUtils.tsx       # RouteUtils from route tree (never reactive)
-│   ├── useRouterTransition.tsx # Transition lifecycle Accessor (isTransitioning, toRoute, fromRoute)
-│   ├── useRouterError.tsx      # Internal — error subscription (used by RouterErrorBoundary)
-│   └── sharedNodeSource.ts     # Shared WeakMap cache for createRouteNodeSource (used by useRouteNode + useRouteNodeStore)
+│   ├── useRouterTransition.tsx # Transition lifecycle (cached getTransitionSource)
+│   └── useRouterError.tsx      # Internal — error subscription (cached getErrorSource)
 └── components/
     ├── Link.tsx                # Reactive link with classList-based active state
     ├── RouterErrorBoundary.tsx  # Declarative navigation error handling
@@ -78,7 +77,7 @@ src/
 | Props access                | Destructure freely                 | Destructure freely                         | Never destructure — use getters                         |
 | `memo()`                    | Required for optimization          | Required for optimization                  | Not needed — components run once                        |
 | `useCallback`               | Required for stable refs           | Required for stable refs                   | Not needed — no re-renders                              |
-| `useStableValue`            | JSON-based reference stabilization | JSON-based reference stabilization         | Not needed — signals track dependencies                 |
+| Params stabilization        | `canonicalJson` in sources         | `canonicalJson` in sources                 | `canonicalJson` in sources                              |
 | Active class on Link        | `className` string concat          | `className` string concat                  | `classList` object                                      |
 | `keepAlive` / Activity      | React 19.2+                        | Not available                              | Not available                                           |
 | Entry points                | Main + Legacy                      | Single                                     | Single                                                  |
@@ -129,27 +128,27 @@ useNavigator()  — reads RouterContext → returns Navigator, never reactive
 ### Signal-Based (via createSignalFromSource)
 
 ```
-useRouteNode(name)            — createRouteNodeSource(router, name)     → Accessor<RouteState>            [WeakMap cached]
-useRouteNodeStore(name)       — createRouteNodeSource(router, name)     → Store<RouteState>               [WeakMap cached]
-useRouterTransition()         — createTransitionSource(router)          → Accessor<RouterTransitionSnapshot> [WeakMap cached]
-useRouterError()  [internal]  — createErrorSource(router)               → Accessor<RouterErrorSnapshot>   [WeakMap cached]
-Link (slow path, internal)    — createActiveRouteSource(router, ...)    → Accessor<boolean>               [WeakMap cached]
-RouterProvider                — createRouteSource(router)               → Accessor<RouteState>
+useRouteNode(name)            — cached createRouteNodeSource(router, name)   → Accessor<RouteState>
+useRouteNodeStore(name)       — cached createRouteNodeSource(router, name)   → Store<RouteState>
+useRouterTransition()         — cached getTransitionSource(router)           → Accessor<RouterTransitionSnapshot>
+useRouterError()  [internal]  — cached getErrorSource(router)                → Accessor<RouterErrorSnapshot>
+Link (slow path, internal)    — cached createActiveRouteSource(router, ...)  → Accessor<boolean>
+RouterProvider                — createRouteSource(router)                    → Accessor<RouteState>
 ```
 
-### WeakMap Source Cache
+### Per-Router Source Cache (in @real-router/sources)
 
-Source instances are shared per-router via module-level `WeakMap` caches. N consumers of `useRouteNode("users")` on the same router share ONE source — one router subscription, not N. Detailed cache shapes:
+All caches live inside `@real-router/sources` — no local WeakMaps in this adapter. N consumers of `useRouteNode("users")` on the same router share ONE source — one router subscription, not N.
 
-| Hook / Component          | Cache shape                                                       | Rationale                                                                                                                                                       |
-| ------------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `useRouteNode(name)`      | `WeakMap<Router, Map<nodeName, RouterSource<RouteNodeSnapshot>>>` | Shared subscription per (router, nodeName)                                                                                                                      |
-| `useRouteNodeStore(name)` | `WeakMap<Router, Map<nodeName, RouterSource<RouteNodeSnapshot>>>` | Same cache shape as useRouteNode                                                                                                                                |
-| `useRouterTransition()`   | `WeakMap<Router, RouterSource<RouterTransitionSnapshot>>`         | One eager source per router                                                                                                                                     |
-| `useRouterError()`        | `WeakMap<Router, RouterSource<RouterErrorSnapshot>>`              | One eager source per router                                                                                                                                     |
-| Link (slow path)          | `WeakMap<Router, Map<compositeKey, RouterSource<boolean>>>`       | `compositeKey = ${routeName}\|${JSON.stringify(routeParams)}\|${activeStrict}\|${ignoreQueryParams}` — stable because slow-path props are captured at Link init |
+| Hook / Component          | Source factory                                         | Cache key                                                        |
+| ------------------------- | ------------------------------------------------------ | ---------------------------------------------------------------- |
+| `useRouteNode(name)`      | `createRouteNodeSource(router, nodeName)`              | `(router, nodeName)`                                             |
+| `useRouteNodeStore(name)` | `createRouteNodeSource(router, nodeName)`              | `(router, nodeName)`                                             |
+| `useRouterTransition()`   | `getTransitionSource(router)`                          | `(router)`                                                       |
+| `useRouterError()`        | `getErrorSource(router)`                               | `(router)`                                                       |
+| Link (slow path)          | `createActiveRouteSource(router, name, params, opts)`  | `(router, name, canonicalJson(params), strict, ignoreQueryParams)` — key-order-insensitive |
 
-Routers are used as WeakMap keys, so per-router state is released automatically when the router is GC'd — no explicit teardown needed. Lazy sources (`createRouteNodeSource`, `createActiveRouteSource`, `createRouteSource`) disconnect from the router when their last listener unsubscribes; upon re-subscription, they reconcile their snapshot so signals never observe stale values (enforced by `createSignalFromSource` re-reading `getSnapshot()` after subscribe).
+Routers are WeakMap keys, so per-router state is released automatically when the router is GC'd — no explicit teardown needed. Lazy sources disconnect from the router when their last listener unsubscribes; upon re-subscription, they reconcile their snapshot so signals never observe stale values (enforced by `createSignalFromSource` re-reading `getSnapshot()` after subscribe).
 
 ## Component Architecture
 
@@ -190,14 +189,14 @@ RouteView
 
 Solid's fine-grained reactivity eliminates most of the optimization work needed in React/Preact:
 
-| Optimization              | React/Preact                        | Solid                                                          |
-| ------------------------- | ----------------------------------- | -------------------------------------------------------------- |
-| Prevent re-renders        | `memo()` + comparators              | Not needed — components run once                               |
-| Stable object references  | `useStableValue` (JSON memoization) | Not needed — signals track dependencies, not object identity   |
-| Stable callbacks          | `useCallback`                       | Not needed — closures are stable                               |
-| Node-scoped subscriptions | `shouldUpdateNode()` filter         | `shouldUpdateNode()` filter (same — in `@real-router/sources`) |
-| Frozen singletons         | `EMPTY_PARAMS`, `EMPTY_OPTIONS`     | Same — avoids allocation for default props                     |
-| WeakMap caching           | Per-router selector functions       | Same — in `@real-router/sources`                               |
+| Optimization              | React/Preact                                  | Solid                                                          |
+| ------------------------- | --------------------------------------------- | -------------------------------------------------------------- |
+| Prevent re-renders        | `memo()` + comparators                        | Not needed — components run once                               |
+| Stable object references  | `canonicalJson` in sources (params)           | Same — in `@real-router/sources`                               |
+| Stable callbacks          | `useCallback`                                 | Not needed — closures are stable                               |
+| Node-scoped subscriptions | `shouldUpdateNode()` filter                   | Same — in `@real-router/sources`                               |
+| Shared source cache       | Cached factories (per-router)                 | Same — in `@real-router/sources`                               |
+| Frozen singletons         | `EMPTY_PARAMS`, `EMPTY_OPTIONS`               | Same — avoids allocation for default props                     |
 
 The main performance primitive is `createSignalFromSource`: it creates a signal that only updates when the underlying source emits, and Solid's scheduler batches DOM updates automatically.
 
