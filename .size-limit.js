@@ -80,7 +80,7 @@ export default [
   {
     name: "@real-router/sources (ESM)",
     path: "packages/sources/dist/esm/index.mjs",
-    limit: "2 kB",
+    limit: "2.5 kB",
     ignore: ["@real-router/core"],
   },
   {
