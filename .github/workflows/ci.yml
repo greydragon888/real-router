@@ -275,7 +275,10 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      # ── PR sizes: reuse dist artifacts from pipeline job ──
+      # ── PR sizes: start from pipeline's dist artifact (affected + upstream),
+      #    then fill in non-affected packages from turbo remote cache so
+      #    size-limit sees every dist/. Symmetric with the base-branch step
+      #    below (`pnpm turbo run bundle --filter='./packages/*'`).
       - name: Checkout PR
         uses: actions/checkout@v6
 
@@ -296,6 +299,12 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # Fill in dist/ for packages that pipeline skipped (non-affected).
+      # Affected packages already have dist from the downloaded artifact;
+      # everything else is a turbo remote-cache hit.
+      - name: Bundle remaining packages (cache-hit for non-affected)
+        run: pnpm turbo run bundle --filter='./packages/*'
 
       - name: Get PR sizes
         id: pr_sizes

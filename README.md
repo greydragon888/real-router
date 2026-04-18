@@ -81,14 +81,14 @@ const routes = [
     name: "users",
     path: "/users",
     canActivate: authGuard,
-    onEnter: (state) => {
+    onNavigate: (state) => {
       store.users.load(state.params);
     },
     children: [
       {
         name: "profile",
         path: "/:id",
-        onEnter: (state) => {
+        onNavigate: (state) => {
           document.title = `User ${state.params.id}`;
           store.users.loadOne(state.params.id);
         },
@@ -210,19 +210,21 @@ The Segment Trie matcher traverses in O(segments), not O(routes).
 | --------- | ------------------ |
 | React     | **~14× faster**    |
 | Solid     | **~13× faster**    |
-| Vue       |  **~2.3× faster**  |
+| Vue       | **~2.3× faster**   |
 
 **Memory per navigation** (relative to TanStack Router, lower is better):
 
-| Framework | vs TanStack Router           |
-| --------- | ---------------------------- |
-| React     | **~9.5× fewer allocations**  |
-| Solid     | **~7.7× fewer allocations**  |
-| Vue       | **~2.3× fewer allocations**  |
+| Framework | vs TanStack Router          |
+| --------- | --------------------------- |
+| React     | **~9.5× fewer allocations** |
+| Solid     | **~7.7× fewer allocations** |
+| Vue       | **~2.3× fewer allocations** |
 
-> Benchmark: [benchmarks/vs-tanstack](benchmarks/vs-tanstack) — identical workload, JSDOM, Vite production build, `--expose-gc`. Absolute hz/heap numbers are machine-dependent; ratios reported here are stable across runs. Full report with raw numbers: [2026-04-18-report.md](benchmarks/.bench-results/vs-tanstack/2026-04-18-report.md).
+> Benchmark: [benchmarks/vs-tanstack](benchmarks/vs-tanstack) — identical workload, JSDOM, Vite production build, `--expose-gc`. Absolute hz/heap numbers are machine-dependent; ratios reported here are stable across runs.
 >
-> **Note on Vue:** the smaller speed ratio (~2.3× vs ~14×/13× for React/Solid) reflects Vue runtime overhead, not router overhead. On this workload (44 route-state subscribers rendering `null`) Vue proxy access + scheduler dominate navigation time for both routers. Three targeted Vue-adapter rewrites were attempted and reverted after measuring only noise-level gains — see [packages/vue/ARCHITECTURE.md § Vue Runtime Floor](packages/vue/ARCHITECTURE.md#vue-runtime-floor-vs-tanstack-benchmark).
+> **Note on Vue:** the smaller speed ratio (~2.3× vs ~14×/13× for React/Solid) reflects Vue runtime overhead, not router overhead. \
+> On this workload (44 route-state subscribers rendering `null`) Vue proxy access + scheduler dominate navigation time for both routers. \
+> Three targeted Vue-adapter rewrites were attempted and reverted after measuring only noise-level gains — see [Vue Runtime Floor](packages/vue/ARCHITECTURE.md#vue-runtime-floor-vs-tanstack-benchmark).
 
 <details>
 <summary><b>Benchmarks vs router5 and router6 (core-level)</b></summary>
@@ -301,17 +303,21 @@ await router.navigate("users.profile", { id: "123" });
 > router.usePlugin(browserPluginFactory(), __DEV__ && validationPlugin());
 > ```
 
-> **Route-level lifecycle hooks:** add [`@real-router/lifecycle-plugin`](https://www.npmjs.com/package/@real-router/lifecycle-plugin) to attach `onEnter`, `onStay`, `onLeave` callbacks directly to route definitions — no `subscribe()` boilerplate:
+> **Route-level lifecycle hooks:** add [`@real-router/lifecycle-plugin`](https://www.npmjs.com/package/@real-router/lifecycle-plugin) to attach `onNavigate`, `onEnter`, `onStay`, `onLeave` callbacks directly to route definitions — no `subscribe()` boilerplate:
 >
 > ```typescript
 > import { lifecyclePluginFactory } from "@real-router/lifecycle-plugin";
 >
 > const routes = [
->   { name: "home", path: "/", onLeave: () => cleanup() },
+>   {
+>     name: "home",
+>     path: "/",
+>     onLeave: () => cleanup(),
+>   },
 >   {
 >     name: "users.view",
 >     path: "/users/:id",
->     onEnter: (s) => track(s.params.id),
+>     onNavigate: (s) => track(s.params.id),
 >   },
 > ];
 >
@@ -372,28 +378,28 @@ function App() {
 
 ### Plugins
 
-| Package                                                                      | Version                                                                                                                                                                 | Description                                      |
-| ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| [`@real-router/browser-plugin`](packages/browser-plugin)                     | [![npm](https://img.shields.io/npm/v/@real-router/browser-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/browser-plugin)                     | Browser History API and URL synchronization      |
-| [`@real-router/navigation-plugin`](packages/navigation-plugin)               | [![npm](https://img.shields.io/npm/v/@real-router/navigation-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/navigation-plugin)               | Navigation API integration + route-level history |
-| [`@real-router/memory-plugin`](packages/memory-plugin)                       | [![npm](https://img.shields.io/npm/v/@real-router/memory-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/memory-plugin)                       | In-memory history: back/forward/go (no DOM)      |
-| [`@real-router/hash-plugin`](packages/hash-plugin)                           | [![npm](https://img.shields.io/npm/v/@real-router/hash-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/hash-plugin)                           | Hash-based routing (`#/path`)                    |
-| [`@real-router/logger-plugin`](packages/logger-plugin)                       | [![npm](https://img.shields.io/npm/v/@real-router/logger-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/logger-plugin)                       | Development logging with transition tracking     |
-| [`@real-router/persistent-params-plugin`](packages/persistent-params-plugin) | [![npm](https://img.shields.io/npm/v/@real-router/persistent-params-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/persistent-params-plugin) | Parameter persistence across navigations         |
-| [`@real-router/ssr-data-plugin`](packages/ssr-data-plugin)                   | [![npm](https://img.shields.io/npm/v/@real-router/ssr-data-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/ssr-data-plugin)                   | SSR per-route data loading via interceptor       |
-| [`@real-router/lifecycle-plugin`](packages/lifecycle-plugin)                 | [![npm](https://img.shields.io/npm/v/@real-router/lifecycle-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/lifecycle-plugin)                 | Route-level hooks: onEnter, onStay, onLeave      |
-| [`@real-router/preload-plugin`](packages/preload-plugin)                     | [![npm](https://img.shields.io/npm/v/@real-router/preload-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/preload-plugin)                     | Preload on navigation intent (hover, touch)      |
-| [`@real-router/validation-plugin`](packages/validation-plugin)               | [![npm](https://img.shields.io/npm/v/@real-router/validation-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/validation-plugin)               | Runtime argument validation for development      |
-| [`@real-router/search-schema-plugin`](packages/search-schema-plugin)         | [![npm](https://img.shields.io/npm/v/@real-router/search-schema-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/search-schema-plugin)         | Search param validation via Standard Schema      |
+| Package                                                                      | Version                                                                                                                                                                 | Description                                             |
+| ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| [`@real-router/browser-plugin`](packages/browser-plugin)                     | [![npm](https://img.shields.io/npm/v/@real-router/browser-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/browser-plugin)                     | Browser History API and URL synchronization             |
+| [`@real-router/navigation-plugin`](packages/navigation-plugin)               | [![npm](https://img.shields.io/npm/v/@real-router/navigation-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/navigation-plugin)               | Navigation API integration + route-level history        |
+| [`@real-router/memory-plugin`](packages/memory-plugin)                       | [![npm](https://img.shields.io/npm/v/@real-router/memory-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/memory-plugin)                       | In-memory history: back/forward/go (no DOM)             |
+| [`@real-router/hash-plugin`](packages/hash-plugin)                           | [![npm](https://img.shields.io/npm/v/@real-router/hash-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/hash-plugin)                           | Hash-based routing (`#/path`)                           |
+| [`@real-router/logger-plugin`](packages/logger-plugin)                       | [![npm](https://img.shields.io/npm/v/@real-router/logger-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/logger-plugin)                       | Development logging with transition tracking            |
+| [`@real-router/persistent-params-plugin`](packages/persistent-params-plugin) | [![npm](https://img.shields.io/npm/v/@real-router/persistent-params-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/persistent-params-plugin) | Parameter persistence across navigations                |
+| [`@real-router/ssr-data-plugin`](packages/ssr-data-plugin)                   | [![npm](https://img.shields.io/npm/v/@real-router/ssr-data-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/ssr-data-plugin)                   | SSR per-route data loading via interceptor              |
+| [`@real-router/lifecycle-plugin`](packages/lifecycle-plugin)                 | [![npm](https://img.shields.io/npm/v/@real-router/lifecycle-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/lifecycle-plugin)                 | Route-level hooks: onNavigate, onEnter, onStay, onLeave |
+| [`@real-router/preload-plugin`](packages/preload-plugin)                     | [![npm](https://img.shields.io/npm/v/@real-router/preload-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/preload-plugin)                     | Preload on navigation intent (hover, touch)             |
+| [`@real-router/validation-plugin`](packages/validation-plugin)               | [![npm](https://img.shields.io/npm/v/@real-router/validation-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/validation-plugin)               | Runtime argument validation for development             |
+| [`@real-router/search-schema-plugin`](packages/search-schema-plugin)         | [![npm](https://img.shields.io/npm/v/@real-router/search-schema-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/search-schema-plugin)         | Search param validation via Standard Schema             |
 
 ### Utilities
 
-| Package                                            | Version                                                                                                                                       | Description                                                                  |
-| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Package                                            | Version                                                                                                                                       | Description                                                                                                                                                              |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | [`@real-router/sources`](packages/sources)         | [![npm](https://img.shields.io/npm/v/@real-router/sources.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/sources)         | Reactive subscription sources for UI bindings — per-router cached `getTransitionSource` / `createDismissableError` / `createActiveNameSelector` + canonical params cache |
-| [`@real-router/rx`](packages/rx)                   | [![npm](https://img.shields.io/npm/v/@real-router/rx.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/rx)                   | Observable API: `state$`, `events$`, operators, TC39 Observable              |
-| [`@real-router/route-utils`](packages/route-utils) | [![npm](https://img.shields.io/npm/v/@real-router/route-utils.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/route-utils) | Route tree queries: `getRouteUtils`, segment testers, `areRoutesRelated`     |
-| [`@real-router/logger`](packages/logger)           | [![npm](https://img.shields.io/npm/v/@real-router/logger.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/logger)           | Structured logging utility                                                   |
+| [`@real-router/rx`](packages/rx)                   | [![npm](https://img.shields.io/npm/v/@real-router/rx.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/rx)                   | Observable API: `state$`, `events$`, operators, TC39 Observable                                                                                                          |
+| [`@real-router/route-utils`](packages/route-utils) | [![npm](https://img.shields.io/npm/v/@real-router/route-utils.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/route-utils) | Route tree queries: `getRouteUtils`, segment testers, `areRoutesRelated`                                                                                                 |
+| [`@real-router/logger`](packages/logger)           | [![npm](https://img.shields.io/npm/v/@real-router/logger.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/logger)           | Structured logging utility                                                                                                                                               |
 
 ## Documentation
 
