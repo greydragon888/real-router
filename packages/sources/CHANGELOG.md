@@ -1,5 +1,13 @@
 # @real-router/sources
 
+## 0.7.0
+
+### Minor Changes
+
+- [#479](https://github.com/greydragon888/real-router/pull/479) [`1107380`](https://github.com/greydragon888/real-router/commit/11073804666e724008847c6b34b20b445f1d6f39) Thanks [@greydragon888](https://github.com/greydragon888)! - Add optional generic parameter to `RouteSnapshot<P>` / `RouteNodeSnapshot<P>` ([#464](https://github.com/greydragon888/real-router/issues/464))
+
+  Both snapshot types now accept an optional generic for typed `route.params`, defaulting to `Params` for full backward compatibility. Enables adapter-level propagation in `injectRoute<P>()` and similar hooks without a framework-specific snapshot shape.
+
 ## 0.6.0
 
 ### Minor Changes

@@ -7,6 +7,138 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-04-18]
 
+### @real-router/angular@0.2.0
+
+### Minor Changes
+
+- [#479](https://github.com/greydragon888/real-router/pull/479) [`1107380`](https://github.com/greydragon888/real-router/commit/11073804666e724008847c6b34b20b445f1d6f39) Thanks [@greydragon888](https://github.com/greydragon888)! - Add generic type parameter to `injectRoute<P>()` / `RouteSignals<P>` ([#464](https://github.com/greydragon888/real-router/issues/464))
+
+  `injectRoute<P>()` now accepts an optional generic so `routeState().route?.params` is typed without `as` casts. `RouteSignals<P>` is likewise generic, defaulting to `Params`. Runtime is unchanged — the cast happens once inside the function.
+
+  ```typescript
+  type SearchParams = { q: string; sort: string } & Params;
+
+  const route = injectRoute<SearchParams>();
+  const q = route.routeState().route?.params.q; // typed as string
+  ```
+
+### Patch Changes
+
+- Updated dependencies [[`1107380`](https://github.com/greydragon888/real-router/commit/11073804666e724008847c6b34b20b445f1d6f39)]:
+  - @real-router/sources@0.7.0
+
+### @real-router/preact@0.5.0
+
+### Minor Changes
+
+- [#479](https://github.com/greydragon888/real-router/pull/479) [`1107380`](https://github.com/greydragon888/real-router/commit/11073804666e724008847c6b34b20b445f1d6f39) Thanks [@greydragon888](https://github.com/greydragon888)! - Add generic type parameter to `useRoute<P>()` / `RouteContext<P>` ([#464](https://github.com/greydragon888/real-router/issues/464))
+
+  `useRoute<P>()` now accepts an optional generic so `route.params` is typed without `as` casts at the call site. The generic is erased at compile time — no runtime change. `RouteContext<P>` is likewise generic, defaulting to `Params`.
+
+  ```typescript
+  type SearchParams = { q: string; sort: string } & Params;
+
+  const { route } = useRoute<SearchParams>();
+
+  route?.params.q; // typed as string — no cast needed
+  ```
+
+### Patch Changes
+
+- Updated dependencies [[`1107380`](https://github.com/greydragon888/real-router/commit/11073804666e724008847c6b34b20b445f1d6f39)]:
+  - @real-router/sources@0.7.0
+
+### @real-router/react@0.17.0
+
+### Minor Changes
+
+- [#479](https://github.com/greydragon888/real-router/pull/479) [`1107380`](https://github.com/greydragon888/real-router/commit/11073804666e724008847c6b34b20b445f1d6f39) Thanks [@greydragon888](https://github.com/greydragon888)! - Add generic type parameter to `useRoute<P>()` / `RouteContext<P>` ([#464](https://github.com/greydragon888/real-router/issues/464))
+
+  `useRoute<P>()` now accepts an optional generic so `route.params` is typed without `as` casts at the call site. The generic is erased at compile time — no runtime change. `RouteContext<P>` is likewise generic, defaulting to `Params`.
+
+  ```typescript
+  type SearchParams = { q: string; sort: string } & Params;
+
+  const { route } = useRoute<SearchParams>();
+
+  route?.params.q; // typed as string — no cast needed
+  route?.params.sort; // typed as string
+  ```
+
+### Patch Changes
+
+- Updated dependencies [[`1107380`](https://github.com/greydragon888/real-router/commit/11073804666e724008847c6b34b20b445f1d6f39)]:
+  - @real-router/sources@0.7.0
+
+### @real-router/solid@0.5.0
+
+### Minor Changes
+
+- [#479](https://github.com/greydragon888/real-router/pull/479) [`1107380`](https://github.com/greydragon888/real-router/commit/11073804666e724008847c6b34b20b445f1d6f39) Thanks [@greydragon888](https://github.com/greydragon888)! - Add generic type parameter to `useRoute<P>()` ([#464](https://github.com/greydragon888/real-router/issues/464))
+
+  `useRoute<P>()` now accepts an optional generic so `route.params` is typed without `as` casts at the call site. Returns `Accessor<RouteState<P>>`. The generic is erased at compile time — no runtime change.
+
+  ```typescript
+  type SearchParams = { q: string; sort: string } & Params;
+
+  const routeState = useRoute<SearchParams>();
+  const q = routeState().route?.params.q; // typed as string
+  ```
+
+### Patch Changes
+
+- Updated dependencies [[`1107380`](https://github.com/greydragon888/real-router/commit/11073804666e724008847c6b34b20b445f1d6f39)]:
+  - @real-router/sources@0.7.0
+
+### @real-router/sources@0.7.0
+
+### Minor Changes
+
+- [#479](https://github.com/greydragon888/real-router/pull/479) [`1107380`](https://github.com/greydragon888/real-router/commit/11073804666e724008847c6b34b20b445f1d6f39) Thanks [@greydragon888](https://github.com/greydragon888)! - Add optional generic parameter to `RouteSnapshot<P>` / `RouteNodeSnapshot<P>` ([#464](https://github.com/greydragon888/real-router/issues/464))
+
+  Both snapshot types now accept an optional generic for typed `route.params`, defaulting to `Params` for full backward compatibility. Enables adapter-level propagation in `injectRoute<P>()` and similar hooks without a framework-specific snapshot shape.
+
+### @real-router/svelte@0.4.0
+
+### Minor Changes
+
+- [#479](https://github.com/greydragon888/real-router/pull/479) [`1107380`](https://github.com/greydragon888/real-router/commit/11073804666e724008847c6b34b20b445f1d6f39) Thanks [@greydragon888](https://github.com/greydragon888)! - Add generic type parameter to `useRoute<P>()` / `RouteContext<P>` ([#464](https://github.com/greydragon888/real-router/issues/464))
+
+  `useRoute<P>()` now accepts an optional generic so `route.current?.params` is typed without `as` casts. `RouteContext<P>` is likewise generic, defaulting to `Params`. Runtime is unchanged — the cast happens once inside the composable.
+
+  ```typescript
+  type SearchParams = { q: string; sort: string } & Params;
+
+  const { route } = useRoute<SearchParams>();
+  const q = route.current?.params.q; // typed as string
+  ```
+
+### Patch Changes
+
+- Updated dependencies [[`1107380`](https://github.com/greydragon888/real-router/commit/11073804666e724008847c6b34b20b445f1d6f39)]:
+  - @real-router/sources@0.7.0
+
+### @real-router/vue@0.6.0
+
+### Minor Changes
+
+- [#479](https://github.com/greydragon888/real-router/pull/479) [`1107380`](https://github.com/greydragon888/real-router/commit/11073804666e724008847c6b34b20b445f1d6f39) Thanks [@greydragon888](https://github.com/greydragon888)! - Add generic type parameter to `useRoute<P>()` / `RouteContext<P>` ([#464](https://github.com/greydragon888/real-router/issues/464))
+
+  `useRoute<P>()` now accepts an optional generic so `route.value?.params` is typed without `as` casts. `RouteContext<P>` is likewise generic, defaulting to `Params`. Runtime is unchanged — the cast happens once inside the composable.
+
+  ```typescript
+  type SearchParams = { q: string; sort: string } & Params;
+
+  const { route } = useRoute<SearchParams>();
+  const q = route.value?.params.q; // typed as string
+  ```
+
+### Patch Changes
+
+- Updated dependencies [[`1107380`](https://github.com/greydragon888/real-router/commit/11073804666e724008847c6b34b20b445f1d6f39)]:
+  - @real-router/sources@0.7.0
+
+
 ### @real-router/lifecycle-plugin@0.4.0
 
 ### Minor Changes
