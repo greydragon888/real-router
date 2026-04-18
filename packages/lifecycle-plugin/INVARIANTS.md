@@ -25,6 +25,15 @@
 | 1   | `onStay` fires when params change on the same route     | Navigating to the same route with different params calls `onStay` exactly once. Confirms that same-route param changes are correctly classified as "stay" events.                             |
 | 2   | `onStay` does not fire when route changes               | Navigating to a different route does not call `onStay`. Prevents false stay events on cross-route transitions.                                                                               |
 
+## Hook Dispatch — onNavigate
+
+| #   | Invariant                                                       | Description                                                                                                                                                                                  |
+| --- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `onNavigate` fires on entry regardless of `onEnter`             | Navigating to a target that declares `onNavigate` calls it exactly once on entry. Fires alongside `onEnter` when both are defined — hooks are orthogonal.                                    |
+| 2   | `onNavigate` fires on param-change regardless of `onStay`       | Navigating to the same route with different params calls `onNavigate` exactly once. Fires alongside `onStay` when both are defined — hooks are orthogonal.                                   |
+| 3   | `onEnter` and `onNavigate` both fire on entry when both defined | Each hook fires based on its own condition — declaring `onEnter` does not silence `onNavigate`. Enables hybrid declarations (entry-specific setup + shared navigation logic).               |
+| 4   | `onStay` and `onNavigate` both fire on param-change when both defined | Each hook fires based on its own condition — declaring `onStay` does not silence `onNavigate`. Enables hybrid declarations (stay-specific update + shared navigation logic).             |
+
 ## Hook Ordering
 
 | #   | Invariant                                               | Description                                                                                                                                                                                  |
@@ -54,4 +63,4 @@
 
 | File                                          | Invariants | Category                                                     |
 | --------------------------------------------- | ---------- | ------------------------------------------------------------ |
-| `tests/property/lifecycle.properties.ts`      | 13         | onEnter dispatch, onLeave dispatch, onStay dispatch, ordering, teardown, mutual exclusion, compilation |
+| `tests/property/lifecycle.properties.ts`      | 17         | onEnter dispatch, onLeave dispatch, onStay dispatch, onNavigate dispatch + orthogonality, ordering, teardown, mutual exclusion, compilation |

@@ -4,7 +4,7 @@
 
 ## Overview
 
-`@real-router/lifecycle-plugin` is a **route-level lifecycle hooks plugin** for the router. It adds `onEnter`, `onStay`, `onLeave` callbacks to route definitions — declarative side-effects that fire on navigation events.
+`@real-router/lifecycle-plugin` is a **route-level lifecycle hooks plugin** for the router. It adds `onEnter`, `onStay`, `onLeave`, `onNavigate` callbacks to route definitions — declarative side-effects that fire on navigation events.
 
 **Key role:** Bridges the gap between global plugin hooks (fire for every transition) and route guards (control flow). Lifecycle hooks are per-route side-effects — analytics, data prefetch, cleanup — without `subscribe()` boilerplate.
 
@@ -60,12 +60,16 @@ onTransitionSuccess(toState, fromState)
     ├── toState.name === fromState.name?
     │   ├── YES → compileHook("onStay", "users.view") → call if resolved
     │   └── NO  → compileHook("onEnter", "users.view") → call if resolved
+    │
+    └── compileHook("onNavigate", "users.view") → call if resolved (orthogonal — always consulted)
 ```
+
+`onNavigate` fires independently of `onEnter` / `onStay` — if both are defined, both fire. Each hook is dispatched based on its own condition.
 
 ### Lazy Compile + Cache Pattern
 
 ```typescript
-compileHook(hookName: "onEnter" | "onStay" | "onLeave", routeName: string)
+compileHook(hookName: "onEnter" | "onStay" | "onLeave" | "onNavigate", routeName: string)
     │
     ├── Cache key: `${hookName}:${routeName}`
     │
@@ -89,7 +93,7 @@ Cost: one `getRouteConfig()` call per hook invocation (simple property lookup on
 
 ### Route Custom Fields
 
-Custom fields are extracted automatically by core's `registerSingleRouteHandlers` in `routesStore.ts`. Standard fields (`name`, `path`, `children`, `canActivate`, `canDeactivate`, `forwardTo`, `encodeParams`, `decodeParams`, `defaultParams`) are excluded. Everything else — including `onEnter`, `onStay`, `onLeave` — lands in `routeCustomFields[routeName]`.
+Custom fields are extracted automatically by core's `registerSingleRouteHandlers` in `routesStore.ts`. Standard fields (`name`, `path`, `children`, `canActivate`, `canDeactivate`, `forwardTo`, `encodeParams`, `decodeParams`, `defaultParams`) are excluded. Everything else — including `onEnter`, `onStay`, `onLeave`, `onNavigate` — lands in `routeCustomFields[routeName]`.
 
 ## Design Decisions
 
@@ -108,6 +112,22 @@ Hooks fire only for `toState.name` / `fromState.name`, not for all segments in `
 - Simpler mental model — one route, one hook call
 - No loops, no Set allocations — just a property lookup
 - Parent route hooks would fire on every child navigation, which is rarely desired
+
+### Why `onNavigate` is orthogonal, not a fallback
+
+`onNavigate` covers the most common pattern: run the same side-effect whenever the route is the navigation target (data loading, analytics, UI reset). Two design options were considered:
+
+1. **Orthogonal** — fire `onNavigate` on every success, independently of `onEnter` / `onStay`.
+2. **Fallback** — fire `onNavigate` only when the case-specific hook (`onEnter` or `onStay`) is absent for the current case.
+
+The orthogonal design wins:
+
+- **Matches the real-world hybrid example.** Chat route: `onEnter` connects the WebSocket, `onNavigate` loads messages. Under fallback semantics, `onNavigate` would not fire on entry (since `onEnter` is defined), forcing the user to duplicate `loadMessages` inside `onEnter` — exactly the duplication `onNavigate` was introduced to eliminate.
+- **Mirrors global plugin hooks.** `onTransitionStart` and `onTransitionSuccess` coexist — neither silences the other. Route-level hooks follow the same model.
+- **Simpler mental model.** Each hook fires based on its own condition. No priority rules, no fallback chains, no hidden interactions.
+- **Composable.** Declaring `onEnter` alongside `onNavigate` cannot silently break the latter during refactors.
+
+The only failure mode of orthogonal dispatch is the user declaring the same function in both `onEnter` and `onNavigate` — a user error; the fix is to keep only `onNavigate`.
 
 ### Why no configuration
 

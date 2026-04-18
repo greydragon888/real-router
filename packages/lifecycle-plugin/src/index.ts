@@ -15,6 +15,12 @@ declare module "@real-router/core" {
     onStay?: LifecycleHookFactory<Dependencies>;
     /** Factory that returns a hook called when this route segment is deactivated (left). */
     onLeave?: LifecycleHookFactory<Dependencies>;
+    /**
+     * Factory that returns a hook called on every successful navigation to this route
+     * (both entry and param-change). Acts as a fallback when `onEnter` or `onStay`
+     * is not defined for the corresponding case.
+     */
+    onNavigate?: LifecycleHookFactory<Dependencies>;
   }
 }
 
