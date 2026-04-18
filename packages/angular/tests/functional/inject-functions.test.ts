@@ -12,6 +12,8 @@ import { injectRouterTransition } from "../../src/functions/injectRouterTransiti
 import { injectRouteUtils } from "../../src/functions/injectRouteUtils";
 import { provideRealRouter } from "../../src/providers";
 
+import type { Params } from "@real-router/core";
+
 const routes = [
   { name: "home", path: "/" },
   {
@@ -111,6 +113,21 @@ describe("inject functions", () => {
           injectRoute();
         });
       }).toThrow("injectRoute must be used within a provideRealRouter context");
+    });
+
+    it("propagates generic params type without runtime change", () => {
+      type TypedParams = { id: string; tab: string } & Params;
+
+      const injector = TestBed.inject(Injector);
+
+      runInInjectionContext(injector, () => {
+        const route = injectRoute<TypedParams>();
+        const params: TypedParams | undefined =
+          route.routeState().route?.params;
+
+        expect(route.routeState().route?.name).toBe("home");
+        expect(params).toBeDefined();
+      });
     });
   });
 

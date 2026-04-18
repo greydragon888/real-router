@@ -9,8 +9,8 @@ import {
 } from "../helpers";
 import RouteCapture from "../helpers/RouteCapture.svelte";
 
-import type { RouteContext } from "../../src/types";
-import type { Router } from "@real-router/core";
+import type { RouteContext } from "../../src";
+import type { Params, Router } from "@real-router/core";
 
 describe("useRoute composable", () => {
   let router: Router;
@@ -183,5 +183,25 @@ describe("useRoute composable", () => {
         props: { onCapture: () => {} },
       }),
     ).toThrow();
+  });
+
+  it("should propagate generic params type without runtime change", async () => {
+    type TypedParams = { id: string; tab: string } & Params;
+
+    await router.navigate("test");
+    flushSync();
+
+    let typed: RouteContext<TypedParams> | undefined;
+
+    renderWithRouter(router, RouteCapture, {
+      onCapture: (r: RouteContext) => {
+        typed = r as RouteContext<TypedParams>;
+      },
+    });
+
+    const params: TypedParams | undefined = typed!.route.current?.params;
+
+    expect(typed!.route.current?.name).toStrictEqual("test");
+    expect(params).toBeDefined();
   });
 });

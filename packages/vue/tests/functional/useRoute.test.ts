@@ -2,12 +2,12 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 import { defineComponent, h, watchSyncEffect } from "vue";
 
-import { useRoute } from "../../src/composables/useRoute";
-import { RouterProvider } from "../../src/RouterProvider";
+import { useRoute } from "../../src";
+import { RouterProvider } from "../../src";
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
 import type { RouteContext } from "../../src/types";
-import type { Router } from "@real-router/core";
+import type { Params, Router } from "@real-router/core";
 
 function mountWithRouter(router: Router, composable: () => RouteContext) {
   let result: RouteContext;
@@ -137,5 +137,30 @@ describe("useRoute composable", () => {
     await flushPromises();
 
     expect(effectCount).toBe(countAfterNavigation + 1);
+  });
+
+  it("should propagate generic params type without runtime change", () => {
+    type TypedParams = { id: string; tab: string } & Params;
+
+    let typedParams: TypedParams | undefined;
+
+    const App = defineComponent({
+      setup() {
+        const { route } = useRoute<TypedParams>();
+
+        typedParams = route.value?.params;
+
+        return () => h("div");
+      },
+    });
+
+    mount(
+      defineComponent({
+        setup: () => () =>
+          h(RouterProvider, { router }, { default: () => h(App) }),
+      }),
+    );
+
+    expect(typedParams).toBeDefined();
   });
 });

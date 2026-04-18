@@ -5,9 +5,9 @@ import type {
   State,
 } from "@real-router/core";
 
-export interface RouteContext {
+export interface RouteContext<P extends Params = Params> {
   readonly navigator: Navigator;
-  readonly route: { readonly current: State | undefined };
+  readonly route: { readonly current: State<P> | undefined };
   readonly previousRoute: { readonly current: State | undefined };
 }
 

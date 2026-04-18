@@ -6,7 +6,7 @@ import { RouterProvider, useRoute } from "@real-router/solid";
 
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Params, Router } from "@real-router/core";
 import type { JSX } from "solid-js";
 
 const wrapper = (router: Router) => (props: { children: JSX.Element }) => (
@@ -98,5 +98,20 @@ describe("useRoute hook", () => {
     await router.navigate("about");
 
     expect(effectRunCount).toBe(3);
+  });
+
+  it("should propagate generic params type without runtime change", async () => {
+    type TypedParams = { id: string; tab: string } & Params;
+
+    await router.navigate("test").catch(() => {});
+
+    const { result } = renderHook(() => useRoute<TypedParams>(), {
+      wrapper: wrapper(router),
+    });
+
+    const params: TypedParams | undefined = result().route?.params;
+
+    expect(result().route?.name).toStrictEqual("test");
+    expect(params).toBeDefined();
   });
 });

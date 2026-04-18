@@ -1,12 +1,12 @@
-import type { RouterError, State } from "@real-router/core";
+import type { Params, RouterError, State } from "@real-router/core";
 
-export interface RouteSnapshot {
-  route: State | undefined;
+export interface RouteSnapshot<P extends Params = Params> {
+  route: State<P> | undefined;
   previousRoute: State | undefined;
 }
 
-export interface RouteNodeSnapshot {
-  route: State | undefined;
+export interface RouteNodeSnapshot<P extends Params = Params> {
+  route: State<P> | undefined;
   previousRoute: State | undefined;
 }
 
