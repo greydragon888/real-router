@@ -34,3 +34,16 @@ export interface RouterErrorSnapshot {
   fromRoute: State | null;
   version: number;
 }
+
+export interface DismissableErrorSnapshot {
+  /** Currently visible error, or `null` if none (never seen or dismissed). */
+  error: RouterError | null;
+  /** Target route of the failed navigation. */
+  toRoute: State | null;
+  /** Source route at the time of failure. */
+  fromRoute: State | null;
+  /** Monotonic version counter from the underlying error source. */
+  version: number;
+  /** Dismisses the current error. Next error (new version) becomes visible again. */
+  resetError: () => void;
+}

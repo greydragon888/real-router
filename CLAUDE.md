@@ -198,6 +198,7 @@ When adding packages or features, keep these root files in sync:
 - [ARCHITECTURE.md](ARCHITECTURE.md) — System design and package structure
 - [IMPLEMENTATION_NOTES.md](IMPLEMENTATION_NOTES.md) — Infrastructure decisions
 - [packages/core/CLAUDE.md](packages/core/CLAUDE.md) — Core package architecture
+- [packages/sources/CLAUDE.md](packages/sources/CLAUDE.md) — Subscription layer for UI bindings (cached factories, canonicalJson)
 - [packages/react/CLAUDE.md](packages/react/CLAUDE.md) — React integration architecture
 - [packages/preact/CLAUDE.md](packages/preact/CLAUDE.md) — Preact integration architecture
 - [packages/solid/CLAUDE.md](packages/solid/CLAUDE.md) — Solid.js integration architecture

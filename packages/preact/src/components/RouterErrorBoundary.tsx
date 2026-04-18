@@ -1,7 +1,9 @@
+import { createDismissableError } from "@real-router/sources";
 import { Fragment } from "preact";
-import { useCallback, useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useRef } from "preact/hooks";
 
-import { useRouterError } from "../hooks/useRouterError";
+import { useRouter } from "../hooks/useRouter";
+import { useSyncExternalStore } from "../useSyncExternalStore";
 
 import type { RouterError, State } from "@real-router/core";
 import type { ComponentChildren, VNode } from "preact";
@@ -24,8 +26,13 @@ export function RouterErrorBoundary({
   fallback,
   onError,
 }: RouterErrorBoundaryProps): VNode {
-  const snapshot = useRouterError();
-  const [dismissedVersion, setDismissedVersion] = useState(-1);
+  const router = useRouter();
+  const store = createDismissableError(router);
+  const snapshot = useSyncExternalStore(
+    store.subscribe,
+    store.getSnapshot,
+    store.getSnapshot,
+  );
 
   const onErrorRef = useRef(onError);
 
@@ -43,17 +50,10 @@ export function RouterErrorBoundary({
     // eslint-disable-next-line @eslint-react/exhaustive-deps -- onError tracked via ref, snapshot fields accessed inside callback
   }, [snapshot.version]);
 
-  const visibleError =
-    snapshot.version > dismissedVersion ? snapshot.error : null;
-
-  const resetError = useCallback(() => {
-    setDismissedVersion(snapshot.version);
-  }, [snapshot.version]);
-
   return (
     <Fragment>
       {children}
-      {visibleError ? fallback(visibleError, resetError) : null}
+      {snapshot.error ? fallback(snapshot.error, snapshot.resetError) : null}
     </Fragment>
   );
 }

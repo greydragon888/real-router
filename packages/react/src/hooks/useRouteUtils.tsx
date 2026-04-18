@@ -3,15 +3,14 @@ import { getRouteUtils } from "@real-router/route-utils";
 
 import { useRouter } from "./useRouter";
 
-import type { Router } from "@real-router/core";
 import type { RouteUtils } from "@real-router/route-utils";
-
-const routeUtilsCache = new WeakMap<Router, RouteUtils>();
 
 /**
  * Returns a pre-computed {@link RouteUtils} instance for the current router.
  *
- * Cached per router reference — no plugin/tree lookups on re-render.
+ * `getRouteUtils` is WeakMap-cached per `RouteTreeNode` inside
+ * `@real-router/route-utils`, so the same router always returns the same
+ * `RouteUtils` instance across renders — no local cache needed in the adapter.
  *
  * @returns RouteUtils instance with pre-computed chains and siblings
  *
@@ -32,12 +31,5 @@ const routeUtilsCache = new WeakMap<Router, RouteUtils>();
 export const useRouteUtils = (): RouteUtils => {
   const router = useRouter();
 
-  let utils = routeUtilsCache.get(router);
-
-  if (!utils) {
-    utils = getRouteUtils(getPluginApi(router).getTree());
-    routeUtilsCache.set(router, utils);
-  }
-
-  return utils;
+  return getRouteUtils(getPluginApi(router).getTree());
 };

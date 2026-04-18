@@ -1,20 +1,13 @@
 import { NgTemplateOutlet } from "@angular/common";
-import {
-  Component,
-  computed,
-  effect,
-  input,
-  output,
-  signal,
-} from "@angular/core";
-import { createErrorSource } from "@real-router/sources";
+import { Component, computed, effect, input, output } from "@angular/core";
+import { createDismissableError } from "@real-router/sources";
 
 import { injectRouter } from "../functions/injectRouter";
 import { sourceToSignal } from "../sourceToSignal";
 
 import type { TemplateRef } from "@angular/core";
 import type { RouterError, State } from "@real-router/core";
-import type { RouterErrorSnapshot } from "@real-router/sources";
+import type { DismissableErrorSnapshot } from "@real-router/sources";
 
 export interface ErrorContext {
   $implicit: RouterError;
@@ -43,30 +36,23 @@ export class RouterErrorBoundary {
     fromRoute: State | null;
   }>();
 
-  readonly visibleError = computed(() => {
+  readonly errorContext = computed<ErrorContext | null>(() => {
     const snap = this.snapshot();
 
-    return snap.version > this.dismissedVersion() ? snap.error : null;
-  });
-
-  readonly errorContext = computed<ErrorContext | null>(() => {
-    const error = this.visibleError();
-
-    if (!error) {
+    if (!snap.error) {
       return null;
     }
 
     return {
-      $implicit: error,
-      resetError: this.resetError,
+      $implicit: snap.error,
+      resetError: snap.resetError,
     };
   });
 
   private readonly router = injectRouter();
-  private readonly snapshot = sourceToSignal<RouterErrorSnapshot>(
-    createErrorSource(this.router),
+  private readonly snapshot = sourceToSignal<DismissableErrorSnapshot>(
+    createDismissableError(this.router),
   );
-  private readonly dismissedVersion = signal(-1);
 
   constructor() {
     effect(() => {
@@ -81,8 +67,4 @@ export class RouterErrorBoundary {
       }
     });
   }
-
-  private readonly resetError = (): void => {
-    this.dismissedVersion.set(this.snapshot().version);
-  };
 }

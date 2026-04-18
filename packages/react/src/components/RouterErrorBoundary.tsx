@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { createDismissableError } from "@real-router/sources";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 
-import { useRouterError } from "../hooks/useRouterError";
+import { useRouter } from "../hooks/useRouter";
 
 import type { RouterError, State } from "@real-router/core";
 import type { ReactNode, JSX } from "react";
@@ -20,8 +21,13 @@ export function RouterErrorBoundary({
   fallback,
   onError,
 }: RouterErrorBoundaryProps): JSX.Element {
-  const snapshot = useRouterError();
-  const [dismissedVersion, setDismissedVersion] = useState(-1);
+  const router = useRouter();
+  const store = createDismissableError(router);
+  const snapshot = useSyncExternalStore(
+    store.subscribe,
+    store.getSnapshot,
+    store.getSnapshot,
+  );
 
   const onErrorRef = useRef(onError);
 
@@ -39,17 +45,10 @@ export function RouterErrorBoundary({
     // eslint-disable-next-line @eslint-react/exhaustive-deps -- onError tracked via ref, snapshot fields accessed inside callback
   }, [snapshot.version]);
 
-  const visibleError =
-    snapshot.version > dismissedVersion ? snapshot.error : null;
-
-  const resetError = useCallback(() => {
-    setDismissedVersion(snapshot.version);
-  }, [snapshot.version]);
-
   return (
     <>
       {children}
-      {visibleError ? fallback(visibleError, resetError) : null}
+      {snapshot.error ? fallback(snapshot.error, snapshot.resetError) : null}
     </>
   );
 }

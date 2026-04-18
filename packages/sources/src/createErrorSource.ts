@@ -13,6 +13,11 @@ const INITIAL_SNAPSHOT: RouterErrorSnapshot = {
   version: 0,
 };
 
+const errorSourceCache = new WeakMap<
+  Router,
+  RouterSource<RouterErrorSnapshot>
+>();
+
 export function createErrorSource(
   router: Router,
 ): RouterSource<RouterErrorSnapshot> {
@@ -63,4 +68,44 @@ export function createErrorSource(
   ];
 
   return source;
+}
+
+/**
+ * Returns a per-router cached error source shared across all consumers.
+ *
+ * Safe to call destroy() — the cached source ignores external destroy() calls
+ * and lives until the router itself is garbage-collected (the WeakMap entry
+ * releases automatically).
+ *
+ * Use this in framework adapters (React/Preact/Solid/Vue/Svelte/Angular) to
+ * share a single ErrorSource instance across all mount/unmount cycles.
+ *
+ * For isolated/advanced use (ad-hoc, short-lived, per-owner teardown), call
+ * `createErrorSource(router)` directly — it returns a fresh instance with a
+ * working `destroy()`.
+ */
+export function getErrorSource(
+  router: Router,
+): RouterSource<RouterErrorSnapshot> {
+  let cached = errorSourceCache.get(router);
+
+  if (!cached) {
+    const source = createErrorSource(router);
+
+    // Wrap with no-op destroy. The underlying source is shared across all
+    // consumers; letting any one consumer call destroy() would tear it down
+    // for the rest. The source lives as long as the router (WeakMap key).
+    cached = {
+      subscribe: source.subscribe,
+      getSnapshot: source.getSnapshot,
+      destroy: noopDestroy,
+    };
+    errorSourceCache.set(router, cached);
+  }
+
+  return cached;
+}
+
+function noopDestroy(): void {
+  // Shared cached source — external destroy() is a no-op.
 }

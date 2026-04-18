@@ -7,7 +7,7 @@
 ```
 @real-router/svelte
 ├── @real-router/core         # Router instance, Navigator, State types
-├── @real-router/sources      # Subscription layer (createRouteSource, createRouteNodeSource, createActiveRouteSource, createErrorSource)
+├── @real-router/sources      # Subscription layer (createRouteSource, createRouteNodeSource, createActiveRouteSource, getTransitionSource, createDismissableError)
 └── @real-router/route-utils  # Route tree queries (getRouteUtils, getChain, getSiblings)
 ```
 
@@ -37,8 +37,7 @@ dist/
 │   ├── useRouteNode.svelte.js
 │   ├── useRouteUtils.svelte.js
 │   ├── useRouterTransition.svelte.js
-│   ├── useIsActiveRoute.svelte.js
-│   └── useRouterError.svelte.js
+│   └── useIsActiveRoute.svelte.js
 └── RouterProvider.svelte
 ```
 
@@ -64,8 +63,7 @@ src/
 │   ├── useRouteNode.svelte.ts            # Node-scoped subscription via createReactiveSource
 │   ├── useIsActiveRoute.svelte.ts        # Active state subscription (internal — used by Link)
 │   ├── useRouteUtils.svelte.ts
-│   ├── useRouterTransition.svelte.ts
-│   └── useRouterError.svelte.ts          # Internal — error subscription (used by RouterErrorBoundary)
+│   └── useRouterTransition.svelte.ts
 ├── actions/
 │   └── link.svelte.ts                    # createLinkAction factory (use:link directive)
 └── components/
@@ -89,7 +87,7 @@ src/
 | External store subscription | `useSyncExternalStore` / polyfill | `useRefFromSource` (shallowRef + onScopeDispose) | `createSignalFromSource` (createSignal + onCleanup) | `createReactiveSource` (createSubscriber) |
 | Composable return types     | Values (`RouteState`)             | Values with ShallowRefs                          | Accessors (`Accessor<RouteState>`)                  | `{ current: T }` getter objects           |
 | `memo()`                    | Required for optimization         | Not needed                                       | Not needed                                          | Not needed                                |
-| `useStableValue`            | JSON-based stabilization          | Not needed                                       | Not needed                                          | Not needed                                |
+| Params stabilization        | `canonicalJson` in sources        | `canonicalJson` in sources                       | `canonicalJson` in sources                          | `canonicalJson` in sources                |
 | Active class on Link        | `className` string concat         | `class` string concat                            | `classList` object                                  | `class:` directive / string concat        |
 | `keepAlive` / Activity      | React 19.2+                       | Vue native `<KeepAlive>`                         | Not available                                       | Not available                             |
 | Context mechanism           | `createContext` + Provider        | `provide` / `inject` + `InjectionKey`            | `createContext` + Provider                          | `setContext` / `getContext` + string keys |
@@ -169,12 +167,14 @@ useNavigator()  — reads NAVIGATOR_KEY → returns Navigator, never reactive
 ### Reactive Source-Based (via createReactiveSource)
 
 ```
-useRouteNode(name)      — createRouteNodeSource(router, name)     → { navigator, route: { current }, previousRoute: { current } }
-useRouterTransition()   — createTransitionSource(router)          → { current: RouterTransitionSnapshot }
-useIsActiveRoute(...)   — createActiveRouteSource(router, ...)    → { current: boolean }
-useRouterError()  [internal]  — createErrorSource(router) with WeakMap cache
-RouterProvider          — createRouteSource(router)               → updates route/previousRoute .current getters
+useRouteNode(name)      — cached createRouteNodeSource(router, name)     → { navigator, route: { current }, previousRoute: { current } }
+useRouterTransition()   — cached getTransitionSource(router)             → { current: RouterTransitionSnapshot }
+useIsActiveRoute(...)   — cached createActiveRouteSource(router, ...)    → { current: boolean }
+RouterErrorBoundary     — cached createDismissableError(router)          → { current: DismissableErrorSnapshot }
+RouterProvider          — createRouteSource(router)                      → updates route/previousRoute .current getters
 ```
+
+All source caches live in `@real-router/sources` — no local WeakMaps in this adapter.
 
 ## Component Architecture
 
@@ -188,8 +188,8 @@ Link (.svelte)
     └── {@render children?.()}
 
 RouterErrorBoundary (.svelte)
-├── useRouterError() — error subscription via createErrorSource (internal, cached)
-├── dismissedVersion state — tracks manually dismissed errors (version-based)
+├── createReactiveSource(createDismissableError(router)) — shared per-router source
+│     (integrated dismissedVersion + resetError — no local state)
 ├── fallback snippet — {#snippet fallback(error, resetError)} passed by caller
 └── Renders: {@render children?.()} + {@render fallback?.(error, resetError)}
 ```
@@ -235,14 +235,14 @@ RouteView (.svelte)
 
 Svelte's compiler-driven reactivity eliminates most of the optimization work needed in React/Preact:
 
-| Optimization              | React/Preact                        | Svelte                                                                   |
-| ------------------------- | ----------------------------------- | ------------------------------------------------------------------------ |
-| Prevent re-renders        | `memo()` + comparators              | Not needed — Svelte compiles to fine-grained DOM updates                 |
-| Stable object references  | `useStableValue` (JSON memoization) | Not needed — `createSubscriber` tracks dependencies, not object identity |
-| Stable callbacks          | `useCallback`                       | Not needed — no re-renders                                               |
-| Node-scoped subscriptions | `shouldUpdateNode()` filter         | `shouldUpdateNode()` filter (same — in `@real-router/sources`)           |
-| Frozen singletons         | `EMPTY_PARAMS`, `EMPTY_OPTIONS`     | Same — avoids allocation for default props                               |
-| WeakMap caching           | Per-router selector functions       | Same — in `@real-router/sources`                                         |
+| Optimization              | React/Preact                              | Svelte                                                                   |
+| ------------------------- | ----------------------------------------- | ------------------------------------------------------------------------ |
+| Prevent re-renders        | `memo()` + comparators                    | Not needed — Svelte compiles to fine-grained DOM updates                 |
+| Stable object references  | `canonicalJson` in sources                | Same — in `@real-router/sources`                                         |
+| Stable callbacks          | `useCallback`                             | Not needed — no re-renders                                               |
+| Node-scoped subscriptions | Cached `createRouteNodeSource`            | Same — in `@real-router/sources`                                         |
+| Shared eager sources      | `getTransitionSource` / `createDismissableError` | Same — in `@real-router/sources`                                  |
+| Frozen singletons         | `EMPTY_PARAMS`, `EMPTY_OPTIONS`           | Same — avoids allocation for default props                               |
 
 The main performance primitive is `createReactiveSource`: it creates a lazy `{ current }` getter that only subscribes when read in a reactive context, and Svelte's scheduler batches DOM updates automatically.
 

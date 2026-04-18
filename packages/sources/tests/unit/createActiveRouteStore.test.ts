@@ -166,7 +166,7 @@ describe("createActiveRouteSources", () => {
     expect(listener).not.toHaveBeenCalled();
   });
 
-  it("destroy: unsubscribes from router (further navigations don't call listener)", async () => {
+  it("destroy: is a no-op on shared cached source (listener still receives updates)", async () => {
     const source = createActiveRouteSource(router, "admin");
     const listener = vi.fn();
 
@@ -175,7 +175,8 @@ describe("createActiveRouteSources", () => {
     source.destroy();
     await router.navigate("admin");
 
-    expect(listener).not.toHaveBeenCalled();
+    // Shared cached source ignores external destroy() — updates still flow.
+    expect(listener).toHaveBeenCalledTimes(1);
   });
 
   it("destroy: idempotent", () => {
@@ -226,7 +227,7 @@ describe("createActiveRouteSources", () => {
     expect(source.getSnapshot()).toBe(true);
   });
 
-  it("post-destroy: subscribe returns no-op unsubscribe (no errors)", () => {
+  it("post-destroy: subscribe still works (shared source survives external teardown)", async () => {
     const source = createActiveRouteSource(router, "admin");
 
     source.destroy();
@@ -234,9 +235,10 @@ describe("createActiveRouteSources", () => {
     const listener = vi.fn();
     const unsubscribe = source.subscribe(listener);
 
-    expect(listener).not.toHaveBeenCalled();
-    expect(() => {
-      unsubscribe();
-    }).not.toThrow();
+    await router.navigate("admin");
+
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    unsubscribe();
   });
 });
