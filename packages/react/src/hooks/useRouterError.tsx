@@ -1,25 +1,13 @@
-import { createErrorSource } from "@real-router/sources";
-import { useMemo, useSyncExternalStore } from "react";
+import { getErrorSource } from "@real-router/sources";
+import { useSyncExternalStore } from "react";
 
 import { useRouter } from "./useRouter";
 
-import type { Router } from "@real-router/core";
-import type { RouterErrorSnapshot, RouterSource } from "@real-router/sources";
-
-const cache = new WeakMap<Router, RouterSource<RouterErrorSnapshot>>();
+import type { RouterErrorSnapshot } from "@real-router/sources";
 
 export function useRouterError(): RouterErrorSnapshot {
   const router = useRouter();
-  const store = useMemo(() => {
-    let source = cache.get(router);
-
-    if (!source) {
-      source = createErrorSource(router);
-      cache.set(router, source);
-    }
-
-    return source;
-  }, [router]);
+  const store = getErrorSource(router);
 
   return useSyncExternalStore(
     store.subscribe,

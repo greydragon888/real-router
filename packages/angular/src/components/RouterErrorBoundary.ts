@@ -7,7 +7,7 @@ import {
   output,
   signal,
 } from "@angular/core";
-import { createErrorSource } from "@real-router/sources";
+import { getErrorSource } from "@real-router/sources";
 
 import { injectRouter } from "../functions/injectRouter";
 import { sourceToSignal } from "../sourceToSignal";
@@ -64,7 +64,7 @@ export class RouterErrorBoundary {
 
   private readonly router = injectRouter();
   private readonly snapshot = sourceToSignal<RouterErrorSnapshot>(
-    createErrorSource(this.router),
+    getErrorSource(this.router),
   );
   private readonly dismissedVersion = signal(-1);
 

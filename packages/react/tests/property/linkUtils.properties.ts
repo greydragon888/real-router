@@ -9,10 +9,8 @@
  * - Active class must be present in the result whenever isActive=true and
  *   activeClassName is non-empty.
  *
- * Confirmed bugs covered for `useStableValue.stableSerialize`:
- * - Key order in plain objects MUST NOT affect serialized output.
- * - Equal nested objects with reordered keys produce equal output.
- * - Throws (not silently equates) on BigInt.
+ * Previously included tests for `stableSerialize` — moved to `@real-router/sources`
+ * as `canonicalJson` (see `packages/sources/tests/unit/canonicalJson.test.ts`).
  */
 
 import { fc, test } from "@fast-check/vitest";
@@ -20,7 +18,6 @@ import { describe, expect } from "vitest";
 
 import { NUM_RUNS } from "./helpers";
 import { buildActiveClassName, buildHref } from "../../src/dom-utils/index.js";
-import { stableSerialize } from "../../src/hooks/useStableValue";
 
 import type { Router } from "@real-router/core";
 
@@ -185,67 +182,5 @@ describe("buildHref — Property Tests", () => {
   });
 });
 
-// =============================================================================
-// stableSerialize — key-order insensitive
-// =============================================================================
-
-describe("stableSerialize — Property Tests", () => {
-  describe("Invariant 8: key order does not affect output", () => {
-    test.prop(
-      [
-        fc.array(
-          fc.tuple(arbToken, fc.oneof(fc.integer(), fc.string(), fc.boolean())),
-          { minLength: 1, maxLength: 5 },
-        ),
-      ],
-      { numRuns: NUM_RUNS.thorough },
-    )("permuted entries → same serialization", (entries) => {
-      // Deduplicate by key: Object.fromEntries drops earlier duplicates, so
-      // same-key-different-value pairs produce inequivalent objects in the
-      // original and reversed arrays. Only unique-key entries match the invariant.
-      const uniqueMap = new Map<string, unknown>();
-
-      for (const [key, value] of entries) {
-        uniqueMap.set(key, value);
-      }
-
-      const uniqueEntries = [...uniqueMap.entries()];
-
-      fc.pre(uniqueEntries.length > 0);
-
-      const original = Object.fromEntries(uniqueEntries);
-      const reversed = Object.fromEntries(uniqueEntries.toReversed());
-
-      expect(stableSerialize(original)).toBe(stableSerialize(reversed));
-    });
-  });
-
-  describe("Invariant 9: nested objects also key-order normalized", () => {
-    test.prop([arbToken, arbToken, fc.integer(), fc.integer()], {
-      numRuns: NUM_RUNS.standard,
-    })("nested permutation → same output", (a, b, va, vb) => {
-      fc.pre(a !== b);
-
-      const o1 = { outer: { [a]: va, [b]: vb } };
-      const o2 = { outer: { [b]: vb, [a]: va } };
-
-      expect(stableSerialize(o1)).toBe(stableSerialize(o2));
-    });
-  });
-
-  describe("Invariant 10: BigInt throws (caller falls back to identity)", () => {
-    test("BigInt input throws TypeError", () => {
-      expect(() => stableSerialize({ id: 1n })).toThrow();
-    });
-  });
-
-  describe("Invariant 11: arrays preserve order", () => {
-    test.prop([fc.array(fc.integer(), { minLength: 1, maxLength: 5 })], {
-      numRuns: NUM_RUNS.standard,
-    })("array != reversed array (when contents differ)", (arr) => {
-      fc.pre(arr.some((v, i) => v !== arr[arr.length - 1 - i]));
-
-      expect(stableSerialize(arr)).not.toBe(stableSerialize(arr.toReversed()));
-    });
-  });
-});
+// Canonical serialization tests moved to @real-router/sources canonicalJson.
+// See: packages/sources/tests/unit/canonicalJson.test.ts

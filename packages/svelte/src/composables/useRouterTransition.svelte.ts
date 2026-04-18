@@ -1,4 +1,4 @@
-import { createTransitionSource } from "@real-router/sources";
+import { getTransitionSource } from "@real-router/sources";
 
 import { createReactiveSource } from "../createReactiveSource.svelte";
 import { useRouter } from "./useRouter.svelte";
@@ -9,8 +9,7 @@ export function useRouterTransition(): {
   readonly current: RouterTransitionSnapshot;
 } {
   const router = useRouter();
-
-  const source = createTransitionSource(router);
+  const source = getTransitionSource(router);
 
   return createReactiveSource(source);
 }

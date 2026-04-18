@@ -1,8 +1,7 @@
 import { createActiveRouteSource } from "@real-router/sources";
-import { useMemo, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 
 import { useRouter } from "./useRouter";
-import { useStableValue } from "./useStableValue";
 
 import type { Params } from "@real-router/core";
 
@@ -14,23 +13,17 @@ export function useIsActiveRoute(
 ): boolean {
   const router = useRouter();
 
-  // useStableValue: JSON.stringify memoization of params object.
-  // Without it, every render with a new params reference (e.g.,
-  // <Link routeParams={{ id: '123' }} />) would recreate the store.
-  const stableParams = useStableValue(params);
-
-  const store = useMemo(
-    () =>
-      createActiveRouteSource(router, routeName, stableParams, {
-        strict,
-        ignoreQueryParams,
-      }),
-    [router, routeName, stableParams, strict, ignoreQueryParams],
-  );
+  // createActiveRouteSource is per-router + canonical-args cached in
+  // @real-router/sources, so passing params by reference is safe — equivalent
+  // param shapes hit the same cache entry regardless of key order.
+  const store = createActiveRouteSource(router, routeName, params, {
+    strict,
+    ignoreQueryParams,
+  });
 
   return useSyncExternalStore(
     store.subscribe,
     store.getSnapshot,
-    store.getSnapshot, // SSR: router returns same state on server and client
+    store.getSnapshot,
   );
 }

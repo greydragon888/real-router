@@ -1,4 +1,4 @@
-import { createTransitionSource } from "@real-router/sources";
+import { getTransitionSource } from "@real-router/sources";
 
 import { sourceToSignal } from "../sourceToSignal";
 import { injectRouter } from "./injectRouter";
@@ -8,7 +8,7 @@ import type { RouterTransitionSnapshot } from "@real-router/sources";
 
 export function injectRouterTransition(): Signal<RouterTransitionSnapshot> {
   const router = injectRouter();
-  const source = createTransitionSource(router);
+  const source = getTransitionSource(router);
 
   return sourceToSignal(source);
 }
