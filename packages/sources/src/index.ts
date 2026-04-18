@@ -23,6 +23,10 @@ export { createErrorSource, getErrorSource } from "./createErrorSource";
 
 export { createDismissableError } from "./createDismissableError";
 
+export { createActiveNameSelector } from "./createActiveNameSelector";
+
+export type { ActiveNameSelector } from "./createActiveNameSelector";
+
 export {
   DEFAULT_ACTIVE_OPTIONS,
   normalizeActiveOptions,
