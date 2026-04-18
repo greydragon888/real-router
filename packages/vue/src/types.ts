@@ -12,9 +12,9 @@ import type { Ref } from "vue";
  * (`useRoute` mirrors via `shallowRef`, `useRouteNode` derives via `computed`),
  * but consumers only need `.value` read access — typed as `Readonly<Ref<…>>`.
  */
-export interface RouteContext {
+export interface RouteContext<P extends Params = Params> {
   navigator: Navigator;
-  route: Readonly<Ref<State | undefined>>;
+  route: Readonly<Ref<State<P> | undefined>>;
   previousRoute: Readonly<Ref<State | undefined>>;
 }
 

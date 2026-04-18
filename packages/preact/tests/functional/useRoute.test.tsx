@@ -5,7 +5,7 @@ import { RouterProvider, useRoute } from "@real-router/preact";
 
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Params, Router } from "@real-router/core";
 import type { ComponentChildren } from "preact";
 
 const wrapper =
@@ -73,5 +73,20 @@ describe("useRoute hook", () => {
 
   it("should throw error if router instance was not passed to provider", () => {
     expect(() => renderHook(() => useRoute())).toThrow();
+  });
+
+  it("should propagate generic params type without runtime change", async () => {
+    type TypedParams = { id: string; tab: string } & Params;
+
+    await router.navigate("test");
+
+    const { result } = renderHook(() => useRoute<TypedParams>(), {
+      wrapper: wrapper(router),
+    });
+
+    const params: TypedParams | undefined = result.current.route?.params;
+
+    expect(result.current.route?.name).toStrictEqual("test");
+    expect(params).toBeDefined();
   });
 });

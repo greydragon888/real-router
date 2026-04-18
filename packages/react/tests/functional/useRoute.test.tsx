@@ -5,7 +5,7 @@ import { RouterProvider, useRoute } from "@real-router/react";
 
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Params, Router } from "@real-router/core";
 import type { ReactNode } from "react";
 
 const wrapper =
@@ -88,5 +88,20 @@ describe("useRoute hook", () => {
     expect(() => renderHook(() => useRoute())).toThrow(
       "useRoute must be used within a RouteProvider",
     );
+  });
+
+  it("should propagate generic params type without runtime change", async () => {
+    type TypedParams = { id: string; tab: string } & Params;
+
+    await router.navigate("test");
+
+    const { result } = renderHook(() => useRoute<TypedParams>(), {
+      wrapper: wrapper(router),
+    });
+
+    const params: TypedParams | undefined = result.current.route?.params;
+
+    expect(result.current.route?.name).toStrictEqual("test");
+    expect(params).toBeDefined();
   });
 });
