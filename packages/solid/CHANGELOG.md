@@ -1,5 +1,19 @@
 # @real-router/solid
 
+## 0.4.1
+
+### Patch Changes
+
+- [#474](https://github.com/greydragon888/real-router/pull/474) [`d6c1b39`](https://github.com/greydragon888/real-router/commit/d6c1b39e7c2b6c427be062b13ba3eb633eadc7c3) Thanks [@greydragon888](https://github.com/greydragon888)! - refactor: RouterErrorBoundary uses shared `createDismissableError` from `@real-router/sources` — removes local `dismissedVersion` state duplication ([#467](https://github.com/greydragon888/real-router/issues/467))
+
+- [#474](https://github.com/greydragon888/real-router/pull/474) [`d6c1b39`](https://github.com/greydragon888/real-router/commit/d6c1b39e7c2b6c427be062b13ba3eb633eadc7c3) Thanks [@greydragon888](https://github.com/greydragon888)! - fix: unified node/active source caches moved to `@real-router/sources` ([#467](https://github.com/greydragon888/real-router/issues/467))
+  - Migrated `useRouterError`/`useRouterTransition` to `getErrorSource` / `getTransitionSource` — removed local WeakMap caches.
+  - Removed local `sharedNodeSource` helper — `createRouteNodeSource` in `@real-router/sources` now caches per `(router, nodeName)` natively.
+  - Removed `Link` slow-path `activeSourceCache` + `getOrCreateActiveSource` — `createActiveRouteSource` now caches per `(router, name, params, options)` natively.
+
+- Updated dependencies [[`d6c1b39`](https://github.com/greydragon888/real-router/commit/d6c1b39e7c2b6c427be062b13ba3eb633eadc7c3), [`d6c1b39`](https://github.com/greydragon888/real-router/commit/d6c1b39e7c2b6c427be062b13ba3eb633eadc7c3), [`d6c1b39`](https://github.com/greydragon888/real-router/commit/d6c1b39e7c2b6c427be062b13ba3eb633eadc7c3)]:
+  - @real-router/sources@0.6.0
+
 ## 0.4.0
 
 ### Minor Changes
