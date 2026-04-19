@@ -538,3 +538,36 @@ export function validateLimitsConsistency(
   checkRouteCountLimit(store, configuredLimits);
   checkDepCountLimit(deps, configuredLimits);
 }
+
+// =============================================================================
+// 7. validateResolvedDefaultRoute
+// =============================================================================
+
+/**
+ * Validates that a resolved defaultRoute name points to a route that exists
+ * in the tree. Called at two places:
+ *
+ *   1. At plugin registration (retrospective) — with the static string value
+ *      of options.defaultRoute, if any.
+ *   2. At runtime inside resolveDefault() — with the return value of a
+ *      DefaultRouteCallback, on every navigateToDefault() / start() fallback.
+ *
+ * No-op for empty string (means "no default configured" — handled upstream by
+ * NavigationNamespace.navigateToDefault).
+ */
+export function validateResolvedDefaultRoute(
+  routeName: unknown,
+  store: unknown,
+): void {
+  if (typeof routeName !== "string" || !routeName) {
+    return;
+  }
+
+  const routesStore = assertRoutesStore(store, "validateResolvedDefaultRoute");
+
+  if (!routeExistsInTree(routesStore.tree, routeName)) {
+    throw new Error(
+      `[validation-plugin] defaultRoute resolved to non-existent route: "${routeName}"`,
+    );
+  }
+}

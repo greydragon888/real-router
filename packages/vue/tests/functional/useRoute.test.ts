@@ -2,8 +2,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 import { defineComponent, h, watchSyncEffect } from "vue";
 
-import { useRoute } from "../../src";
-import { RouterProvider } from "../../src";
+import { useRoute, RouterProvider } from "../../src";
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
 import type { RouteContext } from "../../src/types";

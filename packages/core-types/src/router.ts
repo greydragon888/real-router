@@ -85,7 +85,8 @@ export interface Options {
    * - "strict": Route must match exactly
    * - "never": Always remove trailing slash
    * - "always": Always add trailing slash
-   * - "preserve": Keep as provided
+   * - "preserve": Keep the source path's trailing-slash choice, even when
+   *   `rewritePathOnMatch: true` rewrites the rest of the path.
    *
    * @default "preserve"
    */
@@ -125,9 +126,13 @@ export interface Options {
   allowNotFound: boolean;
 
   /**
-   * Rewrite path on successful match.
+   * Rewrite `state.path` on successful match to the canonical path built
+   * from the matched route's pattern. Applies `forwardTo` aliases, encoders,
+   * `defaultParams`, and `trailingSlash` normalization (`"never"` / `"always"`).
+   * When `trailingSlash: "preserve"`, the source path's trailing-slash choice
+   * is kept on the rewritten path.
    *
-   * @default false
+   * @default true
    */
   rewritePathOnMatch: boolean;
 

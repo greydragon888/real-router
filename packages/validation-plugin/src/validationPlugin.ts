@@ -57,6 +57,7 @@ import {
   validateForwardToTargetsStore,
   validateDependenciesStructure,
   validateLimitsConsistency,
+  validateResolvedDefaultRoute,
 } from "./validators/retrospective";
 import {
   validateBuildPathArgs,
@@ -186,6 +187,7 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
         validateLimits(limits, "validate");
       },
       validateOptions,
+      validateResolvedDefaultRoute,
     },
     dependencies: {
       validateDependencyName,
@@ -315,6 +317,10 @@ export function validationPlugin(): PluginFactory {
         options as unknown,
         "constructor (retrospective)",
       );
+
+      if (typeof options.defaultRoute === "string") {
+        validateResolvedDefaultRoute(options.defaultRoute, store);
+      }
     } catch (error) {
       ctx.validator = null;
 

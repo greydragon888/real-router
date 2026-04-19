@@ -56,6 +56,7 @@ export interface RouterValidator {
     validateLimitValue: (name: string, value: unknown) => void;
     validateLimits: (limits: unknown) => void;
     validateOptions: (options: unknown, methodName: string) => void;
+    validateResolvedDefaultRoute: (routeName: unknown, store: unknown) => void;
   };
 
   /**

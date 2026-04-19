@@ -41,6 +41,7 @@ Without this plugin, core has structural guards (constructor, plugin registratio
 - Decoder/encoder async detection (sync required for `matchPath`/`buildPath`)
 - Dependency store structure validation
 - Limits consistency checks
+- Cross-field `Options` diagnostics: `warnListeners > maxListeners`, `callbackIgnoresLevel` without `callback`, `defaultRoute` pointing to a missing route (static at registration, callbacks at first use)
 
 The plugin also runs a **retrospective pass** at registration time, validating routes and dependencies that were added before `usePlugin()` was called.
 
@@ -95,17 +96,17 @@ If the retrospective pass fails, the plugin rolls back cleanly. The router is le
 
 ## What Gets Validated
 
-| Namespace     | Validated operations                                                                                                                                    |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Routes        | `buildPath`, `matchPath`, `isActiveRoute`, `shouldUpdateNode`, `addRoute`, `removeRoute`, `updateRoute`, `forwardTo` targets and cycles                 |
-| Options       | `limits` object shape, individual limit values                                                                                                          |
-| Dependencies  | `setDependency` args, dependency name format, full store structure                                                                                      |
-| Plugins       | Plugin count vs `maxPlugins` limit, `addInterceptor` args (method enum + function type)                                                                 |
-| Lifecycle     | Guard/hook handler type, count vs `maxLifecycleHandlers`                                                                                                |
-| Navigation    | `navigate` args, `navigateToDefault` args, `NavigationOptions` shape, `params` validation (navigate, buildPath, canNavigateTo), `start` path validation |
-| State         | `makeState` args, `areStatesEqual` args                                                                                                                 |
-| Event bus     | Event name format, listener args                                                                                                                        |
-| Retrospective | Existing route tree integrity, `forwardTo` consistency, decoder/encoder types, dependency store structure, limits consistency                           |
+| Namespace     | Validated operations                                                                                                                                                                         |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Routes        | `buildPath`, `matchPath`, `isActiveRoute`, `shouldUpdateNode`, `addRoute`, `removeRoute`, `updateRoute`, `forwardTo` targets and cycles                                                      |
+| Options       | `limits` object shape, individual limit values; cross-field `warnListeners ≤ maxListeners`; `logger.callbackIgnoresLevel` requires `logger.callback`; `defaultRoute` callback return value   |
+| Dependencies  | `setDependency` args, dependency name format, full store structure                                                                                                                           |
+| Plugins       | Plugin count vs `maxPlugins` limit, `addInterceptor` args (method enum + function type)                                                                                                      |
+| Lifecycle     | Guard/hook handler type, count vs `maxLifecycleHandlers`                                                                                                                                     |
+| Navigation    | `navigate` args, `navigateToDefault` args, `NavigationOptions` shape, `params` validation (navigate, buildPath, canNavigateTo), `start` path validation                                      |
+| State         | `makeState` args, `areStatesEqual` args                                                                                                                                                      |
+| Event bus     | Event name format, listener args                                                                                                                                                             |
+| Retrospective | Existing route tree integrity, `forwardTo` consistency, decoder/encoder types, dependency store structure, limits consistency, static `defaultRoute` resolves to a registered route         |
 
 ## Error Messages
 

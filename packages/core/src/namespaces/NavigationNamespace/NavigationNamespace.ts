@@ -268,7 +268,14 @@ export class NavigationNamespace {
       );
     }
 
-    const { route, params } = deps.resolveDefault();
+    let route: string;
+    let params: Params;
+
+    try {
+      ({ route, params } = deps.resolveDefault());
+    } catch (error) {
+      return Promise.reject(error as Error);
+    }
 
     if (!route) {
       return Promise.reject(

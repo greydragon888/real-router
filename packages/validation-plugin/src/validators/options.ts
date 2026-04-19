@@ -1,5 +1,6 @@
 // packages/validation-plugin/src/validators/options.ts
 
+import { logger } from "@real-router/logger";
 import { isObjKey } from "type-guards";
 
 const VALID_OPTION_VALUES = {
@@ -97,6 +98,19 @@ export function validateLimits(
     }
 
     validateLimitValue(key as keyof LimitsConfig, value, methodName);
+  }
+
+  const { warnListeners, maxListeners } = limits as Partial<LimitsConfig>;
+
+  if (
+    typeof warnListeners === "number" &&
+    typeof maxListeners === "number" &&
+    maxListeners > 0 &&
+    warnListeners > maxListeners
+  ) {
+    throw new RangeError(
+      `[router.${methodName}] "limits.warnListeners" (${warnListeners}) must not exceed "limits.maxListeners" (${maxListeners}) — the warning channel would be unreachable`,
+    );
   }
 }
 
@@ -239,6 +253,16 @@ function validateLoggerOption(loggerOpt: unknown, methodName: string): void {
   ) {
     throw new TypeError(
       `[router.${methodName}] Invalid "logger.callbackIgnoresLevel": expected boolean`,
+    );
+  }
+
+  if (
+    loggerOptions.callbackIgnoresLevel === true &&
+    loggerOptions.callback === undefined
+  ) {
+    logger.error(
+      `router.${methodName}`,
+      `"logger.callbackIgnoresLevel: true" has no effect without "logger.callback" — the option is ignored`,
     );
   }
 }

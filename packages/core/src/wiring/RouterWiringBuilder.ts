@@ -156,20 +156,28 @@ export class RouterWiringBuilder<
       },
       resolveDefault: () => {
         const options = this.options.get();
+        const ctx = getInternals(this.router);
 
-        return {
-          route: resolveOption(
-            options.defaultRoute,
-            (name: string) =>
-              this.dependenciesStore.dependencies[name as keyof Dependencies],
-          ),
-          params: resolveOption(
-            options.defaultParams,
-            /* v8 ignore next -- @preserve: unreachable unless defaultParams is a callback that calls getDependency */
-            (name: string) =>
-              this.dependenciesStore.dependencies[name as keyof Dependencies],
-          ),
-        };
+        const route = resolveOption(
+          options.defaultRoute,
+          (name: string) =>
+            this.dependenciesStore.dependencies[name as keyof Dependencies],
+        );
+        const params = resolveOption(
+          options.defaultParams,
+          /* v8 ignore next -- @preserve: unreachable unless defaultParams is a callback that calls getDependency */
+          (name: string) =>
+            this.dependenciesStore.dependencies[name as keyof Dependencies],
+        );
+
+        if (typeof options.defaultRoute === "function") {
+          ctx.validator?.options.validateResolvedDefaultRoute(
+            route,
+            ctx.routeGetStore(),
+          );
+        }
+
+        return { route, params };
       },
       startTransition: (toState, fromState) => {
         this.eventBus.sendNavigate(toState, fromState);

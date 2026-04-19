@@ -106,6 +106,13 @@ const validLoggerArbitrary = fc
       }
     }
 
+    // Cross-field invariant (#471 case 4): callbackIgnoresLevel: true has no
+    // effect without callback. Drop the flag in that case so the generated
+    // options don't trigger the validator's noisy logger.error on every run.
+    if (result.callbackIgnoresLevel === true && result.callback === undefined) {
+      delete result.callbackIgnoresLevel;
+    }
+
     return result;
   });
 
@@ -137,6 +144,18 @@ const validLimitsArbitrary = fc
       if (value !== undefined) {
         result[key] = value;
       }
+    }
+
+    // Cross-field invariant (#471 case 1): warnListeners must not exceed
+    // maxListeners when both are provided and maxListeners > 0.
+    // Clamp warn to max to keep generated options semantically valid.
+    if (
+      typeof result.warnListeners === "number" &&
+      typeof result.maxListeners === "number" &&
+      result.maxListeners > 0 &&
+      result.warnListeners > result.maxListeners
+    ) {
+      result.warnListeners = result.maxListeners;
     }
 
     return result;

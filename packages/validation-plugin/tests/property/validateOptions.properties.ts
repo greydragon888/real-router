@@ -118,4 +118,37 @@ describe("validateOptions — property-based", () => {
       expect(threw1).toBe(threw2);
     },
   );
+
+  test.prop(
+    [
+      fc.integer({ min: 1, max: 100_000 }).chain((max) =>
+        fc.record({
+          maxListeners: fc.constant(max),
+          warnListeners: fc.integer({ min: max + 1, max: max + 100_000 }),
+        }),
+      ),
+    ],
+    { numRuns: 2000 },
+  )(
+    "warnListeners > maxListeners always throws RangeError (#471 case 1)",
+    ({ maxListeners, warnListeners }) => {
+      // fast-check's .chain upper bound can exceed LIMIT_BOUNDS.warnListeners
+      // (100_000); clamp so we only exercise the cross-field path, not the
+      // per-field bounds path.
+      const clampedWarn = Math.min(warnListeners, 100_000);
+
+      // Skip if clamping collapsed the inequality (max=100_000, warn=100_001
+      // → clampedWarn=100_000 == max). Cross-field check uses strict `>`.
+      if (clampedWarn <= maxListeners) {
+        return;
+      }
+
+      expect(() => {
+        validateOptions(
+          { limits: { maxListeners, warnListeners: clampedWarn } },
+          "test",
+        );
+      }).toThrow(RangeError);
+    },
+  );
 });

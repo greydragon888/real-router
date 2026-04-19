@@ -51,7 +51,12 @@ router.usePlugin(validationPlugin())
     │       ├── retroV.validateRoutePropertiesStore(store)
     │       ├── retroV.validateForwardToTargetsStore(store)
     │       ├── retroV.validateDependenciesStructure(deps)
-    │       └── retroV.validateLimitsConsistency(options, store, deps)
+    │       ├── retroV.validateLimitsConsistency(options, store, deps)
+    │       ├── validator.options.validateOptions(options)
+    │       │       └── cross-field: warnListeners ≤ maxListeners, callbackIgnoresLevel requires callback
+    │       └── retroV.validateResolvedDefaultRoute(options.defaultRoute, store)  ← string defaultRoute only
+    │               (callback defaultRoute is validated at runtime via ctx.validator?.options.validateResolvedDefaultRoute,
+    │                called from core's resolveDefault() on each navigateToDefault() / start() fallback)
     │
     │   On error: ctx.validator = null  ← rollback, then re-throw
     │
@@ -164,11 +169,11 @@ Examples:
 
 **Error type mapping:**
 
-| Error type       | When to use                                                   |
-| ---------------- | ------------------------------------------------------------- |
-| `TypeError`      | Wrong argument type or shape                                  |
-| `ReferenceError` | Resource not found (route, dependency)                        |
-| `RangeError`     | Numeric limit exceeded (`maxPlugins`, `maxLifecycleHandlers`) |
+| Error type       | When to use                                                                                                          |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `TypeError`      | Wrong argument type or shape                                                                                         |
+| `ReferenceError` | Resource not found (route, dependency)                                                                               |
+| `RangeError`     | Numeric limit exceeded (`maxPlugins`, `maxLifecycleHandlers`), cross-field limit violation (`warnListeners > maxListeners`) |
 
 Retrospective validation errors use `[validation-plugin]` prefix instead of `[router.METHOD]`, because no specific public method was called — the plugin is checking accumulated state at registration time:
 

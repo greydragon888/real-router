@@ -155,6 +155,47 @@ describe("options validators", () => {
         );
       }).not.toThrow();
     });
+
+    describe("warnListeners vs maxListeners cross-field (#471 case 1)", () => {
+      it("throws RangeError when warnListeners exceeds maxListeners", () => {
+        expect(() => {
+          validateLimits({ warnListeners: 5000, maxListeners: 100 }, "test");
+        }).toThrow(RangeError);
+        expect(() => {
+          validateLimits({ warnListeners: 5000, maxListeners: 100 }, "test");
+        }).toThrow(/warning channel would be unreachable/);
+      });
+
+      it("accepts warnListeners equal to maxListeners", () => {
+        expect(() => {
+          validateLimits({ warnListeners: 100, maxListeners: 100 }, "test");
+        }).not.toThrow();
+      });
+
+      it("accepts warnListeners below maxListeners", () => {
+        expect(() => {
+          validateLimits({ warnListeners: 50, maxListeners: 100 }, "test");
+        }).not.toThrow();
+      });
+
+      it("skips cross-check when maxListeners is 0 (unlimited)", () => {
+        expect(() => {
+          validateLimits({ warnListeners: 5000, maxListeners: 0 }, "test");
+        }).not.toThrow();
+      });
+
+      it("skips cross-check when only warnListeners provided", () => {
+        expect(() => {
+          validateLimits({ warnListeners: 5000 }, "test");
+        }).not.toThrow();
+      });
+
+      it("skips cross-check when only maxListeners provided", () => {
+        expect(() => {
+          validateLimits({ maxListeners: 100 }, "test");
+        }).not.toThrow();
+      });
+    });
   });
 });
 
@@ -957,6 +998,53 @@ describe("Phase 2 options validators", () => {
       expect(() => {
         validateOptions({ logger: { callback: () => {} } }, "test");
       }).not.toThrow();
+    });
+
+    describe("callbackIgnoresLevel without callback (#471 case 4)", () => {
+      let errorSpy: ReturnType<typeof vi.spyOn>;
+
+      beforeEach(() => {
+        errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+      });
+
+      afterEach(() => {
+        errorSpy.mockRestore();
+      });
+
+      it("logs error when callbackIgnoresLevel is true and callback missing", () => {
+        validateOptions({ logger: { callbackIgnoresLevel: true } }, "test");
+
+        expect(errorSpy).toHaveBeenCalledWith(
+          "router.test",
+          expect.stringContaining("has no effect without"),
+        );
+      });
+
+      it("does not log error when callbackIgnoresLevel is false", () => {
+        validateOptions({ logger: { callbackIgnoresLevel: false } }, "test");
+
+        expect(errorSpy).not.toHaveBeenCalled();
+      });
+
+      it("does not log error when callback is provided alongside callbackIgnoresLevel", () => {
+        validateOptions(
+          {
+            logger: {
+              callbackIgnoresLevel: true,
+              callback: () => {},
+            },
+          },
+          "test",
+        );
+
+        expect(errorSpy).not.toHaveBeenCalled();
+      });
+
+      it("does not log error when callbackIgnoresLevel is undefined", () => {
+        validateOptions({ logger: { level: "all" } }, "test");
+
+        expect(errorSpy).not.toHaveBeenCalled();
+      });
     });
   });
 });
