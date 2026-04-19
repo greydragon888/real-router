@@ -1,5 +1,34 @@
 # @real-router/validation-plugin
 
+## 0.6.0
+
+### Minor Changes
+
+- [#484](https://github.com/greydragon888/real-router/pull/484) [`4db4ada`](https://github.com/greydragon888/real-router/commit/4db4ada42154d4101bd7fde6a7e9fa041ca35e23) Thanks [@greydragon888](https://github.com/greydragon888)! - Log error when `logger.callbackIgnoresLevel` is set without `logger.callback` ([#471](https://github.com/greydragon888/real-router/issues/471))
+
+  `callbackIgnoresLevel` only has meaning when a `callback` is provided; setting it alone was a silent no-op. `validateOptions` now emits `logger.error` in that case — the option is non-load-bearing, so throwing would be overreach, but a silent ignore left users debugging phantom log-filter behavior.
+
+  The check fires whenever `validateOptions` runs (router construction via retrospective pass, direct calls via `RouterValidator.options.validateOptions`).
+
+- [#484](https://github.com/greydragon888/real-router/pull/484) [`4db4ada`](https://github.com/greydragon888/real-router/commit/4db4ada42154d4101bd7fde6a7e9fa041ca35e23) Thanks [@greydragon888](https://github.com/greydragon888)! - Validate `defaultRoute` resolves to an existing route ([#471](https://github.com/greydragon888/real-router/issues/471))
+
+  `validationPlugin` now verifies that `options.defaultRoute` points to a route that actually exists in the route tree:
+  - **Static string `defaultRoute`** — checked at `router.usePlugin(validationPlugin())` time. A non-existent name throws immediately with `[validation-plugin] defaultRoute resolved to non-existent route: "<name>"`.
+  - **`DefaultRouteCallback`** — checked at runtime inside `resolveDefault()` on every `navigateToDefault()` / `start()` invocation. A callback that returns a non-existent route name surfaces as `Promise.reject` from `navigateToDefault()` with the same error message instead of the previous opaque `ROUTE_NOT_FOUND`.
+
+  Callbacks are **not** probed at registration time — their return value depends on dependencies that may not be registered yet. The runtime check guarantees that a bad return value is diagnosed on first navigation with a pointer to the callback as the source, rather than the generic `ROUTE_NOT_FOUND` at an unrelated call site.
+
+- [#484](https://github.com/greydragon888/real-router/pull/484) [`4db4ada`](https://github.com/greydragon888/real-router/commit/4db4ada42154d4101bd7fde6a7e9fa041ca35e23) Thanks [@greydragon888](https://github.com/greydragon888)! - Reject `warnListeners > maxListeners` cross-field combination ([#471](https://github.com/greydragon888/real-router/issues/471))
+
+  `validateLimits` now throws `RangeError` when `limits.warnListeners` exceeds `limits.maxListeners` (and `maxListeners > 0`). Previously both bounds were checked only in isolation, so `{ warnListeners: 5000, maxListeners: 100 }` passed validation yet the warning channel was dead code — the hard cap would always fire first.
+
+  The check fires both on router construction (when validation-plugin is installed) and through any direct `validateOptions` / `validateLimits` call. `maxListeners: 0` (unlimited) disables the cross-check, matching the existing "0 means unlimited" convention.
+
+### Patch Changes
+
+- Updated dependencies [[`4db4ada`](https://github.com/greydragon888/real-router/commit/4db4ada42154d4101bd7fde6a7e9fa041ca35e23), [`4db4ada`](https://github.com/greydragon888/real-router/commit/4db4ada42154d4101bd7fde6a7e9fa041ca35e23)]:
+  - @real-router/core@0.49.0
+
 ## 0.5.1
 
 ### Patch Changes
