@@ -48,9 +48,21 @@
 | 1   | Optional param value roundtrip | `match(buildPath("search", {query})).params` equals `{query}`. Optional parameter values survive the build/match cycle, not just the route name (which Matching #3 already covers).          |
 | 2   | Encoding-aware roundtrip       | `match(buildPath(name, params)).params` equals the original params for all 4 encoding strategies (`default`, `uri`, `uriComponent`, `none`). Matching #1/#2 only test with default encoding. |
 
+## Undefined-strip (Layered Contract)
+
+Level 2 of the layered `undefined`-strip contract defined in [rfc-query-param-semantics.md](../core/.claude/rfc/rfc-query-param-semantics.md) section 5.3 bis. `SegmentMatcher.buildPath` never emits `undefined` into the final URL regardless of how the injected query engine behaves.
+
+| #   | Invariant                                   | Description                                                                                                                                                                           |
+| --- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | URL output never contains `undefined`       | For any `params` (including mixed `defined + undefined`), `buildPath(name, params, { queryParamsMode: "loose" })` produces a URL with no `=undefined` segment and no literal `undefined` key. |
+| 2   | Build → match recovers only defined keys    | After `match(buildPath(name, params))`, any key whose input value was `undefined` is absent from `result.params`. Defined keys survive the cycle.                                     |
+| 3   | Undefined-key equivalence                   | `buildPath(name, {defined, key: undefined})` produces the identical URL to `buildPath(name, {defined})` for any defined subset. Adding or removing `undefined` keys does not affect output. |
+| 4   | Engine-independence of final URL            | Even when the injected `buildQueryString` performs no filtering, the final URL produced by `buildPath` contains no `=undefined` segment. Documents the current matcher contract (strip happens at engine or caller level). |
+
 ## Test Files
 
-| File                                    | Invariants | Category                                                                            |
-| --------------------------------------- | ---------- | ----------------------------------------------------------------------------------- |
-| `tests/property/encoding.properties.ts` | 7          | URL parameter encoding/decoding                                                     |
-| `tests/property/matching.properties.ts` | 21         | Segment Trie matching, path building, rejection, hash stripping, encoding roundtrip |
+| File                                           | Invariants | Category                                                                            |
+| ---------------------------------------------- | ---------- | ----------------------------------------------------------------------------------- |
+| `tests/property/encoding.properties.ts`        | 7          | URL parameter encoding/decoding                                                     |
+| `tests/property/matching.properties.ts`        | 21         | Segment Trie matching, path building, rejection, hash stripping, encoding roundtrip |
+| `tests/property/undefined-strip.properties.ts` | 4          | Undefined-strip layered contract (RFC 5.3 bis, level 2)                             |

@@ -11,9 +11,14 @@
 
 import { measure, do_not_optimize } from "mitata";
 
-import { SegmentMatcher, buildParamMeta } from "../../src";
+import { buildParamMeta } from "../../src";
+import { createTestMatcher } from "../helpers/createTestMatcher";
 
-import type { MatcherInputNode, SegmentMatcherOptions } from "../../src";
+import type {
+  MatcherInputNode,
+  SegmentMatcherOptions,
+  SegmentMatcher,
+} from "../../src";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -112,10 +117,10 @@ function buildTree(routes: SimpleRoute[]): MatcherInputNode {
 
 function createMatcher(
   routes: SimpleRoute[],
-  options?: SegmentMatcherOptions,
+  options?: Partial<SegmentMatcherOptions>,
 ): SegmentMatcher {
   const tree = buildTree(routes);
-  const matcher = new SegmentMatcher(options);
+  const matcher = createTestMatcher(options);
 
   matcher.registerTree(tree);
 
@@ -209,7 +214,7 @@ async function main(): Promise<void> {
     await isolatedMeasure(
       `registerTree ${count} static routes`,
       () => {
-        const matcher = new SegmentMatcher();
+        const matcher = createTestMatcher();
 
         matcher.registerTree(tree);
       },
@@ -224,7 +229,7 @@ async function main(): Promise<void> {
     await isolatedMeasure(
       `registerTree ${count} param routes`,
       () => {
-        const matcher = new SegmentMatcher();
+        const matcher = createTestMatcher();
 
         matcher.registerTree(tree);
       },
@@ -239,7 +244,7 @@ async function main(): Promise<void> {
     await isolatedMeasure(
       `registerTree ${count} query routes`,
       () => {
-        const matcher = new SegmentMatcher();
+        const matcher = createTestMatcher();
 
         matcher.registerTree(tree);
       },

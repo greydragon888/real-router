@@ -1,13 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { buildParamMeta } from "../../src/buildParamMeta";
-import {
-  createSegmentNode,
-  defaultBuildQueryString,
-  defaultParseQueryString,
-  SegmentMatcher,
-} from "../../src/SegmentMatcher";
+import { createSegmentNode } from "../../src/SegmentMatcher";
+import { createTestMatcher } from "../helpers/createTestMatcher";
 
+import type { SegmentMatcher } from "../../src/SegmentMatcher";
 import type {
   BuildParamSlot,
   CompiledRoute,
@@ -32,82 +29,6 @@ function createInputNode(
     ...overrides,
   };
 }
-
-// =============================================================================
-// Default DI Functions
-// =============================================================================
-
-describe("defaultParseQueryString", () => {
-  it("should return empty object for empty string", () => {
-    expect(defaultParseQueryString("")).toStrictEqual({});
-  });
-
-  it("should parse key=value pairs", () => {
-    expect(defaultParseQueryString("a=1&b=2")).toStrictEqual({
-      a: "1",
-      b: "2",
-    });
-  });
-
-  it("should handle keys without values", () => {
-    expect(defaultParseQueryString("flag")).toStrictEqual({ flag: "" });
-  });
-
-  it("should handle mixed keys with and without values", () => {
-    expect(defaultParseQueryString("a=1&flag&b=2")).toStrictEqual({
-      a: "1",
-      flag: "",
-      b: "2",
-    });
-  });
-
-  it("should decode URI-encoded values", () => {
-    expect(defaultParseQueryString("q=hello%20world")).toStrictEqual({
-      q: "hello world",
-    });
-  });
-
-  it("should decode URI-encoded keys", () => {
-    expect(defaultParseQueryString("hello%20key=value")).toStrictEqual({
-      "hello key": "value",
-    });
-  });
-
-  it("should decode special characters", () => {
-    expect(defaultParseQueryString("a=%26&b=%3D")).toStrictEqual({
-      a: "&",
-      b: "=",
-    });
-  });
-
-  it("should roundtrip with defaultBuildQueryString", () => {
-    const params = { q: "hello world", tag: "a&b", eq: "x=y" };
-    const built = defaultBuildQueryString(params);
-    const parsed = defaultParseQueryString(built);
-
-    expect(parsed).toStrictEqual(params);
-  });
-});
-
-describe("defaultBuildQueryString", () => {
-  it("should return empty string for empty object", () => {
-    expect(defaultBuildQueryString({})).toBe("");
-  });
-
-  it("should build key=value pairs", () => {
-    expect(defaultBuildQueryString({ a: "1", b: "2" })).toBe("a=1&b=2");
-  });
-
-  it("should omit value for empty string values", () => {
-    expect(defaultBuildQueryString({ flag: "" })).toBe("flag");
-  });
-
-  it("should handle mixed values", () => {
-    expect(defaultBuildQueryString({ a: "1", flag: "", b: "2" })).toBe(
-      "a=1&flag&b=2",
-    );
-  });
-});
 
 // =============================================================================
 // Type Compilation Tests
@@ -182,6 +103,8 @@ describe("type compilation", () => {
       strictTrailingSlash: false,
       strictQueryParams: false,
       urlParamsEncoding: "default",
+      parseQueryString: () => ({}),
+      buildQueryString: () => "",
     };
 
     expect(options.caseSensitive).toBe(true);
@@ -249,7 +172,7 @@ describe("createSegmentNode", () => {
 describe("SegmentMatcher", () => {
   describe("constructor", () => {
     it("should resolve default options", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       expect(matcher.options.caseSensitive).toBe(true);
       expect(matcher.options.strictTrailingSlash).toBe(false);
@@ -260,14 +183,14 @@ describe("SegmentMatcher", () => {
     });
 
     it("should resolve empty options to defaults", () => {
-      const matcher = new SegmentMatcher({});
+      const matcher = createTestMatcher({});
 
       expect(matcher.options.caseSensitive).toBe(true);
       expect(matcher.options.strictTrailingSlash).toBe(false);
     });
 
     it("should accept custom options", () => {
-      const matcher = new SegmentMatcher({
+      const matcher = createTestMatcher({
         caseSensitive: false,
         strictTrailingSlash: true,
         strictQueryParams: true,
@@ -287,7 +210,7 @@ describe("SegmentMatcher", () => {
       const buildQueryString = (params: Record<string, unknown>): string =>
         JSON.stringify(params);
 
-      const matcher = new SegmentMatcher({
+      const matcher = createTestMatcher({
         parseQueryString,
         buildQueryString,
       });
@@ -303,7 +226,7 @@ describe("SegmentMatcher", () => {
 
   describe("registerTree", () => {
     it("should register single static route", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
       const node = createInputNode({ name: "home", path: "/" });
 
       matcher.registerTree(node);
@@ -312,13 +235,13 @@ describe("SegmentMatcher", () => {
     });
 
     it("should return false for unregistered route", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       expect(matcher.hasRoute("nonexistent")).toBe(false);
     });
 
     it("should register route with path segments", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
       const node = createInputNode({ name: "users", path: "/users" });
 
       matcher.registerTree(node);
@@ -327,7 +250,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should register nested routes via children", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const profileNode = createInputNode({
         name: "profile",
@@ -350,7 +273,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should register deeply nested routes", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const settingsNode = createInputNode({
         name: "settings",
@@ -388,7 +311,7 @@ describe("SegmentMatcher", () => {
 
   describe("match — static routes", () => {
     function createStaticMatcher(): SegmentMatcher {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
       const aboutNode = createInputNode({
         name: "about",
         path: "/about",
@@ -529,7 +452,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should handle case-insensitive matching", () => {
-      const matcher = new SegmentMatcher({ caseSensitive: false });
+      const matcher = createTestMatcher({ caseSensitive: false });
       const aboutNode = createInputNode({
         name: "about",
         path: "/about",
@@ -561,7 +484,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should match nested static routes", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
       const settingsNode = createInputNode({
         name: "settings",
         path: "/settings",
@@ -594,7 +517,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should register route with query params in path", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
       const searchNode = createInputNode({
         name: "search",
         path: "/search?q&page",
@@ -617,7 +540,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should register route with trailing slash in path", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
       const trailingNode = createInputNode({
         name: "trailing",
         path: "/trailing/",
@@ -640,7 +563,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should handle child with empty path (slash-child)", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
       const listNode = createInputNode({
         name: "list",
         path: "",
@@ -668,7 +591,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should register route with param constraint", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
       const userNode = createInputNode({
         name: "user",
         path: String.raw`/users/:id<\d+>`,
@@ -688,7 +611,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should return nested meta with all segments", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
       const settingsNode = createInputNode({
         name: "settings",
         path: "/settings",
@@ -727,7 +650,7 @@ describe("SegmentMatcher", () => {
 
   describe("buildPath — static routes", () => {
     function createStaticMatcher(): SegmentMatcher {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
       const aboutNode = createInputNode({
         name: "about",
         path: "/about",
@@ -783,7 +706,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should build nested static path", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
       const settingsNode = createInputNode({
         name: "settings",
         path: "/settings",
@@ -816,7 +739,7 @@ describe("SegmentMatcher", () => {
 
   describe("getSegmentsByName", () => {
     it("should return segments for registered route", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
       const aboutNode = createInputNode({
         name: "about",
         path: "/about",
@@ -840,13 +763,13 @@ describe("SegmentMatcher", () => {
     });
 
     it("should return undefined for unregistered route", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       expect(matcher.getSegmentsByName("unknown")).toBeUndefined();
     });
 
     it("should return frozen segments array", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
       const aboutNode = createInputNode({
         name: "about",
         path: "/about",
@@ -868,7 +791,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should return nested segments chain", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
       const settingsNode = createInputNode({
         name: "settings",
         path: "/settings",
@@ -905,13 +828,13 @@ describe("SegmentMatcher", () => {
 
   describe("getMetaByName", () => {
     it("should return undefined for unregistered route", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       expect(matcher.getMetaByName("home")).toBeUndefined();
     });
 
     it("should return meta for registered route", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
       const aboutNode = createInputNode({
         name: "about",
         path: "/about",
@@ -933,7 +856,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should return frozen meta object", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
       const aboutNode = createInputNode({
         name: "about",
         path: "/about",
@@ -961,7 +884,7 @@ describe("SegmentMatcher", () => {
 
   describe("setRootPath", () => {
     it("should accept root path string", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       expect(() => {
         matcher.setRootPath("/app");
@@ -969,7 +892,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should affect buildPath output", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
       const aboutNode = createInputNode({
         name: "about",
         path: "/about",
@@ -996,7 +919,7 @@ describe("SegmentMatcher", () => {
 
   describe("hasRoute", () => {
     it("should return true for registered route", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
       const node = createInputNode({ name: "home", path: "/" });
 
       matcher.registerTree(node);
@@ -1005,13 +928,13 @@ describe("SegmentMatcher", () => {
     });
 
     it("should return false for unregistered route", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       expect(matcher.hasRoute("anything")).toBe(false);
     });
 
     it("should use fullName for lookup", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const profileNode = createInputNode({
         name: "profile",
@@ -1041,9 +964,9 @@ describe("SegmentMatcher", () => {
 
   describe("match — param routes", () => {
     function createParamMatcher(
-      options?: SegmentMatcherOptions,
+      options?: Partial<SegmentMatcherOptions>,
     ): SegmentMatcher {
-      const matcher = new SegmentMatcher(options);
+      const matcher = createTestMatcher(options);
 
       const profileNode = createInputNode({
         name: "profile",
@@ -1157,7 +1080,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should prioritize static over param", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const newNode = createInputNode({
         name: "new",
@@ -1208,7 +1131,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should return undefined when no param and no static match", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const usersNode = createInputNode({
         name: "users",
@@ -1231,7 +1154,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should match multiple params", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const postNode = createInputNode({
         name: "post",
@@ -1320,7 +1243,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should handle slash-child with param parent", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const listNode = createInputNode({
         name: "list",
@@ -1362,7 +1285,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should handle param at root level", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const itemNode = createInputNode({
         name: "item",
@@ -1417,7 +1340,7 @@ describe("SegmentMatcher", () => {
 
   describe("buildPath — param routes", () => {
     function createParamBuildMatcher(): SegmentMatcher {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const profileNode = createInputNode({
         name: "profile",
@@ -1513,7 +1436,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should build path with multiple params", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const postNode = createInputNode({
         name: "post",
@@ -1560,7 +1483,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should build path with param between static segments", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const settingsNode = createInputNode({
         name: "settings",
@@ -1608,7 +1531,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should encode splat param preserving / separators", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const filesNode = createInputNode({
         name: "files",
@@ -1632,7 +1555,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should encode splat param segments individually", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const filesNode = createInputNode({
         name: "files",
@@ -1656,7 +1579,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should use no encoding for params when urlParamsEncoding is none", () => {
-      const matcher = new SegmentMatcher({ urlParamsEncoding: "none" });
+      const matcher = createTestMatcher({ urlParamsEncoding: "none" });
 
       const profileNode = createInputNode({
         name: "profile",
@@ -1688,7 +1611,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should skip optional param when value is undefined", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const searchNode = createInputNode({
         name: "search",
@@ -1710,7 +1633,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should validate constraints in buildPath", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const profileNode = createInputNode({
         name: "profile",
@@ -1753,7 +1676,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should skip constraint validation for undefined optional param", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const profileNode = createInputNode({
         name: "profile",
@@ -1818,7 +1741,7 @@ describe("SegmentMatcher", () => {
       profileNode: MatcherInputNode;
       settingsNode: MatcherInputNode;
     } {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const settingsNode = createInputNode({
         name: "settings",
@@ -2003,7 +1926,7 @@ describe("SegmentMatcher", () => {
 
   describe("slash-child routes", () => {
     function createSlashChildMatcher(): SegmentMatcher {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const listNode = createInputNode({
         name: "list",
@@ -2070,7 +1993,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should handle slash-child with empty path (path: '')", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const listNode = createInputNode({
         name: "list",
@@ -2104,7 +2027,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should handle slash-child with parent param route", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const listNode = createInputNode({
         name: "list",
@@ -2173,7 +2096,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should prefer parent route over slash-child", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const usersNode = createInputNode({
         name: "users",
@@ -2199,7 +2122,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should buildPath for slash-child with parent params", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const listNode = createInputNode({
         name: "list",
@@ -2245,7 +2168,7 @@ describe("SegmentMatcher", () => {
 
   describe("match — optional params", () => {
     function createOptionalParamMatcher(): SegmentMatcher {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const searchNode = createInputNode({
         name: "search",
@@ -2287,7 +2210,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should handle optional param in middle of path", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const searchNode = createInputNode({
         name: "search",
@@ -2317,7 +2240,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should handle consecutive optional params", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const routeNode = createInputNode({
         name: "route",
@@ -2363,7 +2286,7 @@ describe("SegmentMatcher", () => {
   describe("buildPath — optional params", () => {
     // eslint-disable-next-line sonarjs/no-identical-functions -- Test fixture intentionally similar to match suite - tests buildPath behavior vs match behavior
     function createOptionalBuildMatcher(): SegmentMatcher {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const searchNode = createInputNode({
         name: "search",
@@ -2405,7 +2328,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should not produce double slash for optional-in-middle", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const searchNode = createInputNode({
         name: "search",
@@ -2430,7 +2353,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should handle consecutive optionals in buildPath", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const routeNode = createInputNode({
         name: "route",
@@ -2463,7 +2386,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should handle optional param at root level", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const routeNode = createInputNode({
         name: "item",
@@ -2492,7 +2415,7 @@ describe("SegmentMatcher", () => {
 
   describe("match — splat routes", () => {
     function createSplatMatcher(): SegmentMatcher {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const filesNode = createInputNode({
         name: "files",
@@ -2591,7 +2514,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should prioritize static over splat", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const staticChildNode = createInputNode({
         name: "docs",
@@ -2634,7 +2557,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should prioritize param over splat", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const paramChildNode = createInputNode({
         name: "item",
@@ -2682,7 +2605,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should handle splat in nested route", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const catchAllNode = createInputNode({
         name: "catchall",
@@ -2724,7 +2647,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should handle case-insensitive static + splat", () => {
-      const matcher = new SegmentMatcher({ caseSensitive: false });
+      const matcher = createTestMatcher({ caseSensitive: false });
 
       const filesNode = createInputNode({
         name: "files",
@@ -2749,7 +2672,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should skip decoding splat when urlParamsEncoding is none", () => {
-      const matcher = new SegmentMatcher({ urlParamsEncoding: "none" });
+      const matcher = createTestMatcher({ urlParamsEncoding: "none" });
 
       const filesNode = createInputNode({
         name: "files",
@@ -2782,7 +2705,7 @@ describe("SegmentMatcher", () => {
 
   describe("buildPath — splat routes", () => {
     it("should build path with splat param preserving /", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const filesNode = createInputNode({
         name: "files",
@@ -2806,7 +2729,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should prepend rootPath to splat path", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const filesNode = createInputNode({
         name: "files",
@@ -2837,7 +2760,7 @@ describe("SegmentMatcher", () => {
 
   describe("buildPath — trailing slash options", () => {
     it("should add trailing slash when mode is 'always'", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const homeNode = createInputNode({
         name: "home",
@@ -2861,7 +2784,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should not double trailing slash when already present", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const homeNode = createInputNode({
         name: "home",
@@ -2885,7 +2808,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should remove trailing slash when mode is 'never'", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const homeNode = createInputNode({
         name: "home",
@@ -2909,7 +2832,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should not remove slash from root path '/'", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const indexNode = createInputNode({
         name: "index",
@@ -2933,7 +2856,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should not modify path without trailingSlash option", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const homeNode = createInputNode({
         name: "home",
@@ -2961,7 +2884,7 @@ describe("SegmentMatcher", () => {
 
   describe("buildPath — query string options", () => {
     it("should include declared query params", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const searchNode = createInputNode({
         name: "search",
@@ -2985,7 +2908,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should omit query params not in params", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const searchNode = createInputNode({
         name: "search",
@@ -3009,7 +2932,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should return path without query string when no query params are provided", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const searchNode = createInputNode({
         name: "search",
@@ -3031,7 +2954,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should inherit root query params to child routes", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const usersNode = createInputNode({
         name: "users",
@@ -3055,7 +2978,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should add undeclared params as query params in loose mode", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const usersNode = createInputNode({
         name: "users",
@@ -3083,7 +3006,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should not add undeclared params in default mode", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const usersNode = createInputNode({
         name: "users",
@@ -3107,7 +3030,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should not duplicate declared query params in loose mode", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const searchNode = createInputNode({
         name: "search",
@@ -3135,7 +3058,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should combine trailing slash and query params", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const searchNode = createInputNode({
         name: "search",
@@ -3159,7 +3082,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should return empty query string when no params given", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const homeNode = createInputNode({
         name: "home",
@@ -3187,7 +3110,7 @@ describe("SegmentMatcher", () => {
 
   describe("absolute paths (~prefix)", () => {
     it("should match absolute path from root", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const dashboardNode = createInputNode({
         name: "dashboard",
@@ -3223,7 +3146,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should include full ancestor chain in matchSegments", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const dashboardNode = createInputNode({
         name: "dashboard",
@@ -3259,7 +3182,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should buildPath for absolute route from root", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const dashboardNode = createInputNode({
         name: "dashboard",
@@ -3290,7 +3213,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should not match absolute route on parent path", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const dashboardNode = createInputNode({
         name: "dashboard",
@@ -3322,7 +3245,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should handle absolute path with params", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const detailNode = createInputNode({
         name: "detail",
@@ -3359,7 +3282,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should buildPath for absolute route with params", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const detailNode = createInputNode({
         name: "detail",
@@ -3390,7 +3313,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should handle order independence — absolute registered first", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const dashboardNode = createInputNode({
         name: "dashboard",
@@ -3437,7 +3360,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should return correct meta for absolute route", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const dashboardNode = createInputNode({
         name: "dashboard",
@@ -3474,7 +3397,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should handle absolute root path", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const homeNode = createInputNode({
         name: "home",
@@ -3515,7 +3438,7 @@ describe("SegmentMatcher", () => {
 
   describe("slash-child — case-insensitive", () => {
     it("should update static cache for slash-child with case-insensitive matching", () => {
-      const matcher = new SegmentMatcher({ caseSensitive: false });
+      const matcher = createTestMatcher({ caseSensitive: false });
 
       const listNode = createInputNode({
         name: "list",
@@ -3555,9 +3478,9 @@ describe("SegmentMatcher", () => {
 
   describe("match — query parameters", () => {
     function createQueryMatcher(
-      options?: SegmentMatcherOptions,
+      options?: Partial<SegmentMatcherOptions>,
     ): SegmentMatcher {
-      const matcher = new SegmentMatcher(options);
+      const matcher = createTestMatcher(options);
 
       const searchNode = createInputNode({
         name: "search",
@@ -3635,7 +3558,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should merge URL params with query params", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const profileNode = createInputNode({
         name: "profile",
@@ -3671,7 +3594,7 @@ describe("SegmentMatcher", () => {
       const customParser = (qs: string): Record<string, unknown> => ({
         raw: qs,
       });
-      const matcher = new SegmentMatcher({ parseQueryString: customParser });
+      const matcher = createTestMatcher({ parseQueryString: customParser });
 
       const homeNode = createInputNode({
         name: "home",
@@ -3701,7 +3624,7 @@ describe("SegmentMatcher", () => {
       const result = matcher.match("/search?query");
 
       expect(result).toBeDefined();
-      expect(result!.params).toStrictEqual({ query: "" });
+      expect(result!.params).toStrictEqual({ query: null });
     });
 
     it("should handle strict mode with no query params on URL", () => {
@@ -3737,7 +3660,7 @@ describe("SegmentMatcher", () => {
 
   describe("match — strict trailing slash", () => {
     function createStrictSlashMatcher(): SegmentMatcher {
-      const matcher = new SegmentMatcher({ strictTrailingSlash: true });
+      const matcher = createTestMatcher({ strictTrailingSlash: true });
 
       const trailingNode = createInputNode({
         name: "trailing",
@@ -3814,7 +3737,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should handle strict trailing slash with param routes", () => {
-      const matcher = new SegmentMatcher({ strictTrailingSlash: true });
+      const matcher = createTestMatcher({ strictTrailingSlash: true });
 
       const profileNode = createInputNode({
         name: "profile",
@@ -3855,7 +3778,7 @@ describe("SegmentMatcher", () => {
 
   describe("match — case sensitivity", () => {
     function createCaseInsensitiveMatcher(): SegmentMatcher {
-      const matcher = new SegmentMatcher({ caseSensitive: false });
+      const matcher = createTestMatcher({ caseSensitive: false });
 
       const profileNode = createInputNode({
         name: "profile",
@@ -3931,7 +3854,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should reject unknown path in case-sensitive mode", () => {
-      const matcher = new SegmentMatcher({ caseSensitive: true });
+      const matcher = createTestMatcher({ caseSensitive: true });
 
       const usersNode = createInputNode({
         name: "users",
@@ -3959,7 +3882,7 @@ describe("SegmentMatcher", () => {
 
   describe("match — setRootPath", () => {
     function createRootPathMatcher(): SegmentMatcher {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
 
       const profileNode = createInputNode({
         name: "profile",
@@ -4102,7 +4025,7 @@ describe("SegmentMatcher", () => {
 
   describe("constraint validation", () => {
     it("should match when param satisfies numeric constraint", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
       const userNode = createInputNode({
         name: "user",
         path: String.raw`/users/:id<\d+>`,
@@ -4125,7 +4048,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should reject when param fails numeric constraint", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
       const userNode = createInputNode({
         name: "user",
         path: String.raw`/users/:id<\d+>`,
@@ -4147,7 +4070,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should match without constraints (fast path, hasConstraints is false)", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
       const userNode = createInputNode({
         name: "user",
         path: "/users/:id",
@@ -4170,7 +4093,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should validate constraint against raw (pre-decode) param value", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
       const userNode = createInputNode({
         name: "user",
         path: String.raw`/users/:id<\d+>`,
@@ -4193,7 +4116,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should validate multiple constraints on different params", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
       const postNode = createInputNode({
         name: "post",
         path: String.raw`/:postId<\d+>`,
@@ -4226,7 +4149,7 @@ describe("SegmentMatcher", () => {
     });
 
     it("should match with alpha constraint", () => {
-      const matcher = new SegmentMatcher();
+      const matcher = createTestMatcher();
       const slugNode = createInputNode({
         name: "slug",
         path: String.raw`/posts/:slug<[a-z-]+>`,

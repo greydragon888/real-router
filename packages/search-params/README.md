@@ -75,6 +75,30 @@ parse("page=1&price=12.5&name=abc", { numberFormat: "auto" });
 // → { page: 1, price: 12.5, name: "abc" }
 ```
 
+## Value Semantics
+
+| Input                      | `build(...)` output                    | Notes                                  |
+| -------------------------- | -------------------------------------- | -------------------------------------- |
+| `undefined`                | stripped                               | Key absent from URL                    |
+| `null`                     | `?key` (key-only)                      | Via `nullFormat: "default"`            |
+| `""` (empty string)        | `?key=` (explicit empty)               | Distinct from `null` — roundtrip with `parse("?key=") → { key: "" }` |
+| `"value"`                  | `?key=value` (URI-encoded)             |                                        |
+| `0`, `false`               | `?key=0`, `?key=false`                 | Falsy-but-defined preserved            |
+
+| URL fragment               | `parse(...)` with default options  |
+| -------------------------- | ---------------------------------- |
+| `?flag`                    | `{ flag: null }` (key-only → `null`) |
+| `?flag=`                   | `{ flag: "" }` (explicit empty value) |
+| `?flag=x`                  | `{ flag: "x" }`                    |
+
+**Key distinction:** `?flag` and `?flag=` are NOT equivalent. `null` (absent value) and `""` (present-but-empty) are distinct states. `undefined` is a third state — never emitted and never parsed (always absent key).
+
+## Interaction with `@real-router/core`
+
+`@real-router/core` normalizes `undefined` at its own boundary via `normalizeParams` (see [core README — Params Contract](../core/README.md#params-contract)). The `search-params.build()` strip of `undefined` acts as defense-in-depth at the string-serialization layer — both packages protect their own contract independently.
+
+Use `booleanFormat: "empty-true"` together with [@real-router/search-schema-plugin](../search-schema-plugin/README.md) when schema declares `z.boolean()` — the plugin sees already-decoded `boolean` values, not strings.
+
 ## Key Design Decisions
 
 - **Single-pass parsing** — no intermediate arrays

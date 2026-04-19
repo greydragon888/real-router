@@ -213,6 +213,70 @@ const routes: Route[] = [
 ];
 ```
 
+## Params Contract
+
+`router.navigate(name, params)` and `router.buildPath(name, params)` follow a stable contract for how each value type is serialized into the URL and preserved in `state.params`:
+
+### Input — `params` object values
+
+| Value                      | URL path param (`:id`) | URL query param (`?q`)                             | `state.params` after navigation |
+| -------------------------- | ---------------------- | -------------------------------------------------- | ------------------------------- |
+| `undefined`                | Error (required) / skip (optional `:id?`) | **stripped** — parameter absent from URL         | Key absent (`"q" in params` is `false`) |
+| `null`                     | Same as `undefined`    | `?q` (key-only, via `nullFormat: "default"`)       | `null`                          |
+| `""` (empty string)        | Empty segment (caller's responsibility) | `?q=` (explicit empty value, distinct from `null`) | `""`                            |
+| `string`                   | Encoded per `urlParamsEncoding` | `?q=value` (URI-encoded)                           | Unchanged                       |
+| `number`                   | `/users/42`            | `?q=42`                                            | `42` (number, via `numberFormat: "auto"`) |
+| `boolean`                  | `/users/true`          | `?q=true` / `?q=false` (via `booleanFormat: "auto"`) | `true` / `false`              |
+| `0`, `false` (falsy-defined) | Coerced to string   | Preserved (not stripped)                           | Preserved                       |
+
+**`undefined` is stripped at the core boundary.** This is an explicit public contract, not an implementation detail. Plugins that add `undefined` values via `addInterceptor("forwardState")` also have them scrubbed before URL and state.
+
+### Output — parsing query strings back (`match()`)
+
+| URL fragment  | `booleanFormat: "auto"` (default) | `booleanFormat: "empty-true"` | `booleanFormat: "none"` |
+| ------------- | --------------------------------- | ----------------------------- | ----------------------- |
+| `?flag`       | `null`                            | `true`                        | `null`                  |
+| `?flag=`      | `""`                              | `""`                          | `""`                    |
+| `?flag=x`     | `"x"`                             | `"x"`                         | `"x"`                   |
+| `?flag=true`  | `true` (coerced)                  | `"true"`                      | `"true"`                |
+| `?flag=false` | `false` (coerced)                 | `"false"`                     | `"false"`               |
+
+**`?flag` and `?flag=` are distinct**: three-state expressiveness (absent / explicit empty / has value). Matches `search-params` engine semantics.
+
+### Example
+
+```typescript
+router.navigate("search", {
+  q: "hello",
+  page: undefined, // stripped
+  sort: null, // becomes ?sort (key-only)
+  filter: "", // becomes ?filter= (explicit empty)
+  active: true, // becomes ?active=true
+});
+// URL: /search?q=hello&sort&filter=&active=true
+//
+// state.params:
+//   { q: "hello", sort: null, filter: "", active: true }
+//   ("page" key is absent)
+```
+
+### Configuration
+
+Query string behavior is configurable via `queryParams` option on `createRouter`:
+
+```typescript
+const router = createRouter(routes, {
+  queryParams: {
+    booleanFormat: "empty-true", // `true` → ?flag, `false` → ?flag=false
+    nullFormat: "hidden", // `null` → stripped (vs `default`: ?key)
+    numberFormat: "none", // `"42"` stays string after parse
+    arrayFormat: "brackets", // `[1,2]` → ?x[]=1&x[]=2
+  },
+});
+```
+
+See [@real-router/search-schema-plugin](https://www.npmjs.com/package/@real-router/search-schema-plugin) for schema-driven parsing with Zod/Valibot/ArkType — handles `booleanFormat` interaction and explicit type coercion.
+
 ## Error Handling
 
 Navigation errors are instances of `RouterError` with typed error codes:

@@ -1,7 +1,3 @@
-import {
-  defaultBuildQueryString,
-  defaultParseQueryString,
-} from "./defaultQueryString";
 import { DECODING_METHODS } from "./encoding";
 import { createSegmentNode, normalizeTrailingSlash } from "./pathUtils";
 import { validatePercentEncoding } from "./percentEncoding";
@@ -51,14 +47,14 @@ export class SegmentMatcher {
   readonly #caseSensitive: boolean;
   readonly #decode: ((param: string) => string) | null;
 
-  constructor(options?: SegmentMatcherOptions) {
+  constructor(options: SegmentMatcherOptions) {
     this.#options = {
-      caseSensitive: options?.caseSensitive ?? true,
-      strictTrailingSlash: options?.strictTrailingSlash ?? false,
-      strictQueryParams: options?.strictQueryParams ?? false,
-      urlParamsEncoding: options?.urlParamsEncoding ?? "default",
-      parseQueryString: options?.parseQueryString ?? defaultParseQueryString,
-      buildQueryString: options?.buildQueryString ?? defaultBuildQueryString,
+      caseSensitive: options.caseSensitive ?? true,
+      strictTrailingSlash: options.strictTrailingSlash ?? false,
+      strictQueryParams: options.strictQueryParams ?? false,
+      urlParamsEncoding: options.urlParamsEncoding ?? "default",
+      parseQueryString: options.parseQueryString,
+      buildQueryString: options.buildQueryString,
     };
 
     this.#caseSensitive = this.#options.caseSensitive;
@@ -547,8 +543,3 @@ export class SegmentMatcher {
 }
 
 export { createSegmentNode } from "./pathUtils";
-
-export {
-  defaultParseQueryString,
-  defaultBuildQueryString,
-} from "./defaultQueryString";

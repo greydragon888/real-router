@@ -1,5 +1,6 @@
 // packages/core/src/wiring/RouterWiringBuilder.ts
 
+import { normalizeParams } from "../helpers";
 import { getInternals } from "../internals";
 import { resolveOption } from "../namespaces/OptionsNamespace";
 
@@ -140,7 +141,9 @@ export class RouterWiringBuilder<
           "navigate",
         );
 
-        const { name, params } = ctx.forwardState(routeName, routeParams);
+        const forwarded = ctx.forwardState(routeName, routeParams);
+        const name = forwarded.name;
+        const params = normalizeParams(forwarded.params);
         const meta = this.routes.getMetaForState(name);
 
         if (meta === undefined) {

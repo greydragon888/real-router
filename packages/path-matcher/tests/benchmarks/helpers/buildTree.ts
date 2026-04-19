@@ -6,9 +6,14 @@
  * on route-tree (which depends on path-matcher at runtime).
  */
 
-import { buildParamMeta, SegmentMatcher } from "../../../src";
+import { buildParamMeta } from "../../../src";
+import { createTestMatcher } from "../../helpers/createTestMatcher";
 
-import type { MatcherInputNode, SegmentMatcherOptions } from "../../../src";
+import type {
+  MatcherInputNode,
+  SegmentMatcherOptions,
+  SegmentMatcher,
+} from "../../../src";
 
 export interface SimpleRoute {
   name: string;
@@ -103,10 +108,10 @@ export function buildTree(routes: SimpleRoute[]): MatcherInputNode {
 
 export function createMatcher(
   routes: SimpleRoute[],
-  options?: SegmentMatcherOptions,
+  options?: Partial<SegmentMatcherOptions>,
 ): SegmentMatcher {
   const tree = buildTree(routes);
-  const matcher = new SegmentMatcher(options);
+  const matcher = createTestMatcher(options);
 
   matcher.registerTree(tree);
 
