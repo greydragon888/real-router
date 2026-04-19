@@ -895,4 +895,20 @@ describe("navigateToDefault", () => {
       });
     });
   });
+
+  describe("when defaultRoute callback throws", () => {
+    it("should surface the thrown error as Promise rejection", async () => {
+      router.stop();
+      router = createTestRouter({
+        defaultRoute: () => {
+          throw new Error("callback exploded");
+        },
+      });
+      await router.start("/home");
+
+      await expect(router.navigateToDefault()).rejects.toThrow(
+        "callback exploded",
+      );
+    });
+  });
 });

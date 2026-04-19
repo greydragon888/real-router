@@ -125,4 +125,88 @@ describe("retrospective validation — triggered at usePlugin() time", () => {
 
     r.stop();
   });
+
+  describe("defaultRoute validation (#471 case 5)", () => {
+    it("static defaultRoute pointing to missing route throws at usePlugin", () => {
+      router = createRouter([{ name: "home", path: "/home" }], {
+        defaultRoute: "missing",
+      });
+
+      expect(() => router.usePlugin(validationPlugin())).toThrow(
+        /defaultRoute resolved to non-existent route: "missing"/,
+      );
+    });
+
+    it("static defaultRoute pointing to existing route passes", () => {
+      router = createRouter([{ name: "home", path: "/home" }], {
+        defaultRoute: "home",
+      });
+
+      expect(() => router.usePlugin(validationPlugin())).not.toThrow();
+    });
+
+    it("empty static defaultRoute passes (means not configured)", () => {
+      router = createRouter([{ name: "home", path: "/home" }], {
+        defaultRoute: "",
+      });
+
+      expect(() => router.usePlugin(validationPlugin())).not.toThrow();
+    });
+
+    it("callback defaultRoute returning missing route surfaces on navigateToDefault", async () => {
+      router = createRouter(
+        [
+          { name: "home", path: "/home" },
+          { name: "about", path: "/about" },
+        ],
+        {
+          defaultRoute: () => "ghost",
+        },
+      );
+
+      router.usePlugin(validationPlugin());
+
+      await router.start("/home");
+
+      await expect(router.navigateToDefault()).rejects.toThrow(
+        /defaultRoute resolved to non-existent route: "ghost"/,
+      );
+    });
+
+    it("callback defaultRoute returning existing route works", async () => {
+      router = createRouter(
+        [
+          { name: "home", path: "/home" },
+          { name: "about", path: "/about" },
+        ],
+        {
+          defaultRoute: () => "about",
+        },
+      );
+
+      router.usePlugin(validationPlugin());
+
+      await router.start("/home");
+
+      const state = await router.navigateToDefault();
+
+      expect(state.name).toBe("about");
+    });
+
+    it("callback defaultRoute is not probed at usePlugin time", () => {
+      let callCount = 0;
+
+      router = createRouter([{ name: "home", path: "/home" }], {
+        defaultRoute: () => {
+          callCount++;
+
+          return "home";
+        },
+      });
+
+      router.usePlugin(validationPlugin());
+
+      expect(callCount).toBe(0);
+    });
+  });
 });

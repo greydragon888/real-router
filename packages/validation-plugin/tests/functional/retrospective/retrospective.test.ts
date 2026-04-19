@@ -7,6 +7,7 @@ import {
   validateForwardToTargetsStore,
   validateDependenciesStructure,
   validateLimitsConsistency,
+  validateResolvedDefaultRoute,
 } from "../../../src/validators/retrospective";
 
 function makeTree(routes: { name: string; children?: typeof routes }[] = []) {
@@ -771,5 +772,102 @@ describe("validateLimitsConsistency", () => {
         makeDeps(),
       );
     }).not.toThrow();
+  });
+});
+
+describe("validateResolvedDefaultRoute", () => {
+  it("is a no-op when routeName is not a string", () => {
+    const store = makeStore({ treeRoutes: [{ name: "home" }] });
+
+    expect(() => {
+      validateResolvedDefaultRoute(undefined, store);
+    }).not.toThrow();
+    expect(() => {
+      validateResolvedDefaultRoute(null, store);
+    }).not.toThrow();
+    expect(() => {
+      validateResolvedDefaultRoute(42, store);
+    }).not.toThrow();
+    expect(() => {
+      validateResolvedDefaultRoute({}, store);
+    }).not.toThrow();
+  });
+
+  it("is a no-op when routeName is empty string", () => {
+    const store = makeStore({ treeRoutes: [{ name: "home" }] });
+
+    expect(() => {
+      validateResolvedDefaultRoute("", store);
+    }).not.toThrow();
+  });
+
+  it("passes when route exists in tree", () => {
+    const store = makeStore({
+      treeRoutes: [{ name: "home" }, { name: "about" }],
+    });
+
+    expect(() => {
+      validateResolvedDefaultRoute("home", store);
+    }).not.toThrow();
+  });
+
+  it("passes for nested route that exists in tree", () => {
+    const store = {
+      definitions: [],
+      config: {
+        forwardMap: {},
+        forwardFnMap: {},
+        decoders: {},
+        encoders: {},
+        defaultParams: {},
+      },
+      tree: {
+        children: new Map([
+          [
+            "admin",
+            {
+              children: new Map([
+                [
+                  "dashboard",
+                  {
+                    children: new Map(),
+                    paramMeta: { urlParams: [], spatParams: [] },
+                  },
+                ],
+              ]),
+              paramMeta: { urlParams: [], spatParams: [] },
+            },
+          ],
+        ]),
+        paramMeta: { urlParams: [], spatParams: [] },
+      },
+      matcher: { getSegmentsByName: () => null },
+    };
+
+    expect(() => {
+      validateResolvedDefaultRoute("admin.dashboard", store);
+    }).not.toThrow();
+  });
+
+  it("throws when route does not exist in tree", () => {
+    const store = makeStore({ treeRoutes: [{ name: "home" }] });
+
+    expect(() => {
+      validateResolvedDefaultRoute("missing", store);
+    }).toThrow(/defaultRoute resolved to non-existent route: "missing"/);
+  });
+
+  it("throws when nested route's parent is missing", () => {
+    const store = makeStore({ treeRoutes: [{ name: "home" }] });
+
+    expect(() => {
+      validateResolvedDefaultRoute("admin.dashboard", store);
+    }).toThrow(/non-existent route: "admin.dashboard"/);
+  });
+
+  it("throws TypeError when store is invalid", () => {
+    expect(() => {
+      validateResolvedDefaultRoute("home", null);
+    }).toThrow(TypeError);
   });
 });
