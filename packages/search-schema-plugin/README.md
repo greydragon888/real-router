@@ -172,6 +172,29 @@ router.usePlugin(
 );
 ```
 
+## Schema ↔ Format Coercion
+
+The plugin validates **decoded** values (not raw URL strings). The coercion from URL string to typed value happens at the `search-params` layer, controlled by `queryParams` options on the router. Align your schema types with the format options:
+
+| Schema                 | Required `queryParams` option        | URL example      | Plugin sees       |
+| ---------------------- | ------------------------------------ | ---------------- | ----------------- |
+| `z.boolean()`          | `booleanFormat: "auto"` (default)    | `?compact=true`  | `{ compact: true }` |
+| `z.boolean()`          | `booleanFormat: "empty-true"`        | `?compact`       | `{ compact: true }` |
+| `z.number().int()`     | `numberFormat: "auto"` (default)     | `?page=2`        | `{ page: 2 }`     |
+| `z.string()`           | Any                                  | `?q=hello`       | `{ q: "hello" }`  |
+| `z.array(z.string())`  | `arrayFormat: "brackets"` (or other) | `?tags[]=a&tags[]=b` | `{ tags: ["a", "b"] }` |
+
+**Gotcha — mismatched config:** if schema declares `z.boolean()` but `booleanFormat: "none"` is set, the plugin receives the string `"true"` / `"false"` and Zod's `z.boolean()` will reject it. Fix:
+
+- Switch to `booleanFormat: "auto"` (recommended), OR
+- Use `z.coerce.boolean()` in the schema (accepts strings)
+
+Same applies for numbers — use `z.coerce.number()` if `numberFormat: "none"` is set.
+
+**Recommended baseline:** keep `queryParams` defaults (`booleanFormat: "auto"`, `numberFormat: "auto"`, `nullFormat: "default"`) unless you have a specific URL aesthetic preference. Defaults align well with typical Zod/Valibot/ArkType schemas.
+
+See [@real-router/core — Params Contract](../core/README.md#params-contract) for the full type-to-URL mapping.
+
 ## Documentation
 
 Full documentation: [Wiki — search-schema-plugin](https://github.com/greydragon888/real-router/wiki/search-schema-plugin)

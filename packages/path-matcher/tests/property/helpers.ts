@@ -12,8 +12,9 @@
 import { fc } from "@fast-check/vitest";
 
 import { buildParamMeta } from "../../src/buildParamMeta";
-import { SegmentMatcher } from "../../src/SegmentMatcher";
+import { createTestMatcher } from "../helpers/createTestMatcher";
 
+import type { SegmentMatcher } from "../../src/SegmentMatcher";
 import type {
   MatcherInputNode,
   SegmentMatcherOptions,
@@ -81,9 +82,9 @@ export function createRootWithChildren(
  * Routes: "users", "users.profile"
  */
 export function createParamMatcher(
-  options?: SegmentMatcherOptions,
+  options?: Partial<SegmentMatcherOptions>,
 ): SegmentMatcher {
-  const matcher = new SegmentMatcher(options);
+  const matcher = createTestMatcher(options);
 
   const profileNode = createInputNode({
     name: "profile",
@@ -112,9 +113,9 @@ export function createParamMatcher(
  * Constraint: id must match \d+
  */
 export function createConstrainedMatcher(
-  options?: SegmentMatcherOptions,
+  options?: Partial<SegmentMatcherOptions>,
 ): SegmentMatcher {
-  const matcher = new SegmentMatcher(options);
+  const matcher = createTestMatcher(options);
 
   const profileNode = createInputNode({
     name: "profile",
@@ -143,9 +144,9 @@ export function createConstrainedMatcher(
  * Matches both /search and /search/:query
  */
 export function createOptionalParamMatcher(
-  options?: SegmentMatcherOptions,
+  options?: Partial<SegmentMatcherOptions>,
 ): SegmentMatcher {
-  const matcher = new SegmentMatcher(options);
+  const matcher = createTestMatcher(options);
 
   const searchNode = createInputNode({
     name: "search",
@@ -166,9 +167,9 @@ export function createOptionalParamMatcher(
  * Splat captures everything after /files/
  */
 export function createSplatMatcher(
-  options?: SegmentMatcherOptions,
+  options?: Partial<SegmentMatcherOptions>,
 ): SegmentMatcher {
-  const matcher = new SegmentMatcher(options);
+  const matcher = createTestMatcher(options);
 
   const filesNode = createInputNode({
     name: "files",
@@ -189,9 +190,9 @@ export function createSplatMatcher(
  * Priority: /users/new → users.new (static wins over param)
  */
 export function createStaticParamPriorityMatcher(
-  options?: SegmentMatcherOptions,
+  options?: Partial<SegmentMatcherOptions>,
 ): SegmentMatcher {
-  const matcher = new SegmentMatcher(options);
+  const matcher = createTestMatcher(options);
 
   const newNode = createInputNode({
     name: "new",
@@ -229,9 +230,9 @@ export function createStaticParamPriorityMatcher(
  * Priority: /items/hello → items.specific (param wins over splat for single segment)
  */
 export function createParamSplatMatcher(
-  options?: SegmentMatcherOptions,
+  options?: Partial<SegmentMatcherOptions>,
 ): SegmentMatcher {
-  const matcher = new SegmentMatcher(options);
+  const matcher = createTestMatcher(options);
 
   const specificNode = createInputNode({
     name: "specific",

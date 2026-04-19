@@ -192,8 +192,8 @@ export interface SegmentMatcherOptions {
   strictTrailingSlash?: boolean;
   strictQueryParams?: boolean;
   urlParamsEncoding?: URLParamsEncodingType;
-  parseQueryString?: (queryString: string) => Record<string, unknown>;
-  buildQueryString?: (params: Record<string, unknown>) => string;
+  parseQueryString: (queryString: string) => Record<string, unknown>;
+  buildQueryString: (params: Record<string, unknown>) => string;
 }
 
 export interface ResolvedMatcherOptions {

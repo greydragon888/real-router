@@ -8,6 +8,8 @@
 
 **Key role:** All URL path operations (matching, building, parameter extraction) are implemented here. Higher-level packages never parse URLs directly.
 
+**Query string handling is external.** `SegmentMatcher` requires `parseQueryString` and `buildQueryString` functions at construction — it does not ship a default implementation. Production code receives these from `search-params` via `route-tree/createMatcher()`. Tests use a shared `createTestMatcher()` helper that wires a minimal inline parser matching `search-params` no-strategies defaults — the package stays free of any dependency on `search-params` (runtime or dev) and remains fully self-contained.
+
 ## Package Structure
 
 ```
@@ -19,7 +21,6 @@ path-matcher/
 │   ├── encoding.ts               — URL parameter encoding/decoding (4 strategies)
 │   ├── percentEncoding.ts        — Percent encoding validation (%XX)
 │   ├── constraintValidation.ts   — Regex constraint validation
-│   ├── defaultQueryString.ts     — Default query string parse/build (encodeURIComponent key=value)
 │   ├── pathUtils.ts              — SegmentNode factory, trailing slash normalization, buildFullPath
 │   ├── types.ts                  — All type definitions
 │   └── index.ts                  — Public API exports
@@ -46,7 +47,7 @@ graph LR
 | **route-tree** | `buildParamMeta()`                    | Extract param metadata during tree construction |
 | **route-tree** | `ParamMeta`, `MatcherInputNode` types | Tree node structure, param type classification  |
 
-**Key design:** `path-matcher` has **no query string handling** beyond a minimal default. `route-tree` injects `search-params` functions via dependency injection at matcher creation time.
+**Key design:** `path-matcher` has **no query string handling of its own** — consumers inject `parseQueryString` and `buildQueryString` functions via `SegmentMatcherOptions`. `route-tree` wires `search-params` there; there is no fallback.
 
 ## Public API
 
@@ -54,7 +55,7 @@ graph LR
 
 ```typescript
 class SegmentMatcher {
-  constructor(options?: SegmentMatcherOptions);
+  constructor(options: SegmentMatcherOptions);
 
   get options(): ResolvedMatcherOptions;
 
@@ -84,13 +85,6 @@ encodeURIComponentExcludingSubDelims(segment: string): string
 createSegmentNode(): SegmentNode
 ENCODING_METHODS: Record<URLParamsEncodingType, (param: string) => string>
 DECODING_METHODS: Record<URLParamsEncodingType, (param: string) => string>
-```
-
-**Also re-exported from `SegmentMatcher.ts`** (not from main `index.ts`):
-
-```typescript
-defaultParseQueryString(queryString: string): Record<string, unknown>
-defaultBuildQueryString(params: Record<string, unknown>): string
 ```
 
 ## Core Data Structures
@@ -433,12 +427,12 @@ interface SegmentMatcherOptions {
   strictTrailingSlash?: boolean; // default: false — /path and /path/ both match
   strictQueryParams?: boolean; // default: false — allow undeclared query params
   urlParamsEncoding?: URLParamsEncodingType; // default: "default"
-  parseQueryString?: (queryString: string) => Record<string, unknown>; // DI: query string parser
-  buildQueryString?: (params: Record<string, unknown>) => string; // DI: query string builder
+  parseQueryString: (queryString: string) => Record<string, unknown>; // REQUIRED — injected by consumer
+  buildQueryString: (params: Record<string, unknown>) => string; // REQUIRED — injected by consumer
 }
 ```
 
-**Default query string handling:** simple `key=value&key=value` split/join (in `defaultQueryString.ts`). `route-tree` replaces these with `search-params` functions for full strategy support.
+**Query string handling is required DI.** `parseQueryString`/`buildQueryString` have no default — constructing `SegmentMatcher` without them is a type error. `route-tree/createMatcher()` wires `search-params` (`parse`/`build`) into both slots. Tests use `createTestMatcher()` from `tests/helpers/createTestMatcher.ts`, which injects the same pair, keeping test semantics identical to production behavior.
 
 ## Internal Module Dependencies
 
@@ -446,14 +440,13 @@ interface SegmentMatcherOptions {
 types.ts (leaf — no imports)
     ↓
     ├── percentEncoding.ts (leaf)
-    ├── defaultQueryString.ts (leaf)
     ├── encoding.ts → types
     ├── pathUtils.ts → types
     ├── constraintValidation.ts → types
     ├── buildParamMeta.ts → types
     ├── registration.ts → types, pathUtils, encoding
     └── SegmentMatcher.ts → types, encoding, pathUtils, registration,
-                            percentEncoding, defaultQueryString
+                            percentEncoding
 ```
 
 No circular dependencies.

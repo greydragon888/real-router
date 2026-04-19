@@ -22,7 +22,7 @@
 
 import { barplot, bench, do_not_optimize, lineplot, summary } from "mitata";
 
-import { SegmentMatcher } from "../../src";
+import { createTestMatcher } from "../helpers/createTestMatcher";
 import { buildTree, createMatcher } from "./helpers/buildTree";
 
 import type { SimpleRoute } from "./helpers/buildTree";
@@ -261,7 +261,7 @@ lineplot(() => {
       const tree = buildTree(routes);
 
       yield () => {
-        const matcher = new SegmentMatcher();
+        const matcher = createTestMatcher();
 
         matcher.registerTree(tree);
       };
@@ -326,13 +326,13 @@ barplot(() => {
     const matcherNoRoot = createMatcher(routes);
 
     const tree = buildTree(routes);
-    const matcherShortRoot = new SegmentMatcher();
+    const matcherShortRoot = createTestMatcher();
 
     matcherShortRoot.registerTree(tree);
     matcherShortRoot.setRootPath("/app");
 
     const tree2 = buildTree(routes);
-    const matcherLongRoot = new SegmentMatcher();
+    const matcherLongRoot = createTestMatcher();
 
     matcherLongRoot.registerTree(tree2);
     matcherLongRoot.setRootPath("/base/v2/app");

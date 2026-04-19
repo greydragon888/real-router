@@ -16,12 +16,18 @@ Low-level URL matching engine. Compiles route definitions into a Segment Trie fo
 
 ### `SegmentMatcher`
 
+`parseQueryString` and `buildQueryString` are **required** options — consumers inject query-string handling. Production code uses `route-tree/createMatcher()` (wires `search-params`); construct `SegmentMatcher` directly only when you own that wiring.
+
 ```typescript
+import { parse, build } from "search-params";
+
 const matcher = new SegmentMatcher({
   caseSensitive: true,        // default: true
   strictTrailingSlash: false, // default: false
   strictQueryParams: false,   // default: false
   urlParamsEncoding: "default",
+  parseQueryString: (qs) => parse(qs),
+  buildQueryString: (params) => build(params),
 });
 
 matcher.registerTree(routeTreeRoot);
@@ -67,7 +73,7 @@ interface SegmentNode {
 
 ## Dependencies
 
-None (zero dependencies).
+Zero dependencies, runtime and dev. `path-matcher` is fully self-contained; production wiring of query-string handling (`search-params`) is done by `route-tree/createMatcher()`, tests use a minimal inline parser in `tests/helpers/createTestMatcher.ts`.
 
 ## License
 

@@ -12,7 +12,7 @@ import { EventEmitter } from "event-emitter";
 import { EMPTY_PARAMS, errorCodes } from "./constants";
 import { createRouterFSM } from "./fsm";
 import { guardDependencies, guardRouteStructure } from "./guards";
-import { createLimits } from "./helpers";
+import { createLimits, normalizeParams } from "./helpers";
 import {
   createInterceptable,
   createInterceptable2,
@@ -342,7 +342,7 @@ export class Router<
     ctx.validator?.routes.validateBuildPathArgs(route);
     ctx.validator?.navigation.validateParams(params, "buildPath");
 
-    return ctx.buildPath(route, params);
+    return ctx.buildPath(route, normalizeParams(params));
   }
 
   // ============================================================================

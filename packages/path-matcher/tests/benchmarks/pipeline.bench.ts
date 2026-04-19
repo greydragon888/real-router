@@ -12,7 +12,7 @@
 
 import { barplot, bench, boxplot, do_not_optimize, summary } from "mitata";
 
-import { SegmentMatcher } from "../../src";
+import { createTestMatcher } from "../helpers/createTestMatcher";
 import { buildTree, createMatcher } from "./helpers/buildTree";
 
 import type { SimpleRoute } from "./helpers/buildTree";
@@ -462,7 +462,7 @@ barplot(() => {
     const matcherNoRoot = createMatcher(standardRoutes);
 
     const tree = buildTree(standardRoutes);
-    const matcherWithRoot = new SegmentMatcher();
+    const matcherWithRoot = createTestMatcher();
 
     matcherWithRoot.registerTree(tree);
     matcherWithRoot.setRootPath("/app");
@@ -480,7 +480,7 @@ barplot(() => {
         ],
       },
     ]);
-    const matcherDeepRoot = new SegmentMatcher();
+    const matcherDeepRoot = createTestMatcher();
 
     matcherDeepRoot.registerTree(deepTree);
     matcherDeepRoot.setRootPath("/base/app");
