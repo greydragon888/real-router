@@ -1,5 +1,23 @@
 # @real-router/search-schema-plugin
 
+## 0.2.2
+
+### Patch Changes
+
+- [#481](https://github.com/greydragon888/real-router/pull/481) [`39697e4`](https://github.com/greydragon888/real-router/commit/39697e4128614605ee7dcd81a34e48cb62bb4c4f) Thanks [@greydragon888](https://github.com/greydragon888)! - Document schema ↔ format coercion in README ([#465](https://github.com/greydragon888/real-router/issues/465))
+
+  Added "Schema ↔ Format Coercion" section explaining:
+  - The plugin validates decoded (typed) values, not raw URL strings
+  - How `queryParams` options (booleanFormat, numberFormat, arrayFormat) interact with schema types
+  - Gotcha: `z.boolean()` with `booleanFormat: "none"` breaks because schema receives strings
+  - Workaround: `z.coerce.boolean()` / `z.coerce.number()` for mismatched configs
+  - Recommended baseline: keep `queryParams` defaults for typical Zod/Valibot schemas
+
+  Cross-reference to `@real-router/core` Params Contract section.
+
+- Updated dependencies [[`39697e4`](https://github.com/greydragon888/real-router/commit/39697e4128614605ee7dcd81a34e48cb62bb4c4f), [`39697e4`](https://github.com/greydragon888/real-router/commit/39697e4128614605ee7dcd81a34e48cb62bb4c4f)]:
+  - @real-router/core@0.48.1
+
 ## 0.2.1
 
 ### Patch Changes

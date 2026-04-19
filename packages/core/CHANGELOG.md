@@ -1,5 +1,32 @@
 # @real-router/core
 
+## 0.48.1
+
+### Patch Changes
+
+- [#481](https://github.com/greydragon888/real-router/pull/481) [`39697e4`](https://github.com/greydragon888/real-router/commit/39697e4128614605ee7dcd81a34e48cb62bb4c4f) Thanks [@greydragon888](https://github.com/greydragon888)! - Document the public `params` contract in README ([#465](https://github.com/greydragon888/real-router/issues/465))
+
+  Added explicit documentation of how `navigate()` and `buildPath()` handle each value type in `params`:
+  - `undefined` → stripped (documented contract, not implementation detail)
+  - `null` → `?key` (key-only)
+  - `""` → `?key=` (explicit empty value, distinct from `null`)
+  - Falsy-but-defined values (`0`, `false`, `""`) preserved
+  - Number and boolean auto-coercion on parse
+
+  Tables for input (`params` object) and output (URL → `state.params`) semantics.
+
+  Cross-references to `search-params` and `search-schema-plugin` README for configuration and schema integration.
+
+- [#481](https://github.com/greydragon888/real-router/pull/481) [`39697e4`](https://github.com/greydragon888/real-router/commit/39697e4128614605ee7dcd81a34e48cb62bb4c4f) Thanks [@greydragon888](https://github.com/greydragon888)! - Lock `undefined` params contract at core boundary ([#465](https://github.com/greydragon888/real-router/issues/465))
+
+  `router.navigate(name, { x: undefined })` and `router.buildPath(name, { x: undefined })` are now guaranteed to produce URLs without `x` **by core itself**, not transitively through the query-string engine. Plugin interceptors that introduce `undefined` values into `forwardState` output are also normalized away before they reach URL and `state.params`.
+
+  **Behavior change:** `state.params` no longer contains keys whose values are `undefined` after navigation — `"x" in state.params` is `false`, not `true` with `state.params.x === undefined`. The serialized URL is unchanged; only the in-memory `state.params` shape is tightened.
+
+  **Internal:** `defaultQueryString` fallback removed from `path-matcher` (dead code, internal package). `SegmentMatcher` now requires `parseQueryString`/`buildQueryString` as mandatory options; `search-params` remains the only engine used by the public API.
+
+  Groundwork for the query-param semantics contract defined in the RFC (`packages/core/.claude/rfc/rfc-query-param-semantics.md`).
+
 ## 0.48.0
 
 ### Minor Changes
