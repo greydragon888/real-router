@@ -124,3 +124,39 @@ export function clearConfigEntries<T>(
     }
   }
 }
+
+/**
+ * Used by matchPath() when trailingSlash is "preserve": the matcher's
+ * buildPath() with an unset trailingSlash mode strips trailing slashes,
+ * but "preserve" means the source path's trailing-slash choice wins.
+ * If the source had a trailing slash, re-attach it to the rewritten path.
+ * The reverse case (rewritten has trailing, source does not) is not
+ * reachable with the current matcher — it never adds a trailing slash
+ * with undefined mode.
+ */
+export function matchSourceTrailingSlash(
+  sourcePath: string,
+  rewrittenPath: string,
+): string {
+  const queryIndex = rewrittenPath.search(/[?#]/);
+  const pathPart =
+    queryIndex === -1 ? rewrittenPath : rewrittenPath.slice(0, queryIndex);
+
+  if (pathPart === "/" || pathPart.endsWith("/")) {
+    return rewrittenPath;
+  }
+
+  const sourceQueryIndex = sourcePath.search(/[?#]/);
+  const sourcePathPart =
+    sourceQueryIndex === -1
+      ? sourcePath
+      : sourcePath.slice(0, sourceQueryIndex);
+
+  if (!(sourcePathPart.length > 1 && sourcePathPart.endsWith("/"))) {
+    return rewrittenPath;
+  }
+
+  const querySuffix = queryIndex === -1 ? "" : rewrittenPath.slice(queryIndex);
+
+  return `${pathPart}/${querySuffix}`;
+}

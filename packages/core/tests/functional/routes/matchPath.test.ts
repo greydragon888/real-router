@@ -203,6 +203,83 @@ describe("core/routes/routePath/matchPath", () => {
       expect(withoutSlash?.name).toBe("page");
     });
 
+    describe("trailingSlash: preserve + rewritePathOnMatch: true (#471 case 2)", () => {
+      it("preserves trailing slash from source path when rewrite would strip it", () => {
+        const customRouter = createTestRouter({
+          trailingSlash: "preserve",
+          rewritePathOnMatch: true,
+        });
+
+        getRoutesApi(customRouter).add({ name: "page", path: "/page" });
+
+        const state = getPluginApi(customRouter).matchPath("/page/");
+
+        expect(state?.name).toBe("page");
+        expect(state?.path).toBe("/page/");
+      });
+
+      it("preserves absence of trailing slash when source has none", () => {
+        const customRouter = createTestRouter({
+          trailingSlash: "preserve",
+          rewritePathOnMatch: true,
+        });
+
+        getRoutesApi(customRouter).add({ name: "page", path: "/page" });
+
+        const state = getPluginApi(customRouter).matchPath("/page");
+
+        expect(state?.path).toBe("/page");
+      });
+
+      it("preserves trailing slash even when rewrite changes route (forwardTo)", () => {
+        const customRouter = createTestRouter({
+          trailingSlash: "preserve",
+          rewritePathOnMatch: true,
+        });
+
+        getRoutesApi(customRouter).add([
+          { name: "target", path: "/target" },
+          { name: "source", path: "/source", forwardTo: "target" },
+        ]);
+
+        const state = getPluginApi(customRouter).matchPath("/source/");
+
+        expect(state?.name).toBe("target");
+        expect(state?.path).toBe("/target/");
+      });
+
+      it("keeps rewritten query string intact when adjusting trailing slash", () => {
+        const customRouter = createTestRouter({
+          trailingSlash: "preserve",
+          rewritePathOnMatch: true,
+        });
+
+        getRoutesApi(customRouter).add({
+          name: "search",
+          path: "/search?q",
+          defaultParams: { sort: "date" },
+        });
+
+        const state = getPluginApi(customRouter).matchPath("/search/?q=test");
+
+        expect(state?.path).toMatch(/^\/search\/\?/);
+        expect(state?.path).toContain("q=test");
+      });
+
+      it("is a no-op for root path /", () => {
+        const customRouter = createTestRouter({
+          trailingSlash: "preserve",
+          rewritePathOnMatch: true,
+        });
+
+        getRoutesApi(customRouter).add({ name: "root", path: "/" });
+
+        const state = getPluginApi(customRouter).matchPath("/");
+
+        expect(state?.path).toBe("/");
+      });
+    });
+
     it("should match both with and without trailing slash when trailingSlash is never", () => {
       // Note: "never" affects path building (buildPath), not matching
       // During matching, trailing slashes are normalized

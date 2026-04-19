@@ -1,7 +1,11 @@
 // packages/core/src/namespaces/RoutesNamespace/RoutesNamespace.ts
 
 import { DEFAULT_ROUTE_NAME } from "./constants";
-import { paramsMatch, paramsMatchExcluding } from "./helpers";
+import {
+  matchSourceTrailingSlash,
+  paramsMatch,
+  paramsMatchExcluding,
+} from "./helpers";
 import {
   createRoutesStore,
   rebuildTreeInPlace,
@@ -266,6 +270,10 @@ export class RoutesNamespace<
         trailingSlash: ts === "never" || ts === "always" ? ts : undefined,
         queryParamsMode: opts.queryParamsMode,
       });
+
+      if (ts === "preserve") {
+        builtPath = matchSourceTrailingSlash(path, builtPath);
+      }
     }
 
     return this.#deps.makeState<P>(routeName, routeParams, builtPath, meta);
