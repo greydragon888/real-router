@@ -98,6 +98,19 @@ export function validateLimits(
 
     validateLimitValue(key as keyof LimitsConfig, value, methodName);
   }
+
+  const { warnListeners, maxListeners } = limits as Partial<LimitsConfig>;
+
+  if (
+    typeof warnListeners === "number" &&
+    typeof maxListeners === "number" &&
+    maxListeners > 0 &&
+    warnListeners > maxListeners
+  ) {
+    throw new RangeError(
+      `[router.${methodName}] "limits.warnListeners" (${warnListeners}) must not exceed "limits.maxListeners" (${maxListeners}) — the warning channel would be unreachable`,
+    );
+  }
 }
 
 function validateStringEnum(

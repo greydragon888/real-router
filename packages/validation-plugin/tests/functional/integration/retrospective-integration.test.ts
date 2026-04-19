@@ -209,4 +209,25 @@ describe("retrospective validation — triggered at usePlugin() time", () => {
       expect(callCount).toBe(0);
     });
   });
+
+  describe("limits cross-field (#471 case 1)", () => {
+    it("warnListeners exceeding maxListeners throws RangeError at usePlugin", () => {
+      router = createRouter([{ name: "home", path: "/home" }], {
+        limits: { warnListeners: 5000, maxListeners: 100 },
+      });
+
+      expect(() => router.usePlugin(validationPlugin())).toThrow(RangeError);
+      expect(() => router.usePlugin(validationPlugin())).toThrow(
+        /warning channel would be unreachable/,
+      );
+    });
+
+    it("warnListeners <= maxListeners passes", () => {
+      router = createRouter([{ name: "home", path: "/home" }], {
+        limits: { warnListeners: 50, maxListeners: 100 },
+      });
+
+      expect(() => router.usePlugin(validationPlugin())).not.toThrow();
+    });
+  });
 });

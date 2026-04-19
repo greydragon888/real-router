@@ -139,6 +139,18 @@ const validLimitsArbitrary = fc
       }
     }
 
+    // Cross-field invariant (#471 case 1): warnListeners must not exceed
+    // maxListeners when both are provided and maxListeners > 0.
+    // Clamp warn to max to keep generated options semantically valid.
+    if (
+      typeof result.warnListeners === "number" &&
+      typeof result.maxListeners === "number" &&
+      result.maxListeners > 0 &&
+      result.warnListeners > result.maxListeners
+    ) {
+      result.warnListeners = result.maxListeners;
+    }
+
     return result;
   });
 

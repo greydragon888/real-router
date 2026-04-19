@@ -155,6 +155,47 @@ describe("options validators", () => {
         );
       }).not.toThrow();
     });
+
+    describe("warnListeners vs maxListeners cross-field (#471 case 1)", () => {
+      it("throws RangeError when warnListeners exceeds maxListeners", () => {
+        expect(() => {
+          validateLimits({ warnListeners: 5000, maxListeners: 100 }, "test");
+        }).toThrow(RangeError);
+        expect(() => {
+          validateLimits({ warnListeners: 5000, maxListeners: 100 }, "test");
+        }).toThrow(/warning channel would be unreachable/);
+      });
+
+      it("accepts warnListeners equal to maxListeners", () => {
+        expect(() => {
+          validateLimits({ warnListeners: 100, maxListeners: 100 }, "test");
+        }).not.toThrow();
+      });
+
+      it("accepts warnListeners below maxListeners", () => {
+        expect(() => {
+          validateLimits({ warnListeners: 50, maxListeners: 100 }, "test");
+        }).not.toThrow();
+      });
+
+      it("skips cross-check when maxListeners is 0 (unlimited)", () => {
+        expect(() => {
+          validateLimits({ warnListeners: 5000, maxListeners: 0 }, "test");
+        }).not.toThrow();
+      });
+
+      it("skips cross-check when only warnListeners provided", () => {
+        expect(() => {
+          validateLimits({ warnListeners: 5000 }, "test");
+        }).not.toThrow();
+      });
+
+      it("skips cross-check when only maxListeners provided", () => {
+        expect(() => {
+          validateLimits({ maxListeners: 100 }, "test");
+        }).not.toThrow();
+      });
+    });
   });
 });
 
