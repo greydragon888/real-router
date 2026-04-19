@@ -106,6 +106,13 @@ const validLoggerArbitrary = fc
       }
     }
 
+    // Cross-field invariant (#471 case 4): callbackIgnoresLevel: true has no
+    // effect without callback. Drop the flag in that case so the generated
+    // options don't trigger the validator's noisy logger.error on every run.
+    if (result.callbackIgnoresLevel === true && result.callback === undefined) {
+      delete result.callbackIgnoresLevel;
+    }
+
     return result;
   });
 

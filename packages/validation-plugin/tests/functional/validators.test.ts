@@ -999,6 +999,53 @@ describe("Phase 2 options validators", () => {
         validateOptions({ logger: { callback: () => {} } }, "test");
       }).not.toThrow();
     });
+
+    describe("callbackIgnoresLevel without callback (#471 case 4)", () => {
+      let errorSpy: ReturnType<typeof vi.spyOn>;
+
+      beforeEach(() => {
+        errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+      });
+
+      afterEach(() => {
+        errorSpy.mockRestore();
+      });
+
+      it("logs error when callbackIgnoresLevel is true and callback missing", () => {
+        validateOptions({ logger: { callbackIgnoresLevel: true } }, "test");
+
+        expect(errorSpy).toHaveBeenCalledWith(
+          "router.test",
+          expect.stringContaining("has no effect without"),
+        );
+      });
+
+      it("does not log error when callbackIgnoresLevel is false", () => {
+        validateOptions({ logger: { callbackIgnoresLevel: false } }, "test");
+
+        expect(errorSpy).not.toHaveBeenCalled();
+      });
+
+      it("does not log error when callback is provided alongside callbackIgnoresLevel", () => {
+        validateOptions(
+          {
+            logger: {
+              callbackIgnoresLevel: true,
+              callback: () => {},
+            },
+          },
+          "test",
+        );
+
+        expect(errorSpy).not.toHaveBeenCalled();
+      });
+
+      it("does not log error when callbackIgnoresLevel is undefined", () => {
+        validateOptions({ logger: { level: "all" } }, "test");
+
+        expect(errorSpy).not.toHaveBeenCalled();
+      });
+    });
   });
 });
 
