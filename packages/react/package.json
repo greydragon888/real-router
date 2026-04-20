@@ -10,6 +10,9 @@
     "*": {
       "legacy": [
         "./dist/cjs/legacy.d.ts"
+      ],
+      "ink": [
+        "./dist/cjs/ink.d.ts"
       ]
     }
   },
@@ -31,6 +34,15 @@
       },
       "import": "./dist/esm/legacy.mjs",
       "require": "./dist/cjs/legacy.js"
+    },
+    "./ink": {
+      "@real-router/internal-source": "./src/ink.ts",
+      "types": {
+        "import": "./dist/esm/ink.d.mts",
+        "require": "./dist/cjs/ink.d.ts"
+      },
+      "import": "./dist/esm/ink.mjs",
+      "require": "./dist/cjs/ink.js"
     }
   },
   "files": [
@@ -84,12 +96,20 @@
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "16.3.2",
     "@testing-library/user-event": "14.6.1",
+    "ink": "7.0.1",
+    "ink-testing-library": "4.0.0",
     "vitest-react-profiler": "1.12.0"
   },
   "peerDependencies": {
     "@types/react": ">=18.0.0",
     "@types/react-dom": ">=18.0.0",
+    "ink": "^7.0.0",
     "react": ">=18.0.0",
     "react-dom": ">=18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "ink": {
+      "optional": true
+    }
   }
 }

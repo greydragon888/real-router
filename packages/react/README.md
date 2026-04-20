@@ -13,16 +13,17 @@
 npm install @real-router/react @real-router/core @real-router/browser-plugin
 ```
 
-**Peer dependency:** main entry requires `react` >= 19.2.0 (uses `<Activity>`); `@real-router/react/legacy` works with `react` >= 18.0.0.
+**Peer dependency:** main entry requires `react` >= 19.2.0 (uses `<Activity>`); `@real-router/react/legacy` works with `react` >= 18.0.0; `@real-router/react/ink` requires `react` >= 19.2 **and** `ink` >= 7.0.0 (Ink v7 itself pins React 19.2+).
 
 ## Entry Points
 
-| Import Path                 | React Version | Includes                                               |
-| --------------------------- | ------------- | ------------------------------------------------------ |
-| `@real-router/react`        | 19.2+         | Full API (hooks, `Link`, `RouteView` with `keepAlive`) |
-| `@real-router/react/legacy` | 18+           | All hooks and `Link`, no `RouteView`                   |
+| Import Path                 | React Version | Runtime           | Includes                                               |
+| --------------------------- | ------------- | ----------------- | ------------------------------------------------------ |
+| `@real-router/react`        | 19.2+         | DOM               | Full API (hooks, `Link`, `RouteView` with `keepAlive`) |
+| `@real-router/react/legacy` | 18+           | DOM               | All hooks and `Link`, no `RouteView`                   |
+| `@real-router/react/ink`    | 19.2+         | Terminal (Ink 7+) | Hooks, `InkRouterProvider`, `InkLink`, no `RouteView`  |
 
-Both share the same underlying code — `/legacy` excludes components that require React 19.2's `<Activity>` API.
+All entries share the same underlying hook code. `/legacy` excludes React 19.2 `<Activity>`; `/ink` excludes DOM-bound primitives (`<a>`-based `Link`, `announceNavigation`) and replaces them with keyboard-driven terminal equivalents.
 
 ## Quick Start
 
@@ -202,6 +203,67 @@ One import path change — all hooks and `Link` work identically:
 ```
 
 `RouteView` is not available from `/legacy`. Use `useRouteNode` with a switch/case pattern instead.
+
+## Ink (Terminal UI)
+
+`@real-router/react/ink` lets you build terminal apps with the same hooks you use in the browser.
+
+> The official Ink routing recipe ([vadimdemedes/ink#874](https://github.com/vadimdemedes/ink/pull/874), merged Feb 2026) recommends React Router's `MemoryRouter` plus hand-rolled `useInput` / `useNavigate` per menu item — there's no Link-equivalent because RR's `<Link>` renders HTML anchors, which terminals can't handle. **We ship that packaged**: `<InkLink>` is focus-aware out of the box (joins Ink's focus ring, Enter navigates, `activeColor`/`focusColor` props), and `@real-router/memory-plugin` replaces `MemoryRouter`. No boilerplate per menu entry.
+
+Ships three entry-specific pieces alongside the shared hooks:
+
+- `InkRouterProvider` — drop-in provider, no DOM, no aria-live.
+- `InkLink` — focusable text link. Joins Ink's focus ring via `useFocus`; Enter navigates.
+- Hooks re-exported unchanged.
+
+```tsx
+import { createRouter } from "@real-router/core";
+import { memoryPluginFactory } from "@real-router/memory-plugin";
+import { InkLink, InkRouterProvider, useRouteNode } from "@real-router/react/ink";
+import { Box, Text, render } from "ink";
+
+const router = createRouter([
+  { name: "home", path: "/" },
+  { name: "users", path: "/users" },
+]);
+
+router.usePlugin(memoryPluginFactory());
+await router.start("/");
+
+const App = () => {
+  const { route } = useRouteNode("");
+
+  return (
+    <Box flexDirection="column" paddingX={1}>
+      <Box columnGap={2}>
+        <InkLink routeName="home" focusColor="cyan" activeColor="green" autoFocus>
+          [ Home ]
+        </InkLink>
+        <InkLink routeName="users" focusColor="cyan" activeColor="green">
+          [ Users ]
+        </InkLink>
+      </Box>
+      <Text>Current: {route?.name}</Text>
+    </Box>
+  );
+};
+
+render(
+  <InkRouterProvider router={router}>
+    <App />
+  </InkRouterProvider>,
+);
+```
+
+**Navigation contract:** Tab moves focus between `InkLink`s, Enter calls `router.navigate(...)`. `RouteView` and the DOM `Link` are intentionally absent from this entry — compose routes with `useRouteNode("")` and a switch.
+
+**Install:**
+
+```bash
+npm install @real-router/react @real-router/core @real-router/memory-plugin ink
+```
+
+`ink` is an optional peer dependency — only install it if you use `/ink`.
 
 ## Migration from react-router5
 

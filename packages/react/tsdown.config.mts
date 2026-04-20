@@ -5,6 +5,7 @@ export default createIsomorphicConfig({
     entry: {
       index: "src/index.ts",
       legacy: "src/legacy.ts",
+      ink: "src/ink.ts",
     },
   },
 });

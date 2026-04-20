@@ -2,7 +2,7 @@
 
 > Simple, powerful, view-agnostic, modular and extensible router
 
-pnpm monorepo with 31 packages + `benchmarks/` + bare `shared/` sources (symlinked into consumers' `src/dom-utils` and `src/browser-env`, except `packages/angular` which uses a git-tracked copy) + 75 example applications. Run `pnpm install` after cloning.
+pnpm monorepo with 31 packages + `benchmarks/` + bare `shared/` sources (symlinked into consumers' `src/dom-utils` and `src/browser-env`, except `packages/angular` which uses a git-tracked copy) + 76 example applications. Run `pnpm install` after cloning.
 
 `shared/` is a minimal workspace entry (name, type, devDeps) with no `src/` of its own — it owns sibling directories `shared/browser-env/` and `shared/dom-utils/` that are git-tracked symlink targets. This entry is required for `type-guards` resolution during bundling via symlinks. See IMPLEMENTATION_NOTES.md section "Shared Sources via Symlinks" for details.
 

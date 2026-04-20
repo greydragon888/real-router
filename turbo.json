@@ -86,7 +86,7 @@
         "**/*.spec.{ts,tsx}",
         "!**/node_modules/**"
       ],
-      "env": ["NODE_ENV"],
+      "env": ["NODE_ENV", "FORCE_COLOR"],
       "passThroughEnv": ["CI"],
       "outputLogs": "errors-only",
       "cache": true
