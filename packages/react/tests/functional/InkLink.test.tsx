@@ -13,10 +13,13 @@ const TAB = "\t";
 const ESC = String.fromCodePoint(27);
 
 // Ink's focus-manager applies autoFocus inside an effect, and each frame commit
-// is scheduled via setImmediate. Give both React and Ink's scheduler time to
-// settle (50ms is empirically enough, aligned with ink-testing-library examples).
-const flushInk = (ms = 50): Promise<void> =>
+// is scheduled via setImmediate. CI runners are slower than local machines, so
+// the default settle time is generous; individual tests can override. Post-input
+// assertions use `vi.waitFor` instead of a fixed delay.
+const flushInk = (ms = 250): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
+
+const WAIT_OPTS = { timeout: 3000, interval: 50 } as const;
 
 describe("InkLink", () => {
   let router: Router;
@@ -55,9 +58,10 @@ describe("InkLink", () => {
 
     await flushInk();
     stdin.write(ENTER);
-    await flushInk();
 
-    expect(navigateSpy).toHaveBeenCalledWith("users.list", {}, {});
+    await vi.waitFor(() => {
+      expect(navigateSpy).toHaveBeenCalledWith("users.list", {}, {});
+    }, WAIT_OPTS);
   });
 
   it("forwards routeParams and routeOptions to navigate", async () => {
@@ -80,9 +84,10 @@ describe("InkLink", () => {
 
     await flushInk();
     stdin.write(ENTER);
-    await flushInk();
 
-    expect(navigateSpy).toHaveBeenCalledWith("users.view", params, options);
+    await vi.waitFor(() => {
+      expect(navigateSpy).toHaveBeenCalledWith("users.view", params, options);
+    }, WAIT_OPTS);
   });
 
   it("calls onSelect before navigate", async () => {
@@ -104,9 +109,10 @@ describe("InkLink", () => {
 
     await flushInk();
     stdin.write(ENTER);
-    await flushInk();
 
-    expect(calls).toStrictEqual(["onSelect", "navigate"]);
+    await vi.waitFor(() => {
+      expect(calls).toStrictEqual(["onSelect", "navigate"]);
+    }, WAIT_OPTS);
     expect(navigateSpy).toHaveBeenCalled();
   });
 
@@ -163,9 +169,10 @@ describe("InkLink", () => {
     stdin.write(TAB);
     await flushInk();
     stdin.write(ENTER);
-    await flushInk();
 
-    expect(navigateSpy).toHaveBeenCalledWith("about", {}, {});
+    await vi.waitFor(() => {
+      expect(navigateSpy).toHaveBeenCalledWith("about", {}, {});
+    }, WAIT_OPTS);
   });
 
   it("applies focusColor when focused", async () => {
