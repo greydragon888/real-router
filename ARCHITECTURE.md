@@ -21,7 +21,7 @@ real-router/
 ├── packages/
 │   ├── core/                      # Router implementation (facade + namespaces)
 │   ├── core-types/                # @real-router/types — shared TypeScript types
-│   ├── react/                     # React integration (dual entry: main for 19.2+, /legacy for 18+)
+│   ├── react/                     # React integration (triple entry: main for 19.2+, /legacy for 18+, /ink for Ink 7+ terminal UIs)
 │   ├── preact/                     # Preact integration (hooks, components, Suspense)
 │   ├── solid/                     # Solid.js integration (hooks, components, directives)
 │   ├── vue/                       # Vue 3 integration (composables, components, directives)
@@ -54,7 +54,7 @@ real-router/
 │   └── browser-env/               # Shared browser abstractions for URL plugins: history API, popstate, SSR fallback
 ├── examples/
 │   ├── shared/                    # Shared store, API, abilities, styles
-│   ├── react/    (17 examples)    # React 19.2+ examples + 9 e2e suites
+│   ├── react/    (18 examples)    # React 19.2+ examples (incl. ink-demo for @real-router/react/ink) + 9 e2e suites
 │   ├── preact/   (12 examples)    # Preact examples + 9 e2e suites
 │   ├── solid/    (15 examples)    # Solid.js examples + 9 e2e suites
 │   ├── vue/      (15 examples)    # Vue 3 SFC examples + 9 e2e suites

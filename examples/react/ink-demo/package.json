@@ -1,0 +1,23 @@
+{
+  "name": "react-ink-demo-example",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": "./src/main.tsx",
+  "scripts": {
+    "dev": "tsx src/main.tsx",
+    "build": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@real-router/core": "workspace:^",
+    "@real-router/memory-plugin": "workspace:^",
+    "@real-router/react": "workspace:^",
+    "ink": "7.0.1",
+    "react": "19.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.14",
+    "tsx": "4.20.6",
+    "typescript": "5.8.3"
+  }
+}

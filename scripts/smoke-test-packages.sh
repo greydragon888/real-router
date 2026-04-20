@@ -72,9 +72,16 @@ for tarball in "$TARBALLS_DIR"/*.tgz; do
   INSTALL_ARGS+=("$tarball")
 done
 
+# Optional peer deps are not auto-installed by npm — add them explicitly so
+# their subpath entries can be imported by Phase 3. A real consumer using
+# `@real-router/react/ink` would install `ink` themselves.
+OPTIONAL_PEERS=(
+  "ink@^7.0.0"
+)
+
 # Install with --install-strategy=hoisted to simulate flat npm layout
 # Use npm (not pnpm) to simulate real consumer experience
-(cd "$PROJECT_DIR" && npm install --install-strategy=hoisted "${INSTALL_ARGS[@]}" 2>&1) | tail -3
+(cd "$PROJECT_DIR" && npm install --install-strategy=hoisted "${INSTALL_ARGS[@]}" "${OPTIONAL_PEERS[@]}" 2>&1) | tail -3
 
 echo ""
 echo "=== Phase 3: Verify all exports resolve ==="
