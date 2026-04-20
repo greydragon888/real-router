@@ -1,6 +1,6 @@
 {
   "name": "@real-router/preload-plugin",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "type": "commonjs",
   "description": "Preload plugin — trigger data preloading on navigation intent (hover, touch)",
   "main": "./dist/cjs/index.js",
