@@ -1,5 +1,19 @@
 # @real-router/memory-plugin
 
+## 0.3.3
+
+### Patch Changes
+
+- [#491](https://github.com/greydragon888/real-router/pull/491) [`d4678ca`](https://github.com/greydragon888/real-router/commit/d4678ca1855faed40eb110dbbd45eecaba791710) Thanks [@greydragon888](https://github.com/greydragon888)! - Document `MemoryPluginOptions.maxHistoryLength` ([#490](https://github.com/greydragon888/real-router/issues/490))
+
+  Added inline JSDoc for `maxHistoryLength` covering the `0 = unlimited`
+  sentinel, the rejected values (negatives, `NaN`, `±Infinity`, fractions),
+  and the default (`1000`). The behavior was previously documented only
+  in the package's CLAUDE.md.
+
+- Updated dependencies [[`d4678ca`](https://github.com/greydragon888/real-router/commit/d4678ca1855faed40eb110dbbd45eecaba791710), [`d4678ca`](https://github.com/greydragon888/real-router/commit/d4678ca1855faed40eb110dbbd45eecaba791710)]:
+  - @real-router/types@0.34.1
+
 ## 0.3.2
 
 ### Patch Changes

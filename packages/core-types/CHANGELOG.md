@@ -1,5 +1,22 @@
 # @real-router/types
 
+## 0.34.1
+
+### Patch Changes
+
+- [#491](https://github.com/greydragon888/real-router/pull/491) [`d4678ca`](https://github.com/greydragon888/real-router/commit/d4678ca1855faed40eb110dbbd45eecaba791710) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove stale file-path header comments from `src/*.ts` ([#490](https://github.com/greydragon888/real-router/issues/490))
+
+  Each `src/*.ts` file carried a `// packages/core-types/modules/<name>.ts`
+  comment whose path no longer exists (the directory was renamed to `src/`).
+  These comments added no value beyond what the editor already shows, so
+  they have been removed. No behavior or API change.
+
+- [#491](https://github.com/greydragon888/real-router/pull/491) [`d4678ca`](https://github.com/greydragon888/real-router/commit/d4678ca1855faed40eb110dbbd45eecaba791710) Thanks [@greydragon888](https://github.com/greydragon888)! - Document `Unsubscribe` type ([#490](https://github.com/greydragon888/real-router/issues/490))
+
+  Added a short JSDoc block to the `Unsubscribe` type explaining where it
+  comes from (subscription APIs) and the idempotency guarantee, which was
+  previously only implicit.
+
 ## 0.34.0
 
 ### Minor Changes
