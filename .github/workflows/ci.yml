@@ -117,6 +117,7 @@ jobs:
       - name: Test with coverage
         run: >-
           pnpm turbo run test test:properties test:stress
+          --summarize
           --filter='...[${{ needs.check.outputs.turbo_base || 'origin/master' }}]'
           --filter='!./examples/**'
           --filter='!./benchmarks'
@@ -127,9 +128,21 @@ jobs:
       - name: Bundle
         run: >-
           pnpm turbo run bundle
+          --summarize
           --filter='...[${{ needs.check.outputs.turbo_base || 'origin/master' }}]'
           --filter='!./examples/**'
           --filter='!./benchmarks'
+
+      # Phase 2 of #478: upload turbo run summaries to diff inputs.hashes
+      # between two CI runs on the same SHA → identify unstable input.
+      # Temporary; remove once the unstable hash source is fixed.
+      - name: Upload turbo summaries
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: turbo-summaries-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .turbo/runs/
+          retention-days: 7
 
       - name: Check dependency consistency
         run: pnpm lint:deps
