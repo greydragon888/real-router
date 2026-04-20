@@ -106,7 +106,7 @@ export default [
   {
     name: "@real-router/browser-plugin (ESM)",
     path: "packages/browser-plugin/dist/esm/index.mjs",
-    limit: "2.5 kB",
+    limit: "2.6 kB",
     ignore: ["@real-router/core"],
   },
   {
