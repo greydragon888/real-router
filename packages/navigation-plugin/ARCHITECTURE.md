@@ -410,10 +410,11 @@ User clicks back/forward/link, or navigation.navigate() fires
         │
         └── !matchedState && !allowNotFound?
               event.intercept({ handler: async () => {
-                await router.navigateToDefault()
-                catch RouterError → ignore
-                catch other → recoverFromNavigateError()
+                const err = new RouterError(ROUTE_NOT_FOUND, { path })
+                api.emitTransitionError(err)
+                throw err  // Navigation API auto-rolls back URL on reject
               }})
+              (no silent navigateToDefault — see #483)
 ```
 
 ### No Race Condition

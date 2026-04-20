@@ -2270,6 +2270,56 @@ Added `decodeURIComponent()` to both key and value extraction in `defaultParseQu
 
 `defaultParseQueryString` is a fallback for standalone `path-matcher` usage. Standard configuration uses `search-params` package (injected via DI in `route-tree/createMatcher.ts`) which handles encoding correctly.
 
+## Unified Strict-Mode Behavior on Unmatched URLs (#483)
+
+### Problem
+
+`allowNotFound: false` had inconsistent semantics depending on the entry point:
+
+| Entry point                    | Behaviour on unmatched URL + strict mode                            |
+| ------------------------------ | ------------------------------------------------------------------- |
+| `router.start(path)`           | throws `ROUTE_NOT_FOUND`                                            |
+| `browser-plugin` popstate      | silent `router.navigateToDefault({ reload, replace })`              |
+| `navigation-plugin` navigate   | silent `router.navigateToDefault()` in `event.intercept`            |
+| `hash-plugin` popstate         | silent fallback (shared `browser-env/popstate-handler`)             |
+
+The same configuration, the same unmatched URL → three different outcomes depending on how the URL arrived. `defaultRoute` was overloaded: explicit target for `navigateToDefault()` **and** implicit auto-fallback on popstate. The silent fallback hid errors from logs, analytics, and the `onTransitionError` hook.
+
+### Solution
+
+Unified contract: `allowNotFound: false` means "unknown route is an error, reported, everywhere". `start()` already implemented it — the three plugins now match.
+
+1. Added `PluginApi.emitTransitionError(error)` — a standard point-of-entry for plugins to emit `$$error` without synthesising a navigation. Delegates to `ctx.emitTransitionError` on `RouterInternals`, which calls `eventBus.sendFailSafe(undefined, state.get(), error)` (safe at any FSM state — direct emit when not READY).
+2. `shared/browser-env/popstate-handler.ts`: strict-mode else-branch emits `ROUTE_NOT_FOUND` via `api.emitTransitionError` and calls `rollbackUrlToCurrentState()` (replaces URL with the current router state's path) — no more silent `navigateToDefault`.
+3. `navigation-plugin/navigate-handler.ts`: strict-mode branch emits the same error and throws inside an `async` `event.intercept()` handler — Navigation API auto-rolls back the URL via intercept rejection.
+4. `hash-plugin`: inherits the fix via `browser-env` symlink.
+
+### Incidental fix bundled in
+
+The popstate-handler catch was extended: `RouterError` from `deps.router.navigate()` (e.g., `CANNOT_DEACTIVATE` from a blocking guard) now also rolls the URL back. Previously, guard-rejected popstate left the browser URL on the new location while state stayed on the old — an inconsistent observable state.
+
+Teardown-safe: the rollback is wrapped in try/catch because `router.buildUrl` may have been removed by plugin teardown while a popstate event was still queued.
+
+### Userland migration
+
+Users who relied on the silent fallback subscribe explicitly:
+
+```ts
+router.usePlugin(() => ({
+  onTransitionError(_toState, _fromState, err) {
+    if (err.code === "ROUTE_NOT_FOUND") {
+      void router.navigateToDefault({ replace: true });
+    }
+  },
+}));
+```
+
+### Why this matters
+
+- Closes #471 case 3 from the opposite direction — `{ allowNotFound: false, defaultRoute: "" }` is no longer a dead-end configuration.
+- Single purpose for `defaultRoute`: only the explicit `router.navigateToDefault()` target.
+- All error surfaces go through one channel (`onTransitionError`) — uniform observability for logs, analytics, and recovery UIs.
+
 ## CI/CD: Split CI into PR-only and Post-Merge Workflows
 
 ### Problem
