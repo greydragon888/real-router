@@ -51,6 +51,8 @@ export interface RouterInternals<
 
   readonly buildPath: (route: string, params?: Params) => string;
 
+  readonly emitTransitionError: (error: Error) => void;
+
   readonly start: (path: string) => Promise<State>;
 
   /* eslint-disable @typescript-eslint/no-explicit-any -- heterogeneous map: stores different InterceptorFn<M> types under different keys */

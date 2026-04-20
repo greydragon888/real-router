@@ -179,7 +179,7 @@ describe("N1 — Navigate Event Storm", () => {
     expect(router.getState()).toStrictEqual(stateBefore);
   });
 
-  it("1.6 — 50 navigate events, allowNotFound=false: navigateToDefault called", async () => {
+  it("1.6 — 50 navigate events, allowNotFound=false: no silent fallback, errors surface, state pinned (#483)", async () => {
     const result = createStressRouter({ allowNotFound: false });
 
     router = result.router;
@@ -189,15 +189,28 @@ describe("N1 — Navigate Event Storm", () => {
 
     await router.start();
 
-    const navigateSpy = vi.spyOn(router, "navigateToDefault");
+    const initialState = router.getState()!;
+    const errorHook = vi.fn();
+
+    router.usePlugin(() => ({ onTransitionError: errorHook }));
+
+    const navigateDefaultSpy = vi.spyOn(router, "navigateToDefault");
 
     for (let i = 0; i < 50; i++) {
-      mockNav.navigate("http://localhost/nonexistent");
+      mockNav
+        .navigate("http://localhost/nonexistent")
+        .finished.catch(() => undefined);
     }
 
     await waitForTransitions(200);
 
-    expect(navigateSpy).toHaveBeenCalled();
-    expect(router.getState()?.name).toBe("home");
+    // No silent fallback
+    expect(navigateDefaultSpy).not.toHaveBeenCalled();
+
+    // Every navigate event produced a ROUTE_NOT_FOUND error hook invocation
+    expect(errorHook).toHaveBeenCalled();
+
+    // Router state pinned to initial — Navigation API rolled back each URL
+    expect(router.getState()).toStrictEqual(initialState);
   });
 });

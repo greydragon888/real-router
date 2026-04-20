@@ -169,6 +169,10 @@ export function getPluginApi<
         }
       };
     },
+    emitTransitionError: (error) => {
+      throwIfDisposed(ctx.isDisposed);
+      ctx.emitTransitionError(error);
+    },
     claimContextNamespace: ((namespace: string) => {
       throwIfDisposed(ctx.isDisposed);
 
