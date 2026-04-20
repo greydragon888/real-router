@@ -8,7 +8,9 @@ concurrency:
   group: post-merge-${{ github.ref }}
   cancel-in-progress: true
 
+# Self-hosted ducktors/turborepo-remote-cache on Cloud Run + Cloudflare R2 (#490)
 env:
+  TURBO_API: ${{ vars.TURBO_API }}
   TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
   TURBO_TEAM: ${{ vars.TURBO_TEAM }}
 

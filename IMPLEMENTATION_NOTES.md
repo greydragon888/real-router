@@ -797,6 +797,42 @@ New turbo task for Playwright e2e tests in example applications:
 
 Depends on `^bundle` to ensure packages are compiled before examples run e2e tests. Uses `^bundle` (not `^build`) — e2e tests only need dist/, not upstream test validation.
 
+### Self-Hosted Turbo Remote Cache (#490)
+
+**Problem:** Vercel Remote Cache evicted artifacts non-deterministically on the free tier. Same SHA rerun showed **4 tasks going HIT → MISS** in ~2 minutes with zero input drift (#490 evidence: `@real-router/{angular,preact,react,solid}#lint`; `@real-router/svelte#test:properties` never landed remotely). Cost: 30–60 s wasted per PR at random.
+
+**Solution:** Self-hosted [`ducktors/turborepo-remote-cache`](https://github.com/ducktors/turborepo-remote-cache) on Google Cloud Run with Cloudflare R2 as S3-compatible backend. Deployment runbook: [`.github/turbo-remote-cache-deployment.md`](.claude/turbo-remote-cache-deployment.md).
+
+**Why R2 + Cloud Run:**
+
+| Constraint | How this stack satisfies it |
+|---|---|
+| $0/mo for OSS-scale CI | R2: 10 GB + 1M Class A / 10M Class B ops free. Cloud Run: 2M req/mo + 360 K GB·s free. Well above footprint. |
+| Deterministic retention | We control TTL via R2 lifecycle rules; no vendor-side eviction. |
+| Compatible with existing `TURBO_*` env contract | Adds `TURBO_API` (public URL var); `TURBO_TOKEN`/`TURBO_TEAM` reused. |
+| Minimal moving parts | Single stateless container, public endpoint, static bearer auth (`AUTH_MODE=static`). |
+
+**Client wiring.** All 4 workflows (`ci.yml`, `post-merge.yml`, `changesets.yml`, `examples.yml`) declare `TURBO_API: ${{ vars.TURBO_API }}` alongside existing `TURBO_TOKEN`/`TURBO_TEAM`. When `TURBO_API` is unset, turbo falls back to Vercel's default endpoint — trivial rollback.
+
+**Security model.** Cloud Run deployed with `--allow-unauthenticated`; access gated solely by `TURBO_TOKEN` (Bearer header). IAM-based auth (Workload Identity Federation) was rejected as dead weight: a GHA-secret leak compromises both models equally, and IAM adds GCP SA provisioning + 4-workflow auth steps — blows the 1–2 h setup budget without improving the threat model.
+
+**Cost-control guardrails.** `--max-instances=3`, `--min-instances=0`, `--memory=512Mi`, `--timeout=60s`. Caps runaway autoscale (malicious replay or misconfigured CI loop) at free-tier ceiling.
+
+**Operational notes.** Cold start ~2–5 s (min-instances=0) — still strictly better than 30–60 s Vercel miss. Bucket size reviewed monthly; R2 lifecycle rule (delete > 30 d old) added when approaching 10 GB.
+
+**Empirical results (PR #491, April 2026).** Four back-to-back CI runs on the self-hosted cache validated both the headline fix and cascade precision:
+
+| Scenario | Pipeline | Tasks cached | Notes |
+|---|---|---|---|
+| Cold (first run, empty R2) | 14m39s | baseline | Populates R2 |
+| Rerun on same SHA | **3m5s** | ~100 % | `>>> FULL TURBO`. Zero `HIT → MISS` — the #490 failure mode is gone |
+| Foundation change (`@real-router/types`) | 13m1s | 30/162 | ~132 tasks invalidated by `dependsOn: ^bundle` cascade — unavoidable for a foundational package |
+| Leaf change (`@real-router/memory-plugin`) | **1m34s** | **156/162** | Only the 6 tasks of the edited package are MISS; cascade is surgically precise |
+
+R2 HTTP summary across all four runs: 0× 401, 0× 5xx, `PUT 200` on every upload, `GET 200/404` split matches expected cold/warm state. Typical PR touches 1–3 leaf-ish packages → expect ~1–3 min CI vs 14+ min with a hypothetical cold cache.
+
+**Gotcha — GitHub Variables vs Secrets.** `TURBO_API` must be added as a **repository Variable**, not a Secret. The URL is not sensitive, and the workflows reference it as `${{ vars.TURBO_API }}`. Creating it as `secrets.TURBO_API` is silently wrong: `vars.TURBO_API` then resolves to an empty string, turbo falls back to the Vercel default, all requests authenticate with a token Vercel doesn't know → 100 % cache MISS. Diagnose via any workflow log — if the `env` block of a step shows `TURBO_API:` with nothing after the colon (while `TURBO_TOKEN: ***` is masked), the variable is missing from the Variables tab. Only `TURBO_TOKEN` belongs in Secrets.
+
 ## macOS Development Setup
 
 ### Spotlight Exclusion

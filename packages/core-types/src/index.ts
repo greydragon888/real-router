@@ -1,5 +1,3 @@
-// packages/core-types/modules/index.ts
-
 // Route node types
 export type {
   QueryParamsMode,

@@ -1,9 +1,16 @@
-// packages/core-types/modules/base.ts
-
 // Note: RouteTreeState is exported from route-node-types.ts
 // It uses RouteParams as default type parameter.
 // Real Router code should use RouteTreeState<Params> when needed.
 
+/**
+ * Detach function returned by subscription APIs.
+ *
+ * @description
+ * Calling this function removes the associated listener. Returned by
+ * `router.subscribe()`, `router.addEventListener()`, `router.subscribeLeave()`,
+ * and plugin interceptors. Idempotent — calling more than once is safe and
+ * has no additional effect after the first call.
+ */
 export type Unsubscribe = () => void;
 
 export interface SimpleState<P extends Params = Params> {
