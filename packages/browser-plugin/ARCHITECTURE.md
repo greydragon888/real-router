@@ -333,10 +333,11 @@ User clicks back or forward
         ├── route found?
         │     YES: await router.navigate(route.name, route.params, transitionOptions)
         │     NO + allowNotFound: router.navigateToNotFound(browser.getLocation())
-        │     NO + !allowNotFound: await router.navigateToDefault({ ...transitionOptions, reload: true, replace: true })
+        │     NO + !allowNotFound: api.emitTransitionError(ROUTE_NOT_FOUND) + rollbackUrlToCurrentState()
+        │                          (no silent navigateToDefault — see #483)
         │
         ├── catch (error):
-        │     error instanceof RouterError? → ignore (CANNOT_DEACTIVATE, etc.)
+        │     error instanceof RouterError? → rollbackUrlToCurrentState() (URL↔state resync)
         │     otherwise: recoverFromCriticalError(error)
         │               └── browser.replaceState(currentState, buildUrl(...))
         │

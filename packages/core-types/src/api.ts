@@ -133,6 +133,20 @@ export interface PluginApi {
 
   extendRouter: (extensions: Record<string, unknown>) => Unsubscribe;
 
+  /**
+   * Emits a `$$error` event without going through the navigation pipeline.
+   *
+   * Used by plugins that detect an error outside a running transition (e.g.,
+   * an unmatched URL on popstate in strict mode). The event reaches any
+   * `onTransitionError` plugin hook and any `$$error` listener so developers
+   * can observe errors raised by the plugin layer.
+   *
+   * The current router state is used as `fromState`; `toState` is `undefined`
+   * because no transition was attempted. Safe to call at any FSM state —
+   * delegates to `sendFailSafe` internally (direct emit when not READY).
+   */
+  emitTransitionError: (error: Error) => void;
+
   claimContextNamespace: {
     // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents -- StateContext is an empty interface extended via module augmentation, so `keyof StateContext & string` is `never` at baseline and resolves to the augmented keys when plugins extend it
     <K extends keyof StateContext & string>(

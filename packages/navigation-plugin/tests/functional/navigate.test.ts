@@ -1,4 +1,4 @@
-import { createRouter, RouterError, UNKNOWN_ROUTE } from "@real-router/core";
+import { createRouter, UNKNOWN_ROUTE } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
@@ -61,7 +61,7 @@ describe("Navigation Plugin — Navigate", () => {
       expect(router.getState()?.name).toBe(UNKNOWN_ROUTE);
     });
 
-    it("handles navigate to unknown URL without allowNotFound (navigateToDefault)", async () => {
+    it("emits $$error and rejects intercept on unknown URL when allowNotFound is false (#483)", async () => {
       router.stop();
       unsubscribe?.();
       unsubscribe = undefined;
@@ -74,6 +74,11 @@ describe("Navigation Plugin — Navigate", () => {
       restrictedRouter.usePlugin(navigationPluginFactory({}, browser));
       await restrictedRouter.start();
 
+      const previousState = restrictedRouter.getState()!;
+      const errorHook = vi.fn();
+
+      restrictedRouter.usePlugin(() => ({ onTransitionError: errorHook }));
+
       const navigateDefaultSpy = vi.spyOn(
         restrictedRouter,
         "navigateToDefault",
@@ -83,9 +88,20 @@ describe("Navigation Plugin — Navigate", () => {
         "http://localhost/nonexistent-path",
       );
 
-      await finished;
+      await finished.catch(() => undefined);
 
-      expect(navigateDefaultSpy).toHaveBeenCalled();
+      // No silent fallback
+      expect(navigateDefaultSpy).not.toHaveBeenCalled();
+
+      // Error surfaces via onTransitionError
+      expect(errorHook).toHaveBeenCalledTimes(1);
+      expect(errorHook.mock.calls[0][2]).toMatchObject({
+        code: "ROUTE_NOT_FOUND",
+      });
+
+      // Router state unchanged — Navigation API auto-rolls back the URL
+      // via intercept rejection
+      expect(restrictedRouter.getState()).toStrictEqual(previousState);
 
       restrictedRouter.stop();
     });
@@ -400,41 +416,8 @@ describe("Error Recovery", () => {
     consoleSpy.mockRestore();
   });
 
-  it("recovers URL on non-RouterError in navigateToDefault handler", async () => {
-    router.stop();
-
-    const restrictedRouter = createRouter(routerConfig, {
-      defaultRoute: "home",
-      allowNotFound: false,
-    });
-
-    unsub = restrictedRouter.usePlugin(navigationPluginFactory({}, browser));
-    await restrictedRouter.start();
-
-    vi.spyOn(restrictedRouter, "navigateToDefault").mockRejectedValue(
-      new TypeError("navigateToDefault crash"),
-    );
-
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const browserNavigateSpy = vi.spyOn(browser, "navigate");
-
-    const { finished } = mockNav.navigate("http://localhost/nonexistent");
-
-    await finished;
-
-    expect(consoleSpy).toHaveBeenCalledWith(
-      "[navigation-plugin] Critical error in navigate handler",
-      expect.any(TypeError),
-    );
-
-    expect(browserNavigateSpy).toHaveBeenCalledWith(
-      "/",
-      expect.objectContaining({ history: "replace" }),
-    );
-
-    consoleSpy.mockRestore();
-    restrictedRouter.stop();
-  });
+  // Obsolete after #483: strict-mode path no longer invokes navigateToDefault,
+  // so there is no "navigateToDefault crash" code path to recover from.
 
   it("does NOT recover on RouterError (expected behavior)", async () => {
     unsub = router.usePlugin(
@@ -458,7 +441,7 @@ describe("Error Recovery", () => {
     consoleSpy.mockRestore();
   });
 
-  it("does NOT recover on RouterError from navigateToDefault", async () => {
+  it("strict-mode throws ROUTE_NOT_FOUND silently (no critical recovery) — Navigation API auto-rolls back URL (#483)", async () => {
     router.stop();
 
     const restrictedRouter = createRouter(routerConfig, {
@@ -469,20 +452,22 @@ describe("Error Recovery", () => {
     unsub = restrictedRouter.usePlugin(navigationPluginFactory({}, browser));
     await restrictedRouter.start();
 
-    vi.spyOn(restrictedRouter, "navigateToDefault").mockImplementation(() => {
-      throw new RouterError("TRANSITION_ERR");
-    });
-
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const browserNavigateSpy = vi.spyOn(browser, "navigate");
 
     const { finished } = mockNav.navigate("http://localhost/nonexistent");
 
-    await finished;
+    await finished.catch(() => undefined);
 
+    // RouterError does not trigger the critical-recovery console.error path
     expect(consoleSpy).not.toHaveBeenCalledWith(
       "[navigation-plugin] Critical error in navigate handler",
       expect.anything(),
     );
+
+    // Plugin does not call browser.navigate for recovery — Navigation API
+    // rolls back URL automatically on intercept rejection
+    expect(browserNavigateSpy).not.toHaveBeenCalled();
 
     consoleSpy.mockRestore();
     restrictedRouter.stop();

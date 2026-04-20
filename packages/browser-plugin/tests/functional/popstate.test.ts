@@ -87,7 +87,7 @@ describe("Browser Plugin — Popstate", () => {
       expect(navigateSpy).toHaveBeenCalled();
     });
 
-    it("navigates to default when allowNotFound is false and no route matches", async () => {
+    it("emits $$error and rolls back URL when allowNotFound is false and no route matches (#483)", async () => {
       router.stop();
 
       const restrictedRouter = createRouter(routerConfig, {
@@ -99,12 +99,34 @@ describe("Browser Plugin — Popstate", () => {
       restrictedRouter.usePlugin(browserPluginFactory({}, mockedBrowser));
       await restrictedRouter.start();
 
-      globalThis.history.replaceState({}, "", "/nonexistent-path");
-      const navigateSpy = vi.spyOn(restrictedRouter, "navigateToDefault");
+      const previousState = restrictedRouter.getState()!;
+      const errorHook = vi.fn();
 
+      restrictedRouter.usePlugin(() => ({ onTransitionError: errorHook }));
+
+      const defaultSpy = vi.spyOn(restrictedRouter, "navigateToDefault");
+      const replaceSpy = vi.spyOn(mockedBrowser, "replaceState");
+
+      globalThis.history.replaceState({}, "", "/nonexistent-path");
       globalThis.dispatchEvent(new PopStateEvent("popstate", { state: null }));
 
-      expect(navigateSpy).toHaveBeenCalled();
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // No silent fallback
+      expect(defaultSpy).not.toHaveBeenCalled();
+
+      // Error surfaces via onTransitionError
+      expect(errorHook).toHaveBeenCalledTimes(1);
+      expect(errorHook.mock.calls[0][2]).toMatchObject({
+        code: "ROUTE_NOT_FOUND",
+      });
+
+      // State unchanged, URL re-synced to previous state
+      expect(restrictedRouter.getState()).toStrictEqual(previousState);
+      expect(replaceSpy).toHaveBeenCalledWith(
+        previousState,
+        expect.stringContaining(previousState.path),
+      );
 
       restrictedRouter.stop();
     });
