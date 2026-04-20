@@ -5,6 +5,234 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-04-20]
+
+### @real-router/browser-plugin@0.14.0
+
+### Minor Changes
+
+- [#487](https://github.com/greydragon888/real-router/pull/487) [`8e4551f`](https://github.com/greydragon888/real-router/commit/8e4551f36af69732c0889f92a08e593a723b76c6) Thanks [@greydragon888](https://github.com/greydragon888)! - **BREAKING:** popstate to unmatched URL in strict mode no longer silently redirects to `defaultRoute` ([#483](https://github.com/greydragon888/real-router/issues/483))
+
+  When `allowNotFound: false` and a popstate event targets a URL that matches no registered route, the plugin used to silently call `router.navigateToDefault({ reload: true, replace: true })`. This hid the error from logs, analytics, and the `onTransitionError` plugin hook, and overloaded `defaultRoute` with two unrelated meanings (explicit target + implicit auto-fallback).
+
+  **New behaviour:**
+  - `$$error` event is emitted with `ROUTE_NOT_FOUND` — reaches `Plugin.onTransitionError` hooks and `router.addEventListener("$$error", ...)` listeners.
+  - Browser URL is rolled back to the last-known router state (URL↔state consistency preserved).
+  - Router state is unchanged.
+
+  The `defaultRoute` option now has a single purpose: it is only consulted by an **explicit** `router.navigateToDefault()` call.
+
+  **Incidental fix:** the same catch now rolls back URL on any `RouterError` (including guard-rejected navigations). Previously, a `canDeactivate: false` on popstate left the browser URL on the new location while router state stayed on the old — an inconsistent observable state that is now resolved.
+
+  **Migration** — if you relied on the silent fallback:
+
+  ```ts
+  router.usePlugin(() => ({
+    onTransitionError(_toState, _fromState, err) {
+      if (err.code === "ROUTE_NOT_FOUND") {
+        void router.navigateToDefault({ replace: true });
+      }
+    },
+  }));
+  ```
+
+### Patch Changes
+
+- Updated dependencies [[`8e4551f`](https://github.com/greydragon888/real-router/commit/8e4551f36af69732c0889f92a08e593a723b76c6)]:
+  - @real-router/core@0.50.0
+
+### @real-router/hash-plugin@0.5.0
+
+### Minor Changes
+
+- [#487](https://github.com/greydragon888/real-router/pull/487) [`8e4551f`](https://github.com/greydragon888/real-router/commit/8e4551f36af69732c0889f92a08e593a723b76c6) Thanks [@greydragon888](https://github.com/greydragon888)! - **BREAKING:** popstate to unmatched hash in strict mode no longer silently redirects to `defaultRoute` ([#483](https://github.com/greydragon888/real-router/issues/483))
+
+  Same change as `@real-router/browser-plugin` — hash-plugin reuses the shared `popstate-handler` from `browser-env`, so the fix propagates automatically.
+
+  When `allowNotFound: false` and a popstate targets a hash that matches no registered route, the plugin used to silently call `router.navigateToDefault({ reload: true, replace: true })`. This is removed.
+
+  **New behaviour:**
+  - `$$error` event with `ROUTE_NOT_FOUND` — observable via `onTransitionError` hook.
+  - Browser URL is rolled back to the last-known router state.
+  - Router state is unchanged.
+
+  **Migration** — same as browser-plugin:
+
+  ```ts
+  router.usePlugin(() => ({
+    onTransitionError(_toState, _fromState, err) {
+      if (err.code === "ROUTE_NOT_FOUND") {
+        void router.navigateToDefault({ replace: true });
+      }
+    },
+  }));
+  ```
+
+### Patch Changes
+
+- Updated dependencies [[`8e4551f`](https://github.com/greydragon888/real-router/commit/8e4551f36af69732c0889f92a08e593a723b76c6)]:
+  - @real-router/core@0.50.0
+
+### @real-router/navigation-plugin@0.4.0
+
+### Minor Changes
+
+- [#487](https://github.com/greydragon888/real-router/pull/487) [`8e4551f`](https://github.com/greydragon888/real-router/commit/8e4551f36af69732c0889f92a08e593a723b76c6) Thanks [@greydragon888](https://github.com/greydragon888)! - **BREAKING:** navigate event on unmatched URL in strict mode no longer silently redirects to `defaultRoute` ([#483](https://github.com/greydragon888/real-router/issues/483))
+
+  When `allowNotFound: false` and a navigate event targets a URL that matches no registered route, the plugin used to silently call `router.navigateToDefault()` inside `event.intercept`. This hid the error from logs, analytics, and the `onTransitionError` plugin hook.
+
+  **New behaviour:**
+  - `$$error` event is emitted with `ROUTE_NOT_FOUND` — reaches `Plugin.onTransitionError` hooks and `router.addEventListener("$$error", ...)` listeners.
+  - `event.intercept()` handler rejects, so the Navigation API automatically rolls back the URL (no manual `browser.navigate()` call needed).
+  - Router state is unchanged.
+
+  The `defaultRoute` option now has a single purpose: it is only consulted by an **explicit** `router.navigateToDefault()` call.
+
+  **Migration** — if you relied on the silent fallback:
+
+  ```ts
+  router.usePlugin(() => ({
+    onTransitionError(_toState, _fromState, err) {
+      if (err.code === "ROUTE_NOT_FOUND") {
+        void router.navigateToDefault({ replace: true });
+      }
+    },
+  }));
+  ```
+
+### Patch Changes
+
+- Updated dependencies [[`8e4551f`](https://github.com/greydragon888/real-router/commit/8e4551f36af69732c0889f92a08e593a723b76c6)]:
+  - @real-router/core@0.50.0
+
+### @real-router/core@0.50.0
+
+### Minor Changes
+
+- [#487](https://github.com/greydragon888/real-router/pull/487) [`8e4551f`](https://github.com/greydragon888/real-router/commit/8e4551f36af69732c0889f92a08e593a723b76c6) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `PluginApi.emitTransitionError(error)` ([#483](https://github.com/greydragon888/real-router/issues/483))
+
+  Plugins can now emit `$$error` events without going through the navigation pipeline. Delegates to `eventBus.sendFailSafe` internally with the current router state as `fromState` and `toState: undefined`. Safe to call at any FSM state.
+
+  Used by `@real-router/browser-plugin`, `@real-router/navigation-plugin`, and `@real-router/hash-plugin` to surface strict-mode errors (`ROUTE_NOT_FOUND` on unmatched URL) through the standard `onTransitionError` hook instead of silently falling back to `navigateToDefault()`.
+
+### @real-router/angular@0.2.2
+
+### Patch Changes
+
+- Updated dependencies [[`8e4551f`](https://github.com/greydragon888/real-router/commit/8e4551f36af69732c0889f92a08e593a723b76c6)]:
+  - @real-router/core@0.50.0
+  - @real-router/sources@0.7.2
+
+### @real-router/lifecycle-plugin@0.4.2
+
+### Patch Changes
+
+- Updated dependencies [[`8e4551f`](https://github.com/greydragon888/real-router/commit/8e4551f36af69732c0889f92a08e593a723b76c6)]:
+  - @real-router/core@0.50.0
+
+### @real-router/logger-plugin@0.5.3
+
+### Patch Changes
+
+- Updated dependencies [[`8e4551f`](https://github.com/greydragon888/real-router/commit/8e4551f36af69732c0889f92a08e593a723b76c6)]:
+  - @real-router/core@0.50.0
+
+### @real-router/memory-plugin@0.3.2
+
+### Patch Changes
+
+- Updated dependencies [[`8e4551f`](https://github.com/greydragon888/real-router/commit/8e4551f36af69732c0889f92a08e593a723b76c6)]:
+  - @real-router/core@0.50.0
+
+### @real-router/persistent-params-plugin@0.2.3
+
+### Patch Changes
+
+- Updated dependencies [[`8e4551f`](https://github.com/greydragon888/real-router/commit/8e4551f36af69732c0889f92a08e593a723b76c6)]:
+  - @real-router/core@0.50.0
+
+### @real-router/preact@0.5.2
+
+### Patch Changes
+
+- Updated dependencies [[`8e4551f`](https://github.com/greydragon888/real-router/commit/8e4551f36af69732c0889f92a08e593a723b76c6)]:
+  - @real-router/core@0.50.0
+  - @real-router/sources@0.7.2
+
+### @real-router/preload-plugin@0.3.2
+
+### Patch Changes
+
+- Updated dependencies [[`8e4551f`](https://github.com/greydragon888/real-router/commit/8e4551f36af69732c0889f92a08e593a723b76c6)]:
+  - @real-router/core@0.50.0
+
+### @real-router/react@0.17.2
+
+### Patch Changes
+
+- Updated dependencies [[`8e4551f`](https://github.com/greydragon888/real-router/commit/8e4551f36af69732c0889f92a08e593a723b76c6)]:
+  - @real-router/core@0.50.0
+  - @real-router/sources@0.7.2
+
+### @real-router/rx@0.3.3
+
+### Patch Changes
+
+- Updated dependencies [[`8e4551f`](https://github.com/greydragon888/real-router/commit/8e4551f36af69732c0889f92a08e593a723b76c6)]:
+  - @real-router/core@0.50.0
+
+### @real-router/search-schema-plugin@0.2.4
+
+### Patch Changes
+
+- Updated dependencies [[`8e4551f`](https://github.com/greydragon888/real-router/commit/8e4551f36af69732c0889f92a08e593a723b76c6)]:
+  - @real-router/core@0.50.0
+
+### @real-router/solid@0.5.2
+
+### Patch Changes
+
+- Updated dependencies [[`8e4551f`](https://github.com/greydragon888/real-router/commit/8e4551f36af69732c0889f92a08e593a723b76c6)]:
+  - @real-router/core@0.50.0
+  - @real-router/sources@0.7.2
+
+### @real-router/sources@0.7.2
+
+### Patch Changes
+
+- Updated dependencies [[`8e4551f`](https://github.com/greydragon888/real-router/commit/8e4551f36af69732c0889f92a08e593a723b76c6)]:
+  - @real-router/core@0.50.0
+
+### @real-router/ssr-data-plugin@0.3.2
+
+### Patch Changes
+
+- Updated dependencies [[`8e4551f`](https://github.com/greydragon888/real-router/commit/8e4551f36af69732c0889f92a08e593a723b76c6)]:
+  - @real-router/core@0.50.0
+
+### @real-router/svelte@0.4.2
+
+### Patch Changes
+
+- Updated dependencies [[`8e4551f`](https://github.com/greydragon888/real-router/commit/8e4551f36af69732c0889f92a08e593a723b76c6)]:
+  - @real-router/core@0.50.0
+  - @real-router/sources@0.7.2
+
+### @real-router/validation-plugin@0.6.1
+
+### Patch Changes
+
+- Updated dependencies [[`8e4551f`](https://github.com/greydragon888/real-router/commit/8e4551f36af69732c0889f92a08e593a723b76c6)]:
+  - @real-router/core@0.50.0
+
+### @real-router/vue@0.6.2
+
+### Patch Changes
+
+- Updated dependencies [[`8e4551f`](https://github.com/greydragon888/real-router/commit/8e4551f36af69732c0889f92a08e593a723b76c6)]:
+  - @real-router/core@0.50.0
+  - @real-router/sources@0.7.2
+
 ## [2026-04-19]
 
 ### @real-router/core@0.49.0

@@ -1,6 +1,6 @@
 {
   "name": "dom-utils",
-  "version": "0.2.11",
+  "version": "0.2.12",
   "private": true,
   "description": "Tests for shared/dom-utils — source files live in /shared/dom-utils (src is a symlink)",
   "repository": {
