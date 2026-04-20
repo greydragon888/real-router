@@ -7,6 +7,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-04-20]
 
+### @real-router/react@0.18.0
+
+### Minor Changes
+
+- [#494](https://github.com/greydragon888/real-router/pull/494) [`b0cdc41`](https://github.com/greydragon888/real-router/commit/b0cdc410ee97b3b8b7012216f863756be832d729) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `@real-router/react/ink` subpath export for Ink (terminal UI) ([#493](https://github.com/greydragon888/real-router/issues/493))
+
+  New third entry alongside `main` and `/legacy`, targeting React 19.2+ & Ink 7+. Ships all shared hooks plus two terminal-specific pieces:
+  - **`InkRouterProvider`** — wrapper around the shared `RouterProvider` that omits `announceNavigation` (no DOM, no aria-live).
+  - **`InkLink`** — focusable text link built on Ink's `useFocus` + `useInput`. Joins the focus ring (Tab to move, Enter to navigate). Props mirror `Link`: `routeName`, `routeParams`, `routeOptions`, `activeStrict`, `ignoreQueryParams`. DOM-only props (`className`, `target`, `onClick`) are replaced with terminal equivalents (`activeColor`, `focusColor`, `inverse`/`activeInverse`/`focusInverse`, `onSelect`).
+
+  ```tsx
+  import {
+    InkLink,
+    InkRouterProvider,
+    useRouteNode,
+  } from "@real-router/react/ink";
+
+  <InkRouterProvider router={router}>
+    <InkLink routeName="home" focusColor="cyan" activeColor="green" autoFocus>
+      Home
+    </InkLink>
+  </InkRouterProvider>;
+  ```
+
+  `ink` is added as an **optional** peer dependency (`peerDependenciesMeta.ink.optional = true`) — existing DOM consumers don't need to install it. The main and `/legacy` entries are unchanged.
+
+### @real-router/memory-plugin@0.3.3
+
+### Patch Changes
+
+- [#491](https://github.com/greydragon888/real-router/pull/491) [`d4678ca`](https://github.com/greydragon888/real-router/commit/d4678ca1855faed40eb110dbbd45eecaba791710) Thanks [@greydragon888](https://github.com/greydragon888)! - Document `MemoryPluginOptions.maxHistoryLength` ([#490](https://github.com/greydragon888/real-router/issues/490))
+
+  Added inline JSDoc for `maxHistoryLength` covering the `0 = unlimited`
+  sentinel, the rejected values (negatives, `NaN`, `±Infinity`, fractions),
+  and the default (`1000`). The behavior was previously documented only
+  in the package's CLAUDE.md.
+
+- Updated dependencies [[`d4678ca`](https://github.com/greydragon888/real-router/commit/d4678ca1855faed40eb110dbbd45eecaba791710), [`d4678ca`](https://github.com/greydragon888/real-router/commit/d4678ca1855faed40eb110dbbd45eecaba791710)]:
+  - @real-router/types@0.34.1
+
+### @real-router/types@0.34.1
+
+### Patch Changes
+
+- [#491](https://github.com/greydragon888/real-router/pull/491) [`d4678ca`](https://github.com/greydragon888/real-router/commit/d4678ca1855faed40eb110dbbd45eecaba791710) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove stale file-path header comments from `src/*.ts` ([#490](https://github.com/greydragon888/real-router/issues/490))
+
+  Each `src/*.ts` file carried a `// packages/core-types/modules/<name>.ts`
+  comment whose path no longer exists (the directory was renamed to `src/`).
+  These comments added no value beyond what the editor already shows, so
+  they have been removed. No behavior or API change.
+
+- [#491](https://github.com/greydragon888/real-router/pull/491) [`d4678ca`](https://github.com/greydragon888/real-router/commit/d4678ca1855faed40eb110dbbd45eecaba791710) Thanks [@greydragon888](https://github.com/greydragon888)! - Document `Unsubscribe` type ([#490](https://github.com/greydragon888/real-router/issues/490))
+
+  Added a short JSDoc block to the `Unsubscribe` type explaining where it
+  comes from (subscription APIs) and the idempotency guarantee, which was
+  previously only implicit.
+
+
 ### @real-router/browser-plugin@0.14.0
 
 ### Minor Changes
