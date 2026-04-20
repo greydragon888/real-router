@@ -18,3 +18,19 @@ allow-licenses:
   - LGPL-3.0-only
   - GPL-3.0-only
   - GPL-3.0-or-later
+
+# Transitive devDeps with SPDX strings the allow-list doesn't disambiguate but
+# that are de-facto permissive. All four are vendored by jsdom / Playwright /
+# pnpm tooling and have been present in pnpm-lock.yaml since before the Ink
+# entry PR — the action only surfaces them now because the dependency graph
+# shifted. Exempted by name (any version) for future-proofing.
+allow-dependencies-licenses:
+  # "JSON AND MIT" — JSON license (harmless, dual-listed with MIT).
+  - pkg:npm/parse-statements
+  # "WTFPL OR (MIT AND WTFPL)" — effectively MIT under the OR branch.
+  - pkg:npm/spark-md5
+  # "CC-BY-3.0" — documentation-style license; this package is a list of SPDX
+  #              exception identifiers, used by SPDX validators.
+  - pkg:npm/spdx-exceptions
+  # "BSD-2-Clause AND BSD-2-Clause-Views" — AND variant the parser doesn't match.
+  - pkg:npm/uri-js
