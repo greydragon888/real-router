@@ -215,6 +215,9 @@ export class Router<
           ),
         interceptorsMap,
       ) as unknown as RouterInternals["buildPath"],
+      emitTransitionError: (error) => {
+        this.#eventBus.sendFailSafe(undefined, this.#state.get(), error);
+      },
       start: createInterceptable(
         "start",
         (path: string) => {

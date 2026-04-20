@@ -188,7 +188,7 @@ describe("B1 — Popstate Storm", () => {
     expect(router.getState()).toStrictEqual(stateBefore);
   });
 
-  it("1.6 — 50 null-state events, allowNotFound=false: navigateToDefault called, replaceState used", async () => {
+  it("1.6 — 50 null-state events, allowNotFound=false: no silent fallback, errors surface, URL rolls back (#483)", async () => {
     globalThis.history.replaceState({}, "", "/");
 
     const result = createStressRouter({ allowNotFound: false });
@@ -200,9 +200,14 @@ describe("B1 — Popstate Storm", () => {
 
     await router.start();
 
+    const initialState = router.getState()!;
+    const errorHook = vi.fn();
+
+    router.usePlugin(() => ({ onTransitionError: errorHook }));
+
     globalThis.history.replaceState({}, "", "/nonexistent");
 
-    const navigateSpy = vi.spyOn(router, "navigateToDefault");
+    const navigateDefaultSpy = vi.spyOn(router, "navigateToDefault");
     const replaceStateSpy = vi.spyOn(browser, "replaceState");
 
     for (let i = 0; i < 50; i++) {
@@ -211,8 +216,14 @@ describe("B1 — Popstate Storm", () => {
 
     await waitForTransitions(200);
 
-    expect(navigateSpy).toHaveBeenCalled();
+    // No silent fallback
+    expect(navigateDefaultSpy).not.toHaveBeenCalled();
+
+    // Every popstate produced a ROUTE_NOT_FOUND error + URL rollback
+    expect(errorHook).toHaveBeenCalled();
     expect(replaceStateSpy).toHaveBeenCalled();
-    expect(router.getState()?.name).toBe("home");
+
+    // Router state is pinned to what it was before the storm — no drift
+    expect(router.getState()).toStrictEqual(initialState);
   });
 });

@@ -123,7 +123,7 @@ import {
 | `getRoutesApi(router)`       | Dynamic route CRUD    | `add`, `remove`, `update`, `replace`, `has`, `get`                           |
 | `getDependenciesApi(router)` | Dependency injection  | `get`, `set`, `setAll`, `remove`, `has`                                      |
 | `getLifecycleApi(router)`    | Guard registration    | `addActivateGuard`, `addDeactivateGuard`, `remove*`                          |
-| `getPluginApi(router)`       | Plugin infrastructure | `makeState`, `matchPath`, `addInterceptor`, `extendRouter`, `getRouteConfig` |
+| `getPluginApi(router)`       | Plugin infrastructure | `makeState`, `matchPath`, `addInterceptor`, `extendRouter`, `emitTransitionError`, `getRouteConfig` |
 | `cloneRouter(router, deps?)` | SSR cloning           | Shares route definitions, independent state                                  |
 
 ## Utilities

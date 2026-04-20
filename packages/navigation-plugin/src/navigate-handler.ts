@@ -1,4 +1,4 @@
-import { RouterError } from "@real-router/core";
+import { errorCodes, RouterError } from "@real-router/core";
 
 import { extractPath } from "./browser-env/index.js";
 
@@ -105,8 +105,18 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
         },
       });
     } else {
+      // Strict mode — unmatched URL is an error. Emit $$error and reject the
+      // intercept so the Navigation API auto-rolls back the URL. No silent
+      // fallback to defaultRoute.
       event.intercept({
-        handler: () => withRecovery(() => router.navigateToDefault()),
+        // eslint-disable-next-line @typescript-eslint/require-await -- Navigation API requires async handler; synchronous throw is the rollback signal
+        handler: async () => {
+          const err = new RouterError(errorCodes.ROUTE_NOT_FOUND, { path });
+
+          api.emitTransitionError(err);
+
+          throw err;
+        },
       });
     }
   };
