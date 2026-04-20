@@ -1,5 +1,3 @@
-// packages/core-types/modules/route-node-types.ts
-
 /**
  * Route Node Type Definitions — Minimal Public API.
  *

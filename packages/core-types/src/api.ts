@@ -1,5 +1,3 @@
-// packages/core-types/modules/api.ts
-
 /**
  * API interfaces for modular router access.
  * These interfaces are implemented by standalone API functions in @real-router/core.

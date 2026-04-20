@@ -1,5 +1,3 @@
-// packages/core-types/modules/constants.ts
-
 /**
  * Plugin lifecycle method names
  */

@@ -1,5 +1,3 @@
-// packages/core-types/modules/router.ts
-
 /**
  * Router types and interfaces.
  *

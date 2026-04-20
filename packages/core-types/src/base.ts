@@ -1,5 +1,3 @@
-// packages/core-types/modules/base.ts
-
 // Note: RouteTreeState is exported from route-node-types.ts
 // It uses RouteParams as default type parameter.
 // Real Router code should use RouteTreeState<Params> when needed.
