@@ -35,12 +35,20 @@
     },
     "build": {
       "dependsOn": ["bundle", "test", "test:properties", "test:stress"],
-      "inputs": [],
-      "outputs": [],
+      "inputs": [
+        "src/**/*.{ts,tsx,vue,svelte,html,css}",
+        "index.html",
+        "vite.config.*",
+        "angular.json",
+        "tsconfig.json",
+        "tsconfig.app.json",
+        "package.json"
+      ],
+      "outputs": ["dist/**"],
       "cache": true
     },
     "test:e2e": {
-      "dependsOn": ["^bundle"],
+      "dependsOn": ["^bundle", "build"],
       "outputs": [],
       "inputs": [
         "src/**/*.{ts,tsx,vue,svelte}",

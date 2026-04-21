@@ -92,6 +92,17 @@ function renderWithRootKA(
   return wrapWithSuspense(keepAliveContent, fallback);
 }
 
+// Vue compiles boolean-shorthand template attributes (`<Match keepAlive>`) to
+// an empty string instead of `true`, and converts them to `true` only when the
+// receiving component's prop is declared with `type: Boolean`. `Match` is a
+// marker component (`render: null`) — its props are inspected on the VNode
+// without ever going through Vue's prop-casting pipeline, so the raw `""` (or
+// the hyphenated attribute name) reaches us here. Accept the same trio Vue's
+// runtime does.
+function isKeepAliveEnabled(value: unknown): boolean {
+  return value === true || value === "" || value === "keep-alive";
+}
+
 function renderWithPerMatchKA(
   activeChild: VNode,
   wrapperCache: Map<string, Component>,
@@ -99,12 +110,12 @@ function renderWithPerMatchKA(
 ): VNode | null {
   const matchProps = activeChild.props as {
     segment?: string;
-    keepAlive?: boolean;
+    keepAlive?: unknown;
   } | null;
 
-  if (matchProps?.keepAlive === true && activeChild.type === Match) {
+  if (isKeepAliveEnabled(matchProps?.keepAlive) && activeChild.type === Match) {
     /* v8 ignore start */
-    const segment = matchProps.segment ?? "__not-found__";
+    const segment = matchProps?.segment ?? "__not-found__";
     /* v8 ignore stop */
     const WrapperComponent = getOrCreateWrapper(wrapperCache, segment);
     const slotContent = getSlotContent(activeChild) ?? [];
@@ -166,7 +177,9 @@ const RouteViewComponent = defineComponent({
       lastHasPerMatchKA = elements.some(
         (element) =>
           element.type === Match &&
-          (element.props as { keepAlive?: boolean } | null)?.keepAlive === true,
+          isKeepAliveEnabled(
+            (element.props as { keepAlive?: unknown } | null)?.keepAlive,
+          ),
       );
 
       return lastHasPerMatchKA;
