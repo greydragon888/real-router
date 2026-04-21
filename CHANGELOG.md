@@ -7,6 +7,107 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-04-21]
 
+### @real-router/angular@0.3.0
+
+### Minor Changes
+
+- [#502](https://github.com/greydragon888/real-router/pull/502) [`dcfd9cc`](https://github.com/greydragon888/real-router/commit/dcfd9cc2578c22449d2653d25d0b09a0fdb74681) Thanks [@greydragon888](https://github.com/greydragon888)! - Add opt-in scroll restoration via `provideRealRouter(router, { scrollRestoration })` ([#497](https://github.com/greydragon888/real-router/issues/497))
+
+  `provideRealRouter` now accepts an optional options bag. When `scrollRestoration` is provided, the adapter creates a `createScrollRestoration` instance via `provideEnvironmentInitializer`; teardown is wired through `DestroyRef`.
+
+  ```ts
+  import { provideRealRouter } from "@real-router/angular";
+
+  bootstrapApplication(AppComponent, {
+    providers: [
+      provideRealRouter(router, { scrollRestoration: { mode: "restore" } }),
+    ],
+  });
+  ```
+
+  Supports `manual` / `top` / `restore` modes and a custom scroll container. Direction is read from `@real-router/navigation-plugin`'s `state.context.navigation`; position is persisted across reloads via `sessionStorage` + `pagehide`.
+
+### @real-router/preact@0.6.0
+
+### Minor Changes
+
+- [#502](https://github.com/greydragon888/real-router/pull/502) [`dcfd9cc`](https://github.com/greydragon888/real-router/commit/dcfd9cc2578c22449d2653d25d0b09a0fdb74681) Thanks [@greydragon888](https://github.com/greydragon888)! - Add opt-in scroll restoration via `RouterProvider.scrollRestoration` ([#497](https://github.com/greydragon888/real-router/issues/497))
+
+  New `scrollRestoration?: ScrollRestorationOptions` prop on `RouterProvider`. Restores scroll position on back navigation, scrolls to top or hash on push. Supports `manual` / `top` / `restore` modes and a custom scroll container.
+
+  ```tsx
+  <RouterProvider router={router} scrollRestoration={{ mode: "restore" }}>
+    {/* ... */}
+  </RouterProvider>
+  ```
+
+  Backed by the shared `createScrollRestoration` utility in `shared/dom-utils` — same pattern as `createRouteAnnouncer`. Direction is read from `@real-router/navigation-plugin`'s `state.context.navigation`; position is persisted across reloads via `sessionStorage` + `pagehide`.
+
+### @real-router/react@0.19.0
+
+### Minor Changes
+
+- [#502](https://github.com/greydragon888/real-router/pull/502) [`dcfd9cc`](https://github.com/greydragon888/real-router/commit/dcfd9cc2578c22449d2653d25d0b09a0fdb74681) Thanks [@greydragon888](https://github.com/greydragon888)! - Add opt-in scroll restoration via `RouterProvider.scrollRestoration` ([#497](https://github.com/greydragon888/real-router/issues/497))
+
+  New `scrollRestoration?: ScrollRestorationOptions` prop on `RouterProvider`. Restores scroll position on back navigation, scrolls to top or hash on push. Supports `manual` / `top` / `restore` modes and a custom scroll container.
+
+  ```tsx
+  <RouterProvider router={router} scrollRestoration={{ mode: "restore" }}>
+    {/* ... */}
+  </RouterProvider>
+  ```
+
+  Backed by the shared `createScrollRestoration` utility in `shared/dom-utils` — same pattern as `createRouteAnnouncer`. Direction is read from `@real-router/navigation-plugin`'s `state.context.navigation`; position is persisted across reloads via `sessionStorage` + `pagehide`.
+
+### @real-router/solid@0.6.0
+
+### Minor Changes
+
+- [#502](https://github.com/greydragon888/real-router/pull/502) [`dcfd9cc`](https://github.com/greydragon888/real-router/commit/dcfd9cc2578c22449d2653d25d0b09a0fdb74681) Thanks [@greydragon888](https://github.com/greydragon888)! - Add opt-in scroll restoration via `RouterProvider.scrollRestoration` ([#497](https://github.com/greydragon888/real-router/issues/497))
+
+  New `scrollRestoration?: ScrollRestorationOptions` prop on `RouterProvider`. Restores scroll position on back navigation, scrolls to top or hash on push. Supports `manual` / `top` / `restore` modes and a custom scroll container.
+
+  ```tsx
+  <RouterProvider router={router} scrollRestoration={{ mode: "restore" }}>
+    {/* ... */}
+  </RouterProvider>
+  ```
+
+  Backed by the shared `createScrollRestoration` utility in `shared/dom-utils` — same pattern as `createRouteAnnouncer`. Direction is read from `@real-router/navigation-plugin`'s `state.context.navigation`; position is persisted across reloads via `sessionStorage` + `pagehide`.
+
+### @real-router/svelte@0.5.0
+
+### Minor Changes
+
+- [#502](https://github.com/greydragon888/real-router/pull/502) [`dcfd9cc`](https://github.com/greydragon888/real-router/commit/dcfd9cc2578c22449d2653d25d0b09a0fdb74681) Thanks [@greydragon888](https://github.com/greydragon888)! - Add opt-in scroll restoration via `RouterProvider.scrollRestoration` ([#497](https://github.com/greydragon888/real-router/issues/497))
+
+  New `scrollRestoration?: ScrollRestorationOptions` prop on `RouterProvider`. Restores scroll position on back navigation, scrolls to top or hash on push. Supports `manual` / `top` / `restore` modes and a custom scroll container.
+
+  ```svelte
+  <RouterProvider {router} scrollRestoration={{ mode: "restore" }}>
+    <!-- ... -->
+  </RouterProvider>
+  ```
+
+  Backed by the shared `createScrollRestoration` utility in `shared/dom-utils` — same pattern as `createRouteAnnouncer`. Direction is read from `@real-router/navigation-plugin`'s `state.context.navigation`; position is persisted across reloads via `sessionStorage` + `pagehide`.
+
+### @real-router/vue@0.7.0
+
+### Minor Changes
+
+- [#502](https://github.com/greydragon888/real-router/pull/502) [`dcfd9cc`](https://github.com/greydragon888/real-router/commit/dcfd9cc2578c22449d2653d25d0b09a0fdb74681) Thanks [@greydragon888](https://github.com/greydragon888)! - Add opt-in scroll restoration via `RouterProvider.scrollRestoration` ([#497](https://github.com/greydragon888/real-router/issues/497))
+
+  New `scrollRestoration?: ScrollRestorationOptions` prop on `RouterProvider`. Restores scroll position on back navigation, scrolls to top or hash on push. Supports `manual` / `top` / `restore` modes and a custom scroll container.
+
+  ```vue
+  <RouterProvider :router="router" :scroll-restoration="{ mode: 'restore' }">
+    <!-- ... -->
+  </RouterProvider>
+  ```
+
+  Backed by the shared `createScrollRestoration` utility in `shared/dom-utils` — same pattern as `createRouteAnnouncer`. Direction is read from `@real-router/navigation-plugin`'s `state.context.navigation`; position is persisted across reloads via `sessionStorage` + `pagehide`.
+
+
 ### @real-router/vue@0.6.3
 
 ### Patch Changes

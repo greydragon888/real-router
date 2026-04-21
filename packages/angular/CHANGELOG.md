@@ -1,5 +1,25 @@
 # @real-router/angular
 
+## 0.3.0
+
+### Minor Changes
+
+- [#502](https://github.com/greydragon888/real-router/pull/502) [`dcfd9cc`](https://github.com/greydragon888/real-router/commit/dcfd9cc2578c22449d2653d25d0b09a0fdb74681) Thanks [@greydragon888](https://github.com/greydragon888)! - Add opt-in scroll restoration via `provideRealRouter(router, { scrollRestoration })` ([#497](https://github.com/greydragon888/real-router/issues/497))
+
+  `provideRealRouter` now accepts an optional options bag. When `scrollRestoration` is provided, the adapter creates a `createScrollRestoration` instance via `provideEnvironmentInitializer`; teardown is wired through `DestroyRef`.
+
+  ```ts
+  import { provideRealRouter } from "@real-router/angular";
+
+  bootstrapApplication(AppComponent, {
+    providers: [
+      provideRealRouter(router, { scrollRestoration: { mode: "restore" } }),
+    ],
+  });
+  ```
+
+  Supports `manual` / `top` / `restore` modes and a custom scroll container. Direction is read from `@real-router/navigation-plugin`'s `state.context.navigation`; position is persisted across reloads via `sessionStorage` + `pagehide`.
+
 ## 0.2.2
 
 ### Patch Changes
