@@ -1,6 +1,6 @@
 {
   "name": "@real-router/preact",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "type": "commonjs",
   "description": "Preact integration for Real-Router",
   "main": "./dist/cjs/index.js",

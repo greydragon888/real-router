@@ -1,5 +1,21 @@
 # @real-router/vue
 
+## 0.7.0
+
+### Minor Changes
+
+- [#502](https://github.com/greydragon888/real-router/pull/502) [`dcfd9cc`](https://github.com/greydragon888/real-router/commit/dcfd9cc2578c22449d2653d25d0b09a0fdb74681) Thanks [@greydragon888](https://github.com/greydragon888)! - Add opt-in scroll restoration via `RouterProvider.scrollRestoration` ([#497](https://github.com/greydragon888/real-router/issues/497))
+
+  New `scrollRestoration?: ScrollRestorationOptions` prop on `RouterProvider`. Restores scroll position on back navigation, scrolls to top or hash on push. Supports `manual` / `top` / `restore` modes and a custom scroll container.
+
+  ```vue
+  <RouterProvider :router="router" :scroll-restoration="{ mode: 'restore' }">
+    <!-- ... -->
+  </RouterProvider>
+  ```
+
+  Backed by the shared `createScrollRestoration` utility in `shared/dom-utils` — same pattern as `createRouteAnnouncer`. Direction is read from `@real-router/navigation-plugin`'s `state.context.navigation`; position is persisted across reloads via `sessionStorage` + `pagehide`.
+
 ## 0.6.3
 
 ### Patch Changes
