@@ -539,6 +539,82 @@ describe("RouteView - Integration Tests", () => {
       expect(wrapper.find("[data-testid='count']").text()).toBe("1");
     });
 
+    it("per-Match keepAlive: accepts template-compiled boolean shorthand (empty string)", async () => {
+      // Vue compiles `<Match keepAlive>` to `{ keepAlive: "" }` and only
+      // promotes it to `true` when the prop is declared `type: Boolean` on the
+      // receiving component. Match is a render: null marker — its props never
+      // go through the cast pipeline, so the raw `""` reaches RouteView.
+      await router.start("/users/list");
+
+      const Counter = defineComponent({
+        setup() {
+          const count = ref(0);
+
+          return () =>
+            h("div", [
+              h("span", { "data-testid": "count" }, String(count.value)),
+              h(
+                "button",
+                {
+                  "data-testid": "increment",
+                  onClick: () => {
+                    count.value++;
+                  },
+                },
+                "+",
+              ),
+            ]);
+        },
+      });
+
+      const wrapper = mount(
+        defineComponent({
+          setup: () => () =>
+            h(
+              RouterProvider,
+              { router },
+              {
+                default: () =>
+                  h(
+                    RouteView,
+                    { nodeName: "" },
+                    {
+                      default: () => [
+                        h(
+                          RouteView.Match,
+
+                          { segment: "users", keepAlive: "" as any },
+                          { default: () => h(Counter) },
+                        ),
+                        h(
+                          RouteView.Match,
+                          { segment: "about" },
+                          {
+                            default: () =>
+                              h("div", { "data-testid": "about" }, "About"),
+                          },
+                        ),
+                      ],
+                    },
+                  ),
+              },
+            ),
+        }),
+      );
+
+      await wrapper.find("[data-testid='increment']").trigger("click");
+      await flushPromises();
+
+      expect(wrapper.find("[data-testid='count']").text()).toBe("1");
+
+      await router.navigate("about");
+      await flushPromises();
+      await router.navigate("users.list");
+      await flushPromises();
+
+      expect(wrapper.find("[data-testid='count']").text()).toBe("1");
+    });
+
     it("per-Match keepAlive: calls onActivated/onDeactivated lifecycle hooks", async () => {
       await router.start("/users/list");
 
