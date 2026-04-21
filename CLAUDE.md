@@ -27,6 +27,7 @@ shared/
 └── dom-utils/            # DOM helpers — for framework adapters
     ├── link-utils.ts     # shouldNavigate, buildHref, buildActiveClassName, applyLinkA11y
     ├── route-announcer.ts  # createRouteAnnouncer (a11y aria-live region)
+    ├── scroll-restore.ts   # createScrollRestoration (opt-in scroll capture + restore)
     └── index.ts          # barrel
 ```
 

@@ -3,11 +3,7 @@ import { defineComponent, h, computed, shallowRef, watch } from "vue";
 
 import { useRouter } from "../composables/useRouter";
 import { EMPTY_PARAMS, EMPTY_OPTIONS } from "../constants";
-import {
-  shouldNavigate,
-  buildHref,
-  buildActiveClassName,
-} from "../dom-utils/index.js";
+import { shouldNavigate, buildHref, buildActiveClassName } from "../dom-utils";
 
 import type { Params, NavigationOptions } from "@real-router/core";
 import type { PropType } from "vue";

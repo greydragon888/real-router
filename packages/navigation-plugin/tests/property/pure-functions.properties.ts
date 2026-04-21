@@ -2,7 +2,7 @@ import { fc, test } from "@fast-check/vitest";
 import { describe, expect } from "vitest";
 
 import { NUM_RUNS } from "./helpers";
-import { shouldReplaceHistory } from "../../src/browser-env/index.js";
+import { shouldReplaceHistory } from "../../src/browser-env";
 import { computeDirection } from "../../src/navigate-handler";
 import { deriveNavigationType } from "../../src/plugin";
 

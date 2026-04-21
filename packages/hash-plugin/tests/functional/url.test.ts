@@ -10,7 +10,7 @@ import {
   createMockedBrowser,
 } from "../helpers/testUtils";
 
-import type { Browser } from "../../src/browser-env/index.js";
+import type { Browser } from "../../src/browser-env";
 import type { Router } from "@real-router/core";
 
 let router: Router;

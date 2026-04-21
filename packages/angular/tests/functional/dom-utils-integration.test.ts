@@ -1,11 +1,7 @@
 import { createRouter } from "@real-router/core";
 import { describe, it, expect } from "vitest";
 
-import {
-  buildHref,
-  shallowEqual,
-  shouldNavigate,
-} from "../../src/dom-utils/index.js";
+import { buildHref, shallowEqual, shouldNavigate } from "../../src/dom-utils";
 
 describe("dom-utils integration (copy from shared/)", () => {
   it("buildHref returns correct path after prebundle copy", async () => {

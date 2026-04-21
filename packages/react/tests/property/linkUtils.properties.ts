@@ -17,7 +17,7 @@ import { fc, test } from "@fast-check/vitest";
 import { describe, expect } from "vitest";
 
 import { NUM_RUNS } from "./helpers";
-import { buildActiveClassName, buildHref } from "../../src/dom-utils/index.js";
+import { buildActiveClassName, buildHref } from "../../src/dom-utils";
 
 import type { Router } from "@real-router/core";
 

@@ -16,7 +16,12 @@ router.usePlugin(browserPluginFactory());
 
 void router.start().then(() => {
   void bootstrapApplication(AppComponent, {
-    providers: [provideZonelessChangeDetection(), provideRealRouter(router)],
+    providers: [
+      provideZonelessChangeDetection(),
+      provideRealRouter(router, {
+        scrollRestoration: { mode: "restore" },
+      }),
+    ],
   }).catch((err: unknown) => {
     console.error(err);
   });

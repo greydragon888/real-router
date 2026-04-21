@@ -1,6 +1,6 @@
 import { errorCodes, RouterError } from "@real-router/core";
 
-import { extractPath } from "./browser-env/index.js";
+import { extractPath } from "./browser-env";
 
 import type {
   NavigationBrowser,

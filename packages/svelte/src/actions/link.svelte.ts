@@ -2,7 +2,7 @@ import type { ActionReturn } from "svelte/action";
 import type { Router, Params, NavigationOptions } from "@real-router/core";
 import { ROUTER_KEY, getContextOrThrow } from "../context";
 import { EMPTY_OPTIONS, EMPTY_PARAMS, NOOP } from "../constants";
-import { shouldNavigate, applyLinkA11y } from "../dom-utils/index.js";
+import { shouldNavigate, applyLinkA11y } from "../dom-utils";
 
 export interface LinkActionParams {
   name: string;

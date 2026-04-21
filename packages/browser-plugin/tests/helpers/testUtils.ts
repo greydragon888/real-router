@@ -1,6 +1,6 @@
-import { createSafeBrowser } from "../../src/browser-env/index.js";
+import { createSafeBrowser } from "../../src/browser-env";
 
-import type { Browser } from "../../src/browser-env/index.js";
+import type { Browser } from "../../src/browser-env";
 import type { State } from "@real-router/core";
 
 export const noop = (): void => undefined;

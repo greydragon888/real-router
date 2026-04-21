@@ -5,7 +5,7 @@ import {
   buildUrl,
   extractPathFromAbsoluteUrl,
   urlToPath,
-} from "./browser-env/index.js";
+} from "./browser-env";
 import { LOGGER_CONTEXT } from "./constants";
 import {
   peekBack,

@@ -63,6 +63,7 @@ src/
 └── dom-utils/                  # Shared DOM utilities (prebuild copy of shared/)
     ├── link-utils.ts           # buildHref, buildActiveClassName, applyLinkA11y, shouldNavigate
     ├── route-announcer.ts      # createRouteAnnouncer
+    ├── scroll-restore.ts       # createScrollRestoration (opt-in scroll capture + restore)
     └── index.ts
 ```
 
@@ -178,6 +179,10 @@ Template renders `<ng-content>` (always) plus the error template alongside it wh
 ### NavigationAnnouncer
 
 Minimal component. Constructor injects `injectRouter()` and `inject(DestroyRef)`, calls `createRouteAnnouncer(router)` from `dom-utils`, and registers `announcer.destroy()` on `DestroyRef`. No template content — the announcer creates its own `aria-live` DOM node.
+
+### Scroll Restoration
+
+Opt-in via `provideRealRouter(router, { scrollRestoration })`. Not a component — wired through `provideEnvironmentInitializer`: when the environment injector is created (first `inject()` call), the initializer runs `createScrollRestoration(router, options)` from `shared/dom-utils/` and registers `sr.destroy()` on `inject(DestroyRef)`. Options are a bootstrap-time snapshot, not reactive to runtime changes. Lifecycle is tied to the environment injector — destroy fires on `TestBed.resetTestingModule()` / application teardown.
 
 ### RealLink
 

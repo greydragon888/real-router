@@ -263,6 +263,7 @@ The Segment Trie matcher traverses in O(segments), not O(routes).
 - **Plugin architecture** — intercept and extend router behavior
 - **Observable state** — RxJS and TC39 Observable compatible
 - **Immutable state** — deeply frozen, predictable state management
+- **Scroll restoration** — opt-in via `RouterProvider.scrollRestoration` ([docs](https://github.com/greydragon888/real-router/wiki/Scroll-Restoration)); restores on back/forward, scrolls to top / `#hash` on push; `restore` / `top` / `manual` modes; custom scroll containers
 
 ## Quick Start
 

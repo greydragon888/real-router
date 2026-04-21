@@ -7,7 +7,7 @@ import {
   buildHref,
   buildActiveClassName,
   shallowEqual,
-} from "../dom-utils/index.js";
+} from "../dom-utils";
 import { useIsActiveRoute } from "../hooks/useIsActiveRoute";
 import { useRouter } from "../hooks/useRouter";
 

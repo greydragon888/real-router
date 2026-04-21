@@ -21,7 +21,7 @@ const root = document.querySelector("#root");
 
 if (root) {
   render(
-    <RouterProvider router={router}>
+    <RouterProvider router={router} scrollRestoration={{ mode: "restore" }}>
       <App />
     </RouterProvider>,
     root,

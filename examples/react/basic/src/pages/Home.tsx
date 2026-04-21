@@ -2,6 +2,8 @@ import { useRoute } from "@real-router/react";
 
 import type { JSX } from "react";
 
+const items = Array.from({ length: 100 }, (_, i) => i + 1);
+
 export function Home(): JSX.Element {
   const { route } = useRoute();
 
@@ -17,6 +19,15 @@ export function Home(): JSX.Element {
         and <em>Forward</em> in the browser — routing state is preserved in the
         URL.
       </p>
+      <p>
+        <strong>Scroll restoration demo:</strong> scroll down the list below,
+        navigate to About, then hit Back — your position is restored.
+      </p>
+      <ul>
+        {items.map((n) => (
+          <li key={n}>Item #{n}</li>
+        ))}
+      </ul>
     </div>
   );
 }

@@ -15,7 +15,7 @@
   ];
 </script>
 
-<RouterProvider {router}>
+<RouterProvider {router} scrollRestoration={{ mode: "restore" }}>
   <Layout title="Real-Router — Basic" {links}>
     <RouteView nodeName="">
       {#snippet home()}

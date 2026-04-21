@@ -1,6 +1,6 @@
 import { getPluginApi } from "@real-router/core/api";
 
-import { isBrowserEnvironment, normalizeBase } from "./browser-env/index.js";
+import { isBrowserEnvironment, normalizeBase } from "./browser-env";
 import { defaultOptions, source } from "./constants";
 import { createNavigationBrowser } from "./navigation-browser";
 import { NavigationPlugin } from "./plugin";

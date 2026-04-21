@@ -7,10 +7,10 @@ import {
   updateBrowserState,
   buildUrl,
   urlToPath,
-} from "./browser-env/index.js";
+} from "./browser-env";
 import { LOGGER_CONTEXT, POPSTATE_SOURCE } from "./constants";
 
-import type { Browser, SharedFactoryState } from "./browser-env/index.js";
+import type { Browser, SharedFactoryState } from "./browser-env";
 import type { BrowserContext, BrowserPluginOptions } from "./types";
 import type {
   NavigationOptions,

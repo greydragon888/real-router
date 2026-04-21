@@ -6,7 +6,7 @@
     shouldNavigate,
     buildHref,
     buildActiveClassName,
-  } from "../dom-utils/index.js";
+  } from "../dom-utils";
 
   import type { NavigationOptions, Params } from "@real-router/core";
   import type { Snippet } from "svelte";

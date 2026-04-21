@@ -18,10 +18,7 @@ import {
   noop,
   routeConfig,
 } from "./helpers";
-import {
-  createSafeBrowser,
-  safelyEncodePath,
-} from "../../src/browser-env/index.js";
+import { createSafeBrowser, safelyEncodePath } from "../../src/browser-env";
 import { createHashPrefixRegex, extractHashPath } from "../../src/hash-utils";
 
 import type { Router } from "@real-router/core";

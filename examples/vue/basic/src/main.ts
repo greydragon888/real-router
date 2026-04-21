@@ -18,7 +18,12 @@ router.usePlugin(browserPluginFactory());
 await router.start();
 
 const app = createApp({
-  render: () => h(RouterProvider, { router }, { default: () => h(App) }),
+  render: () =>
+    h(
+      RouterProvider,
+      { router, scrollRestoration: { mode: "restore" } },
+      { default: () => h(App) },
+    ),
 });
 
 app.mount("#root");

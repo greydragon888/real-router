@@ -1,4 +1,4 @@
-import { shouldNavigate, applyLinkA11y } from "../dom-utils/index.js";
+import { shouldNavigate, applyLinkA11y } from "../dom-utils";
 
 import type { Router, NavigationOptions, Params } from "@real-router/core";
 import type { Directive } from "vue";

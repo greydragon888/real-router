@@ -5,10 +5,10 @@ import {
   createReplaceHistoryState,
   shouldReplaceHistory,
   updateBrowserState,
-} from "./browser-env/index.js";
+} from "./browser-env";
 import { hashUrlToPath } from "./hash-utils";
 
-import type { Browser, SharedFactoryState } from "./browser-env/index.js";
+import type { Browser, SharedFactoryState } from "./browser-env";
 import type { HashPluginOptions } from "./types";
 import type {
   NavigationOptions,

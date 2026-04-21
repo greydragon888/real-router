@@ -1,4 +1,4 @@
-import { createWarnOnce } from "./browser-env/index.js";
+import { createWarnOnce } from "./browser-env";
 
 import type { NavigationBrowser } from "./types";
 

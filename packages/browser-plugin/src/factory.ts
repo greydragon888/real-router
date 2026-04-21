@@ -5,12 +5,12 @@ import {
   normalizeBase,
   safelyEncodePath,
   extractPath,
-} from "./browser-env/index.js";
+} from "./browser-env";
 import { defaultOptions, POPSTATE_SOURCE } from "./constants";
 import { BrowserPlugin } from "./plugin";
 import { validateOptions } from "./validation";
 
-import type { Browser, SharedFactoryState } from "./browser-env/index.js";
+import type { Browser, SharedFactoryState } from "./browser-env";
 import type { BrowserPluginOptions } from "./types";
 import type { PluginFactory, Router } from "@real-router/core";
 

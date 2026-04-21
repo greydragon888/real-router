@@ -18,7 +18,7 @@ import {
   noop,
   routeConfig,
 } from "./helpers";
-import { createSafeBrowser } from "../../src/browser-env/index.js";
+import { createSafeBrowser } from "../../src/browser-env";
 
 import type { Router } from "@real-router/core";
 

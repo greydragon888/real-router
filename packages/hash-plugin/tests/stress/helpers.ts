@@ -2,13 +2,10 @@ import { createRouter } from "@real-router/core";
 
 import { hashPluginFactory } from "@real-router/hash-plugin";
 
-import {
-  createSafeBrowser,
-  safelyEncodePath,
-} from "../../src/browser-env/index.js";
+import { createSafeBrowser, safelyEncodePath } from "../../src/browser-env";
 import { createHashPrefixRegex, extractHashPath } from "../../src/hash-utils";
 
-import type { Browser } from "../../src/browser-env/index.js";
+import type { Browser } from "../../src/browser-env";
 import type { Router, Unsubscribe } from "@real-router/core";
 
 export const noop = (): void => undefined;

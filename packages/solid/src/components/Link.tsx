@@ -4,11 +4,7 @@ import { createMemo, mergeProps, splitProps, useContext } from "solid-js";
 import { EMPTY_PARAMS, EMPTY_OPTIONS } from "../constants";
 import { RouterContext } from "../context";
 import { createSignalFromSource } from "../createSignalFromSource";
-import {
-  shouldNavigate,
-  buildHref,
-  buildActiveClassName,
-} from "../dom-utils/index.js";
+import { shouldNavigate, buildHref, buildActiveClassName } from "../dom-utils";
 
 import type { LinkProps } from "../types";
 import type { Params } from "@real-router/core";

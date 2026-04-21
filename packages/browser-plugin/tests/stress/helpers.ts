@@ -2,9 +2,9 @@ import { createRouter } from "@real-router/core";
 
 import { browserPluginFactory } from "@real-router/browser-plugin";
 
-import { createSafeBrowser } from "../../src/browser-env/index.js";
+import { createSafeBrowser } from "../../src/browser-env";
 
-import type { Browser } from "../../src/browser-env/index.js";
+import type { Browser } from "../../src/browser-env";
 import type { Router, Unsubscribe } from "@real-router/core";
 
 export const noop = (): void => undefined;

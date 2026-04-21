@@ -28,10 +28,7 @@ import {
   arbOptionalClassName,
   arbMouseEventProps,
 } from "./helpers";
-import {
-  buildActiveClassName,
-  shouldNavigate,
-} from "../../src/dom-utils/index.js";
+import { buildActiveClassName, shouldNavigate } from "../../src/dom-utils";
 
 // =============================================================================
 // shouldNavigate Tests

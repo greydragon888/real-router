@@ -4,14 +4,16 @@ import { createSelector, onCleanup, onMount } from "solid-js";
 
 import { RouterContext, RouteContext } from "./context";
 import { createSignalFromSource } from "./createSignalFromSource";
-import { createRouteAnnouncer } from "./dom-utils/index.js";
+import { createRouteAnnouncer, createScrollRestoration } from "./dom-utils";
 
+import type { ScrollRestorationOptions } from "./dom-utils";
 import type { Router } from "@real-router/core";
 import type { ParentProps, JSX } from "solid-js";
 
 export interface RouteProviderProps {
   router: Router;
   announceNavigation?: boolean;
+  scrollRestoration?: ScrollRestorationOptions;
 }
 
 export function isRouteActive(
@@ -36,6 +38,18 @@ export function RouterProvider(
 
     onCleanup(() => {
       announcer.destroy();
+    });
+  });
+
+  onMount(() => {
+    if (!props.scrollRestoration) {
+      return;
+    }
+
+    const sr = createScrollRestoration(props.router, props.scrollRestoration);
+
+    onCleanup(() => {
+      sr.destroy();
     });
   });
 

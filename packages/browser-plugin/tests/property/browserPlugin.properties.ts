@@ -14,7 +14,7 @@ import {
   arbNonMatchingPath,
   createPluginRouter,
 } from "./helpers";
-import { extractPath } from "../../src/browser-env/index.js";
+import { extractPath } from "../../src/browser-env";
 
 describe("Browser Plugin URL Invariants", () => {
   describe("URL Roundtrip (no base)", () => {

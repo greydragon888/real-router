@@ -337,6 +337,32 @@ export class AppComponent {}
 
 The announcer creates a visually hidden `aria-live` region and announces each navigation to screen readers. See the [Accessibility guide](https://github.com/greydragon888/real-router/wiki/Accessibility) for details.
 
+## Scroll Restoration
+
+Opt-in via the `provideRealRouter` options bag:
+
+```typescript
+import { provideRealRouter } from "@real-router/angular";
+
+bootstrapApplication(AppComponent, {
+  providers: [
+    provideRealRouter(router, {
+      scrollRestoration: { mode: "restore" },
+    }),
+  ],
+});
+```
+
+`RealRouterOptions` shape:
+
+```typescript
+interface RealRouterOptions {
+  scrollRestoration?: ScrollRestorationOptions; // { mode?, anchorScrolling?, scrollContainer? }
+}
+```
+
+Restores scroll on back/forward, scrolls to top (or `#hash`) on push. Three modes: `"restore"` (default), `"top"`, `"manual"`. Custom containers via `scrollContainer: () => HTMLElement | null`. The utility is created by `provideEnvironmentInitializer` and torn down via `inject(DestroyRef)`. Options are a snapshot at bootstrap — not reactive to runtime changes. See [Scroll Restoration guide](https://github.com/greydragon888/real-router/wiki/Scroll-Restoration) for details.
+
 ## Angular-Specific Patterns
 
 ### Signals, Not Observables
@@ -433,7 +459,7 @@ const transitionSignal = sourceToSignal(createTransitionSource(router));
 
 Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 
-- [RouterProvider](https://github.com/greydragon888/real-router/wiki/RouterProvider) · [RouteView](https://github.com/greydragon888/real-router/wiki/RouteView) · [RouterErrorBoundary](https://github.com/greydragon888/real-router/wiki/RouterErrorBoundary)
+- [RouterProvider](https://github.com/greydragon888/real-router/wiki/RouterProvider) · [RouteView](https://github.com/greydragon888/real-router/wiki/RouteView) · [RouterErrorBoundary](https://github.com/greydragon888/real-router/wiki/RouterErrorBoundary) · [Scroll Restoration](https://github.com/greydragon888/real-router/wiki/Scroll-Restoration)
 - [injectRouter](https://github.com/greydragon888/real-router/wiki/injectRouter) · [injectRoute](https://github.com/greydragon888/real-router/wiki/injectRoute) · [injectRouteNode](https://github.com/greydragon888/real-router/wiki/injectRouteNode) · [injectNavigator](https://github.com/greydragon888/real-router/wiki/injectNavigator) · [injectRouteUtils](https://github.com/greydragon888/real-router/wiki/injectRouteUtils) · [injectRouterTransition](https://github.com/greydragon888/real-router/wiki/injectRouterTransition)
 
 ## Related Packages

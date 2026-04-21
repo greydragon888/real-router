@@ -17,7 +17,7 @@ import { fc, test } from "@fast-check/vitest";
 import { describe, expect } from "vitest";
 
 import { NUM_RUNS, arbRouteName, arbParams } from "./helpers";
-import { shallowEqual } from "../../src/dom-utils/index.js";
+import { shallowEqual } from "../../src/dom-utils";
 
 // =============================================================================
 // Inline replica of areLinkPropsEqual (not exported from Preact adapter)

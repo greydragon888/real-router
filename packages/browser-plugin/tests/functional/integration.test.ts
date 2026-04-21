@@ -14,7 +14,7 @@ import {
 
 import { browserPluginFactory } from "@real-router/browser-plugin";
 
-import { createSafeBrowser } from "../../src/browser-env/index.js";
+import { createSafeBrowser } from "../../src/browser-env";
 import {
   createTrackingPlugin,
   createStateModifierPlugin,
@@ -24,7 +24,7 @@ import {
   createAsyncPlugin,
 } from "../helpers/mockPlugins";
 
-import type { Browser } from "../../src/browser-env/index.js";
+import type { Browser } from "../../src/browser-env";
 import type { Router, State, Unsubscribe } from "@real-router/core";
 
 const noop = (): void => undefined;
