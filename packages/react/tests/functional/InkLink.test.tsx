@@ -113,6 +113,7 @@ describe("InkLink", () => {
     await vi.waitFor(() => {
       expect(calls).toStrictEqual(["onSelect", "navigate"]);
     }, WAIT_OPTS);
+
     expect(navigateSpy).toHaveBeenCalled();
   });
 

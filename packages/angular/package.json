@@ -6,7 +6,7 @@
   "exports": {
     ".": {
       "@real-router/internal-source": "./src/index.ts",
-      "types": "./dist/index.d.ts",
+      "types": "./dist/types/real-router-angular.d.ts",
       "default": "./dist/fesm2022/real-router-angular.mjs"
     }
   },

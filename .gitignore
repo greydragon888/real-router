@@ -59,6 +59,7 @@ packages/**/.eslintcache
 
 # Frameworks
 .svelte-kit
+.angular
 
 # AI / tooling
 **/CLAUDE.md
