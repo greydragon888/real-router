@@ -2,7 +2,7 @@
 "@real-router/vue": patch
 ---
 
-Fix per-Match `keepAlive` when used as template boolean shorthand
+Fix per-Match `keepAlive` when used as template boolean shorthand (#500)
 
 Template usage like `<RouteView.Match segment="dashboard" keepAlive>` was not
 preserving state across navigation. Vue compiles boolean-shorthand attributes
