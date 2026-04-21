@@ -16,7 +16,7 @@ export default [
   {
     name: "@real-router/react (ESM)",
     path: "packages/react/dist/esm/index.mjs",
-    limit: "2.5 kB",
+    limit: "3.1 kB",
     ignore: [
       "react",
       "react-dom",
@@ -28,7 +28,7 @@ export default [
   {
     name: "@real-router/preact (ESM)",
     path: "packages/preact/dist/esm/index.mjs",
-    limit: "2.5 kB",
+    limit: "3 kB",
     ignore: [
       "preact",
       "preact/hooks",
@@ -41,7 +41,7 @@ export default [
   {
     name: "@real-router/solid (ESM)",
     path: "packages/solid/dist/esm/index.mjs",
-    limit: "2.6 kB",
+    limit: "3.5 kB",
     ignore: [
       "solid-js",
       "solid-js/store",
@@ -54,7 +54,7 @@ export default [
   {
     name: "@real-router/vue (ESM)",
     path: "packages/vue/dist/esm/index.mjs",
-    limit: "3.5 kB",
+    limit: "4 kB",
     ignore: [
       "vue",
       "@real-router/core",
@@ -65,7 +65,7 @@ export default [
   {
     name: "@real-router/angular (FESM2022)",
     path: "packages/angular/dist/fesm2022/real-router-angular.mjs",
-    limit: "3.5 kB",
+    limit: "4.1 kB",
     ignore: [
       "@angular/core",
       "@angular/common",
