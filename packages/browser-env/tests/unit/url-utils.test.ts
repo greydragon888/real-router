@@ -76,26 +76,21 @@ describe("buildUrl", () => {
 
 describe("urlToPath", () => {
   it("parses absolute URL and returns path + search", () => {
-    expect(urlToPath("https://example.com/users?q=1", "", "test")).toBe(
-      "/users?q=1",
-    );
+    expect(urlToPath("https://example.com/users?q=1", "")).toBe("/users?q=1");
   });
 
-  it("returns null for invalid URL", () => {
-    const originalWarn = console.warn;
+  it("extracts path from URL regardless of scheme (desktop environments)", () => {
+    // Post-desktop-support: arbitrary schemes (ftp://, custom://, tauri://)
+    // are accepted — the path is what matters for routing.
 
-    console.warn = () => {};
+    expect(urlToPath("ftp://example.com/users", "")).toBe("/users");
+  });
 
-    try {
-      expect(urlToPath("ftp://example.com/users", "", "test")).toBeNull();
-    } finally {
-      console.warn = originalWarn;
-    }
+  it("returns '/' for empty URL input (parser is total)", () => {
+    expect(urlToPath("", "")).toBe("/");
   });
 
   it("strips base from URL path", () => {
-    expect(urlToPath("https://example.com/app/users", "/app", "test")).toBe(
-      "/users",
-    );
+    expect(urlToPath("https://example.com/app/users", "/app")).toBe("/users");
   });
 });

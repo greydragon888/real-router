@@ -128,17 +128,10 @@ describe("Browser Plugin — URL", () => {
         expect(state).toBeUndefined();
       });
 
-      it("returns undefined for invalid URL protocol (graceful)", async () => {
-        const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
-
-        const state = router.matchUrl("not-a-valid-url://example.com");
+      it("parses custom-scheme URLs and returns undefined for non-matching path", async () => {
+        const state = router.matchUrl("not-a-valid-url://example.com/bogus");
 
         expect(state).toBeUndefined();
-        expect(consoleSpy).toHaveBeenCalledWith(
-          expect.stringContaining("Invalid URL protocol"),
-        );
-
-        consoleSpy.mockRestore();
       });
 
       it("strips base from URL", async () => {
@@ -166,57 +159,15 @@ describe("Browser Plugin — URL", () => {
     });
   });
 
-  describe("URL parsing error (lines 180-182)", () => {
-    it("handles URL constructor throwing (lines 180-182)", async () => {
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
-
-      router.usePlugin(browserPluginFactory({}, mockedBrowser));
-
-      // Mock URL constructor to throw
-      const OriginalURL = globalThis.URL;
-
-      vi.stubGlobal(
-        "URL",
-        class extends OriginalURL {
-          constructor(url: string | URL, base?: string | URL) {
-            if (url === "throw://error") {
-              throw new Error("URL parse error");
-            }
-
-            super(url, base);
-          }
-        },
-      );
-
-      const state = router.matchUrl("throw://error");
-
-      expect(state).toBeUndefined();
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Could not parse url"),
-        expect.any(Error),
-      );
-
-      vi.unstubAllGlobals();
-      consoleSpy.mockRestore();
-    });
-  });
-
   describe("URL Parsing Edge Cases", () => {
     beforeEach(async () => {
       router.usePlugin(browserPluginFactory({}, mockedBrowser));
     });
 
-    it("handles file: protocol gracefully", async () => {
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
-
+    it("handles file: protocol — parses path, returns undefined for non-matching route", async () => {
       const state = router.matchUrl("file:///home/user/file.html");
 
       expect(state).toBeUndefined();
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Invalid URL protocol"),
-      );
-
-      consoleSpy.mockRestore();
     });
 
     it("handles encoded special characters in params", async () => {

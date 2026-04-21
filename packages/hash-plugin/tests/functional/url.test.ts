@@ -110,16 +110,12 @@ describe("Hash Plugin — URL Operations", () => {
         });
       });
 
-      it("returns undefined for invalid protocol", () => {
-        const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
-        const state = router.matchUrl("file:///home/user/file.html");
-
-        expect(state).toBeUndefined();
-        expect(consoleSpy).toHaveBeenCalledWith(
-          expect.stringContaining("Invalid URL protocol"),
+      it("parses file:// URLs — returns undefined when hash does not match route", () => {
+        const state = router.matchUrl(
+          "file:///home/user/file.html#/nonexistent",
         );
 
-        consoleSpy.mockRestore();
+        expect(state).toBeUndefined();
       });
 
       it("returns undefined when hash does not match any route", () => {

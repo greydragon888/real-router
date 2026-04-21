@@ -62,11 +62,8 @@ export class BrowserPlugin {
 
     this.#removeExtensions = api.extendRouter({
       buildUrl: pluginBuildUrl,
-      matchUrl: (url: string) => {
-        const path = urlToPath(url, options.base, LOGGER_CONTEXT);
-
-        return path ? api.matchPath(path) : undefined;
-      },
+      matchUrl: (url: string) =>
+        api.matchPath(urlToPath(url, options.base)) ?? undefined,
       replaceHistoryState: createReplaceHistoryState(
         api,
         router,

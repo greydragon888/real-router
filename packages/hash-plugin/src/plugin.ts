@@ -50,11 +50,8 @@ export class HashPlugin {
 
     this.#removeExtensions = api.extendRouter({
       buildUrl: pluginBuildUrl,
-      matchUrl: (url: string) => {
-        const path = hashUrlToPath(url, prefixRegex);
-
-        return path ? api.matchPath(path) : undefined;
-      },
+      matchUrl: (url: string) =>
+        api.matchPath(hashUrlToPath(url, prefixRegex)) ?? undefined,
       replaceHistoryState: createReplaceHistoryState(
         api,
         router,

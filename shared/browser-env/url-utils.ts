@@ -26,28 +26,17 @@ export function buildUrl(path: string, base: string): string {
   return path.startsWith("/") ? `${base}${path}` : `${base}/${path}`;
 }
 
-export function urlToPath(
-  url: string,
-  base: string,
-  context: string,
-): string | null {
-  const parsedUrl = safeParseUrl(url, context);
+export function urlToPath(url: string, base: string): string {
+  const parsedUrl = safeParseUrl(url);
 
-  return parsedUrl
-    ? extractPath(parsedUrl.pathname, base) + parsedUrl.search
-    : null;
+  return extractPath(parsedUrl.pathname, base) + parsedUrl.search;
 }
 
 /**
  * Parses an absolute URL and returns its path + search, stripped of `base`.
- * Alias of {@link urlToPath} with an explicit non-null contract when the caller
- * already knows the URL is valid (e.g., sourced from the Navigation API or a
- * plugin-owned history store). Safe against malformed input — returns `null`.
+ * Alias of {@link urlToPath} kept for call-site readability — history-query
+ * paths (Navigation API entries, etc.) are absolute URLs by contract.
  */
-export function extractPathFromAbsoluteUrl(
-  url: string,
-  base: string,
-  context: string,
-): string | null {
-  return urlToPath(url, base, context);
+export function extractPathFromAbsoluteUrl(url: string, base: string): string {
+  return urlToPath(url, base);
 }

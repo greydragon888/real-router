@@ -6,7 +6,6 @@ import {
   extractPathFromAbsoluteUrl,
   urlToPath,
 } from "./browser-env";
-import { LOGGER_CONTEXT } from "./constants";
 import {
   peekBack,
   peekForward,
@@ -100,11 +99,8 @@ export class NavigationPlugin {
 
     this.#removeExtensions = api.extendRouter({
       buildUrl: pluginBuildUrl,
-      matchUrl: (url: string) => {
-        const path = urlToPath(url, options.base, LOGGER_CONTEXT);
-
-        return path ? api.matchPath(path) : undefined;
-      },
+      matchUrl: (url: string) =>
+        api.matchPath(urlToPath(url, options.base)) ?? undefined,
       replaceHistoryState: createReplaceHistoryState(
         api,
         router,
@@ -175,13 +171,8 @@ export class NavigationPlugin {
       throw new Error(`No matching route for entry URL "${entry.url}"`);
     }
 
-    const path = extractPathFromAbsoluteUrl(
-      entry.url,
-      this.#options.base,
-      LOGGER_CONTEXT,
-    );
-
-    const matchedState = path ? this.#api.matchPath(path) : undefined;
+    const path = extractPathFromAbsoluteUrl(entry.url, this.#options.base);
+    const matchedState = this.#api.matchPath(path);
 
     if (!matchedState) {
       throw new Error(`No matching route for entry URL "${entry.url}"`);

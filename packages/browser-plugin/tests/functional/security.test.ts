@@ -186,68 +186,41 @@ describe("Browser Plugin — Security", () => {
       router.usePlugin(browserPluginFactory({}, mockedBrowser));
     });
 
-    it("blocks javascript: protocol URLs in matchUrl", async () => {
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
-
+    it("safely handles javascript: URLs — no matching route", async () => {
       const state = router.matchUrl("javascript:alert('xss')");
 
       expect(state).toBeUndefined();
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Invalid URL protocol"),
-      );
-
-      consoleSpy.mockRestore();
     });
 
-    it("blocks data: protocol URLs", async () => {
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
-
+    it("safely handles data: URLs — no matching route", async () => {
       const state = router.matchUrl(
         "data:text/html,<script>alert('xss')</script>",
       );
 
       expect(state).toBeUndefined();
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Invalid URL protocol"),
-      );
-
-      consoleSpy.mockRestore();
     });
 
-    it("blocks vbscript: protocol URLs (legacy IE)", async () => {
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
-
+    it("safely handles vbscript: URLs — no matching route", async () => {
       const state = router.matchUrl("vbscript:msgbox('xss')");
 
       expect(state).toBeUndefined();
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Invalid URL protocol"),
-      );
-
-      consoleSpy.mockRestore();
     });
 
-    it("allows only http: and https: protocols", async () => {
-      // Valid protocols should work
-      const httpState = router.matchUrl("http://example.com/home");
+    it("extracts path from any scheme (desktop compat) — routing decides", async () => {
+      // Post-desktop-support: http/https are no longer privileged. Tauri and
+      // Electron ship custom schemes (tauri://, app://, file://) — the router
+      // matches by path, not by scheme. Security comes from route matching.
+      expect(router.matchUrl("http://example.com/home")).toBeDefined();
+      expect(router.matchUrl("https://example.com/home")).toBeDefined();
 
-      expect(httpState).toBeDefined();
+      expect(router.matchUrl("ftp://example.com/home")).toBeDefined();
+      expect(router.matchUrl("ws://example.com/home")).toBeDefined();
+      expect(router.matchUrl("wss://example.com/home")).toBeDefined();
+      expect(router.matchUrl("tauri://localhost/home")).toBeDefined();
+      expect(router.matchUrl("app://my-app/home")).toBeDefined();
 
-      const httpsState = router.matchUrl("https://example.com/home");
-
-      expect(httpsState).toBeDefined();
-
-      // Invalid protocols should be blocked
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
-
-      expect(router.matchUrl("ftp://example.com/home")).toBeUndefined();
-      expect(router.matchUrl("ws://example.com/home")).toBeUndefined();
-      expect(router.matchUrl("wss://example.com/home")).toBeUndefined();
+      // Opaque URIs without `://` have no path to route against.
       expect(router.matchUrl("mailto:test@example.com")).toBeUndefined();
-
-      expect(consoleSpy).toHaveBeenCalled();
-
-      consoleSpy.mockRestore();
     });
 
     it("handles URLs with null bytes gracefully", async () => {

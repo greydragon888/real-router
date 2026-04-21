@@ -1,7 +1,6 @@
 // packages/hash-plugin/src/hash-utils.ts
 
 import { safeParseUrl } from "./browser-env";
-import { LOGGER_CONTEXT } from "./constants";
 
 function escapeRegExp(str: string): string {
   return str.replaceAll(/[$()*+.?[\\\]^{|}-]/g, String.raw`\$&`);
@@ -31,16 +30,8 @@ export function extractHashPath(
   return path || "/";
 }
 
-export function hashUrlToPath(
-  url: string,
-  prefixRegex: RegExp | null,
-): string | null {
-  const parsedUrl = safeParseUrl(url, LOGGER_CONTEXT);
-
-  if (!parsedUrl) {
-    return null;
-  }
-
+export function hashUrlToPath(url: string, prefixRegex: RegExp | null): string {
+  const parsedUrl = safeParseUrl(url);
   const hashPath = extractHashPath(parsedUrl.hash, prefixRegex);
 
   return hashPath.includes("?") ? hashPath : hashPath + parsedUrl.search;

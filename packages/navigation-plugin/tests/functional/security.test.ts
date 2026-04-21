@@ -30,29 +30,36 @@ describe("Cross-Origin Filtering", () => {
   });
 });
 
-describe("Protocol Validation", () => {
-  it("urlToPath rejects ftp:// protocol", () => {
-    expect(urlToPath("ftp://files.example.com/doc", "", "test")).toBeNull();
+describe("Protocol Handling", () => {
+  // Post-desktop-support: urlToPath is scheme-agnostic. Security against
+  // malicious URLs comes from route matching (unknown paths return undefined
+  // state), not from scheme filtering. See issue #496.
+
+  it("urlToPath extracts path from ftp:// URLs (routing will match or miss)", () => {
+    expect(urlToPath("ftp://files.example.com/doc", "")).toBe("/doc");
   });
 
-  it("urlToPath rejects javascript: protocol", () => {
-    expect(urlToPath("javascript:alert(1)", "", "test")).toBeNull();
+  it("urlToPath treats javascript: as literal pathname (no route will match)", () => {
+    expect(urlToPath("javascript:alert(1)", "")).toBe("/javascript:alert(1)");
   });
 
-  it("urlToPath rejects data: protocol", () => {
-    expect(urlToPath("data:text/html,<h1>hi</h1>", "", "test")).toBeNull();
+  it("urlToPath treats data: as literal pathname (no route will match)", () => {
+    expect(urlToPath("data:text/html,<h1>hi</h1>", "")).toBe(
+      "/data:text/html,<h1>hi</h1>",
+    );
   });
 
   it("urlToPath accepts http:// protocol", () => {
-    const result = urlToPath("http://localhost/users", "", "test");
-
-    expect(result).toBe("/users");
+    expect(urlToPath("http://localhost/users", "")).toBe("/users");
   });
 
   it("urlToPath accepts https:// protocol", () => {
-    const result = urlToPath("https://example.com/users", "", "test");
+    expect(urlToPath("https://example.com/users", "")).toBe("/users");
+  });
 
-    expect(result).toBe("/users");
+  it("urlToPath accepts Tauri/Electron custom schemes", () => {
+    expect(urlToPath("tauri://localhost/users", "")).toBe("/users");
+    expect(urlToPath("app://myapp/home", "")).toBe("/home");
   });
 });
 

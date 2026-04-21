@@ -1,5 +1,4 @@
 import { extractPathFromAbsoluteUrl } from "./browser-env";
-import { LOGGER_CONTEXT } from "./constants";
 
 import type { NavigationBrowser } from "./types";
 import type { State } from "@real-router/core";
@@ -11,10 +10,6 @@ import type { PluginApi } from "@real-router/core/api";
  * - Entries before plugin init have no state
  * - Entries after router.replace(routes) may have stale state
  * - Entries from other SPAs on the same origin have foreign state
- *
- * URL parsing is delegated to `safeParseUrl` (via `extractPathFromAbsoluteUrl`)
- * so malformed entry URLs from mocks or non-spec sources never throw — they
- * return `undefined` instead.
  */
 export function entryToState(
   entry: NavigationHistoryEntry | undefined,
@@ -25,13 +20,9 @@ export function entryToState(
     return undefined;
   }
 
-  const path = extractPathFromAbsoluteUrl(entry.url, base, LOGGER_CONTEXT);
-
-  if (path === null) {
-    return undefined;
-  }
-
-  return api.matchPath(path) ?? undefined;
+  return (
+    api.matchPath(extractPathFromAbsoluteUrl(entry.url, base)) ?? undefined
+  );
 }
 
 function peekAt(

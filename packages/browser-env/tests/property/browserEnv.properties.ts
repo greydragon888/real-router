@@ -163,12 +163,11 @@ describe("Browser-env Properties", () => {
       );
 
     test.prop([arbAbsoluteUrl], { numRuns: NUM_RUNS.standard })(
-      "returns non-null string starting with '/'",
+      "returns string starting with '/'",
       (url: string) => {
-        const result = urlToPath(url, "", "property-test");
+        const result = urlToPath(url, "");
 
-        expect(result).not.toBeNull();
-        expect(result?.startsWith("/")).toBe(true);
+        expect(result.startsWith("/")).toBe(true);
       },
     );
   });
@@ -207,28 +206,25 @@ describe("Browser-env Properties", () => {
     );
   });
 
-  describe("safeParseUrl — valid HTTP paths return non-null URL", () => {
+  describe("safeParseUrl — valid HTTP paths preserve pathname", () => {
     test.prop([arbUrlPath], { numRuns: NUM_RUNS.standard })(
-      "parses valid paths to URL with matching pathname",
+      "parses valid paths to object with matching pathname",
       (path: string) => {
-        const result = safeParseUrl(path, "property-test");
+        const result = safeParseUrl(path);
 
-        expect(result).not.toBeNull();
-
-        if (result !== null) {
-          expect(result.pathname).toStrictEqual(path);
-        }
+        expect(result.pathname).toStrictEqual(path);
       },
     );
   });
 
-  describe("safeParseUrl — rejects non-HTTP protocols", () => {
+  describe("safeParseUrl — accepts any scheme (desktop environments)", () => {
     test.prop([arbNonHttpProtocol], { numRuns: NUM_RUNS.fast })(
-      "non-HTTP protocol URLs return null",
+      "non-HTTP scheme URLs yield a parsed object — Electron/Tauri compat",
       (url: string) => {
-        const result = safeParseUrl(url, "property-test");
+        const result = safeParseUrl(url);
 
-        expect(result).toBeNull();
+        // The parser is total: any string yields {pathname, search, hash}.
+        expect(typeof result.pathname).toBe("string");
       },
     );
   });
@@ -240,13 +236,9 @@ describe("Browser-env Properties", () => {
       "pathname equals the path portion regardless of search/hash",
       (path: string, search: string, hash: string) => {
         const fullUrl = `${path}${search}${hash}`;
-        const result = safeParseUrl(fullUrl, "property-test");
+        const result = safeParseUrl(fullUrl);
 
-        expect(result).not.toBeNull();
-
-        if (result !== null) {
-          expect(result.pathname).toStrictEqual(path);
-        }
+        expect(result.pathname).toStrictEqual(path);
       },
     );
   });
