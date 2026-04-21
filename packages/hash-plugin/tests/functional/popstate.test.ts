@@ -14,7 +14,7 @@ import { hashPluginFactory } from "@real-router/hash-plugin";
 
 import { noop, routerConfig, createMockedBrowser } from "../helpers/testUtils";
 
-import type { Browser } from "../../src/browser-env/index.js";
+import type { Browser } from "../../src/browser-env";
 import type { Router, State } from "@real-router/core";
 
 const STUB_TRANSITION = Object.freeze({

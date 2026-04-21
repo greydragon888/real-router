@@ -2372,3 +2372,43 @@ Split into two workflows:
 ### Why this matters
 
 `changesets.yml` uses `workflow_run` trigger and must reference the workflow that runs on master push. After the split, this trigger was updated from `workflows: [CI]` to `workflows: [Post-Merge Build]`. Missing this update breaks the release pipeline — changesets never triggers after merge, no Version PR is created.
+
+## Scroll Restoration as Utility, Not Plugin
+
+**Problem.** SPA navigation typically loses scroll position — users expect back/forward to restore where they left off (browser default for MPAs, universally emulated by modern SPA routers: Angular `withInMemoryScrolling`, React Router `<ScrollRestoration>`, Vue `scrollBehavior`). Real-router shipped no such feature, putting us behind parity.
+
+**Solution.** Added `shared/dom-utils/scroll-restore.ts` exposing `createScrollRestoration(router, options?)` — a function-shaped utility with the same contract as `createRouteAnnouncer`. Each framework adapter wires it to a `scrollRestoration?: ScrollRestorationOptions` prop on `RouterProvider` (Angular: options bag on `provideRealRouter`). Lifecycle tied to provider mount/unmount.
+
+**Why not a `@real-router/scroll-plugin`.** `window.scrollY` is a DOM concern; router-core is DOM-agnostic (`state.name` / `params` / `context` only). A plugin would be a layering leak — the same mistake as Angular's `TitleStrategy` inside router-core. The routing-layer inputs the utility needs (direction, navigationType) are already published by `@real-router/navigation-plugin` via `state.context.navigation`. A plugin would duplicate an existing channel without adding value.
+
+### Key-Synthesis Decision: Composite Route Identity, Not Per-Entry UUID
+
+**Problem.** The issue specification (#497) called for keying saved positions by `history.state.key`. Investigation showed:
+
+- `@real-router/browser-plugin.history.state` contains `{ name, params, path }` only — no key.
+- `@real-router/navigation-plugin` exposes entry `.key` internally (Navigation API) but does **not** publish it on `state.context`.
+
+Pulling a per-entry UUID into the public contract would require coordinated changes in `browser-plugin` (write UUID on every entry) and a new context namespace — a larger RFC.
+
+**Solution.** The utility synthesizes the key as `${state.name}:${canonicalJson(state.params)}`. Two history entries that resolve to the same `(name, params)` pair collapse to one bucket; the latest save wins. This key-shape satisfies ~99% of real-world scroll-restoration UX (list → item → back) with zero plugin coupling.
+
+**Why acceptable.** The alternative — emit `canonical-json(path)` or write UUIDs into `history.state` from `browser-plugin` — adds cross-package coordination for a case (same-name+same-params entries appearing multiple times in history) that is rare and self-correcting (subsequent saves overwrite).
+
+### Capture Strategy: Subscribe + pagehide, Not Throttled Scroll Listener
+
+**Problem.** Common scroll-restoration implementations attach a throttled `scroll` listener to continuously persist `window.scrollY`. This adds complexity (throttle timer, flush-on-transition, debouncing) and produces hundreds of sessionStorage writes per page.
+
+**Solution.** Use two discrete event sources:
+
+1. `router.subscribe(({ route, previousRoute }) => ...)` — fires on transition success. Synchronously from the FSM's `$$success` event, **before** the framework re-renders the new route. At that instant `window.scrollY` still reflects the old DOM, so we capture it keyed by `previousRoute`.
+2. `pagehide` — single listener that saves the current route's position on reload / tab close.
+
+No throttling, no timers, no scroll listener. Precision guaranteed because capture runs at the exact navigation boundary rather than "within 100ms of the last scroll."
+
+### Why Default Mode = `"restore"`
+
+The utility is **opt-in** (`undefined` = off), so users who don't want restoration pay nothing. But when they opt in, `"restore"` matches expected UX (what they'd get in an MPA by default, and what every competitor ships). Users wanting different semantics pass `mode: "top"` or `mode: "manual"` explicitly.
+
+### Why Not Expose `ScrollRestorationOptions` from Adapter Roots
+
+`RouteAnnouncerOptions` is already not re-exported from any adapter's public entry (`RouterProvider` prop-type inference covers consumer needs). `ScrollRestorationOptions` follows the same convention. If users ask, we promote in a later minor.

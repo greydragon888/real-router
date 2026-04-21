@@ -1,7 +1,7 @@
 import { createRouter } from "@real-router/core";
 import { describe, expect, it, vi } from "vitest";
 
-import { urlToPath } from "../../src/browser-env/index.js";
+import { urlToPath } from "../../src/browser-env";
 import { navigationPluginFactory } from "../../src/factory";
 import { MockNavigation } from "../helpers/mockNavigation";
 import {

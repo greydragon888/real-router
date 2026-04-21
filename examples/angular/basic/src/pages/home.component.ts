@@ -16,10 +16,20 @@ import { injectRoute } from "@real-router/angular";
         and <em>Forward</em> in the browser — routing state is preserved in the
         URL.
       </p>
+      <p>
+        <strong>Scroll restoration demo:</strong> scroll down the list below,
+        navigate to About, then hit Back — your position is restored.
+      </p>
+      <ul>
+        @for (n of items; track n) {
+          <li>Item #{{ n }}</li>
+        }
+      </ul>
     </div>
   `,
 })
 export class HomeComponent {
   private readonly route = injectRoute();
   readonly routeState = this.route.routeState;
+  readonly items = Array.from({ length: 100 }, (_, i) => i + 1);
 }

@@ -7,7 +7,7 @@ import {
   NUM_RUNS,
   type Primitive,
 } from "./helpers";
-import { shallowEqual } from "../../src/dom-utils/index.js";
+import { shallowEqual } from "../../src/dom-utils";
 
 // =============================================================================
 // areLinkPropsEqual — replicated from src/components/Link.tsx

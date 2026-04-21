@@ -10,7 +10,7 @@ export { hashPluginFactory } from "./factory";
 // Types
 export type { HashPluginOptions } from "./types";
 
-export type { Browser } from "./browser-env/index.js";
+export type { Browser } from "./browser-env";
 
 // Type guards
 export { isStateStrict as isState } from "type-guards";

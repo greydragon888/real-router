@@ -2,7 +2,7 @@ import { Text, useFocus, useInput } from "ink";
 import { memo, useCallback } from "react";
 
 import { EMPTY_OPTIONS, EMPTY_PARAMS } from "../constants";
-import { shallowEqual } from "../dom-utils/index.js";
+import { shallowEqual } from "../dom-utils";
 import { useIsActiveRoute } from "../hooks/useIsActiveRoute";
 import { useRouter } from "../hooks/useRouter";
 

@@ -3,11 +3,7 @@ import { createEffect, onCleanup } from "solid-js";
 
 import { EMPTY_PARAMS, EMPTY_OPTIONS } from "../constants";
 import { createSignalFromSource } from "../createSignalFromSource";
-import {
-  shouldNavigate,
-  applyLinkA11y,
-  buildHref,
-} from "../dom-utils/index.js";
+import { shouldNavigate, applyLinkA11y, buildHref } from "../dom-utils";
 import { useRouter } from "../hooks/useRouter";
 
 import type { Params } from "@real-router/core";

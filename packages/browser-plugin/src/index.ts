@@ -12,7 +12,7 @@ export type {
   BrowserSource,
 } from "./types";
 
-export type { Browser } from "./browser-env/index.js";
+export type { Browser } from "./browser-env";
 
 // Type guards
 export { isStateStrict as isState } from "type-guards";

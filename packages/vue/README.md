@@ -460,11 +460,33 @@ Or in a template:
 
 When enabled, a visually hidden `aria-live` region announces each navigation. Focus moves to the first `<h1>` on the new page. See [Accessibility guide](https://github.com/greydragon888/real-router/wiki/Accessibility) for details.
 
+## Scroll Restoration
+
+Opt-in preservation of scroll position across navigations:
+
+```vue
+<RouterProvider :router="router" :scroll-restoration="{ mode: 'restore' }">
+  <!-- Your app -->
+</RouterProvider>
+```
+
+Or via `h()`:
+
+```typescript
+h(
+  RouterProvider,
+  { router, scrollRestoration: { mode: "restore" } },
+  { default: () => [/* Your app */] },
+);
+```
+
+Restores scroll on back/forward, scrolls to top (or `#hash`) on push. Three modes: `"restore"` (default), `"top"`, `"manual"`. Custom containers via `scrollContainer: () => HTMLElement | null`. Prop is reactive — toggling mode at runtime reconfigures the utility (watched by primitive fields, so inline objects with the same fields do not thrash). See [Scroll Restoration guide](https://github.com/greydragon888/real-router/wiki/Scroll-Restoration) for details.
+
 ## Documentation
 
 Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 
-- [RouterProvider](https://github.com/greydragon888/real-router/wiki/RouterProvider) · [RouteView](https://github.com/greydragon888/real-router/wiki/RouteView) · [RouterErrorBoundary](https://github.com/greydragon888/real-router/wiki/RouterErrorBoundary) · [Link](https://github.com/greydragon888/real-router/wiki/Link)
+- [RouterProvider](https://github.com/greydragon888/real-router/wiki/RouterProvider) · [RouteView](https://github.com/greydragon888/real-router/wiki/RouteView) · [RouterErrorBoundary](https://github.com/greydragon888/real-router/wiki/RouterErrorBoundary) · [Link](https://github.com/greydragon888/real-router/wiki/Link) · [Scroll Restoration](https://github.com/greydragon888/real-router/wiki/Scroll-Restoration)
 - [useRouter](https://github.com/greydragon888/real-router/wiki/useRouter) · [useRoute](https://github.com/greydragon888/real-router/wiki/useRoute) · [useRouteNode](https://github.com/greydragon888/real-router/wiki/useRouteNode) · [useNavigator](https://github.com/greydragon888/real-router/wiki/useNavigator) · [useRouteUtils](https://github.com/greydragon888/real-router/wiki/useRouteUtils) · [useRouterTransition](https://github.com/greydragon888/real-router/wiki/useRouterTransition)
 
 ## Examples

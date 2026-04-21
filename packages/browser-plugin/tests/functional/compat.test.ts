@@ -13,7 +13,7 @@ import { browserPluginFactory } from "@real-router/browser-plugin";
 
 import { createMockedBrowser, routerConfig, noop } from "../helpers/testUtils";
 
-import type { Browser } from "../../src/browser-env/index.js";
+import type { Browser } from "../../src/browser-env";
 import type { Router, State, Unsubscribe } from "@real-router/core";
 
 let router: Router;

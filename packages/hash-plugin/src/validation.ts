@@ -2,7 +2,7 @@ import {
   createOptionsValidator,
   safeBaseRule,
   safeHashPrefixRule,
-} from "./browser-env/index.js";
+} from "./browser-env";
 import { LOGGER_CONTEXT, defaultOptions } from "./constants";
 
 import type { HashPluginOptions } from "./types";

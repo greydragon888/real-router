@@ -20,7 +20,7 @@ import {
   extractPath,
   normalizeBase,
   safelyEncodePath,
-} from "../../src/browser-env/index.js";
+} from "../../src/browser-env";
 
 describe("Navigation Plugin URL Invariants", () => {
   describe("URL Roundtrip (no base)", () => {

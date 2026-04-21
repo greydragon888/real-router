@@ -44,7 +44,8 @@ src/
 ├── dom-utils/                  # Symlink → shared/dom-utils/ (shared across all framework adapters)
 │   ├── index.ts                # Barrel re-exports
 │   ├── link-utils.ts           # shouldNavigate, buildHref, buildActiveClassName, applyLinkA11y
-│   └── route-announcer.ts      # createRouteAnnouncer — WCAG aria-live announcements
+│   ├── route-announcer.ts      # createRouteAnnouncer — WCAG aria-live announcements
+│   └── scroll-restore.ts       # createScrollRestoration — opt-in scroll capture + restore
 ├── hooks/
 │   ├── useRouter.tsx           # Router instance from context (never re-renders)
 │   ├── useRoute.tsx            # Full route state from context (every navigation)

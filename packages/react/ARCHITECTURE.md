@@ -52,6 +52,7 @@ src/
 ├── dom-utils/                  # Shared DOM helpers (symlink → shared/dom-utils/)
 │   ├── link-utils.ts           # shouldNavigate, buildHref, buildActiveClassName, applyLinkA11y
 │   ├── route-announcer.ts      # createRouteAnnouncer (WCAG aria-live)
+│   ├── scroll-restore.ts       # createScrollRestoration (opt-in scroll capture + restore)
 │   └── index.ts
 ├── hooks/
 │   ├── useRouter.tsx           # Router instance from context (never re-renders)
@@ -82,6 +83,7 @@ The `dom-utils/` directory is a symlink to `shared/dom-utils/` — identical hel
 - **`buildActiveClassName(isActive, activeClassName, baseClassName)`** — class string composition
 - **`applyLinkA11y(element)`** — adds `role="link"` + `tabindex="0"` to non-interactive elements. Not used by React's `<Link>` (always renders `<a>`), but used by Svelte/Solid/Vue/Angular directive-based navigation. Exported for consumers building custom navigation components on non-anchor elements.
 - **`createRouteAnnouncer(router, options?)`** — WCAG screen reader announcements via `aria-live` region
+- **`createScrollRestoration(router, options?)`** — opt-in scroll capture on transition, restore on back/pagehide. DOM-concern isolated from router-core. Lifecycle: `useEffect` on `RouterProvider` creates the utility when `scrollRestoration` prop is set; cleanup destroys it. Primitive-field deps (`mode`, `anchorScrolling`) guard against inline-object thrash; `scrollContainer` is read lazily, excluded from deps.
 
 ## Context Architecture
 

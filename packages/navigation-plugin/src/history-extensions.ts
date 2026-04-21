@@ -1,4 +1,4 @@
-import { extractPathFromAbsoluteUrl } from "./browser-env/index.js";
+import { extractPathFromAbsoluteUrl } from "./browser-env";
 import { LOGGER_CONTEXT } from "./constants";
 
 import type { NavigationBrowser } from "./types";
