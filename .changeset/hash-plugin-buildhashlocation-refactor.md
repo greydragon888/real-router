@@ -38,3 +38,12 @@ added. Consolidating into one helper prevents the class of regression.
 Internal refactor only — no public API changes. `buildHashLocation` is
 not exported from the package; it lives in `src/hash-utils.ts` alongside
 the other hash-URL primitives.
+
+Direct unit tests added in `tests/functional/hash-utils.test.ts` — 13
+cases covering the "no double `?`" contract, the hashPrefix strip, URL
+encoding of non-ASCII paths, malformed percent-sequence passthrough, and
+composition agreement with `extractHashPath` / `hashUrlToPath`. The
+regression previously surfaced only through an end-to-end router test
+(`url.test.ts` — "well-formed path (no double '?')"); unit coverage now
+pins the helper directly so future edits to `buildHashLocation` fail at
+the helper level before they corrupt the router flow.
