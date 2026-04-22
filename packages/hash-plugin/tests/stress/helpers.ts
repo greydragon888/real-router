@@ -2,8 +2,8 @@ import { createRouter } from "@real-router/core";
 
 import { hashPluginFactory } from "@real-router/hash-plugin";
 
-import { createSafeBrowser, safelyEncodePath } from "../../src/browser-env";
-import { createHashPrefixRegex, extractHashPath } from "../../src/hash-utils";
+import { createSafeBrowser } from "../../src/browser-env";
+import { buildHashLocation, createHashPrefixRegex } from "../../src/hash-utils";
 
 import type { Browser } from "../../src/browser-env";
 import type { Router, Unsubscribe } from "@real-router/core";
@@ -40,15 +40,15 @@ export function createStressRouter(options?: {
   const hashPrefix = options?.hashPrefix ?? "";
   const prefixRegex = createHashPrefixRegex(hashPrefix);
 
-  const safeBrowser = createSafeBrowser(() => {
-    const hashPath = safelyEncodePath(
-      extractHashPath(globalThis.location.hash, prefixRegex),
-    );
-
-    return hashPath.includes("?")
-      ? hashPath
-      : hashPath + globalThis.location.search;
-  }, "hash-plugin");
+  const safeBrowser = createSafeBrowser(
+    () =>
+      buildHashLocation(
+        globalThis.location.hash,
+        globalThis.location.search,
+        prefixRegex,
+      ),
+    "hash-plugin",
+  );
 
   const browser: Browser = {
     ...safeBrowser,
