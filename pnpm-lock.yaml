@@ -677,8 +677,8 @@ importers:
         specifier: 7.0.3
         version: 7.0.3
       electron:
-        specifier: 33.3.0
-        version: 33.3.0
+        specifier: 41.2.2
+        version: 41.2.2
       typescript:
         specifier: 5.8.3
         version: 5.8.3
@@ -726,8 +726,8 @@ importers:
         specifier: 7.0.3
         version: 7.0.3
       electron:
-        specifier: 33.3.0
-        version: 33.3.0
+        specifier: 41.2.2
+        version: 41.2.2
       typescript:
         specifier: 5.8.3
         version: 5.8.3
@@ -775,8 +775,8 @@ importers:
         specifier: 7.0.3
         version: 7.0.3
       electron:
-        specifier: 33.3.0
-        version: 33.3.0
+        specifier: 41.2.2
+        version: 41.2.2
       typescript:
         specifier: 5.8.3
         version: 5.8.3
@@ -8814,8 +8814,8 @@ packages:
   electron-to-chromium@1.5.321:
     resolution: {integrity: sha512-L2C7Q279W2D/J4PLZLk7sebOILDSWos7bMsMNN06rK482umHUrh/3lM8G7IlHFOYip2oAg5nha1rCMxr/rs6ZQ==}
 
-  electron@33.3.0:
-    resolution: {integrity: sha512-316ZlFUHJmzGrhRj87tVStxyYvknDqVR9eYSsGKAHY7auhVWFLIcPPGxcnbD/H1mez8CpDjXvEjcz76zpWxsXw==}
+  electron@41.2.2:
+    resolution: {integrity: sha512-3rzz/hVIpF726W9g7nleQzyF2IOEZbzZnUTUYGhMaEfsoab8fDyOYAWbdBdo4+DczS1Ifz11rdYo8IAAGcRx/g==}
     engines: {node: '>= 12.20.55'}
     hasBin: true
 
@@ -16871,7 +16871,7 @@ snapshots:
 
   electron-to-chromium@1.5.321: {}
 
-  electron@33.3.0:
+  electron@41.2.2:
     dependencies:
       '@electron/get': 2.0.3
       '@types/node': 25.5.0
