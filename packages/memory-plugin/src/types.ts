@@ -3,8 +3,8 @@ import type { Params } from "@real-router/core";
 export type MemoryDirection = "back" | "forward" | "navigate";
 
 export interface MemoryContext {
-  direction: MemoryDirection;
-  historyIndex: number;
+  readonly direction: MemoryDirection;
+  readonly historyIndex: number;
 }
 
 export interface MemoryPluginOptions {

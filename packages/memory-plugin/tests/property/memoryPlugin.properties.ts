@@ -463,6 +463,142 @@ describe("Back/forward round-trip invariant", () => {
   );
 });
 
+// Bi-implication between `canGoBack() ⇔ state.context.memory.historyIndex > 0`.
+// Fix for #508: short-circuit branch of #go(delta) now writes
+// state.context.memory with the updated historyIndex, keeping the public
+// context view in sync with the private `#index`.
+describe("canGoBack/canGoForward bi-implication with historyIndex", () => {
+  // Covers INVARIANTS #3 and #4 as strict bi-implications.
+  test.prop([arbMaxHistory, arbActionSequence], { numRuns: NUM_RUNS.async })(
+    "canGoBack() === (historyIndex > 0) after every action",
+    async (maxHistory: number, actions) => {
+      const router = await createTestRouter(maxHistory);
+
+      for (const action of actions) {
+        await executeAction(router, action);
+
+        const idx = getHistoryIndex(router);
+
+        expect(router.canGoBack()).toBe(idx > 0);
+      }
+
+      router.stop();
+    },
+  );
+});
+
+describe("direction === 'navigate' for successful pushes", () => {
+  // Covers new invariant D: every non-history push writes direction='navigate'.
+  test.prop([fc.array(arbRouteWithParams, { minLength: 1, maxLength: 10 })], {
+    numRuns: NUM_RUNS.async,
+  })(
+    "every successful navigate(name, params) writes direction='navigate'",
+    async (routes) => {
+      const router = await createTestRouter(0);
+
+      for (const r of routes) {
+        try {
+          const state = await router.navigate(r.name, r.params);
+
+          expect(state.context.memory?.direction).toBe("navigate");
+        } catch (error) {
+          const code = (error as { code?: string }).code;
+
+          if (code !== "SAME_STATES" && code !== "CANNOT_ACTIVATE") {
+            throw error;
+          }
+        }
+      }
+
+      router.stop();
+    },
+  );
+});
+
+describe("maxHistoryLength=1 idempotency", () => {
+  // Covers new invariant G: at cap=1, history stays exactly one entry;
+  // back()/forward() are always no-ops.
+  test.prop([fc.array(arbRouteWithParams, { minLength: 2, maxLength: 8 })], {
+    numRuns: NUM_RUNS.async,
+  })(
+    "maxHistory=1: canGoBack and canGoForward are always false after any sequence",
+    async (routes) => {
+      const router = await createTestRouter(1);
+
+      for (const r of routes) {
+        try {
+          await router.navigate(r.name, r.params);
+        } catch (error) {
+          const code = (error as { code?: string }).code;
+
+          if (code !== "SAME_STATES" && code !== "CANNOT_ACTIVATE") {
+            throw error;
+          }
+        }
+
+        expect(router.canGoBack()).toBe(false);
+        expect(router.canGoForward()).toBe(false);
+
+        const idx = getHistoryIndex(router);
+
+        expect(idx).toBe(0);
+      }
+
+      router.stop();
+    },
+  );
+});
+
+describe("N×back then N×forward round-trip", () => {
+  // Covers new invariant C: for distinct-path pushes without guards,
+  // N back() followed by N forward() lands on the same path.
+  test.prop(
+    [
+      arbMaxHistory,
+      fc.array(arbRouteWithParams, { minLength: 3, maxLength: 8 }),
+      fc.integer({ min: 1, max: 4 }),
+    ],
+    { numRuns: NUM_RUNS.async },
+  )(
+    "N back() then N forward() returns to the same path (no guards)",
+    async (maxHistory: number, routes, n: number) => {
+      const router = await createTestRouter(maxHistory);
+
+      for (const r of routes) {
+        await executeAction(router, {
+          type: "navigate",
+          name: r.name,
+          params: r.params,
+        });
+      }
+
+      const pathBefore = router.getState()?.path;
+      let backSteps = 0;
+
+      while (router.canGoBack() && backSteps < n) {
+        router.back();
+        await settle();
+        backSteps++;
+      }
+
+      let forwardSteps = 0;
+
+      while (router.canGoForward() && forwardSteps < backSteps) {
+        router.forward();
+        await settle();
+        forwardSteps++;
+      }
+
+      // After symmetric round-trip, path must match the pre-back() state.
+      if (backSteps > 0 && forwardSteps === backSteps) {
+        expect(router.getState()?.path).toBe(pathBefore);
+      }
+
+      router.stop();
+    },
+  );
+});
+
 describe("Consistency counting invariant", () => {
   // After N successful pure pushes of *distinct* routes (no replace, no back),
   // canGoBack() must hold exactly N times — then become false. No unbounded

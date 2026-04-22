@@ -394,16 +394,50 @@ describe("Memory plugin", () => {
     expect(router.canGoForward()).toBe(true);
   });
 
-  it("should update index without navigating when back() targets same state", async () => {
+  it("should update index synchronously without navigating when back() targets same path (short-circuit)", async () => {
+    router.usePlugin(memoryPluginFactory());
+    await router.start("/");
+
+    await router.navigate("users");
+    await router.navigate("home", {}, { replace: true });
+
+    // History: [home, home], index=1. Both entries have path "/".
+    const stateBefore = router.getState()!;
+
+    expect(stateBefore.name).toBe("home");
+    expect(stateBefore.context.memory?.historyIndex).toBe(1);
+
+    const navigateSpy = vi.spyOn(router, "navigate");
+
+    router.back();
+
+    // Short-circuit branch: #index synchronously moves 1 → 0, no navigate fires.
+    expect(navigateSpy).not.toHaveBeenCalled();
+    expect(router.canGoBack()).toBe(false);
+    expect(router.canGoForward()).toBe(true);
+    // Router state object is the same instance (no full transition), but
+    // state.context.memory is rewritten in place to reflect the new
+    // historyIndex + direction (fix for #508).
+    expect(router.getState()).toBe(stateBefore);
+    expect(stateBefore.context.memory?.direction).toBe("back");
+    expect(stateBefore.context.memory?.historyIndex).toBe(0);
+
+    // forward() from index 0 back to index 1 must also rewrite context
+    // with direction="forward" (symmetric case).
+    router.forward();
+
+    expect(stateBefore.context.memory?.direction).toBe("forward");
+    expect(stateBefore.context.memory?.historyIndex).toBe(1);
+  });
+
+  it("should navigate back normally when target entry has a different path", async () => {
     router.usePlugin(memoryPluginFactory());
     await router.start("/");
 
     await router.navigate("users");
     await router.navigate("home");
 
-    // History: [home, users, home], index=2
-    // back() targets "users", forward back to "home" — same path as current
-
+    // History: [home, users, home], index=2. back() targets "users" (different path).
     await waitForHistoryNavigation(router, () => {
       router.back();
     });
@@ -414,27 +448,8 @@ describe("Memory plugin", () => {
       router.back();
     });
 
-    // History: [home, users, home], index=0 — "home" same as entry at index=2
     expect(router.getState()?.name).toBe("home");
     expect(router.canGoBack()).toBe(false);
-
-    // forward() twice: index 0→1 (users, different state), then 1→2 (home, same state as... wait no)
-    // Let's test same-state: replace creates duplicate entries
-    router.stop();
-
-    router = createRouter(routes, { defaultRoute: "home" });
-    router.usePlugin(memoryPluginFactory());
-    await router.start("/");
-
-    await router.navigate("users");
-    await router.navigate("home", {}, { replace: true });
-
-    // History: [home, home], index=1 — back() targets "home" = same path
-    router.back();
-
-    expect(router.canGoBack()).toBe(false);
-    expect(router.canGoForward()).toBe(true);
-    expect(router.getState()?.name).toBe("home");
   });
 
   describe("Edge cases", () => {
@@ -658,10 +673,13 @@ describe("Memory plugin", () => {
       expect(state.context.memory?.historyIndex).toBe(1);
     });
 
-    it("context.memory is frozen", async () => {
+    it("context.memory has the expected shape", async () => {
       const state = await router.start("/");
 
-      expect(Object.isFrozen(state.context.memory)).toBe(true);
+      expect(state.context.memory).toStrictEqual({
+        direction: "navigate",
+        historyIndex: 0,
+      });
     });
 
     it("is available in subscribe callback", async () => {

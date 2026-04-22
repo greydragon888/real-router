@@ -106,14 +106,11 @@ export class MemoryPlugin {
   }
 
   #writeMemoryContext(toState: State, direction: MemoryDirection): void {
-    this.#claim.write(
-      toState,
-      Object.freeze({ direction, historyIndex: this.#index }),
-    );
+    this.#claim.write(toState, { direction, historyIndex: this.#index });
   }
 
   #go(delta: number): void {
-    if (delta === 0 || !Number.isFinite(delta) || !Number.isInteger(delta)) {
+    if (!Number.isInteger(delta) || delta === 0) {
       return;
     }
 
@@ -127,7 +124,14 @@ export class MemoryPlugin {
     const currentState = this.#router.getState();
 
     if (entry.path === currentState?.path) {
+      // Short-circuit: landing on an entry whose path matches the current
+      // state skips router.navigate(). Still rewrite state.context.memory
+      // so subscribers see the new historyIndex + direction — otherwise
+      // UI animation driven by `direction` sees a stale "navigate" value
+      // and `state.context.memory.historyIndex` diverges from `#index`
+      // until the next full transition (#508).
       this.#index = targetIndex;
+      this.#writeMemoryContext(currentState, delta > 0 ? "forward" : "back");
 
       return;
     }
@@ -141,16 +145,19 @@ export class MemoryPlugin {
 
     void this.#router
       .navigate(entry.name, entry.params, { replace: true })
-      .catch(() => {
-        if (this.#goGeneration === generation) {
-          this.#index = previousIndex;
-        }
-      })
-      .finally(() => {
-        if (this.#goGeneration === generation) {
-          this.#navigatingFromHistory = false;
-        }
-      });
+      .then(
+        () => {
+          if (this.#goGeneration === generation) {
+            this.#navigatingFromHistory = false;
+          }
+        },
+        () => {
+          if (this.#goGeneration === generation) {
+            this.#index = previousIndex;
+            this.#navigatingFromHistory = false;
+          }
+        },
+      );
   }
 
   #clear(): void {
