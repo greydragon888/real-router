@@ -61,10 +61,12 @@ writes `{ name, params, path }` — nothing else — into `history.state`.
   Guarantees a leading `/` (including `pathname === ""` → `"/"`).
 - `buildUrl(path, base)` — joins `base + path`, inserting a separator when `path` lacks a leading `/`.
   Returns `base` unchanged when `path` is empty.
-- `urlToPath(url, base, ctx)` — parses via `safeParseUrl`, returns `extractPath(pathname, base) + search`
-  or `null` for invalid URLs.
-- `safeParseUrl(url, ctx)` — wraps `new URL(url, globalThis.location.origin)` with a protocol check
-  (only `http:` and `https:` pass) and returns `null` on any failure.
+- `urlToPath(url, base)` — parses via `safeParseUrl`, returns `extractPath(pathname, base) + search`.
+  Total — never returns null (scheme-agnostic parser handles any input).
+- `safeParseUrl(url)` — manual scheme-agnostic parser, extracts `{ pathname, search, hash }` from
+  any input (`http(s)://`, `app://`, `tauri://`, `file://`, path-relative, opaque). Total —
+  never throws, never returns null. See
+  [IMPLEMENTATION_NOTES#safeParseUrl](../../IMPLEMENTATION_NOTES.md#safeparseurl--scheme-agnostic-parser-496).
 - `safelyEncodePath(path)` — `encodeURI(decodeURI(path))` with a try/catch for malformed
   percent-encoding; idempotent on already-well-encoded ASCII.
 

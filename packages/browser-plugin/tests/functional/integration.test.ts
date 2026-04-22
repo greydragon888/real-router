@@ -202,9 +202,14 @@ describe("Browser Plugin Integration", () => {
       await router.start();
       await router.navigate("users.view", { id: "1" });
 
-      // Browser plugin should handle modified state
+      // Browser plugin should handle modified state.
+      // At minimum two forwardState calls: initial start → "home"
+      // (defaultRoute) and navigate → "users.view". Core may call it
+      // additionally for internal resolutions — asserting lower-bound 2.
       expect(currentHistoryState?.params.modified).toBe(true);
-      expect(modifiedStates.length).toBeGreaterThan(0);
+      expect(modifiedStates.length).toBeGreaterThanOrEqual(2);
+      // Last recorded state must reflect the navigation target.
+      expect(modifiedStates.at(-1)?.params.modified).toBe(true);
     });
 
     it("persistent params work with browser plugin", async () => {
@@ -267,8 +272,25 @@ describe("Browser Plugin Integration", () => {
       );
       router.usePlugin(browserPluginFactory({}, mockedBrowser));
 
-      // Should not crash
-      await expect(router.start()).resolves.toBeDefined();
+      // start() must resolve (the error in the other plugin's onStart is
+      // expected to propagate via $$error but not crash the start sequence).
+      // The mocked browser starts at "/" → resolves to the "index" route.
+      const startState = await router.start();
+
+      expect(startState.name).toBe("index");
+
+      // The browser plugin must have written history.state for the start
+      // navigation — this is what proves it is "still working" after the
+      // sibling plugin's onStart threw. Without this assertion the test
+      // would pass even if browserPlugin's lifecycle was silently broken.
+      expect(currentHistoryState?.name).toBe("index");
+      expect(currentHistoryState?.path).toBe("/");
+
+      // Subsequent navigation should also flow through browser-plugin.
+      await router.navigate("users.list");
+
+      expect(currentHistoryState?.name).toBe("users.list");
+      expect(currentHistoryState?.path).toBe("/users/list");
     });
   });
 

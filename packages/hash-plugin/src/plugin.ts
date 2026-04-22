@@ -6,6 +6,7 @@ import {
   shouldReplaceHistory,
   updateBrowserState,
 } from "./browser-env";
+import { LOGGER_CONTEXT } from "./constants";
 import { hashUrlToPath } from "./hash-utils";
 
 import type { Browser, SharedFactoryState } from "./browser-env";
@@ -50,11 +51,8 @@ export class HashPlugin {
 
     this.#removeExtensions = api.extendRouter({
       buildUrl: pluginBuildUrl,
-      matchUrl: (url: string) => {
-        const path = hashUrlToPath(url, prefixRegex);
-
-        return path ? api.matchPath(path) : undefined;
-      },
+      matchUrl: (url: string) =>
+        api.matchPath(hashUrlToPath(url, prefixRegex)) ?? undefined,
       replaceHistoryState: createReplaceHistoryState(
         api,
         router,
@@ -70,9 +68,8 @@ export class HashPlugin {
       browser,
       allowNotFound: api.getOptions().allowNotFound,
       transitionOptions,
-      loggerContext: "hash-plugin",
-      buildUrl: (name: string, params?: Params) =>
-        router.buildUrl(name, params),
+      loggerContext: LOGGER_CONTEXT,
+      buildUrl: pluginBuildUrl,
     });
 
     this.#lifecycle = createPopstateLifecycle({

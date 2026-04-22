@@ -61,6 +61,8 @@ real-router/
 │   ├── svelte/   (16 examples)    # Svelte 5 examples + 9 e2e suites
 │   │   ├── ssr/                    # Server-side rendering with Express + Vite
 │   │   └── ssg/                   # Static site generation with Vite
+│   ├── electron/ (3 examples)     # Electron desktop: browser-plugin (app://), hash-plugin (file://), navigation-plugin
+│   └── tauri/    (2 examples)     # Tauri v2 desktop: browser-plugin, navigation-plugin
 ```
 
 **Public packages** (published to npm): `core`, `core-types`, `react`, `preact`, `solid`, `vue`, `svelte`, `angular`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `lifecycle-plugin`, `preload-plugin`, `memory-plugin`, `navigation-plugin`, `validation-plugin`, `search-schema-plugin`, `route-utils`, `logger`

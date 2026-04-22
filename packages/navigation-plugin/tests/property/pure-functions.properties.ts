@@ -2,7 +2,7 @@ import { fc, test } from "@fast-check/vitest";
 import { describe, expect } from "vitest";
 
 import { NUM_RUNS } from "./helpers";
-import { shouldReplaceHistory } from "../../src/browser-env";
+import { safeParseUrl, shouldReplaceHistory } from "../../src/browser-env";
 import { computeDirection } from "../../src/navigate-handler";
 import { deriveNavigationType } from "../../src/plugin";
 
@@ -120,4 +120,133 @@ describe("shouldReplaceHistory Properties (cross-partition)", () => {
 
     expect(typeof result).toBe("boolean");
   });
+});
+
+describe("shouldReplaceHistory Properties (partitioned)", () => {
+  // G4 truth-table cells — each partition of (replace, reload, fromState)
+  // has a deterministic answer. Totality alone doesn't protect against a
+  // regression that silently flips one cell.
+  test.prop([arbState, fc.option(arbState, { nil: undefined })], {
+    numRuns: NUM_RUNS.standard,
+  })("replace: true → always true", (toState, fromState) => {
+    expect(shouldReplaceHistory({ replace: true }, toState, fromState)).toBe(
+      true,
+    );
+  });
+
+  test.prop([arbState], { numRuns: NUM_RUNS.fast })(
+    "replace nullish + fromState undefined → true (initial nav default)",
+    (toState) => {
+      expect(shouldReplaceHistory({}, toState, undefined)).toBe(true);
+    },
+  );
+
+  test.prop([arbState], { numRuns: NUM_RUNS.fast })(
+    "replace: false + fromState undefined → false (explicit user override, #447)",
+    (toState) => {
+      expect(shouldReplaceHistory({ replace: false }, toState, undefined)).toBe(
+        false,
+      );
+    },
+  );
+
+  test.prop([arbState], { numRuns: NUM_RUNS.fast })(
+    "reload: true + same path → true",
+    (state) => {
+      expect(shouldReplaceHistory({ reload: true }, state, state)).toBe(true);
+    },
+  );
+
+  test.prop([arbState, arbState.filter((s) => s.path !== "/")], {
+    numRuns: NUM_RUNS.fast,
+  })(
+    "reload: true + different path + explicit replace:false → false",
+    (to, from) => {
+      fc.pre(to.path !== from.path);
+
+      expect(
+        shouldReplaceHistory({ reload: true, replace: false }, to, from),
+      ).toBe(false);
+    },
+  );
+});
+
+describe("deriveNavigationType Properties (partitioned)", () => {
+  test.prop([arbState], { numRuns: NUM_RUNS.fast })(
+    "reload: true + same path → reload",
+    (state) => {
+      expect(deriveNavigationType({ reload: true }, state, state)).toBe(
+        "reload",
+      );
+    },
+  );
+
+  test.prop([arbState, fc.option(arbState, { nil: undefined })], {
+    numRuns: NUM_RUNS.standard,
+  })("replace: true → replace (unless reload+same-path)", (to, from) => {
+    fc.pre(to.path !== from?.path);
+
+    expect(deriveNavigationType({ replace: true }, to, from)).toBe("replace");
+  });
+
+  test.prop([arbState, arbState.filter((s) => s.path !== "/")], {
+    numRuns: NUM_RUNS.fast,
+  })(
+    "replace: false + fromState present + different path → push",
+    (to, from) => {
+      fc.pre(to.path !== from.path);
+
+      expect(deriveNavigationType({ replace: false }, to, from)).toBe("push");
+    },
+  );
+});
+
+describe("safeParseUrl Properties (totality)", () => {
+  // G3 — scheme-agnostic parser must NEVER throw and must ALWAYS return
+  // a {pathname, search, hash} triple of strings, for any input.
+  // Includes random bytes, non-ASCII, opaque URIs, custom schemes.
+  test.prop([fc.string()], { numRuns: 2000 })(
+    "never throws on any string input",
+    (anyStr) => {
+      expect(() => safeParseUrl(anyStr)).not.toThrow();
+    },
+  );
+
+  test.prop([fc.string()], { numRuns: 1000 })(
+    "always returns three string fields",
+    (anyStr) => {
+      const result = safeParseUrl(anyStr);
+
+      expect(typeof result.pathname).toBe("string");
+      expect(typeof result.search).toBe("string");
+      expect(typeof result.hash).toBe("string");
+    },
+  );
+
+  test.prop([fc.string()], { numRuns: 1000 })(
+    "search field is empty or starts with '?'",
+    (anyStr) => {
+      const { search } = safeParseUrl(anyStr);
+
+      expect(search === "" || search.startsWith("?")).toBe(true);
+    },
+  );
+
+  test.prop([fc.string()], { numRuns: 1000 })(
+    "hash field is empty or starts with '#'",
+    (anyStr) => {
+      const { hash } = safeParseUrl(anyStr);
+
+      expect(hash === "" || hash.startsWith("#")).toBe(true);
+    },
+  );
+
+  test.prop([fc.webUrl()], { numRuns: NUM_RUNS.standard })(
+    "pathname for absolute HTTP URLs always starts with '/'",
+    (url) => {
+      const { pathname } = safeParseUrl(url);
+
+      expect(pathname.startsWith("/")).toBe(true);
+    },
+  );
 });

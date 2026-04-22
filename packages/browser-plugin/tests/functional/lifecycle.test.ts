@@ -244,6 +244,31 @@ describe("Browser Plugin — Lifecycle", () => {
       );
     });
 
+    it("uses pushState when replace: false is explicit on first navigation (gotcha)", async () => {
+      // Gotcha documented in CLAUDE.md: `navigate(..., { replace: false })` before
+      // any successful navigation creates a push entry, not replace. The `??`
+      // in shouldReplaceHistory keeps the explicit `false`.
+      router.stop();
+      unsubscribe?.();
+
+      router = createRouter(routerConfig, { defaultRoute: "home" });
+      router.usePlugin(browserPluginFactory({}, mockedBrowser));
+
+      const pushSpy = vi.spyOn(mockedBrowser, "pushState");
+      const replaceSpy = vi.spyOn(mockedBrowser, "replaceState");
+
+      await router.start();
+
+      // First "real" navigation with explicit replace: false — must push.
+      pushSpy.mockClear();
+      replaceSpy.mockClear();
+
+      await router.navigate("users.list", {}, { replace: false });
+
+      expect(pushSpy).toHaveBeenCalledTimes(1);
+      expect(replaceSpy).not.toHaveBeenCalled();
+    });
+
     it("uses pushState for subsequent navigations", async () => {
       // Router already started on "home" (default route)
       vi.spyOn(mockedBrowser, "pushState");
@@ -273,14 +298,12 @@ describe("Browser Plugin — Lifecycle", () => {
     it("supports navigate callback", async () => {
       const state = await router.navigate("users.list", {}, {});
 
-      expect(state).toBeDefined();
       expect(state.name).toBe("users.list");
     });
 
     it("supports navigate with params and callback", async () => {
       const state = await router.navigate("users.view", { id: "1" });
 
-      expect(state).toBeDefined();
       expect(state.name).toBe("users.view");
       expect(router.getState()?.params.id).toBe("1");
     });
@@ -437,6 +460,37 @@ describe("Browser Plugin — Lifecycle", () => {
       router.usePlugin(
         browserPluginFactory({ unknownOption: "value" } as any, mockedBrowser),
       );
+    });
+  });
+
+  describe("Default browser getLocation cache (#8.2 A7)", () => {
+    it("returns the same path on repeated start when URL has not changed (cache hit)", async () => {
+      globalThis.history.replaceState({}, "", "/users/list");
+
+      router.usePlugin(browserPluginFactory());
+
+      const first = await router.start();
+
+      router.stop();
+
+      const second = await router.start();
+
+      expect(second.path).toBe(first.path);
+    });
+
+    it("recomputes when pathname changes between calls (cache miss)", async () => {
+      globalThis.history.replaceState({}, "", "/users/list");
+
+      router.usePlugin(browserPluginFactory());
+      await router.start();
+
+      router.stop();
+
+      globalThis.history.replaceState({}, "", "/home");
+
+      const second = await router.start();
+
+      expect(second.name).toBe("home");
     });
   });
 

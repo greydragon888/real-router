@@ -167,6 +167,60 @@ describe("Browser Plugin — Popstate", () => {
       // Should NOT call replaceState because there's no previous history entry to restore to.
       expect(mockedBrowser.replaceState).not.toHaveBeenCalled();
     });
+
+    it("restores URL via replaceState when deactivate guard blocks back-navigation (CANNOT_DEACTIVATE recovery)", async () => {
+      // Set up the disposable router with forceDeactivate: false so that
+      // deactivate guards actually block popstate-triggered back navigations.
+      router.stop();
+
+      const guardedRouter = createRouter(routerConfig, {
+        defaultRoute: "home",
+        queryParamsMode: "default",
+      });
+
+      guardedRouter.usePlugin(
+        browserPluginFactory({ forceDeactivate: false }, mockedBrowser),
+      );
+      await guardedRouter.start();
+      await guardedRouter.navigate("users.view", { id: "42" });
+
+      const previousState = guardedRouter.getState()!;
+
+      expect(previousState.name).toBe("users.view");
+
+      // Now block deactivation of users.view.
+      getLifecycleApi(guardedRouter).addDeactivateGuard(
+        "users.view",
+        () => () => false,
+      );
+
+      const replaceSpy = vi.spyOn(mockedBrowser, "replaceState");
+
+      // Simulate clicking "back" — browser already changed URL to /users/list
+      // and dispatches popstate with the previous (users.list) history.state.
+      globalThis.dispatchEvent(
+        new PopStateEvent("popstate", {
+          state: { name: "users.list", params: {}, path: "/users/list" },
+        }),
+      );
+
+      // Wait for navigate() rejection to propagate through the popstate handler
+      // and rollbackUrlToCurrentState to call replaceState.
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Router state must remain on users.view (deactivation was blocked).
+      expect(guardedRouter.getState()).toStrictEqual(previousState);
+
+      // The plugin must have called replaceState with the previous state
+      // and a URL containing the previous path — this is the actual URL
+      // restoration that the gotcha promises but was previously untested.
+      expect(replaceSpy).toHaveBeenCalledWith(
+        previousState,
+        expect.stringContaining(previousState.path),
+      );
+
+      guardedRouter.stop();
+    });
   });
 
   describe("Race Condition Protection", () => {
@@ -420,12 +474,26 @@ describe("Browser Plugin — Popstate", () => {
       noDefaultRouter.usePlugin(browserPluginFactory({}, mockedBrowser));
       await noDefaultRouter.start("/home");
 
+      const stateBefore = noDefaultRouter.getState();
+
       // Trigger popstate with no state (new URL, not from history)
       // Browser is at "/", which doesn't match any route → matchPath returns undefined
       globalThis.dispatchEvent(new PopStateEvent("popstate", { state: null }));
 
-      // Should not crash and should handle gracefully
-      expect(noDefaultRouter.getState()?.name).toBe("home");
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // With allowNotFound: true (default) the plugin calls
+      // navigateToNotFound(path) — but the router tree has no matching
+      // route. The key invariant: the handler did not crash, and the
+      // router settled on a defined state (either unchanged or the
+      // UNKNOWN_ROUTE sentinel). No exception must leak to the caller.
+      const stateAfter = noDefaultRouter.getState();
+
+      expect(stateAfter).toBeDefined();
+      expect(
+        stateAfter?.name === stateBefore?.name ||
+          stateAfter?.name.includes("UNKNOWN"),
+      ).toBe(true);
 
       noDefaultRouter.stop();
     });
@@ -508,7 +576,13 @@ describe("Browser Plugin — Popstate", () => {
 
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      expect(router.getState()?.name).toBe("home");
+      const currentState = router.getState();
+
+      expect(currentState?.name).toBe("home");
+      // Stray `meta` at the root level must not leak into routed state —
+      // the plugin reads only { name, params, path } from history.state.
+      expect(currentState?.params).toStrictEqual({});
+      expect(currentState?.path).toBe("/home");
     });
   });
 });

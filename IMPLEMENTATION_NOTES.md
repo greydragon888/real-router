@@ -2412,3 +2412,111 @@ The utility is **opt-in** (`undefined` = off), so users who don't want restorati
 ### Why Not Expose `ScrollRestorationOptions` from Adapter Roots
 
 `RouteAnnouncerOptions` is already not re-exported from any adapter's public entry (`RouterProvider` prop-type inference covers consumer needs). `ScrollRestorationOptions` follows the same convention. If users ask, we promote in a later minor.
+
+## safeParseUrl — scheme-agnostic parser (#496)
+
+### Problem
+
+Before [issue #496](https://github.com/greydragon888/real-router/issues/496), `shared/browser-env/url-parsing.ts` contained:
+
+```ts
+export function safeParseUrl(url: string, context: string): URL | null {
+  try {
+    const parsed = new URL(url, globalThis.location.origin);
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      console.warn(`[${context}] Invalid URL protocol in ${url}`);
+      return null;
+    }
+    return parsed;
+  } catch (err) {
+    console.warn(`[${context}] Could not parse url ${url}`, err);
+    return null;
+  }
+}
+```
+
+Two failure modes in desktop WebViews:
+
+1. **`TypeError` on `file://`.** In Electron windows loaded via `win.loadFile(...)`, `globalThis.location.origin` returns the string `"null"` (not `null` — the literal four characters). `new URL("/users", "null")` throws `TypeError: Invalid base URL`. Both `browser-plugin` and `navigation-plugin` became unusable in Electron `file://` windows without a custom protocol.
+2. **Whitelist rejected non-HTTP schemes.** Protocols `app://` (Electron custom scheme), `tauri://` (Tauri macOS/iOS), `asset://`, and any other desktop runtime URL failed the `["http:", "https:"].includes(parsed.protocol)` check. The function returned `null` with a console warning, the plugin treated the URL as invalid, and navigation silently failed.
+
+Both issues blocked real-world desktop usage without downstream patches.
+
+### Solution
+
+Rewrote `safeParseUrl` as a **manual, scheme-agnostic parser** that produces `{ pathname, search, hash }` directly:
+
+```ts
+export interface ParsedUrl {
+  pathname: string;
+  search: string;
+  hash: string;
+}
+
+export function safeParseUrl(url: string): ParsedUrl {
+  // Manual parse — works for any scheme: tauri://, app://, file://, https://, path-only, opaque.
+  // ... implementation details ...
+}
+```
+
+Contract changes:
+
+- Returns `ParsedUrl` (a plain struct), not `URL | null`.
+- Total — never throws, never returns `null` for any input (empty string yields `{ pathname: "", search: "", hash: "" }`).
+- `context` parameter removed — no warnings, no protocol whitelist.
+
+Consumers — `browser-plugin`, `hash-plugin`, `navigation-plugin` — pass `url`, extract the field they need, and drop their null-case branches. `urlToPath(url, base, context)` in `shared/browser-env/url-utils.ts` also lost its `context` parameter.
+
+### Why
+
+1. **Routing doesn't need origin or protocol.** The router cares about `pathname`, `search`, and `hash`. The origin-check and protocol-check were false security: real desktop runtimes emit non-HTTP origins for legitimate content, and the matcher is already the source of truth for "is this URL valid for this app."
+2. **Real-Router is the only router with explicit desktop support.** Users picking our router for Electron / Tauri come for this. Silently auto-downgrading or falling back to `memory-plugin` would hide the value — instead we document the compatibility matrix (see [Desktop Integration Guide](https://github.com/greydragon888/real-router/wiki/Desktop-Integration) in the wiki).
+3. **Performance bonus.** The manual parser runs 4–6× faster than `new URL(url, origin)` on the URL-roundtrip fixtures used by `navigation-plugin`'s `hasVisited` / `getVisitedRoutes` hot path (both iterate every session-history entry). On short flat histories the win is invisible; on 100+ entries with frequent `peekBack` / `getVisitedRoutes` calls it matters.
+
+### Before / After
+
+```diff
+-export function safeParseUrl(url: string, context: string): URL | null {
+-  try {
+-    const parsed = new URL(url, globalThis.location.origin);
+-    if (!["http:", "https:"].includes(parsed.protocol)) {
+-      console.warn(`[${context}] Invalid URL protocol`);
+-      return null;
+-    }
+-    return parsed;
+-  } catch {
+-    return null;
+-  }
+-}
++export interface ParsedUrl { pathname: string; search: string; hash: string }
++export function safeParseUrl(url: string): ParsedUrl {
++  // ... manual scheme-agnostic parse ...
++}
+```
+
+### Consumers — code simplification
+
+- `urlToPath(url, base, context)` → `urlToPath(url, base)`. The function is total and always returns a `string` starting with `/`.
+- `entryToState` in `navigation-plugin` — removed `if (path === null) return undefined` branch.
+- `matchUrl` in `browser-plugin` / `hash-plugin` — removed null-check, the expression collapsed to a single `return` without an intermediate variable.
+
+See commit `06ccab93` for the full diff.
+
+### Trade-offs
+
+- **Breaking: callers receive `ParsedUrl`, not `URL`.** `safeParseUrl` is not a public export of any plugin — it lives in `shared/browser-env/`, consumed only by the three URL plugins in the monorepo. External consumers are not affected.
+- **No scheme validation.** If `javascript:alert(1)` reaches the router, its "pathname" is extracted. The router still rejects it — it won't match any route → `navigateToDefault` / `navigateToNotFound`. Validation moved from the parser layer (where it was a false check) to the matcher layer (where it has always lived).
+- **No warnings for debugging.** Previously a warning fired on every non-HTTP scheme, which was noise — the protocol was the expected behavior in Electron / Tauri. Debugging specific URLs is done with a targeted `console.log` in the plugin's call site, not a blanket parser warning.
+
+### Test coverage
+
+- Property tests on parser invariants — `packages/browser-env/tests/property/browserEnv.properties.ts`: valid HTTP paths, any scheme (desktop environments), `pathname` not polluted by `search` / `hash`.
+- Property tests in consumer plugins — `packages/browser-plugin/tests/property/browserPlugin.properties.ts`, `packages/hash-plugin/tests/property/hashPlugin.properties.ts`, `packages/navigation-plugin/tests/property/{url-roundtrip,history-model,pure-functions}.properties.ts`: URL-roundtrip invariants preserved after the refactor.
+- Functional tests across all three plugins updated — null-case branches removed, scheme-agnostic assertions added.
+- 5 desktop examples (`examples/electron/{react,react-hash,react-navigation}` + `examples/tauri/{react,react-navigation}`) with 32 Playwright e2e specs including deep-link reload at three nested levels across `app://`, `file://`, and `tauri://` schemes.
+
+### Related
+
+- A short micro-benchmark lived in `benchmarks/core/url-parsing-compare.ts` during the refactor and was removed after validation — the new parser ran 4–6× faster than `new URL()` on 6 fixtures (shortHttp / longHttp / withQueryHash / hashRouting / customScheme / fileUrl) and ~3.87× faster on a history-iteration scenario of 100 entries. Results are captured in the #496 commit message (`06ccab93`); the bench itself wasn't kept because it was a one-shot validation.
+- `navigation-plugin` hot path — `getVisitedRoutes` / `hasVisited` iterate every entry in the Navigation API's session history; the scheme-agnostic parser is measurable there.
+- Public surface documented in [Desktop Integration Guide](https://github.com/greydragon888/real-router/wiki/Desktop-Integration) (wiki).

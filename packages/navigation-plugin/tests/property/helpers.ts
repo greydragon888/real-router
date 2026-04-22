@@ -79,7 +79,7 @@ export const arbLeafRoute: fc.Arbitrary<string> = fc.constantFrom(
 /**
  * Arbitrary: alphanumeric ID param for `users.view`.
  * URL-safe characters — encode as identity, so the roundtrip is purely
- * about the Navigation API path extraction (safeParseUrl → new URL()).
+ * about the Navigation API path extraction (safeParseUrl manual parser).
  */
 export const arbIdParam: fc.Arbitrary<{ id: string }> = fc.record({
   id: fc.stringMatching(/^[a-zA-Z0-9_-]{1,10}$/),

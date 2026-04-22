@@ -5,10 +5,12 @@ import { memoryPluginFactory } from "@real-router/memory-plugin";
 
 import type { Router, Route } from "@real-router/core";
 
+const CI = Boolean(process.env.CI);
+
 export const NUM_RUNS = {
-  standard: 100,
-  lifecycle: 50,
-  async: 100,
+  standard: CI ? 300 : 100,
+  lifecycle: CI ? 100 : 50,
+  async: CI ? 300 : 100,
 } as const;
 
 const ROUTES: Route[] = [
@@ -38,7 +40,7 @@ export const arbRouteWithParams: fc.Arbitrary<{
 }> = arbRouteName.chain((name) =>
   name === "user"
     ? fc
-        .integer({ min: 1, max: 100 })
+        .integer({ min: 1, max: 3 })
         .map((id) => ({ name, params: { id: String(id) } }))
     : fc.constant({ name, params: {} as Record<string, string> }),
 );
@@ -73,6 +75,18 @@ export const arbActionSequence: fc.Arbitrary<Action[]> = fc.array(arbAction, {
   minLength: 1,
   maxLength: 15,
 });
+
+/**
+ * Long sequence — for marathon scenarios that exercise overflow trimming and
+ * deep back/forward chains. Use with `numRuns: 20` to keep CI time bounded.
+ */
+export const arbActionSequenceLong: fc.Arbitrary<Action[]> = fc.array(
+  arbAction,
+  {
+    minLength: 30,
+    maxLength: 100,
+  },
+);
 
 export const arbMaxHistory: fc.Arbitrary<number> = fc.oneof(
   fc.constant(0),

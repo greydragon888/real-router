@@ -9,7 +9,7 @@
 | 1   | `matchUrl(buildUrl(name))` preserves route name     | Parsing a URL that was built from a route name returns a state whose `name` matches the original input. Confirms that `buildUrl` and `matchUrl` are inverse operations for static routes.                                                                             |
 | 2   | `matchUrl(buildUrl(name, params))` preserves params | After a full URL roundtrip with a parameterized route, the decoded `params.id` equals the original value. Verifies that URL encoding and decoding are symmetric for path parameters.                                                                                  |
 | 3   | `buildUrl` is deterministic                         | Calling `buildUrl` twice with the same route name and params produces identical URLs. Ensures the function has no hidden state or randomness.                                                                                                                         |
-| 4   | URL roundtrip preserves URL-unsafe characters       | Arbitrary strings (Unicode, slashes, percent-literals, query-like chars) survive the `buildPath → new URL() → extractPath → matchPath` pipeline. Uses `fc.pre` to skip unsupported inputs — verifies that IF the route matches, the param value is preserved exactly. |
+| 4   | URL roundtrip preserves URL-unsafe characters       | Arbitrary strings (Unicode, slashes, percent-literals, query-like chars) survive the `buildPath → safeParseUrl → extractPath → matchPath` pipeline. Uses `fc.pre` to skip unsupported inputs — verifies that IF the route matches, the param value is preserved exactly. |
 
 ## Base Path
 

@@ -36,21 +36,29 @@ describe("S4: concurrent back()/forward()", () => {
     await settle();
     await settle();
 
-    // Router must be in a valid state — one of the five pushed routes.
+    // History has 5 entries; final index must be valid (0..4). We can't predict
+    // the exact landing slot under concurrent back/forward because core cancels
+    // in-flight navigations — but the index MUST be a valid position, and from
+    // any valid position in a 5-entry history at least one of back/forward is
+    // possible.
     const finalName = router.getState()?.name;
 
     expect(["home", "users", "user", "settings", "profile"]).toContain(
       finalName ?? "",
     );
+    expect(router.canGoBack() || router.canGoForward()).toBe(true);
 
-    // canGoBack/canGoForward must be bools reflecting a valid index position.
-    expect(typeof router.canGoBack()).toBe("boolean");
-    expect(typeof router.canGoForward()).toBe("boolean");
+    const memory = router.getState()?.context.memory as
+      | { historyIndex: number }
+      | undefined;
+
+    expect(memory?.historyIndex).toBeGreaterThanOrEqual(0);
+    expect(memory?.historyIndex).toBeLessThanOrEqual(4);
 
     router.stop();
   });
 
-  it("S4.2: rapid go(+/-N) does not crash", async () => {
+  it("S4.2: rapid go(+/-N) does not crash and leaves index in valid range", async () => {
     const { router } = createStressRouter();
 
     await router.start("/");
@@ -59,6 +67,7 @@ describe("S4: concurrent back()/forward()", () => {
       await router.navigate("user", { id: String(i) });
     }
 
+    // History has 11 entries after 10 pushes (start adds "home"). max index = 10.
     expect(() => {
       for (let i = 0; i < 200; i++) {
         router.go((i % 7) - 3);
@@ -66,6 +75,13 @@ describe("S4: concurrent back()/forward()", () => {
     }).not.toThrow();
 
     await settle();
+
+    const memory = router.getState()?.context.memory as
+      | { historyIndex: number }
+      | undefined;
+
+    expect(memory?.historyIndex).toBeGreaterThanOrEqual(0);
+    expect(memory?.historyIndex).toBeLessThanOrEqual(10);
 
     router.stop();
   });

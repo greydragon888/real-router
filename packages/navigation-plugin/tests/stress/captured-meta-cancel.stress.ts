@@ -71,8 +71,11 @@ describe("N14 — capturedMeta cleanup under cancel storm", () => {
     const meta = router.getState()?.context.navigation;
 
     expect(meta).toBeDefined();
-    expect(["push", "replace", "traverse", "reload"]).toContain(
-      meta!.navigationType,
-    );
+    // Targeted navigate(name, params) with no replace/reload flags → "push"
+    // exactly. A weaker `.toContain([...valid types])` would silently accept
+    // stale meta leaked from a cancelled transition.
+    expect(meta!.navigationType).toBe("push");
+    expect(meta!.direction).toBe("forward");
+    expect(meta!.userInitiated).toBe(false);
   });
 });

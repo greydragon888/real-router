@@ -69,9 +69,10 @@ describe("Browser Plugin — Compatibility", () => {
 
       await Promise.all(promises);
 
-      expect(router.getState()).toBeDefined();
+      const finalState = router.getState();
+
       expect(
-        router.isActiveRoute("home") || router.isActiveRoute("users.list"),
+        finalState?.name === "home" || finalState?.name === "users.list",
       ).toBe(true);
     });
 
@@ -96,7 +97,9 @@ describe("Browser Plugin — Compatibility", () => {
       // onPopState is async, wait for microtasks to settle
       await new Promise((resolve) => setTimeout(resolve, 50));
 
-      expect(router.getState()).toBeDefined();
+      const finalState = router.getState();
+
+      expect(routes).toContain(finalState?.name);
     });
 
     it("handles memory cleanup on repeated plugin lifecycle", async () => {
@@ -122,7 +125,7 @@ describe("Browser Plugin — Compatibility", () => {
 
       await finalRouter.start();
 
-      expect(finalRouter.getState()?.name).toBeDefined();
+      expect(finalRouter.getState()?.name).toBe("home");
 
       finalRouter.stop();
       finalUnsub();
@@ -263,7 +266,7 @@ describe("Browser Plugin — Compatibility", () => {
 
         await ssrRouter.start();
 
-        expect(ssrRouter.getState()).toBeDefined();
+        expect(ssrRouter.getState()?.name).toBe("index");
 
         await ssrRouter.navigate("users.list");
 
@@ -274,6 +277,47 @@ describe("Browser Plugin — Compatibility", () => {
         );
 
         ssrRouter.stop();
+      } finally {
+        globalThis.window = originalWindow;
+        warnSpy.mockRestore();
+      }
+    });
+
+    it("warn-once: multiple method calls produce exactly one SSR warning per plugin instance", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(noop);
+      const originalWindow = globalThis.window;
+
+      // @ts-expect-error — simulating SSR by removing window
+      delete globalThis.window;
+
+      try {
+        const ssrRouter = createRouter(routerConfig, {
+          defaultRoute: "home",
+        });
+
+        ssrRouter.usePlugin(browserPluginFactory({}));
+
+        // Trigger multiple SSR fallback paths:
+        //   start() → getLocation + replaceState (via onTransitionSuccess)
+        //   navigate() × 3 → pushState × 3
+        await ssrRouter.start();
+        await ssrRouter.navigate("users.list");
+        await ssrRouter.navigate("home");
+        await ssrRouter.navigate("users.list");
+        ssrRouter.stop();
+
+        const nonBrowserWarns = warnSpy.mock.calls.filter(
+          ([msg]) =>
+            typeof msg === "string" && msg.includes("non-browser environment"),
+        );
+
+        // createSafeBrowser instantiates two independent warnOnce closures —
+        // one for getLocation (safe-browser.ts) and one shared across
+        // pushState/replaceState/addPopstateListener/getHash (via
+        // createHistoryFallbackBrowser). Each fires at most once, so the
+        // ceiling across 4 navigations + start is 2, not N.
+        expect(nonBrowserWarns.length).toBeLessThanOrEqual(2);
+        expect(nonBrowserWarns.length).toBeGreaterThanOrEqual(1);
       } finally {
         globalThis.window = originalWindow;
         warnSpy.mockRestore();

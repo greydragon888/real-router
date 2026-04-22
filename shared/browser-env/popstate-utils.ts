@@ -56,3 +56,40 @@ export function updateBrowserState(
     browser.pushState(historyState, url);
   }
 }
+
+/**
+ * Creates a `updateBrowserState` closure that reuses a single mutable buffer
+ * across calls instead of allocating a fresh `{ name, params, path }` object
+ * per push/replace.
+ *
+ * Why: Browsers structured-clone `history.state` synchronously inside
+ * `pushState`/`replaceState`, so the caller never sees the buffer escape —
+ * it can be safely overwritten before the next call. Eliminates one
+ * allocation per navigation on the hot path.
+ *
+ * Each plugin instance must own its own buffer (do not share across plugins).
+ */
+export function createUpdateBrowserState(): (
+  state: State,
+  url: string,
+  replace: boolean,
+  browser: Browser,
+) => void {
+  const buffer = {
+    name: "",
+    params: {} as Params,
+    path: "",
+  };
+
+  return (state, url, replace, browser) => {
+    buffer.name = state.name;
+    buffer.params = state.params;
+    buffer.path = state.path;
+
+    if (replace) {
+      browser.replaceState(buffer, url);
+    } else {
+      browser.pushState(buffer, url);
+    }
+  };
+}

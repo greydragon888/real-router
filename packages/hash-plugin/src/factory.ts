@@ -20,7 +20,18 @@ export function hashPluginFactory(
 ): PluginFactory {
   validateOptions(opts);
 
-  const options: Required<HashPluginOptions> = { ...defaultOptions, ...opts };
+  const definedOpts = opts
+    ? Object.fromEntries(
+        Object.entries(opts).filter(
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime may receive explicit undefined via conditional spreads (exactOptionalPropertyTypes does not apply here)
+          ([, value]) => value !== undefined,
+        ),
+      )
+    : {};
+  const options: Required<HashPluginOptions> = {
+    ...defaultOptions,
+    ...definedOpts,
+  };
 
   options.base = normalizeBase(options.base);
 

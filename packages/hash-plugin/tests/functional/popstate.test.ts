@@ -129,7 +129,12 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
         code: "ROUTE_NOT_FOUND",
       });
       expect(restrictedRouter.getState()).toStrictEqual(previousState);
-      expect(replaceSpy).toHaveBeenCalled();
+      // URL rollback: replaceState must be called with the previous state
+      // and the canonical URL for it, not arbitrary arguments.
+      expect(replaceSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ name: previousState.name }),
+        restrictedRouter.buildUrl(previousState.name, previousState.params),
+      );
 
       restrictedRouter.stop();
     });
@@ -393,7 +398,9 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
         new TypeError("Critical navigate error"),
       );
 
-      vi.spyOn(router, "buildUrl").mockImplementation(() => {
+      // pluginBuildUrl internally calls router.buildPath; throwing there
+      // propagates through the recovery path.
+      vi.spyOn(router, "buildPath").mockImplementation(() => {
         throw new Error("Recovery error");
       });
 

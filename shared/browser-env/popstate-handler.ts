@@ -6,16 +6,24 @@ import type { Browser, SharedFactoryState } from "./types.js";
 import type { Params, Plugin, Router } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
 
+/**
+ * Navigation options used by the popstate handler to trigger a
+ * router.navigate() call from a back/forward event. `source` identifies
+ * the origin of the transition to downstream context consumers;
+ * `replace: true` keeps the history stack in sync with the browser.
+ */
+export interface PopstateTransitionOptions {
+  source: string;
+  replace: true;
+  forceDeactivate?: boolean;
+}
+
 export interface PopstateHandlerDeps {
   router: Router;
   api: PluginApi;
   browser: Browser;
   allowNotFound: boolean;
-  transitionOptions: {
-    source: string;
-    replace: true;
-    forceDeactivate?: boolean;
-  };
+  transitionOptions: PopstateTransitionOptions;
   loggerContext: string;
   buildUrl: (name: string, params?: Params) => string;
 }

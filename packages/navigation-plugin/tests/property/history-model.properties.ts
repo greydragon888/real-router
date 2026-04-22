@@ -288,12 +288,6 @@ class AssertMetaExistsCommand implements fc.AsyncCommand<
       // it to `false`, browser events carry `event.userInitiated`. Either way
       // the field must exist and be typed.
       expect(typeof meta!.userInitiated).toBe("boolean");
-
-      // It must match the navigation source: NavigateCommand drives programmatic
-      // calls (always false), and BackCommand/ForwardCommand go through mockNav
-      // which sets userInitiated=true. Since we don't track the trigger in the
-      // model, we only assert the field is consistent (boolean, not undefined).
-      expect(meta!.userInitiated || !meta!.userInitiated).toBe(true);
     }
   }
 
@@ -404,6 +398,59 @@ class AssertCanGoBackPeekConsistencyCommand implements fc.AsyncCommand<
 
   toString() {
     return "assertCanGoBackPeekConsistency()";
+  }
+}
+
+/**
+ * Symmetric to canGoBack↔peekBack consistency — `canGoForward()` must
+ * return true iff `peekForward()` is defined. Both read from
+ * `browser.currentEntry.index` and `entries()` with the same offset;
+ * a regression in one must surface via divergence here.
+ */
+class AssertCanGoForwardPeekConsistencyCommand implements fc.AsyncCommand<
+  HistoryModel,
+  HistoryReal
+> {
+  check(m: Readonly<HistoryModel>) {
+    return m.started;
+  }
+
+  async run(_m: HistoryModel, r: HistoryReal) {
+    const forward = r.router.canGoForward();
+    const peeked = r.router.peekForward();
+
+    expect(forward).toBe(peeked !== undefined);
+  }
+
+  toString() {
+    return "assertCanGoForwardPeekConsistency()";
+  }
+}
+
+/**
+ * `hasVisited(r) === (getRouteVisitCount(r) > 0)` must hold for every
+ * route at every step — these two functions iterate the same entry
+ * list and must agree on presence.
+ */
+class AssertHasVisitedCountConsistencyCommand implements fc.AsyncCommand<
+  HistoryModel,
+  HistoryReal
+> {
+  check(m: Readonly<HistoryModel>) {
+    return m.started;
+  }
+
+  async run(_m: HistoryModel, r: HistoryReal) {
+    for (const routeName of LEAF_ROUTE_NAMES) {
+      const visited = r.router.hasVisited(routeName);
+      const count = r.router.getRouteVisitCount(routeName);
+
+      expect(visited).toBe(count > 0);
+    }
+  }
+
+  toString() {
+    return "assertHasVisitedCountConsistency()";
   }
 }
 
@@ -526,6 +573,8 @@ const allCommands = [
   fc.constant(new AssertFindLastEntryForRouteCommand()),
   fc.constant(new AssertNavigationTypeCommand()),
   fc.constant(new AssertCanGoBackPeekConsistencyCommand()),
+  fc.constant(new AssertCanGoForwardPeekConsistencyCommand()),
+  fc.constant(new AssertHasVisitedCountConsistencyCommand()),
   fc.constant(new AssertCanGoBackToImpliesCanGoBackCommand()),
   fc.constant(new AssertCanGoBackToImpliesHasVisitedCommand()),
   fc.constant(new AssertHasVisitedMonotonicityCommand()),

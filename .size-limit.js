@@ -100,19 +100,19 @@ export default [
   {
     name: "@real-router/navigation-plugin (ESM)",
     path: "packages/navigation-plugin/dist/esm/index.mjs",
-    limit: "3.1 kB",
+    limit: "3.5 kB",
     ignore: ["@real-router/core"],
   },
   {
     name: "@real-router/browser-plugin (ESM)",
     path: "packages/browser-plugin/dist/esm/index.mjs",
-    limit: "2.6 kB",
+    limit: "3 kB",
     ignore: ["@real-router/core"],
   },
   {
     name: "@real-router/hash-plugin (ESM)",
     path: "packages/hash-plugin/dist/esm/index.mjs",
-    limit: "2.6 kB",
+    limit: "3 kB",
     ignore: ["@real-router/core"],
   },
   {

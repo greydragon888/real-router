@@ -1,0 +1,33 @@
+{
+  "name": "electron-react-hash-example",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "concurrently -k \"vite\" \"wait-on tcp:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron dist-electron/main.js\"",
+    "build": "vite build && tsc -p electron/tsconfig.json",
+    "start": "electron dist-electron/main.js",
+    "preview": "vite preview",
+    "test:e2e": "pnpm build && playwright test"
+  },
+  "dependencies": {
+    "@real-router/core": "workspace:^",
+    "@real-router/hash-plugin": "workspace:^",
+    "@real-router/react": "workspace:^",
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.58.2",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "5.2.0",
+    "concurrently": "9.1.0",
+    "cross-env": "7.0.3",
+    "electron": "41.2.2",
+    "typescript": "5.8.3",
+    "vite": "7.3.2",
+    "wait-on": "8.0.1"
+  }
+}

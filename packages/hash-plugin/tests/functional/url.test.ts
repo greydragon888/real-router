@@ -110,16 +110,12 @@ describe("Hash Plugin — URL Operations", () => {
         });
       });
 
-      it("returns undefined for invalid protocol", () => {
-        const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
-        const state = router.matchUrl("file:///home/user/file.html");
-
-        expect(state).toBeUndefined();
-        expect(consoleSpy).toHaveBeenCalledWith(
-          expect.stringContaining("Invalid URL protocol"),
+      it("parses file:// URLs — returns undefined when hash does not match route", () => {
+        const state = router.matchUrl(
+          "file:///home/user/file.html#/nonexistent",
         );
 
-        consoleSpy.mockRestore();
+        expect(state).toBeUndefined();
       });
 
       it("returns undefined when hash does not match any route", () => {
@@ -161,6 +157,57 @@ describe("Hash Plugin — URL Operations", () => {
         expect(first!.name).toBe("home");
         expect(second!.name).toBe("users.list");
       });
+
+      it("prefix-only hash '#!' resolves to index route when hashPrefix matches", () => {
+        router.usePlugin(
+          hashPluginFactory(
+            { hashPrefix: "!" },
+            createMockedBrowser(noop, "!"),
+          ),
+        );
+
+        const state = router.matchUrl("https://example.com/#!");
+
+        expect(withoutMeta(state!)).toStrictEqual({
+          name: "index",
+          params: {},
+          path: "/",
+        });
+      });
+
+      it("bare '#' resolves to index route even when hashPrefix is configured (#504)", () => {
+        router.usePlugin(
+          hashPluginFactory(
+            { hashPrefix: "!" },
+            createMockedBrowser(noop, "!"),
+          ),
+        );
+
+        const state = router.matchUrl("https://example.com/#");
+
+        expect(withoutMeta(state!)).toStrictEqual({
+          name: "index",
+          params: {},
+          path: "/",
+        });
+      });
+
+      it("URL without hash resolves to index route when hashPrefix is configured (#504)", () => {
+        router.usePlugin(
+          hashPluginFactory(
+            { hashPrefix: "!" },
+            createMockedBrowser(noop, "!"),
+          ),
+        );
+
+        const state = router.matchUrl("https://example.com/");
+
+        expect(withoutMeta(state!)).toStrictEqual({
+          name: "index",
+          params: {},
+          path: "/",
+        });
+      });
     });
 
     describe("matchUrl query param source of truth", () => {
@@ -196,6 +243,7 @@ describe("Hash Plugin — URL Operations", () => {
         );
 
         expect(state?.path).toBe("/users/list");
+        expect(state?.path).not.toContain("??");
       });
     });
   });

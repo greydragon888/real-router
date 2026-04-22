@@ -120,6 +120,7 @@
     "onlyBuiltDependencies": [
       "@parcel/watcher",
       "core-js",
+      "electron",
       "esbuild",
       "fsevents",
       "lmdb",

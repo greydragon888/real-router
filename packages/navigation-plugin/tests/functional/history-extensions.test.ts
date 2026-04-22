@@ -109,27 +109,31 @@ describe("Navigation Plugin — History Extensions", () => {
       expect(result?.name).not.toBe("deleted.route");
     });
 
-    it("returns undefined when previous entry URL is malformed (safeParseUrl returns null)", () => {
+    it("returns undefined when previous entry URL path does not match any route", () => {
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       router.stop();
       unsubscribe?.();
 
-      // eslint-disable-next-line sonarjs/no-clear-text-protocols -- test payload: plugin must tolerate http/ftp URLs without throwing
+      // eslint-disable-next-line sonarjs/no-clear-text-protocols -- test payload: plugin must tolerate arbitrary schemes (Electron/Tauri ship custom protocols)
       const currentEntry = { index: 1, key: "k1", url: "http://x/home" };
-      // eslint-disable-next-line sonarjs/no-clear-text-protocols -- test payload: malformed ftp URL triggers safeParseUrl null path
-      const malformedEntry = { index: 0, key: "k0", url: "ftp://x/bad" };
+      // Arbitrary scheme with a path that doesn't match any route in the fixture.
+      // eslint-disable-next-line sonarjs/no-clear-text-protocols -- test payload: scheme is irrelevant; only the path matters for routing
+      const unknownPathEntry = { index: 0, key: "k0", url: "ftp://x/bad" };
 
-      const malformedBrowser: NavigationBrowser = {
+      const unknownPathBrowser: NavigationBrowser = {
         ...browser,
         currentEntry: currentEntry as unknown as NavigationHistoryEntry,
         entries: () =>
-          [malformedEntry, currentEntry] as unknown as NavigationHistoryEntry[],
+          [
+            unknownPathEntry,
+            currentEntry,
+          ] as unknown as NavigationHistoryEntry[],
       };
 
       router = createRouter(routerConfig, { defaultRoute: "home" });
       unsubscribe = router.usePlugin(
-        navigationPluginFactory({}, malformedBrowser),
+        navigationPluginFactory({}, unknownPathBrowser),
       );
 
       expect(router.peekBack()).toBeUndefined();
@@ -389,7 +393,7 @@ describe("Navigation Plugin — History Extensions", () => {
       );
     });
 
-    it("throws when entry URL is a non-HTTP protocol (safeParseUrl returns null)", async () => {
+    it("throws when entry URL path does not match the requested route", async () => {
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       await router.start();
@@ -398,14 +402,17 @@ describe("Navigation Plugin — History Extensions", () => {
 
       const entries = browser.entries();
       const userListEntry = entries[1];
-      const entryWithBadProtocol = Object.assign(
+      const entryWithUnknownPath = Object.assign(
         Object.create(Object.getPrototypeOf(userListEntry)),
         userListEntry,
+        // Arbitrary scheme (Tauri/Electron custom protocols are now accepted by
+        // safeParseUrl); the path /evil doesn't match the users.list route.
+
         { url: "ftp://example.com/evil" },
       );
 
       vi.spyOn(historyExtensions, "findLastEntryForRoute").mockReturnValue(
-        entryWithBadProtocol as NavigationHistoryEntry,
+        entryWithUnknownPath as NavigationHistoryEntry,
       );
 
       await expect(router.traverseToLast("users.list")).rejects.toThrow(

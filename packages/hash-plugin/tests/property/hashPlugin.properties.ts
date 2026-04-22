@@ -12,6 +12,7 @@ import {
   createHashRouter,
   NUM_RUNS,
 } from "./helpers";
+import { normalizeBase } from "../../src/browser-env";
 import { createHashPrefixRegex, extractHashPath } from "../../src/hash-utils";
 
 // =============================================================================
@@ -312,6 +313,26 @@ describe("empty-hash fallback: extractHashPath returns '/' when hash has no path
       expect(path).toBe("/");
     },
   );
+
+  test.prop([arbHashPrefix], { numRuns: NUM_RUNS.standard })(
+    "bare '#' yields '/' regardless of configured prefix (#504)",
+    (prefix: string) => {
+      const regex = createHashPrefixRegex(prefix);
+      const path = extractHashPath("#", regex);
+
+      expect(path).toBe("/");
+    },
+  );
+
+  test.prop([arbHashPrefix], { numRuns: NUM_RUNS.standard })(
+    "empty hash '' yields '/' regardless of configured prefix (#504)",
+    (prefix: string) => {
+      const regex = createHashPrefixRegex(prefix);
+      const path = extractHashPath("", regex);
+
+      expect(path).toBe("/");
+    },
+  );
 });
 
 // =============================================================================
@@ -531,6 +552,77 @@ describe("query collision: inner hash query is source of truth", () => {
       expect(state!.params.outer).toBeUndefined();
 
       router.stop();
+    },
+  );
+});
+
+// =============================================================================
+// Idempotence: extractHashPath applied to its own output is stable
+// =============================================================================
+
+describe("idempotence: extractHashPath is stable under its own output", () => {
+  test.prop([arbHashPrefix, arbSimpleRouteName], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "extractHashPath(buildUrl-hash, regex) re-wrapped with '#' yields the same path (null regex branch)",
+    (_hashPrefix: string, routeName: string) => {
+      // For null-regex branch: re-extract after wrapping with '#'
+      const router = createHashRouter("");
+      const url = router.buildUrl(routeName, {});
+      const hash = url.slice(url.indexOf("#"));
+      const first = extractHashPath(hash, null);
+      const second = extractHashPath(`#${first}`, null);
+
+      expect(second).toBe(first);
+
+      router.stop();
+    },
+  );
+
+  test.prop([fc.string()], { numRuns: NUM_RUNS.standard })(
+    "extractHashPath(arbitrary-string, null) is idempotent when re-wrapped",
+    (raw: string) => {
+      const first = extractHashPath(raw, null);
+      // Re-wrap with '#' to turn the path back into a valid hash form.
+      const second = extractHashPath(`#${first}`, null);
+
+      expect(second).toBe(first);
+    },
+  );
+});
+
+// =============================================================================
+// Idempotence: normalizeBase(normalizeBase(x)) === normalizeBase(x)
+// =============================================================================
+
+describe("idempotence: normalizeBase is a projection", () => {
+  test.prop([arbRawBase], { numRuns: NUM_RUNS.standard })(
+    "normalizeBase(normalizeBase(base)) === normalizeBase(base) for fixture bases",
+    (base: string) => {
+      const once = normalizeBase(base);
+      const twice = normalizeBase(once);
+
+      expect(twice).toBe(once);
+    },
+  );
+
+  test.prop(
+    [
+      fc
+        .string({ minLength: 0, maxLength: 20 })
+        // Drop bases that safeBaseRule would reject — validation is out of scope.
+        // eslint-disable-next-line no-control-regex -- reject control chars
+        .filter((s) => !/[ -]/.test(s))
+        .filter((s) => !s.split("/").includes("..")),
+    ],
+    { numRuns: NUM_RUNS.standard },
+  )(
+    "normalizeBase is idempotent for arbitrary strings that pass safeBaseRule",
+    (base: string) => {
+      const once = normalizeBase(base);
+      const twice = normalizeBase(once);
+
+      expect(twice).toBe(once);
     },
   );
 });

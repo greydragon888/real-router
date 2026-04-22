@@ -74,7 +74,7 @@ export const arbLeafRoute: fc.Arbitrary<string> = fc.constantFrom(
 /**
  * Arbitrary: alphanumeric ID param for `users.view`.
  * URL-safe characters — encode as identity, so the roundtrip is purely
- * about the Browser URL API path extraction (safeParseUrl → new URL()).
+ * about the Browser URL API path extraction (safeParseUrl manual parser).
  */
 export const arbIdParam: fc.Arbitrary<{ id: string }> = fc.record({
   id: fc.stringMatching(/^[a-zA-Z0-9_-]{1,10}$/),
@@ -87,10 +87,17 @@ export const arbIdParam: fc.Arbitrary<{ id: string }> = fc.record({
  * Used in P3/P4 (base inclusion and roundtrip) where we want a clean,
  * predictable base without testing normalization itself.
  *
- * Expanded beyond simple letters to include URL-safe punctuation
- * (`.`, `-`, `_`, digits) and multi-segment paths — all of which
- * appear in real-world deployments (`/app.v2`, `/my-app`, `/v2/api`).
+ * Combines a curated fixed list of real-world shapes (`/app.v2`, `/my-app`,
+ * `/v2/api`) with a generator for deep-nested bases (2–5 segments) to
+ * exercise path handling beyond one or two levels.
  */
+const arbDeepBase: fc.Arbitrary<string> = fc
+  .array(fc.stringMatching(/^[a-z][a-z0-9._-]{0,5}$/), {
+    minLength: 2,
+    maxLength: 5,
+  })
+  .map((segments) => `/${segments.join("/")}`);
+
 export const arbNormalizedBase: fc.Arbitrary<string> = fc.oneof(
   fc.constant(""),
   fc.constantFrom(
@@ -105,6 +112,7 @@ export const arbNormalizedBase: fc.Arbitrary<string> = fc.oneof(
     "/under_score",
     "/mixed-name.v1",
   ),
+  arbDeepBase,
 );
 
 /**
@@ -127,15 +135,34 @@ export const arbUnsafeIdParam: fc.Arbitrary<{ id: string }> = fc.record({
 });
 
 // --- P6: Query string resilience ---
+//
+// Three value shapes mirror real-world query strings:
+//   - alphanumeric (baseline)
+//   - percent-encoded (encodeURIComponent-safe values with space/`&`/`=`)
+//   - empty values (`?key=`) that real routers must tolerate
+// Keys are filtered to never be `id` (reserved for the `users.view` route).
+
+const arbQueryKey: fc.Arbitrary<string> = fc
+  .stringMatching(/^[a-z]{1,6}$/)
+  .filter((k) => k !== "id");
+
+const arbAlphaValue: fc.Arbitrary<string> =
+  fc.stringMatching(/^[a-zA-Z0-9=]{1,8}$/);
+
+const arbEncodedValue: fc.Arbitrary<string> = fc
+  .string({ minLength: 0, maxLength: 8 })
+  .map((raw) => encodeURIComponent(raw));
+
+const arbEmptyValue: fc.Arbitrary<string> = fc.constant("");
+
+const arbQueryValue: fc.Arbitrary<string> = fc.oneof(
+  arbAlphaValue,
+  arbEncodedValue,
+  arbEmptyValue,
+);
 
 export const arbQueryString: fc.Arbitrary<string> = fc
-  .array(
-    fc.tuple(
-      fc.stringMatching(/^[a-z]{1,6}$/).filter((k) => k !== "id"),
-      fc.stringMatching(/^[a-zA-Z0-9=]{1,8}$/),
-    ),
-    { minLength: 1, maxLength: 3 },
-  )
+  .array(fc.tuple(arbQueryKey, arbQueryValue), { minLength: 1, maxLength: 3 })
   .map((pairs) => pairs.map(([k, v]) => `${k}=${v}`).join("&"));
 
 // --- extractPath arbitrary paths ---

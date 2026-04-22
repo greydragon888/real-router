@@ -18,6 +18,12 @@ describe("N10: replaceHistoryState during active transition", () => {
 
     await router.start();
 
+    // Intent: both `target` and `other` are declared routes, so
+    // replaceHistoryState MUST NOT throw. A throw during an active transition
+    // would indicate a state-machine/sync-flag regression — fail the test
+    // instead of silently swallowing it.
+    let replaceThrew = 0;
+
     for (let i = 0; i < 50; i++) {
       // Alternate between two routes
       const target = i % 2 === 0 ? "users.list" : "home";
@@ -28,11 +34,10 @@ describe("N10: replaceHistoryState during active transition", () => {
       // Fire browser navigate event to a different route
       mockNav.navigate(`http://localhost${router.buildPath(other)}`);
 
-      // Before the transition completes, call replaceHistoryState
       try {
         router.replaceHistoryState(target);
       } catch {
-        // May throw during transition — that's acceptable
+        replaceThrew++;
       }
 
       await waitForTransitions();
@@ -43,6 +48,8 @@ describe("N10: replaceHistoryState during active transition", () => {
       expect(state).toBeDefined();
       expect(["home", "users.list", "index"]).toContain(state!.name);
     }
+
+    expect(replaceThrew).toBe(0);
 
     // Entries should not grow unbounded
     const entries = mockNav.entries();
@@ -58,18 +65,24 @@ describe("N10: replaceHistoryState during active transition", () => {
 
     await router.start();
 
+    let replaceThrew = 0;
+
     for (let i = 0; i < 50; i++) {
       const navigatePromise = router.navigate("users.list");
 
       try {
         router.replaceHistoryState("home");
       } catch {
-        // Acceptable during transition
+        replaceThrew++;
       }
 
       await navigatePromise;
       await router.navigate("home");
     }
+
+    // Both "home" and "users.list" are valid routes: replaceHistoryState
+    // must never throw, not even while a transition is in flight.
+    expect(replaceThrew).toBe(0);
 
     const state = router.getState();
 

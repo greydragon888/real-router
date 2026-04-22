@@ -4,12 +4,12 @@
 
 ## Index Bounds
 
-| #   | Invariant    | Description                                                                                                  |
-| --- | ------------ | ------------------------------------------------------------------------------------------------------------ |
-| 1   | Empty state  | When no navigations have occurred (after stop or before start), `#index === -1` and `#entries.length === 0`. |
-| 2   | Valid bounds | After any sequence of operations, `#index === -1` (empty) or `0 <= #index < #entries.length`.                |
-| 3   | canGoBack    | `canGoBack()` returns `true` if and only if `#index > 0`.                                                    |
-| 4   | canGoForward | `canGoForward()` returns `true` if and only if `#index < #entries.length - 1`.                               |
+| #   | Invariant    | Description                                                                                                                               |
+| --- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Empty state  | When no navigations have occurred (after stop or before start), `#index === -1` and `#entries.length === 0`.                              |
+| 2   | Valid bounds | After any sequence of operations, `#index === -1` (empty) or `0 <= #index < #entries.length`.                                             |
+| 3   | canGoBack    | `canGoBack()` returns `true` **if and only if** `#index > 0` (strict bi-implication — verified for every action in an action sequence).   |
+| 4   | canGoForward | `canGoForward()` returns `true` **if and only if** `#index < #entries.length - 1` (strict bi-implication — indirectly via invariant #3).  |
 
 ## History Size
 
@@ -33,9 +33,19 @@
 | --- | ----------- | ----------------------------------------------------------------------------------------------- |
 | 11  | Stop resets | After `router.stop()`, `#entries.length === 0` and `#index === -1`. Extensions remain callable. |
 
+## State Context (`state.context.memory`)
+
+| #   | Invariant                  | Description                                                                                                                                                                                                                                     |
+| --- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 12  | Push direction             | Every successful non-history navigation (including the first push from `router.start()`) writes `state.context.memory.direction === "navigate"`.                                                                                                 |
+| 13  | Cap=1 idempotency          | With `maxHistoryLength === 1`, after any action sequence `canGoBack()` and `canGoForward()` are always `false` and `state.context.memory.historyIndex === 0`.                                                                                    |
+| 14  | Back/forward round-trip    | For pushes of distinct paths without guards, `N × back()` followed by `N × forward()` lands on the same `path` as before the first `back()`. (Exception: the `entry.path === currentState.path` short-circuit — see [#508].)                      |
+
+[#508]: https://github.com/greydragon888/real-router/issues/508
+
 ## Test Files
 
-| File                                        | Invariants | Category                               |
-| ------------------------------------------- | ---------- | -------------------------------------- |
-| `tests/property/memoryPlugin.properties.ts` | 1–11       | Index bounds, history size, navigation |
-| `tests/property/helpers.ts`                 | —          | Shared arbitraries and router factory  |
+| File                                        | Invariants | Category                                         |
+| ------------------------------------------- | ---------- | ------------------------------------------------ |
+| `tests/property/memoryPlugin.properties.ts` | 1–14       | Index bounds, history size, navigation, context  |
+| `tests/property/helpers.ts`                 | —          | Shared arbitraries and router factory            |

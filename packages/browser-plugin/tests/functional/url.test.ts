@@ -1,4 +1,4 @@
-import { createRouter } from "@real-router/core";
+import { createRouter, UNKNOWN_ROUTE } from "@real-router/core";
 import {
   describe,
   beforeAll,
@@ -128,17 +128,10 @@ describe("Browser Plugin — URL", () => {
         expect(state).toBeUndefined();
       });
 
-      it("returns undefined for invalid URL protocol (graceful)", async () => {
-        const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
-
-        const state = router.matchUrl("not-a-valid-url://example.com");
+      it("parses custom-scheme URLs and returns undefined for non-matching path", async () => {
+        const state = router.matchUrl("not-a-valid-url://example.com/bogus");
 
         expect(state).toBeUndefined();
-        expect(consoleSpy).toHaveBeenCalledWith(
-          expect.stringContaining("Invalid URL protocol"),
-        );
-
-        consoleSpy.mockRestore();
       });
 
       it("strips base from URL", async () => {
@@ -166,57 +159,15 @@ describe("Browser Plugin — URL", () => {
     });
   });
 
-  describe("URL parsing error (lines 180-182)", () => {
-    it("handles URL constructor throwing (lines 180-182)", async () => {
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
-
-      router.usePlugin(browserPluginFactory({}, mockedBrowser));
-
-      // Mock URL constructor to throw
-      const OriginalURL = globalThis.URL;
-
-      vi.stubGlobal(
-        "URL",
-        class extends OriginalURL {
-          constructor(url: string | URL, base?: string | URL) {
-            if (url === "throw://error") {
-              throw new Error("URL parse error");
-            }
-
-            super(url, base);
-          }
-        },
-      );
-
-      const state = router.matchUrl("throw://error");
-
-      expect(state).toBeUndefined();
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Could not parse url"),
-        expect.any(Error),
-      );
-
-      vi.unstubAllGlobals();
-      consoleSpy.mockRestore();
-    });
-  });
-
   describe("URL Parsing Edge Cases", () => {
     beforeEach(async () => {
       router.usePlugin(browserPluginFactory({}, mockedBrowser));
     });
 
-    it("handles file: protocol gracefully", async () => {
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
-
+    it("handles file: protocol — parses path, returns undefined for non-matching route", async () => {
       const state = router.matchUrl("file:///home/user/file.html");
 
       expect(state).toBeUndefined();
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Invalid URL protocol"),
-      );
-
-      consoleSpy.mockRestore();
     });
 
     it("handles encoded special characters in params", async () => {
@@ -224,7 +175,6 @@ describe("Browser Plugin — URL", () => {
         "https://example.com/users/view/John%20Doe",
       );
 
-      expect(state).toBeDefined();
       expect(state?.params.id).toBe("John Doe");
     });
 
@@ -325,7 +275,6 @@ describe("Browser Plugin — URL", () => {
       const state = router.matchUrl("https://example.com/app/users/list");
 
       // After normalization: "app" → "/app", so matching now works!
-      expect(state).toBeDefined();
       expect(state?.name).toBe("users.list");
     });
 
@@ -429,7 +378,6 @@ describe("Browser Plugin — URL", () => {
       const state = router.matchUrl(fullUrl);
 
       // Should decode back to original (route-node handles this)
-      expect(state).toBeDefined();
       expect(state?.params.id).toBe(testId);
     });
 
@@ -565,10 +513,9 @@ describe("Browser Plugin — URL", () => {
       await router.navigate("users.view", { id: "42" });
 
       // history.state should contain the core state fields
-      expect(currentHistoryState).toBeDefined();
-      expect(currentHistoryState!.name).toBe("users.view");
-      expect(currentHistoryState!.params).toStrictEqual({ id: "42" });
-      expect(currentHistoryState!.path).toBe("/users/view/42");
+      expect(currentHistoryState?.name).toBe("users.view");
+      expect(currentHistoryState?.params).toStrictEqual({ id: "42" });
+      expect(currentHistoryState?.path).toBe("/users/view/42");
     });
 
     it("updates history.state on each navigation", async () => {
@@ -619,7 +566,6 @@ describe("Browser Plugin — URL", () => {
         "https://example.com/users/42/posts/99",
       );
 
-      expect(state).toBeDefined();
       expect(state?.name).toBe("users.posts");
       expect(state?.params).toStrictEqual({ userId: "42", postId: "99" });
     });
@@ -677,7 +623,10 @@ describe("Browser Plugin — URL", () => {
 
           await realRouter.start();
 
-          expect(realRouter.getState()).toBeDefined();
+          // The truncated path doesn't match any route, so the router falls back
+          // to UNKNOWN_ROUTE. The point of this test is the warn-and-continue
+          // behavior of safelyEncodePath, not the route resolution.
+          expect(realRouter.getState()?.name).toBe(UNKNOWN_ROUTE);
           expect(warnSpy).toHaveBeenCalledWith(
             expect.stringContaining("Could not encode path"),
             expect.any(URIError),

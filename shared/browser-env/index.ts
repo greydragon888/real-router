@@ -16,7 +16,11 @@ export {
   createHistoryFallbackBrowser,
 } from "./ssr-fallback.js";
 
-export { getRouteFromEvent, updateBrowserState } from "./popstate-utils.js";
+export {
+  getRouteFromEvent,
+  updateBrowserState,
+  createUpdateBrowserState,
+} from "./popstate-utils.js";
 
 export {
   createOptionsValidator,
@@ -37,6 +41,7 @@ export {
 export type {
   PopstateHandlerDeps,
   PopstateLifecycleDeps,
+  PopstateTransitionOptions,
 } from "./popstate-handler.js";
 
 export {

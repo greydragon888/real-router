@@ -14,7 +14,15 @@ import {
   arbNonMatchingPath,
   createPluginRouter,
 } from "./helpers";
-import { extractPath } from "../../src/browser-env";
+import {
+  buildUrl,
+  extractPath,
+  normalizeBase,
+  safeParseUrl,
+  shouldReplaceHistory,
+} from "../../src/browser-env";
+
+import type { NavigationOptions, State } from "@real-router/core";
 
 describe("Browser Plugin URL Invariants", () => {
   describe("URL Roundtrip (no base)", () => {
@@ -26,8 +34,7 @@ describe("Browser Plugin URL Invariants", () => {
         const url = router.buildUrl(name);
         const state = router.matchUrl(url);
 
-        expect(state).toBeDefined();
-        expect(state!.name).toBe(name);
+        expect(state?.name).toBe(name);
       },
     );
 
@@ -37,9 +44,8 @@ describe("Browser Plugin URL Invariants", () => {
         const url = router.buildUrl(PARAM_ROUTE_NAME, params);
         const state = router.matchUrl(url);
 
-        expect(state).toBeDefined();
-        expect(state!.name).toBe(PARAM_ROUTE_NAME);
-        expect(state!.params.id).toBe(params.id);
+        expect(state?.name).toBe(PARAM_ROUTE_NAME);
+        expect(state?.params.id).toBe(params.id);
       },
     );
 
@@ -97,8 +103,7 @@ describe("Browser Plugin URL Invariants", () => {
         const url = router.buildUrl(name);
         const state = router.matchUrl(url);
 
-        expect(state).toBeDefined();
-        expect(state!.name).toBe(name);
+        expect(state?.name).toBe(name);
       },
     );
 
@@ -111,9 +116,8 @@ describe("Browser Plugin URL Invariants", () => {
         const url = router.buildUrl(PARAM_ROUTE_NAME, params);
         const state = router.matchUrl(url);
 
-        expect(state).toBeDefined();
-        expect(state!.name).toBe(PARAM_ROUTE_NAME);
-        expect(state!.params.id).toBe(params.id);
+        expect(state?.name).toBe(PARAM_ROUTE_NAME);
+        expect(state?.params.id).toBe(params.id);
       },
     );
   });
@@ -152,8 +156,7 @@ describe("Browser Plugin URL Invariants", () => {
         const url = router.buildUrl(name);
         const state = router.matchUrl(`${url}?${qs}`);
 
-        expect(state).toBeDefined();
-        expect(state!.name).toBe(name);
+        expect(state?.name).toBe(name);
       },
     );
 
@@ -163,9 +166,8 @@ describe("Browser Plugin URL Invariants", () => {
         const url = router.buildUrl(PARAM_ROUTE_NAME, params);
         const state = router.matchUrl(`${url}?${qs}`);
 
-        expect(state).toBeDefined();
-        expect(state!.name).toBe(PARAM_ROUTE_NAME);
-        expect(state!.params.id).toBe(params.id);
+        expect(state?.name).toBe(PARAM_ROUTE_NAME);
+        expect(state?.params.id).toBe(params.id);
       },
     );
   });
@@ -238,6 +240,146 @@ describe("Browser Plugin URL Invariants", () => {
         expect(state).toBeUndefined();
       },
     );
+  });
+
+  describe("Pure helpers — math invariants", () => {
+    describe("safeParseUrl", () => {
+      test.prop([fc.string({ minLength: 0, maxLength: 200 })], {
+        numRuns: 2000,
+      })(
+        "is total: never throws and returns string-typed fields for any input",
+        (url) => {
+          const r = safeParseUrl(url);
+
+          expect(typeof r.pathname).toBe("string");
+          expect(typeof r.search).toBe("string");
+          expect(typeof r.hash).toBe("string");
+        },
+      );
+
+      test.prop(
+        [fc.stringMatching(/^\/[a-z]{0,6}(\?[a-z=&]{0,8})?(#[a-z]{0,6})?$/)],
+        { numRuns: 500 },
+      )("pathname + search + hash === input for scheme-less paths", (url) => {
+        const { pathname, search, hash } = safeParseUrl(url);
+
+        expect(pathname + search + hash).toBe(url);
+      });
+    });
+
+    describe("extractPath", () => {
+      test.prop([arbUrlPath], { numRuns: 500 })(
+        "is idempotent with empty base",
+        (p) => {
+          expect(extractPath(extractPath(p, ""), "")).toBe(extractPath(p, ""));
+        },
+      );
+    });
+
+    describe("buildUrl", () => {
+      test.prop(
+        [
+          fc
+            .stringMatching(/^\/[a-z0-9/]{0,20}$/)
+            .filter((p) => !p.endsWith("/") || p === "/"),
+          arbNormalizedBase,
+        ],
+        { numRuns: 500 },
+      )(
+        "always produces a URL that starts with base (or '/' when base empty)",
+        (path, base) => {
+          const url = buildUrl(path, base);
+
+          if (base.length > 0) {
+            expect(url.startsWith(base)).toBe(true);
+          } else {
+            expect(url.startsWith("/")).toBe(true);
+          }
+        },
+      );
+
+      test.prop([arbUrlPath, arbNormalizedBase], { numRuns: 500 })(
+        "composition: extractPath(buildUrl(path, base), base) === path for leading-slash paths",
+        (path, base) => {
+          fc.pre(path.startsWith("/"));
+
+          expect(extractPath(buildUrl(path, base), base)).toBe(path);
+        },
+      );
+    });
+
+    describe("normalizeBase", () => {
+      test.prop([fc.string({ minLength: 0, maxLength: 50 })], { numRuns: 500 })(
+        "is idempotent: normalizeBase(normalizeBase(x)) === normalizeBase(x)",
+        (x) => {
+          const once = normalizeBase(x);
+
+          expect(normalizeBase(once)).toBe(once);
+        },
+      );
+
+      test.prop([fc.string({ minLength: 0, maxLength: 50 })], { numRuns: 500 })(
+        "produces canonical form: empty OR leading slash, no trailing slash, no '//' runs",
+        (x) => {
+          const r = normalizeBase(x);
+
+          if (r === "") {
+            return;
+          }
+
+          expect(r.startsWith("/")).toBe(true);
+          expect(r.endsWith("/")).toBe(false);
+          expect(r).not.toContain("//");
+        },
+      );
+    });
+
+    describe("shouldReplaceHistory — truth table", () => {
+      const arbNavOptions: fc.Arbitrary<NavigationOptions> = fc.record(
+        {
+          replace: fc.option(fc.boolean(), { nil: undefined }),
+          reload: fc.option(fc.boolean(), { nil: undefined }),
+        },
+        { requiredKeys: [] },
+      );
+
+      const arbStubState: fc.Arbitrary<State> = fc.constantFrom("/a", "/b").map(
+        (path) =>
+          ({
+            path,
+            name: "stub",
+            params: {},
+            transition: undefined,
+            context: {},
+          }) as unknown as State,
+      );
+
+      test.prop(
+        [
+          arbNavOptions,
+          arbStubState,
+          fc.option(arbStubState, { nil: undefined }),
+        ],
+        { numRuns: 1000 },
+      )(
+        "matches the specification: replace===true, or !fromState and replace!==false, or reload+same path",
+        (navOptions, toState, fromState) => {
+          const actual = shouldReplaceHistory(navOptions, toState, fromState);
+
+          let expected: boolean;
+
+          if (navOptions.replace === true) {
+            expected = true;
+          } else if (fromState) {
+            expected = !!navOptions.reload && toState.path === fromState.path;
+          } else {
+            expected = navOptions.replace !== false;
+          }
+
+          expect(actual).toBe(expected);
+        },
+      );
+    });
   });
 
   describe("getRouteFromEvent (via popstate)", () => {

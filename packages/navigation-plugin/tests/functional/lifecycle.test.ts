@@ -414,6 +414,16 @@ describe("Navigation Plugin — Lifecycle", () => {
         router.replaceHistoryState("definitely.nonexistent.route");
       }).toThrow("[real-router] Cannot replace state");
     });
+
+    it("preserves hash fragment — symmetric with onTransitionSuccess", async () => {
+      mockNav.navigate("http://localhost/home#anchor", { history: "replace" });
+      await router.start();
+
+      router.replaceHistoryState("users.view", { id: "123" });
+
+      expect(mockNav.currentUrl).toContain("#anchor");
+      expect(mockNav.currentUrl).toBe("http://localhost/users/view/123#anchor");
+    });
   });
 
   describe("Hash Fragment Preservation", () => {

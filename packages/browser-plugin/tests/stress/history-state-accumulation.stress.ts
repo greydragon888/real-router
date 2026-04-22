@@ -9,7 +9,7 @@ import {
   vi,
 } from "vitest";
 
-import { createStressRouter, noop } from "./helpers";
+import { createStressRouter, expectedStressError, noop } from "./helpers";
 
 import type { Router, Unsubscribe } from "@real-router/core";
 
@@ -50,7 +50,7 @@ describe("B2 — History State Accumulation", () => {
     for (let i = 0; i < 500; i++) {
       const name = i % 2 === 0 ? "home" : "users.list";
 
-      await router.navigate(name).catch(noop);
+      await router.navigate(name).catch(expectedStressError);
     }
 
     expect(pushStateSpy).toHaveBeenCalledTimes(500);
@@ -72,7 +72,9 @@ describe("B2 — History State Accumulation", () => {
     for (let i = 0; i < 500; i++) {
       const name = i % 2 === 0 ? "home" : "users.list";
 
-      await router.navigate(name, {}, { replace: true }).catch(noop);
+      await router
+        .navigate(name, {}, { replace: true })
+        .catch(expectedStressError);
     }
 
     expect(replaceStateSpy).toHaveBeenCalledTimes(500);
@@ -97,7 +99,7 @@ describe("B2 — History State Accumulation", () => {
 
       await router
         .navigate(name, {}, i % 2 === 0 ? { replace: true } : {})
-        .catch(noop);
+        .catch(expectedStressError);
     }
 
     expect(replaceStateSpy).toHaveBeenCalledTimes(250);
@@ -118,7 +120,9 @@ describe("B2 — History State Accumulation", () => {
     const replaceStateSpy = vi.spyOn(browser, "replaceState");
 
     for (let i = 0; i < 500; i++) {
-      await router.navigate("home", {}, { reload: true }).catch(noop);
+      await router
+        .navigate("home", {}, { reload: true })
+        .catch(expectedStressError);
     }
 
     expect(replaceStateSpy).toHaveBeenCalledTimes(500);
@@ -143,7 +147,7 @@ describe("B2 — History State Accumulation", () => {
     for (let i = 0; i < 200; i++) {
       const name = i % 2 === 0 ? "home" : "users.list";
 
-      await router.navigate(name).catch(noop);
+      await router.navigate(name).catch(expectedStressError);
     }
 
     expect(pushStateSpy).toHaveBeenCalledTimes(200);

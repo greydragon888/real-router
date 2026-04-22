@@ -1,4 +1,4 @@
-import { createRouter } from "@real-router/core";
+import { createRouter, errorCodes, RouterError } from "@real-router/core";
 
 import { browserPluginFactory } from "@real-router/browser-plugin";
 
@@ -8,6 +8,44 @@ import type { Browser } from "../../src/browser-env";
 import type { Router, Unsubscribe } from "@real-router/core";
 
 export const noop = (): void => undefined;
+
+/**
+ * Error codes that may be thrown during stress scenarios but are NOT bugs:
+ * - SAME_STATES: navigate() to current state during rapid-fire
+ * - CANCELLED: superseded by next navigate() (TRANSITION_CANCELLED)
+ * - ROUTE_NOT_FOUND: corrupted popstate.state (intentional in some stress tests)
+ * - NOT_STARTED: race with router.stop() during teardown (ROUTER_NOT_STARTED)
+ *
+ * Any other RouterError code OR any non-RouterError instance must surface
+ * as a test failure — silent swallowing would hide real regressions.
+ */
+const EXPECTED_STRESS_ERROR_CODES = new Set<string>([
+  errorCodes.SAME_STATES,
+  errorCodes.TRANSITION_CANCELLED,
+  errorCodes.ROUTE_NOT_FOUND,
+  errorCodes.ROUTER_NOT_STARTED,
+]);
+
+/**
+ * Catch handler for stress-test `navigate()` calls.
+ *
+ * Re-throws on:
+ * - Unexpected RouterError codes (unknown failures hidden by `.catch(noop)`)
+ * - Non-RouterError exceptions (programming errors, plugin bugs)
+ *
+ * Replaces `.catch(noop)` which silently swallowed ALL errors.
+ */
+export function expectedStressError(error: unknown): void {
+  if (error instanceof RouterError) {
+    if (!EXPECTED_STRESS_ERROR_CODES.has(error.code)) {
+      throw error;
+    }
+
+    return;
+  }
+
+  throw error;
+}
 
 export const routeConfig = [
   {

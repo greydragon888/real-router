@@ -294,5 +294,14 @@ describe("Navigation Plugin URL Invariants", () => {
         expect(result.endsWith("/")).toBe(false);
       },
     );
+
+    test.prop([arbRawBase], { numRuns: NUM_RUNS.standard })(
+      "G5: normalizeBase never contains runs of // anywhere",
+      (base) => {
+        const result = normalizeBase(base);
+
+        expect(result).not.toMatch(/\/{2,}/);
+      },
+    );
   });
 });

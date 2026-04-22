@@ -151,4 +151,88 @@ describe("Teardown Mid-Navigation (Hash)", () => {
     addSpy.mockRestore();
     removeSpy.mockRestore();
   });
+
+  it("popstate event dispatched during teardown: handler swallows buildUrl-after-teardown gracefully (M2)", async () => {
+    const { router, dispatchPopstate, unsubscribe } = createStressRouter();
+
+    await router.start();
+    await router.navigate("users.list").catch(noop);
+
+    const unhandled: unknown[] = [];
+    const listener = (event: PromiseRejectionEvent | { reason?: unknown }) => {
+      unhandled.push("reason" in event ? event.reason : event);
+    };
+
+    (globalThis as any).addEventListener?.("unhandledrejection", listener);
+
+    // Fire popstate while teardown is in flight — the handler must not throw
+    // even if router.buildUrl has already been removed from the instance.
+    dispatchPopstate({ name: "home", params: {}, path: "/home" });
+    unsubscribe();
+
+    await waitForTransitions(50);
+
+    expect(unhandled).toHaveLength(0);
+
+    (globalThis as any).removeEventListener?.("unhandledrejection", listener);
+  });
+
+  it("navigate() called after teardown: rejects but stays consistent (M8)", async () => {
+    const { router, unsubscribe } = createStressRouter();
+
+    await router.start();
+    unsubscribe();
+
+    // After teardown the plugin is gone, but the router itself is stopped by
+    // teardown; calling navigate() now must either resolve with a fresh state
+    // or reject cleanly — never throw synchronously.
+    const result = await router
+      .navigate("users.list")
+      .catch((error: unknown) => error);
+
+    expect(result).toBeDefined();
+    // Router is stopped; navigate on a stopped router should not corrupt state.
+    expect(() => router.getState()).not.toThrow();
+  });
+
+  it("replaceHistoryState called during an active transition: URL updates do not corrupt state (M3)", async () => {
+    const { router, browser, unsubscribe } = createStressRouter();
+
+    await router.start();
+
+    const replaceSpy = vi.spyOn(browser, "replaceState");
+
+    // Slow guard keeps transition in-flight during replaceHistoryState.
+    getLifecycleApi(router).addActivateGuard(
+      "users.view",
+      () => () =>
+        new Promise<boolean>((resolve) => {
+          setTimeout(() => {
+            resolve(true);
+          }, 30);
+        }),
+    );
+
+    const pending = router.navigate("users.view", { id: "1" }).catch(noop);
+
+    // Mid-flight: rewrite history state for a different route.
+    router.replaceHistoryState("home");
+
+    await pending;
+    await waitForTransitions(50);
+
+    // replaceHistoryState must have fired at least once with the "home" URL.
+    const homeCall = replaceSpy.mock.calls.find(
+      ([, url]) => typeof url === "string" && url.endsWith("/home"),
+    );
+
+    expect(homeCall).toBeDefined();
+    // Router state after navigate() resolves should be users.view (the winner
+    // of navigation), not "home" — replaceHistoryState only rewrites the URL.
+    expect(router.getState()?.name).toBe("users.view");
+
+    replaceSpy.mockRestore();
+    router.stop();
+    unsubscribe();
+  });
 });
