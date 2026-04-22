@@ -1,5 +1,53 @@
 # @real-router/hash-plugin
 
+## 0.6.0
+
+### Minor Changes
+
+- [#511](https://github.com/greydragon888/real-router/pull/511) [`12f81b4`](https://github.com/greydragon888/real-router/commit/12f81b4daeaef26e443d3ab9ad5b2cf491583d15) Thanks [@greydragon888](https://github.com/greydragon888)! - Desktop environments support (Electron, Tauri) ([#496](https://github.com/greydragon888/real-router/issues/496))
+
+  `safeParseUrl` (shared with `browser-plugin` and `navigation-plugin`) no longer depends on `globalThis.location.origin` and no longer filters by scheme. Hash routing now works uniformly in Electron `file://` mode (where `location.origin === "null"` previously caused `TypeError`), Tauri webviews, and any other webview that may ship with non-HTTP origins.
+
+  **What changed**
+  - `hashUrlToPath` now returns `string` (never `null`) — the parser is total.
+  - Scheme whitelist removed. Any URL with a hash fragment is parsed, regardless of scheme.
+
+  **Migration**
+
+  No source changes required. `hash-plugin` remains the safest option for Electron apps that cannot configure a custom protocol handler — hash routing never hits the `SecurityError` that History API triggers on `file://`.
+
+### Patch Changes
+
+- [#511](https://github.com/greydragon888/real-router/pull/511) [`12f81b4`](https://github.com/greydragon888/real-router/commit/12f81b4daeaef26e443d3ab9ad5b2cf491583d15) Thanks [@greydragon888](https://github.com/greydragon888)! - Internal refactors: filter explicit `undefined` option values and remove `router.buildUrl` indirection ([#511](https://github.com/greydragon888/real-router/issues/511))
+  - **Bug fix**: `hashPluginFactory({ hashPrefix: undefined })` now correctly falls back to the default `""` instead of producing `urlPrefix: "#undefined"`. Previously, explicit `undefined` values leaked through `{ ...defaults, ...opts }` spread because `undefined` is a legitimate enumerable own property.
+  - **Refactor**: the popstate-handler `buildUrl` callback now uses the pre-computed `pluginBuildUrl` closure directly instead of going through `router.buildUrl(name, params)` wrapper (removes one level of indirection on the error-recovery path).
+  - **Refactor**: `loggerContext` in `createPopstateHandler` now references the `LOGGER_CONTEXT` constant from `src/constants.ts` instead of a duplicated string literal.
+
+  No public API changes.
+
+- [#511](https://github.com/greydragon888/real-router/pull/511) [`12f81b4`](https://github.com/greydragon888/real-router/commit/12f81b4daeaef26e443d3ab9ad5b2cf491583d15) Thanks [@greydragon888](https://github.com/greydragon888)! - Reduce per-call allocation in `router.replaceHistoryState()` ([#470](https://github.com/greydragon888/real-router/issues/470))
+
+  Shared `createReplaceHistoryState` helper in `browser-env` now reuses a
+  mutable `{ name, params, path }` buffer via `createUpdateBrowserState()`
+  across calls instead of allocating a fresh literal per invocation. Hash
+  plugin benefits transparently — no API change.
+
+- [#511](https://github.com/greydragon888/real-router/pull/511) [`12f81b4`](https://github.com/greydragon888/real-router/commit/12f81b4daeaef26e443d3ab9ad5b2cf491583d15) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `extractHashPath("#", regex)` returning `"#"` when `hashPrefix` is configured ([#504](https://github.com/greydragon888/real-router/issues/504))
+
+  A bare `#` or empty hash now consistently resolves to `"/"` regardless of the configured `hashPrefix`. Previously, when a non-null `prefixRegex` was compiled (e.g. from `hashPrefix: "!"`), a bare `#` was returned verbatim because the regex did not match, and the `path || "/"` fallback was never triggered.
+
+  **Impact:** `router.matchUrl("https://example.com/#")` now correctly matches the index route instead of returning `undefined` when a non-empty `hashPrefix` is configured.
+
+  ```diff
+    export function extractHashPath(hash: string, prefixRegex: RegExp | null): string {
+  +   if (hash === "" || hash === "#") {
+  +     return "/";
+  +   }
+      const path = prefixRegex ? hash.replace(prefixRegex, "") : hash.slice(1);
+      return path || "/";
+    }
+  ```
+
 ## 0.5.0
 
 ### Minor Changes

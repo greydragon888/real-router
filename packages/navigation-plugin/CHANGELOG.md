@@ -1,5 +1,61 @@
 # @real-router/navigation-plugin
 
+## 0.5.0
+
+### Minor Changes
+
+- [#511](https://github.com/greydragon888/real-router/pull/511) [`12f81b4`](https://github.com/greydragon888/real-router/commit/12f81b4daeaef26e443d3ab9ad5b2cf491583d15) Thanks [@greydragon888](https://github.com/greydragon888)! - Desktop environments support (Electron, Tauri) ([#496](https://github.com/greydragon888/real-router/issues/496))
+
+  `safeParseUrl` (shared with `browser-plugin`) no longer depends on `globalThis.location.origin` and no longer filters by scheme. The plugin now works in desktop webviews with non-HTTP origins, subject to Navigation API availability (Safari 26.2+, WebKitGTK 2.52+, Chromium-based webviews).
+
+  **What changed**
+  - URL parsing is now scheme-agnostic. `matchUrl()`, `peekBack()`, `peekForward()`, `hasVisited()`, `getVisitedRoutes()`, `traverseToLast()`, `canGoBackTo()` work against any `NavigationHistoryEntry.url`, regardless of scheme.
+  - `extractPathFromAbsoluteUrl` / `urlToPath` signatures dropped the unused `context` parameter; the parser is total (always returns a string).
+
+  **Migration**
+
+  No source changes required. For developers targeting WKWebView (macOS/iOS ≤ 26.1) or WebKitGTK ≤ 2.50, prefer `@real-router/browser-plugin` — `navigation-plugin` extensions (`peekBack`, `peekForward`, `traverseToLast`, etc.) have no automatic downgrade and will throw at runtime if the Navigation API is missing.
+
+### Patch Changes
+
+- [#511](https://github.com/greydragon888/real-router/pull/511) [`12f81b4`](https://github.com/greydragon888/real-router/commit/12f81b4daeaef26e443d3ab9ad5b2cf491583d15) Thanks [@greydragon888](https://github.com/greydragon888)! - Replace `new URL()` with `safeParseUrl()` on the navigate-event hot path ([#496](https://github.com/greydragon888/real-router/issues/496))
+
+  `handleNavigateEvent` used `new URL(event.destination.url)` to extract
+  `pathname` + `search`. The `safeParseUrl` manual parser (already on the
+  hot path via `entryToState`) is 4–6× faster and allocates no `URL` object.
+
+  This removes one `URL` construction per browser-initiated navigation
+  (back/forward, link click, programmatic `navigation.navigate()`).
+  No behavior change — the Navigation API guarantees absolute URLs, and
+  `safeParseUrl` returns identical `pathname`/`search` for them.
+
+- [#511](https://github.com/greydragon888/real-router/pull/511) [`12f81b4`](https://github.com/greydragon888/real-router/commit/12f81b4daeaef26e443d3ab9ad5b2cf491583d15) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `replaceHistoryState` hash preservation and guard `isSyncingFromRouter` against stuck state ([#496](https://github.com/greydragon888/real-router/issues/496))
+
+  Two related correctness fixes in the navigation-plugin internals:
+
+  **1. `replaceHistoryState` now preserves `location.hash`** — symmetric with `onTransitionSuccess`.
+
+  ```ts
+  // URL before: /home#anchor
+  router.replaceHistoryState("users.view", { id: "123" });
+  // URL after:  /users/view/123#anchor  (hash preserved)
+  ```
+
+  This matches the behavior already documented in `CLAUDE.md` and the wiki.
+  Previously the local `createReplaceHistoryState` implementation dropped the
+  hash, while the equivalent helper in `browser-plugin` kept it — causing a
+  subtle divergence between the two plugins.
+
+  **2. `isSyncingFromRouter` is now released in a `finally` block** at all three
+  set-sites (`onTransitionSuccess`, `createReplaceHistoryState`, and the
+  navigate-error recovery path). If the internal `browser.navigate` /
+  `browser.replaceState` / `browser.traverseTo` call throws, the sync flag
+  will no longer get stuck in the `true` state, which previously caused
+  all subsequent browser-initiated navigations to be silently ignored.
+
+  This enforces invariant D4 from `INVARIANTS.md` ("isSyncingFromRouter Error
+  Recovery") — see `packages/navigation-plugin/INVARIANTS.md`.
+
 ## 0.4.0
 
 ### Minor Changes
