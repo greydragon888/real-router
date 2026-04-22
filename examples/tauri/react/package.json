@@ -1,0 +1,29 @@
+{
+  "name": "tauri-react-example",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "test:e2e": "pnpm build && playwright test"
+  },
+  "dependencies": {
+    "@real-router/browser-plugin": "workspace:^",
+    "@real-router/core": "workspace:^",
+    "@real-router/react": "workspace:^",
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.58.2",
+    "@tauri-apps/cli": "2.2.7",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "5.2.0",
+    "typescript": "5.8.3",
+    "vite": "7.3.2"
+  }
+}
