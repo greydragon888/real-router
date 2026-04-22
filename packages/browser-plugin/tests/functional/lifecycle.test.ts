@@ -273,14 +273,12 @@ describe("Browser Plugin — Lifecycle", () => {
     it("supports navigate callback", async () => {
       const state = await router.navigate("users.list", {}, {});
 
-      expect(state).toBeDefined();
       expect(state.name).toBe("users.list");
     });
 
     it("supports navigate with params and callback", async () => {
       const state = await router.navigate("users.view", { id: "1" });
 
-      expect(state).toBeDefined();
       expect(state.name).toBe("users.view");
       expect(router.getState()?.params.id).toBe("1");
     });
@@ -437,6 +435,37 @@ describe("Browser Plugin — Lifecycle", () => {
       router.usePlugin(
         browserPluginFactory({ unknownOption: "value" } as any, mockedBrowser),
       );
+    });
+  });
+
+  describe("Default browser getLocation cache (#8.2 A7)", () => {
+    it("returns the same path on repeated start when URL has not changed (cache hit)", async () => {
+      globalThis.history.replaceState({}, "", "/users/list");
+
+      router.usePlugin(browserPluginFactory());
+
+      const first = await router.start();
+
+      router.stop();
+
+      const second = await router.start();
+
+      expect(second.path).toBe(first.path);
+    });
+
+    it("recomputes when pathname changes between calls (cache miss)", async () => {
+      globalThis.history.replaceState({}, "", "/users/list");
+
+      router.usePlugin(browserPluginFactory());
+      await router.start();
+
+      router.stop();
+
+      globalThis.history.replaceState({}, "", "/home");
+
+      const second = await router.start();
+
+      expect(second.name).toBe("home");
     });
   });
 

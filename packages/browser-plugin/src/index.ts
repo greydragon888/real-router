@@ -25,6 +25,11 @@ declare module "@real-router/types" {
   interface StateContext {
     browser?: import("./types").BrowserContext;
   }
+
+  interface NavigationOptions {
+    /** @internal — set by browser/hash/navigation plugins to mark transition origin. */
+    source?: string;
+  }
 }
 
 declare module "@real-router/core" {
