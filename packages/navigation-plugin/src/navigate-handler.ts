@@ -1,6 +1,6 @@
 import { errorCodes, RouterError } from "@real-router/core";
 
-import { extractPath } from "./browser-env";
+import { extractPath, safeParseUrl } from "./browser-env";
 
 import type {
   NavigationBrowser,
@@ -58,7 +58,7 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
       return;
     }
 
-    const destinationUrl = new URL(event.destination.url);
+    const destinationUrl = safeParseUrl(event.destination.url);
     const path =
       extractPath(destinationUrl.pathname, base) + destinationUrl.search;
     const matchedState = api.matchPath(path);
@@ -140,15 +140,19 @@ function recoverFromNavigateError(
       const url = router.buildUrl(currentState.name, currentState.params);
 
       setSyncing(true);
-      browser.navigate(url, {
-        state: {
-          name: currentState.name,
-          params: currentState.params,
-          path: currentState.path,
-        },
-        history: "replace",
-      });
-      setSyncing(false);
+
+      try {
+        browser.navigate(url, {
+          state: {
+            name: currentState.name,
+            params: currentState.params,
+            path: currentState.path,
+          },
+          history: "replace",
+        });
+      } finally {
+        setSyncing(false);
+      }
     }
   } catch (recoveryError) {
     console.error(

@@ -229,34 +229,36 @@ export class NavigationPlugin {
 
         this.#isSyncingFromRouter = true;
 
-        if (this.#pendingTraverseKey) {
-          this.#browser.traverseTo(this.#pendingTraverseKey);
-          this.#pendingTraverseKey = undefined;
-        } else {
-          const url = buildUrl(toState.path, this.#options.base);
-          const shouldPreserveHash =
-            !fromState || fromState.path === toState.path;
-          const hash = shouldPreserveHash ? this.#browser.getHash() : "";
-          const finalUrl = hash ? url + hash : url;
-          const historyState = {
-            name: toState.name,
-            params: toState.params,
-            path: toState.path,
-          };
-
-          if (toState.name === UNKNOWN_ROUTE) {
-            this.#browser.updateCurrentEntry({ state: historyState });
+        try {
+          if (this.#pendingTraverseKey) {
+            this.#browser.traverseTo(this.#pendingTraverseKey);
+            this.#pendingTraverseKey = undefined;
           } else {
-            const replace = navigationType !== "push";
+            const url = buildUrl(toState.path, this.#options.base);
+            const shouldPreserveHash =
+              !fromState || fromState.path === toState.path;
+            const hash = shouldPreserveHash ? this.#browser.getHash() : "";
+            const finalUrl = hash ? url + hash : url;
+            const historyState = {
+              name: toState.name,
+              params: toState.params,
+              path: toState.path,
+            };
 
-            this.#browser.navigate(finalUrl, {
-              state: historyState,
-              history: replace ? "replace" : "push",
-            });
+            if (toState.name === UNKNOWN_ROUTE) {
+              this.#browser.updateCurrentEntry({ state: historyState });
+            } else {
+              const replace = navigationType !== "push";
+
+              this.#browser.navigate(finalUrl, {
+                state: historyState,
+                history: replace ? "replace" : "push",
+              });
+            }
           }
+        } finally {
+          this.#isSyncingFromRouter = false;
         }
-
-        this.#isSyncingFromRouter = false;
       },
 
       onTransitionCancel: () => {

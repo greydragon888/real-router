@@ -43,6 +43,12 @@ describe("N6: History extensions storm", () => {
     expect(visited).toContain("home");
     expect(visited).toContain("users.list");
     expect(visited).toContain("users.view");
+    // Uniqueness: the initial "index" entry + 3 routes drove 500 navigations;
+    // getVisitedRoutes() must deduplicate. A weaker `.toContain(...)` would
+    // silently accept a regression that doubled entries (e.g., a Set → Array
+    // bug).
+    expect(visited).toHaveLength(4);
+    expect(visited).toContain("index");
 
     router.stop();
     unsubscribe();

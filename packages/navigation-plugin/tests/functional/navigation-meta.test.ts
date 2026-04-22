@@ -1,6 +1,6 @@
 import { createRouter, errorCodes } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { navigationPluginFactory } from "../../src";
 import { MockNavigation } from "../helpers/mockNavigation";
@@ -230,6 +230,18 @@ describe("Navigation Plugin — NavigationMeta", () => {
       await expect(router.navigate("users.list")).rejects.toMatchObject({
         code: errorCodes.CANNOT_ACTIVATE,
       });
+
+      // If capturedMeta were leaked from the failed users.list attempt,
+      // the next transition would inherit it. Fresh programmatic navigate
+      // must start with a newly-derived meta (navigationType: "push").
+      const state = await router.navigate("users.view", { id: "1" });
+
+      expect(state.context.navigation).toStrictEqual({
+        navigationType: "push",
+        userInitiated: false,
+        direction: "forward",
+        sourceElement: null,
+      });
     });
 
     it("capturedMeta cleared on transition cancel (superseding navigation)", async () => {
@@ -279,6 +291,19 @@ describe("Navigation Plugin — NavigationMeta", () => {
       });
 
       expect(router.getState()!.name).toBe("home");
+
+      // Observable check: if #pendingTraverseKey had leaked, the next
+      // successful navigate would dispatch browser.traverseTo(stale-key)
+      // instead of browser.navigate(newUrl).
+      lifecycle.removeDeactivateGuard("home");
+
+      const traverseSpy = vi.spyOn(browser, "traverseTo");
+      const navigateSpy = vi.spyOn(browser, "navigate");
+
+      await router.navigate("users.list");
+
+      expect(traverseSpy).not.toHaveBeenCalled();
+      expect(navigateSpy).toHaveBeenCalled();
     });
   });
 

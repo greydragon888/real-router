@@ -47,7 +47,7 @@ export function createReplaceHistoryState(
       },
     );
 
-    const url = buildUrl(name, params);
+    const url = buildUrl(name, params) + browser.getHash();
     const historyState = {
       name: builtState.name,
       params: builtState.params,
@@ -55,7 +55,11 @@ export function createReplaceHistoryState(
     };
 
     setSyncing(true);
-    browser.replaceState(historyState, url);
-    setSyncing(false);
+
+    try {
+      browser.replaceState(historyState, url);
+    } finally {
+      setSyncing(false);
+    }
   };
 }

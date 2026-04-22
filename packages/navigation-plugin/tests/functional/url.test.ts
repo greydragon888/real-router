@@ -44,6 +44,17 @@ describe("extractPath", () => {
   it("returns / for exact base match", () => {
     expect(extractPath("/app", "/app")).toBe("/");
   });
+
+  // Baseline behavior doc: with a canonical base, extractPath preserves any
+  // runs of '/' inside the tail unchanged. Callers that want collapsed paths
+  // must normalize downstream (router.matchPath tolerates '//foo' as no-match).
+  it("preserves double slashes after stripping base (extractPath is not a normalizer)", () => {
+    expect(extractPath("/app//users", "/app")).toBe("//users");
+  });
+
+  it("preserves double slashes when base is empty", () => {
+    expect(extractPath("//foo", "")).toBe("//foo");
+  });
 });
 
 describe("buildUrl", () => {

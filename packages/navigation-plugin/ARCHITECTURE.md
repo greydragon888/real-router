@@ -34,7 +34,8 @@ navigation-plugin/
 │   ├── ssr-fallback.ts        — createNavigationFallbackBrowser (no-op fallback for SSR)
 │   ├── validation.ts          — Options validation (delegates to browser-env)
 │   ├── constants.ts           — Constants (defaultOptions, source, LOGGER_CONTEXT)
-│   └── browser-env/           — Symlink → shared/browser-env (extractPath, buildUrl, urlToPath, shouldReplaceHistory, etc.)
+│   ├── validation.ts          — Options validation (delegates to browser-env)
+│   └── browser-env/           — Symlink → shared/browser-env (extractPath, buildUrl, urlToPath, safeParseUrl, shouldReplaceHistory, etc.)
 ```
 
 ## Module Dependency Graph
@@ -55,7 +56,8 @@ index.ts
             ├── ssr-fallback.ts
             │       └── browser-env (createWarnOnce)
             ├── validation.ts
-            │       └── constants.ts
+            │       ├── constants.ts
+            │       └── browser-env (createOptionsValidator, safeBaseRule)
             ├── constants.ts
             └── browser-env (isBrowserEnvironment, normalizeBase)
 
@@ -68,7 +70,7 @@ External dependencies:
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | `@real-router/core`  | `getPluginApi`, types (`Router`, `PluginApi`, `State`, `Plugin`, etc.)                                                                          | `factory.ts`, `plugin.ts`, `navigate-handler.ts`, `index.ts`                              |
 | `@real-router/types` | `StateContext` interface (for module augmentation)                                                                                               | `index.ts`                                                                                |
-| `browser-env`        | `normalizeBase`, `safelyEncodePath`, `safeParseUrl`, `shouldReplaceHistory`, `isBrowserEnvironment`, `createWarnOnce`, `createOptionsValidator` | `factory.ts`, `navigation-browser.ts`, `ssr-fallback.ts`, `url-utils.ts`, `validation.ts` |
+| `browser-env`        | `normalizeBase`, `safelyEncodePath`, `safeParseUrl`, `shouldReplaceHistory`, `isBrowserEnvironment`, `createWarnOnce`, `createOptionsValidator`, `extractPath`, `buildUrl`, `urlToPath`, `extractPathFromAbsoluteUrl` | `factory.ts`, `plugin.ts`, `navigate-handler.ts`, `navigation-browser.ts`, `ssr-fallback.ts`, `validation.ts`, `history-extensions.ts` |
 
 ## Factory + Class Pattern
 
@@ -226,11 +228,7 @@ declare module "@real-router/core" {
   interface Router {
     buildUrl: (name: string, params?: Params) => string;
     matchUrl: (url: string) => State | undefined;
-    replaceHistoryState: (
-      name: string,
-      params?: Params,
-      title?: string,
-    ) => void;
+    replaceHistoryState: (name: string, params?: Params) => void;
     peekBack: () => State | undefined;
     peekForward: () => State | undefined;
     hasVisited: (routeName: string) => boolean;
@@ -423,9 +421,11 @@ The Navigation API serializes navigations via `event.intercept()`. Only one inte
 
 ## URL Utilities
 
-### url-utils.ts — pure functions
+### browser-env URL helpers — pure functions
 
-All functions in `url-utils.ts` are pure (no side effects, no direct access to globals).
+All URL helpers come from `shared/browser-env/url-utils.ts` (symlinked as
+`src/browser-env/` into this package) and are pure (no side effects, no
+direct access to globals).
 
 **`extractPath(pathname, base)`**:
 
@@ -502,12 +502,13 @@ All history extensions in `history-extensions.ts` use `entryToState()` to conver
 ```typescript
 function entryToState(entry, api, base): State | undefined {
   if (!entry?.url) return undefined;
-  const path = extractPathFromAbsoluteUrl(entry.url, base, LOGGER_CONTEXT);
-  // Returns null for malformed URLs (non-HTTP protocol, parse error) —
-  // never throws, even if a mock emits garbage into `entry.url`.
-  return path ? api.matchPath(path) ?? undefined : undefined;
+  return api.matchPath(extractPathFromAbsoluteUrl(entry.url, base)) ?? undefined;
 }
 ```
+
+`extractPathFromAbsoluteUrl` delegates to `safeParseUrl` — never throws,
+returns a string path for any input (malformed URL → best-effort path the
+matcher will then fail to resolve).
 
 Search params are **preserved** — `extractPathFromAbsoluteUrl` returns `pathname + search`, which is needed for strict `queryParamsMode` matching (#449). An entry like `/users?filter=active` is matched against routes declaring `?filter`; entries with undeclared search params fail the match.
 
