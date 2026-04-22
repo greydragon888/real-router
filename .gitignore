@@ -6,6 +6,9 @@ dist
 packages/**/dist
 packages/*/modules/**/*.js
 packages/*/tests/**/*.js
+examples/**/dist-electron
+examples/**/src-tauri/target
+examples/**/src-tauri/gen/schemas
 
 # TypeScript compiled artifacts
 *.tsbuildinfo
