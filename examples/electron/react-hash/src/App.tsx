@@ -1,4 +1,4 @@
-import { useRoute } from "@real-router/react";
+import { RouteView } from "@real-router/react";
 
 import { Dashboard } from "./pages/Dashboard";
 import { Home } from "./pages/Home";
@@ -18,16 +18,32 @@ const links = [
 ];
 
 export function App(): JSX.Element {
-  const { route } = useRoute();
-
   return (
     <Layout title="Real-Router — Electron + hash-plugin" links={links}>
-      {route?.name === "home" && <Home />}
-      {route?.name === "dashboard" && <Dashboard />}
-      {route?.name === "settings" && <Settings />}
-      {route?.name === "users" && <UsersList />}
-      {route?.name === "users.user" && <UserDetail />}
-      {route?.name === "users.user.edit" && <UserEdit />}
+      <RouteView nodeName="">
+        <RouteView.Match segment="home" exact>
+          <Home />
+        </RouteView.Match>
+        <RouteView.Match segment="dashboard" exact>
+          <Dashboard />
+        </RouteView.Match>
+        <RouteView.Match segment="settings" exact>
+          <Settings />
+        </RouteView.Match>
+        <RouteView.Match segment="users" exact>
+          <UsersList />
+        </RouteView.Match>
+        <RouteView.Match segment="users.user" exact>
+          <UserDetail />
+        </RouteView.Match>
+        <RouteView.Match segment="users.user.edit" exact>
+          <UserEdit />
+        </RouteView.Match>
+        <RouteView.NotFound>
+          <h1>404 — Page Not Found</h1>
+          <p>The page you are looking for does not exist.</p>
+        </RouteView.NotFound>
+      </RouteView>
     </Layout>
   );
 }

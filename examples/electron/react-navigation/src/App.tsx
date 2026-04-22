@@ -1,4 +1,4 @@
-import { useRoute, useRouter } from "@real-router/react";
+import { RouteView, useRoute, useRouter } from "@real-router/react";
 
 import { HistoryPanel } from "./HistoryPanel";
 import { Dashboard } from "./pages/Dashboard";
@@ -13,7 +13,8 @@ import type { JSX } from "react";
 
 export function App(): JSX.Element {
   const router = useRouter();
-  const { route } = useRoute();
+  // Subscribe to route changes so visited-marks re-render on navigation.
+  useRoute();
 
   const mark = (name: string): string => (router.hasVisited(name) ? " ✓" : "");
 
@@ -28,12 +29,30 @@ export function App(): JSX.Element {
     <Layout title="Real-Router — Electron + navigation-plugin" links={links}>
       <HistoryPanel />
 
-      {route?.name === "home" && <Home />}
-      {route?.name === "dashboard" && <Dashboard />}
-      {route?.name === "settings" && <Settings />}
-      {route?.name === "users" && <UsersList />}
-      {route?.name === "users.user" && <UserDetail />}
-      {route?.name === "users.user.edit" && <UserEdit />}
+      <RouteView nodeName="">
+        <RouteView.Match segment="home" exact>
+          <Home />
+        </RouteView.Match>
+        <RouteView.Match segment="dashboard" exact>
+          <Dashboard />
+        </RouteView.Match>
+        <RouteView.Match segment="settings" exact>
+          <Settings />
+        </RouteView.Match>
+        <RouteView.Match segment="users" exact>
+          <UsersList />
+        </RouteView.Match>
+        <RouteView.Match segment="users.user" exact>
+          <UserDetail />
+        </RouteView.Match>
+        <RouteView.Match segment="users.user.edit" exact>
+          <UserEdit />
+        </RouteView.Match>
+        <RouteView.NotFound>
+          <h1>404 — Page Not Found</h1>
+          <p>The page you are looking for does not exist.</p>
+        </RouteView.NotFound>
+      </RouteView>
     </Layout>
   );
 }

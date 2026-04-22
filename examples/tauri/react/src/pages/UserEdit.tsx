@@ -11,7 +11,7 @@ export function UserEdit(): JSX.Element {
       <h1>Edit user</h1>
       <label>
         ID (read-only):
-        <input readOnly defaultValue={id} />
+        <input readOnly={true} defaultValue={id} />
       </label>
       <p>
         <Link routeName="users.user" routeParams={{ id }}>
