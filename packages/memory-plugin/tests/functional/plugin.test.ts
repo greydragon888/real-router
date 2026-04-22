@@ -699,4 +699,117 @@ describe("Memory plugin", () => {
       });
     });
   });
+
+  describe("lifecycle race with in-flight #go (#505)", () => {
+    // Regression tests for https://github.com/greydragon888/real-router/issues/505
+    //
+    // Before the fix: stop() / teardown() called while #go is in flight would
+    // let the superseded reject-handler write #index = previousIndex into
+    // already-cleared state, and leave #navigatingFromHistory stuck at true
+    // so the next push after restart silently skipped recording an entry.
+    //
+    // The fix bumps #goGeneration in onStop and teardown (so settlers skip
+    // via generation mismatch) and resets #navigatingFromHistory /
+    // #pendingDirection inside #clear (so the next lifecycle starts clean).
+
+    it("stop() mid-flight leaves history empty and next navigation records entry", async () => {
+      router.usePlugin(memoryPluginFactory());
+      await router.start("/");
+      await router.navigate("users");
+      await router.navigate("user", { id: "42" });
+
+      // History: [home, users, user/42], index = 2.
+
+      // Stall the in-flight navigate so its settler cannot run before
+      // router.stop() clears the plugin. A rejected navigate fires after
+      // stop() — the reject-handler must then observe a generation mismatch
+      // and skip its revert.
+      const navigateSpy = vi.spyOn(router, "navigate").mockImplementationOnce(
+        () =>
+          new Promise((_, reject) => {
+            setTimeout(() => {
+              reject(new Error("stalled rejection"));
+            }, 50);
+          }),
+      );
+
+      router.back(); // kicks off #go(-1): optimistic #index = 1
+
+      router.stop(); // #clear + generation bump — settler must no-op
+
+      // Wait out the mocked rejection so the settler has a chance to run.
+      await new Promise((r) => setTimeout(r, 100));
+
+      // Post-stop invariants: history empty, geometry reports cleared.
+      expect(router.canGoBack()).toBe(false);
+      expect(router.canGoForward()).toBe(false);
+
+      navigateSpy.mockRestore();
+
+      // Restart: the next navigation must actually record a new entry.
+      // Without the #navigatingFromHistory reset in #clear(), the flag
+      // would be stuck at true and onTransitionSuccess would skip the push,
+      // leaving history empty forever.
+      await router.start("/");
+      await router.navigate("users");
+
+      expect(router.canGoBack()).toBe(true);
+      expect(router.canGoForward()).toBe(false);
+      expect(router.getState()?.name).toBe("users");
+      expect(router.getState()?.context.memory?.historyIndex).toBe(1);
+    });
+
+    it("unsubscribe() mid-flight does not desync #index against cleared entries", async () => {
+      const unsubscribe = router.usePlugin(memoryPluginFactory());
+
+      await router.start("/");
+      await router.navigate("users");
+      await router.navigate("user", { id: "42" });
+
+      const navigateSpy = vi.spyOn(router, "navigate").mockImplementationOnce(
+        () =>
+          new Promise((_, reject) => {
+            setTimeout(() => {
+              reject(new Error("stalled rejection"));
+            }, 50);
+          }),
+      );
+
+      router.back(); // in-flight #go
+
+      unsubscribe(); // teardown: removes extensions, bumps generation
+
+      await new Promise((r) => setTimeout(r, 100));
+
+      // After teardown the router no longer exposes the memory extensions;
+      // accessing them should throw (extendRouter unsubscribe removes them).
+      expect(() => router.canGoBack()).toThrow();
+      expect(() => router.canGoForward()).toThrow();
+
+      navigateSpy.mockRestore();
+    });
+
+    it("stop() → start() cycle leaves #navigatingFromHistory false even with no in-flight #go", async () => {
+      // Sanity check: the #clear() reset must not introduce regressions for
+      // the normal stop/start cycle with no race. Before the fix, #clear()
+      // only touched #entries + #index; after the fix it also resets the
+      // #go flags. Normal code paths must still behave identically.
+
+      router.usePlugin(memoryPluginFactory());
+      await router.start("/");
+      await router.navigate("users");
+      router.stop();
+
+      await router.start("/");
+      await router.navigate("settings");
+
+      expect(router.getState()?.name).toBe("settings");
+      expect(router.canGoBack()).toBe(true);
+      expect(router.canGoForward()).toBe(false);
+      expect(router.getState()?.context.memory).toStrictEqual({
+        direction: "navigate",
+        historyIndex: 1,
+      });
+    });
+  });
 });
