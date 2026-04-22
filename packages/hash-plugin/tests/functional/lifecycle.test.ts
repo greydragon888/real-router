@@ -66,6 +66,24 @@ describe("Hash Plugin — Lifecycle & Configuration", async () => {
       expect(() => hashPluginFactory()).not.toThrow();
     });
 
+    it("falls back to defaults when option value is explicitly undefined", () => {
+      // Users may legitimately pass undefined through conditional option objects
+      // (e.g. { hashPrefix: process.env.PREFIX }). Cast bypasses
+      // exactOptionalPropertyTypes to reproduce that runtime shape.
+      router.usePlugin(
+        hashPluginFactory(
+          { hashPrefix: undefined, base: undefined } as Partial<
+            Record<string, unknown>
+          >,
+          mockedBrowser,
+        ),
+      );
+
+      // Without undefined-filtering, urlPrefix would become "undefined#undefined"
+      // and buildUrl would produce "/undefined#undefined/home".
+      expect(router.buildUrl("home", {})).toBe("#/home");
+    });
+
     it("creates working browser when none provided", async () => {
       globalThis.history.replaceState({}, "", "/#/home");
 
@@ -338,7 +356,10 @@ describe("Hash Plugin — Lifecycle & Configuration", async () => {
       await router.start();
       unsubscribe();
 
-      expect(removeEventSpy).toHaveBeenCalled();
+      expect(removeEventSpy).toHaveBeenCalledWith(
+        "popstate",
+        expect.any(Function),
+      );
 
       removeEventSpy.mockRestore();
     });

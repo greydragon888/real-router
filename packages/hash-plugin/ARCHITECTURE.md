@@ -189,11 +189,7 @@ declare module "@real-router/core" {
   interface Router {
     buildUrl: (name: string, params?: Params) => string;
     matchUrl: (url: string) => State | undefined;
-    replaceHistoryState: (
-      name: string,
-      params?: Params,
-      title?: string,
-    ) => void;
+    replaceHistoryState: (name: string, params?: Params) => void;
     start(path?: string): Promise<State>; // overload — makes path optional
   }
 }

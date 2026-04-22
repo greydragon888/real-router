@@ -25,6 +25,10 @@ export function extractHashPath(
   hash: string,
   prefixRegex: RegExp | null,
 ): string {
+  if (hash === "" || hash === "#") {
+    return "/";
+  }
+
   const path = prefixRegex ? hash.replace(prefixRegex, "") : hash.slice(1);
 
   return path || "/";

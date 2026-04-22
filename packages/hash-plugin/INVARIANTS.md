@@ -64,6 +64,7 @@
 | --- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | `extractHashPath` returns `"/"` for prefix-only hash         | When the hash contains only the prefix and no path (e.g., `#!`), `extractHashPath` falls back to `"/"`. This maps to the index route and prevents empty-path matching. |
 | 2   | `extractHashPath` returns `"/"` for bare `#` with null regex | A bare `#` with no prefix regex yields `"/"` after `hash.slice(1)` produces an empty string. Ensures the fallback works for the default (no prefix) configuration.     |
+| 3   | `extractHashPath` returns `"/"` for bare `#` or empty hash regardless of prefix regex | A bare `#` or empty string always resolves to `"/"`, even when a non-null `prefixRegex` is configured. Fixes #504 where the regex branch returned `"#"` verbatim because the prefix did not match the bare `#`. |
 
 ## Route Rejection
 
@@ -95,6 +96,13 @@
 | --- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | Distinct route names produce distinct URLs       | `buildUrl("home") !== buildUrl("users.list")` across arbitrary `base` and `hashPrefix`. A sanity check that URL construction actually depends on the route name and is not a constant. |
 
+## Idempotence
+
+| #   | Invariant                                                 | Description                                                                                                                                                                                                      |
+| --- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `extractHashPath` is idempotent under re-wrapping         | For any string `s`, `extractHashPath("#" + extractHashPath(s, null), null) === extractHashPath(s, null)`. Confirms the function is a projection — repeated application converges after one step.                 |
+| 2   | `normalizeBase` is idempotent                             | `normalizeBase(normalizeBase(x)) === normalizeBase(x)` for any base that passes `safeBaseRule`. Confirms the function is a projection: normalizing an already-normalized base is a no-op.                        |
+
 ## Query Source of Truth
 
 | #   | Invariant                                                   | Description                                                                                                                                                                                                                                                                                              |
@@ -111,4 +119,4 @@
 
 | File                                      | Invariants | Category                                                                                                                                                                                                                                    |
 | ----------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tests/property/hashPlugin.properties.ts` | 25         | URL roundtrip, hash prefix inclusion, prefix stripping, regex escaping, default prefix, parameter encoding, unsafe encoding, base, fallback, rejection, determinism, path suffix, leading-slash, injectivity, query collision, multi-key query |
+| `tests/property/hashPlugin.properties.ts` | 33         | URL roundtrip, hash prefix inclusion, prefix stripping, regex escaping, default prefix, parameter encoding, unsafe encoding, base, fallback, rejection, determinism, path suffix, leading-slash, injectivity, query collision, multi-key query, idempotence (`extractHashPath`, `normalizeBase`) |

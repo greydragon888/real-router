@@ -73,7 +73,11 @@ describe("Popstate Storm (Hash)", () => {
     await waitForTransitions();
 
     expect(router.getState()?.name).toBe(lastRouteName);
-    expect(transitions.length).toBeLessThan(50);
+    // Deferred-popstate dedup: intermediate events are dropped. Expect the
+    // first processed event + a handful of flushed deferred ones, never close
+    // to the full 50.
+    expect(transitions.length).toBeGreaterThanOrEqual(1);
+    expect(transitions.length).toBeLessThanOrEqual(5);
   });
 
   it("50 popstate events with 100ms async guards: only first and last transition", async () => {
@@ -163,7 +167,7 @@ describe("Popstate Storm (Hash)", () => {
 
     await waitForTransitions();
 
-    expect(spy).toHaveBeenCalled();
+    expect(spy).toHaveBeenCalledWith("/nonexistent");
   });
 
   it("50 same-state popstate events: SAME_STATES suppressed, state stable", async () => {
