@@ -83,6 +83,27 @@ router.replaceHistoryState(name, params); // URL only, no transition
 router.navigate(name, params, { replace: true }); // Full transition + URL update
 ```
 
+## Navigation Source (`state.context.browser.source`)
+
+On every successful transition the plugin tags `state.context.browser` with the trigger origin — use this in `subscribe` handlers to distinguish back/forward from programmatic navigation:
+
+```typescript
+router.subscribe(({ route }) => {
+  if (route.context.browser?.source === "popstate") {
+    // back/forward button — restore scroll, skip analytics "view" event, ...
+  } else {
+    // router.navigate()/router.start() — programmatic
+  }
+});
+```
+
+Both values are frozen singletons, so object-identity comparison is safe and zero-allocation.
+
+| Value       | Meaning                                                       |
+| ----------- | ------------------------------------------------------------- |
+| `"navigate"` | Triggered by `router.navigate()`, `router.start()`, or `replaceHistoryState()` |
+| `"popstate"` | Triggered by browser back/forward buttons (popstate event)   |
+
 ## Form Protection
 
 Set `forceDeactivate: false` to respect `canDeactivate` guards on back/forward:
@@ -103,14 +124,18 @@ lifecycle.addDeactivateGuard(
 
 ## SSR Support
 
-The plugin is SSR-safe — automatically detects the environment and falls back to no-ops:
+The plugin is SSR-safe — `createSafeBrowser` detects the absence of `window`/`history` and swaps the History API calls (`pushState`, `replaceState`, `addPopstateListener`, `getLocation`, `getHash`) for warn-once no-ops. Pure URL helpers are environment-agnostic and behave identically on the server:
 
 ```typescript
-// Server-side — no errors, methods return safe defaults
-router.usePlugin(browserPluginFactory());
-router.buildUrl("home"); // returns path without base
-router.matchUrl("/path"); // returns undefined
+// Server-side — no crashes, History API calls become no-ops
+router.usePlugin(browserPluginFactory({ base: "/app" }));
+
+router.buildUrl("home");           // "/app/home" — base is still applied
+router.matchUrl("/app/users/123"); // { name: "users", params: { id: "123" }, path: "/users/123" }
+await router.start("/app/home");   // transitions normally; no popstate subscription
 ```
+
+The first call to any History API method emits a one-time console warning so accidental SSR usage is visible without spamming logs.
 
 ## Documentation
 
