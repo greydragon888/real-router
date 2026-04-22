@@ -1,5 +1,5 @@
 ---
-"@real-router/memory-plugin": minor
+"@real-router/memory-plugin": patch
 ---
 
 Fix stale `state.context.memory` after short-circuit `back()`/`forward()` (#508)

@@ -2,7 +2,7 @@
 "@real-router/hash-plugin": patch
 ---
 
-Internal refactors: filter explicit `undefined` option values and remove `router.buildUrl` indirection
+Internal refactors: filter explicit `undefined` option values and remove `router.buildUrl` indirection (#511)
 
 - **Bug fix**: `hashPluginFactory({ hashPrefix: undefined })` now correctly falls back to the default `""` instead of producing `urlPrefix: "#undefined"`. Previously, explicit `undefined` values leaked through `{ ...defaults, ...opts }` spread because `undefined` is a legitimate enumerable own property.
 - **Refactor**: the popstate-handler `buildUrl` callback now uses the pre-computed `pluginBuildUrl` closure directly instead of going through `router.buildUrl(name, params)` wrapper (removes one level of indirection on the error-recovery path).

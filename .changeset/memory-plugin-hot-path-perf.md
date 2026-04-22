@@ -2,7 +2,7 @@
 "@real-router/memory-plugin": patch
 ---
 
-Hot-path and code-quality cleanup from audit (#508, #510)
+Hot-path and code-quality cleanup from audit (#510, #511)
 
 Audit follow-up — items from `packages/memory-plugin/.claude/review-2026-04-22.md`:
 

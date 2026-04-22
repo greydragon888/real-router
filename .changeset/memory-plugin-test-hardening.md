@@ -2,7 +2,7 @@
 "@real-router/memory-plugin": patch
 ---
 
-Test-suite hardening and new invariants from audit (#508)
+Test-suite hardening and new invariants from audit (#511)
 
 Audit follow-up — items from `packages/memory-plugin/.claude/review-2026-04-22.md`
 (categories 1, 3, 4, 5, 7, 10-13). No runtime behaviour changes — this is
