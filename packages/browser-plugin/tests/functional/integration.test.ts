@@ -202,9 +202,14 @@ describe("Browser Plugin Integration", () => {
       await router.start();
       await router.navigate("users.view", { id: "1" });
 
-      // Browser plugin should handle modified state
+      // Browser plugin should handle modified state.
+      // At minimum two forwardState calls: initial start → "home"
+      // (defaultRoute) and navigate → "users.view". Core may call it
+      // additionally for internal resolutions — asserting lower-bound 2.
       expect(currentHistoryState?.params.modified).toBe(true);
-      expect(modifiedStates.length).toBeGreaterThan(0);
+      expect(modifiedStates.length).toBeGreaterThanOrEqual(2);
+      // Last recorded state must reflect the navigation target.
+      expect(modifiedStates.at(-1)?.params.modified).toBe(true);
     });
 
     it("persistent params work with browser plugin", async () => {

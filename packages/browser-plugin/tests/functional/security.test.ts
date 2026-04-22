@@ -306,13 +306,12 @@ describe("Browser Plugin — Security", () => {
         },
       };
 
-      // Router should handle or reject function in params
-
+      // Router should handle or reject function in params without crashing.
+      // The function value lives in the `evil` field which is not part of
+      // the route path, so buildUrl ignores it entirely.
       const result = router.buildUrl("users.view", maliciousParams as any);
 
-      // Result should be defined (no crash)
-      expect(result).toBeDefined();
-      expect(typeof result).toBe("string");
+      expect(result).toBe("/users/view/123");
     });
 
     it("handles params with symbol values", async () => {
@@ -321,12 +320,11 @@ describe("Browser Plugin — Security", () => {
         sym: Symbol("test"),
       };
 
-      // Router should handle symbols gracefully
-
+      // Symbols in non-path params are ignored — buildUrl only consumes
+      // string-coercible values for the declared path segments.
       const result = router.buildUrl("users.view", symbolParam as any);
 
-      expect(result).toBeDefined();
-      expect(typeof result).toBe("string");
+      expect(result).toBe("/users/view/123");
     });
   });
 });

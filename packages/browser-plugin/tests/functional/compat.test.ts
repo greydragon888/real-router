@@ -282,5 +282,46 @@ describe("Browser Plugin — Compatibility", () => {
         warnSpy.mockRestore();
       }
     });
+
+    it("warn-once: multiple method calls produce exactly one SSR warning per plugin instance", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(noop);
+      const originalWindow = globalThis.window;
+
+      // @ts-expect-error — simulating SSR by removing window
+      delete globalThis.window;
+
+      try {
+        const ssrRouter = createRouter(routerConfig, {
+          defaultRoute: "home",
+        });
+
+        ssrRouter.usePlugin(browserPluginFactory({}));
+
+        // Trigger multiple SSR fallback paths:
+        //   start() → getLocation + replaceState (via onTransitionSuccess)
+        //   navigate() × 3 → pushState × 3
+        await ssrRouter.start();
+        await ssrRouter.navigate("users.list");
+        await ssrRouter.navigate("home");
+        await ssrRouter.navigate("users.list");
+        ssrRouter.stop();
+
+        const nonBrowserWarns = warnSpy.mock.calls.filter(
+          ([msg]) =>
+            typeof msg === "string" && msg.includes("non-browser environment"),
+        );
+
+        // createSafeBrowser instantiates two independent warnOnce closures —
+        // one for getLocation (safe-browser.ts) and one shared across
+        // pushState/replaceState/addPopstateListener/getHash (via
+        // createHistoryFallbackBrowser). Each fires at most once, so the
+        // ceiling across 4 navigations + start is 2, not N.
+        expect(nonBrowserWarns.length).toBeLessThanOrEqual(2);
+        expect(nonBrowserWarns.length).toBeGreaterThanOrEqual(1);
+      } finally {
+        globalThis.window = originalWindow;
+        warnSpy.mockRestore();
+      }
+    });
   });
 });

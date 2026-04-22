@@ -244,6 +244,31 @@ describe("Browser Plugin — Lifecycle", () => {
       );
     });
 
+    it("uses pushState when replace: false is explicit on first navigation (gotcha)", async () => {
+      // Gotcha documented in CLAUDE.md: `navigate(..., { replace: false })` before
+      // any successful navigation creates a push entry, not replace. The `??`
+      // in shouldReplaceHistory keeps the explicit `false`.
+      router.stop();
+      unsubscribe?.();
+
+      router = createRouter(routerConfig, { defaultRoute: "home" });
+      router.usePlugin(browserPluginFactory({}, mockedBrowser));
+
+      const pushSpy = vi.spyOn(mockedBrowser, "pushState");
+      const replaceSpy = vi.spyOn(mockedBrowser, "replaceState");
+
+      await router.start();
+
+      // First "real" navigation with explicit replace: false — must push.
+      pushSpy.mockClear();
+      replaceSpy.mockClear();
+
+      await router.navigate("users.list", {}, { replace: false });
+
+      expect(pushSpy).toHaveBeenCalledTimes(1);
+      expect(replaceSpy).not.toHaveBeenCalled();
+    });
+
     it("uses pushState for subsequent navigations", async () => {
       // Router already started on "home" (default route)
       vi.spyOn(mockedBrowser, "pushState");

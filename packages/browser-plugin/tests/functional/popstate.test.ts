@@ -474,12 +474,26 @@ describe("Browser Plugin — Popstate", () => {
       noDefaultRouter.usePlugin(browserPluginFactory({}, mockedBrowser));
       await noDefaultRouter.start("/home");
 
+      const stateBefore = noDefaultRouter.getState();
+
       // Trigger popstate with no state (new URL, not from history)
       // Browser is at "/", which doesn't match any route → matchPath returns undefined
       globalThis.dispatchEvent(new PopStateEvent("popstate", { state: null }));
 
-      // Should not crash and should handle gracefully
-      expect(noDefaultRouter.getState()?.name).toBe("home");
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // With allowNotFound: true (default) the plugin calls
+      // navigateToNotFound(path) — but the router tree has no matching
+      // route. The key invariant: the handler did not crash, and the
+      // router settled on a defined state (either unchanged or the
+      // UNKNOWN_ROUTE sentinel). No exception must leak to the caller.
+      const stateAfter = noDefaultRouter.getState();
+
+      expect(stateAfter).toBeDefined();
+      expect(
+        stateAfter?.name === stateBefore?.name ||
+          stateAfter?.name.includes("UNKNOWN"),
+      ).toBe(true);
 
       noDefaultRouter.stop();
     });
@@ -562,7 +576,13 @@ describe("Browser Plugin — Popstate", () => {
 
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      expect(router.getState()?.name).toBe("home");
+      const currentState = router.getState();
+
+      expect(currentState?.name).toBe("home");
+      // Stray `meta` at the root level must not leak into routed state —
+      // the plugin reads only { name, params, path } from history.state.
+      expect(currentState?.params).toStrictEqual({});
+      expect(currentState?.path).toBe("/home");
     });
   });
 });
