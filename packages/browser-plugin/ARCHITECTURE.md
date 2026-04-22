@@ -177,16 +177,12 @@ Router extension involves two layers:
 TypeScript allows extending existing interfaces via `declare module`. The plugin adds methods to the `Router` interface from the core:
 
 ```typescript
-// index.ts, lines 20-46
+// index.ts, lines 35-57
 declare module "@real-router/core" {
   interface Router {
     buildUrl: (name: string, params?: Params) => string;
     matchUrl: (url: string) => State | undefined;
-    replaceHistoryState: (
-      name: string,
-      params?: Params,
-      title?: string,
-    ) => void;
+    replaceHistoryState: (name: string, params?: Params) => void;
     start(path?: string): Promise<State>; // overload — makes path optional
   }
 }

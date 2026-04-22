@@ -1,4 +1,4 @@
-import { updateBrowserState } from "./popstate-utils.js";
+import { createUpdateBrowserState } from "./popstate-utils.js";
 
 import type { Browser } from "./types.js";
 import type {
@@ -25,6 +25,8 @@ export function createReplaceHistoryState(
   buildUrl: (name: string, params?: Params) => string,
   preserveHash = true,
 ): (name: string, params?: Params) => void {
+  const updateState = createUpdateBrowserState();
+
   return (name: string, params: Params = {}) => {
     const state = api.buildState(name, params);
 
@@ -46,7 +48,7 @@ export function createReplaceHistoryState(
     const hash = preserveHash ? browser.getHash() : "";
     const url = buildUrl(name, params) + hash;
 
-    updateBrowserState(builtState, url, true, browser);
+    updateState(builtState, url, true, browser);
   };
 }
 
@@ -55,9 +57,13 @@ export function shouldReplaceHistory(
   toState: State,
   fromState: State | undefined,
 ): boolean {
-  return (
-    (navOptions.replace ?? !fromState) ||
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- fromState is NOT narrowed when replace is false (#447)
-    (!!navOptions.reload && toState.path === fromState?.path)
-  );
+  if (navOptions.replace === true) {
+    return true;
+  }
+
+  if (!fromState) {
+    return navOptions.replace !== false;
+  }
+
+  return !!navOptions.reload && toState.path === fromState.path;
 }

@@ -17,7 +17,11 @@ import {
 import { defaultOptions, LOGGER_CONTEXT, POPSTATE_SOURCE } from "./constants";
 import { validateOptions } from "./validation";
 
-import type { Browser, SharedFactoryState } from "./browser-env";
+import type {
+  Browser,
+  PopstateTransitionOptions,
+  SharedFactoryState,
+} from "./browser-env";
 import type { BrowserContext, BrowserPluginOptions } from "./types";
 import type {
   NavigationOptions,
@@ -96,18 +100,12 @@ function createDefaultBrowser(base: string): Browser {
   }, "browser-plugin");
 }
 
-interface TransitionOptions {
-  source: string;
-  replace: true;
-  forceDeactivate?: boolean;
-}
-
 function createBrowserPlugin(
   router: Router,
   api: PluginApi,
   options: Required<BrowserPluginOptions>,
   browser: Browser,
-  transitionOptions: TransitionOptions,
+  transitionOptions: PopstateTransitionOptions,
   shared: SharedFactoryState,
 ): Plugin {
   const claim = api.claimContextNamespace("browser");
