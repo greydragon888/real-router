@@ -1,5 +1,5 @@
-import { createSafeBrowser, safelyEncodePath } from "../../src/browser-env";
-import { createHashPrefixRegex, extractHashPath } from "../../src/hash-utils";
+import { createSafeBrowser } from "../../src/browser-env";
+import { buildHashLocation, createHashPrefixRegex } from "../../src/hash-utils";
 
 import type { Browser } from "../../src/browser-env";
 
@@ -10,15 +10,15 @@ export function createMockedBrowser(
   hashPrefix = "",
 ): Browser {
   const prefixRegex = createHashPrefixRegex(hashPrefix);
-  const safeBrowser = createSafeBrowser(() => {
-    const hashPath = safelyEncodePath(
-      extractHashPath(globalThis.location.hash, prefixRegex),
-    );
-
-    return hashPath.includes("?")
-      ? hashPath
-      : hashPath + globalThis.location.search;
-  }, "hash-plugin");
+  const safeBrowser = createSafeBrowser(
+    () =>
+      buildHashLocation(
+        globalThis.location.hash,
+        globalThis.location.search,
+        prefixRegex,
+      ),
+    "hash-plugin",
+  );
 
   return {
     ...safeBrowser,

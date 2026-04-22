@@ -1,12 +1,8 @@
 import { getPluginApi } from "@real-router/core/api";
 
-import {
-  createSafeBrowser,
-  normalizeBase,
-  safelyEncodePath,
-} from "./browser-env";
+import { createSafeBrowser, normalizeBase } from "./browser-env";
 import { defaultOptions, source } from "./constants";
-import { createHashPrefixRegex, extractHashPath } from "./hash-utils";
+import { buildHashLocation, createHashPrefixRegex } from "./hash-utils";
 import { HashPlugin } from "./plugin";
 import { validateOptions } from "./validation";
 
@@ -38,15 +34,15 @@ export function hashPluginFactory(
   const prefixRegex = createHashPrefixRegex(options.hashPrefix);
   const resolvedBrowser =
     browser ??
-    createSafeBrowser(() => {
-      const hashPath = safelyEncodePath(
-        extractHashPath(globalThis.location.hash, prefixRegex),
-      );
-
-      return hashPath.includes("?")
-        ? hashPath
-        : hashPath + globalThis.location.search;
-    }, "hash-plugin");
+    createSafeBrowser(
+      () =>
+        buildHashLocation(
+          globalThis.location.hash,
+          globalThis.location.search,
+          prefixRegex,
+        ),
+      "hash-plugin",
+    );
 
   const transitionOptions = {
     forceDeactivate: options.forceDeactivate,
