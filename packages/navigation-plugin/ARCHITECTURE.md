@@ -442,12 +442,13 @@ Without base:
 Uses `String.startsWith()` + `String.slice()` — no regex needed for base path stripping.
 The result is normalized to always start with `/`.
 
-**`urlToPath(url, base, context)`**:
+**`urlToPath(url, base)`**:
 
-Delegates URL parsing to `safeParseUrl` from `browser-env` (validates protocol, handles errors).
-The `context` string is passed to `safeParseUrl` for warning messages.
+Delegates URL parsing to `safeParseUrl` from `browser-env`. The parser is
+scheme-agnostic and total (never throws, never returns null). The `context`
+parameter was removed in #496 (see
+[IMPLEMENTATION_NOTES#safeParseUrl](../../IMPLEMENTATION_NOTES.md#safeparseurl--scheme-agnostic-parser-496)).
 Preserves search params: the result is `extractPath(pathname, base) + search`.
-Returns `null` for invalid URLs — calling code handles `null` explicitly.
 
 **`buildUrl(path, base)`**:
 
@@ -516,7 +517,14 @@ Search params are **preserved** — `extractPathFromAbsoluteUrl` returns `pathna
 - Entries after `router.replace(routes)` may have stale state
 - Entries from other SPAs on the same origin have foreign state
 
-**Why `safeParseUrl` instead of raw `new URL()`?** The Navigation API spec guarantees absolute URLs, but mocks, shims, and non-spec test harnesses can emit anything into `entry.url`. `safeParseUrl` rejects non-`http(s)` protocols and catches parse errors, so `entryToState` is total over any input.
+**Why `safeParseUrl` instead of raw `new URL()`?** The Navigation API spec
+guarantees absolute URLs, but (1) `new URL(url, globalThis.location.origin)`
+throws `TypeError` on `file://` windows where `location.origin === "null"`
+(the literal string), and (2) `new URL()` is 4–6× slower than a manual parser
+on the hot path (`getVisitedRoutes` / `hasVisited` iterate every session-
+history entry). `safeParseUrl` is scheme-agnostic and total — `entryToState`
+composes cleanly without null-case branches. See
+[IMPLEMENTATION_NOTES#safeParseUrl](../../IMPLEMENTATION_NOTES.md#safeparseurl--scheme-agnostic-parser-496).
 
 URL matching is always authoritative — it reflects the current route config.
 

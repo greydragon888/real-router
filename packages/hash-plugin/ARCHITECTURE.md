@@ -398,8 +398,11 @@ Empty hash:
 
 **`hashUrlToPath(url, prefixRegex)`**:
 
-Delegates URL parsing to `safeParseUrl` from `browser-env` (validates protocol, handles errors).
-Returns `null` for invalid URLs — calling code handles `null` explicitly.
+Delegates URL parsing to `safeParseUrl` from `browser-env`. The parser is
+scheme-agnostic (works with `http(s)://`, `app://`, `tauri://`, `file://`,
+etc.) and total — never throws, never returns null. No protocol whitelist,
+no `context` parameter. See
+[IMPLEMENTATION_NOTES#safeParseUrl](../../IMPLEMENTATION_NOTES.md#safeparseurl--scheme-agnostic-parser-496).
 
 ## Popstate Utilities, Error Recovery
 

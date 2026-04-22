@@ -388,9 +388,12 @@ The result is normalized to always start with `/` (e.g. base `"/app"` with pathn
 
 **`urlToPath(url, base)`**:
 
-Delegates URL parsing to `safeParseUrl` from `browser-env` (validates protocol, handles errors).
+Delegates URL parsing to `safeParseUrl` from `browser-env`. The parser is
+scheme-agnostic (works with `http(s)://`, `app://`, `tauri://`, `file://`,
+etc.) and total — never throws, never returns null. No protocol whitelist,
+no `context` parameter. See
+[IMPLEMENTATION_NOTES#safeParseUrl](../../IMPLEMENTATION_NOTES.md#safeparseurl--scheme-agnostic-parser-496).
 Preserves search params: the result is `extractPath(pathname, base) + search`.
-Returns `null` for invalid URLs — calling code handles `null` explicitly.
 
 **`buildUrl(path, base)`**:
 

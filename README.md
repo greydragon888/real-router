@@ -192,6 +192,8 @@ The core is platform-agnostic — no DOM, no History API, no framework dependenc
 It works in any JavaScript runtime, not just browsers: SSR, SSG, Service Workers, edge functions, React Native — all without special modes or framework-specific adapters.
 Swap the platform plugin, reuse everything else.
 
+Runs in **browser, terminal (Ink), and desktop (Electron, Tauri)** — same router, different plugins. See [Desktop Integration Guide](https://github.com/greydragon888/real-router/wiki/Desktop-Integration).
+
 SSR works naturally: `cloneRouter()` per request, `start(url)` to resolve, `dispose()` to clean up.
 Data loading plugs in via interceptors without touching the transition pipeline.
 SSG is the same loop at build time — `getStaticPaths()` enumerates routes, `cloneRouter()` + `renderToString()` per URL.
@@ -454,7 +456,9 @@ Many runnable examples across the most popular frameworks — each is a standalo
 
 | **Terminal UI (Ink)** | [ink-demo](examples/react/ink-demo) — CLI app via [@real-router/react/ink](packages/react/README.md#ink-terminal-ui) + memory-plugin |
 
-Run any example: `cd examples/react/basic && pnpm dev` (the Ink demo is tsx-based — `cd examples/react/ink-demo && pnpm dev`).
+| **Desktop (Electron, Tauri)** | [electron/react](examples/electron/react) (`browser-plugin` + `app://`), [electron/react-hash](examples/electron/react-hash) (`hash-plugin` + `file://`), [electron/react-navigation](examples/electron/react-navigation) (`navigation-plugin` + HistoryPanel), [tauri/react](examples/tauri/react) (Tauri v2 + `browser-plugin`), [tauri/react-navigation](examples/tauri/react-navigation) (Tauri v2 + `navigation-plugin`). See [Desktop Integration Guide](https://github.com/greydragon888/real-router/wiki/Desktop-Integration) |
+
+Run any example: `cd examples/react/basic && pnpm dev` (the Ink demo is tsx-based — `cd examples/react/ink-demo && pnpm dev`; Electron — `cd examples/electron/react && pnpm dev`; Tauri — `cd examples/tauri/react && pnpm tauri dev`, requires Rust toolchain).
 
 ## Relationship to Router5
 

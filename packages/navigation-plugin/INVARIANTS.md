@@ -705,18 +705,28 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 ### G3. URL Parsing Robustness
 **Category:** URL Handling  
 **Testable:** PBT-testable  
-**Description:** `urlToPath()` must safely parse URLs and return null on invalid input.
+**Description:** `urlToPath()` must be total — never throws, always returns a
+`string` starting with `/`, for any input (including scheme-less paths, opaque
+URIs, and custom schemes like `app://`, `tauri://`, `file://`).
 
 **Precondition:**
-- Valid URL: `http://localhost/app/users/123?sort=name`
-- Invalid URL: `not a url`
+- Absolute HTTP URL: `http://localhost/app/users/123?sort=name`
+- Custom-scheme URL: `tauri://localhost/users/123`
+- Path-only input: `/users/123?sort=name`
+- Opaque / garbage input: `not a url`
 
 **Postcondition:**
-- Valid URL: returns `/users/123?sort=name` (with base `/app`)
-- Invalid URL: returns `null`
-- No exceptions thrown
+- Absolute HTTP URL: returns `/users/123?sort=name` (with base `/app`)
+- Custom-scheme URL: returns `/users/123` (scheme and authority ignored)
+- Path-only input: returns `/users/123?sort=name`
+- Opaque / garbage input: returns a string — the router rejects unmatched
+  paths at the matcher layer, not the parser layer.
+- No exceptions thrown.
 
-**Why it matters:** Prevents crashes on malformed URLs.
+**Why it matters:** A total parser composes cleanly without null-case branches.
+Desktop runtimes (Electron `app://`, Tauri `tauri://`, `file://`) need scheme-
+agnostic parsing; validation is the matcher's job, not the parser's. See
+[IMPLEMENTATION_NOTES#safeParseUrl](../../../IMPLEMENTATION_NOTES.md#safeparseurl--scheme-agnostic-parser-496).
 
 ---
 
