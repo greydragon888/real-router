@@ -13,6 +13,7 @@ import { browserPluginFactory } from "@real-router/browser-plugin";
 
 import {
   createStressRouter,
+  expectedStressError,
   makePopstateState,
   waitForTransitions,
   noop,
@@ -64,11 +65,11 @@ describe("B5: Browser plugin lifecycle churn", () => {
 
     for (let i = 0; i < 50; i++) {
       await router.start();
-      await router.navigate("home").catch(noop);
-      await router.navigate("users.list").catch(noop);
-      await router.navigate("home").catch(noop);
-      await router.navigate("users.list").catch(noop);
-      await router.navigate("home").catch(noop);
+      await router.navigate("home").catch(expectedStressError);
+      await router.navigate("users.list").catch(expectedStressError);
+      await router.navigate("home").catch(expectedStressError);
+      await router.navigate("users.list").catch(expectedStressError);
+      await router.navigate("home").catch(expectedStressError);
 
       stateBeforeLastStop = router.getState()?.name;
       router.stop();
@@ -95,7 +96,7 @@ describe("B5: Browser plugin lifecycle churn", () => {
 
       r.usePlugin(factory);
       await r.start();
-      await r.navigate("users.list").catch(noop);
+      await r.navigate("users.list").catch(expectedStressError);
       r.stop();
 
       lastRouter = r;
@@ -143,7 +144,7 @@ describe("B5: Browser plugin lifecycle churn", () => {
       const { router, unsubscribe } = createStressRouter();
 
       await router.start();
-      await router.navigate("users.list").catch(noop);
+      await router.navigate("users.list").catch(expectedStressError);
       router.stop();
       unsubscribe();
 

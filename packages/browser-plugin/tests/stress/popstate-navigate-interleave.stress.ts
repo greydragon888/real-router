@@ -10,6 +10,7 @@ import {
 
 import {
   createStressRouter,
+  expectedStressError,
   makePopstateState,
   waitForTransitions,
   noop,
@@ -55,7 +56,7 @@ describe("B3 — Popstate/Navigate Interleave Stress", () => {
       );
 
       dispatchPopstate(state);
-      router.navigate("users.list").catch(noop);
+      router.navigate("users.list").catch(expectedStressError);
     }
 
     await waitForTransitions();
@@ -68,7 +69,7 @@ describe("B3 — Popstate/Navigate Interleave Stress", () => {
 
   it("3.2 — navigate then popstate: 100 pairs, popstate processed immediately, no stuck transitions", async () => {
     for (let i = 0; i < 100; i++) {
-      router.navigate("users.list").catch(noop);
+      router.navigate("users.list").catch(expectedStressError);
 
       const state = makePopstateState("home", {}, "/home");
 
@@ -92,12 +93,14 @@ describe("B3 — Popstate/Navigate Interleave Stress", () => {
       );
 
       dispatchPopstate(popState1);
-      router.navigate("users.list").catch(noop);
+      router.navigate("users.list").catch(expectedStressError);
 
       const popState2 = makePopstateState("home", {}, "/home");
 
       dispatchPopstate(popState2);
-      router.navigate("users.view", { id: String(i) }).catch(noop);
+      router
+        .navigate("users.view", { id: String(i) })
+        .catch(expectedStressError);
     }
 
     await waitForTransitions();
@@ -117,7 +120,7 @@ describe("B3 — Popstate/Navigate Interleave Stress", () => {
       const path = i % 3 === 0 ? `/users/view/${i}` : "/home";
       const popState = makePopstateState(targetName, params, path);
 
-      router.navigate(routeName).catch(noop);
+      router.navigate(routeName).catch(expectedStressError);
       dispatchPopstate(popState);
     }
 

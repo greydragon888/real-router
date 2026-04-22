@@ -1,4 +1,4 @@
-import { createRouter } from "@real-router/core";
+import { createRouter, UNKNOWN_ROUTE } from "@real-router/core";
 import {
   describe,
   beforeAll,
@@ -175,7 +175,6 @@ describe("Browser Plugin — URL", () => {
         "https://example.com/users/view/John%20Doe",
       );
 
-      expect(state).toBeDefined();
       expect(state?.params.id).toBe("John Doe");
     });
 
@@ -276,7 +275,6 @@ describe("Browser Plugin — URL", () => {
       const state = router.matchUrl("https://example.com/app/users/list");
 
       // After normalization: "app" → "/app", so matching now works!
-      expect(state).toBeDefined();
       expect(state?.name).toBe("users.list");
     });
 
@@ -380,7 +378,6 @@ describe("Browser Plugin — URL", () => {
       const state = router.matchUrl(fullUrl);
 
       // Should decode back to original (route-node handles this)
-      expect(state).toBeDefined();
       expect(state?.params.id).toBe(testId);
     });
 
@@ -516,10 +513,9 @@ describe("Browser Plugin — URL", () => {
       await router.navigate("users.view", { id: "42" });
 
       // history.state should contain the core state fields
-      expect(currentHistoryState).toBeDefined();
-      expect(currentHistoryState!.name).toBe("users.view");
-      expect(currentHistoryState!.params).toStrictEqual({ id: "42" });
-      expect(currentHistoryState!.path).toBe("/users/view/42");
+      expect(currentHistoryState?.name).toBe("users.view");
+      expect(currentHistoryState?.params).toStrictEqual({ id: "42" });
+      expect(currentHistoryState?.path).toBe("/users/view/42");
     });
 
     it("updates history.state on each navigation", async () => {
@@ -570,7 +566,6 @@ describe("Browser Plugin — URL", () => {
         "https://example.com/users/42/posts/99",
       );
 
-      expect(state).toBeDefined();
       expect(state?.name).toBe("users.posts");
       expect(state?.params).toStrictEqual({ userId: "42", postId: "99" });
     });
@@ -628,7 +623,10 @@ describe("Browser Plugin — URL", () => {
 
           await realRouter.start();
 
-          expect(realRouter.getState()).toBeDefined();
+          // The truncated path doesn't match any route, so the router falls back
+          // to UNKNOWN_ROUTE. The point of this test is the warn-and-continue
+          // behavior of safelyEncodePath, not the route resolution.
+          expect(realRouter.getState()?.name).toBe(UNKNOWN_ROUTE);
           expect(warnSpy).toHaveBeenCalledWith(
             expect.stringContaining("Could not encode path"),
             expect.any(URIError),

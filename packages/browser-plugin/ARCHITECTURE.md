@@ -21,13 +21,12 @@ Contains no navigation business logic — only URL synchronization and browser e
 ```
 browser-plugin/
 ├── src/
-│   ├── index.ts           — Public API + module augmentation
-│   ├── factory.ts         — browserPluginFactory (validation, normalization, instance creation)
-│   ├── plugin.ts          — BrowserPlugin class (runtime behavior)
-│   ├── types.ts           — Types (BrowserPluginOptions)
-│   ├── browser-env/       — Symlink → shared/browser-env (extractPath, buildUrl, urlToPath, popstate, validation, …)
+│   ├── index.ts           — Public API + module augmentation (StateContext.browser, NavigationOptions.source)
+│   ├── factory.ts         — browserPluginFactory + internal createDefaultBrowser (cached getLocation) + createBrowserPlugin (extends router, wires popstate, onTransitionSuccess)
+│   ├── types.ts           — Types (BrowserPluginOptions, BrowserContext, BrowserSource)
+│   ├── browser-env/       — Symlink → shared/browser-env (extractPath, buildUrl, urlToPath, popstate, validation, createUpdateBrowserState, …)
 │   ├── validation.ts      — Options validation (delegates to browser-env)
-│   └── constants.ts       — Constants (defaultOptions, source, LOGGER_CONTEXT)
+│   └── constants.ts       — Constants (defaultOptions, POPSTATE_SOURCE, LOGGER_CONTEXT)
 ```
 
 ## Module Dependency Graph
@@ -35,36 +34,38 @@ browser-plugin/
 ```
 index.ts
     └── factory.ts
-            ├── plugin.ts
-            │       └── browser-env (shared abstractions: URL utils, popstate, validation)
+            ├── browser-env (shared abstractions: URL utils, popstate, validation, createUpdateBrowserState)
             ├── validation.ts
             │       └── constants.ts
             └── constants.ts
 
-types.ts  ← imported by factory.ts, plugin.ts, validation.ts
+types.ts  ← imported by factory.ts, validation.ts, index.ts
 ```
 
 External dependencies:
 
-| Dependency          | What it provides                                                         | Used in                                           |
-| ------------------- | ------------------------------------------------------------------------ | ------------------------------------------------- |
-| `@real-router/core` | `getPluginApi`, types (`Router`, `PluginApi`, `State`, etc.)             | `factory.ts`, `plugin.ts`, `index.ts`             |
-| `browser-env`       | Browser abstraction, popstate handling, validation, URL parsing, URL utils | `factory.ts`, `plugin.ts`, `validation.ts`       |
-| `type-guards`       | `isStateStrict` (`history.state` validation)                             | `index.ts` (re-exported as `isState`)             |
+| Dependency          | What it provides                                                         | Used in                          |
+| ------------------- | ------------------------------------------------------------------------ | -------------------------------- |
+| `@real-router/core` | `getPluginApi`, types (`Router`, `PluginApi`, `State`, etc.)             | `factory.ts`, `index.ts`         |
+| `browser-env`       | Browser abstraction, popstate handling, validation, URL parsing, URL utils, `createUpdateBrowserState` | `factory.ts`, `validation.ts`    |
+| `type-guards`       | `isStateStrict` (`history.state` validation)                             | `index.ts` (re-exported as `isState`) |
 
-## Factory + Class Pattern
+## Factory Pattern
 
 ### Separation of Concerns
 
-`browserPluginFactory()` in `factory.ts` and `BrowserPlugin` in `plugin.ts` are intentionally separate:
+`browserPluginFactory()` is the only public entry. Two internal helpers in the same `factory.ts` file split the work:
 
 ```
-browserPluginFactory(opts?, browser?)   ← factory.ts
+browserPluginFactory(opts?, browser?)         ← public
         │
-        │  Runs once on call:
+        │  Runs once per factory call:
         │  - validateOptions()
         │  - base path normalization (normalizeBase from browser-env)
-        │  - createSafeBrowser() if no browser provided
+        │  - createDefaultBrowser(base) if no browser provided
+        │      └── memoized getLocation: caches extractPath + safelyEncodePath
+        │          keyed by (location.pathname, location.search) — sentinel "\0"
+        │          for first-call miss
         │  - transitionOptions construction
         │  - SharedFactoryState creation
         │
@@ -72,22 +73,23 @@ browserPluginFactory(opts?, browser?)   ← factory.ts
                 │
                 │  Called by the router on router.usePlugin():
                 │
-                └── new BrowserPlugin(router, api, options, browser, ...)
+                └── createBrowserPlugin(router, api, options, browser, ...)   ← internal function
                             │
-                            │  Constructor:
-                            │  - registers start interceptor (via browser-env)
-                            │  - calls api.extendRouter({buildUrl, matchUrl, replaceHistoryState})
-                            │  - creates popstate handler and lifecycle (via browser-env)
+                            │  Per-plugin-instance setup:
+                            │  - api.claimContextNamespace("browser")
+                            │  - createUpdateBrowserState() — closure with reusable
+                            │    mutable {name, params, path} buffer (browser
+                            │    structured-clones synchronously, so reuse is safe)
+                            │  - createStartInterceptor (via browser-env)
+                            │  - api.extendRouter({buildUrl, matchUrl, replaceHistoryState})
+                            │  - createPopstateHandler + createPopstateLifecycle
                             │
-                            └── .getPlugin()  → Plugin { onStart, onStop, ... }
+                            └── returns Plugin { onStart, onStop, teardown, onTransitionSuccess }
 ```
 
-**Why this split instead of a single object?**
+**Why no class?**
 
-- `factory.ts` runs once — expensive operations (validation, browser creation) don't repeat on every `usePlugin()` call
-- `BrowserPlugin` wires together browser-env helpers with plugin-specific URL logic — a class encapsulates the setup cleanly
-- Testability: `BrowserPlugin` can be instantiated directly with mock `Browser` and `PluginApi` objects
-- Lifecycle: the constructor registers the interceptor and extends the router via `api.extendRouter()`; `teardown` calls the returned unsubscribe to remove extensions
+`createBrowserPlugin` was previously a `BrowserPlugin` class with private fields — but it was `@internal` and never exported. Inlining as a function eliminates one source file and one `export class` from the package surface. The state that lived in private fields (`#claim`, `#updateState`, `#browser`, `#base`) is now closure-captured by `onTransitionSuccess`.
 
 ### Creation Flow
 
@@ -98,45 +100,43 @@ export function browserPluginFactory(opts?, browser?): PluginFactory {
   const options = { ...defaultOptions, ...opts };
   options.base = normalizeBase(options.base);
 
-  const resolvedBrowser =
-    browser ??
-    createSafeBrowser(
-      () =>
-        safelyEncodePath(
-          extractPath(globalThis.location.pathname, options.base),
-        ) + globalThis.location.search,
-      "browser-plugin",
-    );
+  const resolvedBrowser = browser ?? createDefaultBrowser(options.base);
 
-  const transitionOptions = { forceDeactivate, source, replace: true as const };
+  const transitionOptions = {
+    forceDeactivate: options.forceDeactivate,
+    source: POPSTATE_SOURCE,
+    replace: true as const,
+  };
   const shared: SharedFactoryState = { removePopStateListener: undefined };
 
   return function browserPlugin(routerBase) {
-    const plugin = new BrowserPlugin(
-      routerBase,
+    return createBrowserPlugin(
+      routerBase as Router,
       getPluginApi(routerBase),
       options,
       resolvedBrowser,
       transitionOptions,
       shared,
     );
-
-    return plugin.getPlugin();
   };
 }
 ```
 
 ## Browser API Abstraction
 
-The `Browser` interface, `createSafeBrowser()`, `createFallbackBrowser()`, `safelyEncodePath()`, and all SSR fallback logic live in the private `browser-env` package — shared between `browser-plugin` and `hash-plugin`.
+The `Browser` interface, `createSafeBrowser()`, `createHistoryFallbackBrowser()`, `safelyEncodePath()`, and all SSR fallback logic live in `shared/browser-env/` — symlinked into both `browser-plugin` and `hash-plugin` as `src/browser-env/`. Sources:
 
-See [browser-env/ARCHITECTURE.md](../browser-env/ARCHITECTURE.md) for details on the Browser interface and its two implementations.
+- `shared/browser-env/types.ts` — `Browser`, `HistoryBrowser`, `SharedFactoryState`
+- `shared/browser-env/safe-browser.ts` — `createSafeBrowser` (real History API binding)
+- `shared/browser-env/ssr-fallback.ts` — `createHistoryFallbackBrowser` (no-op fallback for SSR/Node)
+- `shared/browser-env/detect.ts` — `isBrowserEnvironment()`
+- `shared/browser-env/history-api.ts` — `pushState`, `replaceState`, `addPopstateListener`, `getHash`
 
 **Key points for browser-plugin:**
 
 - `browserPluginFactory(opts, browser)` accepts an optional `browser` argument for DI / testing
-- If not provided, `createSafeBrowser()` from `browser-env` is called once during factory creation
-- The `getLocation` callback passed to `createSafeBrowser` uses `extractPath(pathname, base)` + `safelyEncodePath()` — plugin-specific URL logic
+- If not provided, `createDefaultBrowser(base)` (in `factory.ts`) wraps `createSafeBrowser()` with a memoized `getLocation` callback (caches `extractPath + safelyEncodePath` keyed by `pathname + search`)
+- `createSafeBrowser` checks `typeof globalThis.window !== "undefined" && !!globalThis.history` once at construction and returns either the real `Browser` or the SSR fallback. Subsequent calls do not repeat the environment check
 - Tests pass a mock `Browser` object directly — no need to mock globals
 
 ## Start Interceptor Integration
@@ -149,8 +149,8 @@ The plugin needs to make `path` optional without changing the core's signature.
 ### Solution: addInterceptor
 
 ```typescript
-// plugin.ts constructor
-this.#removeStartInterceptor = createStartInterceptor(api, browser);
+// factory.ts — createBrowserPlugin
+const removeStartInterceptor = createStartInterceptor(api, browser);
 ```
 
 `createStartInterceptor` from `browser-env` registers an interceptor that intercepts calls to `router.start(path?)`.
@@ -161,7 +161,7 @@ If provided, it passes it through as-is.
 
 - `addInterceptor` is an official core API designed for plugins
 - Interceptors execute in LIFO order (last-registered wraps first); multiple plugins can intercept the same method
-- `#removeStartInterceptor` stores the unsubscribe function — called in `teardown`
+- `removeStartInterceptor` is closure-captured and invoked in `cleanup` (called by `teardown`)
 
 ## Router Augmentation
 
@@ -170,7 +170,7 @@ If provided, it passes it through as-is.
 Router extension involves two layers:
 
 1. **Compile-time types** — `declare module "@real-router/core"` in `index.ts` augments the `Router` interface so TypeScript knows about the new methods.
-2. **Runtime registration** — `api.extendRouter({...})` in `plugin.ts` adds the actual methods to the router instance with conflict detection and automatic cleanup.
+2. **Runtime registration** — `api.extendRouter({...})` in `factory.ts` (inside `createBrowserPlugin`) adds the actual methods to the router instance with conflict detection and automatic cleanup.
 
 ### Type Augmentation (index.ts)
 
@@ -192,18 +192,16 @@ declare module "@real-router/core" {
 }
 ```
 
-### Runtime Registration via extendRouter (plugin.ts)
+### Runtime Registration via extendRouter (factory.ts)
 
-TypeScript augmentation is type-level only. The actual methods are registered in the `BrowserPlugin` constructor via `api.extendRouter()`:
+TypeScript augmentation is type-level only. The actual methods are registered inside `createBrowserPlugin` via `api.extendRouter()`:
 
 ```typescript
-// plugin.ts, constructor
-this.#removeExtensions = api.extendRouter({
+// factory.ts — createBrowserPlugin
+const removeExtensions = api.extendRouter({
   buildUrl: pluginBuildUrl, // buildPath() + buildUrl(path, base)
-  matchUrl: (url: string) => {
-    const path = urlToPath(url, options.base);
-    return path ? api.matchPath(path) : undefined;
-  },
+  matchUrl: (url: string) =>
+    api.matchPath(urlToPath(url, options.base)) ?? undefined,
   replaceHistoryState: createReplaceHistoryState(
     api,
     router,
@@ -222,14 +220,15 @@ this.#removeExtensions = api.extendRouter({
 Lifecycle hooks (`onStart`, `onStop`, `teardown`) are created by `createPopstateLifecycle` from `browser-env`:
 
 ```typescript
-// plugin.ts, constructor
-this.#lifecycle = createPopstateLifecycle({
+// factory.ts — createBrowserPlugin
+const lifecycle = createPopstateLifecycle({
   browser,
   shared,
   handler,
   cleanup: () => {
-    this.#removeStartInterceptor();
-    this.#removeExtensions(); // ← removes buildUrl, matchUrl, replaceHistoryState
+    removeStartInterceptor();
+    removeExtensions(); // ← removes buildUrl, matchUrl, replaceHistoryState
+    claim.release();
   },
 });
 ```
@@ -257,7 +256,7 @@ interface BrowserPluginOptions {
 
 Options are validated at runtime via `validateOptions()` in `validation.ts`, which delegates to `createOptionsValidator` from `browser-env`.
 
-Pure URL functions (`extractPath`, `buildUrl`, `urlToPath`) live in `browser-env/url-utils.ts` (symlink). They accept `base: string` directly rather than the full options object — the calling code in `plugin.ts` already works with validated `Required<BrowserPluginOptions>` and passes the specific values needed.
+Pure URL functions (`extractPath`, `buildUrl`, `urlToPath`) live in `browser-env/url-utils.ts` (symlink). They accept `base: string` directly rather than the full options object — the calling code in `factory.ts` already works with validated `Required<BrowserPluginOptions>` and passes the specific values needed.
 
 Types shared between browser-plugin and hash-plugin (`Browser`, `SharedFactoryState`, etc.) live in `browser-env`.
 
@@ -300,10 +299,10 @@ router.navigate(name, params, opts)
         ├── If paths match (hash preservation):
         │     finalUrl = url + browser.getHash()
         │
-        └── updateBrowserState(toState, finalUrl, shouldReplace, browser)
+        └── updateState(toState, finalUrl, shouldReplace, browser)   ← createUpdateBrowserState() closure
                   │
-                   ├── Create historyState = { name, params, path }
-                   └── browser.pushState() or browser.replaceState()
+                   ├── Reuse mutable buffer { name, params, path } (overwritten in place)
+                   └── browser.pushState() or browser.replaceState()  (browser structured-clones)
 ```
 
 ## Data Flow: popstate (back/forward buttons)
@@ -363,7 +362,7 @@ navigate("page1") done → processDeferredEvent → navigate("page3")
 
 The intermediate `page2` state is skipped — this is expected behavior.
 
-See [browser-env/ARCHITECTURE.md](../browser-env/ARCHITECTURE.md) for implementation details.
+See `shared/browser-env/popstate-handler.ts` (`createPopstateHandler`) for the implementation — `isTransitioning` flag, `deferredEvent` slot, `processDeferredEvent` continuation in `onSettle`.
 
 ## URL Utilities
 
@@ -401,13 +400,12 @@ Simple concatenation: `base + path`.
 
 ## Popstate Utilities, Error Recovery
 
-Popstate event handling (`getRouteFromEvent`, `updateBrowserState`), critical error recovery, and deferred event processing all live in `browser-env` — shared between browser-plugin and hash-plugin.
+Popstate event handling, critical error recovery, and deferred event processing live in `shared/browser-env/`:
 
-See [browser-env/ARCHITECTURE.md](../browser-env/ARCHITECTURE.md) for details on:
-
-- Route extraction from popstate events (history.state validation → URL matching fallback)
-- `historyState` as a subset of `State` (only `name`, `params`, `path` stored in `history.state`)
-- Error categorization (RouterError = expected, anything else = critical recovery via `replaceState`)
+- `shared/browser-env/popstate-utils.ts` — `getRouteFromEvent` (validates `history.state` via `isStateStrict`, falls back to `api.matchPath(browser.getLocation())` when invalid), `updateBrowserState` (legacy), `createUpdateBrowserState` (mutable-buffer factory used by browser-plugin on the hot path)
+- `shared/browser-env/popstate-handler.ts` — `createPopstateHandler` (deferred-queue, last-write-wins, `RouterError` vs critical-error split), `createPopstateLifecycle` (popstate listener add/remove + `cleanup` callback)
+- `historyState` is a subset of `State`: only `{ name, params, path }` are stored in `history.state` — `transition`, `context`, etc. are not persisted across reloads
+- Error categorization in `popstate-handler.ts`: `RouterError` instances are routed through `rollbackUrlToCurrentState()` (sync URL with current router state); anything else triggers `recoverFromCriticalError()` (warns + `replaceState` to last good URL)
 
 ## Options Validation
 
@@ -422,12 +420,13 @@ router.usePlugin(browserPluginFactory(opts))
         ▼
   browserPlugin(router)  ← called by the core
         │
-        ├── new BrowserPlugin(...)
-        │     ├── Registers start interceptor
-        │     └── api.extendRouter({buildUrl, matchUrl, replaceHistoryState})
-        │           → stores returned unsubscribe as #removeExtensions
-        │
-        └── plugin.getPlugin() → { onStart, onStop, onTransitionSuccess, teardown }
+        └── createBrowserPlugin(router, api, options, browser, ...)   ← internal function
+              ├── Claims context namespace ("browser")
+              ├── Creates updateState = createUpdateBrowserState() (per-instance buffer)
+              ├── Registers start interceptor (closure-captured removeStartInterceptor)
+              ├── api.extendRouter({buildUrl, matchUrl, replaceHistoryState})
+              │     → closure-captured removeExtensions
+              └── Returns Plugin { onStart, onStop, onTransitionSuccess, teardown }
 
 router.start()
         │
@@ -440,7 +439,11 @@ router.navigate() → success
         │
         ▼
   Plugin.onTransitionSuccess()
-        └── pushState / replaceState
+        ├── shouldReplaceHistory(navOptions, toState, fromState)
+        ├── url = buildUrl(toState.path, base)
+        ├── hash = (same path or first nav) ? browser.getHash() : ""
+        ├── updateState(toState, finalUrl, replaceHistory, browser)  ← reuses buffer
+        └── claim.write(toState, FROZEN_POPSTATE | FROZEN_NAVIGATE)
 
 router.stop()
         │
@@ -453,8 +456,7 @@ unsubscribe() or router.dispose()
         ▼
   Plugin.teardown()
         ├── Removes popstate listener
-        ├── Unregisters start interceptor (#removeStartInterceptor)
-        └── Removes router extensions (#removeExtensions)
+        └── cleanup() — calls removeStartInterceptor(), removeExtensions(), claim.release()
 ```
 
 ## History Mode
@@ -477,34 +479,41 @@ Requires a server-side fallback (all paths → `index.html`).
 ### Hash Fragment Preservation
 
 ```typescript
-// plugin.ts
+// factory.ts — onTransitionSuccess
 const shouldPreserveHash = !fromState || fromState.path === toState.path;
 
-const finalUrl = shouldPreserveHash ? url + this.#browser.getHash() : url;
+const hash = shouldPreserveHash ? browser.getHash() : "";
+const finalUrl = hash ? url + hash : url;
 ```
 
 The hash fragment (`#section`) is always preserved when navigating to the same path (or on first navigation). On a route change, the hash is cleared.
 
 ## Performance
 
-| Optimization                        | Location       | Effect                                                |
-| ----------------------------------- | -------------- | ----------------------------------------------------- |
-| `String.startsWith` + `slice`       | `browser-env/url-utils.ts` | No regex needed for base path stripping   |
-| `isTransitioning` flag              | `browser-env`  | Blocks concurrent popstate processing without a queue |
-| Last-write-wins for deferred events | `browser-env`  | Intermediate states are skipped without accumulation  |
-| `historyState` as a subset of State | `browser-env`  | Less data stored in `history.state`                   |
-| `createSafeBrowser()` called once   | `factory.ts`   | Environment check doesn't repeat                      |
+| Optimization                                          | Location                                  | Effect                                                                                    |
+| ----------------------------------------------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `String.startsWith` + `slice`                         | `browser-env/url-utils.ts`                | No regex needed for base path stripping                                                   |
+| `isTransitioning` flag                                | `browser-env`                             | Blocks concurrent popstate processing without a queue                                     |
+| Last-write-wins for deferred events                   | `browser-env`                             | Intermediate states are skipped without accumulation                                      |
+| `historyState` as a subset of `State`                 | `browser-env`                             | Less data stored in `history.state`                                                       |
+| `createSafeBrowser()` called once                     | `factory.ts`                              | Environment check doesn't repeat                                                          |
+| `FROZEN_POPSTATE` / `FROZEN_NAVIGATE` constants       | `factory.ts:32-33`                        | Pre-frozen `BrowserContext` literals — no `Object.freeze()` allocation per `onTransitionSuccess` |
+| Mutable `historyState` buffer (`createUpdateBrowserState`) | `browser-env/popstate-utils.ts`      | Per-instance closure reuses one `{ name, params, path }` object across `pushState`/`replaceState` (browser structured-clones synchronously, so reuse is safe) |
+| Memoized `getLocation` (`createDefaultBrowser`)       | `factory.ts:79-97`                        | Skips `extractPath + safelyEncodePath` when `(pathname, search)` is unchanged since the last call (popstate-storm benefit) |
+| `buildUrl(toState.path, base)` instead of `buildPath` | `factory.ts:170`                          | Skips re-running `buildPath()` in `onTransitionSuccess` — `toState.path` is already final |
 
 ## Stress Test Coverage
 
-6 stress tests in `tests/stress/` validate behavior under extreme conditions:
+Stress tests in `tests/stress/` validate behavior under extreme conditions:
 
-| Category  | Tests                                             | What they verify                                       |
-| --------- | ------------------------------------------------- | ------------------------------------------------------ |
-| Popstate  | popstate-storm, popstate-navigate-interleave      | Rapid back/forward, popstate during navigation         |
-| Guards    | cannot-deactivate-storm                           | canDeactivate guard blocking under rapid back/forward  |
-| State     | corrupted-state-storm, history-state-accumulation | Corrupted history.state recovery, history entry growth |
-| Lifecycle | plugin-lifecycle-churn                            | Rapid plugin register/unregister cycles                |
+| Category  | Tests                                                              | What they verify                                                            |
+| --------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------- |
+| Popstate  | popstate-storm, popstate-navigate-interleave                       | Rapid back/forward, popstate during navigation                              |
+| Guards    | cannot-deactivate-storm, mixed-guards                              | canDeactivate guard blocking under rapid back/forward; mixed sync/async timing |
+| State     | corrupted-state-storm, history-state-accumulation, exotic-state    | Corrupted `history.state` recovery, history entry growth, non-cloneable state values |
+| Lifecycle | plugin-lifecycle-churn, teardown-mid-nav, factory-instance-cleanup | Rapid plugin register/unregister, teardown during in-flight navigation, factory pool disposal |
+| Memory    | history-state-accumulation (10K + heap snapshot)                   | Heap stability across long-running session                                  |
+| Race      | replace-vs-navigate                                                | `replaceHistoryState` racing concurrent `navigate()` calls                  |
 
 ## Related Documents
 

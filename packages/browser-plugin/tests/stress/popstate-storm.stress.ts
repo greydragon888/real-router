@@ -12,6 +12,7 @@ import {
 
 import {
   createStressRouter,
+  expectedStressError,
   makePopstateState,
   waitForTransitions,
   roundRobinStates,
@@ -137,7 +138,7 @@ describe("B1 — Popstate Storm", () => {
     expect(router.getState()?.name).toBe(lastRouteName);
     expect(router.isActive()).toBe(true);
 
-    await router.navigate("home").catch(noop);
+    await router.navigate("home").catch(expectedStressError);
 
     expect(router.getState()?.name).toBe("home");
   });
@@ -173,7 +174,7 @@ describe("B1 — Popstate Storm", () => {
     const { dispatchPopstate } = result;
 
     await router.start();
-    await router.navigate("home").catch(noop);
+    await router.navigate("home").catch(expectedStressError);
 
     const homeState = makePopstateState("home", {}, "/home");
     const stateBefore = router.getState();

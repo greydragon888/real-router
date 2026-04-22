@@ -69,9 +69,10 @@ describe("Browser Plugin — Compatibility", () => {
 
       await Promise.all(promises);
 
-      expect(router.getState()).toBeDefined();
+      const finalState = router.getState();
+
       expect(
-        router.isActiveRoute("home") || router.isActiveRoute("users.list"),
+        finalState?.name === "home" || finalState?.name === "users.list",
       ).toBe(true);
     });
 
@@ -96,7 +97,9 @@ describe("Browser Plugin — Compatibility", () => {
       // onPopState is async, wait for microtasks to settle
       await new Promise((resolve) => setTimeout(resolve, 50));
 
-      expect(router.getState()).toBeDefined();
+      const finalState = router.getState();
+
+      expect(routes).toContain(finalState?.name);
     });
 
     it("handles memory cleanup on repeated plugin lifecycle", async () => {
@@ -122,7 +125,7 @@ describe("Browser Plugin — Compatibility", () => {
 
       await finalRouter.start();
 
-      expect(finalRouter.getState()?.name).toBeDefined();
+      expect(finalRouter.getState()?.name).toBe("home");
 
       finalRouter.stop();
       finalUnsub();
@@ -263,7 +266,7 @@ describe("Browser Plugin — Compatibility", () => {
 
         await ssrRouter.start();
 
-        expect(ssrRouter.getState()).toBeDefined();
+        expect(ssrRouter.getState()?.name).toBe("index");
 
         await ssrRouter.navigate("users.list");
 

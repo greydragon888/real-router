@@ -26,8 +26,7 @@ describe("Browser Plugin URL Invariants", () => {
         const url = router.buildUrl(name);
         const state = router.matchUrl(url);
 
-        expect(state).toBeDefined();
-        expect(state!.name).toBe(name);
+        expect(state?.name).toBe(name);
       },
     );
 
@@ -37,9 +36,8 @@ describe("Browser Plugin URL Invariants", () => {
         const url = router.buildUrl(PARAM_ROUTE_NAME, params);
         const state = router.matchUrl(url);
 
-        expect(state).toBeDefined();
-        expect(state!.name).toBe(PARAM_ROUTE_NAME);
-        expect(state!.params.id).toBe(params.id);
+        expect(state?.name).toBe(PARAM_ROUTE_NAME);
+        expect(state?.params.id).toBe(params.id);
       },
     );
 
@@ -97,8 +95,7 @@ describe("Browser Plugin URL Invariants", () => {
         const url = router.buildUrl(name);
         const state = router.matchUrl(url);
 
-        expect(state).toBeDefined();
-        expect(state!.name).toBe(name);
+        expect(state?.name).toBe(name);
       },
     );
 
@@ -111,9 +108,8 @@ describe("Browser Plugin URL Invariants", () => {
         const url = router.buildUrl(PARAM_ROUTE_NAME, params);
         const state = router.matchUrl(url);
 
-        expect(state).toBeDefined();
-        expect(state!.name).toBe(PARAM_ROUTE_NAME);
-        expect(state!.params.id).toBe(params.id);
+        expect(state?.name).toBe(PARAM_ROUTE_NAME);
+        expect(state?.params.id).toBe(params.id);
       },
     );
   });
@@ -152,8 +148,7 @@ describe("Browser Plugin URL Invariants", () => {
         const url = router.buildUrl(name);
         const state = router.matchUrl(`${url}?${qs}`);
 
-        expect(state).toBeDefined();
-        expect(state!.name).toBe(name);
+        expect(state?.name).toBe(name);
       },
     );
 
@@ -163,9 +158,8 @@ describe("Browser Plugin URL Invariants", () => {
         const url = router.buildUrl(PARAM_ROUTE_NAME, params);
         const state = router.matchUrl(`${url}?${qs}`);
 
-        expect(state).toBeDefined();
-        expect(state!.name).toBe(PARAM_ROUTE_NAME);
-        expect(state!.params.id).toBe(params.id);
+        expect(state?.name).toBe(PARAM_ROUTE_NAME);
+        expect(state?.params.id).toBe(params.id);
       },
     );
   });

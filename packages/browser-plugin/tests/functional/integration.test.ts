@@ -267,8 +267,25 @@ describe("Browser Plugin Integration", () => {
       );
       router.usePlugin(browserPluginFactory({}, mockedBrowser));
 
-      // Should not crash
-      await expect(router.start()).resolves.toBeDefined();
+      // start() must resolve (the error in the other plugin's onStart is
+      // expected to propagate via $$error but not crash the start sequence).
+      // The mocked browser starts at "/" → resolves to the "index" route.
+      const startState = await router.start();
+
+      expect(startState.name).toBe("index");
+
+      // The browser plugin must have written history.state for the start
+      // navigation — this is what proves it is "still working" after the
+      // sibling plugin's onStart threw. Without this assertion the test
+      // would pass even if browserPlugin's lifecycle was silently broken.
+      expect(currentHistoryState?.name).toBe("index");
+      expect(currentHistoryState?.path).toBe("/");
+
+      // Subsequent navigation should also flow through browser-plugin.
+      await router.navigate("users.list");
+
+      expect(currentHistoryState?.name).toBe("users.list");
+      expect(currentHistoryState?.path).toBe("/users/list");
     });
   });
 
