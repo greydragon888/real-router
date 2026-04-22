@@ -41,9 +41,19 @@ describe("S10: back() targeting an entry whose route was removed mid-session", (
 
       await settle();
 
-      // canGoBack()/canGoForward() return booleans — index didn't end up NaN.
-      expect(typeof router.canGoBack()).toBe("boolean");
-      expect(typeof router.canGoForward()).toBe("boolean");
+      // History was [a, b], index=1. back() fires navigate("a") with params
+      // captured at push time. The concrete landing depends on how core's
+      // routes.replace() revalidates the current state — we don't assert the
+      // name here. What we DO assert: router still has a valid state, and
+      // context.memory.historyIndex is in range [0..1] (2-entry history, or
+      // 1 if revalidation collapsed it).
+      const memory = router.getState()?.context.memory as
+        | { historyIndex: number }
+        | undefined;
+
+      expect(memory).toBeDefined();
+      expect(memory!.historyIndex).toBeGreaterThanOrEqual(0);
+      expect(memory!.historyIndex).toBeLessThanOrEqual(1);
     } finally {
       router.stop();
       unsubscribe();
