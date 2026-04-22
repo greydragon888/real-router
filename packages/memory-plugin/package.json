@@ -1,6 +1,6 @@
 {
   "name": "@real-router/memory-plugin",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "type": "commonjs",
   "description": "In-memory history engine for Real-Router — non-browser environments and benchmarks",
   "main": "./dist/cjs/index.js",

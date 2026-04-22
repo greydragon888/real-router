@@ -5,6 +5,391 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-04-22]
+
+### @real-router/browser-plugin@0.15.0
+
+### Minor Changes
+
+- [#511](https://github.com/greydragon888/real-router/pull/511) [`12f81b4`](https://github.com/greydragon888/real-router/commit/12f81b4daeaef26e443d3ab9ad5b2cf491583d15) Thanks [@greydragon888](https://github.com/greydragon888)! - Desktop environments support (Electron, Tauri) ([#496](https://github.com/greydragon888/real-router/issues/496))
+
+  `safeParseUrl` no longer depends on `globalThis.location.origin` and no longer filters by scheme. The plugin now works out of the box in Electron (`app://`, `file://` with custom protocol) and Tauri (`tauri://`, `https://tauri.localhost`, `asset://`).
+
+  **What changed**
+  - Removed `new URL(url, globalThis.location.origin)` — previously threw `TypeError` on `file://` where `location.origin === "null"`.
+  - Removed HTTP(S) protocol whitelist — arbitrary schemes (`tauri://`, `app://`, `custom-protocol://`, …) now pass through.
+  - `matchUrl()` is now scheme-agnostic: it extracts `pathname + search + hash` and routes on the path alone. Security against malicious URLs comes from route matching (unknown paths return `undefined`), not from scheme filtering.
+
+  **Migration**
+
+  No source changes required. If you relied on the `"Invalid URL protocol"` warning to reject non-HTTP URLs, route-level matching now handles this — `router.matchUrl("javascript:alert(1)")` still returns `undefined`.
+
+### Patch Changes
+
+- [#511](https://github.com/greydragon888/real-router/pull/511) [`12f81b4`](https://github.com/greydragon888/real-router/commit/12f81b4daeaef26e443d3ab9ad5b2cf491583d15) Thanks [@greydragon888](https://github.com/greydragon888)! - Hot-path and code-quality cleanup from audit ([#470](https://github.com/greydragon888/real-router/issues/470))
+
+  Audit follow-up — Priority 4 items from `packages/browser-plugin/.claude/review-2026-04-17.md`:
+  - **`history.state` buffer reuse ([#8](https://github.com/greydragon888/real-router/issues/8).2 H5/A2):** new `createUpdateBrowserState()`
+    factory returns a closure that reuses one mutable `{ name, params, path }`
+    object across `pushState`/`replaceState` calls. Browsers structured-clone
+    `history.state` synchronously, so the buffer never escapes — eliminates
+    one allocation per navigation on the hot path.
+  - **`getLocation` memoization ([#8](https://github.com/greydragon888/real-router/issues/8).2 A7):** the default `Browser` now caches the
+    last `extractPath + safelyEncodePath` result keyed by `(pathname, search)`,
+    so popstate-storms hitting the same URL do not re-encode every time.
+  - **`NavigationOptions.source` typed via module augmentation ([#8](https://github.com/greydragon888/real-router/issues/8).1):**
+    `declare module "@real-router/types"` adds an optional `source?: string`
+    field to `NavigationOptions`, replacing the
+    `(navOptions as Record<string, unknown>).source` cast in
+    `onTransitionSuccess`.
+  - **Internal class removed ([#8](https://github.com/greydragon888/real-router/issues/8).4):** the `BrowserPlugin` class was an
+    `@internal` implementation detail — its constructor and `getPlugin()`
+    method are now plain functions inside `factory.ts`, removing one source
+    file and the only `export class` in the package.
+
+  No public API changes. The `createUpdateBrowserState` export from the private
+  `browser-env` workspace is available to other plugins (hash-plugin,
+  navigation-plugin) that want the same allocation savings.
+
+- [#511](https://github.com/greydragon888/real-router/pull/511) [`12f81b4`](https://github.com/greydragon888/real-router/commit/12f81b4daeaef26e443d3ab9ad5b2cf491583d15) Thanks [@greydragon888](https://github.com/greydragon888)! - Reduce per-call allocation in `router.replaceHistoryState()` ([#470](https://github.com/greydragon888/real-router/issues/470))
+
+  Audit follow-up from `packages/browser-plugin/.claude/review-2026-04-22.md`
+  (section 8a.6 / 8c.6). `createReplaceHistoryState` in the shared `browser-env`
+  helper now creates a single mutable `{ name, params, path }` buffer via
+  `createUpdateBrowserState()` once per plugin instance and reuses it on every
+  `router.replaceHistoryState(name, params)` call. The previous implementation
+  allocated a fresh literal on each call — wasteful for UI-heavy flows that
+  replace history on every reactive state change.
+
+  Also refactors `shouldReplaceHistory` into three explicit branches, removing
+  the `eslint-disable @typescript-eslint/no-unnecessary-condition` comment.
+  Extracts the `PopstateTransitionOptions` type into `shared/browser-env` so
+  it is no longer duplicated inline in `browser-plugin`'s factory.
+
+  No public API changes. Documentation fixes:
+  - `ARCHITECTURE.md` removed the non-existent `title?: string` parameter from
+    the documented `replaceHistoryState` signature.
+  - `README.md` SSR section rewritten — `buildUrl` / `matchUrl` are
+    environment-agnostic and work in SSR (the previous text claimed the plugin
+    returns "path without base", which was incorrect).
+  - New "Navigation Source" section describing `state.context.browser.source`
+    (`"navigate"` / `"popstate"`) with the zero-allocation frozen-literal note.
+
+- [#511](https://github.com/greydragon888/real-router/pull/511) [`12f81b4`](https://github.com/greydragon888/real-router/commit/12f81b4daeaef26e443d3ab9ad5b2cf491583d15) Thanks [@greydragon888](https://github.com/greydragon888)! - Test-suite hardening and new invariants from audit ([#470](https://github.com/greydragon888/real-router/issues/470))
+
+  Audit follow-up from `packages/browser-plugin/.claude/review-2026-04-22.md`
+  (sections 1, 2, 4, 5, 6, 7). No runtime behaviour changes — documentation
+  and test coverage only.
+
+  **New property-based invariants (`tests/property/`):**
+  - `safeParseUrl` is total — never throws and always returns string-typed
+    fields for any input (2000 runs).
+  - `safeParseUrl` scheme-less path input partitions exactly into
+    `pathname + search + hash`.
+  - `extractPath` is idempotent with an empty base.
+  - `buildUrl` always starts with `base` (or `/` when base is empty).
+  - `buildUrl` composes with `extractPath` for leading-slash paths:
+    `extractPath(buildUrl(p, b), b) === p`.
+  - `normalizeBase` is idempotent — `normalizeBase(normalizeBase(x)) === normalizeBase(x)`.
+  - `normalizeBase` produces canonical form — empty or leading-slash, no
+    trailing slash, no `//` runs.
+  - `shouldReplaceHistory` truth-table covers all `replace × reload × fromState`
+    combinations (1000 runs).
+
+  **Generator improvements:**
+  - `arbNormalizedBase` now includes a generator for deep-nested bases
+    (2–5 segments) in addition to the curated fixed list.
+  - `arbQueryString` mixes three value shapes: alphanumeric, percent-encoded,
+    and empty (`?key=`).
+
+  **New stress scenarios (`tests/stress/`):**
+  - `buildurl-allocation.stress.ts` (B7.8) — 10 000 `router.buildUrl()` calls
+    keep heap growth under a generous ceiling (catches closure / memoization
+    leaks on the per-render hot path).
+  - `popstate-during-recovery.stress.ts` (B7.7) — 100 interleaved popstate
+    bursts arriving during CANNOT_DEACTIVATE recovery rollback. Verifies the
+    deferred queue absorbs them, no plugin-level `Critical error`/`Failed to
+recover` logs fire, and a fresh navigation still settles afterwards.
+
+  **Functional assertion upgrades:**
+  - `lifecycle.test.ts` — new test documents the gotcha "explicit `replace:
+false` on first navigation → push" with a `pushSpy.toHaveBeenCalledTimes(1)`
+    assertion.
+  - `popstate.test.ts` null-state test asserts the current state is unchanged
+    (or settles on UNKNOWN_ROUTE), and the meta-params edge case asserts
+    stray root-level `meta` does not leak into `state.params`.
+  - `integration.test.ts` state-modifier test replaces the weak
+    `toBeGreaterThan(0)` with a lower-bound + last-entry assertion.
+  - `security.test.ts` function/symbol param tests replaced the tautological
+    `toBeDefined() + typeof string` with a concrete expected URL.
+  - `compat.test.ts` SSR block gets a warn-once verification — running start +
+    4 navigations produces at most 2 SSR warnings (one per warnOnce closure
+    inside `createSafeBrowser`), not N.
+
+- [#511](https://github.com/greydragon888/real-router/pull/511) [`12f81b4`](https://github.com/greydragon888/real-router/commit/12f81b4daeaef26e443d3ab9ad5b2cf491583d15) Thanks [@greydragon888](https://github.com/greydragon888)! - Test-suite hardening + documentation cleanup from audit ([#470](https://github.com/greydragon888/real-router/issues/470))
+
+  Audit follow-up — Priority 2 (documentation) and Priority 3 (tests) items
+  from `packages/browser-plugin/.claude/review-2026-04-17.md`.
+
+  **Documentation:**
+  - Replaced 3 dead links to `../browser-env/ARCHITECTURE.md` (no such
+    package — only `shared/browser-env/`) with concrete file references
+    inside `shared/browser-env/`.
+  - `Performance` table in `ARCHITECTURE.md` extended with the hot-path
+    optimisations applied in the previous changeset (`FROZEN_POPSTATE`/
+    `FROZEN_NAVIGATE` constants, mutable `historyState` buffer via
+    `createUpdateBrowserState`, memoised `getLocation`, `buildUrl`
+    shortcut against `toState.path`).
+  - `Plugin Lifecycle` / `Factory Pattern` / data-flow sections rewritten
+    to match the post-class structure (`createBrowserPlugin` function +
+    `createDefaultBrowser` instead of `class BrowserPlugin`).
+
+  **Tests:**
+  - Replaced weak `expect(state).toBeDefined()` pre-checks with
+    `expect(state?.<field>).toBe(<concrete value>)` across the property
+    suite (`browserPlugin.properties.ts`) and 4 functional files
+    (`lifecycle.test.ts`, `url.test.ts`, `compat.test.ts`,
+    `integration.test.ts`). `expect(getState()).toBeDefined()` etc.
+    replaced with the actual expected route name.
+  - New `expectedStressError` helper in `tests/stress/helpers.ts`
+    whitelists only `SAME_STATES`, `TRANSITION_CANCELLED`,
+    `ROUTE_NOT_FOUND`, `ROUTER_NOT_STARTED`. All 21 `.catch(noop)` calls
+    in the 5 existing stress files now use it — any other RouterError code
+    or non-RouterError surfaces as a real test failure instead of being
+    silently swallowed.
+  - `integration.test.ts` "browser plugin works when other plugins throw on
+    start" now also asserts `currentHistoryState` after `start()` and
+    after a subsequent `navigate()` — proving the plugin keeps writing
+    history state, not just that `start()` resolves.
+  - New functional test in `popstate.test.ts` covers the real
+    CANNOT_DEACTIVATE recovery path: a deactivate-guard blocks a popstate
+    back-navigation, and the plugin restores the URL via `replaceState`
+    with the previous state. Closes the gap noted in §4 of the audit
+    ("gotcha promised but not actually tested").
+  - Five new stress files for previously missing scenarios:
+    - `replace-vs-navigate.stress.ts` — race between
+      `replaceHistoryState` and concurrent `navigate()`.
+    - `heap-snapshot.stress.ts` — 10 000 navigations with
+      `process.memoryUsage().heapUsed` delta < 50 MiB (uses `--expose-gc`
+      already enabled in `vitest.config.stress.mts`).
+    - `factory-instance-cleanup.stress.ts` — 100 routers built from one
+      factory, asserts net-zero `addEventListener`/`removeEventListener
+("popstate")` after teardown.
+    - `mixed-async-guards.stress.ts` — sync / 10ms / 200ms guards on
+      different routes, 200 navigations, no wedge / no `console.error`.
+    - `exotic-state.stress.ts` — 1000 popstate events with
+      `Map`/`Date`/Symbol-keyed/closure values; `isStateStrict` must
+      filter all of them.
+
+  No public API changes.
+
+### @real-router/hash-plugin@0.6.0
+
+### Minor Changes
+
+- [#511](https://github.com/greydragon888/real-router/pull/511) [`12f81b4`](https://github.com/greydragon888/real-router/commit/12f81b4daeaef26e443d3ab9ad5b2cf491583d15) Thanks [@greydragon888](https://github.com/greydragon888)! - Desktop environments support (Electron, Tauri) ([#496](https://github.com/greydragon888/real-router/issues/496))
+
+  `safeParseUrl` (shared with `browser-plugin` and `navigation-plugin`) no longer depends on `globalThis.location.origin` and no longer filters by scheme. Hash routing now works uniformly in Electron `file://` mode (where `location.origin === "null"` previously caused `TypeError`), Tauri webviews, and any other webview that may ship with non-HTTP origins.
+
+  **What changed**
+  - `hashUrlToPath` now returns `string` (never `null`) — the parser is total.
+  - Scheme whitelist removed. Any URL with a hash fragment is parsed, regardless of scheme.
+
+  **Migration**
+
+  No source changes required. `hash-plugin` remains the safest option for Electron apps that cannot configure a custom protocol handler — hash routing never hits the `SecurityError` that History API triggers on `file://`.
+
+### Patch Changes
+
+- [#511](https://github.com/greydragon888/real-router/pull/511) [`12f81b4`](https://github.com/greydragon888/real-router/commit/12f81b4daeaef26e443d3ab9ad5b2cf491583d15) Thanks [@greydragon888](https://github.com/greydragon888)! - Internal refactors: filter explicit `undefined` option values and remove `router.buildUrl` indirection ([#511](https://github.com/greydragon888/real-router/issues/511))
+  - **Bug fix**: `hashPluginFactory({ hashPrefix: undefined })` now correctly falls back to the default `""` instead of producing `urlPrefix: "#undefined"`. Previously, explicit `undefined` values leaked through `{ ...defaults, ...opts }` spread because `undefined` is a legitimate enumerable own property.
+  - **Refactor**: the popstate-handler `buildUrl` callback now uses the pre-computed `pluginBuildUrl` closure directly instead of going through `router.buildUrl(name, params)` wrapper (removes one level of indirection on the error-recovery path).
+  - **Refactor**: `loggerContext` in `createPopstateHandler` now references the `LOGGER_CONTEXT` constant from `src/constants.ts` instead of a duplicated string literal.
+
+  No public API changes.
+
+- [#511](https://github.com/greydragon888/real-router/pull/511) [`12f81b4`](https://github.com/greydragon888/real-router/commit/12f81b4daeaef26e443d3ab9ad5b2cf491583d15) Thanks [@greydragon888](https://github.com/greydragon888)! - Reduce per-call allocation in `router.replaceHistoryState()` ([#470](https://github.com/greydragon888/real-router/issues/470))
+
+  Shared `createReplaceHistoryState` helper in `browser-env` now reuses a
+  mutable `{ name, params, path }` buffer via `createUpdateBrowserState()`
+  across calls instead of allocating a fresh literal per invocation. Hash
+  plugin benefits transparently — no API change.
+
+- [#511](https://github.com/greydragon888/real-router/pull/511) [`12f81b4`](https://github.com/greydragon888/real-router/commit/12f81b4daeaef26e443d3ab9ad5b2cf491583d15) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `extractHashPath("#", regex)` returning `"#"` when `hashPrefix` is configured ([#504](https://github.com/greydragon888/real-router/issues/504))
+
+  A bare `#` or empty hash now consistently resolves to `"/"` regardless of the configured `hashPrefix`. Previously, when a non-null `prefixRegex` was compiled (e.g. from `hashPrefix: "!"`), a bare `#` was returned verbatim because the regex did not match, and the `path || "/"` fallback was never triggered.
+
+  **Impact:** `router.matchUrl("https://example.com/#")` now correctly matches the index route instead of returning `undefined` when a non-empty `hashPrefix` is configured.
+
+  ```diff
+    export function extractHashPath(hash: string, prefixRegex: RegExp | null): string {
+  +   if (hash === "" || hash === "#") {
+  +     return "/";
+  +   }
+      const path = prefixRegex ? hash.replace(prefixRegex, "") : hash.slice(1);
+      return path || "/";
+    }
+  ```
+
+### @real-router/navigation-plugin@0.5.0
+
+### Minor Changes
+
+- [#511](https://github.com/greydragon888/real-router/pull/511) [`12f81b4`](https://github.com/greydragon888/real-router/commit/12f81b4daeaef26e443d3ab9ad5b2cf491583d15) Thanks [@greydragon888](https://github.com/greydragon888)! - Desktop environments support (Electron, Tauri) ([#496](https://github.com/greydragon888/real-router/issues/496))
+
+  `safeParseUrl` (shared with `browser-plugin`) no longer depends on `globalThis.location.origin` and no longer filters by scheme. The plugin now works in desktop webviews with non-HTTP origins, subject to Navigation API availability (Safari 26.2+, WebKitGTK 2.52+, Chromium-based webviews).
+
+  **What changed**
+  - URL parsing is now scheme-agnostic. `matchUrl()`, `peekBack()`, `peekForward()`, `hasVisited()`, `getVisitedRoutes()`, `traverseToLast()`, `canGoBackTo()` work against any `NavigationHistoryEntry.url`, regardless of scheme.
+  - `extractPathFromAbsoluteUrl` / `urlToPath` signatures dropped the unused `context` parameter; the parser is total (always returns a string).
+
+  **Migration**
+
+  No source changes required. For developers targeting WKWebView (macOS/iOS ≤ 26.1) or WebKitGTK ≤ 2.50, prefer `@real-router/browser-plugin` — `navigation-plugin` extensions (`peekBack`, `peekForward`, `traverseToLast`, etc.) have no automatic downgrade and will throw at runtime if the Navigation API is missing.
+
+### Patch Changes
+
+- [#511](https://github.com/greydragon888/real-router/pull/511) [`12f81b4`](https://github.com/greydragon888/real-router/commit/12f81b4daeaef26e443d3ab9ad5b2cf491583d15) Thanks [@greydragon888](https://github.com/greydragon888)! - Replace `new URL()` with `safeParseUrl()` on the navigate-event hot path ([#496](https://github.com/greydragon888/real-router/issues/496))
+
+  `handleNavigateEvent` used `new URL(event.destination.url)` to extract
+  `pathname` + `search`. The `safeParseUrl` manual parser (already on the
+  hot path via `entryToState`) is 4–6× faster and allocates no `URL` object.
+
+  This removes one `URL` construction per browser-initiated navigation
+  (back/forward, link click, programmatic `navigation.navigate()`).
+  No behavior change — the Navigation API guarantees absolute URLs, and
+  `safeParseUrl` returns identical `pathname`/`search` for them.
+
+- [#511](https://github.com/greydragon888/real-router/pull/511) [`12f81b4`](https://github.com/greydragon888/real-router/commit/12f81b4daeaef26e443d3ab9ad5b2cf491583d15) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `replaceHistoryState` hash preservation and guard `isSyncingFromRouter` against stuck state ([#496](https://github.com/greydragon888/real-router/issues/496))
+
+  Two related correctness fixes in the navigation-plugin internals:
+
+  **1. `replaceHistoryState` now preserves `location.hash`** — symmetric with `onTransitionSuccess`.
+
+  ```ts
+  // URL before: /home#anchor
+  router.replaceHistoryState("users.view", { id: "123" });
+  // URL after:  /users/view/123#anchor  (hash preserved)
+  ```
+
+  This matches the behavior already documented in `CLAUDE.md` and the wiki.
+  Previously the local `createReplaceHistoryState` implementation dropped the
+  hash, while the equivalent helper in `browser-plugin` kept it — causing a
+  subtle divergence between the two plugins.
+
+  **2. `isSyncingFromRouter` is now released in a `finally` block** at all three
+  set-sites (`onTransitionSuccess`, `createReplaceHistoryState`, and the
+  navigate-error recovery path). If the internal `browser.navigate` /
+  `browser.replaceState` / `browser.traverseTo` call throws, the sync flag
+  will no longer get stuck in the `true` state, which previously caused
+  all subsequent browser-initiated navigations to be silently ignored.
+
+  This enforces invariant D4 from `INVARIANTS.md` ("isSyncingFromRouter Error
+  Recovery") — see `packages/navigation-plugin/INVARIANTS.md`.
+
+### @real-router/memory-plugin@0.3.4
+
+### Patch Changes
+
+- [#511](https://github.com/greydragon888/real-router/pull/511) [`12f81b4`](https://github.com/greydragon888/real-router/commit/12f81b4daeaef26e443d3ab9ad5b2cf491583d15) Thanks [@greydragon888](https://github.com/greydragon888)! - Hot-path and code-quality cleanup from audit ([#510](https://github.com/greydragon888/real-router/issues/510), [#511](https://github.com/greydragon888/real-router/issues/511))
+
+  Audit follow-up — items from `packages/memory-plugin/.claude/review-2026-04-22.md`:
+  - **`MemoryContext` per-call freeze removed (#8c.1):** `#writeMemoryContext` no
+    longer wraps the `{ direction, historyIndex }` literal in `Object.freeze()`
+    on every successful transition. The freeze was a half-measure — `state.context`
+    itself is intentionally **not** frozen by core (`packages/core/src/helpers.ts`),
+    so a consumer can already overwrite `state.context.memory = {...}` regardless.
+    Immutability is now expressed at the type level: both fields of
+    `MemoryContext` are marked `readonly`. Eliminates one freeze (~18ns) per
+    successful navigation on the hot path.
+  - **`#go(delta)` promise chain flattened (#8c.2):** `.catch().finally()` was
+    replaced with `.then(onResolve, onReject)`. The reject handler now performs
+    both the `#index` revert and the `#navigatingFromHistory` flag reset, so the
+    observable behaviour is unchanged. Saves one promise + one microtask per
+    `back()` / `forward()` / `go(delta)` invocation.
+  - **Redundant `Number.isFinite` check dropped ([#9](https://github.com/greydragon888/real-router/issues/9).3):** the guard at the top of
+    `#go(delta)` simplified from
+    `delta === 0 || !Number.isFinite(delta) || !Number.isInteger(delta)` to
+    `!Number.isInteger(delta) || delta === 0`. `Number.isInteger` already returns
+    `false` for `NaN`, `±Infinity`, fractional values, and non-numbers, so the
+    finite-check was redundant. Existing functional tests for `go(NaN)`,
+    `go(Infinity)`, `go(-Infinity)`, `go(0.5)`, `go(-1.7)` continue to pass.
+
+  No public API changes. The frozen-context test
+  (`tests/functional/plugin.test.ts` — "context.memory is frozen") was updated
+  to assert the structural shape via `toStrictEqual` instead of
+  `Object.isFrozen`. If your code branches on `Object.isFrozen(state.context.memory)`,
+  update it to rely on the `readonly` typing instead.
+
+- [#511](https://github.com/greydragon888/real-router/pull/511) [`12f81b4`](https://github.com/greydragon888/real-router/commit/12f81b4daeaef26e443d3ab9ad5b2cf491583d15) Thanks [@greydragon888](https://github.com/greydragon888)! - Test-suite hardening and new invariants from audit ([#511](https://github.com/greydragon888/real-router/issues/511))
+
+  Audit follow-up — items from `packages/memory-plugin/.claude/review-2026-04-22.md`
+  (categories 1, 3, 4, 5, 7, 10-13). No runtime behaviour changes — this is
+  exclusively documentation and test coverage work.
+
+  **New property-based invariants (`tests/property/`, [#3](https://github.com/greydragon888/real-router/issues/3)/[#6](https://github.com/greydragon888/real-router/issues/6).3):**
+  - `direction === 'navigate'` is written for every successful push (including
+    the first one from `router.start()`).
+  - `maxHistoryLength=1` idempotency: at cap=1, `canGoBack()`/`canGoForward()`
+    are always `false` and `historyIndex === 0` regardless of the action sequence.
+  - `N × back()` followed by `N × forward()` (for distinct-path pushes without
+    guards) returns to the same `path`.
+  - Bi-implication `canGoBack() ⇔ state.context.memory.historyIndex > 0` is
+    declared but currently `describe.skip`'d with a TODO referencing [#508](https://github.com/greydragon888/real-router/issues/508) — the
+    short-circuit branch leaves `context.memory` stale, so the property does not
+    hold until [#508](https://github.com/greydragon888/real-router/issues/508) is fixed.
+
+  `INVARIANTS.md` updated with invariants 12-14 and a new "State Context" section.
+
+  **New stress scenarios (`tests/stress/`, [#4](https://github.com/greydragon888/real-router/issues/4)):**
+  - `back-then-navigate-race.stress.ts` (S11) — `back()` in flight + immediate
+    `navigate()`: verifies the `#navigatingFromHistory` flag does not leak to
+    `true` and subsequent pushes still land.
+  - `navigate-replace-overlap.stress.ts` (S12) — two concurrent navigations
+    (one with an async guard, one with `{ replace: true }`): verifies the
+    second supersedes the first and history stays consistent.
+  - `memory-leak.stress.ts` (S13) — 1000 `start → navigate × 5 → stop →
+unsubscribe` cycles keep heap growth under 25× the baseline; a single
+    long-lived router with 10 000 navigations respects `maxHistoryLength=100`
+    exactly (final `historyIndex === 99`, 99 back-steps reachable).
+  - `maxhistory-1-cap.stress.ts` (S14) — 1000 successful pushes at cap=1 keep
+    index at 0; `back()`/`forward()`/`go(±N)` are always no-ops; alternating
+    push + replace never grows the stack past 1 entry.
+
+  **Tautological assertions removed ([#5](https://github.com/greydragon888/real-router/issues/5)):**
+  - `expect(typeof router.canGoBack()).toBe("boolean")` and variants in
+    `concurrent-back-forward.stress.ts`, `generation-guard-async.stress.ts`,
+    `stale-entries.stress.ts` replaced with concrete index-range assertions
+    via `state.context.memory.historyIndex`.
+  - `expect(activations).toBeGreaterThan(0)` in S9.1 tightened to also assert
+    an upper bound (`≤ 10`).
+
+  **Property-test generator tuning ([#11](https://github.com/greydragon888/real-router/issues/11), [#12](https://github.com/greydragon888/real-router/issues/12)):**
+  - `NUM_RUNS` now scales with CI: `standard` and `async` bump from 100 to 300
+    under `process.env.CI`, `lifecycle` from 50 to 100. Local runs unchanged.
+  - `arbRouteWithParams` for the `user` route narrowed from `id: 1-100` to
+    `id: 1-3` so the shrinker can explore same-id collisions.
+  - New `arbActionSequenceLong` (30-100 actions) exported for marathon scenarios.
+
+  **Documentation ([#7](https://github.com/greydragon888/real-router/issues/7), [#10](https://github.com/greydragon888/real-router/issues/10), [#13](https://github.com/greydragon888/real-router/issues/13)):**
+  - The functional test "should update index without navigating when back()
+    targets same state" was split into two: (a) short-circuit behavior with
+    explicit `vi.spyOn(router, "navigate")` + assertion that `navigate` is
+    not called, and (b) a separate test for the different-path back() case.
+    The short-circuit test includes a TODO comment referencing [#508](https://github.com/greydragon888/real-router/issues/508) to track
+    the stale `context.memory` bug.
+  - `CLAUDE.md` gotchas about `go(0)`, `go(NaN)`, `go(±Infinity)`, `go(0.5)`
+    merged into a single block. The `.catch()`/`.finally()` gotcha reworded to
+    match the new `.then(onResolve, onReject)` wiring. A new gotcha documents
+    the short-circuit branch and its stale-context limitation ([#508](https://github.com/greydragon888/real-router/issues/508)).
+  - Wiki (`memory-plugin.md`) gets a matching "Short-circuit" section.
+
+- [#511](https://github.com/greydragon888/real-router/pull/511) [`12f81b4`](https://github.com/greydragon888/real-router/commit/12f81b4daeaef26e443d3ab9ad5b2cf491583d15) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix stale `state.context.memory` after short-circuit `back()`/`forward()` ([#508](https://github.com/greydragon888/real-router/issues/508))
+
+  When `back(-1)` or `forward(+1)` lands on a history entry whose `path` equals the current router state path (e.g. history `[home, home]` after a `replace`), `#go(delta)` previously updated `#index` synchronously but left `state.context.memory` unchanged — so `direction` and `historyIndex` reflected the last full transition, not the short-circuit move. UI code relying on `direction` for animation saw stale data, and the bi-implication `canGoBack() ⇔ state.context.memory.historyIndex > 0` broke on those entries.
+
+  The short-circuit branch now rewrites `state.context.memory` in place with the new `historyIndex` and `direction` (`"back"` or `"forward"`). The state object identity is preserved (no full transition), but subscribers observe the correct direction signal. The previously skipped property-based test for the `canGoBack ⇔ historyIndex > 0` bi-implication has been re-enabled.
+
 ## [2026-04-21]
 
 ### @real-router/angular@0.3.0

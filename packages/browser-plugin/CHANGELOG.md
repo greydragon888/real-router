@@ -1,5 +1,181 @@
 # @real-router/browser-plugin
 
+## 0.15.0
+
+### Minor Changes
+
+- [#511](https://github.com/greydragon888/real-router/pull/511) [`12f81b4`](https://github.com/greydragon888/real-router/commit/12f81b4daeaef26e443d3ab9ad5b2cf491583d15) Thanks [@greydragon888](https://github.com/greydragon888)! - Desktop environments support (Electron, Tauri) ([#496](https://github.com/greydragon888/real-router/issues/496))
+
+  `safeParseUrl` no longer depends on `globalThis.location.origin` and no longer filters by scheme. The plugin now works out of the box in Electron (`app://`, `file://` with custom protocol) and Tauri (`tauri://`, `https://tauri.localhost`, `asset://`).
+
+  **What changed**
+  - Removed `new URL(url, globalThis.location.origin)` — previously threw `TypeError` on `file://` where `location.origin === "null"`.
+  - Removed HTTP(S) protocol whitelist — arbitrary schemes (`tauri://`, `app://`, `custom-protocol://`, …) now pass through.
+  - `matchUrl()` is now scheme-agnostic: it extracts `pathname + search + hash` and routes on the path alone. Security against malicious URLs comes from route matching (unknown paths return `undefined`), not from scheme filtering.
+
+  **Migration**
+
+  No source changes required. If you relied on the `"Invalid URL protocol"` warning to reject non-HTTP URLs, route-level matching now handles this — `router.matchUrl("javascript:alert(1)")` still returns `undefined`.
+
+### Patch Changes
+
+- [#511](https://github.com/greydragon888/real-router/pull/511) [`12f81b4`](https://github.com/greydragon888/real-router/commit/12f81b4daeaef26e443d3ab9ad5b2cf491583d15) Thanks [@greydragon888](https://github.com/greydragon888)! - Hot-path and code-quality cleanup from audit ([#470](https://github.com/greydragon888/real-router/issues/470))
+
+  Audit follow-up — Priority 4 items from `packages/browser-plugin/.claude/review-2026-04-17.md`:
+  - **`history.state` buffer reuse ([#8](https://github.com/greydragon888/real-router/issues/8).2 H5/A2):** new `createUpdateBrowserState()`
+    factory returns a closure that reuses one mutable `{ name, params, path }`
+    object across `pushState`/`replaceState` calls. Browsers structured-clone
+    `history.state` synchronously, so the buffer never escapes — eliminates
+    one allocation per navigation on the hot path.
+  - **`getLocation` memoization ([#8](https://github.com/greydragon888/real-router/issues/8).2 A7):** the default `Browser` now caches the
+    last `extractPath + safelyEncodePath` result keyed by `(pathname, search)`,
+    so popstate-storms hitting the same URL do not re-encode every time.
+  - **`NavigationOptions.source` typed via module augmentation ([#8](https://github.com/greydragon888/real-router/issues/8).1):**
+    `declare module "@real-router/types"` adds an optional `source?: string`
+    field to `NavigationOptions`, replacing the
+    `(navOptions as Record<string, unknown>).source` cast in
+    `onTransitionSuccess`.
+  - **Internal class removed ([#8](https://github.com/greydragon888/real-router/issues/8).4):** the `BrowserPlugin` class was an
+    `@internal` implementation detail — its constructor and `getPlugin()`
+    method are now plain functions inside `factory.ts`, removing one source
+    file and the only `export class` in the package.
+
+  No public API changes. The `createUpdateBrowserState` export from the private
+  `browser-env` workspace is available to other plugins (hash-plugin,
+  navigation-plugin) that want the same allocation savings.
+
+- [#511](https://github.com/greydragon888/real-router/pull/511) [`12f81b4`](https://github.com/greydragon888/real-router/commit/12f81b4daeaef26e443d3ab9ad5b2cf491583d15) Thanks [@greydragon888](https://github.com/greydragon888)! - Reduce per-call allocation in `router.replaceHistoryState()` ([#470](https://github.com/greydragon888/real-router/issues/470))
+
+  Audit follow-up from `packages/browser-plugin/.claude/review-2026-04-22.md`
+  (section 8a.6 / 8c.6). `createReplaceHistoryState` in the shared `browser-env`
+  helper now creates a single mutable `{ name, params, path }` buffer via
+  `createUpdateBrowserState()` once per plugin instance and reuses it on every
+  `router.replaceHistoryState(name, params)` call. The previous implementation
+  allocated a fresh literal on each call — wasteful for UI-heavy flows that
+  replace history on every reactive state change.
+
+  Also refactors `shouldReplaceHistory` into three explicit branches, removing
+  the `eslint-disable @typescript-eslint/no-unnecessary-condition` comment.
+  Extracts the `PopstateTransitionOptions` type into `shared/browser-env` so
+  it is no longer duplicated inline in `browser-plugin`'s factory.
+
+  No public API changes. Documentation fixes:
+  - `ARCHITECTURE.md` removed the non-existent `title?: string` parameter from
+    the documented `replaceHistoryState` signature.
+  - `README.md` SSR section rewritten — `buildUrl` / `matchUrl` are
+    environment-agnostic and work in SSR (the previous text claimed the plugin
+    returns "path without base", which was incorrect).
+  - New "Navigation Source" section describing `state.context.browser.source`
+    (`"navigate"` / `"popstate"`) with the zero-allocation frozen-literal note.
+
+- [#511](https://github.com/greydragon888/real-router/pull/511) [`12f81b4`](https://github.com/greydragon888/real-router/commit/12f81b4daeaef26e443d3ab9ad5b2cf491583d15) Thanks [@greydragon888](https://github.com/greydragon888)! - Test-suite hardening and new invariants from audit ([#470](https://github.com/greydragon888/real-router/issues/470))
+
+  Audit follow-up from `packages/browser-plugin/.claude/review-2026-04-22.md`
+  (sections 1, 2, 4, 5, 6, 7). No runtime behaviour changes — documentation
+  and test coverage only.
+
+  **New property-based invariants (`tests/property/`):**
+  - `safeParseUrl` is total — never throws and always returns string-typed
+    fields for any input (2000 runs).
+  - `safeParseUrl` scheme-less path input partitions exactly into
+    `pathname + search + hash`.
+  - `extractPath` is idempotent with an empty base.
+  - `buildUrl` always starts with `base` (or `/` when base is empty).
+  - `buildUrl` composes with `extractPath` for leading-slash paths:
+    `extractPath(buildUrl(p, b), b) === p`.
+  - `normalizeBase` is idempotent — `normalizeBase(normalizeBase(x)) === normalizeBase(x)`.
+  - `normalizeBase` produces canonical form — empty or leading-slash, no
+    trailing slash, no `//` runs.
+  - `shouldReplaceHistory` truth-table covers all `replace × reload × fromState`
+    combinations (1000 runs).
+
+  **Generator improvements:**
+  - `arbNormalizedBase` now includes a generator for deep-nested bases
+    (2–5 segments) in addition to the curated fixed list.
+  - `arbQueryString` mixes three value shapes: alphanumeric, percent-encoded,
+    and empty (`?key=`).
+
+  **New stress scenarios (`tests/stress/`):**
+  - `buildurl-allocation.stress.ts` (B7.8) — 10 000 `router.buildUrl()` calls
+    keep heap growth under a generous ceiling (catches closure / memoization
+    leaks on the per-render hot path).
+  - `popstate-during-recovery.stress.ts` (B7.7) — 100 interleaved popstate
+    bursts arriving during CANNOT_DEACTIVATE recovery rollback. Verifies the
+    deferred queue absorbs them, no plugin-level `Critical error`/`Failed to
+recover` logs fire, and a fresh navigation still settles afterwards.
+
+  **Functional assertion upgrades:**
+  - `lifecycle.test.ts` — new test documents the gotcha "explicit `replace:
+false` on first navigation → push" with a `pushSpy.toHaveBeenCalledTimes(1)`
+    assertion.
+  - `popstate.test.ts` null-state test asserts the current state is unchanged
+    (or settles on UNKNOWN_ROUTE), and the meta-params edge case asserts
+    stray root-level `meta` does not leak into `state.params`.
+  - `integration.test.ts` state-modifier test replaces the weak
+    `toBeGreaterThan(0)` with a lower-bound + last-entry assertion.
+  - `security.test.ts` function/symbol param tests replaced the tautological
+    `toBeDefined() + typeof string` with a concrete expected URL.
+  - `compat.test.ts` SSR block gets a warn-once verification — running start +
+    4 navigations produces at most 2 SSR warnings (one per warnOnce closure
+    inside `createSafeBrowser`), not N.
+
+- [#511](https://github.com/greydragon888/real-router/pull/511) [`12f81b4`](https://github.com/greydragon888/real-router/commit/12f81b4daeaef26e443d3ab9ad5b2cf491583d15) Thanks [@greydragon888](https://github.com/greydragon888)! - Test-suite hardening + documentation cleanup from audit ([#470](https://github.com/greydragon888/real-router/issues/470))
+
+  Audit follow-up — Priority 2 (documentation) and Priority 3 (tests) items
+  from `packages/browser-plugin/.claude/review-2026-04-17.md`.
+
+  **Documentation:**
+  - Replaced 3 dead links to `../browser-env/ARCHITECTURE.md` (no such
+    package — only `shared/browser-env/`) with concrete file references
+    inside `shared/browser-env/`.
+  - `Performance` table in `ARCHITECTURE.md` extended with the hot-path
+    optimisations applied in the previous changeset (`FROZEN_POPSTATE`/
+    `FROZEN_NAVIGATE` constants, mutable `historyState` buffer via
+    `createUpdateBrowserState`, memoised `getLocation`, `buildUrl`
+    shortcut against `toState.path`).
+  - `Plugin Lifecycle` / `Factory Pattern` / data-flow sections rewritten
+    to match the post-class structure (`createBrowserPlugin` function +
+    `createDefaultBrowser` instead of `class BrowserPlugin`).
+
+  **Tests:**
+  - Replaced weak `expect(state).toBeDefined()` pre-checks with
+    `expect(state?.<field>).toBe(<concrete value>)` across the property
+    suite (`browserPlugin.properties.ts`) and 4 functional files
+    (`lifecycle.test.ts`, `url.test.ts`, `compat.test.ts`,
+    `integration.test.ts`). `expect(getState()).toBeDefined()` etc.
+    replaced with the actual expected route name.
+  - New `expectedStressError` helper in `tests/stress/helpers.ts`
+    whitelists only `SAME_STATES`, `TRANSITION_CANCELLED`,
+    `ROUTE_NOT_FOUND`, `ROUTER_NOT_STARTED`. All 21 `.catch(noop)` calls
+    in the 5 existing stress files now use it — any other RouterError code
+    or non-RouterError surfaces as a real test failure instead of being
+    silently swallowed.
+  - `integration.test.ts` "browser plugin works when other plugins throw on
+    start" now also asserts `currentHistoryState` after `start()` and
+    after a subsequent `navigate()` — proving the plugin keeps writing
+    history state, not just that `start()` resolves.
+  - New functional test in `popstate.test.ts` covers the real
+    CANNOT_DEACTIVATE recovery path: a deactivate-guard blocks a popstate
+    back-navigation, and the plugin restores the URL via `replaceState`
+    with the previous state. Closes the gap noted in §4 of the audit
+    ("gotcha promised but not actually tested").
+  - Five new stress files for previously missing scenarios:
+    - `replace-vs-navigate.stress.ts` — race between
+      `replaceHistoryState` and concurrent `navigate()`.
+    - `heap-snapshot.stress.ts` — 10 000 navigations with
+      `process.memoryUsage().heapUsed` delta < 50 MiB (uses `--expose-gc`
+      already enabled in `vitest.config.stress.mts`).
+    - `factory-instance-cleanup.stress.ts` — 100 routers built from one
+      factory, asserts net-zero `addEventListener`/`removeEventListener
+("popstate")` after teardown.
+    - `mixed-async-guards.stress.ts` — sync / 10ms / 200ms guards on
+      different routes, 200 navigations, no wedge / no `console.error`.
+    - `exotic-state.stress.ts` — 1000 popstate events with
+      `Map`/`Date`/Symbol-keyed/closure values; `isStateStrict` must
+      filter all of them.
+
+  No public API changes.
+
 ## 0.14.0
 
 ### Minor Changes
