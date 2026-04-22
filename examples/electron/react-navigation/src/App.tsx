@@ -15,8 +15,7 @@ export function App(): JSX.Element {
   const router = useRouter();
   const { route } = useRoute();
 
-  const mark = (name: string): string =>
-    router.hasVisited(name) ? " ✓" : "";
+  const mark = (name: string): string => (router.hasVisited(name) ? " ✓" : "");
 
   const links = [
     { routeName: "home", label: `Home${mark("home")}` },
@@ -26,10 +25,7 @@ export function App(): JSX.Element {
   ];
 
   return (
-    <Layout
-      title="Real-Router — Electron + navigation-plugin"
-      links={links}
-    >
+    <Layout title="Real-Router — Electron + navigation-plugin" links={links}>
       <HistoryPanel />
 
       {route?.name === "home" && <Home />}

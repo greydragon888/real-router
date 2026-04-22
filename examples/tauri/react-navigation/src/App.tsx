@@ -15,8 +15,7 @@ export function App(): JSX.Element {
   const router = useRouter();
   const { route } = useRoute();
 
-  const mark = (name: string): string =>
-    router.hasVisited(name) ? " ✓" : "";
+  const mark = (name: string): string => (router.hasVisited(name) ? " ✓" : "");
 
   const links = [
     { routeName: "home", label: `Home${mark("home")}` },

@@ -4,6 +4,7 @@ import type { JSX } from "react";
 
 export function HistoryPanel(): JSX.Element {
   const router = useRouter();
+
   // Subscribe to route changes so the panel re-renders on each navigation.
   useRoute();
 
@@ -49,14 +50,18 @@ export function HistoryPanel(): JSX.Element {
         <button
           type="button"
           disabled={!canBack}
-          onClick={() => globalThis.history.back()}
+          onClick={() => {
+            globalThis.history.back();
+          }}
         >
           Back
         </button>
         <button
           type="button"
           disabled={!canForward}
-          onClick={() => globalThis.history.forward()}
+          onClick={() => {
+            globalThis.history.forward();
+          }}
         >
           Forward
         </button>
