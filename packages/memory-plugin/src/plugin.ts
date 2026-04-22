@@ -88,6 +88,10 @@ export class MemoryPlugin {
       },
 
       onStop: () => {
+        // Bump generation so any in-flight #go settler observes a mismatch
+        // and skips its revert / flag reset — writing into cleared state
+        // would otherwise leave #index pointing into an empty #entries (#505).
+        this.#goGeneration++;
         this.#clear();
       },
 
@@ -98,6 +102,9 @@ export class MemoryPlugin {
         }
 
         this.#disposed = true;
+        // Same generation bump as onStop — pre-teardown in-flight #go settlers
+        // must not write into a released plugin (#505).
+        this.#goGeneration++;
         this.#removeExtensions();
         this.#claim.release();
         this.#clear();
@@ -163,5 +170,14 @@ export class MemoryPlugin {
   #clear(): void {
     this.#entries.length = 0;
     this.#index = -1;
+    // Reset transient #go state as well: if #clear runs while a #go is in
+    // flight, the reject-handler skips (generation mismatch) and would
+    // otherwise leave #navigatingFromHistory stuck at true — the next
+    // onTransitionSuccess after restart would take the history-restore
+    // branch and silently skip pushing a new entry. Both fields are
+    // "current #go intent", not persistent history, so resetting them on
+    // clear is always correct (#505).
+    this.#navigatingFromHistory = false;
+    this.#pendingDirection = "navigate";
   }
 }
