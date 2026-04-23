@@ -206,6 +206,47 @@ describe("Navigation Plugin — Navigate", () => {
     });
   });
 
+  describe("Cross-document fallback prevention — #518", () => {
+    // Verifies that plugin-initiated navigations (from onTransitionSuccess) never
+    // leave a navigate event un-intercepted. An un-intercepted canIntercept
+    // event triggers Chromium's cross-document fallback (full page reload) —
+    // the root cause of the #518 infinite loop under vite preview + Playwright.
+    beforeEach(async () => {
+      mockNav.enableStrictIntercept();
+      unsubscribe = router.usePlugin(navigationPluginFactory({}, browser));
+      await router.start();
+    });
+
+    it("router.start() does not trigger cross-document reload", () => {
+      expect(mockNav.crossDocumentReloadCount).toBe(0);
+    });
+
+    it("router.navigate() does not trigger cross-document reload", async () => {
+      await router.navigate("users.list");
+
+      expect(mockNav.crossDocumentReloadCount).toBe(0);
+      expect(router.getState()?.name).toBe("users.list");
+    });
+
+    it("multiple consecutive router.navigate() calls stay loop-free", async () => {
+      await router.navigate("users.list");
+      await router.navigate("home");
+      await router.navigate("users.view", { id: "42" });
+
+      expect(mockNav.crossDocumentReloadCount).toBe(0);
+      expect(router.getState()?.name).toBe("users.view");
+    });
+
+    it("browser-initiated navigate event does not trigger cross-document reload", async () => {
+      const { finished } = mockNav.navigate("http://localhost/users/list");
+
+      await finished;
+
+      expect(mockNav.crossDocumentReloadCount).toBe(0);
+      expect(router.getState()?.name).toBe("users.list");
+    });
+  });
+
   describe("Navigate Event Properties", () => {
     beforeEach(async () => {
       unsubscribe = router.usePlugin(navigationPluginFactory({}, browser));
@@ -343,7 +384,13 @@ describe("createNavigateHandler — direct", () => {
     expect(setCapturedMeta).not.toHaveBeenCalled();
   });
 
-  it("skips event when isSyncingFromRouter() returns true", () => {
+  it("intercepts with noop handler when isSyncingFromRouter() returns true — #518", () => {
+    // Regression test for #518: when the plugin itself triggers a navigate
+    // event (via browser.navigate in onTransitionSuccess), the handler MUST
+    // still call event.intercept(). Per Navigation API spec, a bare `return`
+    // leaves a same-origin canIntercept event un-intercepted, and Chromium
+    // falls back to a cross-document (full-reload) navigation — which
+    // re-runs the bootstrap and triggers an infinite loop.
     const setCapturedMeta = vi.fn();
     const handler = createNavigateHandler(
       makeHandlerDeps({
@@ -351,11 +398,23 @@ describe("createNavigateHandler — direct", () => {
         setCapturedMeta,
       }),
     );
-    const event = makeEvent();
+    const interceptSpy = vi.fn();
+    const event = makeEvent({
+      intercept: interceptSpy,
+    } as unknown as Partial<NavigateEvent>);
 
     handler(event);
 
-    expect(event.intercept).not.toHaveBeenCalled();
+    // Must intercept to cancel the cross-document fallback.
+    expect(interceptSpy).toHaveBeenCalledTimes(1);
+
+    // But the handler must be a noop — router state is already committed.
+    const interceptCall = interceptSpy.mock.calls[0][0] as {
+      handler: () => Promise<unknown>;
+    };
+
+    expect(typeof interceptCall.handler).toBe("function");
+    // Must NOT capture meta — the plugin-initiated navigation already has it.
     expect(setCapturedMeta).not.toHaveBeenCalled();
   });
 });
