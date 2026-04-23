@@ -1086,4 +1086,157 @@ describe("RouteView", () => {
       expect(screen.queryByTestId("fallback")).not.toBeInTheDocument();
     });
   });
+
+  describe("Flat RouteView re-renders on nested transitions — #519", () => {
+    // Regression: flat `<RouteView nodeName="">` with dot-notated segments
+    // (e.g. segment="users.view" exact) used to subscribe via
+    // useRouteNode("") → createRouteNodeSource, which calls
+    // shouldUpdateNode("") and returns false when a transition's
+    // intersection is non-root (e.g. users → users.view, intersection="users").
+    // Result: RouteView never re-rendered on such transitions and the wrong
+    // Match stayed visible. Now RouteView subscribes via useRoute (RouteContext)
+    // so every transition recomputes the active match.
+
+    it("re-renders Match when navigating from parent to child (users → users.view)", async () => {
+      await router.start("/users");
+
+      render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="">
+            <RouteView.Match segment="users" exact>
+              <div data-testid="users-list">UsersList</div>
+            </RouteView.Match>
+            <RouteView.Match segment="users.view" exact>
+              <div data-testid="user-detail">UserDetail</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      expect(screen.getByTestId("users-list")).toBeInTheDocument();
+      expect(screen.queryByTestId("user-detail")).not.toBeInTheDocument();
+
+      await act(async () => {
+        await router.navigate("users.view", { id: "1" });
+      });
+
+      expect(screen.queryByTestId("users-list")).not.toBeInTheDocument();
+      expect(screen.getByTestId("user-detail")).toBeInTheDocument();
+    });
+
+    it("re-renders Match across sibling subtree transitions with a shared ancestor (users.view → users.edit)", async () => {
+      await router.start("/users/1");
+
+      render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="">
+            <RouteView.Match segment="users.view" exact>
+              <div data-testid="detail">UserDetail</div>
+            </RouteView.Match>
+            <RouteView.Match segment="users.edit" exact>
+              <div data-testid="edit">UserEdit</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      expect(screen.getByTestId("detail")).toBeInTheDocument();
+
+      await act(async () => {
+        await router.navigate("users.edit", { id: "1" });
+      });
+
+      // intersection="users" — used to skip nodeName="" update and leave
+      // UserDetail stale.
+      expect(screen.queryByTestId("detail")).not.toBeInTheDocument();
+      expect(screen.getByTestId("edit")).toBeInTheDocument();
+    });
+
+    it("re-renders when navigating from child back up to parent (users.view → users)", async () => {
+      await router.start("/users/1");
+
+      render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="">
+            <RouteView.Match segment="users" exact>
+              <div data-testid="list">UsersList</div>
+            </RouteView.Match>
+            <RouteView.Match segment="users.view" exact>
+              <div data-testid="detail">UserDetail</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      expect(screen.getByTestId("detail")).toBeInTheDocument();
+
+      await act(async () => {
+        await router.navigate("users");
+      });
+
+      expect(screen.queryByTestId("detail")).not.toBeInTheDocument();
+      expect(screen.getByTestId("list")).toBeInTheDocument();
+    });
+
+    it("scoped RouteView (nodeName='users') still returns null when route is outside its subtree", async () => {
+      await router.start("/about");
+
+      const { container } = render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="users">
+            <RouteView.Match segment="list">
+              <div data-testid="list">UsersList</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      expect(screen.queryByTestId("list")).not.toBeInTheDocument();
+      expect(container.innerHTML).toBe("");
+    });
+
+    it("scoped RouteView (nodeName='users') renders when route enters its subtree", async () => {
+      await router.start("/about");
+
+      render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="users">
+            <RouteView.Match segment="list">
+              <div data-testid="list">UsersList</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      expect(screen.queryByTestId("list")).not.toBeInTheDocument();
+
+      await act(async () => {
+        await router.navigate("users.list");
+      });
+
+      expect(screen.getByTestId("list")).toBeInTheDocument();
+    });
+
+    it("scoped RouteView (nodeName='users') matches exact route (routeName === nodeName)", async () => {
+      await router.start("/users");
+
+      render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="users">
+            <RouteView.Match segment="">
+              <div data-testid="users-self">UsersSelf</div>
+            </RouteView.Match>
+            <RouteView.Match segment="list">
+              <div data-testid="list">UsersList</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      // RouteView with nodeName="users" is active (routeName === nodeName),
+      // even though no child Match matches (segment="" is never active).
+      expect(screen.queryByTestId("list")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("users-self")).not.toBeInTheDocument();
+    });
+  });
 });
