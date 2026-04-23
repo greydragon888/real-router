@@ -1,0 +1,175 @@
+.page {
+  animation-duration: 240ms;
+  animation-fill-mode: both;
+  animation-timing-function: cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+.page.slide-left {
+  animation-name: slide-left;
+}
+
+.page.slide-right {
+  animation-name: slide-right;
+}
+
+.page.fade {
+  animation-name: fade;
+}
+
+@keyframes slide-left {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-right {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.content {
+  overflow: hidden;
+}
+
+.smart-nav {
+  display: flex;
+  gap: 8px;
+  padding: 12px 24px;
+  border-bottom: 1px solid #e0e0e0;
+  background: #fafafa;
+}
+
+.smart-nav button {
+  padding: 6px 12px;
+  font-size: 13px;
+  border: 1px solid #ccc;
+  background: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.smart-nav button:disabled {
+  color: #aaa;
+  cursor: not-allowed;
+  background: #f5f5f5;
+}
+
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 24px;
+  color: #555;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+
+.sidebar-link:hover {
+  background: #f0f0f0;
+}
+
+.sidebar-link.active {
+  color: #16213e;
+  font-weight: 600;
+  background: #e8eaf6;
+  border-left: 3px solid #16213e;
+}
+
+.badge {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.badge-new {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.badge-visited {
+  background: #d4edda;
+  color: #155724;
+}
+
+.progress-wrapper {
+  padding: 16px 24px;
+  border-top: 1px solid #e0e0e0;
+  margin-top: 12px;
+}
+
+.progress-label {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 6px;
+}
+
+.progress-bar {
+  height: 6px;
+  background: #e0e0e0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #16213e;
+  transition: width 0.3s;
+}
+
+.return-banner {
+  padding: 8px 16px;
+  background: #e8eaf6;
+  border: 1px solid #9fa8da;
+  border-radius: 4px;
+  margin-bottom: 16px;
+}
+
+.return-banner button {
+  background: none;
+  border: none;
+  color: #16213e;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  font-size: 14px;
+}
+
+.fallback {
+  max-width: 560px;
+  margin: 48px auto;
+  padding: 24px;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.5;
+  color: #333;
+}
+
+.fallback h1 {
+  margin-bottom: 12px;
+  color: #16213e;
+}
+
+.fallback p {
+  margin-bottom: 12px;
+}

@@ -1818,6 +1818,43 @@ importers:
         specifier: 7.3.2
         version: 7.3.2(@types/node@25.5.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)
 
+  examples/react/navigation-api:
+    dependencies:
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../../../packages/core
+      '@real-router/navigation-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/navigation-plugin
+      '@real-router/react':
+        specifier: workspace:^
+        version: link:../../../packages/react
+      react:
+        specifier: 19.2.0
+        version: 19.2.0
+      react-dom:
+        specifier: 19.2.0
+        version: 19.2.0(react@19.2.0)
+    devDependencies:
+      '@playwright/test':
+        specifier: 1.58.2
+        version: 1.58.2
+      '@types/react':
+        specifier: 19.2.14
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: 19.2.3
+        version: 19.2.3(@types/react@19.2.14)
+      '@vitejs/plugin-react':
+        specifier: 5.2.0
+        version: 5.2.0(vite@7.3.2(@types/node@25.5.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
+      typescript:
+        specifier: 5.8.3
+        version: 5.8.3
+      vite:
+        specifier: 7.3.2
+        version: 7.3.2(@types/node@25.5.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)
+
   examples/react/nested-routes:
     dependencies:
       '@real-router/browser-plugin':
