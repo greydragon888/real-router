@@ -1,8 +1,9 @@
 import { createRouter } from "@real-router/core";
+import { getPluginApi } from "@real-router/core/api";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { navigationPluginFactory } from "../../src";
-import * as historyExtensions from "../../src/history-extensions";
+import { resolveEntryToMatchedState } from "../../src/history-extensions";
 import { MockNavigation } from "../helpers/mockNavigation";
 import {
   createMockNavigationBrowser,
@@ -319,11 +320,54 @@ describe("Navigation Plugin — History Extensions", () => {
       await router.navigate("users.list");
       await router.navigate("home");
 
+      const usersListEntry = browser
+        .entries()
+        .find((entry) => entry.url?.endsWith("/users/list") ?? false);
+
+      expect(usersListEntry).toBeDefined();
+
       const traverseToSpy = vi.spyOn(browser, "traverseTo");
 
       await router.traverseToLast("users.list");
 
-      expect(traverseToSpy).toHaveBeenCalledWith(expect.any(String));
+      // Assert the EXACT key captured from #pendingTraverseKey — a regression
+      // that passes an arbitrary or stale key (e.g., current entry's key)
+      // would be caught here, not by `expect.any(String)`.
+      expect(traverseToSpy).toHaveBeenCalledWith(usersListEntry!.key);
+    });
+
+    it("throws invariant-error when browser.currentEntry becomes null mid-call", async () => {
+      // Invariant violation scenario: entries() returns valid history but
+      // currentEntry is null. The plugin previously silently defaulted
+      // currentIndex to -1 (picking direction "forward"); after the #524 /
+      // #435 cleanup it throws so the bug cannot hide.
+      await router.start();
+      await router.navigate("users.list");
+      await router.navigate("home");
+
+      const snapshotEntries = browser.entries();
+
+      router.stop();
+      unsubscribe?.();
+
+      // Craft a browser whose currentEntry is null but entries() still has
+      // the captured history. findLastEntryForRoute will find "users.list",
+      // resolveEntryToMatchedState will succeed (URLs still match route
+      // config), and then the direction calculation blows up.
+      const nullCurrentBrowser: NavigationBrowser = {
+        ...browser,
+        currentEntry: null,
+        entries: () => snapshotEntries,
+      };
+
+      router = createRouter(routerConfig, { defaultRoute: "home" });
+      unsubscribe = router.usePlugin(
+        navigationPluginFactory({}, nullCurrentBrowser),
+      );
+
+      await expect(router.traverseToLast("users.list")).rejects.toThrow(
+        /currentEntry is null/,
+      );
     });
 
     it("throws when entry URL no longer matches routes (stale route with strict queryParamsMode)", async () => {
@@ -348,78 +392,128 @@ describe("Navigation Plugin — History Extensions", () => {
         "No history entry",
       );
     });
+  });
+
+  describe("resolveEntryToMatchedState — direct unit tests (DI replacement for vi.spyOn)", () => {
+    // These tests replace a trio of fragile `vi.spyOn(namespace, ...)` tests
+    // that depended on Vitest transforming star-import bindings at module
+    // boundaries. Extracting the helper from NavigationPlugin eliminates the
+    // reliance on spy transformation and lets us pin the three error branches
+    // (missing entry, null url, unmatched url) with plain synchronous calls.
+
+    it("throws when entry is undefined", async () => {
+      await router.start();
+
+      const api = getPluginApi(router);
+
+      expect(() =>
+        resolveEntryToMatchedState(undefined, "users.list", api, ""),
+      ).toThrow('No history entry for route "users.list"');
+    });
 
     it("throws when entry has null url", async () => {
       await router.start();
       await router.navigate("users.list");
-      await router.navigate("home");
 
+      const api = getPluginApi(router);
       const entries = browser.entries();
-      const userListEntry = entries[1]; // index 1 = "users.list"
+      const userListEntry = entries[1];
       const entryWithNullUrl = Object.assign(
         Object.create(Object.getPrototypeOf(userListEntry)),
         userListEntry,
         { url: null },
-      );
+      ) as NavigationHistoryEntry;
 
-      vi.spyOn(historyExtensions, "findLastEntryForRoute").mockReturnValue(
-        entryWithNullUrl as NavigationHistoryEntry,
-      );
-
-      await expect(router.traverseToLast("users.list")).rejects.toThrow(
-        'No matching route for entry URL "null"',
-      );
+      expect(() =>
+        resolveEntryToMatchedState(entryWithNullUrl, "users.list", api, ""),
+      ).toThrow('No matching route for entry URL "null"');
     });
 
     it("throws when entry URL exists but does not match any route", async () => {
       await router.start();
       await router.navigate("users.list");
-      await router.navigate("home");
 
+      const api = getPluginApi(router);
       const entries = browser.entries();
       const userListEntry = entries[1];
       const entryWithUnknownUrl = Object.assign(
         Object.create(Object.getPrototypeOf(userListEntry)),
         userListEntry,
         { url: "http://localhost/no-such-route" },
-      );
+      ) as NavigationHistoryEntry;
 
-      vi.spyOn(historyExtensions, "findLastEntryForRoute").mockReturnValue(
-        entryWithUnknownUrl as NavigationHistoryEntry,
-      );
-
-      await expect(router.traverseToLast("users.list")).rejects.toThrow(
-        "No matching route",
+      expect(() =>
+        resolveEntryToMatchedState(entryWithUnknownUrl, "users.list", api, ""),
+      ).toThrow(
+        'No matching route for entry URL "http://localhost/no-such-route"',
       );
     });
 
-    it("throws when entry URL path does not match the requested route", async () => {
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-
+    it("throws when entry URL uses arbitrary scheme with unmatchable path", async () => {
       await router.start();
       await router.navigate("users.list");
-      await router.navigate("home");
 
+      const api = getPluginApi(router);
       const entries = browser.entries();
       const userListEntry = entries[1];
+      // Arbitrary scheme (Tauri/Electron custom protocols are now accepted by
+      // safeParseUrl); the path /evil doesn't match the users.list route.
       const entryWithUnknownPath = Object.assign(
         Object.create(Object.getPrototypeOf(userListEntry)),
         userListEntry,
-        // Arbitrary scheme (Tauri/Electron custom protocols are now accepted by
-        // safeParseUrl); the path /evil doesn't match the users.list route.
-
         { url: "ftp://example.com/evil" },
+      ) as NavigationHistoryEntry;
+
+      expect(() =>
+        resolveEntryToMatchedState(entryWithUnknownPath, "users.list", api, ""),
+      ).toThrow("No matching route");
+    });
+
+    it("returns {entry, matchedState} on success", async () => {
+      await router.start();
+      await router.navigate("users.list");
+
+      const api = getPluginApi(router);
+      const entries = browser.entries();
+      const userListEntry = entries[1];
+
+      const result = resolveEntryToMatchedState(
+        userListEntry,
+        "users.list",
+        api,
+        "",
       );
 
-      vi.spyOn(historyExtensions, "findLastEntryForRoute").mockReturnValue(
-        entryWithUnknownPath as NavigationHistoryEntry,
+      expect(result.entry).toBe(userListEntry);
+      expect(result.matchedState.name).toBe("users.list");
+    });
+
+    it("strips base path before matching", async () => {
+      router.stop();
+      unsubscribe?.();
+
+      mockNav = new MockNavigation("http://localhost/app/");
+      browser = createMockNavigationBrowser(mockNav);
+      router = createRouter(routerConfig, { defaultRoute: "home" });
+      unsubscribe = router.usePlugin(
+        navigationPluginFactory({ base: "/app" }, browser),
+      );
+      await router.start();
+      await router.navigate("users.list");
+
+      const api = getPluginApi(router);
+      const entries = browser.entries();
+      const userListEntry = entries.at(-1);
+
+      const result = resolveEntryToMatchedState(
+        userListEntry,
+        "users.list",
+        api,
+        "/app",
       );
 
-      await expect(router.traverseToLast("users.list")).rejects.toThrow(
-        "No matching route",
-      );
-
-      warnSpy.mockRestore();
+      expect(result.matchedState.name).toBe("users.list");
+      expect(result.matchedState.path).toBe("/users/list");
     });
   });
 

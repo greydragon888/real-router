@@ -315,6 +315,40 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 
 ---
 
+### B14. getRouteVisitCount Monotonicity After Push
+**Category:** History Extensions  
+**Testable:** PBT-testable (model-based)  
+**Description:** After a **push** navigation to route `r` (i.e., `navigationType === "push"` — no `replace`, not a no-op same-state), `getRouteVisitCount(r)` must grow by exactly 1. Replace and reload must not change the count.
+
+**Precondition:**
+- Current state: `getRouteVisitCount(r) === N`
+- Model operation: `navigate(r, params)` producing a push entry
+
+**Postcondition:**
+- After the navigation: `getRouteVisitCount(r) === N + 1`
+- After a `replace` navigation to `r`: count unchanged (replace overwrites the current entry, which may already match `r`)
+- After a `reload` of `r` from state `r`: count unchanged (reload replaces the current entry)
+
+**Why it matters:** Users treat `getRouteVisitCount` as an analytics counter. A push that failed to increment, or a replace that incremented, would skew all downstream metrics (session-length stats, "did the user visit X N-or-more times" guards).
+
+---
+
+### B15. Visit Count Sum Consistency
+**Category:** History Extensions  
+**Testable:** PBT-testable (model-based)  
+**Description:** The sum of `getRouteVisitCount(r)` over all routes returned by `getVisitedRoutes()` must equal the number of matchable history entries — entries whose URL resolves to a route.
+
+**Precondition:**
+- Any navigation history sequence (possibly including entries with unmatchable URLs)
+
+**Postcondition:**
+- Let `M = |{ entry ∈ entries() : entryToState(entry) !== undefined }|` (matchable entries).
+- Then: `∑ getRouteVisitCount(r) for r in getVisitedRoutes() === M`.
+
+**Why it matters:** This glues the three history-query functions into one arithmetic identity. A bug in `getVisitedRoutes` (e.g., dropping routes at depth > 1) or in `getRouteVisitCount` (e.g., off-by-one on the current entry) surfaces here, not in isolated property tests. Unmatchable entries are excluded — foreign entries from other SPAs should not count.
+
+---
+
 ## C. NavigationMeta Invariants
 
 ### C1. Meta Attachment on Success
@@ -438,6 +472,23 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 - Info is available in subscribe callbacks via `state.context.navigation`
 
 **Why it matters:** Enables passing context through navigate events.
+
+---
+
+### C8. deriveNavigationType on Initial Navigation with `reload`
+**Category:** NavigationMeta  
+**Testable:** PBT-testable  
+**Description:** On the very first navigation (`fromState === undefined`), `deriveNavigationType` returns `"replace"` even when `navOptions.reload === true`. Reason: the `"reload"` branch requires `toState.path === fromState?.path`, which is false for `undefined?.path === undefined` vs a concrete `toState.path`. After the reload check fails, `shouldReplaceHistory` classifies the initial navigation as a replace (G4 — replace nullish + fromState undefined).
+
+**Precondition:**
+- `fromState === undefined` (first navigation)
+- `navOptions.reload === true` (user requested reload semantics on start)
+
+**Postcondition:**
+- `deriveNavigationType({ reload: true }, toState, undefined) === "replace"`
+- NOT `"reload"` — there is no previous state to reload
+
+**Why it matters:** Documents a subtle asymmetry: requesting reload on the initial navigation silently downgrades to replace. Tooling that pattern-matches `navigationType === "reload"` for cache-busting logic must tolerate the start-time absence. Pinning this in PBT prevents a regression where someone "fixes" the initial-reload case by returning `"reload"` with an undefined `fromState`, which would then confuse plugins that treat reload as "same URL re-entered".
 
 ---
 
@@ -976,6 +1027,9 @@ agnostic parsing; validation is the matcher's job, not the parser's. See
 | B10. canGoBackTo | History | PBT | High |
 | B11. traverseToLast State | History | Example | High |
 | B12. traverseToLast Error | History | Example | High |
+| B13. canGoBackTo Implies hasVisited | History | PBT | Medium |
+| B14. getRouteVisitCount Monotonicity After Push | History | PBT | High |
+| B15. Visit Count Sum Consistency | History | PBT | High |
 | C1. Meta Attachment | NavigationMeta | Example | Critical |
 | C2. deriveNavigationType | NavigationMeta | PBT | High |
 | C3. pendingMeta Lifecycle | NavigationMeta | Example | Critical |
@@ -983,6 +1037,7 @@ agnostic parsing; validation is the matcher's job, not the parser's. See
 | C5. pendingMeta Error | NavigationMeta | Example | High |
 | C6. userInitiated Accuracy | NavigationMeta | Example | High |
 | C7. info Preservation | NavigationMeta | Example | Medium |
+| C8. deriveNavigationType on Initial with reload | NavigationMeta | PBT | Medium |
 | D1. isSyncingFromRouter Loop Prevention | Syncing | Example | Critical |
 | D2. isSyncingFromRouter Scope (onTransitionSuccess) | Syncing | Example | Critical |
 | D3. isSyncingFromRouter Scope (replaceHistoryState) | Syncing | Example | Critical |

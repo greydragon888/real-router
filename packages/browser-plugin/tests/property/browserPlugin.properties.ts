@@ -90,7 +90,14 @@ describe("Browser Plugin URL Invariants", () => {
 
         const pathAfterBase = url.slice(base.length);
 
-        expect(pathAfterBase.startsWith("/")).toBe(true);
+        // Tail is either "/<segments>" (non-index routes) or "" —
+        // the empty case is `buildUrl("/", "/app") === "/app"` after the
+        // canonical-base fix that collapses index-under-base to the base
+        // without a trailing slash. Roundtrip holds:
+        // `extractPath("/app", "/app") === "/"`.
+        expect(pathAfterBase === "" || pathAfterBase.startsWith("/")).toBe(
+          true,
+        );
       },
     );
   });

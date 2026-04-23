@@ -1,5 +1,19 @@
 # @real-router/browser-plugin
 
+## 0.15.1
+
+### Patch Changes
+
+- [#526](https://github.com/greydragon888/real-router/pull/526) [`076203e`](https://github.com/greydragon888/real-router/commit/076203ed1b4b61596c7689fe054bc29960000124) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `buildUrl("/", base)` producing trailing-slash index URLs ([#526](https://github.com/greydragon888/real-router/issues/526))
+
+  `buildUrl("/", "/app")` previously returned `"/app/"` (with trailing slash) for the index route under a non-empty base. That disagreed with the canonical form `normalizeBase("/app/") === "/app"` and produced asymmetric URLs in `browser.history`. The function now collapses index-under-base to the bare base (`"/app"`), keeping URLs symmetric. Roundtrip is preserved: `extractPath("/app", "/app") === "/"`.
+
+  Fix is in the shared `browser-env` source (`shared/browser-env/url-utils.ts`) consumed by `browser-plugin`, `hash-plugin`, and `navigation-plugin` via symlink. Each consumer gets its own patch changeset.
+
+- [#526](https://github.com/greydragon888/real-router/pull/526) [`076203e`](https://github.com/greydragon888/real-router/commit/076203ed1b4b61596c7689fe054bc29960000124) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `extractPath` matching non-segment-boundary base prefix ([#446](https://github.com/greydragon888/real-router/issues/446))
+
+  `extractPath("/application/users", "/app")` incorrectly stripped the base, returning `/lication/users`. Now enforces `/`-delimited segment boundaries: only exact match (`pathname === base`) or segment-boundary match (`pathname.startsWith(base + "/")`) triggers stripping.
+
 ## 0.15.0
 
 ### Minor Changes
@@ -159,20 +173,15 @@ false` on first navigation → push" with a `pushSpy.toHaveBeenCalledTimes(1)`
     back-navigation, and the plugin restores the URL via `replaceState`
     with the previous state. Closes the gap noted in §4 of the audit
     ("gotcha promised but not actually tested").
-  - Five new stress files for previously missing scenarios:
-    - `replace-vs-navigate.stress.ts` — race between
-      `replaceHistoryState` and concurrent `navigate()`.
-    - `heap-snapshot.stress.ts` — 10 000 navigations with
-      `process.memoryUsage().heapUsed` delta < 50 MiB (uses `--expose-gc`
-      already enabled in `vitest.config.stress.mts`).
-    - `factory-instance-cleanup.stress.ts` — 100 routers built from one
-      factory, asserts net-zero `addEventListener`/`removeEventListener
-("popstate")` after teardown.
-    - `mixed-async-guards.stress.ts` — sync / 10ms / 200ms guards on
-      different routes, 200 navigations, no wedge / no `console.error`.
-    - `exotic-state.stress.ts` — 1000 popstate events with
-      `Map`/`Date`/Symbol-keyed/closure values; `isStateStrict` must
-      filter all of them.
+  - Five new stress files for previously missing scenarios: - `replace-vs-navigate.stress.ts` — race between
+    `replaceHistoryState` and concurrent `navigate()`. - `heap-snapshot.stress.ts` — 10 000 navigations with
+    `process.memoryUsage().heapUsed` delta < 50 MiB (uses `--expose-gc`
+    already enabled in `vitest.config.stress.mts`). - `factory-instance-cleanup.stress.ts` — 100 routers built from one
+    factory, asserts net-zero `addEventListener`/`removeEventListener
+("popstate")` after teardown. - `mixed-async-guards.stress.ts` — sync / 10ms / 200ms guards on
+    different routes, 200 navigations, no wedge / no `console.error`. - `exotic-state.stress.ts` — 1000 popstate events with
+    `Map`/`Date`/Symbol-keyed/closure values; `isStateStrict` must
+    filter all of them.
 
   No public API changes.
 

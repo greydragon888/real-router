@@ -1,6 +1,6 @@
 import { errorCodes, RouterError } from "@real-router/core";
 
-import { extractPath, safeParseUrl } from "./browser-env";
+import { urlToPath } from "./browser-env";
 
 import type {
   NavigationBrowser,
@@ -72,9 +72,7 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
       return;
     }
 
-    const destinationUrl = safeParseUrl(event.destination.url);
-    const path =
-      extractPath(destinationUrl.pathname, base) + destinationUrl.search;
+    const path = urlToPath(event.destination.url, base);
     const matchedState = api.matchPath(path);
 
     const navType = event.navigationType as NavigationMeta["navigationType"];
@@ -98,7 +96,37 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
       } catch (error) {
         if (!(error instanceof RouterError)) {
           recoverFromNavigateError(error, router, browser, setSyncing);
+
+          return;
         }
+
+        // TRANSITION_CANCELLED: a newer navigation aborted this one — the
+        // newer navigate event is (or will be) handled by this same plugin,
+        // and THAT event is responsible for syncing URL/state. Firing our
+        // own sync here races against it: browser.navigate(replace, same-url)
+        // would cancel the in-flight newer transition, which is exactly the
+        // rapid-fire-events storm failure mode.
+        //
+        // SAME_STATES: router refused because router.getState() already equals
+        // the target. URL and router state are already consistent — no sync
+        // needed.
+        if (
+          error.code === errorCodes.TRANSITION_CANCELLED ||
+          error.code === errorCodes.SAME_STATES
+        ) {
+          return;
+        }
+
+        // Other RouterError codes (CANNOT_DEACTIVATE, CANNOT_ACTIVATE,
+        // ROUTE_NOT_FOUND, …) — router rejected the transition, state is
+        // unchanged, but URL may have already committed to a different
+        // value by the Navigation API. Sync the URL back to the current
+        // router state in a single visible transition (headless Chromium
+        // and some cross-origin setups leave "committed-then-reverted"
+        // windows if we relied on the native rollback via intercept reject).
+        // Observers that care about the error see it through the router's
+        // TRANSITION_ERROR event.
+        syncUrlToRouterState(router, browser, setSyncing);
       }
     };
 
@@ -147,6 +175,14 @@ function recoverFromNavigateError(
     error,
   );
 
+  syncUrlToRouterState(router, browser, setSyncing);
+}
+
+function syncUrlToRouterState(
+  router: Router,
+  browser: NavigationBrowser,
+  setSyncing: (value: boolean) => void,
+): void {
   try {
     const currentState = router.getState();
 
@@ -168,10 +204,10 @@ function recoverFromNavigateError(
         setSyncing(false);
       }
     }
-  } catch (recoveryError) {
+  } catch (syncError) {
     console.error(
-      "[navigation-plugin] Failed to recover from critical error",
-      recoveryError,
+      "[navigation-plugin] Failed to sync URL to router state",
+      syncError,
     );
   }
 }

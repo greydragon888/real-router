@@ -1,8 +1,12 @@
 import { fc, test } from "@fast-check/vitest";
-import { describe, expect } from "vitest";
+import { afterAll, beforeAll, describe, expect, vi } from "vitest";
 
 import { NUM_RUNS } from "./helpers";
-import { safeParseUrl, shouldReplaceHistory } from "../../src/browser-env";
+import {
+  safeParseUrl,
+  safelyEncodePath,
+  shouldReplaceHistory,
+} from "../../src/browser-env";
 import { computeDirection } from "../../src/navigate-handler";
 import { deriveNavigationType } from "../../src/plugin";
 
@@ -199,6 +203,20 @@ describe("deriveNavigationType Properties (partitioned)", () => {
       expect(deriveNavigationType({ replace: false }, to, from)).toBe("push");
     },
   );
+
+  // C8: reload:true on the initial navigation (fromState === undefined)
+  // cannot match the same-path precondition of the reload branch (there is
+  // no previous path to compare), so classification falls through to
+  // shouldReplaceHistory — which returns true on initial nav with nullish
+  // replace → "replace". Documented asymmetry.
+  test.prop([arbState], { numRuns: NUM_RUNS.fast })(
+    "C8: reload: true + fromState undefined → replace (not reload)",
+    (toState) => {
+      expect(deriveNavigationType({ reload: true }, toState, undefined)).toBe(
+        "replace",
+      );
+    },
+  );
 });
 
 describe("safeParseUrl Properties (totality)", () => {
@@ -247,6 +265,49 @@ describe("safeParseUrl Properties (totality)", () => {
       const { pathname } = safeParseUrl(url);
 
       expect(pathname.startsWith("/")).toBe(true);
+    },
+  );
+});
+
+describe("safelyEncodePath Properties (totality)", () => {
+  // safelyEncodePath must be total: never throws, always returns a string,
+  // for any input (including malformed percent-sequences, Unicode, control
+  // chars). The try/catch fallback is the safety net; this property pins
+  // that contract down so regressions surface as assertion failures.
+  //
+  // Suppress the legitimate warnings the fallback emits for malformed
+  // percent-sequences — totality testing intentionally exercises that path.
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeAll(() => {
+    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  afterAll(() => {
+    warnSpy.mockRestore();
+  });
+
+  test.prop([fc.string()], { numRuns: 2000 })(
+    "never throws on any string input",
+    (anyStr) => {
+      expect(() => safelyEncodePath(anyStr)).not.toThrow();
+    },
+  );
+
+  test.prop([fc.string()], { numRuns: 1000 })(
+    "always returns a string",
+    (anyStr) => {
+      expect(typeof safelyEncodePath(anyStr)).toBe("string");
+    },
+  );
+
+  test.prop([fc.string()], { numRuns: 1000 })(
+    "is idempotent for any string",
+    (anyStr) => {
+      const once = safelyEncodePath(anyStr);
+      const twice = safelyEncodePath(once);
+
+      expect(twice).toBe(once);
     },
   );
 });

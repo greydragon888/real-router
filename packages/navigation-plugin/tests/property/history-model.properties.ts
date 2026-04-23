@@ -267,6 +267,14 @@ class AssertCanGoBackToCommand implements fc.AsyncCommand<
   }
 }
 
+const VALID_NAVIGATION_TYPES = [
+  "push",
+  "replace",
+  "traverse",
+  "reload",
+] as const;
+const VALID_DIRECTIONS = ["forward", "back", "unknown"] as const;
+
 class AssertMetaExistsCommand implements fc.AsyncCommand<
   HistoryModel,
   HistoryReal
@@ -282,12 +290,23 @@ class AssertMetaExistsCommand implements fc.AsyncCommand<
       const meta = state.context.navigation;
 
       expect(meta).toBeDefined();
-      expect(meta!.navigationType).toBeDefined();
 
-      // Meta must carry a boolean `userInitiated` — programmatic calls set
-      // it to `false`, browser events carry `event.userInitiated`. Either way
-      // the field must exist and be typed.
+      // navigationType must be one of the four enumerated values — a weaker
+      // `toBeDefined()` would pass for `"garbage"` or `undefined`-from-partial
+      // writes, which is exactly the regression we want to catch.
+      expect(VALID_NAVIGATION_TYPES).toContain(meta!.navigationType);
+
+      // direction must be one of the three enumerated values for the same
+      // reason — pins the field's domain rather than just its presence.
+      expect(VALID_DIRECTIONS).toContain(meta!.direction);
+
+      // userInitiated is a strict boolean — no undefined, no truthy-ish.
       expect(typeof meta!.userInitiated).toBe("boolean");
+
+      // sourceElement is either null or a DOM Element — never undefined.
+      expect(
+        meta!.sourceElement === null || meta!.sourceElement instanceof Element,
+      ).toBe(true);
     }
   }
 

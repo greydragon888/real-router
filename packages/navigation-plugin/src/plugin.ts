@@ -1,11 +1,6 @@
 import { UNKNOWN_ROUTE } from "@real-router/core";
 
-import {
-  shouldReplaceHistory,
-  buildUrl,
-  extractPathFromAbsoluteUrl,
-  urlToPath,
-} from "./browser-env";
+import { shouldReplaceHistory, buildUrl, urlToPath } from "./browser-env";
 import {
   peekBack,
   peekForward,
@@ -13,6 +8,7 @@ import {
   getVisitedRoutes,
   getRouteVisitCount,
   findLastEntryForRoute,
+  resolveEntryToMatchedState,
   canGoBack,
   canGoForward,
   canGoBackTo,
@@ -155,7 +151,7 @@ export class NavigationPlugin {
   async traverseToLast(routeName: string): Promise<State> {
     const entries = this.#browser.entries();
     const currentKey = this.#browser.currentEntry?.key;
-    const entry = findLastEntryForRoute(
+    const candidate = findLastEntryForRoute(
       entries,
       routeName,
       this.#api,
@@ -163,28 +159,34 @@ export class NavigationPlugin {
       currentKey,
     );
 
-    if (!entry) {
-      throw new Error(`No history entry for route "${routeName}"`);
+    // resolveEntryToMatchedState throws for missing entry, null url, or
+    // unmatched url — same three error branches the old inline checks
+    // produced. Extracted so the error paths can be unit-tested directly
+    // without namespace-level vi.spyOn gymnastics.
+    const { entry, matchedState } = resolveEntryToMatchedState(
+      candidate,
+      routeName,
+      this.#api,
+      this.#options.base,
+    );
+
+    const currentEntry = this.#browser.currentEntry;
+
+    if (!currentEntry) {
+      // Invariant violation: traverseToLast is only callable after
+      // router.start(), which guarantees a current entry. A null here means
+      // the plugin was stopped mid-call or the browser abstraction is
+      // broken — either way, silently picking direction "forward" from a
+      // fallback `-1` would mask the bug. Fail loudly instead.
+      throw new Error(
+        `[navigation-plugin] Cannot determine direction for traverseToLast("${routeName}"): browser.currentEntry is null. The plugin must be started before calling traverseToLast.`,
+      );
     }
-
-    if (!entry.url) {
-      throw new Error(`No matching route for entry URL "${entry.url}"`);
-    }
-
-    const path = extractPathFromAbsoluteUrl(entry.url, this.#options.base);
-    const matchedState = this.#api.matchPath(path);
-
-    if (!matchedState) {
-      throw new Error(`No matching route for entry URL "${entry.url}"`);
-    }
-
-    /* v8 ignore next -- @preserve: currentEntry always exists when traverseToLast is callable (after start) */
-    const currentIndex = this.#browser.currentEntry?.index ?? -1;
 
     this.#capturedMeta = {
       navigationType: "traverse",
       userInitiated: false,
-      direction: entry.index > currentIndex ? "forward" : "back",
+      direction: entry.index > currentEntry.index ? "forward" : "back",
       sourceElement: null,
     };
     this.#pendingTraverseKey = entry.key;
@@ -222,17 +224,25 @@ export class NavigationPlugin {
           };
         }
 
-        const { navigationType } = this.#capturedMeta;
+        const frozenMeta = Object.freeze(this.#capturedMeta);
 
-        this.#claim.write(toState, Object.freeze(this.#capturedMeta));
+        this.#claim.write(toState, frozenMeta);
         this.#capturedMeta = undefined;
 
         this.#isSyncingFromRouter = true;
 
+        // Consume pendingTraverseKey BEFORE calling browser.traverseTo.
+        // If traverseTo throws (Navigation API can reject on evicted keys
+        // under memory pressure), we must not leave the stale key behind —
+        // otherwise the NEXT transition's onTransitionSuccess would see it
+        // and replay the traverse against the same already-broken key.
+        const traverseKey = this.#pendingTraverseKey;
+
+        this.#pendingTraverseKey = undefined;
+
         try {
-          if (this.#pendingTraverseKey) {
-            this.#browser.traverseTo(this.#pendingTraverseKey);
-            this.#pendingTraverseKey = undefined;
+          if (traverseKey) {
+            this.#browser.traverseTo(traverseKey);
           } else {
             const url = buildUrl(toState.path, this.#options.base);
             const shouldPreserveHash =
@@ -248,7 +258,7 @@ export class NavigationPlugin {
             if (toState.name === UNKNOWN_ROUTE) {
               this.#browser.updateCurrentEntry({ state: historyState });
             } else {
-              const replace = navigationType !== "push";
+              const replace = frozenMeta.navigationType !== "push";
 
               this.#browser.navigate(finalUrl, {
                 state: historyState,

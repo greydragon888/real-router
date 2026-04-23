@@ -105,7 +105,6 @@
     },
     "packages/ssr-data-plugin": {
       "project": ["src/**/*.ts"],
-      "ignoreDependencies": ["@real-router/types"],
       "vitest": {
         "config": ["vitest.config.mts", "vitest.config.*.mts"]
       }
@@ -123,6 +122,6 @@
   "ignoreWorkspaces": ["examples/**", "benchmarks"],
   "ignore": ["benchmarks/**"],
   "ignoreDependencies": ["@stryker-mutator/api", "jsdom"],
-  "ignoreBinaries": ["tree", "tsx", "open", "ps", "awk", "perl"],
+  "ignoreBinaries": ["tree", "tsx", "open", "perl"],
   "ignoreExportsUsedInFile": true
 }
