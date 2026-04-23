@@ -5,6 +5,41 @@ import type { State } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
 
 /**
+ * Validates a candidate history entry for `traverseToLast(routeName)` and
+ * returns both the entry (now known non-null) and the matched router state.
+ * Extracted from `NavigationPlugin` so the three error branches (missing
+ * entry, null url, unmatched url) can be tested directly without vi.spyOn
+ * on module namespaces — the star-import spy pattern is fragile under ESM
+ * and was working by accident in history-extensions.test.ts.
+ *
+ * Throws a descriptive Error on any failure; the caller (NavigationPlugin)
+ * propagates it as the rejection of `traverseToLast`.
+ */
+export function resolveEntryToMatchedState(
+  entry: NavigationHistoryEntry | undefined,
+  routeName: string,
+  api: PluginApi,
+  base: string,
+): { entry: NavigationHistoryEntry; matchedState: State } {
+  if (!entry) {
+    throw new Error(`No history entry for route "${routeName}"`);
+  }
+
+  if (!entry.url) {
+    throw new Error(`No matching route for entry URL "${entry.url}"`);
+  }
+
+  const path = extractPathFromAbsoluteUrl(entry.url, base);
+  const matchedState = api.matchPath(path);
+
+  if (!matchedState) {
+    throw new Error(`No matching route for entry URL "${entry.url}"`);
+  }
+
+  return { entry, matchedState };
+}
+
+/**
  * Converts a NavigationHistoryEntry to a State via URL matching.
  * Uses URL matching (not entry.getState()) because:
  * - Entries before plugin init have no state

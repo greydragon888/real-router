@@ -27,6 +27,17 @@ describe("extractPath", () => {
     expect(extractPath("/users/list", "")).toBe("/users/list");
   });
 
+  // Edge cases: empty pathname — the fallback branch `if (!pathname)`
+  // returns "/" so callers never see an empty string. Pin both base
+  // variants so a regression that returns "" or `base` stands out.
+  it("returns / for empty pathname with empty base", () => {
+    expect(extractPath("", "")).toBe("/");
+  });
+
+  it("returns / for empty pathname with non-empty base", () => {
+    expect(extractPath("", "/app")).toBe("/");
+  });
+
   it("does not strip partial segment match", () => {
     expect(extractPath("/application/users", "/app")).toBe(
       "/application/users",
@@ -64,6 +75,26 @@ describe("buildUrl", () => {
 
   it("returns path unchanged when base is empty", () => {
     expect(buildUrl("/users", "")).toBe("/users");
+  });
+
+  // Edge cases: empty path and index-with-base.
+  it("returns empty string for empty path with empty base", () => {
+    expect(buildUrl("", "")).toBe("");
+  });
+
+  it("returns base unchanged for empty path with non-empty base", () => {
+    expect(buildUrl("", "/app")).toBe("/app");
+  });
+
+  it("returns canonical base (no trailing slash) for path=/ with non-empty base", () => {
+    // Historically this produced "/app/" — the collapse to bare base keeps
+    // index URLs symmetric with `normalizeBase("/app/") === "/app"`. Roundtrip
+    // holds: extractPath("/app", "/app") === "/".
+    expect(buildUrl("/", "/app")).toBe("/app");
+  });
+
+  it("returns / for path=/ with empty base", () => {
+    expect(buildUrl("/", "")).toBe("/");
   });
 });
 

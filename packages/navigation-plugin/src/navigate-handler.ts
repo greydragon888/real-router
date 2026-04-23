@@ -1,6 +1,6 @@
 import { errorCodes, RouterError } from "@real-router/core";
 
-import { extractPath, safeParseUrl } from "./browser-env";
+import { urlToPath } from "./browser-env";
 
 import type {
   NavigationBrowser,
@@ -72,9 +72,7 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
       return;
     }
 
-    const destinationUrl = safeParseUrl(event.destination.url);
-    const path =
-      extractPath(destinationUrl.pathname, base) + destinationUrl.search;
+    const path = urlToPath(event.destination.url, base);
     const matchedState = api.matchPath(path);
 
     const navType = event.navigationType as NavigationMeta["navigationType"];

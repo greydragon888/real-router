@@ -23,6 +23,15 @@ export function buildUrl(path: string, base: string): string {
     return path.startsWith("/") ? path : `/${path}`;
   }
 
+  // Path "/" with a non-empty base would otherwise produce `"${base}/"` —
+  // a trailing-slash URL (e.g. `/app/`). The canonical form of the base
+  // (normalizeBase strips trailing slash) is `/app`, and the router's
+  // `extractPath("/app", "/app")` round-trips to `"/"` regardless. Collapse
+  // the index case to the canonical base to keep URLs symmetric.
+  if (path === "/") {
+    return base;
+  }
+
   return path.startsWith("/") ? `${base}${path}` : `${base}/${path}`;
 }
 
