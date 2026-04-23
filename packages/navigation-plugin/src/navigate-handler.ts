@@ -100,17 +100,32 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
           return;
         }
 
-        // RouterError (CANNOT_DEACTIVATE, CANNOT_ACTIVATE, SAME_STATES…) —
-        // router rejected the transition, state is unchanged. Sync the URL
-        // back to the current router state. We do not re-throw: the built-
-        // in Navigation API rollback on intercept rejection is unreliable
-        // in headless Chromium and on some platforms — it leaves an
-        // intermediate "committed-then-reverted" URL window that UI tests
-        // race against. Manual sync via `browser.navigate({history:"replace"})`
-        // from the syncing code path keeps URL and router state consistent
-        // with a single visible state transition. Router state remains on
-        // the old route, URL stays on the old URL; observers that care
-        // about the rejection see it via router's TRANSITION_ERROR.
+        // TRANSITION_CANCELLED: a newer navigation aborted this one — the
+        // newer navigate event is (or will be) handled by this same plugin,
+        // and THAT event is responsible for syncing URL/state. Firing our
+        // own sync here races against it: browser.navigate(replace, same-url)
+        // would cancel the in-flight newer transition, which is exactly the
+        // rapid-fire-events storm failure mode.
+        //
+        // SAME_STATES: router refused because router.getState() already equals
+        // the target. URL and router state are already consistent — no sync
+        // needed.
+        if (
+          error.code === errorCodes.TRANSITION_CANCELLED ||
+          error.code === errorCodes.SAME_STATES
+        ) {
+          return;
+        }
+
+        // Other RouterError codes (CANNOT_DEACTIVATE, CANNOT_ACTIVATE,
+        // ROUTE_NOT_FOUND, …) — router rejected the transition, state is
+        // unchanged, but URL may have already committed to a different
+        // value by the Navigation API. Sync the URL back to the current
+        // router state in a single visible transition (headless Chromium
+        // and some cross-origin setups leave "committed-then-reverted"
+        // windows if we relied on the native rollback via intercept reject).
+        // Observers that care about the error see it through the router's
+        // TRANSITION_ERROR event.
         syncUrlToRouterState(router, browser, setSyncing);
       }
     };

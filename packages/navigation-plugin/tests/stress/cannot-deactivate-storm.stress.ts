@@ -113,8 +113,15 @@ describe("N4 — Cannot Deactivate Storm", () => {
 
     await waitForTransitions();
 
+    // After #524 the recovery-path helper was renamed from
+    // "Failed to recover from critical error" to
+    // "Failed to sync URL to router state" (syncUrlToRouterState).
+    // This stress test checks that under a double-failure storm (router.navigate
+    // throws non-RouterError AND the sync-URL recovery itself throws),
+    // the second-level error is logged through console.error without
+    // any unhandled rejection.
     expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Failed to recover"),
+      expect.stringContaining("Failed to sync URL to router state"),
       expect.any(Error),
     );
 
