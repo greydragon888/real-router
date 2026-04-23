@@ -48,7 +48,7 @@ router.traverseToLast("users.list"); // jump back to the last users list
 router.usePlugin(
   navigationPluginFactory({
     base: "/app", // Base path prefix for all routes
-    forceDeactivate: true, // Bypass canDeactivate guards on back/forward
+    forceDeactivate: false, // Respect canDeactivate guards on back/forward (default)
   }),
 );
 ```
@@ -56,7 +56,7 @@ router.usePlugin(
 | Option            | Type      | Default | Description                                                            |
 | ----------------- | --------- | ------- | ---------------------------------------------------------------------- |
 | `base`            | `string`  | `""`    | Base path for all routes (e.g., `"/app"` → URLs start with `/app/...`) |
-| `forceDeactivate` | `boolean` | `true`  | Bypass `canDeactivate` guards on browser back/forward                  |
+| `forceDeactivate` | `boolean` | `false` | If `true`, browser back/forward skip `canDeactivate` guards. Default `false` respects guards — matches browser-plugin. |
 
 ## Router Extensions
 
@@ -234,10 +234,10 @@ router.usePlugin(plugin);
 
 ## Form Protection
 
-Set `forceDeactivate: false` to respect `canDeactivate` guards on back/forward:
+`canDeactivate` guards run on browser back/forward by default — no extra configuration needed:
 
 ```typescript
-router.usePlugin(navigationPluginFactory({ forceDeactivate: false }));
+router.usePlugin(navigationPluginFactory());
 
 import { getLifecycleApi } from "@real-router/core/api";
 

@@ -34,7 +34,6 @@ navigation-plugin/
 │   ├── ssr-fallback.ts        — createNavigationFallbackBrowser (no-op fallback for SSR)
 │   ├── validation.ts          — Options validation (delegates to browser-env)
 │   ├── constants.ts           — Constants (defaultOptions, source, LOGGER_CONTEXT)
-│   ├── validation.ts          — Options validation (delegates to browser-env)
 │   └── browser-env/           — Symlink → shared/browser-env (extractPath, buildUrl, urlToPath, safeParseUrl, shouldReplaceHistory, etc.)
 ```
 
@@ -251,10 +250,8 @@ this.#claim = api.claimContextNamespace("navigation");
 
 this.#removeExtensions = api.extendRouter({
   buildUrl: pluginBuildUrl,
-  matchUrl: (url: string) => {
-    const path = urlToPath(url, options.base);
-    return path ? api.matchPath(path) : undefined;
-  },
+  matchUrl: (url: string) =>
+    api.matchPath(urlToPath(url, options.base)) ?? undefined,
   replaceHistoryState: createReplaceHistoryState(
     api,
     router,

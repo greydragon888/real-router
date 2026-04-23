@@ -247,6 +247,81 @@ describe("Navigation Plugin — Navigate", () => {
     });
   });
 
+  describe("canDeactivate guard contract — #524", () => {
+    // Regression for #524: canDeactivate guards must run on browser
+    // back/forward by default (`forceDeactivate` flipped from true → false),
+    // and a blocked guard must reject the intercept() handler so the
+    // Navigation API rolls back the URL.
+
+    it("forceDeactivate default is false (respect guards)", async () => {
+      // Indirect contract check: with default options, a blocking guard must
+      // actually block. If forceDeactivate defaulted to true, the guard
+      // would be bypassed and router.getState() would move to users.list.
+      unsubscribe = router.usePlugin(navigationPluginFactory({}, browser));
+      await router.start();
+
+      getLifecycleApi(router).addDeactivateGuard("index", () => () => false);
+
+      const { finished } = mockNav.navigate("http://localhost/users/list");
+
+      await finished;
+
+      // Router state stays on "index" — guard blocked the transition.
+      expect(router.getState()?.name).toBe("index");
+    });
+
+    it("browser-initiated navigate triggers canDeactivate guard by default", async () => {
+      unsubscribe = router.usePlugin(navigationPluginFactory({}, browser));
+      await router.start();
+
+      const guardSpy = vi.fn(() => true);
+
+      getLifecycleApi(router).addDeactivateGuard("index", () => guardSpy);
+
+      const { finished } = mockNav.navigate("http://localhost/users/list");
+
+      await finished;
+
+      expect(guardSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("guard rejection syncs URL back and leaves router state unchanged", async () => {
+      unsubscribe = router.usePlugin(navigationPluginFactory({}, browser));
+      await router.start();
+
+      getLifecycleApi(router).addDeactivateGuard("index", () => () => false);
+
+      const urlBefore = mockNav.currentUrl;
+      const { finished } = mockNav.navigate("http://localhost/users/list");
+
+      await finished;
+
+      // Explicit sync via browser.navigate({history:"replace"}) in the
+      // syncing branch keeps URL and router state consistent. No desync.
+      expect(mockNav.currentUrl).toBe(urlBefore);
+      expect(router.getState()?.name).toBe("index");
+    });
+
+    it("explicit forceDeactivate: true still bypasses guards (opt-in escape hatch)", async () => {
+      unsubscribe = router.usePlugin(
+        navigationPluginFactory({ forceDeactivate: true }, browser),
+      );
+      await router.start();
+
+      const guardSpy = vi.fn(() => false);
+
+      getLifecycleApi(router).addDeactivateGuard("index", () => guardSpy);
+
+      const { finished } = mockNav.navigate("http://localhost/users/list");
+
+      await finished;
+
+      // Guard was bypassed — navigation completed.
+      expect(guardSpy).not.toHaveBeenCalled();
+      expect(router.getState()?.name).toBe("users.list");
+    });
+  });
+
   describe("Navigate Event Properties", () => {
     beforeEach(async () => {
       unsubscribe = router.usePlugin(navigationPluginFactory({}, browser));
@@ -478,7 +553,7 @@ describe("Error Recovery", () => {
   // Obsolete after #483: strict-mode path no longer invokes navigateToDefault,
   // so there is no "navigateToDefault crash" code path to recover from.
 
-  it("does NOT recover on RouterError (expected behavior)", async () => {
+  it("does NOT recover on RouterError (expected behavior) and manually syncs URL via replace", async () => {
     unsub = router.usePlugin(
       navigationPluginFactory({ forceDeactivate: false }, browser),
     );
@@ -487,17 +562,35 @@ describe("Error Recovery", () => {
     getLifecycleApi(router).addDeactivateGuard("index", () => () => false);
 
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const browserNavigateSpy = vi.spyOn(browser, "navigate");
 
     const { finished } = mockNav.navigate("http://localhost/users/list");
 
+    // #524: RouterError triggers manual URL sync (syncUrlToRouterState) but
+    // does not surface through `finished`.
     await finished;
 
+    // Negative: the critical-error logging path (for non-RouterError crashes)
+    // must stay quiet.
     expect(consoleSpy).not.toHaveBeenCalledWith(
       "[navigation-plugin] Critical error in navigate handler",
       expect.anything(),
     );
 
+    // Positive: manual URL sync must fire — `browser.navigate(url, { history: "replace" })`
+    // with the current (unchanged) router state. Pins the #524 contract so a
+    // regression that "handles RouterError silently" (i.e. no sync at all,
+    // restoring the old URL/state desync) fails here.
+    expect(browserNavigateSpy).toHaveBeenCalledWith(
+      "/",
+      expect.objectContaining({
+        state: expect.objectContaining({ name: "index", path: "/" }),
+        history: "replace",
+      }),
+    );
+
     consoleSpy.mockRestore();
+    browserNavigateSpy.mockRestore();
   });
 
   it("strict-mode throws ROUTE_NOT_FOUND silently (no critical recovery) — Navigation API auto-rolls back URL (#483)", async () => {
@@ -576,7 +669,7 @@ describe("Error Recovery", () => {
       expect.any(TypeError),
     );
     expect(consoleSpy).toHaveBeenCalledWith(
-      "[navigation-plugin] Failed to recover from critical error",
+      "[navigation-plugin] Failed to sync URL to router state",
       expect.any(Error),
     );
 

@@ -5,10 +5,12 @@ import {
   NUM_RUNS,
   PARAM_ROUTE_NAME,
   arbBaseSegment,
+  arbDeepPath,
   arbIdParam,
   arbLeafRoute,
   arbNormalizedBase,
   arbRawBase,
+  arbSpecialCharPath,
   arbUnsafeIdParam,
   arbQueryString,
   arbUrlPath,
@@ -20,6 +22,7 @@ import {
   extractPath,
   normalizeBase,
   safelyEncodePath,
+  urlToPath,
 } from "../../src/browser-env";
 
 describe("Navigation Plugin URL Invariants", () => {
@@ -90,7 +93,14 @@ describe("Navigation Plugin URL Invariants", () => {
 
         const pathAfterBase = url.slice(base.length);
 
-        expect(pathAfterBase.startsWith("/")).toBe(true);
+        // The tail is either "/<segments>" (non-index routes under base),
+        // "/<segments>" (any route with empty base), or "" — the last case
+        // is exclusively `buildUrl("/", "/app") === "/app"` after the
+        // canonical-base fix: index-under-base collapses the trailing slash
+        // to keep URLs symmetric with `normalizeBase`.
+        expect(pathAfterBase === "" || pathAfterBase.startsWith("/")).toBe(
+          true,
+        );
       },
     );
   });
@@ -301,6 +311,50 @@ describe("Navigation Plugin URL Invariants", () => {
         const result = normalizeBase(base);
 
         expect(result).not.toMatch(/\/{2,}/);
+      },
+    );
+  });
+
+  // Coverage for pathological / unusual inputs — deeper paths than
+  // arbUrlPath produces, and paths with special characters the matcher
+  // must tolerate without crashing. The matcher itself usually fails
+  // to resolve these (they don't match fixture routes), but the URL
+  // utilities and safeParseUrl must stay total.
+  describe("Deep Paths and Special-Character Segments", () => {
+    test.prop([arbDeepPath, arbNormalizedBase], { numRuns: NUM_RUNS.fast })(
+      "extractPath(buildUrl(deepPath, base), base) === deepPath (roundtrip holds at 4–8 segments)",
+      (path, base) => {
+        expect(extractPath(buildUrl(path, base), base)).toBe(path);
+      },
+    );
+
+    test.prop([arbSpecialCharPath, arbNormalizedBase], {
+      numRuns: NUM_RUNS.fast,
+    })(
+      "extractPath never throws for paths with uppercase / dots / %-encoding",
+      (path, base) => {
+        expect(() => extractPath(path, base)).not.toThrow();
+      },
+    );
+
+    test.prop([arbSpecialCharPath, arbNormalizedBase], {
+      numRuns: NUM_RUNS.fast,
+    })(
+      "buildUrl never throws for paths with uppercase / dots / %-encoding",
+      (path, base) => {
+        expect(() => buildUrl(path, base)).not.toThrow();
+      },
+    );
+
+    test.prop([arbSpecialCharPath, arbNormalizedBase], {
+      numRuns: NUM_RUNS.fast,
+    })(
+      "urlToPath on a scheme-less special-char path returns a string starting with /",
+      (path, base) => {
+        const result = urlToPath(path, base);
+
+        expect(typeof result).toBe("string");
+        expect(result.startsWith("/")).toBe(true);
       },
     );
   });

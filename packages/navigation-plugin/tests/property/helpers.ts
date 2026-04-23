@@ -151,6 +151,37 @@ export const arbUrlPath: fc.Arbitrary<string> = fc.oneof(
     .map((segments) => `/${segments.join("/")}`),
 );
 
+/**
+ * Deeper URL paths (up to 8 segments) for stress-testing extractPath /
+ * buildUrl / urlToPath on pathological depths. Complements `arbUrlPath`
+ * which caps at 3 segments and misses linear-time-per-segment regressions.
+ */
+export const arbDeepPath: fc.Arbitrary<string> = fc
+  .array(arbPathSegment, { minLength: 4, maxLength: 8 })
+  .map((segments) => `/${segments.join("/")}`);
+
+/**
+ * URL path segments that include special characters the matcher must
+ * tolerate without crashing: uppercase, dots, %-encoded bytes, tildes.
+ * Complements `arbPathSegment` (lowercase alphanumeric only) and
+ * `arbUnsafeIdParam` (param values, not segment names).
+ *
+ * The generated segments will typically NOT match the fixture's routes —
+ * the purpose is to verify the URL utilities (extractPath, buildUrl,
+ * urlToPath, safeParseUrl) never throw on shapes users can type into
+ * the address bar.
+ */
+export const arbSpecialCharSegment: fc.Arbitrary<string> = fc.oneof(
+  fc.stringMatching(/^[A-Z]{1,8}$/),
+  fc.stringMatching(/^[a-z]{1,4}\.[a-z]{1,4}$/),
+  fc.stringMatching(/^~[a-z]{1,6}$/),
+  fc.stringMatching(/^[a-z]{1,4}%[0-9A-F]{2}[a-z]{0,4}$/),
+);
+
+export const arbSpecialCharPath: fc.Arbitrary<string> = fc
+  .array(arbSpecialCharSegment, { minLength: 1, maxLength: 4 })
+  .map((segments) => `/${segments.join("/")}`);
+
 // --- non-matching paths (guaranteed to miss all fixture routes) ---
 
 const KNOWN_PREFIXES = new Set(["home", "users", "index"]);
