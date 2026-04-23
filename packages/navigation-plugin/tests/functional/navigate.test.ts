@@ -553,7 +553,7 @@ describe("Error Recovery", () => {
   // Obsolete after #483: strict-mode path no longer invokes navigateToDefault,
   // so there is no "navigateToDefault crash" code path to recover from.
 
-  it("does NOT recover on RouterError (expected behavior)", async () => {
+  it("does NOT recover on RouterError (expected behavior) and manually syncs URL via replace", async () => {
     unsub = router.usePlugin(
       navigationPluginFactory({ forceDeactivate: false }, browser),
     );
@@ -562,20 +562,35 @@ describe("Error Recovery", () => {
     getLifecycleApi(router).addDeactivateGuard("index", () => () => false);
 
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const browserNavigateSpy = vi.spyOn(browser, "navigate");
 
     const { finished } = mockNav.navigate("http://localhost/users/list");
 
     // #524: RouterError triggers manual URL sync (syncUrlToRouterState) but
-    // does not surface through `finished` — this test asserts only that the
-    // non-RouterError recovery path stays quiet.
+    // does not surface through `finished`.
     await finished;
 
+    // Negative: the critical-error logging path (for non-RouterError crashes)
+    // must stay quiet.
     expect(consoleSpy).not.toHaveBeenCalledWith(
       "[navigation-plugin] Critical error in navigate handler",
       expect.anything(),
     );
 
+    // Positive: manual URL sync must fire — `browser.navigate(url, { history: "replace" })`
+    // with the current (unchanged) router state. Pins the #524 contract so a
+    // regression that "handles RouterError silently" (i.e. no sync at all,
+    // restoring the old URL/state desync) fails here.
+    expect(browserNavigateSpy).toHaveBeenCalledWith(
+      "/",
+      expect.objectContaining({
+        state: expect.objectContaining({ name: "index", path: "/" }),
+        history: "replace",
+      }),
+    );
+
     consoleSpy.mockRestore();
+    browserNavigateSpy.mockRestore();
   });
 
   it("strict-mode throws ROUTE_NOT_FOUND silently (no critical recovery) — Navigation API auto-rolls back URL (#483)", async () => {
