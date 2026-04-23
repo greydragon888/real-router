@@ -391,6 +391,10 @@ describe("Navigation Plugin — NavigationMeta", () => {
       const currentKey = mockNav.currentEntry!.key;
       const result = mockNav.traverseTo(currentKey);
 
+      // SAME_STATES is a RouterError. After #524, the plugin catches it,
+      // syncs URL back manually and resolves finished. The captured meta
+      // from the navigate event (before the router rejected) still has
+      // direction "unknown" for equal indices — that's what we assert.
       await result.finished;
 
       const state = router.getState()!;

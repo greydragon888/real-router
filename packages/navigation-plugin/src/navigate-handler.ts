@@ -98,7 +98,22 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
       } catch (error) {
         if (!(error instanceof RouterError)) {
           recoverFromNavigateError(error, router, browser, setSyncing);
+
+          return;
         }
+
+        // RouterError (CANNOT_DEACTIVATE, CANNOT_ACTIVATE, SAME_STATES…) —
+        // router rejected the transition, state is unchanged. Sync the URL
+        // back to the current router state. We do not re-throw: the built-
+        // in Navigation API rollback on intercept rejection is unreliable
+        // in headless Chromium and on some platforms — it leaves an
+        // intermediate "committed-then-reverted" URL window that UI tests
+        // race against. Manual sync via `browser.navigate({history:"replace"})`
+        // from the syncing code path keeps URL and router state consistent
+        // with a single visible state transition. Router state remains on
+        // the old route, URL stays on the old URL; observers that care
+        // about the rejection see it via router's TRANSITION_ERROR.
+        syncUrlToRouterState(router, browser, setSyncing);
       }
     };
 
@@ -147,6 +162,14 @@ function recoverFromNavigateError(
     error,
   );
 
+  syncUrlToRouterState(router, browser, setSyncing);
+}
+
+function syncUrlToRouterState(
+  router: Router,
+  browser: NavigationBrowser,
+  setSyncing: (value: boolean) => void,
+): void {
   try {
     const currentState = router.getState();
 
@@ -168,10 +191,10 @@ function recoverFromNavigateError(
         setSyncing(false);
       }
     }
-  } catch (recoveryError) {
+  } catch (syncError) {
     console.error(
-      "[navigation-plugin] Failed to recover from critical error",
-      recoveryError,
+      "[navigation-plugin] Failed to sync URL to router state",
+      syncError,
     );
   }
 }
