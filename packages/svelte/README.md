@@ -384,9 +384,9 @@ Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 
 ## Examples
 
-16 runnable examples — each is a standalone Vite app. Run: `cd examples/svelte/basic && pnpm dev`
+16 runnable examples — each is a standalone Vite app. Run: `cd examples/web/svelte/basic && pnpm dev`
 
-[basic](../../examples/svelte/basic) · [nested-routes](../../examples/svelte/nested-routes) · [auth-guards](../../examples/svelte/auth-guards) · [data-loading](../../examples/svelte/data-loading) · [lazy-loading](../../examples/svelte/lazy-loading) · [async-guards](../../examples/svelte/async-guards) · [hash-routing](../../examples/svelte/hash-routing) · [persistent-params](../../examples/svelte/persistent-params) · [error-handling](../../examples/svelte/error-handling) · [dynamic-routes](../../examples/svelte/dynamic-routes) · [link-action](../../examples/svelte/link-action) · [lazy-loading-svelte](../../examples/svelte/lazy-loading-svelte) · [snippets-routing](../../examples/svelte/snippets-routing) · [reactive-source](../../examples/svelte/reactive-source) · [search-schema](../../examples/svelte/search-schema) · [combined](../../examples/svelte/combined)
+[basic](../../examples/web/svelte/basic) · [nested-routes](../../examples/web/svelte/nested-routes) · [auth-guards](../../examples/web/svelte/auth-guards) · [data-loading](../../examples/web/svelte/data-loading) · [lazy-loading](../../examples/web/svelte/lazy-loading) · [async-guards](../../examples/web/svelte/async-guards) · [hash-routing](../../examples/web/svelte/hash-routing) · [persistent-params](../../examples/web/svelte/persistent-params) · [error-handling](../../examples/web/svelte/error-handling) · [dynamic-routes](../../examples/web/svelte/dynamic-routes) · [link-action](../../examples/web/svelte/link-action) · [lazy-loading-svelte](../../examples/web/svelte/lazy-loading-svelte) · [snippets-routing](../../examples/web/svelte/snippets-routing) · [reactive-source](../../examples/web/svelte/reactive-source) · [search-schema](../../examples/web/svelte/search-schema) · [combined](../../examples/web/svelte/combined)
 
 ## Related Packages
 

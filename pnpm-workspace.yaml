@@ -1,6 +1,8 @@
 packages:
   - "packages/*"
   - "shared"
-  - "examples/*"
-  - "examples/*/*"
+  - "examples/web/*"
+  - "examples/web/*/*"
+  - "examples/desktop/*/*"
+  - "examples/console/*"
   - "benchmarks"

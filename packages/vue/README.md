@@ -491,9 +491,9 @@ Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 
 ## Examples
 
-14 runnable examples — each is a standalone Vite app. Run: `cd examples/vue/basic && pnpm dev`
+14 runnable examples — each is a standalone Vite app. Run: `cd examples/web/vue/basic && pnpm dev`
 
-[basic](../../examples/vue/basic) · [nested-routes](../../examples/vue/nested-routes) · [auth-guards](../../examples/vue/auth-guards) · [data-loading](../../examples/vue/data-loading) · [lazy-loading](../../examples/vue/lazy-loading) · [async-guards](../../examples/vue/async-guards) · [hash-routing](../../examples/vue/hash-routing) · [persistent-params](../../examples/vue/persistent-params) · [error-handling](../../examples/vue/error-handling) · [dynamic-routes](../../examples/vue/dynamic-routes) · [plugin-installation](../../examples/vue/plugin-installation) · [v-link-directive](../../examples/vue/v-link-directive) · [keep-alive](../../examples/vue/keep-alive) · [combined](../../examples/vue/combined)
+[basic](../../examples/web/vue/basic) · [nested-routes](../../examples/web/vue/nested-routes) · [auth-guards](../../examples/web/vue/auth-guards) · [data-loading](../../examples/web/vue/data-loading) · [lazy-loading](../../examples/web/vue/lazy-loading) · [async-guards](../../examples/web/vue/async-guards) · [hash-routing](../../examples/web/vue/hash-routing) · [persistent-params](../../examples/web/vue/persistent-params) · [error-handling](../../examples/web/vue/error-handling) · [dynamic-routes](../../examples/web/vue/dynamic-routes) · [plugin-installation](../../examples/web/vue/plugin-installation) · [v-link-directive](../../examples/web/vue/v-link-directive) · [keep-alive](../../examples/web/vue/keep-alive) · [combined](../../examples/web/vue/combined)
 
 ## Related Packages
 

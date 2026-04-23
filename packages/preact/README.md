@@ -240,9 +240,9 @@ Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 
 ## Examples
 
-11 runnable examples — each is a standalone Vite app. Run: `cd examples/preact/basic && pnpm dev`
+11 runnable examples — each is a standalone Vite app. Run: `cd examples/web/preact/basic && pnpm dev`
 
-[basic](../../examples/preact/basic) · [nested-routes](../../examples/preact/nested-routes) · [auth-guards](../../examples/preact/auth-guards) · [data-loading](../../examples/preact/data-loading) · [lazy-loading](../../examples/preact/lazy-loading) · [async-guards](../../examples/preact/async-guards) · [hash-routing](../../examples/preact/hash-routing) · [persistent-params](../../examples/preact/persistent-params) · [error-handling](../../examples/preact/error-handling) · [dynamic-routes](../../examples/preact/dynamic-routes) · [combined](../../examples/preact/combined)
+[basic](../../examples/web/preact/basic) · [nested-routes](../../examples/web/preact/nested-routes) · [auth-guards](../../examples/web/preact/auth-guards) · [data-loading](../../examples/web/preact/data-loading) · [lazy-loading](../../examples/web/preact/lazy-loading) · [async-guards](../../examples/web/preact/async-guards) · [hash-routing](../../examples/web/preact/hash-routing) · [persistent-params](../../examples/web/preact/persistent-params) · [error-handling](../../examples/web/preact/error-handling) · [dynamic-routes](../../examples/web/preact/dynamic-routes) · [combined](../../examples/web/preact/combined)
 
 ## Related Packages
 
