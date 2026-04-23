@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-04-23]
+
+### @real-router/navigation-plugin@0.5.1
+
+### Patch Changes
+
+- [#520](https://github.com/greydragon888/real-router/pull/520) [`3d6ee88`](https://github.com/greydragon888/real-router/commit/3d6ee88e4aa04979d1c44b9e6d251ef9d3b53ae0) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix cross-document reload loop under router-syncing navigation events ([#518](https://github.com/greydragon888/real-router/issues/518))
+
+  When the plugin's `onTransitionSuccess` hook called `browser.navigate()` to sync
+  the URL after a successful transition, the dispatched `navigate` event was
+  short-circuited by the handler via a bare `return` while `isSyncingFromRouter`
+  was `true`. Per the Navigation API spec, a same-origin `canIntercept` event
+  with **no** `event.intercept()` call falls back to a cross-document navigation
+  (full page reload). In headless Chromium (Playwright + `vite preview`) this
+  triggered an infinite loop: every reload re-ran the app bootstrap, which
+  re-entered the same `browser.navigate → navigate event → bare return → reload`
+  cycle hundreds of times per second. `page.goto()` could never reach the `load`
+  event, breaking Playwright e2e for every example that relied on the plugin
+  (e.g. `examples/tauri/react-navigation`).
+
+  The handler now calls `event.intercept({ handler: async () => {} })` on the
+  syncing branch — cancelling the cross-document fallback without running any
+  router logic (state is already committed). Non-syncing events keep their
+  previous behaviour.
+
+  The bug was invisible to the existing test suite because `MockNavigation` did
+  not model the cross-document fallback — an un-intercepted event was silently
+  committed rather than producing the observable reload. `MockNavigation` now
+  has an opt-in `enableStrictIntercept()` mode that mirrors Chromium's behaviour,
+  and the fix is covered by four new regression tests under `[#518](https://github.com/greydragon888/real-router/issues/518)`.
+
 ## [2026-04-22]
 
 ### @real-router/memory-plugin@0.3.5
