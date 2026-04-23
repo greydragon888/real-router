@@ -1,56 +1,63 @@
 # Tauri + `@real-router/navigation-plugin`
 
-Desktop example for [issue #496](https://github.com/greydragon888/real-router/issues/496). Demonstrates all **9 exclusive methods** of `navigation-plugin` in Tauri v2.
+Demonstrates all **9 exclusive methods** of `navigation-plugin` in Tauri v2. Unlike `browser-plugin`, this plugin depends on the browser [Navigation API](https://caniuse.com/mdn-api_navigation), and in Tauri that depends on the host OS WebView — see the compatibility table below.
 
 ## ⚠️ OS Requirements
 
-This example uses `@real-router/navigation-plugin`, which requires the browser [Navigation API](https://caniuse.com/mdn-api_navigation). In Tauri v2 availability depends on the host OS WebView:
+| Host                          | WebView                   | Navigation API        |
+| ----------------------------- | ------------------------- | --------------------- |
+| Tauri Windows                 | WebView2 (Chromium)       | ✅ Yes                |
+| Tauri Android                 | Chrome WebView (Chromium) | ✅ Yes                |
+| Tauri macOS ≥ 26.2            | WKWebView                 | ✅ Yes                |
+| Tauri iOS ≥ 26.2              | WKWebView                 | ✅ Yes                |
+| Tauri Linux WebKitGTK ≥ 2.52  | WebKitGTK                 | ✅ Yes                |
+| Tauri macOS ≤ 26.1            | WKWebView                 | ❌ Crashes at startup |
+| Tauri iOS ≤ 26.1              | WKWebView                 | ❌ Crashes at startup |
+| Tauri Linux WebKitGTK ≤ 2.50  | WebKitGTK                 | ❌ Crashes at startup |
 
-| Host                          | WebView                   | Navigation API         |
-| ----------------------------- | ------------------------- | ---------------------- |
-| Tauri Windows                 | WebView2 (Chromium)       | ✅ Yes                  |
-| Tauri Android                 | Chrome WebView (Chromium) | ✅ Yes                  |
-| Tauri macOS ≥ 26.2            | WKWebView                 | ✅ Yes                  |
-| Tauri iOS ≥ 26.2              | WKWebView                 | ✅ Yes                  |
-| Tauri Linux WebKitGTK ≥ 2.52  | WebKitGTK                 | ✅ Yes                  |
-| Tauri macOS ≤ 26.1            | WKWebView                 | ❌ Crashes at startup   |
-| Tauri iOS ≤ 26.1              | WKWebView                 | ❌ Crashes at startup   |
-| Tauri Linux WebKitGTK ≤ 2.50  | WebKitGTK                 | ❌ Crashes at startup   |
+**If your target OS matrix includes any of the ❌ rows, use [`examples/tauri/react`](../react) instead** — it uses `browser-plugin`, which works on all WebView versions.
 
-**If your target OS matrix includes any of the ❌ rows — use [`examples/tauri/react`](../react) instead.** It uses `@real-router/browser-plugin`, which works on all WebView versions.
+The plugin throws `[navigation-plugin] Navigation API is not supported` at startup on unsupported WebViews. Failing fast is intentional: the exclusive history methods (`peekBack`, `hasVisited`, `traverseToLast`, …) cannot be emulated without the API.
 
-The plugin throws at startup with `[navigation-plugin] Navigation API is not supported` on unsupported systems. This is intentional: failing fast is better than silently degrading, because the exclusive history methods (`peekBack`, `hasVisited`, `traverseToLast`) cannot be emulated without the API.
+## Why `navigation-plugin` at all
 
-## Why real-router and not X?
+At the time of this example, real-router is the only front-end router with first-class Navigation API integration. Pick this example when you need the exclusive history methods:
 
-At the time of this example, real-router is the **only** front-end router with first-class Navigation API integration. If you need the exclusive history methods (list of visited routes, visit counts, preview of back/forward entries, traverse-to-last-entry for a route), you are choosing real-router consciously. The OS trade-offs above are part of that choice.
+- List of routes the user has visited in this session.
+- Visit count per route name.
+- Preview of what back / forward would land on (`peekBack`, `peekForward`).
+- Jump-to-last-visit-for-a-route (`traverseToLast`) without stepping through intermediate entries.
+
+The OS compatibility trade-off above is part of that choice. If you only need `pushState` / `replaceState` + back / forward, [`examples/tauri/react`](../react) is the safer default.
 
 ## Quick Start
 
 ```bash
 pnpm install
-pnpm tauri dev      # launches Tauri window with Vite dev server (requires Rust toolchain)
-pnpm build          # vite build — frontend only (used by CI)
-pnpm preview        # vite preview at http://localhost:4173 (used by e2e)
-pnpm test:e2e       # Playwright vs vite preview, 8 tests
+pnpm tauri dev      # launches a Tauri window with Vite dev server (requires Rust toolchain)
+pnpm build          # vite build (frontend only)
+pnpm preview        # vite preview at http://localhost:4173
+pnpm test:e2e       # Playwright against vite preview
 ```
 
-## Exclusive methods — where to look
+## What it covers
 
-| Method | UI location |
-| --- | --- |
-| `getVisitedRoutes()` | list in `HistoryPanel` |
-| `hasVisited(name)` | `✓` suffix on sidebar Link after first visit (`App.tsx`) |
-| `getRouteVisitCount(name)` | `× N` next to each visited route |
-| `peekBack()` | `← previous: {name}` label |
-| `peekForward()` | `next: {name} →` label |
-| `canGoBack()` | disabled state of "Back" button |
-| `canGoForward()` | disabled state of "Forward" button |
-| `canGoBackTo(name)` | disabled state of "Jump to last Dashboard" button |
-| `traverseToLast(name)` | onClick of "Jump to last Dashboard" button |
+Every exclusive `navigation-plugin` method has a visible hook in the UI:
 
-## См. также
+| Method                     | UI location                                                    |
+| -------------------------- | -------------------------------------------------------------- |
+| `getVisitedRoutes()`       | `HistoryPanel` — list of route names                           |
+| `hasVisited(name)`         | `✓` suffix on a sidebar link after its first visit (`App.tsx`) |
+| `getRouteVisitCount(name)` | `× N` next to each entry in the visited list                   |
+| `peekBack()`               | `← previous: {name}` label above the history buttons           |
+| `peekForward()`            | `next: {name} →` label                                         |
+| `canGoBack()`              | disabled state of the `Back` button                            |
+| `canGoForward()`           | disabled state of the `Forward` button                         |
+| `canGoBackTo(name)`        | disabled state of the `Jump to last Dashboard` button          |
+| `traverseToLast(name)`     | `onClick` of the `Jump to last Dashboard` button               |
 
-- [`examples/tauri/react`](../react) — browser-plugin в Tauri (без OS-ограничений)
-- [`examples/electron/react-navigation`](../../electron/react-navigation) — тот же набор методов в Electron (Chromium → API всегда доступен)
-- Desktop Integration guide (wiki) — OS compatibility, plugin selection
+## See also
+
+- [`examples/tauri/react`](../react) — browser-plugin in Tauri, no OS caveats
+- [`examples/electron/react-navigation`](../../electron/react-navigation) — same plugin in Electron, Chromium on every OS
+- [Desktop Integration guide (wiki)](https://github.com/greydragon888/real-router/wiki/Desktop-Integration) — plugin × OS compatibility matrix

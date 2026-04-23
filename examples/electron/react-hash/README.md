@@ -1,38 +1,36 @@
 # Electron + `@real-router/hash-plugin` (`file://` + `#!/`)
 
-Desktop example for [issue #496](https://github.com/greydragon888/real-router/issues/496). Demonstrates hash-routing inside an Electron window loaded directly from `file://` — the fallback path when registering a custom protocol is not an option.
+Demonstrates hash routing inside an Electron window loaded directly from `file://` — the fallback path when registering a custom protocol is not an option.
 
 ## Quick Start
 
 ```bash
 pnpm install
-pnpm dev            # Vite HMR at http://localhost:5173, Electron window points to it
+pnpm dev            # Vite HMR + Electron window pointed at it
 pnpm build          # tsc + vite build → dist/ + dist-electron/
-pnpm start          # launches Electron with file:///.../dist/index.html#!/ (prod)
-pnpm test:e2e       # Playwright + _electron.launch, 5 tests
+pnpm start          # launches Electron with file://…/dist/index.html#!/
+pnpm test:e2e       # Playwright via _electron.launch
 ```
 
-## Как это работает без правки `safeParseUrl`
+## What it covers
 
-На `file://` URL'ах старый `safeParseUrl` ломался в двух местах:
+- `createRouter(routes)` + `hashPluginFactory({ hashPrefix: "!" })` + `router.start()`
+- URLs of the form `file:///.../index.html#!/users/42/edit`
+- Works on `file://` without custom-scheme registration — no changes to the Electron main process beyond `BrowserWindow.loadFile`
+- Deep links via `#!/` hash work after restart (Electron restores the last URL)
 
-1. `globalThis.location.origin` на `file://` возвращает строку `"null"` → `new URL(url, "null")` бросает `TypeError`.
-2. Схема `file:` не входила в whitelist `["http:", "https:"]` → плагин логировал `"Invalid URL protocol"` и возвращал `null`.
+## Why hash routing, not a custom protocol
 
-Hash-plugin особенно страдал: href вида `file:///.../dist/index.html#!/dashboard` — абсолютный URL, который плагин пытался распарсить через `safeParseUrl`, но обе проверки срабатывали одновременно.
+The History API throws `SecurityError` on `pushState` when the document is served from `file://`. Hash routing sidesteps the problem entirely — changes to `location.hash` don't require `pushState` and don't trigger a security check. The trade-off is the visible `#!/` prefix in URLs.
 
-После правки в этапе 1 (`06ccab93`) парсер scheme-agnostic — `file://` работает как любой другой origin.
+Pick this example when:
+- You're porting an existing Create-React-App project to Electron without restructuring the main process.
+- You can't register a privileged scheme (policy restriction, Electron version, etc.).
 
-## Почему hash, а не custom protocol
+Otherwise prefer [`examples/electron/react`](../react) — cleaner URLs without the `#!/` prefix.
 
-- Не требует `app.whenReady()` + `protocol.registerSchemesAsPrivileged()` — Electron грузит файл напрямую.
-- Подходит для миграции существующих Create-React-App приложений без переписывания main-process.
-- History API на `file://` всё равно бросает `SecurityError` — hash-routing обходит эту проблему.
-
-Если возможно зарегистрировать custom protocol — предпочитай [`examples/electron/react`](../react): чистые URL'ы без `#!/` префикса.
-
-## См. также
+## See also
 
 - [`examples/electron/react`](../react) — browser-plugin + `app://` custom protocol
-- [`examples/electron/react-navigation`](../react-navigation) — navigation-plugin + эксклюзивные методы истории
-- Desktop Integration guide (wiki) — OS compatibility matrix, plugin selection
+- [`examples/electron/react-navigation`](../react-navigation) — navigation-plugin + exclusive history methods
+- [Desktop Integration guide (wiki)](https://github.com/greydragon888/real-router/wiki/Desktop-Integration) — plugin × OS compatibility matrix

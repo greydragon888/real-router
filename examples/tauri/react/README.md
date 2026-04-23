@@ -1,43 +1,34 @@
 # Tauri + `@real-router/browser-plugin`
 
-Desktop example for [issue #496](https://github.com/greydragon888/real-router/issues/496). Demonstrates `browser-plugin` inside a Tauri v2 window — URL scheme is `tauri://localhost` (macOS/iOS/Linux) or `https://tauri.localhost` (Windows/Android).
+Demonstrates `browser-plugin` inside a Tauri v2 window. The URL scheme is `tauri://localhost` on macOS / iOS / Linux and `https://tauri.localhost` on Windows / Android.
 
 ## Quick Start
 
 ```bash
 pnpm install
-pnpm tauri dev      # launches Tauri window with Vite dev server (requires Rust toolchain)
-pnpm build          # vite build — frontend only (used by CI)
-pnpm preview        # vite preview at http://localhost:4173 (used by e2e)
-pnpm test:e2e       # Playwright vs vite preview, 5 tests
+pnpm tauri dev      # launches a Tauri window with Vite dev server (requires Rust toolchain)
+pnpm build          # vite build (frontend only)
+pnpm preview        # vite preview at http://localhost:4173
+pnpm test:e2e       # Playwright against vite preview
 ```
 
-Для полной сборки native-приложения: `pnpm tauri build` → `src-tauri/target/release/bundle/*`. Требует Rust toolchain + платформенные deps (webkit2gtk на Linux, Xcode CLI на macOS).
+Full native bundle: `pnpm tauri build` produces artifacts under `src-tauri/target/release/bundle/`. Requires a Rust toolchain and per-platform dependencies (`webkit2gtk-4.1` on Linux, Xcode Command Line Tools on macOS, etc.).
 
-## Как это работает без правки `safeParseUrl`
+## What it covers
 
-До этапа 1 `browser-plugin` использовал `new URL(url, globalThis.location.origin)` + whitelist `["http:", "https:"]`:
+- `createRouter(routes)` + `browserPluginFactory()` + `router.start()`
+- History API routing inside a Tauri WebView on all four platforms (macOS, Windows, Linux, iOS/Android)
+- Nested routes with deep linking — direct load of `/users/42/edit` decodes params at all three levels
+- `Link`, `RouteView` with `Match` segments, browser back/forward preservation
 
-- На **macOS/iOS/Linux** Tauri грузит UI с `tauri://localhost/` — схема `tauri:` не в whitelist → плагин логировал `"Invalid URL protocol"` и возвращал `null`. Любая попытка `matchUrl`/popstate молча проваливалась.
-- На **Windows/Android** схема `https:` проходила whitelist — там плагин работал. Разработчики на этих OS могли не заметить проблему до тестирования на других платформах.
+## Why `browser-plugin` in Tauri (and not `navigation-plugin`)
 
-После правки в этапе 1 (`06ccab93`) `safeParseUrl` scheme-agnostic — работает на всех 4 OS единообразно.
+`browser-plugin` uses the History API, which every Tauri WebView supports out of the box, on every supported OS version. This example is the safe default for Tauri apps with a broad OS matrix.
 
-## CI vs локальная проверка
+If you need the exclusive history methods (visited-routes list, visit counts, `peekBack` / `peekForward`, `traverseToLast`), use [`examples/tauri/react-navigation`](../react-navigation) and accept its OS compatibility trade-offs.
 
-- **CI** — только frontend: `pnpm build` + Playwright против `vite preview` (Chromium на http://localhost:4173). Не требует Rust / Tauri runtime.
-- **Локально перед merge** — обязательно прогнать `pnpm tauri dev` на одном из supported OS, чтобы проверить реальный `tauri://` scheme в DevTools.
+## See also
 
-Manual check:
-```bash
-pnpm tauri build
-./src-tauri/target/release/real-router-tauri-browser-demo
-# In DevTools → Network: URL starts with tauri:// (macOS/iOS/Linux)
-#   or https://tauri.localhost (Windows/Android)
-```
-
-## См. также
-
-- [`examples/tauri/react-navigation`](../react-navigation) — Tauri + navigation-plugin + OS requirements
-- [`examples/electron/react`](../../electron/react) — эквивалент на Electron с custom `app://` protocol
-- Desktop Integration guide (wiki) — OS compatibility, plugin selection
+- [`examples/tauri/react-navigation`](../react-navigation) — navigation-plugin in Tauri, with OS compatibility notes
+- [`examples/electron/react`](../../electron/react) — same plugin in Electron with a custom `app://` protocol
+- [Desktop Integration guide (wiki)](https://github.com/greydragon888/real-router/wiki/Desktop-Integration) — plugin × OS compatibility matrix
