@@ -341,9 +341,9 @@ Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 
 ## Examples
 
-14 runnable examples — each is a standalone Vite app. Run: `cd examples/solid/basic && pnpm dev`
+14 runnable examples — each is a standalone Vite app. Run: `cd examples/web/solid/basic && pnpm dev`
 
-[basic](../../examples/solid/basic) · [nested-routes](../../examples/solid/nested-routes) · [auth-guards](../../examples/solid/auth-guards) · [data-loading](../../examples/solid/data-loading) · [lazy-loading](../../examples/solid/lazy-loading) · [async-guards](../../examples/solid/async-guards) · [hash-routing](../../examples/solid/hash-routing) · [persistent-params](../../examples/solid/persistent-params) · [error-handling](../../examples/solid/error-handling) · [dynamic-routes](../../examples/solid/dynamic-routes) · [store-based-state](../../examples/solid/store-based-state) · [use-link-directive](../../examples/solid/use-link-directive) · [signal-primitives](../../examples/solid/signal-primitives) · [combined](../../examples/solid/combined)
+[basic](../../examples/web/solid/basic) · [nested-routes](../../examples/web/solid/nested-routes) · [auth-guards](../../examples/web/solid/auth-guards) · [data-loading](../../examples/web/solid/data-loading) · [lazy-loading](../../examples/web/solid/lazy-loading) · [async-guards](../../examples/web/solid/async-guards) · [hash-routing](../../examples/web/solid/hash-routing) · [persistent-params](../../examples/web/solid/persistent-params) · [error-handling](../../examples/web/solid/error-handling) · [dynamic-routes](../../examples/web/solid/dynamic-routes) · [store-based-state](../../examples/web/solid/store-based-state) · [use-link-directive](../../examples/web/solid/use-link-directive) · [signal-primitives](../../examples/web/solid/signal-primitives) · [combined](../../examples/web/solid/combined)
 
 ## Related Packages
 

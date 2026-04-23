@@ -8,7 +8,7 @@ set -e
 
 errors=0
 
-for config in examples/*/*/playwright.config.ts; do
+while IFS= read -r config; do
   dir=$(dirname "$config")
   e2e_dir="$dir/e2e"
 
@@ -24,7 +24,7 @@ for config in examples/*/*/playwright.config.ts; do
     echo "ERROR: $e2e_dir has 0 spec files"
     errors=$((errors + 1))
   fi
-done
+done < <(find examples -name playwright.config.ts -not -path '*/node_modules/*' 2>/dev/null)
 
 if [ "$errors" -gt 0 ]; then
   echo ""
