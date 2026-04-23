@@ -15,8 +15,10 @@ const ESC = String.fromCodePoint(27);
 // Ink's focus-manager applies autoFocus inside an effect, and each frame commit
 // is scheduled via setImmediate. CI runners are slower than local machines, so
 // the default settle time is generous; individual tests can override. Post-input
-// assertions use `vi.waitFor` instead of a fixed delay.
-const flushInk = (ms = 250): Promise<void> =>
+// assertions use `vi.waitFor` instead of a fixed delay. The 1000ms default is
+// tuned to survive slow GitHub Actions runners — it ran into intermittent
+// failures at 250ms under load (Enter sent before useInput activated on focus).
+const flushInk = (ms = 1000): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
 const WAIT_OPTS = { timeout: 3000, interval: 50 } as const;

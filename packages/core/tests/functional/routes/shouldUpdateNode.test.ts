@@ -191,13 +191,15 @@ describe("core/routes", () => {
       expect(shouldUpdate).toStrictEqual(true);
     });
 
-    it("should tell node above intersection to not update", () => {
+    it("should always update root node '' — it represents the whole tree (#519)", () => {
+      // Root node "" has no route-level identity; it must see every transition.
+      // See RoutesNamespace.shouldUpdateNode comment for rationale.
       const shouldUpdate = router.shouldUpdateNode("")(
         makeState("a.b.c.d", { p1: 0, p2: 2, p3: 3 }, meta.params),
         makeState("a.b.c.d", { p1: 1, p2: 2, p3: 3 }, meta.params),
       );
 
-      expect(shouldUpdate).toStrictEqual(false);
+      expect(shouldUpdate).toStrictEqual(true);
     });
 
     it("should update nodes when they become active, inactive, or change internally", () => {
@@ -535,9 +537,11 @@ describe("core/routes", () => {
         expect(router.shouldUpdateNode("")(toState, undefined)).toBe(true);
       });
 
-      it("should not update root node on transitions between non-root states", () => {
-        // On transitions between non-root states, root node
-        // should not update (unless it's the intersection)
+      it("should update root node on transitions between non-root states (#519)", () => {
+        // Root node "" represents the whole tree — it has to see sibling
+        // subtree switches so flat <RouteView nodeName=""> with dot-notated
+        // Match segments re-renders correctly. The optimisation that used
+        // to skip root updates here hid bug #519.
         const fromState = makeState("a.b.c", {});
         const toState = makeState("a.b.d", {});
 
@@ -546,8 +550,8 @@ describe("core/routes", () => {
 
         expect(intersection).not.toBe("");
 
-        // Root node should not update
-        expect(router.shouldUpdateNode("")(toState, fromState)).toBe(false);
+        // Root node updates on every transition (including intermediate ones).
+        expect(router.shouldUpdateNode("")(toState, fromState)).toBe(true);
       });
 
       it("should update root node when transitioning from any state to root", () => {

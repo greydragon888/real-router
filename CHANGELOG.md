@@ -5,6 +5,54 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-04-23]
+
+### @real-router/core@0.50.1
+
+### Patch Changes
+
+- [#522](https://github.com/greydragon888/real-router/pull/522) [`204b00f`](https://github.com/greydragon888/real-router/commit/204b00f07165561b05c8446a94d382d6f10142aa) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `shouldUpdateNode("")` to always return `true`, matching the documented "Root — ALL route changes" contract ([#519](https://github.com/greydragon888/real-router/issues/519))
+
+  Root node `""` has no route-level identity — it represents the whole tree. Every adapter's docs state `useRouteNode("")` returns "ALL route changes"; the implementation, however, skipped updates when a transition's intersection was non-root (e.g. `users → users.user`, intersection = `"users"`). This was correct for nested-pattern layouts (each subtree has its own `useRouteNode("users")`) but wrong for flat patterns and for any code subscribing to `useRouteNode("")` directly for logging or cross-cutting concerns.
+
+  Symptom: root-level `<RouteView nodeName="">` with dot-notated Match segments like `<Match segment="users.user" exact>` never switched the active Match on parent→child, sibling-subtree, or child→parent transitions, even though the URL and `useRoute()` both updated correctly. Reproducible under every adapter (React, Preact, Solid, Vue, Svelte, Angular) and every plugin (browser-plugin, navigation-plugin, hash-plugin).
+
+  The fix is a two-line change in core `RoutesNamespace.shouldUpdateNode`: when `nodeName === DEFAULT_ROUTE_NAME`, return `true` unconditionally (instead of only on initial navigation). All adapter `RouteView` implementations receive the fix automatically via their shared `createRouteNodeSource` subscription. Two existing core tests that encoded the buggy behaviour as the contract are updated; adapter tests continue to pass unchanged.
+
+  No public API change. Consumers of `useRouteNode("")` may observe more re-renders per navigation, but each adapter's source already applies `stabilizeState` by `path`, so no-op transitions (identical URL) still deduplicate. This is a correctness fix aligning behaviour with the documented contract.
+
+  Verified end-to-end: `examples/tauri/react-navigation` e2e 8/8 (was 0/8), `examples/tauri/react` parent→child render works with browser-plugin (was broken).
+
+
+### @real-router/navigation-plugin@0.5.1
+
+### Patch Changes
+
+- [#520](https://github.com/greydragon888/real-router/pull/520) [`3d6ee88`](https://github.com/greydragon888/real-router/commit/3d6ee88e4aa04979d1c44b9e6d251ef9d3b53ae0) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix cross-document reload loop under router-syncing navigation events ([#518](https://github.com/greydragon888/real-router/issues/518))
+
+  When the plugin's `onTransitionSuccess` hook called `browser.navigate()` to sync
+  the URL after a successful transition, the dispatched `navigate` event was
+  short-circuited by the handler via a bare `return` while `isSyncingFromRouter`
+  was `true`. Per the Navigation API spec, a same-origin `canIntercept` event
+  with **no** `event.intercept()` call falls back to a cross-document navigation
+  (full page reload). In headless Chromium (Playwright + `vite preview`) this
+  triggered an infinite loop: every reload re-ran the app bootstrap, which
+  re-entered the same `browser.navigate → navigate event → bare return → reload`
+  cycle hundreds of times per second. `page.goto()` could never reach the `load`
+  event, breaking Playwright e2e for every example that relied on the plugin
+  (e.g. `examples/tauri/react-navigation`).
+
+  The handler now calls `event.intercept({ handler: async () => {} })` on the
+  syncing branch — cancelling the cross-document fallback without running any
+  router logic (state is already committed). Non-syncing events keep their
+  previous behaviour.
+
+  The bug was invisible to the existing test suite because `MockNavigation` did
+  not model the cross-document fallback — an un-intercepted event was silently
+  committed rather than producing the observable reload. `MockNavigation` now
+  has an opt-in `enableStrictIntercept()` mode that mirrors Chromium's behaviour,
+  and the fix is covered by four new regression tests under `[#518](https://github.com/greydragon888/real-router/issues/518)`.
+
 ## [2026-04-22]
 
 ### @real-router/memory-plugin@0.3.5

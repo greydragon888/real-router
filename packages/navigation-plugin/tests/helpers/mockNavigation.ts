@@ -483,6 +483,23 @@ export class MockNavigation implements Navigation {
       return { committed: committedPromise, finished: finishedPromise };
     }
 
+    if (params.canIntercept && this._strictIntercept) {
+      // Emulate Chromium behaviour: a `navigate` event on a same-origin,
+      // canIntercept URL that NO listener intercepts falls back to a
+      // cross-document navigation (full page reload). In a real browser that
+      // tears down the document and re-runs the bootstrap script, which is
+      // exactly the infinite-loop symptom of #518. Tests that need to catch
+      // that regression should opt in via `strictIntercept: true` — see
+      // `enableStrictIntercept()`.
+      this._crossDocumentReloads += 1;
+      this._ongoingAbortController = null;
+
+      throw new DOMException(
+        "Navigate event was not intercepted — Chromium would perform a cross-document reload",
+        "InvalidStateError",
+      );
+    }
+
     const entry = applyNavigation();
 
     this._ongoingAbortController = null;
@@ -491,5 +508,23 @@ export class MockNavigation implements Navigation {
       committed: Promise.resolve(entry),
       finished: Promise.resolve(entry),
     };
+  }
+
+  private _strictIntercept = false;
+  private _crossDocumentReloads = 0;
+
+  /**
+   * Opt in to strict cross-document fallback emulation. When enabled, any
+   * `navigate` event with `canIntercept: true` that is NOT intercepted by
+   * any listener causes the mock to throw `InvalidStateError` from the
+   * `navigate()` call site, mirroring Chromium's cross-document reload
+   * behaviour (the primary symptom of #518).
+   */
+  enableStrictIntercept(): void {
+    this._strictIntercept = true;
+  }
+
+  get crossDocumentReloadCount(): number {
+    return this._crossDocumentReloads;
   }
 }

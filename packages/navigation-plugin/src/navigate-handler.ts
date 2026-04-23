@@ -54,7 +54,21 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
   const { allowNotFound } = api.getOptions();
 
   return function handleNavigateEvent(event: NavigateEvent): void {
-    if (!event.canIntercept || isSyncingFromRouter() || !router.isActive()) {
+    if (!event.canIntercept || !router.isActive()) {
+      return;
+    }
+
+    if (isSyncingFromRouter()) {
+      // Plugin-originated navigate event after its own successful transition
+      // (onTransitionSuccess calls browser.navigate to sync URL). We must still
+      // intercept — a bare `return` leaves the event un-intercepted, and
+      // Chromium falls back to a cross-document navigation (full page reload).
+      // The noop handler cancels the fallback without running router logic;
+      // state is already committed.
+      event.intercept({
+        handler: async () => {},
+      });
+
       return;
     }
 

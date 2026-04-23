@@ -115,7 +115,15 @@ export class RoutesNamespace<
         return true;
       }
 
-      if (nodeName === DEFAULT_ROUTE_NAME && !fromState) {
+      // Root node (DEFAULT_ROUTE_NAME === "") has no route-level identity — it
+      // represents "any route". It must update on every transition so that
+      // consumers subscribed via useRouteNode("") (including RouteView at
+      // the top of the tree) see every change. This matches the documented
+      // contract in adapter docs: `useRouteNode("")` — Root — ALL route
+      // changes. See #519 for the missed transitions it was suffering from
+      // (users → users.user had intersection="users", leaving the root node
+      // un-updated under a flat <Match segment="users.user" exact> pattern).
+      if (nodeName === DEFAULT_ROUTE_NAME) {
         return true;
       }
 
