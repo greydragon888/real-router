@@ -306,4 +306,59 @@ describe("createViewTransitions", () => {
 
     expect(startSpy).toHaveBeenCalledTimes(2);
   });
+
+  it("updateCallback promise resolves when browser invokes cb asynchronously (regression for closeVT race)", async () => {
+    // Real-browser behavior: startViewTransition captures the old DOM
+    // synchronously but invokes the updateCallback in a LATER microtask.
+    // If the utility captures `closeVT` inside the cb, `router.subscribe`
+    // (TRANSITION_SUCCESS) fires BEFORE cb runs, sees closeVT still null,
+    // and never resolves the deferred — VT aborts after 4s with
+    // TimeoutError, and the next navigation throws InvalidStateError.
+    // This test uses an async invocation stub (vs the default sync stub)
+    // to reproduce that timing.
+    let capturedCb: (() => Promise<void> | void) | null = null;
+
+    const asyncStartSpy = vi.fn(
+      (cb: () => void | Promise<void>): FakeVTInstance => {
+        capturedCb = cb;
+
+        return { skipTransition: vi.fn() };
+      },
+    );
+
+    (
+      document as Document & { startViewTransition?: unknown }
+    ).startViewTransition =
+      asyncStartSpy as unknown as Document["startViewTransition"];
+
+    const fake = makeFakeRouter();
+
+    track(createViewTransitions(fake.router));
+
+    void fake.emitLeave(makeState("home"), makeState("about"));
+    // subscribe fires BEFORE the browser invokes cb — this is the regression
+    // timing window where closeVT used to be null.
+    fake.emitSuccess(makeState("about"), makeState("home"));
+
+    // Now the browser would invoke cb. Its returned Promise must resolve;
+    // on pre-fix code it hangs forever because closeVT was never captured.
+    expect(capturedCb).not.toBeNull();
+
+    const cb = capturedCb as unknown as () => void | Promise<void>;
+    const cbResult = cb();
+
+    expect(cbResult).toBeInstanceOf(Promise);
+
+    let settled = false;
+
+    void (cbResult as Promise<void>).then(() => {
+      settled = true;
+    });
+
+    // Flush microtasks (rAF stub fires sync, which schedules .then()).
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(settled).toBe(true);
+  });
 });

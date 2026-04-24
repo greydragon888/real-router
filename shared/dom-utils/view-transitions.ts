@@ -29,14 +29,20 @@ export function createViewTransitions(router: Router): ViewTransitions {
   const offLeave = router.subscribeLeave(({ signal }) => {
     resolveAndClear();
 
-    currentVT = document.startViewTransition(
-      () =>
-        new Promise<void>((resolve) => {
-          closeVT = resolve;
-        }),
-    );
+    // Capture the resolver synchronously BEFORE startViewTransition() is
+    // called. The browser invokes the updateCallback in a later microtask,
+    // but router.subscribe (TRANSITION_SUCCESS) can fire before that. If we
+    // captured `resolve` inside the callback, subscribe would see closeVT
+    // still null and skip resolving — the update promise would hang for 4s
+    // until the VT API aborts with TimeoutError, and the next navigation
+    // would then fail with InvalidStateError.
+    const deferred = new Promise<void>((resolve) => {
+      closeVT = resolve;
+    });
 
     signal.addEventListener("abort", resolveAndClear, { once: true });
+
+    currentVT = document.startViewTransition(() => deferred);
   });
 
   const offSuccess = router.subscribe(() => {
