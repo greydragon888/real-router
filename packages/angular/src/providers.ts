@@ -9,7 +9,7 @@ import {
 import { getNavigator, type Router, type Navigator } from "@real-router/core";
 import { createRouteSource } from "@real-router/sources";
 
-import { createScrollRestoration } from "./dom-utils";
+import { createScrollRestoration, createViewTransitions } from "./dom-utils";
 import { sourceToSignal } from "./sourceToSignal";
 
 import type { ScrollRestorationOptions } from "./dom-utils";
@@ -23,6 +23,7 @@ export const ROUTE = new InjectionToken<RouteSignals>("ROUTE");
 
 export interface RealRouterOptions {
   scrollRestoration?: ScrollRestorationOptions;
+  viewTransitions?: boolean;
 }
 
 export function provideRealRouter(
@@ -52,6 +53,18 @@ export function provideRealRouter(
 
         inject(DestroyRef).onDestroy(() => {
           sr.destroy();
+        });
+      }),
+    );
+  }
+
+  if (options?.viewTransitions === true) {
+    providers.push(
+      provideEnvironmentInitializer(() => {
+        const vt = createViewTransitions(router);
+
+        inject(DestroyRef).onDestroy(() => {
+          vt.destroy();
         });
       }),
     );

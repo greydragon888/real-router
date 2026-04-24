@@ -2,6 +2,8 @@ export { createRouteAnnouncer } from "./route-announcer";
 
 export { createScrollRestoration } from "./scroll-restore";
 
+export { createViewTransitions } from "./view-transitions";
+
 export {
   shouldNavigate,
   buildHref,
@@ -16,3 +18,5 @@ export type {
   ScrollRestorationOptions,
   ScrollRestorationMode,
 } from "./scroll-restore";
+
+export type { ViewTransitions } from "./view-transitions";

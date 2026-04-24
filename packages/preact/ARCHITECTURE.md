@@ -45,7 +45,8 @@ src/
 │   ├── index.ts                # Barrel re-exports
 │   ├── link-utils.ts           # shouldNavigate, buildHref, buildActiveClassName, applyLinkA11y
 │   ├── route-announcer.ts      # createRouteAnnouncer — WCAG aria-live announcements
-│   └── scroll-restore.ts       # createScrollRestoration — opt-in scroll capture + restore
+│   ├── scroll-restore.ts       # createScrollRestoration — opt-in scroll capture + restore
+│   └── view-transitions.ts     # createViewTransitions — opt-in View Transitions API integration
 ├── hooks/
 │   ├── useRouter.tsx           # Router instance from context (never re-renders)
 │   ├── useRoute.tsx            # Full route state from context (every navigation)

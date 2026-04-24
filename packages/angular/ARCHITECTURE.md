@@ -64,6 +64,7 @@ src/
     ├── link-utils.ts           # buildHref, buildActiveClassName, applyLinkA11y, shouldNavigate
     ├── route-announcer.ts      # createRouteAnnouncer
     ├── scroll-restore.ts       # createScrollRestoration (opt-in scroll capture + restore)
+    ├── view-transitions.ts     # createViewTransitions (opt-in View Transitions API integration)
     └── index.ts
 ```
 
@@ -183,6 +184,10 @@ Minimal component. Constructor injects `injectRouter()` and `inject(DestroyRef)`
 ### Scroll Restoration
 
 Opt-in via `provideRealRouter(router, { scrollRestoration })`. Not a component — wired through `provideEnvironmentInitializer`: when the environment injector is created (first `inject()` call), the initializer runs `createScrollRestoration(router, options)` from `shared/dom-utils/` and registers `sr.destroy()` on `inject(DestroyRef)`. Options are a bootstrap-time snapshot, not reactive to runtime changes. Lifecycle is tied to the environment injector — destroy fires on `TestBed.resetTestingModule()` / application teardown.
+
+### View Transitions
+
+Opt-in via `provideRealRouter(router, { viewTransitions: true })`. Same wiring pattern as Scroll Restoration: `provideEnvironmentInitializer` runs `createViewTransitions(router)` from `shared/dom-utils/` and registers `vt.destroy()` on `inject(DestroyRef)`. The utility subscribes to `router.subscribeLeave` (opens `document.startViewTransition` with a deferred async callback) and `router.subscribe` (resolves the deferred + `requestAnimationFrame` so VT snapshots the committed new DOM). No-op when `document.startViewTransition` is unavailable (SSR, Firefox as of 2026-04). On teardown, `destroy()` calls `skipTransition()` on any in-flight VT. Option is a bootstrap-time snapshot — toggling requires re-bootstrap.
 
 ### RealLink
 

@@ -358,10 +358,27 @@ bootstrapApplication(AppComponent, {
 ```typescript
 interface RealRouterOptions {
   scrollRestoration?: ScrollRestorationOptions; // { mode?, anchorScrolling?, scrollContainer? }
+  viewTransitions?: boolean;
 }
 ```
 
 Restores scroll on back/forward, scrolls to top (or `#hash`) on push. Three modes: `"restore"` (default), `"top"`, `"manual"`. Custom containers via `scrollContainer: () => HTMLElement | null`. The utility is created by `provideEnvironmentInitializer` and torn down via `inject(DestroyRef)`. Options are a snapshot at bootstrap — not reactive to runtime changes. See [Scroll Restoration guide](https://github.com/greydragon888/real-router/wiki/Scroll-Restoration) for details.
+
+## View Transitions
+
+Opt-in animated route transitions via the browser's [View Transitions API](https://developer.mozilla.org/en-US/docs/Web/API/View_Transitions_API):
+
+```typescript
+import { provideRealRouter } from "@real-router/angular";
+
+bootstrapApplication(AppComponent, {
+  providers: [
+    provideRealRouter(router, { viewTransitions: true }),
+  ],
+});
+```
+
+No-op on unsupported browsers (Firefox as of 2026-04, SSR). Utility is created by `provideEnvironmentInitializer` at bootstrap and torn down via `inject(DestroyRef)`. Option is a snapshot at bootstrap — not reactive to runtime changes. Customization is pure CSS via `::view-transition-*` pseudo-elements and `view-transition-name` for hero morphs. See [View Transitions guide](https://github.com/greydragon888/real-router/wiki/View-Transitions) for patterns.
 
 ## Angular-Specific Patterns
 

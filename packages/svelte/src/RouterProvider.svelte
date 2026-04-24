@@ -4,6 +4,7 @@
   import {
     createRouteAnnouncer,
     createScrollRestoration,
+    createViewTransitions,
   } from "./dom-utils";
   import { setContext, untrack } from "svelte";
 
@@ -20,11 +21,13 @@
     children,
     announceNavigation,
     scrollRestoration,
+    viewTransitions,
   }: {
     router: Router;
     children: Snippet;
     announceNavigation?: boolean;
     scrollRestoration?: ScrollRestorationOptions;
+    viewTransitions?: boolean;
   } = $props();
 
   $effect(() => {
@@ -52,6 +55,12 @@
       scrollContainer: untrack(() => scrollRestoration?.scrollContainer),
     });
     return () => sr.destroy();
+  });
+
+  $effect(() => {
+    if (!viewTransitions) return;
+    const vt = createViewTransitions(router);
+    return () => vt.destroy();
   });
 
   const navigator = getNavigator(router);

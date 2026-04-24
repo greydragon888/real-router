@@ -44,6 +44,7 @@ src/
 │   ├── link-utils.ts           # shouldNavigate, buildHref, buildActiveClassName, applyLinkA11y
 │   ├── route-announcer.ts      # createRouteAnnouncer (a11y aria-live region)
 │   ├── scroll-restore.ts       # createScrollRestoration (opt-in scroll capture + restore)
+│   ├── view-transitions.ts     # createViewTransitions (opt-in View Transitions API integration)
 │   └── index.ts                # barrel
 ├── createSignalFromSource.ts   # Signal bridge — converts RouterSource to Solid Accessor
 ├── createStoreFromSource.ts    # Store bridge — converts RouterSource to Solid store (reconcile)

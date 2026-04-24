@@ -3,7 +3,11 @@ import { createRouteSource } from "@real-router/sources";
 import { useEffect, useMemo } from "preact/hooks";
 
 import { NavigatorContext, RouteContext, RouterContext } from "./context";
-import { createRouteAnnouncer, createScrollRestoration } from "./dom-utils";
+import {
+  createRouteAnnouncer,
+  createScrollRestoration,
+  createViewTransitions,
+} from "./dom-utils";
 import { useSyncExternalStore } from "./useSyncExternalStore";
 
 import type { ScrollRestorationOptions } from "./dom-utils";
@@ -15,6 +19,7 @@ export interface RouteProviderProps {
   children: ComponentChildren;
   announceNavigation?: boolean;
   scrollRestoration?: ScrollRestorationOptions;
+  viewTransitions?: boolean;
 }
 
 export const RouterProvider: FunctionComponent<RouteProviderProps> = ({
@@ -22,6 +27,7 @@ export const RouterProvider: FunctionComponent<RouteProviderProps> = ({
   children,
   announceNavigation,
   scrollRestoration,
+  viewTransitions,
 }) => {
   useEffect(() => {
     if (!announceNavigation) {
@@ -61,6 +67,19 @@ export const RouterProvider: FunctionComponent<RouteProviderProps> = ({
     // scrollRestoration (for scrollContainer) omitted — see comment above.
     // eslint-disable-next-line @eslint-react/exhaustive-deps
   }, [router, srEnabled, srMode, srAnchor]);
+
+  useEffect(() => {
+    if (!viewTransitions) {
+      return;
+    }
+
+    const vt = createViewTransitions(router);
+
+    return () => {
+      vt.destroy();
+    };
+  }, [router, viewTransitions]);
+
   const navigator = useMemo(() => getNavigator(router), [router]);
 
   // useSyncExternalStore manages the router subscription lifecycle:

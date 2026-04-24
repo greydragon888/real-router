@@ -1,0 +1,295 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+import { createViewTransitions } from "../../src/dom-utils";
+
+import type { Router, State } from "@real-router/core";
+
+type SubscribeListener = (payload: {
+  route: State;
+  previousRoute?: State;
+}) => void;
+
+type LeaveListener = (payload: {
+  route: State;
+  nextRoute: State;
+  signal: AbortSignal;
+}) => void | Promise<void>;
+
+interface FakeRouter {
+  emitSuccess: (route: State, previousRoute?: State) => void;
+  emitLeave: (
+    fromRoute: State,
+    toRoute: State,
+    signal?: AbortSignal,
+  ) => Promise<void>;
+  router: Router;
+}
+
+function makeState(name: string): State {
+  return {
+    name,
+    params: {} as State["params"],
+    path: `/${name}`,
+    context: {} as State["context"],
+    transition: {} as State["transition"],
+  };
+}
+
+function makeFakeRouter(): FakeRouter {
+  const subscribeListeners = new Set<SubscribeListener>();
+  const leaveListeners = new Set<LeaveListener>();
+
+  const router = {
+    subscribe(fn: SubscribeListener) {
+      subscribeListeners.add(fn);
+
+      return () => {
+        subscribeListeners.delete(fn);
+      };
+    },
+    subscribeLeave(fn: LeaveListener) {
+      leaveListeners.add(fn);
+
+      return () => {
+        leaveListeners.delete(fn);
+      };
+    },
+  } as unknown as Router;
+
+  return {
+    emitSuccess(route, previousRoute) {
+      const payload =
+        previousRoute === undefined ? { route } : { route, previousRoute };
+
+      for (const fn of subscribeListeners) {
+        fn(payload);
+      }
+    },
+    emitLeave(fromRoute, toRoute, signal) {
+      const sig = signal ?? new AbortController().signal;
+      const promises: Promise<void>[] = [];
+
+      for (const fn of leaveListeners) {
+        const result = fn({
+          route: fromRoute,
+          nextRoute: toRoute,
+          signal: sig,
+        });
+
+        if (result !== undefined && typeof result.then === "function") {
+          promises.push(result);
+        }
+      }
+
+      return Promise.all(promises).then(() => {
+        /* void */
+      });
+    },
+    router,
+  };
+}
+
+interface FakeVTInstance {
+  skipTransition: ReturnType<typeof vi.fn>;
+}
+
+function stubStartViewTransition(): {
+  startSpy: ReturnType<typeof vi.fn>;
+  instances: FakeVTInstance[];
+} {
+  const instances: FakeVTInstance[] = [];
+  const startSpy = vi.fn((cb: () => void | Promise<void>) => {
+    void cb();
+
+    const instance: FakeVTInstance = {
+      skipTransition: vi.fn(),
+    };
+
+    instances.push(instance);
+
+    return instance;
+  });
+
+  (
+    document as Document & { startViewTransition?: unknown }
+  ).startViewTransition =
+    startSpy as unknown as Document["startViewTransition"];
+
+  return { startSpy, instances };
+}
+
+const activeInstances: { destroy: () => void }[] = [];
+
+function track<T extends { destroy: () => void }>(instance: T): T {
+  activeInstances.push(instance);
+
+  return instance;
+}
+
+describe("createViewTransitions (Angular copy)", () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      "requestAnimationFrame",
+      (cb: FrameRequestCallback): number => {
+        cb(0);
+
+        return 0;
+      },
+    );
+  });
+
+  afterEach(() => {
+    while (activeInstances.length > 0) {
+      activeInstances.pop()?.destroy();
+    }
+
+    delete (document as any).startViewTransition;
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("returns no-op when document.startViewTransition is undefined", () => {
+    const fake = makeFakeRouter();
+    const vt = track(createViewTransitions(fake.router));
+
+    expect(typeof vt.destroy).toBe("function");
+
+    expect(() => {
+      void fake.emitLeave(makeState("home"), makeState("about"));
+    }).not.toThrow();
+  });
+
+  it("opens VT synchronously when subscribeLeave fires", () => {
+    const { startSpy } = stubStartViewTransition();
+    const fake = makeFakeRouter();
+
+    track(createViewTransitions(fake.router));
+
+    void fake.emitLeave(makeState("home"), makeState("about"));
+
+    expect(startSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls subscribe listener on TRANSITION_SUCCESS without throwing", () => {
+    stubStartViewTransition();
+    const fake = makeFakeRouter();
+
+    track(createViewTransitions(fake.router));
+
+    void fake.emitLeave(makeState("home"), makeState("about"));
+
+    expect(() => {
+      fake.emitSuccess(makeState("about"), makeState("home"));
+    }).not.toThrow();
+  });
+
+  it("destroy() unsubscribes both leave and success listeners", () => {
+    const { startSpy } = stubStartViewTransition();
+    const fake = makeFakeRouter();
+
+    const vt = createViewTransitions(fake.router);
+
+    vt.destroy();
+
+    void fake.emitLeave(makeState("home"), makeState("about"));
+    fake.emitSuccess(makeState("about"), makeState("home"));
+
+    expect(startSpy).not.toHaveBeenCalled();
+  });
+
+  it("double destroy() is safe (idempotent)", () => {
+    stubStartViewTransition();
+    const fake = makeFakeRouter();
+
+    const vt = createViewTransitions(fake.router);
+
+    vt.destroy();
+
+    expect(() => {
+      vt.destroy();
+    }).not.toThrow();
+  });
+
+  it("rapid subscribeLeave calls close the previous VT", () => {
+    const { startSpy } = stubStartViewTransition();
+    const fake = makeFakeRouter();
+
+    track(createViewTransitions(fake.router));
+
+    void fake.emitLeave(makeState("home"), makeState("about"));
+    void fake.emitLeave(makeState("home"), makeState("contacts"));
+
+    expect(startSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("abort signal cleans up closeVT (normal path)", () => {
+    stubStartViewTransition();
+    const fake = makeFakeRouter();
+    const controller = new AbortController();
+
+    track(createViewTransitions(fake.router));
+
+    void fake.emitLeave(
+      makeState("home"),
+      makeState("about"),
+      controller.signal,
+    );
+
+    expect(() => {
+      controller.abort();
+    }).not.toThrow();
+
+    expect(() => {
+      void fake.emitLeave(makeState("about"), makeState("contacts"));
+    }).not.toThrow();
+  });
+
+  it("destroy() closes an open VT (cleanup during active transition)", () => {
+    const { instances } = stubStartViewTransition();
+    const fake = makeFakeRouter();
+
+    const vt = createViewTransitions(fake.router);
+
+    void fake.emitLeave(makeState("home"), makeState("about"));
+
+    expect(() => {
+      vt.destroy();
+    }).not.toThrow();
+
+    expect(instances).toHaveLength(1);
+  });
+
+  it("addEventListener uses { once: true } — abort handler fires at most once", () => {
+    stubStartViewTransition();
+    const fake = makeFakeRouter();
+    const controller = new AbortController();
+    const addSpy = vi.spyOn(controller.signal, "addEventListener");
+
+    track(createViewTransitions(fake.router));
+
+    void fake.emitLeave(
+      makeState("home"),
+      makeState("about"),
+      controller.signal,
+    );
+
+    expect(addSpy).toHaveBeenCalledWith("abort", expect.any(Function), {
+      once: true,
+    });
+  });
+
+  it("listener chain works across multiple full navigations", () => {
+    const { startSpy } = stubStartViewTransition();
+    const fake = makeFakeRouter();
+
+    track(createViewTransitions(fake.router));
+
+    void fake.emitLeave(makeState("home"), makeState("about"));
+    fake.emitSuccess(makeState("about"), makeState("home"));
+
+    void fake.emitLeave(makeState("about"), makeState("contacts"));
+    fake.emitSuccess(makeState("contacts"), makeState("about"));
+
+    expect(startSpy).toHaveBeenCalledTimes(2);
+  });
+});
