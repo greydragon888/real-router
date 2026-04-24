@@ -1,23 +1,18 @@
 import { RouteView } from "@real-router/react";
 
-import { AbortRacing } from "./pages/AbortRacing";
 import { About } from "./pages/About";
 import { Home } from "./pages/Home";
-import { ProductDetail } from "./pages/ProductDetail";
 import { Products } from "./pages/Products";
 import { QueryDemo } from "./pages/QueryDemo";
-import { ReducedMotion } from "./pages/ReducedMotion";
 import { Layout } from "../../shared/Layout";
 
 import type { JSX } from "react";
 
 const links = [
   { routeName: "home", label: "Home" },
-  { routeName: "products", label: "Products" },
   { routeName: "about", label: "About" },
+  { routeName: "products", label: "Products" },
   { routeName: "queryDemo", label: "Query demo" },
-  { routeName: "reducedMotion", label: "Reduced motion" },
-  { routeName: "abortRacing", label: "Abort racing" },
 ];
 
 export function App(): JSX.Element {
@@ -38,20 +33,11 @@ export function App(): JSX.Element {
           <RouteView.Match segment="products">
             <Products />
           </RouteView.Match>
-          <RouteView.Match segment="productDetail">
-            <ProductDetail />
-          </RouteView.Match>
           <RouteView.Match segment="about">
             <About />
           </RouteView.Match>
           <RouteView.Match segment="queryDemo">
             <QueryDemo />
-          </RouteView.Match>
-          <RouteView.Match segment="reducedMotion">
-            <ReducedMotion />
-          </RouteView.Match>
-          <RouteView.Match segment="abortRacing">
-            <AbortRacing />
           </RouteView.Match>
           <RouteView.NotFound>
             <h1>404 — Page Not Found</h1>

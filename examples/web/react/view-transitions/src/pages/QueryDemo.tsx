@@ -15,6 +15,11 @@ const ITEMS = [
 type Filter = "all" | "letter" | "number" | "color";
 
 export function QueryDemo(): JSX.Element {
+  // useRoute re-renders on every navigation (including query-only changes
+  // on the same route). useRouteNode would only re-render when the node
+  // activates/deactivates — so a filter=all → filter=letter change would
+  // leave `filter` frozen at "all" forever, and all buttons would look
+  // like the initial active one.
   const { route } = useRoute<{ filter?: Filter }>();
   const filter = route?.params.filter ?? "all";
 
@@ -28,8 +33,8 @@ export function QueryDemo(): JSX.Element {
     <div>
       <h1>Query-only navigation</h1>
       <p>
-        Changing the filter via query params is still a navigation, so VT
-        runs. The <strong>inner list container</strong> has its own{" "}
+        Changing the filter via query params is still a navigation, so VT runs.
+        The <strong>inner list container</strong> has its own{" "}
         <code>view-transition-name: query-demo-list</code> — only this area
         animates, while the page header and buttons stay fixed.
       </p>
@@ -40,7 +45,7 @@ export function QueryDemo(): JSX.Element {
             key={value}
             routeName="queryDemo"
             routeParams={{ filter: value }}
-            activeClassName="active"
+            ignoreQueryParams={false}
           >
             {value}
           </Link>

@@ -7,23 +7,47 @@ test.describe("Hero morph", () => {
     await page.goto("/products");
     await expect(page.getByRole("heading", { name: "Products" })).toBeVisible();
 
-    // Verify the thumb on the list has a named VT element.
-    const thumbName = await page.evaluate(() => {
-      const thumb = document.querySelector(".vt-product-thumb") as HTMLElement | null;
-      return thumb?.style.viewTransitionName ?? null;
+    // `data-product-id` is the stable marker that main.tsx uses to find
+    // the target element during navigation and add `.vt-hero-active` to
+    // it. No thumb has a name before a nav is in progress.
+    const thumbProductId = await page.evaluate(() => {
+      const thumb = document.querySelector(".vt-product-thumb");
+      return thumb?.getAttribute("data-product-id") ?? null;
     });
-    expect(thumbName).toMatch(/^product-cover-\d+$/);
+    expect(thumbProductId).toMatch(/^\d+$/);
 
-    // Click on Crimson Flask (id=1) and verify the detail page uses the
-    // matching VT name. The browser pairs them during the transition.
+    // Click on Crimson Flask (id=1). During the navigation main.tsx:
+    // 1) sets html.vt-hero-morph + data-vt-hero-id="1"
+    // 2) adds .vt-hero-active to the source thumb (old DOM, subscribeLeave)
+    // 3) adds .vt-hero-active to the destination cover (new DOM,
+    //    router.subscribe via setTimeout after React commit)
+    // CSS then gives each of those one shared name "hero" which the browser
+    // uses to pair them for FLIP-morph. Verify the wiring by reading the
+    // computed name on the cover after arrival.
     await page.getByRole("link", { name: /Crimson Flask/ }).click();
     await page.waitForURL(/\/products\/1/);
 
     const coverName = await page.evaluate(() => {
-      const cover = document.querySelector(".vt-product-cover") as HTMLElement | null;
-      return cover?.style.viewTransitionName ?? null;
+      const cover = document.querySelector(".vt-product-cover");
+      return cover !== null
+        ? getComputedStyle(cover).viewTransitionName
+        : null;
     });
-    expect(coverName).toBe("product-cover-1");
+    expect(coverName).toBe("hero");
+
+    // And confirm the wiring: html should carry the hero id matching the url.
+    const heroId = await page.evaluate(
+      () => document.documentElement.dataset.vtHeroId ?? null,
+    );
+    expect(heroId).toBe("1");
+
+    // The cover should carry .vt-hero-active — that's the class the CSS
+    // rule keys off.
+    const hasActiveClass = await page.evaluate(() => {
+      const cover = document.querySelector(".vt-product-cover");
+      return cover?.classList.contains("vt-hero-active") ?? false;
+    });
+    expect(hasActiveClass).toBe(true);
   });
 
   test("unknown product id renders fallback", async ({ page }) => {

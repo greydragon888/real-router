@@ -37,21 +37,17 @@
 
 /* ------------------------------------------------------------------ */
 /* 1. Root transition — SEQUENTIAL for demo clarity                   */
-/*                                                                    */
 /* Pedagogical choice (not production-default): exit and entry are    */
 /* explicitly non-overlapping so the observer can see each phase.     */
-/*                                                                    */
 /* Both animations share the same duration and run in parallel,       */
 /* but sequencing is encoded INSIDE the keyframes:                    */
 /*   exit keyframe:  0-50% animates out, 50-100% holds the "gone" pose */
 /*   entry keyframe: 0-50% holds off-screen, 50-100% animates in       */
-/*                                                                    */
 /* Why not animation-delay + fill-mode: both? Those don't apply        */
 /* reliably to ::view-transition-old/new pseudo-elements across        */
 /* browsers — the runtime may ignore the delay and snap the "new"     */
 /* frame to its final state immediately. Keyframes are the contract   */
 /* the VT API does honour end-to-end.                                 */
-/*                                                                    */
 /* For production, shorten --vt-duration-root to ~400ms and overlap    */
 /* the two halves (e.g. 0-60% exit + 40-100% entry) for snappy nav.   */
 /* ------------------------------------------------------------------ */
@@ -59,9 +55,25 @@
 /* Black backdrop behind the snapshot stack. Because both exit and entry
  * animations reach opacity 0 at the 50% mark, the backdrop bleeds
  * through — producing a fade-to-black / fade-from-black curtain that
- * makes the boundary between exit and entry phases unmistakable. */
+ * makes the boundary between exit and entry phases unmistakable.
+ *
+ * Note on input during long animations: while a VT is animating, the
+ * document's real DOM is under `rendering suppression` (CSS VT L1 §4) —
+ * it stays in the document but is not painted and is effectively absent
+ * from the hit-test tree. Only the ::view-transition pseudo stack is
+ * visible. `pointer-events: none` on this overlay tells the browser not
+ * to hit-test the overlay either — but there's nothing underneath to
+ * hit, so clicks still go nowhere until the animation ends.
+ *
+ * We keep the rule anyway: for scoped transitions where only part of
+ * the page is captured (e.g. a single named scope), the real DOM OUTSIDE
+ * that scope remains live, and `pointer-events: none` on the overlay is
+ * what lets clicks on that outside area still work. For this demo's
+ * long root-scope animations the block is unavoidable; the About page
+ * explains the trade-off. */
 ::view-transition {
   background-color: var(--vt-curtain-color);
+  pointer-events: none;
 }
 
 ::view-transition-old(root),
@@ -73,7 +85,6 @@
 
 /* ------------------------------------------------------------------ */
 /* 2. Direction-aware slide on root                                   */
-/*                                                                    */
 /* main.tsx sets data-nav-direction="back" on <html> when popstate    */
 /* fires. We key the keyframes off that attribute so back/forward     */
 /* slide in opposite directions — forward pushes the new view from    */
@@ -146,6 +157,88 @@ html[data-nav-direction="back"]::view-transition-new(root) {
   }
 }
 
+/* ------------------------------------------------------------------ */
+/* 2b. Query-only navigation — suppress root animation                */
+/* main.tsx sets html.vt-query-only when route.name === nextRoute.name */
+/* (same-route navigation, typically just query-param changes).        */
+/* Root-scope captures the WHOLE page minus named areas, so its        */
+/* keyframes would play a 2400ms curtain even when only a list         */
+/* re-sorted. We kill the root animation — named scopes (product-list, */
+/* query-demo-list, hero morphs) keep animating normally.              */
+/* ------------------------------------------------------------------ */
+
+html.vt-query-only::view-transition-old(root),
+html.vt-query-only::view-transition-new(root) {
+  animation: none !important;
+}
+
+/* ------------------------------------------------------------------ */
+/* 2d. Hero-morph navigations — soften root animation                 */
+/* Without this, the root plays the 2400ms curtain + slide that       */
+/* dominates the screen and visually drowns out the hero FLIP (which  */
+/* runs for 1400ms over the product cover). Replace root's            */
+/* direction-aware slide with a shorter, non-slide crossfade tuned to */
+/* the hero duration, so the user sees the thumb morph into the cover */
+/* clearly while the surrounding page softly swaps.                   */
+/* ------------------------------------------------------------------ */
+
+html.vt-hero-morph::view-transition-old(root) {
+  animation-name: vt-fade-out;
+  animation-duration: var(--vt-duration-hero);
+  animation-timing-function: var(--vt-easing-standard);
+}
+
+html.vt-hero-morph::view-transition-new(root) {
+  animation-name: vt-fade-in;
+  animation-duration: var(--vt-duration-hero);
+  animation-timing-function: var(--vt-easing-standard);
+}
+
+/* ------------------------------------------------------------------ */
+/* 2c. Scope-gating: named VT scopes are only useful in specific      */
+/* navigations. Outside those, strip the names so elements rejoin the */
+/* nearest parent scope (product-list or root) and animate together.  */
+/* - .vt-product-thumb (on Products page) and .vt-product-cover (on   */
+/*   ProductDetail page) both carry `data-product-id`. The            */
+/*   `view-transition-name` is NOT set inline any more; CSS grants it */
+/*   dynamically only to the element whose id matches                 */
+/*   <html data-vt-hero-id>, which main.tsx sets from nextRoute.      */
+/*   Net effect: exactly ONE thumb on Products (the one that was      */
+/*   clicked) keeps its scope and morphs into the detail cover; the   */
+/*   other 5 rejoin root and slide with the page. Without this        */
+/*   precision, all 6 thumbs would get their own scope on every       */
+/*   Products ↔ Detail navigation and float statically over the       */
+/*   sliding root.                                                    */
+/* - vt-product-list / vt-qd-list are set via CSS. Useful ONLY for    */
+/*   query-only navigation on the same page (sort/filter change).     */
+/*   On cross-route leave their name would make the whole list hang   */
+/*   statically while the root slides. A :not(.vt-query-only)         */
+/*   selector removes the name for all cross-route transitions.       */
+/* ------------------------------------------------------------------ */
+
+/* Single rule — scales to unlimited products.
+ *
+ * main.tsx adds the .vt-hero-active class to exactly ONE element per
+ * navigation (the product whose id matches nextRoute.params.id) — on the
+ * source DOM in subscribeLeave, and on the destination DOM in
+ * router.subscribe after React commits. Everything else stays in its
+ * parent scope (root or product-list).
+ *
+ * The shared name "hero" is arbitrary — both the source thumb and the
+ * destination cover just need to match to be paired by the browser. */
+.vt-hero-active {
+  view-transition-name: hero;
+}
+
+html:not(.vt-query-only) .vt-product-list {
+  view-transition-name: none;
+}
+
+html:not(.vt-query-only) .vt-qd-list {
+  view-transition-name: none;
+}
+
+
 /* Simple fades reused by per-area scopes below (product-list, query-demo-list). */
 @keyframes vt-fade-out {
   to {
@@ -161,26 +254,19 @@ html[data-nav-direction="back"]::view-transition-new(root) {
 
 /* ------------------------------------------------------------------ */
 /* 3. Hero morph — product cover                                      */
-/*                                                                    */
 /* The thumb on Products and the cover on ProductDetail both set      */
 /* `view-transition-name: product-cover-${id}`. The browser pairs     */
 /* them and interpolates position + size automatically (FLIP-style).  */
 /* We only tune the timing here.                                      */
 /* ------------------------------------------------------------------ */
 
-::view-transition-group(product-cover-1),
-::view-transition-group(product-cover-2),
-::view-transition-group(product-cover-3),
-::view-transition-group(product-cover-4),
-::view-transition-group(product-cover-5),
-::view-transition-group(product-cover-6) {
+::view-transition-group(hero) {
   animation-duration: var(--vt-duration-hero);
   animation-timing-function: var(--vt-easing-hero);
 }
 
 /* ------------------------------------------------------------------ */
 /* 4. Per-area scope — query demo list                                */
-/*                                                                    */
 /* QueryDemo renders <ul style="view-transition-name: query-demo-list">.
 /* When filter query changes, only this container gets a VT group —   */
 /* the page header/toolbar stays static.                              */
@@ -226,7 +312,6 @@ html[data-nav-direction="back"]::view-transition-new(root) {
 
 /* ------------------------------------------------------------------ */
 /* 5. Reduced motion                                                  */
-/*                                                                    */
 /* When the user prefers reduced motion, the VT pipeline still runs   */
 /* (old/new snapshots are taken, DOM swap happens) but the animations */
 /* collapse to zero duration. Visually equivalent to an instant swap. */
@@ -316,9 +401,13 @@ html[data-nav-direction="back"]::view-transition-new(root) {
   text-decoration: none;
 }
 
+/* `color: #fff !important` is needed to beat the global `a.active { color:
+ * #16213e !important }` in shared/styles.css. Without it, active button text
+ * goes dark on dark background — unreadable. Background wins through
+ * selector specificity, no !important needed there. */
 .vt-qd-toolbar a.active {
   background: #0f3460;
-  color: #fff;
+  color: #fff !important;
   border-color: #0f3460;
 }
 

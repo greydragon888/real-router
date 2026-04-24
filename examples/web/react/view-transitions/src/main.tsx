@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 
 import { App } from "./App";
 import { routes } from "./routes";
+import { installViewTransitionPolicy } from "./vt-policy";
 
 import "../../../../shared/styles.css";
 import "./styles/transitions.css";
@@ -16,26 +17,7 @@ const router = createRouter(routes, {
 
 router.usePlugin(browserPluginFactory());
 
-// Direction-aware: expose nav direction as a data attribute on <html> so
-// CSS can key direction-specific keyframes off it. popstate fires when the
-// user clicks back/forward in the browser; any other source of navigation
-// (Link click, router.navigate) is treated as forward. The flag is consumed
-// in subscribeLeave so the attribute value is ready when the VT snapshots
-// the old DOM.
-if (typeof globalThis.window !== "undefined") {
-  let popstateFlag = false;
-
-  document.documentElement.dataset.navDirection = "forward";
-  globalThis.addEventListener("popstate", () => {
-    popstateFlag = true;
-  });
-  router.subscribeLeave(() => {
-    document.documentElement.dataset.navDirection = popstateFlag
-      ? "back"
-      : "forward";
-    popstateFlag = false;
-  });
-}
+installViewTransitionPolicy(router);
 
 await router.start();
 

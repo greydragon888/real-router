@@ -29,14 +29,7 @@ test.describe("No console or page errors during navigation", () => {
     // Walk the sidebar to exercise every route once, giving each transition
     // a moment to complete before the next click.
     const sidebar = page.getByRole("complementary");
-    const targets = [
-      "Products",
-      "About",
-      "Query demo",
-      "Reduced motion",
-      "Abort racing",
-      "Home",
-    ];
+    const targets = ["Products", "About", "Query demo", "Home"];
 
     for (const name of targets) {
       await sidebar.getByRole("link", { name }).first().click();
