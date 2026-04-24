@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "pnpm turbo run bundle --filter=...ssg-react-example",
     "dev": "vite",
     "build:app": "vite build && vite build --ssr src/entry-server.tsx --outDir dist/server && tsx scripts/ssg-build.ts",
     "preview": "vite preview",

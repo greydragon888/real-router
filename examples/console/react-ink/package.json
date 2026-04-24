@@ -5,6 +5,7 @@
   "type": "module",
   "bin": "./src/main.tsx",
   "scripts": {
+    "predev": "pnpm turbo run bundle --filter=...react-ink-demo-example",
     "dev": "tsx src/main.tsx",
     "build": "tsc --noEmit"
   },

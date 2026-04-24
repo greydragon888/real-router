@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
+    "predev": "pnpm turbo run bundle --filter=...angular-dynamic-routes-example",
     "dev": "ng serve",
     "build": "ng build",
     "preview": "sirv dist/angular-dynamic-routes-example/browser --port 4173 --single --quiet",

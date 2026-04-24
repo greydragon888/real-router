@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "pnpm turbo run bundle --filter=...svelte-snippets-routing-example",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"

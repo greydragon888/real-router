@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "pnpm turbo run bundle --filter=...vue-async-guards-example",
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview",
