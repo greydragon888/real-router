@@ -12,4 +12,9 @@ export interface MatchProps {
   readonly keepAlive?: boolean;
 }
 
+export interface SelfProps {
+  /** Fallback content while children are suspended. */
+  readonly fallback?: VNode | (() => VNode);
+}
+
 export type NotFoundProps = Record<string, never>;

@@ -31,6 +31,7 @@ export type { RouterErrorBoundaryProps } from "./components/RouterErrorBoundary"
 export type {
   RouteViewProps,
   RouteViewMatchProps,
+  RouteViewSelfProps,
   RouteViewNotFoundProps,
 } from "./components/RouteView";
 

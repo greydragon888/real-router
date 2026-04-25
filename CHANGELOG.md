@@ -5,6 +5,170 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-04-25]
+
+### @real-router/angular@0.4.0
+
+### Minor Changes
+
+- [#539](https://github.com/greydragon888/real-router/pull/539) [`2f39d54`](https://github.com/greydragon888/real-router/commit/2f39d54f82dfb62da5309d8520d4c7d8281c52d6) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `RouteSelf` directive (`<ng-template routeSelf>`) for the parent-as-list pattern ([#538](https://github.com/greydragon888/real-router/issues/538))
+
+  `RouteSelf` is a structural directive (mirrors `RouteMatch`/`RouteNotFound`)
+  that marks an `ng-template` as the "self" slot for `<route-view>`. The
+  template is rendered when the active route name equals the parent
+  `<route-view>`'s `routeNode` input and no descendant `RouteMatch` is active.
+
+  ```html
+  <route-view [routeNode]="'users'">
+    <ng-template routeSelf>
+      <users-list />
+    </ng-template>
+    <ng-template routeMatch="profile">
+      <user-profile />
+    </ng-template>
+  </route-view>
+  ```
+
+  Priority: `RouteMatch` (descendant) → `RouteSelf` (active equals `routeNode`)
+  → `RouteNotFound` (`UNKNOWN_ROUTE`). Multiple `RouteSelf` instances follow
+  first-wins (declaration order from `contentChildren`). Exported as `RouteSelf`
+  from `@real-router/angular`.
+
+### @real-router/preact@0.7.0
+
+### Minor Changes
+
+- [#539](https://github.com/greydragon888/real-router/pull/539) [`2f39d54`](https://github.com/greydragon888/real-router/commit/2f39d54f82dfb62da5309d8520d4c7d8281c52d6) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `<RouteView.Self>` slot for the parent-as-list pattern ([#538](https://github.com/greydragon888/real-router/issues/538))
+
+  `RouteView.Self` renders its children when the active route name equals the
+  parent `RouteView`'s `nodeName` and no descendant `Match` is active.
+
+  ```tsx
+  <RouteView nodeName="users">
+    <RouteView.Self>
+      <UsersList />
+    </RouteView.Self>
+    <RouteView.Match segment="profile">
+      <UserProfile />
+    </RouteView.Match>
+  </RouteView>
+  ```
+
+  Priority: `Match` → `Self` → `NotFound`. Multiple `Self` follow first-wins
+  (mirrors `NotFound`). Optional `fallback` prop wraps children in `<Suspense>`
+  from `preact/compat`.
+
+### @real-router/react@0.20.0
+
+### Minor Changes
+
+- [#539](https://github.com/greydragon888/real-router/pull/539) [`2f39d54`](https://github.com/greydragon888/real-router/commit/2f39d54f82dfb62da5309d8520d4c7d8281c52d6) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `<RouteView.Self>` slot for the parent-as-list pattern ([#538](https://github.com/greydragon888/real-router/issues/538))
+
+  `RouteView.Self` renders its children when the active route name equals the
+  parent `RouteView`'s `nodeName` and no descendant `Match` is active. This
+  closes the API gap that previously forced imperative
+  `route.name === ...` ternaries when a parent route IS the listing of its
+  children.
+
+  ```tsx
+  <RouteView nodeName="users">
+    <RouteView.Self>
+      <UsersList />
+    </RouteView.Self>
+    <RouteView.Match segment="profile">
+      <UserProfile />
+    </RouteView.Match>
+    <RouteView.Match segment="settings">
+      <UserSettings />
+    </RouteView.Match>
+  </RouteView>
+  ```
+
+  Priority order: `Match` (descendant of `nodeName`) → `Self` (active equals
+  `nodeName`) → `NotFound` (`UNKNOWN_ROUTE`). At most one slot renders. Multiple
+  `Self` instances follow the first-wins rule (mirrors `NotFound`). `Self`
+  accepts an optional `fallback` prop that wraps children in `<Suspense>`.
+
+### @real-router/solid@0.7.0
+
+### Minor Changes
+
+- [#539](https://github.com/greydragon888/real-router/pull/539) [`2f39d54`](https://github.com/greydragon888/real-router/commit/2f39d54f82dfb62da5309d8520d4c7d8281c52d6) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `<RouteView.Self>` slot for the parent-as-list pattern ([#538](https://github.com/greydragon888/real-router/issues/538))
+
+  `RouteView.Self` renders its children when the active route name equals the
+  parent `RouteView`'s `nodeName` and no descendant `Match` is active.
+
+  ```tsx
+  <RouteView nodeName="users">
+    <RouteView.Self>
+      <UsersList />
+    </RouteView.Self>
+    <RouteView.Match segment="profile">
+      <UserProfile />
+    </RouteView.Match>
+  </RouteView>
+  ```
+
+  Implemented as a Symbol-based marker object (`SELF_MARKER`), symmetric to the
+  existing `Match`/`NotFound` markers. Priority: `Match` → `Self` → `NotFound`.
+  Multiple `Self` follow first-wins. Optional `fallback` prop wraps children in
+  Solid's `<Suspense>`.
+
+### @real-router/svelte@0.6.0
+
+### Minor Changes
+
+- [#539](https://github.com/greydragon888/real-router/pull/539) [`2f39d54`](https://github.com/greydragon888/real-router/commit/2f39d54f82dfb62da5309d8520d4c7d8281c52d6) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `self` reserved snippet on `<RouteView>` for the parent-as-list pattern ([#538](https://github.com/greydragon888/real-router/issues/538))
+
+  `RouteView` now recognises a `self` named snippet, alongside the existing
+  `notFound`. The `self` snippet renders when the active route name equals the
+  parent `RouteView`'s `nodeName` and no segment snippet matches.
+
+  ```svelte
+  <RouteView nodeName="users">
+    {#snippet self()}
+      <UsersList />
+    {/snippet}
+    {#snippet profile()}
+      <UserProfile />
+    {/snippet}
+    {#snippet notFound()}
+      <NotFoundPage />
+    {/snippet}
+  </RouteView>
+  ```
+
+  Priority: segment snippet match → `self` (active equals `nodeName`) →
+  `notFound` (`UNKNOWN_ROUTE`). Like `notFound`, `self` is reserved — a route
+  literally named `self` is **never** picked as a regular segment match (use a
+  different snippet name if you need to render a route called `self`).
+
+### @real-router/vue@0.8.0
+
+### Minor Changes
+
+- [#539](https://github.com/greydragon888/real-router/pull/539) [`2f39d54`](https://github.com/greydragon888/real-router/commit/2f39d54f82dfb62da5309d8520d4c7d8281c52d6) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `<RouteView.Self>` slot for the parent-as-list pattern ([#538](https://github.com/greydragon888/real-router/issues/538))
+
+  `RouteView.Self` is a marker `defineComponent` (mirrors `Match`/`NotFound`)
+  that renders its slot content when the active route name equals the parent
+  `RouteView`'s `nodeName` and no descendant `Match` is active.
+
+  ```vue
+  <RouteView nodeName="users">
+    <RouteView.Self>
+      <UsersList />
+    </RouteView.Self>
+    <RouteView.Match segment="profile">
+      <UserProfile />
+    </RouteView.Match>
+  </RouteView>
+  ```
+
+  Priority: `Match` → `Self` → `NotFound`. Multiple `Self` follow first-wins.
+  Optional `fallback` prop (`VNode | () => VNode`) wraps children in
+  `<Suspense>`. Compatible with the existing `keepAlive` modes on the
+  parent `RouteView`.
+
 ## [2026-04-23]
 
 ### @real-router/navigation-plugin@0.6.0

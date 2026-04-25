@@ -182,6 +182,150 @@ describe("RouteView", () => {
     });
   });
 
+  describe("Self", () => {
+    it("renders Self when active === nodeName (no descendant active)", async () => {
+      await router.start("/users");
+
+      render(() => (
+        <RouterProvider router={router}>
+          <RouteView nodeName="users">
+            <RouteView.Self>
+              <div data-testid="users-self">UsersList</div>
+            </RouteView.Self>
+            <RouteView.Match segment="view">
+              <div data-testid="users-view">View</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>
+      ));
+
+      expect(screen.getByTestId("users-self")).toBeInTheDocument();
+      expect(screen.queryByTestId("users-view")).not.toBeInTheDocument();
+    });
+
+    it("does not render Self when descendant Match active", async () => {
+      await router.start("/users/list");
+
+      render(() => (
+        <RouterProvider router={router}>
+          <RouteView nodeName="users">
+            <RouteView.Self>
+              <div data-testid="users-self">Self</div>
+            </RouteView.Self>
+            <RouteView.Match segment="list">
+              <div data-testid="users-list">List</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>
+      ));
+
+      expect(screen.getByTestId("users-list")).toBeInTheDocument();
+      expect(screen.queryByTestId("users-self")).not.toBeInTheDocument();
+    });
+
+    it("first <Self> wins when multiple are provided", async () => {
+      await router.start("/users");
+
+      render(() => (
+        <RouterProvider router={router}>
+          <RouteView nodeName="users">
+            <RouteView.Self>
+              <div data-testid="users-self-first">First</div>
+            </RouteView.Self>
+            <RouteView.Self>
+              <div data-testid="users-self-second">Second</div>
+            </RouteView.Self>
+          </RouteView>
+        </RouterProvider>
+      ));
+
+      expect(screen.getByTestId("users-self-first")).toBeInTheDocument();
+      expect(screen.queryByTestId("users-self-second")).not.toBeInTheDocument();
+    });
+
+    it("Self has priority over NotFound when active === nodeName", async () => {
+      await router.start("/users");
+
+      render(() => (
+        <RouterProvider router={router}>
+          <RouteView nodeName="users">
+            <RouteView.Self>
+              <div data-testid="users-self">Self</div>
+            </RouteView.Self>
+            <RouteView.NotFound>
+              <div data-testid="not-found">404</div>
+            </RouteView.NotFound>
+          </RouteView>
+        </RouterProvider>
+      ));
+
+      expect(screen.getByTestId("users-self")).toBeInTheDocument();
+      expect(screen.queryByTestId("not-found")).not.toBeInTheDocument();
+    });
+
+    it("does not render Self when active is unrelated (no Match for it either)", async () => {
+      await router.start("/users/list");
+
+      const { container } = render(() => (
+        <RouterProvider router={router}>
+          <RouteView nodeName="users">
+            <RouteView.Self>
+              <div data-testid="users-self">Self</div>
+            </RouteView.Self>
+          </RouteView>
+        </RouterProvider>
+      ));
+
+      expect(container.innerHTML).toBe("");
+    });
+
+    it("Self with fallback wraps children in Suspense", async () => {
+      await router.start("/users");
+
+      render(() => (
+        <RouterProvider router={router}>
+          <RouteView nodeName="users">
+            <RouteView.Self
+              fallback={<div data-testid="self-fallback">Loading...</div>}
+            >
+              <div data-testid="users-self">UsersList</div>
+            </RouteView.Self>
+          </RouteView>
+        </RouterProvider>
+      ));
+
+      // Synchronous children resolve immediately — fallback path covered
+      // structurally even when no async boundary triggers visibly.
+      expect(screen.getByTestId("users-self")).toBeInTheDocument();
+    });
+
+    it("transitions: descendant Match → Self when navigating up", async () => {
+      await router.start("/users/list");
+
+      render(() => (
+        <RouterProvider router={router}>
+          <RouteView nodeName="users">
+            <RouteView.Self>
+              <div data-testid="users-self">Self</div>
+            </RouteView.Self>
+            <RouteView.Match segment="list">
+              <div data-testid="users-list">List</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>
+      ));
+
+      expect(screen.getByTestId("users-list")).toBeInTheDocument();
+
+      await router.navigate("users");
+
+      await waitFor(() => {
+        expect(screen.getByTestId("users-self")).toBeInTheDocument();
+        expect(screen.queryByTestId("users-list")).not.toBeInTheDocument();
+      });
+    });
+  });
+
   describe("NotFound", () => {
     let notFoundRouter: Router;
 
@@ -310,6 +454,14 @@ describe("RouteView", () => {
     it("Match renders null when used standalone", () => {
       const { container } = render(() => (
         <RouteView.Match segment="x">content</RouteView.Match>
+      ));
+
+      expect(container.innerHTML).toBe("");
+    });
+
+    it("Self renders null when used standalone", () => {
+      const { container } = render(() => (
+        <RouteView.Self>content</RouteView.Self>
       ));
 
       expect(container.innerHTML).toBe("");

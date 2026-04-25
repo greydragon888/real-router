@@ -1,5 +1,36 @@
 # @real-router/react
 
+## 0.20.0
+
+### Minor Changes
+
+- [#539](https://github.com/greydragon888/real-router/pull/539) [`2f39d54`](https://github.com/greydragon888/real-router/commit/2f39d54f82dfb62da5309d8520d4c7d8281c52d6) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `<RouteView.Self>` slot for the parent-as-list pattern ([#538](https://github.com/greydragon888/real-router/issues/538))
+
+  `RouteView.Self` renders its children when the active route name equals the
+  parent `RouteView`'s `nodeName` and no descendant `Match` is active. This
+  closes the API gap that previously forced imperative
+  `route.name === ...` ternaries when a parent route IS the listing of its
+  children.
+
+  ```tsx
+  <RouteView nodeName="users">
+    <RouteView.Self>
+      <UsersList />
+    </RouteView.Self>
+    <RouteView.Match segment="profile">
+      <UserProfile />
+    </RouteView.Match>
+    <RouteView.Match segment="settings">
+      <UserSettings />
+    </RouteView.Match>
+  </RouteView>
+  ```
+
+  Priority order: `Match` (descendant of `nodeName`) → `Self` (active equals
+  `nodeName`) → `NotFound` (`UNKNOWN_ROUTE`). At most one slot renders. Multiple
+  `Self` instances follow the first-wins rule (mirrors `NotFound`). `Self`
+  accepts an optional `fallback` prop that wraps children in `<Suspense>`.
+
 ## 0.19.0
 
 ### Minor Changes

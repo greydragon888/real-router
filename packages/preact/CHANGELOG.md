@@ -1,5 +1,29 @@
 # @real-router/preact
 
+## 0.7.0
+
+### Minor Changes
+
+- [#539](https://github.com/greydragon888/real-router/pull/539) [`2f39d54`](https://github.com/greydragon888/real-router/commit/2f39d54f82dfb62da5309d8520d4c7d8281c52d6) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `<RouteView.Self>` slot for the parent-as-list pattern ([#538](https://github.com/greydragon888/real-router/issues/538))
+
+  `RouteView.Self` renders its children when the active route name equals the
+  parent `RouteView`'s `nodeName` and no descendant `Match` is active.
+
+  ```tsx
+  <RouteView nodeName="users">
+    <RouteView.Self>
+      <UsersList />
+    </RouteView.Self>
+    <RouteView.Match segment="profile">
+      <UserProfile />
+    </RouteView.Match>
+  </RouteView>
+  ```
+
+  Priority: `Match` → `Self` → `NotFound`. Multiple `Self` follow first-wins
+  (mirrors `NotFound`). Optional `fallback` prop wraps children in `<Suspense>`
+  from `preact/compat`.
+
 ## 0.6.0
 
 ### Minor Changes

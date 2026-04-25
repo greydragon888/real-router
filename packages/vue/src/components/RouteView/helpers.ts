@@ -2,11 +2,17 @@ import { UNKNOWN_ROUTE } from "@real-router/core";
 import { startsWithSegment } from "@real-router/route-utils";
 import { Fragment, isVNode } from "vue";
 
-import { Match, NotFound } from "./components";
+import { Match, NotFound, Self } from "./components";
 
 import type { VNode } from "vue";
 
 type FallbackType = VNode | (() => VNode) | undefined;
+
+interface FallbackSlots {
+  selfVNode: VNode | null;
+  selfFallback: FallbackType;
+  notFoundChildren: unknown;
+}
 
 function isSegmentMatch(
   routeName: string,
@@ -46,12 +52,81 @@ export function collectElements(children: unknown, result: VNode[]): void {
   const vnodes = normalizeChildren(children);
 
   for (const child of vnodes) {
-    if (child.type === Match || child.type === NotFound) {
+    if (
+      child.type === Match ||
+      child.type === Self ||
+      child.type === NotFound
+    ) {
       result.push(child);
     } else if (child.type === Fragment) {
       collectElements(child.children, result);
     }
   }
+}
+
+function recordFallback(child: VNode, slots: FallbackSlots): boolean {
+  if (child.type === NotFound) {
+    slots.notFoundChildren = child.children;
+
+    return true;
+  }
+
+  if (child.type === Self) {
+    if (slots.selfVNode === null) {
+      slots.selfVNode = child;
+      const props = child.props as { fallback?: FallbackType } | null;
+
+      slots.selfFallback = props?.fallback;
+    }
+
+    return true;
+  }
+
+  return false;
+}
+
+function evaluateMatch(
+  child: VNode,
+  routeName: string,
+  nodeName: string,
+): { isActive: boolean; fallback: FallbackType } {
+  const props = child.props as {
+    segment: string;
+    exact?: boolean;
+    fallback?: FallbackType;
+  } | null;
+  const segment = props?.segment ?? "";
+  const exact = props?.exact ?? false;
+  const fullSegmentName = nodeName ? `${nodeName}.${segment}` : segment;
+  const isActive = isSegmentMatch(routeName, fullSegmentName, exact);
+
+  return { isActive, fallback: props?.fallback };
+}
+
+function appendFallback(
+  rendered: VNode[],
+  routeName: string,
+  nodeName: string,
+  slots: FallbackSlots,
+  elements: VNode[],
+): FallbackType {
+  if (slots.selfVNode !== null && routeName === nodeName) {
+    rendered.push(slots.selfVNode);
+
+    return slots.selfFallback;
+  }
+
+  if (routeName === UNKNOWN_ROUTE && slots.notFoundChildren !== null) {
+    const nfElements = elements.filter((element) => element.type === NotFound);
+    /* v8 ignore next 3 */
+    const lastNf = nfElements.at(-1);
+
+    if (lastNf) {
+      rendered.push(lastNf);
+    }
+  }
+
+  return undefined;
 }
 
 export function buildRenderList(
@@ -63,47 +138,35 @@ export function buildRenderList(
   activeMatchFound: boolean;
   fallback?: FallbackType;
 } {
-  let notFoundChildren: unknown = null;
+  const slots: FallbackSlots = {
+    selfVNode: null,
+    selfFallback: undefined,
+    notFoundChildren: null,
+  };
   let activeMatchFound = false;
   let fallback: FallbackType = undefined;
   const rendered: VNode[] = [];
 
   for (const child of elements) {
-    if (child.type === NotFound) {
-      notFoundChildren = child.children;
+    if (recordFallback(child, slots)) {
       continue;
     }
 
-    const props = child.props as {
-      segment: string;
-      exact?: boolean;
-      fallback?: FallbackType;
-    } | null;
-    const segment = props?.segment ?? "";
-    const exact = props?.exact ?? false;
-    const fullSegmentName = nodeName ? `${nodeName}.${segment}` : segment;
-    const isActive =
-      !activeMatchFound && isSegmentMatch(routeName, fullSegmentName, exact);
+    if (activeMatchFound) {
+      continue;
+    }
 
-    if (isActive) {
+    const result = evaluateMatch(child, routeName, nodeName);
+
+    if (result.isActive) {
       activeMatchFound = true;
-      fallback = props?.fallback;
+      fallback = result.fallback;
       rendered.push(child);
     }
   }
 
-  if (
-    !activeMatchFound &&
-    routeName === UNKNOWN_ROUTE &&
-    notFoundChildren !== null
-  ) {
-    const nfElements = elements.filter((element) => element.type === NotFound);
-    /* v8 ignore next 3 */
-    const lastNf = nfElements.at(-1);
-
-    if (lastNf) {
-      rendered.push(lastNf);
-    }
+  if (!activeMatchFound) {
+    fallback = appendFallback(rendered, routeName, nodeName, slots, elements);
   }
 
   return { rendered, activeMatchFound, fallback };

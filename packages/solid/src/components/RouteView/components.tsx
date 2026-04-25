@@ -1,9 +1,11 @@
-import type { MatchProps, NotFoundProps } from "./types";
+import type { MatchProps, NotFoundProps, SelfProps } from "./types";
 import type { JSX } from "solid-js";
 
 // Local (non-global) Symbols — Symbol.for() would expose markers to spoofing
 // via the global Symbol registry. See Gotchas section "RouteView Marker Objects".
 export const MATCH_MARKER = Symbol("RouteView.Match");
+
+export const SELF_MARKER = Symbol("RouteView.Self");
 
 export const NOT_FOUND_MARKER = Symbol("RouteView.NotFound");
 
@@ -15,12 +17,18 @@ export interface MatchMarker {
   children: JSX.Element;
 }
 
+export interface SelfMarker {
+  $$type: typeof SELF_MARKER;
+  fallback?: JSX.Element;
+  children: JSX.Element;
+}
+
 export interface NotFoundMarker {
   $$type: typeof NOT_FOUND_MARKER;
   children: JSX.Element;
 }
 
-export type RouteViewMarker = MatchMarker | NotFoundMarker;
+export type RouteViewMarker = MatchMarker | SelfMarker | NotFoundMarker;
 
 export function Match(props: MatchProps): JSX.Element {
   const result: MatchMarker = {
@@ -40,6 +48,21 @@ export function Match(props: MatchProps): JSX.Element {
 }
 
 Match.displayName = "RouteView.Match";
+
+export function Self(props: SelfProps): JSX.Element {
+  const result: SelfMarker = {
+    $$type: SELF_MARKER,
+    fallback: props.fallback,
+    get children(): JSX.Element {
+      return props.children;
+    },
+  };
+
+  // See Match for the marker-pattern rationale.
+  return result as unknown as JSX.Element;
+}
+
+Self.displayName = "RouteView.Self";
 
 export function NotFound(props: NotFoundProps): JSX.Element {
   const result: NotFoundMarker = {
