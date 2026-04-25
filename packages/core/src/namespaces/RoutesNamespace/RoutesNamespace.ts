@@ -5,6 +5,7 @@ import {
   matchSourceTrailingSlash,
   paramsMatch,
   paramsMatchExcluding,
+  stripQueryDefaults,
 } from "./helpers";
 import {
   createRoutesStore,
@@ -430,6 +431,15 @@ export class RoutesNamespace<
       );
     }
 
+    // The fast path above lets through three relations: exact (handled in
+    // the previous block), `activeName` descendant of `name`, and `name`
+    // descendant of `activeName`. Only the first two count as "active" —
+    // a link pointing DEEPER than the current state is a navigation option,
+    // not an active state. Reject the descendant-of-active case explicitly.
+    if (!activeName.startsWith(`${name}.`)) {
+      return false;
+    }
+
     // Hierarchical check: activeState is a descendant of target (name)
     const activeParams = activeState.params;
 
@@ -437,11 +447,30 @@ export class RoutesNamespace<
       return false;
     }
 
-    // Check defaultParams (skip keys already in params)
-    return (
-      !defaultParams ||
-      paramsMatchExcluding(defaultParams, activeParams, params)
-    );
+    if (!defaultParams) {
+      return true;
+    }
+
+    // Honor `ignoreQueryParams` symmetrically with the exact-match branch
+    // above: query-only param differences (e.g. parent has
+    // `defaultParams: { sort: "asc" }` while the active descendant is
+    // `products.detail` with `params: { id: "6" }` and no sort) must not
+    // disqualify an ancestor link from being active. Strip query-typed
+    // keys of `name` from the defaults before comparison; URL-typed keys
+    // (`:id`, `:role`, etc.) are still enforced.
+    // `name` reaches this point only after the fast-path established a valid
+    // hierarchical relation AND `defaultParams` is non-null — both imply the
+    // matcher has registered the route, so `getMetaByName(name)![name]` is
+    // always defined here. Non-null assertions trade a defensive guard for
+    // honest 100% coverage.
+    const defaultsToCheck = ignoreQueryParams
+      ? stripQueryDefaults(
+          defaultParams,
+          this.#store.matcher.getMetaByName(name)?.[name],
+        )
+      : defaultParams;
+
+    return paramsMatchExcluding(defaultsToCheck, activeParams, params);
   }
 
   getMetaForState(
