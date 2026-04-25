@@ -7,6 +7,7 @@ import { createTestRouterWithADefaultRouter } from "../helpers";
 import RouteViewBasicTest from "../helpers/RouteViewBasicTest.svelte";
 import RouteViewNestedTest from "../helpers/RouteViewNestedTest.svelte";
 import RouteViewNoNotFoundTest from "../helpers/RouteViewNoNotFoundTest.svelte";
+import RouteViewSelfTest from "../helpers/RouteViewSelfTest.svelte";
 
 import type { Router } from "@real-router/core";
 
@@ -105,6 +106,35 @@ describe("RouteView", () => {
     });
   });
 
+  describe("Self snippet", () => {
+    it("renders self snippet when active route name === nodeName", async () => {
+      await router.start("/users");
+
+      render(RouteViewSelfTest, { props: { router } });
+
+      expect(screen.getByTestId("users-self")).toHaveTextContent("UsersList");
+      expect(screen.queryByTestId("users-view")).toBeNull();
+    });
+
+    it("does not render self when a descendant snippet matches", async () => {
+      await router.start("/users/42");
+
+      render(RouteViewSelfTest, { props: { router } });
+
+      expect(screen.getByTestId("users-view")).toHaveTextContent("User View");
+      expect(screen.queryByTestId("users-self")).toBeNull();
+    });
+
+    it("does not render self when route is unrelated to nodeName", async () => {
+      await router.start("/home");
+
+      render(RouteViewSelfTest, { props: { router } });
+
+      expect(screen.queryByTestId("users-self")).toBeNull();
+      expect(screen.queryByTestId("users-view")).toBeNull();
+    });
+  });
+
   describe("getActiveSegment (pure helper)", () => {
     it("returns the matching segment for a top-level node", () => {
       expect(
@@ -160,6 +190,14 @@ describe("RouteView", () => {
       expect(
         getActiveSegment("notFound.detail", "", { notFound: () => {} }),
       ).toBe("");
+    });
+
+    it("never returns 'self' even when the route name matches it exactly", () => {
+      expect(getActiveSegment("self", "", { self: () => {} })).toBe("");
+    });
+
+    it("never returns 'self' for a child route under a 'self' parent", () => {
+      expect(getActiveSegment("self.detail", "", { self: () => {} })).toBe("");
     });
   });
 });

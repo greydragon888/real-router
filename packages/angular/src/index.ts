@@ -22,6 +22,8 @@ export { NavigationAnnouncer } from "./components/NavigationAnnouncer";
 
 export { RouteMatch } from "./directives/RouteMatch";
 
+export { RouteSelf } from "./directives/RouteSelf";
+
 export { RouteNotFound } from "./directives/RouteNotFound";
 
 export { RealLink } from "./directives/RealLink";

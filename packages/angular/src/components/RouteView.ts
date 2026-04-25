@@ -16,6 +16,7 @@ import { createRouteNodeSource } from "@real-router/sources";
 
 import { RouteMatch } from "../directives/RouteMatch";
 import { RouteNotFound } from "../directives/RouteNotFound";
+import { RouteSelf } from "../directives/RouteSelf";
 import { injectRouter } from "../functions/injectRouter";
 
 import type { RouteSnapshot } from "@real-router/sources";
@@ -38,6 +39,7 @@ export class RouteView implements OnInit {
   readonly nodeName = input<string>("", { alias: "routeNode" });
 
   readonly matches = contentChildren(RouteMatch, { descendants: true });
+  readonly selfs = contentChildren(RouteSelf, { descendants: true });
   readonly notFounds = contentChildren(RouteNotFound, { descendants: true });
 
   readonly activeTemplate = computed<TemplateRef<unknown> | null>(() => {
@@ -54,6 +56,18 @@ export class RouteView implements OnInit {
     for (const { match, fullSegmentName } of entries) {
       if (startsWithSegment(routeName, fullSegmentName)) {
         return match.templateRef;
+      }
+    }
+
+    // Self has priority over NotFound. First-wins to mirror NotFound's
+    // last-wins inversion would be inconsistent with React/Preact/Solid/Vue
+    // adapters where Self is "first wins"; Angular's contentChildren returns
+    // declaration order, so picking [0] gives first-wins.
+    if (routeName === this.nodeName()) {
+      const first = this.selfs().at(0);
+
+      if (first) {
+        return first.templateRef;
       }
     }
 

@@ -326,6 +326,231 @@ describe("RouteView", () => {
     });
   });
 
+  describe("Self", () => {
+    it("renders Self when active route name equals nodeName (no descendant active)", async () => {
+      await router.start("/users");
+
+      render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="users">
+            <RouteView.Self>
+              <div data-testid="users-self">UsersList</div>
+            </RouteView.Self>
+            <RouteView.Match segment="view">
+              <div data-testid="users-view">View</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      expect(screen.getByTestId("users-self")).toBeInTheDocument();
+      expect(screen.queryByTestId("users-view")).not.toBeInTheDocument();
+    });
+
+    it("does not render Self when a descendant Match is active", async () => {
+      await router.start("/users/list");
+
+      render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="users">
+            <RouteView.Self>
+              <div data-testid="users-self">UsersList</div>
+            </RouteView.Self>
+            <RouteView.Match segment="list">
+              <div data-testid="users-list">List</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      expect(screen.getByTestId("users-list")).toBeInTheDocument();
+      expect(screen.queryByTestId("users-self")).not.toBeInTheDocument();
+    });
+
+    it("does not render Self when no descendant matches but active != nodeName", async () => {
+      await router.start("/users/list");
+
+      const { container } = render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="users">
+            <RouteView.Self>
+              <div data-testid="users-self">Self</div>
+            </RouteView.Self>
+            {/* No Match for "list" — Self should still NOT fire because activeName !== nodeName */}
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      expect(container.innerHTML).toBe("");
+    });
+
+    it("position-independent: Self before Match is still ignored when descendant is active", async () => {
+      await router.start("/users/list");
+
+      render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="users">
+            <RouteView.Match segment="list">
+              <div data-testid="users-list">List</div>
+            </RouteView.Match>
+            <RouteView.Self>
+              <div data-testid="users-self">Self</div>
+            </RouteView.Self>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      expect(screen.getByTestId("users-list")).toBeInTheDocument();
+      expect(screen.queryByTestId("users-self")).not.toBeInTheDocument();
+    });
+
+    it("first <Self> wins when multiple are provided", async () => {
+      await router.start("/users");
+
+      render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="users">
+            <RouteView.Self>
+              <div data-testid="users-self-first">First</div>
+            </RouteView.Self>
+            <RouteView.Self>
+              <div data-testid="users-self-second">Second</div>
+            </RouteView.Self>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      expect(screen.getByTestId("users-self-first")).toBeInTheDocument();
+      expect(screen.queryByTestId("users-self-second")).not.toBeInTheDocument();
+    });
+
+    it("Self has priority over NotFound when active === nodeName", async () => {
+      await router.start("/users");
+
+      render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="users">
+            <RouteView.Self>
+              <div data-testid="users-self">Self</div>
+            </RouteView.Self>
+            <RouteView.NotFound>
+              <div data-testid="not-found">404</div>
+            </RouteView.NotFound>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      expect(screen.getByTestId("users-self")).toBeInTheDocument();
+      expect(screen.queryByTestId("not-found")).not.toBeInTheDocument();
+    });
+
+    it("NotFound still renders for UNKNOWN_ROUTE even when Self is present", async () => {
+      const routesApi = getRoutesApi(router);
+
+      // Force allowNotFound on this fresh router clone
+      router.stop();
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          {
+            name: "users",
+            path: "/users",
+            children: [{ name: "list", path: "/list" }],
+          },
+        ],
+        { defaultRoute: "home", allowNotFound: true },
+      );
+      router.usePlugin(browserPluginFactory({}));
+
+      // Sanity: routesApi is reachable on the rebuilt router (we don't
+      // mutate, but the cast keeps the lint rule out of the way).
+      expect(routesApi).toBeDefined();
+
+      await router.start("/nonexistent");
+
+      render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="">
+            <RouteView.Self>
+              <div data-testid="root-self">RootSelf</div>
+            </RouteView.Self>
+            <RouteView.NotFound>
+              <div data-testid="not-found">404</div>
+            </RouteView.NotFound>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      // Self never fires at root (nodeName="" can't equal a real activeName).
+      // NotFound wins for UNKNOWN_ROUTE.
+      expect(screen.getByTestId("not-found")).toBeInTheDocument();
+      expect(screen.queryByTestId("root-self")).not.toBeInTheDocument();
+    });
+
+    it("Self with fallback prop wraps content in Suspense", async () => {
+      await router.start("/users");
+
+      const LazySelf = lazy(
+        () =>
+          new Promise<{ default: FC }>((resolve) => {
+            setTimeout(() => {
+              resolve({
+                default: () => <div data-testid="lazy-self">LazyLoaded</div>,
+              });
+            }, 0);
+          }),
+      );
+
+      render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="users">
+            <RouteView.Self
+              fallback={<div data-testid="self-fallback">Loading...</div>}
+            >
+              <LazySelf />
+            </RouteView.Self>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      // Initially fallback renders while lazy module resolves
+      expect(screen.getByTestId("self-fallback")).toBeInTheDocument();
+
+      // After lazy resolves, content swaps in
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 10));
+      });
+
+      expect(screen.getByTestId("lazy-self")).toBeInTheDocument();
+    });
+
+    it("transition: descendant active → parent active swaps Match → Self", async () => {
+      await router.start("/users/list");
+
+      render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="users">
+            <RouteView.Self>
+              <div data-testid="users-self">Self</div>
+            </RouteView.Self>
+            <RouteView.Match segment="list">
+              <div data-testid="users-list">List</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      expect(screen.getByTestId("users-list")).toBeInTheDocument();
+
+      await act(async () => {
+        await router.navigate("users");
+      });
+
+      expect(screen.getByTestId("users-self")).toBeInTheDocument();
+      expect(screen.queryByTestId("users-list")).not.toBeInTheDocument();
+    });
+  });
+
   describe("Children handling", () => {
     it("should ignore non-Match/non-NotFound children", async () => {
       await router.start("/users/list");
@@ -408,6 +633,12 @@ describe("RouteView", () => {
       const { container } = render(
         <RouteView.Match segment="x">content</RouteView.Match>,
       );
+
+      expect(container.innerHTML).toBe("");
+    });
+
+    it("Self renders null when used standalone", () => {
+      const { container } = render(<RouteView.Self>content</RouteView.Self>);
 
       expect(container.innerHTML).toBe("");
     });
