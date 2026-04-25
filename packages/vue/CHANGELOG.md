@@ -1,5 +1,31 @@
 # @real-router/vue
 
+## 0.8.0
+
+### Minor Changes
+
+- [#539](https://github.com/greydragon888/real-router/pull/539) [`2f39d54`](https://github.com/greydragon888/real-router/commit/2f39d54f82dfb62da5309d8520d4c7d8281c52d6) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `<RouteView.Self>` slot for the parent-as-list pattern ([#538](https://github.com/greydragon888/real-router/issues/538))
+
+  `RouteView.Self` is a marker `defineComponent` (mirrors `Match`/`NotFound`)
+  that renders its slot content when the active route name equals the parent
+  `RouteView`'s `nodeName` and no descendant `Match` is active.
+
+  ```vue
+  <RouteView nodeName="users">
+    <RouteView.Self>
+      <UsersList />
+    </RouteView.Self>
+    <RouteView.Match segment="profile">
+      <UserProfile />
+    </RouteView.Match>
+  </RouteView>
+  ```
+
+  Priority: `Match` → `Self` → `NotFound`. Multiple `Self` follow first-wins.
+  Optional `fallback` prop (`VNode | () => VNode`) wraps children in
+  `<Suspense>`. Compatible with the existing `keepAlive` modes on the
+  parent `RouteView`.
+
 ## 0.7.0
 
 ### Minor Changes

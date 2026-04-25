@@ -1,5 +1,32 @@
 # @real-router/angular
 
+## 0.4.0
+
+### Minor Changes
+
+- [#539](https://github.com/greydragon888/real-router/pull/539) [`2f39d54`](https://github.com/greydragon888/real-router/commit/2f39d54f82dfb62da5309d8520d4c7d8281c52d6) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `RouteSelf` directive (`<ng-template routeSelf>`) for the parent-as-list pattern ([#538](https://github.com/greydragon888/real-router/issues/538))
+
+  `RouteSelf` is a structural directive (mirrors `RouteMatch`/`RouteNotFound`)
+  that marks an `ng-template` as the "self" slot for `<route-view>`. The
+  template is rendered when the active route name equals the parent
+  `<route-view>`'s `routeNode` input and no descendant `RouteMatch` is active.
+
+  ```html
+  <route-view [routeNode]="'users'">
+    <ng-template routeSelf>
+      <users-list />
+    </ng-template>
+    <ng-template routeMatch="profile">
+      <user-profile />
+    </ng-template>
+  </route-view>
+  ```
+
+  Priority: `RouteMatch` (descendant) → `RouteSelf` (active equals `routeNode`)
+  → `RouteNotFound` (`UNKNOWN_ROUTE`). Multiple `RouteSelf` instances follow
+  first-wins (declaration order from `contentChildren`). Exported as `RouteSelf`
+  from `@real-router/angular`.
+
 ## 0.3.0
 
 ### Minor Changes
