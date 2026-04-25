@@ -1,5 +1,34 @@
 # @real-router/svelte
 
+## 0.6.0
+
+### Minor Changes
+
+- [#539](https://github.com/greydragon888/real-router/pull/539) [`2f39d54`](https://github.com/greydragon888/real-router/commit/2f39d54f82dfb62da5309d8520d4c7d8281c52d6) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `self` reserved snippet on `<RouteView>` for the parent-as-list pattern ([#538](https://github.com/greydragon888/real-router/issues/538))
+
+  `RouteView` now recognises a `self` named snippet, alongside the existing
+  `notFound`. The `self` snippet renders when the active route name equals the
+  parent `RouteView`'s `nodeName` and no segment snippet matches.
+
+  ```svelte
+  <RouteView nodeName="users">
+    {#snippet self()}
+      <UsersList />
+    {/snippet}
+    {#snippet profile()}
+      <UserProfile />
+    {/snippet}
+    {#snippet notFound()}
+      <NotFoundPage />
+    {/snippet}
+  </RouteView>
+  ```
+
+  Priority: segment snippet match → `self` (active equals `nodeName`) →
+  `notFound` (`UNKNOWN_ROUTE`). Like `notFound`, `self` is reserved — a route
+  literally named `self` is **never** picked as a regular segment match (use a
+  different snippet name if you need to render a route called `self`).
+
 ## 0.5.0
 
 ### Minor Changes
