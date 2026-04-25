@@ -1,6 +1,6 @@
 import { children as resolveChildren, createMemo } from "solid-js";
 
-import { Match, NotFound } from "./components";
+import { Match, NotFound, Self } from "./components";
 import { buildRenderList, collectElements } from "./helpers";
 import { useRouteNode } from "../../hooks/useRouteNode";
 
@@ -44,10 +44,15 @@ function RouteViewRoot(props: Readonly<RouteViewProps>): JSX.Element {
 
 RouteViewRoot.displayName = "RouteView";
 
-export const RouteView = Object.assign(RouteViewRoot, { Match, NotFound });
+export const RouteView = Object.assign(RouteViewRoot, {
+  Match,
+  Self,
+  NotFound,
+});
 
 export type {
   RouteViewProps,
   MatchProps as RouteViewMatchProps,
+  SelfProps as RouteViewSelfProps,
   NotFoundProps as RouteViewNotFoundProps,
 } from "./types";

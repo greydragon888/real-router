@@ -264,6 +264,173 @@ describe("RouteView", () => {
     });
   });
 
+  describe("Self", () => {
+    it("renders Self when active === nodeName (no descendant active)", async () => {
+      await router.start("/users");
+
+      const wrapper = mountRouteView(
+        router,
+        h(
+          RouteView,
+          { nodeName: "users" },
+          {
+            default: () => [
+              h(
+                RouteView.Self,
+                {},
+                {
+                  default: () =>
+                    h("div", { "data-testid": "users-self" }, "Self"),
+                },
+              ),
+              h(
+                RouteView.Match,
+                { segment: "view" },
+                {
+                  default: () => h("div", { "data-testid": "users-view" }, "V"),
+                },
+              ),
+            ],
+          },
+        ),
+      );
+
+      expect(wrapper.find("[data-testid='users-self']").exists()).toBe(true);
+      expect(wrapper.find("[data-testid='users-view']").exists()).toBe(false);
+    });
+
+    it("does not render Self when descendant Match is active", async () => {
+      await router.start("/users/list");
+
+      const wrapper = mountRouteView(
+        router,
+        h(
+          RouteView,
+          { nodeName: "users" },
+          {
+            default: () => [
+              h(
+                RouteView.Self,
+                {},
+                {
+                  default: () =>
+                    h("div", { "data-testid": "users-self" }, "Self"),
+                },
+              ),
+              h(
+                RouteView.Match,
+                { segment: "list" },
+                {
+                  default: () => h("div", { "data-testid": "users-list" }, "L"),
+                },
+              ),
+            ],
+          },
+        ),
+      );
+
+      expect(wrapper.find("[data-testid='users-list']").exists()).toBe(true);
+      expect(wrapper.find("[data-testid='users-self']").exists()).toBe(false);
+    });
+
+    it("first <Self> wins when multiple are provided", async () => {
+      await router.start("/users");
+
+      const wrapper = mountRouteView(
+        router,
+        h(
+          RouteView,
+          { nodeName: "users" },
+          {
+            default: () => [
+              h(
+                RouteView.Self,
+                {},
+                {
+                  default: () =>
+                    h("div", { "data-testid": "users-self-first" }, "First"),
+                },
+              ),
+              h(
+                RouteView.Self,
+                {},
+                {
+                  default: () =>
+                    h("div", { "data-testid": "users-self-second" }, "Second"),
+                },
+              ),
+            ],
+          },
+        ),
+      );
+
+      expect(wrapper.find("[data-testid='users-self-first']").exists()).toBe(
+        true,
+      );
+      expect(wrapper.find("[data-testid='users-self-second']").exists()).toBe(
+        false,
+      );
+    });
+
+    it("Self has priority over NotFound when active === nodeName", async () => {
+      await router.start("/users");
+
+      const wrapper = mountRouteView(
+        router,
+        h(
+          RouteView,
+          { nodeName: "users" },
+          {
+            default: () => [
+              h(
+                RouteView.Self,
+                {},
+                {
+                  default: () => h("div", { "data-testid": "users-self" }, "S"),
+                },
+              ),
+              h(
+                RouteView.NotFound,
+                {},
+                {
+                  default: () =>
+                    h("div", { "data-testid": "not-found" }, "404"),
+                },
+              ),
+            ],
+          },
+        ),
+      );
+
+      expect(wrapper.find("[data-testid='users-self']").exists()).toBe(true);
+      expect(wrapper.find("[data-testid='not-found']").exists()).toBe(false);
+    });
+
+    it("does not render Self when active is unrelated leaf with no Match", async () => {
+      await router.start("/users/list");
+
+      const wrapper = mountRouteView(
+        router,
+        h(
+          RouteView,
+          { nodeName: "users" },
+          {
+            default: () =>
+              h(
+                RouteView.Self,
+                {},
+                {
+                  default: () => h("div", { "data-testid": "users-self" }, "S"),
+                },
+              ),
+          },
+        ),
+      );
+
+      expect(wrapper.find("[data-testid='users-self']").exists()).toBe(false);
+    });
+  });
+
   describe("NotFound", () => {
     let notFoundRouter: Router;
 
@@ -618,6 +785,14 @@ describe("RouteView", () => {
     it("Match renders null when used standalone", () => {
       const wrapper = mount(RouteView.Match, {
         props: { segment: "x" },
+        slots: { default: () => "content" },
+      });
+
+      expect(wrapper.html()).toBe("");
+    });
+
+    it("Self renders null when used standalone", () => {
+      const wrapper = mount(RouteView.Self, {
         slots: { default: () => "content" },
       });
 

@@ -7,7 +7,7 @@ import {
   Suspense,
 } from "vue";
 
-import { Match, NotFound } from "./components";
+import { Match, NotFound, Self } from "./components";
 import { buildRenderList, collectElements } from "./helpers";
 import { useRouteNode } from "../../composables/useRouteNode";
 
@@ -214,7 +214,11 @@ const RouteViewComponent = defineComponent({
       }
 
       /* v8 ignore start */
-      if (activeChild.type !== Match && activeChild.type !== NotFound) {
+      if (
+        activeChild.type !== Match &&
+        activeChild.type !== Self &&
+        activeChild.type !== NotFound
+      ) {
         return null;
       }
       /* v8 ignore stop */
@@ -236,10 +240,15 @@ const RouteViewComponent = defineComponent({
   },
 });
 
-export const RouteView = Object.assign(RouteViewComponent, { Match, NotFound });
+export const RouteView = Object.assign(RouteViewComponent, {
+  Match,
+  Self,
+  NotFound,
+});
 
 export type {
   RouteViewProps,
   MatchProps as RouteViewMatchProps,
+  SelfProps as RouteViewSelfProps,
   NotFoundProps as RouteViewNotFoundProps,
 } from "./types";

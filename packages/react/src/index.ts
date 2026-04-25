@@ -29,6 +29,7 @@ export type { LinkProps } from "./types";
 export type {
   RouteViewProps,
   RouteViewMatchProps,
+  RouteViewSelfProps,
   RouteViewNotFoundProps,
 } from "./components/modern/RouteView";
 
