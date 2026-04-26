@@ -499,18 +499,22 @@ describe("Browser Plugin — Lifecycle", () => {
       unsubscribe = router.usePlugin(browserPluginFactory({}, mockedBrowser));
     });
 
-    it('source is "navigate" for programmatic navigation', async () => {
+    it('source is "navigate" and direction is "forward" for programmatic navigation', async () => {
       await router.start();
 
       const state = await router.navigate("users.list");
 
-      expect(state.context.browser).toStrictEqual({ source: "navigate" });
+      expect(state.context.browser).toStrictEqual({
+        source: "navigate",
+        direction: "forward",
+      });
     });
 
-    it('source is "navigate" for first start()', async () => {
+    it('source is "navigate" and direction is "forward" for first start()', async () => {
       const state = await router.start();
 
       expect(state.context.browser?.source).toBe("navigate");
+      expect(state.context.browser?.direction).toBe("forward");
     });
 
     it("context.browser is frozen", async () => {
@@ -530,7 +534,41 @@ describe("Browser Plugin — Lifecycle", () => {
 
       await router.navigate("users.list");
 
-      expect(contextBrowser).toStrictEqual({ source: "navigate" });
+      expect(contextBrowser).toStrictEqual({
+        source: "navigate",
+        direction: "forward",
+      });
+    });
+
+    it('direction is "back" for popstate-driven navigation', async () => {
+      await router.start();
+
+      const captured: unknown[] = [];
+
+      router.subscribe(({ route }) => {
+        captured.push(route.context.browser);
+      });
+
+      await router.navigate("users.list");
+
+      // Simulate browser back: dispatch popstate with the previous state in
+      // history.state — popstate-handler reads history.state.path and
+      // re-navigates through the router with source: POPSTATE_SOURCE.
+      globalThis.dispatchEvent(
+        new PopStateEvent("popstate", {
+          state: { name: "home", params: {}, path: "/" },
+        }),
+      );
+
+      // Wait for popstate-handler's async navigate.
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 50);
+      });
+
+      expect(captured).toContainEqual({
+        source: "popstate",
+        direction: "back",
+      });
     });
   });
 });
