@@ -14,7 +14,7 @@ export function App(): JSX.Element {
       <nav>
         <Link routeName="home">Home</Link>
         {" | "}
-        <Link routeName="users.list">Users</Link>
+        <Link routeName="users">Users</Link>
         {" | "}
         <Link routeName="dashboard">Dashboard</Link>
       </nav>
@@ -26,9 +26,9 @@ export function App(): JSX.Element {
           <RouteView.Match segment="users">
             <h1>Users</h1>
             <RouteView nodeName="users">
-              <RouteView.Match segment="list">
+              <RouteView.Self>
                 <UsersList />
-              </RouteView.Match>
+              </RouteView.Self>
               <RouteView.Match segment="profile">
                 <UserProfile />
               </RouteView.Match>

@@ -6,15 +6,14 @@ import { ProductsList } from "./ProductsList";
 import type { JSX } from "react";
 
 export function Products(): JSX.Element {
+  // Persistent shell — h1 and intro stay mounted across
+  // /products ↔ /products/:id navigations. The `products` route IS the list
+  // (no synthetic `list` child / `forwardTo`); only `detail` is a real
+  // descendant. <RouteView.Self> renders ProductsList when the active route
+  // is `products` itself; <RouteView.Match segment="detail"> renders
+  // ProductDetail when /products/:id is active.
   return (
     <div>
-      {/*
-        Persistent shell — h1 and intro stay mounted across
-        /products ↔ /products/:id navigations. real-router's `forwardTo`
-        on the parent route redirects /products → products.list, so the
-        inner RouteView always has an active child to render; we never
-        hit a "parent active without child" gap.
-      */}
       <h1>Products</h1>
       <p>
         Click a product card to see the hero-morph transition. The colored
@@ -23,9 +22,9 @@ export function Products(): JSX.Element {
       </p>
 
       <RouteView nodeName="products">
-        <RouteView.Match segment="list">
+        <RouteView.Self>
           <ProductsList />
-        </RouteView.Match>
+        </RouteView.Self>
         <RouteView.Match segment="detail">
           <ProductDetail />
         </RouteView.Match>

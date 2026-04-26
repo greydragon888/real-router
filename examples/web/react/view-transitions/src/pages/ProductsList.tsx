@@ -37,7 +37,7 @@ export function ProductsList(): JSX.Element {
       <div className="vt-products-toolbar">
         <span>Sort:</span>
         <Link
-          routeName="products.list"
+          routeName="products"
           routeParams={{ sort: "asc" }}
           ignoreQueryParams={false}
         >
@@ -45,7 +45,7 @@ export function ProductsList(): JSX.Element {
         </Link>
         {" · "}
         <Link
-          routeName="products.list"
+          routeName="products"
           routeParams={{ sort: "desc" }}
           ignoreQueryParams={false}
         >

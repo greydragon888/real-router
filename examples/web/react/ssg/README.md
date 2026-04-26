@@ -22,7 +22,7 @@ src/
   entry-client.tsx    hydrate (SSG) or createRoot (dev) detection
   App.tsx             Shared component tree
   router/
-    routes.ts         Route definitions (home, users.list, users.profile)
+    routes.ts         Route definitions (home, users, users.profile)
     loaders.ts        Per-route data loaders
     entries.ts        Parameter sets for dynamic routes (users.profile → id: 1, 2, 3)
     createAppRouter.ts  Router factory

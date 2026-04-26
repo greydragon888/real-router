@@ -126,7 +126,7 @@ describe("Data-driven render", () => {
     testRouter.usePlugin(lifecyclePluginFactory());
     getDependenciesApi(testRouter).set("abilities", defineAbilities("admin"));
 
-    await testRouter.start("/products/list");
+    await testRouter.start("/products");
 
     render(() => (
       <RouterProvider router={testRouter}>

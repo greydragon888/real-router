@@ -105,9 +105,9 @@ async function onLogout() {
       </RouteView.Match>
       <RouteView.Match segment="products">
         <RouteView nodeName="products">
-          <RouteView.Match segment="list">
+          <RouteView.Self>
             <ProductList />
-          </RouteView.Match>
+          </RouteView.Self>
           <RouteView.Match segment="detail">
             <ProductDetail />
           </RouteView.Match>

@@ -8,51 +8,67 @@ test.describe("Nested Routes Example", () => {
       await expect(page.locator(".sidebar a.active")).toContainText("Home");
     });
 
-    test("Users link → redirects to /users/list via forwardTo", async ({
-      page,
-    }) => {
+    test("Users link → navigates to /users (the list)", async ({ page }) => {
       await page.goto("/");
       await page.click(".sidebar a:has-text('Users')");
-      await expect(page).toHaveURL(/\/users\/list/);
+      await expect(page).toHaveURL(/\/users(?:\?|$)/);
       await expect(page.getByRole("heading", { name: "Users" })).toBeVisible();
       await expect(page.locator(".sidebar a.active")).toContainText("Users");
     });
   });
 
-  test.describe("Inner sidebar (nested nav)", () => {
-    test("List and Settings links visible", async ({ page }) => {
-      await page.goto("/users/list");
-      await expect(page.getByRole("link", { name: "List" })).toBeVisible();
+  test.describe("Per-user sub-navigation (inside profile)", () => {
+    test("Profile and Settings links visible on /users/:id", async ({
+      page,
+    }) => {
+      await page.goto("/users/1");
+      await expect(page.getByRole("link", { name: "Profile" })).toBeVisible();
       await expect(page.getByRole("link", { name: "Settings" })).toBeVisible();
     });
 
-    test("List highlighted as active on /users/list", async ({ page }) => {
-      await page.goto("/users/list");
-      await expect(page.locator("a.active:has-text('List')")).toBeVisible();
+    test("Profile highlighted as active on /users/:id", async ({ page }) => {
+      await page.goto("/users/1");
+      await expect(
+        page.locator("a.active:has-text('Profile')"),
+      ).toBeVisible();
     });
 
-    test("Settings click → /users/settings + active", async ({ page }) => {
-      await page.goto("/users/list");
-      await page.click("a:has-text('Settings')");
-      await expect(page).toHaveURL(/\/users\/settings/);
+    test("Settings click → /users/:id/settings + active", async ({ page }) => {
+      await page.goto("/users/1");
+      await page.getByRole("link", { name: "Settings" }).click();
+      await expect(page).toHaveURL(/\/users\/1\/settings/);
       await expect(
         page.getByRole("heading", { name: "User Settings" }),
       ).toBeVisible();
-      await expect(page.locator("a.active:has-text('Settings')")).toBeVisible();
+      await expect(
+        page.locator("a.active:has-text('Settings')"),
+      ).toBeVisible();
+    });
+
+    test("per-user sidebar absent on /users (the list)", async ({ page }) => {
+      await page.goto("/users");
+      // Exact name match — "View Profile" links in the list are not the
+      // sidebar's "Profile" link, so we anchor with regex to disambiguate.
+      await expect(
+        page.getByRole("link", { name: /^Profile$/ }),
+      ).toHaveCount(0);
+      await expect(
+        page.getByRole("link", { name: /^Settings$/ }),
+      ).toHaveCount(0);
     });
   });
 
   test.describe("Breadcrumbs", () => {
-    test("Home > Users on /users/list", async ({ page }) => {
-      await page.goto("/users/list");
+    test("Home > Users on /users", async ({ page }) => {
+      await page.goto("/users");
       const crumbs = page.locator("nav.breadcrumbs");
 
       await expect(crumbs).toContainText("Home");
       await expect(crumbs).toContainText("Users");
     });
 
-    test("Home > Users > Alice on profile /users/1", async ({ page }) => {
-      await page.goto("/users/list");
+    test("Home > Users > User #1 on /users/1", async ({ page }) => {
+      await page.goto("/users");
       await page.getByRole("link", { name: "View Profile" }).first().click();
       await expect(page).toHaveURL(/\/users\/1/);
 
@@ -60,34 +76,46 @@ test.describe("Nested Routes Example", () => {
 
       await expect(crumbs).toContainText("Home");
       await expect(crumbs).toContainText("Users");
+      await expect(crumbs).toContainText("User #1");
+    });
+
+    test("Home > Users > User #1 > Settings on /users/1/settings", async ({
+      page,
+    }) => {
+      await page.goto("/users/1/settings");
+
+      const crumbs = page.locator("nav.breadcrumbs");
+
+      await expect(crumbs).toContainText("Home");
+      await expect(crumbs).toContainText("Users");
+      await expect(crumbs).toContainText("User #1");
+      await expect(crumbs).toContainText("Settings");
     });
 
     test("breadcrumb Home link → navigates to /", async ({ page }) => {
-      await page.goto("/users/list");
+      await page.goto("/users");
       await page.click("nav.breadcrumbs a:has-text('Home')");
       await expect(page.getByRole("heading", { name: "Home" })).toBeVisible();
     });
 
-    test("breadcrumb Users link → navigates to /users/list", async ({
-      page,
-    }) => {
+    test("breadcrumb Users link → navigates to /users", async ({ page }) => {
       await page.goto("/users/1");
       await page.click("nav.breadcrumbs a:has-text('Users')");
-      await expect(page).toHaveURL(/\/users\/list/);
+      await expect(page).toHaveURL(/\/users(?:\?|$)/);
       await expect(page.getByRole("heading", { name: "Users" })).toBeVisible();
     });
   });
 
   test.describe("User profile", () => {
     test("click View Profile → profile with user name", async ({ page }) => {
-      await page.goto("/users/list");
+      await page.goto("/users");
       await page.getByRole("link", { name: "View Profile" }).first().click();
       await expect(page).toHaveURL(/\/users\/1/);
       await expect(page.getByRole("heading", { name: "Alice" })).toBeVisible();
     });
 
     test("second user has different profile", async ({ page }) => {
-      await page.goto("/users/list");
+      await page.goto("/users");
       await page.getByRole("link", { name: "View Profile" }).nth(1).click();
       await expect(page).toHaveURL(/\/users\/2/);
       await expect(page.getByRole("heading", { name: "Bob" })).toBeVisible();
@@ -107,7 +135,7 @@ test.describe("Nested Routes Example", () => {
       await expect(page.getByRole("heading", { name: "Home" })).toBeVisible();
 
       await page.click(".sidebar a:has-text('Users')");
-      await expect(page).toHaveURL(/\/users\/list/);
+      await expect(page).toHaveURL(/\/users(?:\?|$)/);
       await expect(page.getByRole("heading", { name: "Users" })).toBeVisible();
 
       await page.getByRole("link", { name: "View Profile" }).first().click();
@@ -126,7 +154,7 @@ test.describe("Nested Routes Example", () => {
     });
 
     test("back then forward preserves profile (Bob)", async ({ page }) => {
-      await page.goto("/users/list");
+      await page.goto("/users");
       await page.getByRole("link", { name: "View Profile" }).nth(1).click();
       await expect(page).toHaveURL(/\/users\/2/);
 
@@ -141,14 +169,20 @@ test.describe("Nested Routes Example", () => {
       });
     });
 
-    test("Settings → back → list → forward → Settings", async ({ page }) => {
-      await page.goto("/users/list");
+    test("Alice → Settings → back → Alice → forward → Settings", async ({
+      page,
+    }) => {
+      await page.goto("/users/1");
+      await expect(page.getByRole("heading", { name: "Alice" })).toBeVisible();
 
-      await page.click("a:has-text('Settings')");
-      await expect(page).toHaveURL(/\/users\/settings/);
+      await page.getByRole("link", { name: "Settings" }).click();
+      await expect(page).toHaveURL(/\/users\/1\/settings/);
+      await expect(
+        page.getByRole("heading", { name: "User Settings" }),
+      ).toBeVisible();
 
       await page.goBack();
-      await expect(page.getByRole("heading", { name: "Users" })).toBeVisible({
+      await expect(page.getByRole("heading", { name: "Alice" })).toBeVisible({
         timeout: 3000,
       });
 
@@ -158,16 +192,17 @@ test.describe("Nested Routes Example", () => {
       ).toBeVisible({ timeout: 3000 });
     });
 
-    test("deep: Alice → Settings → back → Alice → back → list", async ({
-      page,
-    }) => {
-      await page.goto("/users/list");
+    test("deep: list → Alice → Settings → back x3 → home", async ({ page }) => {
+      await page.goto("/");
+
+      await page.click(".sidebar a:has-text('Users')");
+      await expect(page).toHaveURL(/\/users(?:\?|$)/);
 
       await page.getByRole("link", { name: "View Profile" }).first().click();
       await expect(page).toHaveURL(/\/users\/1/);
 
-      await page.click("a:has-text('Settings')");
-      await expect(page).toHaveURL(/\/users\/settings/);
+      await page.getByRole("link", { name: "Settings" }).click();
+      await expect(page).toHaveURL(/\/users\/1\/settings/);
 
       await page.goBack();
       await expect(page.getByRole("heading", { name: "Alice" })).toBeVisible({
@@ -178,18 +213,48 @@ test.describe("Nested Routes Example", () => {
       await expect(page.getByRole("heading", { name: "Users" })).toBeVisible({
         timeout: 3000,
       });
-    });
-
-    test("back from settings returns to previous page", async ({ page }) => {
-      await page.goto("/users/list");
-
-      await page.click("a:has-text('Settings')");
-      await expect(page).toHaveURL(/\/users\/settings/);
 
       await page.goBack();
-      await expect(page.getByRole("heading", { name: "Users" })).toBeVisible({
-        timeout: 5000,
+      await expect(page.getByRole("heading", { name: "Home" })).toBeVisible({
+        timeout: 3000,
       });
+    });
+
+    test("triple forward restores list → Alice → Settings", async ({
+      page,
+    }) => {
+      await page.goto("/");
+
+      await page.click(".sidebar a:has-text('Users')");
+      await expect(page).toHaveURL(/\/users(?:\?|$)/);
+
+      await page.getByRole("link", { name: "View Profile" }).first().click();
+      await expect(page).toHaveURL(/\/users\/1/);
+
+      await page.getByRole("link", { name: "Settings" }).click();
+      await expect(page).toHaveURL(/\/users\/1\/settings/);
+
+      await page.goBack();
+      await page.goBack();
+      await page.goBack();
+      await expect(page.getByRole("heading", { name: "Home" })).toBeVisible({
+        timeout: 3000,
+      });
+
+      await page.goForward();
+      await expect(page.getByRole("heading", { name: "Users" })).toBeVisible({
+        timeout: 3000,
+      });
+
+      await page.goForward();
+      await expect(page.getByRole("heading", { name: "Alice" })).toBeVisible({
+        timeout: 3000,
+      });
+
+      await page.goForward();
+      await expect(
+        page.getByRole("heading", { name: "User Settings" }),
+      ).toBeVisible({ timeout: 3000 });
     });
   });
 
@@ -197,7 +262,7 @@ test.describe("Nested Routes Example", () => {
     test("outer sidebar stays when navigating nested routes", async ({
       page,
     }) => {
-      await page.goto("/users/list");
+      await page.goto("/users");
       await expect(page.locator(".sidebar a:has-text('Users')")).toBeVisible();
 
       await page.getByRole("link", { name: "View Profile" }).first().click();
@@ -205,14 +270,14 @@ test.describe("Nested Routes Example", () => {
       await expect(page.locator(".sidebar a:has-text('Home')")).toBeVisible();
     });
 
-    test("inner nav stays when switching between nested pages", async ({
+    test("per-user nav stays when switching Profile ↔ Settings", async ({
       page,
     }) => {
-      await page.goto("/users/list");
-      await expect(page.getByRole("link", { name: "List" })).toBeVisible();
+      await page.goto("/users/1");
+      await expect(page.getByRole("link", { name: "Profile" })).toBeVisible();
 
-      await page.click("a:has-text('Settings')");
-      await expect(page.getByRole("link", { name: "List" })).toBeVisible();
+      await page.getByRole("link", { name: "Settings" }).click();
+      await expect(page.getByRole("link", { name: "Profile" })).toBeVisible();
       await expect(page.getByRole("link", { name: "Settings" })).toBeVisible();
     });
   });

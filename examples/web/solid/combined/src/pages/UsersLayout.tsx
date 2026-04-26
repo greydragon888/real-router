@@ -13,7 +13,6 @@ import type { JSX } from "solid-js";
 const routeLabels: Record<string, string> = {
   home: "Home",
   users: "Users",
-  "users.list": "List",
 };
 
 function getLabel(name: string, params: Params): string {
@@ -107,7 +106,7 @@ function UserProfile(): JSX.Element {
       <div class="card">
         <p>Profile for user {id()}</p>
       </div>
-      <Link routeName="users.list">← Back to list</Link>
+      <Link routeName="users">← Back to list</Link>
     </div>
   );
 }
@@ -119,32 +118,15 @@ export function UsersLayout(): JSX.Element {
     <Show when={nodeState().route}>
       <div>
         <Breadcrumbs />
-        <div style={{ display: "flex", gap: "24px", "margin-top": "16px" }}>
-          <nav style={{ "min-width": "120px" }}>
-            <Link
-              routeName="users.list"
-              activeClassName="active"
-              style={{
-                display: "block",
-                padding: "6px 12px",
-                "text-decoration": "none",
-                color: "#555",
-                "border-radius": "4px",
-              }}
-            >
-              List
-            </Link>
-          </nav>
-          <div style={{ flex: 1 }}>
-            <RouteView nodeName="users">
-              <RouteView.Match segment="list">
-                <UsersList />
-              </RouteView.Match>
-              <RouteView.Match segment="profile">
-                <UserProfile />
-              </RouteView.Match>
-            </RouteView>
-          </div>
+        <div style={{ "margin-top": "16px" }}>
+          <RouteView nodeName="users">
+            <RouteView.Self>
+              <UsersList />
+            </RouteView.Self>
+            <RouteView.Match segment="profile">
+              <UserProfile />
+            </RouteView.Match>
+          </RouteView>
         </div>
       </div>
     </Show>

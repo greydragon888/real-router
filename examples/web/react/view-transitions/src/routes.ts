@@ -6,11 +6,7 @@ export const routes: Route[] = [
     name: "products",
     path: "/products?sort",
     defaultParams: { sort: "asc" },
-    forwardTo: "products.list",
-    children: [
-      { name: "list", path: "" },
-      { name: "detail", path: "/:id" },
-    ],
+    children: [{ name: "detail", path: "/:id" }],
   },
   { name: "about", path: "/about" },
   {

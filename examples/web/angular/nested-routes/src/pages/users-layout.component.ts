@@ -4,11 +4,11 @@ import {
   injectRouteUtils,
   RealLink,
   RouteMatch,
+  RouteSelf,
   RouteView,
 } from "@real-router/angular";
 
 import { UserProfileComponent } from "./user-profile.component";
-import { UserSettingsComponent } from "./user-settings.component";
 import { UsersListComponent } from "./users-list.component";
 
 import type { Params } from "@real-router/core";
@@ -16,8 +16,7 @@ import type { Params } from "@real-router/core";
 const ROUTE_LABELS: Record<string, string> = {
   home: "Home",
   users: "Users",
-  "users.list": "List",
-  "users.settings": "Settings",
+  "users.profile.settings": "Settings",
 };
 
 function getLabel(name: string, params: Params): string {
@@ -36,11 +35,15 @@ function getLabel(name: string, params: Params): string {
   imports: [
     RealLink,
     RouteMatch,
+    RouteSelf,
     RouteView,
     UsersListComponent,
     UserProfileComponent,
-    UserSettingsComponent,
   ],
+  // `users` IS the list — no synthetic `list` child / forwardTo. routeSelf
+  // template renders UsersList when active is exactly `users`; routeMatch
+  // "profile" wins for /users/:id and deeper (UserProfile owns its own
+  // sub-navigation between profile-info and per-user Settings).
   template: `
     @if (crumbs(); as list) {
       <nav class="breadcrumbs" aria-label="breadcrumb">
@@ -57,38 +60,11 @@ function getLabel(name: string, params: Params): string {
       </nav>
     }
 
-    <div style="display: flex; gap: 24px; margin-top: 16px;">
-      <nav style="min-width: 140px;">
-        <p
-          style="font-size: 12px; text-transform: uppercase; color: #888; margin-bottom: 8px;"
-        >
-          Users
-        </p>
-        <a
-          realLink
-          routeName="users.list"
-          activeClassName="active"
-          style="display: block; padding: 6px 12px; text-decoration: none; color: #555; border-radius: 4px;"
-        >
-          List
-        </a>
-        <a
-          realLink
-          routeName="users.settings"
-          activeClassName="active"
-          style="display: block; padding: 6px 12px; text-decoration: none; color: #555; border-radius: 4px;"
-        >
-          Settings
-        </a>
-      </nav>
-
-      <div style="flex: 1;">
-        <route-view [routeNode]="'users'">
-          <ng-template routeMatch="list"><users-list /></ng-template>
-          <ng-template routeMatch="profile"><user-profile /></ng-template>
-          <ng-template routeMatch="settings"><user-settings /></ng-template>
-        </route-view>
-      </div>
+    <div style="margin-top: 16px;">
+      <route-view [routeNode]="'users'">
+        <ng-template routeSelf><users-list /></ng-template>
+        <ng-template routeMatch="profile"><user-profile /></ng-template>
+      </route-view>
     </div>
   `,
 })

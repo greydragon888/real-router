@@ -6,7 +6,7 @@ Demonstrates browser View Transitions API integration via the `viewTransitions` 
 
 - `<RouterProvider viewTransitions>` — one-prop opt-in, utility coordinates `subscribeLeave` → `document.startViewTransition` → `subscribe` → deferred release
 - **Basic exit → URL change → entry** — router blocks on the old-snapshot-captured phase so URL change happens under the VT freeze frame, not ahead of the animation
-- **Nested routes with persistent shell** — `products` forward'd to `products.list`; `Products.tsx` stays mounted across list ↔ detail, swaps only the inner content (see [Nested routes](#nested-routes))
+- **Nested routes with persistent shell** — `products` IS the list (no synthetic `list` child / `forwardTo`); `Products.tsx` stays mounted across list ↔ detail, `<RouteView.Self>` renders the list while `<RouteView.Match segment="detail">` swaps in the detail page (see [Nested routes](#nested-routes))
 - **Hero morph** — exactly one element gets `view-transition-name: hero` via `.vt-hero-active` class toggled by `vt-policy.ts`; scales to unlimited products with a single CSS rule (see [Scope gating](#scope-gating))
 - **Query-only navigation** — sort/filter change on the same route animates only the local list, not the whole page
 - **Cross-route navigation** — thumbs and lists rejoin the root scope and slide together with the page (no floating frozen elements)
@@ -72,7 +72,7 @@ Net effect: **exit animation** (on `::view-transition-old`) runs over the old sn
 
 ## Nested routes
 
-`/products` and `/products/:id` share a persistent shell (`<h1>Products</h1>` + intro paragraph). They're expressed as parent + child with `forwardTo`:
+`/products` and `/products/:id` share a persistent shell (`<h1>Products</h1>` + intro paragraph). The parent `products` IS the list — no synthetic `list` child, no `forwardTo`:
 
 ```ts
 // routes.ts
@@ -80,15 +80,13 @@ Net effect: **exit animation** (on `::view-transition-old`) runs over the old sn
   name: "products",
   path: "/products?sort",
   defaultParams: { sort: "asc" },
-  forwardTo: "products.list",     // any navigation to "products" resolves here
   children: [
-    { name: "list", path: "" },   // /products
     { name: "detail", path: "/:id" }, // /products/:id
   ],
 }
 ```
 
-`App.tsx` mounts `Products` for the outer segment; `Products.tsx` contains an inner `<RouteView nodeName="products">` that swaps list ↔ detail without remounting the shell:
+`App.tsx` mounts `Products` for the outer segment; `Products.tsx` contains an inner `<RouteView nodeName="products">` with `<RouteView.Self>` for the list (rendered when the active route equals `products`) and `<RouteView.Match segment="detail">` for the detail. The shell stays mounted across the swap:
 
 ```tsx
 // Products.tsx — persistent shell + inner swap
@@ -96,7 +94,7 @@ Net effect: **exit animation** (on `::view-transition-old`) runs over the old sn
   <h1>Products</h1>          {/* stays mounted across list ↔ detail */}
   <p>Click a product card…</p>
   <RouteView nodeName="products">
-    <RouteView.Match segment="list"><ProductsList /></RouteView.Match>
+    <RouteView.Self><ProductsList /></RouteView.Self>
     <RouteView.Match segment="detail"><ProductDetail /></RouteView.Match>
   </RouteView>
 </div>
@@ -110,8 +108,8 @@ A named `view-transition-name` promotes an element into its own VT group. The br
 
 | Navigation                      | Target element scope should …  | Why                                                                 |
 | ------------------------------- | ------------------------------- | ------------------------------------------------------------------- |
-| Products.list → Products.detail | One thumb + cover get `hero`    | Pair for FLIP-animated position + size                              |
-| Products → any other route      | Nothing gets a scope            | Else thumbs float statically while root slides — "glued" look       |
+| products → products.detail      | One thumb + cover get `hero`    | Pair for FLIP-animated position + size                              |
+| products → any other route      | Nothing gets a scope            | Else thumbs float statically while root slides — "glued" look       |
 | Same-route sort/filter change    | Only list container gets a scope | Else thumbs do a tiny FLIP while the list fades around them         |
 
 The utility in `shared/dom-utils/view-transitions.ts` is policy-free — it doesn't know which navigations are hero morphs or which element is the target. That's app-level logic.
@@ -130,7 +128,7 @@ The policy hooks `router.subscribeLeave` + `router.subscribe` and writes classes
 | ---------------------- | ------------------------------------------------------------- | ------------------------------------- |
 | `data-nav-direction`   | Toggled "back" after popstate, "forward" otherwise             | Direction-aware slide keyframes       |
 | `class="vt-query-only"` | Set when `route.name === nextRoute.name` (same-route nav)     | Suppresses root-scope animation       |
-| `class="vt-hero-morph"` | Set when `products.list ↔ products.detail`                     | Softens root to non-slide crossfade   |
+| `class="vt-hero-morph"` | Set when `products ↔ products.detail`                          | Softens root to non-slide crossfade   |
 | `data-vt-hero-id`       | The id of the morphing product                                 | Bookkeeping                           |
 
 Plus one JS action: `.vt-hero-active` class is toggled on **exactly one element per hero-morph** — the source thumb in `subscribeLeave` (old DOM), then the destination cover in `router.subscribe` after `setTimeout(0)` (new DOM, post-React-commit). The stylesheet promotes that element to a shared name:

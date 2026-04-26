@@ -6,22 +6,22 @@ import { store } from "../../../../shared/store";
 import type { Product } from "../../../../shared/api";
 
 const products = shallowRef<Product[] | null>(
-  store.get("products.list") as Product[] | null,
+  store.get("products") as Product[] | null,
 );
 const loading = shallowRef<boolean | undefined>(
-  store.get("products.list:loading") as boolean | undefined,
+  store.get("products:loading") as boolean | undefined,
 );
 const error = shallowRef<string | null | undefined>(
-  store.get("products.list:error") as string | null | undefined,
+  store.get("products:error") as string | null | undefined,
 );
 
 let unsub: (() => void) | undefined;
 
 onMounted(() => {
   unsub = store.subscribe(() => {
-    products.value = store.get("products.list") as Product[] | null;
-    loading.value = store.get("products.list:loading") as boolean | undefined;
-    error.value = store.get("products.list:error") as string | null | undefined;
+    products.value = store.get("products") as Product[] | null;
+    loading.value = store.get("products:loading") as boolean | undefined;
+    error.value = store.get("products:error") as string | null | undefined;
   });
 });
 

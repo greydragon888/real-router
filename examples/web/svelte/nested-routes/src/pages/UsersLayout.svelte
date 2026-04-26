@@ -3,13 +3,11 @@
   import type { Params } from "@real-router/core";
   import UsersList from "./UsersList.svelte";
   import UserProfile from "./UserProfile.svelte";
-  import UserSettings from "./UserSettings.svelte";
 
   const routeLabels: Record<string, string> = {
     home: "Home",
     users: "Users",
-    "users.list": "List",
-    "users.settings": "Settings",
+    "users.profile.settings": "Settings",
   };
 
   function getLabel(name: string, params: Params): string {
@@ -44,39 +42,20 @@
     </nav>
   {/if}
 
-  <div style="display: flex; gap: 24px; margin-top: 16px;">
-    <nav style="min-width: 140px;">
-      <p style="font-size: 12px; text-transform: uppercase; color: #888; margin-bottom: 8px;">
-        Users
-      </p>
-      <Link
-        routeName="users.list"
-        activeClassName="active"
-        style="display: block; padding: 6px 12px; text-decoration: none; color: #555; border-radius: 4px;"
-      >
-        List
-      </Link>
-      <Link
-        routeName="users.settings"
-        activeClassName="active"
-        style="display: block; padding: 6px 12px; text-decoration: none; color: #555; border-radius: 4px;"
-      >
-        Settings
-      </Link>
-    </nav>
-
-    <div style="flex: 1;">
-      <RouteView nodeName="users">
-        {#snippet list()}
-          <UsersList />
-        {/snippet}
-        {#snippet profile()}
-          <UserProfile />
-        {/snippet}
-        {#snippet settings()}
-          <UserSettings />
-        {/snippet}
-      </RouteView>
-    </div>
+  <!--
+    `users` IS the list — no synthetic `list` child / forwardTo. The `self`
+    snippet renders UsersList when active route is exactly `users`; the
+    `profile` snippet wins for /users/:id and deeper (UserProfile owns its
+    own sub-navigation).
+  -->
+  <div style="margin-top: 16px;">
+    <RouteView nodeName="users">
+      {#snippet self()}
+        <UsersList />
+      {/snippet}
+      {#snippet profile()}
+        <UserProfile />
+      {/snippet}
+    </RouteView>
   </div>
 {/if}

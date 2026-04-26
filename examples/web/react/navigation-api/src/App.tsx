@@ -31,14 +31,22 @@ export function App(): JSX.Element {
               <RouteView.Match segment="home" exact>
                 <Home />
               </RouteView.Match>
-              <RouteView.Match segment="products" exact>
-                <Products />
-              </RouteView.Match>
-              <RouteView.Match segment="products.product" exact>
-                <Product />
-              </RouteView.Match>
-              <RouteView.Match segment="products.product.edit" exact>
-                <ProductEdit />
+              <RouteView.Match segment="products">
+                <RouteView nodeName="products">
+                  <RouteView.Self>
+                    <Products />
+                  </RouteView.Self>
+                  <RouteView.Match segment="product">
+                    <RouteView nodeName="products.product">
+                      <RouteView.Self>
+                        <Product />
+                      </RouteView.Self>
+                      <RouteView.Match segment="edit">
+                        <ProductEdit />
+                      </RouteView.Match>
+                    </RouteView>
+                  </RouteView.Match>
+                </RouteView>
               </RouteView.Match>
               <RouteView.Match segment="categories" exact>
                 <Categories />

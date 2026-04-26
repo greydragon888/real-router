@@ -19,7 +19,7 @@ import type { Router } from "@real-router/core";
  * | ----------------------- | ------------------------------------------ | -------------------------------- |
  * | `data-nav-direction`    | Flipped to "back" after popstate event     | Direction-aware slide keyframes  |
  * | `class="vt-query-only"` | `route.name === nextRoute.name`            | Rule that suppresses root anim   |
- * | `class="vt-hero-morph"` | Products.list ↔ Products.detail            | Rule that softens root anim      |
+ * | `class="vt-hero-morph"` | products ↔ products.detail                 | Rule that softens root anim      |
  * | `data-vt-hero-id`       | id of morphing product during hero-morph   | Bookkeeping / debugging          |
  *
  * Plus `.vt-hero-active` is toggled on exactly one DOM element per
@@ -76,9 +76,8 @@ export function installViewTransitionPolicy(router: Router): () => void {
     html.classList.toggle("vt-query-only", sameRoute);
 
     const isHeroMorph =
-      (route.name === "products.list" &&
-        nextRoute.name === "products.detail") ||
-      (route.name === "products.detail" && nextRoute.name === "products.list");
+      (route.name === "products" && nextRoute.name === "products.detail") ||
+      (route.name === "products.detail" && nextRoute.name === "products");
 
     html.classList.toggle("vt-hero-morph", isHeroMorph);
 

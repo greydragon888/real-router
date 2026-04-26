@@ -8,20 +8,20 @@ import type { JSX } from "solid-js";
 
 export function ProductList(): JSX.Element {
   const [products, setProducts] = createSignal<Product[] | null>(
-    store.get("products.list") as Product[] | null,
+    store.get("products") as Product[] | null,
   );
   const [loading, setLoading] = createSignal<boolean | undefined>(
-    store.get("products.list:loading") as boolean | undefined,
+    store.get("products:loading") as boolean | undefined,
   );
   const [error, setError] = createSignal<string | null | undefined>(
-    store.get("products.list:error") as string | null | undefined,
+    store.get("products:error") as string | null | undefined,
   );
 
   createEffect(() => {
     const unsub = store.subscribe(() => {
-      setProducts(store.get("products.list") as Product[] | null);
-      setLoading(store.get("products.list:loading") as boolean | undefined);
-      setError(store.get("products.list:error") as string | null | undefined);
+      setProducts(store.get("products") as Product[] | null);
+      setLoading(store.get("products:loading") as boolean | undefined);
+      setError(store.get("products:error") as string | null | undefined);
     });
 
     onCleanup(unsub);

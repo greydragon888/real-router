@@ -4,7 +4,7 @@ import { defineConfig } from "vite";
 export default defineConfig({
   plugins: [svelte()],
   resolve: {
-    conditions: ["development"],
+    conditions: ["browser", "development"],
     dedupe: ["svelte"],
   },
   preview: {
