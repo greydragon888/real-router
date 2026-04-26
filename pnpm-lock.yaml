@@ -895,6 +895,61 @@ importers:
         specifier: 6.0.2
         version: 6.0.2
 
+  examples/web/angular/view-transitions:
+    dependencies:
+      '@angular/common':
+        specifier: 21.2.8
+        version: 21.2.8(@angular/core@21.2.8(@angular/compiler@21.2.8)(rxjs@7.8.2))(rxjs@7.8.2)
+      '@angular/core':
+        specifier: 21.2.8
+        version: 21.2.8(@angular/compiler@21.2.8)(rxjs@7.8.2)
+      '@angular/platform-browser':
+        specifier: 21.2.8
+        version: 21.2.8(@angular/common@21.2.8(@angular/core@21.2.8(@angular/compiler@21.2.8)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@21.2.8(@angular/compiler@21.2.8)(rxjs@7.8.2))
+      '@real-router/angular':
+        specifier: workspace:^
+        version: link:../../../../packages/angular
+      '@real-router/browser-plugin':
+        specifier: workspace:^
+        version: link:../../../../packages/browser-plugin
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../../../../packages/core
+      rxjs:
+        specifier: 7.8.2
+        version: 7.8.2
+      tslib:
+        specifier: 2.8.1
+        version: 2.8.1
+    devDependencies:
+      '@angular-devkit/architect':
+        specifier: 0.2102.7
+        version: 0.2102.7(chokidar@5.0.0)
+      '@angular-devkit/schematics':
+        specifier: 21.2.7
+        version: 21.2.7(chokidar@5.0.0)
+      '@angular/build':
+        specifier: 21.2.7
+        version: 21.2.7(@angular/compiler-cli@21.2.8(@angular/compiler@21.2.8)(typescript@6.0.2))(@angular/compiler@21.2.8)(@angular/core@21.2.8(@angular/compiler@21.2.8)(rxjs@7.8.2))(@angular/platform-browser@21.2.8(@angular/common@21.2.8(@angular/core@21.2.8(@angular/compiler@21.2.8)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@21.2.8(@angular/compiler@21.2.8)(rxjs@7.8.2)))(@emnapi/core@1.8.1)(@emnapi/runtime@1.8.1)(@types/node@25.5.0)(chokidar@5.0.0)(jiti@2.6.1)(less@4.6.4)(ng-packagr@21.2.2(@angular/compiler-cli@21.2.8(@angular/compiler@21.2.8)(typescript@6.0.2))(tslib@2.8.1)(typescript@6.0.2))(postcss@8.5.8)(terser@5.46.1)(tslib@2.8.1)(tsx@4.21.0)(typescript@6.0.2)(vitest@4.1.0)(yaml@2.8.3)
+      '@angular/cli':
+        specifier: 21.2.7
+        version: 21.2.7(@types/node@25.5.0)(chokidar@5.0.0)
+      '@angular/compiler':
+        specifier: 21.2.8
+        version: 21.2.8
+      '@angular/compiler-cli':
+        specifier: 21.2.8
+        version: 21.2.8(@angular/compiler@21.2.8)(typescript@6.0.2)
+      '@playwright/test':
+        specifier: 1.58.2
+        version: 1.58.2
+      sirv-cli:
+        specifier: 3.0.1
+        version: 3.0.1
+      typescript:
+        specifier: 6.0.2
+        version: 6.0.2
+
   examples/web/preact:
     dependencies:
       '@real-router/preact':
@@ -1340,6 +1395,34 @@ importers:
       zod:
         specifier: 3.24.4
         version: 3.24.4
+    devDependencies:
+      '@playwright/test':
+        specifier: 1.58.2
+        version: 1.58.2
+      '@preact/preset-vite':
+        specifier: 2.10.5
+        version: 2.10.5(@babel/core@7.29.0)(preact@10.28.2)(rollup@4.60.1)(vite@7.3.2(@types/node@25.5.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
+      typescript:
+        specifier: 5.8.3
+        version: 5.8.3
+      vite:
+        specifier: 7.3.2
+        version: 7.3.2(@types/node@25.5.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)
+
+  examples/web/preact/view-transitions:
+    dependencies:
+      '@real-router/browser-plugin':
+        specifier: workspace:^
+        version: link:../../../../packages/browser-plugin
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../../../../packages/core
+      '@real-router/preact':
+        specifier: workspace:^
+        version: link:../../../../packages/preact
+      preact:
+        specifier: 10.28.2
+        version: 10.28.2
     devDependencies:
       '@playwright/test':
         specifier: 1.58.2
@@ -2739,6 +2822,34 @@ importers:
         specifier: 2.11.11
         version: 2.11.11(@testing-library/jest-dom@6.9.1)(solid-js@1.9.5)(vite@7.3.2(@types/node@25.5.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
 
+  examples/web/solid/view-transitions:
+    dependencies:
+      '@real-router/browser-plugin':
+        specifier: workspace:^
+        version: link:../../../../packages/browser-plugin
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../../../../packages/core
+      '@real-router/solid':
+        specifier: workspace:^
+        version: link:../../../../packages/solid
+      solid-js:
+        specifier: 1.9.5
+        version: 1.9.5
+    devDependencies:
+      '@playwright/test':
+        specifier: 1.58.2
+        version: 1.58.2
+      typescript:
+        specifier: 5.8.3
+        version: 5.8.3
+      vite:
+        specifier: 7.3.2
+        version: 7.3.2(@types/node@25.5.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)
+      vite-plugin-solid:
+        specifier: 2.11.11
+        version: 2.11.11(@testing-library/jest-dom@6.9.1)(solid-js@1.9.5)(vite@7.3.2(@types/node@25.5.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
+
   examples/web/svelte:
     dependencies:
       '@real-router/svelte':
@@ -3291,6 +3402,34 @@ importers:
         specifier: 5.54.0
         version: 5.54.0
     devDependencies:
+      '@sveltejs/vite-plugin-svelte':
+        specifier: 6.2.4
+        version: 6.2.4(svelte@5.54.0)(vite@7.3.2(@types/node@25.5.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
+      typescript:
+        specifier: 5.8.3
+        version: 5.8.3
+      vite:
+        specifier: 7.3.2
+        version: 7.3.2(@types/node@25.5.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)
+
+  examples/web/svelte/view-transitions:
+    dependencies:
+      '@real-router/browser-plugin':
+        specifier: workspace:^
+        version: link:../../../../packages/browser-plugin
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../../../../packages/core
+      '@real-router/svelte':
+        specifier: workspace:^
+        version: link:../../../../packages/svelte
+      svelte:
+        specifier: 5.54.0
+        version: 5.54.0
+    devDependencies:
+      '@playwright/test':
+        specifier: 1.58.2
+        version: 1.58.2
       '@sveltejs/vite-plugin-svelte':
         specifier: 6.2.4
         version: 6.2.4(svelte@5.54.0)(vite@7.3.2(@types/node@25.5.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
@@ -3870,6 +4009,37 @@ importers:
         specifier: 3.5.13
         version: 3.5.13(typescript@5.8.3)
     devDependencies:
+      '@vitejs/plugin-vue':
+        specifier: 6.0.5
+        version: 6.0.5(vite@7.3.2(@types/node@25.5.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))(vue@3.5.13(typescript@5.8.3))
+      typescript:
+        specifier: 5.8.3
+        version: 5.8.3
+      vite:
+        specifier: 7.3.2
+        version: 7.3.2(@types/node@25.5.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)
+      vue-tsc:
+        specifier: 3.2.6
+        version: 3.2.6(typescript@5.8.3)
+
+  examples/web/vue/view-transitions:
+    dependencies:
+      '@real-router/browser-plugin':
+        specifier: workspace:^
+        version: link:../../../../packages/browser-plugin
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../../../../packages/core
+      '@real-router/vue':
+        specifier: workspace:^
+        version: link:../../../../packages/vue
+      vue:
+        specifier: 3.5.13
+        version: 3.5.13(typescript@5.8.3)
+    devDependencies:
+      '@playwright/test':
+        specifier: 1.58.2
+        version: 1.58.2
       '@vitejs/plugin-vue':
         specifier: 6.0.5
         version: 6.0.5(vite@7.3.2(@types/node@25.5.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))(vue@3.5.13(typescript@5.8.3))
