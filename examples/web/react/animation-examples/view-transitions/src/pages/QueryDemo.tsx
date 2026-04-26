@@ -1,7 +1,7 @@
 import { Link, useRoute } from "@real-router/react";
 import { useMemo } from "react";
 
-import type { JSX } from "react";
+import type { CSSProperties, JSX } from "react";
 
 const ITEMS = [
   { id: "alpha", label: "Alpha", category: "letter" },
@@ -54,7 +54,13 @@ export function QueryDemo(): JSX.Element {
 
       <ul className="vt-qd-list" data-vt-scope="query-demo-list">
         {visible.map((item) => (
-          <li key={item.id} className="vt-qd-item">
+          <li
+            key={item.id}
+            className="vt-qd-item"
+            style={
+              { "--vt-qd-name": `vt-qd-${item.id}` } as CSSProperties
+            }
+          >
             <strong>{item.label}</strong>
             <span> — {item.category}</span>
           </li>

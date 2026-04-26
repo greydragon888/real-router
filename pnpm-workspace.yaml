@@ -3,6 +3,7 @@ packages:
   - "shared"
   - "examples/web/*"
   - "examples/web/*/*"
+  - "examples/web/*/*/*" # subgroups (e.g. examples/web/react/animation-examples/)
   - "examples/desktop/*/*"
   - "examples/console/*"
   - "benchmarks"

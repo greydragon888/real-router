@@ -1,7 +1,7 @@
 import { Link, useRoute } from "@real-router/react";
 import { useMemo } from "react";
 
-import type { JSX } from "react";
+import type { CSSProperties, JSX } from "react";
 
 interface Product {
   id: string;
@@ -57,7 +57,15 @@ export function ProductsList(): JSX.Element {
 
       <ul className="vt-product-list" data-vt-scope="product-list">
         {items.map((product) => (
-          <li key={product.id} className="vt-product-card">
+          <li
+            key={product.id}
+            className="vt-product-card"
+            style={
+              {
+                "--vt-card-name": `vt-card-${product.id}`,
+              } as CSSProperties
+            }
+          >
             <Link routeName="products.detail" routeParams={{ id: product.id }}>
               <span
                 className="vt-product-thumb"
