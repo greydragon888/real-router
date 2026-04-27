@@ -7,7 +7,7 @@ import { App } from "./App";
 import { routes } from "./routes";
 import { installViewTransitionPolicy } from "./vt-policy";
 
-import "../../../../shared/styles.css";
+import "../../../../../shared/styles.css";
 import "./styles/transitions.css";
 
 const router = createRouter(routes, {

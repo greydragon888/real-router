@@ -1,0 +1,105 @@
+/*
+ * Page styles for motion-animations example.
+ *
+ * No @keyframes here — animations are driven entirely by `motion` library
+ * via WAAPI under the hood. This file holds only layout / typography /
+ * cosmetic styling for the example's page elements. See `App.tsx` for the
+ * top-level <AnimatePresence>/<motion.div> wrapper that animates page
+ * entry / exit, and `pages/Products.tsx` + `pages/ProductDetail.tsx` for
+ * inner motion components (`layoutId` for hero morph, `layout` for list
+ * reorder).
+ */
+
+.products-toolbar {
+  margin: 16px 0;
+  font-size: 14px;
+}
+
+.products-toolbar a {
+  color: #0f3460;
+}
+
+.product-list {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.product-card a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: #fff;
+  color: #1a1a2e;
+  text-decoration: none;
+}
+
+.product-card a:hover {
+  border-color: #0f3460;
+}
+
+.product-thumb {
+  display: block;
+  width: 100%;
+  height: 80px;
+  border-radius: 4px;
+}
+
+.product-name {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.product-cover {
+  display: block;
+  width: 100%;
+  max-width: 480px;
+  height: 220px;
+  border-radius: 12px;
+  margin: 16px 0;
+}
+
+.qd-toolbar {
+  margin: 16px 0;
+  display: flex;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.qd-toolbar a {
+  padding: 4px 10px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  color: #0f3460;
+  text-decoration: none;
+}
+
+.qd-toolbar a.active {
+  background: #0f3460;
+  color: #fff !important;
+  border-color: #0f3460;
+}
+
+.qd-list {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+}
+
+.qd-item {
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background: #fff;
+  font-size: 14px;
+}

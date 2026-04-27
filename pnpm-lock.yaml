@@ -1050,6 +1050,121 @@ importers:
         specifier: 10.28.2
         version: 10.28.2
 
+  examples/web/preact/animation-examples/motion-animations:
+    dependencies:
+      '@real-router/browser-plugin':
+        specifier: workspace:^
+        version: link:../../../../../packages/browser-plugin
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../../../../../packages/core
+      '@real-router/preact':
+        specifier: workspace:^
+        version: link:../../../../../packages/preact
+      motion:
+        specifier: 12.37.0
+        version: 12.37.0(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
+      preact:
+        specifier: 10.28.2
+        version: 10.28.2
+    devDependencies:
+      '@playwright/test':
+        specifier: 1.58.2
+        version: 1.58.2
+      '@preact/preset-vite':
+        specifier: 2.10.5
+        version: 2.10.5(@babel/core@7.29.0)(preact@10.28.2)(rollup@4.60.1)(vite@7.3.2(@types/node@25.5.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
+      typescript:
+        specifier: 5.8.3
+        version: 5.8.3
+      vite:
+        specifier: 7.3.2
+        version: 7.3.2(@types/node@25.5.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)
+
+  examples/web/preact/animation-examples/page-animations:
+    dependencies:
+      '@real-router/browser-plugin':
+        specifier: workspace:^
+        version: link:../../../../../packages/browser-plugin
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../../../../../packages/core
+      '@real-router/preact':
+        specifier: workspace:^
+        version: link:../../../../../packages/preact
+      preact:
+        specifier: 10.28.2
+        version: 10.28.2
+    devDependencies:
+      '@playwright/test':
+        specifier: 1.58.2
+        version: 1.58.2
+      '@preact/preset-vite':
+        specifier: 2.10.5
+        version: 2.10.5(@babel/core@7.29.0)(preact@10.28.2)(rollup@4.60.1)(vite@7.3.2(@types/node@25.5.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
+      typescript:
+        specifier: 5.8.3
+        version: 5.8.3
+      vite:
+        specifier: 7.3.2
+        version: 7.3.2(@types/node@25.5.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)
+
+  examples/web/preact/animation-examples/route-animations:
+    dependencies:
+      '@real-router/browser-plugin':
+        specifier: workspace:^
+        version: link:../../../../../packages/browser-plugin
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../../../../../packages/core
+      '@real-router/preact':
+        specifier: workspace:^
+        version: link:../../../../../packages/preact
+      preact:
+        specifier: 10.28.2
+        version: 10.28.2
+    devDependencies:
+      '@playwright/test':
+        specifier: 1.58.2
+        version: 1.58.2
+      '@preact/preset-vite':
+        specifier: 2.10.5
+        version: 2.10.5(@babel/core@7.29.0)(preact@10.28.2)(rollup@4.60.1)(vite@7.3.2(@types/node@25.5.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
+      typescript:
+        specifier: 5.8.3
+        version: 5.8.3
+      vite:
+        specifier: 7.3.2
+        version: 7.3.2(@types/node@25.5.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)
+
+  examples/web/preact/animation-examples/view-transitions:
+    dependencies:
+      '@real-router/browser-plugin':
+        specifier: workspace:^
+        version: link:../../../../../packages/browser-plugin
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../../../../../packages/core
+      '@real-router/preact':
+        specifier: workspace:^
+        version: link:../../../../../packages/preact
+      preact:
+        specifier: 10.28.2
+        version: 10.28.2
+    devDependencies:
+      '@playwright/test':
+        specifier: 1.58.2
+        version: 1.58.2
+      '@preact/preset-vite':
+        specifier: 2.10.5
+        version: 2.10.5(@babel/core@7.29.0)(preact@10.28.2)(rollup@4.60.1)(vite@7.3.2(@types/node@25.5.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
+      typescript:
+        specifier: 5.8.3
+        version: 5.8.3
+      vite:
+        specifier: 7.3.2
+        version: 7.3.2(@types/node@25.5.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)
+
   examples/web/preact/async-guards:
     dependencies:
       '@real-router/browser-plugin':
@@ -1486,34 +1601,6 @@ importers:
       zod:
         specifier: 3.24.4
         version: 3.24.4
-    devDependencies:
-      '@playwright/test':
-        specifier: 1.58.2
-        version: 1.58.2
-      '@preact/preset-vite':
-        specifier: 2.10.5
-        version: 2.10.5(@babel/core@7.29.0)(preact@10.28.2)(rollup@4.60.1)(vite@7.3.2(@types/node@25.5.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
-      typescript:
-        specifier: 5.8.3
-        version: 5.8.3
-      vite:
-        specifier: 7.3.2
-        version: 7.3.2(@types/node@25.5.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)
-
-  examples/web/preact/view-transitions:
-    dependencies:
-      '@real-router/browser-plugin':
-        specifier: workspace:^
-        version: link:../../../../packages/browser-plugin
-      '@real-router/core':
-        specifier: workspace:^
-        version: link:../../../../packages/core
-      '@real-router/preact':
-        specifier: workspace:^
-        version: link:../../../../packages/preact
-      preact:
-        specifier: 10.28.2
-        version: 10.28.2
     devDependencies:
       '@playwright/test':
         specifier: 1.58.2

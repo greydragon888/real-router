@@ -4,7 +4,7 @@ import { About } from "./pages/About";
 import { Home } from "./pages/Home";
 import { Products } from "./pages/Products";
 import { QueryDemo } from "./pages/QueryDemo";
-import { Layout } from "../../shared/Layout";
+import { Layout } from "../../../shared/Layout";
 
 const links = [
   { routeName: "home", label: "Home" },
