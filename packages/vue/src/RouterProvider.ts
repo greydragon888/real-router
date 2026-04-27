@@ -2,7 +2,11 @@ import { defineComponent, onScopeDispose, provide, watch } from "vue";
 
 import { NavigatorKey, RouteKey, RouterKey } from "./context";
 import { pushDirectiveRouter } from "./directives/vLink";
-import { createRouteAnnouncer, createScrollRestoration } from "./dom-utils";
+import {
+  createRouteAnnouncer,
+  createScrollRestoration,
+  createViewTransitions,
+} from "./dom-utils";
 import { setupRouteProvision } from "./setupRouteProvision";
 
 import type { ScrollRestorationOptions } from "./dom-utils";
@@ -22,6 +26,10 @@ export const RouterProvider = defineComponent({
     },
     scrollRestoration: {
       type: Object as PropType<ScrollRestorationOptions>,
+    },
+    viewTransitions: {
+      type: Boolean,
+      default: false,
     },
   },
   setup(props, { slots }) {
@@ -69,6 +77,23 @@ export const RouterProvider = defineComponent({
 
         onCleanup(() => {
           sr.destroy();
+        });
+      },
+      { immediate: true },
+    );
+
+    // Reactive viewTransitions: toggling prop creates/destroys the utility.
+    watch(
+      () => [props.router, props.viewTransitions] as const,
+      ([router, enabled], _prev, onCleanup) => {
+        if (!enabled) {
+          return;
+        }
+
+        const vt = createViewTransitions(router);
+
+        onCleanup(() => {
+          vt.destroy();
         });
       },
       { immediate: true },

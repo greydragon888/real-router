@@ -1,10 +1,10 @@
 import { createRouter, errorCodes } from "@real-router/core";
 import { getDependenciesApi, getRoutesApi } from "@real-router/core/api";
+import { lifecyclePluginFactory } from "@real-router/lifecycle-plugin";
 import { describe, afterEach, it, expect } from "vitest";
 
 import { defineAbilities } from "../../../shared/abilities";
 import { store } from "../../../shared/store";
-import { lifecyclePluginFactory } from "@real-router/lifecycle-plugin";
 import { privateRoutes, publicRoutes } from "../src/routes";
 
 import type { AppDependencies } from "../src/types";
@@ -188,14 +188,14 @@ describe("Custom plugin — lifecyclePluginFactory", () => {
 
     vi.useFakeTimers();
 
-    await router.navigate("products.list");
+    await router.navigate("products");
 
-    expect(store.get("products.list:loading")).toBe(true);
+    expect(store.get("products:loading")).toBe(true);
 
     await vi.advanceTimersByTimeAsync(300);
 
-    expect(store.get("products.list:loading")).toBe(false);
-    expect(store.get("products.list")).toEqual(
+    expect(store.get("products:loading")).toBe(false);
+    expect(store.get("products")).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: "Laptop" }),
         expect.objectContaining({ name: "Keyboard" }),

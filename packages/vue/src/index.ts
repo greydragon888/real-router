@@ -21,6 +21,10 @@ export { useRouteNode } from "./composables/useRouteNode";
 
 export { useRouterTransition } from "./composables/useRouterTransition";
 
+export { useRouteExit } from "./composables/useRouteExit";
+
+export { useRouteEnter } from "./composables/useRouteEnter";
+
 // Plugin
 export { createRouterPlugin } from "./createRouterPlugin";
 
@@ -41,6 +45,18 @@ export type {
   RouteViewMatchProps,
   RouteViewNotFoundProps,
 } from "./components/RouteView";
+
+export type {
+  RouteExitContext,
+  RouteExitHandler,
+  UseRouteExitOptions,
+} from "./composables/useRouteExit";
+
+export type {
+  RouteEnterContext,
+  RouteEnterHandler,
+  UseRouteEnterOptions,
+} from "./composables/useRouteEnter";
 
 export type { Navigator } from "@real-router/core";
 

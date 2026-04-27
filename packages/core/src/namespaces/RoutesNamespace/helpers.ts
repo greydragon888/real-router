@@ -62,6 +62,48 @@ export function paramsMatchExcluding(
 }
 
 /**
+ * Returns a copy of `defaultParams` with query-typed keys removed, based on
+ * `ownMeta` (the per-route paramTypeMap from the matcher). When no query keys
+ * are present, returns the input by reference (zero-allocation fast path).
+ *
+ * `ownMeta` may be `undefined` for non-registered route names — this is the
+ * caller's escape hatch (e.g. `getMetaByName(name)?.[name]`); a missing meta
+ * means no query type information is available, so defaults pass through
+ * unchanged.
+ */
+export function stripQueryDefaults(
+  defaultParams: Params,
+  ownMeta: Record<string, "url" | "query"> | undefined,
+): Params {
+  if (!ownMeta || !hasQueryDefault(defaultParams, ownMeta)) {
+    return defaultParams;
+  }
+
+  const filtered: Params = {};
+
+  for (const key in defaultParams) {
+    if (ownMeta[key] !== "query") {
+      filtered[key] = defaultParams[key];
+    }
+  }
+
+  return filtered;
+}
+
+function hasQueryDefault(
+  defaultParams: Params,
+  ownMeta: Record<string, "url" | "query">,
+): boolean {
+  for (const key in defaultParams) {
+    if (ownMeta[key] === "query") {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * Sanitizes a route by keeping only essential properties.
  */
 export function sanitizeRoute<Dependencies extends DefaultDependencies>(

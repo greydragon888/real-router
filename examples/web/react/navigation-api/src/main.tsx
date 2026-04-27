@@ -10,16 +10,7 @@ import { routes } from "./routes";
 import "../../../../shared/styles.css";
 import "./styles.css";
 
-if (!("navigation" in globalThis)) {
-  document.body.innerHTML = `
-    <div class="fallback">
-      <h1>Navigation API is required</h1>
-      <p>This example showcases features exclusive to the Navigation API
-         (~89% browser support). Open in Chrome, Edge, or any Chromium-based
-         browser. Safari &lt; 16.4 and Firefox do not support it yet.</p>
-      <p><a href="https://caniuse.com/mdn-api_navigation">caniuse.com/mdn-api_navigation</a></p>
-    </div>`;
-} else {
+if ("navigation" in globalThis) {
   const router = createRouter(routes, {
     defaultRoute: "home",
     allowNotFound: true,
@@ -39,4 +30,13 @@ if (!("navigation" in globalThis)) {
       </RouterProvider>,
     );
   }
+} else {
+  document.body.innerHTML = `
+    <div class="fallback">
+      <h1>Navigation API is required</h1>
+      <p>This example showcases features exclusive to the Navigation API
+         (~89% browser support). Open in Chrome, Edge, or any Chromium-based
+         browser. Safari &lt; 16.4 and Firefox do not support it yet.</p>
+      <p><a href="https://caniuse.com/mdn-api_navigation">caniuse.com/mdn-api_navigation</a></p>
+    </div>`;
 }

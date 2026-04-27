@@ -89,7 +89,7 @@ test.describe("Combined Example", () => {
     test("users layout with breadcrumbs", async ({ page }) => {
       await login(page);
       await page.click(".sidebar a:has-text('Users')");
-      await expect(page).toHaveURL(/\/users\/list/);
+      await expect(page).toHaveURL(/\/users(?:\?|$)/);
       await expect(page.getByRole("heading", { name: "Users" })).toBeVisible();
       await expect(page.locator("nav.breadcrumbs")).toBeVisible();
     });
@@ -228,14 +228,14 @@ test.describe("Combined Example", () => {
     }) => {
       await login(page);
       await page.click(".sidebar a:has-text('Products')");
-      await expect(page).toHaveURL(/\/products\/list/);
+      await expect(page).toHaveURL(/\/products(?:\?|$)/);
       await expect(page).toHaveURL(/page=1/);
       await expect(page).toHaveURL(/sort=name/);
     });
 
     test("invalid query params recovered to defaults", async ({ page }) => {
       await login(page);
-      await page.goto("/products/list?page=-1&sort=invalid");
+      await page.goto("/products?page=-1&sort=invalid");
       await expect(page).toHaveURL(/page=1/);
       await expect(page).toHaveURL(/sort=name/);
     });

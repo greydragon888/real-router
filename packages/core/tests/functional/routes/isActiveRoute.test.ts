@@ -250,6 +250,103 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
       });
     });
 
+    describe("ignoreQueryParams in hierarchical check", () => {
+      beforeEach(async () => {
+        // Parent route with a query-typed defaultParam, plus a child route
+        // that does NOT inherit the query default into its matched state.
+        routesApi.add({
+          name: "products",
+          path: "/products?sort",
+          defaultParams: { sort: "asc" },
+          children: [{ name: "detail", path: "/:id" }],
+        });
+      });
+
+      it("treats ancestor link as active when descendant lacks the query default (ignoreQueryParams=true)", async () => {
+        await router.navigate("products.detail", { id: "6" });
+
+        // /products/6 → state.params = { id: "6" } (no sort).
+        // Parent has defaultParams.sort = "asc"; with ignoreQueryParams=true
+        // the query-typed default must be stripped before comparison so the
+        // ancestor link still highlights as active.
+        expect(router.isActiveRoute("products", {}, false, true)).toBe(true);
+      });
+
+      it("still enforces query default when ignoreQueryParams=false", async () => {
+        await router.navigate("products.detail", { id: "6" });
+
+        expect(router.isActiveRoute("products", {}, false, false)).toBe(false);
+      });
+
+      it("treats descendant link as inactive when current state is the parent", async () => {
+        // At /products (parent), a Link pointing DEEPER (products.detail) is
+        // a navigation option, not active. The hierarchical block must
+        // reject the "name is descendant of activeName" relation.
+        await router.navigate("products");
+
+        expect(router.isActiveRoute("products.detail")).toBe(false);
+      });
+
+      it("preserves URL-typed defaults during the strip (URL key first)", async () => {
+        // URL key first in iteration order — the stripper sees the URL key
+        // BEFORE allocating `filtered`, so the URL key never enters the
+        // append branch. It still survives because the final return uses
+        // the original `defaultParams` reference when no query was found —
+        // here `q` IS query, so `filtered` is allocated when q is reached
+        // and contains the slot prefix from the inner break loop.
+        routesApi.add({
+          name: "mixedA",
+          path: "/mixedA/:slot?q",
+          defaultParams: { slot: "a", q: "x" },
+          children: [{ name: "leaf", path: "/leaf" }],
+        });
+
+        await router.navigate("mixedA.leaf", { slot: "b" });
+
+        expect(router.isActiveRoute("mixedA", {}, false, true)).toBe(false);
+
+        await router.navigate("mixedA.leaf", { slot: "a" });
+
+        expect(router.isActiveRoute("mixedA", {}, false, true)).toBe(true);
+      });
+
+      it("strips multiple consecutive query defaults", async () => {
+        // Two query defaults in a row — exercises the `filtered !== null`
+        // branch on the second query key (no re-allocation).
+        routesApi.add({
+          name: "twoQ",
+          path: "/twoQ?a&b&:slot",
+          defaultParams: { a: "1", b: "2", slot: "x" },
+          children: [{ name: "leaf", path: "/leaf" }],
+        });
+
+        await router.navigate("twoQ.leaf", { slot: "x" });
+
+        // Both `a` and `b` are query defaults → stripped; URL slot enforced.
+        expect(router.isActiveRoute("twoQ", {}, false, true)).toBe(true);
+      });
+
+      it("preserves URL-typed defaults during the strip (query key first)", async () => {
+        // Query key first in iteration order — `filtered` is allocated on
+        // the first iteration and the subsequent URL key flows into the
+        // `filtered[key] = defaultParams[key]` append branch.
+        routesApi.add({
+          name: "mixedB",
+          path: "/mixedB/:slot?q",
+          defaultParams: { q: "x", slot: "a" },
+          children: [{ name: "leaf", path: "/leaf" }],
+        });
+
+        await router.navigate("mixedB.leaf", { slot: "a" });
+
+        expect(router.isActiveRoute("mixedB", {}, false, true)).toBe(true);
+
+        await router.navigate("mixedB.leaf", { slot: "b" });
+
+        expect(router.isActiveRoute("mixedB", {}, false, true)).toBe(false);
+      });
+    });
+
     describe("edge cases: param value types", () => {
       it("should not match when param value is undefined (undefined !== string)", async () => {
         await router.navigate("users.view", { id: "123" });

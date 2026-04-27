@@ -68,6 +68,8 @@ function App() {
 | `useRouteNode(name)`    | `{ navigator, route, previousRoute }`                      | Only when node activates/deactivates    |
 | `useRouteUtils()`       | `RouteUtils`                                               | Never                                   |
 | `useRouterTransition()` | `{ isTransitioning, isLeaveApproved, toRoute, fromRoute }` | On transition start/end                 |
+| `useRouteExit(handler, options?)`  | `void` — wraps `router.subscribeLeave` with abort + same-route guards | Never (stable subscription) |
+| `useRouteEnter(handler, options?)` | `void` — fires on nav-driven mount via `useRoute()` snapshot          | Never (handler stays current) |
 
 ```tsx
 // useRouteNode — re-renders only when "users.*" changes
@@ -96,6 +98,33 @@ function GlobalProgress() {
   const { isTransitioning } = useRouterTransition();
   if (!isTransitioning) return null;
   return <div className="progress-bar" />;
+}
+
+// useRouteExit — exit animations, draft autosave, AbortSignal-aware cleanup
+function FadeOut() {
+  const ref = useRef<HTMLDivElement>(null);
+  useRouteExit(async ({ signal }) => {
+    const el = ref.current;
+    if (!el) return;
+    el.classList.add("fade-out");
+    const cleanup = () => el.classList.remove("fade-out");
+    signal.addEventListener("abort", cleanup, { once: true });
+    el.getBoundingClientRect(); // style flush
+    await Promise.allSettled(el.getAnimations().map((a) => a.finished));
+    cleanup();
+  });
+  return <div ref={ref}>...</div>;
+}
+
+// useRouteEnter — page-enter analytics, focus management, entry animations
+function PageEnterAnalytics() {
+  useRouteEnter(({ route, previousRoute }) => {
+    analytics.track("page_enter", {
+      route: route.name,
+      from: previousRoute.name,
+    });
+  });
+  return null;
 }
 ```
 
@@ -231,12 +260,24 @@ Opt-in preservation of scroll position across navigations:
 
 Restores scroll on back/forward, scrolls to top (or `#hash`) on push. Three modes: `"restore"` (default), `"top"`, `"manual"`. Custom containers via `scrollContainer: () => HTMLElement | null`. Lifecycle tied to the provider — created on mount, destroyed on unmount. See [Scroll Restoration guide](https://github.com/greydragon888/real-router/wiki/Scroll-Restoration) for details.
 
+## View Transitions
+
+Opt-in animated route transitions via the browser's [View Transitions API](https://developer.mozilla.org/en-US/docs/Web/API/View_Transitions_API):
+
+```tsx
+<RouterProvider router={router} viewTransitions>
+  {/* Your app */}
+</RouterProvider>
+```
+
+No-op on unsupported browsers (Firefox as of 2026-04, SSR). Customization is pure CSS via `::view-transition-*` pseudo-elements and `view-transition-name` for hero morphs. See [View Transitions guide](https://github.com/greydragon888/real-router/wiki/View-Transitions) for patterns.
+
 ## Documentation
 
 Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 
-- [RouterProvider](https://github.com/greydragon888/real-router/wiki/RouterProvider) · [RouteView](https://github.com/greydragon888/real-router/wiki/RouteView) · [RouterErrorBoundary](https://github.com/greydragon888/real-router/wiki/RouterErrorBoundary) · [Link](https://github.com/greydragon888/real-router/wiki/Link) · [Scroll Restoration](https://github.com/greydragon888/real-router/wiki/Scroll-Restoration)
-- [useRouter](https://github.com/greydragon888/real-router/wiki/useRouter) · [useRoute](https://github.com/greydragon888/real-router/wiki/useRoute) · [useRouteNode](https://github.com/greydragon888/real-router/wiki/useRouteNode) · [useNavigator](https://github.com/greydragon888/real-router/wiki/useNavigator) · [useRouteUtils](https://github.com/greydragon888/real-router/wiki/useRouteUtils) · [useRouterTransition](https://github.com/greydragon888/real-router/wiki/useRouterTransition)
+- [RouterProvider](https://github.com/greydragon888/real-router/wiki/RouterProvider) · [RouteView](https://github.com/greydragon888/real-router/wiki/RouteView) · [RouterErrorBoundary](https://github.com/greydragon888/real-router/wiki/RouterErrorBoundary) · [Link](https://github.com/greydragon888/real-router/wiki/Link) · [Scroll Restoration](https://github.com/greydragon888/real-router/wiki/Scroll-Restoration) · [View Transitions](https://github.com/greydragon888/real-router/wiki/View-Transitions)
+- [useRouter](https://github.com/greydragon888/real-router/wiki/useRouter) · [useRoute](https://github.com/greydragon888/real-router/wiki/useRoute) · [useRouteNode](https://github.com/greydragon888/real-router/wiki/useRouteNode) · [useNavigator](https://github.com/greydragon888/real-router/wiki/useNavigator) · [useRouteUtils](https://github.com/greydragon888/real-router/wiki/useRouteUtils) · [useRouterTransition](https://github.com/greydragon888/real-router/wiki/useRouterTransition) · [useRouteExit](https://github.com/greydragon888/real-router/wiki/useRouteExit) · [useRouteEnter](https://github.com/greydragon888/real-router/wiki/useRouteEnter)
 
 ## Examples
 

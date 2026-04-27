@@ -48,6 +48,8 @@ src/
 │   ├── injectRouteUtils.ts     # RouteUtils from route tree (never reactive)
 │   ├── injectRouterTransition.ts  # Transition lifecycle Signal (isTransitioning, toRoute, fromRoute)
 │   ├── injectIsActiveRoute.ts  # Active state Signal
+│   ├── injectRouteExit.ts      # Wrap subscribeLeave with abort + same-route guards (cleanup via DestroyRef)
+│   ├── injectRouteEnter.ts     # Fire on nav-driven mount via injectRoute() + effect() + transition.from
 │   └── index.ts
 ├── directives/                 # Directives
 │   ├── RouteMatch.ts           # ng-template[routeMatch] — segment marker
@@ -64,6 +66,7 @@ src/
     ├── link-utils.ts           # buildHref, buildActiveClassName, applyLinkA11y, shouldNavigate
     ├── route-announcer.ts      # createRouteAnnouncer
     ├── scroll-restore.ts       # createScrollRestoration (opt-in scroll capture + restore)
+    ├── view-transitions.ts     # createViewTransitions (opt-in View Transitions API integration)
     └── index.ts
 ```
 
@@ -183,6 +186,21 @@ Minimal component. Constructor injects `injectRouter()` and `inject(DestroyRef)`
 ### Scroll Restoration
 
 Opt-in via `provideRealRouter(router, { scrollRestoration })`. Not a component — wired through `provideEnvironmentInitializer`: when the environment injector is created (first `inject()` call), the initializer runs `createScrollRestoration(router, options)` from `shared/dom-utils/` and registers `sr.destroy()` on `inject(DestroyRef)`. Options are a bootstrap-time snapshot, not reactive to runtime changes. Lifecycle is tied to the environment injector — destroy fires on `TestBed.resetTestingModule()` / application teardown.
+
+### View Transitions
+
+Opt-in via `provideRealRouter(router, { viewTransitions: true })`. Same wiring pattern as Scroll Restoration: `provideEnvironmentInitializer` runs `createViewTransitions(router)` from `shared/dom-utils/` and registers `vt.destroy()` on `inject(DestroyRef)`. The utility subscribes to `router.subscribeLeave` (opens `document.startViewTransition` with a deferred async callback) and `router.subscribe` (resolves the deferred via a `setTimeout(0)` so the new-DOM snapshot capture runs after Angular commits — `rAF` is suppressed during VT's `update-callback-called` phase). No-op when `document.startViewTransition` is unavailable (SSR, Firefox as of 2026-04). On teardown, `destroy()` calls `skipTransition()` on any in-flight VT. Option is a bootstrap-time snapshot — toggling requires re-bootstrap.
+
+**Angular-specific tick:** the same initializer also installs a `router.subscribe` listener that calls `applicationRef.tick()` synchronously before the VT utility resolves its deferred. Angular's zoneless change detection is `rAF`-driven and is therefore blocked while VT sits in `update-callback-called`; without a forced synchronous tick the new DOM is not committed when the browser captures the new snapshot, so old and new snapshots end up identical and animations finish in ~0 ms with no visible work. Subscribers fire in registration order, so this listener runs before the VT utility's own subscriber.
+
+### Route Exit / Entry Hooks
+
+`injectRouteExit(handler, options?)` and `injectRouteEnter(handler, options?)` mirror the React `useRouteExit` / `useRouteEnter` API in idiomatic Angular form (must be called inside an injection context).
+
+- **`injectRouteExit`** wraps `router.subscribeLeave` with the universal guards: reentrant abort pre-check, same-route skip default. Cleanup is bound to the injection context's `DestroyRef`. Handler can return a `Promise` — the router awaits it before committing the new state, giving router-coordinated exit timing for animations or auto-save scenarios.
+- **`injectRouteEnter`** fires once when the component is created as a result of a navigation. Skip-initial via `route.transition.from` (undefined on the very first state); skip-same-route via `transition.from === route.name`. Reads from `injectRoute()` inside `effect()`; the effect is owned by the active context's `DestroyRef`.
+
+**Handler-reactivity caveat:** `inject*` functions run **once** during component construction; the handler is captured at injection time and is NOT swapped between change-detection cycles. The common pattern is to pass a class method (or arrow-property) — its identity is stable. To vary behavior over time, read signals **inside** the handler body. This contrasts with React/Preact, where the hook keeps a `handlerRef` updated on every render.
 
 ### RealLink
 

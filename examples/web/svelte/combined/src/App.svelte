@@ -83,7 +83,7 @@
       {/snippet}
       {#snippet products()}
         <RouteView nodeName="products">
-          {#snippet list()}
+          {#snippet self()}
             <ProductList />
           {/snippet}
           {#snippet detail()}

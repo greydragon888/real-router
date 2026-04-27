@@ -18,6 +18,10 @@ export { useRouteNode } from "./hooks/useRouteNode";
 
 export { useRouterTransition } from "./hooks/useRouterTransition";
 
+export { useRouteExit } from "./hooks/useRouteExit";
+
+export { useRouteEnter } from "./hooks/useRouteEnter";
+
 // Context
 export { RouterProvider } from "./RouterProvider";
 
@@ -34,6 +38,18 @@ export type {
   RouteViewSelfProps,
   RouteViewNotFoundProps,
 } from "./components/RouteView";
+
+export type {
+  RouteExitContext,
+  RouteExitHandler,
+  UseRouteExitOptions,
+} from "./hooks/useRouteExit";
+
+export type {
+  RouteEnterContext,
+  RouteEnterHandler,
+  UseRouteEnterOptions,
+} from "./hooks/useRouteEnter";
 
 export type { Navigator } from "@real-router/core";
 

@@ -26,7 +26,8 @@ export function Layout({
           <Link
             key={link.routeName}
             routeName={link.routeName}
-            activeClassName="active"
+            activeStrict={false}
+            ignoreQueryParams={true}
           >
             {link.label}
           </Link>

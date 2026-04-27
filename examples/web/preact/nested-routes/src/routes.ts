@@ -5,11 +5,12 @@ export const routes: Route[] = [
   {
     name: "users",
     path: "/users",
-    forwardTo: "users.list",
     children: [
-      { name: "list", path: "/list" },
-      { name: "profile", path: "/:id" },
-      { name: "settings", path: "/settings" },
+      {
+        name: "profile",
+        path: "/:id",
+        children: [{ name: "settings", path: "/settings" }],
+      },
     ],
   },
 ];

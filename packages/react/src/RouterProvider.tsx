@@ -3,7 +3,11 @@ import { createRouteSource } from "@real-router/sources";
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 
 import { NavigatorContext, RouteContext, RouterContext } from "./context";
-import { createRouteAnnouncer, createScrollRestoration } from "./dom-utils";
+import {
+  createRouteAnnouncer,
+  createScrollRestoration,
+  createViewTransitions,
+} from "./dom-utils";
 
 import type { ScrollRestorationOptions } from "./dom-utils";
 import type { Router } from "@real-router/core";
@@ -14,6 +18,7 @@ export interface RouteProviderProps {
   children: ReactNode;
   announceNavigation?: boolean;
   scrollRestoration?: ScrollRestorationOptions;
+  viewTransitions?: boolean;
 }
 
 export const RouterProvider: FC<RouteProviderProps> = ({
@@ -21,6 +26,7 @@ export const RouterProvider: FC<RouteProviderProps> = ({
   children,
   announceNavigation,
   scrollRestoration,
+  viewTransitions,
 }) => {
   useEffect(() => {
     if (!announceNavigation) {
@@ -60,6 +66,18 @@ export const RouterProvider: FC<RouteProviderProps> = ({
     // scrollRestoration (for scrollContainer) omitted — see comment above.
     // eslint-disable-next-line @eslint-react/exhaustive-deps
   }, [router, srEnabled, srMode, srAnchor]);
+
+  useEffect(() => {
+    if (!viewTransitions) {
+      return;
+    }
+
+    const vt = createViewTransitions(router);
+
+    return () => {
+      vt.destroy();
+    };
+  }, [router, viewTransitions]);
 
   const navigator = useMemo(() => getNavigator(router), [router]);
 

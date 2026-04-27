@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "pnpm turbo run bundle --filter=...ssr-react-example",
     "dev": "tsx server/dev.ts",
     "build:app": "vite build --outDir dist/client && vite build --ssr src/entry-server.tsx --outDir dist/server",
     "preview": "NODE_ENV=production tsx server/index.ts",

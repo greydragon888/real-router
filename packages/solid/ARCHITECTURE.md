@@ -44,6 +44,7 @@ src/
 │   ├── link-utils.ts           # shouldNavigate, buildHref, buildActiveClassName, applyLinkA11y
 │   ├── route-announcer.ts      # createRouteAnnouncer (a11y aria-live region)
 │   ├── scroll-restore.ts       # createScrollRestoration (opt-in scroll capture + restore)
+│   ├── view-transitions.ts     # createViewTransitions (opt-in View Transitions API integration)
 │   └── index.ts                # barrel
 ├── createSignalFromSource.ts   # Signal bridge — converts RouterSource to Solid Accessor
 ├── createStoreFromSource.ts    # Store bridge — converts RouterSource to Solid store (reconcile)
@@ -55,7 +56,9 @@ src/
 │   ├── useRouteNodeStore.tsx   # Same cached node source, store-based
 │   ├── useRouteStore.tsx       # Full route state as store (reconcile)
 │   ├── useRouteUtils.tsx       # RouteUtils from route tree (never reactive)
-│   └── useRouterTransition.tsx # Transition lifecycle (cached getTransitionSource)
+│   ├── useRouterTransition.tsx # Transition lifecycle (cached getTransitionSource)
+│   ├── useRouteExit.tsx        # Wrap subscribeLeave with abort + same-route guards (handler captured at hook call)
+│   └── useRouteEnter.tsx       # Fire on nav-driven mount via useRoute() accessor + route.transition.from
 └── components/
     ├── Link.tsx                # Reactive link with classList-based active state
     ├── RouterErrorBoundary.tsx  # Declarative navigation error handling

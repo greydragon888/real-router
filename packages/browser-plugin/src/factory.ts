@@ -33,8 +33,14 @@ import type {
 } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
 
-const FROZEN_POPSTATE: BrowserContext = Object.freeze({ source: "popstate" });
-const FROZEN_NAVIGATE: BrowserContext = Object.freeze({ source: "navigate" });
+const FROZEN_POPSTATE: BrowserContext = Object.freeze({
+  source: "popstate",
+  direction: "back",
+});
+const FROZEN_NAVIGATE: BrowserContext = Object.freeze({
+  source: "navigate",
+  direction: "forward",
+});
 
 export function browserPluginFactory(
   opts?: Partial<BrowserPluginOptions>,

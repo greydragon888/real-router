@@ -14,12 +14,14 @@
 <div>
   <h1>Users</h1>
   <p>
-    This component uses a nested <code>RouteView nodeName="users"</code> to
-    match <code>users.list</code> and <code>users.profile</code> via named snippets.
+    This component uses a nested <code>RouteView nodeName="users"</code>. The
+    parent <code>users</code> route IS the list — rendered via the
+    <code>self</code> snippet — and <code>users.profile</code> renders via a
+    snippet named after the segment.
   </p>
 
   <RouteView nodeName="users">
-    {#snippet list()}
+    {#snippet self()}
       <div>
         <h2>User List</h2>
         <div class="card">
@@ -43,7 +45,7 @@
             <code>users.profile</code>.
           </p>
         </div>
-        <Link routeName="users.list">← Back to list</Link>
+        <Link routeName="users">← Back to list</Link>
       </div>
     {/snippet}
   </RouteView>

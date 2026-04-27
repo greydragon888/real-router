@@ -53,6 +53,7 @@ src/
 │   ├── link-utils.ts           # shouldNavigate, buildHref, buildActiveClassName, applyLinkA11y
 │   ├── route-announcer.ts      # createRouteAnnouncer (WCAG aria-live)
 │   ├── scroll-restore.ts       # createScrollRestoration (opt-in scroll capture + restore)
+│   ├── view-transitions.ts     # createViewTransitions (opt-in View Transitions API integration)
 │   └── index.ts
 ├── hooks/
 │   ├── useRouter.tsx           # Router instance from context (never re-renders)
@@ -61,7 +62,9 @@ src/
 │   ├── useRouteNode.tsx        # Node-scoped subscription (cached createRouteNodeSource from sources)
 │   ├── useIsActiveRoute.tsx    # Active state subscription (cached createActiveRouteSource)
 │   ├── useRouteUtils.tsx       # RouteUtils from route tree (never re-renders)
-│   └── useRouterTransition.tsx # Transition lifecycle (cached getTransitionSource)
+│   ├── useRouterTransition.tsx # Transition lifecycle (cached getTransitionSource)
+│   ├── useRouteExit.tsx        # Wrap subscribeLeave with abort + same-route + latest-handler guards
+│   └── useRouteEnter.tsx       # Fire on nav-driven mount via useRoute() snapshot + route.transition.from
 └── components/
     ├── Link.tsx                # memo'd link with custom areLinkPropsEqual + active state
     ├── RouterErrorBoundary.tsx  # Declarative navigation error handling
@@ -84,6 +87,7 @@ The `dom-utils/` directory is a symlink to `shared/dom-utils/` — identical hel
 - **`applyLinkA11y(element)`** — adds `role="link"` + `tabindex="0"` to non-interactive elements. Not used by React's `<Link>` (always renders `<a>`), but used by Svelte/Solid/Vue/Angular directive-based navigation. Exported for consumers building custom navigation components on non-anchor elements.
 - **`createRouteAnnouncer(router, options?)`** — WCAG screen reader announcements via `aria-live` region
 - **`createScrollRestoration(router, options?)`** — opt-in scroll capture on transition, restore on back/pagehide. DOM-concern isolated from router-core. Lifecycle: `useEffect` on `RouterProvider` creates the utility when `scrollRestoration` prop is set; cleanup destroys it. Primitive-field deps (`mode`, `anchorScrolling`) guard against inline-object thrash; `scrollContainer` is read lazily, excluded from deps.
+- **`createViewTransitions(router)`** — opt-in View Transitions API integration. Wires `subscribeLeave` (open VT snapshot of old DOM, returns immediately so router isn't blocked) + `subscribe` (resolve deferred → `requestAnimationFrame` → VT snapshots new DOM → animates). No-op when `document.startViewTransition` is unavailable (SSR, Firefox as of 2026-04). Lifecycle: `useEffect` on `RouterProvider` creates the utility when `viewTransitions` prop is truthy; cleanup calls `destroy()` which skips any in-flight VT via `skipTransition()`.
 
 ## Context Architecture
 

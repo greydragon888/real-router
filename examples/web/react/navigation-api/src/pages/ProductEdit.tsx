@@ -34,6 +34,7 @@ export function ProductEdit(): JSX.Element {
           value={notes}
           onChange={(evt) => {
             const value = evt.target.value;
+
             setNotes(value);
             if (value) {
               sessionStorage.setItem(draftKey, value);

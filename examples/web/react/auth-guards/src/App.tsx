@@ -21,10 +21,7 @@ import type { JSX } from "react";
 export function App(): JSX.Element {
   const navigator = useNavigator();
 
-  const user = useSyncExternalStore(
-    store.subscribe,
-    () => store.get("user") as User | null,
-  );
+  const user = useSyncExternalStore(store.subscribe, () => store.get("user"));
 
   const links = user
     ? [

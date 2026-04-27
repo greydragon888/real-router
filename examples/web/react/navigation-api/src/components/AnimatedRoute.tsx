@@ -16,7 +16,11 @@ export function AnimatedRoute({
         : "page fade";
 
   return (
-    <div className={className} key={route?.path ?? ""} data-direction={direction}>
+    <div
+      className={className}
+      key={route?.path ?? ""}
+      data-direction={direction}
+    >
       {children}
     </div>
   );

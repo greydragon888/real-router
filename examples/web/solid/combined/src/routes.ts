@@ -83,23 +83,18 @@ export const privateRoutes: Route<AppDependencies>[] = [
   { name: "dashboard", path: "/dashboard" },
   {
     name: "products",
-    path: "/products",
-    forwardTo: "products.list",
-    children: [
-      {
-        name: "list",
-        path: "/list?page&sort",
-        defaultParams: { page: 1, sort: "name" },
-        searchSchema: productsListSchema,
-        preload: () => async () => {
-          const data = await api.getProducts();
+    path: "/products?page&sort",
+    defaultParams: { page: 1, sort: "name" },
+    searchSchema: productsListSchema,
+    preload: () => async () => {
+      const data = await api.getProducts();
 
-          store.set("products.list", data);
-        },
-        onEnter: () => () => {
-          loadRoute("products.list", () => api.getProducts());
-        },
-      },
+      store.set("products", data);
+    },
+    onEnter: () => () => {
+      loadRoute("products", () => api.getProducts());
+    },
+    children: [
       {
         name: "detail",
         path: "/:id",
@@ -120,11 +115,7 @@ export const privateRoutes: Route<AppDependencies>[] = [
   {
     name: "users",
     path: "/users",
-    forwardTo: "users.list",
-    children: [
-      { name: "list", path: "/list" },
-      { name: "profile", path: "/:id" },
-    ],
+    children: [{ name: "profile", path: "/:id" }],
   },
   {
     name: "settings",

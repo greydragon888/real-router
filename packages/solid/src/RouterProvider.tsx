@@ -4,7 +4,11 @@ import { createSelector, onCleanup, onMount } from "solid-js";
 
 import { RouterContext, RouteContext } from "./context";
 import { createSignalFromSource } from "./createSignalFromSource";
-import { createRouteAnnouncer, createScrollRestoration } from "./dom-utils";
+import {
+  createRouteAnnouncer,
+  createScrollRestoration,
+  createViewTransitions,
+} from "./dom-utils";
 
 import type { ScrollRestorationOptions } from "./dom-utils";
 import type { Router } from "@real-router/core";
@@ -14,6 +18,7 @@ export interface RouteProviderProps {
   router: Router;
   announceNavigation?: boolean;
   scrollRestoration?: ScrollRestorationOptions;
+  viewTransitions?: boolean;
 }
 
 export function isRouteActive(
@@ -50,6 +55,18 @@ export function RouterProvider(
 
     onCleanup(() => {
       sr.destroy();
+    });
+  });
+
+  onMount(() => {
+    if (!props.viewTransitions) {
+      return;
+    }
+
+    const vt = createViewTransitions(props.router);
+
+    onCleanup(() => {
+      vt.destroy();
     });
   });
 

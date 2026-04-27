@@ -18,7 +18,7 @@
             "polyfills": [],
             "tsConfig": "tsconfig.app.json",
             "assets": [],
-            "styles": ["../../shared/styles.css"],
+            "styles": ["../../../shared/styles.css"],
             "scripts": []
           }
         },

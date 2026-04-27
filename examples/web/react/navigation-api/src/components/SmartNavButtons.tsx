@@ -5,29 +5,39 @@ import type { JSX } from "react";
 
 function labelFor(state: State): string {
   switch (state.name) {
-    case "home":
+    case "home": {
       return "Home";
-    case "products":
+    }
+    case "products": {
       return "Products";
-    case "products.product":
+    }
+    case "products.product": {
       return `Product #${String(state.params.id)}`;
-    case "products.product.edit":
+    }
+    case "products.product.edit": {
       return `Edit #${String(state.params.id)}`;
-    case "categories":
+    }
+    case "categories": {
       return "Categories";
-    case "cart":
+    }
+    case "cart": {
       return "Cart";
-    case "checkout":
+    }
+    case "checkout": {
       return "Checkout";
-    case "about":
+    }
+    case "about": {
       return "About";
-    default:
+    }
+    default: {
       return state.name;
+    }
   }
 }
 
 export function SmartNavButtons(): JSX.Element {
   const router = useRouter();
+
   // Subscribe to route changes so peek values refresh on navigation.
   useRoute();
 

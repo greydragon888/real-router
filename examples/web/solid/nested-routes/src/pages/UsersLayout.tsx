@@ -8,7 +8,6 @@ import {
 import { For, Show } from "solid-js";
 
 import { UserProfile } from "./UserProfile";
-import { UserSettings } from "./UserSettings";
 import { UsersList } from "./UsersList";
 
 import type { Params } from "@real-router/core";
@@ -17,8 +16,7 @@ import type { JSX } from "solid-js";
 const routeLabels: Record<string, string> = {
   home: "Home",
   users: "Users",
-  "users.list": "List",
-  "users.settings": "Settings",
+  "users.profile.settings": "Settings",
 };
 
 function getLabel(name: string, params: Params): string {
@@ -82,59 +80,20 @@ export function UsersLayout(): JSX.Element {
       <div>
         <Breadcrumbs />
 
-        <div style={{ display: "flex", gap: "24px", "margin-top": "16px" }}>
-          <nav style={{ "min-width": "140px" }}>
-            <p
-              style={{
-                "font-size": "12px",
-                "text-transform": "uppercase",
-                color: "#888",
-                "margin-bottom": "8px",
-              }}
-            >
-              Users
-            </p>
-            <Link
-              routeName="users.list"
-              activeClassName="active"
-              style={{
-                display: "block",
-                padding: "6px 12px",
-                "text-decoration": "none",
-                color: "#555",
-                "border-radius": "4px",
-              }}
-            >
-              List
-            </Link>
-            <Link
-              routeName="users.settings"
-              activeClassName="active"
-              style={{
-                display: "block",
-                padding: "6px 12px",
-                "text-decoration": "none",
-                color: "#555",
-                "border-radius": "4px",
-              }}
-            >
-              Settings
-            </Link>
-          </nav>
-
-          <div style={{ flex: 1 }}>
-            <RouteView nodeName="users">
-              <RouteView.Match segment="list">
-                <UsersList />
-              </RouteView.Match>
-              <RouteView.Match segment="profile">
-                <UserProfile />
-              </RouteView.Match>
-              <RouteView.Match segment="settings">
-                <UserSettings />
-              </RouteView.Match>
-            </RouteView>
-          </div>
+        {/*
+          `users` IS the list — no synthetic `list` child / forwardTo.
+          <RouteView.Self> renders UsersList when active is exactly `users`;
+          <RouteView.Match segment="profile"> wins for /users/:id and deeper.
+        */}
+        <div style={{ "margin-top": "16px" }}>
+          <RouteView nodeName="users">
+            <RouteView.Self>
+              <UsersList />
+            </RouteView.Self>
+            <RouteView.Match segment="profile">
+              <UserProfile />
+            </RouteView.Match>
+          </RouteView>
         </div>
       </div>
     </Show>

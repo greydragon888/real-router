@@ -9,15 +9,15 @@ import type { JSX } from "react";
 export function ProductList(): JSX.Element {
   const products = useSyncExternalStore(
     store.subscribe,
-    () => store.get("products.list") as Product[] | null,
+    () => store.get("products") as Product[] | null,
   );
   const loading = useSyncExternalStore(
     store.subscribe,
-    () => store.get("products.list:loading") as boolean | undefined,
+    () => store.get("products:loading") as boolean | undefined,
   );
   const error = useSyncExternalStore(
     store.subscribe,
-    () => store.get("products.list:error") as string | null | undefined,
+    () => store.get("products:error") as string | null | undefined,
   );
 
   if (loading) {

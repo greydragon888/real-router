@@ -23,6 +23,10 @@ export { useRouteNode } from "./composables/useRouteNode.svelte";
 
 export { useRouterTransition } from "./composables/useRouterTransition.svelte";
 
+export { useRouteExit } from "./composables/useRouteExit.svelte";
+
+export { useRouteEnter } from "./composables/useRouteEnter.svelte";
+
 // Actions
 export { createLinkAction } from "./actions/link.svelte";
 
@@ -35,6 +39,18 @@ export { ROUTER_KEY, NAVIGATOR_KEY, ROUTE_KEY } from "./context";
 
 // Types
 export type { LinkProps, RouteContext } from "./types";
+
+export type {
+  RouteExitContext,
+  RouteExitHandler,
+  UseRouteExitOptions,
+} from "./composables/useRouteExit.svelte";
+
+export type {
+  RouteEnterContext,
+  RouteEnterHandler,
+  UseRouteEnterOptions,
+} from "./composables/useRouteEnter.svelte";
 
 export type { Navigator } from "@real-router/core";
 

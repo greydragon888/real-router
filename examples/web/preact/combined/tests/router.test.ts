@@ -188,14 +188,14 @@ describe("Custom plugin — lifecyclePluginFactory", () => {
 
     vi.useFakeTimers();
 
-    await router.navigate("products.list");
+    await router.navigate("products");
 
-    expect(store.get("products.list:loading")).toBe(true);
+    expect(store.get("products:loading")).toBe(true);
 
     await vi.advanceTimersByTimeAsync(300);
 
-    expect(store.get("products.list:loading")).toBe(false);
-    expect(store.get("products.list")).toEqual(
+    expect(store.get("products:loading")).toBe(false);
+    expect(store.get("products")).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: "Laptop" }),
         expect.objectContaining({ name: "Keyboard" }),

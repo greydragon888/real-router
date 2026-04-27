@@ -110,6 +110,8 @@ All inject functions must be called within an injection context (constructor, fi
 | `injectRouteUtils()`                        | `RouteUtils`                       | Never                                |
 | `injectRouterTransition()`                  | `Signal<RouterTransitionSnapshot>` | On transition start/end              |
 | `injectIsActiveRoute(name, params?, opts?)` | `Signal<boolean>`                  | On active state change               |
+| `injectRouteExit(handler, options?)`        | `void` — wraps `subscribeLeave` with abort + same-route guards            | Never (handler captured at injection time) |
+| `injectRouteEnter(handler, options?)`       | `void` — fires once on nav-driven mount via `effect()` + `transition.from` | Never (handler captured at injection time) |
 
 `RouteSignals` shape:
 
@@ -166,7 +168,47 @@ export class BackButtonComponent {
 export class ProgressComponent {
   readonly transition = injectRouterTransition();
 }
+
+// injectRouteExit — exit animations, draft autosave, AbortSignal-aware cleanup
+@Component({
+  selector: "app-fade-out",
+  template: `<div #box>...</div>`,
+})
+export class FadeOutComponent {
+  private el = viewChild.required<ElementRef<HTMLDivElement>>("box");
+
+  constructor() {
+    injectRouteExit(async ({ signal }) => {
+      const el = this.el().nativeElement;
+      el.classList.add("fade-out");
+      const cleanup = () => el.classList.remove("fade-out");
+      signal.addEventListener("abort", cleanup, { once: true });
+      el.getBoundingClientRect(); // style flush
+      await Promise.allSettled(el.getAnimations().map((a) => a.finished));
+      cleanup();
+    });
+  }
+}
+
+// injectRouteEnter — page-enter analytics, focus management, entry animations
+@Component({ selector: "app-page-enter", template: "" })
+export class PageEnterAnalyticsComponent {
+  constructor() {
+    injectRouteEnter(({ route, previousRoute }) => {
+      analytics.track("page_enter", {
+        route: route.name,
+        from: previousRoute.name,
+      });
+    });
+  }
+}
 ```
+
+> **Angular handler-reactivity:** `inject*` functions run once at construction,
+> so `handler` is captured at injection time. Pass a class method (stable
+> identity) and read signals **inside** the handler body to react to changes.
+> See [CLAUDE.md](./CLAUDE.md) → "injectRouteExit / injectRouteEnter Handler
+> Is Captured At Injection Time".
 
 ## Components
 
@@ -358,10 +400,27 @@ bootstrapApplication(AppComponent, {
 ```typescript
 interface RealRouterOptions {
   scrollRestoration?: ScrollRestorationOptions; // { mode?, anchorScrolling?, scrollContainer? }
+  viewTransitions?: boolean;
 }
 ```
 
 Restores scroll on back/forward, scrolls to top (or `#hash`) on push. Three modes: `"restore"` (default), `"top"`, `"manual"`. Custom containers via `scrollContainer: () => HTMLElement | null`. The utility is created by `provideEnvironmentInitializer` and torn down via `inject(DestroyRef)`. Options are a snapshot at bootstrap — not reactive to runtime changes. See [Scroll Restoration guide](https://github.com/greydragon888/real-router/wiki/Scroll-Restoration) for details.
+
+## View Transitions
+
+Opt-in animated route transitions via the browser's [View Transitions API](https://developer.mozilla.org/en-US/docs/Web/API/View_Transitions_API):
+
+```typescript
+import { provideRealRouter } from "@real-router/angular";
+
+bootstrapApplication(AppComponent, {
+  providers: [
+    provideRealRouter(router, { viewTransitions: true }),
+  ],
+});
+```
+
+No-op on unsupported browsers (Firefox as of 2026-04, SSR). Utility is created by `provideEnvironmentInitializer` at bootstrap and torn down via `inject(DestroyRef)`. Option is a snapshot at bootstrap — not reactive to runtime changes. Customization is pure CSS via `::view-transition-*` pseudo-elements and `view-transition-name` for hero morphs. See [View Transitions guide](https://github.com/greydragon888/real-router/wiki/View-Transitions) for patterns.
 
 ## Angular-Specific Patterns
 
@@ -460,7 +519,7 @@ const transitionSignal = sourceToSignal(createTransitionSource(router));
 Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 
 - [RouterProvider](https://github.com/greydragon888/real-router/wiki/RouterProvider) · [RouteView](https://github.com/greydragon888/real-router/wiki/RouteView) · [RouterErrorBoundary](https://github.com/greydragon888/real-router/wiki/RouterErrorBoundary) · [Scroll Restoration](https://github.com/greydragon888/real-router/wiki/Scroll-Restoration)
-- [injectRouter](https://github.com/greydragon888/real-router/wiki/injectRouter) · [injectRoute](https://github.com/greydragon888/real-router/wiki/injectRoute) · [injectRouteNode](https://github.com/greydragon888/real-router/wiki/injectRouteNode) · [injectNavigator](https://github.com/greydragon888/real-router/wiki/injectNavigator) · [injectRouteUtils](https://github.com/greydragon888/real-router/wiki/injectRouteUtils) · [injectRouterTransition](https://github.com/greydragon888/real-router/wiki/injectRouterTransition)
+- [injectRouter](https://github.com/greydragon888/real-router/wiki/injectRouter) · [injectRoute](https://github.com/greydragon888/real-router/wiki/injectRoute) · [injectRouteNode](https://github.com/greydragon888/real-router/wiki/injectRouteNode) · [injectNavigator](https://github.com/greydragon888/real-router/wiki/injectNavigator) · [injectRouteUtils](https://github.com/greydragon888/real-router/wiki/injectRouteUtils) · [injectRouterTransition](https://github.com/greydragon888/real-router/wiki/injectRouterTransition) · [injectRouteExit](https://github.com/greydragon888/real-router/wiki/injectRouteExit) · [injectRouteEnter](https://github.com/greydragon888/real-router/wiki/injectRouteEnter)
 
 ## Related Packages
 

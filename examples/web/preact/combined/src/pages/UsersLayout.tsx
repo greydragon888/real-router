@@ -13,7 +13,6 @@ import type { JSX } from "preact";
 const routeLabels: Record<string, string> = {
   home: "Home",
   users: "Users",
-  "users.list": "List",
 };
 
 function getLabel(name: string, params: Params): string {
@@ -99,7 +98,7 @@ function UserProfile(): JSX.Element {
       <div className="card">
         <p>Profile for user {id}</p>
       </div>
-      <Link routeName="users.list">← Back to list</Link>
+      <Link routeName="users">← Back to list</Link>
     </div>
   );
 }
@@ -114,32 +113,15 @@ export function UsersLayout(): JSX.Element | null {
   return (
     <div>
       <Breadcrumbs />
-      <div style={{ display: "flex", gap: "24px", marginTop: "16px" }}>
-        <nav style={{ minWidth: "120px" }}>
-          <Link
-            routeName="users.list"
-            activeClassName="active"
-            style={{
-              display: "block",
-              padding: "6px 12px",
-              textDecoration: "none",
-              color: "#555",
-              borderRadius: "4px",
-            }}
-          >
-            List
-          </Link>
-        </nav>
-        <div style={{ flex: 1 }}>
-          <RouteView nodeName="users">
-            <RouteView.Match segment="list">
-              <UsersList />
-            </RouteView.Match>
-            <RouteView.Match segment="profile">
-              <UserProfile />
-            </RouteView.Match>
-          </RouteView>
-        </div>
+      <div style={{ marginTop: "16px" }}>
+        <RouteView nodeName="users">
+          <RouteView.Self>
+            <UsersList />
+          </RouteView.Self>
+          <RouteView.Match segment="profile">
+            <UserProfile />
+          </RouteView.Match>
+        </RouteView>
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
-import { api } from "../../../shared/api";
-import { store } from "../../../shared/store";
+import { api } from "../../../../shared/api";
+import { store } from "../../../../shared/store";
 
 import type { Params, Route } from "@real-router/core";
 
@@ -48,21 +48,16 @@ export const routes: Route[] = [
   {
     name: "products",
     path: "/products",
-    forwardTo: "products.list",
-    children: [
-      {
-        name: "list",
-        path: "/list",
-        preload: () => async () => {
-          const data = await api.getProducts();
+    preload: () => async () => {
+      const data = await api.getProducts();
 
-          store.set("products.list", data);
-        },
-        onEnter: () => () => {
-          loadData("products.list", (signal) => api.getProducts(signal));
-        },
-        onLeave: () => abortPending,
-      },
+      store.set("products", data);
+    },
+    onEnter: () => () => {
+      loadData("products", (signal) => api.getProducts(signal));
+    },
+    onLeave: () => abortPending,
+    children: [
       {
         name: "detail",
         path: "/:id",

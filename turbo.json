@@ -25,6 +25,7 @@
       "outputs": ["dist/**"],
       "inputs": [
         "src/**/*.{ts,tsx,vue,svelte}",
+        "../../shared/dom-utils/**/*.ts",
         "tsdown.config.*",
         "tsconfig.json",
         "package.json"

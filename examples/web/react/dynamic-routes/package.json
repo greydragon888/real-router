@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "pnpm turbo run bundle --filter=...react-dynamic-routes-example",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",

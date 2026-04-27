@@ -3,10 +3,7 @@ export const routes = [
   {
     name: "users",
     path: "/users",
-    children: [
-      { name: "list", path: "/" },
-      { name: "profile", path: "/:id" },
-    ],
+    children: [{ name: "profile", path: "/:id" }],
   },
   {
     name: "dashboard",

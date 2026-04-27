@@ -1,0 +1,26 @@
+{
+  "name": "preact-motion-animations-example",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "predev": "pnpm turbo run bundle --filter=...preact-motion-animations-example",
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@real-router/browser-plugin": "workspace:^",
+    "@real-router/core": "workspace:^",
+    "@real-router/preact": "workspace:^",
+    "motion": "12.37.0",
+    "preact": "10.28.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.58.2",
+    "@preact/preset-vite": "2.10.5",
+    "typescript": "5.8.3",
+    "vite": "7.3.2"
+  }
+}

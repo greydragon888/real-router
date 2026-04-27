@@ -37,7 +37,9 @@ dist/
 │   ├── useRouteNode.svelte.js
 │   ├── useRouteUtils.svelte.js
 │   ├── useRouterTransition.svelte.js
-│   └── useIsActiveRoute.svelte.js
+│   ├── useIsActiveRoute.svelte.js
+│   ├── useRouteExit.svelte.js
+│   └── useRouteEnter.svelte.js
 └── RouterProvider.svelte
 ```
 
@@ -55,7 +57,8 @@ src/
 ├── createRouteContext.svelte.ts          # Helper — builds RouteContext from a reactive source (RouterProvider + useRouteNode)
 ├── types.ts                              # RouteContext, LinkProps
 ├── dom-utils/                            # Symlink → ../../shared/dom-utils
-│                                         # shouldNavigate, buildHref, buildActiveClassName, applyLinkA11y, createRouteAnnouncer
+│                                         # shouldNavigate, buildHref, buildActiveClassName, applyLinkA11y,
+│                                         # createRouteAnnouncer, createScrollRestoration, createViewTransitions
 ├── composables/
 │   ├── useRouter.svelte.ts               # Router instance from getContext (never reactive)
 │   ├── useNavigator.svelte.ts            # Navigator from getContext (never reactive)
@@ -63,7 +66,9 @@ src/
 │   ├── useRouteNode.svelte.ts            # Node-scoped subscription via createReactiveSource
 │   ├── useIsActiveRoute.svelte.ts        # Active state subscription (internal — used by Link)
 │   ├── useRouteUtils.svelte.ts
-│   └── useRouterTransition.svelte.ts
+│   ├── useRouterTransition.svelte.ts
+│   ├── useRouteExit.svelte.ts            # Wrap subscribeLeave with abort + same-route guards (handler captured at init)
+│   └── useRouteEnter.svelte.ts           # Fire on nav-driven mount via $effect + route.transition.from
 ├── actions/
 │   └── link.svelte.ts                    # createLinkAction factory (use:link directive)
 └── components/

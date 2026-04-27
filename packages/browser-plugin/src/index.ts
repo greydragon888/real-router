@@ -9,6 +9,7 @@ export { browserPluginFactory } from "./factory";
 export type {
   BrowserPluginOptions,
   BrowserContext,
+  BrowserDirection,
   BrowserSource,
 } from "./types";
 

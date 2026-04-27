@@ -4,15 +4,15 @@
 
   import type { Product } from "../../../../shared/api";
 
-  let products = $state(store.get("products.list") as Product[] | null);
-  let loading = $state(store.get("products.list:loading") as boolean | undefined);
-  let error = $state(store.get("products.list:error") as string | null | undefined);
+  let products = $state(store.get("products") as Product[] | null);
+  let loading = $state(store.get("products:loading") as boolean | undefined);
+  let error = $state(store.get("products:error") as string | null | undefined);
 
   $effect(() => {
     return store.subscribe(() => {
-      products = store.get("products.list") as Product[] | null;
-      loading = store.get("products.list:loading") as boolean | undefined;
-      error = store.get("products.list:error") as string | null | undefined;
+      products = store.get("products") as Product[] | null;
+      loading = store.get("products:loading") as boolean | undefined;
+      error = store.get("products:error") as string | null | undefined;
     });
   });
 </script>
