@@ -1,0 +1,26 @@
+{
+  "name": "solid-motion-animations-example",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "predev": "pnpm turbo run bundle --filter=...solid-motion-animations-example",
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@real-router/browser-plugin": "workspace:^",
+    "@real-router/core": "workspace:^",
+    "@real-router/solid": "workspace:^",
+    "solid-js": "1.9.5",
+    "solid-motionone": "1.0.4"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.58.2",
+    "typescript": "5.8.3",
+    "vite": "7.3.2",
+    "vite-plugin-solid": "2.11.11"
+  }
+}
