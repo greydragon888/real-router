@@ -1,5 +1,74 @@
 # @real-router/react
 
+## 0.21.0
+
+### Minor Changes
+
+- [#552](https://github.com/greydragon888/real-router/pull/552) [`1e9868e`](https://github.com/greydragon888/real-router/commit/1e9868ef02ed8f34f809fbd8bccd2a855d9a1fe2) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `useRouteEnter` hook ([#548](https://github.com/greydragon888/real-router/issues/548))
+
+  Symmetric counterpart to `useRouteExit` ([#544](https://github.com/greydragon888/real-router/issues/544)). Fires `handler` once when the component mounts as a result of a navigation, with the mount-time `{ route, previousRoute }` snapshot.
+
+  ```tsx
+  import { useRouteEnter } from "@real-router/react";
+
+  useRouteEnter(({ route, previousRoute }) => {
+    analytics.track("page_enter", {
+      route: route.name,
+      from: previousRoute.name,
+    });
+  });
+  ```
+
+  What the hook covers that ad-hoc `useEffect` + `useRoute()` doesn't:
+  - **Skip-initial** — handler is skipped when there is no `previousRoute` (i.e. first-load mount). Most consumers want to fire side effects only on real navigations, not on hydration.
+  - **StrictMode double-mount immunity** — in dev, React's StrictMode runs every effect twice to surface bugs. Without a guard, analytics fire twice, animations restart, focus jumps. The hook tracks the last-handled `route` reference and short-circuits the second pass.
+  - **Latest-handler ref** — handler can change identity on every render without re-running the effect.
+  - **Mount-time snapshot** — handler receives the values that were live at the moment of mount, not the latest ones.
+
+  Common scenarios covered: direction-aware entry animation (read `route.context.browser?.direction`), source-aware focus management (`route.context.browser?.source === "navigate"`), analytics page-enter events, request cancellation tied to navigation.
+
+  Race-safety: `useRoute()` is wired through `useSyncExternalStore` from `@real-router/sources`, so by the time the new component's effect runs, the snapshot is the post-commit one. The hook does not need a separate centralised buffer or new context — it consumes `useRoute()` directly.
+
+  Replication to Preact / Vue / Solid / Svelte / Angular tracked in [#547](https://github.com/greydragon888/real-router/issues/547).
+
+- [#552](https://github.com/greydragon888/real-router/pull/552) [`1e9868e`](https://github.com/greydragon888/real-router/commit/1e9868ef02ed8f34f809fbd8bccd2a855d9a1fe2) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `useRouteExit` hook ([#544](https://github.com/greydragon888/real-router/issues/544))
+
+  New React-side primitive for animation and side-effect coordination during the leave window.
+
+  **`useRouteExit(handler, options?)`** — wraps `router.subscribeLeave` with the universal guards: reentrant abort pre-check, same-route skip (`route.name === nextRoute.name`, opt-out via `skipSameRoute: false`), latest-handler ref so handler identity can change without resubscribing.
+
+  ```tsx
+  import { useRouteExit } from "@real-router/react";
+
+  useRouteExit(async ({ signal }) => {
+    await api.saveDraft(formState, { signal });
+  });
+  ```
+
+  The hook is general-purpose — animation is one case. Other scenarios: auto-save form drafts, cancel inflight requests, capture scroll position, optimistic-UI rollback, library-coordinated exit (motion's `AnimatePresence onExitComplete`).
+
+  Companion utility shipped alongside in `shared/dom-utils`:
+  - **`createDirectionTracker(router)`** — popstate-driven `data-nav-direction` on `<html>` for direction-aware CSS / library state. Must be installed **before** `router.usePlugin(browserPluginFactory())` due to popstate listener ordering. Used in `examples/web/react/animation-examples/route-animations`.
+
+  **Breaking (pre-1.0):** `createRouteAnimator` and the internal `awaitElementAnimations` helper are removed from `shared/dom-utils`. The single consumer (`route-animations` example) was rewritten as a presence-only React component (`<PageAnimator />`) built on top of `useRouteExit`, symmetric with `<HeroMorph />` and `<ListFlip />` already in that example. The 4-line CSS-class exit recipe (style flush + `Element.getAnimations()` + `Promise.allSettled`) is inlined where it runs — pedagogically clearer than a separate utility, no abstraction tax.
+
+  Migration if you used `createRouteAnimator(router, { exitClass, selector })` directly: write a small React component that calls `useRouteExit` with the same recipe. See `examples/web/react/animation-examples/route-animations/src/animations/PageAnimator.tsx` for the canonical 30-line implementation.
+
+  Replication to Preact / Vue / Solid / Svelte / Angular tracked in [#547](https://github.com/greydragon888/real-router/issues/547).
+
+- [#552](https://github.com/greydragon888/real-router/pull/552) [`1e9868e`](https://github.com/greydragon888/real-router/commit/1e9868ef02ed8f34f809fbd8bccd2a855d9a1fe2) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `viewTransitions` prop on `<RouterProvider>` for View Transitions API integration ([#498](https://github.com/greydragon888/real-router/issues/498))
+
+  Opt in with `<RouterProvider router={router} viewTransitions>` to animate route transitions via the browser's View Transitions API. The prop is a boolean — utility is either enabled or no-op (SSR, Firefox without VT support).
+
+  Customization is pure CSS via `::view-transition-*` pseudo-elements and `view-transition-name`. See the [View Transitions wiki page](https://github.com/greydragon888/real-router/wiki/View-Transitions) for patterns (hero morph, per-area transitions, direction-aware animations).
+
+  The utility lives in `shared/dom-utils/` as `createViewTransitions(router)` — same architectural pattern as `createScrollRestoration` ([#497](https://github.com/greydragon888/real-router/issues/497)) and `createRouteAnnouncer`. It uses only the public `subscribeLeave` + `subscribe` router API.
+
+### Patch Changes
+
+- Updated dependencies [[`1e9868e`](https://github.com/greydragon888/real-router/commit/1e9868ef02ed8f34f809fbd8bccd2a855d9a1fe2)]:
+  - @real-router/core@0.50.2
+
 ## 0.20.0
 
 ### Minor Changes
