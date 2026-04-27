@@ -68,6 +68,8 @@ All hooks that subscribe to route state return `Accessor<T>` — call the access
 | `useRouterTransition()`   | `Accessor<RouterTransitionSnapshot>` | On transition start/end              |
 | `useRouteStore()`         | `RouteState` (store)                 | Granular — per-property              |
 | `useRouteNodeStore(name)` | `RouteState` (store)                 | Granular — per-property, node-scoped |
+| `useRouteExit(handler, options?)`  | `void` — wraps `subscribeLeave` with abort + same-route guards            | Never (handler captured at hook call) |
+| `useRouteEnter(handler, options?)` | `void` — fires once on nav-driven mount via `useRoute()` + `transition.from` | Never (handler captured at hook call) |
 
 ### Store-Based Hooks (Granular Reactivity)
 
@@ -137,7 +139,38 @@ function GlobalProgress() {
     </Show>
   );
 }
+
+// useRouteExit — exit animations, draft autosave, AbortSignal-aware cleanup
+function FadeOut() {
+  let ref: HTMLDivElement | undefined;
+  useRouteExit(async ({ signal }) => {
+    if (!ref) return;
+    ref.classList.add("fade-out");
+    const cleanup = () => ref!.classList.remove("fade-out");
+    signal.addEventListener("abort", cleanup, { once: true });
+    ref.getBoundingClientRect(); // style flush
+    await Promise.allSettled(ref.getAnimations().map((a) => a.finished));
+    cleanup();
+  });
+  return <div ref={ref}>...</div>;
+}
+
+// useRouteEnter — page-enter analytics, focus management, entry animations
+function PageEnterAnalytics() {
+  useRouteEnter(({ route, previousRoute }) => {
+    analytics.track("page_enter", {
+      route: route.name,
+      from: previousRoute.name,
+    });
+  });
+  return null;
+}
 ```
+
+> **Solid handler-reactivity:** components run once, so `handler` is captured at
+> hook-call time. To vary behavior over time, read signals **inside** the
+> handler body. See [CLAUDE.md](./CLAUDE.md) → "useRouteExit / useRouteEnter
+> Handler Is Captured At Init".
 
 ## Components
 
@@ -349,7 +382,7 @@ No-op on unsupported browsers (Firefox as of 2026-04, SSR). Prop is read once on
 Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 
 - [RouterProvider](https://github.com/greydragon888/real-router/wiki/RouterProvider) · [RouteView](https://github.com/greydragon888/real-router/wiki/RouteView) · [RouterErrorBoundary](https://github.com/greydragon888/real-router/wiki/RouterErrorBoundary) · [Link](https://github.com/greydragon888/real-router/wiki/Link) · [Scroll Restoration](https://github.com/greydragon888/real-router/wiki/Scroll-Restoration) · [View Transitions](https://github.com/greydragon888/real-router/wiki/View-Transitions)
-- [useRouter](https://github.com/greydragon888/real-router/wiki/useRouter) · [useRoute](https://github.com/greydragon888/real-router/wiki/useRoute) · [useRouteNode](https://github.com/greydragon888/real-router/wiki/useRouteNode) · [useNavigator](https://github.com/greydragon888/real-router/wiki/useNavigator) · [useRouteUtils](https://github.com/greydragon888/real-router/wiki/useRouteUtils) · [useRouterTransition](https://github.com/greydragon888/real-router/wiki/useRouterTransition)
+- [useRouter](https://github.com/greydragon888/real-router/wiki/useRouter) · [useRoute](https://github.com/greydragon888/real-router/wiki/useRoute) · [useRouteNode](https://github.com/greydragon888/real-router/wiki/useRouteNode) · [useNavigator](https://github.com/greydragon888/real-router/wiki/useNavigator) · [useRouteUtils](https://github.com/greydragon888/real-router/wiki/useRouteUtils) · [useRouterTransition](https://github.com/greydragon888/real-router/wiki/useRouterTransition) · [useRouteExit](https://github.com/greydragon888/real-router/wiki/useRouteExit) · [useRouteEnter](https://github.com/greydragon888/real-router/wiki/useRouteEnter)
 
 ## Examples
 

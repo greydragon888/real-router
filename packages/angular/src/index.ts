@@ -10,6 +10,17 @@ export {
   injectRouteUtils,
   injectRouterTransition,
   injectIsActiveRoute,
+  injectRouteExit,
+  injectRouteEnter,
+} from "./functions";
+
+export type {
+  RouteExitContext,
+  RouteExitHandler,
+  UseRouteExitOptions,
+  RouteEnterContext,
+  RouteEnterHandler,
+  UseRouteEnterOptions,
 } from "./functions";
 
 export { RouteView } from "./components/RouteView";
