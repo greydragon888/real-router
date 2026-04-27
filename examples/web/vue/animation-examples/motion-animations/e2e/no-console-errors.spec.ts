@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-// Regression guard: motion + AnimatePresence + key changes should not
+// Regression guard: Vue's <Transition> + :key changes should not
 // produce console errors during normal navigation. Walks the sidebar to
 // exercise every route, then asserts no console errors.
 test.describe("No console or page errors during navigation", () => {
@@ -29,7 +29,7 @@ test.describe("No console or page errors during navigation", () => {
     }
 
     const filteredConsole = consoleErrors.filter(
-      (text) => !text.includes("React DevTools") && !text.includes("[vite]"),
+      (text) => !text.includes("Vue DevTools") && !text.includes("[vite]"),
     );
 
     expect(pageErrors).toEqual([]);

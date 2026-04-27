@@ -32,8 +32,8 @@ test.describe("Abort safety", () => {
     ).toBeVisible();
 
     // After the dust settles, no leftover exit class. The cancelled
-    // navigations had their useEffect cleanup remove the wrapper anyway,
-    // but verify defensively.
+    // navigations had their onScopeDispose cleanup remove the wrapper
+    // anyway, but verify defensively.
     await page.waitForFunction(
       () =>
         document.querySelectorAll(".fade-out, .slide-out").length === 0,

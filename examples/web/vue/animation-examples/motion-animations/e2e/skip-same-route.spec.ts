@@ -13,7 +13,8 @@ test.describe("Skip same-route navigation", () => {
     await page.waitForTimeout(1100);
 
     // SAME_STATES rejection short-circuits before render — route.name
-    // does not change, AnimatePresence is not triggered.
+    // does not change, the exitToken is not bumped, and the keyed <div>
+    // does not remount, so <Transition> is not triggered.
     await page.getByRole("link", { name: "About" }).first().click();
     await page.waitForTimeout(200);
 

@@ -6,17 +6,17 @@ Demonstrates route animations via CSS `@keyframes` + an async `subscribeLeave` l
 
 |                                       | `view-transitions/`                            | `route-animations/` (this)                       | `page-animations/`                  | `motion-animations/`               |
 | ------------------------------------- | ---------------------------------------------- | ------------------------------------------------ | ----------------------------------- | ---------------------------------- |
-| Mechanism                             | `document.startViewTransition()` + VT pseudos  | `subscribeLeave` returns Promise + `@keyframes`  | Per-page `useRouteAnimation` hook   | `<Presence>` from `solid-motionone` |
-| Router coordination                   | Promise blocks pipeline                        | Promise blocks pipeline                          | Promise blocks pipeline             | Promise blocks pipeline (via `onMotionComplete`) |
-| Browser support                       | Chromium 111+, Safari 18+, Firefox 147+        | All browsers with CSS animations                 | All browsers with CSS animations    | All browsers with WAAPI            |
-| Exit / entry timing                   | Always parallel crossfade                      | Sequential by default (router blocks on Promise) | Sequential per page                 | Sequential (`exitBeforeEnter`)     |
+| Mechanism                             | `document.startViewTransition()` + VT pseudos  | `subscribeLeave` returns Promise + `@keyframes`  | Per-page `useRouteAnimation` hook   | Vue's `<Transition>` + `:key`      |
+| Router coordination                   | Promise blocks pipeline                        | Promise blocks pipeline                          | Promise blocks pipeline             | Promise blocks pipeline (via `@after-leave`) |
+| Browser support                       | Chromium 111+, Safari 18+, Firefox 147+        | All browsers with CSS animations                 | All browsers with CSS animations    | All browsers with CSS transitions  |
+| Exit / entry timing                   | Always parallel crossfade                      | Sequential by default (router blocks on Promise) | Sequential per page                 | Sequential (`mode="out-in"`)       |
 | Per-route customisation               | Free via `view-transition-name` per scope      | Free via `data-route-anim` attribute             | Per-page class names                | Single page-level transition       |
-| Hero morph (FLIP between routes)      | Free via matching `view-transition-name` pairs | Manual via `getBoundingClientRect` + WAAPI       | Out of scope (cross-page state)     | **Not built in** — Motion One ships no `layoutId` |
-| List FLIP with ghost exits            | Free                                           | Implemented (≈80 LOC)                            | Local FLIP via `useListFlip` view-local | **Not built in** — Motion One ships no `layout` |
+| Hero morph (FLIP between routes)      | Free via matching `view-transition-name` pairs | Manual via `getBoundingClientRect` + WAAPI       | Out of scope (cross-page state)     | **Not built in** — Vue's `<Transition>` is per-element |
+| List FLIP with ghost exits            | Free                                           | Implemented (≈80 LOC)                            | Local FLIP via `useListFlip` view-local | Available via `<TransitionGroup>` (in-list only, not cross-route) |
 | Persistent shell crossfade            | Free (pixel-level snapshot diff)               | Granular `[data-route-root]` placement           | Out of scope (no shell)             | Out of scope (no shell)            |
 | Rendering suppression during playback | Yes — clicks land on overlay                   | None — DOM stays interactive                     | None                                | None                               |
-| External dependency                   | None                                           | None                                             | None                                | `solid-motionone` (~30 KB min+gzip) |
-| Code size                             | ~30 LOC utility + ~120 LOC policy              | ~30 LOC helper + ~380 LOC across three hooks     | ~120 LOC hook + per-page binding    | ~85 LOC App + ~75 LOC coordination |
+| External dependency                   | None                                           | None                                             | None                                | None — Vue's `<Transition>` is a language feature |
+| Code size                             | ~30 LOC utility + ~120 LOC policy              | ~30 LOC helper + ~380 LOC across three hooks     | ~120 LOC hook + per-page binding    | ~115 LOC App + ~75 LOC coordination |
 
 Pick `route-animations/` if you need Firefox 145- support, custom timing per route, full router coordination (URL + UI in lock-step), and the most control over choreography. The other three trade some of that for simpler code or library ergonomics.
 
@@ -111,17 +111,17 @@ The recipe relies on three router behaviours and two CSS conventions:
 }
 ```
 
-The wiring lives directly in `App.tsx` — no separate `Products.tsx` shell component. **`[data-route-root]` lives on `ProductsList` and `ProductDetail` themselves**, on each leaf's outermost wrapper:
+The wiring lives directly in `App.vue` — no separate `Products.vue` shell component. **`[data-route-root]` lives on `ProductsList` and `ProductDetail` themselves**, on each leaf's outermost wrapper:
 
-```tsx
-// App.tsx
+```vue
+<!-- App.vue -->
 <RouteView.Match segment="products">
   <RouteView nodeName="products">
     <RouteView.Self>
-      <ProductsList />         {/* has data-route-root inside */}
+      <ProductsList />         <!-- has data-route-root inside -->
     </RouteView.Self>
     <RouteView.Match segment="detail">
-      <ProductDetail />        {/* has data-route-root inside */}
+      <ProductDetail />        <!-- has data-route-root inside -->
     </RouteView.Match>
   </RouteView>
 </RouteView.Match>
@@ -137,7 +137,7 @@ The sibling `view-transitions/` example needs `setTimeout(0)` inside its `subscr
 
 The CSS-classes recipe has no equivalent suppression. `subscribeLeave` returns a Promise; the router is genuinely waiting on `animationend`, not on a deferred coordinated through the rendering pipeline. After `animationend` resolves, the router activates the new state synchronously, Vue commits, and the entry keyframe plays on the new `[data-route-root]:not([data-leaving])` element via the natural CSS animation-on-mount semantics.
 
-The only `setTimeout(0)` in this example is in the hero-morph branch (after `subscribe` fires) — and there it is needed for the same reason `useSyncExternalStore` has commit-phase subtleties: we need to wait one task for Vue to commit before measuring the destination element's rect.
+The only `setTimeout(0)` in this example is in the hero-morph branch (after `subscribe` fires) — and there it is needed for the same reason Vue's reactive update queues into a microtask: `router.subscribe` fires synchronously when the router commits the new state, but Vue's reactive system flushes its DOM updates on the next microtask. We need to wait one task for Vue to commit before measuring the destination element's rect.
 
 ## Known limits
 

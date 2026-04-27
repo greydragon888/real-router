@@ -1,12 +1,13 @@
 import { expect, test } from "@playwright/test";
 
-// Hero morph via layoutId. ProductsList thumbnails carry
-// layoutId="product-${id}"; ProductDetail cover carries the matching
-// layoutId. When the route changes from products → products.detail under
-// AnimatePresence mode="wait", the library caches layout info from the
-// unmounting thumb and animates the cover from the cached position/size.
-test.describe("layoutId hero morph", () => {
-  test("clicking a product card pairs thumb and cover via layoutId", async ({
+// Vue's built-in <Transition> has no layoutId / hero-morph primitive —
+// products → products.detail navigates with the standard page-level
+// fade + slide. This test verifies the nested-route navigation completes
+// successfully and the cover renders at full size on the detail page.
+// For an inverse-FLIP hero morph in Vue, see route-animations/'s
+// useHeroMorph composable.
+test.describe("Nested-route navigation (no hero morph in Vue)", () => {
+  test("clicking a product card navigates to the detail page and renders the cover", async ({
     page,
   }) => {
     await page.goto("/products");
@@ -20,9 +21,8 @@ test.describe("layoutId hero morph", () => {
     await page.getByRole("link", { name: /Crimson Flask/ }).click();
     await page.waitForURL(/\/products\/1/);
 
-    // After mount the cover element exists with the matching data already
-    // pinned by layoutId. Cover should be present and end up at its full
-    // size (transform identity post-FLIP).
+    // After mount the cover element exists with full size (no inverse-
+    // FLIP transform — Vue's <Transition> is per-element entry/exit).
     await page.waitForSelector(".product-cover", { timeout: 2000 });
     await page.waitForTimeout(1500);
 
@@ -36,18 +36,5 @@ test.describe("layoutId hero morph", () => {
     expect(finalCover).not.toBeNull();
     expect(finalCover!.width).toBeGreaterThan(100);
     expect(finalCover!.height).toBeGreaterThan(100);
-
-    // The cover was rendered through a motion-component (layoutId) — the
-    // detail page navigated successfully, no errors.
-    const coverHasMotionMarkers = await page.evaluate(() => {
-      const cover = document.querySelector<HTMLElement>(".product-cover");
-      // motion-components inject a `style` attribute. If layoutId pairing
-      // ran, the element has had transform property set and unset by the
-      // library at some point. Presence of the element with correct
-      // dimensions is sufficient — motion's internals are an
-      // implementation detail.
-      return cover !== null;
-    });
-    expect(coverHasMotionMarkers).toBe(true);
   });
 });

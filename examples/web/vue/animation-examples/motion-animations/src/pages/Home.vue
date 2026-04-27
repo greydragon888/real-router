@@ -46,10 +46,13 @@
       <li>
         <strong>Reduced motion</strong>: with
         <code>prefers-reduced-motion: reduce</code>, the
+        <code>@media</code> block in <code>App.vue</code> collapses
         <code>.page-enter-active</code> /
-        <code>.page-leave-active</code> media query disables the CSS
-        transition. The router is unblocked synchronously via the
-        empty getAnimations() fast-path.
+        <code>.page-leave-active</code> to
+        <code>transition: none</code>. Vue still fires
+        <code>@after-leave</code> on the next frame, so the router
+        unblocks immediately and navigation completes without visible
+        animation.
       </li>
       <li>
         <strong>Abort safety (rapid clicks)</strong>: click sidebar

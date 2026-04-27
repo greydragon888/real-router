@@ -5,7 +5,7 @@ import { expect, test } from "@playwright/test";
 // must NOT animate. Named scopes (product-list) may animate, but the
 // full-screen curtain/slide on root would drown them out.
 //
-// Mechanism: main.tsx sets html.vt-query-only on same-route navigation,
+// Mechanism: main.ts sets html.vt-query-only on same-route navigation,
 // and transitions.css disables root keyframes under that class.
 
 test.describe("Query-only suppresses root animation", () => {
@@ -55,7 +55,7 @@ test.describe("Query-only suppresses root animation", () => {
       return Array.from(names);
     });
 
-    // html.vt-query-only must be applied by main.tsx.
+    // html.vt-query-only must be applied by main.ts.
     const hasQueryOnlyClass = await page.evaluate(() =>
       document.documentElement.classList.contains("vt-query-only"),
     );

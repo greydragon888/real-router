@@ -1,10 +1,11 @@
 import { expect, test } from "@playwright/test";
 
 // Router-coordinated semantics: subscribeLeave returns a Promise that
-// resolves on onExitComplete. The router blocks until exit finishes — so
-// `await router.navigate(...)` resolves only after the user can see the
-// new route. URL update via browser-plugin's onTransitionSuccess fires
-// post-Promise-resolution, keeping URL and UI in lock-step.
+// resolves on Vue's @after-leave event. The router blocks until exit
+// finishes — so `await router.navigate(...)` resolves only after the
+// user can see the new route. URL update via browser-plugin's
+// onTransitionSuccess fires post-Promise-resolution, keeping URL and UI
+// in lock-step.
 //
 // Verify: time between click and the new heading visible should be at
 // least the exit-animation duration (minus a small epsilon for jitter).

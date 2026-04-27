@@ -1,10 +1,14 @@
 import { expect, test } from "@playwright/test";
 
-// motion.li layout — list reorder FLIP. When the products array changes
-// order (sort change), the library reads each item's position before and
-// after re-render and animates the difference. Stable key={id} is required.
-test.describe("List layout reorder", () => {
-  test("sort change triggers layout animations on product cards", async ({
+// Vue's built-in <Transition> has no per-list layout-animation
+// primitive — the products list re-renders in the new order without
+// inverse-FLIP per item (Vue ships <TransitionGroup> for in-list
+// animations, but motion-animations uses a single page-level
+// <Transition>). This test verifies the sort change causes a DOM
+// re-order — items end up at their new positions; for cross-route /
+// in-list FLIP, see route-animations/'s useListFlip composable.
+test.describe("List reorder (DOM order swap, no per-item FLIP)", () => {
+  test("sort change re-renders the product cards in reversed order", async ({
     page,
   }) => {
     await page.goto("/products");
@@ -25,10 +29,10 @@ test.describe("List layout reorder", () => {
     await page.waitForURL(/sort=desc/);
     await page.waitForTimeout(1500);
 
-    // After sort change DOM order should be reversed. motion.li layout
-    // animates positions transparently; the visual result is items at
-    // their new spots. Verify by comparing order — library FLIP'd them
-    // there without us managing positions manually.
+    // After sort change DOM order should be reversed. Vue re-renders
+    // the list in the new order; items snap to their new spots without
+    // inverse-FLIP (this is the expected trade-off of the page-level
+    // <Transition> approach).
     const finalOrder = await page.evaluate(() =>
       Array.from(
         document.querySelectorAll<HTMLElement>(".product-card .product-name"),

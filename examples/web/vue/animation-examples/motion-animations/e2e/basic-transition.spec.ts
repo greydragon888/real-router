@@ -14,7 +14,7 @@ test.describe("Basic transition", () => {
     ).toBeVisible();
   });
 
-  test("WAAPI animation runs on the page-level motion.div during navigation", async ({
+  test("CSS transition runs on the page-level keyed div during navigation", async ({
     page,
   }) => {
     await page.goto("/");
@@ -22,8 +22,8 @@ test.describe("Basic transition", () => {
       page.getByRole("heading", { name: "Motion Animations" }),
     ).toBeVisible();
 
-    // Click About; before the navigation settles, motion library should
-    // have a running animation on the page-level <motion.div>.
+    // Click About; before the navigation settles, Vue's <Transition>
+    // should have a running CSS transition on the page-level keyed <div>.
     await Promise.all([
       page.getByRole("link", { name: "About" }).first().click(),
       page.waitForFunction(() => document.getAnimations().length > 0, null, {
