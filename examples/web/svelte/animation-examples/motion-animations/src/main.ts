@@ -4,19 +4,13 @@ import { mount } from "svelte";
 
 import App from "./App.svelte";
 import { routes } from "./routes";
-import { installViewTransitionPolicy } from "./vt-policy";
 
-import "../../../../shared/styles.css";
-import "./styles/transitions.css";
+import "../../../../../shared/styles.css";
+import "./styles/styles.css";
 
-const router = createRouter(routes, {
-  defaultRoute: "home",
-  allowNotFound: true,
-});
+const router = createRouter(routes);
 
 router.usePlugin(browserPluginFactory());
-
-installViewTransitionPolicy(router);
 
 await router.start();
 
