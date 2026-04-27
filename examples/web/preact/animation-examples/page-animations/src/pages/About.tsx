@@ -40,14 +40,14 @@ export function About() {
 
       <h2>page-animations/ (this example)</h2>
       <p>
-        Distributed via <code>useRouteAnimation(ref, …)</code> per page. Each
-        page subscribes to the router for its own lifetime; no central
-        module. Encapsulated, simpler mental model, less boilerplate per new
-        page after the hook is in place. The trade-off: each
-        <code> useEffect</code> only sees its own page. Hero morph between
-        routes needs shared state because the source rect is captured in
-        page A but the destination is in page B. Same for list FLIP with
-        ghost exits — survivors live in the new page&apos;s DOM, ghosts live
+        Distributed via <code>useRouteAnimation(ref, …)</code> per page.
+        Each page subscribes to the router for its own lifetime; no central
+        module. Encapsulated, simpler mental model, less boilerplate per
+        new page after the hook is in place. The trade-off: each component
+        instance only sees its own lifecycle. Hero morph between routes
+        needs shared state because the source rect is captured in page A
+        but the destination is in page B. Same for list FLIP with ghost
+        exits — survivors live in the new page&apos;s DOM, ghosts live
         nowhere unless something orchestrates them centrally.
       </p>
 

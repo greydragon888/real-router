@@ -5,7 +5,7 @@
  * via WAAPI under the hood. This file holds only layout / typography /
  * cosmetic styling for the example's page elements. See `App.tsx` for the
  * top-level <AnimatePresence>/<motion.div> wrapper that animates page
- * entry / exit, and `pages/Products.tsx` + `pages/ProductDetail.tsx` for
+ * entry / exit, and `pages/ProductsList.tsx` + `pages/ProductDetail.tsx` for
  * inner motion components (`layoutId` for hero morph, `layout` for list
  * reorder).
  */

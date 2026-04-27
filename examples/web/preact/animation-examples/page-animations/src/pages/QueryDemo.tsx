@@ -41,9 +41,9 @@ export function QueryDemo() {
         <code>useListFlip</code>: survivors translate from old to new
         positions (inverse-FLIP from a <code>getBoundingClientRect</code>{" "}
         diff in <code>useLayoutEffect</code>); newly-visible items fade in;
-        items removed by a narrowing filter fade out via cloned ghosts pinned
-        at their last-known rect through a <code>MutationObserver</code> on
-        the container. View-local — no router events, no shared state
+        items removed by a narrowing filter fade out via cloned ghosts
+        reconstructed from <code>outerHTML</code> and pinned at their
+        last-known rect. View-local — no router events, no shared state
         between components.
       </p>
 
