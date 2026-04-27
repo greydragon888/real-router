@@ -23,6 +23,6 @@
     "@angular/compiler": "21.2.8",
     "@angular/compiler-cli": "21.2.8",
     "sirv-cli": "3.0.1",
-    "typescript": "6.0.2"
+    "typescript": "6.0.3"
   }
 }
