@@ -3,7 +3,7 @@ import type { Router } from "@real-router/core";
 /**
  * View-Transition scope-gating policy for this demo.
  *
- * The VT utility in `@real-router/preact` (via `viewTransitions` prop)
+ * The VT utility in `@real-router/svelte` (via `viewTransitions` prop)
  * handles only the generic pipeline: `subscribeLeave` →
  * `startViewTransition` → `subscribe` → `setTimeout(0)` → resolve. It is
  * intentionally policy-free — it does not decide which scopes to promote,
@@ -25,12 +25,12 @@ import type { Router } from "@real-router/core";
  * Plus `.vt-hero-active` is toggled on exactly one DOM element per
  * hero-morph navigation: the source thumb/cover in `subscribeLeave` (old
  * DOM), and the destination thumb/cover in `router.subscribe` via
- * `setTimeout(0)` (new DOM, after Preact commits). A single CSS rule
+ * `setTimeout(0)` (new DOM, after Svelte commits). A single CSS rule
  * promotes that element to `view-transition-name: hero`; the matching
  * names on both sides let the browser FLIP-morph them.
  *
  * @returns a teardown function that unsubscribes all listeners and
- *          removes the popstate listener. Not used by main.tsx (policy
+ *          removes the popstate listener. Not used by main.ts (policy
  *          lives for the page lifetime), but available for tests or HMR
  *          cleanup if needed.
  */
@@ -101,8 +101,8 @@ export function installViewTransitionPolicy(router: Router): () => void {
   });
 
   const offSuccess = router.subscribe(() => {
-    // After Preact commits the new DOM, find the target element on the
-    // destination page and mark it. setTimeout(0) defers past Preact's
+    // After Svelte commits the new DOM, find the target element on the
+    // destination page and mark it. setTimeout(0) defers past Svelte's
     // commit and runs before the VT utility's own setTimeout — so the
     // class is in place when the browser captures the new snapshot.
     const heroId = html.dataset.vtHeroId ?? null;

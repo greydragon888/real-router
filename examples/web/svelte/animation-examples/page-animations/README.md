@@ -3,20 +3,20 @@
 Distributed per-page route-animation recipe: each page mounts the
 `useRouteAnimation(() => ref, { entryClass, exitClass })` hook in its own component, which subscribes to `router.subscribeLeave` / `router.subscribe` (via `useRouteExit` / `useRouteEnter` from `@real-router/svelte`) for as long as the page is mounted. The hook is route-agnostic — pages declare their own class names.
 
-This is the third first-class animation example in the monorepo, alongside `view-transitions/` (browser VT API), `route-animations/` (centralised hooks), and `motion-animations/` (library-driven via `motion-svelte`).
+This is the third first-class animation example in the monorepo, alongside `view-transitions/` (browser VT API), `route-animations/` (centralised composables), and `motion-animations/` (library-free via Svelte's built-in `transition:` directives).
 
 ## Four approaches at a glance
 
 |                                        | `view-transitions/`        | `route-animations/`              | `page-animations/` (this)           | `motion-animations/`               |
 | -------------------------------------- | -------------------------- | -------------------------------- | ----------------------------------- | ---------------------------------- |
-| Mechanism                              | `document.startViewTransition` | Centralised hooks + DOM markers | Per-page `useRouteAnimation` hook   | `<Presence>` from `motion-svelte` |
-| Router coordination                    | Promise blocks pipeline    | Promise blocks pipeline          | Promise blocks pipeline             | Promise blocks pipeline (via `onMotionComplete`) |
-| Where animation logic lives            | One CSS file               | Three thin hooks in `App`        | Each page component                 | App.tsx                            |
+| Mechanism                              | `document.startViewTransition` | Centralised composables + DOM markers | Per-page `useRouteAnimation` composable | Svelte's `transition:fly` + `{#key}` |
+| Router coordination                    | Promise blocks pipeline    | Promise blocks pipeline          | Promise blocks pipeline             | Promise blocks pipeline (via `onoutroend`) |
+| Where animation logic lives            | One CSS file               | Three thin composables in inner host | Each page component             | TransitionHost.svelte (~30 LOC of coordination) |
 | Boilerplate per new route              | None (CSS only)            | Add `data-route-root` attribute  | Add `let ref` + `useRouteAnimation` call | None (single page-level transition) |
-| Cross-route hero morph                 | Free (matching VT names)   | Manual WAAPI (`useHeroMorph`)    | Out of scope (cross-page state)     | Not built in (Motion One)          |
-| List FLIP with ghost exits             | Free                       | Implemented (`useListFlip`)      | Local FLIP via view-local hook      | Not built in (Motion One)          |
+| Cross-route hero morph                 | Free (matching VT names)   | Manual WAAPI (`useHeroMorph`)    | Out of scope (cross-page state)     | Not built in (per-element transitions) |
+| List FLIP with ghost exits             | Free                       | Implemented (`useListFlip`)      | Local FLIP via view-local composable | Not built in (per-element transitions) |
 | Persistent-shell crossfade             | Free                       | Achievable via marker placement  | Out of scope (no nested shell)      | Out of scope                       |
-| External dependency                    | None                       | None                             | None                                | `motion-svelte` (~30 KB)         |
+| External dependency                    | None                       | None                             | None                                | None — Svelte's transitions are language features |
 | Browser support                        | Chromium 111+ / Safari 18+ / Firefox 147+ | Every browser with WAAPI | Every browser with CSS animations + WAAPI | Every browser with WAAPI    |
 
 Pick `page-animations/` if your animations are entry / exit per page with no cross-route coordination, and you prefer animation logic next to the page that owns it.

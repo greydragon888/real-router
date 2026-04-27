@@ -52,10 +52,12 @@
 
   <h2>motion-animations/</h2>
   <p>
-    Router-coordinated via <code>motion-svelte</code> — Svelte bindings
-    around the framework-agnostic Motion One engine. Same URL-and-UI
-    lock-step semantics as the other three examples, but the entry /
-    exit choreography is expressed through library primitives.
+    Router-coordinated via Svelte's built-in <code>transition:</code>
+    directives (<code>fly</code>, <code>fade</code>) wrapped in a
+    <code>{`{#key}`}</code> block keyed off an <code>exitToken</code>.
+    Library-free, language-native. Same URL-and-UI lock-step semantics
+    as the other three examples, but the entry / exit choreography is
+    expressed through Svelte's first-class transition directives.
   </p>
 
   <h2>Decision tree</h2>

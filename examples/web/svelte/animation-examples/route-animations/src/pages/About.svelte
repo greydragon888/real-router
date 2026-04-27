@@ -78,8 +78,9 @@
       Use <code>page-animations/</code>.
     </li>
     <li>
-      Want library-driven page transitions via <code>motion-svelte</code>?
-      Use <code>motion-animations/</code>.
+      Want library-free, language-native page transitions via Svelte's
+      built-in <code>transition:</code> directives? Use
+      <code>motion-animations/</code>.
     </li>
   </ul>
 

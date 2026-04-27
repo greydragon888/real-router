@@ -6,17 +6,17 @@ Demonstrates route animations via CSS `@keyframes` + an async `subscribeLeave` l
 
 |                                       | `view-transitions/`                            | `route-animations/` (this)                       | `page-animations/`                  | `motion-animations/`               |
 | ------------------------------------- | ---------------------------------------------- | ------------------------------------------------ | ----------------------------------- | ---------------------------------- |
-| Mechanism                             | `document.startViewTransition()` + VT pseudos  | `subscribeLeave` returns Promise + `@keyframes`  | Per-page `useRouteAnimation` hook   | `<Presence>` from `motion-svelte` |
-| Router coordination                   | Promise blocks pipeline                        | Promise blocks pipeline                          | Promise blocks pipeline             | Promise blocks pipeline (via `onMotionComplete`) |
+| Mechanism                             | `document.startViewTransition()` + VT pseudos  | `subscribeLeave` returns Promise + `@keyframes`  | Per-page `useRouteAnimation` composable | Svelte's `transition:fly` + `{#key}` |
+| Router coordination                   | Promise blocks pipeline                        | Promise blocks pipeline                          | Promise blocks pipeline             | Promise blocks pipeline (via `onoutroend`) |
 | Browser support                       | Chromium 111+, Safari 18+, Firefox 147+        | All browsers with CSS animations                 | All browsers with CSS animations    | All browsers with WAAPI            |
-| Exit / entry timing                   | Always parallel crossfade                      | Sequential by default (router blocks on Promise) | Sequential per page                 | Sequential (`exitBeforeEnter`)     |
+| Exit / entry timing                   | Always parallel crossfade                      | Sequential by default (router blocks on Promise) | Sequential per page                 | Sequential (Svelte queues out before in) |
 | Per-route customisation               | Free via `view-transition-name` per scope      | Free via `data-route-anim` attribute             | Per-page class names                | Single page-level transition       |
-| Hero morph (FLIP between routes)      | Free via matching `view-transition-name` pairs | Manual via `getBoundingClientRect` + WAAPI       | Out of scope (cross-page state)     | **Not built in** — Motion One ships no `layoutId` |
-| List FLIP with ghost exits            | Free                                           | Implemented (≈80 LOC)                            | Local FLIP via `useListFlip` view-local | **Not built in** — Motion One ships no `layout` |
+| Hero morph (FLIP between routes)      | Free via matching `view-transition-name` pairs | Manual via `getBoundingClientRect` + WAAPI       | Out of scope (cross-page state)     | **Not built in** — Svelte transitions are per-element |
+| List FLIP with ghost exits            | Free                                           | Implemented (~230 LOC `useListFlip`)             | Local FLIP via `useListFlip` view-local | **Not built in** — same reason |
 | Persistent shell crossfade            | Free (pixel-level snapshot diff)               | Granular `[data-route-root]` placement           | Out of scope (no shell)             | Out of scope (no shell)            |
 | Rendering suppression during playback | Yes — clicks land on overlay                   | None — DOM stays interactive                     | None                                | None                               |
-| External dependency                   | None                                           | None                                             | None                                | `motion-svelte` (~30 KB min+gzip) |
-| Code size                             | ~30 LOC utility + ~120 LOC policy              | ~30 LOC helper + ~380 LOC across three hooks     | ~120 LOC hook + per-page binding    | ~85 LOC App + ~75 LOC coordination |
+| External dependency                   | None                                           | None                                             | None                                | None — Svelte's transitions are language features |
+| Code size                             | ~30 LOC utility + ~120 LOC policy              | ~30 LOC helper + ~380 LOC across three composables | ~120 LOC composable + per-page binding | ~75 LOC TransitionHost + ~75 LOC coordination |
 
 Pick `route-animations/` if you need Firefox 145- support, custom timing per route, full router coordination (URL + UI in lock-step), and the most control over choreography. The other three trade some of that for simpler code or library ergonomics.
 
@@ -111,20 +111,24 @@ The recipe relies on three router behaviours and two CSS conventions:
 }
 ```
 
-The wiring lives directly in `App.tsx` — no separate `Products.tsx` shell component. **`[data-route-root]` lives on `ProductsList` and `ProductDetail` themselves**, on each leaf's outermost wrapper:
+The wiring lives directly in `AnimationHost.svelte` (which `App.svelte` mounts inside `<RouterProvider>`) — no separate `Products.svelte` shell component. **`[data-route-root]` lives on `ProductsList` and `ProductDetail` themselves**, on each leaf's outermost wrapper:
 
-```tsx
-// App.tsx
-<RouteView.Match segment="products">
-  <RouteView nodeName="products">
-    <RouteView.Self>
-      <ProductsList />         {/* has data-route-root inside */}
-    </RouteView.Self>
-    <RouteView.Match segment="detail">
-      <ProductDetail />        {/* has data-route-root inside */}
-    </RouteView.Match>
-  </RouteView>
-</RouteView.Match>
+```svelte
+<!-- AnimationHost.svelte -->
+<RouteView nodeName="">
+  ...
+  {#snippet products()}
+    <RouteView nodeName="products">
+      {#snippet self()}
+        <ProductsList />         <!-- has data-route-root inside -->
+      {/snippet}
+      {#snippet detail()}
+        <ProductDetail />        <!-- has data-route-root inside -->
+      {/snippet}
+    </RouteView>
+  {/snippet}
+  ...
+</RouteView>
 ```
 
 `usePageAnimator` queries `document.querySelector("[data-route-root]")` and finds exactly one match per render — the active leaf. Both `ProductsList` and `ProductDetail` mark their own outer wrapper with the attribute; on a `products` ↔ `products.detail` navigation, the marker swaps between the two leaves and the page-level fade animates each one in turn. (For a true persistent shell with a static heading, an outer wrapper without `[data-route-root]` could be added — out of scope for this example.)
@@ -137,7 +141,7 @@ The sibling `view-transitions/` example needs `setTimeout(0)` inside its `subscr
 
 The CSS-classes recipe has no equivalent suppression. `subscribeLeave` returns a Promise; the router is genuinely waiting on `animationend`, not on a deferred coordinated through the rendering pipeline. After `animationend` resolves, the router activates the new state synchronously, Svelte commits, and the entry keyframe plays on the new `[data-route-root]:not([data-leaving])` element via the natural CSS animation-on-mount semantics.
 
-The only `setTimeout(0)` in this example is in the hero-morph branch (after `subscribe` fires) — and there it is needed for the same reason `useSyncExternalStore` has commit-phase subtleties: we need to wait one task for Svelte to commit before measuring the destination element's rect.
+The only `setTimeout(0)` in this example is in the hero-morph branch (after `subscribe` fires) — there it is needed because `router.subscribe` fires synchronously when the router commits the new state, but the destination DOM (`<ProductDetail>`'s cover element) is rendered by Svelte's reactive pipeline after the subscribe callback returns. We need to wait one task for Svelte to commit before measuring the destination element's rect.
 
 ## Known limits
 
