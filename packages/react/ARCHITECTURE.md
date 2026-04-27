@@ -62,7 +62,9 @@ src/
 │   ├── useRouteNode.tsx        # Node-scoped subscription (cached createRouteNodeSource from sources)
 │   ├── useIsActiveRoute.tsx    # Active state subscription (cached createActiveRouteSource)
 │   ├── useRouteUtils.tsx       # RouteUtils from route tree (never re-renders)
-│   └── useRouterTransition.tsx # Transition lifecycle (cached getTransitionSource)
+│   ├── useRouterTransition.tsx # Transition lifecycle (cached getTransitionSource)
+│   ├── useRouteExit.tsx        # Wrap subscribeLeave with abort + same-route + latest-handler guards
+│   └── useRouteEnter.tsx       # Fire on nav-driven mount via useRoute() snapshot + route.transition.from
 └── components/
     ├── Link.tsx                # memo'd link with custom areLinkPropsEqual + active state
     ├── RouterErrorBoundary.tsx  # Declarative navigation error handling

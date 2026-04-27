@@ -49,7 +49,9 @@ src/
 │   ├── useRouteNode.ts         # Node-scoped subscription via useRefFromSource
 │   ├── useIsActiveRoute.ts     # Active state subscription (internal — used by Link)
 │   ├── useRouteUtils.ts        # RouteUtils from route tree (never reactive)
-│   └── useRouterTransition.ts  # Transition lifecycle ShallowRef (isTransitioning, toRoute, fromRoute)
+│   ├── useRouterTransition.ts  # Transition lifecycle ShallowRef (isTransitioning, toRoute, fromRoute)
+│   ├── useRouteExit.ts         # Wrap subscribeLeave with abort + same-route guards (handler captured in setup())
+│   └── useRouteEnter.ts        # Fire on nav-driven mount via watch(route) + route.transition.from
 └── components/
     ├── Link.ts                 # defineComponent + h('a'), computed href/class, active state
     ├── RouterErrorBoundary.ts   # Declarative navigation error handling

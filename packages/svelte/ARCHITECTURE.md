@@ -37,7 +37,9 @@ dist/
 │   ├── useRouteNode.svelte.js
 │   ├── useRouteUtils.svelte.js
 │   ├── useRouterTransition.svelte.js
-│   └── useIsActiveRoute.svelte.js
+│   ├── useIsActiveRoute.svelte.js
+│   ├── useRouteExit.svelte.js
+│   └── useRouteEnter.svelte.js
 └── RouterProvider.svelte
 ```
 
@@ -64,7 +66,9 @@ src/
 │   ├── useRouteNode.svelte.ts            # Node-scoped subscription via createReactiveSource
 │   ├── useIsActiveRoute.svelte.ts        # Active state subscription (internal — used by Link)
 │   ├── useRouteUtils.svelte.ts
-│   └── useRouterTransition.svelte.ts
+│   ├── useRouterTransition.svelte.ts
+│   ├── useRouteExit.svelte.ts            # Wrap subscribeLeave with abort + same-route guards (handler captured at init)
+│   └── useRouteEnter.svelte.ts           # Fire on nav-driven mount via $effect + route.transition.from
 ├── actions/
 │   └── link.svelte.ts                    # createLinkAction factory (use:link directive)
 └── components/

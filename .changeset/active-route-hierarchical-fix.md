@@ -1,5 +1,5 @@
 ---
-"@real-router/core": minor
+"@real-router/core": patch
 ---
 
 Fix two `isActiveRoute` bugs in the hierarchical (ancestor) branch (#536, #537)

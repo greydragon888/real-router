@@ -56,7 +56,9 @@ src/
 │   ├── useRouteNodeStore.tsx   # Same cached node source, store-based
 │   ├── useRouteStore.tsx       # Full route state as store (reconcile)
 │   ├── useRouteUtils.tsx       # RouteUtils from route tree (never reactive)
-│   └── useRouterTransition.tsx # Transition lifecycle (cached getTransitionSource)
+│   ├── useRouterTransition.tsx # Transition lifecycle (cached getTransitionSource)
+│   ├── useRouteExit.tsx        # Wrap subscribeLeave with abort + same-route guards (handler captured at hook call)
+│   └── useRouteEnter.tsx       # Fire on nav-driven mount via useRoute() accessor + route.transition.from
 └── components/
     ├── Link.tsx                # Reactive link with classList-based active state
     ├── RouterErrorBoundary.tsx  # Declarative navigation error handling

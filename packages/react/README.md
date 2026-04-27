@@ -77,6 +77,8 @@ function App() {
 | `useRouteNode(name)`    | `{ navigator, route, previousRoute }`                      | Only when node activates/deactivates    |
 | `useRouteUtils()`       | `RouteUtils`                                               | Never                                   |
 | `useRouterTransition()` | `{ isTransitioning, isLeaveApproved, toRoute, fromRoute }` | On transition start/end                 |
+| `useRouteExit(handler, options?)`  | `void` — wraps `router.subscribeLeave` with abort + same-route guards | Never (stable subscription)        |
+| `useRouteEnter(handler, options?)` | `void` — fires on nav-driven mount via `useRoute()` snapshot          | Never (handler stays current)      |
 
 ```tsx
 // useRouteNode — re-renders only when "users.*" changes
@@ -105,6 +107,22 @@ function GlobalProgress() {
   const { isTransitioning } = useRouterTransition();
   if (!isTransitioning) return null;
   return <div className="progress-bar" />;
+}
+
+// useRouteExit — exit animations, draft autosave, AbortSignal-aware cleanup
+function FormPage() {
+  useRouteExit(async ({ signal }) => {
+    await api.saveDraft(formState, { signal });
+  });
+  return <Form />;
+}
+
+// useRouteEnter — page-enter analytics, focus management, entry animations
+function AboutPage() {
+  useRouteEnter(({ route, previousRoute }) => {
+    analytics.track("page_enter", { route: route.name, from: previousRoute.name });
+  });
+  return <About />;
 }
 ```
 
@@ -318,7 +336,7 @@ No-op on unsupported browsers (Firefox as of 2026-04, SSR). Customization is pur
 Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 
 - [RouterProvider](https://github.com/greydragon888/real-router/wiki/RouterProvider) · [RouteView](https://github.com/greydragon888/real-router/wiki/RouteView) · [RouterErrorBoundary](https://github.com/greydragon888/real-router/wiki/RouterErrorBoundary) · [Link](https://github.com/greydragon888/real-router/wiki/Link) · [Scroll Restoration](https://github.com/greydragon888/real-router/wiki/Scroll-Restoration) · [View Transitions](https://github.com/greydragon888/real-router/wiki/View-Transitions)
-- [useRouter](https://github.com/greydragon888/real-router/wiki/useRouter) · [useRoute](https://github.com/greydragon888/real-router/wiki/useRoute) · [useRouteNode](https://github.com/greydragon888/real-router/wiki/useRouteNode) · [useNavigator](https://github.com/greydragon888/real-router/wiki/useNavigator) · [useRouteUtils](https://github.com/greydragon888/real-router/wiki/useRouteUtils) · [useRouterTransition](https://github.com/greydragon888/real-router/wiki/useRouterTransition)
+- [useRouter](https://github.com/greydragon888/real-router/wiki/useRouter) · [useRoute](https://github.com/greydragon888/real-router/wiki/useRoute) · [useRouteNode](https://github.com/greydragon888/real-router/wiki/useRouteNode) · [useNavigator](https://github.com/greydragon888/real-router/wiki/useNavigator) · [useRouteUtils](https://github.com/greydragon888/real-router/wiki/useRouteUtils) · [useRouterTransition](https://github.com/greydragon888/real-router/wiki/useRouterTransition) · [useRouteExit](https://github.com/greydragon888/real-router/wiki/useRouteExit) · [useRouteEnter](https://github.com/greydragon888/real-router/wiki/useRouteEnter)
 
 ## Examples
 
