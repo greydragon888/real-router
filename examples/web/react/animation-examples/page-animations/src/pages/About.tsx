@@ -45,12 +45,12 @@ export function About(): JSX.Element {
         Distributed via <code>useRouteAnimation(ref, …)</code> per page. Each
         page subscribes to the router for its own lifetime; no central module.
         Encapsulated, simpler mental model, less boilerplate per new page after
-        the hook is in place. The trade-off: each
-        <code> useEffect</code> only sees its own page. Hero morph between
-        routes needs shared state because the source rect is captured in page A
-        but the destination is in page B. Same for list FLIP with ghost exits —
-        survivors live in the new page&apos;s DOM, ghosts live nowhere unless
-        something orchestrates them centrally.
+        the hook is in place. The trade-off: each component instance only sees
+        its own lifecycle. Hero morph between routes needs shared state because
+        the source rect is captured in page A but the destination is in page B.
+        Same for list FLIP with ghost exits — survivors live in the new
+        page&apos;s DOM, ghosts live nowhere unless something orchestrates them
+        centrally.
       </p>
 
       <h2>motion-animations/</h2>
