@@ -221,7 +221,7 @@ html.vt-hero-morph::view-transition-new(root) {
  * main.tsx adds the .vt-hero-active class to exactly ONE element per
  * navigation (the product whose id matches nextRoute.params.id) — on the
  * source DOM in subscribeLeave, and on the destination DOM in
- * router.subscribe after React commits. Everything else stays in its
+ * router.subscribe after Solid commits. Everything else stays in its
  * parent scope (root or product-list).
  *
  * The shared name "hero" is arbitrary — both the source thumb and the

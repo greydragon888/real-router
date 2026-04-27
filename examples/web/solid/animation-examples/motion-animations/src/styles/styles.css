@@ -1,13 +1,17 @@
 /*
  * Page styles for motion-animations example.
  *
- * No @keyframes here — animations are driven entirely by `motion` library
- * via WAAPI under the hood. This file holds only layout / typography /
- * cosmetic styling for the example's page elements. See `App.tsx` for the
- * top-level <AnimatePresence>/<motion.div> wrapper that animates page
- * entry / exit, and `pages/ProductsList.tsx` + `pages/ProductDetail.tsx` for
- * inner motion components (`layoutId` for hero morph, `layout` for list
- * reorder).
+ * No @keyframes here — page-level entry/exit animations are driven by
+ * `solid-motionone` (Solid bindings around Motion One) via WAAPI under
+ * the hood. This file holds only layout / typography / cosmetic styling
+ * for the example's page elements. See `App.tsx` for the top-level
+ * <Presence>/<Motion.div> wrapper.
+ *
+ * Note: Motion One does not ship layoutId / layout primitives, so the
+ * Solid version uses plain <li>/<div> for cards and covers — no inner
+ * motion components for hero morph or list reorder. For those scenarios
+ * see `route-animations/` (`useHeroMorph`, `useListFlip` — manual WAAPI
+ * inverse-FLIP).
  */
 
 .products-toolbar {

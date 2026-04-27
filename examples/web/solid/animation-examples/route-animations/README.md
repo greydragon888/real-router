@@ -6,17 +6,17 @@ Demonstrates route animations via CSS `@keyframes` + an async `subscribeLeave` l
 
 |                                       | `view-transitions/`                            | `route-animations/` (this)                       | `page-animations/`                  | `motion-animations/`               |
 | ------------------------------------- | ---------------------------------------------- | ------------------------------------------------ | ----------------------------------- | ---------------------------------- |
-| Mechanism                             | `document.startViewTransition()` + VT pseudos  | `subscribeLeave` returns Promise + `@keyframes`  | Per-page `useEffect` hook            | `<AnimatePresence>` from `motion`  |
-| Router coordination                   | Promise blocks pipeline                        | Promise blocks pipeline                          | Promise blocks pipeline             | Promise blocks pipeline (via onExitComplete) |
+| Mechanism                             | `document.startViewTransition()` + VT pseudos  | `subscribeLeave` returns Promise + `@keyframes`  | Per-page `useRouteAnimation` hook   | `<Presence>` from `solid-motionone` |
+| Router coordination                   | Promise blocks pipeline                        | Promise blocks pipeline                          | Promise blocks pipeline             | Promise blocks pipeline (via `onMotionComplete`) |
 | Browser support                       | Chromium 111+, Safari 18+, Firefox 147+        | All browsers with CSS animations                 | All browsers with CSS animations    | All browsers with WAAPI            |
-| Exit / entry timing                   | Always parallel crossfade                      | Sequential by default (router blocks on Promise) | Sequential per page                 | Sequential (`mode="wait"`)         |
+| Exit / entry timing                   | Always parallel crossfade                      | Sequential by default (router blocks on Promise) | Sequential per page                 | Sequential (`exitBeforeEnter`)     |
 | Per-route customisation               | Free via `view-transition-name` per scope      | Free via `data-route-anim` attribute             | Per-page class names                | Single page-level transition       |
-| Hero morph (FLIP between routes)      | Free via matching `view-transition-name` pairs | Manual via `getBoundingClientRect` + WAAPI       | Out of scope (cross-page state)     | Free via `layoutId` prop           |
-| List FLIP with ghost exits            | Free                                           | Implemented (≈80 LOC)                            | Out of scope                        | Free via `<motion.li layout>`      |
+| Hero morph (FLIP between routes)      | Free via matching `view-transition-name` pairs | Manual via `getBoundingClientRect` + WAAPI       | Out of scope (cross-page state)     | **Not built in** — Motion One ships no `layoutId` |
+| List FLIP with ghost exits            | Free                                           | Implemented (≈80 LOC)                            | Local FLIP via `useListFlip` view-local | **Not built in** — Motion One ships no `layout` |
 | Persistent shell crossfade            | Free (pixel-level snapshot diff)               | Granular `[data-route-root]` placement           | Out of scope (no shell)             | Out of scope (no shell)            |
 | Rendering suppression during playback | Yes — clicks land on overlay                   | None — DOM stays interactive                     | None                                | None                               |
-| External dependency                   | None                                           | None                                             | None                                | `motion` (~50 KB min+gzip)         |
-| Code size                             | ~30 LOC utility + ~120 LOC policy              | ~30 LOC helper + ~250 LOC policy                 | ~80 LOC hook + per-page useEffect   | ~100 LOC App + inner motion props  |
+| External dependency                   | None                                           | None                                             | None                                | `solid-motionone` (~30 KB min+gzip) |
+| Code size                             | ~30 LOC utility + ~120 LOC policy              | ~30 LOC helper + ~380 LOC across three hooks     | ~120 LOC hook + per-page binding    | ~85 LOC App + ~75 LOC coordination |
 
 Pick `route-animations/` if you need Firefox 145- support, custom timing per route, full router coordination (URL + UI in lock-step), and the most control over choreography. The other three trade some of that for simpler code or library ergonomics.
 
@@ -97,7 +97,7 @@ The recipe relies on three router behaviours and two CSS conventions:
 
 ## Nested routes
 
-`/products` and `/products/:id` share a persistent shell (`<h1>Products</h1>` + intro paragraph). The parent `products` IS the list — no synthetic `list` child, no `forwardTo`:
+`/products` and `/products/:id` share the parent `products` route — no synthetic `list` child, no `forwardTo`. The parent IS the list:
 
 ```ts
 // routes.ts
@@ -111,19 +111,23 @@ The recipe relies on three router behaviours and two CSS conventions:
 }
 ```
 
-`Products.tsx` mounts the persistent shell; `<RouteView.Self>` renders the list while `<RouteView.Match segment="detail">` swaps in the detail page. **`[data-route-root]` lives on `ProductsList` and `ProductDetail`, not on the shell itself** — so the heading and intro do not fade across list ↔ detail navigations:
+The wiring lives directly in `App.tsx` — no separate `Products.tsx` shell component. **`[data-route-root]` lives on `ProductsList` and `ProductDetail` themselves**, on each leaf's outermost wrapper:
 
 ```tsx
-// Products.tsx
-<div>
-  <h1>Products</h1>          {/* persistent — no data-route-root */}
-  <p>Click a product card…</p>
+// App.tsx
+<RouteView.Match segment="products">
   <RouteView nodeName="products">
-    <RouteView.Self><ProductsList /></RouteView.Self>          {/* has data-route-root inside */}
-    <RouteView.Match segment="detail"><ProductDetail /></RouteView.Match>  {/* has data-route-root inside */}
+    <RouteView.Self>
+      <ProductsList />         {/* has data-route-root inside */}
+    </RouteView.Self>
+    <RouteView.Match segment="detail">
+      <ProductDetail />        {/* has data-route-root inside */}
+    </RouteView.Match>
   </RouteView>
-</div>
+</RouteView.Match>
 ```
+
+`usePageAnimator` queries `document.querySelector("[data-route-root]")` and finds exactly one match per render — the active leaf. Both `ProductsList` and `ProductDetail` mark their own outer wrapper with the attribute; on a `products` ↔ `products.detail` navigation, the marker swaps between the two leaves and the page-level fade animates each one in turn. (For a true persistent shell with a static heading, an outer wrapper without `[data-route-root]` could be added — out of scope for this example.)
 
 This is the trade-off the recipe makes vs View Transitions, which gets persistent-shell static rendering for free via pixel-level snapshot diffing. With CSS animations, anything inside the leaving `[data-route-root]` fades, so the marker has to be placed precisely.
 
@@ -138,7 +142,7 @@ The only `setTimeout(0)` in this example is in the hero-morph branch (after `sub
 ## Known limits
 
 - **No true crossfade.** The recipe is sequential (exit fully → entry). Crossfade requires both DOM trees mounted simultaneously, which is a framework-adapter coordination problem the recipe does not solve. View Transitions gives crossfade for free via DOM snapshots.
-- **Hero morph is manual.** Capturing source rects, applying inverse-FLIP transforms, and identifying destination elements by `data-product-id` is application-level code (~30 LOC in `animations-policy.ts`). VT does this with two matching `view-transition-name` rules. The recipe trades terseness for cross-browser support.
-- **List reorder is also manual.** Same trade-off as hero-morph: VT pairs items by `view-transition-name` and animates positions automatically; the recipe captures every `[data-flip-key]` rect on leave and replays inverse-FLIP transforms via the Web Animations API. Removed-item EXIT is approximated with `cloneNode` ghosts (position:fixed at the captured rect, fade + scale, then dropped) — visually convincing but the ghost is non-interactive during the fade. A library like `react-flip-toolkit` solves this with a richer state machine; the recipe's ~40 LOC is enough for the demo.
+- **Hero morph is manual.** Capturing source rects, applying inverse-FLIP transforms, and identifying destination elements by `data-product-id` is application-level code (~110 LOC in `useHeroMorph`). VT does this with two matching `view-transition-name` rules. The recipe trades terseness for cross-browser support.
+- **List reorder is also manual.** Same trade-off as hero-morph: VT pairs items by `view-transition-name` and animates positions automatically; the recipe captures every `[data-flip-key]` rect on leave and replays inverse-FLIP transforms via the Web Animations API. Removed-item EXIT is approximated with `cloneNode` ghosts (position:fixed at the captured rect, fade + scale, then dropped) — visually convincing but the ghost is non-interactive during the fade. The recipe's ~230 LOC is enough for the demo.
 - **Mixed exit / entry timing.** Home (fade, 900 ms) → Products (slide, 2100 ms) plays a 900 ms fade-out followed by a 2100 ms slide-in. Exit timing is determined by the leaving route, entry timing by the arriving route. If you want all transitions to use a single timing pair, use a single `data-route-anim` value across all leaf routes.
-- **Granular `[data-route-root]` discipline.** Forgetting the marker on a new page silently disables animation on that route. There is no central registry — wiring is by data attribute. A `console.warn` in `animations-policy.ts` when the leaf has no marker would help; we leave that as a hook for users to add per-app.
+- **Granular `[data-route-root]` discipline.** Forgetting the marker on a new page silently disables animation on that route. There is no central registry — wiring is by data attribute. A `console.warn` in `usePageAnimator` when the leaf has no marker would help; we leave that as a hook for users to add per-app.
