@@ -136,7 +136,7 @@ function resolveText(
     return getCustomText(route);
   }
 
-  const h1Text = h1?.textContent.trim() ?? "";
+  const h1Text = (h1?.textContent ?? "").trim();
   const routeName = route.name.startsWith(INTERNAL_ROUTE_PREFIX)
     ? ""
     : route.name;

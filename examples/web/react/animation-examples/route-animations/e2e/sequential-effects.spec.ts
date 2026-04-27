@@ -24,7 +24,7 @@ test.describe("Sequential exit then entry", () => {
     // Wait for the new heading to appear — this is the moment the new DOM
     // has committed AND any entry keyframe has had time to start.
     await page.waitForSelector(
-      '[data-route-anim="fade"]:not([data-leaving]) h1:has-text("CSS-classes recipe")',
+      '[data-route-anim="fade"]:not(.leaving) h1:has-text("CSS-classes recipe")',
     );
     const elapsed = Date.now() - t0;
 

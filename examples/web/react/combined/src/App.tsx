@@ -25,10 +25,7 @@ const LazyDashboard = lazy(() => import("./pages/Dashboard"));
 export function App(): JSX.Element {
   const navigator = useNavigator();
 
-  const user = useSyncExternalStore(
-    store.subscribe,
-    () => store.get("user") as User | null,
-  );
+  const user = useSyncExternalStore(store.subscribe, () => store.get("user"));
 
   const privateLinks = [
     { routeName: "dashboard", label: "Dashboard" },

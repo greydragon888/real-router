@@ -33,7 +33,17 @@ export function ProductsList(): JSX.Element {
   }, [sort]);
 
   return (
-    <div data-route-root data-route-anim="slide" data-route-scope="products">
+    <div data-route-root data-route-anim="slide">
+      <h1>Products</h1>
+      <p>
+        Click a product card to see the manual hero-morph: the thumbnail&apos;s
+        bounding rect is captured before leave, an inverse-FLIP transform on the
+        destination cover after the new page mounts. Compare with the parallel{" "}
+        <code>view-transitions/</code> example, where the browser pairs{" "}
+        <code>view-transition-name</code> values and animates for you in two CSS
+        rules.
+      </p>
+
       <div className="products-toolbar">
         <span>Sort:</span>
         <Link

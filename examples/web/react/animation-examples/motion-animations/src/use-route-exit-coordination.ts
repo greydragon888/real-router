@@ -1,13 +1,13 @@
-import { useRouter } from "@real-router/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouteExit } from "@real-router/react";
+import { useCallback, useRef, useState } from "react";
 
 export interface RouteExitCoordination {
   /**
    * Increments inside `subscribeLeave` before the router commits.
    * Pass as `key` to the page-level `<motion.div>` under
-   * `<AnimatePresence>` — the key change triggers exit on the cached old
-   * subtree (which still shows the old route's content because router
-   * state hasn't moved yet).
+   * `<AnimatePresence>` — the key change triggers exit on the cached
+   * old subtree (which still shows the old route's content because
+   * router state hasn't moved yet).
    */
   exitToken: number;
   /**
@@ -20,66 +20,51 @@ export interface RouteExitCoordination {
 }
 
 /**
- * Router-coordinated bridge between `subscribeLeave` and `AnimatePresence`.
+ * Router-coordinated bridge between the leave-window and
+ * `<AnimatePresence>`. The router blocks on a Promise we return from
+ * `useRouteExit`; the Promise resolves when motion library's
+ * `onExitComplete` fires (or when the navigation is superseded — the
+ * abort signal forwards through to keep the router pipeline drainable).
  *
- * The router blocks on a Promise we return from `subscribeLeave`; the
- * Promise resolves when motion library's `onExitComplete` fires. URL and
- * UI stay in lock-step — same semantics as `route-animations/` and
- * `page-animations/`, but driven by motion's exit lifecycle instead of
- * `animationend` on a CSS keyframe.
+ * URL and UI stay in lock-step — same semantics as `route-animations/`
+ * and `page-animations/`, but driven by motion's exit lifecycle instead
+ * of `animationend` on a CSS keyframe.
  *
  * Same-route navigations (e.g. sort / filter param changes on the same
- * route name) skip the page-level exit/entry — inner motion components
- * (`<motion.li layout>`, `layoutId`) still react to data changes via the
- * library's own re-render-driven layout animations.
+ * route name) skip the page-level exit/entry — `useRouteExit`'s default
+ * `skipSameRoute: true` handles this. Inner motion components
+ * (`<motion.li layout>`, `layoutId`) still react to data changes via
+ * the library's own re-render-driven layout animations.
  *
- * Cancellation: when the router cancels a navigation (rapid clicks), the
- * `signal` aborts. We resolve the outdated Promise so the router can drain
- * the cancelled pipeline cleanly.
+ * What used to be a hand-rolled exitToken counter is gone — `useRouteExit`'s
+ * abort signal pre-check guarantees the handler does not run for stale
+ * navigations, and the abort listener resolves the in-flight Promise to
+ * drain the cancelled pipeline.
  */
 export function useRouteExitCoordination(): RouteExitCoordination {
-  const router = useRouter();
   const [exitToken, setExitToken] = useState(0);
   const exitResolverRef = useRef<(() => void) | null>(null);
 
-  useEffect(() => {
-    return router.subscribeLeave(({ route, nextRoute, signal }) => {
-      if (route.name === nextRoute.name) {
-        return;
-      }
-
-      // Free a previous pending resolver — rapid clicks queue exits, and
-      // the router cancels the older navigation. Resolving lets the
-      // cancelled pipeline drain cleanly.
-      exitResolverRef.current?.();
-
-      return new Promise<void>((resolve) => {
-        exitResolverRef.current = resolve;
-        setExitToken((current) => current + 1);
-
-        const onAbort = (): void => {
-          if (exitResolverRef.current === resolve) {
-            exitResolverRef.current = null;
-            resolve();
-          }
-        };
-
-        if (signal.aborted) {
-          onAbort();
-
-          return;
-        }
-
-        signal.addEventListener("abort", onAbort, { once: true });
-      });
+  useRouteExit(({ signal }) => {
+    return new Promise<void>((resolve) => {
+      exitResolverRef.current = resolve;
+      setExitToken((current) => current + 1);
+      // Wrapped in a no-arg arrow because `addEventListener` passes
+      // the Event to its callback, but `resolve` accepts only
+      // `void | PromiseLike<void>`.
+      signal.addEventListener(
+        "abort",
+        () => {
+          resolve();
+        },
+        { once: true },
+      );
     });
-  }, [router]);
+  });
 
   const onExitComplete = useCallback((): void => {
-    const resolver = exitResolverRef.current;
-
+    exitResolverRef.current?.();
     exitResolverRef.current = null;
-    resolver?.();
   }, []);
 
   return { exitToken, onExitComplete };

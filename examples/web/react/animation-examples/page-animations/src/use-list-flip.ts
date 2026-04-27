@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 
 import type { RefObject } from "react";
 
@@ -6,35 +6,57 @@ const FLIP_DURATION_MS = 1800;
 const FLIP_EASING = "cubic-bezier(0.4, 0, 0.2, 1)";
 const LIST_FADE_EASING = "linear";
 
+interface Snapshot {
+  rect: DOMRect;
+  html: string;
+}
+
 /**
  * Per-component list FLIP hook with full enter / exit / move coverage.
  *
- * Three coordinated WAAPI animations driven by React commits + a
- * MutationObserver:
+ * One `useLayoutEffect` runs after every commit and computes three
+ * coordinated WAAPI animations against a snapshot of the previous
+ * commit:
  *
- *   1. **Survivors that moved** — `useLayoutEffect` after every commit
- *      compares each `[data-flip-key]` element's `getBoundingClientRect`
- *      against the previous commit's rect. If the item shifted by more
- *      than 1px, an inverse-FLIP `transform` animates it from old to new
- *      position.
- *   2. **New items** (filter widens, sort change introduces a previously
- *      hidden item) — same pass: items present in this commit but not in
- *      the previous rects map fade in via `opacity: 0 → 1`.
- *   3. **Removed items** (filter narrows) — a `MutationObserver` on the
- *      container watches `childList` and clones the removed `<li>` into
- *      a `position: fixed` ghost pinned to its last-known rect. The clone
- *      fades out and self-removes, so React can drop the original
- *      immediately while the visual exit plays.
+ *   1. **Survivors that moved** — `[data-flip-key]` items present in
+ *      both commits whose `getBoundingClientRect` shifted by more than
+ *      1px get an inverse-FLIP `translate` from old → new position.
+ *   2. **Newly mounted items** — items in current commit but not in
+ *      previous fade in via `opacity: 0 → 1`.
+ *   3. **Removed items** — items in previous snapshot but not in
+ *      current are reconstructed from their saved `outerHTML`,
+ *      positioned `fixed` at their last-known rect, faded out, and
+ *      self-removed when the animation settles.
  *
- * No router events. No `subscribeLeave`. The hook is purely view-local —
- * driven by React commits, which is when this kind of choreography
- * conceptually belongs.
+ * Why everything in `useLayoutEffect` and no `MutationObserver`:
+ *
+ *   - **Move != remove for MutationObserver**: when React reorders
+ *     children via `insertBefore` / `appendChild`, each moved node
+ *     fires both `removedNodes` (from old position) and `addedNodes`
+ *     (at new position) in the observer batch. Treating `removedNodes`
+ *     as exits would create ghost clones for every moved item on a
+ *     sort change. `useLayoutEffect`'s `querySelectorAll` view is
+ *     post-commit and naturally distinguishes moves (still present)
+ *     from exits (gone).
+ *   - **No race**: the previous snapshot lives in a ref that we read
+ *     before overwriting. There's no window for an observer microtask
+ *     to see a half-updated map.
+ *
+ * Trade-off: ghost clones use `outerHTML` to reconstruct the visual,
+ * which loses event handlers / refs / embedded React state. For
+ * static cards with `<Link>` children this is fine — `pointer-events:
+ * none` on the ghost prevents clicks from reaching the cloned anchor
+ * anyway. For more complex items (forms, controls), a coordinated
+ * solution that captures rects pre-commit would be needed.
+ *
+ * No router events. The hook is purely view-local — driven by React
+ * commits, which is when this kind of choreography conceptually
+ * belongs.
  */
 export function useListFlip<T extends HTMLElement>(): RefObject<T | null> {
   const containerRef = useRef<T | null>(null);
-  const previousRectsRef = useRef<Map<string, DOMRect>>(new Map());
+  const previousRef = useRef<Map<string, Snapshot>>(new Map());
 
-  // Move + enter — runs after every commit.
   useLayoutEffect(() => {
     const container = containerRef.current;
 
@@ -43,8 +65,9 @@ export function useListFlip<T extends HTMLElement>(): RefObject<T | null> {
     }
 
     const items = container.querySelectorAll<HTMLElement>("[data-flip-key]");
-    const currentRects = new Map<string, DOMRect>();
+    const current = new Map<string, Snapshot>();
 
+    // Pass 1 — survivors and new items.
     for (const item of items) {
       const key = item.dataset.flipKey;
 
@@ -53,12 +76,11 @@ export function useListFlip<T extends HTMLElement>(): RefObject<T | null> {
       }
 
       const newRect = item.getBoundingClientRect();
-      const oldRect = previousRectsRef.current.get(key);
+      const prev = previousRef.current.get(key);
 
-      if (oldRect) {
-        // Survivor: FLIP if moved.
-        const dx = oldRect.left - newRect.left;
-        const dy = oldRect.top - newRect.top;
+      if (prev) {
+        const dx = prev.rect.left - newRect.left;
+        const dy = prev.rect.top - newRect.top;
 
         if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
           item.animate(
@@ -74,7 +96,6 @@ export function useListFlip<T extends HTMLElement>(): RefObject<T | null> {
           );
         }
       } else {
-        // Newly mounted — fade in.
         item.animate([{ opacity: 0 }, { opacity: 1 }], {
           duration: FLIP_DURATION_MS,
           easing: LIST_FADE_EASING,
@@ -82,84 +103,70 @@ export function useListFlip<T extends HTMLElement>(): RefObject<T | null> {
         });
       }
 
-      currentRects.set(key, newRect);
+      // Save outerHTML alongside rect so we can reconstruct a ghost on
+      // exit even though the original element is gone from the DOM by
+      // the time the next layout effect runs.
+      current.set(key, { rect: newRect, html: item.outerHTML });
     }
 
-    previousRectsRef.current = currentRects;
-  });
-
-  // Exit — MutationObserver clones unmounted items and fades them out.
-  useEffect(() => {
-    const container = containerRef.current;
-
-    if (!container) {
-      return;
-    }
-
-    const observer = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        for (const removed of mutation.removedNodes) {
-          if (!(removed instanceof HTMLElement)) {
-            continue;
-          }
-
-          const key = removed.dataset.flipKey;
-
-          if (!key) {
-            continue;
-          }
-
-          const lastRect = previousRectsRef.current.get(key);
-
-          if (!lastRect) {
-            continue;
-          }
-
-          const clone = removed.cloneNode(true) as HTMLElement;
-
-          // Detached <li> outside its <ul> reverts to default
-          // `display: list-item` and renders a bullet. Force list-style
-          // off and switch display to block so the ghost paints exactly
-          // like the original card.
-          clone.style.position = "fixed";
-          clone.style.left = `${lastRect.left}px`;
-          clone.style.top = `${lastRect.top}px`;
-          clone.style.width = `${lastRect.width}px`;
-          clone.style.height = `${lastRect.height}px`;
-          clone.style.margin = "0";
-          clone.style.pointerEvents = "none";
-          clone.style.listStyle = "none";
-          clone.style.display = "block";
-
-          document.body.append(clone);
-
-          const exitAnimation = clone.animate(
-            [
-              { opacity: 1, transform: "scale(1)" },
-              { opacity: 0, transform: "scale(0.92)" },
-            ],
-            {
-              duration: FLIP_DURATION_MS,
-              easing: LIST_FADE_EASING,
-              fill: "both",
-            },
-          );
-
-          const removeClone = (): void => {
-            clone.remove();
-          };
-
-          exitAnimation.finished.then(removeClone, removeClone);
-        }
+    // Pass 2 — ghosts for removed items (in previous snapshot, absent
+    // from current pass). Reconstruct from saved outerHTML, pin
+    // position:fixed at last-known rect, fade out, self-remove.
+    for (const [key, prev] of previousRef.current) {
+      if (current.has(key)) {
+        continue;
       }
-    });
 
-    observer.observe(container, { childList: true });
+      const wrapper = document.createElement("div");
 
-    return () => {
-      observer.disconnect();
-    };
-  }, []);
+      wrapper.innerHTML = prev.html;
+
+      const ghost = wrapper.firstElementChild as HTMLElement | null;
+
+      if (!ghost) {
+        continue;
+      }
+
+      // Detached <li> outside its <ul> reverts to default
+      // `display: list-item` and renders a bullet. Force list-style
+      // off and switch display to block so the ghost paints exactly
+      // like the original card.
+      ghost.style.position = "fixed";
+      ghost.style.left = `${prev.rect.left}px`;
+      ghost.style.top = `${prev.rect.top}px`;
+      ghost.style.width = `${prev.rect.width}px`;
+      ghost.style.height = `${prev.rect.height}px`;
+      ghost.style.margin = "0";
+      ghost.style.pointerEvents = "none";
+      ghost.style.listStyle = "none";
+      ghost.style.display = "block";
+
+      document.body.append(ghost);
+
+      const exit = ghost.animate(
+        [
+          { opacity: 1, transform: "scale(1)" },
+          { opacity: 0, transform: "scale(0.92)" },
+        ],
+        {
+          duration: FLIP_DURATION_MS,
+          easing: LIST_FADE_EASING,
+          fill: "both",
+        },
+      );
+
+      exit.finished.then(
+        () => {
+          ghost.remove();
+        },
+        () => {
+          ghost.remove();
+        },
+      );
+    }
+
+    previousRef.current = current;
+  });
 
   return containerRef;
 }

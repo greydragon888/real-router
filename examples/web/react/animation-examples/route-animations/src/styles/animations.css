@@ -1,16 +1,19 @@
 /*
  * Route Animations CSS
  *
- * The wiring lives in `animations-policy.ts`: it sets `data-leaving="true"`
- * on the active page's `[data-route-root]` element when the router emits
- * LEAVE_APPROVED, and resolves the Promise it returned when `animationend`
- * fires (with a 50 ms safety net for `prefers-reduced-motion`). All visual
- * decisions live here — three exit/entry recipes keyed off `[data-route-anim]`
- * plus direction-aware slide variants keyed off `html[data-nav-direction]`.
+ * `createRouteAnimator` (from `shared/dom-utils/route-animator.ts`) adds
+ * `.leaving` to the active `[data-route-root]` when the router emits
+ * LEAVE_APPROVED, then resolves its `subscribeLeave` Promise when the
+ * element's CSS animations finish (`Element.getAnimations() + .finished`,
+ * which short-circuits to immediate resolution under
+ * `prefers-reduced-motion: reduce`). All visual decisions live here — three
+ * exit/entry recipes keyed off `[data-route-anim]` plus direction-aware
+ * slide variants keyed off `html[data-nav-direction]` (also driven by the
+ * utility's `trackDirection: true` option).
  *
  * Per-route knobs:
- *   - Home / About / QueryDemo → `[data-route-anim="fade"]`  (300 ms)
- *   - ProductsList               → `[data-route-anim="slide"]` (700 ms, direction-aware)
+ *   - Home / About / QueryDemo → `[data-route-anim="fade"]`  (900 ms)
+ *   - ProductsList               → `[data-route-anim="slide"]` (2100 ms, direction-aware)
  *   - ProductDetail              → `[data-route-anim="hero-flip"]` (background fade,
  *                                                                   FLIP plays via WAAPI)
  */
@@ -29,11 +32,11 @@
 /* 1. Fade — Home, About, QueryDemo                                    */
 /* ------------------------------------------------------------------ */
 
-[data-route-anim="fade"][data-leaving] {
+[data-route-anim="fade"].leaving {
   animation: anim-fade-out var(--duration-fade) var(--easing-standard) forwards;
 }
 
-[data-route-anim="fade"]:not([data-leaving]) {
+[data-route-anim="fade"]:not(.leaving) {
   animation: anim-fade-in var(--duration-fade) var(--easing-standard);
 }
 
@@ -62,27 +65,27 @@
 /* back    = exit-right + entry-from-left.                             */
 /* ------------------------------------------------------------------ */
 
-[data-route-anim="slide"][data-leaving],
-[data-route-anim="slide"]:not([data-leaving]) {
+[data-route-anim="slide"].leaving,
+[data-route-anim="slide"]:not(.leaving) {
   animation-duration: var(--duration-slide);
   animation-timing-function: var(--easing-standard);
   animation-fill-mode: forwards;
 }
 
-html[data-nav-direction="forward"] [data-route-anim="slide"][data-leaving] {
+html[data-nav-direction="forward"] [data-route-anim="slide"].leaving {
   animation-name: anim-slide-out-left;
 }
 
 html[data-nav-direction="forward"]
-  [data-route-anim="slide"]:not([data-leaving]) {
+  [data-route-anim="slide"]:not(.leaving) {
   animation-name: anim-slide-in-right;
 }
 
-html[data-nav-direction="back"] [data-route-anim="slide"][data-leaving] {
+html[data-nav-direction="back"] [data-route-anim="slide"].leaving {
   animation-name: anim-slide-out-right;
 }
 
-html[data-nav-direction="back"] [data-route-anim="slide"]:not([data-leaving]) {
+html[data-nav-direction="back"] [data-route-anim="slide"]:not(.leaving) {
   animation-name: anim-slide-in-left;
 }
 
@@ -139,12 +142,12 @@ html[data-nav-direction="back"] [data-route-anim="slide"]:not([data-leaving]) {
 /* element itself — it's all WAAPI.                                    */
 /* ------------------------------------------------------------------ */
 
-[data-route-anim="hero-flip"][data-leaving] {
+[data-route-anim="hero-flip"].leaving {
   animation: anim-fade-out var(--duration-hero-bg) var(--easing-standard)
     forwards;
 }
 
-[data-route-anim="hero-flip"]:not([data-leaving]) {
+[data-route-anim="hero-flip"]:not(.leaving) {
   animation: anim-fade-in var(--duration-hero-bg) var(--easing-standard);
 }
 
@@ -156,7 +159,7 @@ html[data-nav-direction="back"] [data-route-anim="slide"]:not([data-leaving]) {
 
 @media (prefers-reduced-motion: reduce) {
   [data-route-root],
-  [data-route-root][data-leaving] {
+  [data-route-root].leaving {
     animation: none !important;
   }
 }

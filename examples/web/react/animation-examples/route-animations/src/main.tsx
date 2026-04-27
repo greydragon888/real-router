@@ -3,9 +3,12 @@ import { createRouter } from "@real-router/core";
 import { RouterProvider } from "@real-router/react";
 import { createRoot } from "react-dom/client";
 
-import { installRouteAnimations } from "./animations-policy";
+// Relative path to shared utility — symlinks make
+// `@real-router/{adapter}/dom-utils` re-exports a follow-up step.
+
 import { App } from "./App";
 import { routes } from "./routes";
+import { createDirectionTracker } from "../../../../../../shared/dom-utils";
 
 import "../../../../../shared/styles.css";
 import "./styles/animations.css";
@@ -15,9 +18,19 @@ const router = createRouter(routes, {
   allowNotFound: true,
 });
 
+// `createDirectionTracker` MUST run before `usePlugin(browserPlugin)`.
+// Both register window-level `popstate` listeners, and listeners fire
+// in registration order. The browser-plugin's listener synchronously
+// dispatches `subscribeLeave` — if the tracker is registered second,
+// our flag setter runs *after* the leave callback has already read the
+// (still-false) flag. Registering first guarantees correct ordering.
+createDirectionTracker(router);
+
 router.usePlugin(browserPluginFactory());
 
-installRouteAnimations(router);
+// All three coordinators (PageAnimator, HeroMorph, ListFlip) are
+// mounted as React components inside <App />, each using `useRouteExit`
+// from `@real-router/react`. No router-level install needed.
 
 await router.start();
 

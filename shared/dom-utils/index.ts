@@ -1,3 +1,5 @@
+export { createDirectionTracker } from "./direction-tracker.js";
+
 export { createRouteAnnouncer } from "./route-announcer.js";
 
 export { createScrollRestoration } from "./scroll-restore.js";
@@ -18,5 +20,7 @@ export type {
   ScrollRestorationOptions,
   ScrollRestorationMode,
 } from "./scroll-restore.js";
+
+export type { DirectionTracker } from "./direction-tracker.js";
 
 export type { ViewTransitions } from "./view-transitions.js";

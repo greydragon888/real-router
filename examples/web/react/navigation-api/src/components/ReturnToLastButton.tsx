@@ -4,6 +4,7 @@ import type { JSX } from "react";
 
 export function ReturnToLastButton(): JSX.Element | null {
   const router = useRouter();
+
   // Subscribe so canGoBackTo refreshes on navigation.
   useRoute();
 

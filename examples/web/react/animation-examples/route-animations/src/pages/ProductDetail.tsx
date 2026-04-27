@@ -18,11 +18,7 @@ export function ProductDetail(): JSX.Element {
 
   if (!product) {
     return (
-      <div
-        data-route-root
-        data-route-anim="hero-flip"
-        data-route-scope="products.detail"
-      >
+      <div data-route-root data-route-anim="hero-flip">
         <h2>Unknown product</h2>
         <Link routeName="products" activeStrict>
           Back to products
@@ -32,17 +28,13 @@ export function ProductDetail(): JSX.Element {
   }
 
   return (
-    <div
-      data-route-root
-      data-route-anim="hero-flip"
-      data-route-scope="products.detail"
-    >
+    <div data-route-root data-route-anim="hero-flip">
       <h2>{product.name}</h2>
       {/*
         `data-product-id` is the same stable handle the thumbnail on
-        ProductsList carried. animations-policy.ts measures the thumb&apos;s
-        rect on leave and applies an inverse-FLIP transform to this cover
-        after the new page mounts.
+        ProductsList carried. `useHeroMorph` measures the thumb's rect
+        inside `useRouteExit`, then applies an inverse-FLIP transform to
+        this cover via `navigator.subscribe` after the new page mounts.
       */}
       <div
         className="product-cover"
@@ -53,14 +45,14 @@ export function ProductDetail(): JSX.Element {
       <p>
         The thumbnail morphed into this cover via a{" "}
         <a href="https://aerotwist.com/blog/flip-your-animations/">FLIP</a>{" "}
-        animation: source rect captured on leave (in <code>subscribeLeave</code>
-        ), destination rect measured after commit (in <code>
-          subscribe
-        </code> + <code>setTimeout(0)</code>), then the delta plays via{" "}
-        <code>element.animate()</code>. The parallel{" "}
-        <code>view-transitions/</code> example does this with two CSS rules and
-        matching <code>view-transition-name</code> — the recipe pays in JS for
-        cross-browser support.
+        animation: source rect captured on leave (inside the{" "}
+        <code>useRouteExit</code> handler in <code>useHeroMorph</code>),
+        destination rect measured after commit (in{" "}
+        <code>navigator.subscribe</code> + <code>setTimeout(0)</code>), then
+        the delta plays via <code>element.animate()</code>. The parallel{" "}
+        <code>view-transitions/</code> example does this with two CSS rules
+        and matching <code>view-transition-name</code> — the recipe pays in
+        JS for cross-browser support.
       </p>
       <p>
         <Link routeName="products" activeStrict>

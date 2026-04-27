@@ -22,13 +22,13 @@ test.describe("Basic transition", () => {
       page.getByRole("heading", { name: "Route Animations" }),
     ).toBeVisible();
 
-    // Click the link and wait until policy has set [data-leaving]. At that
-    // moment the @keyframes on [data-route-anim="fade"][data-leaving] is
+    // Click the link and wait until policy has set .leaving. At that
+    // moment the @keyframes on [data-route-anim="fade"].leaving is
     // running — getAnimations() must return at least one.
     await Promise.all([
       page.getByRole("link", { name: "About" }).first().click(),
       page.waitForFunction(
-        () => document.querySelector("[data-leaving]") !== null,
+        () => document.querySelector(".leaving") !== null,
       ),
     ]);
 

@@ -13,7 +13,7 @@ test.describe("Abort safety", () => {
 
     // Fire 3 rapid clicks — each cancels the previous. real-router fires
     // signal.abort on the in-flight LeaveState; animations-policy.ts
-    // removes data-leaving from the cancelled exit.
+    // removes .leaving class from the cancelled exit.
     await Promise.all([
       sidebar.getByRole("link", { name: "Products" }).click(),
       page
@@ -35,10 +35,10 @@ test.describe("Abort safety", () => {
     ).toBeVisible();
 
     // After the final transition settles, the only [data-route-root] in the
-    // DOM is About's, and it must NOT carry data-leaving — that would mean
+    // DOM is About's, and it must NOT carry .leaving class — that would mean
     // an aborted exit's marker leaked.
     await page.waitForFunction(
-      () => document.querySelectorAll("[data-leaving]").length === 0,
+      () => document.querySelectorAll(".leaving").length === 0,
       null,
       { timeout: 3000 },
     );

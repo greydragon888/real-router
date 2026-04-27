@@ -109,6 +109,13 @@
         "config": ["vitest.config.mts", "vitest.config.*.mts"]
       }
     },
+    "packages/angular": {
+      "project": ["src/**/*.ts"],
+      "ignore": ["src/dom-utils/**"],
+      "vitest": {
+        "config": ["vitest.config.mts"]
+      }
+    },
     "packages/*": {
       "project": ["src/**/*.{ts,tsx}"],
       "vitest": {
@@ -122,6 +129,6 @@
   "ignoreWorkspaces": ["examples/**", "benchmarks"],
   "ignore": ["benchmarks/**"],
   "ignoreDependencies": ["@stryker-mutator/api", "jsdom"],
-  "ignoreBinaries": ["tree", "tsx", "open", "perl"],
+  "ignoreBinaries": ["tree", "tsx", "open"],
   "ignoreExportsUsedInFile": true
 }

@@ -57,9 +57,7 @@ export function QueryDemo(): JSX.Element {
           <li
             key={item.id}
             className="vt-qd-item"
-            style={
-              { "--vt-qd-name": `vt-qd-${item.id}` } as CSSProperties
-            }
+            style={{ "--vt-qd-name": `vt-qd-${item.id}` } as CSSProperties}
           >
             <strong>{item.label}</strong>
             <span> — {item.category}</span>

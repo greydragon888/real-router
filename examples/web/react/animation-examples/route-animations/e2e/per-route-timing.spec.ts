@@ -22,7 +22,7 @@ test.describe("Per-route timing", () => {
             // duration, which identifies the most expensive route's
             // signature animation.
             const roots = document.querySelectorAll(
-              "[data-route-root]:not([data-leaving])",
+              "[data-route-root]:not(.leaving)",
             );
             let max = 0;
             for (const root of roots) {
@@ -58,7 +58,7 @@ test.describe("Per-route timing", () => {
       () =>
         (
           document.querySelector(
-            "[data-route-root]:not([data-leaving])",
+            "[data-route-root]:not(.leaving)",
           ) as Element | null
         )?.getAnimations().length === 0,
       null,
@@ -76,7 +76,7 @@ test.describe("Per-route timing", () => {
       () =>
         (
           document.querySelector(
-            "[data-route-root]:not([data-leaving])",
+            "[data-route-root]:not(.leaving)",
           ) as Element | null
         )?.getAnimations().length === 0,
       null,

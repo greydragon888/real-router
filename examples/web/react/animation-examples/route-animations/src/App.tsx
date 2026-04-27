@@ -1,8 +1,12 @@
 import { RouteView } from "@real-router/react";
 
+import { useHeroMorph } from "./animations/useHeroMorph";
+import { useListFlip } from "./animations/useListFlip";
+import { usePageAnimator } from "./animations/usePageAnimator";
 import { About } from "./pages/About";
 import { Home } from "./pages/Home";
-import { Products } from "./pages/Products";
+import { ProductDetail } from "./pages/ProductDetail";
+import { ProductsList } from "./pages/ProductsList";
 import { QueryDemo } from "./pages/QueryDemo";
 import { Layout } from "../../../shared/Layout";
 
@@ -16,10 +20,19 @@ const links = [
 ];
 
 export function App(): JSX.Element {
-  // No `data-route-root` here. The marker lives on each leaf page's outermost
-  // contentful element so persistent shells (e.g. <Products>'s h1 + intro)
-  // do not fade across products ↔ products.detail navigations. The recipe
+  // Three thin hooks own the app's animation behavior — each calls
+  // `useRouteExit` from `@real-router/react` once with its own recipe:
+  //   - usePageAnimator: page-level fade/slide on cross-route nav
+  //   - useHeroMorph: cross-component DOM rect capture (products ↔ detail)
+  //   - useListFlip: same-route list reorder + ghost exits (sort/filter)
+  //
+  // No `data-route-root` on this outer div. The marker lives on each
+  // leaf page's outermost contentful element. The page-level hook
   // queries `[data-route-root]` and finds exactly one — the active leaf.
+  usePageAnimator();
+  useHeroMorph();
+  useListFlip();
+
   return (
     <Layout title="Real-Router — Route Animations" links={links}>
       <RouteView nodeName="">
@@ -27,7 +40,14 @@ export function App(): JSX.Element {
           <Home />
         </RouteView.Match>
         <RouteView.Match segment="products">
-          <Products />
+          <RouteView nodeName="products">
+            <RouteView.Self>
+              <ProductsList />
+            </RouteView.Self>
+            <RouteView.Match segment="detail">
+              <ProductDetail />
+            </RouteView.Match>
+          </RouteView>
         </RouteView.Match>
         <RouteView.Match segment="about">
           <About />

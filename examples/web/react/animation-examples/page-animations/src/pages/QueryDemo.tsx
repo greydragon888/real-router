@@ -36,18 +36,16 @@ export function QueryDemo(): JSX.Element {
     <div ref={ref}>
       <h1>Query-only navigation</h1>
       <p>
-        Click a filter — the page itself does not fade because the
-        hook&apos;s default <code>skipSameRoute: true</code> short-circuits
-        when <code>route.name === nextRoute.name</code>. Three coordinated
-        WAAPI animations play instead, all driven by{" "}
-        <code>useListFlip</code>: survivors translate from old to new
-        positions (inverse-FLIP from a{" "}
-        <code>getBoundingClientRect</code> diff in{" "}
-        <code>useLayoutEffect</code>); newly-visible items fade in; items
-        removed by a narrowing filter fade out via cloned ghosts pinned
-        at their last-known rect through a <code>MutationObserver</code>{" "}
-        on the container. View-local — no router events, no shared state
-        between components.
+        Click a filter — the page itself does not fade because the hook&apos;s
+        default <code>skipSameRoute: true</code> short-circuits when{" "}
+        <code>route.name === nextRoute.name</code>. Three coordinated WAAPI
+        animations play instead, all driven by <code>useListFlip</code>:
+        survivors translate from old to new positions (inverse-FLIP from a{" "}
+        <code>getBoundingClientRect</code> diff in <code>useLayoutEffect</code>
+        ); newly-visible items fade in; items removed by a narrowing filter fade
+        out via cloned ghosts pinned at their last-known rect through a{" "}
+        <code>MutationObserver</code> on the container. View-local — no router
+        events, no shared state between components.
       </p>
 
       <div className="qd-toolbar">

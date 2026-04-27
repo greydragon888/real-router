@@ -7,9 +7,8 @@ import type { Product } from "../../../../shared/api";
 import type { JSX } from "react";
 
 export function ProductDetail(): JSX.Element {
-  const product = useSyncExternalStore(
-    store.subscribe,
-    () => store.get("products.detail") as Product | null | undefined,
+  const product = useSyncExternalStore(store.subscribe, () =>
+    store.get("products.detail"),
   );
   const loading = useSyncExternalStore(
     store.subscribe,

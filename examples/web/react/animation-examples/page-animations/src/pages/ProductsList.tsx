@@ -23,10 +23,10 @@ const PRODUCTS: Product[] = [
 
 type SortDirection = "asc" | "desc";
 
-// ProductsList is the leaf for the `products` route name (shell-only —
-// `products` IS the list, `products.detail` is its nested child). The
-// hook here gives the list its own slide entry / exit, while the parent
-// Products shell stays mounted across list ↔ detail.
+// ProductsList is the leaf for the `products` route name. `products` IS
+// the list, `products.detail` is its nested child. The hook gives the
+// list its own slide entry / exit; on navigation to the detail page,
+// this whole component unmounts and ProductDetail mounts in its place.
 export function ProductsList(): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   const listRef = useListFlip<HTMLUListElement>();
@@ -40,11 +40,20 @@ export function ProductsList(): JSX.Element {
     const sorted = PRODUCTS.toSorted((left, right) =>
       left.name.localeCompare(right.name),
     );
+
     return sort === "desc" ? sorted.toReversed() : sorted;
   }, [sort]);
 
   return (
     <div ref={ref}>
+      <h1>Products</h1>
+      <p>
+        Click a product to see the detail. Each page (this list and the detail)
+        registers its own <code>useRouteAnimation</code> hook on its wrapper —
+        slide-out for the list&apos;s exit, fade-in for the detail&apos;s
+        entry, no shared shell, no centralised policy.
+      </p>
+
       <div className="products-toolbar">
         <span>Sort:</span>
         <Link

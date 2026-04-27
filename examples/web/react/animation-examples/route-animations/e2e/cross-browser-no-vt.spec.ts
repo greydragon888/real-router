@@ -37,7 +37,7 @@ test.describe("Cross-browser without View Transitions API", () => {
     await Promise.all([
       page.getByRole("link", { name: "About" }).first().click(),
       page.waitForFunction(
-        () => document.querySelector("[data-leaving]") !== null,
+        () => document.querySelector(".leaving") !== null,
       ),
     ]);
 

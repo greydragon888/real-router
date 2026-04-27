@@ -3,7 +3,8 @@ import { AnimatePresence, motion } from "motion/react";
 
 import { About } from "./pages/About";
 import { Home } from "./pages/Home";
-import { Products } from "./pages/Products";
+import { ProductDetail } from "./pages/ProductDetail";
+import { ProductsList } from "./pages/ProductsList";
 import { QueryDemo } from "./pages/QueryDemo";
 import { useRouteExitCoordination } from "./use-route-exit-coordination";
 import { Layout } from "../../../shared/Layout";
@@ -44,8 +45,11 @@ export function App(): JSX.Element {
         */}
         <motion.div
           key={exitToken}
+          // eslint-disable-next-line id-length -- `x` is motion's transform-X axis, library API
           initial={{ opacity: 0, x: 20 }}
+          // eslint-disable-next-line id-length
           animate={{ opacity: 1, x: 0 }}
+          // eslint-disable-next-line id-length
           exit={{ opacity: 0, x: -20 }}
           transition={{ duration: 0.9, ease: [0.4, 0, 0.2, 1] }}
         >
@@ -54,7 +58,14 @@ export function App(): JSX.Element {
               <Home />
             </RouteView.Match>
             <RouteView.Match segment="products">
-              <Products />
+              <RouteView nodeName="products">
+                <RouteView.Self>
+                  <ProductsList />
+                </RouteView.Self>
+                <RouteView.Match segment="detail">
+                  <ProductDetail />
+                </RouteView.Match>
+              </RouteView>
             </RouteView.Match>
             <RouteView.Match segment="about">
               <About />

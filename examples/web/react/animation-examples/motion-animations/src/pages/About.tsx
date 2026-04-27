@@ -21,20 +21,25 @@ export function About(): JSX.Element {
 
       <h2>route-animations/</h2>
       <p>
-        Centralised policy via <code>installRouteAnimations(router)</code>.
-        Every <code>[data-route-root]</code> declares its scope; the policy
-        keeps closure state for hero rects, list-FLIP rects, and ghost clones
-        across leave / subscribe. Cross-route coordination works because state
-        lives in one place. Pages stay declarative — attributes only.
+        Centralised via three thin hooks (<code>usePageAnimator</code>,{" "}
+        <code>useHeroMorph</code>, <code>useListFlip</code>) called once at
+        the top of <code>App</code>. Each hook wraps{" "}
+        <code>useRouteExit</code> from <code>@real-router/react</code> with
+        its own DOM recipe; pages stay declarative — they only mark{" "}
+        <code>[data-route-root]</code> / <code>[data-flip-key]</code>{" "}
+        attributes. Cross-route coordination (hero rects, list FLIP, ghost
+        clones) lives in module-level refs inside the hooks.
       </p>
 
       <h2>page-animations/</h2>
       <p>
-        Distributed via <code>useRouteAnimation(ref, …)</code> per page. Each
-        page subscribes to the router for its own lifetime; no central module.
-        Encapsulated, simpler mental model, less boilerplate per new page once
-        the hook exists. Cross-page coordination needs shared state because each{" "}
-        <code>useEffect</code> only sees its own page&apos;s lifecycle.
+        Distributed via <code>useRouteAnimation(ref, …)</code> per page.
+        Each page calls the hook in its own component; the hook itself is
+        built on <code>useRouteExit</code> + <code>useRouteEnter</code>{" "}
+        from <code>@real-router/react</code>. Encapsulated, simpler mental
+        model, less boilerplate per new page once the hook exists.
+        Cross-page coordination needs shared state because each
+        component&apos;s hook only sees its own lifecycle.
       </p>
 
       <h2>motion-animations/ (this example)</h2>
@@ -42,14 +47,14 @@ export function About(): JSX.Element {
         Router-coordinated via <code>motion</code> (formerly Framer Motion).{" "}
         <code>&lt;AnimatePresence mode=&quot;wait&quot;&gt;</code> wraps a
         single page-level <code>motion.div</code> keyed by an{" "}
-        <code>exitToken</code> counter that bumps inside{" "}
-        <code>subscribeLeave</code>. The Promise router awaits resolves on{" "}
+        <code>exitToken</code> counter bumped inside{" "}
+        <code>useRouteExit</code>. The Promise the router awaits resolves on{" "}
         <code>onExitComplete</code> — URL and UI stay in lock-step like the
-        other three examples. Hero morph through <code>layoutId</code> and list
-        reorder through <code>&lt;motion.li layout&gt;</code> are{" "}
+        other three examples. Hero morph through <code>layoutId</code> and
+        list reorder through <code>&lt;motion.li layout&gt;</code> are{" "}
         <strong>library-native</strong> — what <code>route-animations/</code>{" "}
-        implements in ~80 LOC of manual <code>getBoundingClientRect</code> +
-        WAAPI bookkeeping is one prop here.
+        implements in ~340 LOC of manual <code>getBoundingClientRect</code> +
+        WAAPI bookkeeping is a single prop here.
       </p>
 
       <h2>Decision tree</h2>
@@ -92,20 +97,23 @@ export function About(): JSX.Element {
       <h2>The wiring</h2>
       <p>
         See <code>src/main.tsx</code>, <code>src/App.tsx</code>, and{" "}
-        <code>src/use-route-exit-coordination.ts</code>.{" "}
-        <code>main.tsx</code> wraps <code>RouterProvider</code> in{" "}
+        <code>src/use-route-exit-coordination.ts</code>. <code>main.tsx</code>{" "}
+        wraps <code>RouterProvider</code> in{" "}
         <code>&lt;MotionConfig reducedMotion=&quot;user&quot;&gt;</code> for
         application-wide accessibility respect.{" "}
-        <code>useRouteExitCoordination()</code> bridges{" "}
-        <code>router.subscribeLeave</code> with{" "}
-        <code>&lt;AnimatePresence onExitComplete&gt;</code> — it bumps an{" "}
-        <code>exitToken</code> inside <code>subscribeLeave</code> (triggering
-        AnimatePresence&apos;s exit on the cached old subtree) and resolves
-        the router-blocking Promise when motion fires{" "}
-        <code>onExitComplete</code>. Entry animations are declarative — the{" "}
-        <code>initial</code> / <code>animate</code> props on{" "}
-        <code>motion.div</code> in <code>App.tsx</code>; no hook involvement
-        needed because motion handles mount-time animation natively.
+        <code>useRouteExitCoordination()</code> bridges the leave-window
+        with <code>&lt;AnimatePresence onExitComplete&gt;</code>: it calls{" "}
+        <code>useRouteExit</code> from <code>@real-router/react</code> with
+        a handler that bumps an <code>exitToken</code> (triggering
+        AnimatePresence&apos;s exit on the cached old subtree) and returns
+        a Promise resolved when motion fires <code>onExitComplete</code>.
+        The abort signal from <code>useRouteExit</code> resolves the same
+        Promise on rapid navigation, so the router pipeline drains cleanly
+        — no exit-token-counter bookkeeping. Entry animations are
+        declarative — the <code>initial</code> / <code>animate</code> props
+        on <code>motion.div</code> in <code>App.tsx</code>; no hook
+        involvement needed because motion handles mount-time animation
+        natively.
       </p>
     </div>
   );

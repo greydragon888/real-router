@@ -34,9 +34,7 @@ describe("Per-user sub-navigation appearance", () => {
     renderApp();
 
     await waitFor(() => {
-      expect(
-        screen.getByRole("link", { name: "Profile" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Profile" })).toBeInTheDocument();
     });
 
     expect(screen.getByRole("link", { name: "Settings" })).toBeInTheDocument();

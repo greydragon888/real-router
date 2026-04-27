@@ -9,11 +9,12 @@ export function Home(): JSX.Element {
         Motion, v12+).{" "}
         <code>&lt;AnimatePresence mode=&quot;wait&quot;&gt;</code> in{" "}
         <code>App.tsx</code> wraps a single page-level <code>motion.div</code>{" "}
-        keyed by an <code>exitToken</code> counter that bumps inside{" "}
-        <code>subscribeLeave</code>; AnimatePresence detects the key change and
-        starts exit. The router blocks on a Promise that resolves on{" "}
-        <code>onExitComplete</code> — URL and UI stay in lock-step, same
-        semantics as the other three examples.
+        keyed by an <code>exitToken</code> counter bumped inside{" "}
+        <code>useRouteExit</code> (from <code>@real-router/react</code>);
+        AnimatePresence detects the key change and starts exit. The router
+        blocks on a Promise that resolves on <code>onExitComplete</code> —
+        URL and UI stay in lock-step, same semantics as the other three
+        examples.
       </p>
 
       <h2>Scenarios to try</h2>
@@ -55,9 +56,10 @@ export function Home(): JSX.Element {
           <strong>Filter (Query demo)</strong>: switch a filter — survivors
           glide via <code>layout</code>, newcomers fade in via{" "}
           <code>initial</code> / <code>animate</code>, removed items fade out
-          via the inner <code>&lt;AnimatePresence mode=&quot;popLayout&quot;&gt;</code>
-          {" "}wrapping the list. <code>popLayout</code> pulls exiting items
-          from layout flow immediately so survivors reflow into the gap.
+          via the inner{" "}
+          <code>&lt;AnimatePresence mode=&quot;popLayout&quot;&gt;</code>{" "}
+          wrapping the list. <code>popLayout</code> pulls exiting items from
+          layout flow immediately so survivors reflow into the gap.
         </li>
         <li>
           <strong>Reduced motion</strong>: with{" "}

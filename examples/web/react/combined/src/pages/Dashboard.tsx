@@ -11,10 +11,7 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ onLogout }: DashboardProps): JSX.Element {
-  const user = useSyncExternalStore(
-    store.subscribe,
-    () => store.get("user") as User | null,
-  );
+  const user = useSyncExternalStore(store.subscribe, () => store.get("user"));
   const { route } = useRoute();
   const navigator = useNavigator();
 

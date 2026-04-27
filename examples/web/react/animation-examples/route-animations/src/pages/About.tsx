@@ -2,7 +2,7 @@ import type { JSX } from "react";
 
 export function About(): JSX.Element {
   return (
-    <div data-route-root data-route-anim="fade" data-route-scope="about">
+    <div data-route-root data-route-anim="fade">
       <h1>CSS-classes recipe vs View Transitions</h1>
       <p>
         Two first-class approaches ship side-by-side in this monorepo. They
@@ -51,11 +51,11 @@ export function About(): JSX.Element {
           <strong>Persistent shell &quot;free crossfade&quot;</strong>: VT does
           a pixel-level crossfade between snapshots, so identical regions (e.g.
           a header that does not change) are visually static. With CSS recipes,
-          anything inside the leaving root fades. We work around this by placing{" "}
-          <code>[data-route-root]</code> on each leaf page&apos;s inner content
-          (not on the App-level outer), which keeps the <em>Products</em>{" "}
-          shell&apos;s heading + intro from fading on the list ↔ detail
-          navigations. But this requires per-page wrapping discipline.
+          everything inside the leaving root fades — there is no concept of
+          &quot;identical region stays static&quot; because we never compare
+          old and new DOM. To approximate persistence, you would have to mount
+          the persistent content above the animation root, but cross-route
+          shared content is then outside the leave-window entirely.
         </li>
         <li>
           <strong>Crossfade between routes</strong>: the recipe is sequential. A
@@ -78,27 +78,55 @@ export function About(): JSX.Element {
           suppression? Use this recipe.
         </li>
         <li>
-          Need simple entry/exit per page without cross-page coordination?
-          Use <code>page-animations/</code>.
+          Need simple entry/exit per page without cross-page coordination? Use{" "}
+          <code>page-animations/</code>.
         </li>
         <li>
-          Want library-native hero morph (<code>layoutId</code>) + list
-          FLIP (<code>motion.li layout</code>) declaratively, with
-          router-coordinated semantics, willing to accept a 50 KB bundle
-          cost? Use <code>motion-animations/</code>.
+          Want library-native hero morph (<code>layoutId</code>) + list FLIP (
+          <code>motion.li layout</code>) declaratively, with router-coordinated
+          semantics, willing to accept a 50 KB bundle cost? Use{" "}
+          <code>motion-animations/</code>.
         </li>
       </ul>
 
       <h2>The recipe internals</h2>
       <p>
-        See <code>src/animations.ts</code> (~10 LOC: <code>Promise.race</code>{" "}
-        of <code>animationend</code> + 50 ms timeout) and{" "}
-        <code>src/animations-policy.ts</code> (~140 LOC including manual FLIP)
-        for the full code. Wiring is symmetric to the VT example: call{" "}
-        <code>installRouteAnimations(router)</code> once before{" "}
-        <code>router.start()</code>. No <code>RouterProvider</code> prop needed
-        — the policy talks to the router directly via{" "}
-        <code>subscribeLeave</code> + <code>subscribe</code>.
+        Three thin hooks own the app&apos;s animation behavior, each calling{" "}
+        <code>useRouteExit</code> from <code>@real-router/react</code> once
+        with its own recipe:
+      </p>
+      <ul>
+        <li>
+          <code>usePageAnimator</code> (~50 LOC) — page-level fade/slide on
+          cross-route nav. Adds <code>.leaving</code> to the active{" "}
+          <code>[data-route-root]</code>, awaits its{" "}
+          <code>getAnimations() + .finished</code> promises, strips the class.
+        </li>
+        <li>
+          <code>useHeroMorph</code> (~110 LOC) — captures the source thumb
+          rect on <code>useRouteExit</code>, plays an inverse-FLIP transform
+          on the destination cover after commit (via{" "}
+          <code>navigator.subscribe</code>) using the Web Animations API.
+        </li>
+        <li>
+          <code>useListFlip</code> (~230 LOC) — same-route reorder + ghost
+          exits. Captures rects + clones unmount-bound items, replays inverse
+          translates on survivors, fades clones for removed items.
+        </li>
+      </ul>
+      <p>
+        <code>createDirectionTracker(router)</code> from{" "}
+        <code>shared/dom-utils</code> is wired in <code>main.tsx</code> before{" "}
+        <code>router.usePlugin(browserPluginFactory())</code>; it writes{" "}
+        <code>data-nav-direction=&quot;forward&quot; | &quot;back&quot;</code>{" "}
+        on <code>&lt;html&gt;</code> for direction-aware slide keyframes.
+      </p>
+      <p>
+        Routing-side coordination — abort signal pre-check, same-route skip,
+        latest-handler ref — is delegated entirely to the{" "}
+        <code>useRouteExit</code> hook. The hooks themselves only own the
+        DOM-side recipes (style flush, element-scoped{" "}
+        <code>getAnimations()</code>, reduced-motion fast-path).
       </p>
     </div>
   );

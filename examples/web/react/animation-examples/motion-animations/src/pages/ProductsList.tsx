@@ -39,6 +39,14 @@ export function ProductsList(): JSX.Element {
 
   return (
     <>
+      <h1>Products</h1>
+      <p>
+        Click a product card to see the layoutId hero morph. The
+        thumbnail&apos;s coloured square is paired with the cover via{" "}
+        <code>layoutId=&quot;product-&#123;id&#125;&quot;</code> — library
+        FLIP&apos;s it automatically across the route boundary.
+      </p>
+
       <div className="products-toolbar">
         <span>Sort:</span>
         <Link

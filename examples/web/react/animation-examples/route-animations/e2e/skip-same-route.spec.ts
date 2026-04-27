@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("Skip same-route navigation", () => {
-  test("clicking the current-route link does not set data-leaving", async ({
+  test("clicking the current-route link does not set .leaving class", async ({
     page,
   }) => {
     await page.goto("/about");
@@ -15,7 +15,7 @@ test.describe("Skip same-route navigation", () => {
     await page.getByRole("link", { name: "About" }).first().click();
     await page.waitForTimeout(200);
 
-    const leavingCount = await page.locator("[data-leaving]").count();
+    const leavingCount = await page.locator(".leaving").count();
     expect(leavingCount).toBe(0);
   });
 });

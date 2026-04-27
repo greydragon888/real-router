@@ -25,15 +25,17 @@ export function QueryDemo(): JSX.Element {
   }, [filter]);
 
   return (
-    <div data-route-root data-route-anim="fade" data-route-scope="queryDemo">
+    <div data-route-root data-route-anim="fade">
       <h1>Query-only navigation</h1>
       <p>
         Changing the filter via query params is a same-route navigation (
-        <code>route.name === nextRoute.name</code>). Policy detects this and
-        skips the leave marker entirely — the page does not fade. Compare with
-        the parallel <code>view-transitions/</code> example, which uses{" "}
-        <code>html.vt-query-only</code> + a <code>::view-transition</code>{" "}
-        suppression rule for the same effect.
+        <code>route.name === nextRoute.name</code>).{" "}
+        <code>useRouteExit</code> detects this via its default{" "}
+        <code>skipSameRoute: true</code> and skips the page-level fade
+        entirely — the page does not animate. <code>useListFlip</code>{" "}
+        opts in via <code>skipSameRoute: false</code> to own the same-route
+        window: items glide between positions, newcomers fade in, removed
+        items fade out via ghost clones.
       </p>
 
       <div className="qd-toolbar">

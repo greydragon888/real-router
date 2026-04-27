@@ -29,7 +29,7 @@ test.describe("Reduced motion fallback", () => {
     const t0 = Date.now();
     await page.getByRole("link", { name: "About" }).first().click();
     await page.waitForSelector(
-      '[data-route-anim="fade"]:not([data-leaving]) h1:has-text("CSS-classes recipe")',
+      '[data-route-anim="fade"]:not(.leaving) h1:has-text("CSS-classes recipe")',
     );
     const elapsed = Date.now() - t0;
 

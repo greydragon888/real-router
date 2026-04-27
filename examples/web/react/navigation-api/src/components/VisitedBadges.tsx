@@ -2,7 +2,7 @@ import { Link, useRoute, useRouter } from "@real-router/react";
 
 import type { JSX } from "react";
 
-const SIDEBAR_LINKS: Array<{ name: string; label: string }> = [
+const SIDEBAR_LINKS: { name: string; label: string }[] = [
   { name: "home", label: "Home" },
   { name: "products", label: "Products" },
   { name: "categories", label: "Categories" },
@@ -13,6 +13,7 @@ const SIDEBAR_LINKS: Array<{ name: string; label: string }> = [
 
 export function VisitedBadges(): JSX.Element {
   const router = useRouter();
+
   // Subscribe to route changes so badges/progress re-render on navigation.
   useRoute();
 

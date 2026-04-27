@@ -29,12 +29,15 @@ export function About(): JSX.Element {
 
       <h2>route-animations/</h2>
       <p>
-        Centralised policy via <code>installRouteAnimations(router)</code>.
-        Every <code>[data-route-root]</code> declares its scope; the policy
-        keeps closure state for hero rects, list-FLIP rects, and ghost clones
-        across leave / subscribe. Cross-route coordination works because state
-        lives in one place. Pages stay declarative — attributes only, no
-        per-page subscribe code.
+        Centralised via three thin hooks (<code>usePageAnimator</code>,{" "}
+        <code>useHeroMorph</code>, <code>useListFlip</code>) called once at
+        the top of <code>App</code>. Each hook wraps{" "}
+        <code>useRouteExit</code> from <code>@real-router/react</code> with
+        its own DOM recipe. Cross-route coordination (hero rect capture, list
+        FLIP, ghost clones) works because state lives in module-level refs
+        inside the hooks. Pages stay declarative — they only mark{" "}
+        <code>[data-route-root]</code> / <code>[data-flip-key]</code>{" "}
+        attributes; the hooks find them via DOM queries.
       </p>
 
       <h2>page-animations/ (this example)</h2>
@@ -52,10 +55,10 @@ export function About(): JSX.Element {
 
       <h2>motion-animations/</h2>
       <p>
-        Router-coordinated via <code>motion</code> (formerly Framer Motion).
-        {" "}<code>&lt;AnimatePresence mode=&quot;wait&quot;&gt;</code>{" "}
-        is keyed by an <code>exitToken</code> counter that bumps in{" "}
-        <code>subscribeLeave</code>; the Promise router awaits resolves on{" "}
+        Router-coordinated via <code>motion</code> (formerly Framer Motion).{" "}
+        <code>&lt;AnimatePresence mode=&quot;wait&quot;&gt;</code> is keyed by
+        an <code>exitToken</code> counter bumped inside{" "}
+        <code>useRouteExit</code>; the Promise the router awaits resolves on{" "}
         <code>onExitComplete</code>. Same URL-and-UI lock-step semantics as
         the other three. Hero morph through <code>layoutId</code> and list
         reorder through <code>&lt;motion.li layout&gt;</code> are{" "}
@@ -70,29 +73,30 @@ export function About(): JSX.Element {
           <code>view-transitions/</code>.
         </li>
         <li>
-          Cross-browser, custom timing per route, hero morph,{" "}
-          <em>and</em> list FLIP with ghosts? →{" "}
-          <code>route-animations/</code>.
+          Cross-browser, custom timing per route, hero morph, <em>and</em> list
+          FLIP with ghosts? → <code>route-animations/</code>.
         </li>
         <li>
           Cross-browser, simple entry / exit per page, no hero morph, no
           coordinated reorder? → <code>page-animations/</code> (this).
         </li>
         <li>
-          Cross-browser, hero morph + list FLIP via library primitives,
-          willing to add a 50 KB dependency for declarative ergonomics? →{" "}
+          Cross-browser, hero morph + list FLIP via library primitives, willing
+          to add a 50 KB dependency for declarative ergonomics? →{" "}
           <code>motion-animations/</code>.
         </li>
       </ul>
 
       <h2>The hook</h2>
       <p>
-        See <code>src/use-route-animation.ts</code> (~60 LOC). Two{" "}
-        <code>useEffect</code> blocks: one subscribes to{" "}
-        <code>subscribeLeave</code> and returns a Promise that resolves on{" "}
-        <code>animationend</code> (50 ms fallback for reduced-motion); the other
-        subscribes to <code>subscribe</code> and adds an entry class whose CSS
-        animation plays on the new page&apos;s mount.
+        See <code>src/use-route-animation.ts</code> (~120 LOC).{" "}
+        <code>useRouteExit</code> from <code>@real-router/react</code>{" "}
+        wraps <code>subscribeLeave</code> with abort/skip-same-route guards;
+        the handler awaits <code>Element.getAnimations() + .finished</code>{" "}
+        (reduced-motion fast-path: <code>allSettled([])</code> resolves
+        synchronously). Entry plays on nav-driven mount via{" "}
+        <code>useRouteEnter</code> from the same package — skip-initial and
+        StrictMode double-mount immunity built in.
       </p>
     </div>
   );

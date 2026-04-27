@@ -34,6 +34,13 @@ export function ProductsList(): JSX.Element {
 
   return (
     <>
+      <h1>Products</h1>
+      <p>
+        Click a product card to see the hero-morph transition. The colored
+        square on the card smoothly morphs into the large cover on the detail
+        page via matching <code>view-transition-name</code>.
+      </p>
+
       <div className="vt-products-toolbar">
         <span>Sort:</span>
         <Link

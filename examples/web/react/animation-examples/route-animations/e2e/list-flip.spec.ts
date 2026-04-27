@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 // List FLIP: changing the sort on /products (or filter on /query-demo)
-// should leave [data-leaving] untouched (query-only suppression) AND run
+// should leave .leaving untouched (query-only suppression) AND run
 // WAAPI animations on the [data-flip-key] items via animations-policy.ts.
 //
 // `<li>` carries no CSS animations of its own — every animation visible on
@@ -41,7 +41,7 @@ test.describe("List reorder FLIP", () => {
     );
 
     // Marker invariant — sort change is query-only.
-    const leavingCount = await page.locator("[data-leaving]").count();
+    const leavingCount = await page.locator(".leaving").count();
     expect(leavingCount).toBe(0);
   });
 
