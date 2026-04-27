@@ -3,7 +3,7 @@
   "version": 1,
   "newProjectRoot": "projects",
   "projects": {
-    "angular-view-transitions-example": {
+    "angular-route-animations-example": {
       "projectType": "application",
       "root": "",
       "sourceRoot": "src",
@@ -12,20 +12,20 @@
         "build": {
           "builder": "@angular/build:application",
           "options": {
-            "outputPath": "dist/angular-view-transitions-example",
+            "outputPath": "dist/angular-route-animations-example",
             "index": "index.html",
             "browser": "src/main.ts",
             "polyfills": [],
             "tsConfig": "tsconfig.app.json",
             "assets": [],
-            "styles": ["../../../shared/styles.css", "src/styles/transitions.css"],
+            "styles": ["../../../../shared/styles.css", "src/styles/animations.css"],
             "scripts": []
           }
         },
         "serve": {
           "builder": "@angular/build:dev-server",
           "options": {
-            "buildTarget": "angular-view-transitions-example:build",
+            "buildTarget": "angular-route-animations-example:build",
             "port": 4200
           }
         }

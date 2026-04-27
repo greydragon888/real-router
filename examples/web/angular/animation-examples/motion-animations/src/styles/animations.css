@@ -1,0 +1,60 @@
+/*
+ * Page-level entry / exit animations driven by a phase signal in
+ * TransitionHost. The host element of <transition-host> is the
+ * <transition-host> tag itself, so we target the wrapper inside its
+ * template via .page.
+ *
+ * Phase classes:
+ *   - .page (no phase class)        — visible, at rest
+ *   - .page.leaving                 — exit keyframe playing
+ *   - .page.entering                — entry keyframe playing
+ *
+ * The router awaits the leave keyframe's animationend before committing,
+ * so URL and UI stay in lock-step. After the router commits and Angular
+ * re-renders the inner content, injectRouteEnter sets the phase to
+ * "entering"; the entry keyframe plays. On its animationend the phase
+ * snaps to "active" (the no-class default).
+ *
+ * 0.9s matches the React/Vue/Solid/Svelte motion-animations examples.
+ */
+
+.page {
+  /* default visible state */
+}
+
+.page.leaving {
+  animation: page-leave 0.9s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.page.entering {
+  animation: page-enter 0.9s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes page-leave {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page.leaving,
+  .page.entering {
+    animation: none;
+  }
+}

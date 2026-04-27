@@ -5,7 +5,7 @@ import { AboutComponent } from "./pages/about.component";
 import { HomeComponent } from "./pages/home.component";
 import { ProductsComponent } from "./pages/products.component";
 import { QueryDemoComponent } from "./pages/query-demo.component";
-import { Layout } from "../../shared/Layout";
+import { Layout } from "../../../shared/Layout";
 
 const LINKS = [
   { routeName: "home", label: "Home" },
