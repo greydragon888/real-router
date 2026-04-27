@@ -53,7 +53,10 @@ const FILTERS: Filter[] = ["all", "letter", "number", "color"];
 
       <ul class="vt-qd-list" data-vt-scope="query-demo-list">
         @for (item of visible(); track item.id) {
-          <li class="vt-qd-item">
+          <li
+            class="vt-qd-item"
+            [style.--vt-qd-name]="'vt-qd-' + item.id"
+          >
             <strong>{{ item.label }}</strong>
             <span> — {{ item.category }}</span>
           </li>

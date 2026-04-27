@@ -47,7 +47,10 @@ type SortDirection = "asc" | "desc";
 
     <ul class="vt-product-list" data-vt-scope="product-list">
       @for (product of items(); track product.id) {
-        <li class="vt-product-card">
+        <li
+          class="vt-product-card"
+          [style.--vt-card-name]="'vt-card-' + product.id"
+        >
           <a
             realLink
             routeName="products.detail"

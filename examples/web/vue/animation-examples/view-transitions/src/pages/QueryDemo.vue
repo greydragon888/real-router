@@ -58,6 +58,7 @@ const FILTERS: Filter[] = ["all", "letter", "number", "color"];
         v-for="item in visible"
         :key="item.id"
         class="vt-qd-item"
+        :style="{ '--vt-qd-name': `vt-qd-${item.id}` }"
       >
         <strong>{{ item.label }}</strong>
         <span> — {{ item.category }}</span>

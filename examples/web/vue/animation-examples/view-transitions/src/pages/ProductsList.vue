@@ -61,6 +61,7 @@ const items = computed(() => {
       v-for="product in items"
       :key="product.id"
       class="vt-product-card"
+      :style="{ '--vt-card-name': `vt-card-${product.id}` }"
     >
       <Link
         routeName="products.detail"

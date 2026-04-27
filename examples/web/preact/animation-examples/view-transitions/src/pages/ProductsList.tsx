@@ -57,7 +57,11 @@ export function ProductsList(): JSX.Element {
 
       <ul className="vt-product-list" data-vt-scope="product-list">
         {items.map((product) => (
-          <li key={product.id} className="vt-product-card">
+          <li
+            key={product.id}
+            className="vt-product-card"
+            style={{ "--vt-card-name": `vt-card-${product.id}` }}
+          >
             <Link routeName="products.detail" routeParams={{ id: product.id }}>
               <span
                 className="vt-product-thumb"

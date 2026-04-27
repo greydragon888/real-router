@@ -311,6 +311,43 @@ html:not(.vt-query-only) .vt-qd-list {
 }
 
 /* ------------------------------------------------------------------ */
+/* 4b. Per-item VT names — list reorder + filter narrow / widen        */
+/* Each <li> in vt-product-list / vt-qd-list carries an inline CSS    */
+/* custom property (`--vt-card-name` / `--vt-qd-name`) that the rules  */
+/* below promote to a real `view-transition-name` ONLY when            */
+/* `html.vt-query-only` is set (i.e. same-route navigation: sort or    */
+/* filter changed). The browser then captures each item as its own VT  */
+/* scope; matching names across the snapshot pair animate FLIP         */
+/* (position + size) automatically, missing names crossfade.           */
+/*                                                                    */
+/* Why gated on `vt-query-only`: cross-route navigation                */
+/* (products → about / products → products.detail) routes through hero */
+/* morph and root crossfade; per-card names there would collide with   */
+/* the hero pair (product-thumb's `vt-hero-active` sets the same       */
+/* element to `view-transition-name: hero`). Restricting to            */
+/* same-route keeps the two paths separate.                            */
+/*                                                                    */
+/* `view-transition-class` groups the per-item scopes so we can tune   */
+/* duration once. Browser support: Chromium 125+, Safari 18.2+.        */
+/* Older browsers ignore the class — duration falls back to 250ms.     */
+/* ------------------------------------------------------------------ */
+
+html.vt-query-only .vt-product-card {
+  view-transition-name: var(--vt-card-name);
+  view-transition-class: vt-list-item;
+}
+
+html.vt-query-only .vt-qd-item {
+  view-transition-name: var(--vt-qd-name);
+  view-transition-class: vt-list-item;
+}
+
+::view-transition-group(.vt-list-item) {
+  animation-duration: var(--vt-duration-area);
+  animation-timing-function: var(--vt-easing-standard);
+}
+
+/* ------------------------------------------------------------------ */
 /* 5. Reduced motion                                                  */
 /* When the user prefers reduced motion, the VT pipeline still runs   */
 /* (old/new snapshots are taken, DOM swap happens) but the animations */

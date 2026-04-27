@@ -61,7 +61,10 @@ export function ProductsList(): JSX.Element {
       <ul class="vt-product-list" data-vt-scope="product-list">
         <For each={items()}>
           {(product) => (
-            <li class="vt-product-card">
+            <li
+              class="vt-product-card"
+              style={{ "--vt-card-name": `vt-card-${product.id}` }}
+            >
               <Link
                 routeName="products.detail"
                 routeParams={{ id: product.id }}

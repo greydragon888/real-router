@@ -61,7 +61,10 @@ export function QueryDemo(): JSX.Element {
       <ul class="vt-qd-list" data-vt-scope="query-demo-list">
         <For each={visible()}>
           {(item) => (
-            <li class="vt-qd-item">
+            <li
+              class="vt-qd-item"
+              style={{ "--vt-qd-name": `vt-qd-${item.id}` }}
+            >
               <strong>{item.label}</strong>
               <span> — {item.category}</span>
             </li>
