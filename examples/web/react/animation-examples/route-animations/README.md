@@ -97,7 +97,7 @@ The recipe relies on three router behaviours and two CSS conventions:
 
 ## Nested routes
 
-`/products` and `/products/:id` share a persistent shell (`<h1>Products</h1>` + intro paragraph). The parent `products` IS the list — no synthetic `list` child, no `forwardTo`:
+`/products` and `/products/:id` share the parent `products` route — no synthetic `list` child, no `forwardTo`. The parent IS the list:
 
 ```ts
 // routes.ts
@@ -111,19 +111,23 @@ The recipe relies on three router behaviours and two CSS conventions:
 }
 ```
 
-`Products.tsx` mounts the persistent shell; `<RouteView.Self>` renders the list while `<RouteView.Match segment="detail">` swaps in the detail page. **`[data-route-root]` lives on `ProductsList` and `ProductDetail`, not on the shell itself** — so the heading and intro do not fade across list ↔ detail navigations:
+The wiring lives directly in `App.tsx` — no separate `Products.tsx` shell component. **`[data-route-root]` lives on `ProductsList` and `ProductDetail` themselves**, on each leaf's outermost wrapper:
 
 ```tsx
-// Products.tsx
-<div>
-  <h1>Products</h1>          {/* persistent — no data-route-root */}
-  <p>Click a product card…</p>
+// App.tsx
+<RouteView.Match segment="products">
   <RouteView nodeName="products">
-    <RouteView.Self><ProductsList /></RouteView.Self>          {/* has data-route-root inside */}
-    <RouteView.Match segment="detail"><ProductDetail /></RouteView.Match>  {/* has data-route-root inside */}
+    <RouteView.Self>
+      <ProductsList />         {/* has data-route-root inside */}
+    </RouteView.Self>
+    <RouteView.Match segment="detail">
+      <ProductDetail />        {/* has data-route-root inside */}
+    </RouteView.Match>
   </RouteView>
-</div>
+</RouteView.Match>
 ```
+
+`usePageAnimator` queries `document.querySelector("[data-route-root]")` and finds exactly one match per render — the active leaf. Both `ProductsList` and `ProductDetail` mark their own outer wrapper with the attribute; on a `products` ↔ `products.detail` navigation, the marker swaps between the two leaves and the page-level fade animates each one in turn. (For a true persistent shell with a static heading, an outer wrapper without `[data-route-root]` could be added — out of scope for this example.)
 
 This is the trade-off the recipe makes vs View Transitions, which gets persistent-shell static rendering for free via pixel-level snapshot diffing. With CSS animations, anything inside the leaving `[data-route-root]` fades, so the marker has to be placed precisely.
 
@@ -138,7 +142,7 @@ The only `setTimeout(0)` in this example is in the hero-morph branch (after `sub
 ## Known limits
 
 - **No true crossfade.** The recipe is sequential (exit fully → entry). Crossfade requires both DOM trees mounted simultaneously, which is a framework-adapter coordination problem the recipe does not solve. View Transitions gives crossfade for free via DOM snapshots.
-- **Hero morph is manual.** Capturing source rects, applying inverse-FLIP transforms, and identifying destination elements by `data-product-id` is application-level code (~30 LOC in `animations-policy.ts`). VT does this with two matching `view-transition-name` rules. The recipe trades terseness for cross-browser support.
-- **List reorder is also manual.** Same trade-off as hero-morph: VT pairs items by `view-transition-name` and animates positions automatically; the recipe captures every `[data-flip-key]` rect on leave and replays inverse-FLIP transforms via the Web Animations API. Removed-item EXIT is approximated with `cloneNode` ghosts (position:fixed at the captured rect, fade + scale, then dropped) — visually convincing but the ghost is non-interactive during the fade. A library like `react-flip-toolkit` solves this with a richer state machine; the recipe's ~40 LOC is enough for the demo.
+- **Hero morph is manual.** Capturing source rects, applying inverse-FLIP transforms, and identifying destination elements by `data-product-id` is application-level code (~110 LOC in `useHeroMorph`). VT does this with two matching `view-transition-name` rules. The recipe trades terseness for cross-browser support.
+- **List reorder is also manual.** Same trade-off as hero-morph: VT pairs items by `view-transition-name` and animates positions automatically; the recipe captures every `[data-flip-key]` rect on leave and replays inverse-FLIP transforms via the Web Animations API. Removed-item EXIT is approximated with `cloneNode` ghosts (position:fixed at the captured rect, fade + scale, then dropped) — visually convincing but the ghost is non-interactive during the fade. A library like `react-flip-toolkit` solves this with a richer state machine; the recipe's ~230 LOC is enough for the demo.
 - **Mixed exit / entry timing.** Home (fade, 900 ms) → Products (slide, 2100 ms) plays a 900 ms fade-out followed by a 2100 ms slide-in. Exit timing is determined by the leaving route, entry timing by the arriving route. If you want all transitions to use a single timing pair, use a single `data-route-anim` value across all leaf routes.
-- **Granular `[data-route-root]` discipline.** Forgetting the marker on a new page silently disables animation on that route. There is no central registry — wiring is by data attribute. A `console.warn` in `animations-policy.ts` when the leaf has no marker would help; we leave that as a hook for users to add per-app.
+- **Granular `[data-route-root]` discipline.** Forgetting the marker on a new page silently disables animation on that route. There is no central registry — wiring is by data attribute. A `console.warn` in `usePageAnimator` when the leaf has no marker would help; we leave that as a hook for users to add per-app.

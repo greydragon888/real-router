@@ -60,9 +60,9 @@
 
 /* ------------------------------------------------------------------ */
 /* 2. Slide (direction-aware) — ProductsList                           */
-/* `html[data-nav-direction]` is flipped by animations-policy.ts on    */
-/* every popstate. forward = exit-left + entry-from-right;             */
-/* back    = exit-right + entry-from-left.                             */
+/* `html[data-nav-direction]` is flipped by createDirectionTracker    */
+/* (from shared/dom-utils) on every popstate. forward = exit-left +   */
+/* entry-from-right; back = exit-right + entry-from-left.             */
 /* ------------------------------------------------------------------ */
 
 [data-route-anim="slide"].leaving,
@@ -136,7 +136,7 @@ html[data-nav-direction="back"] [data-route-anim="slide"]:not(.leaving) {
 /* ------------------------------------------------------------------ */
 /* 3. Hero-flip — ProductDetail                                        */
 /* The page background fades while the product cover does an          */
-/* inverse-FLIP transform via Web Animations API (animations-policy.ts */
+/* inverse-FLIP transform via Web Animations API (useHeroMorph hook   */
 /* measures source rect on leave + applies WAAPI animation after the  */
 /* destination has mounted). No CSS keyframe runs on the cover         */
 /* element itself — it's all WAAPI.                                    */
