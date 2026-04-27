@@ -5,7 +5,7 @@ import { expect, test } from "@playwright/test";
 // fade + slide. This test verifies the nested-route navigation completes
 // successfully and the cover renders at full size on the detail page.
 // For an inverse-FLIP hero morph in Angular, see route-animations/'s
-// useHeroMorph composable.
+// installHeroMorph factory.
 test.describe("Nested-route navigation (no hero morph in motion-animations)", () => {
   test("clicking a product card navigates to the detail page and renders the cover", async ({
     page,

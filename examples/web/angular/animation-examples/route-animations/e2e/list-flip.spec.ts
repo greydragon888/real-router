@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 // List FLIP: changing the sort on /products (or filter on /query-demo)
 // should leave .leaving untouched (query-only suppression) AND run
-// WAAPI animations on the [data-flip-key] items via useListFlip.
+// WAAPI animations on the [data-flip-key] items via installListFlip.
 //
 // `<li>` carries no CSS animations of its own — every animation visible on
 // it is policy-emitted (FLIP translate or new-item fade-in), so a live

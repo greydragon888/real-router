@@ -31,7 +31,7 @@ import type { Router } from "@real-router/core";
  * names on both sides let the browser FLIP-morph them.
  *
  * @returns a teardown function that unsubscribes all listeners and
- *          removes the popstate listener. Not used by main.tsx (policy
+ *          removes the popstate listener. Not used by main.ts (policy
  *          lives for the page lifetime), but available for tests or HMR
  *          cleanup if needed.
  */

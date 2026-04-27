@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-// Regression guard: the three animation hooks (usePageAnimator / useHeroMorph / useListFlip) must not throw or log during normal
+// Regression guard: the three animation factories (installPageAnimator / installHeroMorph / installListFlip) must not throw or log during normal
 // navigation. Walks the sidebar to exercise every route, then asserts no
 // console errors and no uncaught exceptions.
 test.describe("No console or page errors during navigation", () => {

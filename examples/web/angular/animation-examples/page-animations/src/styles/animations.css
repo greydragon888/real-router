@@ -1,8 +1,8 @@
 /*
  * Page Animations CSS
  *
- * Each page declares an exit / entry class pair via the `useRouteAnimation`
- * hook; CSS keys keyframes off those classes. Class names are page-local —
+ * Each page declares an exit / entry class pair via the `installRouteAnimation`
+ * factory; CSS keys keyframes off those classes. Class names are page-local —
  * pages can pick their own (`fade-out` here, `slide-out-left` for products,
  * etc.) without coordinating with other pages or a central policy file.
  */
@@ -82,9 +82,10 @@
 }
 
 /* ------------------------------------------------------------------ */
-/* Reduced motion — animationend never fires when animation:none, so   */
-/* useRouteAnimation falls back to a 50 ms timeout to release the      */
-/* router. The visual is an instant swap.                              */
+/* Reduced motion — when animation:none is applied, getAnimations()    */
+/* returns [], so Promise.allSettled([]) in installRouteAnimation      */
+/* resolves synchronously and the router unblocks instantly. The       */
+/* visual is an instant swap.                                          */
 /* ------------------------------------------------------------------ */
 
 @media (prefers-reduced-motion: reduce) {
@@ -94,9 +95,9 @@
   .slide-in {
     animation: none !important;
   }
-  /* The useListFlip hook reads getBoundingClientRect and applies WAAPI
+  /* The installListFlip factory reads getBoundingClientRect and applies WAAPI
    * transforms — those are not blocked by this media rule. To honour
-   * reduced-motion fully, the hook itself could check
+   * reduced-motion fully, the factory itself could check
    * `globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches`
    * and skip the animate() call; left as an exercise for the reader. */
 }

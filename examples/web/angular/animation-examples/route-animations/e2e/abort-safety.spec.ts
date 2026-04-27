@@ -12,7 +12,7 @@ test.describe("Abort safety", () => {
     const sidebar = page.getByRole("complementary");
 
     // Fire 3 rapid clicks — each cancels the previous. real-router fires
-    // signal.abort on the in-flight LeaveState; usePageAnimator
+    // signal.abort on the in-flight LeaveState; installPageAnimator
     // removes .leaving class from the cancelled exit.
     await Promise.all([
       sidebar.getByRole("link", { name: "Products" }).click(),

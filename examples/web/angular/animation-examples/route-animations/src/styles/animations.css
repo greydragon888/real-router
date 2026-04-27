@@ -136,7 +136,7 @@ html[data-nav-direction="back"] [data-route-anim="slide"]:not(.leaving) {
 /* ------------------------------------------------------------------ */
 /* 3. Hero-flip — ProductDetail                                        */
 /* The page background fades while the product cover does an          */
-/* inverse-FLIP transform via Web Animations API (useHeroMorph hook   */
+/* inverse-FLIP transform via Web Animations API (installHeroMorph hook   */
 /* measures source rect on leave + applies WAAPI animation after the  */
 /* destination has mounted). No CSS keyframe runs on the cover         */
 /* element itself — it's all WAAPI.                                    */
@@ -153,8 +153,9 @@ html[data-nav-direction="back"] [data-route-anim="slide"]:not(.leaving) {
 
 /* ------------------------------------------------------------------ */
 /* 4. Reduced motion                                                   */
-/* `animation: none` makes `animationend` never fire — animations.ts   */
-/* `Promise.race`s with a 50 ms timeout so the router still unblocks.  */
+/* `animation: none` means getAnimations() returns [], so              */
+/* `Promise.allSettled([])` in installPageAnimator resolves            */
+/* synchronously — the router unblocks instantly without animation.    */
 /* ------------------------------------------------------------------ */
 
 @media (prefers-reduced-motion: reduce) {

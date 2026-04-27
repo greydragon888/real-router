@@ -85,7 +85,7 @@
 
 /* ------------------------------------------------------------------ */
 /* 2. Direction-aware slide on root                                   */
-/* main.tsx sets data-nav-direction="back" on <html> when popstate    */
+/* main.ts sets data-nav-direction="back" on <html> when popstate    */
 /* fires. We key the keyframes off that attribute so back/forward     */
 /* slide in opposite directions — forward pushes the new view from    */
 /* the right, back reveals from the left.                             */
@@ -159,7 +159,7 @@ html[data-nav-direction="back"]::view-transition-new(root) {
 
 /* ------------------------------------------------------------------ */
 /* 2b. Query-only navigation — suppress root animation                */
-/* main.tsx sets html.vt-query-only when route.name === nextRoute.name */
+/* main.ts sets html.vt-query-only when route.name === nextRoute.name */
 /* (same-route navigation, typically just query-param changes).        */
 /* Root-scope captures the WHOLE page minus named areas, so its        */
 /* keyframes would play a 2400ms curtain even when only a list         */
@@ -202,7 +202,7 @@ html.vt-hero-morph::view-transition-new(root) {
 /*   ProductDetail page) both carry `data-product-id`. The            */
 /*   `view-transition-name` is NOT set inline any more; CSS grants it */
 /*   dynamically only to the element whose id matches                 */
-/*   <html data-vt-hero-id>, which main.tsx sets from nextRoute.      */
+/*   <html data-vt-hero-id>, which main.ts sets from nextRoute.      */
 /*   Net effect: exactly ONE thumb on Products (the one that was      */
 /*   clicked) keeps its scope and morphs into the detail cover; the   */
 /*   other 5 rejoin root and slide with the page. Without this        */
@@ -218,10 +218,10 @@ html.vt-hero-morph::view-transition-new(root) {
 
 /* Single rule — scales to unlimited products.
  *
- * main.tsx adds the .vt-hero-active class to exactly ONE element per
+ * main.ts adds the .vt-hero-active class to exactly ONE element per
  * navigation (the product whose id matches nextRoute.params.id) — on the
  * source DOM in subscribeLeave, and on the destination DOM in
- * router.subscribe after React commits. Everything else stays in its
+ * router.subscribe after Angular commits. Everything else stays in its
  * parent scope (root or product-list).
  *
  * The shared name "hero" is arbitrary — both the source thumb and the

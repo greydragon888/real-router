@@ -2,15 +2,14 @@
  * Page styles for motion-animations example.
  *
  * No @keyframes here — page-level entry/exit animations are driven by
- * Vue's built-in <Transition> component via CSS class hooks defined
- * inline in App.vue's <style> block (`.page-enter-from`,
- * `.page-leave-to`, etc.). This file holds only layout / typography /
- * cosmetic styling for the example's page elements.
+ * `.page.leaving` / `.page.entering` class state defined in
+ * animations.css. This file holds only layout / typography / cosmetic
+ * styling for the example's page elements.
  *
- * Note: Vue's <Transition> is per-element only — no layoutId / layout
- * primitives. The Vue version uses plain elements for cards / covers;
- * for hero morph in Vue, see `route-animations/` (`useHeroMorph` —
- * manual WAAPI inverse-FLIP).
+ * Note: the page wrapper's CSS keyframes are per-element entry/exit
+ * only — no layoutId / layout primitives. This example uses plain
+ * elements for cards / covers; for hero morph in Angular, see
+ * `route-animations/` (`installHeroMorph` — manual WAAPI inverse-FLIP).
  */
 
 .products-toolbar {

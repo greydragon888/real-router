@@ -7,7 +7,7 @@ test.describe("Hero morph", () => {
     await page.goto("/products");
     await expect(page.getByRole("heading", { name: "Products" })).toBeVisible();
 
-    // `data-product-id` is the stable marker that main.tsx uses to find
+    // `data-product-id` is the stable marker that main.ts uses to find
     // the target element during navigation and add `.vt-hero-active` to
     // it. No thumb has a name before a nav is in progress.
     const thumbProductId = await page.evaluate(() => {
@@ -16,7 +16,7 @@ test.describe("Hero morph", () => {
     });
     expect(thumbProductId).toMatch(/^\d+$/);
 
-    // Click on Crimson Flask (id=1). During the navigation main.tsx:
+    // Click on Crimson Flask (id=1). During the navigation main.ts:
     // 1) sets html.vt-hero-morph + data-vt-hero-id="1"
     // 2) adds .vt-hero-active to the source thumb (old DOM, subscribeLeave)
     // 3) adds .vt-hero-active to the destination cover (new DOM,

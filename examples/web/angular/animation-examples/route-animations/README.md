@@ -22,7 +22,7 @@ Pick `route-animations/` if you need Firefox 145- support, custom timing per rou
 
 ## What it covers
 
-- **Async `subscribeLeave`** — listener returns `Promise<void>`, the router blocks on it until `animationend` fires (or 50 ms fallback timeout for `prefers-reduced-motion`)
+- **Async `subscribeLeave`** — listener returns `Promise<void>`, the router blocks on it until `Element.getAnimations() + .finished` settle (synchronous resolution under `prefers-reduced-motion` because `getAnimations()` returns `[]`)
 - **Per-route timing** — Home / About / QueryDemo fade (900 ms), ProductsList slides direction-aware (2100 ms), ProductDetail uses background fade + WAAPI hero-FLIP (1800 ms / 2400 ms). Durations are intentionally long for pedagogical clarity — for production, scale them down to ~250–500 ms
 - **Direction-aware** — `data-nav-direction` on `<html>` flips between forward / back keyframes (popstate → back)
 - **Skip-initial / skip-same-route** — `router.start()` does not fire `subscribeLeave`; `SAME_STATES` for clicks on the active link short-circuits before listeners run
@@ -30,7 +30,7 @@ Pick `route-animations/` if you need Firefox 145- support, custom timing per rou
 - **List reorder FLIP** — sort / filter on the same route runs three coordinated WAAPI animations: survivors translate from old to new position, newly-visible items fade in, and items removed by a narrowing filter fade out via `cloneNode` ghosts pinned at their old rect (Angular unmounts the originals before subscribe fires, so the recipe keeps offscreen copies)
 - **Manual hero-FLIP** — thumb rect captured before leave + inverse-FLIP transform via Web Animations API after destination commits. The recipe pays ~30 LOC of policy code for what View Transitions does in two CSS rules
 - **Abort safety** — rapid clicks fire `signal.abort` from `LeaveState`; cleanup removes `data-leaving` from cancelled exits
-- **Reduced motion** — `@media (prefers-reduced-motion: reduce)` collapses keyframes to `animation: none`; 50 ms `Promise.race` fallback unblocks the router
+- **Reduced motion** — `@media (prefers-reduced-motion: reduce)` collapses keyframes to `animation: none`; `getAnimations()` returns `[]`, `Promise.allSettled([])` resolves synchronously, the router unblocks immediately
 
 ## Run
 
@@ -55,7 +55,7 @@ Every browser that runs CSS animations and supports the Web Animations API (`ele
 - Firefox (all current versions — including those without View Transitions)
 - Safari 13.1+ (WAAPI shipped in March 2020)
 
-For `prefers-reduced-motion`, the recipe degrades to instant swaps via the 50 ms timeout.
+For `prefers-reduced-motion`, the recipe degrades to instant swaps via the empty-`getAnimations()` fast-path (`Promise.allSettled([])` resolves synchronously).
 
 ## How it works
 
