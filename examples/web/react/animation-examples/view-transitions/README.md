@@ -6,7 +6,7 @@ Demonstrates browser View Transitions API integration via the `viewTransitions` 
 
 - `<RouterProvider viewTransitions>` — one-prop opt-in, utility coordinates `subscribeLeave` → `document.startViewTransition` → `subscribe` → deferred release
 - **Basic exit → URL change → entry** — router blocks on the old-snapshot-captured phase so URL change happens under the VT freeze frame, not ahead of the animation
-- **Nested routes with persistent shell** — `products` IS the list (no synthetic `list` child / `forwardTo`); `Products.tsx` stays mounted across list ↔ detail, `<RouteView.Self>` renders the list while `<RouteView.Match segment="detail">` swaps in the detail page (see [Nested routes](#nested-routes))
+- **Nested routes** — `products` IS the list (no synthetic `list` child / `forwardTo`); the inner `<RouteView nodeName="products">` is wired directly in `App.tsx`, with `<RouteView.Self>` rendering `ProductsList` and `<RouteView.Match segment="detail">` swapping in `ProductDetail` (see [Nested routes](#nested-routes))
 - **Hero morph** — exactly one element gets `view-transition-name: hero` via `.vt-hero-active` class toggled by `vt-policy.ts`; scales to unlimited products with a single CSS rule (see [Scope gating](#scope-gating))
 - **Query-only navigation** — sort/filter change on the same route animates only the local list, not the whole page
 - **Cross-route navigation** — thumbs and lists rejoin the root scope and slide together with the page (no floating frozen elements)
@@ -86,18 +86,16 @@ Net effect: **exit animation** (on `::view-transition-old`) runs over the old sn
 }
 ```
 
-`App.tsx` mounts `Products` for the outer segment; `Products.tsx` contains an inner `<RouteView nodeName="products">` with `<RouteView.Self>` for the list (rendered when the active route equals `products`) and `<RouteView.Match segment="detail">` for the detail. The shell stays mounted across the swap:
+The wiring lives directly in `App.tsx` — no separate `Products.tsx` shell component. The inner `<RouteView nodeName="products">` is nested inline inside the outer match, with `<RouteView.Self>` for the list (rendered when the active route equals `products`) and `<RouteView.Match segment="detail">` for the detail:
 
 ```tsx
-// Products.tsx — persistent shell + inner swap
-<div>
-  <h1>Products</h1>          {/* stays mounted across list ↔ detail */}
-  <p>Click a product card…</p>
+// App.tsx — inline nested RouteView for products
+<RouteView.Match segment="products">
   <RouteView nodeName="products">
     <RouteView.Self><ProductsList /></RouteView.Self>
     <RouteView.Match segment="detail"><ProductDetail /></RouteView.Match>
   </RouteView>
-</div>
+</RouteView.Match>
 ```
 
 Side benefit of dot-notation (`products.detail`): sidebar `<Link routeName="products" activeStrict={false}>` stays active on both `/products` and `/products/:id` via real-router's `areRoutesRelated("products", "products.detail") === true`. Flat siblings (`products`, `productDetail`) would lose this.

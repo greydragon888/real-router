@@ -23,7 +23,7 @@ Pick `motion-animations/` if you want library-native ergonomics (declarative pro
 ## What it covers
 
 - **Page-level fade + slide** via `<AnimatePresence mode="wait">` + `<motion.div key={route.name}>` — `mode="wait"` sequences exit fully before entry; `initial={false}` suppresses the first-mount animation so the heading is visible immediately on reload.
-- **Hero morph (free)** — `layoutId="product-${id}"` on the thumbnail and the cover. Library caches layout info from the unmounting element and uses it as the start position for the new mount. Compare with the manual `getBoundingClientRect` + WAAPI machinery in `route-animations/animations-policy.ts`.
+- **Hero morph (free)** — `layoutId="product-${id}"` on the thumbnail and the cover. Library caches layout info from the unmounting element and uses it as the start position for the new mount. Compare with the manual `getBoundingClientRect` + WAAPI machinery in `route-animations/`'s `useHeroMorph` hook (~110 LOC).
 - **List reorder (free)** — `<motion.li layout>` runs FLIP automatically on parent re-render with reordered children. Stable `key={item.id}` is the only requirement.
 - **Filter fade-in** — newly-visible items use `initial={{ opacity: 0 }}` + `animate={{ opacity: 1 }}` for entrance; library-respected `prefers-reduced-motion` collapses them to instant.
 - **Reduced motion (global)** — `<MotionConfig reducedMotion="user">` in `main.tsx`. Library disables transform / layout animations site-wide while keeping opacity / backgroundColor active.
@@ -95,7 +95,7 @@ This is router-coordinated, identical in spirit to `route-animations/` and `page
 `src/App.tsx` (~70 LOC):
 - `<AnimatePresence mode="wait" initial={false}>` wraps the `<RouteView>`
 - Inside: a single `<motion.div key={routeName} initial animate exit transition>` — the page-level transition
-- All routes share this transition; per-page customisation would live in inner motion-components (e.g. `Products.tsx`'s `<motion.li layoutId>`)
+- All routes share this transition; per-page customisation lives in inner motion-components (e.g. `ProductsList.tsx`'s `<motion.li layout>` + `<motion.span layoutId>` for hero morph)
 
 That's the entire infrastructure. ~100 LOC.
 

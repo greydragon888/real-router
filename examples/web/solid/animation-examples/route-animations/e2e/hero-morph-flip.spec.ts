@@ -10,7 +10,7 @@ test.describe("Hero morph (manual FLIP)", () => {
     ).toBeVisible();
 
     // The thumb on the products list and the cover on the detail page share
-    // a `data-product-id` — that's the stable handle animations-policy.ts
+    // a `data-product-id` — that's the stable handle useHeroMorph
     // uses to find the destination element after commit.
     const thumbProductId = await page.evaluate(() => {
       const thumb = document.querySelector(".product-thumb");
