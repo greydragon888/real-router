@@ -1,0 +1,200 @@
+/*
+ * Page Animations CSS
+ *
+ * Each page declares an exit / entry class pair via the `useRouteAnimation`
+ * hook; CSS keys keyframes off those classes. Class names are page-local —
+ * pages can pick their own (`fade-out` here, `slide-out-left` for products,
+ * etc.) without coordinating with other pages or a central policy file.
+ */
+
+:root {
+  --duration-fade: 900ms;
+  --duration-slide: 2100ms;
+
+  --slide-distance: 80px;
+
+  --easing-standard: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ------------------------------------------------------------------ */
+/* Fade (Home / About / QueryDemo / ProductDetail)                     */
+/* ------------------------------------------------------------------ */
+
+.fade-out {
+  animation: page-fade-out var(--duration-fade) var(--easing-standard) forwards;
+}
+
+.fade-in {
+  animation: page-fade-in var(--duration-fade) var(--easing-standard);
+}
+
+@keyframes page-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes page-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Slide (Products) — same easing pair, different motion              */
+/* ------------------------------------------------------------------ */
+
+.slide-out {
+  animation: page-slide-out var(--duration-slide) var(--easing-standard)
+    forwards;
+}
+
+.slide-in {
+  animation: page-slide-in var(--duration-slide) var(--easing-standard);
+}
+
+@keyframes page-slide-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(calc(-1 * var(--slide-distance)));
+  }
+}
+
+@keyframes page-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(var(--slide-distance));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Reduced motion — animationend never fires when animation:none, so   */
+/* useRouteAnimation falls back to a 50 ms timeout to release the      */
+/* router. The visual is an instant swap.                              */
+/* ------------------------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-out,
+  .fade-in,
+  .slide-out,
+  .slide-in {
+    animation: none !important;
+  }
+  /* The useListFlip hook reads getBoundingClientRect and applies WAAPI
+   * transforms — those are not blocked by this media rule. To honour
+   * reduced-motion fully, the hook itself could check
+   * `globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches`
+   * and skip the animate() call; left as an exercise for the reader. */
+}
+
+/* ------------------------------------------------------------------ */
+/* Page styles — neutral classnames, copied from route-animations      */
+/* ------------------------------------------------------------------ */
+
+.products-toolbar {
+  margin: 16px 0;
+  font-size: 14px;
+}
+
+.products-toolbar a {
+  color: #0f3460;
+}
+
+.product-list {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.product-card a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: #fff;
+  color: #1a1a2e;
+  text-decoration: none;
+}
+
+.product-card a:hover {
+  border-color: #0f3460;
+}
+
+.product-thumb {
+  display: block;
+  width: 100%;
+  height: 80px;
+  border-radius: 4px;
+}
+
+.product-name {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.product-cover {
+  display: block;
+  width: 100%;
+  max-width: 480px;
+  height: 220px;
+  border-radius: 12px;
+  margin: 16px 0;
+}
+
+.qd-toolbar {
+  margin: 16px 0;
+  display: flex;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.qd-toolbar a {
+  padding: 4px 10px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  color: #0f3460;
+  text-decoration: none;
+}
+
+.qd-toolbar a.active {
+  background: #0f3460;
+  color: #fff !important;
+  border-color: #0f3460;
+}
+
+.qd-list {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+}
+
+.qd-item {
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background: #fff;
+  font-size: 14px;
+}

@@ -5,29 +5,19 @@ import { createApp, h } from "vue";
 
 import App from "./App.vue";
 import { routes } from "./routes";
-import { installViewTransitionPolicy } from "./vt-policy";
 
-import "../../../../shared/styles.css";
-import "./styles/transitions.css";
+import "../../../../../shared/styles.css";
+import "./styles/styles.css";
 
-const router = createRouter(routes, {
-  defaultRoute: "home",
-  allowNotFound: true,
-});
+const router = createRouter(routes);
 
 router.usePlugin(browserPluginFactory());
-
-installViewTransitionPolicy(router);
 
 await router.start();
 
 const app = createApp({
   render: () =>
-    h(
-      RouterProvider,
-      { router, viewTransitions: true },
-      { default: () => h(App) },
-    ),
+    h(RouterProvider, { router }, { default: () => h(App) }),
 });
 
 app.mount("#root");

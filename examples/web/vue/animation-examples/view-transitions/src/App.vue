@@ -5,7 +5,7 @@ import About from "./pages/About.vue";
 import Home from "./pages/Home.vue";
 import Products from "./pages/Products.vue";
 import QueryDemo from "./pages/QueryDemo.vue";
-import Layout from "../../shared/Layout.vue";
+import Layout from "../../../shared/Layout.vue";
 
 const links = [
   { routeName: "home", label: "Home" },
