@@ -5,6 +5,342 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-04-27]
+
+### @real-router/react@0.21.0
+
+### Minor Changes
+
+- [#552](https://github.com/greydragon888/real-router/pull/552) [`1e9868e`](https://github.com/greydragon888/real-router/commit/1e9868ef02ed8f34f809fbd8bccd2a855d9a1fe2) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `useRouteEnter` hook ([#548](https://github.com/greydragon888/real-router/issues/548))
+
+  Symmetric counterpart to `useRouteExit` ([#544](https://github.com/greydragon888/real-router/issues/544)). Fires `handler` once when the component mounts as a result of a navigation, with the mount-time `{ route, previousRoute }` snapshot.
+
+  ```tsx
+  import { useRouteEnter } from "@real-router/react";
+
+  useRouteEnter(({ route, previousRoute }) => {
+    analytics.track("page_enter", {
+      route: route.name,
+      from: previousRoute.name,
+    });
+  });
+  ```
+
+  What the hook covers that ad-hoc `useEffect` + `useRoute()` doesn't:
+  - **Skip-initial** — handler is skipped when there is no `previousRoute` (i.e. first-load mount). Most consumers want to fire side effects only on real navigations, not on hydration.
+  - **StrictMode double-mount immunity** — in dev, React's StrictMode runs every effect twice to surface bugs. Without a guard, analytics fire twice, animations restart, focus jumps. The hook tracks the last-handled `route` reference and short-circuits the second pass.
+  - **Latest-handler ref** — handler can change identity on every render without re-running the effect.
+  - **Mount-time snapshot** — handler receives the values that were live at the moment of mount, not the latest ones.
+
+  Common scenarios covered: direction-aware entry animation (read `route.context.browser?.direction`), source-aware focus management (`route.context.browser?.source === "navigate"`), analytics page-enter events, request cancellation tied to navigation.
+
+  Race-safety: `useRoute()` is wired through `useSyncExternalStore` from `@real-router/sources`, so by the time the new component's effect runs, the snapshot is the post-commit one. The hook does not need a separate centralised buffer or new context — it consumes `useRoute()` directly.
+
+  Replication to Preact / Vue / Solid / Svelte / Angular tracked in [#547](https://github.com/greydragon888/real-router/issues/547).
+
+- [#552](https://github.com/greydragon888/real-router/pull/552) [`1e9868e`](https://github.com/greydragon888/real-router/commit/1e9868ef02ed8f34f809fbd8bccd2a855d9a1fe2) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `useRouteExit` hook ([#544](https://github.com/greydragon888/real-router/issues/544))
+
+  New React-side primitive for animation and side-effect coordination during the leave window.
+
+  **`useRouteExit(handler, options?)`** — wraps `router.subscribeLeave` with the universal guards: reentrant abort pre-check, same-route skip (`route.name === nextRoute.name`, opt-out via `skipSameRoute: false`), latest-handler ref so handler identity can change without resubscribing.
+
+  ```tsx
+  import { useRouteExit } from "@real-router/react";
+
+  useRouteExit(async ({ signal }) => {
+    await api.saveDraft(formState, { signal });
+  });
+  ```
+
+  The hook is general-purpose — animation is one case. Other scenarios: auto-save form drafts, cancel inflight requests, capture scroll position, optimistic-UI rollback, library-coordinated exit (motion's `AnimatePresence onExitComplete`).
+
+  Companion utility shipped alongside in `shared/dom-utils`:
+  - **`createDirectionTracker(router)`** — popstate-driven `data-nav-direction` on `<html>` for direction-aware CSS / library state. Must be installed **before** `router.usePlugin(browserPluginFactory())` due to popstate listener ordering. Used in `examples/web/react/animation-examples/route-animations`.
+
+  **Breaking (pre-1.0):** `createRouteAnimator` and the internal `awaitElementAnimations` helper are removed from `shared/dom-utils`. The single consumer (`route-animations` example) was rewritten as a presence-only React component (`<PageAnimator />`) built on top of `useRouteExit`, symmetric with `<HeroMorph />` and `<ListFlip />` already in that example. The 4-line CSS-class exit recipe (style flush + `Element.getAnimations()` + `Promise.allSettled`) is inlined where it runs — pedagogically clearer than a separate utility, no abstraction tax.
+
+  Migration if you used `createRouteAnimator(router, { exitClass, selector })` directly: write a small React component that calls `useRouteExit` with the same recipe. See `examples/web/react/animation-examples/route-animations/src/animations/PageAnimator.tsx` for the canonical 30-line implementation.
+
+  Replication to Preact / Vue / Solid / Svelte / Angular tracked in [#547](https://github.com/greydragon888/real-router/issues/547).
+
+- [#552](https://github.com/greydragon888/real-router/pull/552) [`1e9868e`](https://github.com/greydragon888/real-router/commit/1e9868ef02ed8f34f809fbd8bccd2a855d9a1fe2) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `viewTransitions` prop on `<RouterProvider>` for View Transitions API integration ([#498](https://github.com/greydragon888/real-router/issues/498))
+
+  Opt in with `<RouterProvider router={router} viewTransitions>` to animate route transitions via the browser's View Transitions API. The prop is a boolean — utility is either enabled or no-op (SSR, Firefox without VT support).
+
+  Customization is pure CSS via `::view-transition-*` pseudo-elements and `view-transition-name`. See the [View Transitions wiki page](https://github.com/greydragon888/real-router/wiki/View-Transitions) for patterns (hero morph, per-area transitions, direction-aware animations).
+
+  The utility lives in `shared/dom-utils/` as `createViewTransitions(router)` — same architectural pattern as `createScrollRestoration` ([#497](https://github.com/greydragon888/real-router/issues/497)) and `createRouteAnnouncer`. It uses only the public `subscribeLeave` + `subscribe` router API.
+
+### Patch Changes
+
+- Updated dependencies [[`1e9868e`](https://github.com/greydragon888/real-router/commit/1e9868ef02ed8f34f809fbd8bccd2a855d9a1fe2)]:
+  - @real-router/core@0.50.2
+
+### @real-router/angular@0.5.0
+
+### Minor Changes
+
+- [#552](https://github.com/greydragon888/real-router/pull/552) [`1e9868e`](https://github.com/greydragon888/real-router/commit/1e9868ef02ed8f34f809fbd8bccd2a855d9a1fe2) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `injectRouteExit` and `injectRouteEnter` ([#547](https://github.com/greydragon888/real-router/issues/547))
+
+  Angular parity with the React adapter ([#544](https://github.com/greydragon888/real-router/issues/544), [#548](https://github.com/greydragon888/real-router/issues/548)). Identical context types and option shapes; idiomatic Angular implementation uses `inject(DestroyRef)` (for the leave subscription) and `effect()` (for the enter watcher). Both must be called within an injection context.
+  - **`injectRouteExit(handler, options?)`** — wraps `router.subscribeLeave` with reentrant abort pre-check and same-route skip (default `true`). Cleanup is bound to the injection context's `DestroyRef`.
+  - **`injectRouteEnter(handler, options?)`** — fires `handler` once when the component is created as a result of a navigation. Skip-initial via `route.transition.from`, skip-same-route default. Reads from `injectRoute()` (`{ routeState, navigator }`) inside `effect()`; cleanup wired through the active context's `DestroyRef`.
+
+  ```ts
+  @Component({ ... })
+  class FormComponent {
+    constructor() {
+      injectRouteExit(async ({ signal }) => {
+        await this.api.saveDraft(this.form, { signal });
+      });
+
+      injectRouteEnter(({ route, previousRoute }) => {
+        analytics.track("page_enter", { route: route.name, from: previousRoute.name });
+      });
+    }
+  }
+  ```
+
+  **Handler-reactivity caveat:** `inject*` functions run **once** during component construction; the handler is captured at injection time. The common Angular pattern is to pass a class method whose identity is stable across change detection. To vary behavior over time, read signals **inside** the handler body. See `packages/angular/CLAUDE.md` for details.
+
+  Types exported: `RouteExitContext`, `RouteExitHandler`, `UseRouteExitOptions`, `RouteEnterContext`, `RouteEnterHandler`, `UseRouteEnterOptions`.
+
+- [#552](https://github.com/greydragon888/real-router/pull/552) [`1e9868e`](https://github.com/greydragon888/real-router/commit/1e9868ef02ed8f34f809fbd8bccd2a855d9a1fe2) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `viewTransitions` option to `provideRealRouter()` for View Transitions API integration ([#498](https://github.com/greydragon888/real-router/issues/498))
+
+  Opt in with `provideRealRouter(router, { viewTransitions: true })` to animate route transitions via the browser's View Transitions API. The option is a boolean — utility is either enabled or no-op (SSR, Firefox without VT support).
+
+  ```ts
+  import { provideRealRouter } from "@real-router/angular";
+
+  bootstrapApplication(AppComponent, {
+    providers: [provideRealRouter(router, { viewTransitions: true })],
+  });
+  ```
+
+  Customization is pure CSS via `::view-transition-*` pseudo-elements and `view-transition-name`. See the [View Transitions wiki page](https://github.com/greydragon888/real-router/wiki/View-Transitions) for patterns (hero morph, per-area transitions, direction-aware animations).
+
+  Teardown is wired through `DestroyRef` — same architectural pattern as the existing `scrollRestoration` option ([#497](https://github.com/greydragon888/real-router/issues/497)).
+
+### Patch Changes
+
+- Updated dependencies [[`1e9868e`](https://github.com/greydragon888/real-router/commit/1e9868ef02ed8f34f809fbd8bccd2a855d9a1fe2)]:
+  - @real-router/core@0.50.2
+
+### @real-router/browser-plugin@0.16.0
+
+### Minor Changes
+
+- [#552](https://github.com/greydragon888/real-router/pull/552) [`1e9868e`](https://github.com/greydragon888/real-router/commit/1e9868ef02ed8f34f809fbd8bccd2a855d9a1fe2) Thanks [@greydragon888](https://github.com/greydragon888)! - Publish navigation direction in `state.context.browser.direction` ([#541](https://github.com/greydragon888/real-router/issues/541))
+
+  `BrowserContext` now includes a `direction: "forward" | "back"` field alongside the existing `source`. Programmatic `router.navigate()` writes `"forward"`; popstate-driven navigations write `"back"`. Consumers building reverse-aware UI (e.g. direction-aware route animations) can read this synchronously instead of maintaining their own popstate listener.
+
+  The Web Platform does not expose a true forward-vs-back distinction in `popstate` events, so `"back"` is the heuristic for any popstate (browser back, browser forward, hash jump). For most UI cases — slide-aware route transitions, animation choreography — that's the meaningful signal.
+
+  ```ts
+  import type { BrowserDirection } from "@real-router/browser-plugin";
+
+  router.subscribe(({ route }) => {
+    const direction = route.context.browser?.direction;
+    // ...
+  });
+  ```
+
+  The new `BrowserDirection` type is exported alongside `BrowserContext` and `BrowserSource`.
+
+### Patch Changes
+
+- Updated dependencies [[`1e9868e`](https://github.com/greydragon888/real-router/commit/1e9868ef02ed8f34f809fbd8bccd2a855d9a1fe2)]:
+  - @real-router/core@0.50.2
+
+### @real-router/preact@0.8.0
+
+### Minor Changes
+
+- [#552](https://github.com/greydragon888/real-router/pull/552) [`1e9868e`](https://github.com/greydragon888/real-router/commit/1e9868ef02ed8f34f809fbd8bccd2a855d9a1fe2) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `useRouteExit` and `useRouteEnter` hooks ([#547](https://github.com/greydragon888/real-router/issues/547))
+
+  Preact parity with the React adapter ([#544](https://github.com/greydragon888/real-router/issues/544), [#548](https://github.com/greydragon888/real-router/issues/548)). Same API surface, same guards, same docstring examples.
+  - **`useRouteExit(handler, options?)`** — wraps `router.subscribeLeave` with reentrant abort pre-check, same-route skip (default `true`), and latest-handler ref so handler identity can change between renders without resubscribing.
+  - **`useRouteEnter(handler, options?)`** — fires `handler` once when a component mounts as a result of a navigation. Skip-initial via `route.transition.from`, skip-same-route default, latest-handler ref. Uses Preact's `useSyncExternalStore` polyfill, so the snapshot is post-commit (the same race-safety guarantee as React).
+
+  ```tsx
+  import { useRouteExit, useRouteEnter } from "@real-router/preact";
+
+  useRouteExit(async ({ signal }) => {
+    await api.saveDraft(formState, { signal });
+  });
+
+  useRouteEnter(({ route, previousRoute }) => {
+    analytics.track("page_enter", {
+      route: route.name,
+      from: previousRoute.name,
+    });
+  });
+  ```
+
+  Notes vs React:
+  - Preact has no `StrictMode` equivalent. The `lastHandledRouteRef` dedupe guard is preserved for defensive symmetry but is otherwise harmless.
+  - Handler identity remains reactive (functional components re-run hooks per render and `useLayoutEffect` keeps the registered wrapper pointing at the latest handler).
+
+  Types exported: `RouteExitContext`, `RouteExitHandler`, `UseRouteExitOptions`, `RouteEnterContext`, `RouteEnterHandler`, `UseRouteEnterOptions`.
+
+- [#552](https://github.com/greydragon888/real-router/pull/552) [`1e9868e`](https://github.com/greydragon888/real-router/commit/1e9868ef02ed8f34f809fbd8bccd2a855d9a1fe2) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `viewTransitions` prop on `<RouterProvider>` for View Transitions API integration ([#498](https://github.com/greydragon888/real-router/issues/498))
+
+  Opt in with `<RouterProvider router={router} viewTransitions>` to animate route transitions via the browser's View Transitions API. The prop is a boolean — utility is either enabled or no-op (SSR, Firefox without VT support).
+
+  Customization is pure CSS via `::view-transition-*` pseudo-elements and `view-transition-name`. See the [View Transitions wiki page](https://github.com/greydragon888/real-router/wiki/View-Transitions) for patterns.
+
+  The utility lives in `shared/dom-utils/` as `createViewTransitions(router)` — same architectural pattern as `createScrollRestoration` ([#497](https://github.com/greydragon888/real-router/issues/497)).
+
+### Patch Changes
+
+- Updated dependencies [[`1e9868e`](https://github.com/greydragon888/real-router/commit/1e9868ef02ed8f34f809fbd8bccd2a855d9a1fe2)]:
+  - @real-router/core@0.50.2
+
+### @real-router/solid@0.8.0
+
+### Minor Changes
+
+- [#552](https://github.com/greydragon888/real-router/pull/552) [`1e9868e`](https://github.com/greydragon888/real-router/commit/1e9868ef02ed8f34f809fbd8bccd2a855d9a1fe2) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `useRouteExit` and `useRouteEnter` hooks ([#547](https://github.com/greydragon888/real-router/issues/547))
+
+  Solid parity with the React adapter ([#544](https://github.com/greydragon888/real-router/issues/544), [#548](https://github.com/greydragon888/real-router/issues/548)). API surface and types are identical; idiomatic Solid implementation uses `createEffect` + `onCleanup` instead of `useEffect`.
+  - **`useRouteExit(handler, options?)`** — wraps `router.subscribeLeave` with reentrant abort pre-check and same-route skip (default `true`). Cleanup is bound to the component via `onCleanup`.
+  - **`useRouteEnter(handler, options?)`** — fires `handler` once when the component mounts as a result of a navigation. Skip-initial via `route.transition.from`, skip-same-route default. Reads from `useRoute()` (`Accessor<RouteState>`) inside `createEffect`.
+
+  ```tsx
+  import { useRouteExit, useRouteEnter } from "@real-router/solid";
+
+  useRouteExit(async ({ signal }) => {
+    await api.saveDraft(formState, { signal });
+  });
+
+  useRouteEnter(({ route, previousRoute }) => {
+    analytics.track("page_enter", {
+      route: route.name,
+      from: previousRoute.name,
+    });
+  });
+  ```
+
+  **Handler-reactivity caveat:** Solid components run **once**; the handler is captured at hook-call time and is not swapped between renders. To vary behavior over time, read signals **inside** the handler body. See `packages/solid/CLAUDE.md` for details.
+
+  Types exported: `RouteExitContext`, `RouteExitHandler`, `UseRouteExitOptions`, `RouteEnterContext`, `RouteEnterHandler`, `UseRouteEnterOptions`.
+
+- [#552](https://github.com/greydragon888/real-router/pull/552) [`1e9868e`](https://github.com/greydragon888/real-router/commit/1e9868ef02ed8f34f809fbd8bccd2a855d9a1fe2) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `viewTransitions` prop on `<RouterProvider>` for View Transitions API integration ([#498](https://github.com/greydragon888/real-router/issues/498))
+
+  Opt in with `<RouterProvider router={router} viewTransitions>` to animate route transitions via the browser's View Transitions API. The prop is a boolean — utility is either enabled or no-op (SSR, Firefox without VT support).
+
+  Customization is pure CSS via `::view-transition-*` pseudo-elements and `view-transition-name`. See the [View Transitions wiki page](https://github.com/greydragon888/real-router/wiki/View-Transitions) for patterns.
+
+  The utility lives in `shared/dom-utils/` as `createViewTransitions(router)` — same architectural pattern as `createScrollRestoration` ([#497](https://github.com/greydragon888/real-router/issues/497)).
+
+### Patch Changes
+
+- Updated dependencies [[`1e9868e`](https://github.com/greydragon888/real-router/commit/1e9868ef02ed8f34f809fbd8bccd2a855d9a1fe2)]:
+  - @real-router/core@0.50.2
+
+### @real-router/svelte@0.7.0
+
+### Minor Changes
+
+- [#552](https://github.com/greydragon888/real-router/pull/552) [`1e9868e`](https://github.com/greydragon888/real-router/commit/1e9868ef02ed8f34f809fbd8bccd2a855d9a1fe2) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `useRouteExit` and `useRouteEnter` composables ([#547](https://github.com/greydragon888/real-router/issues/547))
+
+  Svelte 5 parity with the React adapter ([#544](https://github.com/greydragon888/real-router/issues/544), [#548](https://github.com/greydragon888/real-router/issues/548)). Identical API surface and types; idiomatic Svelte 5 implementation uses `onDestroy` (for the leave subscription) and `$effect` (for the enter watcher), all in `.svelte.ts` files so they run inside the Svelte compiler.
+  - **`useRouteExit(handler, options?)`** — wraps `router.subscribeLeave` with reentrant abort pre-check and same-route skip (default `true`). Cleanup is bound to the component via `onDestroy`.
+  - **`useRouteEnter(handler, options?)`** — fires `handler` once when the component mounts as a result of a navigation. Skip-initial via `route.transition.from`, skip-same-route default. Reads from `useRoute()` (`{ route, previousRoute }: { current }`-getter pattern) inside `$effect`.
+
+  ```svelte
+  <script lang="ts">
+    import { useRouteExit, useRouteEnter } from "@real-router/svelte";
+
+    useRouteExit(async ({ signal }) => {
+      await api.saveDraft(formState, { signal });
+    });
+
+    useRouteEnter(({ route, previousRoute }) => {
+      analytics.track("page_enter", { route: route.name, from: previousRoute.name });
+    });
+  </script>
+  ```
+
+  **Handler-reactivity caveat:** Svelte composables run **once** at component init; the handler is captured at hook-call time and is not swapped between renders. To vary behavior over time, read `$state` / `$derived` **inside** the handler body. See `packages/svelte/CLAUDE.md` for details.
+
+  Types exported: `RouteExitContext`, `RouteExitHandler`, `UseRouteExitOptions`, `RouteEnterContext`, `RouteEnterHandler`, `UseRouteEnterOptions`.
+
+- [#552](https://github.com/greydragon888/real-router/pull/552) [`1e9868e`](https://github.com/greydragon888/real-router/commit/1e9868ef02ed8f34f809fbd8bccd2a855d9a1fe2) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `viewTransitions` prop on `<RouterProvider>` for View Transitions API integration ([#498](https://github.com/greydragon888/real-router/issues/498))
+
+  Opt in with `<RouterProvider {router} viewTransitions>` to animate route transitions via the browser's View Transitions API. The prop is a boolean — utility is either enabled or no-op (SSR, Firefox without VT support).
+
+  Customization is pure CSS via `::view-transition-*` pseudo-elements and `view-transition-name`. See the [View Transitions wiki page](https://github.com/greydragon888/real-router/wiki/View-Transitions) for patterns.
+
+  The utility lives in `shared/dom-utils/` as `createViewTransitions(router)` — same architectural pattern as `createScrollRestoration` ([#497](https://github.com/greydragon888/real-router/issues/497)).
+
+### Patch Changes
+
+- Updated dependencies [[`1e9868e`](https://github.com/greydragon888/real-router/commit/1e9868ef02ed8f34f809fbd8bccd2a855d9a1fe2)]:
+  - @real-router/core@0.50.2
+
+### @real-router/vue@0.9.0
+
+### Minor Changes
+
+- [#552](https://github.com/greydragon888/real-router/pull/552) [`1e9868e`](https://github.com/greydragon888/real-router/commit/1e9868ef02ed8f34f809fbd8bccd2a855d9a1fe2) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `useRouteExit` and `useRouteEnter` composables ([#547](https://github.com/greydragon888/real-router/issues/547))
+
+  Vue parity with the React adapter ([#544](https://github.com/greydragon888/real-router/issues/544), [#548](https://github.com/greydragon888/real-router/issues/548)). Identical API surface and types; idiomatic Vue implementation uses `onScopeDispose` and `watch` instead of `useEffect`.
+  - **`useRouteExit(handler, options?)`** — wraps `router.subscribeLeave` with reentrant abort pre-check and same-route skip (default `true`). Cleanup is bound to the component's effect scope via `onScopeDispose`.
+  - **`useRouteEnter(handler, options?)`** — fires `handler` once when the component mounts as a result of a navigation. Skip-initial via `watch(route)` (`immediate: false` by default), skip-same-route via `route.transition.from === route.name`. Reads from `useRoute()` (`{ route, previousRoute }: ShallowRefs`).
+
+  ```ts
+  import { useRouteExit, useRouteEnter } from "@real-router/vue";
+
+  useRouteExit(async ({ signal }) => {
+    await api.saveDraft(formState.value, { signal });
+  });
+
+  useRouteEnter(({ route, previousRoute }) => {
+    analytics.track("page_enter", {
+      route: route.name,
+      from: previousRoute.name,
+    });
+  });
+  ```
+
+  **Handler-reactivity caveat:** Vue composables run **once** in `setup()`; the handler is captured at hook-call time and is not swapped between renders. To vary behavior over time, read refs/computeds **inside** the handler body. See `packages/vue/CLAUDE.md` for details.
+
+  Types exported: `RouteExitContext`, `RouteExitHandler`, `UseRouteExitOptions`, `RouteEnterContext`, `RouteEnterHandler`, `UseRouteEnterOptions`.
+
+- [#552](https://github.com/greydragon888/real-router/pull/552) [`1e9868e`](https://github.com/greydragon888/real-router/commit/1e9868ef02ed8f34f809fbd8bccd2a855d9a1fe2) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `viewTransitions` prop on `<RouterProvider>` for View Transitions API integration ([#498](https://github.com/greydragon888/real-router/issues/498))
+
+  Opt in with `<RouterProvider :router="router" :view-transitions="true">` to animate route transitions via the browser's View Transitions API. The prop is a boolean — utility is either enabled or no-op (SSR, Firefox without VT support). Reactive — toggling the prop at runtime creates/destroys the utility.
+
+  Customization is pure CSS via `::view-transition-*` pseudo-elements and `view-transition-name`. See the [View Transitions wiki page](https://github.com/greydragon888/real-router/wiki/View-Transitions) for patterns.
+
+  The utility lives in `shared/dom-utils/` as `createViewTransitions(router)` — same architectural pattern as `createScrollRestoration` ([#497](https://github.com/greydragon888/real-router/issues/497)).
+
+### Patch Changes
+
+- Updated dependencies [[`1e9868e`](https://github.com/greydragon888/real-router/commit/1e9868ef02ed8f34f809fbd8bccd2a855d9a1fe2)]:
+  - @real-router/core@0.50.2
+
+### @real-router/core@0.50.2
+
+### Patch Changes
+
+- [#552](https://github.com/greydragon888/real-router/pull/552) [`1e9868e`](https://github.com/greydragon888/real-router/commit/1e9868ef02ed8f34f809fbd8bccd2a855d9a1fe2) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix two `isActiveRoute` bugs in the hierarchical (ancestor) branch ([#536](https://github.com/greydragon888/real-router/issues/536), [#537](https://github.com/greydragon888/real-router/issues/537))
+  - **`ignoreQueryParams` is now honored symmetrically** with the exact-match
+    branch. When a parent route declares query-typed `defaultParams` (e.g.
+    `path: "/products?sort"`, `defaultParams: { sort: "asc" }`) and a descendant
+    state lacks the query value (e.g. `/products/6` → `params: { id: "6" }`), an
+    ancestor link `<Link routeName="products" />` now correctly resolves as
+    active under the default `ignoreQueryParams=true`. URL-typed defaults are
+    still enforced; passing `ignoreQueryParams=false` keeps the strict behavior
+    unchanged.
+  - **Descendant-of-active links no longer spuriously match.** When the link's
+    `routeName` is a descendant of the active route name (e.g. you are on
+    `/users`, the link points to `users.settings`), the link is no longer
+    reported as active — it is a navigation option, not an active state.
+    Standard ancestor-match semantics apply; only exact match and
+    ancestor-of-active relations resolve to `true`.
+
 ## [2026-04-25]
 
 ### @real-router/angular@0.4.0

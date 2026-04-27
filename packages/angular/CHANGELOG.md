@@ -1,5 +1,55 @@
 # @real-router/angular
 
+## 0.5.0
+
+### Minor Changes
+
+- [#552](https://github.com/greydragon888/real-router/pull/552) [`1e9868e`](https://github.com/greydragon888/real-router/commit/1e9868ef02ed8f34f809fbd8bccd2a855d9a1fe2) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `injectRouteExit` and `injectRouteEnter` ([#547](https://github.com/greydragon888/real-router/issues/547))
+
+  Angular parity with the React adapter ([#544](https://github.com/greydragon888/real-router/issues/544), [#548](https://github.com/greydragon888/real-router/issues/548)). Identical context types and option shapes; idiomatic Angular implementation uses `inject(DestroyRef)` (for the leave subscription) and `effect()` (for the enter watcher). Both must be called within an injection context.
+  - **`injectRouteExit(handler, options?)`** — wraps `router.subscribeLeave` with reentrant abort pre-check and same-route skip (default `true`). Cleanup is bound to the injection context's `DestroyRef`.
+  - **`injectRouteEnter(handler, options?)`** — fires `handler` once when the component is created as a result of a navigation. Skip-initial via `route.transition.from`, skip-same-route default. Reads from `injectRoute()` (`{ routeState, navigator }`) inside `effect()`; cleanup wired through the active context's `DestroyRef`.
+
+  ```ts
+  @Component({ ... })
+  class FormComponent {
+    constructor() {
+      injectRouteExit(async ({ signal }) => {
+        await this.api.saveDraft(this.form, { signal });
+      });
+
+      injectRouteEnter(({ route, previousRoute }) => {
+        analytics.track("page_enter", { route: route.name, from: previousRoute.name });
+      });
+    }
+  }
+  ```
+
+  **Handler-reactivity caveat:** `inject*` functions run **once** during component construction; the handler is captured at injection time. The common Angular pattern is to pass a class method whose identity is stable across change detection. To vary behavior over time, read signals **inside** the handler body. See `packages/angular/CLAUDE.md` for details.
+
+  Types exported: `RouteExitContext`, `RouteExitHandler`, `UseRouteExitOptions`, `RouteEnterContext`, `RouteEnterHandler`, `UseRouteEnterOptions`.
+
+- [#552](https://github.com/greydragon888/real-router/pull/552) [`1e9868e`](https://github.com/greydragon888/real-router/commit/1e9868ef02ed8f34f809fbd8bccd2a855d9a1fe2) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `viewTransitions` option to `provideRealRouter()` for View Transitions API integration ([#498](https://github.com/greydragon888/real-router/issues/498))
+
+  Opt in with `provideRealRouter(router, { viewTransitions: true })` to animate route transitions via the browser's View Transitions API. The option is a boolean — utility is either enabled or no-op (SSR, Firefox without VT support).
+
+  ```ts
+  import { provideRealRouter } from "@real-router/angular";
+
+  bootstrapApplication(AppComponent, {
+    providers: [provideRealRouter(router, { viewTransitions: true })],
+  });
+  ```
+
+  Customization is pure CSS via `::view-transition-*` pseudo-elements and `view-transition-name`. See the [View Transitions wiki page](https://github.com/greydragon888/real-router/wiki/View-Transitions) for patterns (hero morph, per-area transitions, direction-aware animations).
+
+  Teardown is wired through `DestroyRef` — same architectural pattern as the existing `scrollRestoration` option ([#497](https://github.com/greydragon888/real-router/issues/497)).
+
+### Patch Changes
+
+- Updated dependencies [[`1e9868e`](https://github.com/greydragon888/real-router/commit/1e9868ef02ed8f34f809fbd8bccd2a855d9a1fe2)]:
+  - @real-router/core@0.50.2
+
 ## 0.4.0
 
 ### Minor Changes
