@@ -84,27 +84,27 @@ export function useRouteEnter(
   let lastHandledRoute: State | null = null;
 
   watch(route, (newRoute) => {
+    const prev = previousRoute.value;
+
     // Early-exit guards, top-down:
     //
-    //   - **Defensive**: `route` may be undefined during SSR or
-    //     pre-start hydration. v8-ignored.
-    //   - **Skip-initial**: `state.transition.from` is undefined only
-    //     for the very first state committed by `router.start()`.
+    //   - **Defensive + skip-initial**: `route` may be undefined during
+    //     SSR / pre-start hydration; `!transition.from` would catch the
+    //     first commit from `router.start()`. Vue's `watch` (default
+    //     `immediate: false`) does not fire on the initial state, so
+    //     both are unreachable in Vue (covered by React/Preact tests).
     //   - **Skip-same-route**: query-only navigations have
     //     `transition.from === route.name`. Opt-out via
     //     `skipSameRoute: false`.
-    //   - **Defensive dedupe**: same `route` ref between watcher
-    //     activations is unexpected on Vue (the watcher drives off ref
-    //     identity), but we keep the guard for parity with React;
-    //     v8-ignored.
+    //   - **Defensive dedupe + missing `previousRoute`**: same `route`
+    //     ref between watcher activations is unexpected on Vue (driven
+    //     off ref identity); `!prev` is unreachable once
+    //     `transition.from` is set (core populates them together). Both
+    //     kept for parity with React; v8-ignored.
     /* v8 ignore start */
     if (!newRoute) {
       return;
     }
-    // Vue's `watch` (default `immediate: false`) does not fire on the
-    // initial state, so this branch — which would catch the first
-    // commit from `router.start()` — is unreachable in Vue (covered in
-    // React/Preact tests instead).
     if (!newRoute.transition.from) {
       return;
     }
@@ -113,15 +113,7 @@ export function useRouteEnter(
       return;
     }
     /* v8 ignore start */
-    if (lastHandledRoute === newRoute) {
-      return;
-    }
-    /* v8 ignore stop */
-
-    const prev = previousRoute.value;
-
-    /* v8 ignore start */
-    if (!prev) {
+    if (lastHandledRoute === newRoute || !prev) {
       return;
     }
     /* v8 ignore stop */

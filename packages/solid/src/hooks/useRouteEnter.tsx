@@ -89,8 +89,7 @@ export function useRouteEnter(
   let lastHandledRoute: State | null = null;
 
   createEffect(() => {
-    const snapshot = routeState();
-    const route = snapshot.route;
+    const { route, previousRoute } = routeState();
 
     // Early-exit guards, top-down:
     //
@@ -102,10 +101,11 @@ export function useRouteEnter(
     //   - **Skip-same-route**: query-only navigations have
     //     `transition.from === route.name`. Opt-out via
     //     `skipSameRoute: false`.
-    //   - **Defensive dedupe**: same `route` ref between effect
-    //     activations is unexpected on Solid (effects run once per
-    //     dependency change), but we keep the guard for parity with
-    //     React; v8-ignored.
+    //   - **Defensive dedupe + missing `previousRoute`**: same `route`
+    //     ref between effect activations is unexpected on Solid (effects
+    //     run once per dependency change); `!previousRoute` is unreachable
+    //     once `transition.from` is set (the two are populated together by
+    //     core). Both kept for parity with React; v8-ignored.
     /* v8 ignore start */
     if (!route) {
       return;
@@ -118,15 +118,7 @@ export function useRouteEnter(
       return;
     }
     /* v8 ignore start */
-    if (lastHandledRoute === route) {
-      return;
-    }
-    /* v8 ignore stop */
-
-    const previousRoute = snapshot.previousRoute;
-
-    /* v8 ignore start */
-    if (!previousRoute) {
+    if (lastHandledRoute === route || !previousRoute) {
       return;
     }
     /* v8 ignore stop */

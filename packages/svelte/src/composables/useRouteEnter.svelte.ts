@@ -81,6 +81,7 @@ export function useRouteEnter(
 
   $effect(() => {
     const currentRoute = route.current;
+    const prev = previousRoute.current;
 
     // Early-exit guards, top-down:
     //
@@ -91,10 +92,11 @@ export function useRouteEnter(
     //   - **Skip-same-route**: query-only navigations have
     //     `transition.from === route.name`. Opt-out via
     //     `skipSameRoute: false`.
-    //   - **Defensive dedupe**: same `route` ref between `$effect`
-    //     re-runs is unexpected on Svelte (`createSubscriber` only
-    //     fires on real reference changes), but we keep the guard for
-    //     parity with React; v8-ignored.
+    //   - **Defensive dedupe + missing `previousRoute`**: same `route`
+    //     ref between `$effect` re-runs is unexpected (createSubscriber
+    //     only fires on real reference changes); `!prev` is unreachable
+    //     once `transition.from` is set (core populates them together).
+    //     Both kept for parity with React; v8-ignored.
     /* v8 ignore start */
     if (!currentRoute) {
       return;
@@ -107,15 +109,7 @@ export function useRouteEnter(
       return;
     }
     /* v8 ignore start */
-    if (lastHandledRoute === currentRoute) {
-      return;
-    }
-    /* v8 ignore stop */
-
-    const prev = previousRoute.current;
-
-    /* v8 ignore start */
-    if (!prev) {
+    if (lastHandledRoute === currentRoute || !prev) {
       return;
     }
     /* v8 ignore stop */

@@ -90,8 +90,7 @@ export function injectRouteEnter(
   let lastHandledRoute: State | null = null;
 
   effect(() => {
-    const snapshot = routeState();
-    const route = snapshot.route;
+    const { route, previousRoute } = routeState();
 
     // Early-exit guards, top-down:
     //
@@ -102,10 +101,11 @@ export function injectRouteEnter(
     //   - **Skip-same-route**: query-only navigations have
     //     `transition.from === route.name`. Opt-out via
     //     `skipSameRoute: false`.
-    //   - **Defensive dedupe**: same `route` ref between effect
-    //     re-runs is unexpected on Angular (the signal only fires on
-    //     real reference changes), but we keep the guard for parity
-    //     with React; v8-ignored.
+    //   - **Defensive dedupe + missing `previousRoute`**: same `route`
+    //     ref between effect re-runs is unexpected on Angular (the
+    //     signal only fires on real reference changes); `!previousRoute`
+    //     is unreachable once `transition.from` is set (core populates
+    //     them together). Both kept for parity with React; v8-ignored.
     /* v8 ignore start */
     if (!route) {
       return;
@@ -118,15 +118,7 @@ export function injectRouteEnter(
       return;
     }
     /* v8 ignore start */
-    if (lastHandledRoute === route) {
-      return;
-    }
-    /* v8 ignore stop */
-
-    const previousRoute = snapshot.previousRoute;
-
-    /* v8 ignore start */
-    if (!previousRoute) {
+    if (lastHandledRoute === route || !previousRoute) {
       return;
     }
     /* v8 ignore stop */
