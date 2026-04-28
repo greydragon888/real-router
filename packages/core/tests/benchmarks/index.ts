@@ -21,6 +21,7 @@ import { run } from "mitata";
 // import "./navigation/options.bench";
 // import "./navigation/guards.bench";
 import "./navigation/leave-listeners.bench";
+import "./navigation/popstate-roundtrip.bench";
 // import "./helpers/freezeStateInPlace.bench";
 // import "./transitionPath/getTransitionPath.bench";
 // import "./routes/routeQuery/isActiveRoute.bench";
