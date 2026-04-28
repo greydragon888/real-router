@@ -1,6 +1,6 @@
 import { UNKNOWN_ROUTE } from "@real-router/core";
 import { cloneRouter } from "@real-router/core/api";
-import { serializeState } from "@real-router/core/utils";
+import { serializeRouterState } from "@real-router/core/utils";
 import { RouterProvider } from "@real-router/react";
 import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 import { renderToString } from "react-dom/server";
@@ -22,8 +22,8 @@ interface RenderResult {
   redirect: string | null;
 }
 
-function wrapInScript(data: unknown): string {
-  return `<script>window.__SSR_DATA__=${serializeState(data)}</script>`;
+function wrapInScript(json: string): string {
+  return `<script>window.__SSR_STATE__=${json}</script>`;
 }
 
 export async function render(
@@ -39,7 +39,6 @@ export async function render(
   try {
     const state = await router.start(url);
     const statusCode = state.name === UNKNOWN_ROUTE ? 404 : 200;
-    const data = router.getRouteData();
 
     const html = renderToString(
       <RouterProvider router={router}>
@@ -47,9 +46,12 @@ export async function render(
       </RouterProvider>,
     );
 
+    // Hydration payload (#563): server-resolved State (incl. state.context.data
+    // from ssr-data-plugin) — client commits via hydrateRouter without
+    // re-running matchPath/forwardState/buildPath.
     return {
       html,
-      serializedData: wrapInScript({ data }),
+      serializedData: wrapInScript(serializeRouterState(state)),
       statusCode,
       redirect: null,
     };
