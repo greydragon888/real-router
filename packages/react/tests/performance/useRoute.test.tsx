@@ -44,7 +44,7 @@ describe("useRoute - Performance Tests", { tags: ["performance"] }, () => {
       });
 
       expect(result.current.navigator).toBeDefined();
-      expect(result.current.route?.name).toBe("users.list");
+      expect(result.current.route.name).toBe("users.list");
     });
 
     it("should have undefined previousRoute on initial mount", async () => {
@@ -153,13 +153,13 @@ describe("useRoute - Performance Tests", { tags: ["performance"] }, () => {
         renderOptions: { wrapper },
       });
 
-      expect(result.current.route?.name).toBe("users.list");
+      expect(result.current.route.name).toBe("users.list");
 
       await act(async () => {
         await router.navigate("about");
       });
 
-      expect(result.current.route?.name).toBe("about");
+      expect(result.current.route.name).toBe("about");
     });
 
     it("should track previousRoute correctly", async () => {
@@ -176,14 +176,14 @@ describe("useRoute - Performance Tests", { tags: ["performance"] }, () => {
       });
 
       expect(result.current.previousRoute?.name).toBe("users.list");
-      expect(result.current.route?.name).toBe("about");
+      expect(result.current.route.name).toBe("about");
 
       await act(async () => {
         await router.navigate("home");
       });
 
       expect(result.current.previousRoute?.name).toBe("about");
-      expect(result.current.route?.name).toBe("home");
+      expect(result.current.route.name).toBe("home");
     });
 
     it("should include route params in route object", async () => {
@@ -197,8 +197,8 @@ describe("useRoute - Performance Tests", { tags: ["performance"] }, () => {
         await router.navigate("users.view", { id: "123" });
       });
 
-      expect(result.current.route?.name).toBe("users.view");
-      expect(result.current.route?.params).toStrictEqual({ id: "123" });
+      expect(result.current.route.name).toBe("users.view");
+      expect(result.current.route.params).toStrictEqual({ id: "123" });
     });
   });
 
@@ -363,7 +363,7 @@ describe("useRoute - Performance Tests", { tags: ["performance"] }, () => {
       });
 
       expect(ProfiledHook).toHaveRenderedTimes(4);
-      expect(result.current.route?.name).toBe("users.edit");
+      expect(result.current.route.name).toBe("users.edit");
       expect(result.current.previousRoute?.name).toBe("users.view");
     });
   });

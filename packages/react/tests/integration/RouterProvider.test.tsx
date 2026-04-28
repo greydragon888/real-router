@@ -20,7 +20,7 @@ import type { FC, ReactNode } from "react";
 const RouteDisplay: FC = () => {
   const { route } = useRoute();
 
-  return <div data-testid="route">{route?.name}</div>;
+  return <div data-testid="route">{route.name}</div>;
 };
 
 describe("RouterProvider - Integration Tests", () => {
@@ -344,7 +344,7 @@ describe("RouterProvider - Integration Tests", () => {
 
         return (
           <div>
-            <span data-testid="route">{route?.name}</span>
+            <span data-testid="route">{route.name}</span>
             <span data-testid="previous">{previousRoute?.name ?? "none"}</span>
             <span data-testid="has-router">yes</span>
           </div>
@@ -371,7 +371,7 @@ describe("RouterProvider - Integration Tests", () => {
 
         return (
           <div>
-            <span data-testid="route">{route?.name}</span>
+            <span data-testid="route">{route.name}</span>
             <button
               data-testid="navigate-btn"
               onClick={() => {
@@ -506,7 +506,7 @@ describe("RouterProvider - Integration Tests", () => {
 
         return (
           <div>
-            <span data-testid="route">{route?.name}</span>
+            <span data-testid="route">{route.name}</span>
             <span data-testid="count">{count}</span>
             <button
               data-testid="increment"
@@ -553,7 +553,7 @@ describe("RouterProvider - Integration Tests", () => {
       const ConditionalComponent: FC = () => {
         const { route } = useRoute();
 
-        if (route?.name.startsWith("users")) {
+        if (route.name.startsWith("users")) {
           return <div data-testid="users-section">Users Section</div>;
         }
 
@@ -581,7 +581,7 @@ describe("RouterProvider - Integration Tests", () => {
       const Consumer1: FC = () => {
         const { route } = useRoute();
 
-        return <div data-testid="consumer-1">{route?.name}</div>;
+        return <div data-testid="consumer-1">{route.name}</div>;
       };
 
       const Consumer2: FC = () => {
@@ -593,7 +593,7 @@ describe("RouterProvider - Integration Tests", () => {
       const Consumer3: FC = () => {
         const { route } = useRoute();
 
-        return <div data-testid="consumer-3">{route?.name}</div>;
+        return <div data-testid="consumer-3">{route.name}</div>;
       };
 
       render(
@@ -643,12 +643,6 @@ describe("RouterProvider - Integration Tests", () => {
 
     it("should handle router restart", async () => {
       await router.start("/users/list");
-
-      const RouteDisplay: FC = () => {
-        const { route } = useRoute();
-
-        return <div data-testid="route">{route?.name ?? "no-route"}</div>;
-      };
 
       render(
         <RouterProvider router={router}>
@@ -731,11 +725,11 @@ describe("RouterProvider - Integration Tests", () => {
 
         useEffect(() => {
           return () => {
-            cleanupCalls.push(route?.name ?? "unknown");
+            cleanupCalls.push(route.name);
           };
-        }, [route?.name]);
+        }, [route.name]);
 
-        return <div data-testid="route">{route?.name}</div>;
+        return <div data-testid="route">{route.name}</div>;
       };
 
       render(

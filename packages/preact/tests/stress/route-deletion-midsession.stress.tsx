@@ -38,7 +38,7 @@ describe("preact — route deleted mid-session", () => {
     const RouteProbe: FunctionComponent = () => {
       const { route } = useRoute();
 
-      return <div data-testid="route-name">{route?.name ?? "null"}</div>;
+      return <div data-testid="route-name">{route.name}</div>;
     };
 
     const { getByTestId, queryByTestId } = render(

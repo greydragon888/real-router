@@ -148,7 +148,7 @@ describe("RouterProvider - Integration Tests", () => {
 
           return () =>
             h("div", [
-              h("span", { "data-testid": "route" }, route.value?.name),
+              h("span", { "data-testid": "route" }, route.value.name),
               h(
                 "span",
                 { "data-testid": "previous" },
@@ -183,7 +183,7 @@ describe("RouterProvider - Integration Tests", () => {
 
           return () =>
             h("div", [
-              h("span", { "data-testid": "route" }, route.value?.name),
+              h("span", { "data-testid": "route" }, route.value.name),
               h(
                 "button",
                 {
@@ -243,11 +243,7 @@ describe("RouterProvider - Integration Tests", () => {
           return () => {
             router2RenderCount++;
 
-            return h(
-              "span",
-              { "data-testid": "r2-route" },
-              route.value?.name ?? "none",
-            );
+            return h("span", { "data-testid": "r2-route" }, route.value.name);
           };
         },
       });
@@ -329,7 +325,7 @@ describe("RouterProvider - Integration Tests", () => {
         setup() {
           const { route } = useRoute();
 
-          return () => h("div", { "data-testid": "route" }, route.value?.name);
+          return () => h("div", { "data-testid": "route" }, route.value.name);
         },
       });
 

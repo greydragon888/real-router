@@ -110,7 +110,7 @@ describe("RouterProvider - Integration Tests", () => {
 
         return (
           <div>
-            <span data-testid="current">{route().route?.name}</span>
+            <span data-testid="current">{route().route.name}</span>
             <span data-testid="previous">
               {route().previousRoute?.name ?? "none"}
             </span>
@@ -192,7 +192,7 @@ describe("RouterProvider - Integration Tests", () => {
 
         return (
           <div>
-            <span data-testid="route">{route().route?.name}</span>
+            <span data-testid="route">{route().route.name}</span>
             <button
               data-testid="navigate-btn"
               onClick={() => {
@@ -249,7 +249,7 @@ describe("RouterProvider - Integration Tests", () => {
       function RouteDisplay() {
         const route = useRoute();
 
-        return <div data-testid="route">{route().route?.name}</div>;
+        return <div data-testid="route">{route().route.name}</div>;
       }
 
       const { unmount } = render(() => (
@@ -273,13 +273,13 @@ describe("RouterProvider - Integration Tests", () => {
       function Consumer1() {
         const route = useRoute();
 
-        return <div data-testid="consumer-1">{route().route?.name}</div>;
+        return <div data-testid="consumer-1">{route().route.name}</div>;
       }
 
       function Consumer2() {
         const route = useRoute();
 
-        return <div data-testid="consumer-2">{route().route?.name}</div>;
+        return <div data-testid="consumer-2">{route().route.name}</div>;
       }
 
       render(() => (
