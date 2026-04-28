@@ -60,11 +60,11 @@ export class RouterLifecycleNamespace {
     deps.completeStart();
 
     if (matchedState) {
-      return deps.navigate(
-        matchedState.name,
-        matchedState.params,
-        REPLACE_OPTS,
-      );
+      // navigateToState commits matchedState verbatim — same primitive URL
+      // plugins use on popstate / navigate-event (#525). Keeps trailing-slash
+      // and any other source-URL flavor that matchPath produced; skips the
+      // redundant forwardState+buildPath round-trip in buildNavigateState.
+      return deps.navigateToState(matchedState, REPLACE_OPTS);
     }
 
     return deps.navigateToNotFound(startPath);

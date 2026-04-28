@@ -2585,10 +2585,13 @@ Architecturally:
 - `Router` constructor registers the entry point on the `RouterInternals` WeakMap (alongside `start`, also there) — not on the `Router` class facade. `getPluginApi.navigateToState` calls through `ctx.navigateToState`, which preserves the same `lastSyncResolved`/`lastSyncRejected` bookkeeping and unhandled-rejection suppression that `Router.navigate` uses, so plugin call-sites can fire-and-forget the returned promise (popstate handlers do).
 - `getPluginApi` is now WeakMap-cached per router (mirrors `getNavigator`). Avoids re-allocating the closure-bag on each call AND gives `vi.spyOn(getPluginApi(router), "navigateToState")` a stable identity to attach to — used by the recovery tests in browser-plugin / hash-plugin / navigation-plugin.
 
-URL plugins migrated:
+All four URL-driven flows migrated to use the same primitive — `URL → matchPath → navigateToState`:
 
+- `packages/core/src/namespaces/RouterLifecycleNamespace/RouterLifecycleNamespace.ts` — `router.start(path)` now commits `matchPath(path)` via `deps.navigateToState(matched, REPLACE_OPTS)` instead of deconstructing back to `(name, params)` and calling `deps.navigate`. Closes the asymmetry that made `await router.start("/users/")` canonicalize the trailing slash while a subsequent popstate-back to the same URL would preserve it.
 - `packages/navigation-plugin/src/navigate-handler.ts` — the `event.intercept(...)` handler now calls `api.navigateToState(matchedState, …)`.
-- `shared/browser-env/popstate-handler.ts` — popstate path uses `api.navigateToState(state, …)`. `getRouteFromEvent` now returns `State | undefined` (synthesizes via `api.makeState` when `evt.state` is structurally valid; falls back to `api.matchPath(getLocation())` otherwise).
+- `shared/browser-env/popstate-handler.ts` (consumed by `browser-plugin` and `hash-plugin`) — popstate path uses `api.navigateToState(state, …)`. `getRouteFromEvent` now returns `State | undefined` (synthesizes via `api.makeState` when `evt.state` is structurally valid; falls back to `api.matchPath(getLocation())` otherwise).
+
+This makes `navigateToState` the canonical primitive for **every** URL-driven entry point (initial start + browser back/forward + Navigation API events). Programmatic `router.navigate(name, params)` is reserved for intent-driven calls (Link clicks, declarative API consumers) where the full interceptor pipeline is the right semantics.
 
 ### Why bypassing `forwardState`/`buildPath` interceptors is correct, not a hack
 

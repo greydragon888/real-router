@@ -225,8 +225,8 @@ export class RouterWiringBuilder<
   wireLifecycleDeps(): void {
     const lifecycleDeps: RouterLifecycleDependencies = {
       getOptions: () => this.options.get(),
-      navigate: (name, params, opts) =>
-        this.navigation.navigate(name, params, opts),
+      navigateToState: (state, opts) =>
+        this.navigation.navigateToState(state, opts),
       navigateToNotFound: (path) => this.navigation.navigateToNotFound(path),
       clearState: () => {
         this.state.set(undefined);

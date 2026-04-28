@@ -63,6 +63,28 @@ describe("trailingSlash: preserve — matchPath ↔ navigate (#525, Q2)", () => 
     expect(navigated.path).toBe("/users/");
   });
 
+  // `router.start(path)` internally uses the same `navigateToState`
+  // primitive — matchPath produces the State and lifecycle commits it
+  // verbatim. So a trailing-slash URL passed to `start` propagates through.
+  // Without this contract, there's a silent asymmetry: popstate-back to
+  // `/users/` would preserve, but the very first `start("/users/")` would
+  // canonicalize. Pin both ends of the URL-driven flow.
+  it("router.start(path) preserves source trailing slash end-to-end", async () => {
+    const router = createRouter(
+      [
+        { name: "home", path: "/" },
+        { name: "users", path: "/users" },
+      ],
+      { trailingSlash: "preserve" },
+    );
+
+    const started = await router.start("/users/");
+
+    expect(started.name).toBe("users");
+    expect(started.path).toBe("/users/");
+    expect(router.getState()?.path).toBe("/users/");
+  });
+
   // Programmatic `router.navigate(name, params)` carries no source URL hint,
   // so its result IS the canonical path — by design. Pinning this contract
   // documents the intentional asymmetry: navigate(name, params) for callers
