@@ -10,6 +10,7 @@ import type {
   StateContext,
   StateMetaInput,
   Unsubscribe,
+  NavigationOptions,
 } from "./base";
 import type { EventMethodMap, EventName } from "./constants";
 import type { RouteTreeState } from "./route-node-types";
@@ -109,6 +110,31 @@ export interface PluginApi {
   ) => SimpleState<P>;
 
   matchPath: <P extends Params = Params>(path: string) => State<P> | undefined;
+
+  /**
+   * Navigate to a fully-built `State`, skipping the redundant
+   * `forwardState`/`buildPath` round-trip in `buildNavigateState`.
+   *
+   * Plugin-only entry point for browser-initiated navigation: a plugin
+   * receives a URL event, resolves it via `api.matchPath(url)`, then commits
+   * the resulting `State` directly via `api.navigateToState(state, opts)`.
+   *
+   * Semantics vs `router.navigate(name, params, opts)`:
+   * - `forwardState` is NOT re-applied (matchPath already ran it).
+   * - `buildPath` is NOT re-run; `state.path` is used verbatim, preserving
+   *   `trailingSlash:"preserve"` source-URL output.
+   * - `forwardState`/`buildPath` interceptors do NOT run on this path; the
+   *   URL the user navigated to is the source of truth.
+   * - Pipeline: SAME_STATES check, FSM transition, guards, `subscribeLeave`,
+   *   `completeTransition`, plugin lifecycle hooks — all unchanged.
+   *
+   * Programmatic / userland navigation should keep using
+   * `router.navigate(name, params, opts)` so interceptors apply.
+   */
+  navigateToState: (
+    state: State,
+    options?: NavigationOptions,
+  ) => Promise<State>;
 
   setRootPath: (rootPath: string) => void;
   getRootPath: () => string;

@@ -16,7 +16,6 @@ export const getNavigator = <
   if (!nav) {
     nav = Object.freeze({
       navigate: router.navigate,
-      navigateToState: router.navigateToState,
       getState: router.getState,
       isActiveRoute: router.isActiveRoute,
       canNavigateTo: router.canNavigateTo,

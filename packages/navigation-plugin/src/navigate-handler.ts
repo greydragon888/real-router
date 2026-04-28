@@ -126,10 +126,11 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
       event.intercept({
         handler: () =>
           withRecovery(() =>
-            // navigateToState: matchPath already applied forwardState +
+            // api.navigateToState: matchPath already applied forwardState +
             // matchSourceTrailingSlash; reusing the State avoids the redundant
-            // round-trip and preserves trailing slashes (#525).
-            router.navigateToState(matchedState, {
+            // round-trip and preserves trailing slashes (#525). Plugin-only
+            // entry point — not on the public Router/Navigator surface.
+            api.navigateToState(matchedState, {
               ...transitionOptions,
               signal: event.signal,
             }),

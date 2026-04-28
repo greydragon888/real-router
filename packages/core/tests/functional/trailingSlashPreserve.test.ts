@@ -58,7 +58,7 @@ describe("trailingSlash: preserve — matchPath ↔ navigate (#525, Q2)", () => 
 
     expect(matched?.path).toBe("/users/");
 
-    const navigated = await router.navigateToState(matched!);
+    const navigated = await getPluginApi(router).navigateToState(matched!);
 
     expect(navigated.path).toBe("/users/");
   });

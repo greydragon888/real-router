@@ -1,4 +1,4 @@
-import { getLifecycleApi } from "@real-router/core/api";
+import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 import {
   describe,
   it,
@@ -84,7 +84,7 @@ describe("N4 — Cannot Deactivate Storm", () => {
   it("4.3 — 50 navigate events with TypeError: error recovery calls browser.navigate", async () => {
     const browserNavigateSpy = vi.spyOn(browser, "navigate");
 
-    vi.spyOn(router, "navigateToState").mockRejectedValue(
+    vi.spyOn(getPluginApi(router), "navigateToState").mockRejectedValue(
       new TypeError("Guard throws"),
     );
 
@@ -100,7 +100,7 @@ describe("N4 — Cannot Deactivate Storm", () => {
   it("4.4 — double error recovery × 20: no unhandled exceptions", async () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(noop);
 
-    vi.spyOn(router, "navigateToState").mockRejectedValue(
+    vi.spyOn(getPluginApi(router), "navigateToState").mockRejectedValue(
       new TypeError("Navigate throws"),
     );
     vi.spyOn(router, "buildUrl").mockImplementation(() => {

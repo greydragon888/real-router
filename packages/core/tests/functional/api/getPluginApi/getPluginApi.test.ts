@@ -38,10 +38,22 @@ describe("getPluginApi()", () => {
     expect(typeof api.extendRouter).toBe("function");
   });
 
-  it("should return a new object on each call", () => {
+  it("should return the cached instance on each call for the same router (#525)", () => {
+    // Mirrors getNavigator()'s WeakMap-cached behaviour: avoids repeated
+    // closure allocations and gives spy/stub helpers a stable identity to
+    // attach to (browser-plugin/hash-plugin/navigation-plugin recovery
+    // tests spy on `getPluginApi(router).navigateToState`).
     const api2 = getPluginApi(router);
 
-    expect(api).not.toBe(api2);
+    expect(api).toBe(api2);
+  });
+
+  it("should return a different instance per router", () => {
+    const router2 = createTestRouter();
+
+    expect(getPluginApi(router)).not.toBe(getPluginApi(router2));
+
+    router2.stop();
   });
 
   it("makeState should delegate to router.makeState", () => {

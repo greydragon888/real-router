@@ -53,7 +53,7 @@ function exerciseRoundtripFast(fixture: Fixture, i: number): void {
   const matched = getPluginApi(fixture.router).matchPath(url);
 
   if (matched) {
-    do_not_optimize(void fixture.router.navigateToState(matched));
+    do_not_optimize(void getPluginApi(fixture.router).navigateToState(matched));
   }
 }
 

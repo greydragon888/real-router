@@ -1,5 +1,5 @@
 import { createRouter } from "@real-router/core";
-import { getLifecycleApi } from "@real-router/core/api";
+import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 import {
   describe,
   beforeAll,
@@ -339,7 +339,7 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
 
       // popstate-handler now uses router.navigateToState (#525);
       // mock that path to surface a non-RouterError into the recovery branch.
-      vi.spyOn(router, "navigateToState").mockRejectedValue(
+      vi.spyOn(getPluginApi(router), "navigateToState").mockRejectedValue(
         new TypeError("Critical error"),
       );
 
@@ -361,7 +361,7 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
 
       await router.navigate("users.list");
 
-      vi.spyOn(router, "navigateToState").mockRejectedValue(
+      vi.spyOn(getPluginApi(router), "navigateToState").mockRejectedValue(
         new TypeError("Critical navigate error"),
       );
 
@@ -396,7 +396,7 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
 
       await router.navigate("users.list");
 
-      vi.spyOn(router, "navigateToState").mockRejectedValue(
+      vi.spyOn(getPluginApi(router), "navigateToState").mockRejectedValue(
         new TypeError("Critical navigate error"),
       );
 

@@ -6,6 +6,7 @@ import type { RouterValidator } from "./types/RouterValidator";
 import type {
   DefaultDependencies,
   EventName,
+  NavigationOptions,
   Options,
   Params,
   Plugin,
@@ -54,6 +55,17 @@ export interface RouterInternals<
   readonly emitTransitionError: (error: Error) => void;
 
   readonly start: (path: string) => Promise<State>;
+
+  /**
+   * Plugin-only navigation entry point — delegates to
+   * `NavigationNamespace.navigateToState` (`getPluginApi(router).navigateToState`).
+   * Hidden from `Router`/`Navigator` to keep the userland surface minimal;
+   * see `core-types/src/api.ts` for usage docs.
+   */
+  readonly navigateToState: (
+    state: State,
+    options?: NavigationOptions,
+  ) => Promise<State>;
 
   /* eslint-disable @typescript-eslint/no-explicit-any -- heterogeneous map: stores different InterceptorFn<M> types under different keys */
   readonly interceptors: Map<

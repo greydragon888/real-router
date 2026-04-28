@@ -19,19 +19,18 @@ describe("core/getNavigator", () => {
     router.stop();
   });
 
-  it("returns frozen object with exactly 8 methods", () => {
+  it("returns frozen object with exactly 7 methods", () => {
     const navigator = getNavigator(router);
 
     expect(Object.isFrozen(navigator)).toBe(true);
     expect(navigator).toHaveProperty("navigate");
-    expect(navigator).toHaveProperty("navigateToState");
     expect(navigator).toHaveProperty("getState");
     expect(navigator).toHaveProperty("isActiveRoute");
     expect(navigator).toHaveProperty("canNavigateTo");
     expect(navigator).toHaveProperty("subscribe");
     expect(navigator).toHaveProperty("subscribeLeave");
     expect(navigator).toHaveProperty("isLeaveApproved");
-    expect(Object.keys(navigator)).toHaveLength(8);
+    expect(Object.keys(navigator)).toHaveLength(7);
   });
 
   it("returns cached instance for same router", () => {

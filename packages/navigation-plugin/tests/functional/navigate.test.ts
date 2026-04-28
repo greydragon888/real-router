@@ -1,5 +1,5 @@
 import { createRouter, UNKNOWN_ROUTE } from "@real-router/core";
-import { getLifecycleApi } from "@real-router/core/api";
+import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { navigationPluginFactory } from "../../src";
@@ -329,7 +329,10 @@ describe("Navigation Plugin — Navigate", () => {
     });
 
     it("passes signal from navigate event to router", async () => {
-      const navigateToStateSpy = vi.spyOn(router, "navigateToState");
+      const navigateToStateSpy = vi.spyOn(
+        getPluginApi(router),
+        "navigateToState",
+      );
 
       const { finished } = mockNav.navigate("http://localhost/users/list");
 
@@ -517,7 +520,7 @@ describe("Error Recovery", () => {
     unsub = router.usePlugin(navigationPluginFactory({}, browser));
     await router.start();
 
-    vi.spyOn(router, "navigateToState").mockRejectedValue(
+    vi.spyOn(getPluginApi(router), "navigateToState").mockRejectedValue(
       new TypeError("unexpected crash"),
     );
 
@@ -627,7 +630,7 @@ describe("Error Recovery", () => {
     unsub = router.usePlugin(navigationPluginFactory({}, browser));
     await router.start();
 
-    vi.spyOn(router, "navigateToState").mockRejectedValue(
+    vi.spyOn(getPluginApi(router), "navigateToState").mockRejectedValue(
       new TypeError("crash"),
     );
     vi.spyOn(router, "getState").mockReturnValue(undefined);
@@ -653,7 +656,7 @@ describe("Error Recovery", () => {
     unsub = router.usePlugin(navigationPluginFactory({}, browser));
     await router.start();
 
-    vi.spyOn(router, "navigateToState").mockRejectedValue(
+    vi.spyOn(getPluginApi(router), "navigateToState").mockRejectedValue(
       new TypeError("crash"),
     );
     vi.spyOn(router, "buildUrl").mockImplementation(() => {

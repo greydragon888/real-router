@@ -45,7 +45,6 @@ describe("getNavigator Properties", () => {
       "isActiveRoute",
       "isLeaveApproved",
       "navigate",
-      "navigateToState",
       "subscribe",
       "subscribeLeave",
     ]);

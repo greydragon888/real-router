@@ -14,7 +14,7 @@ import type { Router, State } from "@real-router/core";
 import type { LifecycleApi } from "@real-router/core/api";
 
 /**
- * Functional tests for `router.navigateToState(state, opts)` — the new
+ * Functional tests for `getPluginApi(router).navigateToState(state, opts)` — the new
  * navigation primitive added by issue #525. Mirrors the navigate.test.ts
  * shape but exercises the bypass-buildNavigateState code path.
  */
@@ -39,11 +39,23 @@ describe("navigateToState", () => {
 
       expect(matched).toBeDefined();
 
-      const next = await router.navigateToState(matched!);
+      const next = await getPluginApi(router).navigateToState(matched!);
 
       expect(next.name).toBe("users");
       expect(next.path).toBe("/users");
       expect(router.getState()?.name).toBe("users");
+    });
+
+    it("accepts NavigationOptions (replace, signal, etc.)", async () => {
+      const matched = getPluginApi(router).matchPath("/users");
+      const controller = new AbortController();
+
+      const next = await getPluginApi(router).navigateToState(matched!, {
+        replace: true,
+        signal: controller.signal,
+      });
+
+      expect(next.name).toBe("users");
     });
 
     it("preserves the path produced by matchPath verbatim (Q2 fix #525)", async () => {
@@ -61,7 +73,7 @@ describe("navigateToState", () => {
 
       expect(matched?.path).toBe("/users/");
 
-      const next = await router.navigateToState(matched!);
+      const next = await getPluginApi(router).navigateToState(matched!);
 
       expect(next.path).toBe("/users/");
     });
@@ -74,7 +86,7 @@ describe("navigateToState", () => {
       });
 
       try {
-        await router.navigateToState(matched!);
+        await getPluginApi(router).navigateToState(matched!);
       } finally {
         unsubscribe();
       }
@@ -89,7 +101,9 @@ describe("navigateToState", () => {
 
       router.stop();
 
-      await expect(router.navigateToState(matched!)).rejects.toMatchObject({
+      await expect(
+        getPluginApi(router).navigateToState(matched!),
+      ).rejects.toMatchObject({
         code: errorCodes.ROUTER_NOT_STARTED,
       });
     });
@@ -113,7 +127,9 @@ describe("navigateToState", () => {
       );
 
       try {
-        await expect(router.navigateToState(fake)).rejects.toMatchObject({
+        await expect(
+          getPluginApi(router).navigateToState(fake),
+        ).rejects.toMatchObject({
           code: errorCodes.ROUTE_NOT_FOUND,
         });
         expect(errorSpy).toHaveBeenCalled();
@@ -125,7 +141,9 @@ describe("navigateToState", () => {
     it("rejects with SAME_STATES when target equals current state", async () => {
       const current = router.getState()!;
 
-      await expect(router.navigateToState(current)).rejects.toMatchObject({
+      await expect(
+        getPluginApi(router).navigateToState(current),
+      ).rejects.toMatchObject({
         code: errorCodes.SAME_STATES,
       });
     });
@@ -135,9 +153,9 @@ describe("navigateToState", () => {
 
       const matched = getPluginApi(router).matchPath("/users");
 
-      await expect(router.navigateToState(matched!)).rejects.toBeInstanceOf(
-        RouterError,
-      );
+      await expect(
+        getPluginApi(router).navigateToState(matched!),
+      ).rejects.toBeInstanceOf(RouterError);
       expect(router.getState()?.name).toBe("home");
     });
   });
@@ -156,7 +174,7 @@ describe("navigateToState", () => {
         context: {},
       };
 
-      const next = await router.navigateToState(synthetic);
+      const next = await getPluginApi(router).navigateToState(synthetic);
 
       expect(next.name).toBe("users");
     });
@@ -170,7 +188,7 @@ describe("navigateToState", () => {
 
       const matched = getPluginApi(router).matchPath("/users");
 
-      await router.navigateToState(matched!);
+      await getPluginApi(router).navigateToState(matched!);
 
       expect(guard).toHaveBeenCalled();
     });
@@ -180,9 +198,9 @@ describe("navigateToState", () => {
 
       const matched = getPluginApi(router).matchPath("/users");
 
-      await expect(router.navigateToState(matched!)).rejects.toBeInstanceOf(
-        RouterError,
-      );
+      await expect(
+        getPluginApi(router).navigateToState(matched!),
+      ).rejects.toBeInstanceOf(RouterError);
       expect(router.getState()?.name).toBe("home");
     });
   });
@@ -207,7 +225,7 @@ describe("navigateToState", () => {
       // a guard error, but never with the ROUTE_NOT_FOUND that hasRoute()
       // would produce for any non-UNKNOWN unknown name.
       try {
-        await router.navigateToState(unknownState);
+        await getPluginApi(router).navigateToState(unknownState);
       } catch (error) {
         expect(error).toBeInstanceOf(RouterError);
         expect((error as RouterError).code).not.toBe(
