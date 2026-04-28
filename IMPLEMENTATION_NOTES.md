@@ -2520,3 +2520,42 @@ See commit `06ccab93` for the full diff.
 - A short micro-benchmark lived in `benchmarks/core/url-parsing-compare.ts` during the refactor and was removed after validation — the new parser ran 4–6× faster than `new URL()` on 6 fixtures (shortHttp / longHttp / withQueryHash / hashRouting / customScheme / fileUrl) and ~3.87× faster on a history-iteration scenario of 100 entries. Results are captured in the #496 commit message (`06ccab93`); the bench itself wasn't kept because it was a one-shot validation.
 - `navigation-plugin` hot path — `getVisitedRoutes` / `hasVisited` iterate every entry in the Navigation API's session history; the scheme-agnostic parser is measurable there.
 - Public surface documented in [Desktop Integration Guide](https://github.com/greydragon888/real-router/wiki/Desktop-Integration) (wiki).
+
+## navigation-plugin: Syncing Flag Owned by `NavigationBrowser`, Not the Plugin (#527)
+
+### Problem
+
+`packages/navigation-plugin/src/plugin-utils.ts` reimplemented `createStartInterceptor` and `createReplaceHistoryState` already living in `shared/browser-env/plugin-utils.ts` (used by `browser-plugin` and `hash-plugin`). The fork existed because of one extra invariant: `NavigationBrowser.replaceState` is implemented via `nav.navigate({history:"replace"})`, which fires a `navigate` event synchronously — and the same is true for `nav.navigate(...)`/`nav.updateCurrentEntry(...)`/`nav.traverseTo(...)`. The plugin had to gate the handler with `#isSyncingFromRouter = true` around every router-driven mutation, otherwise it would treat its own write as a user navigation. `history.replaceState` does NOT fire popstate, so the History API plugins didn't need the gate.
+
+The pre-refactor design encoded the gate as 5+ manual `try/finally` blocks across `plugin.ts:onTransitionSuccess`, `navigate-handler.ts:recoverFromNavigateError`, `navigate-handler.ts:syncUrlToRouterState`, and the local `plugin-utils.ts`. A `setSyncing` callback threaded the flag through `createNavigateHandler` and `createReplaceHistoryState`. The result: the syncing invariant lived in N call-sites instead of one, and any new mutation method had to remember to wrap.
+
+### Solution
+
+Move ownership of the syncing flag into a per-instance plugin field. A new helper `wrapNavigationBrowserWithSyncing(browser, syncing)` produces a `NavigationBrowser` that raises a `SyncingFlag` (`{ current: boolean }`) before each router-driven mutation and lowers it after, including the throw path. `NavigationPlugin` creates its own `#syncing` cell in the constructor and applies the wrap to whatever browser the factory hands it — built-in `createNavigationBrowser(base)`, SSR fallback, or a user-supplied mock (e.g. `createMockNavigationBrowser` in tests). All consumers inherit the invariant for free, and two `NavigationPlugin` instances using the same factory output get **independent** syncing cells (no cross-router spillover).
+
+Once the wrap was in place, the local `plugin-utils.ts` had no reason to exist:
+
+- `createStartInterceptor` widened to accept a structural `LocationSource = { getLocation: () => string }` — both `Browser` and `NavigationBrowser` are assignable.
+- `createReplaceHistoryState` widened to accept a structural `ReplaceStateBrowser = { replaceState; getHash }` — likewise.
+- The buffer-reuse optimization (`createUpdateBrowserState`) was inlined into `createReplaceHistoryState` so its 5th argument shrinks to `preserveHash: boolean = true` (no extra parameters needed for navigation-plugin).
+
+`NavigationPlugin.#syncing: SyncingFlag` is the single place the plugin holds the flag; `isSyncingFromRouter: () => this.#syncing.current` is the only path the navigate handler reads.
+
+### Why not extend the shared utility with a `wrapWrite` callback?
+
+The original RFC proposed adding `wrapWrite?: (write: () => void) => void` to `createReplaceHistoryState` as a hook navigation-plugin would use to inject `setSyncing`. Rejected because:
+
+- Public shared signature would expand for a single consumer; `browser-plugin`/`hash-plugin` would always pass `undefined`.
+- The hook only covered `replaceState` — but the syncing invariant applies to all 4 router-driven mutations (`navigate`, `replaceState`, `updateCurrentEntry`, `traverseTo`). 5+ manual `try/finally` blocks elsewhere would have remained.
+- `setSyncing` is a re-entrancy detail of the `NavigationBrowser` wrapper (it knows its `replaceState` is implemented through `nav.navigate({history:"replace"})`), not of the shared utility. The right boundary is the browser wrapper, applied where the plugin instance owns it.
+
+### Trade-offs
+
+- The refactor shrinks navigation-plugin LOC and removes one source file, but adds the `wrapNavigationBrowserWithSyncing` helper (~25 LOC). Net is still negative; the architectural win is single ownership inside the plugin instance.
+- User-supplied `NavigationBrowser` mocks no longer need to manage the flag themselves — the plugin wraps them in its constructor. This is a *contract change* for any external test code that previously wrapped manually, but no such consumer exists outside the monorepo (the `browser?` factory parameter has only ever been documented as "for testing").
+- `factory.ts` and `types.ts` did not change as part of this refactor — `SyncingFlag` lives in `navigation-browser.ts` next to the wrapper, and the plugin constructor signature stays at 6 parameters. The flag never leaks to public types.
+
+### Test coverage
+
+- `wrapNavigationBrowserWithSyncing` invariants — `packages/navigation-plugin/tests/functional/navigation-browser.test.ts`: 4 mutations × happy path, 4 mutations × throw path (flag clears in `finally`), non-mutation methods bypass the wrap, `currentEntry` getter stays live (not snapshotted).
+- All pre-existing functional + stress tests pass unchanged — observable behavior is identical (222 navigation-plugin, 129 browser-plugin, 84 hash-plugin).

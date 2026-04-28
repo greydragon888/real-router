@@ -1,6 +1,12 @@
 import { UNKNOWN_ROUTE } from "@real-router/core";
 
-import { shouldReplaceHistory, buildUrl, urlToPath } from "./browser-env";
+import {
+  shouldReplaceHistory,
+  buildUrl,
+  urlToPath,
+  createStartInterceptor,
+  createReplaceHistoryState,
+} from "./browser-env";
 import {
   peekBack,
   peekForward,
@@ -14,11 +20,9 @@ import {
   canGoBackTo,
 } from "./history-extensions";
 import { createNavigateHandler } from "./navigate-handler";
-import {
-  createStartInterceptor,
-  createReplaceHistoryState,
-} from "./plugin-utils";
+import { wrapNavigationBrowserWithSyncing } from "./navigation-browser";
 
+import type { SyncingFlag } from "./navigation-browser";
 import type {
   NavigationBrowser,
   NavigationMeta,
@@ -62,8 +66,8 @@ export class NavigationPlugin {
     release: () => void;
   };
   readonly #lifecycle: Pick<Plugin, "onStart" | "onStop" | "teardown">;
+  readonly #syncing: SyncingFlag = { current: false };
 
-  #isSyncingFromRouter = false;
   #capturedMeta: NavigationMeta | undefined;
   #pendingTraverseKey: string | undefined;
 
@@ -82,10 +86,16 @@ export class NavigationPlugin {
     this.#router = router;
     this.#api = api;
     this.#options = options;
-    this.#browser = browser;
+    // Wrap mutations with the syncing flag so the navigate handler can
+    // short-circuit re-entrant events fired by the plugin's own writes
+    // (`nav.navigate` and `nav.navigate({history:"replace"})` fire navigate
+    // events synchronously). The flag is per-instance — never shared across
+    // plugins — so multiple routers running concurrent transitions don't
+    // bleed syncing state into each other.
+    this.#browser = wrapNavigationBrowserWithSyncing(browser, this.#syncing);
 
     this.#claim = api.claimContextNamespace("navigation");
-    this.#removeStartInterceptor = createStartInterceptor(api, browser);
+    this.#removeStartInterceptor = createStartInterceptor(api, this.#browser);
 
     // Cross-document load priming (#531). On F5, browser back/forward across
     // a page boundary, or a fresh URL bar entry, the prior JS context is
@@ -96,7 +106,7 @@ export class NavigationPlugin {
     // navigation.activation reflects the cross-document navigation that
     // activated this document; it stays constant across same-document
     // navigations, so this only affects the FIRST transition.
-    const activationType = browser.getActivationType();
+    const activationType = this.#browser.getActivationType();
 
     if (activationType) {
       this.#capturedMeta = {
@@ -120,35 +130,30 @@ export class NavigationPlugin {
       replaceHistoryState: createReplaceHistoryState(
         api,
         router,
-        browser,
+        this.#browser,
         pluginBuildUrl,
-        (syncing) => {
-          this.#isSyncingFromRouter = syncing;
-        },
       ),
 
-      peekBack: () => peekBack(browser, api, options.base),
-      peekForward: () => peekForward(browser, api, options.base),
+      peekBack: () => peekBack(this.#browser, api, options.base),
+      peekForward: () => peekForward(this.#browser, api, options.base),
       hasVisited: (routeName: string) =>
-        hasVisited(browser, api, options.base, routeName),
-      getVisitedRoutes: () => getVisitedRoutes(browser, api, options.base),
+        hasVisited(this.#browser, api, options.base, routeName),
+      getVisitedRoutes: () =>
+        getVisitedRoutes(this.#browser, api, options.base),
       getRouteVisitCount: (routeName: string) =>
-        getRouteVisitCount(browser, api, options.base, routeName),
+        getRouteVisitCount(this.#browser, api, options.base, routeName),
       traverseToLast: (routeName: string) => this.traverseToLast(routeName),
-      canGoBack: () => canGoBack(browser),
-      canGoForward: () => canGoForward(browser),
+      canGoBack: () => canGoBack(this.#browser),
+      canGoForward: () => canGoForward(this.#browser),
       canGoBackTo: (routeName: string) =>
-        canGoBackTo(browser, api, options.base, routeName),
+        canGoBackTo(this.#browser, api, options.base, routeName),
     });
 
     const handler = createNavigateHandler({
       router,
       api,
-      browser,
-      isSyncingFromRouter: () => this.#isSyncingFromRouter,
-      setSyncing: (syncing) => {
-        this.#isSyncingFromRouter = syncing;
-      },
+      browser: this.#browser,
+      isSyncingFromRouter: () => this.#syncing.current,
       setCapturedMeta: (meta) => {
         this.#capturedMeta = meta;
       },
@@ -157,7 +162,7 @@ export class NavigationPlugin {
     });
 
     this.#lifecycle = createNavigateLifecycle({
-      browser,
+      browser: this.#browser,
       shared,
       handler,
       removeStartInterceptor: this.#removeStartInterceptor,
@@ -249,45 +254,41 @@ export class NavigationPlugin {
         this.#claim.write(toState, frozenMeta);
         this.#capturedMeta = undefined;
 
-        this.#isSyncingFromRouter = true;
-
         // Consume pendingTraverseKey BEFORE calling browser.traverseTo.
         // If traverseTo throws (Navigation API can reject on evicted keys
         // under memory pressure), we must not leave the stale key behind —
         // otherwise the NEXT transition's onTransitionSuccess would see it
         // and replay the traverse against the same already-broken key.
+        // The syncing flag is raised/lowered inside NavigationBrowser around
+        // each mutation, so we do not need to manage it here.
         const traverseKey = this.#pendingTraverseKey;
 
         this.#pendingTraverseKey = undefined;
 
-        try {
-          if (traverseKey) {
-            this.#browser.traverseTo(traverseKey);
+        if (traverseKey) {
+          this.#browser.traverseTo(traverseKey);
+        } else {
+          const url = buildUrl(toState.path, this.#options.base);
+          const shouldPreserveHash =
+            !fromState || fromState.path === toState.path;
+          const hash = shouldPreserveHash ? this.#browser.getHash() : "";
+          const finalUrl = hash ? url + hash : url;
+          const historyState = {
+            name: toState.name,
+            params: toState.params,
+            path: toState.path,
+          };
+
+          if (toState.name === UNKNOWN_ROUTE) {
+            this.#browser.updateCurrentEntry({ state: historyState });
           } else {
-            const url = buildUrl(toState.path, this.#options.base);
-            const shouldPreserveHash =
-              !fromState || fromState.path === toState.path;
-            const hash = shouldPreserveHash ? this.#browser.getHash() : "";
-            const finalUrl = hash ? url + hash : url;
-            const historyState = {
-              name: toState.name,
-              params: toState.params,
-              path: toState.path,
-            };
+            const replace = frozenMeta.navigationType !== "push";
 
-            if (toState.name === UNKNOWN_ROUTE) {
-              this.#browser.updateCurrentEntry({ state: historyState });
-            } else {
-              const replace = frozenMeta.navigationType !== "push";
-
-              this.#browser.navigate(finalUrl, {
-                state: historyState,
-                history: replace ? "replace" : "push",
-              });
-            }
+            this.#browser.navigate(finalUrl, {
+              state: historyState,
+              history: replace ? "replace" : "push",
+            });
           }
-        } finally {
-          this.#isSyncingFromRouter = false;
         }
       },
 

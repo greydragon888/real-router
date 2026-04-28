@@ -15,7 +15,6 @@ interface NavigateHandlerDeps {
   api: PluginApi;
   browser: NavigationBrowser;
   isSyncingFromRouter: () => boolean;
-  setSyncing: (value: boolean) => void;
   setCapturedMeta: (meta: NavigationMeta) => void;
   base: string;
   transitionOptions: {
@@ -42,15 +41,8 @@ export function computeDirection(
 }
 
 export function createNavigateHandler(deps: NavigateHandlerDeps) {
-  const {
-    router,
-    api,
-    browser,
-    isSyncingFromRouter,
-    setSyncing,
-    base,
-    transitionOptions,
-  } = deps;
+  const { router, api, browser, isSyncingFromRouter, base, transitionOptions } =
+    deps;
   const { allowNotFound } = api.getOptions();
 
   return function handleNavigateEvent(event: NavigateEvent): void {
@@ -95,7 +87,7 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
         await run();
       } catch (error) {
         if (!(error instanceof RouterError)) {
-          recoverFromNavigateError(error, router, browser, setSyncing);
+          recoverFromNavigateError(error, router, browser);
 
           return;
         }
@@ -126,7 +118,7 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
         // windows if we relied on the native rollback via intercept reject).
         // Observers that care about the error see it through the router's
         // TRANSITION_ERROR event.
-        syncUrlToRouterState(router, browser, setSyncing);
+        syncUrlToRouterState(router, browser);
       }
     };
 
@@ -168,20 +160,18 @@ function recoverFromNavigateError(
   error: unknown,
   router: Router,
   browser: NavigationBrowser,
-  setSyncing: (value: boolean) => void,
 ): void {
   console.error(
     "[navigation-plugin] Critical error in navigate handler",
     error,
   );
 
-  syncUrlToRouterState(router, browser, setSyncing);
+  syncUrlToRouterState(router, browser);
 }
 
 function syncUrlToRouterState(
   router: Router,
   browser: NavigationBrowser,
-  setSyncing: (value: boolean) => void,
 ): void {
   try {
     const currentState = router.getState();
@@ -189,20 +179,17 @@ function syncUrlToRouterState(
     if (currentState) {
       const url = router.buildUrl(currentState.name, currentState.params);
 
-      setSyncing(true);
-
-      try {
-        browser.navigate(url, {
-          state: {
-            name: currentState.name,
-            params: currentState.params,
-            path: currentState.path,
-          },
-          history: "replace",
-        });
-      } finally {
-        setSyncing(false);
-      }
+      // The syncing flag is raised/lowered inside NavigationBrowser around
+      // browser.navigate, including the throw path — no manual try/finally
+      // needed here.
+      browser.navigate(url, {
+        state: {
+          name: currentState.name,
+          params: currentState.params,
+          path: currentState.path,
+        },
+        history: "replace",
+      });
     }
   } catch (syncError) {
     console.error(
