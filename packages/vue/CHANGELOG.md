@@ -1,5 +1,13 @@
 # @real-router/vue
 
+## 0.10.0
+
+### Minor Changes
+
+- [#555](https://github.com/greydragon888/real-router/pull/555) [`6965977`](https://github.com/greydragon888/real-router/commit/69659772cd4f3c49d570ea1d7a2abec07da7dbed) Thanks [@greydragon888](https://github.com/greydragon888)! - Narrow `useRoute()` ref return so `route.value` is non-nullable; throw a clear error when the router has no active state ([#535](https://github.com/greydragon888/real-router/issues/535))
+
+  `useRoute()` now throws `"useRoute called with no active route. Did you forget to await router.start() before rendering, or is the router stopped/disposed?"` when invoked before `router.start()` resolves. `route` is typed as `Readonly<Ref<State<P>>>` (non-nullable inner value) so `route.value.params.id` is direct in scripts, `{{ route.params.id }}` in templates. `useRouteNode(name)` is unchanged.
+
 ## 0.9.0
 
 ### Minor Changes

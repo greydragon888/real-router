@@ -1,5 +1,13 @@
 # @real-router/svelte
 
+## 0.8.0
+
+### Minor Changes
+
+- [#555](https://github.com/greydragon888/real-router/pull/555) [`6965977`](https://github.com/greydragon888/real-router/commit/69659772cd4f3c49d570ea1d7a2abec07da7dbed) Thanks [@greydragon888](https://github.com/greydragon888)! - Narrow `useRoute()` getter return so `route.current` is non-nullable; throw a clear error when the router has no active state ([#535](https://github.com/greydragon888/real-router/issues/535))
+
+  `useRoute()` now throws `"useRoute called with no active route. Did you forget to await router.start() before rendering, or is the router stopped/disposed?"` when invoked before `router.start()` resolves. The getter type narrows so `route.current.name` is direct — no `?.`, no `{#if route.current}` wrapper. `useRouteNode(name)` is unchanged.
+
 ## 0.7.0
 
 ### Minor Changes

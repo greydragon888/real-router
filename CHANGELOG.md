@@ -5,6 +5,56 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-04-28]
+
+### @real-router/angular@0.6.0
+
+### Minor Changes
+
+- [#555](https://github.com/greydragon888/real-router/pull/555) [`6965977`](https://github.com/greydragon888/real-router/commit/69659772cd4f3c49d570ea1d7a2abec07da7dbed) Thanks [@greydragon888](https://github.com/greydragon888)! - Narrow `injectRoute()` signal return so `routeState().route` is non-nullable; throw a clear error when the router has no active state ([#535](https://github.com/greydragon888/real-router/issues/535))
+
+  `injectRoute()` now throws `"injectRoute called with no active route. Did you forget to await router.start() before rendering, or is the router stopped/disposed?"` when called before `router.start()` resolves. The `routeState` signal narrows to `Signal<{ route: State<P>; previousRoute?: State }>` — templates use `routeState().route.name` directly. `injectRouteNode(name)` is unchanged.
+
+### @real-router/preact@0.9.0
+
+### Minor Changes
+
+- [#555](https://github.com/greydragon888/real-router/pull/555) [`6965977`](https://github.com/greydragon888/real-router/commit/69659772cd4f3c49d570ea1d7a2abec07da7dbed) Thanks [@greydragon888](https://github.com/greydragon888)! - Narrow `useRoute()` return type so `route` is non-nullable; throw a clear error when the router has no active state ([#535](https://github.com/greydragon888/real-router/issues/535))
+
+  `useRoute()` now throws `"useRoute called with no active route. Did you forget to await router.start() before rendering, or is the router stopped/disposed?"` when invoked before `router.start()` resolves (or after stop/dispose). The return type narrows so consumers can read `route.params.id` directly without `route?.` defenses. `useRouteNode(name)` is unchanged.
+
+### @real-router/react@0.22.0
+
+### Minor Changes
+
+- [#555](https://github.com/greydragon888/real-router/pull/555) [`6965977`](https://github.com/greydragon888/real-router/commit/69659772cd4f3c49d570ea1d7a2abec07da7dbed) Thanks [@greydragon888](https://github.com/greydragon888)! - Narrow `useRoute()` return type so `route` is non-nullable; throw a clear error when the router has no active state ([#535](https://github.com/greydragon888/real-router/issues/535))
+
+  `useRoute()` previously returned `{ route: State | undefined }`, forcing every consumer to write `route?.x` or `if (!route) return null` — defensive code for a case that is unreachable once `await router.start()` has resolved. The hook now throws `"useRoute called with no active route. Did you forget to await router.start() before rendering, or is the router stopped/disposed?"` when invoked before start (or after stop/dispose), and the return type narrows so consumers can read `route.params.id` directly. `useRouteNode(name)` is unchanged — `route === undefined` there is a legitimate "node inactive" business state.
+
+### @real-router/solid@0.9.0
+
+### Minor Changes
+
+- [#555](https://github.com/greydragon888/real-router/pull/555) [`6965977`](https://github.com/greydragon888/real-router/commit/69659772cd4f3c49d570ea1d7a2abec07da7dbed) Thanks [@greydragon888](https://github.com/greydragon888)! - Narrow `useRoute()` accessor return so `route` is non-nullable; throw a clear error when the router has no active state ([#535](https://github.com/greydragon888/real-router/issues/535))
+
+  `useRoute()` now throws `"useRoute called with no active route. Did you forget to await router.start() before rendering, or is the router stopped/disposed?"` when invoked before `router.start()` resolves. The accessor return type narrows so `state().route.name` is direct — no `?.`, no `<Show when={state().route}>` wrapper. `useRouteNode(name)` and `useRouteStore()` are unchanged — node-scoped nullability is intentional.
+
+### @real-router/svelte@0.8.0
+
+### Minor Changes
+
+- [#555](https://github.com/greydragon888/real-router/pull/555) [`6965977`](https://github.com/greydragon888/real-router/commit/69659772cd4f3c49d570ea1d7a2abec07da7dbed) Thanks [@greydragon888](https://github.com/greydragon888)! - Narrow `useRoute()` getter return so `route.current` is non-nullable; throw a clear error when the router has no active state ([#535](https://github.com/greydragon888/real-router/issues/535))
+
+  `useRoute()` now throws `"useRoute called with no active route. Did you forget to await router.start() before rendering, or is the router stopped/disposed?"` when invoked before `router.start()` resolves. The getter type narrows so `route.current.name` is direct — no `?.`, no `{#if route.current}` wrapper. `useRouteNode(name)` is unchanged.
+
+### @real-router/vue@0.10.0
+
+### Minor Changes
+
+- [#555](https://github.com/greydragon888/real-router/pull/555) [`6965977`](https://github.com/greydragon888/real-router/commit/69659772cd4f3c49d570ea1d7a2abec07da7dbed) Thanks [@greydragon888](https://github.com/greydragon888)! - Narrow `useRoute()` ref return so `route.value` is non-nullable; throw a clear error when the router has no active state ([#535](https://github.com/greydragon888/real-router/issues/535))
+
+  `useRoute()` now throws `"useRoute called with no active route. Did you forget to await router.start() before rendering, or is the router stopped/disposed?"` when invoked before `router.start()` resolves. `route` is typed as `Readonly<Ref<State<P>>>` (non-nullable inner value) so `route.value.params.id` is direct in scripts, `{{ route.params.id }}` in templates. `useRouteNode(name)` is unchanged.
+
 ## [2026-04-27]
 
 ### @real-router/react@0.21.0
