@@ -1,5 +1,27 @@
 # @real-router/validation-plugin
 
+## 0.7.0
+
+### Minor Changes
+
+- [#564](https://github.com/greydragon888/real-router/pull/564) [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `validateNavigateToStateArgs` validator for `api.navigateToState` ([#525](https://github.com/greydragon888/real-router/issues/525))
+
+  New validator function and `RouterValidator` namespace entry covering the
+  new `getPluginApi(router).navigateToState(state, opts)` primitive:
+  - Rejects `state` that is not an object or is `null` with `TypeError`.
+  - Rejects `state` missing required structural fields (`name`, `params`,
+    `path`) or with wrong types per `isString` / `isParams`.
+
+  Wired through `validationPlugin` so `ctx.validator?.navigation.validateNavigateToStateArgs(state)` is called from the core's `getPluginApi.navigateToState` boundary when the plugin is registered.
+
+  No public API surface change for validation-plugin consumers — the
+  validator is invoked indirectly by core when validation-plugin is active.
+
+### Patch Changes
+
+- Updated dependencies [[`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a), [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a)]:
+  - @real-router/core@0.51.0
+
 ## 0.6.1
 
 ### Patch Changes
