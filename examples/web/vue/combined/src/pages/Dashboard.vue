@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { useNavigator, useRoute } from "@real-router/vue";
 import { computed, onMounted, onUnmounted, shallowRef } from "vue";
-import { store } from "../../../../shared/store";
+import { store } from "../../../../../shared/store";
 
-import type { User } from "../../../../shared/api";
+import type { User } from "../../../../../shared/api";
 
 const emit = defineEmits<{
   logout: [];
@@ -26,7 +26,7 @@ const { route } = useRoute();
 const navigator = useNavigator();
 
 const lang = computed(
-  () => (route.value?.params.lang as string | undefined) ?? "en",
+  () => (route.value.params.lang as string | undefined) ?? "en",
 );
 </script>
 
@@ -49,8 +49,8 @@ const lang = computed(
       <button
         @click="
           navigator.navigate(
-            route?.name ?? 'dashboard',
-            { ...route?.params, lang: lang === 'en' ? 'ru' : 'en' },
+            route.name,
+            { ...route.params, lang: lang === 'en' ? 'ru' : 'en' },
             { reload: true },
           )
         "

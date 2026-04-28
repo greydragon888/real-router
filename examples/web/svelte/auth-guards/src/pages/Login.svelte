@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { api } from "../../../../shared/api";
+  import { api } from "../../../../../shared/api";
 
-  import type { User } from "../../../../shared/api";
+  import type { User } from "../../../../../shared/api";
 
   let { onLogin }: { onLogin: (user: User) => Promise<void> } = $props();
 

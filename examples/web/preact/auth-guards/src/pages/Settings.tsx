@@ -1,7 +1,7 @@
 import { useNavigator } from "@real-router/preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 
-import { store } from "../../../../shared/store";
+import { store } from "../../../../../shared/store";
 
 import type { JSX } from "preact";
 

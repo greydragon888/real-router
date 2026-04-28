@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { Link } from "@real-router/vue";
 import { onMounted, onUnmounted, shallowRef } from "vue";
-import { store } from "../../../../shared/store";
+import { store } from "../../../../../shared/store";
 
-import type { Product } from "../../../../shared/api";
+import type { Product } from "../../../../../shared/api";
 
 const product = shallowRef<Product | null | undefined>(
   store.get("products.detail") as Product | null | undefined,

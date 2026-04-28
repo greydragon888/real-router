@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { store } from "../../../../shared/store";
+  import { store } from "../../../../../shared/store";
 
-  import type { User } from "../../../../shared/api";
+  import type { User } from "../../../../../shared/api";
 
   let { onLogout }: { onLogout: () => Promise<void> } = $props();
 

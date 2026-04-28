@@ -1,7 +1,7 @@
 <script lang="ts">
   import { useNavigator } from "@real-router/svelte";
 
-  import { store } from "../../../../shared/store";
+  import { store } from "../../../../../shared/store";
 
   const navigator = useNavigator();
   let displayName = $state("");

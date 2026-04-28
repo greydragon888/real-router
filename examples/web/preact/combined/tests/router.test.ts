@@ -2,8 +2,8 @@ import { createRouter, errorCodes } from "@real-router/core";
 import { getDependenciesApi, getRoutesApi } from "@real-router/core/api";
 import { describe, afterEach, it, expect } from "vitest";
 
-import { defineAbilities } from "../../../shared/abilities";
-import { store } from "../../../shared/store";
+import { defineAbilities } from "../../../../shared/abilities";
+import { store } from "../../../../shared/store";
 import { lifecyclePluginFactory } from "@real-router/lifecycle-plugin";
 import { privateRoutes, publicRoutes } from "../src/routes";
 

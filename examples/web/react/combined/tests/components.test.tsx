@@ -13,8 +13,8 @@ import {
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, it, expect } from "vitest";
 
-import { defineAbilities } from "../../../shared/abilities";
-import { store } from "../../../shared/store";
+import { defineAbilities } from "../../../../shared/abilities";
+import { store } from "../../../../shared/store";
 import { App } from "../src/App";
 import { publicRoutes, privateRoutes } from "../src/routes";
 

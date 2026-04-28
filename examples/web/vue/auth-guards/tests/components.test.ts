@@ -6,8 +6,8 @@ import { render, screen, waitFor } from "@testing-library/vue";
 import { afterEach, describe, it, expect } from "vitest";
 import { defineComponent, h } from "vue";
 
-import { defineAbilities } from "../../../shared/abilities";
-import { store } from "../../../shared/store";
+import { defineAbilities } from "../../../../shared/abilities";
+import { store } from "../../../../shared/store";
 import App from "../src/App.vue";
 import { publicRoutes, privateRoutes } from "../src/routes";
 

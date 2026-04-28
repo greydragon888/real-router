@@ -1,7 +1,7 @@
 <script lang="ts">
   import { useRoute, useNavigator } from "@real-router/svelte";
-  import { store } from "../../../../shared/store";
-  import type { User } from "../../../../shared/api";
+  import { store } from "../../../../../shared/store";
+  import type { User } from "../../../../../shared/api";
 
   let { onLogout }: { onLogout: () => Promise<void> } = $props();
 
@@ -13,7 +13,7 @@
     return store.subscribe(() => { user = store.get("user") as User | null; });
   });
 
-  const lang = $derived((route.current?.params.lang as string | undefined) ?? "en");
+  const lang = $derived((route.current.params.lang as string | undefined) ?? "en");
 </script>
 
 <div>
@@ -26,7 +26,7 @@
     </div>
   {/if}
   <div style="display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap">
-    <button onclick={() => void navigator.navigate(route.current?.name ?? "dashboard", { ...route.current?.params, lang: lang === "en" ? "ru" : "en" }, { reload: true })}>
+    <button onclick={() => void navigator.navigate(route.current.name, { ...route.current.params, lang: lang === "en" ? "ru" : "en" }, { reload: true })}>
       Toggle lang ({lang === "en" ? "→ RU" : "→ EN"})
     </button>
     <button class="danger" onclick={() => void onLogout()}>Logout</button>

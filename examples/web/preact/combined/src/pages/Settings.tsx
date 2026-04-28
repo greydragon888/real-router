@@ -1,6 +1,6 @@
 import { useEffect, useState } from "preact/hooks";
 
-import { store } from "../../../../shared/store";
+import { store } from "../../../../../shared/store";
 
 import type { JSX } from "preact";
 

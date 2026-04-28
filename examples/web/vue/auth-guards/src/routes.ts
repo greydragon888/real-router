@@ -1,5 +1,5 @@
-import { can } from "../../../shared/abilities";
-import { store } from "../../../shared/store";
+import { can } from "../../../../shared/abilities";
+import { store } from "../../../../shared/store";
 
 import type { AppDependencies } from "./types";
 import type { GuardFnFactory, Route } from "@real-router/core";

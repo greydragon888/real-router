@@ -1,9 +1,9 @@
 import { useNavigator, useRoute } from "@real-router/react";
 import { useSyncExternalStore } from "react";
 
-import { store } from "../../../../shared/store";
+import { store } from "../../../../../shared/store";
 
-import type { User } from "../../../../shared/api";
+import type { User } from "../../../../../shared/api";
 import type { JSX } from "react";
 
 interface DashboardProps {
@@ -11,11 +11,14 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ onLogout }: DashboardProps): JSX.Element {
-  const user = useSyncExternalStore(store.subscribe, () => store.get("user"));
+  const user = useSyncExternalStore(
+    store.subscribe,
+    () => store.get("user") as User | null,
+  );
   const { route } = useRoute();
   const navigator = useNavigator();
 
-  const lang = (route?.params.lang as string | undefined) ?? "en";
+  const lang = (route.params.lang as string | undefined) ?? "en";
 
   return (
     <div>
@@ -44,9 +47,9 @@ export default function Dashboard({ onLogout }: DashboardProps): JSX.Element {
         <button
           onClick={() =>
             void navigator.navigate(
-              route?.name ?? "dashboard",
+              route.name,
               {
-                ...route?.params,
+                ...route.params,
                 lang: lang === "en" ? "ru" : "en",
               },
               { reload: true },

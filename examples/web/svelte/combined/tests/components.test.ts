@@ -4,8 +4,8 @@ import { render, screen, cleanup, waitFor } from "@testing-library/svelte";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, it, expect } from "vitest";
 
-import { defineAbilities } from "../../../shared/abilities";
-import { store } from "../../../shared/store";
+import { defineAbilities } from "../../../../shared/abilities";
+import { store } from "../../../../shared/store";
 import App from "../src/App.svelte";
 import { lifecyclePluginFactory } from "@real-router/lifecycle-plugin";
 import { publicRoutes, privateRoutes } from "../src/routes";
