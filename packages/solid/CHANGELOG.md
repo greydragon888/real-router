@@ -1,5 +1,13 @@
 # @real-router/solid
 
+## 0.9.0
+
+### Minor Changes
+
+- [#555](https://github.com/greydragon888/real-router/pull/555) [`6965977`](https://github.com/greydragon888/real-router/commit/69659772cd4f3c49d570ea1d7a2abec07da7dbed) Thanks [@greydragon888](https://github.com/greydragon888)! - Narrow `useRoute()` accessor return so `route` is non-nullable; throw a clear error when the router has no active state ([#535](https://github.com/greydragon888/real-router/issues/535))
+
+  `useRoute()` now throws `"useRoute called with no active route. Did you forget to await router.start() before rendering, or is the router stopped/disposed?"` when invoked before `router.start()` resolves. The accessor return type narrows so `state().route.name` is direct — no `?.`, no `<Show when={state().route}>` wrapper. `useRouteNode(name)` and `useRouteStore()` are unchanged — node-scoped nullability is intentional.
+
 ## 0.8.0
 
 ### Minor Changes
