@@ -48,5 +48,7 @@ export function createNavigationBrowser(base: string): NavigationBrowser {
     get currentEntry() {
       return nav.currentEntry;
     },
+
+    getActivationType: () => nav.activation?.navigationType,
   };
 }

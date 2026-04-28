@@ -61,6 +61,7 @@ export function createMockNavigationBrowser(
       };
     },
     entries: () => mock.entries(),
+    getActivationType: () => mock.activation?.navigationType,
   };
 
   return Object.defineProperty(browser, "currentEntry", {

@@ -35,6 +35,12 @@ export interface NavigationBrowser {
   addNavigateListener: (fn: (evt: NavigateEvent) => void) => () => void;
   entries: () => NavigationHistoryEntry[];
   currentEntry: NavigationHistoryEntry | null;
+  /**
+   * Type of the cross-document navigation that activated this document.
+   * Reads `navigation.activation.navigationType` (Baseline 2026 — Chrome 123+, Firefox 147+, Safari 26.2+).
+   * Returns `undefined` when activation is unavailable (older browsers, SSR).
+   */
+  getActivationType: () => NavigationMeta["navigationType"] | undefined;
 }
 
 /**

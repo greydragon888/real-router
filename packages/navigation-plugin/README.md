@@ -202,6 +202,21 @@ type NavigationDirection = "forward" | "back" | "unknown";
 
 Exported from the package for use in type annotations.
 
+### Cross-document loads (F5, back/forward across page boundaries)
+
+After a cross-document navigation — F5, browser back/forward across the JS context boundary, a fresh URL bar entry — the plugin reads [`navigation.activation.navigationType`](https://developer.mozilla.org/en-US/docs/Web/API/NavigationActivation/navigationType) (Baseline 2026: Chrome 123+, Firefox 147+, Safari 26.2+) and primes `state.context.navigation` for the first transition:
+
+| `navigation.activation.navigationType` | `state.context.navigation.navigationType` | `direction` |
+| -------------------------------------- | ----------------------------------------- | ----------- |
+| `"reload"`                             | `"reload"`                                | `"unknown"` |
+| `"traverse"`                           | `"traverse"`                              | `"unknown"` |
+| `"push"`                               | `"push"`                                  | `"forward"` |
+| `"replace"`                            | `"replace"`                               | `"unknown"` |
+
+`userInitiated` is always `false` for the primed first transition — the browser does not expose whether F5 came from a key press or `location.reload()`.
+
+On browsers without `navigation.activation` (Chrome 102–122, custom mocks), the first transition falls back to `"replace"`.
+
 ### `buildUrl` vs `buildPath`
 
 ```typescript

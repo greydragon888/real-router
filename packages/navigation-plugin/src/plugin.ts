@@ -87,6 +87,26 @@ export class NavigationPlugin {
     this.#claim = api.claimContextNamespace("navigation");
     this.#removeStartInterceptor = createStartInterceptor(api, browser);
 
+    // Cross-document load priming (#531). On F5, browser back/forward across
+    // a page boundary, or a fresh URL bar entry, the prior JS context is
+    // discarded — the navigate event handler never sees the activation.
+    // Without this, deriveNavigationType in onTransitionSuccess falls through
+    // to "replace" for every initial transition, breaking scroll restore on
+    // reload (#497) and any consumer branching on navigationType.
+    // navigation.activation reflects the cross-document navigation that
+    // activated this document; it stays constant across same-document
+    // navigations, so this only affects the FIRST transition.
+    const activationType = browser.getActivationType();
+
+    if (activationType) {
+      this.#capturedMeta = {
+        navigationType: activationType,
+        userInitiated: false,
+        direction: activationType === "push" ? "forward" : "unknown",
+        sourceElement: null,
+      };
+    }
+
     const pluginBuildUrl = (route: string, params?: Params) => {
       const path = router.buildPath(route, params);
 

@@ -151,6 +151,32 @@ describe("createNavigationBrowser", () => {
     });
   });
 
+  describe("getActivationType", () => {
+    it("returns nav.activation.navigationType when activation is set", () => {
+      (mockNav as unknown as { activation: NavigationActivation }).activation =
+        {
+          entry: { url: "http://localhost/" } as NavigationHistoryEntry,
+          from: null,
+          navigationType: "reload",
+        };
+      browser = createNavigationBrowser("");
+
+      expect(browser.getActivationType()).toBe("reload");
+    });
+
+    it("returns undefined when nav.activation is null (older browser)", () => {
+      (mockNav as unknown as { activation: null }).activation = null;
+      browser = createNavigationBrowser("");
+
+      expect(browser.getActivationType()).toBeUndefined();
+    });
+
+    it("returns undefined when nav.activation is missing (no support)", () => {
+      // Pre-Chrome-123 browsers expose `navigation` without `activation`.
+      expect(browser.getActivationType()).toBeUndefined();
+    });
+  });
+
   describe("addNavigateListener", () => {
     it("registers listener and returns cleanup function", () => {
       const handler = vi.fn();

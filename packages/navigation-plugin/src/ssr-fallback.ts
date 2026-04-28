@@ -43,5 +43,6 @@ export const createNavigationFallbackBrowser = (
       return [];
     },
     currentEntry: null,
+    getActivationType: () => undefined,
   };
 };
