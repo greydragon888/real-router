@@ -16,7 +16,7 @@
     same route.
   </p>
   <p>
-    Current route: <strong>{route.current?.name ?? "—"}</strong>
+    Current route: <strong>{route.current.name}</strong>
   </p>
   <p>
     Current URL hash:

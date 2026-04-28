@@ -4,14 +4,14 @@
   const { route } = useRoute();
   const navigator = useNavigator();
 
-  const lang = $derived((route.current?.params.lang as string | undefined) ?? "en");
-  const theme = $derived((route.current?.params.theme as string | undefined) ?? "light");
+  const lang = $derived((route.current.params.lang as string | undefined) ?? "en");
+  const theme = $derived((route.current.params.theme as string | undefined) ?? "light");
 
   const navigate = (newParams: Record<string, string>) => {
     void navigator.navigate(
-      route.current?.name ?? "home",
+      route.current.name,
       {
-        ...route.current?.params,
+        ...route.current.params,
         ...newParams,
       },
       { reload: true },

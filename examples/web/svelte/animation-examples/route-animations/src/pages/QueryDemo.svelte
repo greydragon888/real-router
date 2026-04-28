@@ -16,7 +16,7 @@
   const { route } = useRoute<{ filter?: Filter }>();
 
   const filter: Filter = $derived(
-    (route.current?.params.filter as Filter | undefined) ?? "all",
+    (route.current.params.filter as Filter | undefined) ?? "all",
   );
 
   const visible = $derived.by(() =>

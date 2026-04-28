@@ -12,7 +12,7 @@
     <code>@real-router/sources</code> to Svelte's reactivity system.
   </p>
   <p>
-    Current route: <strong>{route.current?.name ?? "—"}</strong>
+    Current route: <strong>{route.current.name}</strong>
   </p>
   <p>
     Navigate between pages and watch the monitor panel below update in real-time.

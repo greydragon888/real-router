@@ -17,7 +17,7 @@ const { route } = useRoute();
         <strong>Router installed via:</strong> <code>app.use()</code> plugin
         pattern
       </p>
-      <p><strong>Current route:</strong> {{ route?.name ?? "—" }}</p>
+      <p><strong>Current route:</strong> {{ route.name }}</p>
       <p>
         <strong>Router has routes:</strong>
         {{ router.getState() !== null ? "Yes" : "No" }}

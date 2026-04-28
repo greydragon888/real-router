@@ -57,13 +57,13 @@ describe("useRoute hook", () => {
       wrapper: wrapper(router),
     });
 
-    expect(result.current.route?.name).toStrictEqual("test");
+    expect(result.current.route.name).toStrictEqual("test");
 
     await act(async () => {
       await router.navigate("items");
     });
 
-    expect(result.current.route?.name).toStrictEqual("items");
+    expect(result.current.route.name).toStrictEqual("items");
   });
 
   it("should return previousRoute after navigation", async () => {
@@ -74,19 +74,29 @@ describe("useRoute hook", () => {
       wrapper: wrapper(router),
     });
 
-    expect(result.current.route?.name).toStrictEqual("test");
+    expect(result.current.route.name).toStrictEqual("test");
 
     await act(async () => {
       await router.navigate("home");
     });
 
-    expect(result.current.route?.name).toStrictEqual("home");
+    expect(result.current.route.name).toStrictEqual("home");
     expect(result.current.previousRoute?.name).toStrictEqual("test");
   });
 
   it("should throw error if router instance was not passed to provider", () => {
     expect(() => renderHook(() => useRoute())).toThrow(
-      "useRoute must be used within a RouteProvider",
+      "useRoute must be used within a RouterProvider",
+    );
+  });
+
+  it("should throw a clear error if router has not started yet", () => {
+    const unstartedRouter = createTestRouterWithADefaultRouter();
+
+    expect(() =>
+      renderHook(() => useRoute(), { wrapper: wrapper(unstartedRouter) }),
+    ).toThrow(
+      /useRoute called with no active route\. Did you forget to await router\.start\(\) before rendering, or is the router stopped\/disposed\?/,
     );
   });
 
@@ -99,9 +109,9 @@ describe("useRoute hook", () => {
       wrapper: wrapper(router),
     });
 
-    const params: TypedParams | undefined = result.current.route?.params;
+    const params: TypedParams = result.current.route.params;
 
-    expect(result.current.route?.name).toStrictEqual("test");
+    expect(result.current.route.name).toStrictEqual("test");
     expect(params).toBeDefined();
   });
 });

@@ -33,13 +33,9 @@ function getLabel(name: string, params: Params): string {
   return name;
 }
 
-function Breadcrumbs(): JSX.Element | null {
+function Breadcrumbs(): JSX.Element {
   const { route } = useRoute();
   const utils = useRouteUtils();
-
-  if (!route) {
-    return null;
-  }
 
   const chain = utils.getChain(route.name) ?? [route.name];
   const crumbs = ["home", ...chain];

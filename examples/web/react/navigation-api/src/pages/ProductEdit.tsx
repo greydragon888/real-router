@@ -8,7 +8,7 @@ import type { JSX } from "react";
 export function ProductEdit(): JSX.Element {
   const { route } = useRoute<{ id: string }>();
   const navigator = useNavigator();
-  const id = route?.params.id ?? "";
+  const id = route.params.id ?? "";
 
   const draftKey = `draft:product:${id}`;
   const [notes, setNotes] = useState<string>(

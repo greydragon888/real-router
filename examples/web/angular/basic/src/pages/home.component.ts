@@ -9,7 +9,7 @@ import { injectRoute } from "@real-router/angular";
       <p>Welcome to the Real-Router basic example.</p>
       <p>
         Current route:
-        <strong>{{ routeState().route?.name ?? "—" }}</strong>
+        <strong>{{ routeState().route.name }}</strong>
       </p>
       <p>
         Use the sidebar to navigate between pages. Try clicking <em>Back</em>

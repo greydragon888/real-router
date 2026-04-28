@@ -33,7 +33,7 @@ describe("useRoute hook", () => {
 
     const state = result();
 
-    expect(state.route?.name).toStrictEqual("test");
+    expect(state.route.name).toStrictEqual("test");
   });
 
   it("should update when route changes", async () => {
@@ -41,11 +41,11 @@ describe("useRoute hook", () => {
       wrapper: wrapper(router),
     });
 
-    expect(result().route?.name).toStrictEqual("test");
+    expect(result().route.name).toStrictEqual("test");
 
     await router.navigate("items");
 
-    expect(result().route?.name).toStrictEqual("items");
+    expect(result().route.name).toStrictEqual("items");
   });
 
   it("should update previousRoute after navigation", async () => {
@@ -56,17 +56,27 @@ describe("useRoute hook", () => {
     // Navigate to a known route first
     await router.navigate("home");
 
-    expect(result().route?.name).toStrictEqual("home");
+    expect(result().route.name).toStrictEqual("home");
 
     await router.navigate("items");
 
-    expect(result().route?.name).toStrictEqual("items");
+    expect(result().route.name).toStrictEqual("items");
     expect(result().previousRoute?.name).toStrictEqual("home");
   });
 
   it("should throw error if router instance was not passed to provider", () => {
     expect(() => renderHook(() => useRoute())).toThrow(
       "useRoute must be used within a RouterProvider",
+    );
+  });
+
+  it("should throw a clear error if router has not started yet", () => {
+    const unstartedRouter = createTestRouterWithADefaultRouter();
+
+    expect(() =>
+      renderHook(() => useRoute(), { wrapper: wrapper(unstartedRouter) }),
+    ).toThrow(
+      /useRoute called with no active route\. Did you forget to await router\.start\(\) before rendering, or is the router stopped\/disposed\?/,
     );
   });
 
@@ -82,7 +92,7 @@ describe("useRoute hook", () => {
 
         createEffect(() => {
           // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-          routeState().route?.name;
+          routeState().route.name;
           effectRunCount++;
         });
       },
@@ -109,9 +119,9 @@ describe("useRoute hook", () => {
       wrapper: wrapper(router),
     });
 
-    const params: TypedParams | undefined = result().route?.params;
+    const params: TypedParams = result().route.params;
 
-    expect(result().route?.name).toStrictEqual("test");
+    expect(result().route.name).toStrictEqual("test");
     expect(params).toBeDefined();
   });
 });

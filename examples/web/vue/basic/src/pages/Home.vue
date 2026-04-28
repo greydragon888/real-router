@@ -10,7 +10,7 @@ const items = Array.from({ length: 100 }, (_, i) => i + 1);
     <h1>Home</h1>
     <p>Welcome to the Real-Router basic example.</p>
     <p>
-      Current route: <strong>{{ route?.name ?? "—" }}</strong>
+      Current route: <strong>{{ route.name }}</strong>
     </p>
     <p>
       Use the sidebar to navigate between pages. Try clicking <em>Back</em> and

@@ -9,7 +9,7 @@
   <h1>Home</h1>
   <p>Welcome to the Real-Router basic example.</p>
   <p>
-    Current route: <strong>{route.current?.name ?? "—"}</strong>
+    Current route: <strong>{route.current.name}</strong>
   </p>
   <p>
     Use the sidebar to navigate between pages. Try clicking <em>Back</em>

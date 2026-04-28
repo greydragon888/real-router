@@ -16,7 +16,7 @@
   useRouteAnimation(() => ref, { entryClass: "fade-in", exitClass: "fade-out" });
 
   const { route } = useRoute<{ id: string }>();
-  const id = $derived(route.current?.params.id ?? "1");
+  const id = $derived(route.current.params.id ?? "1");
   const product = $derived(COVERS[id]);
 </script>
 

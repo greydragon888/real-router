@@ -6,7 +6,7 @@ export function AnimatedRoute({
   children,
 }: Readonly<{ children: ReactNode }>): JSX.Element {
   const { route } = useRoute();
-  const direction = route?.context.navigation?.direction ?? "unknown";
+  const direction = route.context.navigation?.direction ?? "unknown";
 
   const className =
     direction === "back"
@@ -16,11 +16,7 @@ export function AnimatedRoute({
         : "page fade";
 
   return (
-    <div
-      className={className}
-      key={route?.path ?? ""}
-      data-direction={direction}
-    >
+    <div className={className} key={route.path} data-direction={direction}>
       {children}
     </div>
   );

@@ -121,9 +121,6 @@ export function useRouteEnter(
   useEffect(() => {
     // Early-exit guards, top-down:
     //
-    //   - **Defensive**: `route` / `previousRoute` may be undefined
-    //     during SSR or pre-start hydration. Not testable from vitest
-    //     (tests start the router before render), so v8-ignored.
     //   - **Skip-initial**: `state.transition.from` is undefined only
     //     for the very first state committed by `router.start()`.
     //   - **Skip-same-route**: query-only navigations have
@@ -132,11 +129,6 @@ export function useRouteEnter(
     //   - **Defensive dedupe**: same `route` ref between effect
     //     cleanup + re-run. Preact has no StrictMode, but we keep the
     //     guard for parity with React; v8-ignored.
-    /* v8 ignore start */
-    if (!route) {
-      return;
-    }
-    /* v8 ignore stop */
     if (!route.transition.from) {
       return;
     }

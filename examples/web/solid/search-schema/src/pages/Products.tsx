@@ -6,18 +6,18 @@ export function Products(): JSX.Element {
   const routeState = useRoute();
   const navigator = useNavigator();
 
-  const q = () => (routeState().route?.params.q as string | undefined) ?? "";
+  const q = () => (routeState().route.params.q as string | undefined) ?? "";
   const page = () =>
-    (routeState().route?.params.page as number | undefined) ?? 1;
+    (routeState().route.params.page as number | undefined) ?? 1;
   const sort = () =>
-    (routeState().route?.params.sort as string | undefined) ?? "name";
+    (routeState().route.params.sort as string | undefined) ?? "name";
 
   const navigate = (
     params: Record<string, string | number | boolean | undefined>,
   ) => {
     const route = routeState().route;
 
-    void navigator.navigate("products", { ...route?.params, ...params });
+    void navigator.navigate("products", { ...route.params, ...params });
   };
 
   return (

@@ -64,6 +64,6 @@ const COVERS: Partial<Record<string, { name: string; color: string }>> = {
 export class ProductDetailComponent {
   private readonly state = injectRoute<{ id: string }>();
 
-  readonly id = computed(() => this.state.routeState().route?.params["id"] ?? "1");
+  readonly id = computed(() => this.state.routeState().route.params["id"] ?? "1");
   readonly product = computed(() => COVERS[this.id()]);
 }

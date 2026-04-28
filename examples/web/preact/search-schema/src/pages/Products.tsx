@@ -6,14 +6,14 @@ export function Products(): JSX.Element {
   const { route } = useRoute();
   const navigator = useNavigator();
 
-  const q = (route?.params.q as string | undefined) ?? "";
-  const page = (route?.params.page as number | undefined) ?? 1;
-  const sort = (route?.params.sort as string | undefined) ?? "name";
+  const q = (route.params.q as string | undefined) ?? "";
+  const page = (route.params.page as number | undefined) ?? 1;
+  const sort = (route.params.sort as string | undefined) ?? "name";
 
   const navigate = (
     params: Record<string, string | number | boolean | undefined>,
   ) => {
-    void navigator.navigate("products", { ...route?.params, ...params });
+    void navigator.navigate("products", { ...route.params, ...params });
   };
 
   return (

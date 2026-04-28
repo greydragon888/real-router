@@ -4,7 +4,7 @@
   const { route } = useRoute();
   const navigator = useNavigator();
 
-  let params = $derived(route.current?.params ?? {});
+  let params = $derived(route.current.params);
   let query = $derived((params.q as string | undefined) ?? "");
   let page = $derived((params.page as number | undefined) ?? 1);
   let sort = $derived((params.sort as string | undefined) ?? "name");

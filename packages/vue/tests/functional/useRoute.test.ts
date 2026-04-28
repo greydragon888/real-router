@@ -5,11 +5,10 @@ import { defineComponent, h, watchSyncEffect } from "vue";
 import { useRoute, RouterProvider } from "../../src";
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
-import type { RouteContext } from "../../src/types";
 import type { Params, Router } from "@real-router/core";
 
-function mountWithRouter(router: Router, composable: () => RouteContext) {
-  let result: RouteContext;
+function mountWithRouter<R>(router: Router, composable: () => R) {
+  let result: R;
   const App = defineComponent({
     setup() {
       result = composable();
@@ -58,12 +57,12 @@ describe("useRoute composable", () => {
   it("should return current route", async () => {
     const { result } = mountWithRouter(router, () => useRoute());
 
-    expect(result.route.value?.name).toStrictEqual("test");
+    expect(result.route.value.name).toStrictEqual("test");
 
     await router.navigate("items");
     await flushPromises();
 
-    expect(result.route.value?.name).toStrictEqual("items");
+    expect(result.route.value.name).toStrictEqual("items");
   });
 
   it("should throw error if router instance was not passed to provider", () => {
@@ -77,7 +76,37 @@ describe("useRoute composable", () => {
           },
         }),
       ),
-    ).toThrow();
+    ).toThrow("useRoute must be used within a RouterProvider");
+  });
+
+  it("should throw a clear error if router has not started yet", () => {
+    const unstartedRouter = createTestRouterWithADefaultRouter();
+
+    expect(() =>
+      mount(
+        defineComponent({
+          setup: () => () =>
+            h(
+              RouterProvider,
+              { router: unstartedRouter },
+              {
+                default: () =>
+                  h(
+                    defineComponent({
+                      setup() {
+                        useRoute();
+
+                        return () => h("div");
+                      },
+                    }),
+                  ),
+              },
+            ),
+        }),
+      ),
+    ).toThrow(
+      /useRoute called with no active route\. Did you forget to await router\.start\(\) before rendering, or is the router stopped\/disposed\?/,
+    );
   });
 
   it("shallowRef tracks identity: re-assigning the same frozen snapshot does NOT fire effects", async () => {
@@ -91,9 +120,9 @@ describe("useRoute composable", () => {
         routeRef = ctx.route;
 
         watchSyncEffect(() => {
-          if (ctx.route.value) {
-            effectCount++;
-          }
+          // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+          ctx.route.value;
+          effectCount++;
         });
 
         return () => h("div");
@@ -130,7 +159,7 @@ describe("useRoute composable", () => {
 
     // And: re-rendering with a *new* shallow object containing the same
     // nested data DOES trigger — proving deep-equality is NOT used.
-    const cloned = { ...currentSnapshot! };
+    const cloned = { ...currentSnapshot };
 
     (routeRef!.value as unknown) = cloned;
     await flushPromises();
@@ -147,7 +176,7 @@ describe("useRoute composable", () => {
       setup() {
         const { route } = useRoute<TypedParams>();
 
-        typedParams = route.value?.params;
+        typedParams = route.value.params;
 
         return () => h("div");
       },

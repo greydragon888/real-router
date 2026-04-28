@@ -60,7 +60,7 @@ export class QueryDemoComponent {
   readonly filters = FILTERS;
 
   readonly filter = computed<Filter>(
-    () => (this.state.routeState().route?.params["filter"] as Filter | undefined) ?? "all",
+    () => (this.state.routeState().route.params["filter"] as Filter | undefined) ?? "all",
   );
 
   readonly visible = computed(() => {

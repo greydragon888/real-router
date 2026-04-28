@@ -88,11 +88,10 @@ export function useRouteEnter(
 
     // Early-exit guards, top-down:
     //
-    //   - **Defensive + skip-initial**: `route` may be undefined during
-    //     SSR / pre-start hydration; `!transition.from` would catch the
-    //     first commit from `router.start()`. Vue's `watch` (default
-    //     `immediate: false`) does not fire on the initial state, so
-    //     both are unreachable in Vue (covered by React/Preact tests).
+    //   - **Skip-initial**: `!transition.from` catches the first commit
+    //     from `router.start()`. Vue's `watch` (default `immediate: false`)
+    //     does not fire on the initial state — kept for parity with
+    //     React/Preact and v8-ignored.
     //   - **Skip-same-route**: query-only navigations have
     //     `transition.from === route.name`. Opt-out via
     //     `skipSameRoute: false`.
@@ -102,9 +101,6 @@ export function useRouteEnter(
     //     `transition.from` is set (core populates them together). Both
     //     kept for parity with React; v8-ignored.
     /* v8 ignore start */
-    if (!newRoute) {
-      return;
-    }
     if (!newRoute.transition.from) {
       return;
     }

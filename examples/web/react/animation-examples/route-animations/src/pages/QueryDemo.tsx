@@ -16,7 +16,7 @@ type Filter = "all" | "letter" | "number" | "color";
 
 export function QueryDemo(): JSX.Element {
   const { route } = useRoute<{ filter?: Filter }>();
-  const filter = route?.params.filter ?? "all";
+  const filter = route.params.filter ?? "all";
 
   const visible = useMemo(() => {
     return filter === "all"

@@ -67,16 +67,14 @@ describe("RouterProvider - Integration Tests", () => {
   });
 
   describe("Edge Cases", () => {
-    it("should handle router not started", () => {
-      let routeContext: RouteContext | undefined;
-
-      renderWithRouter(router, RouteCapture, {
-        onCapture: (r: RouteContext) => {
-          routeContext = r;
-        },
-      });
-
-      expect(routeContext?.route.current?.name).toBeUndefined();
+    it("should throw a clear error when router not started", () => {
+      expect(() =>
+        renderWithRouter(router, RouteCapture, {
+          onCapture: () => {},
+        }),
+      ).toThrow(
+        /useRoute called with no active route\. Did you forget to await router\.start\(\) before rendering, or is the router stopped\/disposed\?/,
+      );
     });
 
     it("should handle unmount correctly", async () => {

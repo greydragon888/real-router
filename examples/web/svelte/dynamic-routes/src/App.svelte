@@ -43,7 +43,7 @@
             checked={analyticsEnabled}
             onchange={async () => {
               if (analyticsEnabled) {
-                if (route.current?.name.startsWith("analytics")) {
+                if (route.current.name.startsWith("analytics")) {
                   await navigator.navigate("home");
                 }
                 routesApi.remove("analytics");
@@ -63,7 +63,7 @@
             checked={adminEnabled}
             onchange={async () => {
               if (adminEnabled) {
-                if (route.current?.name.startsWith("admin")) {
+                if (route.current.name.startsWith("admin")) {
                   await navigator.navigate("home");
                 }
                 routesApi.remove("admin");
