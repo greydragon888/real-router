@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/method-signature-style -- method syntax required for declaration merging overload (property syntax causes TS2717) */
 import type { PreloadFnFactory, PreloadPluginOptions } from "./types";
-import type { DefaultDependencies } from "@real-router/core";
+import type { DefaultDependencies, State } from "@real-router/core";
 
 export { preloadPluginFactory } from "./factory";
 
@@ -16,6 +16,7 @@ declare module "@real-router/core" {
   }
 
   interface Router {
+    getPreloadedState?: (href: string) => State | undefined;
     getPreloadSettings(): PreloadPluginOptions;
   }
 }

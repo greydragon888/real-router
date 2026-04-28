@@ -26,6 +26,8 @@ declare module "@real-router/core" {
   }
 }
 
+const STATE_CACHE_LIMIT = 32;
+
 export class PreloadPlugin {
   readonly #router: Router;
   readonly #api: PluginApi;
@@ -36,6 +38,13 @@ export class PreloadPlugin {
     string,
     { fn: PreloadFn; factory: PreloadFnFactory }
   >();
+  // Pre-resolved State cache keyed by anchor href. Populated when a hover/touch
+  // resolves a route via router.matchUrl, consumed once via
+  // router.getPreloadedState(href). Single-use semantics (delete-on-read) keep
+  // the cache from drifting out of sync with current world state — once the
+  // consumer commits the snapshot via api.navigateToState, the entry is gone.
+  // Bounded with insertion-order eviction (#562).
+  readonly #stateCache = new Map<string, State>();
 
   #currentAnchor: HTMLAnchorElement | null = null;
   #hoverTimer: ReturnType<typeof setTimeout> | null = null;
@@ -59,6 +68,15 @@ export class PreloadPlugin {
 
     this.#removeExtensions = api.extendRouter({
       getPreloadSettings: () => cachedOptions,
+      getPreloadedState: (href: string): State | undefined => {
+        const state = this.#stateCache.get(href);
+
+        if (state) {
+          this.#stateCache.delete(href);
+        }
+
+        return state;
+      },
     });
   }
 
@@ -185,6 +203,8 @@ export class PreloadPlugin {
       return undefined;
     }
 
+    this.#cacheState(anchor.href, state);
+
     const config = this.#api.getRouteConfig(state.name);
     const factory =
       typeof config?.preload === "function"
@@ -214,6 +234,22 @@ export class PreloadPlugin {
     this.#compiledPreloads.set(state.name, { fn, factory });
 
     return { fn, params: state.params };
+  }
+
+  #cacheState(href: string, state: State): void {
+    // Re-insert to refresh recency ordering (Map iteration is insertion order).
+    if (this.#stateCache.has(href)) {
+      this.#stateCache.delete(href);
+    } else if (this.#stateCache.size >= STATE_CACHE_LIMIT) {
+      // size >= LIMIT > 0 → iterator has at least one key.
+      for (const oldest of this.#stateCache.keys()) {
+        this.#stateCache.delete(oldest);
+
+        break;
+      }
+    }
+
+    this.#stateCache.set(href, state);
   }
 
   #isGhostMouseEvent(event: MouseEvent): boolean {
@@ -263,5 +299,6 @@ export class PreloadPlugin {
     this.#cancelTouch();
     this.#lastTouchTarget = null;
     this.#lastTouchTimeStamp = Number.NaN;
+    this.#stateCache.clear();
   }
 }

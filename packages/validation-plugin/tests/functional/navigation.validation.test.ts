@@ -1,4 +1,5 @@
 import { errorCodes } from "@real-router/core";
+import { getPluginApi } from "@real-router/core/api";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import { createValidationRouter } from "../helpers";
@@ -159,6 +160,92 @@ describe("navigation validation — with validationPlugin", () => {
       expect(() => raw.navigateToDefault("invalid")).toThrow(
         /navigateToDefault/,
       );
+    });
+  });
+
+  describe("navigateToState() state shape validation", () => {
+    it("should throw TypeError when state is null", () => {
+      expect(() =>
+        (
+          getPluginApi(router) as unknown as {
+            navigateToState: (s: unknown) => Promise<unknown>;
+          }
+        ).navigateToState(null),
+      ).toThrow(/\[router\.navigateToState\] Invalid state/);
+    });
+
+    it("should throw TypeError when state is a string", () => {
+      const api = getPluginApi(router) as unknown as {
+        navigateToState: (s: unknown) => Promise<unknown>;
+      };
+
+      expect(() => api.navigateToState("foo")).toThrow(
+        /Invalid state.*Expected State object/,
+      );
+    });
+
+    it("should throw TypeError when state.name is not a string", () => {
+      const api = getPluginApi(router) as unknown as {
+        navigateToState: (s: unknown) => Promise<unknown>;
+      };
+
+      expect(() =>
+        api.navigateToState({ name: 42, params: {}, path: "/" }),
+      ).toThrow(/Invalid state\.name/);
+    });
+
+    it("should throw TypeError when state.params is not a plain object", () => {
+      const api = getPluginApi(router) as unknown as {
+        navigateToState: (s: unknown) => Promise<unknown>;
+      };
+
+      expect(() =>
+        api.navigateToState({ name: "users", params: "qux", path: "/users" }),
+      ).toThrow(/Invalid state\.params/);
+    });
+
+    it("should throw TypeError when state.path is not a string", () => {
+      const api = getPluginApi(router) as unknown as {
+        navigateToState: (s: unknown) => Promise<unknown>;
+      };
+
+      expect(() =>
+        api.navigateToState({ name: "users", params: {}, path: 9 }),
+      ).toThrow(/Invalid state\.path/);
+    });
+
+    it("should accept a structurally valid state and not throw", async () => {
+      const api = getPluginApi(router);
+      const matched = api.matchPath("/users");
+
+      expect(matched).toBeDefined();
+      await expect(api.navigateToState(matched!)).resolves.toBeDefined();
+    });
+
+    it("should validate options when provided", async () => {
+      const api = getPluginApi(router);
+      const matched = api.matchPath("/users");
+
+      expect(matched).toBeDefined();
+      // Pass invalid options shape — must trigger validateNavigationOptions
+      // throw before any pipeline work happens.
+      expect(() =>
+        (
+          api as unknown as {
+            navigateToState: (s: unknown, o: unknown) => Promise<unknown>;
+          }
+        ).navigateToState(matched!, "not-an-options-object"),
+      ).toThrow(/Invalid options/);
+    });
+
+    it("should accept valid options", async () => {
+      const api = getPluginApi(router);
+      const matched = api.matchPath("/users");
+
+      expect(matched).toBeDefined();
+      await expect(
+        api.navigateToState(matched!, { replace: true }),
+      ).resolves.toBeDefined();
     });
   });
 });

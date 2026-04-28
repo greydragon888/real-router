@@ -225,6 +225,26 @@ export class Router<
         },
         interceptorsMap,
       ),
+      navigateToState: (state, navOpts) => {
+        // Plugin-only navigation primitive (#525). Mirrors the same
+        // unhandled-rejection suppression and lastSync* bookkeeping used by
+        // the public Router.navigate facade so plugin call-sites can
+        // fire-and-forget the returned promise (popstate handlers do).
+        const promiseState = this.#navigation.navigateToState(
+          state,
+          navOpts ?? EMPTY_OPTS,
+        );
+
+        if (this.#navigation.lastSyncResolved) {
+          this.#navigation.lastSyncResolved = false;
+        } else if (this.#navigation.lastSyncRejected) {
+          this.#navigation.lastSyncRejected = false;
+        } else {
+          Router.#suppressUnhandledRejection(promiseState);
+        }
+
+        return promiseState;
+      },
       interceptors: interceptorsMap,
       setRootPath: (rootPath) => {
         this.#routes.setRootPath(rootPath);

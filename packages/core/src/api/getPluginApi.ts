@@ -12,12 +12,25 @@ import type {
   State,
 } from "@real-router/types";
 
+// Cache the assembled PluginApi per router — mirrors getNavigator() (#525):
+// avoids re-allocating the closure-bag on each call (plugins call this once
+// at init, but tests + nested plugins poll it), and gives spy/stub helpers
+// a stable object identity to attach to (e.g. spying on
+// `getPluginApi(router).navigateToState` to inject errors in popstate
+// recovery tests).
+const cache = new WeakMap<object, PluginApi>();
+
 export function getPluginApi<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(router: Router<Dependencies>): PluginApi {
-  const ctx = getInternals(router);
+  const cached = cache.get(router);
 
-  return {
+  if (cached) {
+    return cached;
+  }
+
+  const ctx = getInternals(router);
+  const api: PluginApi = {
     makeState: (name, params, path, meta) => {
       ctx.validator?.state.validateMakeStateArgs(name, params, path);
 
@@ -57,6 +70,20 @@ export function getPluginApi<
       ctx.validator?.routes.validateMatchPathArgs(path);
 
       return ctx.matchPath(path, ctx.getOptions());
+    },
+    navigateToState: (state, options) => {
+      throwIfDisposed(ctx.isDisposed);
+
+      ctx.validator?.navigation.validateNavigateToStateArgs(state);
+
+      if (options !== undefined) {
+        ctx.validator?.navigation.validateNavigationOptions(
+          options,
+          "navigateToState",
+        );
+      }
+
+      return ctx.navigateToState(state, options);
     },
     setRootPath: (rootPath) => {
       throwIfDisposed(ctx.isDisposed);
@@ -194,4 +221,8 @@ export function getPluginApi<
       } satisfies ContextNamespaceClaim;
     }) as PluginApi["claimContextNamespace"],
   };
+
+  cache.set(router, api);
+
+  return api;
 }

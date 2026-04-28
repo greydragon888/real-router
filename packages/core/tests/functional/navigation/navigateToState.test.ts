@@ -1,0 +1,237 @@
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
+
+import {
+  createRouter,
+  errorCodes,
+  events,
+  RouterError,
+} from "@real-router/core";
+import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
+
+import { createTestRouter } from "../../helpers";
+
+import type { Router, State } from "@real-router/core";
+import type { LifecycleApi } from "@real-router/core/api";
+
+/**
+ * Functional tests for `getPluginApi(router).navigateToState(state, opts)` — the new
+ * navigation primitive added by issue #525. Mirrors the navigate.test.ts
+ * shape but exercises the bypass-buildNavigateState code path.
+ */
+describe("navigateToState", () => {
+  let router: Router;
+  let lifecycle: LifecycleApi;
+
+  beforeEach(async () => {
+    router = createTestRouter();
+    await router.start("/home");
+    lifecycle = getLifecycleApi(router);
+  });
+
+  afterEach(() => {
+    router.stop();
+    vi.restoreAllMocks();
+  });
+
+  describe("happy path", () => {
+    it("commits a matched state to the router and resolves with it", async () => {
+      const matched = getPluginApi(router).matchPath("/users");
+
+      expect(matched).toBeDefined();
+
+      const next = await getPluginApi(router).navigateToState(matched!);
+
+      expect(next.name).toBe("users");
+      expect(next.path).toBe("/users");
+      expect(router.getState()?.name).toBe("users");
+    });
+
+    it("accepts NavigationOptions (replace, signal, etc.)", async () => {
+      const matched = getPluginApi(router).matchPath("/users");
+      const controller = new AbortController();
+
+      const next = await getPluginApi(router).navigateToState(matched!, {
+        replace: true,
+        signal: controller.signal,
+      });
+
+      expect(next.name).toBe("users");
+    });
+
+    it("preserves the path produced by matchPath verbatim (Q2 fix #525)", async () => {
+      router.stop();
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          { name: "users", path: "/users" },
+        ],
+        { trailingSlash: "preserve" },
+      );
+      await router.start("/");
+
+      const matched = getPluginApi(router).matchPath("/users/");
+
+      expect(matched?.path).toBe("/users/");
+
+      const next = await getPluginApi(router).navigateToState(matched!);
+
+      expect(next.path).toBe("/users/");
+    });
+
+    it("emits TRANSITION_SUCCESS with the provided state", async () => {
+      const matched = getPluginApi(router).matchPath("/users");
+      const successSpy = vi.fn();
+      const unsubscribe = router.subscribe((evt) => {
+        successSpy(evt.route.name);
+      });
+
+      try {
+        await getPluginApi(router).navigateToState(matched!);
+      } finally {
+        unsubscribe();
+      }
+
+      expect(successSpy).toHaveBeenCalledWith("users");
+    });
+  });
+
+  describe("rejections", () => {
+    it("rejects with ROUTER_NOT_STARTED when router is stopped", async () => {
+      const matched = getPluginApi(router).matchPath("/users");
+
+      router.stop();
+
+      await expect(
+        getPluginApi(router).navigateToState(matched!),
+      ).rejects.toMatchObject({
+        code: errorCodes.ROUTER_NOT_STARTED,
+      });
+    });
+
+    it("rejects with ROUTE_NOT_FOUND when state.name is unknown to the router", async () => {
+      const fake: State = {
+        name: "ghost.route",
+        params: {},
+        path: "/ghost",
+        transition: {
+          phase: "activating",
+          reason: "success",
+          segments: { deactivated: [], activated: [], intersection: "" },
+        },
+        context: {},
+      };
+      const errorSpy = vi.fn();
+      const unsubscribe = getPluginApi(router).addEventListener(
+        events.TRANSITION_ERROR,
+        errorSpy,
+      );
+
+      try {
+        await expect(
+          getPluginApi(router).navigateToState(fake),
+        ).rejects.toMatchObject({
+          code: errorCodes.ROUTE_NOT_FOUND,
+        });
+        expect(errorSpy).toHaveBeenCalled();
+      } finally {
+        unsubscribe();
+      }
+    });
+
+    it("rejects with SAME_STATES when target equals current state", async () => {
+      const current = router.getState()!;
+
+      await expect(
+        getPluginApi(router).navigateToState(current),
+      ).rejects.toMatchObject({
+        code: errorCodes.SAME_STATES,
+      });
+    });
+
+    it("rejects when a deactivation guard blocks the transition", async () => {
+      lifecycle.addDeactivateGuard("home", () => () => false);
+
+      const matched = getPluginApi(router).matchPath("/users");
+
+      await expect(
+        getPluginApi(router).navigateToState(matched!),
+      ).rejects.toBeInstanceOf(RouterError);
+      expect(router.getState()?.name).toBe("home");
+    });
+  });
+
+  describe("validation (with @real-router/validation-plugin absent)", () => {
+    it("does not throw on plain-object state with required fields", async () => {
+      const synthetic: State = {
+        name: "users",
+        params: {},
+        path: "/users",
+        transition: {
+          phase: "activating",
+          reason: "success",
+          segments: { deactivated: [], activated: [], intersection: "" },
+        },
+        context: {},
+      };
+
+      const next = await getPluginApi(router).navigateToState(synthetic);
+
+      expect(next.name).toBe("users");
+    });
+  });
+
+  describe("respects guards", () => {
+    it("runs canActivate guard for the target route", async () => {
+      const guard = vi.fn(() => true);
+
+      lifecycle.addActivateGuard("users", () => guard);
+
+      const matched = getPluginApi(router).matchPath("/users");
+
+      await getPluginApi(router).navigateToState(matched!);
+
+      expect(guard).toHaveBeenCalled();
+    });
+
+    it("guard rejection prevents state commit", async () => {
+      lifecycle.addActivateGuard("users", () => () => false);
+
+      const matched = getPluginApi(router).matchPath("/users");
+
+      await expect(
+        getPluginApi(router).navigateToState(matched!),
+      ).rejects.toBeInstanceOf(RouterError);
+      expect(router.getState()?.name).toBe("home");
+    });
+  });
+
+  describe("UNKNOWN_ROUTE state shape", () => {
+    it("accepts UNKNOWN_ROUTE as a structurally legal state.name", async () => {
+      // navigateToNotFound produces UNKNOWN_ROUTE; navigateToState must
+      // tolerate it for cases where a plugin re-uses such a state.
+      const unknownState: State = {
+        name: "@@router/UNKNOWN_ROUTE",
+        params: {},
+        path: "/anything",
+        transition: {
+          phase: "activating",
+          reason: "success",
+          segments: { deactivated: [], activated: [], intersection: "" },
+        },
+        context: {},
+      };
+
+      // Either resolves (transition completes) or rejects with SAME_STATES /
+      // a guard error, but never with the ROUTE_NOT_FOUND that hasRoute()
+      // would produce for any non-UNKNOWN unknown name.
+      try {
+        await getPluginApi(router).navigateToState(unknownState);
+      } catch (error) {
+        expect(error).toBeInstanceOf(RouterError);
+        expect((error as RouterError).code).not.toBe(
+          errorCodes.ROUTE_NOT_FOUND,
+        );
+      }
+    });
+  });
+});

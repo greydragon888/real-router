@@ -101,4 +101,14 @@ test.describe("SSR", () => {
     expect(response!.status()).toBe(404);
     await expect(page.locator("main")).toContainText("Not Found");
   });
+
+  test("server injects __SSR_STATE__ into HTML", async ({ page }) => {
+    const response = await page.goto("/users");
+    const html = await response!.text();
+
+    expect(html).toContain("window.__SSR_STATE__");
+    expect(html).toContain('"name":"users"');
+    expect(html).toContain('"path":"/users"');
+    expect(html).not.toContain('"transition"');
+  });
 });

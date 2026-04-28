@@ -1,5 +1,3 @@
-import type { Params } from "@real-router/core";
-
 export type MemoryDirection = "back" | "forward" | "navigate";
 
 export interface MemoryContext {
@@ -20,10 +18,4 @@ export interface MemoryPluginOptions {
    * @default 1000
    */
   maxHistoryLength?: number;
-}
-
-export interface HistoryEntry {
-  readonly name: string;
-  readonly params: Params;
-  readonly path: string;
 }

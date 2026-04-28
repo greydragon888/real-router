@@ -1,5 +1,4 @@
 import type {
-  HistoryEntry,
   MemoryContext,
   MemoryDirection,
   MemoryPluginOptions,
@@ -17,8 +16,16 @@ const DEFAULT_MAX_HISTORY = 1000;
 /** @internal — instantiated by `memoryPluginFactory`; not part of the public API. */
 export class MemoryPlugin {
   readonly #router: Router;
+  readonly #api: PluginApi;
   readonly #maxHistory: number;
-  readonly #entries: HistoryEntry[] = [];
+  // Stored entries are full State snapshots (#561). Snapshot semantics for
+  // back/forward replay: api.navigateToState commits the stored State as-is,
+  // immune to post-recording route mutations (routes.update / routes.replace
+  // changing defaultParams or meta) and to non-idempotent dynamic
+  // forwardFn / buildPath interceptors. Activation guards still run at
+  // replay time — that is where current-world-state checks belong, not in
+  // the navigation pipeline.
+  readonly #entries: State[] = [];
   readonly #removeExtensions: () => void;
   readonly #claim: {
     write: (state: State, value: MemoryContext) => void;
@@ -32,6 +39,7 @@ export class MemoryPlugin {
 
   constructor(router: Router, api: PluginApi, options: MemoryPluginOptions) {
     this.#router = router;
+    this.#api = api;
     this.#maxHistory = options.maxHistoryLength ?? DEFAULT_MAX_HISTORY;
     this.#claim = api.claimContextNamespace("memory");
 
@@ -63,17 +71,11 @@ export class MemoryPlugin {
           return;
         }
 
-        const entry: HistoryEntry = {
-          name: toState.name,
-          params: toState.params,
-          path: toState.path,
-        };
-
         if (opts.replace && this.#index >= 0) {
-          this.#entries[this.#index] = entry;
+          this.#entries[this.#index] = toState;
         } else {
           this.#entries.length = this.#index + 1;
-          this.#entries.push(entry);
+          this.#entries.push(toState);
           this.#index = this.#entries.length - 1;
 
           if (this.#maxHistory > 0 && this.#entries.length > this.#maxHistory) {
@@ -132,7 +134,7 @@ export class MemoryPlugin {
 
     if (entry.path === currentState?.path) {
       // Short-circuit: landing on an entry whose path matches the current
-      // state skips router.navigate(). Still rewrite state.context.memory
+      // state skips api.navigateToState. Still rewrite state.context.memory
       // so subscribers see the new historyIndex + direction — otherwise
       // UI animation driven by `direction` sees a stale "navigate" value
       // and `state.context.memory.historyIndex` diverges from `#index`
@@ -150,21 +152,24 @@ export class MemoryPlugin {
     this.#navigatingFromHistory = true;
     this.#index = targetIndex;
 
-    void this.#router
-      .navigate(entry.name, entry.params, { replace: true })
-      .then(
-        () => {
-          if (this.#goGeneration === generation) {
-            this.#navigatingFromHistory = false;
-          }
-        },
-        () => {
-          if (this.#goGeneration === generation) {
-            this.#index = previousIndex;
-            this.#navigatingFromHistory = false;
-          }
-        },
-      );
+    // navigateToState commits the stored snapshot verbatim — same primitive
+    // every URL-driven flow uses (start, popstate, navigate-event). Skips
+    // forwardState + buildPath re-resolution and their interceptors; route
+    // mutations between record and replay do not retroactively change what
+    // back/forward commits (#561).
+    void this.#api.navigateToState(entry, { replace: true }).then(
+      () => {
+        if (this.#goGeneration === generation) {
+          this.#navigatingFromHistory = false;
+        }
+      },
+      () => {
+        if (this.#goGeneration === generation) {
+          this.#index = previousIndex;
+          this.#navigatingFromHistory = false;
+        }
+      },
+    );
   }
 
   #clear(): void {

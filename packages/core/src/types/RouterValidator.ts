@@ -124,6 +124,7 @@ export interface RouterValidator {
   navigation: {
     validateNavigateArgs: (name: unknown) => void;
     validateNavigateToDefaultArgs: (options: unknown) => void;
+    validateNavigateToStateArgs: (state: unknown) => void;
     validateNavigationOptions: (options: unknown, caller: string) => void;
     validateParams: (params: unknown, methodName: string) => void;
     validateStartArgs: (path: unknown) => void;

@@ -5,29 +5,37 @@ import type { State, Params } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
 
 /**
- * Extracts route name and params from a popstate event.
+ * Resolves the popstate event into a navigation-ready `State`.
  *
- * - If history.state is a valid router state → returns name/params from it
- * - If not (e.g. manually entered URL) → matches current URL against route tree
- * - Returns undefined if no route matches
+ * - If `history.state` is a valid router state ({name, params, path} written
+ *   by browser-plugin/hash-plugin during their previous navigation), it is
+ *   the source of truth — synthesize a fully-typed `State` from it via
+ *   `api.makeState`. The synthesized `transition`/`context` fields are
+ *   placeholders; the navigation pipeline (`completeTransition` and plugin
+ *   claim writes) replaces them.
+ *   This branch is mandatory for hash-plugin: `browser.getLocation()`
+ *   returns the History pathname, not the hash, so the matchPath fallback
+ *   below cannot extract the hash route.
+ * - Otherwise (e.g. manually entered URL with no recorded state), fall
+ *   back to `api.matchPath(browser.getLocation())`. browser-plugin's
+ *   `getLocation` returns the URL pathname — this works.
+ * - `undefined` when neither path produces a match.
  *
- * @param evt - PopStateEvent from browser
- * @param api - PluginApi instance
- * @param browser - Browser API instance
- * @returns Route identifier or undefined
+ * Replaces the previous `{ name, params }` shape so the caller can hand
+ * the State directly to `router.navigateToState(state, opts)` and skip
+ * the redundant `forwardState`/`buildPath` round-trip in
+ * `buildNavigateState` (issue #525).
  */
 export function getRouteFromEvent(
   evt: PopStateEvent,
   api: PluginApi,
   browser: Browser,
-): { name: string; params: Params } | undefined {
+): State | undefined {
   if (isState(evt.state)) {
-    return { name: evt.state.name, params: evt.state.params };
+    return api.makeState(evt.state.name, evt.state.params, evt.state.path);
   }
 
-  const state = api.matchPath(browser.getLocation());
-
-  return state ? { name: state.name, params: state.params } : undefined;
+  return api.matchPath(browser.getLocation());
 }
 
 /**

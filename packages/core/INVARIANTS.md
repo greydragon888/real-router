@@ -446,6 +446,20 @@ Guards registered via `getLifecycleApi(router)` run during the transition pipeli
 | 7   | Frozen state is immutable             | After freezing, attempts to modify `err.redirect.params` are silently ignored (or throw in strict mode). The value does not change.  |
 | 8   | Arbitrary State without circular refs | Any `State` object generated without circular references can be passed as `redirect` and will be frozen successfully.                |
 
+## serializeRouterState (SSR transport)
+
+`serializeRouterState(state)` produces XSS-safe JSON for SSR → client transport (#563). It strips `state.transition` and preserves the rest. These invariants confirm the transport contract holds for any State shape.
+
+| #   | Invariant                              | Description                                                                                                                                                          |
+| --- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Output is valid JSON                   | `JSON.parse(serializeRouterState(state))` never throws for any State.                                                                                                |
+| 2   | Transition is always stripped          | The parsed payload never contains a `transition` key — independent of what `state.transition` held on input.                                                        |
+| 3   | Persistent fields preserved            | `name`, `params`, `path`, `context` survive serialize → parse with identical observable values.                                                                      |
+| 4   | XSS-sensitive characters escaped       | The output string contains no raw `<`, `>`, or `&` — they are unicode-escaped to prevent `</script>` and HTML-entity injection inside `<script>` blocks.            |
+| 5   | Determinism                            | `serializeRouterState(state)` returns the same string when called twice on the same input.                                                                           |
+| 6   | Transition-mutation invisibility       | Mutating `state.transition` to any other valid TransitionMeta does not change the output — the transition is fully erased from the serialized form.                  |
+| 7   | Plugin context namespaces transit OK   | Arbitrary `state.context.<namespace>` payloads (e.g. `data` from `ssr-data-plugin`) survive transport with identical values after serialize → parse.                |
+
 ## errorCodes (constants)
 
 `errorCodes` is the frozen object containing all error code constants exported from `@real-router/core`.
@@ -497,3 +511,4 @@ Guards registered via `getLifecycleApi(router)` run during the transition pipeli
 | `tests/property/error/message-formatting.properties.ts` | 10         | RouterError message formatting                |
 | `tests/property/error/circular-refs.properties.ts`      | 8          | Deep-freeze with circular references          |
 | `tests/property/error/constants.properties.ts`          | 11         | errorCodes object invariants                  |
+| `tests/property/serializeRouterState.properties.ts`     | 7          | SSR transport (XSS-safe JSON, transition strip) |

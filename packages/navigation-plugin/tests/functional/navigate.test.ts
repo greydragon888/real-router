@@ -1,5 +1,5 @@
 import { createRouter, UNKNOWN_ROUTE } from "@real-router/core";
-import { getLifecycleApi } from "@real-router/core/api";
+import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { navigationPluginFactory } from "../../src";
@@ -329,15 +329,17 @@ describe("Navigation Plugin — Navigate", () => {
     });
 
     it("passes signal from navigate event to router", async () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
+      const navigateToStateSpy = vi.spyOn(
+        getPluginApi(router),
+        "navigateToState",
+      );
 
       const { finished } = mockNav.navigate("http://localhost/users/list");
 
       await finished;
 
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "users.list",
-        {},
+      expect(navigateToStateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "users.list" }),
         expect.objectContaining({ signal: expect.any(AbortSignal) }),
       );
     });
@@ -518,7 +520,7 @@ describe("Error Recovery", () => {
     unsub = router.usePlugin(navigationPluginFactory({}, browser));
     await router.start();
 
-    vi.spyOn(router, "navigate").mockRejectedValue(
+    vi.spyOn(getPluginApi(router), "navigateToState").mockRejectedValue(
       new TypeError("unexpected crash"),
     );
 
@@ -628,7 +630,9 @@ describe("Error Recovery", () => {
     unsub = router.usePlugin(navigationPluginFactory({}, browser));
     await router.start();
 
-    vi.spyOn(router, "navigate").mockRejectedValue(new TypeError("crash"));
+    vi.spyOn(getPluginApi(router), "navigateToState").mockRejectedValue(
+      new TypeError("crash"),
+    );
     vi.spyOn(router, "getState").mockReturnValue(undefined);
 
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -652,7 +656,9 @@ describe("Error Recovery", () => {
     unsub = router.usePlugin(navigationPluginFactory({}, browser));
     await router.start();
 
-    vi.spyOn(router, "navigate").mockRejectedValue(new TypeError("crash"));
+    vi.spyOn(getPluginApi(router), "navigateToState").mockRejectedValue(
+      new TypeError("crash"),
+    );
     vi.spyOn(router, "buildUrl").mockImplementation(() => {
       throw new Error("buildUrl failed");
     });

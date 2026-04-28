@@ -88,14 +88,13 @@ export function createPopstateHandler(
     isTransitioning = true;
 
     try {
-      const route = getRouteFromEvent(evt, deps.api, deps.browser);
+      const matched = getRouteFromEvent(evt, deps.api, deps.browser);
 
-      if (route) {
-        await deps.router.navigate(
-          route.name,
-          route.params,
-          deps.transitionOptions,
-        );
+      if (matched) {
+        // api.navigateToState — plugin-only entry point. Preserves
+        // matchSourceTrailingSlash output and skips the redundant
+        // forwardState/buildPath round-trip (#525).
+        await deps.api.navigateToState(matched, deps.transitionOptions);
       } else if (deps.allowNotFound) {
         deps.router.navigateToNotFound(deps.browser.getLocation());
       } else {
