@@ -69,7 +69,7 @@ describe("serializeRouterState", () => {
     expect(json).toContain(String.raw`\u0026`);
   });
 
-  it("roundtrip: serialize then parse produces RouterStartInput-shaped object", () => {
+  it("roundtrip: serialize then parse preserves name/params/path/context (only transition stripped)", () => {
     const state: State = {
       name: "users.list",
       params: {},

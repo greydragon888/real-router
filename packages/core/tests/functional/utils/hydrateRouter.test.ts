@@ -48,6 +48,28 @@ describe("hydrateRouter", () => {
     expect(router.getState()?.name).toBe("users.list");
   });
 
+  it("accepts a full State object — extra fields are ignored, only path is used", async () => {
+    const fullState: State = {
+      name: "stale.from.server",
+      params: { id: "999" },
+      path: "/users/list",
+      context: { data: "payload" },
+      transition: {
+        phase: "activating",
+        reason: "success",
+        segments: { deactivated: [], activated: [], intersection: "" },
+      },
+    };
+
+    const result = await hydrateRouter(router, fullState);
+
+    // Client re-resolves the path: name/params come from matchPath, NOT from
+    // server's stale State fields. Confirms path-only contract.
+    expect(result.name).toBe("users.list");
+    expect(result.params).toStrictEqual({});
+    expect(result.path).toBe("/users/list");
+  });
+
   it("propagates ROUTE_NOT_FOUND when client cannot match the path", async () => {
     const router2 = createTestRouter({ allowNotFound: false });
 

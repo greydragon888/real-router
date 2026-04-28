@@ -46,9 +46,11 @@ export async function render(
       </RouterProvider>,
     );
 
-    // Hydration payload (#563): server-resolved State (incl. state.context.data
-    // from ssr-data-plugin) — client commits via hydrateRouter without
-    // re-running matchPath/forwardState/buildPath.
+    // Hydration payload (#563): full server-resolved State (incl.
+    // state.context.data from ssr-data-plugin). Client passes it to
+    // hydrateRouter, which extracts state.path and calls router.start(path) —
+    // matchPath/forwardState/buildPath re-run on client; for URL-deterministic
+    // interceptors the result matches the server snapshot.
     return {
       html,
       serializedData: wrapInScript(serializeRouterState(state)),

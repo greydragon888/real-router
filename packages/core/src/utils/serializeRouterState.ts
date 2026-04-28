@@ -18,13 +18,14 @@ import type { State } from "@real-router/types";
  * const html = `<script>window.__SSR_STATE__=${serializeRouterState(state)}</script>`;
  *
  * // Client
- * const state = JSON.parse(window.__SSR_STATE__);
- * await router.start(state);  // or hydrateRouter(router, state)
+ * await hydrateRouter(router, window.__SSR_STATE__);
  * ```
  */
 export function serializeRouterState(state: State): string {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructure to strip transition from the serialized payload
-  const { transition, ...persistent } = state;
-
-  return serializeState(persistent);
+  return serializeState({
+    name: state.name,
+    params: state.params,
+    path: state.path,
+    context: state.context,
+  });
 }
