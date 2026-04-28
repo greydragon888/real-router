@@ -488,7 +488,28 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 - `deriveNavigationType({ reload: true }, toState, undefined) === "replace"`
 - NOT `"reload"` — there is no previous state to reload
 
-**Why it matters:** Documents a subtle asymmetry: requesting reload on the initial navigation silently downgrades to replace. Tooling that pattern-matches `navigationType === "reload"` for cache-busting logic must tolerate the start-time absence. Pinning this in PBT prevents a regression where someone "fixes" the initial-reload case by returning `"reload"` with an undefined `fromState`, which would then confuse plugins that treat reload as "same URL re-entered".
+**Why it matters:** Documents a subtle asymmetry of the **pure function** `deriveNavigationType`. As of #531 the plugin no longer relies on `deriveNavigationType` alone for the first transition — it primes `#capturedMeta` from `navigation.activation.navigationType` in the constructor (see C9). So consumers now see `"reload"` after F5 in production. C8 still pins the pure function's behavior, which serves as the legacy fallback when `navigation.activation` is absent (Chrome 102–122).
+
+---
+
+### C9. Activation Priming on Cross-Document Load (#531)
+**Category:** NavigationMeta
+**Testable:** Example-based
+**Description:** When the plugin constructor runs and `browser.getActivationType()` returns one of `"reload" | "traverse" | "push" | "replace"`, `#capturedMeta` is primed BEFORE `router.start()` is called. The primed meta is consumed by the first `onTransitionStart` (visible in guards) and the first `onTransitionSuccess` (visible in subscribers), then cleared. Subsequent same-document transitions derive meta from `navOptions` as usual.
+
+**Precondition:**
+- Browser exposes `navigation.activation` (Chrome 123+, Firefox 147+, Safari 26.2+)
+- Document was activated by a cross-document navigation (F5, back/forward across page boundary, fresh URL bar entry, external link click)
+
+**Postcondition:**
+- First transition's `state.context.navigation.navigationType` matches `navigation.activation.navigationType`
+- `direction === "forward"` for `"push"`, `"unknown"` otherwise
+- `userInitiated === false` (browser does not expose F5 vs `location.reload()`)
+- Second and later transitions are unaffected — `#capturedMeta` is consumed exactly once
+
+**Fallback:** If `getActivationType()` returns `undefined` (Chrome 102–122, custom mocks, SSR), no priming happens and C8 takes over for the first transition.
+
+**Why it matters:** Restores a contract that the wiki promised but the plugin couldn't deliver: scroll restoration after F5, reload-aware data refetching, traverse-aware analytics. Before this fix the first transition always reported `"replace"`, breaking every consumer that branched on `navigationType` after a cross-document load.
 
 ---
 

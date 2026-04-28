@@ -288,6 +288,8 @@ router.usePlugin(navigationPluginFactory(opts))
         ├── new NavigationPlugin(...)
         │     ├── api.claimContextNamespace("navigation") → stores #claim
         │     ├── Registers start interceptor
+        │     ├── browser.getActivationType() → if defined, primes #capturedMeta
+        │     │     (cross-document load: F5/back-forward/typed URL — see C9)
         │     └── api.extendRouter({buildUrl, matchUrl, replaceHistoryState, ...9 exclusive})
         │           → stores returned unsubscribe as #removeExtensions
         │
