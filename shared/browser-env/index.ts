@@ -50,6 +50,8 @@ export {
   shouldReplaceHistory,
 } from "./plugin-utils.js";
 
+export type { LocationSource, ReplaceStateBrowser } from "./plugin-utils.js";
+
 export { safeParseUrl } from "./url-parsing.js";
 
 export {

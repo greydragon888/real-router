@@ -1,6 +1,3 @@
-import { createUpdateBrowserState } from "./popstate-utils.js";
-
-import type { Browser } from "./types.js";
 import type {
   NavigationOptions,
   Params,
@@ -9,9 +6,25 @@ import type {
 } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
 
+export interface LocationSource {
+  getLocation: () => string;
+}
+
+/**
+ * Minimal browser surface needed by `createReplaceHistoryState`.
+ *
+ * Both `Browser` (History API) and navigation-plugin's `NavigationBrowser`
+ * (Navigation API) satisfy this structurally — the function never needs
+ * `pushState`/`addPopstateListener`, only the replace path.
+ */
+export interface ReplaceStateBrowser {
+  replaceState: (state: unknown, url: string) => void;
+  getHash: () => string;
+}
+
 export function createStartInterceptor(
   api: PluginApi,
-  browser: Browser,
+  browser: LocationSource,
 ): () => void {
   return api.addInterceptor("start", (next, path) =>
     next(path ?? browser.getLocation()),
@@ -21,11 +34,18 @@ export function createStartInterceptor(
 export function createReplaceHistoryState(
   api: PluginApi,
   router: Router,
-  browser: Browser,
+  browser: ReplaceStateBrowser,
   buildUrl: (name: string, params?: Params) => string,
   preserveHash = true,
 ): (name: string, params?: Params) => void {
-  const updateState = createUpdateBrowserState();
+  // Reusable buffer — browsers structured-clone state synchronously inside
+  // replaceState, so the buffer never escapes. Eliminates one allocation per
+  // navigation on the hot path. (Mirrors createUpdateBrowserState.)
+  const buffer = {
+    name: "",
+    params: {} as Params,
+    path: "",
+  };
 
   return (name: string, params: Params = {}) => {
     const state = api.buildState(name, params);
@@ -48,7 +68,11 @@ export function createReplaceHistoryState(
     const hash = preserveHash ? browser.getHash() : "";
     const url = buildUrl(name, params) + hash;
 
-    updateState(builtState, url, true, browser);
+    buffer.name = builtState.name;
+    buffer.params = builtState.params;
+    buffer.path = builtState.path;
+
+    browser.replaceState(buffer, url);
   };
 }
 

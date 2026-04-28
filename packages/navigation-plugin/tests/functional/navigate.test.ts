@@ -420,7 +420,6 @@ describe("createNavigateHandler — direct", () => {
     } as unknown as Parameters<typeof createNavigateHandler>[0]["api"],
     browser: {} as NavigationBrowser,
     isSyncingFromRouter: () => false,
-    setSyncing: vi.fn(),
     setCapturedMeta: vi.fn(),
     base: "",
     transitionOptions: { source: "navigate", replace: true as const },
@@ -676,12 +675,11 @@ describe("Error Recovery", () => {
     consoleSpy.mockRestore();
   });
 
-  it("setSyncing is called during recovery navigate", async () => {
-    const syncLog: boolean[] = [];
-    const mockSyncing = vi.fn((value: boolean) => {
-      syncLog.push(value);
-    });
-
+  it("recovery calls browser.navigate with replace history", async () => {
+    // Recovery delegates URL→state sync to browser.navigate; the syncing flag
+    // is now raised/lowered inside NavigationBrowser around that call (verified
+    // separately in navigation-browser.test.ts → "syncing wrapper"), not by the
+    // navigate handler.
     const mockRouter = {
       isActive: () => true,
       navigate: vi.fn().mockRejectedValue(new TypeError("crash")),
@@ -708,7 +706,6 @@ describe("Error Recovery", () => {
       } as unknown as Parameters<typeof createNavigateHandler>[0]["api"],
       browser: mockBrowser,
       isSyncingFromRouter: () => false,
-      setSyncing: mockSyncing,
       setCapturedMeta: vi.fn(),
       base: "",
       transitionOptions: { source: "navigate", replace: true as const },
@@ -730,9 +727,6 @@ describe("Error Recovery", () => {
 
     await interceptedHandler?.();
 
-    expect(mockSyncing).toHaveBeenCalledWith(true);
-    expect(mockSyncing).toHaveBeenCalledWith(false);
-    expect(syncLog).toStrictEqual([true, false]);
     expect(mockBrowserNavigate).toHaveBeenCalledWith(
       "/",
       expect.objectContaining({ history: "replace" }),
