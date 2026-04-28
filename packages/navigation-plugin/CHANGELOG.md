@@ -1,5 +1,29 @@
 # @real-router/navigation-plugin
 
+## 0.6.3
+
+### Patch Changes
+
+- [#564](https://github.com/greydragon888/real-router/pull/564) [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a) Thanks [@greydragon888](https://github.com/greydragon888)! - Use `api.navigateToState` in the navigate-event handler ([#525](https://github.com/greydragon888/real-router/issues/525))
+
+  `navigate-handler.ts` now hands the `State` produced by `api.matchPath(url)`
+  directly to `api.navigateToState(state, opts)` inside `event.intercept(...)`,
+  instead of re-deconstructing it as
+  `router.navigate(state.name, state.params, opts)`. This avoids running
+  `forwardState` and `buildPath` a second time on the navigate-event hot
+  path, and (most importantly) preserves the trailing slash from the source
+  URL through to `state.path` in `trailingSlash:"preserve"` mode.
+
+  Affected file: `packages/navigation-plugin/src/navigate-handler.ts` —
+  `event.intercept(...)` body now calls `api.navigateToState(matched, …)`.
+
+  No public API change for plugin consumers. Inherits the 5–20% reduction
+  per navigate event ([#525](https://github.com/greydragon888/real-router/issues/525)).
+
+- Updated dependencies [[`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a), [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a), [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a)]:
+  - @real-router/core@0.51.0
+  - @real-router/types@0.35.0
+
 ## 0.6.2
 
 ### Patch Changes

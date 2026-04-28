@@ -7,6 +7,407 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-04-28]
 
+### @real-router/core@0.51.0
+
+### Minor Changes
+
+- [#564](https://github.com/greydragon888/real-router/pull/564) [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a) Thanks [@greydragon888](https://github.com/greydragon888)! - core: SSR hydration helpers — serializeRouterState + hydrateRouter ([#563](https://github.com/greydragon888/real-router/issues/563))
+
+  Two new utilities in `@real-router/core/utils` for the SSR transport layer:
+
+  **`serializeRouterState(state)`** — XSS-safe JSON serialization of a router State for SSR → client transport. Strips `state.transition` (per-navigation `TransitionMeta` — meaningless after hydration; the client's transition is regenerated on commit). Keeps `name`, `params`, `path`, and `context` (so `state.context.<namespace>` payloads from plugin claims survive transport).
+
+  ```ts
+  // Server
+  const state = await router.start(req.url);
+  const html = `<script>window.__SSR_STATE__=${serializeRouterState(state)}</script>`;
+  ```
+
+  **`hydrateRouter(router, source)`** — convenience helper accepting either a JSON string or a `{ path: string }` object. Internally extracts `state.path` and delegates to `router.start(state.path)` — the canonical URL is the source of truth on hydration. No new Router method, no overload of `start()`.
+
+  ```ts
+  // Client
+  declare global {
+    interface Window {
+      __SSR_STATE__?: { path: string };
+    }
+  }
+
+  const router = createAppRouter();
+  router.usePlugin(browserPluginFactory());
+
+  const ssrState = window.__SSR_STATE__;
+  if (ssrState) {
+    await hydrateRouter(router, ssrState);
+  } else {
+    await router.start();
+  }
+  ```
+
+  **Why path-only:** `state.path` is the canonical URL produced by the server's full pipeline. When the client calls `router.start(state.path)`, `matchPath` resolves the same name + params, and (URL-deterministic) `forwardState`/`buildPath` interceptors reproduce identical state. Bypassing those interceptors on hydration would mask non-idempotent interceptor design rather than fix it. The `transition` strip is the only structural concession needed for SSR transport — everything else is application-level data flow.
+
+  For server-side `state.context.<namespace>` payloads (e.g. `ssr-data-plugin`'s `state.context.data`): read them from `window.__SSR_STATE__` directly in app code (data-layer concern: TanStack Query `dehydrate`/`hydrate`, store rehydration, etc.). The router doesn't carry context across hydration — plugins write context on the client during their own lifecycle hooks.
+
+  See `SSR-Hydration` wiki page for the full pattern.
+
+- [#564](https://github.com/greydragon888/real-router/pull/564) [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a) Thanks [@greydragon888](https://github.com/greydragon888)! - Add plugin-only `getPluginApi(router).navigateToState(state, opts)` ([#525](https://github.com/greydragon888/real-router/issues/525))
+
+  New navigation primitive on `PluginApi`: takes a fully-built `State`
+  (typically from `getPluginApi(router).matchPath(url)`) and skips the
+  redundant `forwardState`+`buildPath` round-trip that
+  `router.navigate(name, params)` runs inside `buildNavigateState`. The
+  committed `state.path` is the matched path verbatim, fixing the
+  `trailingSlash:"preserve"` divergence where the URL bar said `/users/`
+  but `state.path` got canonicalized to `/users` ([#525](https://github.com/greydragon888/real-router/issues/525), Q2).
+  - Plugin-only — NOT exposed on the public `Router` or `Navigator`
+    interfaces. Plugin internal hot path, deliberately hidden from userland
+    autocomplete.
+  - `forwardState` and `buildPath` interceptors do NOT run on this path —
+    matchPath already applied `forwardState`, and the URL the user
+    navigated to is the source of truth (no buildPath rewrite). For
+    programmatic navigation that must apply interceptors (e.g.
+    `persistent-params-plugin` injecting query params), use
+    `router.navigate(name, params)` as before.
+  - `getPluginApi(router)` is now WeakMap-cached per router (mirrors
+    `getNavigator`) so `vi.spyOn(getPluginApi(router), "navigateToState")`
+    attaches to the same object the plugin instance holds. Avoids repeated
+    closure-bag allocations.
+  - `start(path)` migrated to commit `matchPath(path)` via the new
+    primitive, sharing the same code path as URL plugin popstate handlers.
+
+  Benchmark on the `popstate-roundtrip.bench.ts` fixtures (Apple silicon,
+  Node 24): `api.navigateToState` is **0.13–0.83 µs faster per call** than
+  the old `router.navigate(matched.name, matched.params)` round-trip across
+  flat / nested-4 / search-params / forwardTo / defaultParams /
+  trailingSlash:"preserve" fixtures (5–20% reduction).
+
+### Patch Changes
+
+- Updated dependencies [[`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a)]:
+  - @real-router/types@0.35.0
+
+### @real-router/memory-plugin@0.4.0
+
+### Minor Changes
+
+- [#564](https://github.com/greydragon888/real-router/pull/564) [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a) Thanks [@greydragon888](https://github.com/greydragon888)! - memory-plugin: snapshot semantics for back/forward via api.navigateToState ([#561](https://github.com/greydragon888/real-router/issues/561))
+
+  `#go(delta)` (used by `router.back()` / `router.forward()` / `router.go()`)
+  now commits the stored State snapshot via
+  `getPluginApi(router).navigateToState(stored, { replace: true })` instead of
+  re-resolving via `router.navigate(entry.name, entry.params)`. This closes
+  the consistency gap with browser-plugin / hash-plugin / navigation-plugin —
+  all four URL-driven plugins now use the same primitive ([#525](https://github.com/greydragon888/real-router/issues/525)).
+
+  **Storage:** `#entries` now holds full `State` objects instead of the
+  internal `HistoryEntry { name, params, path }` shape. Memory cost is
+  roughly +80 bytes per entry; on the default `maxHistoryLength: 1000`
+  budget that is ~80 KB worst case for a saturated buffer. `HistoryEntry`
+  was never exported publicly, so no API breakage.
+
+  **Behavior change** (the reason this is `minor`, not `patch`):
+
+  For consumers with non-idempotent dynamic interceptors or routes mutated
+  between record and replay, back/forward now commits the snapshot stored
+  at original navigation time, not a re-resolved State. Concrete cases:
+  - Dynamic `forwardFn` reading mutable state: stored target wins on back.
+    Re-evaluation of current world state belongs in `canActivate` guards,
+    which still run on every replay.
+  - `routes.update()` / `routes.replace()` between record and replay: the
+    stored entry is immune to post-recording mutations. If the route was
+    removed, `navigateToState` rejects with `ROUTE_NOT_FOUND` and `#go`'s
+    reject handler reverts `#index`.
+  - `defaultParams` callbacks reading mutable state: stored params win.
+  - `buildPath` interceptors do NOT re-fire on back/forward (matches the
+    contract URL plugins already follow post-[#525](https://github.com/greydragon888/real-router/issues/525)).
+
+  **Migration:** consumers who relied on re-resolve semantics — likely
+  empty set — can opt back into re-resolve explicitly:
+
+  ```ts
+  const current = router.getState();
+  await router.navigate(current.name, current.params, { force: true });
+  ```
+
+  Inherited from [#525](https://github.com/greydragon888/real-router/issues/525): 5–20% perf reduction per `back()` / `forward()`
+  (skipped `forwardState` + `buildPath` round-trip in `buildNavigateState`).
+
+  Same-path short-circuit (`entry.path === currentState?.path → skip
+commit, only update direction + historyIndex`, [#508](https://github.com/greydragon888/real-router/issues/508)) is unchanged.
+
+### Patch Changes
+
+- Updated dependencies [[`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a), [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a), [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a)]:
+  - @real-router/core@0.51.0
+  - @real-router/types@0.35.0
+
+### @real-router/preload-plugin@0.4.0
+
+### Minor Changes
+
+- [#564](https://github.com/greydragon888/real-router/pull/564) [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a) Thanks [@greydragon888](https://github.com/greydragon888)! - preload-plugin: cache pre-resolved State on hover, expose via `router.getPreloadedState(href)` ([#562](https://github.com/greydragon888/real-router/issues/562))
+
+  When `mouseover`/`touchstart` resolves an anchor's URL through `router.matchUrl`, the resulting `State` is now cached internally by `href` in a small bounded Map (limit 32, insertion-order eviction). Consumers can read it via the new router extension:
+
+  ```ts
+  const cachedState = router.getPreloadedState?.(anchor.href);
+  if (cachedState) {
+    getPluginApi(router).navigateToState(cachedState, { replace: false });
+  } else {
+    router.navigate(routeName, params);
+  }
+  ```
+
+  **Single-use semantics** — the entry is deleted on read so the consumer never re-uses a stale snapshot. Re-hovering the same anchor repopulates the cache.
+
+  **Snapshot semantics** match `memory-plugin` post-[#561](https://github.com/greydragon888/real-router/issues/561) and URL plugins post-[#525](https://github.com/greydragon888/real-router/issues/525): activation guards still run on commit, but `forwardState`/`buildPath` interceptors do not re-fire (they ran when the cached State was minted via `matchPath`). For consumers relying on dynamic interceptors, fall back to `router.navigate(name, params)`.
+
+  **Cache populated even without `preload` factory** — the State is useful for fast navigation independently of preload.
+
+  **Cleared on `onStop` and `teardown`.** The `getPreloadedState` extension is removed in `teardown`.
+
+  This is a plugin-only change. No framework adapters were modified — apps that want the optimization wrap `<Link>` in a custom `<FastLink>` consumer (recipe in the wiki).
+
+### Patch Changes
+
+- Updated dependencies [[`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a), [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a), [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a)]:
+  - @real-router/core@0.51.0
+  - @real-router/types@0.35.0
+
+### @real-router/types@0.35.0
+
+### Minor Changes
+
+- [#564](https://github.com/greydragon888/real-router/pull/564) [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `PluginApi.navigateToState` type signature ([#525](https://github.com/greydragon888/real-router/issues/525))
+
+  `PluginApi` interface in `@real-router/types` now declares the new
+  `navigateToState(state, options?)` method introduced in `@real-router/core`.
+  This is the typed surface plugin authors interact with via
+  `getPluginApi(router).navigateToState(...)`.
+
+  ```typescript
+  interface PluginApi {
+    navigateToState: (
+      state: State,
+      options?: NavigationOptions,
+    ) => Promise<State>;
+    // ... existing members
+  }
+  ```
+
+  Type-only addition. No runtime behavior change in this package.
+
+### @real-router/validation-plugin@0.7.0
+
+### Minor Changes
+
+- [#564](https://github.com/greydragon888/real-router/pull/564) [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `validateNavigateToStateArgs` validator for `api.navigateToState` ([#525](https://github.com/greydragon888/real-router/issues/525))
+
+  New validator function and `RouterValidator` namespace entry covering the
+  new `getPluginApi(router).navigateToState(state, opts)` primitive:
+  - Rejects `state` that is not an object or is `null` with `TypeError`.
+  - Rejects `state` missing required structural fields (`name`, `params`,
+    `path`) or with wrong types per `isString` / `isParams`.
+
+  Wired through `validationPlugin` so `ctx.validator?.navigation.validateNavigateToStateArgs(state)` is called from the core's `getPluginApi.navigateToState` boundary when the plugin is registered.
+
+  No public API surface change for validation-plugin consumers — the
+  validator is invoked indirectly by core when validation-plugin is active.
+
+### Patch Changes
+
+- Updated dependencies [[`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a), [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a)]:
+  - @real-router/core@0.51.0
+
+### @real-router/angular@0.6.1
+
+### Patch Changes
+
+- Updated dependencies [[`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a), [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a)]:
+  - @real-router/core@0.51.0
+  - @real-router/sources@0.7.3
+  - @real-router/route-utils@0.2.2
+
+### @real-router/browser-plugin@0.16.1
+
+### Patch Changes
+
+- [#564](https://github.com/greydragon888/real-router/pull/564) [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a) Thanks [@greydragon888](https://github.com/greydragon888)! - Use `api.navigateToState` for popstate-driven navigation ([#525](https://github.com/greydragon888/real-router/issues/525))
+
+  The popstate handler now hands the `State` produced by `api.matchPath(url)`
+  directly to `api.navigateToState(state, opts)` instead of re-deconstructing
+  it as `router.navigate(state.name, state.params, opts)`. This avoids
+  running `forwardState` and `buildPath` a second time on the popstate hot
+  path, and (most importantly) preserves the trailing slash from the source
+  URL through to `state.path` in `trailingSlash:"preserve"` mode.
+
+  Affected file: `shared/browser-env/popstate-handler.ts` (consumed via
+  symlink). `getRouteFromEvent` now returns a `State` (built via
+  `api.makeState` from `evt.state` when present, or `api.matchPath`
+  otherwise); the popstate path uses `api.navigateToState` to commit it.
+
+  No public API change for plugin consumers. Inherits the 5–20% reduction
+  per popstate event ([#525](https://github.com/greydragon888/real-router/issues/525)).
+
+- Updated dependencies [[`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a), [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a), [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a)]:
+  - @real-router/core@0.51.0
+  - @real-router/types@0.35.0
+
+### @real-router/hash-plugin@0.6.3
+
+### Patch Changes
+
+- [#564](https://github.com/greydragon888/real-router/pull/564) [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a) Thanks [@greydragon888](https://github.com/greydragon888)! - Use `api.navigateToState` for popstate-driven navigation ([#525](https://github.com/greydragon888/real-router/issues/525))
+
+  The popstate handler now hands the `State` produced by `api.matchPath(url)`
+  directly to `api.navigateToState(state, opts)` instead of re-deconstructing
+  it as `router.navigate(state.name, state.params, opts)`. This avoids
+  running `forwardState` and `buildPath` a second time on the popstate hot
+  path, and (most importantly) preserves the trailing slash from the source
+  URL through to `state.path` in `trailingSlash:"preserve"` mode.
+
+  Affected file: `shared/browser-env/popstate-handler.ts` (shared with
+  `browser-plugin` via symlink). `getRouteFromEvent` now returns a `State`
+  (built via `api.makeState` from `evt.state` when present, or
+  `api.matchPath` otherwise); the popstate path uses `api.navigateToState`
+  to commit it.
+
+  No public API change for plugin consumers. Inherits the 5–20% reduction
+  per popstate event ([#525](https://github.com/greydragon888/real-router/issues/525)).
+
+- Updated dependencies [[`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a), [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a)]:
+  - @real-router/core@0.51.0
+
+### @real-router/lifecycle-plugin@0.4.3
+
+### Patch Changes
+
+- Updated dependencies [[`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a), [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a), [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a)]:
+  - @real-router/core@0.51.0
+  - @real-router/types@0.35.0
+
+### @real-router/logger-plugin@0.5.4
+
+### Patch Changes
+
+- Updated dependencies [[`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a), [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a)]:
+  - @real-router/core@0.51.0
+
+### @real-router/navigation-plugin@0.6.3
+
+### Patch Changes
+
+- [#564](https://github.com/greydragon888/real-router/pull/564) [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a) Thanks [@greydragon888](https://github.com/greydragon888)! - Use `api.navigateToState` in the navigate-event handler ([#525](https://github.com/greydragon888/real-router/issues/525))
+
+  `navigate-handler.ts` now hands the `State` produced by `api.matchPath(url)`
+  directly to `api.navigateToState(state, opts)` inside `event.intercept(...)`,
+  instead of re-deconstructing it as
+  `router.navigate(state.name, state.params, opts)`. This avoids running
+  `forwardState` and `buildPath` a second time on the navigate-event hot
+  path, and (most importantly) preserves the trailing slash from the source
+  URL through to `state.path` in `trailingSlash:"preserve"` mode.
+
+  Affected file: `packages/navigation-plugin/src/navigate-handler.ts` —
+  `event.intercept(...)` body now calls `api.navigateToState(matched, …)`.
+
+  No public API change for plugin consumers. Inherits the 5–20% reduction
+  per navigate event ([#525](https://github.com/greydragon888/real-router/issues/525)).
+
+- Updated dependencies [[`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a), [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a), [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a)]:
+  - @real-router/core@0.51.0
+  - @real-router/types@0.35.0
+
+### @real-router/persistent-params-plugin@0.2.4
+
+### Patch Changes
+
+- Updated dependencies [[`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a), [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a), [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a)]:
+  - @real-router/core@0.51.0
+  - @real-router/types@0.35.0
+
+### @real-router/preact@0.9.1
+
+### Patch Changes
+
+- Updated dependencies [[`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a), [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a)]:
+  - @real-router/core@0.51.0
+  - @real-router/sources@0.7.3
+  - @real-router/route-utils@0.2.2
+
+### @real-router/react@0.22.1
+
+### Patch Changes
+
+- Updated dependencies [[`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a), [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a)]:
+  - @real-router/core@0.51.0
+  - @real-router/sources@0.7.3
+  - @real-router/route-utils@0.2.2
+
+### @real-router/route-utils@0.2.2
+
+### Patch Changes
+
+- Updated dependencies [[`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a)]:
+  - @real-router/types@0.35.0
+
+### @real-router/rx@0.3.4
+
+### Patch Changes
+
+- Updated dependencies [[`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a), [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a)]:
+  - @real-router/core@0.51.0
+
+### @real-router/search-schema-plugin@0.2.5
+
+### Patch Changes
+
+- Updated dependencies [[`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a), [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a)]:
+  - @real-router/core@0.51.0
+
+### @real-router/solid@0.9.1
+
+### Patch Changes
+
+- Updated dependencies [[`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a), [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a)]:
+  - @real-router/core@0.51.0
+  - @real-router/sources@0.7.3
+  - @real-router/route-utils@0.2.2
+
+### @real-router/sources@0.7.3
+
+### Patch Changes
+
+- Updated dependencies [[`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a), [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a)]:
+  - @real-router/core@0.51.0
+  - @real-router/route-utils@0.2.2
+
+### @real-router/ssr-data-plugin@0.3.3
+
+### Patch Changes
+
+- Updated dependencies [[`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a), [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a), [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a)]:
+  - @real-router/core@0.51.0
+  - @real-router/types@0.35.0
+
+### @real-router/svelte@0.8.1
+
+### Patch Changes
+
+- Updated dependencies [[`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a), [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a)]:
+  - @real-router/core@0.51.0
+  - @real-router/sources@0.7.3
+  - @real-router/route-utils@0.2.2
+
+### @real-router/vue@0.10.1
+
+### Patch Changes
+
+- Updated dependencies [[`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a), [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a)]:
+  - @real-router/core@0.51.0
+  - @real-router/sources@0.7.3
+  - @real-router/route-utils@0.2.2
+
+
 ### @real-router/navigation-plugin@0.6.2
 
 ### Patch Changes

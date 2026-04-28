@@ -1,5 +1,28 @@
 # @real-router/types
 
+## 0.35.0
+
+### Minor Changes
+
+- [#564](https://github.com/greydragon888/real-router/pull/564) [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `PluginApi.navigateToState` type signature ([#525](https://github.com/greydragon888/real-router/issues/525))
+
+  `PluginApi` interface in `@real-router/types` now declares the new
+  `navigateToState(state, options?)` method introduced in `@real-router/core`.
+  This is the typed surface plugin authors interact with via
+  `getPluginApi(router).navigateToState(...)`.
+
+  ```typescript
+  interface PluginApi {
+    navigateToState: (
+      state: State,
+      options?: NavigationOptions,
+    ) => Promise<State>;
+    // ... existing members
+  }
+  ```
+
+  Type-only addition. No runtime behavior change in this package.
+
 ## 0.34.1
 
 ### Patch Changes

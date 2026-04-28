@@ -1,5 +1,84 @@
 # @real-router/core
 
+## 0.51.0
+
+### Minor Changes
+
+- [#564](https://github.com/greydragon888/real-router/pull/564) [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a) Thanks [@greydragon888](https://github.com/greydragon888)! - core: SSR hydration helpers — serializeRouterState + hydrateRouter ([#563](https://github.com/greydragon888/real-router/issues/563))
+
+  Two new utilities in `@real-router/core/utils` for the SSR transport layer:
+
+  **`serializeRouterState(state)`** — XSS-safe JSON serialization of a router State for SSR → client transport. Strips `state.transition` (per-navigation `TransitionMeta` — meaningless after hydration; the client's transition is regenerated on commit). Keeps `name`, `params`, `path`, and `context` (so `state.context.<namespace>` payloads from plugin claims survive transport).
+
+  ```ts
+  // Server
+  const state = await router.start(req.url);
+  const html = `<script>window.__SSR_STATE__=${serializeRouterState(state)}</script>`;
+  ```
+
+  **`hydrateRouter(router, source)`** — convenience helper accepting either a JSON string or a `{ path: string }` object. Internally extracts `state.path` and delegates to `router.start(state.path)` — the canonical URL is the source of truth on hydration. No new Router method, no overload of `start()`.
+
+  ```ts
+  // Client
+  declare global {
+    interface Window {
+      __SSR_STATE__?: { path: string };
+    }
+  }
+
+  const router = createAppRouter();
+  router.usePlugin(browserPluginFactory());
+
+  const ssrState = window.__SSR_STATE__;
+  if (ssrState) {
+    await hydrateRouter(router, ssrState);
+  } else {
+    await router.start();
+  }
+  ```
+
+  **Why path-only:** `state.path` is the canonical URL produced by the server's full pipeline. When the client calls `router.start(state.path)`, `matchPath` resolves the same name + params, and (URL-deterministic) `forwardState`/`buildPath` interceptors reproduce identical state. Bypassing those interceptors on hydration would mask non-idempotent interceptor design rather than fix it. The `transition` strip is the only structural concession needed for SSR transport — everything else is application-level data flow.
+
+  For server-side `state.context.<namespace>` payloads (e.g. `ssr-data-plugin`'s `state.context.data`): read them from `window.__SSR_STATE__` directly in app code (data-layer concern: TanStack Query `dehydrate`/`hydrate`, store rehydration, etc.). The router doesn't carry context across hydration — plugins write context on the client during their own lifecycle hooks.
+
+  See `SSR-Hydration` wiki page for the full pattern.
+
+- [#564](https://github.com/greydragon888/real-router/pull/564) [`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a) Thanks [@greydragon888](https://github.com/greydragon888)! - Add plugin-only `getPluginApi(router).navigateToState(state, opts)` ([#525](https://github.com/greydragon888/real-router/issues/525))
+
+  New navigation primitive on `PluginApi`: takes a fully-built `State`
+  (typically from `getPluginApi(router).matchPath(url)`) and skips the
+  redundant `forwardState`+`buildPath` round-trip that
+  `router.navigate(name, params)` runs inside `buildNavigateState`. The
+  committed `state.path` is the matched path verbatim, fixing the
+  `trailingSlash:"preserve"` divergence where the URL bar said `/users/`
+  but `state.path` got canonicalized to `/users` ([#525](https://github.com/greydragon888/real-router/issues/525), Q2).
+  - Plugin-only — NOT exposed on the public `Router` or `Navigator`
+    interfaces. Plugin internal hot path, deliberately hidden from userland
+    autocomplete.
+  - `forwardState` and `buildPath` interceptors do NOT run on this path —
+    matchPath already applied `forwardState`, and the URL the user
+    navigated to is the source of truth (no buildPath rewrite). For
+    programmatic navigation that must apply interceptors (e.g.
+    `persistent-params-plugin` injecting query params), use
+    `router.navigate(name, params)` as before.
+  - `getPluginApi(router)` is now WeakMap-cached per router (mirrors
+    `getNavigator`) so `vi.spyOn(getPluginApi(router), "navigateToState")`
+    attaches to the same object the plugin instance holds. Avoids repeated
+    closure-bag allocations.
+  - `start(path)` migrated to commit `matchPath(path)` via the new
+    primitive, sharing the same code path as URL plugin popstate handlers.
+
+  Benchmark on the `popstate-roundtrip.bench.ts` fixtures (Apple silicon,
+  Node 24): `api.navigateToState` is **0.13–0.83 µs faster per call** than
+  the old `router.navigate(matched.name, matched.params)` round-trip across
+  flat / nested-4 / search-params / forwardTo / defaultParams /
+  trailingSlash:"preserve" fixtures (5–20% reduction).
+
+### Patch Changes
+
+- Updated dependencies [[`a90f9cf`](https://github.com/greydragon888/real-router/commit/a90f9cfb88ac155478fd9a2f628cb4f68258c70a)]:
+  - @real-router/types@0.35.0
+
 ## 0.50.2
 
 ### Patch Changes
