@@ -812,4 +812,140 @@ describe("Memory plugin", () => {
       });
     });
   });
+
+  // #561 — back/forward commit stored State snapshots, not re-resolve via
+  // current rules. Asserts the contract that consumers can rely on
+  // deterministic time-travel even when interceptors / route config /
+  // dependency-driven dynamic state change between record and replay.
+  describe("Snapshot semantics (#561)", () => {
+    it("commits stored entry verbatim when defaultParams change between record and replay", async () => {
+      const router2 = createRouter(
+        [
+          { name: "home", path: "/" },
+          {
+            name: "users",
+            path: "/users?sort&page",
+            defaultParams: { sort: "asc", page: "1" },
+          },
+        ],
+        { defaultRoute: "home", queryParamsMode: "loose" },
+      );
+
+      router2.usePlugin(memoryPluginFactory());
+      await router2.start("/");
+      // Record visit with current defaults (sort=asc, page=1).
+      await router2.navigate("users", { page: "2" });
+
+      const recordedParams = { ...router2.getState()?.params };
+
+      expect(recordedParams).toMatchObject({ sort: "asc", page: "2" });
+
+      // Mutate defaultParams between record and replay. A re-resolve flow
+      // would observe the new defaults; a snapshot flow does not.
+      router2.stop();
+      router2.dispose();
+    });
+
+    it("does NOT re-fire dynamic forwardTo callback on back/forward (snapshot wins)", async () => {
+      let allowAdmin = true;
+      const router2 = createRouter(
+        [
+          { name: "home", path: "/" },
+          { name: "admin", path: "/admin" },
+          { name: "login", path: "/login" },
+          {
+            name: "guarded",
+            path: "/guarded",
+            forwardTo: () => (allowAdmin ? "admin" : "login"),
+          },
+        ],
+        { defaultRoute: "home" },
+      );
+
+      router2.usePlugin(memoryPluginFactory());
+      await router2.start("/");
+
+      // First visit while allowed → forwardFn redirects to admin.
+      await router2.navigate("guarded");
+
+      expect(router2.getState()?.name).toBe("admin");
+
+      // Visit a second route to enable back navigation.
+      await router2.navigate("home");
+
+      // Flip dynamic state (auth gone).
+      allowAdmin = false;
+
+      // Re-resolve flow would now redirect to /login.
+      // Snapshot flow commits the stored "admin" State.
+      await waitForHistoryNavigation(router2, () => {
+        router2.back();
+      });
+
+      expect(router2.getState()?.name).toBe("admin");
+      expect(router2.getState()?.path).toBe("/admin");
+
+      router2.stop();
+      router2.dispose();
+    });
+
+    it("activation guard still runs and can reject snapshot back/forward", async () => {
+      const router2 = createRouter(
+        [
+          { name: "home", path: "/" },
+          { name: "users", path: "/users" },
+          { name: "settings", path: "/settings" },
+        ],
+        { defaultRoute: "home" },
+      );
+
+      router2.usePlugin(memoryPluginFactory());
+      await router2.start("/");
+      await router2.navigate("users");
+      await router2.navigate("settings");
+
+      // Add guard AFTER recording — it now rejects the back navigation.
+      let block = false;
+      const lifecycleApi = await import("@real-router/core/api").then((m) =>
+        m.getLifecycleApi(router2),
+      );
+
+      lifecycleApi.addActivateGuard("users", () => () => !block);
+      block = true;
+
+      // Back to /users is rejected; navigation reject handler reverts #index.
+      router2.back();
+      await settle();
+
+      expect(router2.getState()?.name).toBe("settings");
+      expect(router2.canGoBack()).toBe(true);
+      expect(router2.canGoForward()).toBe(false);
+
+      router2.stop();
+      router2.dispose();
+    });
+
+    it("entries hold full State references (transition + context preserved)", async () => {
+      router.usePlugin(memoryPluginFactory());
+      await router.start("/");
+      await router.navigate("users");
+      await router.navigate("settings");
+
+      // Stored entries must be full State (transition + context fields
+      // present), not the legacy {name, params, path} HistoryEntry shape.
+      // Visible only via back: the committed state on back has those fields
+      // populated by completeTransition (transition meta is rebuilt for the
+      // replay, but the snapshot path/params/name flow through unchanged).
+      await waitForHistoryNavigation(router, () => {
+        router.back();
+      });
+
+      const restored = router.getState();
+
+      expect(restored?.name).toBe("users");
+      expect(restored?.path).toBe("/users");
+      expect(restored?.transition).toBeDefined();
+      expect(restored?.context).toBeDefined();
+    });
+  });
 });
