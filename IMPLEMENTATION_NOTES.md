@@ -2559,3 +2559,71 @@ The original RFC proposed adding `wrapWrite?: (write: () => void) => void` to `c
 
 - `wrapNavigationBrowserWithSyncing` invariants — `packages/navigation-plugin/tests/functional/navigation-browser.test.ts`: 4 mutations × happy path, 4 mutations × throw path (flag clears in `finally`), non-mutation methods bypass the wrap, `currentEntry` getter stays live (not snapshotted).
 - All pre-existing functional + stress tests pass unchanged — observable behavior is identical (222 navigation-plugin, 129 browser-plugin, 84 hash-plugin).
+
+
+## `router.navigateToState(state, opts)` — bypass `buildNavigateState` for plugin-driven navigation (#525)
+
+### Problem
+
+URL plugins (`browser-plugin`, `hash-plugin`, `navigation-plugin`) handle every browser-initiated navigation by:
+
+1. `api.matchPath(url)` — produces a fully-resolved `State` (includes `forwardState`, decoders, source-URL trailing-slash via `matchSourceTrailingSlash`).
+2. `router.navigate(matchedState.name, matchedState.params, opts)` — re-runs `buildNavigateState` (`RouterWiringBuilder.ts:135-156`), which calls `ctx.forwardState` *and* `ctx.buildPath` again inside the navigation pipeline.
+
+The second pass had two costs documented in #525:
+
+- **Perf (Q3)**: 0.4–1.4 µs per browser navigation (1.20×–1.51× factor depending on fixture). Round-trip benchmark in `packages/core/tests/benchmarks/navigation/popstate-roundtrip.bench.ts`.
+- **Correctness (Q2)**: `buildNavigateState` rebuilds `state.path` *without* the source URL, so `trailingSlash:"preserve"` lost the trailing slash on every back/forward / link click. `matchedState.path === "/users/"` but committed `state.path === "/users"`. Confirmed by `packages/core/tests/functional/trailingSlashPreserve.test.ts`.
+
+### Solution
+
+Add `router.navigateToState(state: State, opts?: NavigationOptions): Promise<State>` — a parallel navigation entry point for callers that already hold a fully-resolved `State`. Refactored `NavigationNamespace.navigate` to extract the post-`buildNavigateState` pipeline into `#executeNavigation`; `navigate(name, params)` calls `buildNavigateState` then delegates, `navigateToState(state)` validates the state shape then delegates directly.
+
+URL plugins migrated:
+
+- `packages/navigation-plugin/src/navigate-handler.ts` — `event.intercept(...)` handler now calls `router.navigateToState(matchedState, …)`.
+- `shared/browser-env/popstate-handler.ts` — popstate path uses `router.navigateToState(state, …)`. `getRouteFromEvent` now returns `State | undefined` (synthesizes a State via `api.makeState` when `evt.state` is structurally valid; falls back to `api.matchPath(getLocation())` otherwise).
+
+### Why bypassing `forwardState`/`buildPath` interceptors is correct, not a hack
+
+`matchPath` already runs `forwardState` (`RoutesNamespace.ts:261`, intercepted) once. Re-running it inside `buildNavigateState` is a no-op when forwarding is idempotent (the common case) and *unsafe* when it isn't — a dynamic `forwardFn` reading mutable global state could send the user to a different route than what the URL bar shows. Skipping the second pass is the correctness-preserving choice.
+
+`buildPath` interceptors (`persistent-params-plugin`) do NOT run on this path. For browser-initiated navigation the URL the user actually saw and clicked is the source of truth; transforming it would silently rewrite the URL bar after every back/forward. Programmatic callers (`router.navigate(name, params)`) still see all interceptors — that's the documented asymmetry.
+
+### Trade-offs
+
+- Adds a second navigation entry point. Future invariants on `navigate` must be replicated on `navigateToState`. Mitigated by sharing the post-`buildNavigateState` pipeline (both feed into `#executeNavigation` → `executeGuardPipeline` → `completeTransition`).
+- Plugins relying ONLY on `buildPath` interception (no matching `forwardState` interceptor) would lose effect on browser-initiated navigation. None exist in the monorepo today; `persistent-params-plugin` registers both interceptors with idempotent merge logic, so it is symmetric.
+- `matchPath` returns deeply-frozen states (`freezeStateInPlace`). `completeTransition` mutates `state.transition`, so `navigateToState` clones the input into a writable shell (`{ name, params, path, context: {...} }`) before handing it to the pipeline. One extra allocation per call; still net-negative vs the `buildNavigateState` cost it replaces.
+
+### Measurement
+
+Delta from `popstate-roundtrip.bench.ts` on Apple silicon / Node 24:
+
+| Fixture | matchPath only | `+ navigate` (old) | `+ navigateToState` (new) | new vs old |
+| --- | --- | --- | --- | --- |
+| flat | 2.02 µs | 2.69 µs | 2.44 µs | **−0.25 µs (−9%)** |
+| nested-4 | 2.39 µs | 3.54 µs | 2.90 µs | **−0.64 µs (−18%)** |
+| search-params | 2.90 µs | 4.17 µs | 3.34 µs | **−0.83 µs (−20%)** |
+| forwardTo | 2.06 µs | 2.48 µs | 2.19 µs | **−0.29 µs (−12%)** |
+| defaultParams | 2.55 µs | 3.73 µs | 3.00 µs | **−0.73 µs (−20%)** |
+| trailingSlash:"preserve" | 2.06 µs | 2.66 µs | 2.53 µs | **−0.13 µs (−5%)** |
+
+The biggest wins are on the heavy-params fixtures (search-params, defaultParams) where the redundant `forwardState`/`buildPath` allocations dominate. trailing-slash fixture sees the smallest perf delta but fixes a correctness bug that the slow path could not.
+
+### Test coverage
+
+- `packages/core/tests/functional/navigation/navigateToState.test.ts` — 9 functional tests (happy path, ROUTER_NOT_STARTED / ROUTE_NOT_FOUND / SAME_STATES / guard rejections, UNKNOWN_ROUTE shape, validator-absent fallback).
+- `packages/core/tests/functional/trailingSlashPreserve.test.ts` — 3 pinned contracts: matchPath preserves slash, `navigateToState` propagates it end-to-end, programmatic `router.navigate(name, params)` canonicalizes (documented asymmetry).
+- `packages/core/tests/functional/matchPathInterceptors.test.ts` — Q1 audit pinning the interceptor-application contract.
+- `packages/validation-plugin/tests/functional/navigation.validation.test.ts` — `validateNavigateToStateArgs` (null/string/wrong-field-type rejections, valid state acceptance).
+- 3 plugin functional + stress test suites updated to spy on `router.navigateToState` instead of `router.navigate` in browser-initiated paths.
+
+### Public-API impact
+
+- `Router.navigateToState(state, opts?)`: new public method.
+- `Navigator.navigateToState(state, opts?)`: re-exported on the frozen `getNavigator(router)` snapshot.
+- `RouterValidator.navigation.validateNavigateToStateArgs`: new namespaced validator (state shape).
+- `NavigationOptions`: unchanged.
+
+`@real-router/core` and `@real-router/types` bumped `minor`; `@real-router/validation-plugin` `minor` (matches the typed surface). The three URL plugins are `patch` (internal call-site migration; no API change).

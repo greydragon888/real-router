@@ -371,7 +371,7 @@ describe("Browser Plugin — Popstate", () => {
     it("recovers from critical error in onPopState", async () => {
       const consoleSpy = vi.spyOn(console, "error").mockImplementation(noop);
 
-      vi.spyOn(router, "navigate").mockRejectedValue(
+      vi.spyOn(router, "navigateToState").mockRejectedValue(
         new TypeError("Critical error"),
       );
 
@@ -393,7 +393,7 @@ describe("Browser Plugin — Popstate", () => {
 
       await router.navigate("users.list");
 
-      vi.spyOn(router, "navigate").mockRejectedValue(
+      vi.spyOn(router, "navigateToState").mockRejectedValue(
         new TypeError("Critical navigate error"),
       );
 
@@ -426,7 +426,7 @@ describe("Browser Plugin — Popstate", () => {
 
       await router.navigate("users.list");
 
-      vi.spyOn(router, "navigate").mockRejectedValue(
+      vi.spyOn(router, "navigateToState").mockRejectedValue(
         new TypeError("Critical navigate error"),
       );
 

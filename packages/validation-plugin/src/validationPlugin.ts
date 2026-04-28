@@ -32,6 +32,7 @@ import {
 import {
   validateNavigateArgs,
   validateNavigateToDefaultArgs,
+  validateNavigateToStateArgs,
   validateNavigationOptions,
   validateNavigateParams,
   validateStartArgs,
@@ -253,6 +254,7 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
     navigation: {
       validateNavigateArgs,
       validateNavigateToDefaultArgs,
+      validateNavigateToStateArgs,
       validateNavigationOptions,
       validateParams: validateNavigateParams,
       validateStartArgs,

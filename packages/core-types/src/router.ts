@@ -225,6 +225,10 @@ export interface Navigator {
     routeParams?: Params,
     options?: NavigationOptions,
   ) => Promise<State>;
+  navigateToState: (
+    state: State,
+    options?: NavigationOptions,
+  ) => Promise<State>;
   getState: () => State | undefined;
   isActiveRoute: (
     name: string,
@@ -296,6 +300,11 @@ export interface Router<D extends DefaultDependencies = DefaultDependencies> {
   navigate: (
     routeName: string,
     routeParams?: Params,
+    options?: NavigationOptions,
+  ) => Promise<State>;
+
+  navigateToState: (
+    state: State,
     options?: NavigationOptions,
   ) => Promise<State>;
 

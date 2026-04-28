@@ -1,6 +1,11 @@
 // packages/validation-plugin/src/validators/navigation.ts
 
-import { getTypeDescription, isNavigationOptions, isParams } from "type-guards";
+import {
+  getTypeDescription,
+  isNavigationOptions,
+  isParams,
+  isString,
+} from "type-guards";
 
 import type { NavigationOptions } from "@real-router/core";
 
@@ -16,6 +21,32 @@ export function validateNavigateToDefaultArgs(opts: unknown): void {
   if (opts !== undefined && (typeof opts !== "object" || opts === null)) {
     throw new TypeError(
       `[router.navigateToDefault] Invalid options: ${getTypeDescription(opts)}. Expected NavigationOptions object.`,
+    );
+  }
+}
+
+export function validateNavigateToStateArgs(state: unknown): void {
+  if (typeof state !== "object" || state === null) {
+    throw new TypeError(
+      `[router.navigateToState] Invalid state: ${getTypeDescription(state)}. Expected State object.`,
+    );
+  }
+
+  const candidate = state as { name: unknown; params: unknown; path: unknown };
+
+  if (!isString(candidate.name)) {
+    throw new TypeError(
+      `[router.navigateToState] Invalid state.name: ${getTypeDescription(candidate.name)}. Expected string.`,
+    );
+  }
+  if (!isParams(candidate.params)) {
+    throw new TypeError(
+      `[router.navigateToState] Invalid state.params: ${getTypeDescription(candidate.params)}. Expected plain object.`,
+    );
+  }
+  if (!isString(candidate.path)) {
+    throw new TypeError(
+      `[router.navigateToState] Invalid state.path: ${getTypeDescription(candidate.path)}. Expected string.`,
     );
   }
 }

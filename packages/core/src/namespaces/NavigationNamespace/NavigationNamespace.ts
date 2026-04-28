@@ -98,24 +98,176 @@ export class NavigationNamespace {
     }
 
     let toState: State | undefined;
+
+    try {
+      toState = deps.buildNavigateState(name, params);
+    } catch (error) {
+      /* v8 ignore next 3 -- @preserve: reachable only via validator-driven
+         throws from buildNavigateState (validateStateBuilderArgs) — covered
+         in @real-router/validation-plugin's suite, not in core. */
+      return Promise.reject(error as Error);
+    }
+
+    if (!toState) {
+      deps.emitTransitionError(
+        undefined,
+        deps.getState(),
+        CACHED_ROUTE_NOT_FOUND_ERROR,
+      );
+      this.lastSyncRejected = true;
+
+      return CACHED_ROUTE_NOT_FOUND_REJECTION;
+    }
+
+    return this.#executeNavigation(toState, opts);
+  }
+
+  /**
+   * Navigate to a fully-built `State` directly, skipping `buildNavigateState`
+   * (forwardState + buildPath + meta lookup). Used by URL plugins after they
+   * have already produced a `State` from a browser-initiated event via
+   * `api.matchPath(url)` — see issue #525.
+   *
+   * Semantics vs. `navigate(name, params, opts)`:
+   * - `forwardState` is NOT re-applied. matchPath already runs it; reapplying
+   *   is redundant in the idempotent case and can race in the dynamic case.
+   * - `buildPath` is NOT re-run. The caller's `state.path` is used as-is —
+   *   so `trailingSlash:"preserve"` matchedState paths flow through unchanged
+   *   (closes #525 Q2). `buildPath` interceptors do NOT run; the URL the
+   *   user navigated to is the source of truth for this code path.
+   * - All other pipeline steps run unchanged: SAME_STATES check, FSM
+   *   transition, guards, `subscribeLeave`, `completeTransition`,
+   *   plugin lifecycle hooks.
+   */
+  navigateToState(state: State, opts: NavigationOptions): Promise<State> {
+    this.lastSyncResolved = false;
+    const deps = this.#deps;
+
+    if (!deps.canNavigate()) {
+      this.lastSyncRejected = true;
+
+      return CACHED_NOT_STARTED_REJECTION;
+    }
+
+    // Reject states whose route no longer exists (e.g. the route tree was
+    // mutated between matchPath and navigateToState). UNKNOWN_ROUTE is
+    // structurally legal — it is the navigateToNotFound output shape.
+    if (state.name !== constants.UNKNOWN_ROUTE && !deps.hasRoute(state.name)) {
+      const err = new RouterError(errorCodes.ROUTE_NOT_FOUND, {
+        routeName: state.name,
+      });
+
+      deps.emitTransitionError(undefined, deps.getState(), err);
+      this.lastSyncRejected = true;
+
+      return Promise.reject(err);
+    }
+
+    // States from `matchPath` are deeply frozen (`freezeStateInPlace`).
+    // `completeTransition` mutates `toState.transition` and `context` is
+    // intentionally extensible for plugin claim writes, so we hand the
+    // pipeline a writable shell — same shape `makeState(skipFreeze=true)`
+    // produces. `params` stays referentially shared (already frozen).
+    // `transition` is omitted so completeTransition can assign it.
+    const writableState = {
+      name: state.name,
+      params: state.params,
+      path: state.path,
+      context: { ...state.context },
+    } as State;
+
+    return this.#executeNavigation(writableState, opts);
+  }
+
+  navigateToDefault(opts: NavigationOptions): Promise<State> {
+    const deps = this.#deps;
+    const options = deps.getOptions();
+
+    if (!options.defaultRoute) {
+      return Promise.reject(
+        new RouterError(errorCodes.ROUTE_NOT_FOUND, {
+          routeName: "defaultRoute not configured",
+        }),
+      );
+    }
+
+    let route: string;
+    let params: Params;
+
+    try {
+      ({ route, params } = deps.resolveDefault());
+    } catch (error) {
+      return Promise.reject(error as Error);
+    }
+
+    if (!route) {
+      return Promise.reject(
+        new RouterError(errorCodes.ROUTE_NOT_FOUND, {
+          routeName: "defaultRoute resolved to empty",
+        }),
+      );
+    }
+
+    return this.navigate(route, params, opts);
+  }
+
+  navigateToNotFound(path: string): State {
+    this.#abortPreviousNavigation();
+
+    const fromState = this.#deps.getState();
+    const deactivated: string[] = fromState
+      ? nameToIDs(fromState.name).toReversed()
+      : [];
+
+    Object.freeze(deactivated);
+
+    const segments: TransitionMeta["segments"] = {
+      deactivated,
+      activated: FROZEN_ACTIVATED,
+      intersection: "",
+    };
+
+    Object.freeze(segments);
+
+    const transitionMeta: TransitionMeta = {
+      phase: "activating",
+      ...(fromState && { from: fromState.name }),
+      reason: "success",
+      segments,
+    };
+
+    Object.freeze(transitionMeta);
+
+    const state: State = {
+      name: constants.UNKNOWN_ROUTE,
+      params: EMPTY_PARAMS as Params,
+      path,
+      transition: transitionMeta,
+      context: {},
+    };
+
+    Object.freeze(state);
+
+    this.#deps.setState(state);
+    this.#deps.emitTransitionSuccess(state, fromState, FROZEN_REPLACE_OPTS);
+
+    return state;
+  }
+
+  abortCurrentNavigation(): void {
+    this.#currentController?.abort(
+      new RouterError(errorCodes.TRANSITION_CANCELLED),
+    );
+    this.#currentController = null;
+  }
+
+  #executeNavigation(toState: State, opts: NavigationOptions): Promise<State> {
+    const deps = this.#deps;
     let fromState: State | undefined;
     let transitionStarted = false;
     let controller: AbortController | null = null;
 
     try {
-      toState = deps.buildNavigateState(name, params);
-
-      if (!toState) {
-        deps.emitTransitionError(
-          undefined,
-          deps.getState(),
-          CACHED_ROUTE_NOT_FOUND_ERROR,
-        );
-        this.lastSyncRejected = true;
-
-        return CACHED_ROUTE_NOT_FOUND_REJECTION;
-      }
-
       fromState = deps.getState();
       opts = forceReplaceFromUnknown(opts, fromState);
 
@@ -254,88 +406,6 @@ export class NavigationNamespace {
 
       return Promise.reject(error as Error);
     }
-  }
-
-  navigateToDefault(opts: NavigationOptions): Promise<State> {
-    const deps = this.#deps;
-    const options = deps.getOptions();
-
-    if (!options.defaultRoute) {
-      return Promise.reject(
-        new RouterError(errorCodes.ROUTE_NOT_FOUND, {
-          routeName: "defaultRoute not configured",
-        }),
-      );
-    }
-
-    let route: string;
-    let params: Params;
-
-    try {
-      ({ route, params } = deps.resolveDefault());
-    } catch (error) {
-      return Promise.reject(error as Error);
-    }
-
-    if (!route) {
-      return Promise.reject(
-        new RouterError(errorCodes.ROUTE_NOT_FOUND, {
-          routeName: "defaultRoute resolved to empty",
-        }),
-      );
-    }
-
-    return this.navigate(route, params, opts);
-  }
-
-  navigateToNotFound(path: string): State {
-    this.#abortPreviousNavigation();
-
-    const fromState = this.#deps.getState();
-    const deactivated: string[] = fromState
-      ? nameToIDs(fromState.name).toReversed()
-      : [];
-
-    Object.freeze(deactivated);
-
-    const segments: TransitionMeta["segments"] = {
-      deactivated,
-      activated: FROZEN_ACTIVATED,
-      intersection: "",
-    };
-
-    Object.freeze(segments);
-
-    const transitionMeta: TransitionMeta = {
-      phase: "activating",
-      ...(fromState && { from: fromState.name }),
-      reason: "success",
-      segments,
-    };
-
-    Object.freeze(transitionMeta);
-
-    const state: State = {
-      name: constants.UNKNOWN_ROUTE,
-      params: EMPTY_PARAMS as Params,
-      path,
-      transition: transitionMeta,
-      context: {},
-    };
-
-    Object.freeze(state);
-
-    this.#deps.setState(state);
-    this.#deps.emitTransitionSuccess(state, fromState, FROZEN_REPLACE_OPTS);
-
-    return state;
-  }
-
-  abortCurrentNavigation(): void {
-    this.#currentController?.abort(
-      new RouterError(errorCodes.TRANSITION_CANCELLED),
-    );
-    this.#currentController = null;
   }
 
   async #finishAsyncNavigation(

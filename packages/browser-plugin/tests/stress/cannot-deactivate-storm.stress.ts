@@ -88,7 +88,7 @@ describe("B4 — Cannot Deactivate Storm", () => {
   it("4.3 — async guard (TypeError) × 50 popstate: recoverFromCriticalError calls replaceState", async () => {
     const replaceStateSpy = vi.spyOn(browser, "replaceState");
 
-    vi.spyOn(router, "navigate").mockRejectedValue(
+    vi.spyOn(router, "navigateToState").mockRejectedValue(
       new TypeError("Guard throws"),
     );
 
@@ -104,7 +104,7 @@ describe("B4 — Cannot Deactivate Storm", () => {
   it("4.4 — critical error in recovery × 20: console.error logged, no unhandled exceptions", async () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(noop);
 
-    vi.spyOn(router, "navigate").mockRejectedValue(
+    vi.spyOn(router, "navigateToState").mockRejectedValue(
       new TypeError("Navigate throws"),
     );
     vi.spyOn(router, "buildPath").mockImplementation(() => {

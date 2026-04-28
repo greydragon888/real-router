@@ -337,7 +337,9 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
     it("logs critical error when navigate throws non-RouterError", async () => {
       const consoleSpy = vi.spyOn(console, "error").mockImplementation(noop);
 
-      vi.spyOn(router, "navigate").mockRejectedValue(
+      // popstate-handler now uses router.navigateToState (#525);
+      // mock that path to surface a non-RouterError into the recovery branch.
+      vi.spyOn(router, "navigateToState").mockRejectedValue(
         new TypeError("Critical error"),
       );
 
@@ -359,7 +361,7 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
 
       await router.navigate("users.list");
 
-      vi.spyOn(router, "navigate").mockRejectedValue(
+      vi.spyOn(router, "navigateToState").mockRejectedValue(
         new TypeError("Critical navigate error"),
       );
 
@@ -394,7 +396,7 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
 
       await router.navigate("users.list");
 
-      vi.spyOn(router, "navigate").mockRejectedValue(
+      vi.spyOn(router, "navigateToState").mockRejectedValue(
         new TypeError("Critical navigate error"),
       );
 

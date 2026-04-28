@@ -290,6 +290,7 @@ export class Router<
 
     // Navigation
     this.navigate = this.navigate.bind(this);
+    this.navigateToState = this.navigateToState.bind(this);
     this.navigateToDefault = this.navigateToDefault.bind(this);
     this.navigateToNotFound = this.navigateToNotFound.bind(this);
 
@@ -579,6 +580,48 @@ export class Router<
       this.#navigation.lastSyncResolved = false;
     } else if (this.#navigation.lastSyncRejected) {
       // Cached rejection — already pre-suppressed at module load, skip .catch()
+      this.#navigation.lastSyncRejected = false;
+    } else {
+      Router.#suppressUnhandledRejection(promiseState);
+    }
+
+    return promiseState;
+  }
+
+  /**
+   * Navigate to a fully-built `State`, skipping `forwardState` + `buildPath`.
+   * Designed for URL plugins that already produced a `State` via
+   * `getPluginApi(router).matchPath(url)` and would otherwise pay the cost of
+   * `router.navigate(name, params)` re-running the same pipeline (#525).
+   *
+   * Trade-offs vs `navigate(name, params)`:
+   * - `forwardState` interceptors do NOT run a second time (matchPath already
+   *   applied them). Side effects of dynamic forwardFn callbacks executed
+   *   during matchPath are preserved verbatim — bypassing a second execution
+   *   is the correctness-preserving choice for browser-initiated navigation.
+   * - `buildPath` interceptors do NOT run. The provided `state.path` is the
+   *   source of truth. This is what matchPath returned (with
+   *   `trailingSlash:"preserve"` honoured), and what the URL bar shows for
+   *   plugin-driven flows.
+   * - All other pipeline steps run unchanged.
+   */
+  navigateToState(state: State, options?: NavigationOptions): Promise<State> {
+    const ctx = getInternals(this);
+
+    ctx.validator?.navigation.validateNavigateToStateArgs(state);
+
+    const opts = options ?? EMPTY_OPTS;
+
+    ctx.validator?.navigation.validateNavigationOptions(
+      opts,
+      "navigateToState",
+    );
+
+    const promiseState = this.#navigation.navigateToState(state, opts);
+
+    if (this.#navigation.lastSyncResolved) {
+      this.#navigation.lastSyncResolved = false;
+    } else if (this.#navigation.lastSyncRejected) {
       this.#navigation.lastSyncRejected = false;
     } else {
       Router.#suppressUnhandledRejection(promiseState);

@@ -331,7 +331,7 @@ describe("Browser-env Properties", () => {
       ],
       { numRuns: NUM_RUNS.standard },
     )(
-      "extracts name and params from valid history.state",
+      "synthesizes a State from valid history.state via api.makeState",
       (name: string, params: Params) => {
         const validState = { name, params, path: "/test" };
         const evt = createMockPopStateEvent(validState);
@@ -340,7 +340,10 @@ describe("Browser-env Properties", () => {
 
         const result = getRouteFromEvent(evt, api, browser);
 
-        expect(result).toStrictEqual({ name, params });
+        // Returns a State produced by api.makeState (#525). Source-of-truth
+        // fields (name, params, path) come from history.state; the rest are
+        // populated by the mock makeState.
+        expect(result).toMatchObject({ name, params, path: "/test" });
       },
     );
   });
@@ -366,7 +369,8 @@ describe("Browser-env Properties", () => {
 
         const result = getRouteFromEvent(evt, api, browser);
 
-        expect(result).toStrictEqual({ name, params });
+        // matchPath's mock returns a full State; assert structural fields.
+        expect(result).toMatchObject({ name, params, path: "/matched" });
       },
     );
   });

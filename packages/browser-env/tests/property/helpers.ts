@@ -172,7 +172,29 @@ export function createSpyBrowser(): SpyBrowser {
 export function createMockPluginApi(
   matchResult: { name: string; params: Params } | undefined,
 ): PluginApi {
-  return { matchPath: () => matchResult } as unknown as PluginApi;
+  // popstate-utils now synthesizes a State via api.makeState when evt.state
+  // is structurally valid (#525), and matchPath now returns a full State as
+  // well. The mock surfaces both shapes so getRouteFromEvent can produce a
+  // structurally-correct State on either branch.
+  return {
+    matchPath: () =>
+      matchResult
+        ? {
+            name: matchResult.name,
+            params: matchResult.params,
+            path: "/matched",
+            transition: STUB_TRANSITION,
+            context: {},
+          }
+        : undefined,
+    makeState: (name: string, params: Params, path: string) => ({
+      name,
+      params,
+      path,
+      transition: STUB_TRANSITION,
+      context: {},
+    }),
+  } as unknown as PluginApi;
 }
 
 export function createMockPopStateEvent(state: unknown): PopStateEvent {

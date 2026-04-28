@@ -48,6 +48,15 @@ function exerciseRoundtrip(fixture: Fixture, i: number): void {
   }
 }
 
+function exerciseRoundtripFast(fixture: Fixture, i: number): void {
+  const url = fixture.urls[i % fixture.urls.length];
+  const matched = getPluginApi(fixture.router).matchPath(url);
+
+  if (matched) {
+    do_not_optimize(void fixture.router.navigateToState(matched));
+  }
+}
+
 function exerciseMatchOnly(fixture: Fixture, i: number): void {
   const url = fixture.urls[i % fixture.urls.length];
 
@@ -99,6 +108,27 @@ boxplot(() => {
 
       bench("flat: matchPath + navigate (round-trip)", () => {
         exerciseRoundtrip(fixture, i++);
+      }).gc("inner");
+    }
+
+    {
+      const routes: Route[] = [
+        { name: "home", path: "/" },
+        { name: "about", path: "/about" },
+        { name: "users", path: "/users" },
+      ];
+      const router = createRouter(routes);
+
+      void router.start("/");
+
+      const fixture: Fixture = {
+        router,
+        urls: ["/", "/about", "/users"] as const,
+      };
+      let i = 0;
+
+      bench("flat: matchPath + navigateToState (#525 fast path)", () => {
+        exerciseRoundtripFast(fixture, i++);
       }).gc("inner");
     }
   });
@@ -167,6 +197,19 @@ boxplot(() => {
         exerciseRoundtrip(fixture, i++);
       }).gc("inner");
     }
+
+    {
+      const router = buildNestedRouter();
+
+      void router.start("/app/users/1/settings");
+
+      const fixture: Fixture = { router, urls };
+      let i = 0;
+
+      bench("nested-4: matchPath + navigateToState (#525 fast path)", () => {
+        exerciseRoundtripFast(fixture, i++);
+      }).gc("inner");
+    }
   });
 });
 
@@ -211,6 +254,22 @@ boxplot(() => {
         exerciseRoundtrip(fixture, i++);
       }).gc("inner");
     }
+
+    {
+      const router = createRouter(routes, { queryParamsMode: "loose" });
+
+      void router.start("/");
+
+      const fixture: Fixture = { router, urls };
+      let i = 0;
+
+      bench(
+        "search-params: matchPath + navigateToState (#525 fast path)",
+        () => {
+          exerciseRoundtripFast(fixture, i++);
+        },
+      ).gc("inner");
+    }
   });
 });
 
@@ -251,6 +310,19 @@ boxplot(() => {
 
       bench("forwardTo: matchPath + navigate (round-trip)", () => {
         exerciseRoundtrip(fixture, i++);
+      }).gc("inner");
+    }
+
+    {
+      const router = createRouter(routes);
+
+      void router.start("/");
+
+      const fixture: Fixture = { router, urls };
+      let i = 0;
+
+      bench("forwardTo: matchPath + navigateToState (#525 fast path)", () => {
+        exerciseRoundtripFast(fixture, i++);
       }).gc("inner");
     }
   });
@@ -301,6 +373,22 @@ boxplot(() => {
         exerciseRoundtrip(fixture, i++);
       }).gc("inner");
     }
+
+    {
+      const router = createRouter(routes, { queryParamsMode: "loose" });
+
+      void router.start("/");
+
+      const fixture: Fixture = { router, urls };
+      let i = 0;
+
+      bench(
+        "defaultParams: matchPath + navigateToState (#525 fast path)",
+        () => {
+          exerciseRoundtripFast(fixture, i++);
+        },
+      ).gc("inner");
+    }
   });
 });
 
@@ -341,6 +429,22 @@ boxplot(() => {
       bench("trailingSlash-preserve: matchPath + navigate (round-trip)", () => {
         exerciseRoundtrip(fixture, i++);
       }).gc("inner");
+    }
+
+    {
+      const router = createRouter(routes, { trailingSlash: "preserve" });
+
+      void router.start("/");
+
+      const fixture: Fixture = { router, urls };
+      let i = 0;
+
+      bench(
+        "trailingSlash-preserve: matchPath + navigateToState (#525 fast path)",
+        () => {
+          exerciseRoundtripFast(fixture, i++);
+        },
+      ).gc("inner");
     }
   });
 });

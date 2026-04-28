@@ -51,6 +51,7 @@ describe("useNavigator composable", () => {
       "isActiveRoute",
       "isLeaveApproved",
       "navigate",
+      "navigateToState",
       "subscribe",
       "subscribeLeave",
     ]);

@@ -1,4 +1,5 @@
 import { errorCodes } from "@real-router/core";
+import { getPluginApi } from "@real-router/core/api";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import { createValidationRouter } from "../helpers";
@@ -159,6 +160,66 @@ describe("navigation validation — with validationPlugin", () => {
       expect(() => raw.navigateToDefault("invalid")).toThrow(
         /navigateToDefault/,
       );
+    });
+  });
+
+  describe("navigateToState() state shape validation", () => {
+    it("should throw TypeError when state is null", () => {
+      const raw = router as unknown as {
+        navigateToState: (s: unknown) => Promise<unknown>;
+      };
+
+      expect(() => raw.navigateToState(null)).toThrow(
+        /\[router\.navigateToState\] Invalid state/,
+      );
+    });
+
+    it("should throw TypeError when state is a string", () => {
+      const raw = router as unknown as {
+        navigateToState: (s: unknown) => Promise<unknown>;
+      };
+
+      expect(() => raw.navigateToState("foo")).toThrow(
+        /Invalid state.*Expected State object/,
+      );
+    });
+
+    it("should throw TypeError when state.name is not a string", () => {
+      const raw = router as unknown as {
+        navigateToState: (s: unknown) => Promise<unknown>;
+      };
+
+      expect(() =>
+        raw.navigateToState({ name: 42, params: {}, path: "/" }),
+      ).toThrow(/Invalid state\.name/);
+    });
+
+    it("should throw TypeError when state.params is not a plain object", () => {
+      const raw = router as unknown as {
+        navigateToState: (s: unknown) => Promise<unknown>;
+      };
+
+      expect(() =>
+        raw.navigateToState({ name: "users", params: "qux", path: "/users" }),
+      ).toThrow(/Invalid state\.params/);
+    });
+
+    it("should throw TypeError when state.path is not a string", () => {
+      const raw = router as unknown as {
+        navigateToState: (s: unknown) => Promise<unknown>;
+      };
+
+      expect(() =>
+        raw.navigateToState({ name: "users", params: {}, path: 9 }),
+      ).toThrow(/Invalid state\.path/);
+    });
+
+    it("should accept a structurally valid state and not throw", async () => {
+      // matchPath via plugin API — validation-plugin doesn't add buildUrl/matchUrl.
+      const matched = getPluginApi(router).matchPath("/users");
+
+      expect(matched).toBeDefined();
+      await expect(router.navigateToState(matched!)).resolves.toBeDefined();
     });
   });
 });
