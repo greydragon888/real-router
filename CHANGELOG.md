@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-04-28]
 
+### @real-router/navigation-plugin@0.6.1
+
+### Patch Changes
+
+- [#557](https://github.com/greydragon888/real-router/pull/557) [`b85dbb3`](https://github.com/greydragon888/real-router/commit/b85dbb3e4b066674d1726e4447de2e040dcdd81d) Thanks [@greydragon888](https://github.com/greydragon888)! - Report `navigationType` correctly after cross-document load ([#531](https://github.com/greydragon888/real-router/issues/531))
+
+  After F5 (`location.reload()`), browser back/forward across the JS context boundary, or a fresh URL bar entry, the plugin used to emit the initial transition with `state.context.navigation.navigationType === "replace"` regardless of how the document was actually loaded. The fallback in `onTransitionSuccess` derived the type only from `navOptions`, which always resolves to `"replace"` on the very first transition.
+
+  The plugin now reads `navigation.activation.navigationType` ([Baseline 2026](https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-navigationactivation-navigationtype): Chrome 123+, Edge 123+, Firefox 147+, Safari 26.2+) in its constructor and primes `state.context.navigation` for the first transition. Affected types correctly reported now: `"reload"`, `"traverse"` (cross-document back/forward), `"push"` (typed URL / external link), `"replace"`. On browsers without `navigation.activation` the plugin falls back to the existing derivation.
+
+  Fixes scroll position restoration after F5 in `createScrollRestoration` (`shared/dom-utils/scroll-restore.ts`) — the `"reload"` branch is now reachable end-to-end, not just under synthetic fake-router tests.
+
+  The new `NavigationBrowser.getActivationType()` method has a no-op SSR fallback returning `undefined`.
+
+
 ### @real-router/angular@0.6.0
 
 ### Minor Changes
