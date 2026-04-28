@@ -10,7 +10,7 @@ export function Home(): JSX.Element {
       <h1>Home</h1>
       <p>Welcome to the Real-Router legacy-entry example.</p>
       <p>
-        Current route: <strong>{route?.name ?? "—"}</strong>
+        Current route: <strong>{route.name}</strong>
       </p>
       <p>
         This app uses <code>@real-router/react/legacy</code> — no{" "}

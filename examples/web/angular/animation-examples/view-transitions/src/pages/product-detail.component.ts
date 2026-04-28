@@ -47,7 +47,7 @@ export class ProductDetailComponent {
   private readonly state = injectRoute<{ id: string }>();
 
   readonly id = computed(() => {
-    const params = this.state.routeState().route?.params;
+    const params = this.state.routeState().route.params;
     return typeof params?.id === "string" ? params.id : "1";
   });
 

@@ -99,7 +99,7 @@ describe("inject functions", () => {
         const route = injectRoute();
 
         expect(route.navigator).toBe(getNavigator(router));
-        expect(route.routeState().route?.name).toBe("home");
+        expect(route.routeState().route.name).toBe("home");
       });
     });
 
@@ -115,6 +115,24 @@ describe("inject functions", () => {
       }).toThrow("injectRoute must be used within a provideRealRouter context");
     });
 
+    it("throws a clear error if router has not started yet", () => {
+      const unstartedRouter = createRouter(routes);
+
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [provideRealRouter(unstartedRouter)],
+      });
+      const injector = TestBed.inject(Injector);
+
+      expect(() => {
+        runInInjectionContext(injector, () => {
+          injectRoute();
+        });
+      }).toThrow(
+        /injectRoute called with no active route\. Did you forget to await router\.start\(\) before rendering, or is the router stopped\/disposed\?/,
+      );
+    });
+
     it("propagates generic params type without runtime change", () => {
       type TypedParams = { id: string; tab: string } & Params;
 
@@ -122,10 +140,9 @@ describe("inject functions", () => {
 
       runInInjectionContext(injector, () => {
         const route = injectRoute<TypedParams>();
-        const params: TypedParams | undefined =
-          route.routeState().route?.params;
+        const params: TypedParams = route.routeState().route.params;
 
-        expect(route.routeState().route?.name).toBe("home");
+        expect(route.routeState().route.name).toBe("home");
         expect(params).toBeDefined();
       });
     });

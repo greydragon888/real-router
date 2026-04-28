@@ -22,7 +22,7 @@ export function QueryDemo() {
   useRouteAnimation(ref, { entryClass: "fade-in", exitClass: "fade-out" });
 
   const { route } = useRoute<{ filter?: Filter }>();
-  const filter = route?.params.filter ?? "all";
+  const filter = route.params.filter ?? "all";
 
   const visible = useMemo(() => {
     return filter === "all"

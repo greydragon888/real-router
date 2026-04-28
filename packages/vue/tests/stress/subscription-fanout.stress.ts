@@ -89,9 +89,10 @@ describe("subscription-fanout stress tests (Vue)", () => {
         const { route } = useRoute();
 
         return () => {
-          if (route.value) {
-            routeRenders++;
-          }
+          // Read .value to register the watch dependency.
+          // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+          route.value;
+          routeRenders++;
 
           return h("div");
         };

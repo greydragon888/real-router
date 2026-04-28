@@ -1,8 +1,8 @@
 import { useState } from "preact/hooks";
 
-import { api } from "../../../../shared/api";
+import { api } from "../../../../../shared/api";
 
-import type { User } from "../../../../shared/api";
+import type { User } from "../../../../../shared/api";
 import type { JSX } from "preact";
 
 interface LoginProps {

@@ -2,8 +2,8 @@ import { createRouter, errorCodes } from "@real-router/core";
 import { getDependenciesApi, getRoutesApi } from "@real-router/core/api";
 import { afterEach, describe, it, expect } from "vitest";
 
-import { defineAbilities } from "../../../shared/abilities";
-import { store } from "../../../shared/store";
+import { defineAbilities } from "../../../../shared/abilities";
+import { store } from "../../../../shared/store";
 import { publicRoutes, privateRoutes } from "../src/routes";
 
 import type { AppDependencies } from "../src/types";

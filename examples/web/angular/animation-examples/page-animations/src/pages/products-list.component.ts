@@ -88,7 +88,7 @@ export class ProductsListComponent {
   readonly list = viewChild<ElementRef<HTMLUListElement>>("list");
 
   readonly sort = computed<SortDirection>(() => {
-    const params = this.state.routeState().route?.params;
+    const params = this.state.routeState().route.params;
     return params?.["sort"] === "desc" ? "desc" : "asc";
   });
 

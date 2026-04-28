@@ -1,8 +1,8 @@
 import { useSyncExternalStore } from "react";
 
-import { store } from "../../../../shared/store";
+import { store } from "../../../../../shared/store";
 
-import type { User } from "../../../../shared/api";
+import type { User } from "../../../../../shared/api";
 import type { JSX } from "react";
 
 interface DashboardProps {
@@ -10,7 +10,10 @@ interface DashboardProps {
 }
 
 export function Dashboard({ onLogout }: DashboardProps): JSX.Element {
-  const user = useSyncExternalStore(store.subscribe, () => store.get("user"));
+  const user = useSyncExternalStore(
+    store.subscribe,
+    () => store.get("user") as User | null,
+  );
 
   return (
     <div>

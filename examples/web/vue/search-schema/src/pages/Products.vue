@@ -5,7 +5,7 @@ import { computed } from "vue";
 const { route } = useRoute();
 const navigator = useNavigator();
 
-const params = computed(() => route.value?.params ?? {});
+const params = computed(() => route.value.params);
 const query = computed(() => (params.value.q as string | undefined) ?? "");
 const page = computed(() => (params.value.page as number | undefined) ?? 1);
 const sort = computed(

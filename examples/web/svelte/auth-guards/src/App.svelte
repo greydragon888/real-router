@@ -11,10 +11,10 @@
   import Services from "./pages/Services.svelte";
   import Contacts from "./pages/Contacts.svelte";
   import { publicRoutes, privateRoutes } from "./routes";
-  import { defineAbilities } from "../../../shared/abilities";
-  import { store } from "../../../shared/store";
+  import { defineAbilities } from "../../../../shared/abilities";
+  import { store } from "../../../../shared/store";
 
-  import type { User } from "../../../shared/api";
+  import type { User } from "../../../../shared/api";
   import type { AppDependencies } from "./types";
 
   let { router }: { router: Router<AppDependencies> } = $props();

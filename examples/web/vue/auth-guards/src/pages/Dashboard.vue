@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, shallowRef } from "vue";
-import { store } from "../../../../shared/store";
+import { store } from "../../../../../shared/store";
 
-import type { User } from "../../../../shared/api";
+import type { User } from "../../../../../shared/api";
 
 const emit = defineEmits<{
   logout: [];

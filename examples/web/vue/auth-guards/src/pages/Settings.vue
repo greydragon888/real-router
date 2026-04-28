@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onUnmounted, ref, watch, watchEffect } from "vue";
 import { useNavigator } from "@real-router/vue";
-import { store } from "../../../../shared/store";
+import { store } from "../../../../../shared/store";
 
 const displayName = ref("");
 const navigator = useNavigator();

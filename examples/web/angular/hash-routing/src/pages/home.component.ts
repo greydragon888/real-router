@@ -17,7 +17,7 @@ import { injectRoute } from "@real-router/angular";
       </p>
       <p>
         Current route:
-        <strong>{{ routeState().route?.name ?? "—" }}</strong>
+        <strong>{{ routeState().route.name }}</strong>
       </p>
       <p>
         Current URL hash:

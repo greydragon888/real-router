@@ -80,7 +80,7 @@ export class ProductsListComponent {
   private readonly state = injectRoute<{ sort?: SortDirection }>();
 
   readonly sort = computed<SortDirection>(() => {
-    const params = this.state.routeState().route?.params;
+    const params = this.state.routeState().route.params;
     return params?.["sort"] === "desc" ? "desc" : "asc";
   });
 

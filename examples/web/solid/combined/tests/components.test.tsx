@@ -4,8 +4,8 @@ import { RouterProvider } from "@real-router/solid";
 import { render, screen, cleanup } from "@solidjs/testing-library";
 import { afterEach, describe, it, expect } from "vitest";
 
-import { defineAbilities } from "../../../shared/abilities";
-import { store } from "../../../shared/store";
+import { defineAbilities } from "../../../../shared/abilities";
+import { store } from "../../../../shared/store";
 import { App } from "../src/App";
 import { lifecyclePluginFactory } from "@real-router/lifecycle-plugin";
 import { publicRoutes, privateRoutes } from "../src/routes";

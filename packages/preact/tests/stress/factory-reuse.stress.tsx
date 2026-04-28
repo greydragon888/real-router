@@ -89,7 +89,7 @@ describe("preact — factory reuse: 100 router instances, all disposed", () => {
     const ProbeA: FunctionComponent = () => {
       const { route } = useRoute();
 
-      lastFromA = route?.name ?? "";
+      lastFromA = route.name;
 
       return null;
     };
@@ -97,7 +97,7 @@ describe("preact — factory reuse: 100 router instances, all disposed", () => {
     const ProbeB: FunctionComponent = () => {
       const { route } = useRoute();
 
-      lastFromB = route?.name ?? "";
+      lastFromB = route.name;
 
       return null;
     };

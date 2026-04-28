@@ -182,7 +182,19 @@ describe("useRoute composable", () => {
       render(RouteCapture, {
         props: { onCapture: () => {} },
       }),
-    ).toThrow();
+    ).toThrow("useRoute must be used within a RouterProvider");
+  });
+
+  it("should throw a clear error if router has not started yet", () => {
+    const unstartedRouter = createTestRouterWithADefaultRouter();
+
+    expect(() =>
+      renderWithRouter(unstartedRouter, RouteCapture, {
+        onCapture: () => {},
+      }),
+    ).toThrow(
+      /useRoute called with no active route\. Did you forget to await router\.start\(\) before rendering, or is the router stopped\/disposed\?/,
+    );
   });
 
   it("should propagate generic params type without runtime change", async () => {

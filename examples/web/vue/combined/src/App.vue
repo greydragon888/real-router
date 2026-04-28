@@ -20,11 +20,11 @@ import Settings from "./pages/Settings.vue";
 import UsersLayout from "./pages/UsersLayout.vue";
 import { router } from "./router";
 import { publicRoutes, privateRoutes } from "./routes";
-import { defineAbilities } from "../../../shared/abilities";
-import { store } from "../../../shared/store";
+import { defineAbilities } from "../../../../shared/abilities";
+import { store } from "../../../../shared/store";
 import Layout from "../../shared/Layout.vue";
 
-import type { User } from "../../../shared/api";
+import type { User } from "../../../../shared/api";
 
 const LazyDashboard = defineAsyncComponent(
   () => import("./pages/Dashboard.vue"),

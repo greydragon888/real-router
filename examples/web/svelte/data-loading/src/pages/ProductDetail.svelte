@@ -1,8 +1,8 @@
 <script lang="ts">
   import { Link } from "@real-router/svelte";
-  import { store } from "../../../../shared/store";
+  import { store } from "../../../../../shared/store";
 
-  import type { Product } from "../../../../shared/api";
+  import type { Product } from "../../../../../shared/api";
 
   let product = $state(store.get("products.detail") as Product | null | undefined);
   let loading = $state(store.get("products.detail:loading") as boolean | undefined);

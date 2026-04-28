@@ -18,7 +18,7 @@ function HmrStatus(): JSX.Element {
 
   return (
     <p style={{ fontSize: "13px", color: "#888", marginTop: "16px" }}>
-      Current route: <strong>{route?.name ?? "—"}</strong>
+      Current route: <strong>{route.name}</strong>
     </p>
   );
 }

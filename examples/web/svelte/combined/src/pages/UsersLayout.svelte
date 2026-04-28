@@ -20,18 +20,16 @@
 
 {#if nodeRoute.current}
   <div>
-    {#if route.current}
-      <nav class="breadcrumbs" aria-label="breadcrumb">
-        {#each ["home", ...(utils.getChain(route.current.name) ?? [route.current.name])] as name, i}
-          {#if i > 0}<span> › </span>{/if}
-          {#if i === ["home", ...(utils.getChain(route.current.name) ?? [route.current.name])].length - 1}
-            <span>{getLabel(name, route.current.params)}</span>
-          {:else}
-            <Link routeName={name}>{getLabel(name, route.current.params)}</Link>
-          {/if}
-        {/each}
-      </nav>
-    {/if}
+    <nav class="breadcrumbs" aria-label="breadcrumb">
+      {#each ["home", ...(utils.getChain(route.current.name) ?? [route.current.name])] as name, i}
+        {#if i > 0}<span> › </span>{/if}
+        {#if i === ["home", ...(utils.getChain(route.current.name) ?? [route.current.name])].length - 1}
+          <span>{getLabel(name, route.current.params)}</span>
+        {:else}
+          <Link routeName={name}>{getLabel(name, route.current.params)}</Link>
+        {/if}
+      {/each}
+    </nav>
     <div style="margin-top: 16px">
       <RouteView nodeName="users">
         {#snippet self()}

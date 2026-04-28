@@ -25,7 +25,7 @@ const adminEnabled = ref(false);
 
 async function toggleAnalytics() {
   if (analyticsEnabled.value) {
-    if (route.value?.name.startsWith("analytics")) {
+    if (route.value.name.startsWith("analytics")) {
       await navigator.navigate("home");
     }
 
@@ -39,7 +39,7 @@ async function toggleAnalytics() {
 
 async function toggleAdmin() {
   if (adminEnabled.value) {
-    if (route.value?.name.startsWith("admin")) {
+    if (route.value.name.startsWith("admin")) {
       await navigator.navigate("home");
     }
 

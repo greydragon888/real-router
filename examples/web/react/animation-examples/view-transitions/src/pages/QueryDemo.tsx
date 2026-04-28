@@ -21,7 +21,7 @@ export function QueryDemo(): JSX.Element {
   // leave `filter` frozen at "all" forever, and all buttons would look
   // like the initial active one.
   const { route } = useRoute<{ filter?: Filter }>();
-  const filter = route?.params.filter ?? "all";
+  const filter = route.params.filter ?? "all";
 
   const visible = useMemo(() => {
     return filter === "all"

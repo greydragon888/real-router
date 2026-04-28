@@ -33,10 +33,6 @@ const { route } = useRoute();
 const utils = useRouteUtils();
 
 function getCrumbs() {
-  if (!route.value) {
-    return [];
-  }
-
   const chain = utils.getChain(route.value.name) ?? [route.value.name];
 
   return ["home", ...chain];
@@ -45,7 +41,7 @@ function getCrumbs() {
 
 <template>
   <div v-if="usersRoute">
-    <nav v-if="route" class="breadcrumbs" aria-label="breadcrumb">
+    <nav class="breadcrumbs" aria-label="breadcrumb">
       <template v-for="(name, i) in getCrumbs()" :key="name">
         <span v-if="i > 0"> › </span>
         <span v-if="i === getCrumbs().length - 1">{{

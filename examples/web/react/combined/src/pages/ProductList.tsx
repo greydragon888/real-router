@@ -1,9 +1,9 @@
 import { Link } from "@real-router/react";
 import { useSyncExternalStore } from "react";
 
-import { store } from "../../../../shared/store";
+import { store } from "../../../../../shared/store";
 
-import type { Product } from "../../../../shared/api";
+import type { Product } from "../../../../../shared/api";
 import type { JSX } from "react";
 
 export function ProductList(): JSX.Element {

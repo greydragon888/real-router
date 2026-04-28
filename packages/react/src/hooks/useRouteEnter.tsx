@@ -121,9 +121,6 @@ export function useRouteEnter(
   useEffect(() => {
     // Early-exit guards, top-down:
     //
-    //   - **Defensive**: `route` / `previousRoute` may be undefined
-    //     during SSR or pre-start hydration. Not testable from vitest
-    //     (tests start the router before render), so v8-ignored.
     //   - **Skip-initial**: `state.transition.from` is undefined only
     //     for the very first state committed by `router.start()`.
     //   - **Skip-same-route**: query-only navigations have
@@ -133,11 +130,6 @@ export function useRouteEnter(
     //     cleanup + re-run in dev's strict pass. Not testable from
     //     vitest (`NODE_ENV === "test"` disables React's strict-mode
     //     double-run), so v8-ignored.
-    /* v8 ignore start */
-    if (!route) {
-      return;
-    }
-    /* v8 ignore stop */
     if (!route.transition.from) {
       return;
     }

@@ -119,7 +119,6 @@ export class UsersLayoutComponent {
 
   readonly crumbs = computed(() => {
     const current = this.route.routeState().route;
-    if (!current) return null;
     const chain = this.utils.getChain(current.name) ?? [current.name];
     const names = ["home", ...chain];
     return names.map((name, i) => ({

@@ -1,8 +1,8 @@
 import { z } from "zod";
 
-import { can } from "../../../shared/abilities";
-import { api } from "../../../shared/api";
-import { store } from "../../../shared/store";
+import { can } from "../../../../shared/abilities";
+import { api } from "../../../../shared/api";
+import { store } from "../../../../shared/store";
 
 import type { AppDependencies } from "./types";
 import type { GuardFnFactory, Params, Route } from "@real-router/core";

@@ -53,7 +53,7 @@ describe("rapid router start/stop cycles (Angular)", () => {
 
     await router.navigate("route1");
 
-    expect(fixture.componentInstance.route.routeState().route?.name).toBe(
+    expect(fixture.componentInstance.route.routeState().route.name).toBe(
       "route1",
     );
 

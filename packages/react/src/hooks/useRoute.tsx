@@ -5,14 +5,25 @@ import { useContext } from "react";
 import { RouteContext } from "../context";
 
 import type { RouteContext as RouteContextType } from "../types";
-import type { Params } from "@real-router/core";
+import type { Params, State } from "@real-router/core";
 
-export const useRoute = <P extends Params = Params>(): RouteContextType<P> => {
+export const useRoute = <P extends Params = Params>(): Omit<
+  RouteContextType<P>,
+  "route"
+> & { route: State<P> } => {
   const routeContext = useContext(RouteContext);
 
   if (!routeContext) {
-    throw new Error("useRoute must be used within a RouteProvider");
+    throw new Error("useRoute must be used within a RouterProvider");
   }
 
-  return routeContext as RouteContextType<P>;
+  if (!routeContext.route) {
+    throw new Error(
+      "useRoute called with no active route. Did you forget to await router.start() before rendering, or is the router stopped/disposed?",
+    );
+  }
+
+  return routeContext as Omit<RouteContextType<P>, "route"> & {
+    route: State<P>;
+  };
 };

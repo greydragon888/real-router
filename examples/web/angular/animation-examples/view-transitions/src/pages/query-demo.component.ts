@@ -71,7 +71,7 @@ export class QueryDemoComponent {
   readonly filters = FILTERS;
 
   readonly filter = computed<Filter>(() => {
-    const params = this.state.routeState().route?.params;
+    const params = this.state.routeState().route.params;
     const raw = params?.filter;
     return raw && FILTERS.includes(raw) ? raw : "all";
   });

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onUnmounted, ref, watch } from "vue";
-import { store } from "../../../../shared/store";
+import { store } from "../../../../../shared/store";
 
 const displayName = ref("");
 

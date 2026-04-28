@@ -11,7 +11,7 @@
     the Svelte 5 pattern for declarative route matching.
   </p>
   <p>
-    Current route: <strong>{route.current?.name ?? "—"}</strong>
+    Current route: <strong>{route.current.name}</strong>
   </p>
   <p>
     Each <code>RouteView</code> renders the snippet matching the active route segment.

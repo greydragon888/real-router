@@ -1,9 +1,9 @@
 import { Link } from "@real-router/preact";
 import { useSyncExternalStore } from "preact/compat";
 
-import { store } from "../../../../shared/store";
+import { store } from "../../../../../shared/store";
 
-import type { Product } from "../../../../shared/api";
+import type { Product } from "../../../../../shared/api";
 import type { JSX } from "preact";
 
 export function ProductDetail(): JSX.Element {

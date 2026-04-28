@@ -59,7 +59,7 @@ function SignalComparison(): JSX.Element {
 
   createEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-    routeState().route?.params.id;
+    routeState().route.params.id;
     setCount((c) => c + 1);
     console.log(`[Signal] effect ran — count=${count()}`);
   });
@@ -67,7 +67,7 @@ function SignalComparison(): JSX.Element {
   return (
     <div class="card">
       <strong>Signal comparison (useRoute → params.id)</strong>
-      <p>User ID: {(routeState().route?.params.id as string) ?? "—"}</p>
+      <p>User ID: {(routeState().route.params.id as string) ?? "—"}</p>
       <p style={{ "font-size": "13px", color: "#888" }}>
         Effect count: {count()} — re-runs on ANY param change
       </p>

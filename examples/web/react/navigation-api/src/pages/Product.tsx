@@ -9,7 +9,7 @@ const PRODUCT_IDS = [1, 2, 3, 5];
 export function Product(): JSX.Element {
   const { route } = useRoute<{ id: string }>();
   const navigator = useNavigator();
-  const id = Number(route?.params.id ?? "1");
+  const id = Number(route.params.id ?? "1");
   const currentIndex = PRODUCT_IDS.indexOf(id);
   const prevId = currentIndex > 0 ? PRODUCT_IDS[currentIndex - 1] : undefined;
   const nextId =

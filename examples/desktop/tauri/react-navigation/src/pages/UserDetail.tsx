@@ -4,7 +4,7 @@ import type { JSX } from "react";
 
 export function UserDetail(): JSX.Element {
   const { route } = useRoute<{ id: string }>();
-  const id = route?.params.id ?? "?";
+  const id = route.params.id ?? "?";
 
   return (
     <section>

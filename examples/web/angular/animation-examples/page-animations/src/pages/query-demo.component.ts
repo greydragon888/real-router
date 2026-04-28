@@ -73,7 +73,7 @@ export class QueryDemoComponent {
   readonly list = viewChild<ElementRef<HTMLUListElement>>("list");
 
   readonly filter = computed<Filter>(
-    () => (this.state.routeState().route?.params["filter"] as Filter | undefined) ?? "all",
+    () => (this.state.routeState().route.params["filter"] as Filter | undefined) ?? "all",
   );
 
   readonly visible = computed(() => {

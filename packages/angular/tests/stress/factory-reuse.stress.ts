@@ -6,6 +6,7 @@ import { createStressRouter } from "./helpers";
 import { injectRoute } from "../../src/functions/injectRoute";
 import { provideRealRouter, ROUTE } from "../../src/providers";
 
+import type { RouteSignals } from "../../src/types";
 import type { Router } from "@real-router/core";
 
 describe("factory reuse (Angular)", () => {
@@ -78,7 +79,7 @@ describe("factory reuse (Angular)", () => {
     });
     const injector = TestBed.inject(Injector);
 
-    const routes: ReturnType<typeof injectRoute>[] = [];
+    const routes: RouteSignals[] = [];
 
     runInInjectionContext(injector, () => {
       for (let i = 0; i < 5; i++) {
@@ -99,7 +100,7 @@ describe("factory reuse (Angular)", () => {
     });
     const injector = TestBed.inject(Injector);
 
-    const routes: ReturnType<typeof injectRoute>[] = [];
+    const routes: RouteSignals[] = [];
 
     runInInjectionContext(injector, () => {
       for (let i = 0; i < 10; i++) {

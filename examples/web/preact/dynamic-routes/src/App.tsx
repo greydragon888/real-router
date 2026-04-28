@@ -27,7 +27,7 @@ export function App(): JSX.Element {
 
   const toggleAnalytics = async () => {
     if (analyticsEnabled) {
-      if (route?.name.startsWith("analytics")) {
+      if (route.name.startsWith("analytics")) {
         await navigator.navigate("home");
       }
 
@@ -41,7 +41,7 @@ export function App(): JSX.Element {
 
   const toggleAdmin = async () => {
     if (adminEnabled) {
-      if (route?.name.startsWith("admin")) {
+      if (route.name.startsWith("admin")) {
         await navigator.navigate("home");
       }
 

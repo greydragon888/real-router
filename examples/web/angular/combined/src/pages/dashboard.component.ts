@@ -40,7 +40,7 @@ export class DashboardComponent {
   readonly user = signal<User | null>(store.get("user") as User | null);
 
   readonly lang = computed<string>(() => {
-    const params = this.state.routeState().route?.params;
+    const params = this.state.routeState().route.params;
     const value = params?.["lang"];
     return typeof value === "string" ? value : "en";
   });

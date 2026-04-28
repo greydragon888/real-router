@@ -1,9 +1,9 @@
 import { Link } from "@real-router/solid";
 import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 
-import { store } from "../../../../shared/store";
+import { store } from "../../../../../shared/store";
 
-import type { Product } from "../../../../shared/api";
+import type { Product } from "../../../../../shared/api";
 import type { JSX } from "solid-js";
 
 export function ProductDetail(): JSX.Element {

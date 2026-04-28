@@ -27,20 +27,18 @@
 </script>
 
 {#if route.current}
-  {#if globalRoute.current}
-    {@const chain = utils.getChain(globalRoute.current.name) ?? [globalRoute.current.name]}
-    {@const crumbs = ["home", ...chain]}
-    <nav class="breadcrumbs" aria-label="breadcrumb">
-      {#each crumbs as name, i}
-        {#if i > 0}<span> › </span>{/if}
-        {#if i === crumbs.length - 1}
-          <span>{getLabel(name, globalRoute.current.params)}</span>
-        {:else}
-          <Link routeName={name}>{getLabel(name, globalRoute.current.params)}</Link>
-        {/if}
-      {/each}
-    </nav>
-  {/if}
+  {@const chain = utils.getChain(globalRoute.current.name) ?? [globalRoute.current.name]}
+  {@const crumbs = ["home", ...chain]}
+  <nav class="breadcrumbs" aria-label="breadcrumb">
+    {#each crumbs as name, i}
+      {#if i > 0}<span> › </span>{/if}
+      {#if i === crumbs.length - 1}
+        <span>{getLabel(name, globalRoute.current.params)}</span>
+      {:else}
+        <Link routeName={name}>{getLabel(name, globalRoute.current.params)}</Link>
+      {/if}
+    {/each}
+  </nav>
 
   <!--
     `users` IS the list — no synthetic `list` child / forwardTo. The `self`

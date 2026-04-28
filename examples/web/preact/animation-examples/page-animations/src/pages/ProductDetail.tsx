@@ -18,7 +18,7 @@ export function ProductDetail() {
   useRouteAnimation(ref, { entryClass: "fade-in", exitClass: "fade-out" });
 
   const { route } = useRoute<{ id: string }>();
-  const id = route?.params.id ?? "1";
+  const id = route.params.id ?? "1";
   const product = COVERS[id];
 
   if (!product) {

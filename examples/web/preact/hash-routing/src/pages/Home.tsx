@@ -18,7 +18,7 @@ export function Home(): JSX.Element {
         same route.
       </p>
       <p>
-        Current route: <strong>{route?.name ?? "—"}</strong>
+        Current route: <strong>{route.name}</strong>
       </p>
       <p>
         Current URL hash:{" "}

@@ -20,7 +20,7 @@ type SortDirection = "asc" | "desc";
 
 export function ProductsList() {
   const { route } = useRoute<{ sort?: SortDirection }>();
-  const sort: SortDirection = route?.params.sort === "desc" ? "desc" : "asc";
+  const sort: SortDirection = route.params.sort === "desc" ? "desc" : "asc";
 
   const items = useMemo(() => {
     const sorted = PRODUCTS.toSorted((left, right) =>

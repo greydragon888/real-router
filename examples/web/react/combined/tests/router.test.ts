@@ -3,8 +3,8 @@ import { getDependenciesApi, getRoutesApi } from "@real-router/core/api";
 import { lifecyclePluginFactory } from "@real-router/lifecycle-plugin";
 import { describe, afterEach, it, expect } from "vitest";
 
-import { defineAbilities } from "../../../shared/abilities";
-import { store } from "../../../shared/store";
+import { defineAbilities } from "../../../../shared/abilities";
+import { store } from "../../../../shared/store";
 import { privateRoutes, publicRoutes } from "../src/routes";
 
 import type { AppDependencies } from "../src/types";

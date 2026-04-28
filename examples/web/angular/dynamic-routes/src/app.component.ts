@@ -137,7 +137,7 @@ export class AppComponent {
 
   async toggleAnalytics(): Promise<void> {
     if (this.analyticsEnabled()) {
-      if (this.route.routeState().route?.name.startsWith("analytics")) {
+      if (this.route.routeState().route.name.startsWith("analytics")) {
         await this.navigator.navigate("home");
       }
       this.routesApi.remove("analytics");
@@ -150,7 +150,7 @@ export class AppComponent {
 
   async toggleAdmin(): Promise<void> {
     if (this.adminEnabled()) {
-      if (this.route.routeState().route?.name.startsWith("admin")) {
+      if (this.route.routeState().route.name.startsWith("admin")) {
         await this.navigator.navigate("home");
       }
       this.routesApi.remove("admin");

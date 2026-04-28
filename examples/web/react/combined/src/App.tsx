@@ -13,11 +13,11 @@ import { Settings } from "./pages/Settings";
 import { UsersLayout } from "./pages/UsersLayout";
 import { router } from "./router";
 import { publicRoutes, privateRoutes } from "./routes";
-import { defineAbilities } from "../../../shared/abilities";
-import { store } from "../../../shared/store";
+import { defineAbilities } from "../../../../shared/abilities";
+import { store } from "../../../../shared/store";
 import { Layout } from "../../shared/Layout";
 
-import type { User } from "../../../shared/api";
+import type { User } from "../../../../shared/api";
 import type { JSX } from "react";
 
 const LazyDashboard = lazy(() => import("./pages/Dashboard"));
@@ -25,7 +25,10 @@ const LazyDashboard = lazy(() => import("./pages/Dashboard"));
 export function App(): JSX.Element {
   const navigator = useNavigator();
 
-  const user = useSyncExternalStore(store.subscribe, () => store.get("user"));
+  const user = useSyncExternalStore(
+    store.subscribe,
+    () => store.get("user") as User | null,
+  );
 
   const privateLinks = [
     { routeName: "dashboard", label: "Dashboard" },

@@ -39,7 +39,6 @@ const { route } = useRoute();
 const utils = useRouteUtils();
 
 const crumbs = computed(() => {
-  if (!route.value) return [];
   const chain = utils.getChain(route.value.name) ?? [route.value.name];
   return ["home", ...chain];
 });
@@ -47,7 +46,7 @@ const crumbs = computed(() => {
 
 <template>
   <div v-if="usersRoute">
-    <nav v-if="route" class="breadcrumbs" aria-label="breadcrumb">
+    <nav class="breadcrumbs" aria-label="breadcrumb">
       <template v-for="(name, i) in crumbs" :key="name">
         <span v-if="i > 0"> › </span>
         <span v-if="i === crumbs.length - 1">{{

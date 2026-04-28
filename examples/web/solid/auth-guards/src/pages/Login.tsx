@@ -1,8 +1,8 @@
 import { createSignal, Show } from "solid-js";
 
-import { api } from "../../../../shared/api";
+import { api } from "../../../../../shared/api";
 
-import type { User } from "../../../../shared/api";
+import type { User } from "../../../../../shared/api";
 import type { JSX } from "solid-js";
 
 interface LoginProps {

@@ -94,8 +94,6 @@ export function injectRouteEnter(
 
     // Early-exit guards, top-down:
     //
-    //   - **Defensive**: `route` may be undefined during SSR or
-    //     pre-start hydration. Not testable from vitest, v8-ignored.
     //   - **Skip-initial**: `state.transition.from` is undefined only
     //     for the very first state committed by `router.start()`.
     //   - **Skip-same-route**: query-only navigations have
@@ -106,11 +104,6 @@ export function injectRouteEnter(
     //     signal only fires on real reference changes); `!previousRoute`
     //     is unreachable once `transition.from` is set (core populates
     //     them together). Both kept for parity with React; v8-ignored.
-    /* v8 ignore start */
-    if (!route) {
-      return;
-    }
-    /* v8 ignore stop */
     if (!route.transition.from) {
       return;
     }

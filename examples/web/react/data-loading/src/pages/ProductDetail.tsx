@@ -1,14 +1,15 @@
 import { Link } from "@real-router/react";
 import { useSyncExternalStore } from "react";
 
-import { store } from "../../../../shared/store";
+import { store } from "../../../../../shared/store";
 
-import type { Product } from "../../../../shared/api";
+import type { Product } from "../../../../../shared/api";
 import type { JSX } from "react";
 
 export function ProductDetail(): JSX.Element {
-  const product = useSyncExternalStore(store.subscribe, () =>
-    store.get("products.detail"),
+  const product = useSyncExternalStore(
+    store.subscribe,
+    () => store.get("products.detail") as Product | null | undefined,
   );
   const loading = useSyncExternalStore(
     store.subscribe,

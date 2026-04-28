@@ -19,7 +19,7 @@
   // like the initial active one.
   const { route } = useRoute<{ filter?: Filter }>();
 
-  const filter: Filter = $derived(route.current?.params.filter ?? "all");
+  const filter: Filter = $derived(route.current.params.filter ?? "all");
 
   const visible = $derived(
     filter === "all"

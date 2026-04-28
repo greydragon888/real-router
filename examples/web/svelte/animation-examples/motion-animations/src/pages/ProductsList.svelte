@@ -21,7 +21,7 @@
   const { route } = useRoute<{ sort?: SortDirection }>();
 
   const sort: SortDirection = $derived(
-    route.current?.params.sort === "desc" ? "desc" : "asc",
+    route.current.params.sort === "desc" ? "desc" : "asc",
   );
 
   const items = $derived.by(() => {

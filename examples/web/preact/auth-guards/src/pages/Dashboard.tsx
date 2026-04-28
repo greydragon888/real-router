@@ -1,8 +1,8 @@
 import { useSyncExternalStore } from "preact/compat";
 
-import { store } from "../../../../shared/store";
+import { store } from "../../../../../shared/store";
 
-import type { User } from "../../../../shared/api";
+import type { User } from "../../../../../shared/api";
 import type { JSX } from "preact";
 
 interface DashboardProps {

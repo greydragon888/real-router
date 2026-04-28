@@ -34,7 +34,7 @@ describe("factory reuse with N distinct routers (Angular)", () => {
 
       fixture.detectChanges();
 
-      expect(fixture.componentInstance.route.routeState().route?.name).toBe(
+      expect(fixture.componentInstance.route.routeState().route.name).toBe(
         "route0",
       );
 

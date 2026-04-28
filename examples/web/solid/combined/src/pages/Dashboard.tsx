@@ -1,9 +1,9 @@
 import { useNavigator, useRoute } from "@real-router/solid";
 import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 
-import { store } from "../../../../shared/store";
+import { store } from "../../../../../shared/store";
 
-import type { User } from "../../../../shared/api";
+import type { User } from "../../../../../shared/api";
 import type { JSX } from "solid-js";
 
 interface DashboardProps {
@@ -26,7 +26,7 @@ export default function Dashboard(props: DashboardProps): JSX.Element {
   });
 
   const lang = () =>
-    (routeState().route?.params.lang as string | undefined) ?? "en";
+    (routeState().route.params.lang as string | undefined) ?? "en";
 
   return (
     <div>
@@ -57,9 +57,9 @@ export default function Dashboard(props: DashboardProps): JSX.Element {
         <button
           onClick={() =>
             void navigator.navigate(
-              routeState().route?.name ?? "dashboard",
+              routeState().route.name,
               {
-                ...routeState().route?.params,
+                ...routeState().route.params,
                 lang: lang() === "en" ? "ru" : "en",
               },
               { reload: true },
