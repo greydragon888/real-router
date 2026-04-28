@@ -68,7 +68,7 @@ describe("concurrent navigation with async guards (Angular)", () => {
     const finalName = router.getState()?.name;
 
     expect(["slow", "fast"]).toContain(finalName);
-    expect(fixture.componentInstance.route.routeState().route?.name).toBe(
+    expect(fixture.componentInstance.route.routeState().route.name).toBe(
       finalName,
     );
 
@@ -96,7 +96,7 @@ describe("concurrent navigation with async guards (Angular)", () => {
 
     await Promise.all(promises);
 
-    expect(fixture.componentInstance.route.routeState().route?.name).toBe(
+    expect(fixture.componentInstance.route.routeState().route.name).toBe(
       router.getState()?.name,
     );
 
