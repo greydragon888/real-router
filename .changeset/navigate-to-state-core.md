@@ -1,7 +1,5 @@
 ---
 "@real-router/core": minor
-"@real-router/types": minor
-"@real-router/validation-plugin": minor
 ---
 
 Add plugin-only `getPluginApi(router).navigateToState(state, opts)` (#525)
@@ -17,8 +15,6 @@ but `state.path` got canonicalized to `/users` (#525, Q2).
 - Plugin-only — NOT exposed on the public `Router` or `Navigator`
   interfaces. Plugin internal hot path, deliberately hidden from userland
   autocomplete.
-- `@real-router/validation-plugin` adds `validateNavigateToStateArgs` for
-  structural state-shape validation.
 - `forwardState` and `buildPath` interceptors do NOT run on this path —
   matchPath already applied `forwardState`, and the URL the user
   navigated to is the source of truth (no buildPath rewrite). For
@@ -29,6 +25,8 @@ but `state.path` got canonicalized to `/users` (#525, Q2).
   `getNavigator`) so `vi.spyOn(getPluginApi(router), "navigateToState")`
   attaches to the same object the plugin instance holds. Avoids repeated
   closure-bag allocations.
+- `start(path)` migrated to commit `matchPath(path)` via the new
+  primitive, sharing the same code path as URL plugin popstate handlers.
 
 Benchmark on the `popstate-roundtrip.bench.ts` fixtures (Apple silicon,
 Node 24): `api.navigateToState` is **0.13–0.83 µs faster per call** than
