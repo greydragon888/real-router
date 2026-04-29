@@ -11,13 +11,21 @@ export function useIsActiveRoute(
   params?: Params,
   strict = false,
   ignoreQueryParams = true,
+  hash?: string,
 ): ShallowRef<boolean> {
   const router = useRouter();
 
-  const source = createActiveRouteSource(router, routeName, params, {
-    strict,
-    ignoreQueryParams,
-  });
+  // The `hash` argument (#532) participates in the cache key when defined.
+  // exactOptionalPropertyTypes forbids `{ hash: undefined }` literally — we
+  // conditionally include the key only when a value is provided.
+  const source = createActiveRouteSource(
+    router,
+    routeName,
+    params,
+    hash === undefined
+      ? { strict, ignoreQueryParams }
+      : { strict, ignoreQueryParams, hash },
+  );
 
   return useRefFromSource(source);
 }

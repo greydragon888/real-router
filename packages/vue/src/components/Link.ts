@@ -3,7 +3,12 @@ import { defineComponent, h, computed, shallowRef, watch } from "vue";
 
 import { useRouter } from "../composables/useRouter";
 import { EMPTY_PARAMS, EMPTY_OPTIONS } from "../constants";
-import { shouldNavigate, buildHref, buildActiveClassName } from "../dom-utils";
+import {
+  shouldNavigate,
+  buildHref,
+  buildActiveClassName,
+  navigateWithHash,
+} from "../dom-utils";
 
 import type { Params, NavigationOptions } from "@real-router/core";
 import type { PropType } from "vue";
@@ -75,6 +80,16 @@ export const Link = defineComponent({
       type: String,
       default: undefined,
     },
+    /**
+     * URL fragment (decoded form, no leading "#") (#532).
+     * - omitted/`undefined` → preserve current fragment on same-route navigation
+     * - `""` → clear fragment
+     * - non-empty → set fragment
+     */
+    hash: {
+      type: String,
+      default: undefined,
+    },
   },
   setup(props, { slots, attrs }) {
     const router = useRouter();
@@ -92,16 +107,23 @@ export const Link = defineComponent({
           props.routeParams,
           props.activeStrict,
           props.ignoreQueryParams,
+          props.hash,
         ] as const,
       (
-        [routeName, routeParams, activeStrict, ignoreQueryParams],
+        [routeName, routeParams, activeStrict, ignoreQueryParams, hash],
         _prev,
         onCleanup,
       ) => {
-        const source = createActiveRouteSource(router, routeName, routeParams, {
-          strict: activeStrict,
-          ignoreQueryParams,
-        });
+        // Hash-aware active (#532): pass hash through so tab links with the
+        // same routeName but different `hash` props don't all light up.
+        const source = createActiveRouteSource(
+          router,
+          routeName,
+          routeParams,
+          hash === undefined
+            ? { strict: activeStrict, ignoreQueryParams }
+            : { strict: activeStrict, ignoreQueryParams, hash },
+        );
 
         isActive.value = source.getSnapshot();
 
@@ -115,7 +137,12 @@ export const Link = defineComponent({
     );
 
     const href = computed(() =>
-      buildHref(router, props.routeName, props.routeParams),
+      buildHref(
+        router,
+        props.routeName,
+        props.routeParams,
+        props.hash === undefined ? undefined : { hash: props.hash },
+      ),
     );
 
     const finalClassName = computed(() =>
@@ -140,9 +167,13 @@ export const Link = defineComponent({
       }
 
       evt.preventDefault();
-      router
-        .navigate(props.routeName, props.routeParams, props.routeOptions)
-        .catch(() => {});
+      navigateWithHash(
+        router,
+        props.routeName,
+        props.routeParams,
+        props.hash,
+        props.routeOptions,
+      ).catch(() => {});
     };
 
     return () => {

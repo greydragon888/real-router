@@ -1,4 +1,9 @@
-import type { Router, Params } from "@real-router/core";
+import type {
+  NavigationOptions,
+  Params,
+  Router,
+  State,
+} from "@real-router/core";
 
 export function shouldNavigate(evt: MouseEvent): boolean {
   return (
@@ -10,25 +15,67 @@ export function shouldNavigate(evt: MouseEvent): boolean {
   );
 }
 
-type BuildUrlFn = (name: string, params: Params) => string | undefined;
+/**
+ * RFC 3986 fragment encoding: preserve sub-delims (`&`, `=`, `?`, `:`),
+ * encode space, `%`, control chars, non-ASCII via encodeURI; defensively
+ * escape `#` (encodeURI does not). Mirrors `encodeHashFragment` in
+ * `shared/browser-env/url-context.ts` — duplicated here because the
+ * shared/dom-utils symlink graph does not reach shared/browser-env.
+ */
+function encodeFragmentInline(decoded: string): string {
+  return encodeURI(decoded).replaceAll("#", "%23");
+}
 
+type BuildUrlFn = (
+  name: string,
+  params: Params,
+  options?: { hash?: string },
+) => string | undefined;
+
+/**
+ * Builds an href for a `<Link>` element.
+ *
+ * - Prefers the URL plugin's `buildUrl` (browser-plugin, navigation-plugin,
+ *   hash-plugin) when present.
+ * - Falls back to `router.buildPath` for runtimes without a URL plugin
+ *   (memory-plugin, console UIs, NativeScript). In that fallback the hash
+ *   is appended manually so the rendered href is still correct.
+ * - The optional 4th argument is an options object so the contract stays
+ *   extensible. The `hash` option is a decoded fragment without leading "#";
+ *   `<Link hash="#section">` is accepted defensively (leading "#" stripped).
+ *   Frozen API: previous 3-arg call sites continue to work unchanged.
+ */
 export function buildHref(
   router: Router,
   routeName: string,
   routeParams: Params,
+  options?: { hash?: string },
 ): string | undefined {
   try {
+    const rawHash = options?.hash;
+    let normHash: string | undefined;
+
+    if (rawHash !== undefined) {
+      normHash = rawHash.startsWith("#") ? rawHash.slice(1) : rawHash;
+    }
+
     const buildUrl = router.buildUrl as BuildUrlFn | undefined;
 
     if (buildUrl) {
-      const url = buildUrl(routeName, routeParams);
+      const url = buildUrl(
+        routeName,
+        routeParams,
+        normHash === undefined ? undefined : { hash: normHash },
+      );
 
       if (url !== undefined) {
         return url;
       }
     }
 
-    return router.buildPath(routeName, routeParams);
+    const path = router.buildPath(routeName, routeParams);
+
+    return normHash ? `${path}#${encodeFragmentInline(normHash)}` : path;
   } catch {
     console.error(
       `[real-router] Route "${routeName}" is not defined. The element will render without an href attribute.`,
@@ -36,6 +83,65 @@ export function buildHref(
 
     return undefined;
   }
+}
+
+/**
+ * `<Link>` click-handler navigation helper (#532).
+ *
+ * Wraps `router.navigate(name, params, opts)` with same-route different-hash
+ * detection: when the consumer clicks a hash-bearing Link that targets the
+ * current route with the same params but a different fragment, core's
+ * SAME_STATES check would otherwise reject the navigation. The helper adds
+ * `force: true` and `hashChange: true` automatically — subscribers can then
+ * disambiguate via `state.context.url.hashChanged`.
+ *
+ * For pure programmatic same-route hash-only navigation, callers are
+ * documented to pass `{ force: true }` themselves; the auto-bypass here is
+ * a UX convenience for `<Link hash>` that all 6 framework adapters share.
+ */
+/**
+ * Local extended-options type. Adapters that depend only on `@real-router/core`
+ * (without a URL plugin) do not see the `NavigationOptions` augmentation that
+ * declares `hash` / `hashChange`. Casting to this widened type inside the
+ * helper keeps shared/dom-utils self-contained — adapters do not need to
+ * augment NavigationOptions themselves to consume `<Link hash>`.
+ */
+type HashAwareNavigationOptions = NavigationOptions & {
+  hash?: string;
+  hashChange?: boolean;
+};
+
+export function navigateWithHash(
+  router: Router,
+  routeName: string,
+  routeParams: Params,
+  hash: string | undefined,
+  extraOptions?: NavigationOptions,
+): Promise<State> {
+  const opts: HashAwareNavigationOptions = { ...extraOptions };
+
+  if (hash !== undefined) {
+    opts.hash = hash;
+  }
+
+  const current = router.getState();
+
+  if (
+    current?.name === routeName &&
+    shallowEqual(current.params, routeParams)
+  ) {
+    const currentHash =
+      (current.context as { url?: { hash?: string } } | undefined)?.url?.hash ??
+      "";
+    const newHash = hash ?? currentHash;
+
+    if (currentHash !== newHash) {
+      opts.force = true;
+      opts.hashChange = true;
+    }
+  }
+
+  return router.navigate(routeName, routeParams, opts);
 }
 
 function parseTokens(value: string | undefined): string[] {

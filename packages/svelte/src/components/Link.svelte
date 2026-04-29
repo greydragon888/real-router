@@ -6,6 +6,7 @@
     shouldNavigate,
     buildHref,
     buildActiveClassName,
+    navigateWithHash,
   } from "../dom-utils";
 
   import type { NavigationOptions, Params } from "@real-router/core";
@@ -19,6 +20,7 @@
     activeClassName = "active",
     activeStrict = false,
     ignoreQueryParams = true,
+    hash = undefined,
     target = undefined,
     children = undefined,
     onclick: userOnClick = undefined,
@@ -31,6 +33,13 @@
     activeClassName?: string;
     activeStrict?: boolean;
     ignoreQueryParams?: boolean;
+    /**
+     * URL fragment (decoded form, no leading "#") (#532).
+     * - omitted/`undefined` → preserve current fragment on same-route navigation
+     * - `""` → clear fragment
+     * - non-empty → set fragment
+     */
+    hash?: string;
     target?: string;
     children?: Snippet;
     onclick?: (evt: MouseEvent) => void;
@@ -38,14 +47,24 @@
   } = $props();
 
   const router = useRouter();
+  // Hash-aware active (#532): tab links sharing routeName but differing in
+  // hash should only light up the matching variant.
   const activeState = useIsActiveRoute(
     routeName,
     routeParams,
     activeStrict,
     ignoreQueryParams,
+    hash,
   );
 
-  const href = $derived(buildHref(router, routeName, routeParams));
+  const href = $derived(
+    buildHref(
+      router,
+      routeName,
+      routeParams,
+      hash !== undefined ? { hash } : undefined,
+    ),
+  );
 
   const finalClassName = $derived(
     buildActiveClassName(activeState.current, activeClassName, className),
@@ -65,7 +84,9 @@
     }
 
     evt.preventDefault();
-    router.navigate(routeName, routeParams, routeOptions).catch(NOOP);
+    navigateWithHash(router, routeName, routeParams, hash, routeOptions).catch(
+      NOOP,
+    );
   }
 </script>
 

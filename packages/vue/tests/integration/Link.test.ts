@@ -127,8 +127,34 @@ describe("Link - Integration Tests", () => {
         h(Link, { routeName: "one-more-test" }, { default: () => "Test" }),
       );
 
-      expect(buildUrlSpy).toHaveBeenCalledWith("one-more-test", {});
+      expect(buildUrlSpy).toHaveBeenCalledWith("one-more-test", {}, undefined);
       expect(wrapper.find("a").attributes("href")).toBe("/custom-url");
+    });
+
+    it("should pass hash option to buildUrl when hash prop is set (#532)", () => {
+      const buildUrlSpy = vi.fn(
+        (_name: string, _params?: object, opts?: { hash?: string }): string =>
+          opts?.hash ? `/url#${opts.hash}` : "/url",
+      );
+
+      router.buildUrl = buildUrlSpy;
+
+      const wrapper = mountWithProvider(router, () =>
+        h(
+          Link,
+          { routeName: "one-more-test", hash: "anchor" },
+          { default: () => "Test" },
+        ),
+      );
+
+      expect(buildUrlSpy).toHaveBeenCalledWith(
+        "one-more-test",
+        {},
+        {
+          hash: "anchor",
+        },
+      );
+      expect(wrapper.find("a").attributes("href")).toBe("/url#anchor");
     });
 
     it("should generate correct href with query params", () => {

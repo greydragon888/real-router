@@ -4,7 +4,12 @@ import { createMemo, mergeProps, splitProps, useContext } from "solid-js";
 import { EMPTY_PARAMS, EMPTY_OPTIONS } from "../constants";
 import { RouterContext } from "../context";
 import { createSignalFromSource } from "../createSignalFromSource";
-import { shouldNavigate, buildHref, buildActiveClassName } from "../dom-utils";
+import {
+  shouldNavigate,
+  buildHref,
+  buildActiveClassName,
+  navigateWithHash,
+} from "../dom-utils";
 
 import type { LinkProps } from "../types";
 import type { Params } from "@real-router/core";
@@ -31,6 +36,7 @@ export function Link<P extends Params = Params>(
     "activeClassName",
     "activeStrict",
     "ignoreQueryParams",
+    "hash",
     "onClick",
     "target",
     "class",
@@ -45,22 +51,47 @@ export function Link<P extends Params = Params>(
 
   const router = ctx.router;
 
+  // Hash-aware active state (#532). `routeSelector` (the O(1) shared selector)
+  // doesn't know about hash — when `hash` prop is set, fall back to the slow
+  // path so the source's hash comparison kicks in. Tab-style UI is opt-in via
+  // the prop, so the fast path stays open for the typical Link case.
   const useFastPath =
+    local.hash === undefined &&
     !local.activeStrict &&
     local.ignoreQueryParams &&
     local.routeParams === EMPTY_PARAMS;
 
+  const buildActiveOptions = () => {
+    const base = {
+      strict: local.activeStrict,
+      ignoreQueryParams: local.ignoreQueryParams,
+    };
+
+    if (local.hash === undefined) {
+      return base;
+    }
+
+    return { ...base, hash: local.hash };
+  };
+
   const isActive = useFastPath
     ? () => ctx.routeSelector(local.routeName)
     : createSignalFromSource(
-        createActiveRouteSource(router, local.routeName, local.routeParams, {
-          strict: local.activeStrict,
-          ignoreQueryParams: local.ignoreQueryParams,
-        }),
+        createActiveRouteSource(
+          router,
+          local.routeName,
+          local.routeParams,
+          buildActiveOptions(),
+        ),
       );
 
   const href = createMemo(() =>
-    buildHref(router, local.routeName, local.routeParams),
+    buildHref(
+      router,
+      local.routeName,
+      local.routeParams,
+      local.hash === undefined ? undefined : { hash: local.hash },
+    ),
   );
 
   const handleClick = (evt: MouseEvent) => {
@@ -77,9 +108,13 @@ export function Link<P extends Params = Params>(
     }
 
     evt.preventDefault();
-    router
-      .navigate(local.routeName, local.routeParams, local.routeOptions)
-      .catch(() => {});
+    navigateWithHash(
+      router,
+      local.routeName,
+      local.routeParams,
+      local.hash,
+      local.routeOptions,
+    ).catch(() => {});
   };
 
   const finalClassName = createMemo(() =>

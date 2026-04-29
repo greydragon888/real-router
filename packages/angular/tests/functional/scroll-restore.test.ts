@@ -180,6 +180,81 @@ describe("createScrollRestoration (Angular dom-utils copy)", () => {
     globalThis.history.replaceState(null, "", "/");
   });
 
+  it("push + state.context.url.hash with existing id → scrollIntoView (#532)", () => {
+    const anchor = document.createElement("div");
+
+    anchor.id = "ctxAnchor";
+    document.body.append(anchor);
+    const scrollIntoViewSpy = vi.fn();
+
+    anchor.scrollIntoView = scrollIntoViewSpy;
+
+    const fake = makeFakeRouter(makeState("home"));
+    const sr = track(createScrollRestoration(fake.router));
+
+    fake.emit(
+      makeState(
+        "about",
+        {},
+        {
+          navigation: { direction: "forward", navigationType: "push" },
+          url: { hash: "ctxAnchor", hashChanged: true },
+        },
+      ),
+      makeState("home"),
+    );
+
+    // Plugin path: read from state.context.url.hash, no DOM fallback.
+    expect(scrollIntoViewSpy).toHaveBeenCalledTimes(1);
+
+    sr.destroy();
+  });
+
+  it("state.context.url.hash empty string → scroll to top (#532)", () => {
+    const fake = makeFakeRouter(makeState("home"));
+    const scrollSpy = vi.spyOn(globalThis, "scrollTo");
+    const sr = track(createScrollRestoration(fake.router));
+
+    fake.emit(
+      makeState(
+        "about",
+        {},
+        {
+          navigation: { direction: "forward", navigationType: "push" },
+          url: { hash: "", hashChanged: false },
+        },
+      ),
+      makeState("home"),
+    );
+
+    // ctxHash !== undefined branch entered, but ctxHash.length === 0 → top.
+    expect(scrollSpy).toHaveBeenLastCalledWith(0, 0);
+
+    sr.destroy();
+  });
+
+  it("state.context.url.hash with missing element → scroll to top (#532)", () => {
+    const fake = makeFakeRouter(makeState("home"));
+    const scrollSpy = vi.spyOn(globalThis, "scrollTo");
+    const sr = track(createScrollRestoration(fake.router));
+
+    fake.emit(
+      makeState(
+        "about",
+        {},
+        {
+          navigation: { direction: "forward", navigationType: "push" },
+          url: { hash: "doesNotExist", hashChanged: true },
+        },
+      ),
+      makeState("home"),
+    );
+
+    expect(scrollSpy).toHaveBeenLastCalledWith(0, 0);
+
+    sr.destroy();
+  });
+
   it("subscribe captures previousRoute's scrollY into storage", () => {
     const fake = makeFakeRouter(makeState("home"));
 
