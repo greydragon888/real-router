@@ -1,6 +1,6 @@
 import { errorCodes, RouterError } from "@real-router/core";
 
-import { urlToPath } from "./browser-env";
+import { urlToPathAndHash } from "./browser-env";
 
 import type {
   NavigationBrowser,
@@ -64,7 +64,7 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
       return;
     }
 
-    const path = urlToPath(event.destination.url, base);
+    const { path, hash } = urlToPathAndHash(event.destination.url, base);
     const matchedState = api.matchPath(path);
 
     const navType = event.navigationType as NavigationMeta["navigationType"];
@@ -130,8 +130,17 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
             // matchSourceTrailingSlash; reusing the State avoids the redundant
             // round-trip and preserves trailing slashes (#525). Plugin-only
             // entry point — not on the public Router/Navigator surface.
+            //
+            // Hash extraction (#532): pass through the destination's hash so
+            // onTransitionSuccess sets state.context.url.hash. When the
+            // browser fires hashChange (same-document fragment-only nav),
+            // add force+hashChange to bypass SAME_STATES — subscribers
+            // disambiguate via state.context.url.hashChanged, not via the
+            // overloaded force flag.
             api.navigateToState(matchedState, {
               ...transitionOptions,
+              hash,
+              ...(event.hashChange ? { force: true, hashChange: true } : {}),
               signal: event.signal,
             }),
           ),
@@ -181,7 +190,17 @@ function syncUrlToRouterState(
     const currentState = router.getState();
 
     if (currentState) {
-      const url = router.buildUrl(currentState.name, currentState.params);
+      // Preserve hash on recovery (#532): reading from state.context.url
+      // keeps the visible URL fragment intact when a guard rejects a hash-
+      // bearing navigation.
+      const ctxHash = (
+        currentState.context as { url?: { hash?: string } } | undefined
+      )?.url?.hash;
+      const url = router.buildUrl(
+        currentState.name,
+        currentState.params,
+        ctxHash ? { hash: ctxHash } : undefined,
+      );
 
       // The syncing flag is raised/lowered inside NavigationBrowser around
       // browser.navigate, including the throw path — no manual try/finally

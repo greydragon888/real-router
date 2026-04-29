@@ -68,13 +68,38 @@ export function createScrollRestoration(
     }
   };
 
-  const scrollToHashOrTop = (): void => {
+  const scrollToHashOrTop = (route: State): void => {
+    // URL plugin path (#532): `state.context.url.hash` is the source of truth
+    // when one of the URL plugins (browser-plugin / navigation-plugin) is
+    // installed. The value is already DECODED — feeding it through
+    // `decodeURIComponent` again would throw on a bare `%`.
+    const ctxHash = (route.context as { url?: { hash?: string } } | undefined)
+      ?.url?.hash;
+
+    if (ctxHash !== undefined) {
+      if (anchorEnabled && ctxHash.length > 0) {
+        // eslint-disable-next-line unicorn/prefer-query-selector -- ids may contain CSS-unsafe chars
+        const element = document.getElementById(ctxHash);
+
+        if (element) {
+          element.scrollIntoView();
+
+          return;
+        }
+      }
+
+      writePos(0);
+
+      return;
+    }
+
+    // Fallback path: no URL plugin, read the DOM. `location.hash` is
+    // percent-encoded; ids in the DOM are the raw string, so decode for the
+    // match. Fall back to the raw slice if the hash contains a malformed
+    // escape sequence (decodeURIComponent throws on those).
     const hash = globalThis.location.hash;
 
     if (anchorEnabled && hash.length > 1) {
-      // location.hash is percent-encoded; ids in the DOM are the raw string.
-      // Decode for the match. Fall back to the raw slice if the hash contains
-      // a malformed escape sequence (decodeURIComponent throws on those).
       let id: string;
 
       try {
@@ -117,7 +142,7 @@ export function createScrollRestoration(
       }
 
       if (mode === "top" || !nav) {
-        scrollToHashOrTop();
+        scrollToHashOrTop(route);
 
         return;
       }
@@ -136,7 +161,7 @@ export function createScrollRestoration(
         return;
       }
 
-      scrollToHashOrTop();
+      scrollToHashOrTop(route);
     });
   });
 

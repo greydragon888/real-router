@@ -6,6 +6,9 @@ import {
   urlToPath,
   createStartInterceptor,
   createReplaceHistoryState,
+  encodeHashFragment,
+  getDecodedHash,
+  normalizeHashInput,
 } from "./browser-env";
 import {
   peekBack,
@@ -22,6 +25,7 @@ import {
 import { createNavigateHandler } from "./navigate-handler";
 import { wrapNavigationBrowserWithSyncing } from "./navigation-browser";
 
+import type { UrlContext } from "./browser-env";
 import type { SyncingFlag } from "./navigation-browser";
 import type {
   NavigationBrowser,
@@ -65,6 +69,10 @@ export class NavigationPlugin {
     write: (state: State, value: NavigationMeta) => void;
     release: () => void;
   };
+  readonly #urlClaim: {
+    write: (state: State, value: UrlContext) => void;
+    release: () => void;
+  };
   readonly #lifecycle: Pick<Plugin, "onStart" | "onStop" | "teardown">;
   readonly #syncing: SyncingFlag = { current: false };
 
@@ -95,6 +103,7 @@ export class NavigationPlugin {
     this.#browser = wrapNavigationBrowserWithSyncing(browser, this.#syncing);
 
     this.#claim = api.claimContextNamespace("navigation");
+    this.#urlClaim = api.claimContextNamespace("url");
     this.#removeStartInterceptor = createStartInterceptor(api, this.#browser);
 
     // Cross-document load priming (#531). On F5, browser back/forward across
@@ -117,10 +126,28 @@ export class NavigationPlugin {
       };
     }
 
-    const pluginBuildUrl = (route: string, params?: Params) => {
-      const path = router.buildPath(route, params);
+    // Hash for the first transition (#532) is read lazily inside
+    // onTransitionSuccess via `getDecodedHash(browser)` — capturing in the
+    // constructor is too eager (in tests, the mock URL is set after the
+    // plugin is constructed). The lazy read still covers F5 / fresh URL
+    // bar entry: by the time onTransitionSuccess fires the browser already
+    // reflects the destination URL.
 
-      return buildUrl(path, options.base);
+    const pluginBuildUrl = (
+      route: string,
+      params?: Params,
+      opts?: { hash?: string },
+    ) => {
+      const path = router.buildPath(route, params);
+      const url = buildUrl(path, options.base);
+
+      if (opts?.hash === undefined) {
+        return url;
+      }
+
+      const norm = normalizeHashInput(opts.hash);
+
+      return norm ? `${url}#${encodeHashFragment(norm)}` : url;
     };
 
     this.#removeExtensions = api.extendRouter({
@@ -169,6 +196,7 @@ export class NavigationPlugin {
       removeExtensions: this.#removeExtensions,
       releaseClaim: () => {
         this.#claim.release();
+        this.#urlClaim.release();
       },
     });
   }
@@ -268,11 +296,41 @@ export class NavigationPlugin {
         if (traverseKey) {
           this.#browser.traverseTo(traverseKey);
         } else {
+          // Tri-state hash resolution (#532).
+          //   navOptions.hash === undefined → preserve current browser hash
+          //   navOptions.hash === ""        → explicitly clear
+          //   navOptions.hash === "value"   → explicitly set
+          //
+          // The "preserve" branch reads location.hash from the browser, not
+          // fromState.context.url.hash — this captures dynamic fragment
+          // changes the user makes outside the plugin (anchor clicks,
+          // manual location.hash assignment) instead of replaying the
+          // last-published value.
+          //
+          // hashChanged compares the chosen hash against the *published*
+          // previous hash (fromState.context.url.hash), so subscribers see
+          // a true signal regardless of whether the value came from
+          // navOptions or the browser.
+          const browserHash = getDecodedHash(this.#browser);
+          const publishedPrevHash =
+            (fromState?.context as { url?: { hash?: string } } | undefined)?.url
+              ?.hash ?? "";
+
+          const hash =
+            navOptions.hash === undefined
+              ? browserHash
+              : normalizeHashInput(navOptions.hash);
+
+          this.#urlClaim.write(
+            toState,
+            Object.freeze({
+              hash,
+              hashChanged: navOptions.hashChange ?? hash !== publishedPrevHash,
+            }),
+          );
+
           const url = buildUrl(toState.path, this.#options.base);
-          const shouldPreserveHash =
-            !fromState || fromState.path === toState.path;
-          const hash = shouldPreserveHash ? this.#browser.getHash() : "";
-          const finalUrl = hash ? url + hash : url;
+          const finalUrl = hash ? `${url}#${encodeHashFragment(hash)}` : url;
           const historyState = {
             name: toState.name,
             params: toState.params,

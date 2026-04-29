@@ -8,8 +8,11 @@ import {
   createSafeBrowser,
   createStartInterceptor,
   createUpdateBrowserState,
+  encodeHashFragment,
   extractPath,
+  getDecodedHash,
   normalizeBase,
+  normalizeHashInput,
   safelyEncodePath,
   shouldReplaceHistory,
   urlToPath,
@@ -21,6 +24,7 @@ import type {
   Browser,
   PopstateTransitionOptions,
   SharedFactoryState,
+  UrlContext,
 } from "./browser-env";
 import type { BrowserContext, BrowserPluginOptions } from "./types";
 import type {
@@ -115,13 +119,30 @@ function createBrowserPlugin(
   shared: SharedFactoryState,
 ): Plugin {
   const claim = api.claimContextNamespace("browser");
+  // Shared URL namespace (#532) — both navigation-plugin and browser-plugin
+  // claim "url"; mutually exclusive at runtime.
+  const urlClaim = api.claimContextNamespace("url") as {
+    write: (state: State, value: UrlContext) => void;
+    release: () => void;
+  };
   const updateState = createUpdateBrowserState();
   const removeStartInterceptor = createStartInterceptor(api, browser);
 
-  const pluginBuildUrl = (route: string, params?: Params) => {
+  const pluginBuildUrl = (
+    route: string,
+    params?: Params,
+    opts?: { hash?: string },
+  ) => {
     const path = router.buildPath(route, params);
+    const url = buildUrl(path, options.base);
 
-    return buildUrl(path, options.base);
+    if (opts?.hash === undefined) {
+      return url;
+    }
+
+    const norm = normalizeHashInput(opts.hash);
+
+    return norm ? `${url}#${encodeHashFragment(norm)}` : url;
   };
 
   const removeExtensions = api.extendRouter({
@@ -144,6 +165,12 @@ function createBrowserPlugin(
     transitionOptions,
     loggerContext: LOGGER_CONTEXT,
     buildUrl: pluginBuildUrl,
+    // Hash bridging (#532). popstate doesn't carry a URL — we sample
+    // location.hash after the browser has updated to the destination.
+    getCurrentHash: () => getDecodedHash(browser),
+    getCurrentContextHash: () =>
+      (router.getState()?.context as { url?: { hash?: string } } | undefined)
+        ?.url?.hash ?? "",
   });
 
   const lifecycle = createPopstateLifecycle({
@@ -154,6 +181,7 @@ function createBrowserPlugin(
       removeStartInterceptor();
       removeExtensions();
       claim.release();
+      urlClaim.release();
     },
   });
 
@@ -171,12 +199,36 @@ function createBrowserPlugin(
         fromState,
       );
 
+      // Tri-state hash resolution (#532).
+      //   navOptions.hash === undefined → preserve current browser hash
+      //   navOptions.hash === ""        → explicitly clear
+      //   navOptions.hash === "value"   → explicitly set
+      //
+      // The "preserve" branch reads location.hash from the browser, not
+      // fromState.context.url.hash — captures dynamic fragment changes
+      // (anchor clicks, manual location.hash assignment) made outside the
+      // plugin. hashChanged compares the chosen hash against the published
+      // previous hash so subscribers see a true signal.
+      const browserHash = getDecodedHash(browser);
+      const publishedPrevHash =
+        (fromState?.context as { url?: { hash?: string } } | undefined)?.url
+          ?.hash ?? "";
+
+      const hash =
+        navOptions.hash === undefined
+          ? browserHash
+          : normalizeHashInput(navOptions.hash);
+
+      urlClaim.write(
+        toState,
+        Object.freeze({
+          hash,
+          hashChanged: navOptions.hashChange ?? hash !== publishedPrevHash,
+        }),
+      );
+
       const url = buildUrl(toState.path, options.base);
-
-      const shouldPreserveHash = !fromState || fromState.path === toState.path;
-
-      const hash = shouldPreserveHash ? browser.getHash() : "";
-      const finalUrl = hash ? url + hash : url;
+      const finalUrl = hash ? `${url}#${encodeHashFragment(hash)}` : url;
 
       updateState(toState, finalUrl, replaceHistory, browser);
 

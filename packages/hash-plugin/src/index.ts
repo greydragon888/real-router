@@ -18,26 +18,57 @@ export { isStateStrict as isState } from "type-guards";
 /**
  * Module augmentation for real-router.
  * Extends Router interface with hash plugin methods.
+ *
+ * NavigationOptions augmentation (#532) keeps the `hash` / `hashChange` keys
+ * known to TypeScript even when only hash-plugin is installed — runtime
+ * silently ignores them with a one-time warn.
  */
+declare module "@real-router/types" {
+  interface NavigationOptions {
+    /**
+     * URL fragment override (decoded, no leading "#"). Ignored by hash-plugin
+     * (URL fragments are structurally incompatible with hash routing); see
+     * `Router.buildUrl`. (#532)
+     */
+    hash?: string;
+    /** @internal — not used by hash-plugin. */
+    hashChange?: boolean;
+  }
+}
+
 declare module "@real-router/core" {
   interface Router {
     /**
      * Builds full URL for a route with base path and hash prefix.
      * Added by hash plugin.
+     *
+     * The optional `hash` option exists for typing parity with browser-plugin
+     * and navigation-plugin (#532). hash-plugin uses `#` as the route
+     * delimiter, so the option is silently ignored at runtime and a
+     * one-time `console.warn` is emitted.
      */
-    buildUrl: (name: string, params?: Params) => string;
+    buildUrl(
+      name: string,
+      params?: Params,
+      options?: { hash?: string },
+    ): string;
 
     /**
      * Matches URL and returns corresponding state.
      * Added by hash plugin.
      */
-    matchUrl: (url: string) => State | undefined;
+    matchUrl(url: string): State | undefined;
 
     /**
      * Replaces current history state without triggering navigation.
-     * Added by hash plugin.
+     * Added by hash plugin. The optional `hash` option is ignored (see
+     * `buildUrl`).
      */
-    replaceHistoryState: (name: string, params?: Params) => void;
+    replaceHistoryState(
+      name: string,
+      params?: Params,
+      options?: { hash?: string },
+    ): void;
 
     start(path?: string): Promise<State>;
   }

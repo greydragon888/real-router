@@ -5,6 +5,7 @@ import {
   shouldNavigate,
   buildHref,
   buildActiveClassName,
+  navigateWithHash,
   shallowEqual,
 } from "../dom-utils";
 import { useIsActiveRoute } from "../hooks/useIsActiveRoute";
@@ -27,6 +28,7 @@ function areLinkPropsEqual(
     prev.target === next.target &&
     prev.style === next.style &&
     prev.children === next.children &&
+    prev.hash === next.hash &&
     shallowEqual(prev.routeParams, next.routeParams) &&
     shallowEqual(prev.routeOptions, next.routeOptions)
   );
@@ -40,6 +42,7 @@ const LinkImpl: FC<LinkProps> = ({
   activeClassName = "active",
   activeStrict = false,
   ignoreQueryParams = true,
+  hash,
   onClick,
   target,
   children,
@@ -52,16 +55,26 @@ const LinkImpl: FC<LinkProps> = ({
 
   const router = useRouter();
 
+  // When `hash` prop is set, active state requires both route AND hash to
+  // match (#532). Without this, three tab links sharing routeName="settings"
+  // would all be marked active by route-name alone, defeating tab semantics.
   const isActive = useIsActiveRoute(
     routeName,
     routeParams,
     activeStrict,
     ignoreQueryParams,
+    hash,
   );
 
   const href = useMemo(
-    () => buildHref(router, routeName, routeParams),
-    [router, routeName, routeParams],
+    () =>
+      buildHref(
+        router,
+        routeName,
+        routeParams,
+        hash === undefined ? undefined : { hash },
+      ),
+    [router, routeName, routeParams, hash],
   );
 
   const handleClick = useCallback(
@@ -79,9 +92,15 @@ const LinkImpl: FC<LinkProps> = ({
       }
 
       evt.preventDefault();
-      router.navigate(routeName, routeParams, routeOptions).catch(() => {});
+      navigateWithHash(
+        router,
+        routeName,
+        routeParams,
+        hash,
+        routeOptions,
+      ).catch(() => {});
     },
-    [onClick, target, router, routeName, routeParams, routeOptions],
+    [onClick, target, router, routeName, routeParams, routeOptions, hash],
   );
 
   const finalClassName = buildActiveClassName(

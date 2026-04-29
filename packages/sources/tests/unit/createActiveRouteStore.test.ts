@@ -241,4 +241,187 @@ describe("createActiveRouteSources", () => {
 
     unsubscribe();
   });
+
+  describe("hash-aware active state (#532)", () => {
+    function makeRouterWithUrlContext(initialHash = ""): Router {
+      const r = createRouter([
+        { name: "home", path: "/" },
+        { name: "settings", path: "/settings" },
+      ]);
+
+      // Tiny stand-in for browser-plugin's onTransitionSuccess: write the
+      // requested hash to state.context.url after every navigation.
+      // Cast to any keeps the test isolated from the URL-plugin module
+      // augmentations of NavigationOptions / StateContext.
+      r.usePlugin(((): unknown => ({
+        onTransitionSuccess: (
+          toState: unknown,
+          _from: unknown,
+          opts: unknown,
+        ) => {
+          const optsAny = opts as
+            | { hash?: string; hashChange?: boolean }
+            | undefined;
+          const ctx = (toState as { context: Record<string, unknown> }).context;
+          const prevUrl = ctx.url as { hash?: string } | undefined;
+          const prevHash = prevUrl?.hash ?? initialHash;
+          const next = optsAny?.hash ?? prevHash;
+
+          ctx.url = Object.freeze({
+            hash: next,
+            hashChanged: optsAny?.hashChange ?? next !== prevHash,
+          });
+        },
+      })) as Parameters<typeof r.usePlugin>[0]);
+
+      return r;
+    }
+
+    it("initial value: true when route AND hash both match", async () => {
+      const r = makeRouterWithUrlContext("billing");
+
+      await r.start("/settings");
+
+      const source = createActiveRouteSource(r, "settings", undefined, {
+        hash: "billing",
+      });
+
+      expect(source.getSnapshot()).toBe(true);
+
+      r.stop();
+    });
+
+    it("initial value: false when route matches but hash differs", async () => {
+      const r = makeRouterWithUrlContext("profile");
+
+      await r.start("/settings");
+
+      const source = createActiveRouteSource(r, "settings", undefined, {
+        hash: "billing",
+      });
+
+      expect(source.getSnapshot()).toBe(false);
+
+      r.stop();
+    });
+
+    it("initial value: false when hash is empty-string sentinel and current is non-empty", async () => {
+      const r = makeRouterWithUrlContext("anchor");
+
+      await r.start("/settings");
+
+      const source = createActiveRouteSource(r, "settings", undefined, {
+        hash: "",
+      });
+
+      expect(source.getSnapshot()).toBe(false);
+
+      r.stop();
+    });
+
+    it("flips on same-route hash change (hashFlip via context.url.hashChanged)", async () => {
+      const r = makeRouterWithUrlContext("profile");
+
+      await r.start("/settings");
+
+      const source = createActiveRouteSource(r, "settings", undefined, {
+        hash: "billing",
+      });
+
+      expect(source.getSnapshot()).toBe(false);
+
+      const listener = vi.fn();
+
+      source.subscribe(listener);
+
+      await r
+        .navigate(
+          "settings",
+          {},
+          // Cast keeps this test independent of URL-plugin augmentations.
+          { hash: "billing", force: true, hashChange: true } as Parameters<
+            typeof r.navigate
+          >[2],
+        )
+        .catch(() => {});
+
+      expect(source.getSnapshot()).toBe(true);
+      expect(listener).toHaveBeenCalled();
+
+      r.stop();
+    });
+
+    it("hash-undefined source ignores hash (legacy semantics preserved)", async () => {
+      const r = makeRouterWithUrlContext("billing");
+
+      await r.start("/settings");
+
+      const source = createActiveRouteSource(r, "settings");
+
+      expect(source.getSnapshot()).toBe(true);
+
+      // Navigate to ensure subscribe path runs with hash === undefined —
+      // exercises the early hashFlip short-circuit branch.
+      await r.navigate("home").catch(() => {});
+
+      expect(source.getSnapshot()).toBe(false);
+
+      r.stop();
+    });
+
+    it("hash-aware source returns false on hash-plugin runtime (no state.context.url)", async () => {
+      const r = createRouter([
+        { name: "home", path: "/" },
+        { name: "settings", path: "/settings" },
+      ]);
+
+      await r.start("/settings");
+
+      const source = createActiveRouteSource(r, "settings", undefined, {
+        hash: "billing",
+      });
+
+      // No URL plugin → state.context.url undefined → readContextHash returns ""
+      // → does not equal "billing" → not active.
+      expect(source.getSnapshot()).toBe(false);
+
+      // Navigate with hash-aware source on a no-plugin router exercises the
+      // hashFlip branch where `hash !== undefined` but state.context.url is
+      // missing — `?? false` short-circuits hashFlip to false. Combined with
+      // route-match this still re-evaluates correctly.
+      await r.navigate("home").catch(() => {});
+
+      expect(source.getSnapshot()).toBe(false);
+
+      await r.navigate("settings").catch(() => {});
+
+      expect(source.getSnapshot()).toBe(false);
+
+      r.stop();
+    });
+
+    it("cache key separates hash variants", async () => {
+      const r = makeRouterWithUrlContext("billing");
+
+      await r.start("/settings");
+
+      const a = createActiveRouteSource(r, "settings", undefined, {
+        hash: "profile",
+      });
+      const b = createActiveRouteSource(r, "settings", undefined, {
+        hash: "billing",
+      });
+      const c = createActiveRouteSource(r, "settings", undefined, {
+        hash: "profile",
+      });
+
+      // a and b are distinct (different hash), a and c are same (cache hit)
+      expect(a).toBe(c);
+      expect(a).not.toBe(b);
+      expect(a.getSnapshot()).toBe(false); // hash differs from "billing"
+      expect(b.getSnapshot()).toBe(true);
+
+      r.stop();
+    });
+  });
 });

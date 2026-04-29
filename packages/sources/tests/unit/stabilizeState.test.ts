@@ -187,4 +187,64 @@ describe("stabilizeState", () => {
       expect(stabilizeState(prevRoute, nextRoute)).toBe(nextRoute);
     });
   });
+
+  // ===
+  // Hash-aware stabilization (#532)
+  // ===
+
+  describe("hash-aware stabilization (#532)", () => {
+    function makeStateWithHash(base: State, hash: string | undefined): State {
+      // Clone the state with a fresh context.url. Path/name/params identical
+      // on purpose — emulates the same-path-different-hash scenario.
+      const clone = {
+        ...base,
+        context: {
+          ...base.context,
+          url:
+            hash === undefined
+              ? undefined
+              : Object.freeze({ hash, hashChanged: true }),
+        },
+      };
+
+      return clone as State;
+    }
+
+    it("same path, different context.url.hash → returns next", () => {
+      const api = getPluginApi(router);
+      const base = api.makeState("home", {}, "/");
+      const prev = makeStateWithHash(base, "profile");
+      const next = makeStateWithHash(base, "billing");
+
+      expect(prev.path).toBe(next.path);
+      expect(stabilizeState(prev, next)).toBe(next);
+    });
+
+    it("same path, same context.url.hash → returns prev", () => {
+      const api = getPluginApi(router);
+      const base = api.makeState("home", {}, "/");
+      const prev = makeStateWithHash(base, "profile");
+      const next = makeStateWithHash(base, "profile");
+
+      expect(stabilizeState(prev, next)).toBe(prev);
+    });
+
+    it("same path, prev has hash, next has no hash → returns next", () => {
+      const api = getPluginApi(router);
+      const base = api.makeState("home", {}, "/");
+      const prev = makeStateWithHash(base, "anchor");
+      const next = makeStateWithHash(base, undefined);
+
+      expect(stabilizeState(prev, next)).toBe(next);
+    });
+
+    it("same path, both no hash → returns prev (legacy behavior preserved)", () => {
+      const api = getPluginApi(router);
+      const base = api.makeState("home", {}, "/");
+      const prev = makeStateWithHash(base, undefined);
+      const next = makeStateWithHash(base, undefined);
+
+      expect(stabilizeState(prev, next)).toBe(prev);
+    });
+  });
 });

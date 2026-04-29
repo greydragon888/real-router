@@ -1,16 +1,27 @@
 import type { ActiveRouteSourceOptions } from "./types.js";
 
 /**
+ * Normalized options shape — booleans are required (filled with defaults),
+ * `hash` stays `string | undefined` because `undefined` is the meaningful
+ * "ignore hash" sentinel that callers pass intentionally.
+ */
+export interface NormalizedActiveOptions {
+  strict: boolean;
+  ignoreQueryParams: boolean;
+  hash: string | undefined;
+}
+
+/**
  * Default options for `createActiveRouteSource` and adapter-level helpers.
  *
  * Frozen to prevent accidental mutation by consumers.
  */
-export const DEFAULT_ACTIVE_OPTIONS: Readonly<
-  Required<ActiveRouteSourceOptions>
-> = Object.freeze({
-  strict: false,
-  ignoreQueryParams: true,
-});
+export const DEFAULT_ACTIVE_OPTIONS: Readonly<NormalizedActiveOptions> =
+  Object.freeze({
+    strict: false,
+    ignoreQueryParams: true,
+    hash: undefined,
+  });
 
 /**
  * Normalizes partial `ActiveRouteSourceOptions` into a fully-defaulted object.
@@ -20,10 +31,11 @@ export const DEFAULT_ACTIVE_OPTIONS: Readonly<
  */
 export function normalizeActiveOptions(
   options?: ActiveRouteSourceOptions,
-): Required<ActiveRouteSourceOptions> {
+): NormalizedActiveOptions {
   return {
     strict: options?.strict ?? DEFAULT_ACTIVE_OPTIONS.strict,
     ignoreQueryParams:
       options?.ignoreQueryParams ?? DEFAULT_ACTIVE_OPTIONS.ignoreQueryParams,
+    hash: options?.hash,
   };
 }

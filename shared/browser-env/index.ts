@@ -50,7 +50,11 @@ export {
   shouldReplaceHistory,
 } from "./plugin-utils.js";
 
-export type { LocationSource, ReplaceStateBrowser } from "./plugin-utils.js";
+export type {
+  LocationSource,
+  ReplaceStateBrowser,
+  ReplaceHistoryStateOptions,
+} from "./plugin-utils.js";
 
 export { safeParseUrl } from "./url-parsing.js";
 
@@ -58,5 +62,15 @@ export {
   extractPath,
   buildUrl,
   urlToPath,
+  urlToPathAndHash,
   extractPathFromAbsoluteUrl,
 } from "./url-utils.js";
+
+export type { UrlContext } from "./url-context.js";
+
+export {
+  encodeHashFragment,
+  decodeHashFragment,
+  normalizeHashInput,
+  getDecodedHash,
+} from "./url-context.js";
