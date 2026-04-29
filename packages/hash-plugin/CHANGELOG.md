@@ -1,5 +1,21 @@
 # @real-router/hash-plugin
 
+## 0.7.0
+
+### Minor Changes
+
+- [#567](https://github.com/greydragon888/real-router/pull/567) [`e8f4a5c`](https://github.com/greydragon888/real-router/commit/e8f4a5c578f1094059d500b0f44ddd7ce788c534) Thanks [@greydragon888](https://github.com/greydragon888)! - Document URL fragment limitation with one-time runtime warning ([#532](https://github.com/greydragon888/real-router/issues/532))
+
+  `hash-plugin` uses `#` as the route delimiter, so URL fragments are
+  structurally incompatible. The plugin now accepts the `hash` option on
+  `buildUrl` / `navigate` for typing parity with `@real-router/browser-plugin`
+  and `@real-router/navigation-plugin`, ignores it at runtime, and emits a
+  single `console.warn` the first time any consumer surfaces a hash through
+  either entry point.
+
+  Use `@real-router/browser-plugin` or `@real-router/navigation-plugin` if you
+  need URL fragment support.
+
 ## 0.6.3
 
 ### Patch Changes

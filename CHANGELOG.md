@@ -5,6 +5,290 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-04-29]
+
+### @real-router/angular@0.7.0
+
+### Minor Changes
+
+- [#567](https://github.com/greydragon888/real-router/pull/567) [`e8f4a5c`](https://github.com/greydragon888/real-router/commit/e8f4a5c578f1094059d500b0f44ddd7ce788c534) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `hash` support to `[realLink]` and `injectIsActiveRoute` ([#532](https://github.com/greydragon888/real-router/issues/532))
+  - The `realLink` directive exposes a signal `hash` input
+    (`input<string | undefined>(undefined)`) that builds a URL with the
+    fragment via the URL plugin's `router.buildUrl(name, params, { hash })`
+    extension and, on click, calls the `navigateWithHash` helper. The helper
+    auto-bypasses SAME_STATES (`force: true, hashChange: true`) when the same
+    route is navigated to with a different fragment, so anchor-style same-path
+    links update both URL and `state.context.url.hashChanged`.
+  - `injectIsActiveRoute(name, params, { strict?, ignoreQueryParams?, hash? })`
+    accepts an optional `hash` field. When provided, the returned
+    `Signal<boolean>` is `true` iff the route matches AND
+    `state.context.url.hash` equals the requested fragment exactly — distinct
+    hashes get distinct cache entries in `@real-router/sources` (see its
+    changeset).
+
+  ```html
+  <a realLink routeName="docs" hash="section">Docs</a>
+  ```
+
+### Patch Changes
+
+- [#567](https://github.com/greydragon888/real-router/pull/567) [`e8f4a5c`](https://github.com/greydragon888/real-router/commit/e8f4a5c578f1094059d500b0f44ddd7ce788c534) Thanks [@greydragon888](https://github.com/greydragon888)! - SSR-safe anchor lookup in `createScrollRestoration` ([#532](https://github.com/greydragon888/real-router/issues/532))
+
+  `createScrollRestoration` now reads the anchor target from
+  `state.context.url.hash` (decoded, populated by the URL plugins) when
+  available, falling back to `globalThis.location.hash` otherwise. Removes a
+  race between the adapter's commit and the browser's hash update.
+
+- Updated dependencies [[`e8f4a5c`](https://github.com/greydragon888/real-router/commit/e8f4a5c578f1094059d500b0f44ddd7ce788c534)]:
+  - @real-router/sources@0.8.0
+
+### @real-router/browser-plugin@0.17.0
+
+### Minor Changes
+
+- [#567](https://github.com/greydragon888/real-router/pull/567) [`e8f4a5c`](https://github.com/greydragon888/real-router/commit/e8f4a5c578f1094059d500b0f44ddd7ce788c534) Thanks [@greydragon888](https://github.com/greydragon888)! - Add URL fragment ("hash") support via `state.context.url` ([#532](https://github.com/greydragon888/real-router/issues/532))
+
+  The plugin claims the shared `"url"` `state.context` namespace alongside its
+  existing `"browser"` namespace. Subscribers can read the decoded fragment and
+  the `hashChanged` signal from `state.context.url`.
+  - `router.buildUrl(name, params, { hash })` and
+    `router.replaceHistoryState(name, params, { hash })` accept an options object
+    with the decoded fragment.
+  - `router.navigate(name, params, { hash })` exposes tri-state `hash`:
+    `undefined` preserves, `""` clears, a non-empty value sets the fragment.
+  - The popstate handler samples `location.hash` after the browser has updated
+    to the destination, detects hash-only navigation, and adds
+    `force: true, hashChange: true` to bypass SAME_STATES.
+  - Cross-path navigation preserves the current fragment by default; the
+    previous `shouldPreserveHash` workaround that dropped the hash on path
+    change is removed.
+  - `rollbackUrlToCurrentState` (popstate recovery) reads the fragment from
+    `state.context.url.hash` so guard rejection or unmatched URLs do not strip
+    the fragment.
+
+### @real-router/hash-plugin@0.7.0
+
+### Minor Changes
+
+- [#567](https://github.com/greydragon888/real-router/pull/567) [`e8f4a5c`](https://github.com/greydragon888/real-router/commit/e8f4a5c578f1094059d500b0f44ddd7ce788c534) Thanks [@greydragon888](https://github.com/greydragon888)! - Document URL fragment limitation with one-time runtime warning ([#532](https://github.com/greydragon888/real-router/issues/532))
+
+  `hash-plugin` uses `#` as the route delimiter, so URL fragments are
+  structurally incompatible. The plugin now accepts the `hash` option on
+  `buildUrl` / `navigate` for typing parity with `@real-router/browser-plugin`
+  and `@real-router/navigation-plugin`, ignores it at runtime, and emits a
+  single `console.warn` the first time any consumer surfaces a hash through
+  either entry point.
+
+  Use `@real-router/browser-plugin` or `@real-router/navigation-plugin` if you
+  need URL fragment support.
+
+### @real-router/navigation-plugin@0.7.0
+
+### Minor Changes
+
+- [#567](https://github.com/greydragon888/real-router/pull/567) [`e8f4a5c`](https://github.com/greydragon888/real-router/commit/e8f4a5c578f1094059d500b0f44ddd7ce788c534) Thanks [@greydragon888](https://github.com/greydragon888)! - Add URL fragment ("hash") support via `state.context.url` ([#532](https://github.com/greydragon888/real-router/issues/532))
+
+  The plugin now publishes a shared `url` namespace under `state.context` containing
+  the decoded fragment and a `hashChanged` signal. Subscribers can branch on
+  `state.context.url.hashChanged` instead of disambiguating via the overloaded
+  `force` flag.
+  - `router.buildUrl(name, params, { hash })` accepts an options object with the
+    decoded fragment (no leading `#`).
+  - `router.replaceHistoryState(name, params, { hash })` mirrors the same widening.
+  - `router.navigate(name, params, { hash })` exposes a tri-state `hash` option:
+    `undefined` preserves the current fragment, `""` clears it, a non-empty value
+    sets it.
+  - The `navigate` event handler detects `event.hashChange` and forwards
+    `force: true, hashChange: true` so same-path hash-only clicks are not swallowed
+    by the SAME_STATES short-circuit.
+  - Cross-path navigation now preserves the current fragment by default, fixing
+    the previous `shouldPreserveHash` workaround which dropped the hash on every
+    path change.
+  - Recovery (`syncUrlToRouterState`) reads the fragment from
+    `state.context.url.hash` so guard rejection or unmatched URLs do not strip the
+    fragment from the visible URL.
+
+### @real-router/preact@0.10.0
+
+### Minor Changes
+
+- [#567](https://github.com/greydragon888/real-router/pull/567) [`e8f4a5c`](https://github.com/greydragon888/real-router/commit/e8f4a5c578f1094059d500b0f44ddd7ce788c534) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `hash` support to `<Link>` and `useIsActiveRoute` ([#532](https://github.com/greydragon888/real-router/issues/532))
+  - `<Link>` accepts an optional `hash?: string` prop that builds a URL with
+    the fragment via the URL plugin's `router.buildUrl(name, params, { hash })`
+    extension and, on click, calls the `navigateWithHash` helper. The helper
+    auto-bypasses SAME_STATES (`force: true, hashChange: true`) when the same
+    route is navigated to with a different fragment, so anchor-style same-path
+    links update both URL and `state.context.url.hashChanged`.
+  - `useIsActiveRoute(name, params, strict?, ignoreQueryParams?, hash?)` gains
+    an optional fifth `hash` argument. When provided, the hook is `true` iff
+    the route matches AND `state.context.url.hash` equals the requested
+    fragment exactly — distinct hashes get distinct cache entries in
+    `@real-router/sources` (see its changeset).
+
+### Patch Changes
+
+- [#567](https://github.com/greydragon888/real-router/pull/567) [`e8f4a5c`](https://github.com/greydragon888/real-router/commit/e8f4a5c578f1094059d500b0f44ddd7ce788c534) Thanks [@greydragon888](https://github.com/greydragon888)! - SSR-safe anchor lookup in `createScrollRestoration` ([#532](https://github.com/greydragon888/real-router/issues/532))
+
+  `createScrollRestoration` now reads the anchor target from
+  `state.context.url.hash` (decoded, populated by the URL plugins) when
+  available, falling back to `globalThis.location.hash` otherwise. Removes a
+  race between the adapter's commit and the browser's hash update.
+
+- Updated dependencies [[`e8f4a5c`](https://github.com/greydragon888/real-router/commit/e8f4a5c578f1094059d500b0f44ddd7ce788c534)]:
+  - @real-router/sources@0.8.0
+
+### @real-router/react@0.23.0
+
+### Minor Changes
+
+- [#567](https://github.com/greydragon888/real-router/pull/567) [`e8f4a5c`](https://github.com/greydragon888/real-router/commit/e8f4a5c578f1094059d500b0f44ddd7ce788c534) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `hash` support to `<Link>` and `useIsActiveRoute` ([#532](https://github.com/greydragon888/real-router/issues/532))
+  - `<Link>` accepts an optional `hash?: string` prop that builds a URL with
+    the fragment via the URL plugin's `router.buildUrl(name, params, { hash })`
+    extension and, on click, calls the new `navigateWithHash` helper. The
+    helper auto-bypasses SAME_STATES (`force: true, hashChange: true`) when
+    the same route is navigated to with a different fragment, so anchor-style
+    same-path links update both URL and `state.context.url.hashChanged`.
+  - `useIsActiveRoute(name, params, strict?, ignoreQueryParams?, hash?)` gains
+    an optional fifth `hash` argument. When provided, the hook is `true` iff
+    the route matches AND `state.context.url.hash` equals the requested
+    fragment exactly — distinct hashes get distinct cache entries in
+    `@real-router/sources` (see its changeset).
+
+### Patch Changes
+
+- [#567](https://github.com/greydragon888/real-router/pull/567) [`e8f4a5c`](https://github.com/greydragon888/real-router/commit/e8f4a5c578f1094059d500b0f44ddd7ce788c534) Thanks [@greydragon888](https://github.com/greydragon888)! - SSR-safe anchor lookup in `createScrollRestoration` ([#532](https://github.com/greydragon888/real-router/issues/532))
+
+  `createScrollRestoration` now reads the anchor target from
+  `state.context.url.hash` (decoded, populated by the URL plugins) rather than
+  `globalThis.location.hash`, falling back to the DOM only when no URL plugin
+  is installed. This avoids race conditions between React's commit and the
+  browser's hash update.
+
+- Updated dependencies [[`e8f4a5c`](https://github.com/greydragon888/real-router/commit/e8f4a5c578f1094059d500b0f44ddd7ce788c534)]:
+  - @real-router/sources@0.8.0
+
+### @real-router/solid@0.10.0
+
+### Minor Changes
+
+- [#567](https://github.com/greydragon888/real-router/pull/567) [`e8f4a5c`](https://github.com/greydragon888/real-router/commit/e8f4a5c578f1094059d500b0f44ddd7ce788c534) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `hash` support to `<Link>` and `useIsActiveRoute` ([#532](https://github.com/greydragon888/real-router/issues/532))
+  - `<Link>` accepts an optional `hash?: string` prop that builds a URL with
+    the fragment via the URL plugin's `router.buildUrl(name, params, { hash })`
+    extension and, on click, calls the `navigateWithHash` helper. The helper
+    auto-bypasses SAME_STATES (`force: true, hashChange: true`) when the same
+    route is navigated to with a different fragment, so anchor-style same-path
+    links update both URL and `state.context.url.hashChanged`.
+  - `useIsActiveRoute(name, params, strict?, ignoreQueryParams?, hash?)` gains
+    an optional fifth `hash` argument. When provided, the hook is `true` iff
+    the route matches AND `state.context.url.hash` equals the requested
+    fragment exactly — distinct hashes get distinct cache entries in
+    `@real-router/sources` (see its changeset).
+
+### Patch Changes
+
+- [#567](https://github.com/greydragon888/real-router/pull/567) [`e8f4a5c`](https://github.com/greydragon888/real-router/commit/e8f4a5c578f1094059d500b0f44ddd7ce788c534) Thanks [@greydragon888](https://github.com/greydragon888)! - SSR-safe anchor lookup in `createScrollRestoration` ([#532](https://github.com/greydragon888/real-router/issues/532))
+
+  `createScrollRestoration` now reads the anchor target from
+  `state.context.url.hash` (decoded, populated by the URL plugins) when
+  available, falling back to `globalThis.location.hash` otherwise. Removes a
+  race between the adapter's commit and the browser's hash update.
+
+- Updated dependencies [[`e8f4a5c`](https://github.com/greydragon888/real-router/commit/e8f4a5c578f1094059d500b0f44ddd7ce788c534)]:
+  - @real-router/sources@0.8.0
+
+### @real-router/sources@0.8.0
+
+### Minor Changes
+
+- [#567](https://github.com/greydragon888/real-router/pull/567) [`e8f4a5c`](https://github.com/greydragon888/real-router/commit/e8f4a5c578f1094059d500b0f44ddd7ce788c534) Thanks [@greydragon888](https://github.com/greydragon888)! - `createActiveRouteSource` accepts optional `hash` to compute hash-aware active state ([#532](https://github.com/greydragon888/real-router/issues/532))
+
+  `ActiveRouteSourceOptions` gains an optional `hash` field. When defined, the
+  source treats a route as active iff:
+  1. `router.isActiveRoute(name, params, strict, ignoreQueryParams)` returns
+     `true`, AND
+  2. `state.context.url.hash` (decoded, populated by the URL plugins) equals
+     the requested fragment exactly.
+
+  The cache key now includes `hash`, so a Link pointing to `/settings#account`
+  shares its source only with consumers using the same routeName + params +
+  hash. Sources with `hash === undefined` retain the legacy route-only active
+  semantics — no behavior change for callers that don't pass the new option.
+
+  Hash-plugin runtimes leave `state.context.url` undefined, so any non-undefined
+  `hash` option produces `false` there — consistent with the documented
+  limitation that hash-plugin doesn't support URL fragments.
+
+  This unlocks tab-style UI in `<Link hash>` across all six framework adapters:
+  the matching variant lights up `activeClassName="active"` automatically, no
+  manual workaround needed.
+
+  `stabilizeState` (used by `createRouteSource`) now also compares
+  `state.context.url.hash`. Previously it short-circuited on `path` only — so
+  `useRoute()` consumers would not re-render on same-path-different-hash
+  transitions (the hash flipped in the URL, but the rendered tab content
+  stayed stale). Treating hash as render identity fixes tab-style UIs that
+  subscribe via `useRoute()` instead of (or in addition to) `<Link>`'s
+  hash-aware active state.
+
+### @real-router/svelte@0.9.0
+
+### Minor Changes
+
+- [#567](https://github.com/greydragon888/real-router/pull/567) [`e8f4a5c`](https://github.com/greydragon888/real-router/commit/e8f4a5c578f1094059d500b0f44ddd7ce788c534) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `hash` support to `<Link>` and `useIsActiveRoute` ([#532](https://github.com/greydragon888/real-router/issues/532))
+  - `<Link>` accepts an optional `hash?: string` prop that builds a URL with
+    the fragment via the URL plugin's `router.buildUrl(name, params, { hash })`
+    extension and, on click, calls the `navigateWithHash` helper. The helper
+    auto-bypasses SAME_STATES (`force: true, hashChange: true`) when the same
+    route is navigated to with a different fragment, so anchor-style same-path
+    links update both URL and `state.context.url.hashChanged`.
+  - `useIsActiveRoute(name, params, strict, ignoreQueryParams, hash?)` gains
+    an optional fifth `hash` argument. When provided, the composable's
+    `current` is `true` iff the route matches AND `state.context.url.hash`
+    equals the requested fragment exactly — distinct hashes get distinct
+    cache entries in `@real-router/sources` (see its changeset).
+
+### Patch Changes
+
+- [#567](https://github.com/greydragon888/real-router/pull/567) [`e8f4a5c`](https://github.com/greydragon888/real-router/commit/e8f4a5c578f1094059d500b0f44ddd7ce788c534) Thanks [@greydragon888](https://github.com/greydragon888)! - SSR-safe anchor lookup in `createScrollRestoration` ([#532](https://github.com/greydragon888/real-router/issues/532))
+
+  `createScrollRestoration` now reads the anchor target from
+  `state.context.url.hash` (decoded, populated by the URL plugins) when
+  available, falling back to `globalThis.location.hash` otherwise. Removes a
+  race between the adapter's commit and the browser's hash update.
+
+- Updated dependencies [[`e8f4a5c`](https://github.com/greydragon888/real-router/commit/e8f4a5c578f1094059d500b0f44ddd7ce788c534)]:
+  - @real-router/sources@0.8.0
+
+### @real-router/vue@0.11.0
+
+### Minor Changes
+
+- [#567](https://github.com/greydragon888/real-router/pull/567) [`e8f4a5c`](https://github.com/greydragon888/real-router/commit/e8f4a5c578f1094059d500b0f44ddd7ce788c534) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `hash` support to `<Link>` and `useIsActiveRoute` ([#532](https://github.com/greydragon888/real-router/issues/532))
+  - `<Link>` accepts an optional `hash?: string` prop that builds a URL with
+    the fragment via the URL plugin's `router.buildUrl(name, params, { hash })`
+    extension and, on click, calls the `navigateWithHash` helper. The helper
+    auto-bypasses SAME_STATES (`force: true, hashChange: true`) when the same
+    route is navigated to with a different fragment, so anchor-style same-path
+    links update both URL and `state.context.url.hashChanged`.
+  - `useIsActiveRoute(name, params, strict?, ignoreQueryParams?, hash?)` gains
+    an optional fifth `hash` argument. When provided, the returned
+    `ShallowRef<boolean>` is `true` iff the route matches AND
+    `state.context.url.hash` equals the requested fragment exactly — distinct
+    hashes get distinct cache entries in `@real-router/sources` (see its
+    changeset).
+
+### Patch Changes
+
+- [#567](https://github.com/greydragon888/real-router/pull/567) [`e8f4a5c`](https://github.com/greydragon888/real-router/commit/e8f4a5c578f1094059d500b0f44ddd7ce788c534) Thanks [@greydragon888](https://github.com/greydragon888)! - SSR-safe anchor lookup in `createScrollRestoration` ([#532](https://github.com/greydragon888/real-router/issues/532))
+
+  `createScrollRestoration` now reads the anchor target from
+  `state.context.url.hash` (decoded, populated by the URL plugins) when
+  available, falling back to `globalThis.location.hash` otherwise. Removes a
+  race between the adapter's commit and the browser's hash update.
+
+- Updated dependencies [[`e8f4a5c`](https://github.com/greydragon888/real-router/commit/e8f4a5c578f1094059d500b0f44ddd7ce788c534)]:
+  - @real-router/sources@0.8.0
+
 ## [2026-04-28]
 
 ### @real-router/core@0.51.0
