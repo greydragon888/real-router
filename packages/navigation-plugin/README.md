@@ -62,11 +62,11 @@ router.usePlugin(
 
 ### Compatible extensions (same as browser-plugin)
 
-| Method                                       | Returns              | Description                                      |
-| -------------------------------------------- | -------------------- | ------------------------------------------------ |
-| `buildUrl(name, params?)`                    | `string`             | Build full URL with base path                    |
-| `matchUrl(url)`                              | `State \| undefined` | Parse URL to router state                        |
-| `replaceHistoryState(name, params?)` | `void`               | Update browser URL without triggering navigation |
+| Method                                                | Returns              | Description                                                                                          |
+| ----------------------------------------------------- | -------------------- | ---------------------------------------------------------------------------------------------------- |
+| `buildUrl(name, params?, options?: { hash? })`        | `string`             | Build full URL with base path. `options.hash` (decoded) is encoded and appended.                     |
+| `matchUrl(url)`                                       | `State \| undefined` | Parse URL to router state                                                                            |
+| `replaceHistoryState(name, params?, options?: { hash? })` | `void`           | Update browser URL without triggering navigation. Tri-state `hash`: `undefined` preserves, `""` clears, value sets. |
 
 ```typescript
 router.buildUrl("users", { id: "123" });
@@ -144,6 +144,27 @@ if (router.canGoBackTo("users.list")) {
   showBackToListButton();
 }
 ```
+
+## URL Fragment ("hash") Support
+
+`navigation-plugin` ships first-class URL-fragment support: `<Link hash>` from any framework adapter, programmatic `router.navigate(name, params, { hash })`, and a `state.context.url = { hash, hashChanged }` namespace populated on every transition.
+
+```typescript
+// Programmatic — tri-state opts.hash
+router.navigate("settings", {}, { hash: "profile" }); // set
+router.navigate("settings", {}, { hash: "" });        // clear
+router.navigate("settings");                          // preserve current
+
+// In subscribers
+router.subscribe(({ route }) => {
+  console.log(route.context.url?.hash);        // "profile"
+  console.log(route.context.url?.hashChanged); // true on hash-only nav
+});
+```
+
+Browser-driven hash-only clicks (`event.hashChange === true` from the Navigation API) bypass core's `SAME_STATES` rejection via `force: true, hashChange: true` — subscribers fire normally on tab-style URLs.
+
+See the [Hash Fragment Support](https://github.com/greydragon888/real-router/wiki/Hash) wiki page for the full surface (encoding, F5 priming, hash-aware active state).
 
 ## Navigation Metadata
 

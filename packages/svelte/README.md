@@ -183,10 +183,20 @@ Navigation link with automatic active state detection. Uses `$derived` for href 
 | `activeClassName`   | `string`            | `"active"`  | Class added when route is active        |
 | `activeStrict`      | `boolean`           | `false`     | Exact match only (no ancestor matching) |
 | `ignoreQueryParams` | `boolean`           | `true`      | Query params don't affect active state  |
+| `hash`              | `string`            | `undefined` | URL fragment (decoded). Tri-state: undefined preserves, `""` clears, value sets. (#532) |
 | `target`            | `string`            | `undefined` | Link target (`_blank`, etc.)            |
 | `onclick`           | `(evt: MouseEvent) => void` | `undefined` | Custom click handler. Runs **before** the navigation logic — call `evt.preventDefault()` to suppress navigation. |
 
 All other props are spread onto the `<a>` element.
+
+#### `hash` — URL fragment / tab-style UIs
+
+```svelte
+<Link routeName="settings" hash="profile">Profile</Link>
+<Link routeName="settings" hash="account">Account</Link>
+```
+
+Active class is hash-aware — only the matching tab lights up. Live demo: [`examples/web/react/link-hash/`](../../examples/web/react/link-hash/) — behavior is identical across adapters, only template syntax differs. See the [Hash Fragment Support](https://github.com/greydragon888/real-router/wiki/Hash) wiki page for the full surface.
 
 ### `<Lazy>`
 

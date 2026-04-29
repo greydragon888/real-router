@@ -191,6 +191,15 @@ Navigation link with automatic active state detection. Uses `classList` for acti
 </Link>
 ```
 
+#### `hash` prop — URL fragment / tab-style UIs
+
+```tsx
+<Link routeName="settings" hash="profile">Profile</Link>
+<Link routeName="settings" hash="account">Account</Link>
+```
+
+Tri-state: `undefined` preserves the current hash, `""` clears it, a value sets it. Active class is hash-aware — only the matching tab lights up. Setting `hash` forces the slow path (the fast-path `routeSelector` is hash-agnostic). Live demo: [`examples/web/react/link-hash/`](../../examples/web/react/link-hash/) — behavior is identical across adapters, only template syntax differs. See the [Hash Fragment Support](https://github.com/greydragon888/real-router/wiki/Hash) wiki page for the full surface.
+
 ### `<RouteView>`
 
 Declarative route matching. Renders the first matching `<RouteView.Match>` child.

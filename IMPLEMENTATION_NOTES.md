@@ -2638,3 +2638,58 @@ The biggest wins are on the heavy-params fixtures (search-params, defaultParams)
 - `getPluginApi(router)`: same return type, now WeakMap-cached per router.
 
 `@real-router/core` and `@real-router/types` bumped `minor` (PluginApi extension); `@real-router/validation-plugin` `minor` (matches the typed surface). The three URL plugins are `patch` (internal call-site migration; no API change).
+
+## URL Fragment ("hash") Support — Plugin-Layer Design (#532)
+
+### Problem
+
+Pre-#532, URL fragments lived in three workarounds:
+
+1. `shouldPreserveHash = !fromState || fromState.path === toState.path` in navigation-plugin & browser-plugin's `onTransitionSuccess` — hash dropped on cross-path navigation, no way to set/clear explicitly.
+2. `urlToPath()` in `shared/browser-env/url-utils.ts` stripped hash before matching → handler never saw the fragment from `event.destination.url`.
+3. Same-path hash-click was swallowed by core's `SAME_STATES` rejection (`navigate-handler.ts` swallowed the error silently) → URL bar updated but `router.subscribe` listeners never fired.
+
+### Solution
+
+Hash treated as **URL-layer** state, owned by URL plugins (browser/navigation), not by core. Symmetric to #497 (scroll restoration utility): viewport-concerns in dom-utils, URL-concerns in plugins, routing-concerns in core.
+
+Three coordinated additions:
+
+- **`state.context.url`** — shared namespace claimed by both URL plugins. Type `{ hash: string; hashChanged: boolean }`. Hash storage form: decoded, no leading `#` (symmetric to params, no leading `?`).
+- **`NavigationOptions.hash` augmentation** — tri-state in plugins' `index.ts`: `undefined` preserves current browser hash, `""` clears, non-empty sets. Plugins read in `onTransitionSuccess`.
+- **`NavigationOptions.hashChange` (@internal)** — flag set by URL plugins on browser-driven hash-only nav (`event.hashChange === true` in navigation-plugin; popstate hashChange detection in browser-plugin). Combined with `force: true` to bypass SAME_STATES; subscribers disambiguate via `state.context.url.hashChanged`, not via the overloaded `force` flag.
+
+### Why not in core
+
+Hash is a URL-layer concept. Memory-plugin / NativeScript / SSR runtimes have no URL → no hash. Adding `hash` to core State would force every non-URL runtime to carry an empty `hash: ""` field and reason about identity it doesn't own. Same line that scroll restoration drew (#497).
+
+### Hash-aware active state & state stabilization
+
+Two follow-ups in `@real-router/sources`:
+
+- `ActiveRouteSourceOptions.hash` — when defined, source is active iff route matches AND `state.context.url.hash` equals requested hash. Cache key includes hash; subscribe path detects hash flip via `state.context.url.hashChanged`. Hash-plugin runtime (no `url` namespace) returns `false` for any non-undefined `hash` — consistent with documented limitation.
+- `stabilizeState` compares `state.context.url.hash` in addition to `path`, so `useRoute()` consumers re-render on same-path-different-hash navigation (tab-style UIs).
+
+### `<Link hash>` API surface
+
+6 adapters get a `hash?: string` prop on `<Link>` / `[realLink]` directive.
+
+- Default `activeClassName="active"` is hash-aware: only the matching variant lights up — tab-style UIs work without manual workaround.
+- Click handler routes through `navigateWithHash` (`shared/dom-utils/link-utils.ts`). When `hash` differs from `state.context.url.hash` on the same route+params, helper auto-adds `force: true, hashChange: true` → bypasses SAME_STATES.
+- Solid's fast-path `routeSelector` is bypassed when `hash` is set (selector is hash-agnostic, slow path through `createActiveRouteSource` is required).
+
+### Encoding contract
+
+- Decoded form in `state.context.url.hash` (no `%` escapes, no leading `#`).
+- Encoded at URL build time via `encodeURI(s).replace(/#/g, "%23")`: preserves RFC-3986 fragment sub-delims (`&`, `=`, `?`, `:`, `@`, etc.) while escaping `%` and `#`. `encodeURIComponent` was rejected — it over-encodes sub-delims.
+- Decoded via `decodeURIComponent` with try/catch fallback to raw input for malformed `%XX` sequences.
+
+### F5 / cold-load: hash is read lazily, not primed
+
+Hash handling is **separate** from navigation-plugin's existing `navigationType` priming (which uses `browser.getActivationType()` to recover the cross-document `navigation.activation.navigationType` so the very first transition reports `reload`/`push`/`traverse`/`replace` correctly — see #531). That priming is Navigation-API-only and does not touch the URL fragment.
+
+For hash, both URL plugins use a **lazy read** in `onTransitionSuccess`: on the first transition (`!fromState`), `getDecodedHash(browser)` is called to obtain the previous hash. By the time `onTransitionSuccess` fires, `location.hash` already reflects the destination URL — F5 on `/page#section`, fresh URL bar entry, and cross-document back/forward all read the correct value. An earlier draft captured the hash in the plugin constructor; this failed in tests where the mock URL is set after plugin construction, and offered no benefit over the lazy read.
+
+### Hash-plugin limitation
+
+`#` is the route delimiter in hash-plugin → URL fragments are structurally incompatible. `pluginBuildUrl` accepts `hash` option for typing parity (TS interface merge needs identical signatures across all 3 URL plugins) but ignores it at runtime + emits one-time `console.warn`. Inline `let warned = false` pattern — existing `createWarnOnce` from `shared/browser-env/ssr-fallback.ts` has SSR-specific signature `(context) => (method) => void` and didn't fit.

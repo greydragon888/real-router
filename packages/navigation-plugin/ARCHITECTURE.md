@@ -352,11 +352,14 @@ router.navigate(name, params, opts)
         ├── Derive or use #capturedMeta (navigationType, userInitiated, info, direction, sourceElement)
         │     └── claim.write(toState, Object.freeze(meta)) → state.context.navigation
         │
-        ├── url = router.buildUrl(toState.name, toState.params)
-        │         └── router.buildPath() + buildUrl(path, base)
+        ├── Resolve hash via tri-state opts.hash (#532):
+        │     prevHash = fromState ? fromState.context.url?.hash : getDecodedHash(browser)
+        │     hash     = navOptions.hash !== undefined ? normalizeHashInput(navOptions.hash) : prevHash
+        │     urlClaim.write(toState, { hash, hashChanged: navOptions.hashChange ?? (hash !== prevHash) })
         │
-        ├── If paths match (hash preservation):
-        │     finalUrl = url + browser.getHash()
+        ├── url      = router.buildUrl(toState.name, toState.params)
+        │              └── router.buildPath() + buildUrl(path, base)
+        ├── finalUrl = hash ? `${url}#${encodeHashFragment(hash)}` : url
         │
         ├── historyState = { name, params, path }
         │

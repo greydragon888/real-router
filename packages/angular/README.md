@@ -320,6 +320,16 @@ Navigation directive for `<a>` elements. Handles click events, sets `href`, and 
 | `activeClassName`   | `string`            | `"active"` | CSS class applied when route is active |
 | `activeStrict`      | `boolean`           | `false`    | Exact match only (no ancestor match)   |
 | `ignoreQueryParams` | `boolean`           | `true`     | Query params don't affect active state |
+| `hash`              | `string`            | `undefined`| URL fragment (decoded). Tri-state: undefined preserves, `""` clears, value sets. (#532) |
+
+#### `hash` input — URL fragment / tab-style UIs
+
+```html
+<a [realLink]="'settings'" [hash]="'profile'">Profile</a>
+<a [realLink]="'settings'" [hash]="'account'">Account</a>
+```
+
+Active class is hash-aware — only the matching tab lights up. Live demo: [`examples/web/react/link-hash/`](../../examples/web/react/link-hash/) — behavior is identical across adapters, only template syntax differs. See the [Hash Fragment Support](https://github.com/greydragon888/real-router/wiki/Hash) wiki page for the full surface.
 
 ### `[realLinkActive]`
 

@@ -95,6 +95,21 @@ lifecycle.addDeactivateGuard(
 );
 ```
 
+## Limitations
+
+### URL Fragments via `<Link hash>` / `opts.hash`
+
+Hash-plugin uses `#` as the route delimiter — URL fragments are structurally incompatible. The signatures of `router.buildUrl(name, params, options?)` and `router.replaceHistoryState(name, params, options?)` accept `{ hash }` for typing parity with the other URL plugins, but at runtime the option is **silently ignored** and a one-time `console.warn` is emitted on the first invocation:
+
+```text
+[@real-router/hash-plugin] `hash` option is ignored — `#` is reserved for the route delimiter.
+Use browser-plugin or navigation-plugin for URL fragments.
+```
+
+`state.context.url` is **not** populated under hash-plugin (`undefined` at runtime). Hash-aware sources (`useIsActiveRoute`, `<Link hash>` active state) consequently return `false` for any non-undefined `hash`. Only one URL plugin (`browser-plugin`, `navigation-plugin`, or `hash-plugin`) may be installed per router instance.
+
+If you need URL fragments for tab-style UIs or anchor scrolling, use [`@real-router/browser-plugin`](../browser-plugin/) or [`@real-router/navigation-plugin`](../navigation-plugin/) instead — see the [Hash Fragment Support](https://github.com/greydragon888/real-router/wiki/Hash) wiki page.
+
 ## SSR Support
 
 SSR-safe — automatically detects the environment and falls back to no-ops:

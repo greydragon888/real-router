@@ -145,6 +145,18 @@ Navigation link with automatic active state detection. Re-renders only when its 
 </Link>
 ```
 
+#### `hash` prop — URL fragment / tab-style UIs
+
+```tsx
+<nav>
+  <Link routeName="settings" hash="profile">Profile</Link>
+  <Link routeName="settings" hash="account">Account</Link>
+  <Link routeName="settings" hash="billing">Billing</Link>
+</nav>
+```
+
+Tri-state: `undefined` preserves the current hash, `""` clears it, a value sets it. Active class is hash-aware — only the matching tab lights up. Live demo: [`examples/web/react/link-hash/`](../../examples/web/react/link-hash/). See the [Hash Fragment Support](https://github.com/greydragon888/real-router/wiki/Hash) wiki page for the full surface.
+
 ### `<RouteView>` (React 19.2+)
 
 Declarative route matching with optional `keepAlive` — preserves component state via React's `<Activity>` API.
