@@ -6,6 +6,7 @@ import {
   shouldNavigate,
   buildHref,
   buildActiveClassName,
+  navigateWithHash,
   shallowEqual,
 } from "../dom-utils";
 import { useIsActiveRoute } from "../hooks/useIsActiveRoute";
@@ -28,6 +29,7 @@ function areLinkPropsEqual(
     prev.target === next.target &&
     prev.style === next.style &&
     prev.children === next.children &&
+    prev.hash === next.hash &&
     shallowEqual(prev.routeParams, next.routeParams) &&
     shallowEqual(prev.routeOptions, next.routeOptions)
   );
@@ -42,6 +44,7 @@ export const Link: FunctionComponent<LinkProps> = memo(
     activeClassName = "active",
     activeStrict = false,
     ignoreQueryParams = true,
+    hash,
     onClick,
     target,
     children,
@@ -54,16 +57,27 @@ export const Link: FunctionComponent<LinkProps> = memo(
     // change caught by shallowEqual), so they're safe to use directly in hook
     // deps without useStableValue.
 
+    // Hash-aware active (#532): when `hash` prop is set, isActive requires
+    // both route AND hash to match. Tab-style UI (multiple links sharing
+    // routeName but differing in hash) needs this to avoid marking all tabs
+    // active by route-name alone.
     const isActive = useIsActiveRoute(
       routeName,
       routeParams,
       activeStrict,
       ignoreQueryParams,
+      hash,
     );
 
     const href = useMemo(
-      () => buildHref(router, routeName, routeParams),
-      [router, routeName, routeParams],
+      () =>
+        buildHref(
+          router,
+          routeName,
+          routeParams,
+          hash === undefined ? undefined : { hash },
+        ),
+      [router, routeName, routeParams, hash],
     );
 
     const handleClick = useCallback(
@@ -81,9 +95,15 @@ export const Link: FunctionComponent<LinkProps> = memo(
         }
 
         evt.preventDefault();
-        router.navigate(routeName, routeParams, routeOptions).catch(() => {});
+        navigateWithHash(
+          router,
+          routeName,
+          routeParams,
+          hash,
+          routeOptions,
+        ).catch(() => {});
       },
-      [onClick, target, router, routeName, routeParams, routeOptions],
+      [onClick, target, router, routeName, routeParams, routeOptions, hash],
     );
 
     const finalClassName = useMemo(

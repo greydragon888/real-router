@@ -35,7 +35,7 @@ export function createActiveRouteSource(
   params?: Params,
   options?: ActiveRouteSourceOptions,
 ): RouterSource<boolean> {
-  const { strict, ignoreQueryParams } = normalizeActiveOptions(options);
+  const { strict, ignoreQueryParams, hash } = normalizeActiveOptions(options);
 
   // BigInt/Symbol/circular refs cannot be serialized — fall back to creating
   // a fresh (non-cached) source. Callers pass these edge-case params rarely;
@@ -43,7 +43,13 @@ export function createActiveRouteSource(
   let key: string | undefined;
 
   try {
-    key = `${routeName}|${canonicalJson(params)}|${String(strict)}|${String(ignoreQueryParams)}`;
+    // `hash === undefined` produces "" via String(undefined) → "undefined";
+    // we encode it as the empty string sentinel to keep the key short and
+    // distinct from the literal "undefined" hash value (which is a valid,
+    // if unusual, fragment).
+    const hashKey = hash === undefined ? "" : `#${hash}`;
+
+    key = `${routeName}|${canonicalJson(params)}|${String(strict)}|${String(ignoreQueryParams)}|${hashKey}`;
   } catch {
     key = undefined;
   }
@@ -55,6 +61,7 @@ export function createActiveRouteSource(
       params,
       strict,
       ignoreQueryParams,
+      hash,
     );
 
     return {
@@ -80,6 +87,7 @@ export function createActiveRouteSource(
       params,
       strict,
       ignoreQueryParams,
+      hash,
     );
 
     cached = {
@@ -93,18 +101,68 @@ export function createActiveRouteSource(
   return cached;
 }
 
+/**
+ * Reads the URL fragment published by browser/navigation plugins on the given
+ * router state. Returns `""` when no plugin claims the `"url"` namespace
+ * (hash-plugin runtime, memory-plugin, SSR) — `undefined` is reserved for
+ * "no published fragment yet" and not visible at the source layer.
+ */
+function readContextHash(router: Router): string {
+  const ctx = router.getState()?.context as
+    | { url?: { hash?: string } }
+    | undefined;
+
+  return ctx?.url?.hash ?? "";
+}
+
+/**
+ * Combines route-name match with optional hash match (#532).
+ *
+ * - Route-name match: `router.isActiveRoute(name, params, strict, ignoreQueryParams)`.
+ * - Hash match (only when `hash !== undefined`): `state.context.url.hash` must
+ *   equal the requested fragment exactly. With hash-plugin (no `url`
+ *   namespace), this returns `false` — the documented limitation.
+ */
+function computeActive(
+  router: Router,
+  routeName: string,
+  params: Params | undefined,
+  strict: boolean,
+  ignoreQueryParams: boolean,
+  hash: string | undefined,
+): boolean {
+  const routeActive = router.isActiveRoute(
+    routeName,
+    params,
+    strict,
+    ignoreQueryParams,
+  );
+
+  if (!routeActive) {
+    return false;
+  }
+  if (hash === undefined) {
+    return true;
+  }
+
+  return readContextHash(router) === hash;
+}
+
 function buildActiveRouteSource(
   router: Router,
   routeName: string,
   params: Params | undefined,
   strict: boolean,
   ignoreQueryParams: boolean,
+  hash: string | undefined,
 ): RouterSource<boolean> {
-  const initialValue = router.isActiveRoute(
+  const initialValue = computeActive(
+    router,
     routeName,
     params,
     strict,
     ignoreQueryParams,
+    hash,
   );
 
   const source = new BaseSource(initialValue);
@@ -119,14 +177,33 @@ function buildActiveRouteSource(
       next.previousRoute &&
       areRoutesRelated(routeName, next.previousRoute.name);
 
-    if (!isNewRelated && !isPrevRelated) {
+    // Hash-aware sources also flip on same-path-different-hash transitions.
+    // The route comparison alone misses these (route is identical), but the
+    // hash claim updated, so we must re-evaluate. Detect via the `hashChanged`
+    // flag published by URL plugins.
+    const hashFlip =
+      hash !== undefined &&
+      ((next.route.context as { url?: { hashChanged?: boolean } } | undefined)
+        ?.url?.hashChanged ??
+        false);
+
+    if (!isNewRelated && !isPrevRelated && !hashFlip) {
       return;
     }
 
     // If new route is not related, we know the route is inactive —
-    // avoid calling isActiveRoute for the optimization
+    // avoid calling isActiveRoute for the optimization. (Hash check would
+    // also fail without route-match, so this short-circuit holds for
+    // hash-aware sources too.)
     const newValue = isNewRelated
-      ? router.isActiveRoute(routeName, params, strict, ignoreQueryParams)
+      ? computeActive(
+          router,
+          routeName,
+          params,
+          strict,
+          ignoreQueryParams,
+          hash,
+        )
       : false;
 
     if (!Object.is(source.getSnapshot(), newValue)) {

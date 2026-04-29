@@ -436,6 +436,58 @@ describe("Hash Plugin — Lifecycle & Configuration", async () => {
     });
   });
 
+  describe("Hash limitation warn-once (#532)", () => {
+    beforeEach(async () => {
+      router.usePlugin(hashPluginFactory({}, mockedBrowser));
+      await router.start("/home");
+    });
+
+    it("warns once on router.buildUrl(name, params, { hash })", () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(noop);
+
+      router.buildUrl("home", {}, { hash: "section" });
+      router.buildUrl("home", {}, { hash: "other" });
+
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "[@real-router/hash-plugin] `hash` option is ignored",
+        ),
+      );
+
+      warnSpy.mockRestore();
+    });
+
+    it("warns once on router.navigate(name, params, { hash })", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(noop);
+
+      await router.navigate("users.list", {}, { hash: "section" });
+      await router.navigate("home", {}, { hash: "other" });
+
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+
+      warnSpy.mockRestore();
+    });
+
+    it("does not warn when no hash option is passed", () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(noop);
+
+      router.buildUrl("home", {});
+      router.buildUrl("users.list");
+
+      expect(warnSpy).not.toHaveBeenCalled();
+
+      warnSpy.mockRestore();
+    });
+
+    it("buildUrl ignores the hash and returns the hash-route URL unchanged", () => {
+      vi.spyOn(console, "warn").mockImplementation(noop);
+
+      // hashPrefix defaults to "" → urlPrefix = "#"
+      expect(router.buildUrl("home", {}, { hash: "anchor" })).toBe("#/home");
+    });
+  });
+
   describe("SSR Fallback Behavior", () => {
     it("plugin works in non-browser environment", async () => {
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(noop);

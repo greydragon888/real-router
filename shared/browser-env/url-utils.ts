@@ -1,3 +1,4 @@
+import { decodeHashFragment } from "./url-context.js";
 import { safeParseUrl } from "./url-parsing.js";
 
 export function extractPath(pathname: string, base: string): string {
@@ -39,6 +40,24 @@ export function urlToPath(url: string, base: string): string {
   const parsedUrl = safeParseUrl(url);
 
   return extractPath(parsedUrl.pathname, base) + parsedUrl.search;
+}
+
+/**
+ * Like `urlToPath` but also returns the decoded URL fragment (#532).
+ *
+ * Used by URL plugins to extract `event.destination.url`'s hash without
+ * dropping it the way `urlToPath` does. The hash is returned in decoded form
+ * with no leading "#" — same form as stored in `state.context.url.hash`.
+ */
+export function urlToPathAndHash(
+  url: string,
+  base: string,
+): { path: string; hash: string } {
+  const parsed = safeParseUrl(url);
+  const path = extractPath(parsed.pathname, base) + parsed.search;
+  const hash = parsed.hash ? decodeHashFragment(parsed.hash.slice(1)) : "";
+
+  return { path, hash };
 }
 
 /**

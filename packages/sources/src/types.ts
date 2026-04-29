@@ -19,6 +19,20 @@ export interface RouterSource<T> {
 export interface ActiveRouteSourceOptions {
   strict?: boolean;
   ignoreQueryParams?: boolean;
+  /**
+   * URL fragment match (#532). When defined, the source is active iff the
+   * route matches AND `state.context.url.hash` (decoded, populated by
+   * browser/navigation URL plugins) equals this value:
+   *
+   * - `undefined` (default): hash is ignored — legacy route-only matching.
+   * - `""`: active only when the current URL has no fragment (or empty).
+   * - `"value"`: active only when the current fragment equals `"value"`.
+   *
+   * Hash-plugin runtimes leave `state.context.url` undefined, so any non-
+   * undefined `hash` option will produce `false` there — consistent with the
+   * documented limitation that hash-plugin doesn't support URL fragments.
+   */
+  hash?: string;
 }
 
 export interface RouterTransitionSnapshot {

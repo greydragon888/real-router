@@ -426,7 +426,10 @@ describe("Link - Integration Tests", () => {
         { wrapper },
       );
 
-      expect(buildUrlSpy).toHaveBeenCalledWith("one-more-test", {});
+      // After #532, buildHref passes a 3rd undefined argument when no hash
+      // is provided so URL plugins can opt into fragment support without
+      // breaking 2-arg signatures.
+      expect(buildUrlSpy).toHaveBeenCalledWith("one-more-test", {}, undefined);
       expect(screen.getByTestId("link")).toHaveAttribute("href", "/custom-url");
     });
 
@@ -441,6 +444,61 @@ describe("Link - Integration Tests", () => {
       );
 
       expect(buildPathSpy).toHaveBeenCalled();
+    });
+
+    it("should pass hash option to buildUrl when hash prop is set (#532)", () => {
+      const buildUrlSpy = vi.fn(
+        (_name: string, _params?: object, opts?: { hash?: string }): string =>
+          opts?.hash ? `/url#${opts.hash}` : "/url",
+      );
+
+      router.buildUrl = buildUrlSpy;
+
+      render(
+        <Link routeName="one-more-test" hash="anchor" data-testid="link">
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      expect(buildUrlSpy).toHaveBeenCalledWith(
+        "one-more-test",
+        {},
+        {
+          hash: "anchor",
+        },
+      );
+      expect(screen.getByTestId("link")).toHaveAttribute("href", "/url#anchor");
+    });
+
+    it("should re-render href when the hash prop changes (#532)", () => {
+      const buildUrlSpy = vi.fn(
+        (_name: string, _params?: object, opts?: { hash?: string }): string =>
+          opts?.hash ? `/url#${opts.hash}` : "/url",
+      );
+
+      router.buildUrl = buildUrlSpy;
+
+      const { rerender } = render(
+        <Link routeName="one-more-test" hash="a" data-testid="link">
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      expect(screen.getByTestId("link")).toHaveAttribute("href", "/url#a");
+
+      rerender(
+        <RouterProvider router={router}>
+          <Link routeName="one-more-test" hash="b" data-testid="link">
+            Test
+          </Link>
+        </RouterProvider>,
+      );
+
+      // areLinkPropsEqual must include the `hash` field so the memoized
+      // component re-renders when the prop changes.
+      expect(screen.getByTestId("link")).toHaveAttribute("href", "/url#b");
     });
 
     it("should generate correct href with query params", () => {

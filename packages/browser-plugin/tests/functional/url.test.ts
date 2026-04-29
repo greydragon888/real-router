@@ -421,7 +421,7 @@ describe("Browser Plugin — URL", () => {
       // Reload same route — path stays the same, hash should be preserved
       await router.navigate("home", {}, { reload: true });
 
-      // shouldPreserveHash: fromState.path === toState.path → true
+      // Tri-state preserve (#532): opts.hash === undefined ⇒ keep prevHash from fromState.context.url.hash
       expect(replaceStateSpy).toHaveBeenCalled();
 
       const lastUrl = replaceStateSpy.mock.calls.at(-1)?.[1];
@@ -429,7 +429,11 @@ describe("Browser Plugin — URL", () => {
       expect(lastUrl).toContain("#section");
     });
 
-    it("clears hash when navigating to a different route (path changed)", async () => {
+    it("preserves hash when navigating to a different route — cross-path preserve (#532)", async () => {
+      // Issue #532 changed cross-path behavior: hash is preserved by default,
+      // not stripped. The previous shouldPreserveHash workaround dropped hash
+      // on path change — this was the cross-path-stripping bug. Tri-state
+      // semantics: opts.hash === undefined ⇒ preserve current browser hash.
       await router.start("/home");
 
       const pushStateSpy = vi.spyOn(mockedBrowser, "pushState");
@@ -441,18 +445,16 @@ describe("Browser Plugin — URL", () => {
         "/home#section",
       );
 
-      // Navigate to a different route (different path)
       await router.navigate("users.list");
 
-      // shouldPreserveHash: fromState.path !== toState.path → false
       expect(pushStateSpy).toHaveBeenCalled();
 
       const lastUrl = pushStateSpy.mock.calls.at(-1)?.[1];
 
-      expect(lastUrl).not.toContain("#section");
+      expect(lastUrl).toContain("#section");
     });
 
-    it("clears hash when navigating to same route name with different path", async () => {
+    it("preserves hash when navigating to same route name with different path (#532)", async () => {
       await router.start("/users/view/1");
 
       const pushStateSpy = vi.spyOn(mockedBrowser, "pushState");
@@ -464,15 +466,81 @@ describe("Browser Plugin — URL", () => {
         "/users/view/1#section",
       );
 
-      // Navigate to same route but different param → different path
       await router.navigate("users.view", { id: "2" });
 
-      // Path changed (/users/view/1 → /users/view/2), hash should be cleared
       expect(pushStateSpy).toHaveBeenCalled();
 
       const lastUrl = pushStateSpy.mock.calls.at(-1)?.[1];
 
+      expect(lastUrl).toContain("#section");
+    });
+
+    it("clears hash when navigation explicitly passes opts.hash = '' (#532)", async () => {
+      await router.start("/home");
+
+      const pushStateSpy = vi.spyOn(mockedBrowser, "pushState");
+
+      globalThis.history.replaceState(
+        globalThis.history.state,
+        "",
+        "/home#section",
+      );
+
+      await router.navigate("users.list", {}, { hash: "" });
+
+      const lastUrl = pushStateSpy.mock.calls.at(-1)?.[1];
+
       expect(lastUrl).not.toContain("#section");
+    });
+
+    it("sets hash when navigation explicitly passes opts.hash = 'value' (#532)", async () => {
+      await router.start("/home");
+
+      const pushStateSpy = vi.spyOn(mockedBrowser, "pushState");
+
+      await router.navigate("users.list", {}, { hash: "footer" });
+
+      const lastUrl = pushStateSpy.mock.calls.at(-1)?.[1];
+
+      expect(lastUrl).toContain("#footer");
+    });
+
+    it("publishes state.context.url with hash and hashChanged (#532)", async () => {
+      await router.start("/home");
+
+      globalThis.history.replaceState(
+        globalThis.history.state,
+        "",
+        "/home#anchor",
+      );
+
+      await router.navigate("users.list");
+
+      const state = router.getState();
+      const url = (
+        state!.context as {
+          url?: { hash: string; hashChanged: boolean };
+        }
+      ).url;
+
+      expect(url?.hash).toBe("anchor");
+      expect(url?.hashChanged).toBe(true);
+    });
+
+    it("router.buildUrl(name, params, { hash }) appends fragment (#532)", () => {
+      expect(
+        router.buildUrl("users.view", { id: "1" }, { hash: "anchor" }),
+      ).toBe("/users/view/1#anchor");
+    });
+
+    it("router.buildUrl returns base URL when hash option is empty string (#532)", () => {
+      expect(router.buildUrl("home", {}, { hash: "" })).toBe("/home");
+    });
+
+    it("router.buildUrl strips leading # defensively (#532)", () => {
+      expect(router.buildUrl("home", {}, { hash: "#anchor" })).toBe(
+        "/home#anchor",
+      );
     });
 
     it("preserves hash on replaceHistoryState", async () => {

@@ -10,6 +10,7 @@ describe("normalizeActiveOptions", () => {
     expect(normalizeActiveOptions()).toStrictEqual({
       strict: false,
       ignoreQueryParams: true,
+      hash: undefined,
     });
   });
 
@@ -17,6 +18,7 @@ describe("normalizeActiveOptions", () => {
     expect(normalizeActiveOptions({})).toStrictEqual({
       strict: false,
       ignoreQueryParams: true,
+      hash: undefined,
     });
   });
 
@@ -24,6 +26,7 @@ describe("normalizeActiveOptions", () => {
     expect(normalizeActiveOptions({ strict: true })).toStrictEqual({
       strict: true,
       ignoreQueryParams: true,
+      hash: undefined,
     });
   });
 
@@ -31,6 +34,7 @@ describe("normalizeActiveOptions", () => {
     expect(normalizeActiveOptions({ ignoreQueryParams: false })).toStrictEqual({
       strict: false,
       ignoreQueryParams: false,
+      hash: undefined,
     });
   });
 
@@ -40,6 +44,23 @@ describe("normalizeActiveOptions", () => {
     ).toStrictEqual({
       strict: true,
       ignoreQueryParams: false,
+      hash: undefined,
+    });
+  });
+
+  it("preserves hash when defined (#532)", () => {
+    expect(normalizeActiveOptions({ hash: "section" })).toStrictEqual({
+      strict: false,
+      ignoreQueryParams: true,
+      hash: "section",
+    });
+  });
+
+  it("preserves hash empty-string sentinel (clear-variant active)", () => {
+    expect(normalizeActiveOptions({ hash: "" })).toStrictEqual({
+      strict: false,
+      ignoreQueryParams: true,
+      hash: "",
     });
   });
 

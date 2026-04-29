@@ -10,6 +10,7 @@ export {
   shouldNavigate,
   buildHref,
   buildActiveClassName,
+  navigateWithHash,
   shallowEqual,
   applyLinkA11y,
 } from "./link-utils.js";

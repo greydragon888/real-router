@@ -440,13 +440,83 @@ describe("Navigation Plugin — Lifecycle", () => {
       expect(mockNav.currentUrl).toContain("#section");
     });
 
-    it("clears hash when navigating to a different path", async () => {
+    it("preserves hash on cross-path navigation when not overridden (#532)", async () => {
+      // Issue #532 changed cross-path behavior: hash is preserved by default,
+      // not stripped. The previous shouldPreserveHash workaround dropped hash
+      // on path change — this was the cross-path-stripping bug. Tri-state
+      // semantics: opts.hash === undefined ⇒ preserve current.
       mockNav.navigate("http://localhost/home#section", { history: "replace" });
       await router.start();
 
       await router.navigate("users.list");
 
+      expect(mockNav.currentUrl).toContain("#section");
+    });
+
+    it("clears hash when navigation explicitly passes opts.hash = '' (#532)", async () => {
+      mockNav.navigate("http://localhost/home#section", { history: "replace" });
+      await router.start();
+
+      await router.navigate("users.list", {}, { hash: "" });
+
       expect(mockNav.currentUrl).not.toContain("#section");
+    });
+
+    it("sets hash when navigation explicitly passes opts.hash = 'value' (#532)", async () => {
+      mockNav.navigate("http://localhost/home#section", { history: "replace" });
+      await router.start();
+
+      await router.navigate("users.list", {}, { hash: "footer" });
+
+      expect(mockNav.currentUrl).toContain("#footer");
+      expect(mockNav.currentUrl).not.toContain("#section");
+    });
+
+    it("opts.hash omitted preserves current browser hash (tri-state default) (#532)", async () => {
+      // Tri-state contract: opts.hash absent → preserve. Tests the third
+      // state of the contract that "" (clear) and "value" (set) cover.
+      // exactOptionalPropertyTypes forbids `{ hash: undefined }` literally,
+      // but at runtime an absent property has the same effect.
+      mockNav.navigate("http://localhost/home#kept", { history: "replace" });
+      await router.start();
+
+      // No `hash` key in the options object — must preserve.
+      await router.navigate("users.list", {}, {});
+
+      expect(mockNav.currentUrl).toContain("#kept");
+    });
+
+    it("publishes hashChanged=false when hash matches published previous (#532)", async () => {
+      mockNav.navigate("http://localhost/home#x", { history: "replace" });
+      await router.start();
+
+      // Programmatic same-hash explicit — hashChanged must be false because
+      // hash equals fromState.context.url.hash.
+      await router.navigate("users.list", {}, { hash: "x" });
+
+      const url = (
+        router.getState()!.context as {
+          url?: { hash: string; hashChanged: boolean };
+        }
+      ).url;
+
+      expect(url?.hash).toBe("x");
+      expect(url?.hashChanged).toBe(false);
+    });
+
+    it("publishes state.context.url even when hash is empty (#532)", async () => {
+      mockNav.navigate("http://localhost/home", { history: "replace" });
+      await router.start();
+
+      // Plugin must always populate the namespace, even if hash is "".
+      const url = (
+        router.getState()!.context as {
+          url?: { hash: string; hashChanged: boolean };
+        }
+      ).url;
+
+      expect(url).toBeDefined();
+      expect(url?.hash).toBe("");
     });
 
     it("G-1: preserves hash on initial navigation (fromState === undefined)", async () => {
@@ -457,8 +527,126 @@ describe("Navigation Plugin — Lifecycle", () => {
 
       // After the first resolved navigation, the URL recorded by
       // onTransitionSuccess must include the hash because `!fromState`
-      // short-circuits `shouldPreserveHash` to true.
+      // falls back to `getDecodedHash(browser)` for prevHash (#532 lazy read).
       expect(mockNav.currentUrl).toContain("#section");
+    });
+
+    it("publishes state.context.url with hash on initial navigation (#532)", async () => {
+      // hashChanged compares against published previous hash; on the very
+      // first transition there is no fromState, so prevHash is "" and
+      // hashChanged is `true` whenever the initial URL carries a fragment.
+      mockNav.navigate("http://localhost/home#section", { history: "replace" });
+      await router.start();
+
+      const state = router.getState();
+
+      expect(state).toBeDefined();
+
+      const url = (
+        state!.context as { url?: { hash: string; hashChanged: boolean } }
+      ).url;
+
+      expect(url).toStrictEqual({ hash: "section", hashChanged: true });
+    });
+
+    it("publishes hashChanged=true on browser-driven hash-only navigation (#532)", async () => {
+      mockNav.navigate("http://localhost/home", { history: "replace" });
+      await router.start();
+
+      // Same path, different hash — Navigation API fires hashChange=true.
+      // Plugin must add force+hashChange so SAME_STATES is bypassed and
+      // state.context.url.hash updates.
+      await mockNav.navigate("http://localhost/home#newsection").committed;
+
+      const state = router.getState();
+      const url = (
+        state!.context as { url?: { hash: string; hashChanged: boolean } }
+      ).url;
+
+      expect(url?.hash).toBe("newsection");
+      expect(url?.hashChanged).toBe(true);
+    });
+
+    it("explicit opts.hashChange overrides auto-detection (#532)", async () => {
+      mockNav.navigate("http://localhost/home#x", { history: "replace" });
+      await router.start();
+
+      // Pass hashChange:true even though hash didn't change — subscriber
+      // sees the explicit signal regardless of computed value.
+      await router.navigate(
+        "home",
+        {},
+        { hash: "x", hashChange: true, force: true },
+      );
+
+      const state = router.getState();
+      const url = (state!.context as { url?: { hashChanged: boolean } }).url;
+
+      expect(url?.hashChanged).toBe(true);
+    });
+  });
+
+  describe("Hash — buildUrl extension (#532)", () => {
+    beforeEach(() => {
+      unsubscribe = router.usePlugin(navigationPluginFactory({}, browser));
+    });
+
+    it("router.buildUrl(name, params, { hash }) appends fragment", () => {
+      expect(
+        router.buildUrl("users.view", { id: "1" }, { hash: "anchor" }),
+      ).toBe("/users/view/1#anchor");
+    });
+
+    it("router.buildUrl encodes RFC-3986 unsafe chars but preserves sub-delims", () => {
+      // space → %20, & preserved, # escaped to %23
+      expect(router.buildUrl("home", {}, { hash: "a b&c#d" })).toBe(
+        "/home#a%20b&c%23d",
+      );
+    });
+
+    it("router.buildUrl strips leading # defensively", () => {
+      expect(router.buildUrl("home", {}, { hash: "#section" })).toBe(
+        "/home#section",
+      );
+    });
+
+    it("router.buildUrl returns base URL when hash is empty string", () => {
+      expect(router.buildUrl("home", {}, { hash: "" })).toBe("/home");
+    });
+
+    it("router.buildUrl ignores hash option when it is undefined", () => {
+      // Equivalent to omitting the third argument.
+      expect(router.buildUrl("home", {}, undefined)).toBe("/home");
+    });
+
+    it("recovery preserves hash from state.context.url on CANNOT_DEACTIVATE (#532)", async () => {
+      // Replace router with strict-deactivate setup so guard rejection
+      // routes through syncUrlToRouterState (navigate-handler.ts:204).
+      router.stop();
+      unsubscribe?.();
+      mockNav.navigate("http://localhost/home#anchor", { history: "replace" });
+      router = createRouter(routerConfig, {
+        defaultRoute: "home",
+        queryParamsMode: "default",
+      });
+      unsubscribe = router.usePlugin(
+        navigationPluginFactory({ forceDeactivate: false }, browser),
+      );
+      await router.start();
+
+      // Block deactivation of home → trigger CANNOT_DEACTIVATE on user-driven nav.
+      getLifecycleApi(router).addDeactivateGuard("home", () => () => false);
+
+      // User clicks a link to /users/list — Navigation API fires navigate
+      // event, plugin intercepts, router rejects with CANNOT_DEACTIVATE,
+      // recovery runs syncUrlToRouterState which must rebuild the URL with
+      // ctxHash from state.context.url.
+      await mockNav
+        .navigate("http://localhost/users/list")
+        .finished.catch(noop);
+
+      expect(mockNav.currentUrl).toContain("#anchor");
+      expect(mockNav.currentUrl).toContain("/home");
     });
   });
 

@@ -16,6 +16,13 @@ export interface LinkProps<P extends Params = Params> extends Omit<
   activeClassName?: string;
   activeStrict?: boolean;
   ignoreQueryParams?: boolean;
+  /**
+   * URL fragment (decoded form, no leading "#") (#532).
+   * - omitted/`undefined` → preserve current fragment on same-route navigation
+   * - `""` → clear fragment
+   * - non-empty → set fragment
+   */
+  hash?: string;
   target?: string;
   onClick?: (evt: MouseEvent) => void;
 }

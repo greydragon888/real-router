@@ -24,6 +24,16 @@ export interface LinkProps<
   activeClassName?: string;
   activeStrict?: boolean;
   ignoreQueryParams?: boolean;
+  /**
+   * URL fragment (decoded form, no leading "#") (#532).
+   * - omitted/`undefined` → preserve current fragment on same-route navigation
+   * - `""` → clear fragment
+   * - non-empty → set fragment
+   *
+   * Requires a URL plugin (browser-plugin or navigation-plugin) for full
+   * round-trip; hash-plugin ignores the prop with a one-time dev warning.
+   */
+  hash?: string;
   target?: string;
   onClick?: MouseEventHandler<HTMLAnchorElement>;
   onMouseOver?: MouseEventHandler<HTMLAnchorElement>;

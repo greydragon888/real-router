@@ -52,11 +52,11 @@ router.usePlugin(
 
 The plugin extends the router instance with three methods via [`extendRouter()`](https://github.com/greydragon888/real-router/wiki/plugin-architecture):
 
-| Method                                       | Returns              | Description                                      |
-| -------------------------------------------- | -------------------- | ------------------------------------------------ |
-| `buildUrl(name, params?)`                    | `string`             | Build full URL with base path                    |
-| `matchUrl(url)`                              | `State \| undefined` | Parse URL to router state                        |
-| `replaceHistoryState(name, params?)`         | `void`               | Update browser URL without triggering navigation |
+| Method                                                | Returns              | Description                                                                                          |
+| ----------------------------------------------------- | -------------------- | ---------------------------------------------------------------------------------------------------- |
+| `buildUrl(name, params?, options?: { hash? })`        | `string`             | Build full URL with base path. `options.hash` (decoded) is encoded and appended.                     |
+| `matchUrl(url)`                                       | `State \| undefined` | Parse URL to router state                                                                            |
+| `replaceHistoryState(name, params?, options?: { hash? })` | `void`           | Update browser URL without triggering navigation. Tri-state `hash`: `undefined` preserves, `""` clears, value sets. |
 
 ```typescript
 router.buildUrl("users", { id: "123" });
@@ -82,6 +82,25 @@ router.buildUrl("users", { id: 1 }); // "/app/users/1"   — plugin, with base
 router.replaceHistoryState(name, params); // URL only, no transition
 router.navigate(name, params, { replace: true }); // Full transition + URL update
 ```
+
+## URL Fragment ("hash") Support
+
+`browser-plugin` ships first-class URL-fragment support: `<Link hash>` from any framework adapter, programmatic `router.navigate(name, params, { hash })`, and a `state.context.url = { hash, hashChanged }` namespace populated on every transition.
+
+```typescript
+// Programmatic — tri-state opts.hash
+router.navigate("settings", {}, { hash: "profile" }); // set
+router.navigate("settings", {}, { hash: "" });        // clear
+router.navigate("settings");                          // preserve current
+
+// In subscribers
+router.subscribe(({ route }) => {
+  console.log(route.context.url?.hash);        // "profile"
+  console.log(route.context.url?.hashChanged); // true on hash-only nav
+});
+```
+
+See the [Hash Fragment Support](https://github.com/greydragon888/real-router/wiki/Hash) wiki page for the full surface (encoding, F5 priming, hash-aware active state).
 
 ## Navigation Source (`state.context.browser.source`)
 

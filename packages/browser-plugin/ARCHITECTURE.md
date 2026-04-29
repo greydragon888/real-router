@@ -472,17 +472,33 @@ extractPath("/app/users/123", { base: "/app" })
 
 Requires a server-side fallback (all paths → `index.html`).
 
-### Hash Fragment Preservation
+### Hash Fragment Support (#532)
+
+URL fragments are first-class state via the `state.context.url` namespace, written by the plugin in `onTransitionSuccess` with tri-state semantics:
 
 ```typescript
 // factory.ts — onTransitionSuccess
-const shouldPreserveHash = !fromState || fromState.path === toState.path;
+const prevHash = fromState
+  ? ((fromState.context as { url?: { hash?: string } }).url?.hash ?? "")
+  : getDecodedHash(browser);
 
-const hash = shouldPreserveHash ? browser.getHash() : "";
-const finalUrl = hash ? url + hash : url;
+const hash = navOptions.hash !== undefined
+  ? normalizeHashInput(navOptions.hash)
+  : prevHash;
+
+urlClaim.write(toState, Object.freeze({
+  hash,
+  hashChanged: navOptions.hashChange ?? (hash !== prevHash),
+}));
+
+const finalUrl = hash ? `${url}#${encodeHashFragment(hash)}` : url;
 ```
 
-The hash fragment (`#section`) is always preserved when navigating to the same path (or on first navigation). On a route change, the hash is cleared.
+- `opts.hash === undefined` (default): preserves previous hash from `fromState.context.url.hash` (or `getDecodedHash(browser)` on first transition — F5 / cold-load).
+- `opts.hash === ""`: clears the hash explicitly.
+- `opts.hash === "value"`: sets the hash; encoded via `encodeURI(s).replace(/#/g, "%23")` to preserve RFC-3986 sub-delims.
+
+`hashChange: true` is set by the popstate handler on browser-driven hash-only navigation (paired with `force: true` to bypass `SAME_STATES`). Recovery paths (`syncUrlToRouterState`, `rollbackUrlToCurrentState`) read `currentState.context.url.hash` to preserve the fragment after guard rejection. See [Wiki › Hash](https://github.com/greydragon888/real-router/wiki/Hash) for the full surface.
 
 ## Performance
 

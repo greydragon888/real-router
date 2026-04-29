@@ -100,9 +100,11 @@ describe("buildHref", () => {
     const result = buildHref(router, "users.profile", { id: "123" });
 
     expect(result).toBe("/url/123");
-    expect(router.buildUrl).toHaveBeenCalledWith("users.profile", {
-      id: "123",
-    });
+    expect(router.buildUrl).toHaveBeenCalledWith(
+      "users.profile",
+      { id: "123" },
+      undefined,
+    );
     expect(router.buildPath).not.toHaveBeenCalled();
   });
 
@@ -127,7 +129,7 @@ describe("buildHref", () => {
 
     buildHref(router, "home", {});
 
-    expect(router.buildUrl).toHaveBeenCalledWith("home", {});
+    expect(router.buildUrl).toHaveBeenCalledWith("home", {}, undefined);
   });
 
   it("4 — passes empty params to buildPath fallback", () => {
@@ -220,7 +222,11 @@ describe("buildHref", () => {
 
     buildHref(router, "items.item", { id: 42 });
 
-    expect(router.buildUrl).toHaveBeenCalledWith("items.item", { id: 42 });
+    expect(router.buildUrl).toHaveBeenCalledWith(
+      "items.item",
+      { id: 42 },
+      undefined,
+    );
   });
 
   it("11 — forwards Unicode params to buildUrl verbatim", () => {
@@ -231,7 +237,11 @@ describe("buildHref", () => {
 
     buildHref(router, "users.view", { id: "иван" });
 
-    expect(router.buildUrl).toHaveBeenCalledWith("users.view", { id: "иван" });
+    expect(router.buildUrl).toHaveBeenCalledWith(
+      "users.view",
+      { id: "иван" },
+      undefined,
+    );
   });
 });
 
