@@ -42,16 +42,23 @@
   const srEnabled = $derived(scrollRestoration !== undefined);
   const srMode = $derived(scrollRestoration?.mode);
   const srAnchor = $derived(scrollRestoration?.anchorScrolling);
+  const srBehavior = $derived(scrollRestoration?.behavior);
+  const srStorageKey = $derived(scrollRestoration?.storageKey);
 
   $effect(() => {
     if (!srEnabled) return;
-    // scrollContainer is a function ref that naturally changes each render.
-    // Read it via `untrack` so this $effect does NOT depend on the parent
-    // `scrollRestoration` signal. Without this, a new inline options object
-    // would re-run the effect regardless of the primitive $derived memos.
+    // Read scrollRestoration object props via `untrack` for non-primitive
+    // refs that naturally change each render. Primitive $derived memos
+    // (mode/anchor/behavior/storageKey) drive re-runs.
+    void srMode;
+    void srAnchor;
+    void srBehavior;
+    void srStorageKey;
     const sr = createScrollRestoration(router, {
       mode: srMode,
       anchorScrolling: srAnchor,
+      behavior: srBehavior,
+      storageKey: srStorageKey,
       scrollContainer: untrack(() => scrollRestoration?.scrollContainer),
     });
     return () => sr.destroy();

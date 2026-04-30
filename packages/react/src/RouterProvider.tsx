@@ -46,6 +46,8 @@ export const RouterProvider: FC<RouteProviderProps> = ({
   // so we intentionally omit it from deps to keep inline getters stable.
   const srMode = scrollRestoration?.mode;
   const srAnchor = scrollRestoration?.anchorScrolling;
+  const srBehavior = scrollRestoration?.behavior;
+  const srStorageKey = scrollRestoration?.storageKey;
   const srEnabled = scrollRestoration !== undefined;
 
   useEffect(() => {
@@ -56,6 +58,8 @@ export const RouterProvider: FC<RouteProviderProps> = ({
     const sr = createScrollRestoration(router, {
       mode: srMode,
       anchorScrolling: srAnchor,
+      behavior: srBehavior,
+      storageKey: srStorageKey,
       // srEnabled check above guarantees scrollRestoration is defined.
       scrollContainer: scrollRestoration.scrollContainer,
     });
@@ -65,7 +69,7 @@ export const RouterProvider: FC<RouteProviderProps> = ({
     };
     // scrollRestoration (for scrollContainer) omitted — see comment above.
     // eslint-disable-next-line @eslint-react/exhaustive-deps
-  }, [router, srEnabled, srMode, srAnchor]);
+  }, [router, srEnabled, srMode, srAnchor, srBehavior, srStorageKey]);
 
   useEffect(() => {
     if (!viewTransitions) {

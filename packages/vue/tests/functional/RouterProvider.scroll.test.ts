@@ -154,8 +154,8 @@ describe("RouterProvider — scrollRestoration", () => {
 
       expect(history.scrollRestoration).toBe("manual");
 
-      // Switch to "manual" — utility returns noop; flip should be reverted.
-      opts.value = { mode: "manual" };
+      // Switch to "native" — utility returns noop; flip should be reverted.
+      opts.value = { mode: "native" };
       await wrapper.vm.$nextTick();
 
       expect(history.scrollRestoration).toBe("auto");

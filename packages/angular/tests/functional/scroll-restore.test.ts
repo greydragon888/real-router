@@ -111,7 +111,11 @@ describe("createScrollRestoration (Angular dom-utils copy)", () => {
       makeState("home"),
     );
 
-    expect(scrollSpy).toHaveBeenLastCalledWith(0, 0);
+    expect(scrollSpy).toHaveBeenLastCalledWith({
+      top: 0,
+      left: 0,
+      behavior: "auto",
+    });
 
     sr.destroy();
   });
@@ -132,7 +136,11 @@ describe("createScrollRestoration (Angular dom-utils copy)", () => {
       makeState("about"),
     );
 
-    expect(scrollSpy).toHaveBeenLastCalledWith(0, 420);
+    expect(scrollSpy).toHaveBeenLastCalledWith({
+      top: 420,
+      left: 0,
+      behavior: "auto",
+    });
 
     sr.destroy();
   });
@@ -228,7 +236,11 @@ describe("createScrollRestoration (Angular dom-utils copy)", () => {
     );
 
     // ctxHash !== undefined branch entered, but ctxHash.length === 0 → top.
-    expect(scrollSpy).toHaveBeenLastCalledWith(0, 0);
+    expect(scrollSpy).toHaveBeenLastCalledWith({
+      top: 0,
+      left: 0,
+      behavior: "auto",
+    });
 
     sr.destroy();
   });
@@ -250,7 +262,11 @@ describe("createScrollRestoration (Angular dom-utils copy)", () => {
       makeState("home"),
     );
 
-    expect(scrollSpy).toHaveBeenLastCalledWith(0, 0);
+    expect(scrollSpy).toHaveBeenLastCalledWith({
+      top: 0,
+      left: 0,
+      behavior: "auto",
+    });
 
     sr.destroy();
   });
@@ -298,7 +314,7 @@ describe("createScrollRestoration (Angular dom-utils copy)", () => {
     sr.destroy();
   });
 
-  it("custom scrollContainer reads/writes .scrollTop", () => {
+  it("custom scrollContainer reads/writes via element.scrollTo", () => {
     const element = document.createElement("div");
 
     element.id = "scroller";
@@ -308,6 +324,9 @@ describe("createScrollRestoration (Angular dom-utils copy)", () => {
       writable: true,
       configurable: true,
     });
+    const elementScrollToSpy = vi.fn();
+
+    element.scrollTo = elementScrollToSpy as unknown as typeof element.scrollTo;
 
     const fake = makeFakeRouter(makeState("home"));
     const sr = track(
@@ -324,7 +343,11 @@ describe("createScrollRestoration (Angular dom-utils copy)", () => {
       makeState("home"),
     );
 
-    expect(element.scrollTop).toBe(200);
+    expect(elementScrollToSpy).toHaveBeenLastCalledWith({
+      top: 200,
+      left: 0,
+      behavior: "auto",
+    });
 
     sr.destroy();
   });
@@ -355,7 +378,11 @@ describe("createScrollRestoration (Angular dom-utils copy)", () => {
     );
 
     expect(scrollIntoViewSpy).not.toHaveBeenCalled();
-    expect(scrollSpy).toHaveBeenLastCalledWith(0, 0);
+    expect(scrollSpy).toHaveBeenLastCalledWith({
+      top: 0,
+      left: 0,
+      behavior: "auto",
+    });
 
     sr.destroy();
     globalThis.history.replaceState(null, "", "/");
@@ -396,10 +423,10 @@ describe("createScrollRestoration (Angular dom-utils copy)", () => {
     }).not.toThrow();
   });
 
-  it("mode 'manual' no-ops everything", () => {
+  it("mode 'native' no-ops everything", () => {
     const fake = makeFakeRouter(makeState("home"));
     const scrollSpy = vi.spyOn(globalThis, "scrollTo");
-    const sr = track(createScrollRestoration(fake.router, { mode: "manual" }));
+    const sr = track(createScrollRestoration(fake.router, { mode: "native" }));
 
     fake.emit(
       makeState("about", {}, { navigation: { navigationType: "push" } }),

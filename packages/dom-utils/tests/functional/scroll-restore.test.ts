@@ -115,12 +115,12 @@ describe("createScrollRestoration", () => {
     expect(history.scrollRestoration).toBe("auto");
   });
 
-  it("mode 'manual' returns noop — no history flip, no subscribe, no pagehide", () => {
+  it("mode 'native' returns noop — no history flip, no subscribe, no pagehide", () => {
     history.scrollRestoration = "auto";
 
     const fake = makeFakeRouter(makeState("home"));
     const scrollSpy = vi.spyOn(globalThis, "scrollTo");
-    const sr = track(createScrollRestoration(fake.router, { mode: "manual" }));
+    const sr = track(createScrollRestoration(fake.router, { mode: "native" }));
 
     // No flip — browser's default auto-restore stays active.
     expect(history.scrollRestoration).toBe("auto");
@@ -144,7 +144,164 @@ describe("createScrollRestoration", () => {
       makeState("home"),
     );
 
-    expect(scrollSpy).toHaveBeenLastCalledWith(0, 0);
+    expect(scrollSpy).toHaveBeenLastCalledWith({
+      top: 0,
+      left: 0,
+      behavior: "auto",
+    });
+
+    sr.destroy();
+  });
+
+  it("behavior option: 'smooth' is forwarded to scrollTo and scrollIntoView", () => {
+    const fake = makeFakeRouter(makeState("home"));
+    const scrollSpy = vi.spyOn(globalThis, "scrollTo");
+    const sr = track(
+      createScrollRestoration(fake.router, {
+        mode: "top",
+        behavior: "smooth",
+      }),
+    );
+
+    fake.emit(
+      makeState(
+        "about",
+        {},
+        { navigation: { direction: "forward", navigationType: "push" } },
+      ),
+      makeState("home"),
+    );
+
+    expect(scrollSpy).toHaveBeenLastCalledWith({
+      top: 0,
+      left: 0,
+      behavior: "smooth",
+    });
+
+    sr.destroy();
+  });
+
+  it("behavior option: 'smooth' is forwarded to anchor scrollIntoView", () => {
+    const anchor = document.createElement("div");
+
+    anchor.id = "target";
+    document.body.append(anchor);
+    const scrollIntoViewSpy = vi.fn();
+
+    anchor.scrollIntoView = scrollIntoViewSpy;
+    globalThis.history.replaceState(null, "", "/#target");
+
+    const fake = makeFakeRouter(makeState("home"));
+    const sr = track(
+      createScrollRestoration(fake.router, { behavior: "smooth" }),
+    );
+
+    fake.emit(
+      makeState(
+        "about",
+        {},
+        { navigation: { direction: "forward", navigationType: "push" } },
+      ),
+      makeState("home"),
+    );
+
+    expect(scrollIntoViewSpy).toHaveBeenCalledWith({ behavior: "smooth" });
+
+    sr.destroy();
+    globalThis.history.replaceState(null, "", "/");
+  });
+
+  it("storageKey: custom key isolates store from default key", () => {
+    const fake = makeFakeRouter(makeState("home"));
+    const sr = track(
+      createScrollRestoration(fake.router, { storageKey: "my-app:scroll" }),
+    );
+
+    Object.defineProperty(globalThis, "scrollY", {
+      value: 250,
+      configurable: true,
+    });
+    fake.emit(
+      makeState("about", {}, { navigation: { navigationType: "push" } }),
+      makeState("home"),
+    );
+
+    // Custom key was written
+    expect(sessionStorage.getItem("my-app:scroll")).not.toBeNull();
+    // Default key untouched
+    expect(sessionStorage.getItem(STORAGE_KEY)).toBeNull();
+
+    sr.destroy();
+  });
+
+  it("storageKey: defaults to 'real-router:scroll' when omitted", () => {
+    const fake = makeFakeRouter(makeState("home"));
+    const sr = track(createScrollRestoration(fake.router));
+
+    Object.defineProperty(globalThis, "scrollY", {
+      value: 100,
+      configurable: true,
+    });
+    fake.emit(
+      makeState("about", {}, { navigation: { navigationType: "push" } }),
+      makeState("home"),
+    );
+
+    expect(sessionStorage.getItem("real-router:scroll")).not.toBeNull();
+
+    sr.destroy();
+  });
+
+  it("storageKey: two utilities with different keys don't share state", () => {
+    const fake = makeFakeRouter(makeState("home"));
+    const srA = track(
+      createScrollRestoration(fake.router, { storageKey: "app-a:scroll" }),
+    );
+    const srB = track(
+      createScrollRestoration(fake.router, { storageKey: "app-b:scroll" }),
+    );
+
+    Object.defineProperty(globalThis, "scrollY", {
+      value: 333,
+      configurable: true,
+    });
+
+    fake.emit(
+      makeState("about", {}, { navigation: { navigationType: "push" } }),
+      makeState("home"),
+    );
+
+    // Both wrote (both are subscribed) but to different keys.
+    const storeA = JSON.parse(
+      sessionStorage.getItem("app-a:scroll") ?? "{}",
+    ) as Record<string, number>;
+    const storeB = JSON.parse(
+      sessionStorage.getItem("app-b:scroll") ?? "{}",
+    ) as Record<string, number>;
+
+    expect(storeA["home:{}"]).toBe(333);
+    expect(storeB["home:{}"]).toBe(333);
+    expect(sessionStorage.getItem(STORAGE_KEY)).toBeNull();
+
+    srA.destroy();
+    srB.destroy();
+  });
+
+  it("behavior defaults to 'auto' when omitted", () => {
+    const fake = makeFakeRouter(makeState("home"));
+    const scrollSpy = vi.spyOn(globalThis, "scrollTo");
+    const sr = track(createScrollRestoration(fake.router, { mode: "top" }));
+
+    fake.emit(
+      makeState("about", {}, { navigation: { navigationType: "push" } }),
+      makeState("home"),
+    );
+
+    expect(scrollSpy).toHaveBeenLastCalledWith({
+      top: 0,
+      left: 0,
+      behavior: "auto",
+    });
 
     sr.destroy();
   });
@@ -165,7 +322,11 @@ describe("createScrollRestoration", () => {
       makeState("about"),
     );
 
-    expect(scrollSpy).toHaveBeenLastCalledWith(0, 420);
+    expect(scrollSpy).toHaveBeenLastCalledWith({
+      top: 420,
+      left: 0,
+      behavior: "auto",
+    });
 
     sr.destroy();
   });
@@ -184,7 +345,11 @@ describe("createScrollRestoration", () => {
       makeState("about"),
     );
 
-    expect(scrollSpy).toHaveBeenLastCalledWith(0, 0);
+    expect(scrollSpy).toHaveBeenLastCalledWith({
+      top: 0,
+      left: 0,
+      behavior: "auto",
+    });
 
     sr.destroy();
   });
@@ -203,7 +368,11 @@ describe("createScrollRestoration", () => {
       makeState("home"),
     );
 
-    expect(scrollSpy).toHaveBeenLastCalledWith(0, 0);
+    expect(scrollSpy).toHaveBeenLastCalledWith({
+      top: 0,
+      left: 0,
+      behavior: "auto",
+    });
 
     sr.destroy();
   });
@@ -251,7 +420,11 @@ describe("createScrollRestoration", () => {
       makeState("home"),
     );
 
-    expect(scrollSpy).toHaveBeenLastCalledWith(0, 0);
+    expect(scrollSpy).toHaveBeenLastCalledWith({
+      top: 0,
+      left: 0,
+      behavior: "auto",
+    });
 
     sr.destroy();
     globalThis.history.replaceState(null, "", "/");
@@ -288,7 +461,11 @@ describe("createScrollRestoration", () => {
       makeState("home"),
     );
 
-    expect(scrollSpy).toHaveBeenLastCalledWith(0, 77);
+    expect(scrollSpy).toHaveBeenLastCalledWith({
+      top: 77,
+      left: 0,
+      behavior: "auto",
+    });
 
     sr.destroy();
   });
@@ -305,7 +482,11 @@ describe("createScrollRestoration", () => {
       makeState("home", {}, { navigation: { navigationType: "reload" } }),
     );
 
-    expect(scrollSpy).toHaveBeenLastCalledWith(0, 200);
+    expect(scrollSpy).toHaveBeenLastCalledWith({
+      top: 200,
+      left: 0,
+      behavior: "auto",
+    });
 
     sr.destroy();
   });
@@ -317,7 +498,11 @@ describe("createScrollRestoration", () => {
 
     fake.emit(makeState("about"), makeState("home"));
 
-    expect(scrollSpy).toHaveBeenLastCalledWith(0, 0);
+    expect(scrollSpy).toHaveBeenLastCalledWith({
+      top: 0,
+      left: 0,
+      behavior: "auto",
+    });
 
     sr.destroy();
   });
@@ -385,7 +570,7 @@ describe("createScrollRestoration", () => {
     sr.destroy();
   });
 
-  it("custom scrollContainer reads/writes .scrollTop, not window", () => {
+  it("custom scrollContainer reads/writes via element.scrollTo, not window", () => {
     const element = document.createElement("div");
 
     element.id = "scroller";
@@ -395,6 +580,9 @@ describe("createScrollRestoration", () => {
       writable: true,
       configurable: true,
     });
+    const elementScrollToSpy = vi.fn();
+
+    element.scrollTo = elementScrollToSpy as unknown as typeof element.scrollTo;
 
     const fake = makeFakeRouter(makeState("home"));
     const windowScrollSpy = vi.spyOn(globalThis, "scrollTo");
@@ -414,7 +602,11 @@ describe("createScrollRestoration", () => {
       makeState("home"),
     );
 
-    expect(element.scrollTop).toBe(200);
+    expect(elementScrollToSpy).toHaveBeenLastCalledWith({
+      top: 200,
+      left: 0,
+      behavior: "auto",
+    });
     expect(windowScrollSpy).not.toHaveBeenCalled();
 
     sr.destroy();
@@ -441,6 +633,9 @@ describe("createScrollRestoration", () => {
       writable: true,
       configurable: true,
     });
+    const elementScrollToSpy = vi.fn();
+
+    element.scrollTo = elementScrollToSpy as unknown as typeof element.scrollTo;
 
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "about:{}": 150 }));
     fake.emit(
@@ -453,7 +648,11 @@ describe("createScrollRestoration", () => {
     );
 
     // Lazy resolve picked up the newly-mounted container.
-    expect(element.scrollTop).toBe(150);
+    expect(elementScrollToSpy).toHaveBeenLastCalledWith({
+      top: 150,
+      left: 0,
+      behavior: "auto",
+    });
 
     sr.destroy();
   });
@@ -476,7 +675,11 @@ describe("createScrollRestoration", () => {
       makeState("home"),
     );
 
-    expect(scrollSpy).toHaveBeenLastCalledWith(0, 0);
+    expect(scrollSpy).toHaveBeenLastCalledWith({
+      top: 0,
+      left: 0,
+      behavior: "auto",
+    });
 
     sr.destroy();
   });
@@ -509,7 +712,11 @@ describe("createScrollRestoration", () => {
     );
 
     expect(scrollIntoViewSpy).not.toHaveBeenCalled();
-    expect(scrollSpy).toHaveBeenLastCalledWith(0, 0);
+    expect(scrollSpy).toHaveBeenLastCalledWith({
+      top: 0,
+      left: 0,
+      behavior: "auto",
+    });
 
     sr.destroy();
     globalThis.history.replaceState(null, "", "/");
@@ -570,7 +777,11 @@ describe("createScrollRestoration", () => {
       makeState("about"),
     );
 
-    expect(scrollSpy).toHaveBeenLastCalledWith(0, 77);
+    expect(scrollSpy).toHaveBeenLastCalledWith({
+      top: 77,
+      left: 0,
+      behavior: "auto",
+    });
 
     sr2.destroy();
   });
@@ -729,7 +940,11 @@ describe("createScrollRestoration", () => {
     );
 
     // Corrupted JSON → store treated as empty → restores to 0.
-    expect(scrollSpy).toHaveBeenLastCalledWith(0, 0);
+    expect(scrollSpy).toHaveBeenLastCalledWith({
+      top: 0,
+      left: 0,
+      behavior: "auto",
+    });
 
     sr.destroy();
   });
@@ -767,7 +982,11 @@ describe("createScrollRestoration", () => {
     // Frame fires → scroll applied.
     pending.shift()?.(0);
 
-    expect(scrollSpy).toHaveBeenCalledWith(0, 0);
+    expect(scrollSpy).toHaveBeenCalledWith({
+      top: 0,
+      left: 0,
+      behavior: "auto",
+    });
 
     sr.destroy();
   });
@@ -817,7 +1036,11 @@ describe("createScrollRestoration", () => {
       makeState("home"),
     );
 
-    expect(scrollSpy).toHaveBeenLastCalledWith(0, 0);
+    expect(scrollSpy).toHaveBeenLastCalledWith({
+      top: 0,
+      left: 0,
+      behavior: "auto",
+    });
 
     sr.destroy();
   });
@@ -869,7 +1092,11 @@ describe("createScrollRestoration", () => {
     }).not.toThrow();
 
     // No element matches the raw "foo%2" id either → scroll to top.
-    expect(scrollSpy).toHaveBeenLastCalledWith(0, 0);
+    expect(scrollSpy).toHaveBeenLastCalledWith({
+      top: 0,
+      left: 0,
+      behavior: "auto",
+    });
 
     sr.destroy();
     globalThis.history.replaceState(null, "", "/");

@@ -1,6 +1,6 @@
 import type { Router, State } from "@real-router/core";
 
-const STORAGE_KEY = "real-router:scroll";
+const DEFAULT_STORAGE_KEY = "real-router:scroll";
 
 const NOOP_INSTANCE: { destroy: () => void } = Object.freeze({
   destroy: () => {
@@ -8,12 +8,33 @@ const NOOP_INSTANCE: { destroy: () => void } = Object.freeze({
   },
 });
 
-export type ScrollRestorationMode = "restore" | "top" | "manual";
+export type ScrollRestorationMode = "restore" | "top" | "native";
 
 export interface ScrollRestorationOptions {
   mode?: ScrollRestorationMode | undefined;
   anchorScrolling?: boolean | undefined;
   scrollContainer?: (() => HTMLElement | null) | undefined;
+  /**
+   * Scroll behavior passed to `scrollTo({ behavior })` and
+   * `scrollIntoView({ behavior })`.
+   *
+   * - `"auto"` (default) — browser-defined, usually instant.
+   * - `"instant"` — explicit instant jump (no animation).
+   * - `"smooth"` — animated transition. Note: smooth restore on back/traverse
+   *   can feel disorienting if the user expects to land at the saved position
+   *   immediately. Recommended for `mode: "top"` or anchor scroll only.
+   *
+   * See [MDN](https://developer.mozilla.org/en-US/docs/Web/API/ScrollToOptions/behavior).
+   */
+  behavior?: ScrollBehavior | undefined;
+  /**
+   * sessionStorage key used to persist saved scroll positions. Default:
+   * `"real-router:scroll"`. Override only when multiple independent
+   * `RouterProvider` instances share the same document and you need to
+   * isolate their scroll stores (e.g. micro-frontends, embedded widgets,
+   * or testing). For a single app with one provider the default is fine.
+   */
+  storageKey?: string | undefined;
 }
 
 interface NavigationContext {
@@ -31,15 +52,41 @@ export function createScrollRestoration(
 
   const mode = options?.mode ?? "restore";
 
-  // mode "manual" = utility does nothing. Don't flip history.scrollRestoration,
-  // don't subscribe, don't register pagehide — leave the browser's native
-  // auto-restore intact for the app to override if it wants to.
-  if (mode === "manual") {
+  // mode "native" = utility does nothing. Don't flip history.scrollRestoration,
+  // don't subscribe, don't register pagehide — `history.scrollRestoration`
+  // stays at the browser default ("auto") so the browser handles scroll
+  // restore natively. (Note: this is the OPPOSITE of `history.scrollRestoration
+  // === "manual"` — utility's "native" leaves the DOM property at "auto" so
+  // the browser is in charge.)
+  if (mode === "native") {
     return NOOP_INSTANCE;
   }
 
   const anchorEnabled = options?.anchorScrolling ?? true;
   const getContainer = options?.scrollContainer;
+  const behavior: ScrollBehavior = options?.behavior ?? "auto";
+  const storageKey = options?.storageKey ?? DEFAULT_STORAGE_KEY;
+
+  const loadStore = (): Record<string, number> => {
+    try {
+      const raw = sessionStorage.getItem(storageKey);
+
+      return raw ? (JSON.parse(raw) as Record<string, number>) : {};
+    } catch {
+      return {};
+    }
+  };
+
+  const putPos = (key: string, pos: number): void => {
+    try {
+      const store = loadStore();
+
+      store[key] = pos;
+      sessionStorage.setItem(storageKey, JSON.stringify(store));
+    } catch {
+      // Ignore quota / security errors.
+    }
+  };
 
   const prevScrollRestoration = history.scrollRestoration;
 
@@ -62,9 +109,9 @@ export function createScrollRestoration(
     const element = getContainer?.();
 
     if (element) {
-      element.scrollTop = top;
+      element.scrollTo({ top, left: 0, behavior });
     } else {
-      globalThis.scrollTo(0, top);
+      globalThis.scrollTo({ top, left: 0, behavior });
     }
   };
 
@@ -82,7 +129,7 @@ export function createScrollRestoration(
         const element = document.getElementById(ctxHash);
 
         if (element) {
-          element.scrollIntoView();
+          element.scrollIntoView({ behavior });
 
           return;
         }
@@ -112,7 +159,7 @@ export function createScrollRestoration(
       const element = document.getElementById(id);
 
       if (element) {
-        element.scrollIntoView();
+        element.scrollIntoView({ behavior });
 
         return;
       }
@@ -196,27 +243,6 @@ export function createScrollRestoration(
 
 function keyOf(state: State): string {
   return `${state.name}:${canonicalJson(state.params)}`;
-}
-
-function loadStore(): Record<string, number> {
-  try {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
-
-    return raw ? (JSON.parse(raw) as Record<string, number>) : {};
-  } catch {
-    return {};
-  }
-}
-
-function putPos(key: string, pos: number): void {
-  try {
-    const store = loadStore();
-
-    store[key] = pos;
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(store));
-  } catch {
-    // Ignore quota / security errors.
-  }
 }
 
 function canonicalJson(value: unknown): string {
