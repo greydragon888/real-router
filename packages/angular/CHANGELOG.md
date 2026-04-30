@@ -1,5 +1,13 @@
 # @real-router/angular
 
+## 0.8.0
+
+### Minor Changes
+
+- [#569](https://github.com/greydragon888/real-router/pull/569) [`5b1eae9`](https://github.com/greydragon888/real-router/commit/5b1eae9e115f5cdf45f4365f3d0bcf5625297140) Thanks [@greydragon888](https://github.com/greydragon888)! - Scroll restoration: rename `mode: "manual"` → `"native"`, add `behavior` and `storageKey` options ([#534](https://github.com/greydragon888/real-router/issues/534))
+
+  `provideRealRouter(router, { scrollRestoration })` now accepts `behavior?: ScrollBehavior` and `storageKey?: string`. The git-tracked `packages/angular/src/dom-utils/scroll-restore.ts` copy is synced with `shared/dom-utils/`. Mode `"manual"` renamed to `"native"` (semantic clarity — utility hands off to browser-native restore, opposite of DOM `history.scrollRestoration === "manual"`).
+
 ## 0.7.0
 
 ### Minor Changes

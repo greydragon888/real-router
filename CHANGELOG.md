@@ -5,6 +5,61 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-04-30]
+
+### @real-router/angular@0.8.0
+
+### Minor Changes
+
+- [#569](https://github.com/greydragon888/real-router/pull/569) [`5b1eae9`](https://github.com/greydragon888/real-router/commit/5b1eae9e115f5cdf45f4365f3d0bcf5625297140) Thanks [@greydragon888](https://github.com/greydragon888)! - Scroll restoration: rename `mode: "manual"` → `"native"`, add `behavior` and `storageKey` options ([#534](https://github.com/greydragon888/real-router/issues/534))
+
+  `provideRealRouter(router, { scrollRestoration })` now accepts `behavior?: ScrollBehavior` and `storageKey?: string`. The git-tracked `packages/angular/src/dom-utils/scroll-restore.ts` copy is synced with `shared/dom-utils/`. Mode `"manual"` renamed to `"native"` (semantic clarity — utility hands off to browser-native restore, opposite of DOM `history.scrollRestoration === "manual"`).
+
+### @real-router/preact@0.11.0
+
+### Minor Changes
+
+- [#569](https://github.com/greydragon888/real-router/pull/569) [`5b1eae9`](https://github.com/greydragon888/real-router/commit/5b1eae9e115f5cdf45f4365f3d0bcf5625297140) Thanks [@greydragon888](https://github.com/greydragon888)! - Scroll restoration: rename `mode: "manual"` → `"native"`, add `behavior` and `storageKey` options ([#534](https://github.com/greydragon888/real-router/issues/534))
+
+  See `@real-router/react` changeset for full details. The `RouterProvider` now forwards `behavior?: ScrollBehavior` and `storageKey?: string` from `scrollRestoration` options to `createScrollRestoration`. Mode `"manual"` renamed to `"native"` (semantic clarity — utility hands off to browser-native restore, opposite of DOM `history.scrollRestoration === "manual"`).
+
+### @real-router/react@0.24.0
+
+### Minor Changes
+
+- [#569](https://github.com/greydragon888/real-router/pull/569) [`5b1eae9`](https://github.com/greydragon888/real-router/commit/5b1eae9e115f5cdf45f4365f3d0bcf5625297140) Thanks [@greydragon888](https://github.com/greydragon888)! - Scroll restoration: rename `mode: "manual"` → `"native"`, add `behavior` and `storageKey` options ([#534](https://github.com/greydragon888/real-router/issues/534))
+
+  `createScrollRestoration` (`shared/dom-utils/`) gains three changes:
+  - **Mode rename `manual` → `native`** for clarity. The previous name was misleading because it had the OPPOSITE meaning of DOM `history.scrollRestoration === "manual"`: utility's mode meant "utility does nothing, browser handles natively", while DOM `"manual"` means "browser does nothing, app handles". Renamed to `"native"` to match the actual semantic ("hand off to browser-native restore").
+  - **`behavior?: ScrollBehavior`** — forwarded to `scrollTo({ behavior })` and `scrollIntoView({ behavior })`. Values: `"auto"` (default), `"instant"`, `"smooth"`. See [MDN ScrollToOptions.behavior](https://developer.mozilla.org/en-US/docs/Web/API/ScrollToOptions/behavior).
+  - **`storageKey?: string`** — sessionStorage key for scroll-store, default `"real-router:scroll"`. Override for namespace-isolation between independent `RouterProvider` instances (micro-frontends, embedded widgets, testing setups).
+
+  `RouterProvider` now forwards all three options. Default behavior unchanged.
+
+### @real-router/solid@0.11.0
+
+### Minor Changes
+
+- [#569](https://github.com/greydragon888/real-router/pull/569) [`5b1eae9`](https://github.com/greydragon888/real-router/commit/5b1eae9e115f5cdf45f4365f3d0bcf5625297140) Thanks [@greydragon888](https://github.com/greydragon888)! - Scroll restoration: rename `mode: "manual"` → `"native"`, add `behavior` and `storageKey` options ([#534](https://github.com/greydragon888/real-router/issues/534))
+
+  `scrollRestoration` prop now accepts `behavior?: ScrollBehavior` and `storageKey?: string`. Solid forwards the entire `props.scrollRestoration` object to `createScrollRestoration`, so no provider-side changes were needed. Mode `"manual"` renamed to `"native"` (semantic clarity — utility hands off to browser-native restore, opposite of DOM `history.scrollRestoration === "manual"`).
+
+### @real-router/svelte@0.10.0
+
+### Minor Changes
+
+- [#569](https://github.com/greydragon888/real-router/pull/569) [`5b1eae9`](https://github.com/greydragon888/real-router/commit/5b1eae9e115f5cdf45f4365f3d0bcf5625297140) Thanks [@greydragon888](https://github.com/greydragon888)! - Scroll restoration: rename `mode: "manual"` → `"native"`, add `behavior` and `storageKey` options ([#534](https://github.com/greydragon888/real-router/issues/534))
+
+  `<RouterProvider>` derives `srBehavior` and `srStorageKey` from `scrollRestoration` props and forwards them to `createScrollRestoration`. Mode `"manual"` renamed to `"native"` (semantic clarity — utility hands off to browser-native restore, opposite of DOM `history.scrollRestoration === "manual"`).
+
+### @real-router/vue@0.12.0
+
+### Minor Changes
+
+- [#569](https://github.com/greydragon888/real-router/pull/569) [`5b1eae9`](https://github.com/greydragon888/real-router/commit/5b1eae9e115f5cdf45f4365f3d0bcf5625297140) Thanks [@greydragon888](https://github.com/greydragon888)! - Scroll restoration: rename `mode: "manual"` → `"native"`, add `behavior` and `storageKey` options ([#534](https://github.com/greydragon888/real-router/issues/534))
+
+  `<RouterProvider>` now watches `scrollRestoration?.behavior` and `scrollRestoration?.storageKey` as primitive deps and forwards them to `createScrollRestoration` on remount. Mode `"manual"` renamed to `"native"` (semantic clarity — utility hands off to browser-native restore, opposite of DOM `history.scrollRestoration === "manual"`).
+
 ## [2026-04-29]
 
 ### @real-router/angular@0.7.0
