@@ -8,15 +8,15 @@
 import eslintConfig from "../../eslint.config.mjs";
 import tsEslint from "typescript-eslint";
 import eslintReact from "@eslint-react/eslint-plugin";
-import reactJsx from "eslint-plugin-react-jsx";
 import testingLibraryPlugin from "eslint-plugin-testing-library";
 
 export default tsEslint.config(
   ...eslintConfig,
 
   // ============================================
-  // @eslint-react v4 — recommended-type-checked
-  // Includes rules-of-hooks + exhaustive-deps (ported from react-hooks)
+  // @eslint-react v5 — recommended-type-checked (all-in-one)
+  // Includes rules-of-hooks, exhaustive-deps, static-components,
+  // and web-api-no-leaked-{fetch,event-listener,timeout,interval,resize-observer}.
   // ============================================
   {
     ...eslintReact.configs["recommended-type-checked"],
@@ -32,20 +32,11 @@ export default tsEslint.config(
   },
 
   // ============================================
-  // eslint-plugin-react-jsx — JSX-specific rules
-  // ============================================
-  {
-    ...reactJsx.configs.recommended,
-    files: ["**/*.tsx"],
-  },
-
-  // ============================================
   // TEST OVERRIDES — tests use intentional anti-patterns
   // ============================================
   {
     files: ["tests/**/*.tsx"],
     rules: {
-      "@eslint-react/component-hook-factories": "off",
       "@eslint-react/exhaustive-deps": "off",
       "@eslint-react/use-state": "off",
       "@eslint-react/immutability": "off",
@@ -81,6 +72,7 @@ export default tsEslint.config(
       "testing-library/no-unnecessary-act": "off",
       "@eslint-react/no-nested-component-definitions": "off",
       "@eslint-react/no-array-index-key": "off",
+      "@eslint-react/static-components": "off",
     },
   },
 
