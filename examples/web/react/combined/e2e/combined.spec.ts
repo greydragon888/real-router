@@ -239,5 +239,433 @@ test.describe("Combined Example", () => {
       await expect(page).toHaveURL(/page=1/);
       await expect(page).toHaveURL(/sort=name/);
     });
+
+  });
+
+  // -----------------------------------------------------------------------
+  // Critical gap #1 — canDeactivate with confirm dialog
+  // -----------------------------------------------------------------------
+  test.describe("canDeactivate — interactive confirm", () => {
+    test("blocks navigation when user dismisses confirm with unsaved changes", async ({
+      page,
+    }) => {
+      await login(page);
+      await page.click(".sidebar a:has-text('Settings')");
+      await expect(page).toHaveURL(/\/settings/);
+
+      await page.fill("input[placeholder='Enter your display name…']", "draft");
+      await expect(page.locator("text=Unsaved changes")).toBeVisible();
+
+      page.once("dialog", (dialog) => {
+        void dialog.dismiss();
+      });
+      await page.click(".sidebar a:has-text('Dashboard')");
+
+      await expect(page).toHaveURL(/\/settings/);
+      await expect(
+        page.getByRole("heading", { name: "Settings" }),
+      ).toBeVisible();
+    });
+
+    test("allows navigation when user accepts confirm with unsaved changes", async ({
+      page,
+    }) => {
+      await login(page);
+      await page.click(".sidebar a:has-text('Settings')");
+      await expect(page).toHaveURL(/\/settings/);
+
+      await page.fill("input[placeholder='Enter your display name…']", "draft");
+      await expect(page.locator("text=Unsaved changes")).toBeVisible();
+
+      page.once("dialog", (dialog) => {
+        void dialog.accept();
+      });
+      await page.click(".sidebar a:has-text('Dashboard')");
+
+      await expect(page).toHaveURL(/\/dashboard/);
+      await expect(
+        page.getByRole("heading", { name: "Dashboard" }),
+      ).toBeVisible();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Critical gap #3 — Login error feedback
+  // -----------------------------------------------------------------------
+  test.describe("Login error feedback", () => {
+    test("invalid email shows error toast and stays on /login", async ({
+      page,
+    }) => {
+      await page.goto("/login");
+      await page.getByPlaceholder("alice@example.com").fill("ghost@nope.com");
+      await page.getByPlaceholder("any password").fill("password");
+      await page.getByRole("button", { name: "Login" }).click();
+
+      await expect(page.locator(".toast.error")).toBeVisible();
+      await expect(page.locator(".toast.error")).toContainText(
+        /Invalid credentials/i,
+      );
+      await expect(page).toHaveURL(/\/login/);
+    });
+
+    test("login button is disabled and shows loading text during submit", async ({
+      page,
+    }) => {
+      await page.goto("/login");
+      await page.getByPlaceholder("alice@example.com").fill("alice@example.com");
+      await page.getByPlaceholder("any password").fill("password");
+
+      const button = page.getByRole("button", { name: /Login|Logging in/ });
+
+      await button.click();
+      await expect(button).toBeDisabled();
+      await expect(button).toHaveText(/Logging in/);
+      await page.waitForURL(/\/dashboard/);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Critical gap #4 — AbortSignal during checkout guard
+  // -----------------------------------------------------------------------
+  test.describe("Async guard — interrupted navigation", () => {
+    test("clicking another link during checkout guard aborts checkout", async ({
+      page,
+    }) => {
+      await login(page);
+
+      await page.click(".sidebar a:has-text('Checkout')");
+      await expect(
+        page.locator("[data-testid='progress-bar']"),
+      ).toBeVisible({ timeout: 1000 });
+
+      await page.click(".sidebar a:has-text('Dashboard')");
+
+      await page.waitForURL(/\/dashboard/);
+      await expect(
+        page.getByRole("heading", { name: "Dashboard" }),
+      ).toBeVisible();
+      await expect(page).not.toHaveURL(/\/checkout/);
+      await expect(
+        page.locator("[data-testid='progress-bar']"),
+      ).toBeHidden({ timeout: 2000 });
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Critical gap #5 — Lang toggle reload
+  // -----------------------------------------------------------------------
+  test.describe("Lang toggle reload", () => {
+    test("button label inverts and dashboard re-reads param after toggle", async ({
+      page,
+    }) => {
+      await login(page);
+
+      const langLine = page.locator("p", { hasText: "Lang param:" });
+
+      await expect(langLine).toContainText("en");
+      await expect(page.getByRole("button", { name: /→ RU/ })).toBeVisible();
+
+      await page.getByRole("button", { name: /→ RU/ }).click();
+      await expect(page).toHaveURL(/lang=ru/);
+      await expect(langLine).toContainText("ru");
+      await expect(page.getByRole("button", { name: /→ EN/ })).toBeVisible();
+
+      await page.getByRole("button", { name: /→ EN/ }).click();
+      await expect(page).toHaveURL(/lang=en/);
+      await expect(langLine).toContainText("en");
+      await expect(page.getByRole("button", { name: /→ RU/ })).toBeVisible();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Critical gap #6 — Bob (editor) role
+  // -----------------------------------------------------------------------
+  test.describe("Role-based access — editor (Bob)", () => {
+    test("editor cannot access admin page", async ({ page }) => {
+      await login(page, "bob@example.com");
+      await page.click(".sidebar a:has-text('Admin')");
+      await expect(page).not.toHaveURL(/\/admin/);
+      await expect(page).toHaveURL(/\/dashboard/);
+    });
+
+    test("editor can access settings page", async ({ page }) => {
+      await login(page, "bob@example.com");
+      await page.click(".sidebar a:has-text('Settings')");
+      await expect(page).toHaveURL(/\/settings/);
+      await expect(
+        page.getByRole("heading", { name: "Settings" }),
+      ).toBeVisible();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Critical gap #7 — Loading states
+  // -----------------------------------------------------------------------
+  test.describe("Loading states — products list/detail", () => {
+    test("products list shows spinner while data loads", async ({ page }) => {
+      await login(page);
+
+      const navPromise = page.click(".sidebar a:has-text('Products')");
+
+      await expect(page.locator("main .spinner")).toBeVisible({
+        timeout: 1500,
+      });
+      await expect(page.locator("main")).toContainText(/Loading products/i);
+
+      await navPromise;
+      await expect(
+        page.locator("main .card:has-text('Laptop')").first(),
+      ).toBeVisible({ timeout: 5000 });
+      await expect(page.locator("main .spinner")).toBeHidden();
+    });
+
+    test("product detail shows spinner while data loads", async ({ page }) => {
+      await login(page);
+      await page.click(".sidebar a:has-text('Products')");
+      await expect(
+        page.getByRole("heading", { name: "Products" }),
+      ).toBeVisible({ timeout: 5000 });
+
+      await page.getByRole("link", { name: "View Details" }).first().click();
+
+      await expect(page.locator("main .spinner")).toBeVisible({
+        timeout: 1500,
+      });
+      await expect(page.locator("main")).toContainText(/Loading…/);
+
+      await expect(page.getByRole("heading", { name: "Laptop" })).toBeVisible({
+        timeout: 5000,
+      });
+      await expect(page.locator("main .spinner")).toBeHidden();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Critical gap #8 — Detail navigation by id (no auth persistence on goto)
+  // -----------------------------------------------------------------------
+  test.describe("Detail navigation by id", () => {
+    test("clicking 'View Details' on second product navigates to /products/2", async ({
+      page,
+    }) => {
+      await login(page);
+      await page.click(".sidebar a:has-text('Products')");
+      await expect(
+        page.getByRole("heading", { name: "Products" }),
+      ).toBeVisible({ timeout: 5000 });
+
+      await page
+        .locator(".card", { hasText: "Keyboard" })
+        .getByRole("link", { name: /View Details/i })
+        .click();
+
+      await expect(page).toHaveURL(/\/products\/2/);
+      await expect(
+        page.getByRole("heading", { name: "Keyboard" }),
+      ).toBeVisible({ timeout: 5000 });
+      await expect(page.locator("main")).toContainText("Mechanical keyboard");
+    });
+
+    test("back link returns to products list", async ({ page }) => {
+      await login(page);
+      await page.click(".sidebar a:has-text('Products')");
+      await expect(
+        page.getByRole("heading", { name: "Products" }),
+      ).toBeVisible({ timeout: 5000 });
+
+      await page
+        .locator(".card", { hasText: "Monitor" })
+        .getByRole("link", { name: /View Details/i })
+        .click();
+      await expect(page).toHaveURL(/\/products\/3/);
+      await expect(page.getByRole("heading", { name: "Monitor" })).toBeVisible({
+        timeout: 5000,
+      });
+
+      await page.getByRole("link", { name: /Back to Products/i }).click();
+      await expect(page).toHaveURL(/\/products(?:\?|$)/);
+      await expect(
+        page.getByRole("heading", { name: "Products" }),
+      ).toBeVisible();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Critical gap #9 — NotFound full content
+  // -----------------------------------------------------------------------
+  test.describe("NotFound contents", () => {
+    test("404 page renders both heading and helper hint", async ({ page }) => {
+      await page.goto("/totally-missing-route");
+      await expect(page.getByRole("heading", { name: "404" })).toBeVisible();
+      await expect(page.locator("main")).toContainText(/does not exist/i);
+      await expect(page.locator("main")).toContainText(
+        /Try logging in.*available routes change/i,
+      );
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Critical gap #10 — Breadcrumb click navigates
+  // -----------------------------------------------------------------------
+  test.describe("Breadcrumb navigation", () => {
+    test("clicking 'Users' crumb returns from profile to list", async ({
+      page,
+    }) => {
+      await login(page);
+      await page.click(".sidebar a:has-text('Users')");
+      await page.click("a:has-text('User #1')");
+      await expect(page).toHaveURL(/\/users\/1/);
+
+      await page.locator("nav.breadcrumbs a:has-text('Users')").click();
+      await expect(page).toHaveURL(/\/users(?:\?|$)/);
+      await expect(page.getByRole("heading", { name: "Users" })).toBeVisible();
+      await expect(page.locator("nav.breadcrumbs")).not.toContainText(
+        "User #1",
+      );
+    });
+
+    test("clicking 'Home' crumb returns to dashboard via forwardTo", async ({
+      page,
+    }) => {
+      await login(page);
+      await page.click(".sidebar a:has-text('Users')");
+      await page.click("a:has-text('User #2')");
+      await expect(page).toHaveURL(/\/users\/2/);
+
+      await page.locator("nav.breadcrumbs a:has-text('Home')").click();
+      await expect(page).toHaveURL(/\/dashboard/);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Critical gap #11 — UserProfile content via useRouteNode
+  // -----------------------------------------------------------------------
+  test.describe("UserProfile — useRouteNode binding", () => {
+    test("renders heading and body matching :id param", async ({ page }) => {
+      await login(page);
+      await page.click(".sidebar a:has-text('Users')");
+      await page.getByRole("link", { name: /User #2/ }).click();
+
+      await expect(page).toHaveURL(/\/users\/2/);
+      await expect(
+        page.getByRole("heading", { name: "User #2" }),
+      ).toBeVisible();
+      await expect(page.locator("main")).toContainText("Profile for user 2");
+    });
+
+    test("navigating between :id values rerenders profile", async ({ page }) => {
+      await login(page);
+      await page.click(".sidebar a:has-text('Users')");
+      await page.getByRole("link", { name: /User #1/ }).click();
+      await expect(
+        page.getByRole("heading", { name: "User #1" }),
+      ).toBeVisible();
+
+      await page.getByRole("link", { name: /Back to list/i }).click();
+      await page.getByRole("link", { name: /User #3/ }).click();
+
+      await expect(
+        page.getByRole("heading", { name: "User #3" }),
+      ).toBeVisible();
+      await expect(page.locator("main")).toContainText("Profile for user 3");
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Critical gap #12 — keepAlive on Dashboard
+  // -----------------------------------------------------------------------
+  test.describe("keepAlive — Dashboard", () => {
+    test("dashboard h1 stays in DOM after navigating away (Activity hidden)", async ({
+      page,
+    }) => {
+      await login(page);
+      const dashboardH1 = page.locator("h1", { hasText: /^Dashboard$/ });
+
+      await expect(dashboardH1).toBeVisible();
+
+      await page.click(".sidebar a:has-text('Users')");
+      await expect(page).toHaveURL(/\/users/);
+      await expect(page.getByRole("heading", { name: "Users" })).toBeVisible();
+
+      await expect(dashboardH1).toHaveCount(1);
+      await expect(dashboardH1).toBeHidden();
+    });
+
+    test("returning to dashboard re-shows it without re-running suspense", async ({
+      page,
+    }) => {
+      await login(page);
+      await expect(
+        page.getByRole("heading", { name: "Dashboard" }),
+      ).toBeVisible();
+
+      await page.click(".sidebar a:has-text('Products')");
+      await expect(
+        page.getByRole("heading", { name: "Products" }),
+      ).toBeVisible({ timeout: 5000 });
+
+      await page.click(".sidebar a:has-text('Dashboard')");
+      await expect(page).toHaveURL(/\/dashboard/);
+      await expect(
+        page.locator("h1", { hasText: /^Dashboard$/ }),
+      ).toBeVisible();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Critical gap #13 — Persistent params on cold start (public route)
+  // -----------------------------------------------------------------------
+  test.describe("Persistent params — cold start", () => {
+    test("cold-load /login?lang=ru preserves param into private session", async ({
+      page,
+    }) => {
+      await page.goto("/login?lang=ru");
+      await expect(page).toHaveURL(/lang=ru/);
+
+      await page.getByPlaceholder("alice@example.com").fill("alice@example.com");
+      await page.getByPlaceholder("any password").fill("password");
+      await page.getByRole("button", { name: "Login" }).click();
+
+      await page.waitForURL(/\/dashboard/);
+      await expect(page).toHaveURL(/lang=ru/);
+      await expect(page.locator("p", { hasText: "Lang param:" })).toContainText(
+        "ru",
+      );
+
+      await page.click(".sidebar a:has-text('Users')");
+      await expect(page).toHaveURL(/lang=ru/);
+    });
+
+    test("cold-load / inherits plugin default 'en'", async ({ page }) => {
+      await page.goto("/");
+      await expect(page).toHaveURL(/lang=en/);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Additional — back/forward race with pending checkout guard
+  // -----------------------------------------------------------------------
+  test.describe("Browser back during pending guard", () => {
+    test("browser back during 600ms checkout guard cancels navigation", async ({
+      page,
+    }) => {
+      await login(page);
+      await page.click(".sidebar a:has-text('Products')");
+      await expect(page).toHaveURL(/\/products/);
+      await expect(
+        page.getByRole("heading", { name: "Products" }),
+      ).toBeVisible({ timeout: 5000 });
+
+      await page.click(".sidebar a:has-text('Checkout')");
+      await expect(
+        page.locator("[data-testid='progress-bar']"),
+      ).toBeVisible({ timeout: 1000 });
+
+      await page.goBack();
+
+      await expect(page).not.toHaveURL(/\/checkout/);
+      await expect(
+        page.locator("[data-testid='progress-bar']"),
+      ).toBeHidden({ timeout: 2000 });
+    });
   });
 });
