@@ -457,7 +457,7 @@ jobs:
   ci:
     name: CI Result
     runs-on: ubuntu-latest
-    needs: [check, pipeline, smoke]
+    needs: [check, pipeline, smoke, sonarcloud]
     if: always()
     steps:
       - name: Determine result
@@ -469,10 +469,15 @@ jobs:
 
           PIPELINE="${{ needs.pipeline.result }}"
           SMOKE="${{ needs.smoke.result }}"
+          SONAR="${{ needs.sonarcloud.result }}"
 
-          echo "pipeline=$PIPELINE smoke=$SMOKE"
+          echo "pipeline=$PIPELINE smoke=$SMOKE sonarcloud=$SONAR"
 
-          if [[ "$PIPELINE" == "success" && "$SMOKE" == "success" ]]; then
+          # SonarCloud is skipped on dependabot PRs (see job-level if) — treat skip as pass.
+          ok() { [[ "$1" == "success" || "$1" == "skipped" ]]; }
+
+          if ok "$PIPELINE" && ok "$SMOKE" && ok "$SONAR" \
+            && [[ "$PIPELINE" == "success" || "$SMOKE" == "success" ]]; then
             echo "✅ All checks passed"
             exit 0
           fi

@@ -3,6 +3,11 @@ name: Danger
 on:
   pull_request:
     types: [opened, synchronize, reopened, edited]
+    # Skip changesets release PRs entirely — they only bump versions/changelogs.
+    paths-ignore:
+      - "**/package.json"
+      - "**/CHANGELOG.md"
+      - ".changeset/**"
 
 permissions:
   contents: read

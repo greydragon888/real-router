@@ -1,6 +1,12 @@
 name: Dependabot Automerge
 
-on: pull_request
+on:
+  pull_request:
+    # Skip changesets release PRs entirely — they only bump versions/changelogs.
+    paths-ignore:
+      - "**/package.json"
+      - "**/CHANGELOG.md"
+      - ".changeset/**"
 
 permissions:
   contents: write

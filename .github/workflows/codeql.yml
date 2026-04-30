@@ -3,6 +3,11 @@ name: CodeQL
 on:
   pull_request:
     branches: [master]
+    # Skip changesets release PRs entirely — they only bump versions/changelogs.
+    paths-ignore:
+      - "**/package.json"
+      - "**/CHANGELOG.md"
+      - ".changeset/**"
   schedule:
     - cron: "0 3 * * 1"
 
@@ -10,7 +15,6 @@ jobs:
   analyze:
     name: Analyze
     runs-on: ubuntu-latest
-    if: github.head_ref != 'changeset-release/master'
     permissions:
       actions: read
       contents: read
@@ -34,7 +38,7 @@ jobs:
   dependency-review:
     name: Dependency Review
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && github.head_ref != 'changeset-release/master'
+    if: github.event_name == 'pull_request'
     permissions:
       contents: read
       pull-requests: write
