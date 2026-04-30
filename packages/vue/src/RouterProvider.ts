@@ -63,8 +63,14 @@ export const RouterProvider = defineComponent({
           props.scrollRestoration !== undefined,
           props.scrollRestoration?.mode,
           props.scrollRestoration?.anchorScrolling,
+          props.scrollRestoration?.behavior,
+          props.scrollRestoration?.storageKey,
         ] as const,
-      ([router, enabled, mode, anchorScrolling], _prev, onCleanup) => {
+      (
+        [router, enabled, mode, anchorScrolling, behavior, storageKey],
+        _prev,
+        onCleanup,
+      ) => {
         if (!enabled) {
           return;
         }
@@ -72,6 +78,8 @@ export const RouterProvider = defineComponent({
         const sr = createScrollRestoration(router, {
           mode,
           anchorScrolling,
+          behavior,
+          storageKey,
           scrollContainer: props.scrollRestoration?.scrollContainer,
         });
 

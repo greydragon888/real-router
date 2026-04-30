@@ -93,11 +93,11 @@ describe("RouterProvider — scrollRestoration", () => {
   // object thrash. If re-created on every render, prevScrollRestoration
   // captures "manual", and the final unmount fails to restore "auto".
   it("replacing the options ref with same fields — does NOT re-create the utility", async () => {
-    let setOpts!: (o: { mode: "restore" | "top" | "manual" }) => void;
+    let setOpts!: (o: { mode: "restore" | "top" | "native" }) => void;
 
     const Harness: FC = () => {
       const [opts, update] = useState<{
-        mode: "restore" | "top" | "manual";
+        mode: "restore" | "top" | "native";
       }>({ mode: "restore" });
 
       setOpts = update;
