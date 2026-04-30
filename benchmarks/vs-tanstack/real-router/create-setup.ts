@@ -8,7 +8,10 @@ interface MountResult {
 }
 
 export function createSetup(appModulePath: string) {
-  let mountTestApp: (container: HTMLElement) => MountResult;
+  let mountTestApp: (
+    container: HTMLElement,
+    startPath?: string,
+  ) => Promise<MountResult>;
 
   return function setup() {
     if (process.env.NODE_ENV !== "production") {
@@ -35,9 +38,7 @@ export function createSetup(appModulePath: string) {
       container = document.createElement("div");
       document.body.append(container);
 
-      const { router, unmount } = mountTestApp(container);
-
-      await router.start("/items/5");
+      const { router, unmount } = await mountTestApp(container, "/items/5");
 
       let resolveRendered: () => void = () => {};
 

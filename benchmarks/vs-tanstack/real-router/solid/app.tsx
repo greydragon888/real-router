@@ -385,8 +385,12 @@ function App(props: { appRouter: ReturnType<typeof createAppRouter> }) {
   );
 }
 
-export function mountTestApp(container: HTMLElement) {
+export async function mountTestApp(
+  container: HTMLElement,
+  startPath = "/items/5",
+) {
   const router = createAppRouter();
+  await router.start(startPath);
   const dispose = render(() => <App appRouter={router} />, container);
 
   return {

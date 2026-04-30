@@ -450,8 +450,12 @@ function createAppComponent(appRouter: ReturnType<typeof createAppRouter>) {
   });
 }
 
-export function mountTestApp(container: HTMLElement) {
+export async function mountTestApp(
+  container: HTMLElement,
+  startPath = "/items/5",
+) {
   const router = createAppRouter();
+  await router.start(startPath);
   const app = createApp(createAppComponent(router));
 
   app.mount(container);
