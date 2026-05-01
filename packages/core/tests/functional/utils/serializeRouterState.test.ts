@@ -87,4 +87,102 @@ describe("serializeRouterState", () => {
     expect(parsed.context).toStrictEqual(state.context);
     expect("transition" in parsed).toBe(false);
   });
+
+  describe("excludeContext option", () => {
+    it("strips named namespaces from output", () => {
+      const state: State = {
+        name: "page",
+        params: {},
+        path: "/page",
+        context: {
+          data: { a: 1 },
+          rsc: () => null,
+        } as unknown as State["context"],
+        transition: baseTransition,
+      };
+
+      const json = serializeRouterState(state, { excludeContext: ["rsc"] });
+      const parsed = JSON.parse(json) as { context: Record<string, unknown> };
+
+      expect(parsed.context).toStrictEqual({ data: { a: 1 } });
+      expect(parsed.context).not.toHaveProperty("rsc");
+    });
+
+    it("preserves other namespaces when excluding one", () => {
+      const state: State = {
+        name: "page",
+        params: {},
+        path: "/page",
+        context: {
+          data: { x: 1 },
+          rsc: { y: 2 },
+          source: "server",
+        } as unknown as State["context"],
+        transition: baseTransition,
+      };
+
+      const json = serializeRouterState(state, { excludeContext: ["rsc"] });
+      const parsed = JSON.parse(json) as { context: Record<string, unknown> };
+
+      expect(parsed.context).toStrictEqual({
+        data: { x: 1 },
+        source: "server",
+      });
+    });
+
+    it("is a no-op when excludeContext is empty array", () => {
+      const state: State = {
+        name: "page",
+        params: {},
+        path: "/page",
+        context: { data: { x: 1 } } as unknown as State["context"],
+        transition: baseTransition,
+      };
+
+      const jsonNoOpt = serializeRouterState(state);
+      const jsonEmptyOpt = serializeRouterState(state, { excludeContext: [] });
+
+      expect(jsonEmptyOpt).toBe(jsonNoOpt);
+    });
+
+    it("is a no-op when options is empty object", () => {
+      const state: State = {
+        name: "page",
+        params: {},
+        path: "/page",
+        context: { data: { x: 1 } } as unknown as State["context"],
+        transition: baseTransition,
+      };
+
+      const jsonNoOpt = serializeRouterState(state);
+      const jsonEmptyOptions = serializeRouterState(state, {});
+
+      expect(jsonEmptyOptions).toBe(jsonNoOpt);
+    });
+
+    it("strips multiple namespaces", () => {
+      const state: State = {
+        name: "page",
+        params: {},
+        path: "/page",
+        context: {
+          data: { a: 1 },
+          rsc: { node: "x" },
+          internal: { z: true },
+          keep: { ok: 1 },
+        } as unknown as State["context"],
+        transition: baseTransition,
+      };
+
+      const json = serializeRouterState(state, {
+        excludeContext: ["rsc", "internal"],
+      });
+      const parsed = JSON.parse(json) as { context: Record<string, unknown> };
+
+      expect(parsed.context).toStrictEqual({
+        data: { a: 1 },
+        keep: { ok: 1 },
+      });
+    });
+  });
 });
