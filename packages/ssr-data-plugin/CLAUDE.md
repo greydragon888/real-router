@@ -44,12 +44,15 @@ Validation at factory time: rejects `null`, non-objects, non-function values wit
 
 ```
 src/
-├── factory.ts     — ssrDataPluginFactory: validates loaders, intercepts start(), claims "data" namespace
-├── validation.ts  — validateLoaders: factory-time validation (non-null object, function values)
-├── types.ts       — DataLoaderFn, DataLoaderFnFactory, DataLoaderFactoryMap
+├── factory.ts     — ssrDataPluginFactory: thin adapter that validates + delegates to createSsrLoaderPlugin
+├── validation.ts  — validateLoaders = createLoadersValidator(ERROR_PREFIX) — generic shared validator
+├── types.ts       — DataLoaderFn, DataLoaderFnFactory, DataLoaderFactoryMap (public-facing types)
 ├── constants.ts   — ERROR_PREFIX (LOGGER_CONTEXT — internal)
-└── index.ts       — Public exports + module augmentation (@real-router/types for StateContext)
+├── index.ts       — Public exports + module augmentation (@real-router/types for StateContext)
+└── shared-ssr/    — symlink → shared/ssr/ (createSsrLoaderPlugin + createLoadersValidator generics)
 ```
+
+The `factory.ts` and `validation.ts` are intentionally tiny adapters — the actual try/catch + interceptor + claim logic lives in [`shared/ssr/`](../../../shared/ssr/) and is consumed by both `ssr-data-plugin` (T = `unknown`, namespace = `"data"`) and `rsc-server-plugin` (T = `ReactNode`, namespace = `"rsc"`).
 
 ## Gotchas
 
@@ -74,3 +77,39 @@ Every `start()` triggers a fresh loader call. Caching is the caller's responsibi
 ### Loader errors propagate
 
 If a loader throws, the error propagates through the `start()` promise. The caller's `try/catch` handles it — same as any async guard failure.
+
+## Composition with `rsc-server-plugin`
+
+`@real-router/ssr-data-plugin` and `@real-router/rsc-server-plugin` follow the **same factory pattern** (claim-based namespace + `start()` interceptor) and are designed to run **side-by-side** on the same router. Their namespaces are distinct:
+
+- `ssr-data-plugin` → `state.context.data` (plain JSON / `unknown`)
+- `rsc-server-plugin` → `state.context.rsc` (`ReactNode` / RSC payload)
+
+```typescript
+import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
+import { rscServerPluginFactory } from "@real-router/rsc-server-plugin";
+
+router.usePlugin(
+  ssrDataPluginFactory({
+    "users.profile": () => async (params) => ({
+      preferences: await prefs.get(params.id),
+    }),
+  }),
+  rscServerPluginFactory({
+    "users.profile": () => async (params) => {
+      const user = await db.users.findById(params.id);
+      return <UserProfile user={user} />;
+    },
+  }),
+);
+
+const state = await router.start("/users/42");
+
+state.context.data; // JSON — hydrate via window.__SSR_STATE__
+state.context.rsc;  // ReactNode — render Flight stream separately
+
+const ssrJson = serializeRouterState(state, { excludeContext: ["rsc"] });
+const flight = renderToReadableStream(state.context.rsc); // bundler's renderer
+```
+
+The two plugins **do not interfere**: distinct namespaces, independent teardown, independent claim release. Composition is verified by `rsc-server-plugin`'s property tests (invariants 14-15).

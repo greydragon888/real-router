@@ -108,11 +108,12 @@ In SSR, `router.dispose()` handles cleanup automatically.
 
 ## Related Packages
 
-| Package                                                                                  | Description                            |
-| ---------------------------------------------------------------------------------------- | -------------------------------------- |
-| [@real-router/core](https://www.npmjs.com/package/@real-router/core)                     | Core router (required peer dependency) |
-| [@real-router/browser-plugin](https://www.npmjs.com/package/@real-router/browser-plugin) | Browser History API integration        |
-| [@real-router/react](https://www.npmjs.com/package/@real-router/react)                   | React bindings                         |
+| Package                                                                                          | Description                                                                                  |
+| ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| [@real-router/core](https://www.npmjs.com/package/@real-router/core)                             | Core router (required peer dependency)                                                       |
+| [@real-router/rsc-server-plugin](https://www.npmjs.com/package/@real-router/rsc-server-plugin)   | Sibling plugin — same `start()` interceptor pattern but for `ReactNode` (RSC payload). Runs side-by-side on the same router with distinct namespaces (`data` vs `rsc`). |
+| [@real-router/browser-plugin](https://www.npmjs.com/package/@real-router/browser-plugin)         | Browser History API integration                                                              |
+| [@real-router/react](https://www.npmjs.com/package/@real-router/react)                           | React bindings                                                                               |
 
 ## License
 
