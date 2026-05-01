@@ -106,6 +106,14 @@
     },
     "packages/ssr-data-plugin": {
       "project": ["src/**/*.ts"],
+      "ignore": ["src/shared-ssr/**"],
+      "vitest": {
+        "config": ["vitest.config.mts", "vitest.config.*.mts"]
+      }
+    },
+    "packages/rsc-server-plugin": {
+      "project": ["src/**/*.ts"],
+      "ignore": ["src/shared-ssr/**"],
       "vitest": {
         "config": ["vitest.config.mts", "vitest.config.*.mts"]
       }

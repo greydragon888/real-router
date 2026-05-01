@@ -5143,6 +5143,25 @@ importers:
         specifier: workspace:^
         version: link:../route-tree
 
+  packages/rsc-server-plugin:
+    dependencies:
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../core
+      '@real-router/types':
+        specifier: workspace:^
+        version: link:../core-types
+    devDependencies:
+      '@real-router/ssr-data-plugin':
+        specifier: workspace:^
+        version: link:../ssr-data-plugin
+      '@types/react':
+        specifier: 19.2.14
+        version: 19.2.14
+      react:
+        specifier: 19.2.0
+        version: 19.2.0
+
   packages/rx:
     dependencies:
       '@real-router/core':
@@ -5335,6 +5354,9 @@ importers:
       '@real-router/core':
         specifier: workspace:*
         version: link:../packages/core
+      '@real-router/types':
+        specifier: workspace:*
+        version: link:../packages/core-types
       type-guards:
         specifier: workspace:*
         version: link:../packages/type-guards
