@@ -2,9 +2,9 @@
 
 > Simple, powerful, view-agnostic, modular and extensible router
 
-pnpm monorepo with 31 packages + `benchmarks/` + bare `shared/` sources (symlinked into consumers' `src/dom-utils` and `src/browser-env`, except `packages/angular` which uses a git-tracked copy) + 81 example applications (incl. `examples/electron/*` and `examples/tauri/*` — see [Desktop Integration](https://github.com/greydragon888/real-router/wiki/Desktop-Integration)). Run `pnpm install` after cloning.
+pnpm monorepo with 32 packages + `benchmarks/` + bare `shared/` sources (symlinked into consumers' `src/dom-utils`, `src/browser-env`, and `src/shared-ssr`, except `packages/angular` which uses a git-tracked copy of `dom-utils`) + 81 example applications (incl. `examples/electron/*` and `examples/tauri/*` — see [Desktop Integration](https://github.com/greydragon888/real-router/wiki/Desktop-Integration)). Run `pnpm install` after cloning.
 
-`shared/` is a minimal workspace entry (name, type, devDeps) with no `src/` of its own — it owns sibling directories `shared/browser-env/` and `shared/dom-utils/` that are git-tracked symlink targets. This entry is required for `type-guards` resolution during bundling via symlinks. See IMPLEMENTATION_NOTES.md section "Shared Sources via Symlinks" for details.
+`shared/` is a minimal workspace entry (name, type, devDeps) with no `src/` of its own — it owns sibling directories `shared/browser-env/`, `shared/dom-utils/`, and `shared/ssr/` that are git-tracked symlink targets. This entry is required for `type-guards` resolution during bundling via symlinks. See IMPLEMENTATION_NOTES.md section "Shared Sources via Symlinks" for details.
 
 ### Shared Sources Tree
 
@@ -24,10 +24,15 @@ shared/
 │   ├── utils.ts          # normalizeBase, safelyEncodePath
 │   ├── validation.ts     # createOptionsValidator
 │   └── index.ts          # barrel
-└── dom-utils/            # DOM helpers — for framework adapters
-    ├── link-utils.ts     # shouldNavigate, buildHref, buildActiveClassName, applyLinkA11y
-    ├── route-announcer.ts  # createRouteAnnouncer (a11y aria-live region)
-    ├── scroll-restore.ts   # createScrollRestoration (opt-in scroll capture + restore)
+├── dom-utils/            # DOM helpers — for framework adapters
+│   ├── link-utils.ts     # shouldNavigate, buildHref, buildActiveClassName, applyLinkA11y
+│   ├── route-announcer.ts  # createRouteAnnouncer (a11y aria-live region)
+│   ├── scroll-restore.ts   # createScrollRestoration (opt-in scroll capture + restore)
+│   └── index.ts          # barrel
+└── ssr/                  # SSR plugin scaffolding — for server-side per-route loader plugins
+    ├── createSsrLoaderPlugin.ts  # generic factory: validate compile loop + start interceptor + claim/teardown
+    ├── createLoadersValidator.ts # generic shape validator (non-null object → function values)
+    ├── types.ts          # SsrLoaderFn<T>, SsrLoaderFnFactory<T,D>, SsrLoaderFactoryMap<T,D>, SsrLoaderPluginConfig
     └── index.ts          # barrel
 ```
 
@@ -37,6 +42,7 @@ shared/
 | --------------------- | ------------------------- | ---------------------------------------------------- |
 | `shared/browser-env/` | `src/browser-env`         | `browser-plugin`, `hash-plugin`, `navigation-plugin` |
 | `shared/dom-utils/`   | `src/dom-utils`           | `preact`, `react`, `solid`, `svelte`, `vue`          |
+| `shared/ssr/`         | `src/shared-ssr`          | `ssr-data-plugin`, `rsc-server-plugin`               |
 
 **Any edit to `shared/browser-env/utils.ts` or `shared/dom-utils/link-utils.ts` propagates instantly to every consumer via its symlink** — verify with `pnpm build` across all affected packages.
 
@@ -212,6 +218,7 @@ When adding packages or features, keep these root files in sync:
 - [packages/logger-plugin/CLAUDE.md](packages/logger-plugin/CLAUDE.md) — Logger plugin architecture
 - [packages/persistent-params-plugin/CLAUDE.md](packages/persistent-params-plugin/CLAUDE.md) — Persistent params plugin architecture
 - [packages/ssr-data-plugin/CLAUDE.md](packages/ssr-data-plugin/CLAUDE.md) — SSR data plugin architecture
+- [packages/rsc-server-plugin/CLAUDE.md](packages/rsc-server-plugin/CLAUDE.md) — RSC server plugin architecture (per-route ReactNode loading)
 - [packages/validation-plugin/CLAUDE.md](packages/validation-plugin/CLAUDE.md) — Validation plugin architecture
 - [packages/search-schema-plugin/CLAUDE.md](packages/search-schema-plugin/CLAUDE.md) — Search schema plugin architecture
 - [packages/lifecycle-plugin/CLAUDE.md](packages/lifecycle-plugin/CLAUDE.md) — Lifecycle plugin architecture

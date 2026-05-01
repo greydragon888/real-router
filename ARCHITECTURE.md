@@ -34,6 +34,7 @@ real-router/
 │   ├── logger-plugin/             # Development logging with timing and param diffs
 │   ├── persistent-params-plugin/  # Parameter persistence across navigations
 │   ├── ssr-data-plugin/           # SSR per-route data loading via start() interceptor
+│   ├── rsc-server-plugin/         # RSC per-route ReactNode loading via start() interceptor (bundler-agnostic)
 │   ├── lifecycle-plugin/          # Route-level lifecycle hooks: onEnter, onStay, onLeave
 │   ├── preload-plugin/           # Preload on navigation intent (hover, touch) via event delegation
 │   ├── memory-plugin/             # In-memory history stack: back/forward/go without browser History API
@@ -51,7 +52,8 @@ real-router/
 ├── shared/                         # Bare source files shared across packages via src/ symlinks (minimal workspace entry)
 │   ├── package.json               # Minimal: name, type:commonjs, devDeps on @real-router/core + type-guards
 │   ├── dom-utils/                 # Shared DOM utilities for adapters: route announcer, scroll restoration, link helpers
-│   └── browser-env/               # Shared browser abstractions for URL plugins: history API, popstate, SSR fallback
+│   ├── browser-env/               # Shared browser abstractions for URL plugins: history API, popstate, SSR fallback
+│   └── ssr/                       # Shared SSR plugin scaffolding: createSsrLoaderPlugin generic factory + createLoadersValidator
 ├── examples/
 │   ├── shared/                    # Shared store, API, abilities, styles
 │   ├── react/    (18 examples)    # React 19.2+ examples (incl. ink-demo for @real-router/react/ink) + 9 e2e suites
@@ -65,11 +67,11 @@ real-router/
 │   └── tauri/    (2 examples)     # Tauri v2 desktop: browser-plugin, navigation-plugin
 ```
 
-**Public packages** (published to npm): `core`, `core-types`, `react`, `preact`, `solid`, `vue`, `svelte`, `angular`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `lifecycle-plugin`, `preload-plugin`, `memory-plugin`, `navigation-plugin`, `validation-plugin`, `search-schema-plugin`, `route-utils`, `logger`
+**Public packages** (published to npm): `core`, `core-types`, `react`, `preact`, `solid`, `vue`, `svelte`, `angular`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `rsc-server-plugin`, `lifecycle-plugin`, `preload-plugin`, `memory-plugin`, `navigation-plugin`, `validation-plugin`, `search-schema-plugin`, `route-utils`, `logger`
 
 **Internal packages** (bundled into consumers, not on npm): `route-tree`, `path-matcher`, `search-params`, `type-guards`, `event-emitter`
 
-**Shared sources** (bundled via per-package `src/*` symlinks; `shared/` is a minimal workspace entry with no source files of its own, only a `package.json` declaring workspace devDeps for transitive resolution): `shared/dom-utils`, `shared/browser-env`
+**Shared sources** (bundled via per-package `src/*` symlinks; `shared/` is a minimal workspace entry with no source files of its own, only a `package.json` declaring workspace devDeps for transitive resolution): `shared/dom-utils`, `shared/browser-env`, `shared/ssr`
 
 ## Package Dependencies
 
@@ -115,6 +117,7 @@ graph TD
 
     BROWSERENV["shared/browser-env<br/>(shared sources)"]
     DOMUTILS["shared/dom-utils<br/>(shared sources)"]
+    SSRSHARED["shared/ssr<br/>(shared sources)"]
 
     BP -->|dep| CORE
     BP -->|dep| LOG
@@ -178,6 +181,11 @@ graph TD
 
     SDP["ssr-data-plugin"]
     SDP -->|dep| CORE
+    SDP -.->|symlink| SSRSHARED
+
+    RSP["rsc-server-plugin"]
+    RSP -->|dep| CORE
+    RSP -.->|symlink| SSRSHARED
 
     LCP["lifecycle-plugin"]
     LCP -->|dep| CORE
@@ -340,7 +348,7 @@ Plugins intercept router methods via `addInterceptor()` on `PluginApi`:
 
 | Method         | Signature                                                 | Used by                         |
 | -------------- | --------------------------------------------------------- | ------------------------------- |
-| `start`        | `(path?: string) => Promise<State>`                       | browser-plugin, ssr-data-plugin |
+| `start`        | `(path?: string) => Promise<State>`                       | browser-plugin, ssr-data-plugin, rsc-server-plugin |
 | `buildPath`    | `(route: string, params?: Params) => string`              | persistent-params-plugin        |
 | `forwardState` | `(routeName: string, routeParams: Params) => SimpleState` | persistent-params-plugin        |
 
@@ -352,7 +360,7 @@ Plugins extend the router instance with new properties via `extendRouter()` on `
 
 ### Context Namespace Claims
 
-Plugins publish per-route data via `claimContextNamespace()` on `PluginApi`. Each plugin claims a unique namespace key at registration time (O(1) collision detection via `Set<string>`), receives a `{ write, release }` object, and publishes data to `state.context.<namespace>` from lifecycle hooks. Mirrors the `extendRouter()` ownership model: closure-based tracking, manual `release()` in `teardown()`, dispose safety net for orphaned claims. Five plugins use this: navigation (`direction`, `sourceElement`), ssr-data (`data`), persistent-params (`persistentParams`), browser (`source`), memory (`direction`, `historyIndex`).
+Plugins publish per-route data via `claimContextNamespace()` on `PluginApi`. Each plugin claims a unique namespace key at registration time (O(1) collision detection via `Set<string>`), receives a `{ write, release }` object, and publishes data to `state.context.<namespace>` from lifecycle hooks. Mirrors the `extendRouter()` ownership model: closure-based tracking, manual `release()` in `teardown()`, dispose safety net for orphaned claims. Six plugins use this: navigation (`direction`, `sourceElement`), ssr-data (`data`), rsc-server (`rsc`), persistent-params (`persistentParams`), browser (`source`), memory (`direction`, `historyIndex`).
 
 ### Validator Slot
 
@@ -420,7 +428,7 @@ These are deliberately designed constraints. Violating them will break the syste
 
 - Consumer packages depend on `core` and `core-types`
 - Consumer packages bundle internal packages as needed (`type-guards`)
-- Consumer packages import shared sources via git-tracked symlinks (`src/dom-utils` → `shared/dom-utils`, `src/browser-env` → `shared/browser-env`)
+- Consumer packages import shared sources via git-tracked symlinks (`src/dom-utils` → `shared/dom-utils`, `src/browser-env` → `shared/browser-env`, `src/shared-ssr` → `shared/ssr`)
 - Foundation packages depend on each other (`route-tree` → `path-matcher`, `search-params`)
 - `shared/browser-env` is the **only** location that touches `window`, `history`, `addEventListener` (enforced by convention, not by package boundary)
 
