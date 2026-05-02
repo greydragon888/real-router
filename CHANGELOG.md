@@ -5,6 +5,189 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-05-02]
+
+### @real-router/core@0.52.0
+
+### Minor Changes
+
+- [#572](https://github.com/greydragon888/real-router/pull/572) [`99a8c3f`](https://github.com/greydragon888/real-router/commit/99a8c3f4722c16d78d322eccb775fb29cc0fd783) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `excludeContext` option to `serializeRouterState` for non-JSON-serializable plugin namespaces ([#566](https://github.com/greydragon888/real-router/issues/566))
+
+  New optional second parameter `{ excludeContext?: readonly string[] }` strips named namespaces from the serialized JSON. Required by `@real-router/rsc-server-plugin` (which writes `ReactNode` to `state.context.rsc`), but useful for any plugin publishing non-JSON-serializable values.
+
+  Backward compatible: omitting the second argument preserves existing behavior.
+
+### @real-router/rsc-server-plugin@0.1.0
+
+### Minor Changes
+
+- [#572](https://github.com/greydragon888/real-router/pull/572) [`99a8c3f`](https://github.com/greydragon888/real-router/commit/99a8c3f4722c16d78d322eccb775fb29cc0fd783) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `@real-router/rsc-server-plugin` — per-route `ReactNode` (RSC payload) loading via `start()` interceptor ([#566](https://github.com/greydragon888/real-router/issues/566))
+
+  New plugin mirroring `@real-router/ssr-data-plugin` for React Server Components. Loaders return `ReactNode` (sync or async); the plugin writes the resolved node to `state.context.rsc` via the `"rsc"` namespace claim. Bundler-agnostic — the caller pipes the published node through their bundler's Flight renderer (`@vitejs/plugin-rsc`, `react-server-dom-webpack`, etc.).
+
+  ```typescript
+  router.usePlugin(rscServerPluginFactory({
+    "users.profile": () => async (params) => {
+      const user = await fetchUser(params.id);
+      return <UserProfile user={user} />;
+    },
+  }));
+
+  const state = await router.start(url);
+  const flight = renderToReadableStream(state.context.rsc);
+  const json = serializeRouterState(state, { excludeContext: ["rsc"] });
+  ```
+
+### Patch Changes
+
+- Updated dependencies [[`99a8c3f`](https://github.com/greydragon888/real-router/commit/99a8c3f4722c16d78d322eccb775fb29cc0fd783)]:
+  - @real-router/core@0.52.0
+
+### @real-router/angular@0.8.1
+
+### Patch Changes
+
+- Updated dependencies [[`99a8c3f`](https://github.com/greydragon888/real-router/commit/99a8c3f4722c16d78d322eccb775fb29cc0fd783)]:
+  - @real-router/core@0.52.0
+  - @real-router/sources@0.8.1
+
+### @real-router/browser-plugin@0.17.1
+
+### Patch Changes
+
+- Updated dependencies [[`99a8c3f`](https://github.com/greydragon888/real-router/commit/99a8c3f4722c16d78d322eccb775fb29cc0fd783)]:
+  - @real-router/core@0.52.0
+
+### @real-router/hash-plugin@0.7.1
+
+### Patch Changes
+
+- Updated dependencies [[`99a8c3f`](https://github.com/greydragon888/real-router/commit/99a8c3f4722c16d78d322eccb775fb29cc0fd783)]:
+  - @real-router/core@0.52.0
+
+### @real-router/lifecycle-plugin@0.4.4
+
+### Patch Changes
+
+- Updated dependencies [[`99a8c3f`](https://github.com/greydragon888/real-router/commit/99a8c3f4722c16d78d322eccb775fb29cc0fd783)]:
+  - @real-router/core@0.52.0
+
+### @real-router/logger-plugin@0.5.5
+
+### Patch Changes
+
+- Updated dependencies [[`99a8c3f`](https://github.com/greydragon888/real-router/commit/99a8c3f4722c16d78d322eccb775fb29cc0fd783)]:
+  - @real-router/core@0.52.0
+
+### @real-router/memory-plugin@0.4.1
+
+### Patch Changes
+
+- Updated dependencies [[`99a8c3f`](https://github.com/greydragon888/real-router/commit/99a8c3f4722c16d78d322eccb775fb29cc0fd783)]:
+  - @real-router/core@0.52.0
+
+### @real-router/navigation-plugin@0.7.1
+
+### Patch Changes
+
+- Updated dependencies [[`99a8c3f`](https://github.com/greydragon888/real-router/commit/99a8c3f4722c16d78d322eccb775fb29cc0fd783)]:
+  - @real-router/core@0.52.0
+
+### @real-router/persistent-params-plugin@0.2.5
+
+### Patch Changes
+
+- Updated dependencies [[`99a8c3f`](https://github.com/greydragon888/real-router/commit/99a8c3f4722c16d78d322eccb775fb29cc0fd783)]:
+  - @real-router/core@0.52.0
+
+### @real-router/preact@0.11.1
+
+### Patch Changes
+
+- Updated dependencies [[`99a8c3f`](https://github.com/greydragon888/real-router/commit/99a8c3f4722c16d78d322eccb775fb29cc0fd783)]:
+  - @real-router/core@0.52.0
+  - @real-router/sources@0.8.1
+
+### @real-router/preload-plugin@0.4.1
+
+### Patch Changes
+
+- Updated dependencies [[`99a8c3f`](https://github.com/greydragon888/real-router/commit/99a8c3f4722c16d78d322eccb775fb29cc0fd783)]:
+  - @real-router/core@0.52.0
+
+### @real-router/react@0.24.1
+
+### Patch Changes
+
+- Updated dependencies [[`99a8c3f`](https://github.com/greydragon888/real-router/commit/99a8c3f4722c16d78d322eccb775fb29cc0fd783)]:
+  - @real-router/core@0.52.0
+  - @real-router/sources@0.8.1
+
+### @real-router/rx@0.3.5
+
+### Patch Changes
+
+- Updated dependencies [[`99a8c3f`](https://github.com/greydragon888/real-router/commit/99a8c3f4722c16d78d322eccb775fb29cc0fd783)]:
+  - @real-router/core@0.52.0
+
+### @real-router/search-schema-plugin@0.2.6
+
+### Patch Changes
+
+- Updated dependencies [[`99a8c3f`](https://github.com/greydragon888/real-router/commit/99a8c3f4722c16d78d322eccb775fb29cc0fd783)]:
+  - @real-router/core@0.52.0
+
+### @real-router/solid@0.11.1
+
+### Patch Changes
+
+- Updated dependencies [[`99a8c3f`](https://github.com/greydragon888/real-router/commit/99a8c3f4722c16d78d322eccb775fb29cc0fd783)]:
+  - @real-router/core@0.52.0
+  - @real-router/sources@0.8.1
+
+### @real-router/sources@0.8.1
+
+### Patch Changes
+
+- Updated dependencies [[`99a8c3f`](https://github.com/greydragon888/real-router/commit/99a8c3f4722c16d78d322eccb775fb29cc0fd783)]:
+  - @real-router/core@0.52.0
+
+### @real-router/ssr-data-plugin@0.3.4
+
+### Patch Changes
+
+- [#572](https://github.com/greydragon888/real-router/pull/572) [`99a8c3f`](https://github.com/greydragon888/real-router/commit/99a8c3f4722c16d78d322eccb775fb29cc0fd783) Thanks [@greydragon888](https://github.com/greydragon888)! - Internal refactor: extract validate-compile-loop + start-interceptor + claim/teardown logic to `shared/ssr/createSsrLoaderPlugin` ([#566](https://github.com/greydragon888/real-router/issues/566))
+
+  `factory.ts` is now a thin adapter that validates loaders and forwards to the generic `createSsrLoaderPlugin<unknown, Dependencies>`. `validation.ts` is now a thin alias `createLoadersValidator(ERROR_PREFIX)`. Both helpers live in the new `shared/ssr/` directory and are consumed via a git-tracked symlink at `src/shared-ssr` (same pattern as `shared/browser-env/` for browser/hash/navigation-plugin and `shared/dom-utils/` for framework adapters). The companion plugin `@real-router/rsc-server-plugin` consumes the same helpers with `T = ReactNode` and `namespace = "rsc"`.
+
+  **Public API unchanged.** All existing tests pass without modification. No runtime behavior change. Bundle output is structurally identical (same logic, same dependencies, +0.02 KB ESM gzipped).
+
+- Updated dependencies [[`99a8c3f`](https://github.com/greydragon888/real-router/commit/99a8c3f4722c16d78d322eccb775fb29cc0fd783)]:
+  - @real-router/core@0.52.0
+
+### @real-router/svelte@0.10.1
+
+### Patch Changes
+
+- Updated dependencies [[`99a8c3f`](https://github.com/greydragon888/real-router/commit/99a8c3f4722c16d78d322eccb775fb29cc0fd783)]:
+  - @real-router/core@0.52.0
+  - @real-router/sources@0.8.1
+
+### @real-router/validation-plugin@0.7.1
+
+### Patch Changes
+
+- Updated dependencies [[`99a8c3f`](https://github.com/greydragon888/real-router/commit/99a8c3f4722c16d78d322eccb775fb29cc0fd783)]:
+  - @real-router/core@0.52.0
+
+### @real-router/vue@0.12.1
+
+### Patch Changes
+
+- Updated dependencies [[`99a8c3f`](https://github.com/greydragon888/real-router/commit/99a8c3f4722c16d78d322eccb775fb29cc0fd783)]:
+  - @real-router/core@0.52.0
+  - @real-router/sources@0.8.1
+
 ## [2026-04-30]
 
 ### @real-router/angular@0.8.0

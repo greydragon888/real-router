@@ -1,5 +1,12 @@
 # browser-env
 
+## 0.2.12
+
+### Patch Changes
+
+- Updated dependencies [[`99a8c3f`](https://github.com/greydragon888/real-router/commit/99a8c3f4722c16d78d322eccb775fb29cc0fd783)]:
+  - @real-router/core@0.52.0
+
 ## 0.2.11
 
 ### Patch Changes
