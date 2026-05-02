@@ -14,5 +14,5 @@
     "noEmit": true,
     "types": ["@vitejs/plugin-rsc/types"]
   },
-  "include": ["src", "server"]
+  "include": ["src", "server", "e2e"]
 }

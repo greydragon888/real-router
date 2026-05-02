@@ -1,9 +1,11 @@
 "use client";
 
-import { use } from "react";
-import type { ReactNode } from "react";
 import type { Router } from "@real-router/core";
-import { RouterProvider } from "@real-router/react";
+import { createFromReadableStream } from "@vitejs/plugin-rsc/browser";
+import type { ReactNode } from "react";
+import { startTransition, use, useEffect, useState } from "react";
+
+import { Layout } from "./client-components/Layout";
 
 interface AppProps {
   router: Router;
@@ -11,7 +13,33 @@ interface AppProps {
 }
 
 export function App({ router, payload }: AppProps) {
-  const node = use(payload);
+  const initialNode = use(payload);
+  const [node, setNode] = useState<ReactNode>(initialNode);
+
+  useEffect(() => {
+    const unsubscribe = router.subscribe(({ route }) => {
+      fetch(`/__rsc?route=${encodeURIComponent(route.path)}`)
+        .then((response) => {
+          if (!response.body) {
+            throw new Error("RSC response missing body");
+          }
+          if (!response.ok) {
+            console.warn(`[App] /__rsc returned ${response.status}`);
+          }
+          return createFromReadableStream<ReactNode>(response.body);
+        })
+        .then((newNode) => {
+          startTransition(() => {
+            setNode(newNode);
+          });
+        })
+        .catch((error: unknown) => {
+          console.error("[App] /__rsc fetch failed:", error);
+        });
+    });
+
+    return unsubscribe;
+  }, [router]);
 
   return (
     <html lang="en">
@@ -21,7 +49,7 @@ export function App({ router, payload }: AppProps) {
       </head>
       <body>
         <div id="root">
-          <RouterProvider router={router}>{node}</RouterProvider>
+          <Layout router={router}>{node}</Layout>
         </div>
       </body>
     </html>

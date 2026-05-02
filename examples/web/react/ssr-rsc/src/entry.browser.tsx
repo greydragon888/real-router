@@ -6,7 +6,7 @@ import { rscStream } from "rsc-html-stream/client";
 import type { ReactNode } from "react";
 
 import { App } from "./App";
-import { createAppRouter } from "./createAppRouter";
+import { createAppRouter } from "./router/createAppRouter";
 
 declare global {
   interface Window {

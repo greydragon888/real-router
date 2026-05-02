@@ -1,14 +1,28 @@
+import { Readable } from "node:stream";
 import express from "express";
+
+function toFetchHeaders(nodeHeaders: express.Request["headers"]): Headers {
+  const headers = new Headers();
+  for (const [key, value] of Object.entries(nodeHeaders)) {
+    if (Array.isArray(value)) {
+      for (const v of value) headers.append(key, v);
+    } else if (value !== undefined) {
+      headers.set(key, value);
+    }
+  }
+  return headers;
+}
 
 export function expressToFetchRequest(req: express.Request): Request {
   const url = `http://${req.headers.host}${req.originalUrl}`;
-  const init: RequestInit = {
+  const init: RequestInit & { duplex?: "half" } = {
     method: req.method,
-    headers: req.headers as Record<string, string>,
+    headers: toFetchHeaders(req.headers),
   };
 
   if (req.method !== "GET" && req.method !== "HEAD") {
-    init.body = req as unknown as BodyInit;
+    init.body = Readable.toWeb(req) as ReadableStream<Uint8Array>;
+    init.duplex = "half";
   }
 
   return new Request(url, init);

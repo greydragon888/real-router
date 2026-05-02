@@ -46,6 +46,7 @@ stryker.log
 stryker.temp.config.mjs
 
 # Playwright
+.playwright-mcp/
 playwright-report/
 test-results/
 

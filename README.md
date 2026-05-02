@@ -433,6 +433,13 @@ Full documentation is available in the [Wiki](https://github.com/greydragon888/r
 
 - [browser-plugin](https://github.com/greydragon888/real-router/wiki/browser-plugin) · [hash-plugin](https://github.com/greydragon888/real-router/wiki/hash-plugin) · [logger-plugin](https://github.com/greydragon888/real-router/wiki/logger-plugin) · [persistent-params-plugin](https://github.com/greydragon888/real-router/wiki/persistent-params-plugin) · [search-schema-plugin](https://github.com/greydragon888/real-router/wiki/search-schema-plugin) · [ssr-data-plugin](https://github.com/greydragon888/real-router/wiki/ssr-data-plugin) · [rsc-server-plugin](https://github.com/greydragon888/real-router/wiki/rsc-server-plugin) · [preload-plugin](https://github.com/greydragon888/real-router/wiki/preload-plugin) · [memory-plugin](https://github.com/greydragon888/real-router/wiki/memory-plugin) · [validation-plugin](https://github.com/greydragon888/real-router/wiki/validation-plugin) · [rx](https://github.com/greydragon888/real-router/wiki/rx-package) · [sources](https://github.com/greydragon888/real-router/wiki/sources-package) · [route-utils](https://github.com/greydragon888/real-router/wiki/route-utils)
 
+### Server-Side Rendering & RSC
+
+- [Server-Side Rendering](https://github.com/greydragon888/real-router/wiki/ssr) — `cloneRouter` per request, `start(url)` resolution, `dispose()` cleanup
+- [SSR Hydration](https://github.com/greydragon888/real-router/wiki/SSR-Hydration) — `serializeRouterState` + `hydrateRouter` round-trip, `excludeContext` for non-serializable namespaces
+- [Data Loading](https://github.com/greydragon888/real-router/wiki/Data-Loading) — `ssr-data-plugin` for plain JSON, fetcher patterns
+- [**RSC Integration**](https://github.com/greydragon888/real-router/wiki/RSC-Integration) — React Server Components end-to-end: `@vitejs/plugin-rsc` setup, two-endpoint architecture (HTML + `/__rsc`), Flight injection, client mount. Reference implementation: [`examples/web/react/ssr-rsc/`](examples/web/react/ssr-rsc)
+
 ## Examples
 
 Many runnable examples across the most popular frameworks — each is a standalone Vite app:
@@ -453,7 +460,7 @@ Many runnable examples across the most popular frameworks — each is a standalo
 | Combined (all features) | [combined](examples/web/react/combined)                                                                           | [combined](examples/web/preact/combined)                   | [combined](examples/web/solid/combined)                                                                                                                                   | [combined](examples/web/vue/combined)                                                                                                                 | [combined](examples/web/svelte/combined)                                                                                                                                                                             |
 | **Framework-specific**  | [keepAlive](examples/web/react/keepAlive), [legacy-entry](examples/web/react/legacy-entry), [hmr](examples/web/react/hmr), [ink-demo](examples/console/react-ink) | —                                                      | [store-based-state](examples/web/solid/store-based-state), [use-link-directive](examples/web/solid/use-link-directive), [signal-primitives](examples/web/solid/signal-primitives) | [plugin-installation](examples/web/vue/plugin-installation), [v-link-directive](examples/web/vue/v-link-directive), [keep-alive](examples/web/vue/keep-alive) | [link-action](examples/web/svelte/link-action), [lazy-loading-svelte](examples/web/svelte/lazy-loading-svelte), [snippets-routing](examples/web/svelte/snippets-routing), [reactive-source](examples/web/svelte/reactive-source) |
 
-| **Server rendering** | [ssr](examples/web/react/ssr) — Express + Vite SSR, [ssg](examples/web/react/ssg) — Static site generation |
+| **Server rendering** | [ssr](examples/web/react/ssr) — Express + Vite SSR, [ssr-rsc](examples/web/react/ssr-rsc) — RSC + Flight streaming via [@vitejs/plugin-rsc](https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-rsc) + [@real-router/rsc-server-plugin](packages/rsc-server-plugin), [ssg](examples/web/react/ssg) — Static site generation |
 
 | **Terminal UI (Ink)** | [ink-demo](examples/console/react-ink) — CLI app via [@real-router/react/ink](packages/react/README.md#ink-terminal-ui) + memory-plugin |
 

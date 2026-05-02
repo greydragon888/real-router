@@ -1,6 +1,8 @@
 import type { Route } from "@real-router/core";
 
-export const routes: Route[] = [
+import type { AppDependencies } from "./router/createAppRouter";
+
+export const routes: Route<AppDependencies>[] = [
   { name: "home", path: "/" },
   {
     name: "users",
