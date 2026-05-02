@@ -5,6 +5,7 @@
   "type": "commonjs",
   "devDependencies": {
     "@real-router/core": "workspace:*",
+    "@real-router/types": "workspace:*",
     "type-guards": "workspace:*"
   }
 }

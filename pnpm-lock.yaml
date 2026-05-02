@@ -2816,6 +2816,61 @@ importers:
         specifier: 7.3.2
         version: 7.3.2(@types/node@25.6.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(tsx@4.21.0)(yaml@2.8.3)
 
+  examples/web/react/ssr-rsc:
+    dependencies:
+      '@real-router/browser-plugin':
+        specifier: workspace:^
+        version: link:../../../../packages/browser-plugin
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../../../../packages/core
+      '@real-router/react':
+        specifier: workspace:^
+        version: link:../../../../packages/react
+      '@real-router/rsc-server-plugin':
+        specifier: workspace:^
+        version: link:../../../../packages/rsc-server-plugin
+      express:
+        specifier: 5.1.0
+        version: 5.1.0
+      react:
+        specifier: 19.2.0
+        version: 19.2.0
+      react-dom:
+        specifier: 19.2.0
+        version: 19.2.0(react@19.2.0)
+      rsc-html-stream:
+        specifier: 0.0.7
+        version: 0.0.7
+    devDependencies:
+      '@playwright/test':
+        specifier: 1.58.2
+        version: 1.58.2
+      '@types/express':
+        specifier: 5.0.6
+        version: 5.0.6
+      '@types/node':
+        specifier: 25.6.0
+        version: 25.6.0
+      '@types/react':
+        specifier: 19.2.14
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: 19.2.3
+        version: 19.2.3(@types/react@19.2.14)
+      '@vitejs/plugin-rsc':
+        specifier: 0.5.25
+        version: 0.5.25(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(vite@7.3.2(@types/node@25.6.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(tsx@4.21.0)(yaml@2.8.3))
+      tsx:
+        specifier: 4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vite:
+        specifier: 7.3.2
+        version: 7.3.2(@types/node@25.6.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(tsx@4.21.0)(yaml@2.8.3)
+
   examples/web/solid:
     dependencies:
       '@real-router/solid':
@@ -5143,6 +5198,25 @@ importers:
         specifier: workspace:^
         version: link:../route-tree
 
+  packages/rsc-server-plugin:
+    dependencies:
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../core
+      '@real-router/types':
+        specifier: workspace:^
+        version: link:../core-types
+    devDependencies:
+      '@real-router/ssr-data-plugin':
+        specifier: workspace:^
+        version: link:../ssr-data-plugin
+      '@types/react':
+        specifier: 19.2.14
+        version: 19.2.14
+      react:
+        specifier: 19.2.0
+        version: 19.2.0
+
   packages/rx:
     dependencies:
       '@real-router/core':
@@ -5335,6 +5409,9 @@ importers:
       '@real-router/core':
         specifier: workspace:*
         version: link:../packages/core
+      '@real-router/types':
+        specifier: workspace:*
+        version: link:../packages/core-types
       type-guards:
         specifier: workspace:*
         version: link:../packages/type-guards
@@ -9101,6 +9178,17 @@ packages:
     peerDependencies:
       vite: ^4.2.0 || ^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0
 
+  '@vitejs/plugin-rsc@0.5.25':
+    resolution: {integrity: sha512-u+0l91DPzvCQjZX0YcdVTfv0171f1GzTL1EkRlu2dx9DY6kXu+xi+oCuPYaVI0KGj4q6gJiJCYSWNuCjuT+Otw==}
+    peerDependencies:
+      react: '*'
+      react-dom: '*'
+      react-server-dom-webpack: '*'
+      vite: '*'
+    peerDependenciesMeta:
+      react-server-dom-webpack:
+        optional: true
+
   '@vitejs/plugin-vue-jsx@5.1.5':
     resolution: {integrity: sha512-jIAsvHOEtWpslLOI2MeElGFxH7M8pM83BU/Tor4RLyiwH0FM4nUW3xdvbw20EeU9wc5IspQwMq225K3CMnJEpA==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -11238,6 +11326,9 @@ packages:
   js-tokens@4.0.0:
     resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
 
+  js-tokens@9.0.1:
+    resolution: {integrity: sha512-mxa9E9ITFOt0ban3j6L5MpjwegGz6lBQmM1IJkWeBZGcMxto50+eWdjC/52xDbS2vy0k7vIMK0Fe2wfL9OQSpQ==}
+
   js-yaml@3.14.2:
     resolution: {integrity: sha512-PMSmkqxr106Xa156c2M265Z+FTrPl+oxd/rgOQy2tijQeK5TxQ43psO1ZCwhVOSdnn+RzkzlRz/eY4BgJBYVpg==}
     hasBin: true
@@ -12547,6 +12638,9 @@ packages:
   rrweb-cssom@0.8.0:
     resolution: {integrity: sha512-guoltQEx+9aMf2gDZ0s62EcV8lsXR+0w8915TC3ITdn2YueuNjdAYh/levpU9nFaoChh9RUS5ZdQMrKfVEN9tw==}
 
+  rsc-html-stream@0.0.7:
+    resolution: {integrity: sha512-v9+fuY7usTgvXdNl8JmfXCvSsQbq2YMd60kOeeMIqCJFZ69fViuIxztHei7v5mlMMa2h3SqS+v44Gu9i9xANZA==}
+
   run-parallel@1.2.0:
     resolution: {integrity: sha512-5l4VyZR86LZ/lDxZTR6jqL8AFE2S0IFLMP26AbjsLVADxHdhB/c0GUsH+y39UfCi3dzz8OlQuPmnaJOMoDHQBA==}
 
@@ -12807,6 +12901,11 @@ packages:
   sprintf-js@1.1.3:
     resolution: {integrity: sha512-Oo+0REFV59/rz3gfJNKQiBlwfHaSESl1pcGyABQsnnIfWOFt6JNj5gCog2U6MLZ//IGYD+nA8nI+mTShREReaA==}
 
+  srvx@0.11.15:
+    resolution: {integrity: sha512-iXsux0UcOjdvs0LCMa2Ws3WwcDUozA3JN3BquNXkaFPP7TpRqgunKdEgoZ/uwb1J6xaYHfxtz9Twlh6yzwM6Tg==}
+    engines: {node: '>=20.16.0'}
+    hasBin: true
+
   ssri@13.0.1:
     resolution: {integrity: sha512-QUiRf1+u9wPTL/76GTYlKttDEBWV1ga9ZXW8BG6kfdeyyM8LGPix9gROyg9V2+P0xNyF3X2Go526xKFdMZrHSQ==}
     engines: {node: ^20.17.0 || >=22.9.0}
@@ -12894,6 +12993,9 @@ packages:
   strip-json-comments@5.0.3:
     resolution: {integrity: sha512-1tB5mhVo7U+ETBKNf92xT4hrQa3pm0MZ0PQvuDnWgAAGHDsfp4lPSpiS6psrSiet87wyGPh9ft6wmhOMQ0hDiw==}
     engines: {node: '>=14.16'}
+
+  strip-literal@3.1.0:
+    resolution: {integrity: sha512-8r3mkIM/2+PpjHoOtiAW8Rg3jJLHaV7xPwG+YRGrv6FP0wwk/toTpATxWYOW0BKdWwl82VT2tFYi5DlROa0Mxg==}
 
   sumchecker@3.0.1:
     resolution: {integrity: sha512-MvjXzkz/BOfyVDkG0oFOtBxHX2u3gKbMHIF/dXblZsgD3BWOFLmHovIpZY7BykJdAjcqRCBi1WYBNdEC9yI7vg==}
@@ -13190,6 +13292,9 @@ packages:
   tunnel@0.0.6:
     resolution: {integrity: sha512-1h/Lnq9yajKY2PEbBadPXj3VxsDDu844OnaAo52UVmIzIvwwtBPIuNvkjuzBlTWpfJyUbG3ez0KSBibQkj4ojg==}
     engines: {node: '>=0.6.11 <=0.7.0 || >=0.7.3'}
+
+  turbo-stream@3.2.0:
+    resolution: {integrity: sha512-EK+bZ9UVrVh7JLslVFOV0GEMsociOqVOvEMTAd4ixMyffN5YNIEdLZWXUx5PJqDbTxSIBWw04HS9gCY4frYQDQ==}
 
   turbo@2.9.6:
     resolution: {integrity: sha512-+v2QJey7ZUeUiuigkU+uFfklvNUyPI2VO2vBpMYJA+a1hKFLFiKtUYlRHdb3P9CrAvMzi0upbjI4WT+zKtqkBg==}
@@ -17301,6 +17406,20 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  '@vitejs/plugin-rsc@0.5.25(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(vite@7.3.2(@types/node@25.6.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(tsx@4.21.0)(yaml@2.8.3))':
+    dependencies:
+      '@rolldown/pluginutils': 1.0.0-rc.17
+      es-module-lexer: 2.1.0
+      estree-walker: 3.0.3
+      magic-string: 0.30.21
+      react: 19.2.0
+      react-dom: 19.2.0(react@19.2.0)
+      srvx: 0.11.15
+      strip-literal: 3.1.0
+      turbo-stream: 3.2.0
+      vite: 7.3.2(@types/node@25.6.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(tsx@4.21.0)(yaml@2.8.3)
+      vitefu: 1.1.3(vite@7.3.2(@types/node@25.6.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(tsx@4.21.0)(yaml@2.8.3))
+
   '@vitejs/plugin-vue-jsx@5.1.5(vite@7.3.2(@types/node@25.6.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(tsx@4.21.0)(yaml@2.8.3))(vue@3.5.13(typescript@6.0.3))':
     dependencies:
       '@babel/core': 7.29.0
@@ -19780,6 +19899,8 @@ snapshots:
 
   js-tokens@4.0.0: {}
 
+  js-tokens@9.0.1: {}
+
   js-yaml@3.14.2:
     dependencies:
       argparse: 1.0.10
@@ -21258,6 +21379,8 @@ snapshots:
 
   rrweb-cssom@0.8.0: {}
 
+  rsc-html-stream@0.0.7: {}
+
   run-parallel@1.2.0:
     dependencies:
       queue-microtask: 1.2.3
@@ -21577,6 +21700,8 @@ snapshots:
   sprintf-js@1.1.3:
     optional: true
 
+  srvx@0.11.15: {}
+
   ssri@13.0.1:
     dependencies:
       minipass: 7.1.3
@@ -21657,6 +21782,10 @@ snapshots:
   strip-indent@4.1.1: {}
 
   strip-json-comments@5.0.3: {}
+
+  strip-literal@3.1.0:
+    dependencies:
+      js-tokens: 9.0.1
 
   sumchecker@3.0.1:
     dependencies:
@@ -21963,6 +22092,8 @@ snapshots:
       - supports-color
 
   tunnel@0.0.6: {}
+
+  turbo-stream@3.2.0: {}
 
   turbo@2.9.6:
     optionalDependencies:

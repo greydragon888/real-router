@@ -1,0 +1,61 @@
+{
+  "name": "@real-router/rsc-server-plugin",
+  "version": "0.0.1",
+  "type": "commonjs",
+  "description": "RSC per-route ReactNode loading plugin for Real-Router (server-side, bundler-agnostic)",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.mjs",
+  "types": "./dist/esm/index.d.mts",
+  "exports": {
+    ".": {
+      "@real-router/internal-source": "./src/index.ts",
+      "types": {
+        "import": "./dist/esm/index.d.mts",
+        "require": "./dist/cjs/index.d.ts"
+      },
+      "import": "./dist/esm/index.mjs",
+      "require": "./dist/cjs/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/greydragon888/real-router.git"
+  },
+  "author": {
+    "name": "Oleg Ivanov",
+    "email": "greydragon888@gmail.com",
+    "url": "https://github.com/greydragon888"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/greydragon888/real-router/issues"
+  },
+  "homepage": "https://github.com/greydragon888/real-router",
+  "scripts": {
+    "test": "vitest",
+    "test:properties": "vitest run --config vitest.config.properties.mts",
+    "test:stress": "vitest --config vitest.config.stress.mts --run",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
+    "lint:package": "publint",
+    "lint:types": "attw --pack .",
+    "bundle": "tsdown --config-loader unrun"
+  },
+  "sideEffects": false,
+  "dependencies": {
+    "@real-router/types": "workspace:^"
+  },
+  "devDependencies": {
+    "@real-router/ssr-data-plugin": "workspace:^",
+    "@types/react": "19.2.14",
+    "react": "19.2.0"
+  },
+  "peerDependencies": {
+    "@real-router/core": "workspace:^",
+    "react": ">=19.0.0"
+  }
+}

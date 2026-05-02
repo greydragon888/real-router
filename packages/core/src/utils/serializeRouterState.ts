@@ -2,6 +2,17 @@ import { serializeState } from "./serializeState";
 
 import type { State } from "@real-router/types";
 
+export interface SerializeRouterStateOptions {
+  /**
+   * Plugin context namespaces to strip from the serialized output.
+   * Use when a plugin populates `state.context.<ns>` with non-JSON-serializable
+   * values (e.g., RSC payload: ReactNode trees containing functions/symbols).
+   *
+   * @default []
+   */
+  excludeContext?: readonly string[];
+}
+
 /**
  * XSS-safe JSON serialization of router State for SSR → client transport (#563).
  *
@@ -10,6 +21,10 @@ import type { State } from "@real-router/types";
  * Keeps `name`, `params`, `path`, and `context` (plugin context namespaces are
  * preserved as-is — server's `state.context.data` from `ssr-data-plugin` and
  * any other plugin claims travel to the client untouched).
+ *
+ * Pass `options.excludeContext` to strip specific namespaces from the output —
+ * required for plugins that publish non-JSON-serializable values (e.g., RSC
+ * `ReactNode` trees from `@real-router/rsc-server-plugin`).
  *
  * @example
  * ```typescript
@@ -20,12 +35,39 @@ import type { State } from "@real-router/types";
  * // Client
  * await hydrateRouter(router, window.__SSR_STATE__);
  * ```
+ *
+ * @example
+ * ```typescript
+ * // With RSC plugin: strip the "rsc" namespace before transport
+ * const state = await router.start(url);
+ * const json = serializeRouterState(state, { excludeContext: ["rsc"] });
+ * ```
  */
-export function serializeRouterState(state: State): string {
+export function serializeRouterState(
+  state: State,
+  options?: SerializeRouterStateOptions,
+): string {
+  const exclude = options?.excludeContext;
+
+  let context = state.context;
+
+  if (exclude?.length) {
+    const filtered: Record<string, unknown> = {};
+    const source = state.context as Record<string, unknown>;
+
+    for (const key of Object.keys(source)) {
+      if (!exclude.includes(key)) {
+        filtered[key] = source[key];
+      }
+    }
+
+    context = filtered;
+  }
+
   return serializeState({
     name: state.name,
     params: state.params,
     path: state.path,
-    context: state.context,
+    context,
   });
 }

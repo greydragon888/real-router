@@ -20,7 +20,8 @@
     "packages/preact/src/**",
     "packages/hash-plugin/src/**",
     "packages/*/src/dom-utils/**",
-    "packages/*/src/browser-env/**"
+    "packages/*/src/browser-env/**",
+    "packages/*/src/shared-ssr/**"
   ],
   "format": ["typescript", "tsx"],
   "absolute": false,

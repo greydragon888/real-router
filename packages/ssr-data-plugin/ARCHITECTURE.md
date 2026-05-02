@@ -22,10 +22,11 @@
 ssr-data-plugin/
 ├── src/
 │   ├── index.ts        — Public API (exports factory + types) + module augmentation
-│   ├── factory.ts      — ssrDataPluginFactory (validation, interceptor, claim-based context)
-│   ├── validation.ts   — validateLoaders (factory-time validation)
+│   ├── factory.ts      — ssrDataPluginFactory: thin adapter over createSsrLoaderPlugin
+│   ├── validation.ts   — validateLoaders = createLoadersValidator(ERROR_PREFIX)
 │   ├── types.ts        — DataLoaderFn, DataLoaderFnFactory, DataLoaderFactoryMap
-│   └── constants.ts    — ERROR_PREFIX, LOGGER_CONTEXT
+│   ├── constants.ts    — ERROR_PREFIX, LOGGER_CONTEXT
+│   └── shared-ssr/     — symlink → shared/ssr/ (contains the generic factory & validator)
 ```
 
 ## Module Dependency Graph
@@ -34,28 +35,41 @@ ssr-data-plugin/
 index.ts
     └── factory.ts
             ├── validation.ts
+            │       ├── shared-ssr/createLoadersValidator.ts
             │       └── constants.ts
+            ├── shared-ssr/createSsrLoaderPlugin.ts
             └── types.ts
 ```
 
 External dependencies:
 
-| Dependency           | What it provides                                           | Used in      |
-| -------------------- | ---------------------------------------------------------- | ------------ |
-| `@real-router/core`  | `getPluginApi`, types (`PluginFactory`, `Plugin`)          | `factory.ts` |
-| `@real-router/types` | `StateContext` (module augmentation target)                 | `index.ts`   |
+| Dependency           | What it provides                                           | Used in                   |
+| -------------------- | ---------------------------------------------------------- | ------------------------- |
+| `@real-router/core`  | `getPluginApi`, types (`PluginFactory`, `Plugin`)          | `shared-ssr/createSsrLoaderPlugin.ts` |
+| `@real-router/types` | `StateContext` (module augmentation target)                | `index.ts`                |
+
+## Shared SSR Scaffolding
+
+The plugin's factory + validation logic lives in [`shared/ssr/`](../../shared/ssr/) and is consumed via a git-tracked symlink at `src/shared-ssr` (same pattern as `shared/browser-env/` for browser/hash/navigation-plugin and `shared/dom-utils/` for framework adapters).
+
+The shared module exports:
+
+- `createSsrLoaderPlugin<T, D>(loaders, { namespace, errorPrefix })` — generic factory implementing the validate-compile-loop + start-interceptor + claim/teardown pattern. Parameterised over loader return type `T` and dependency map `D`.
+- `createLoadersValidator(errorPrefix)` — generic shape validator (non-null object → function values).
+
+`@real-router/rsc-server-plugin` consumes the same helpers with a different namespace (`"rsc"`) and `T = ReactNode`. Because the shared logic is symlinked source (not a published package), bug fixes in one plugin's behaviour automatically apply to the other.
 
 ## Factory Pattern
 
-Unlike `persistent-params-plugin` (which uses a class for mutable state), this plugin uses a plain closure — there is no mutable state to encapsulate.
+The plugin uses a plain closure (not a class) — no mutable state to encapsulate. The closure logic itself lives in [`shared/ssr/createSsrLoaderPlugin.ts`](../../shared/ssr/createSsrLoaderPlugin.ts); `ssrDataPluginFactory` is a thin adapter that runs validation and forwards to the shared factory:
 
 ```
-ssrDataPluginFactory(loaders)                ← factory.ts
+ssrDataPluginFactory(loaders)                ← factory.ts (~20 LOC)
         │
-        │  Runs once on call:
-        │  - validateLoaders(loaders)
+        │  1. validateLoaders(loaders)        ← validation.ts → createLoadersValidator(ERROR_PREFIX)
+        │  2. createSsrLoaderPlugin<unknown, Dependencies>(loaders, { namespace: "data", errorPrefix })
         │
-        └── returns PluginFactory (closure)
+        └── createSsrLoaderPlugin returns PluginFactory (closure)
                 │
                 │  Called by router.usePlugin():
                 │
