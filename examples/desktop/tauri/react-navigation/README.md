@@ -34,11 +34,20 @@ The OS compatibility trade-off above is part of that choice. If you only need `p
 
 ```bash
 pnpm install
-pnpm tauri dev      # launches a Tauri window with Vite dev server (requires Rust toolchain)
-pnpm build          # vite build (frontend only)
+pnpm app:dev        # launches a Tauri window with Vite HMR (requires Rust toolchain)
+pnpm app:build      # native installer under src-tauri/target/release/bundle/ (requires icons — see below)
+pnpm build          # vite build (frontend only — used by Playwright)
 pnpm preview        # vite preview at http://localhost:4173
 pnpm test:e2e       # Playwright against vite preview
 ```
+
+`app:dev` / `app:build` are aliases for `tauri dev` / `tauri build`. The bare `pnpm tauri <cmd>` passthrough still works.
+
+> **Note for `app:build`:** `src-tauri/tauri.conf.json` ships with `bundle.icon: []`. Generate icons before the first native bundle:
+>
+> ```bash
+> pnpm tauri icon path/to/source.png   # writes src-tauri/icons/*
+> ```
 
 ## What it covers
 

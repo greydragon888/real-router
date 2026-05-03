@@ -127,6 +127,9 @@
       "unrs-resolver",
       "vue-demi"
     ],
+    "ignoredBuiltDependencies": [
+      "electron-winstaller"
+    ],
     "peerDependencyRules": {
       "allowedVersions": {
         "typescript": "6"
