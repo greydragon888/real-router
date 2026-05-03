@@ -101,10 +101,18 @@ unsubscribe();
 
 In SSR, `router.dispose()` handles cleanup automatically.
 
+## Streaming SSR
+
+Combine with React 19's `<Suspense>` + `use(promise)` for deferred sections that arrive after the shell. The loader resolves critical data; deferred fetches live inside Suspense components and stream in via `renderToReadableStream`. No router-specific wrapper API needed.
+
+See [`examples/web/react/ssr-streaming/`](../../examples/web/react/ssr-streaming) for a complete working example, or the [Streaming SSR wiki guide](https://github.com/greydragon888/real-router/wiki/Streaming-SSR) for the design pattern.
+
 ## Documentation
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — Design decisions and data flow
-- [SSR Example](../../examples/ssr-react) — Full working example with React + Vite
+- [SSR Example](../../examples/web/react/ssr) — Full working example (classical, non-streaming)
+- [Streaming SSR Example](../../examples/web/react/ssr-streaming) — React 19 native streaming with `<Suspense>` + `use(promise)`
+- [Streaming SSR wiki guide](https://github.com/greydragon888/real-router/wiki/Streaming-SSR)
 
 ## Related Packages
 

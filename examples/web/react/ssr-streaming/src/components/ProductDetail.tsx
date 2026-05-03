@@ -1,0 +1,39 @@
+import { useRoute } from "@real-router/react";
+import { Suspense } from "react";
+
+import { RelatedItems } from "./RelatedItems";
+import { Reviews } from "./Reviews";
+
+import type { ProductDetailData } from "../router/loaders";
+import type { ReactElement } from "react";
+
+export function ProductDetail(): ReactElement {
+  const { route } = useRoute();
+  const data = route.context.data as ProductDetailData | undefined;
+
+  if (!data) {
+    return <p data-testid="product-not-found">Product not found.</p>;
+  }
+
+  const { product } = data;
+
+  return (
+    <article data-testid="product-detail" data-product-id={product.id}>
+      <h1 data-testid="product-name">{product.name}</h1>
+      <p data-testid="product-price">${product.price}</p>
+      <p data-testid="product-description">{product.description}</p>
+
+      <Suspense
+        fallback={<p data-testid="reviews-fallback">Loading reviews…</p>}
+      >
+        <Reviews productId={product.id} />
+      </Suspense>
+
+      <Suspense
+        fallback={<p data-testid="related-fallback">Loading related items…</p>}
+      >
+        <RelatedItems productId={product.id} />
+      </Suspense>
+    </article>
+  );
+}
