@@ -63,13 +63,13 @@ export class ProductsListComponent {
     const unsub = store.subscribe(() => {
       this.products.set(store.get("products") as Product[] | null);
       this.loading.set(store.get("products:loading") as boolean | undefined);
-      this.error.set(
-        store.get("products:error") as string | null | undefined,
-      );
+      this.error.set(store.get("products:error") as string | null | undefined);
     });
 
     effect((onCleanup) => {
-      onCleanup(() => unsub());
+      onCleanup(() => {
+        unsub();
+      });
     });
   }
 }

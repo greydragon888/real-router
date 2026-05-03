@@ -15,10 +15,7 @@ const userStore = new Map<string, User>([
       role: "admin",
     },
   ],
-  [
-    "2",
-    { id: "2", name: "Bob Brown", email: "bob@example.com", role: "user" },
-  ],
+  ["2", { id: "2", name: "Bob Brown", email: "bob@example.com", role: "user" }],
   [
     "42",
     { id: "42", name: "Jane Doe", email: "jane@example.com", role: "user" },
@@ -38,7 +35,11 @@ export const database = {
       ),
     list: (filter?: { role?: "admin" | "user" }): Promise<User[]> => {
       const all = [...userStore.values()];
-      if (!filter?.role) return Promise.resolve(all);
+
+      if (!filter?.role) {
+        return Promise.resolve(all);
+      }
+
       return Promise.resolve(all.filter((u) => u.role === filter.role));
     },
     setEmail: (id: string, email: string): void => {

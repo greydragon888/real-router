@@ -23,7 +23,7 @@ export function QueryDemo(): JSX.Element {
   const routeState = useRoute<{ filter?: Filter }>();
 
   const filter = createMemo<Filter>(
-    () => routeState().route?.params.filter ?? "all",
+    () => routeState().route.params.filter ?? "all",
   );
 
   const visible = createMemo(() =>

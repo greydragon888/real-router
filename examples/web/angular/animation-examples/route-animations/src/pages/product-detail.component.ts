@@ -32,18 +32,15 @@ const COVERS: Partial<Record<string, { name: string; color: string }>> = {
         ></div>
         <p>
           The thumbnail morphed into this cover via a
-          <a href="https://aerotwist.com/blog/flip-your-animations/"
-            >FLIP</a
-          >
+          <a href="https://aerotwist.com/blog/flip-your-animations/">FLIP</a>
           animation: source rect captured on leave (inside the
           <code>injectRouteExit</code> handler in
-          <code>installHeroMorph</code>), destination rect measured
-          after commit (in <code>navigator.subscribe</code> +
-          <code>setTimeout(0)</code>), then the delta plays via
-          <code>element.animate()</code>. The parallel
-          <code>view-transitions/</code> example does this with two CSS
-          rules and matching <code>view-transition-name</code> — the
-          recipe pays in JS for cross-browser support.
+          <code>installHeroMorph</code>), destination rect measured after commit
+          (in <code>navigator.subscribe</code> + <code>setTimeout(0)</code>),
+          then the delta plays via <code>element.animate()</code>. The parallel
+          <code>view-transitions/</code> example does this with two CSS rules
+          and matching <code>view-transition-name</code> — the recipe pays in JS
+          for cross-browser support.
         </p>
         <p>
           <a realLink routeName="products" [activeStrict]="true">
@@ -64,6 +61,6 @@ const COVERS: Partial<Record<string, { name: string; color: string }>> = {
 export class ProductDetailComponent {
   private readonly state = injectRoute<{ id: string }>();
 
-  readonly id = computed(() => this.state.routeState().route.params["id"] ?? "1");
+  readonly id = computed(() => this.state.routeState().route.params.id ?? "1");
   readonly product = computed(() => COVERS[this.id()]);
 }

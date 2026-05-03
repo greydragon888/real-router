@@ -34,7 +34,7 @@ function captureFlipSnapshot(): FlipSnapshot | null {
   let parent: HTMLElement | null = null;
 
   for (const element of elements) {
-    const key = element.dataset["flipKey"];
+    const key = element.dataset.flipKey;
 
     if (!key) {
       continue;
@@ -62,7 +62,7 @@ function preHideNewItems(
           continue;
         }
 
-        const key = node.dataset["flipKey"];
+        const key = node.dataset.flipKey;
 
         if (key && !knownKeys.has(key)) {
           node.style.opacity = "0";
@@ -81,7 +81,7 @@ function applyFlip(snapshot: FlipSnapshot): void {
   const surviving = new Set<string>();
 
   for (const element of findFlipElements()) {
-    const key = element.dataset["flipKey"];
+    const key = element.dataset.flipKey;
 
     if (!key) {
       continue;

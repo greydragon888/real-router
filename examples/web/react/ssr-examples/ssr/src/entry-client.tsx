@@ -19,7 +19,7 @@ declare global {
 // Mirrors server/_auth.ts: parse cookie → currentUser. Kept minimal because
 // the client only needs the same DI value the server fed canActivate guards
 // during SSR — otherwise post-hydration guard checks would diverge.
-const KNOWN_USERS: Record<string, CurrentUser> = {
+const KNOWN_USERS: Partial<Record<string, CurrentUser>> = {
   "1": { id: "1", name: "Alice", role: "admin" },
   "2": { id: "2", name: "Bob", role: "user" },
 };
@@ -32,15 +32,23 @@ function getCurrentUserFromDocument(): CurrentUser | null {
       .filter(Boolean)
       .map((p) => {
         const idx = p.indexOf("=");
+
         return idx === -1
           ? ([p, ""] as const)
           : ([p.slice(0, idx), p.slice(idx + 1)] as const);
       }),
   );
 
-  const userId = cookies["userId"];
-  if (userId && KNOWN_USERS[userId]) return KNOWN_USERS[userId];
-  if (cookies["auth"] === "1") return KNOWN_USERS["1"] ?? null;
+  const userId = cookies.userId;
+  const user = userId ? KNOWN_USERS[userId] : undefined;
+
+  if (user) {
+    return user;
+  }
+  if (cookies.auth === "1") {
+    return KNOWN_USERS["1"] ?? null;
+  }
+
   return null;
 }
 
@@ -50,13 +58,9 @@ const router = createAppRouter({
 
 router.usePlugin(browserPluginFactory(), ssrDataPluginFactory(loaders));
 
-const ssrState = window.__SSR_STATE__;
+const ssrState = globalThis.__SSR_STATE__;
 
-if (ssrState) {
-  await hydrateRouter(router, ssrState);
-} else {
-  await router.start();
-}
+await (ssrState ? hydrateRouter(router, ssrState) : router.start());
 
 const rootElement = document.querySelector("#root");
 

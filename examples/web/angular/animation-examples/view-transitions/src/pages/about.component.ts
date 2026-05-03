@@ -23,10 +23,10 @@ import { Component } from "@angular/core";
         </li>
         <li>
           The browser captures the old DOM snapshot (per CSS VT spec §7.3 —
-          mandatory before <code>updateCallback</code> runs), then invokes
-          the callback. Inside the callback we call
-          <code>resolveLeave()</code> — the router unblocks and proceeds
-          through activation guards and <code>setState</code>.
+          mandatory before <code>updateCallback</code> runs), then invokes the
+          callback. Inside the callback we call <code>resolveLeave()</code> —
+          the router unblocks and proceeds through activation guards and
+          <code>setState</code>.
         </li>
         <li>
           <code>subscribe</code> fires at <code>TRANSITION_SUCCESS</code>.
@@ -35,11 +35,10 @@ import { Component } from "@angular/core";
         </li>
         <li>
           Utility resolves the deferred via <code>setTimeout(0)</code>.
-          Angular's signal-driven change detection runs synchronously during
-          the subscribe callback in zoneless mode, so the DOM is committed by
-          the time our <code>setTimeout(0)</code> task fires. Browser then
-          captures the new snapshot and plays
-          <code>::view-transition-old()</code> /
+          Angular's signal-driven change detection runs synchronously during the
+          subscribe callback in zoneless mode, so the DOM is committed by the
+          time our <code>setTimeout(0)</code> task fires. Browser then captures
+          the new snapshot and plays <code>::view-transition-old()</code> /
           <code>::view-transition-new()</code> animations.
         </li>
       </ol>
@@ -56,42 +55,43 @@ import { Component } from "@angular/core";
         suppression on the document — which <em>also blocks rAF callbacks</em>.
         An rAF scheduled from <code>subscribe</code> would never fire, the
         deferred would hang, and after 4 s Chromium aborts with
-        <code>TimeoutError: Transition was aborted because of timeout in DOM
-        update</code>. <code>setTimeout</code> runs on the task queue
-        independent of the rendering pipeline, so it fires regardless of
-        suppression. This is the one non-obvious detail of the whole design —
-        see <code>shared/dom-utils/view-transitions.ts</code> for the
-        comments.
+        <code
+          >TimeoutError: Transition was aborted because of timeout in DOM
+          update</code
+        >. <code>setTimeout</code> runs on the task queue independent of the
+        rendering pipeline, so it fires regardless of suppression. This is the
+        one non-obvious detail of the whole design — see
+        <code>shared/dom-utils/view-transitions.ts</code> for the comments.
       </p>
 
       <p><strong>Why clicks feel blocked during long animations</strong></p>
       <p>
         While a View Transition is animating, the document is under
         <strong>rendering suppression</strong>
-        (<a href="https://drafts.csswg.org/css-view-transitions-1/">CSS VT L1
-        §4</a>): the real DOM is still mounted, but it is not painted and is
+        (<a href="https://drafts.csswg.org/css-view-transitions-1/"
+          >CSS VT L1 §4</a
+        >): the real DOM is still mounted, but it is not painted and is
         effectively absent from the hit-test tree. Only the
-        <code>::view-transition</code> pseudo stack is visible and
-        hit-testable. A click during playback lands on the overlay — not on
-        the underlying Link — so <code>Link.onClick</code> never fires and no
-        new navigation starts.
+        <code>::view-transition</code> pseudo stack is visible and hit-testable.
+        A click during playback lands on the overlay — not on the underlying
+        Link — so <code>Link.onClick</code> never fires and no new navigation
+        starts.
       </p>
       <p>
         Adding <code>pointer-events: none</code> to
-        <code>::view-transition</code> is the documented workaround, and it
-        does work <em>when part of the page is outside the captured scope</em>.
-        In scoped transitions (e.g. only a list container has
+        <code>::view-transition</code> is the documented workaround, and it does
+        work <em>when part of the page is outside the captured scope</em>. In
+        scoped transitions (e.g. only a list container has
         <code>view-transition-name</code>) the surrounding DOM stays in the
         hit-test tree, so clicks on that surrounding area pass through. For
-        <strong>root-scope</strong> transitions like this demo's default 2400
-        ms fade, the entire viewport is captured — there is nothing
-        underneath to hit, so the overlay-transparency trick cannot rescue
-        interactivity.
+        <strong>root-scope</strong> transitions like this demo's default 2400 ms
+        fade, the entire viewport is captured — there is nothing underneath to
+        hit, so the overlay-transparency trick cannot rescue interactivity.
       </p>
       <p>
-        Production guidance: keep VT durations under ~400 ms. At that length
-        the block is imperceptible to the user. This demo intentionally runs
-        long so each phase is clearly visible for teaching.
+        Production guidance: keep VT durations under ~400 ms. At that length the
+        block is imperceptible to the user. This demo intentionally runs long so
+        each phase is clearly visible for teaching.
       </p>
     </div>
   `,

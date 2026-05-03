@@ -12,9 +12,9 @@ import { injectRoute } from "@real-router/angular";
         <strong>{{ routeState().route.name }}</strong>
       </p>
       <p>
-        Use the sidebar to navigate between pages. Try clicking <em>Back</em>
-        and <em>Forward</em> in the browser — routing state is preserved in the
-        URL.
+        Use the sidebar to navigate between pages. Try clicking
+        <em>Back</em> and <em>Forward</em> in the browser — routing state is
+        preserved in the URL.
       </p>
       <p>
         <strong>Scroll restoration demo:</strong> scroll down the list below,

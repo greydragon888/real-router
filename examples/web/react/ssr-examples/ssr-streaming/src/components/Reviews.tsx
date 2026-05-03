@@ -32,6 +32,7 @@ function fetchReviews(productId: string): Promise<Review[]> {
     if (typeof globalThis.window === "undefined") {
       return Promise.resolve([]);
     }
+
     return Promise.reject(new Error("Reviews service unavailable"));
   }
 

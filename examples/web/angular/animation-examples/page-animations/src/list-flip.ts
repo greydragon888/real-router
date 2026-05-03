@@ -71,13 +71,12 @@ export function installListFlip<T extends HTMLElement>(
       return;
     }
 
-    const items =
-      container.querySelectorAll<HTMLElement>("[data-flip-key]");
+    const items = container.querySelectorAll<HTMLElement>("[data-flip-key]");
     const current = new Map<string, Snapshot>();
 
     // Pass 1 — survivors and new items.
     for (const item of items) {
-      const key = item.dataset["flipKey"];
+      const key = item.dataset.flipKey;
 
       if (!key) {
         continue;

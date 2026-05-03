@@ -1,5 +1,5 @@
 import { createRouter, RouterError, errorCodes } from "@real-router/core";
-import { afterEach, describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 
 import { errorStore } from "../src/error-store";
 import { routes } from "../src/routes";
@@ -8,169 +8,177 @@ import type { PluginFactory, Router } from "@real-router/core";
 
 let router: Router;
 
-afterEach(() => {
-  router.stop();
-  vi.useRealTimers();
-});
+const RESOLVED_SENTINEL = Symbol("did-not-reject");
 
-describe("RouterError — try/catch pattern", () => {
-  it("ROUTE_NOT_FOUND when navigating to nonexistent route", async () => {
-    router = createRouter(routes, {
-      defaultRoute: "home",
-      allowNotFound: true,
-    });
-    await router.start("/");
+async function captureRejection(promise: Promise<unknown>): Promise<unknown> {
+  const result = await promise.then(
+    () => RESOLVED_SENTINEL,
+    (error: unknown) => error,
+  );
 
-    try {
-      await router.navigate("@@nonexistent-route");
+  if (result === RESOLVED_SENTINEL) {
+    throw new Error("Promise resolved instead of rejecting");
+  }
 
-      expect.fail("should have thrown");
-    } catch (error) {
+  return result;
+}
+
+describe("error-handling tests", () => {
+  afterEach(() => {
+    router.stop();
+    vi.useRealTimers();
+  });
+
+  describe("RouterError — try/catch pattern", () => {
+    it("ROUTE_NOT_FOUND when navigating to nonexistent route", async () => {
+      router = createRouter(routes, {
+        defaultRoute: "home",
+        allowNotFound: true,
+      });
+      await router.start("/");
+
+      const error = await captureRejection(
+        router.navigate("@@nonexistent-route"),
+      );
+
       expect(error).toBeInstanceOf(RouterError);
       expect((error as RouterError).code).toBe(errorCodes.ROUTE_NOT_FOUND);
-    }
-  });
-
-  it("CANNOT_ACTIVATE when guard returns false", async () => {
-    router = createRouter(routes, {
-      defaultRoute: "home",
-      allowNotFound: true,
     });
-    await router.start("/");
 
-    try {
-      await router.navigate("protected");
+    it("CANNOT_ACTIVATE when guard returns false", async () => {
+      router = createRouter(routes, {
+        defaultRoute: "home",
+        allowNotFound: true,
+      });
+      await router.start("/");
 
-      expect.fail("should have thrown");
-    } catch (error) {
+      const error = await captureRejection(router.navigate("protected"));
+
       expect(error).toBeInstanceOf(RouterError);
       expect((error as RouterError).code).toBe(errorCodes.CANNOT_ACTIVATE);
-    }
-
-    expect(router.getState()?.name).toBe("home");
-  });
-
-  it("TRANSITION_CANCELLED when second navigation supersedes first", async () => {
-    router = createRouter(routes, {
-      defaultRoute: "home",
-      allowNotFound: true,
+      expect(router.getState()?.name).toBe("home");
     });
-    await router.start("/");
 
-    vi.useFakeTimers();
+    it("TRANSITION_CANCELLED when second navigation supersedes first", async () => {
+      router = createRouter(routes, {
+        defaultRoute: "home",
+        allowNotFound: true,
+      });
+      await router.start("/");
 
-    const firstNav = router.navigate("slow");
-    const secondNav = router.navigate("about");
+      vi.useFakeTimers();
 
-    await vi.advanceTimersByTimeAsync(5000);
+      const firstNav = router.navigate("slow");
+      const secondNav = router.navigate("about");
 
-    try {
-      await firstNav;
+      await vi.advanceTimersByTimeAsync(5000);
 
-      expect.fail("should have thrown");
-    } catch (error) {
+      const error = await captureRejection(firstNav);
+
       expect(error).toBeInstanceOf(RouterError);
       expect((error as RouterError).code).toBe(errorCodes.TRANSITION_CANCELLED);
-    }
 
-    expect((await secondNav).name).toBe("about");
-  });
-});
+      const second = await secondNav;
 
-describe("Fire-and-forget pattern", () => {
-  it("suppresses error with .catch(() => {})", async () => {
-    router = createRouter(routes, {
-      defaultRoute: "home",
-      allowNotFound: true,
+      expect(second.name).toBe("about");
     });
-    await router.start("/");
-
-    router.navigate("protected").catch(() => {});
-
-    // Let microtask queue flush
-    await new Promise((resolve) => {
-      setTimeout(resolve, 0);
-    });
-
-    expect(router.getState()?.name).toBe("home");
-  });
-});
-
-describe("Error logger plugin — onTransitionError / onTransitionCancel", () => {
-  it("onTransitionError receives CANNOT_ACTIVATE errors", async () => {
-    const errors: { code: string }[] = [];
-
-    const errorLoggerPlugin: PluginFactory = () => ({
-      onTransitionError(_toState, _fromState, err) {
-        errors.push({ code: err.code });
-      },
-    });
-
-    router = createRouter(routes, {
-      defaultRoute: "home",
-      allowNotFound: true,
-    });
-    router.usePlugin(errorLoggerPlugin);
-    await router.start("/");
-
-    await router.navigate("protected").catch(() => {});
-
-    expect(errors).toHaveLength(1);
-    expect(errors[0]?.code).toBe(errorCodes.CANNOT_ACTIVATE);
   });
 
-  it("onTransitionCancel receives TRANSITION_CANCELLED", async () => {
-    const cancels: { name: string }[] = [];
+  describe("Fire-and-forget pattern", () => {
+    it("suppresses error with .catch(() => {})", async () => {
+      router = createRouter(routes, {
+        defaultRoute: "home",
+        allowNotFound: true,
+      });
+      await router.start("/");
 
-    const cancelLoggerPlugin: PluginFactory = () => ({
-      onTransitionCancel(toState) {
-        cancels.push({ name: toState.name });
-      },
+      router.navigate("protected").catch(() => {});
+
+      // Let microtask queue flush
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
+
+      expect(router.getState()?.name).toBe("home");
     });
-
-    router = createRouter(routes, {
-      defaultRoute: "home",
-      allowNotFound: true,
-    });
-    router.usePlugin(cancelLoggerPlugin);
-    await router.start("/");
-
-    vi.useFakeTimers();
-
-    const firstNav = router.navigate("slow");
-
-    router.navigate("about").catch(() => {});
-
-    await vi.advanceTimersByTimeAsync(5000);
-    await firstNav.catch(() => {});
-
-    expect(cancels).toHaveLength(1);
-    expect(cancels[0]?.name).toBe("slow");
   });
-});
 
-describe("errorStore integration", () => {
-  it("accumulates errors via plugin callbacks", async () => {
-    const errorLoggerPlugin: PluginFactory = () => ({
-      onTransitionError(_toState, _fromState, err) {
-        errorStore.add(err);
-      },
+  describe("Error logger plugin — onTransitionError / onTransitionCancel", () => {
+    it("onTransitionError receives CANNOT_ACTIVATE errors", async () => {
+      const errors: { code: string }[] = [];
+
+      const errorLoggerPlugin: PluginFactory = () => ({
+        onTransitionError(_toState, _fromState, err) {
+          errors.push({ code: err.code });
+        },
+      });
+
+      router = createRouter(routes, {
+        defaultRoute: "home",
+        allowNotFound: true,
+      });
+      router.usePlugin(errorLoggerPlugin);
+      await router.start("/");
+
+      await router.navigate("protected").catch(() => {});
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0]?.code).toBe(errorCodes.CANNOT_ACTIVATE);
     });
 
-    router = createRouter(routes, {
-      defaultRoute: "home",
-      allowNotFound: true,
+    it("onTransitionCancel receives TRANSITION_CANCELLED", async () => {
+      const cancels: { name: string }[] = [];
+
+      const cancelLoggerPlugin: PluginFactory = () => ({
+        onTransitionCancel(toState) {
+          cancels.push({ name: toState.name });
+        },
+      });
+
+      router = createRouter(routes, {
+        defaultRoute: "home",
+        allowNotFound: true,
+      });
+      router.usePlugin(cancelLoggerPlugin);
+      await router.start("/");
+
+      vi.useFakeTimers();
+
+      const firstNav = router.navigate("slow");
+
+      router.navigate("about").catch(() => {});
+
+      await vi.advanceTimersByTimeAsync(5000);
+      await firstNav.catch(() => {});
+
+      expect(cancels).toHaveLength(1);
+      expect(cancels[0]?.name).toBe("slow");
     });
-    router.usePlugin(errorLoggerPlugin);
-    await router.start("/");
+  });
 
-    await router.navigate("protected").catch(() => {});
-    await router.navigate("@@missing").catch(() => {});
+  describe("errorStore integration", () => {
+    it("accumulates errors via plugin callbacks", async () => {
+      const errorLoggerPlugin: PluginFactory = () => ({
+        onTransitionError(_toState, _fromState, err) {
+          errorStore.add(err);
+        },
+      });
 
-    const entries = errorStore.getAll();
+      router = createRouter(routes, {
+        defaultRoute: "home",
+        allowNotFound: true,
+      });
+      router.usePlugin(errorLoggerPlugin);
+      await router.start("/");
 
-    expect(entries.length).toBeGreaterThanOrEqual(2);
-    expect(entries.at(-2)?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-    expect(entries.at(-1)?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+      await router.navigate("protected").catch(() => {});
+      await router.navigate("@@missing").catch(() => {});
+
+      const entries = errorStore.getAll();
+
+      expect(entries).toHaveLength(2);
+      expect(entries[0]?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+      expect(entries[1]?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+    });
   });
 });

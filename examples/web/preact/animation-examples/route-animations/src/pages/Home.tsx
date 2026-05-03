@@ -4,11 +4,11 @@ export function Home() {
       <h1>Route Animations</h1>
       <p>
         This example animates route changes via CSS <code>@keyframes</code> and
-        the <code>useRouteExit</code> hook from{" "}
-        <code>@real-router/preact</code> — no View Transitions API. Three thin
-        hooks own the animation behavior (page-level fade/slide, hero morph,
-        list FLIP), works in every modern browser including Firefox without VT,
-        and gives you per-route timing control out of the box.
+        the <code>useRouteExit</code> hook from <code>@real-router/preact</code>{" "}
+        — no View Transitions API. Three thin hooks own the animation behavior
+        (page-level fade/slide, hero morph, list FLIP), works in every modern
+        browser including Firefox without VT, and gives you per-route timing
+        control out of the box.
       </p>
 
       <h2>Scenarios to try</h2>
@@ -71,8 +71,8 @@ export function Home() {
         <li>
           <strong>Abort safety</strong>: click sidebar links rapid-fire — the{" "}
           <code>AbortSignal</code> exposed by <code>useRouteExit</code> triggers
-          the abort-listener cleanup that strips the <code>.leaving</code>{" "}
-          class from cancelled exits — no animation leaks.
+          the abort-listener cleanup that strips the <code>.leaving</code> class
+          from cancelled exits — no animation leaks.
         </li>
         <li>
           <strong>Reduced motion</strong>: set your OS to reduce motion —{" "}

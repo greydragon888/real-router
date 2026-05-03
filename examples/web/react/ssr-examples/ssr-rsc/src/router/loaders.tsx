@@ -12,6 +12,7 @@ export const loaders: RscLoaderFactoryMap<AppDependencies> = {
       params.role === "admin" || params.role === "user"
         ? params.role
         : undefined;
+
     return <UsersList roleFilter={role} />;
   },
   "users.profile": (_router, getDep) => async (params) => {

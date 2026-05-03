@@ -35,6 +35,7 @@ export const routes = [
     canActivate:
       (_router: unknown, getDep: (key: string) => unknown) => (): boolean => {
         const user = getDep("currentUser") as CurrentUser | null;
+
         return user?.role === "admin";
       },
   },

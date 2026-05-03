@@ -30,14 +30,14 @@ export function About(): JSX.Element {
       <h2>route-animations/</h2>
       <p>
         Centralised via three thin hooks (<code>usePageAnimator</code>,{" "}
-        <code>useHeroMorph</code>, <code>useListFlip</code>) called once at
-        the top of <code>App</code>. Each hook wraps{" "}
-        <code>useRouteExit</code> from <code>@real-router/react</code> with
-        its own DOM recipe. Cross-route coordination (hero rect capture, list
-        FLIP, ghost clones) works because state lives in module-level refs
-        inside the hooks. Pages stay declarative — they only mark{" "}
-        <code>[data-route-root]</code> / <code>[data-flip-key]</code>{" "}
-        attributes; the hooks find them via DOM queries.
+        <code>useHeroMorph</code>, <code>useListFlip</code>) called once at the
+        top of <code>App</code>. Each hook wraps <code>useRouteExit</code> from{" "}
+        <code>@real-router/react</code> with its own DOM recipe. Cross-route
+        coordination (hero rect capture, list FLIP, ghost clones) works because
+        state lives in module-level refs inside the hooks. Pages stay
+        declarative — they only mark <code>[data-route-root]</code> /{" "}
+        <code>[data-flip-key]</code> attributes; the hooks find them via DOM
+        queries.
       </p>
 
       <h2>page-animations/ (this example)</h2>
@@ -59,9 +59,9 @@ export function About(): JSX.Element {
         <code>&lt;AnimatePresence mode=&quot;wait&quot;&gt;</code> is keyed by
         an <code>exitToken</code> counter bumped inside{" "}
         <code>useRouteExit</code>; the Promise the router awaits resolves on{" "}
-        <code>onExitComplete</code>. Same URL-and-UI lock-step semantics as
-        the other three. Hero morph through <code>layoutId</code> and list
-        reorder through <code>&lt;motion.li layout&gt;</code> are{" "}
+        <code>onExitComplete</code>. Same URL-and-UI lock-step semantics as the
+        other three. Hero morph through <code>layoutId</code> and list reorder
+        through <code>&lt;motion.li layout&gt;</code> are{" "}
         <strong>library-native</strong> — declarative props rather than
         procedural code. Trade-off: ~50 KB extra in bundle.
       </p>
@@ -90,9 +90,9 @@ export function About(): JSX.Element {
       <h2>The hook</h2>
       <p>
         See <code>src/use-route-animation.ts</code> (~120 LOC).{" "}
-        <code>useRouteExit</code> from <code>@real-router/react</code>{" "}
-        wraps <code>subscribeLeave</code> with abort/skip-same-route guards;
-        the handler awaits <code>Element.getAnimations() + .finished</code>{" "}
+        <code>useRouteExit</code> from <code>@real-router/react</code> wraps{" "}
+        <code>subscribeLeave</code> with abort/skip-same-route guards; the
+        handler awaits <code>Element.getAnimations() + .finished</code>{" "}
         (reduced-motion fast-path: <code>allSettled([])</code> resolves
         synchronously). Entry plays on nav-driven mount via{" "}
         <code>useRouteEnter</code> from the same package — skip-initial and

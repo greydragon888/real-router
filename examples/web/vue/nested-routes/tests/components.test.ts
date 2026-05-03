@@ -11,224 +11,230 @@ import type { Router } from "@real-router/core";
 
 let testRouter: Router;
 
-afterEach(() => {
-  testRouter.stop();
-});
-
-function renderApp() {
-  const Wrapper = defineComponent({
-    setup() {
-      return () =>
-        h(RouterProvider, { router: testRouter }, { default: () => h(App) });
-    },
+describe("vue/nested-routes — components", () => {
+  afterEach(() => {
+    testRouter.stop();
   });
 
-  return render(Wrapper);
-}
-
-describe("Per-user sub-navigation appearance", () => {
-  it("shows per-user sidebar (Profile, Settings) when on users.profile.*", async () => {
-    testRouter = createRouter(routes, {
-      defaultRoute: "home",
-      allowNotFound: true,
+  function renderApp() {
+    const Wrapper = defineComponent({
+      setup() {
+        return () =>
+          h(RouterProvider, { router: testRouter }, { default: () => h(App) });
+      },
     });
-    await testRouter.start("/users/1");
 
-    renderApp();
+    return render(Wrapper);
+  }
 
-    await waitFor(() => {
+  describe("Per-user sub-navigation appearance", () => {
+    it("shows per-user sidebar (Profile, Settings) when on users.profile.*", async () => {
+      testRouter = createRouter(routes, {
+        defaultRoute: "home",
+        allowNotFound: true,
+      });
+      await testRouter.start("/users/1");
+
+      renderApp();
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole("link", { name: "Profile" }),
+        ).toBeInTheDocument();
+      });
+
       expect(
-        screen.getByRole("link", { name: "Profile" }),
+        screen.getByRole("link", { name: "Settings" }),
       ).toBeInTheDocument();
     });
 
-    expect(screen.getByRole("link", { name: "Settings" })).toBeInTheDocument();
-  });
+    it("does not show per-user sidebar on the users list page", async () => {
+      testRouter = createRouter(routes, {
+        defaultRoute: "home",
+        allowNotFound: true,
+      });
+      await testRouter.start("/users");
 
-  it("does not show per-user sidebar on the users list page", async () => {
-    testRouter = createRouter(routes, {
-      defaultRoute: "home",
-      allowNotFound: true,
-    });
-    await testRouter.start("/users");
+      renderApp();
 
-    renderApp();
+      await waitFor(() => {
+        expect(
+          screen.getByRole("heading", { name: "Users" }),
+        ).toBeInTheDocument();
+      });
 
-    await waitFor(() => {
       expect(
-        screen.getByRole("heading", { name: "Users" }),
-      ).toBeInTheDocument();
+        screen.queryByRole("link", { name: "Profile" }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("link", { name: "Settings" }),
+      ).not.toBeInTheDocument();
     });
 
-    expect(
-      screen.queryByRole("link", { name: "Profile" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("link", { name: "Settings" }),
-    ).not.toBeInTheDocument();
+    it("does not show per-user sidebar on home page", async () => {
+      testRouter = createRouter(routes, {
+        defaultRoute: "home",
+        allowNotFound: true,
+      });
+      await testRouter.start("/");
+
+      renderApp();
+
+      expect(screen.getByRole("heading", { name: "Home" })).toBeInTheDocument();
+      expect(
+        screen.queryByRole("link", { name: "Profile" }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("link", { name: "Settings" }),
+      ).not.toBeInTheDocument();
+    });
   });
 
-  it("does not show per-user sidebar on home page", async () => {
-    testRouter = createRouter(routes, {
-      defaultRoute: "home",
-      allowNotFound: true,
-    });
-    await testRouter.start("/");
+  describe("Active link classes", () => {
+    it("outer sidebar 'Users' has active class on users", async () => {
+      testRouter = createRouter(routes, {
+        defaultRoute: "home",
+        allowNotFound: true,
+      });
+      await testRouter.start("/users");
 
-    renderApp();
+      renderApp();
 
-    expect(screen.getByRole("heading", { name: "Home" })).toBeInTheDocument();
-    expect(
-      screen.queryByRole("link", { name: "Profile" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("link", { name: "Settings" }),
-    ).not.toBeInTheDocument();
-  });
-});
-
-describe("Active link classes", () => {
-  it("outer sidebar 'Users' has active class on users", async () => {
-    testRouter = createRouter(routes, {
-      defaultRoute: "home",
-      allowNotFound: true,
-    });
-    await testRouter.start("/users");
-
-    renderApp();
-
-    const sidebar = screen.getByRole("complementary");
-    const usersLink = sidebar.querySelector("a[href='/users']");
-    const homeLink = sidebar.querySelector("a[href='/']");
-
-    await waitFor(() => {
-      expect(usersLink).toHaveClass("active");
-    });
-
-    expect(homeLink).not.toHaveClass("active");
-  });
-
-  it("outer sidebar 'Users' stays active on users.profile", async () => {
-    testRouter = createRouter(routes, {
-      defaultRoute: "home",
-      allowNotFound: true,
-    });
-    await testRouter.start("/users");
-
-    renderApp();
-
-    await waitFor(() => {
       const sidebar = screen.getByRole("complementary");
       const usersLink = sidebar.querySelector("a[href='/users']");
+      const homeLink = sidebar.querySelector("a[href='/']");
 
-      expect(usersLink).toHaveClass("active");
+      await waitFor(() => {
+        expect(usersLink).toHaveClass("active");
+      });
+
+      expect(homeLink).not.toHaveClass("active");
     });
 
-    await testRouter.navigate("users.profile", { id: "1" });
+    it("outer sidebar 'Users' stays active on users.profile", async () => {
+      testRouter = createRouter(routes, {
+        defaultRoute: "home",
+        allowNotFound: true,
+      });
+      await testRouter.start("/users");
 
-    await waitFor(() => {
-      const sidebar = screen.getByRole("complementary");
-      const usersLink = sidebar.querySelector("a[href='/users']");
+      renderApp();
 
-      expect(usersLink).toHaveClass("active");
+      await waitFor(() => {
+        const sidebar = screen.getByRole("complementary");
+        const usersLink = sidebar.querySelector("a[href='/users']");
+
+        expect(usersLink).toHaveClass("active");
+      });
+
+      await testRouter.navigate("users.profile", { id: "1" });
+
+      await waitFor(() => {
+        const sidebar = screen.getByRole("complementary");
+        const usersLink = sidebar.querySelector("a[href='/users']");
+
+        expect(usersLink).toHaveClass("active");
+      });
     });
-  });
 
-  it("per-user sidebar Profile link is active on /users/:id, Settings is not", async () => {
-    testRouter = createRouter(routes, {
-      defaultRoute: "home",
-      allowNotFound: true,
-    });
-    await testRouter.start("/users/1");
+    it("per-user sidebar Profile link is active on /users/:id, Settings is not", async () => {
+      testRouter = createRouter(routes, {
+        defaultRoute: "home",
+        allowNotFound: true,
+      });
+      await testRouter.start("/users/1");
 
-    renderApp();
+      renderApp();
 
-    await waitFor(() => {
-      expect(screen.getByRole("link", { name: "Profile" })).toHaveClass(
+      await waitFor(() => {
+        expect(screen.getByRole("link", { name: "Profile" })).toHaveClass(
+          "active",
+        );
+      });
+
+      expect(screen.getByRole("link", { name: "Settings" })).not.toHaveClass(
         "active",
       );
     });
 
-    expect(screen.getByRole("link", { name: "Settings" })).not.toHaveClass(
-      "active",
-    );
-  });
+    it("per-user sidebar Settings link becomes active on /users/:id/settings", async () => {
+      testRouter = createRouter(routes, {
+        defaultRoute: "home",
+        allowNotFound: true,
+      });
+      await testRouter.start("/users/1/settings");
 
-  it("per-user sidebar Settings link becomes active on /users/:id/settings", async () => {
-    testRouter = createRouter(routes, {
-      defaultRoute: "home",
-      allowNotFound: true,
-    });
-    await testRouter.start("/users/1/settings");
+      renderApp();
 
-    renderApp();
+      await waitFor(() => {
+        expect(screen.getByRole("link", { name: "Settings" })).toHaveClass(
+          "active",
+        );
+      });
 
-    await waitFor(() => {
-      expect(screen.getByRole("link", { name: "Settings" })).toHaveClass(
+      expect(screen.getByRole("link", { name: "Profile" })).not.toHaveClass(
         "active",
       );
     });
-
-    expect(screen.getByRole("link", { name: "Profile" })).not.toHaveClass(
-      "active",
-    );
-  });
-});
-
-describe("Breadcrumbs", () => {
-  it("shows breadcrumb trail on users", async () => {
-    testRouter = createRouter(routes, {
-      defaultRoute: "home",
-      allowNotFound: true,
-    });
-    await testRouter.start("/users");
-
-    renderApp();
-
-    const breadcrumb = screen.getByLabelText("breadcrumb");
-
-    await waitFor(() => {
-      expect(breadcrumb).toHaveTextContent("Home");
-    });
-
-    expect(breadcrumb).toHaveTextContent("Users");
   });
 
-  it("shows user ID in breadcrumb on users.profile", async () => {
-    testRouter = createRouter(routes, {
-      defaultRoute: "home",
-      allowNotFound: true,
-    });
-    await testRouter.start("/users");
+  describe("Breadcrumbs", () => {
+    it("shows breadcrumb trail on users", async () => {
+      testRouter = createRouter(routes, {
+        defaultRoute: "home",
+        allowNotFound: true,
+      });
+      await testRouter.start("/users");
 
-    renderApp();
+      renderApp();
 
-    await waitFor(() => {
-      expect(screen.getByLabelText("breadcrumb")).toHaveTextContent("Users");
-    });
+      const breadcrumb = screen.getByLabelText("breadcrumb");
 
-    await testRouter.navigate("users.profile", { id: "2" });
+      await waitFor(() => {
+        expect(breadcrumb).toHaveTextContent("Home");
+      });
 
-    await waitFor(() => {
-      expect(screen.getByLabelText("breadcrumb")).toHaveTextContent("User #2");
-    });
-  });
-
-  it("shows User #id > Settings on /users/:id/settings", async () => {
-    testRouter = createRouter(routes, {
-      defaultRoute: "home",
-      allowNotFound: true,
-    });
-    await testRouter.start("/users/3/settings");
-
-    renderApp();
-
-    const breadcrumb = await screen.findByLabelText("breadcrumb");
-
-    await waitFor(() => {
-      expect(breadcrumb).toHaveTextContent("User #3");
+      expect(breadcrumb).toHaveTextContent("Users");
     });
 
-    expect(breadcrumb).toHaveTextContent("Settings");
+    it("shows user ID in breadcrumb on users.profile", async () => {
+      testRouter = createRouter(routes, {
+        defaultRoute: "home",
+        allowNotFound: true,
+      });
+      await testRouter.start("/users");
+
+      renderApp();
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("breadcrumb")).toHaveTextContent("Users");
+      });
+
+      await testRouter.navigate("users.profile", { id: "2" });
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("breadcrumb")).toHaveTextContent(
+          "User #2",
+        );
+      });
+    });
+
+    it("shows User #id > Settings on /users/:id/settings", async () => {
+      testRouter = createRouter(routes, {
+        defaultRoute: "home",
+        allowNotFound: true,
+      });
+      await testRouter.start("/users/3/settings");
+
+      renderApp();
+
+      const breadcrumb = await screen.findByLabelText("breadcrumb");
+
+      await waitFor(() => {
+        expect(breadcrumb).toHaveTextContent("User #3");
+      });
+
+      expect(breadcrumb).toHaveTextContent("Settings");
+    });
   });
 });

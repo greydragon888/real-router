@@ -24,10 +24,10 @@ const COVERS: Partial<Record<string, { name: string; color: string }>> = {
         aria-hidden="true"
       ></div>
       <p>
-        Note: no hero morph here. The thumbnail on the products page
-        slides away with that page; this cover fades in independently.
-        Bridging the two requires shared state across components — out
-        of scope for the distributed pattern.
+        Note: no hero morph here. The thumbnail on the products page slides away
+        with that page; this cover fades in independently. Bridging the two
+        requires shared state across components — out of scope for the
+        distributed pattern.
       </p>
       <p>
         <a realLink routeName="products" [activeStrict]="true">
@@ -45,11 +45,12 @@ const COVERS: Partial<Record<string, { name: string; color: string }>> = {
 export class ProductDetailComponent {
   private readonly state = injectRoute<{ id: string }>();
 
-  readonly id = computed(() => this.state.routeState().route.params["id"] ?? "1");
+  readonly id = computed(() => this.state.routeState().route.params.id ?? "1");
   readonly product = computed(() => COVERS[this.id()]);
 
   constructor() {
     const hostRef = inject(ElementRef<HTMLElement>);
+
     installRouteAnimation(hostRef, {
       entryClass: "fade-in",
       exitClass: "fade-out",

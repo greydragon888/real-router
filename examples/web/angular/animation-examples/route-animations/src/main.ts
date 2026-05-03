@@ -30,11 +30,8 @@ router.usePlugin(browserPluginFactory());
 
 void router.start().then(() => {
   void bootstrapApplication(AppComponent, {
-    providers: [
-      provideZonelessChangeDetection(),
-      provideRealRouter(router),
-    ],
-  }).catch((err: unknown) => {
-    console.error(err);
+    providers: [provideZonelessChangeDetection(), provideRealRouter(router)],
+  }).catch((error: unknown) => {
+    console.error(error);
   });
 });

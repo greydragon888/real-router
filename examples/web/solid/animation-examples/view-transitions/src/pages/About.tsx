@@ -37,8 +37,8 @@ export function About(): JSX.Element {
           Utility resolves the deferred via <code>setTimeout(0)</code>. Solid's
           fine-grained reactivity commits synchronously inside the subscribe
           callback, so by the time our <code>setTimeout(0)</code> task runs the
-          DOM is already up to date. Browser then captures the new snapshot
-          and plays <code>::view-transition-old()</code> /{" "}
+          DOM is already up to date. Browser then captures the new snapshot and
+          plays <code>::view-transition-old()</code> /{" "}
           <code>::view-transition-new()</code> animations.
         </li>
       </ol>

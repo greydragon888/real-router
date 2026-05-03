@@ -25,10 +25,10 @@ const POSTS: readonly Post[] = [
 export const database = {
   users: {
     list(sort: "asc" | "desc" = "asc"): readonly User[] {
-      return [...USERS].sort((a, b) =>
+      return USERS.toSorted((left, right) =>
         sort === "asc"
-          ? a.name.localeCompare(b.name)
-          : b.name.localeCompare(a.name),
+          ? left.name.localeCompare(right.name)
+          : right.name.localeCompare(left.name),
       );
     },
     findById(id: string): User | undefined {

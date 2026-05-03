@@ -52,7 +52,9 @@ export class ProductDetailComponent {
     });
 
     effect((onCleanup) => {
-      onCleanup(() => unsub());
+      onCleanup(() => {
+        unsub();
+      });
     });
   }
 }

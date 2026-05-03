@@ -25,7 +25,11 @@ export class ReviewsErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
-    console.warn("[Reviews] section failed:", error.message, info.componentStack);
+    console.warn(
+      "[Reviews] section failed:",
+      error.message,
+      info.componentStack,
+    );
   }
 
   render(): ReactElement {

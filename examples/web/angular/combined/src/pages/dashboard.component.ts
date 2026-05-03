@@ -17,9 +17,7 @@ import type { User } from "../../../../../shared/api";
           <p><strong>Lang param:</strong> {{ lang() }}</p>
         </div>
       }
-      <div
-        style="display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap;"
-      >
+      <div style="display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap;">
         <button (click)="toggleLang()">
           Toggle lang ({{ lang() === "en" ? "→ RU" : "→ EN" }})
         </button>
@@ -32,7 +30,7 @@ import type { User } from "../../../../../shared/api";
   `,
 })
 export class DashboardComponent {
-  readonly logout = output<void>();
+  readonly logout = output();
 
   private readonly state = injectRoute<{ lang?: string }>();
   private readonly navigator = injectNavigator();
@@ -41,7 +39,8 @@ export class DashboardComponent {
 
   readonly lang = computed<string>(() => {
     const params = this.state.routeState().route.params;
-    const value = params?.["lang"];
+    const value = params?.lang;
+
     return typeof value === "string" ? value : "en";
   });
 
@@ -51,14 +50,18 @@ export class DashboardComponent {
     });
 
     effect((onCleanup) => {
-      onCleanup(() => unsub());
+      onCleanup(() => {
+        unsub();
+      });
     });
   }
 
   toggleLang(): void {
     const current = this.state.routeState().route;
 
-    if (!current) return;
+    if (!current) {
+      return;
+    }
 
     void this.navigator.navigate(
       current.name,

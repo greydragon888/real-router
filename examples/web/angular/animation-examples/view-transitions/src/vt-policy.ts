@@ -112,20 +112,27 @@ export function installViewTransitionPolicy(router: Router): () => void {
     const heroId = html.dataset.vtHeroId ?? null;
 
     if (heroId === null) {
-      setTimeout(() => activateHero(null), 0);
+      setTimeout(() => {
+        activateHero(null);
+      }, 0);
+
       return;
     }
 
     let attempts = 0;
     const tryActivate = (): void => {
       const found = document.querySelector(`[data-product-id="${heroId}"]`);
+
       if (found !== null || attempts >= 10) {
         activateHero(heroId);
+
         return;
       }
+
       attempts += 1;
       setTimeout(tryActivate, 0);
     };
+
     setTimeout(tryActivate, 0);
   });
 

@@ -29,219 +29,224 @@ vi.mock(import("../src/router"), () => ({
   },
 }));
 
-afterEach(() => {
-  cleanup();
-  testRouter.stop();
-});
-
-// ---------------------------------------------------------------------------
-// a) Login → sidebar swap
-// ---------------------------------------------------------------------------
-describe("Login → sidebar swap", () => {
-  it("swaps sidebar links from public to private after login", async () => {
-    const user = userEvent.setup();
-
-    testRouter = createRouter<AppDependencies>(publicRoutes, {
-      defaultRoute: "home",
-      allowNotFound: true,
-    });
-
-    await testRouter.start("/");
-
-    render(
-      <RouterProvider router={testRouter}>
-        <App />
-      </RouterProvider>,
-    );
-
-    const sidebar = screen.getByRole("complementary");
-
-    // Public sidebar shows Home and Login
-    expect(within(sidebar).getByText("Home")).toBeInTheDocument();
-    expect(within(sidebar).getByText("Login")).toBeInTheDocument();
-
-    // Navigate to login page via sidebar link
-    await user.click(within(sidebar).getByText("Login"));
-
-    // Fill login form
-    await user.type(
-      screen.getByPlaceholderText("alice@example.com"),
-      "alice@example.com",
-    );
-    await user.type(screen.getByPlaceholderText("any password"), "password");
-
-    // Submit login
-    await user.click(screen.getByRole("button", { name: "Login" }));
-
-    // Wait for sidebar to update (300ms API delay → onLogin → route swap)
-    await waitFor(() => {
-      expect(within(sidebar).getByText("Dashboard")).toBeInTheDocument();
-    });
-
-    expect(within(sidebar).getByText("Products")).toBeInTheDocument();
-    expect(within(sidebar).getByText("Users")).toBeInTheDocument();
-    expect(within(sidebar).getByText("Settings")).toBeInTheDocument();
-    expect(within(sidebar).getByText("Admin")).toBeInTheDocument();
-    expect(within(sidebar).getByText("Checkout")).toBeInTheDocument();
-    expect(within(sidebar).queryByText("Login")).not.toBeInTheDocument();
+describe("react/combined — components", () => {
+  afterEach(() => {
+    cleanup();
+    testRouter.stop();
   });
-});
 
-// ---------------------------------------------------------------------------
-// b) Data-driven render
-// ---------------------------------------------------------------------------
-describe("Data-driven render", () => {
-  it("loads products via lifecycle plugin and renders product cards", async () => {
-    store.set("user", {
-      id: "1",
-      name: "Alice",
-      role: "admin" as const,
-      email: "alice@example.com",
+  // ---------------------------------------------------------------------------
+  // a) Login → sidebar swap
+  // ---------------------------------------------------------------------------
+  describe("Login → sidebar swap", () => {
+    it("swaps sidebar links from public to private after login", async () => {
+      const user = userEvent.setup();
+
+      testRouter = createRouter<AppDependencies>(publicRoutes, {
+        defaultRoute: "home",
+        allowNotFound: true,
+      });
+
+      await testRouter.start("/");
+
+      render(
+        <RouterProvider router={testRouter}>
+          <App />
+        </RouterProvider>,
+      );
+
+      const sidebar = screen.getByRole("complementary");
+
+      // Public sidebar shows Home and Login
+      expect(within(sidebar).getByText("Home")).toBeInTheDocument();
+      expect(within(sidebar).getByText("Login")).toBeInTheDocument();
+
+      // Navigate to login page via sidebar link
+      await user.click(within(sidebar).getByText("Login"));
+
+      // Fill login form
+      await user.type(
+        screen.getByPlaceholderText("alice@example.com"),
+        "alice@example.com",
+      );
+      await user.type(screen.getByPlaceholderText("any password"), "password");
+
+      // Submit login
+      await user.click(screen.getByRole("button", { name: "Login" }));
+
+      // Wait for sidebar to update (300ms API delay → onLogin → route swap)
+      await waitFor(() => {
+        expect(within(sidebar).getByText("Dashboard")).toBeInTheDocument();
+      });
+
+      expect(within(sidebar).getByText("Products")).toBeInTheDocument();
+      expect(within(sidebar).getByText("Users")).toBeInTheDocument();
+      expect(within(sidebar).getByText("Settings")).toBeInTheDocument();
+      expect(within(sidebar).getByText("Admin")).toBeInTheDocument();
+      expect(within(sidebar).getByText("Checkout")).toBeInTheDocument();
+      expect(within(sidebar).queryByText("Login")).not.toBeInTheDocument();
     });
-
-    testRouter = createRouter<AppDependencies>(privateRoutes, {
-      defaultRoute: "dashboard",
-      allowNotFound: true,
-    });
-
-    testRouter.usePlugin(lifecyclePluginFactory());
-    getDependenciesApi(testRouter).set("abilities", defineAbilities("admin"));
-
-    await testRouter.start("/products");
-
-    render(
-      <RouterProvider router={testRouter}>
-        <App />
-      </RouterProvider>,
-    );
-
-    // Wait for products to load (300ms API delay via lifecycle plugin)
-    await waitFor(() => {
-      expect(screen.getByText("Laptop")).toBeInTheDocument();
-    });
-
-    expect(screen.getByText("Keyboard")).toBeInTheDocument();
-    expect(screen.getByText("Monitor")).toBeInTheDocument();
   });
-});
 
-// ---------------------------------------------------------------------------
-// c) Guard rejection → UI feedback
-// ---------------------------------------------------------------------------
-describe("Guard rejection → UI feedback", () => {
-  it("keeps user on dashboard when admin guard rejects viewer", async () => {
-    store.set("user", {
-      id: "3",
-      name: "Carol",
-      role: "viewer" as const,
-      email: "carol@example.com",
+  // ---------------------------------------------------------------------------
+  // b) Data-driven render
+  // ---------------------------------------------------------------------------
+  describe("Data-driven render", () => {
+    it("loads products via lifecycle plugin and renders product cards", async () => {
+      store.set("user", {
+        id: "1",
+        name: "Alice",
+        role: "admin" as const,
+        email: "alice@example.com",
+      });
+
+      testRouter = createRouter<AppDependencies>(privateRoutes, {
+        defaultRoute: "dashboard",
+        allowNotFound: true,
+      });
+
+      testRouter.usePlugin(lifecyclePluginFactory());
+      getDependenciesApi(testRouter).set("abilities", defineAbilities("admin"));
+
+      await testRouter.start("/products");
+
+      render(
+        <RouterProvider router={testRouter}>
+          <App />
+        </RouterProvider>,
+      );
+
+      // Wait for products to load (300ms API delay via lifecycle plugin)
+      await waitFor(() => {
+        expect(screen.getByText("Laptop")).toBeInTheDocument();
+      });
+
+      expect(screen.getByText("Keyboard")).toBeInTheDocument();
+      expect(screen.getByText("Monitor")).toBeInTheDocument();
     });
+  });
 
-    testRouter = createRouter<AppDependencies>(privateRoutes, {
-      defaultRoute: "dashboard",
-      allowNotFound: true,
-    });
+  // ---------------------------------------------------------------------------
+  // c) Guard rejection → UI feedback
+  // ---------------------------------------------------------------------------
+  describe("Guard rejection → UI feedback", () => {
+    it("keeps user on dashboard when admin guard rejects viewer", async () => {
+      store.set("user", {
+        id: "3",
+        name: "Carol",
+        role: "viewer" as const,
+        email: "carol@example.com",
+      });
 
-    getDependenciesApi(testRouter).set("abilities", defineAbilities("viewer"));
+      testRouter = createRouter<AppDependencies>(privateRoutes, {
+        defaultRoute: "dashboard",
+        allowNotFound: true,
+      });
 
-    await testRouter.start("/dashboard");
+      getDependenciesApi(testRouter).set(
+        "abilities",
+        defineAbilities("viewer"),
+      );
 
-    render(
-      <RouterProvider router={testRouter}>
-        <App />
-      </RouterProvider>,
-    );
+      await testRouter.start("/dashboard");
 
-    // Verify on dashboard (lazy-loaded — may need to wait)
-    await waitFor(() => {
+      render(
+        <RouterProvider router={testRouter}>
+          <App />
+        </RouterProvider>,
+      );
+
+      // Verify on dashboard (lazy-loaded — may need to wait)
+      await waitFor(() => {
+        expect(
+          screen.getByRole("heading", { name: "Dashboard" }),
+        ).toBeInTheDocument();
+      });
+
+      // Attempt to navigate to admin (guard rejects for viewer role)
+      await act(async () => {
+        await testRouter.navigate("admin").catch(() => {});
+      });
+
+      // Still on dashboard — admin page never rendered
       expect(
         screen.getByRole("heading", { name: "Dashboard" }),
       ).toBeInTheDocument();
-    });
-
-    // Attempt to navigate to admin (guard rejects for viewer role)
-    await act(async () => {
-      await testRouter.navigate("admin").catch(() => {});
-    });
-
-    // Still on dashboard — admin page never rendered
-    expect(
-      screen.getByRole("heading", { name: "Dashboard" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("heading", { name: /admin/i }),
-    ).not.toBeInTheDocument();
-    expect(testRouter.getState()?.name).toBe("dashboard");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// d) canDeactivate UX
-// ---------------------------------------------------------------------------
-describe("canDeactivate UX", () => {
-  it("blocks navigation when confirm returns false, allows when true", async () => {
-    const user = userEvent.setup();
-
-    store.set("user", {
-      id: "1",
-      name: "Alice",
-      role: "admin" as const,
-      email: "alice@example.com",
-    });
-
-    testRouter = createRouter<AppDependencies>(privateRoutes, {
-      defaultRoute: "dashboard",
-      allowNotFound: true,
-    });
-
-    getDependenciesApi(testRouter).set("abilities", defineAbilities("admin"));
-
-    await testRouter.start("/settings");
-
-    render(
-      <RouterProvider router={testRouter}>
-        <App />
-      </RouterProvider>,
-    );
-
-    // Verify on settings page
-    expect(
-      screen.getByRole("heading", { name: "Settings" }),
-    ).toBeInTheDocument();
-
-    // Type in display name input → triggers settings:unsaved = true via useEffect
-    await user.type(
-      screen.getByPlaceholderText("Enter your display name…"),
-      "test",
-    );
-
-    // Mock confirm to return false — navigation should be blocked
-    const confirmSpy = vi.spyOn(globalThis, "confirm").mockReturnValue(false);
-
-    await act(async () => {
-      await testRouter.navigate("dashboard").catch(() => {});
-    });
-
-    // User stays on settings
-    expect(
-      screen.getByRole("heading", { name: "Settings" }),
-    ).toBeInTheDocument();
-    expect(testRouter.getState()?.name).toBe("settings");
-
-    // Mock confirm to return true — navigation should proceed
-    confirmSpy.mockReturnValue(true);
-
-    await act(async () => {
-      await testRouter.navigate("dashboard");
-    });
-
-    // User navigated to dashboard (lazy-loaded)
-    await waitFor(() => {
       expect(
-        screen.getByRole("heading", { name: "Dashboard" }),
-      ).toBeInTheDocument();
+        screen.queryByRole("heading", { name: /admin/i }),
+      ).not.toBeInTheDocument();
+      expect(testRouter.getState()?.name).toBe("dashboard");
     });
+  });
 
-    expect(testRouter.getState()?.name).toBe("dashboard");
+  // ---------------------------------------------------------------------------
+  // d) canDeactivate UX
+  // ---------------------------------------------------------------------------
+  describe("canDeactivate UX", () => {
+    it("blocks navigation when confirm returns false, allows when true", async () => {
+      const user = userEvent.setup();
+
+      store.set("user", {
+        id: "1",
+        name: "Alice",
+        role: "admin" as const,
+        email: "alice@example.com",
+      });
+
+      testRouter = createRouter<AppDependencies>(privateRoutes, {
+        defaultRoute: "dashboard",
+        allowNotFound: true,
+      });
+
+      getDependenciesApi(testRouter).set("abilities", defineAbilities("admin"));
+
+      await testRouter.start("/settings");
+
+      render(
+        <RouterProvider router={testRouter}>
+          <App />
+        </RouterProvider>,
+      );
+
+      // Verify on settings page
+      expect(
+        screen.getByRole("heading", { name: "Settings" }),
+      ).toBeInTheDocument();
+
+      // Type in display name input → triggers settings:unsaved = true via useEffect
+      await user.type(
+        screen.getByPlaceholderText("Enter your display name…"),
+        "test",
+      );
+
+      // Mock confirm to return false — navigation should be blocked
+      const confirmSpy = vi.spyOn(globalThis, "confirm").mockReturnValue(false);
+
+      await act(async () => {
+        await testRouter.navigate("dashboard").catch(() => {});
+      });
+
+      // User stays on settings
+      expect(
+        screen.getByRole("heading", { name: "Settings" }),
+      ).toBeInTheDocument();
+      expect(testRouter.getState()?.name).toBe("settings");
+
+      // Mock confirm to return true — navigation should proceed
+      confirmSpy.mockReturnValue(true);
+
+      await act(async () => {
+        await testRouter.navigate("dashboard");
+      });
+
+      // User navigated to dashboard (lazy-loaded)
+      await waitFor(() => {
+        expect(
+          screen.getByRole("heading", { name: "Dashboard" }),
+        ).toBeInTheDocument();
+      });
+
+      expect(testRouter.getState()?.name).toBe("dashboard");
+    });
   });
 });

@@ -24,9 +24,11 @@ function getLabel(name: string, params: Params): string {
     return ROUTE_LABELS[name] ?? name;
   }
   if (name === "users.profile") {
-    const id = typeof params["id"] === "string" ? params["id"] : "?";
+    const id = typeof params.id === "string" ? params.id : "?";
+
     return `User #${id}`;
   }
+
   return name;
 }
 
@@ -76,6 +78,7 @@ export class UsersLayoutComponent {
     const current = this.route.routeState().route;
     const chain = this.utils.getChain(current.name) ?? [current.name];
     const names = ["home", ...chain];
+
     return names.map((name, i) => ({
       name,
       label: getLabel(name, current.params),

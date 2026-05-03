@@ -18,7 +18,7 @@ const FILTERS: Filter[] = ["all", "letter", "number", "color"];
 export function QueryDemo(): JSX.Element {
   const routeState = useRoute<{ filter?: Filter }>();
   const filter = createMemo<Filter>(
-    () => (routeState().route?.params.filter as Filter | undefined) ?? "all",
+    () => routeState().route.params.filter ?? "all",
   );
 
   const visible = createMemo(() => {
@@ -33,15 +33,15 @@ export function QueryDemo(): JSX.Element {
     <div>
       <h1>Query-only navigation</h1>
       <p>
-        Switch a filter — the page-level Motion.div does not exit/enter
-        because filter changes are same-route (
+        Switch a filter — the page-level Motion.div does not exit/enter because
+        filter changes are same-route (
         <code>route.name === nextRoute.name</code>) and{" "}
         <code>useRouteExit</code>'s default <code>skipSameRoute: true</code>{" "}
         short-circuits before the exitToken bumps. The <code>{`<For>`}</code>{" "}
-        re-renders the visible items array in place. Motion One does not
-        ship list-layout primitives, so individual items do not glide
-        between positions — for that effect in Solid, see{" "}
-        <code>page-animations/</code> → <code>useListFlip</code>.
+        re-renders the visible items array in place. Motion One does not ship
+        list-layout primitives, so individual items do not glide between
+        positions — for that effect in Solid, see <code>page-animations/</code>{" "}
+        → <code>useListFlip</code>.
       </p>
 
       <div class="qd-toolbar">

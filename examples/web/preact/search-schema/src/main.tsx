@@ -1,7 +1,7 @@
 import { browserPluginFactory } from "@real-router/browser-plugin";
 import { createRouter } from "@real-router/core";
-import { searchSchemaPlugin } from "@real-router/search-schema-plugin";
 import { RouterProvider } from "@real-router/preact";
+import { searchSchemaPlugin } from "@real-router/search-schema-plugin";
 import { render } from "preact";
 
 import { App } from "./App";

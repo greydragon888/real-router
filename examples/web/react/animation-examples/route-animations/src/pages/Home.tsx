@@ -26,8 +26,8 @@ export function Home(): JSX.Element {
           wraps <code>subscribeLeave</code> and returns a Promise; the router
           blocks until <code>getAnimations() + .finished</code> resolves. Exit
           fully completes <em>before</em> the next page mounts — no crossfade,
-          no overlap. View Transitions gives you crossfade for free; the
-          recipe gives you sequencing for free.
+          no overlap. View Transitions gives you crossfade for free; the recipe
+          gives you sequencing for free.
         </li>
         <li>
           <strong>Direction-aware slide</strong>: navigate to <em>Products</em>{" "}
@@ -35,8 +35,8 @@ export function Home(): JSX.Element {
           slide-from-left). <code>data-nav-direction</code> on{" "}
           <code>&lt;html&gt;</code> is flipped by{" "}
           <code>createDirectionTracker(router)</code> (installed in{" "}
-          <code>main.tsx</code> before <code>usePlugin(browserPlugin)</code>{" "}
-          so its popstate listener fires first).
+          <code>main.tsx</code> before <code>usePlugin(browserPlugin)</code> so
+          its popstate listener fires first).
         </li>
         <li>
           <strong>Skip on initial</strong>: reload this page — no animation on
@@ -47,8 +47,8 @@ export function Home(): JSX.Element {
           <strong>Skip same-route</strong>: click <em>Home</em> while already on
           Home — the router rejects with <code>SAME_STATES</code> and{" "}
           <code>useRouteExit</code>&apos;s default{" "}
-          <code>skipSameRoute: true</code> short-circuits sort/filter
-          query-only navigations before the handler runs.
+          <code>skipSameRoute: true</code> short-circuits sort/filter query-only
+          navigations before the handler runs.
         </li>
         <li>
           <strong>Query-only suppression + list FLIP</strong>: open{" "}
@@ -64,18 +64,17 @@ export function Home(): JSX.Element {
         <li>
           <strong>Hero morph (manual FLIP)</strong>: open <em>Products</em>,
           click a product card. <code>useHeroMorph</code> captures the
-          thumbnail&apos;s rect on <code>useRouteExit</code>; after the
-          detail page mounts, <code>navigator.subscribe</code> fires an
-          inverse-FLIP transform via the Web Animations API. Costs ~110 lines
-          of hook code that VT gives you for free via{" "}
-          <code>view-transition-name</code> pairing.
+          thumbnail&apos;s rect on <code>useRouteExit</code>; after the detail
+          page mounts, <code>navigator.subscribe</code> fires an inverse-FLIP
+          transform via the Web Animations API. Costs ~110 lines of hook code
+          that VT gives you for free via <code>view-transition-name</code>{" "}
+          pairing.
         </li>
         <li>
           <strong>Abort safety</strong>: click sidebar links rapid-fire — the{" "}
-          <code>AbortSignal</code> exposed by <code>useRouteExit</code>{" "}
-          triggers the abort-listener cleanup that strips the{" "}
-          <code>.leaving</code> class from cancelled exits — no animation
-          leaks.
+          <code>AbortSignal</code> exposed by <code>useRouteExit</code> triggers
+          the abort-listener cleanup that strips the <code>.leaving</code> class
+          from cancelled exits — no animation leaks.
         </li>
         <li>
           <strong>Reduced motion</strong>: set your OS to reduce motion —{" "}

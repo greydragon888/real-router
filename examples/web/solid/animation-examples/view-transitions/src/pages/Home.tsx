@@ -8,9 +8,9 @@ export function Home(): JSX.Element {
         This example demonstrates browser's View Transitions API integration
         with real-router via a single <code>viewTransitions</code> prop on{" "}
         <code>RouterProvider</code>. The utility blocks the router until the
-        browser has captured the old DOM snapshot, so the URL in the address
-        bar updates <em>under</em> the VT freeze frame — exit and entry
-        animations bracket the state change instead of racing ahead of it.
+        browser has captured the old DOM snapshot, so the URL in the address bar
+        updates <em>under</em> the VT freeze frame — exit and entry animations
+        bracket the state change instead of racing ahead of it.
       </p>
 
       <h2>Scenarios to try</h2>

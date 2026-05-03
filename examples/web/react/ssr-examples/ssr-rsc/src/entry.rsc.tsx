@@ -73,5 +73,4 @@ async function handler(request: Request): Promise<Response> {
   }
 }
 
-// eslint-disable-next-line import-x/no-default-export -- @vitejs/plugin-rsc requires default export with `{ fetch }` shape
 export default { fetch: handler };

@@ -71,8 +71,7 @@ export function useListFlip<T extends HTMLElement>(
         return;
       }
 
-      const items =
-        container.querySelectorAll<HTMLElement>("[data-flip-key]");
+      const items = container.querySelectorAll<HTMLElement>("[data-flip-key]");
       const current = new Map<string, Snapshot>();
 
       // Pass 1 — survivors and new items.

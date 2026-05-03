@@ -26,6 +26,7 @@ export interface UserPostsData {
 export const loaders: DataLoaderFactoryMap = {
   users: () => (params) => {
     const sort: "asc" | "desc" = params.sort === "desc" ? "desc" : "asc";
+
     return Promise.resolve<UsersListData>({
       users: database.users.list(sort),
       sort,
@@ -37,6 +38,7 @@ export const loaders: DataLoaderFactoryMap = {
     }),
   "users.profile.posts": () => (params) => {
     const id = params.id as string;
+
     return Promise.resolve<UserPostsData>({
       user: database.users.findById(id),
       posts: database.posts.listByAuthor(id),

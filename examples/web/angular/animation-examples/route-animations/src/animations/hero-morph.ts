@@ -24,8 +24,8 @@ function isHeroNavigation(fromName: string, toName: string): boolean {
 
 function pickProductId(route: State, nextRoute: State): string {
   return String(
-    (nextRoute.params["id"] as string | number | undefined) ??
-      (route.params["id"] as string | number | undefined) ??
+    (nextRoute.params.id as string | number | undefined) ??
+      (route.params.id as string | number | undefined) ??
       "",
   );
 }

@@ -14,7 +14,7 @@ const COVERS: Partial<Record<string, { name: string; color: string }>> = {
 
 export function ProductDetail(): JSX.Element {
   const routeState = useRoute<{ id: string }>();
-  const id = createMemo(() => routeState().route?.params.id ?? "1");
+  const id = createMemo(() => routeState().route.params.id);
   const product = createMemo(() => COVERS[id()]);
 
   return (
@@ -47,17 +47,15 @@ export function ProductDetail(): JSX.Element {
           />
           <p>
             The thumbnail morphed into this cover via a{" "}
-            <a href="https://aerotwist.com/blog/flip-your-animations/">
-              FLIP
-            </a>{" "}
+            <a href="https://aerotwist.com/blog/flip-your-animations/">FLIP</a>{" "}
             animation: source rect captured on leave (inside the{" "}
             <code>useRouteExit</code> handler in <code>useHeroMorph</code>),
             destination rect measured after commit (in{" "}
-            <code>navigator.subscribe</code> + <code>setTimeout(0)</code>),
-            then the delta plays via <code>element.animate()</code>. The
-            parallel <code>view-transitions/</code> example does this with
-            two CSS rules and matching <code>view-transition-name</code> —
-            the recipe pays in JS for cross-browser support.
+            <code>navigator.subscribe</code> + <code>setTimeout(0)</code>), then
+            the delta plays via <code>element.animate()</code>. The parallel{" "}
+            <code>view-transitions/</code> example does this with two CSS rules
+            and matching <code>view-transition-name</code> — the recipe pays in
+            JS for cross-browser support.
           </p>
           <p>
             <Link routeName="products" activeStrict>

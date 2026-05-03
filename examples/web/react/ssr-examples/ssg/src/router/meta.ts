@@ -23,27 +23,31 @@ export function getMetaForState(state: {
   params: Record<string, unknown>;
 }): PageMeta {
   switch (state.name) {
-    case "home":
+    case "home": {
       return {
         title: "Home — Real-Router SSG",
         description: "Welcome page of the Real-Router SSG demo.",
       };
-    case "users":
+    }
+    case "users": {
       return {
         title: "All Users — Real-Router SSG",
         description: "Browse the full list of pre-rendered users.",
       };
+    }
     case "users.profile": {
       const id = state.params.id as string | undefined;
       const user = id ? database.users.findById(id) : undefined;
       const name = user?.name ?? "Unknown user";
+
       return {
         title: `${name} — Real-Router SSG`,
         description: `Profile page for ${name} (id: ${id ?? "?"}).`,
       };
     }
-    default:
+    default: {
       return DEFAULTS;
+    }
   }
 }
 

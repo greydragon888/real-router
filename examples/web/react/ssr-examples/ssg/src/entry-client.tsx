@@ -18,13 +18,9 @@ const router = createAppRouter();
 
 router.usePlugin(browserPluginFactory(), ssrDataPluginFactory(loaders));
 
-const ssrState = window.__SSR_STATE__;
+const ssrState = globalThis.__SSR_STATE__;
 
-if (ssrState) {
-  await hydrateRouter(router, ssrState);
-} else {
-  await router.start();
-}
+await (ssrState ? hydrateRouter(router, ssrState) : router.start());
 
 const rootElement = document.querySelector("#root");
 

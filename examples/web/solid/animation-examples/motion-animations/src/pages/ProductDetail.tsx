@@ -14,7 +14,7 @@ const COVERS: Partial<Record<string, { name: string; color: string }>> = {
 
 export function ProductDetail(): JSX.Element {
   const routeState = useRoute<{ id: string }>();
-  const id = createMemo(() => routeState().route?.params.id ?? "1");
+  const id = createMemo(() => routeState().route.params.id);
   const product = createMemo(() => COVERS[id()]);
 
   return (
@@ -38,14 +38,12 @@ export function ProductDetail(): JSX.Element {
             aria-hidden="true"
           />
           <p>
-            Note: no library-driven hero morph here. Motion One does not
-            ship <code>layoutId</code>, so the thumbnail's coloured
-            square cannot be paired with this cover via a single prop.
-            For an inverse-FLIP hero morph in Solid, see{" "}
-            <code>route-animations/</code> →{" "}
-            <code>useHeroMorph</code>: capture rect on{" "}
-            <code>useRouteExit</code>, animate via WAAPI on{" "}
-            <code>navigator.subscribe</code>.
+            Note: no library-driven hero morph here. Motion One does not ship{" "}
+            <code>layoutId</code>, so the thumbnail's coloured square cannot be
+            paired with this cover via a single prop. For an inverse-FLIP hero
+            morph in Solid, see <code>route-animations/</code> →{" "}
+            <code>useHeroMorph</code>: capture rect on <code>useRouteExit</code>
+            , animate via WAAPI on <code>navigator.subscribe</code>.
           </p>
           <p>
             <Link routeName="products" activeStrict>

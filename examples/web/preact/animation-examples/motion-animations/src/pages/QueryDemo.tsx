@@ -31,10 +31,10 @@ export function QueryDemo() {
         <code>&lt;motion.li layout&gt;</code>, newcomers fade in via{" "}
         <code>initial</code> / <code>animate</code>, and items removed by a
         narrowing filter fade out via the inner{" "}
-        <code>&lt;AnimatePresence mode=&quot;popLayout&quot;&gt;</code>{" "}
-        wrapping the list. <code>popLayout</code> pulls exiting items from
-        the layout flow immediately so survivors can reflow into the new
-        positions while the removed ones fade in place.
+        <code>&lt;AnimatePresence mode=&quot;popLayout&quot;&gt;</code> wrapping
+        the list. <code>popLayout</code> pulls exiting items from the layout
+        flow immediately so survivors can reflow into the new positions while
+        the removed ones fade in place.
       </p>
 
       <div className="qd-toolbar">

@@ -1,13 +1,13 @@
 import { browserPluginFactory } from "@real-router/browser-plugin";
 import { createRouter } from "@real-router/core";
+import { lifecyclePluginFactory } from "@real-router/lifecycle-plugin";
 import { loggerPluginFactory } from "@real-router/logger-plugin";
 import { persistentParamsPluginFactory } from "@real-router/persistent-params-plugin";
+import { preloadPluginFactory } from "@real-router/preload-plugin";
 import { searchSchemaPlugin } from "@real-router/search-schema-plugin";
 import { mount } from "svelte";
 
 import App from "./App.svelte";
-import { lifecyclePluginFactory } from "@real-router/lifecycle-plugin";
-import { preloadPluginFactory } from "@real-router/preload-plugin";
 import { publicRoutes } from "./routes";
 
 import type { AppDependencies } from "./types";

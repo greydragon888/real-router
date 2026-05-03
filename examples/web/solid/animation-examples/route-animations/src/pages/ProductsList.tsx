@@ -24,7 +24,7 @@ export function ProductsList(): JSX.Element {
   const routeState = useRoute<{ sort?: SortDirection }>();
 
   const sort = createMemo<SortDirection>(() =>
-    routeState().route?.params.sort === "desc" ? "desc" : "asc",
+    routeState().route.params.sort === "desc" ? "desc" : "asc",
   );
 
   const items = createMemo(() => {
@@ -40,11 +40,11 @@ export function ProductsList(): JSX.Element {
       <h1>Products</h1>
       <p>
         Click a product card to see the manual hero-morph: the thumbnail's
-        bounding rect is captured before leave, an inverse-FLIP transform
-        on the destination cover after the new page mounts. Compare with
-        the parallel <code>view-transitions/</code> example, where the
-        browser pairs <code>view-transition-name</code> values and animates
-        for you in two CSS rules.
+        bounding rect is captured before leave, an inverse-FLIP transform on the
+        destination cover after the new page mounts. Compare with the parallel{" "}
+        <code>view-transitions/</code> example, where the browser pairs{" "}
+        <code>view-transition-name</code> values and animates for you in two CSS
+        rules.
       </p>
 
       <div class="products-toolbar">

@@ -50,8 +50,8 @@ export function ProductsList(): JSX.Element {
       <p>
         Click a product to see the detail. Each page (this list and the detail)
         registers its own <code>useRouteAnimation</code> hook on its wrapper —
-        slide-out for the list&apos;s exit, fade-in for the detail&apos;s
-        entry, no shared shell, no centralised policy.
+        slide-out for the list&apos;s exit, fade-in for the detail&apos;s entry,
+        no shared shell, no centralised policy.
       </p>
 
       <div className="products-toolbar">

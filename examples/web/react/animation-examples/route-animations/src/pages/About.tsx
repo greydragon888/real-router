@@ -52,10 +52,10 @@ export function About(): JSX.Element {
           a pixel-level crossfade between snapshots, so identical regions (e.g.
           a header that does not change) are visually static. With CSS recipes,
           everything inside the leaving root fades — there is no concept of
-          &quot;identical region stays static&quot; because we never compare
-          old and new DOM. To approximate persistence, you would have to mount
-          the persistent content above the animation root, but cross-route
-          shared content is then outside the leave-window entirely.
+          &quot;identical region stays static&quot; because we never compare old
+          and new DOM. To approximate persistence, you would have to mount the
+          persistent content above the animation root, but cross-route shared
+          content is then outside the leave-window entirely.
         </li>
         <li>
           <strong>Crossfade between routes</strong>: the recipe is sequential. A
@@ -92,8 +92,8 @@ export function About(): JSX.Element {
       <h2>The recipe internals</h2>
       <p>
         Three thin hooks own the app&apos;s animation behavior, each calling{" "}
-        <code>useRouteExit</code> from <code>@real-router/react</code> once
-        with its own recipe:
+        <code>useRouteExit</code> from <code>@real-router/react</code> once with
+        its own recipe:
       </p>
       <ul>
         <li>
@@ -103,10 +103,10 @@ export function About(): JSX.Element {
           <code>getAnimations() + .finished</code> promises, strips the class.
         </li>
         <li>
-          <code>useHeroMorph</code> (~110 LOC) — captures the source thumb
-          rect on <code>useRouteExit</code>, plays an inverse-FLIP transform
-          on the destination cover after commit (via{" "}
-          <code>navigator.subscribe</code>) using the Web Animations API.
+          <code>useHeroMorph</code> (~110 LOC) — captures the source thumb rect
+          on <code>useRouteExit</code>, plays an inverse-FLIP transform on the
+          destination cover after commit (via <code>navigator.subscribe</code>)
+          using the Web Animations API.
         </li>
         <li>
           <code>useListFlip</code> (~230 LOC) — same-route reorder + ghost

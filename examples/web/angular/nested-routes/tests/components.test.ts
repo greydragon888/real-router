@@ -10,131 +10,137 @@ import type { Router } from "@real-router/core";
 
 let testRouter: Router;
 
-afterEach(() => {
-  testRouter.stop();
-});
-
-async function setupApp(url: string) {
-  testRouter = createRouter(routes, {
-    defaultRoute: "home",
-    allowNotFound: true,
-  });
-  await testRouter.start(url);
-
-  TestBed.configureTestingModule({
-    imports: [AppComponent],
-    providers: [provideRealRouter(testRouter)],
+describe("angular/nested-routes — components", () => {
+  afterEach(() => {
+    testRouter.stop();
   });
 
-  const fixture = TestBed.createComponent(AppComponent);
-  fixture.detectChanges();
-  await fixture.whenStable();
-  return fixture;
-}
+  async function setupApp(url: string) {
+    testRouter = createRouter(routes, {
+      defaultRoute: "home",
+      allowNotFound: true,
+    });
+    await testRouter.start(url);
 
-describe("Per-user sub-navigation appearance", () => {
-  it("shows per-user sidebar (Profile, Settings) when on users.profile.*", async () => {
-    const fixture = await setupApp("/users/1");
+    TestBed.configureTestingModule({
+      imports: [AppComponent],
+      providers: [provideRealRouter(testRouter)],
+    });
 
-    const host = fixture.nativeElement as HTMLElement;
-    const profileLink = host.querySelector("a[href='/users/1']");
-    const settingsLink = host.querySelector("a[href='/users/1/settings']");
+    const fixture = TestBed.createComponent(AppComponent);
 
-    expect(profileLink).not.toBeNull();
-    expect(settingsLink).not.toBeNull();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    return fixture;
+  }
+
+  describe("Per-user sub-navigation appearance", () => {
+    it("shows per-user sidebar (Profile, Settings) when on users.profile.*", async () => {
+      const fixture = await setupApp("/users/1");
+
+      const host = fixture.nativeElement as HTMLElement;
+      const profileLink = host.querySelector("a[href='/users/1']");
+      const settingsLink = host.querySelector("a[href='/users/1/settings']");
+
+      expect(profileLink).not.toBeNull();
+      expect(settingsLink).not.toBeNull();
+    });
+
+    it("does not show per-user sidebar on the users list page", async () => {
+      const fixture = await setupApp("/users");
+
+      const host = fixture.nativeElement as HTMLElement;
+
+      expect(host.textContent).toMatch(/Users/);
+      expect(host.querySelector("a[href='/users/1/settings']")).toBeNull();
+    });
+
+    it("does not show per-user sidebar on home page", async () => {
+      const fixture = await setupApp("/");
+
+      const host = fixture.nativeElement as HTMLElement;
+
+      expect(host.textContent).toMatch(/Home/);
+      expect(host.querySelector("a[href='/users/1']")).toBeNull();
+      expect(host.querySelector("a[href='/users/1/settings']")).toBeNull();
+    });
   });
 
-  it("does not show per-user sidebar on the users list page", async () => {
-    const fixture = await setupApp("/users");
+  describe("Active link classes", () => {
+    it("outer sidebar 'Users' has active class on users", async () => {
+      const fixture = await setupApp("/users");
 
-    const host = fixture.nativeElement as HTMLElement;
-    expect(host.textContent).toMatch(/Users/);
-    expect(host.querySelector("a[href='/users/1/settings']")).toBeNull();
+      const host = fixture.nativeElement as HTMLElement;
+      const sidebar = host.querySelector("aside.sidebar");
+      const usersLink = sidebar?.querySelector("a[href='/users']");
+      const homeLink = sidebar?.querySelector("a[href='/']");
+
+      expect(usersLink?.classList.contains("active")).toBe(true);
+      expect(homeLink?.classList.contains("active")).toBe(false);
+    });
+
+    it("outer sidebar 'Users' stays active on users.profile", async () => {
+      const fixture = await setupApp("/users/1");
+
+      const host = fixture.nativeElement as HTMLElement;
+      const sidebar = host.querySelector("aside.sidebar");
+      const usersLink = sidebar?.querySelector("a[href='/users']");
+
+      expect(usersLink?.classList.contains("active")).toBe(true);
+    });
+
+    it("per-user sidebar Profile link is active on /users/:id, Settings is not", async () => {
+      const fixture = await setupApp("/users/1");
+
+      const host = fixture.nativeElement as HTMLElement;
+      const profileLink = host.querySelector("a[href='/users/1']");
+      const settingsLink = host.querySelector("a[href='/users/1/settings']");
+
+      expect(profileLink?.classList.contains("active")).toBe(true);
+      expect(settingsLink?.classList.contains("active")).toBe(false);
+    });
+
+    it("per-user sidebar Settings link becomes active on /users/:id/settings", async () => {
+      const fixture = await setupApp("/users/1/settings");
+
+      const host = fixture.nativeElement as HTMLElement;
+      const profileLink = host.querySelector("a[href='/users/1']");
+      const settingsLink = host.querySelector("a[href='/users/1/settings']");
+
+      expect(settingsLink?.classList.contains("active")).toBe(true);
+      expect(profileLink?.classList.contains("active")).toBe(false);
+    });
   });
 
-  it("does not show per-user sidebar on home page", async () => {
-    const fixture = await setupApp("/");
+  describe("Breadcrumbs", () => {
+    it("shows breadcrumb trail on users", async () => {
+      const fixture = await setupApp("/users");
 
-    const host = fixture.nativeElement as HTMLElement;
-    expect(host.textContent).toMatch(/Home/);
-    expect(host.querySelector("a[href='/users/1']")).toBeNull();
-    expect(host.querySelector("a[href='/users/1/settings']")).toBeNull();
-  });
-});
+      const host = fixture.nativeElement as HTMLElement;
+      const breadcrumb = host.querySelector("nav.breadcrumbs");
 
-describe("Active link classes", () => {
-  it("outer sidebar 'Users' has active class on users", async () => {
-    const fixture = await setupApp("/users");
+      expect(breadcrumb?.textContent).toMatch(/Home/);
+      expect(breadcrumb?.textContent).toMatch(/Users/);
+    });
 
-    const host = fixture.nativeElement as HTMLElement;
-    const sidebar = host.querySelector("aside.sidebar");
-    const usersLink = sidebar?.querySelector("a[href='/users']");
-    const homeLink = sidebar?.querySelector("a[href='/']");
+    it("shows user ID in breadcrumb on users.profile", async () => {
+      const fixture = await setupApp("/users/2");
 
-    expect(usersLink?.classList.contains("active")).toBe(true);
-    expect(homeLink?.classList.contains("active")).toBe(false);
-  });
+      const host = fixture.nativeElement as HTMLElement;
+      const breadcrumb = host.querySelector("nav.breadcrumbs");
 
-  it("outer sidebar 'Users' stays active on users.profile", async () => {
-    const fixture = await setupApp("/users/1");
+      expect(breadcrumb?.textContent).toMatch(/User #2/);
+    });
 
-    const host = fixture.nativeElement as HTMLElement;
-    const sidebar = host.querySelector("aside.sidebar");
-    const usersLink = sidebar?.querySelector("a[href='/users']");
+    it("shows User #id > Settings on /users/:id/settings", async () => {
+      const fixture = await setupApp("/users/3/settings");
 
-    expect(usersLink?.classList.contains("active")).toBe(true);
-  });
+      const host = fixture.nativeElement as HTMLElement;
+      const breadcrumb = host.querySelector("nav.breadcrumbs");
 
-  it("per-user sidebar Profile link is active on /users/:id, Settings is not", async () => {
-    const fixture = await setupApp("/users/1");
-
-    const host = fixture.nativeElement as HTMLElement;
-    const profileLink = host.querySelector("a[href='/users/1']");
-    const settingsLink = host.querySelector("a[href='/users/1/settings']");
-
-    expect(profileLink?.classList.contains("active")).toBe(true);
-    expect(settingsLink?.classList.contains("active")).toBe(false);
-  });
-
-  it("per-user sidebar Settings link becomes active on /users/:id/settings", async () => {
-    const fixture = await setupApp("/users/1/settings");
-
-    const host = fixture.nativeElement as HTMLElement;
-    const profileLink = host.querySelector("a[href='/users/1']");
-    const settingsLink = host.querySelector("a[href='/users/1/settings']");
-
-    expect(settingsLink?.classList.contains("active")).toBe(true);
-    expect(profileLink?.classList.contains("active")).toBe(false);
-  });
-});
-
-describe("Breadcrumbs", () => {
-  it("shows breadcrumb trail on users", async () => {
-    const fixture = await setupApp("/users");
-
-    const host = fixture.nativeElement as HTMLElement;
-    const breadcrumb = host.querySelector("nav.breadcrumbs");
-
-    expect(breadcrumb?.textContent).toMatch(/Home/);
-    expect(breadcrumb?.textContent).toMatch(/Users/);
-  });
-
-  it("shows user ID in breadcrumb on users.profile", async () => {
-    const fixture = await setupApp("/users/2");
-
-    const host = fixture.nativeElement as HTMLElement;
-    const breadcrumb = host.querySelector("nav.breadcrumbs");
-
-    expect(breadcrumb?.textContent).toMatch(/User #2/);
-  });
-
-  it("shows User #id > Settings on /users/:id/settings", async () => {
-    const fixture = await setupApp("/users/3/settings");
-
-    const host = fixture.nativeElement as HTMLElement;
-    const breadcrumb = host.querySelector("nav.breadcrumbs");
-
-    expect(breadcrumb?.textContent).toMatch(/User #3/);
-    expect(breadcrumb?.textContent).toMatch(/Settings/);
+      expect(breadcrumb?.textContent).toMatch(/User #3/);
+      expect(breadcrumb?.textContent).toMatch(/Settings/);
+    });
   });
 });

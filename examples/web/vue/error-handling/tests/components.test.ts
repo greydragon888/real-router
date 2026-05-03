@@ -12,90 +12,92 @@ import type { PluginFactory, Router } from "@real-router/core";
 
 let testRouter: Router;
 
-afterEach(() => {
-  testRouter.stop();
-  vi.useRealTimers();
-});
-
-function renderErrorPanel() {
-  const Wrapper = defineComponent({
-    setup() {
-      return () =>
-        h(
-          RouterProvider,
-          { router: testRouter },
-          { default: () => h(ErrorPanel) },
-        );
-    },
-  });
-
-  return render(Wrapper);
-}
-
-describe("ErrorPanel — plugin log in UI", () => {
-  it("shows 'no errors yet' initially", async () => {
-    testRouter = createRouter(routes, {
-      defaultRoute: "home",
-      allowNotFound: true,
-    });
-    await testRouter.start("/");
-
-    renderErrorPanel();
-
-    expect(screen.getByText(/no errors yet/i)).toBeInTheDocument();
-  });
-
-  it("displays CANNOT_ACTIVATE after guard rejection", async () => {
-    const errorLoggerPlugin: PluginFactory = () => ({
-      onTransitionError(_toState, _fromState, err) {
-        errorStore.add(err);
-      },
-    });
-
-    testRouter = createRouter(routes, {
-      defaultRoute: "home",
-      allowNotFound: true,
-    });
-    testRouter.usePlugin(errorLoggerPlugin);
-    await testRouter.start("/");
-
-    renderErrorPanel();
-
-    await testRouter.navigate("protected").catch(() => {});
-
-    await waitFor(() => {
-      expect(screen.getByText("CANNOT_ACTIVATE")).toBeInTheDocument();
-    });
-  });
-
-  it("displays TRANSITION_CANCELLED after competing navigation", async () => {
-    const errorLoggerPlugin: PluginFactory = () => ({
-      onTransitionCancel(toState, fromState) {
-        errorStore.addCancel(toState, fromState);
-      },
-    });
-
-    testRouter = createRouter(routes, {
-      defaultRoute: "home",
-      allowNotFound: true,
-    });
-    testRouter.usePlugin(errorLoggerPlugin);
-    await testRouter.start("/");
-
-    renderErrorPanel();
-
-    vi.useFakeTimers();
-
-    const firstNav = testRouter.navigate("slow");
-
-    testRouter.navigate("about").catch(() => {});
-    await vi.advanceTimersByTimeAsync(5000);
-    await firstNav.catch(() => {});
-
+describe("vue/error-handling — components", () => {
+  afterEach(() => {
+    testRouter.stop();
     vi.useRealTimers();
+  });
 
-    await waitFor(() => {
-      expect(screen.getByText("TRANSITION_CANCELLED")).toBeInTheDocument();
+  function renderErrorPanel() {
+    const Wrapper = defineComponent({
+      setup() {
+        return () =>
+          h(
+            RouterProvider,
+            { router: testRouter },
+            { default: () => h(ErrorPanel) },
+          );
+      },
+    });
+
+    return render(Wrapper);
+  }
+
+  describe("ErrorPanel — plugin log in UI", () => {
+    it("shows 'no errors yet' initially", async () => {
+      testRouter = createRouter(routes, {
+        defaultRoute: "home",
+        allowNotFound: true,
+      });
+      await testRouter.start("/");
+
+      renderErrorPanel();
+
+      expect(screen.getByText(/no errors yet/i)).toBeInTheDocument();
+    });
+
+    it("displays CANNOT_ACTIVATE after guard rejection", async () => {
+      const errorLoggerPlugin: PluginFactory = () => ({
+        onTransitionError(_toState, _fromState, err) {
+          errorStore.add(err);
+        },
+      });
+
+      testRouter = createRouter(routes, {
+        defaultRoute: "home",
+        allowNotFound: true,
+      });
+      testRouter.usePlugin(errorLoggerPlugin);
+      await testRouter.start("/");
+
+      renderErrorPanel();
+
+      await testRouter.navigate("protected").catch(() => {});
+
+      await waitFor(() => {
+        expect(screen.getByText("CANNOT_ACTIVATE")).toBeInTheDocument();
+      });
+    });
+
+    it("displays TRANSITION_CANCELLED after competing navigation", async () => {
+      const errorLoggerPlugin: PluginFactory = () => ({
+        onTransitionCancel(toState, fromState) {
+          errorStore.addCancel(toState, fromState);
+        },
+      });
+
+      testRouter = createRouter(routes, {
+        defaultRoute: "home",
+        allowNotFound: true,
+      });
+      testRouter.usePlugin(errorLoggerPlugin);
+      await testRouter.start("/");
+
+      renderErrorPanel();
+
+      vi.useFakeTimers();
+
+      const firstNav = testRouter.navigate("slow");
+
+      testRouter.navigate("about").catch(() => {});
+      await vi.advanceTimersByTimeAsync(5000);
+      await firstNav.catch(() => {});
+
+      vi.useRealTimers();
+
+      await waitFor(() => {
+        expect(screen.getByText("TRANSITION_CANCELLED")).toBeInTheDocument();
+      });
     });
   });
 });

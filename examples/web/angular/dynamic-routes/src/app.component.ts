@@ -124,7 +124,10 @@ export class AppComponent {
 
   readonly routeTree = () => {
     const lines = ["home (/)", "about (/about)"];
-    if (this.analyticsEnabled()) lines.push("analytics (/analytics)");
+
+    if (this.analyticsEnabled()) {
+      lines.push("analytics (/analytics)");
+    }
     if (this.adminEnabled()) {
       lines.push(
         "admin (/admin)",
@@ -132,6 +135,7 @@ export class AppComponent {
         "  admin.settings (/settings)",
       );
     }
+
     return lines.join("\n");
   };
 
@@ -140,6 +144,7 @@ export class AppComponent {
       if (this.route.routeState().route.name.startsWith("analytics")) {
         await this.navigator.navigate("home");
       }
+
       this.routesApi.remove("analytics");
       this.analyticsEnabled.set(false);
     } else {
@@ -153,6 +158,7 @@ export class AppComponent {
       if (this.route.routeState().route.name.startsWith("admin")) {
         await this.navigator.navigate("home");
       }
+
       this.routesApi.remove("admin");
       this.adminEnabled.set(false);
     } else {

@@ -22,8 +22,12 @@ import { useStringParam } from "../use-params";
         }}
       </p>
       <div class="card">
-        <p>Active lang: <strong>{{ lang() }}</strong></p>
-        <p>Active theme: <strong>{{ theme() }}</strong></p>
+        <p>
+          Active lang: <strong>{{ lang() }}</strong>
+        </p>
+        <p>
+          Active theme: <strong>{{ theme() }}</strong>
+        </p>
       </div>
     </div>
   `,

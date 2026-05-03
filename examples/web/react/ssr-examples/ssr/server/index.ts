@@ -27,7 +27,11 @@ async function startServer(): Promise<void> {
     render: (
       url: string,
       ctx: {
-        currentUser: { id: string; name: string; role: "admin" | "user" } | null;
+        currentUser: {
+          id: string;
+          name: string;
+          role: "admin" | "user";
+        } | null;
       },
     ) => Promise<{
       html: string;

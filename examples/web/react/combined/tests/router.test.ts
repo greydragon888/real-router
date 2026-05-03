@@ -195,6 +195,7 @@ describe("Custom plugin — lifecyclePluginFactory", () => {
     await vi.advanceTimersByTimeAsync(300);
 
     expect(store.get("products:loading")).toBe(false);
+    // eslint-disable-next-line vitest/prefer-strict-equal -- arrayContaining/objectContaining matchers require .toEqual
     expect(store.get("products")).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: "Laptop" }),

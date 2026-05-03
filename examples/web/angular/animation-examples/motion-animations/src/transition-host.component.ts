@@ -50,10 +50,7 @@ const ENTERING_CLASS = "entering";
   // `getAnimations()` returns `[]`, so `Promise.allSettled([])`
   // resolves synchronously — the router never blocks.
   template: `
-    <div
-      class="page"
-      (animationend)="onAnimationEnd($event)"
-    >
+    <div class="page" (animationend)="onAnimationEnd($event)">
       <route-view [routeNode]="''">
         <ng-template routeMatch="home"><home-page /></ng-template>
         <ng-template routeMatch="products">
@@ -106,7 +103,9 @@ export class TransitionHostComponent {
         // getAnimations() in the same task.
         wrapper.getBoundingClientRect();
         await Promise.allSettled(
-          wrapper.getAnimations().map((animation: Animation) => animation.finished),
+          wrapper
+            .getAnimations()
+            .map((animation: Animation) => animation.finished),
         );
       } finally {
         cleanup();
@@ -128,7 +127,9 @@ export class TransitionHostComponent {
     if (event.target !== event.currentTarget) {
       return;
     }
+
     const wrapper = this.getWrapper();
+
     if (wrapper) {
       wrapper.classList.remove(ENTERING_CLASS);
     }

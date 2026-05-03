@@ -45,11 +45,8 @@ export function App(): JSX.Element {
         */}
         <motion.div
           key={exitToken}
-          // eslint-disable-next-line id-length -- `x` is motion's transform-X axis, library API
           initial={{ opacity: 0, x: 20 }}
-          // eslint-disable-next-line id-length
           animate={{ opacity: 1, x: 0 }}
-          // eslint-disable-next-line id-length
           exit={{ opacity: 0, x: -20 }}
           transition={{ duration: 0.9, ease: [0.4, 0, 0.2, 1] }}
         >

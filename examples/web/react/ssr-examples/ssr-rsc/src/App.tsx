@@ -45,13 +45,19 @@ export function App({ router, payload }: AppProps): ReactNode {
           return createFromReadableStream<ReactNode>(response.body);
         })
         .then((newNode) => {
-          if (controller.signal.aborted) return;
+          if (controller.signal.aborted) {
+            return;
+          }
+
           startTransition(() => {
             setNode(newNode);
           });
         })
         .catch((error: unknown) => {
-          if (controller.signal.aborted) return;
+          if (controller.signal.aborted) {
+            return;
+          }
+
           console.error("[App] /__rsc fetch failed:", error);
         });
     });

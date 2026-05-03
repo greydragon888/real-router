@@ -1,6 +1,8 @@
-import { Component, OnDestroy, effect, signal } from "@angular/core";
+import { Component, effect, signal } from "@angular/core";
 
 import { store } from "../../../../../shared/store";
+
+import type { OnDestroy } from "@angular/core";
 
 @Component({
   selector: "settings-page",
@@ -18,7 +20,8 @@ import { store } from "../../../../../shared/store";
         </div>
         @if (displayName()) {
           <p style="color: #c62828; font-size: 14px;">
-            Unsaved changes — navigating away triggers <code>canDeactivate</code>.
+            Unsaved changes — navigating away triggers
+            <code>canDeactivate</code>.
           </p>
         }
         <button class="primary" style="margin-top: 8px;">Save</button>

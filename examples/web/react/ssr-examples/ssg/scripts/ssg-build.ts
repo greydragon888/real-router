@@ -99,6 +99,7 @@ if (failed.length > 0) {
     console.error(`  ${url}: ${error}`);
   }
 
+  // eslint-disable-next-line unicorn/no-process-exit -- CLI build script
   process.exit(1);
 }
 
@@ -108,6 +109,7 @@ if (failed.length > 0) {
 // /404.html for unknown paths automatically when present in the build output.
 const notFound = await render("/__nonexistent");
 const notFoundHtml = renderPage(notFound, { withSsrState: false });
+
 writeFileSync(path.resolve(dist, "404.html"), notFoundHtml);
 console.log(`  /__nonexistent → dist/404.html (not-found template)`);
 
@@ -115,13 +117,15 @@ console.log(`  /__nonexistent → dist/404.html (not-found template)`);
 const sitemap = [
   '<?xml version="1.0" encoding="UTF-8"?>',
   '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-  ...paths.map(
-    (url) =>
-      `  <url><loc>${escapeHtml(`${SITE_ORIGIN}${url}`)}</loc></url>`,
-  ),
+  ...paths.map((url) => {
+    const fullUrl = `${SITE_ORIGIN}${url}`;
+
+    return `  <url><loc>${escapeHtml(fullUrl)}</loc></url>`;
+  }),
   "</urlset>",
   "",
 ].join("\n");
+
 writeFileSync(path.resolve(dist, "sitemap.xml"), sitemap);
 console.log(`  sitemap.xml → ${paths.length} URLs`);
 

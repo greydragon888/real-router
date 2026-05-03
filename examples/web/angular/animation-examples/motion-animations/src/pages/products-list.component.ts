@@ -24,13 +24,12 @@ type SortDirection = "asc" | "desc";
   template: `
     <h1>Products</h1>
     <p>
-      Click a product card to see the page-level transition: the list
-      slides out, the detail page slides in. There is no library
+      Click a product card to see the page-level transition: the list slides
+      out, the detail page slides in. There is no library
       <code>layoutId</code> hero morph in this Angular example — the
-      <code>page</code> wrapper's CSS keyframes are per-element
-      entry/exit only. For cross-component hero morphs in Angular,
-      see <code>route-animations/</code> →
-      <code>installHeroMorph</code>.
+      <code>page</code> wrapper's CSS keyframes are per-element entry/exit only.
+      For cross-component hero morphs in Angular, see
+      <code>route-animations/</code> → <code>installHeroMorph</code>.
     </p>
 
     <div class="products-toolbar">
@@ -43,7 +42,7 @@ type SortDirection = "asc" | "desc";
       >
         A → Z
       </a>
-      {{ ' · ' }}
+      {{ " · " }}
       <a
         realLink
         routeName="products"
@@ -52,8 +51,8 @@ type SortDirection = "asc" | "desc";
       >
         Z → A
       </a>
-      {{ ' · ' }}
-      <strong>current: {{ sort() }}</strong>
+      {{ " · " }}
+      <strong>current: {{ sortDirection() }}</strong>
     </div>
 
     <ul class="product-list">
@@ -79,16 +78,17 @@ type SortDirection = "asc" | "desc";
 export class ProductsListComponent {
   private readonly state = injectRoute<{ sort?: SortDirection }>();
 
-  readonly sort = computed<SortDirection>(() => {
+  readonly sortDirection = computed<SortDirection>(() => {
     const params = this.state.routeState().route.params;
-    return params?.["sort"] === "desc" ? "desc" : "asc";
+
+    return params?.sort === "desc" ? "desc" : "asc";
   });
 
   readonly items = computed(() => {
-    const sorted = [...PRODUCTS].sort((left, right) =>
+    const sorted = PRODUCTS.toSorted((left, right) =>
       left.name.localeCompare(right.name),
     );
 
-    return this.sort() === "desc" ? sorted.reverse() : sorted;
+    return this.sortDirection() === "desc" ? sorted.toReversed() : sorted;
   });
 }

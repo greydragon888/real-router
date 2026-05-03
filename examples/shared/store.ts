@@ -2,24 +2,24 @@ const data = new Map<string, unknown>();
 const listeners = new Set<() => void>();
 
 export const store = {
-  get: (key: string) => data.get(key),
-  set: (key: string, value: unknown) => {
+  get: (key: string): unknown => data.get(key),
+  set: (key: string, value: unknown): void => {
     data.set(key, value);
-    listeners.forEach((fn) => {
-      fn();
+    listeners.forEach((listener) => {
+      listener();
     });
   },
-  subscribe: (fn: () => void) => {
-    listeners.add(fn);
+  subscribe: (listener: () => void): (() => void) => {
+    listeners.add(listener);
 
-    return () => {
-      listeners.delete(fn);
+    return (): void => {
+      listeners.delete(listener);
     };
   },
-  clear: () => {
+  clear: (): void => {
     data.clear();
-    listeners.forEach((fn) => {
-      fn();
+    listeners.forEach((listener) => {
+      listener();
     });
   },
 };
