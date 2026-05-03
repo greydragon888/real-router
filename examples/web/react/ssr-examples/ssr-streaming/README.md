@@ -122,8 +122,8 @@ Compare with:
 
 ## See Also
 
-- [`@real-router/ssr-data-plugin`](../../../../packages/ssr-data-plugin) — per-route critical data loading
-- [`examples/web/react/ssr/`](../ssr) — classical SSR (no streaming) precedent
-- [`examples/web/react/ssr-rsc/`](../ssr-rsc) — React Server Components + Flight streaming via `@real-router/rsc-server-plugin`
+- [`@real-router/ssr-data-plugin`](../../../../../packages/ssr-data-plugin) — per-route critical data loading
+- [`examples/web/react/ssr-examples/ssr/`](../ssr) — classical SSR (no streaming) precedent
+- [`examples/web/react/ssr-examples/ssr-rsc/`](../ssr-rsc) — React Server Components + Flight streaming via `@real-router/rsc-server-plugin`
 - [Wiki: Streaming SSR](https://github.com/greydragon888/real-router/wiki/Streaming-SSR) — full design rationale
 - React 19 docs: [`renderToReadableStream`](https://react.dev/reference/react-dom/server/renderToReadableStream), [`use(promise)`](https://react.dev/reference/react/use), [`<Suspense>`](https://react.dev/reference/react/Suspense)

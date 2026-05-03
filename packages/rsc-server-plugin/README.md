@@ -139,7 +139,7 @@ In SSR, `router.dispose()` handles cleanup automatically.
 
 ## Example
 
-- [examples/web/react/ssr-rsc](../../examples/web/react/ssr-rsc) — End-to-end dogfooding example: Express + `@vitejs/plugin-rsc` + this plugin, with Flight injection, client navigation via `/__rsc?route=…`, and revalidation. 5-scenario Playwright suite covering initial HTML load, client nav, revalidation, 404, and per-request isolation under concurrent load.
+- [examples/web/react/ssr-examples/ssr-rsc](../../examples/web/react/ssr-examples/ssr-rsc) — End-to-end dogfooding example: Express + `@vitejs/plugin-rsc` + this plugin, with Flight injection, client navigation via `/__rsc?route=…`, and revalidation. 5-scenario Playwright suite covering initial HTML load, client nav, revalidation, 404, and per-request isolation under concurrent load.
 
 ## Documentation
 

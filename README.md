@@ -197,7 +197,7 @@ Runs in **browser, terminal (Ink), and desktop (Electron, Tauri)** — same rout
 SSR works naturally: `cloneRouter()` per request, `start(url)` to resolve, `dispose()` to clean up.
 Data loading plugs in via interceptors without touching the transition pipeline.
 SSG is the same loop at build time — `getStaticPaths()` enumerates routes, `cloneRouter()` + `renderToString()` per URL.
-See the [SSR example](examples/web/react/ssr) and [SSG example](examples/web/react/ssg).
+See the [SSR example](examples/web/react/ssr-examples/ssr) and [SSG example](examples/web/react/ssr-examples/ssg).
 
 ### Performance
 
@@ -256,7 +256,7 @@ The Segment Trie matcher traverses in O(segments), not O(routes).
 ### Key Features
 
 - **Framework-agnostic** — React, Preact, Solid, Vue, Svelte, Angular, or vanilla JS
-- **Universal** — client-side, server-side rendering ([SSR example](examples/web/react/ssr)), and static site generation ([SSG example](examples/web/react/ssg))
+- **Universal** — client-side, server-side rendering ([SSR example](examples/web/react/ssr-examples/ssr)), and static site generation ([SSG example](examples/web/react/ssr-examples/ssg))
 - **Named nested routes** — dot-notation hierarchy (`users.profile`)
 - **Lifecycle guards** — `canActivate` / `canDeactivate` per route or globally
 - **AbortController** — cancel navigations via standard `AbortSignal`
@@ -438,8 +438,8 @@ Full documentation is available in the [Wiki](https://github.com/greydragon888/r
 - [Server-Side Rendering](https://github.com/greydragon888/real-router/wiki/ssr) — `cloneRouter` per request, `start(url)` resolution, `dispose()` cleanup
 - [SSR Hydration](https://github.com/greydragon888/real-router/wiki/SSR-Hydration) — `serializeRouterState` + `hydrateRouter` round-trip, `excludeContext` for non-serializable namespaces
 - [Data Loading](https://github.com/greydragon888/real-router/wiki/Data-Loading) — `ssr-data-plugin` for plain JSON, fetcher patterns
-- [**Streaming SSR**](https://github.com/greydragon888/real-router/wiki/Streaming-SSR) — React 19 `renderToReadableStream` + `<Suspense>` + `use(promise)` for deferred sections. Zero router-specific API — pure delegation to React 19 native primitives. Reference: [`examples/web/react/ssr-streaming/`](examples/web/react/ssr-streaming)
-- [**RSC Integration**](https://github.com/greydragon888/real-router/wiki/RSC-Integration) — React Server Components end-to-end: `@vitejs/plugin-rsc` setup, two-endpoint architecture (HTML + `/__rsc`), Flight injection, client mount. Reference implementation: [`examples/web/react/ssr-rsc/`](examples/web/react/ssr-rsc)
+- [**Streaming SSR**](https://github.com/greydragon888/real-router/wiki/Streaming-SSR) — React 19 `renderToReadableStream` + `<Suspense>` + `use(promise)` for deferred sections. Zero router-specific API — pure delegation to React 19 native primitives. Reference: [`examples/web/react/ssr-examples/ssr-streaming/`](examples/web/react/ssr-examples/ssr-streaming)
+- [**RSC Integration**](https://github.com/greydragon888/real-router/wiki/RSC-Integration) — React Server Components end-to-end: `@vitejs/plugin-rsc` setup, two-endpoint architecture (HTML + `/__rsc`), Flight injection, client mount. Reference implementation: [`examples/web/react/ssr-examples/ssr-rsc/`](examples/web/react/ssr-examples/ssr-rsc)
 
 ## Examples
 
@@ -461,7 +461,7 @@ Many runnable examples across the most popular frameworks — each is a standalo
 | Combined (all features) | [combined](examples/web/react/combined)                                                                           | [combined](examples/web/preact/combined)                   | [combined](examples/web/solid/combined)                                                                                                                                   | [combined](examples/web/vue/combined)                                                                                                                 | [combined](examples/web/svelte/combined)                                                                                                                                                                             |
 | **Framework-specific**  | [keepAlive](examples/web/react/keepAlive), [legacy-entry](examples/web/react/legacy-entry), [hmr](examples/web/react/hmr), [ink-demo](examples/console/react-ink) | —                                                      | [store-based-state](examples/web/solid/store-based-state), [use-link-directive](examples/web/solid/use-link-directive), [signal-primitives](examples/web/solid/signal-primitives) | [plugin-installation](examples/web/vue/plugin-installation), [v-link-directive](examples/web/vue/v-link-directive), [keep-alive](examples/web/vue/keep-alive) | [link-action](examples/web/svelte/link-action), [lazy-loading-svelte](examples/web/svelte/lazy-loading-svelte), [snippets-routing](examples/web/svelte/snippets-routing), [reactive-source](examples/web/svelte/reactive-source) |
 
-| **Server rendering** | [ssr](examples/web/react/ssr) — Express + Vite SSR, [ssr-streaming](examples/web/react/ssr-streaming) — React 19 `renderToReadableStream` + `<Suspense>` + `use(promise)` (no router-specific API), [ssr-rsc](examples/web/react/ssr-rsc) — RSC + Flight streaming via [@vitejs/plugin-rsc](https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-rsc) + [@real-router/rsc-server-plugin](packages/rsc-server-plugin), [ssg](examples/web/react/ssg) — Static site generation |
+| **Server rendering** ([examples/web/react/ssr-examples/](examples/web/react/ssr-examples)) | [ssr](examples/web/react/ssr-examples/ssr) — Express + Vite SSR, [ssr-streaming](examples/web/react/ssr-examples/ssr-streaming) — React 19 `renderToReadableStream` + `<Suspense>` + `use(promise)` (no router-specific API), [ssr-rsc](examples/web/react/ssr-examples/ssr-rsc) — RSC + Flight streaming via [@vitejs/plugin-rsc](https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-rsc) + [@real-router/rsc-server-plugin](packages/rsc-server-plugin), [ssg](examples/web/react/ssr-examples/ssg) — Static site generation |
 
 | **Terminal UI (Ink)** | [ink-demo](examples/console/react-ink) — CLI app via [@real-router/react/ink](packages/react/README.md#ink-terminal-ui) + memory-plugin |
 

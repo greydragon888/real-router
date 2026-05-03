@@ -64,7 +64,7 @@ navigation-plugin and browser-plugin are **interchangeable** (not complementary)
 
 ## Out of scope
 
-- **SSR + hydration** — covered by `examples/web/react/ssr/` and `ssg/`. The utility is a no-op in SSR (`typeof window === "undefined"` early-return).
+- **SSR + hydration** — covered by `examples/web/react/ssr-examples/ssr/` and `ssr-examples/ssg/`. The utility is a no-op in SSR (`typeof window === "undefined"` early-return).
 - **Keep-alive virtual lists** — not part of #497.
 - **Multiple nested `scrollContainer`** — not supported by the utility (one container per RouterProvider).
 - **Other 5 framework adapters** — basic opt-in is already in `examples/web/{preact,solid,vue,svelte,angular}/basic/`; syntax differs only by template form. Wiki has copy-paste blocks for all 6 adapters.

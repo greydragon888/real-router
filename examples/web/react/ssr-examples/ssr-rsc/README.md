@@ -95,9 +95,9 @@ In dev mode, [`server/dev.ts`](server/dev.ts) creates a `createServerModuleRunne
 
 ## See Also
 
-- [@real-router/rsc-server-plugin](../../../../packages/rsc-server-plugin) — the plugin itself (Variant B: ReactNode payload, bundler-agnostic)
-- [@real-router/ssr-data-plugin](../../../../packages/ssr-data-plugin) — sibling plugin for plain JSON data
-- [examples/web/react/ssr](../ssr) — classical SSR (no RSC) precedent
-- [.claude/rfc-rsc-vite-example.md](../../../../.claude/rfc-rsc-vite-example.md) — RFC + design rationale + Stage 0 spike findings
+- [@real-router/rsc-server-plugin](../../../../../packages/rsc-server-plugin) — the plugin itself (Variant B: ReactNode payload, bundler-agnostic)
+- [@real-router/ssr-data-plugin](../../../../../packages/ssr-data-plugin) — sibling plugin for plain JSON data
+- [examples/web/react/ssr-examples/ssr](../ssr) — classical SSR (no RSC) precedent
+- [.claude/rfc-rsc-vite-example.md](../../../../../.claude/rfc-rsc-vite-example.md) — RFC + design rationale + Stage 0 spike findings
 - [@vitejs/plugin-rsc](https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-rsc) — multi-environment RSC bundler
 - [rsc-html-stream](https://github.com/devongovett/rsc-html-stream) — Flight injection library (server + client)

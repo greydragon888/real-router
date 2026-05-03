@@ -2718,20 +2718,20 @@ importers:
         specifier: 7.3.2
         version: 7.3.2(@types/node@25.6.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(tsx@4.21.0)(yaml@2.8.3)
 
-  examples/web/react/ssg:
+  examples/web/react/ssr-examples/ssg:
     dependencies:
       '@real-router/browser-plugin':
         specifier: workspace:^
-        version: link:../../../../packages/browser-plugin
+        version: link:../../../../../packages/browser-plugin
       '@real-router/core':
         specifier: workspace:^
-        version: link:../../../../packages/core
+        version: link:../../../../../packages/core
       '@real-router/react':
         specifier: workspace:^
-        version: link:../../../../packages/react
+        version: link:../../../../../packages/react
       '@real-router/ssr-data-plugin':
         specifier: workspace:^
-        version: link:../../../../packages/ssr-data-plugin
+        version: link:../../../../../packages/ssr-data-plugin
       react:
         specifier: 19.2.0
         version: 19.2.0
@@ -2764,20 +2764,20 @@ importers:
         specifier: 7.3.2
         version: 7.3.2(@types/node@25.6.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(tsx@4.21.0)(yaml@2.8.3)
 
-  examples/web/react/ssr:
+  examples/web/react/ssr-examples/ssr:
     dependencies:
       '@real-router/browser-plugin':
         specifier: workspace:^
-        version: link:../../../../packages/browser-plugin
+        version: link:../../../../../packages/browser-plugin
       '@real-router/core':
         specifier: workspace:^
-        version: link:../../../../packages/core
+        version: link:../../../../../packages/core
       '@real-router/react':
         specifier: workspace:^
-        version: link:../../../../packages/react
+        version: link:../../../../../packages/react
       '@real-router/ssr-data-plugin':
         specifier: workspace:^
-        version: link:../../../../packages/ssr-data-plugin
+        version: link:../../../../../packages/ssr-data-plugin
       express:
         specifier: 5.1.0
         version: 5.1.0
@@ -2816,20 +2816,20 @@ importers:
         specifier: 7.3.2
         version: 7.3.2(@types/node@25.6.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(tsx@4.21.0)(yaml@2.8.3)
 
-  examples/web/react/ssr-rsc:
+  examples/web/react/ssr-examples/ssr-rsc:
     dependencies:
       '@real-router/browser-plugin':
         specifier: workspace:^
-        version: link:../../../../packages/browser-plugin
+        version: link:../../../../../packages/browser-plugin
       '@real-router/core':
         specifier: workspace:^
-        version: link:../../../../packages/core
+        version: link:../../../../../packages/core
       '@real-router/react':
         specifier: workspace:^
-        version: link:../../../../packages/react
+        version: link:../../../../../packages/react
       '@real-router/rsc-server-plugin':
         specifier: workspace:^
-        version: link:../../../../packages/rsc-server-plugin
+        version: link:../../../../../packages/rsc-server-plugin
       express:
         specifier: 5.1.0
         version: 5.1.0
@@ -2871,20 +2871,20 @@ importers:
         specifier: 7.3.2
         version: 7.3.2(@types/node@25.6.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(tsx@4.21.0)(yaml@2.8.3)
 
-  examples/web/react/ssr-streaming:
+  examples/web/react/ssr-examples/ssr-streaming:
     dependencies:
       '@real-router/browser-plugin':
         specifier: workspace:^
-        version: link:../../../../packages/browser-plugin
+        version: link:../../../../../packages/browser-plugin
       '@real-router/core':
         specifier: workspace:^
-        version: link:../../../../packages/core
+        version: link:../../../../../packages/core
       '@real-router/react':
         specifier: workspace:^
-        version: link:../../../../packages/react
+        version: link:../../../../../packages/react
       '@real-router/ssr-data-plugin':
         specifier: workspace:^
-        version: link:../../../../packages/ssr-data-plugin
+        version: link:../../../../../packages/ssr-data-plugin
       express:
         specifier: 5.1.0
         version: 5.1.0
