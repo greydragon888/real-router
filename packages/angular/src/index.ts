@@ -1,5 +1,15 @@
 export { provideRealRouter, ROUTER, NAVIGATOR, ROUTE } from "./providers";
 
+export type { RealRouterOptions } from "./providers";
+
+export { provideRealRouterFactory } from "./providersFactory";
+
+export type {
+  RealRouterFactoryOptions,
+  RequestDepsFactory,
+  RequestPluginsFactory,
+} from "./providersFactory";
+
 export { sourceToSignal } from "./sourceToSignal";
 
 export {
