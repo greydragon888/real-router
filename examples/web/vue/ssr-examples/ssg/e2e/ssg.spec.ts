@@ -278,4 +278,110 @@ test.describe("SSG (Vue)", () => {
       }),
     );
   });
+
+  test("ssgServe middleware 301-redirects extensionless paths to trailing-slash form", async ({
+    request,
+  }) => {
+    // vite.config.ts ships a custom configurePreviewServer plugin that
+    // 301-redirects requests like /users/1 → /users/1/ so vite preview can
+    // serve dist/users/1/index.html. Without it, /users/1 hits the SPA
+    // fallback (or 404) on static hosts that don't auto-resolve directories.
+    const cases = [
+      { from: "/users/1", to: "/users/1/" },
+      { from: "/users/2", to: "/users/2/" },
+      { from: "/users", to: "/users/" },
+    ];
+
+    for (const { from, to } of cases) {
+      const response = await request.get(from, { maxRedirects: 0 });
+
+      expect(response.status(), `GET ${from}`).toBe(301);
+      expect(response.headers().location, `Location for ${from}`).toBe(to);
+    }
+
+    // Files with extensions are NOT redirected (e.g. /sitemap.xml, /404.html).
+    const xml = await request.get("/sitemap.xml", { maxRedirects: 0 });
+
+    expect(xml.status()).toBe(200);
+  });
+
+  test("CSR navigation to dynamic route: state.context.data is undefined post-navigate (SSR-only plugin contract)", async ({
+    page,
+  }) => {
+    // /users initial visit: hydrateRouter calls start("/users") → loader runs
+    // → state.context.data is populated. Alice/Bob/Charlie render normally.
+    await page.goto("/users/");
+    await page.waitForLoadState("networkidle");
+    await expect(page.locator("main")).toContainText("Alice");
+
+    // Inject marker before CSR navigation to prove no full reload happens.
+    await page.evaluate(() => {
+      (
+        globalThis as unknown as Window & { __NAV_MARKER__?: boolean }
+      ).__NAV_MARKER__ = true;
+    });
+
+    // Click "Alice" — Link triggers router.navigate() (CSR, browser-plugin).
+    // ssr-data-plugin intercepts start(), NOT navigate(), so the
+    // users.profile loader DOES NOT run. UserProfile reads
+    // route.value.context.data, finds undefined, renders "User not found".
+    await page.click("text=Alice");
+    await expect(page).toHaveURL(/\/users\/1\/?$/);
+    await expect(page.locator("main")).toContainText("User not found");
+
+    // Marker survived → no reload happened, this was a CSR transition.
+    const marker = await page.evaluate(
+      () =>
+        (globalThis as unknown as Window & { __NAV_MARKER__?: boolean })
+          .__NAV_MARKER__,
+    );
+
+    expect(marker).toBe(true);
+  });
+
+  test("pre-rendered HTML references client bundle via absolute path", async ({
+    request,
+  }) => {
+    // Nested URLs (/users/1/) must reference the bundle by absolute path
+    // (/assets/...). A relative-path script tag would resolve against the
+    // current directory and break hydration on every nested page.
+    const paths = ["/", "/users/", "/users/1/", "/users/2/", "/users/3/"];
+
+    for (const path of paths) {
+      const response = await request.get(path);
+      const html = await response.text();
+
+      expect(html, `${path} script tag absolute`).toMatch(
+        /<script [^>]*src="\/assets\//,
+      );
+      // No accidental relative paths.
+      expect(html, `${path} no relative ./assets`).not.toMatch(
+        /<script [^>]*src="\.\/assets\//,
+      );
+      expect(html, `${path} no parent ../assets`).not.toMatch(
+        /<script [^>]*src="\.\.\/assets\//,
+      );
+    }
+  });
+
+  test("nested deep-link has no flash: profile content visible immediately and survives hydration", async ({
+    page,
+  }) => {
+    // The pre-rendered file dist/users/1/index.html contains the resolved
+    // profile UI. After the document commits, "Alice" should be in the DOM
+    // before any client JS executes — and stay there after hydration runs.
+    await page.goto("/users/1/", { waitUntil: "commit" });
+
+    await expect(page.locator("main")).toContainText("Alice");
+    await expect(page.locator("main")).toContainText("ID: 1");
+    await expect(page.locator("main")).toContainText("Name: Alice");
+
+    await page.waitForLoadState("networkidle");
+
+    // Still visible after hydration — no flicker, no replacement with
+    // "User not found" (which would happen if hydrateRouter mismatched).
+    await expect(page.locator("main")).toContainText("Alice");
+    await expect(page.locator("main")).toContainText("ID: 1");
+    await expect(page.locator("main")).toContainText("Name: Alice");
+  });
 });
