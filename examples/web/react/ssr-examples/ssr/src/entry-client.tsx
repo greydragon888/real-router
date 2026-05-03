@@ -8,22 +8,48 @@ import { App } from "./App";
 import { createAppRouter } from "./router/createAppRouter";
 import { loaders } from "./router/loaders";
 
+import type { CurrentUser } from "./entry-server";
+
 declare global {
   interface Window {
     __SSR_STATE__?: { path: string };
   }
 }
 
+// Mirrors server/_auth.ts: parse cookie → currentUser. Kept minimal because
+// the client only needs the same DI value the server fed canActivate guards
+// during SSR — otherwise post-hydration guard checks would diverge.
+const KNOWN_USERS: Record<string, CurrentUser> = {
+  "1": { id: "1", name: "Alice", role: "admin" },
+  "2": { id: "2", name: "Bob", role: "user" },
+};
+
+function getCurrentUserFromDocument(): CurrentUser | null {
+  const cookies = Object.fromEntries(
+    document.cookie
+      .split(";")
+      .map((p) => p.trim())
+      .filter(Boolean)
+      .map((p) => {
+        const idx = p.indexOf("=");
+        return idx === -1
+          ? ([p, ""] as const)
+          : ([p.slice(0, idx), p.slice(idx + 1)] as const);
+      }),
+  );
+
+  const userId = cookies["userId"];
+  if (userId && KNOWN_USERS[userId]) return KNOWN_USERS[userId];
+  if (cookies["auth"] === "1") return KNOWN_USERS["1"] ?? null;
+  return null;
+}
+
 const router = createAppRouter({
-  isAuthenticated: document.cookie.includes("auth=1"),
+  currentUser: getCurrentUserFromDocument(),
 });
 
 router.usePlugin(browserPluginFactory(), ssrDataPluginFactory(loaders));
 
-// Hydration (#563): use server's canonical state.path. serializeRouterState
-// strips state.transition (regenerated on commit) but keeps name/params/path
-// — only `path` is needed by hydrateRouter, the rest of the payload is
-// available to app code for reading state.context.<namespace> if needed.
 const ssrState = window.__SSR_STATE__;
 
 if (ssrState) {

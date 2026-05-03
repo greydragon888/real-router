@@ -139,9 +139,9 @@ test.describe("SSR", () => {
 
     expect(ssrState.name).toBe("users");
     expect(ssrState.context?.data?.users).toEqual([
-      { id: "1", name: "Alice" },
-      { id: "2", name: "Bob" },
-      { id: "3", name: "Charlie" },
+      { id: "1", name: "Alice", role: "admin" },
+      { id: "2", name: "Bob", role: "user" },
+      { id: "3", name: "Charlie", role: "user" },
     ]);
 
     await context.close();
@@ -168,7 +168,11 @@ test.describe("SSR", () => {
     };
 
     expect(ssrState.params).toEqual({ id: "2" });
-    expect(ssrState.context?.data?.user).toEqual({ id: "2", name: "Bob" });
+    expect(ssrState.context?.data?.user).toEqual({
+      id: "2",
+      name: "Bob",
+      role: "user",
+    });
 
     await context.close();
   });
@@ -334,5 +338,140 @@ test.describe("SSR", () => {
     const items = page.locator('[data-user-id]');
 
     await expect(items).toHaveCount(0);
+  });
+
+  test("query params: ?sort=desc reverses the user list via loader", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ javaScriptEnabled: false });
+    const page = await context.newPage();
+
+    const response = await page.goto("/users?sort=desc");
+    const html = await response!.text();
+
+    // current sort label visible
+    expect(html).toContain("Sorted: ");
+    expect(html).toMatch(/data-testid="current-sort"[^>]*>[^<]*<!--[^>]*>desc/);
+
+    // Charlie is first in desc order, then Bob, then Alice.
+    const charlieIdx = html.indexOf("Charlie");
+    const bobIdx = html.indexOf("Bob");
+    const aliceIdx = html.indexOf("Alice");
+
+    expect(charlieIdx).toBeGreaterThan(-1);
+    expect(charlieIdx).toBeLessThan(bobIdx);
+    expect(bobIdx).toBeLessThan(aliceIdx);
+
+    // __SSR_STATE__ carries sort=desc in params + sort label in data
+    const ssrStateMatch = html.match(/window\.__SSR_STATE__=({.*?})<\/script>/);
+    const ssrState = JSON.parse(ssrStateMatch![1]) as {
+      params: { sort?: string };
+      context?: { data?: { sort?: string } };
+    };
+
+    expect(ssrState.params.sort).toBe("desc");
+    expect(ssrState.context?.data?.sort).toBe("desc");
+
+    await context.close();
+  });
+
+  test("nested loader: /users/1/posts populates state.context.data with posts", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ javaScriptEnabled: false });
+    const page = await context.newPage();
+
+    const response = await page.goto("/users/1/posts");
+    const html = await response!.text();
+
+    expect(html).toContain('data-testid="user-profile"');
+    expect(html).toContain('data-testid="user-posts"');
+    expect(html).toMatch(/data-post-id="p1"[^>]*>[^<]*Hello world/);
+    expect(html).toMatch(/data-post-id="p2"[^>]*>[^<]*On routing/);
+
+    const ssrStateMatch = html.match(/window\.__SSR_STATE__=({.*?})<\/script>/);
+    const ssrState = JSON.parse(ssrStateMatch![1]) as {
+      name: string;
+      params: { id: string };
+      context?: {
+        data?: {
+          user?: { id: string; name: string; role: string };
+          posts?: { id: string; authorId: string; title: string }[];
+        };
+      };
+    };
+
+    expect(ssrState.name).toBe("users.profile.posts");
+    expect(ssrState.params.id).toBe("1");
+    // Leaf loader returns combined user + posts.
+    expect(ssrState.context?.data?.user).toEqual({
+      id: "1",
+      name: "Alice",
+      role: "admin",
+    });
+    expect(ssrState.context?.data?.posts).toEqual([
+      { id: "p1", authorId: "1", title: "Hello world" },
+      { id: "p2", authorId: "1", title: "On routing" },
+    ]);
+
+    await context.close();
+  });
+
+  test("nested loader: /users/3/posts returns empty posts array", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ javaScriptEnabled: false });
+    const page = await context.newPage();
+
+    const response = await page.goto("/users/3/posts");
+    const html = await response!.text();
+
+    expect(html).toContain('data-testid="user-posts-empty"');
+
+    await context.close();
+  });
+
+  test("admin guard: anonymous → /admin redirects to /; admin user → /admin renders Admin page", async ({
+    page,
+  }) => {
+    await page.goto("/admin");
+    await expect(page).toHaveURL(/\/$/);
+
+    await page
+      .context()
+      .addCookies([
+        { name: "userId", value: "1", url: "http://localhost:3000" },
+      ]);
+
+    await page.goto("/admin");
+    await expect(page).toHaveURL(/\/admin$/);
+    await expect(page.getByTestId("admin-page")).toBeVisible();
+  });
+
+  test("admin guard: non-admin (Bob) → /admin redirects to / (role check)", async ({
+    page,
+  }) => {
+    await page
+      .context()
+      .addCookies([
+        { name: "userId", value: "2", url: "http://localhost:3000" },
+      ]);
+
+    await page.goto("/admin");
+    await expect(page).toHaveURL(/\/$/);
+  });
+
+  test("dashboard guard: userId=2 (non-admin) still allowed (currentUser != null)", async ({
+    page,
+  }) => {
+    await page
+      .context()
+      .addCookies([
+        { name: "userId", value: "2", url: "http://localhost:3000" },
+      ]);
+
+    await page.goto("/dashboard");
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page.locator("main")).toContainText("Dashboard");
   });
 });

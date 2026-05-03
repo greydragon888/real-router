@@ -11,8 +11,14 @@ import { loaders } from "./router/loaders";
 
 const baseRouter = createAppRouter();
 
+export interface CurrentUser {
+  id: string;
+  name: string;
+  role: "admin" | "user";
+}
+
 interface RenderContext {
-  isAuthenticated: boolean;
+  currentUser: CurrentUser | null;
 }
 
 interface RenderResult {
@@ -35,7 +41,7 @@ export async function render(
   context: RenderContext,
 ): Promise<RenderResult> {
   const router = cloneRouter(baseRouter, {
-    isAuthenticated: context.isAuthenticated,
+    currentUser: context.currentUser,
   });
 
   router.usePlugin(ssrDataPluginFactory(loaders));

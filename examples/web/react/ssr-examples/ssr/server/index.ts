@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 
 import express from "express";
 
+import { getCurrentUserFromCookies } from "./_auth";
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
 
@@ -24,7 +26,9 @@ async function startServer(): Promise<void> {
   )) as {
     render: (
       url: string,
-      ctx: { isAuthenticated: boolean },
+      ctx: {
+        currentUser: { id: string; name: string; role: "admin" | "user" } | null;
+      },
     ) => Promise<{
       html: string;
       serializedData: string;
@@ -35,9 +39,9 @@ async function startServer(): Promise<void> {
 
   app.get("/{*path}", async (request, response) => {
     const url = request.originalUrl;
-    const isAuthenticated = request.headers.cookie?.includes("auth=1") ?? false;
+    const currentUser = getCurrentUserFromCookies(request.headers.cookie);
 
-    const result = await module_.render(url, { isAuthenticated });
+    const result = await module_.render(url, { currentUser });
 
     if (result.redirect) {
       response.redirect(result.redirect);

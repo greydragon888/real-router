@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { createServer as createViteServer } from "vite";
 
+import { getCurrentUserFromCookies } from "./_auth";
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
 
@@ -32,7 +34,13 @@ async function startServer(): Promise<void> {
       const module_ = (await vite.ssrLoadModule("/src/entry-server.tsx")) as {
         render: (
           url: string,
-          ctx: { isAuthenticated: boolean },
+          ctx: {
+            currentUser: {
+              id: string;
+              name: string;
+              role: "admin" | "user";
+            } | null;
+          },
         ) => Promise<{
           html: string;
           serializedData: string;
@@ -41,10 +49,9 @@ async function startServer(): Promise<void> {
         }>;
       };
 
-      const isAuthenticated =
-        request.headers.cookie?.includes("auth=1") ?? false;
+      const currentUser = getCurrentUserFromCookies(request.headers.cookie);
 
-      const result = await module_.render(url, { isAuthenticated });
+      const result = await module_.render(url, { currentUser });
 
       if (result.redirect) {
         response.redirect(result.redirect);

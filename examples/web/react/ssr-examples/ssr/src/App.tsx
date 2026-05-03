@@ -1,5 +1,6 @@
 import { Link, RouteView } from "@real-router/react";
 
+import { Admin } from "./pages/Admin";
 import { Dashboard } from "./pages/Dashboard";
 import { Home } from "./pages/Home";
 import { NotFound } from "./pages/NotFound";
@@ -17,6 +18,10 @@ export function App(): JSX.Element {
         <Link routeName="users">Users</Link>
         {" | "}
         <Link routeName="dashboard">Dashboard</Link>
+        {" | "}
+        <Link routeName="admin" data-testid="nav-admin">
+          Admin
+        </Link>
       </nav>
       <main>
         <RouteView nodeName="">
@@ -36,6 +41,9 @@ export function App(): JSX.Element {
           </RouteView.Match>
           <RouteView.Match segment="dashboard">
             <Dashboard />
+          </RouteView.Match>
+          <RouteView.Match segment="admin">
+            <Admin />
           </RouteView.Match>
           <RouteView.NotFound>
             <NotFound />
