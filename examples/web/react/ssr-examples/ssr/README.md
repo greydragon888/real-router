@@ -51,7 +51,9 @@ Client (once):
     → hydrateRoot(<RouterProvider><App /></RouterProvider>)
 ```
 
-The client-side `ssrDataPluginFactory` registration is intentional: after hydration, every subsequent client navigation re-runs the loader so `state.context.data` is always populated. SSR-only intercept means the loader fires only on `start(url)`, not on every `navigate()` — but `hydrateRouter` invokes `start` once at hydration time.
+The client-side `ssrDataPluginFactory` registration handles **hydration only**: `hydrateRouter(router, ssrState)` calls `router.start(state.path)` once, and the plugin's `start` interceptor re-runs the loader on the client to repopulate `state.context.data`. This guarantees the post-hydration component tree sees the same data the server rendered — no flash, no mismatch.
+
+**SSR-only by design:** the plugin intercepts `start()`, **not** `navigate()`. After hydration, subsequent `<Link>` clicks (or `router.navigate()` calls) do NOT re-run loaders. Routes visited via client navigation see `state.context.data` from whatever was last set by `start`/hydration — for routes never resolved during initial SSR, `state.context.data` is `undefined`. Application code that needs fresh data on client navigation has three options: (a) use `router.navigate(name, params, { reload: true })` to bypass `SAME_STATES` and trigger a fresh resolution flow (note: this still does not invoke the `start` interceptor), (b) layer a CSR data-fetching library (TanStack Query, SWR) on top, or (c) trigger a full reload via native `<a href>`. For the SSR demo here, the loader's data is always present after the initial `start` because every public route has a loader entry; the limitation surfaces only when navigating client-side to a route whose data wasn't in the initial SSR snapshot.
 
 ## Running
 

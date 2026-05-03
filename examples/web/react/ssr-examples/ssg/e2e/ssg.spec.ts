@@ -82,4 +82,87 @@ test.describe("SSG", () => {
 
     expect(marker).toBe(true);
   });
+
+  test("loader output is baked into static HTML and __SSR_STATE__", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ javaScriptEnabled: false });
+    const page = await context.newPage();
+
+    const response = await page.goto("/users");
+    const html = await response!.text();
+
+    // 1. HTML body has loader's resolved users — pure static, no JS.
+    expect(html).toMatch(/Alice/);
+    expect(html).toMatch(/Bob/);
+    expect(html).toMatch(/Charlie/);
+
+    // 2. __SSR_STATE__ JSON carries state.context.data verbatim.
+    const ssrStateMatch = html.match(/window\.__SSR_STATE__=({.*?})<\/script>/);
+
+    expect(ssrStateMatch?.[1]).toBeDefined();
+
+    const ssrState = JSON.parse(ssrStateMatch![1]) as {
+      name: string;
+      path: string;
+      context?: { data?: { users?: { id: string; name: string }[] } };
+    };
+
+    expect(ssrState.name).toBe("users");
+    expect(ssrState.path).toBe("/users");
+    expect(ssrState.context?.data?.users).toEqual([
+      { id: "1", name: "Alice" },
+      { id: "2", name: "Bob" },
+      { id: "3", name: "Charlie" },
+    ]);
+
+    await context.close();
+  });
+
+  test("dynamic-route loader output is baked into __SSR_STATE__ per pre-rendered URL", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ javaScriptEnabled: false });
+    const page = await context.newPage();
+
+    for (const id of ["1", "2", "3"]) {
+      const response = await page.goto(`/users/${id}`);
+      const html = await response!.text();
+      const ssrStateMatch = html.match(
+        /window\.__SSR_STATE__=({.*?})<\/script>/,
+      );
+
+      expect(ssrStateMatch?.[1]).toBeDefined();
+
+      const ssrState = JSON.parse(ssrStateMatch![1]) as {
+        params: { id: string };
+        context?: { data?: { user?: { id: string; name: string } } };
+      };
+
+      expect(ssrState.params.id).toBe(id);
+      expect(ssrState.context?.data?.user?.id).toBe(id);
+      expect(ssrState.context?.data?.user?.name).toBeDefined();
+    }
+
+    await context.close();
+  });
+
+  test("build determinism: every pre-rendered HTML embeds canonical __SSR_STATE__ shape", async ({
+    request,
+  }) => {
+    const paths = ["/", "/users", "/users/1", "/users/2", "/users/3"];
+
+    for (const path of paths) {
+      const response = await request.get(path);
+
+      expect(response.status(), `GET ${path}`).toBe(200);
+
+      const html = await response.text();
+
+      expect(html, `${path} __SSR_STATE__ presence`).toContain(
+        "window.__SSR_STATE__",
+      );
+      expect(html, `${path} no transition`).not.toContain('"transition"');
+    }
+  });
 });

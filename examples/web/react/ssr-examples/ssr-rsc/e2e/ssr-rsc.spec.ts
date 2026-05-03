@@ -145,4 +145,68 @@ test.describe("RSC SSR Example", () => {
       }),
     );
   });
+
+  test("Scenario 6: Flight payload carries router state via __SSR_STATE__ (rsc namespace excluded)", async ({
+    request,
+  }) => {
+    const response = await request.get("/users/1", {
+      headers: { Accept: "text/html" },
+    });
+    const html = await response.text();
+
+    // Unlike ssr/ssg/ssr-streaming, the RSC example injects __SSR_STATE__ via
+    // React's bootstrapScriptContent (executed before client modules load),
+    // so the inline script ends with a semicolon and the next statement —
+    // not a closing </script> tag. Match a greedy JSON object up to `;`.
+    const ssrStateMatch = html.match(
+      /window\.__SSR_STATE__=({(?:[^{}]|{[^{}]*})*});/,
+    );
+
+    expect(ssrStateMatch?.[1]).toBeDefined();
+
+    const ssrState = JSON.parse(ssrStateMatch![1]) as {
+      name: string;
+      params: { id: string };
+      context?: { rsc?: unknown; data?: unknown };
+    };
+
+    expect(ssrState.name).toBe("users.profile");
+    expect(ssrState.params).toEqual({ id: "1" });
+    // rsc-server-plugin's namespace MUST be excluded from JSON transport —
+    // ReactNode is not JSON-serializable; Flight payload travels separately.
+    expect(ssrState.context?.rsc).toBeUndefined();
+  });
+
+  test("Scenario 7: /__rsc Flight stream returns text/x-component for matched routes", async ({
+    request,
+  }) => {
+    const response = await request.get("/__rsc?route=%2Fusers%2F1");
+
+    expect(response.status()).toBe(200);
+    expect(response.headers()["content-type"]).toContain("text/x-component");
+
+    const body = await response.text();
+
+    // Flight payload is binary-ish but stringifies to a structure containing
+    // the loader's resolved data (user name, email visible in serialized form).
+    expect(body).toContain("Alice Anderson");
+    expect(body).toContain("alice@example.com");
+  });
+
+  test("Scenario 8: SSR HTML reflects loader-driven Server Component output (Flight desuspended)", async ({
+    request,
+  }) => {
+    const response = await request.get("/users/2");
+    const html = await response.text();
+
+    // The Server Component <UserProfile user={...}> rendered with
+    // loader output → values must appear in raw HTML (no JS executed).
+    expect(html).toContain('data-testid="user-profile"');
+    expect(html).toContain('data-user-id="2"');
+    expect(html).toContain("Bob Brown");
+    expect(html).toContain("bob@example.com");
+
+    // Flight chunks for the same content are inline-injected for client takeover.
+    expect(html).toContain("self.__FLIGHT_DATA");
+  });
 });
