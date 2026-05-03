@@ -3534,6 +3534,126 @@ importers:
         specifier: 2.11.11
         version: 2.11.11(@testing-library/jest-dom@6.9.1)(solid-js@1.9.5)(vite@7.3.2(@types/node@25.6.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(tsx@4.21.0)(yaml@2.8.3))
 
+  examples/web/solid/ssr-examples/ssg:
+    dependencies:
+      '@real-router/browser-plugin':
+        specifier: workspace:^
+        version: link:../../../../../packages/browser-plugin
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../../../../../packages/core
+      '@real-router/solid':
+        specifier: workspace:^
+        version: link:../../../../../packages/solid
+      '@real-router/ssr-data-plugin':
+        specifier: workspace:^
+        version: link:../../../../../packages/ssr-data-plugin
+      solid-js:
+        specifier: 1.9.5
+        version: 1.9.5
+    devDependencies:
+      '@playwright/test':
+        specifier: 1.58.2
+        version: 1.58.2
+      '@types/node':
+        specifier: 25.6.0
+        version: 25.6.0
+      tsx:
+        specifier: 4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vite:
+        specifier: 7.3.2
+        version: 7.3.2(@types/node@25.6.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(tsx@4.21.0)(yaml@2.8.3)
+      vite-plugin-solid:
+        specifier: 2.11.11
+        version: 2.11.11(@testing-library/jest-dom@6.9.1)(solid-js@1.9.5)(vite@7.3.2(@types/node@25.6.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(tsx@4.21.0)(yaml@2.8.3))
+
+  examples/web/solid/ssr-examples/ssr:
+    dependencies:
+      '@real-router/browser-plugin':
+        specifier: workspace:^
+        version: link:../../../../../packages/browser-plugin
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../../../../../packages/core
+      '@real-router/solid':
+        specifier: workspace:^
+        version: link:../../../../../packages/solid
+      '@real-router/ssr-data-plugin':
+        specifier: workspace:^
+        version: link:../../../../../packages/ssr-data-plugin
+      express:
+        specifier: 5.1.0
+        version: 5.1.0
+      solid-js:
+        specifier: 1.9.5
+        version: 1.9.5
+    devDependencies:
+      '@playwright/test':
+        specifier: 1.58.2
+        version: 1.58.2
+      '@types/express':
+        specifier: 5.0.6
+        version: 5.0.6
+      '@types/node':
+        specifier: 25.6.0
+        version: 25.6.0
+      tsx:
+        specifier: 4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vite:
+        specifier: 7.3.2
+        version: 7.3.2(@types/node@25.6.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(tsx@4.21.0)(yaml@2.8.3)
+      vite-plugin-solid:
+        specifier: 2.11.11
+        version: 2.11.11(@testing-library/jest-dom@6.9.1)(solid-js@1.9.5)(vite@7.3.2(@types/node@25.6.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(tsx@4.21.0)(yaml@2.8.3))
+
+  examples/web/solid/ssr-examples/ssr-streaming:
+    dependencies:
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../../../../../packages/core
+      '@real-router/solid':
+        specifier: workspace:^
+        version: link:../../../../../packages/solid
+      '@real-router/ssr-data-plugin':
+        specifier: workspace:^
+        version: link:../../../../../packages/ssr-data-plugin
+      express:
+        specifier: 5.1.0
+        version: 5.1.0
+      solid-js:
+        specifier: 1.9.5
+        version: 1.9.5
+    devDependencies:
+      '@playwright/test':
+        specifier: 1.58.2
+        version: 1.58.2
+      '@types/express':
+        specifier: 5.0.6
+        version: 5.0.6
+      '@types/node':
+        specifier: 25.6.0
+        version: 25.6.0
+      tsx:
+        specifier: 4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vite:
+        specifier: 7.3.2
+        version: 7.3.2(@types/node@25.6.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(tsx@4.21.0)(yaml@2.8.3)
+      vite-plugin-solid:
+        specifier: 2.11.11
+        version: 2.11.11(@testing-library/jest-dom@6.9.1)(solid-js@1.9.5)(vite@7.3.2(@types/node@25.6.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(tsx@4.21.0)(yaml@2.8.3))
+
   examples/web/solid/store-based-state:
     dependencies:
       '@real-router/browser-plugin':

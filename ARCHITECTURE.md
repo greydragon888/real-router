@@ -58,11 +58,9 @@ real-router/
 │   ├── shared/                    # Shared store, API, abilities, styles
 │   ├── react/    (18 examples)    # React 19.2+ examples (incl. ink-demo for @real-router/react/ink) + 9 e2e suites
 │   ├── preact/   (12 examples)    # Preact examples + 9 e2e suites
-│   ├── solid/    (15 examples)    # Solid.js examples + 9 e2e suites
+│   ├── solid/    (18 examples)    # Solid.js examples (incl. ssr-examples/ × 3 subgroup) + 9 e2e suites
 │   ├── vue/      (22 examples)    # Vue 3 SFC examples (incl. animation-examples/ × 4 + ssr-examples/ × 3 subgroups) + 9 e2e suites
 │   ├── svelte/   (16 examples)    # Svelte 5 examples + 9 e2e suites
-│   │   ├── ssr/                    # Server-side rendering with Express + Vite
-│   │   └── ssg/                   # Static site generation with Vite
 │   ├── electron/ (3 examples)     # Electron desktop: browser-plugin (app://), hash-plugin (file://), navigation-plugin
 │   └── tauri/    (2 examples)     # Tauri v2 desktop: browser-plugin, navigation-plugin
 ```
