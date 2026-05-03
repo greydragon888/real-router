@@ -11,20 +11,26 @@ const template = readFileSync(path.resolve(dist, "index.html"), "utf8");
 const { render, getStaticPaths } = (await import(
   path.resolve(root, "dist/server/entry-server.js")
 )) as {
-  render: (url: string) => Promise<{ html: string; serializedData: string }>;
+  render: (
+    url: string,
+  ) => Promise<{ html: string; ssrJson: string; statusCode: number }>;
   getStaticPaths: () => Promise<string[]>;
 };
 
-const paths = await getStaticPaths();
+// getStaticPaths returns only leaf routes. The non-leaf parent `users`
+// (UsersList) is also a meaningful page, so include `/users` manually.
+const paths = [...(await getStaticPaths()), "/users"];
 
 console.log(`Pre-rendering ${paths.length} routes...`);
 
 for (const url of paths) {
   const result = await render(url);
 
+  const ssrScript = `<script>window.__SSR_STATE__=${result.ssrJson}</script>`;
+
   const html = template
     .replace("<!--ssr-outlet-->", result.html)
-    .replace("<!--ssr-state-->", result.serializedData);
+    .replace("<!--ssr-state-->", ssrScript);
 
   const filePath =
     url === "/"

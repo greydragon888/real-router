@@ -1,4 +1,9 @@
-export const entries: Record<string, () => Promise<Record<string, string>[]>> =
-  {
-    "users.profile": async () => [{ id: "1" }, { id: "2" }, { id: "3" }],
-  };
+import { database } from "../database";
+
+export const entries: Record<
+  string,
+  () => Promise<Record<string, string>[]>
+> = {
+  "users.profile": () =>
+    Promise.resolve(database.users.allIds().map((id) => ({ id }))),
+};

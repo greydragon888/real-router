@@ -1,7 +1,8 @@
+import { UNKNOWN_ROUTE } from "@real-router/core";
 import { cloneRouter } from "@real-router/core/api";
 import {
   getStaticPaths as getStaticPathsFromRouter,
-  serializeState,
+  serializeRouterState,
 } from "@real-router/core/utils";
 import { RouterProvider } from "@real-router/react";
 import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
@@ -16,11 +17,8 @@ const baseRouter = createAppRouter();
 
 interface RenderResult {
   html: string;
-  serializedData: string;
-}
-
-function wrapInScript(data: unknown): string {
-  return `<script>window.__SSR_DATA__=${serializeState(data)}</script>`;
+  ssrJson: string;
+  statusCode: number;
 }
 
 export async function render(url: string): Promise<RenderResult> {
@@ -29,8 +27,8 @@ export async function render(url: string): Promise<RenderResult> {
   router.usePlugin(ssrDataPluginFactory(loaders));
 
   try {
-    await router.start(url);
-    const data = router.getRouteData();
+    const state = await router.start(url);
+    const statusCode = state.name === UNKNOWN_ROUTE ? 404 : 200;
 
     const html = renderToString(
       <RouterProvider router={router}>
@@ -40,7 +38,8 @@ export async function render(url: string): Promise<RenderResult> {
 
     return {
       html,
-      serializedData: wrapInScript({ data }),
+      ssrJson: serializeRouterState(state),
+      statusCode,
     };
   } finally {
     router.dispose();
