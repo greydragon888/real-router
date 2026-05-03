@@ -18,6 +18,15 @@
   },
   "exports": {
     ".": {
+      "react-server": {
+        "@real-router/internal-source": "./src/index.react-server.ts",
+        "types": {
+          "import": "./dist/esm/index.react-server.d.mts",
+          "require": "./dist/cjs/index.react-server.d.ts"
+        },
+        "import": "./dist/esm/index.react-server.mjs",
+        "require": "./dist/cjs/index.react-server.js"
+      },
       "@real-router/internal-source": "./src/index.ts",
       "types": {
         "import": "./dist/esm/index.d.mts",

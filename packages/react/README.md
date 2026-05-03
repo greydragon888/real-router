@@ -22,8 +22,11 @@ npm install @real-router/react @real-router/core @real-router/browser-plugin
 | `@real-router/react`        | 19.2+         | DOM               | Full API (hooks, `Link`, `RouteView` with `keepAlive`) |
 | `@real-router/react/legacy` | 18+           | DOM               | All hooks and `Link`, no `RouteView`                   |
 | `@real-router/react/ink`    | 19.2+         | Terminal (Ink 7+) | Hooks, `InkRouterProvider`, `InkLink`, no `RouteView`  |
+| `@real-router/react`        | 19+           | RSC bundler (`react-server` condition) | Type-only re-exports for Server Components — no hooks, no components, no `RouterProvider` |
 
 All entries share the same underlying hook code. `/legacy` excludes React 19.2 `<Activity>`; `/ink` excludes DOM-bound primitives (`<a>`-based `Link`, `announceNavigation`) and replaces them with keyboard-driven terminal equivalents.
+
+The root export resolves to a **type-only entry** when bundlers apply the `react-server` condition (Vite RSC, Webpack RSC, Turbopack, Parcel) — Server Components can import public API types without pulling client-only code into the server bundle. Per-request data fetching is handled by [@real-router/rsc-server-plugin](https://www.npmjs.com/package/@real-router/rsc-server-plugin), not this entry. See [RSC Integration wiki guide](https://github.com/greydragon888/real-router/wiki/RSC-Integration).
 
 ## Quick Start
 
