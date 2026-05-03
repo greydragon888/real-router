@@ -153,6 +153,52 @@ test.describe("Streaming SSR Example", () => {
     expect(productNameIdx).toBeLessThan(firstSuspenseMarkerIdx);
   });
 
+  test("Scenario 9: per-request isolation under 9 concurrent /products/:id loads", async ({
+    request,
+  }) => {
+    const ids = ["1", "2", "3", "1", "2", "3", "1", "2", "3"];
+    const expectedNames: Record<string, string> = {
+      "1": "Mechanical Keyboard",
+      "2": "Ergonomic Mouse",
+      "3": "4K Monitor",
+    };
+
+    const responses = await Promise.all(
+      ids.map((id) => request.get(`/products/${id}`)),
+    );
+
+    await Promise.all(
+      responses.map(async (response, i) => {
+        const id = ids[i];
+
+        expect(response.status(), `req ${i} (id=${id})`).toBe(200);
+
+        const html = await response.text();
+
+        // Critical product data is in the shell — must reflect the
+        // requested id, even under concurrent load (cloneRouter() per request).
+        expect(html, `req ${i} product-name`).toContain(expectedNames[id]);
+
+        const ssrStateMatch = html.match(
+          /window\.__SSR_STATE__=({.*?})<\/script>/,
+        );
+        const ssrState = JSON.parse(ssrStateMatch![1]) as {
+          params: { id: string };
+          context?: { data?: { product?: { id: string; name: string } } };
+        };
+
+        expect(ssrState.params.id, `req ${i} state params`).toBe(id);
+        expect(ssrState.context?.data?.product?.id, `req ${i} loader id`).toBe(
+          id,
+        );
+        expect(
+          ssrState.context?.data?.product?.name,
+          `req ${i} loader name`,
+        ).toBe(expectedNames[id]);
+      }),
+    );
+  });
+
   test("Scenario 8: deferred section data arrives in late stream chunks (Suspense templates)", async ({
     request,
   }) => {

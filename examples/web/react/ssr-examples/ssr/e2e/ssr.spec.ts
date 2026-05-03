@@ -205,6 +205,101 @@ test.describe("SSR", () => {
     expect(hydrationErrors).toEqual([]);
   });
 
+  test("per-request isolation: 10 concurrent /users/:id requests return distinct, correct payloads", async ({
+    request,
+  }) => {
+    const ids = ["1", "2", "3", "1", "2", "3", "1", "2", "3", "1"];
+    const expectedNames: Record<string, string> = {
+      "1": "Alice",
+      "2": "Bob",
+      "3": "Charlie",
+    };
+
+    const responses = await Promise.all(
+      ids.map((id) => request.get(`/users/${id}`)),
+    );
+
+    await Promise.all(
+      responses.map(async (response, i) => {
+        const id = ids[i];
+
+        expect(response.status(), `req ${i} (id=${id})`).toBe(200);
+
+        const html = await response.text();
+
+        expect(html, `req ${i} HTML data-user-id`).toContain(
+          `data-user-id="${id}"`,
+        );
+
+        // Each response has its own __SSR_STATE__ — no cross-contamination
+        // (per-request cloneRouter() + plugin claim is freshly bound).
+        const ssrStateMatch = html.match(
+          /window\.__SSR_STATE__=({.*?})<\/script>/,
+        );
+        const ssrState = JSON.parse(ssrStateMatch![1]) as {
+          params: { id: string };
+          context?: { data?: { user?: { id: string; name: string } } };
+        };
+
+        expect(ssrState.params.id, `req ${i} state params`).toBe(id);
+        expect(ssrState.context?.data?.user?.id, `req ${i} loader id`).toBe(id);
+        expect(ssrState.context?.data?.user?.name, `req ${i} loader name`).toBe(
+          expectedNames[id],
+        );
+      }),
+    );
+  });
+
+  test("per-request isolation: dashboard auth + unprotected routes don't bleed across concurrent requests", async ({
+    browser,
+  }) => {
+    // Two simultaneous browser contexts with distinct cookies — verify auth
+    // guard's DI runs per-request, not from a shared mutable.
+    const [authCtx, anonCtx] = await Promise.all([
+      browser.newContext({
+        storageState: {
+          cookies: [
+            {
+              name: "auth",
+              value: "1",
+              domain: "localhost",
+              path: "/",
+              expires: -1,
+              httpOnly: false,
+              secure: false,
+              sameSite: "Lax",
+            },
+          ],
+          origins: [],
+        },
+      }),
+      browser.newContext(),
+    ]);
+
+    try {
+      const [authPage, anonPage] = await Promise.all([
+        authCtx.newPage(),
+        anonCtx.newPage(),
+      ]);
+
+      const [authResp, anonResp] = await Promise.all([
+        authPage.goto("/dashboard"),
+        anonPage.goto("/dashboard"),
+      ]);
+
+      expect(authResp?.status()).toBe(200);
+      // Anonymous request: guard rejects → server sends 302 to /, content is Home
+      // (Express follows the redirect and returns Home HTML with status 200).
+      expect(anonResp?.url()).toMatch(/\/$/);
+
+      await expect(authPage.locator("main")).toContainText("Dashboard");
+      await expect(anonPage.locator("main")).toContainText("Welcome");
+    } finally {
+      await authCtx.close();
+      await anonCtx.close();
+    }
+  });
+
   test("client navigation: ssr-data-plugin is SSR-only — loader does not re-run on navigate()", async ({
     page,
   }) => {

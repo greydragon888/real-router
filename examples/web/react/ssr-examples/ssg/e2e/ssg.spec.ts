@@ -165,4 +165,52 @@ test.describe("SSG", () => {
       expect(html, `${path} no transition`).not.toContain('"transition"');
     }
   });
+
+  test("static output isolation: each pre-rendered URL ships its own resolved __SSR_STATE__ snapshot", async ({
+    request,
+  }) => {
+    // Concurrent reads of distinct pre-rendered files must each carry
+    // the URL-specific snapshot — no shared mutable in the build pipeline,
+    // no cross-pollination between rendered states.
+    const targets = [
+      { path: "/users/1", expectedId: "1", expectedName: "Alice" },
+      { path: "/users/2", expectedId: "2", expectedName: "Bob" },
+      { path: "/users/3", expectedId: "3", expectedName: "Charlie" },
+    ];
+
+    // SSG vite preview redirects /users/1 → /users/1/ before serving the
+    // pre-rendered file. APIRequest follows redirects by default, but we
+    // request the canonical trailing-slash form upfront for clarity.
+    const responses = await Promise.all(
+      targets.map(({ path }) => request.get(`${path}/`)),
+    );
+
+    await Promise.all(
+      responses.map(async (response, i) => {
+        const { expectedId, expectedName, path } = targets[i];
+
+        expect(response.status(), path).toBe(200);
+
+        const html = await response.text();
+        const ssrStateMatch = html.match(
+          /window\.__SSR_STATE__=({.*?})<\/script>/,
+        );
+
+        expect(ssrStateMatch?.[1], `${path} __SSR_STATE__ found`).toBeDefined();
+
+        const ssrState = JSON.parse(ssrStateMatch![1]) as {
+          params: { id: string };
+          context?: { data?: { user?: { id: string; name: string } } };
+        };
+
+        expect(ssrState.params.id, `${path} param id`).toBe(expectedId);
+        expect(ssrState.context?.data?.user?.id, `${path} loader id`).toBe(
+          expectedId,
+        );
+        expect(ssrState.context?.data?.user?.name, `${path} loader name`).toBe(
+          expectedName,
+        );
+      }),
+    );
+  });
 });
