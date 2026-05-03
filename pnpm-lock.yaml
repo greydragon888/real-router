@@ -4936,6 +4936,46 @@ importers:
         specifier: 3.2.6
         version: 3.2.6(typescript@6.0.3)
 
+  examples/web/vue/ssr-examples/ssg:
+    dependencies:
+      '@real-router/browser-plugin':
+        specifier: workspace:^
+        version: link:../../../../../packages/browser-plugin
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../../../../../packages/core
+      '@real-router/ssr-data-plugin':
+        specifier: workspace:^
+        version: link:../../../../../packages/ssr-data-plugin
+      '@real-router/vue':
+        specifier: workspace:^
+        version: link:../../../../../packages/vue
+      vue:
+        specifier: 3.5.13
+        version: 3.5.13(typescript@6.0.3)
+    devDependencies:
+      '@playwright/test':
+        specifier: 1.58.2
+        version: 1.58.2
+      '@types/node':
+        specifier: 25.6.0
+        version: 25.6.0
+      '@vitejs/plugin-vue':
+        specifier: 6.0.5
+        version: 6.0.5(vite@7.3.2(@types/node@25.6.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(tsx@4.21.0)(yaml@2.8.3))(vue@3.5.13(typescript@6.0.3))
+      tsx:
+        specifier: 4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vite:
+        specifier: 7.3.2
+        version: 7.3.2(@types/node@25.6.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(tsx@4.21.0)(yaml@2.8.3)
+      vue-tsc:
+        specifier: 3.2.6
+        version: 3.2.6(typescript@6.0.3)
+
   examples/web/vue/ssr-examples/ssr:
     dependencies:
       '@real-router/browser-plugin':
