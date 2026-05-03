@@ -1,6 +1,7 @@
-import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+import express from "express";
 
 import { expressToFetchRequest, streamResponseToExpress } from "./_helpers";
 
@@ -12,25 +13,24 @@ async function startServer(): Promise<void> {
 
   app.disable("x-powered-by");
 
-  app.use(
-    express.static(path.resolve(root, "dist/client"), { index: false }),
-  );
+  app.use(express.static(path.resolve(root, "dist/client"), { index: false }));
 
-  const rscModule = (await import(
-    path.resolve(root, "dist/rsc/index.js")
-  )) as { default: { fetch: (request: Request) => Promise<Response> } };
+  const rscModule = (await import(path.resolve(root, "dist/rsc/index.js"))) as {
+    default: { fetch: (request: Request) => Promise<Response> };
+  };
 
-  app.all(/.*/, async (req, res, next) => {
+  app.all(/.*/, async (request_, expressResponse, next) => {
     try {
-      const request = expressToFetchRequest(req);
+      const request = expressToFetchRequest(request_);
       const response = await rscModule.default.fetch(request);
 
-      await streamResponseToExpress(response, res);
+      await streamResponseToExpress(response, expressResponse);
     } catch (error) {
       next(error);
     }
   });
 
+  // eslint-disable-next-line turbo/no-undeclared-env-vars -- PORT is conventional Express override, not turbo task input
   const port = Number(process.env.PORT) || 3000;
 
   app.listen(port, () => {

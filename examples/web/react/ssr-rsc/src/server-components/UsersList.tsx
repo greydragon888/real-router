@@ -1,7 +1,9 @@
-import { db } from "../db";
+import { database } from "../database";
 
-export async function UsersList() {
-  const users = await db.users.list();
+import type { ReactElement } from "react";
+
+export async function UsersList(): Promise<ReactElement> {
+  const users = await database.users.list();
 
   return (
     <section data-testid="users-list">

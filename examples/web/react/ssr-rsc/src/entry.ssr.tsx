@@ -2,10 +2,11 @@ import { hydrateRouter } from "@real-router/core/utils";
 import { createFromReadableStream } from "@vitejs/plugin-rsc/ssr";
 import { renderToReadableStream } from "react-dom/server.edge";
 import { injectRSCPayload } from "rsc-html-stream/server";
-import type { ReactNode } from "react";
 
 import { App } from "./App";
 import { createAppRouter } from "./router/createAppRouter";
+
+import type { ReactNode } from "react";
 
 interface RenderHTMLOptions {
   ssrState: string;
@@ -23,8 +24,9 @@ export async function renderHTML(
 
   await hydrateRouter(router, ssrState);
 
-  const clientBootstrap =
-    await import.meta.viteRsc.loadBootstrapScriptContent("index");
+  const clientBootstrap = await import.meta.viteRsc.loadBootstrapScriptContent(
+    "index",
+  );
 
   const htmlStream = await renderToReadableStream(
     <App router={router} payload={payload} />,
@@ -33,7 +35,9 @@ export async function renderHTML(
     },
   );
 
-  const finalStream = htmlStream.pipeThrough(injectRSCPayload(flightForBrowser));
+  const finalStream = htmlStream.pipeThrough(
+    injectRSCPayload(flightForBrowser),
+  );
 
   router.dispose();
 

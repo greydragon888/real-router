@@ -64,7 +64,7 @@ src/App.tsx           — unified root for SSR + client (use(payload) + router.s
 | `users.list`    | `/users`       | `<UsersList />` (direct `db` import)  | async (`db.users.list()`)             |
 | `users.profile` | `/users/:id`   | `<UserProfile user={...} />` + `<RevalidateButton />` (Client Component) | async + DI (`getDep("db").users.findById(params.id)`) |
 
-In-memory mock store ([`src/db.ts`](src/db.ts)) — module-scoped singleton, shared between rsc env loaders and the inline `POST /__test/users/:id` mutation endpoint.
+In-memory mock store ([`src/database.ts`](src/db.ts)) — module-scoped singleton, shared between rsc env loaders and the inline `POST /__test/users/:id` mutation endpoint.
 
 ## E2e Scenarios
 

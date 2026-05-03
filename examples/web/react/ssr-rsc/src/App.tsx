@@ -1,23 +1,24 @@
 "use client";
 
-import type { Router } from "@real-router/core";
 import { createFromReadableStream } from "@vitejs/plugin-rsc/browser";
-import type { ReactNode } from "react";
 import { startTransition, use, useEffect, useState } from "react";
 
 import { Layout } from "./client-components/Layout";
 
+import type { Router } from "@real-router/core";
+import type { ReactNode } from "react";
+
 interface AppProps {
-  router: Router;
-  payload: Promise<ReactNode>;
+  readonly router: Router;
+  readonly payload: Promise<ReactNode>;
 }
 
-export function App({ router, payload }: AppProps) {
+export function App({ router, payload }: AppProps): ReactNode {
   const initialNode = use(payload);
   const [node, setNode] = useState<ReactNode>(initialNode);
 
   useEffect(() => {
-    const unsubscribe = router.subscribe(({ route }) => {
+    return router.subscribe(({ route }) => {
       fetch(`/__rsc?route=${encodeURIComponent(route.path)}`)
         .then((response) => {
           if (!response.body) {
@@ -26,6 +27,7 @@ export function App({ router, payload }: AppProps) {
           if (!response.ok) {
             console.warn(`[App] /__rsc returned ${response.status}`);
           }
+
           return createFromReadableStream<ReactNode>(response.body);
         })
         .then((newNode) => {
@@ -37,14 +39,12 @@ export function App({ router, payload }: AppProps) {
           console.error("[App] /__rsc fetch failed:", error);
         });
     });
-
-    return unsubscribe;
   }, [router]);
 
   return (
     <html lang="en">
       <head>
-        <meta charSet="UTF-8" />
+        <meta charSet="utf-8" />
         <title>real-router RSC example</title>
       </head>
       <body>

@@ -1,27 +1,32 @@
 import { Readable } from "node:stream";
-import express from "express";
+
+import type express from "express";
 
 function toFetchHeaders(nodeHeaders: express.Request["headers"]): Headers {
   const headers = new Headers();
+
   for (const [key, value] of Object.entries(nodeHeaders)) {
     if (Array.isArray(value)) {
-      for (const v of value) headers.append(key, v);
+      for (const item of value) {
+        headers.append(key, item);
+      }
     } else if (value !== undefined) {
       headers.set(key, value);
     }
   }
+
   return headers;
 }
 
-export function expressToFetchRequest(req: express.Request): Request {
-  const url = `http://${req.headers.host}${req.originalUrl}`;
+export function expressToFetchRequest(request: express.Request): Request {
+  const url = `http://${request.headers.host}${request.originalUrl}`;
   const init: RequestInit & { duplex?: "half" } = {
-    method: req.method,
-    headers: toFetchHeaders(req.headers),
+    method: request.method,
+    headers: toFetchHeaders(request.headers),
   };
 
-  if (req.method !== "GET" && req.method !== "HEAD") {
-    init.body = Readable.toWeb(req) as ReadableStream<Uint8Array>;
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    init.body = Readable.toWeb(request) as ReadableStream<Uint8Array>;
     init.duplex = "half";
   }
 
@@ -30,25 +35,22 @@ export function expressToFetchRequest(req: express.Request): Request {
 
 export async function streamResponseToExpress(
   response: Response,
-  res: express.Response,
+  expressResponse: express.Response,
 ): Promise<void> {
-  res.status(response.status);
-  response.headers.forEach((v, k) => res.setHeader(k, v));
+  expressResponse.status(response.status);
+  response.headers.forEach((value, key) =>
+    expressResponse.setHeader(key, value),
+  );
 
   if (!response.body) {
-    res.end();
+    expressResponse.end();
+
     return;
   }
 
-  const reader = response.body.getReader();
-
-  while (true) {
-    const { done, value } = await reader.read();
-
-    if (done) break;
-
-    res.write(Buffer.from(value));
+  for await (const chunk of response.body) {
+    expressResponse.write(Buffer.from(chunk));
   }
 
-  res.end();
+  expressResponse.end();
 }

@@ -1,15 +1,16 @@
 "use client";
 
-import type { Router } from "@real-router/core";
 import { Link, RouterProvider } from "@real-router/react";
-import type { ReactNode } from "react";
+
+import type { Router } from "@real-router/core";
+import type { ReactElement, ReactNode } from "react";
 
 interface LayoutProps {
-  router: Router;
-  children: ReactNode;
+  readonly router: Router;
+  readonly children: ReactNode;
 }
 
-export function Layout({ router, children }: LayoutProps) {
+export function Layout({ router, children }: LayoutProps): ReactElement {
   return (
     <RouterProvider router={router}>
       <header>

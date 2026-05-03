@@ -4,13 +4,18 @@ import { errorCodes, RouterError } from "@real-router/core";
 import { useRouter } from "@real-router/react";
 import { useState } from "react";
 
-export function RevalidateButton() {
+import type { ReactElement } from "react";
+
+export function RevalidateButton(): ReactElement {
   const router = useRouter();
   const [pending, setPending] = useState(false);
 
-  async function handleClick() {
+  async function revalidate(): Promise<void> {
     const state = router.getState();
-    if (!state) return;
+
+    if (!state) {
+      return;
+    }
 
     setPending(true);
     try {
@@ -22,6 +27,7 @@ export function RevalidateButton() {
       ) {
         return;
       }
+
       console.error("[RevalidateButton] navigate failed:", error);
     } finally {
       setPending(false);
@@ -32,7 +38,9 @@ export function RevalidateButton() {
     <button
       type="button"
       data-testid="revalidate"
-      onClick={handleClick}
+      onClick={() => {
+        void revalidate();
+      }}
       disabled={pending}
     >
       {pending ? "Revalidating..." : "Revalidate"}

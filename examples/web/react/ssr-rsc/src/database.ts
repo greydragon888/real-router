@@ -10,7 +10,7 @@ const userStore = new Map<string, User>([
   ["42", { id: "42", name: "Jane Doe", email: "jane@example.com" }],
 ]);
 
-export const db = {
+export const database = {
   users: {
     findById: (id: string): Promise<User> =>
       Promise.resolve(
@@ -18,10 +18,14 @@ export const db = {
       ),
     list: (): Promise<User[]> => Promise.resolve([...userStore.values()]),
     setEmail: (id: string, email: string): void => {
-      const u = userStore.get(id);
-      userStore.set(id, u ? { ...u, email } : { id, name: `User ${id}`, email });
+      const existing = userStore.get(id);
+
+      userStore.set(
+        id,
+        existing ? { ...existing, email } : { id, name: `User ${id}`, email },
+      );
     },
   },
 };
 
-export type Db = typeof db;
+export type Database = typeof database;

@@ -4,7 +4,7 @@ import { serializeRouterState } from "@real-router/core/utils";
 import { rscServerPluginFactory } from "@real-router/rsc-server-plugin";
 import { renderToReadableStream as renderRscToReadableStream } from "@vitejs/plugin-rsc/rsc";
 
-import { db } from "./db";
+import { database } from "./database";
 import { createAppRouter } from "./router/createAppRouter";
 import { loaders } from "./router/loaders";
 
@@ -19,7 +19,7 @@ async function handler(request: Request): Promise<Response> {
     const id = url.pathname.slice("/__test/users/".length);
     const { email } = (await request.json()) as { email: string };
 
-    db.users.setEmail(id, email);
+    database.users.setEmail(id, email);
 
     return new Response(null, { status: 204 });
   }
@@ -29,7 +29,7 @@ async function handler(request: Request): Promise<Response> {
       ? (url.searchParams.get("route") ?? "/")
       : url.pathname + url.search;
 
-  const router = cloneRouter(baseRouter, { db });
+  const router = cloneRouter(baseRouter, { db: database });
 
   router.usePlugin(rscServerPluginFactory(loaders));
 
@@ -37,8 +37,9 @@ async function handler(request: Request): Promise<Response> {
     const state = await router.start(pathname);
     const statusCode = state.name === UNKNOWN_ROUTE ? 404 : 200;
 
-    const rscNode =
-      state.context.rsc ?? <p data-testid="not-found">Not Found</p>;
+    const rscNode = state.context.rsc ?? (
+      <p data-testid="not-found">Not Found</p>
+    );
     const flightStream = renderRscToReadableStream(rscNode);
 
     if (url.pathname === "/__rsc") {
@@ -52,7 +53,7 @@ async function handler(request: Request): Promise<Response> {
       typeof import("./entry.ssr")
     >("ssr", "index");
 
-    return ssr.renderHTML(flightStream, {
+    return await ssr.renderHTML(flightStream, {
       ssrState: serializeRouterState(state, { excludeContext: ["rsc"] }),
       statusCode,
     });
@@ -61,4 +62,5 @@ async function handler(request: Request): Promise<Response> {
   }
 }
 
+// eslint-disable-next-line import-x/no-default-export -- @vitejs/plugin-rsc requires default export with `{ fetch }` shape
 export default { fetch: handler };

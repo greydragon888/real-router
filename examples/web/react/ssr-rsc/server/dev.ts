@@ -1,7 +1,11 @@
-import express from "express";
-import { createServer as createViteServer, createServerModuleRunner } from "vite";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+import express from "express";
+import {
+  createServer as createViteServer,
+  createServerModuleRunner,
+} from "vite";
 
 import { expressToFetchRequest, streamResponseToExpress } from "./_helpers";
 
@@ -23,22 +27,24 @@ async function startDevServer(): Promise<void> {
 
   const rscRunner = createServerModuleRunner(vite.environments.rsc);
 
-  app.all(/.*/, async (req, res, next) => {
+  app.all(/.*/, async (request_, expressResponse, next) => {
     try {
-      const rscModule = (await rscRunner.import("/src/entry.rsc.tsx")) as {
-        default: { fetch: (request: Request) => Promise<Response> };
-      };
+      const rscModule =
+        await rscRunner.import<typeof import("../src/entry.rsc")>(
+          "/src/entry.rsc.tsx",
+        );
 
-      const request = expressToFetchRequest(req);
+      const request = expressToFetchRequest(request_);
       const response = await rscModule.default.fetch(request);
 
-      await streamResponseToExpress(response, res);
+      await streamResponseToExpress(response, expressResponse);
     } catch (error) {
       vite.ssrFixStacktrace(error as Error);
       next(error);
     }
   });
 
+  // eslint-disable-next-line turbo/no-undeclared-env-vars -- PORT is conventional Express override, not turbo task input
   const port = Number(process.env.PORT) || 3000;
 
   app.listen(port, () => {

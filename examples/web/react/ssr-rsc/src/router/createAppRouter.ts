@@ -1,13 +1,27 @@
 import { createRouter } from "@real-router/core";
 
-import type { Db } from "../db";
-import { routes } from "../routes";
+import type { Database } from "../database";
+import type { Route, Router } from "@real-router/core";
 
 export interface AppDependencies {
-  db: Db;
+  db: Database;
 }
 
-export function createAppRouter(deps?: AppDependencies) {
+export const routes: Route<AppDependencies>[] = [
+  { name: "home", path: "/" },
+  {
+    name: "users",
+    path: "/users",
+    children: [
+      { name: "list", path: "/" },
+      { name: "profile", path: "/:id" },
+    ],
+  },
+];
+
+export function createAppRouter(
+  deps?: AppDependencies,
+): Router<AppDependencies> {
   return createRouter<AppDependencies>(
     routes,
     { defaultRoute: "home", allowNotFound: true },
