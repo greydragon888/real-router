@@ -59,7 +59,7 @@ real-router/
 │   ├── react/    (18 examples)    # React 19.2+ examples (incl. ink-demo for @real-router/react/ink) + 9 e2e suites
 │   ├── preact/   (12 examples)    # Preact examples + 9 e2e suites
 │   ├── solid/    (15 examples)    # Solid.js examples + 9 e2e suites
-│   ├── vue/      (18 examples)    # Vue 3 SFC examples (incl. ssr-examples/ subgroup: ssr, ssr-streaming, ssg) + 9 e2e suites
+│   ├── vue/      (22 examples)    # Vue 3 SFC examples (incl. animation-examples/ × 4 + ssr-examples/ × 3 subgroups) + 9 e2e suites
 │   ├── svelte/   (16 examples)    # Svelte 5 examples + 9 e2e suites
 │   │   ├── ssr/                    # Server-side rendering with Express + Vite
 │   │   └── ssg/                   # Static site generation with Vite

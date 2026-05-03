@@ -560,9 +560,13 @@ Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 
 ## Examples
 
-14 runnable examples — each is a standalone Vite app. Run: `cd examples/web/vue/basic && pnpm dev`
+22 runnable examples — each is a standalone Vite app. Run: `cd examples/web/vue/basic && pnpm dev`
 
-[basic](../../examples/web/vue/basic) · [nested-routes](../../examples/web/vue/nested-routes) · [auth-guards](../../examples/web/vue/auth-guards) · [data-loading](../../examples/web/vue/data-loading) · [lazy-loading](../../examples/web/vue/lazy-loading) · [async-guards](../../examples/web/vue/async-guards) · [hash-routing](../../examples/web/vue/hash-routing) · [persistent-params](../../examples/web/vue/persistent-params) · [error-handling](../../examples/web/vue/error-handling) · [dynamic-routes](../../examples/web/vue/dynamic-routes) · [plugin-installation](../../examples/web/vue/plugin-installation) · [v-link-directive](../../examples/web/vue/v-link-directive) · [keep-alive](../../examples/web/vue/keep-alive) · [combined](../../examples/web/vue/combined)
+**Routing patterns:** [basic](../../examples/web/vue/basic) · [nested-routes](../../examples/web/vue/nested-routes) · [auth-guards](../../examples/web/vue/auth-guards) · [data-loading](../../examples/web/vue/data-loading) · [lazy-loading](../../examples/web/vue/lazy-loading) · [async-guards](../../examples/web/vue/async-guards) · [hash-routing](../../examples/web/vue/hash-routing) · [persistent-params](../../examples/web/vue/persistent-params) · [error-handling](../../examples/web/vue/error-handling) · [dynamic-routes](../../examples/web/vue/dynamic-routes) · [plugin-installation](../../examples/web/vue/plugin-installation) · [v-link-directive](../../examples/web/vue/v-link-directive) · [keep-alive](../../examples/web/vue/keep-alive) · [search-schema](../../examples/web/vue/search-schema) · [combined](../../examples/web/vue/combined)
+
+**Animations:** [view-transitions](../../examples/web/vue/animation-examples/view-transitions) · [route-animations](../../examples/web/vue/animation-examples/route-animations) · [page-animations](../../examples/web/vue/animation-examples/page-animations) · [motion-animations](../../examples/web/vue/animation-examples/motion-animations)
+
+**Server-side rendering:** [ssr](../../examples/web/vue/ssr-examples/ssr) · [ssr-streaming](../../examples/web/vue/ssr-examples/ssr-streaming) · [ssg](../../examples/web/vue/ssr-examples/ssg)
 
 ## Related Packages
 
