@@ -433,4 +433,108 @@ test.describe("SSR (Vue)", () => {
     await expect(page).toHaveURL(/\/dashboard$/);
     await expect(page.locator("main")).toContainText("Dashboard");
   });
+
+  test("CSR navigation to dynamic route: state.context.data is undefined post-navigate (SSR-only plugin contract)", async ({
+    page,
+  }) => {
+    // Initial /users SSR + hydration: ssr-data-plugin re-runs the users
+    // loader during hydrateRouter → state.context.data is populated.
+    await page.goto("/users");
+    await page.waitForLoadState("networkidle");
+    await expect(page.locator('[data-user-id="2"]')).toBeVisible();
+
+    // Click "Bob" — Link calls router.navigate() (CSR, no full reload).
+    // ssr-data-plugin intercepts start(), NOT navigate(), so the
+    // /users/profile loader DOES NOT run. UserProfile reads
+    // route.value.context.data, finds undefined, renders "User not found".
+    await page.click("text=Bob");
+    await expect(page).toHaveURL(/\/users\/2$/);
+    await expect(page.getByTestId("user-not-found")).toBeVisible();
+    await expect(page.getByTestId("user-profile")).toHaveCount(0);
+  });
+
+  test("CSR guard: anonymous click on /admin link is blocked, URL unchanged", async ({
+    page,
+  }) => {
+    // No auth cookie — currentUser is null on the client.
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+
+    // Click intercepted by browser-plugin → router.navigate("admin") →
+    // canActivate rejects (currentUser is null) → transition cancelled.
+    // Vue Link swallows the rejection (.catch(() => {})), URL doesn't change.
+    await page.click('[data-testid="nav-admin"]');
+
+    await expect(page).toHaveURL("/");
+    await expect(page.locator("main")).toContainText("Welcome");
+    await expect(page.getByTestId("admin-page")).toHaveCount(0);
+  });
+
+  test("server returns 302 + Location for guarded route without cookie", async ({
+    request,
+  }) => {
+    // entry-server.ts maps a CANNOT_ACTIVATE rejection to { statusCode: 302,
+    // redirect: "/" }; the Express handler issues res.redirect(result.redirect).
+    // Disable auto-follow to inspect the raw redirect response.
+    const response = await request.get("/admin", { maxRedirects: 0 });
+
+    expect(response.status()).toBe(302);
+    expect(response.headers().location).toBe("/");
+  });
+
+  test("server-rendered Link emits absolute href in HTML (no JS)", async ({
+    browser,
+  }) => {
+    // Without JS, the only thing that makes Link clickable is the underlying
+    // <a href="..."> attribute. If the Vue adapter's buildHref were broken in
+    // SSR, the resulting HTML would lack hrefs and SEO/crawlers would fail.
+    const context = await browser.newContext({ javaScriptEnabled: false });
+    const page = await context.newPage();
+
+    const response = await page.goto("/users");
+    const html = await response!.text();
+
+    expect(html).toMatch(/<a [^>]*href="\/users\/1"/);
+    expect(html).toMatch(/<a [^>]*href="\/users\/2"/);
+    expect(html).toMatch(/<a [^>]*href="\/users\/3"/);
+
+    // Top-nav links also have hrefs.
+    expect(html).toMatch(/<a [^>]*href="\/"/);
+    expect(html).toMatch(/<a [^>]*href="\/users"/);
+
+    await context.close();
+  });
+
+  test("CSR guard pass: admin user clicks /admin link, navigates without server roundtrip", async ({
+    page,
+  }) => {
+    // Cookie injected before goto so entry-client.ts picks it up at boot
+    // (getCurrentUserFromDocument parses document.cookie before usePlugin).
+    await page.context().addCookies([
+      { name: "userId", value: "1", url: "http://localhost:3000" },
+    ]);
+
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+
+    // Inject marker after hydration to prove the next nav is CSR (no reload).
+    await page.evaluate(() => {
+      (
+        globalThis as unknown as Window & { __NAV_MARKER__?: boolean }
+      ).__NAV_MARKER__ = true;
+    });
+
+    await page.click('[data-testid="nav-admin"]');
+    await expect(page).toHaveURL(/\/admin$/);
+    await expect(page.getByTestId("admin-page")).toBeVisible();
+
+    // Marker survived → no full reload happened.
+    const marker = await page.evaluate(
+      () =>
+        (globalThis as unknown as Window & { __NAV_MARKER__?: boolean })
+          .__NAV_MARKER__,
+    );
+
+    expect(marker).toBe(true);
+  });
 });
