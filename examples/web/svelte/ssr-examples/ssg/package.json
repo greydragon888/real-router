@@ -1,0 +1,29 @@
+{
+  "name": "ssg-svelte-example",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "predev": "pnpm turbo run bundle --filter=...ssg-svelte-example",
+    "dev": "vite",
+    "build:app": "svelte-check && vite build && vite build --ssr src/entry-server.ts --outDir dist/server && tsx scripts/ssg-build.ts",
+    "preview": "vite preview",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@real-router/browser-plugin": "workspace:^",
+    "@real-router/core": "workspace:^",
+    "@real-router/ssr-data-plugin": "workspace:^",
+    "@real-router/svelte": "workspace:^",
+    "svelte": "5.54.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.58.2",
+    "@sveltejs/vite-plugin-svelte": "6.2.4",
+    "@types/node": "25.6.0",
+    "svelte-check": "4.3.2",
+    "tsx": "4.21.0",
+    "typescript": "6.0.3",
+    "vite": "7.3.2"
+  }
+}

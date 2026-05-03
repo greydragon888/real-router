@@ -4378,6 +4378,135 @@ importers:
         specifier: 7.3.2
         version: 7.3.2(@types/node@25.6.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(tsx@4.21.0)(yaml@2.8.3)
 
+  examples/web/svelte/ssr-examples/ssg:
+    dependencies:
+      '@real-router/browser-plugin':
+        specifier: workspace:^
+        version: link:../../../../../packages/browser-plugin
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../../../../../packages/core
+      '@real-router/ssr-data-plugin':
+        specifier: workspace:^
+        version: link:../../../../../packages/ssr-data-plugin
+      '@real-router/svelte':
+        specifier: workspace:^
+        version: link:../../../../../packages/svelte
+      svelte:
+        specifier: 5.54.0
+        version: 5.54.0(@typescript-eslint/types@8.59.1)
+    devDependencies:
+      '@playwright/test':
+        specifier: 1.58.2
+        version: 1.58.2
+      '@sveltejs/vite-plugin-svelte':
+        specifier: 6.2.4
+        version: 6.2.4(svelte@5.54.0(@typescript-eslint/types@8.59.1))(vite@7.3.2(@types/node@25.6.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(tsx@4.21.0)(yaml@2.8.3))
+      '@types/node':
+        specifier: 25.6.0
+        version: 25.6.0
+      svelte-check:
+        specifier: 4.3.2
+        version: 4.3.2(picomatch@4.0.4)(svelte@5.54.0(@typescript-eslint/types@8.59.1))(typescript@6.0.3)
+      tsx:
+        specifier: 4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vite:
+        specifier: 7.3.2
+        version: 7.3.2(@types/node@25.6.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(tsx@4.21.0)(yaml@2.8.3)
+
+  examples/web/svelte/ssr-examples/ssr:
+    dependencies:
+      '@real-router/browser-plugin':
+        specifier: workspace:^
+        version: link:../../../../../packages/browser-plugin
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../../../../../packages/core
+      '@real-router/ssr-data-plugin':
+        specifier: workspace:^
+        version: link:../../../../../packages/ssr-data-plugin
+      '@real-router/svelte':
+        specifier: workspace:^
+        version: link:../../../../../packages/svelte
+      express:
+        specifier: 5.1.0
+        version: 5.1.0
+      svelte:
+        specifier: 5.54.0
+        version: 5.54.0(@typescript-eslint/types@8.59.1)
+    devDependencies:
+      '@playwright/test':
+        specifier: 1.58.2
+        version: 1.58.2
+      '@sveltejs/vite-plugin-svelte':
+        specifier: 6.2.4
+        version: 6.2.4(svelte@5.54.0(@typescript-eslint/types@8.59.1))(vite@7.3.2(@types/node@25.6.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(tsx@4.21.0)(yaml@2.8.3))
+      '@types/express':
+        specifier: 5.0.6
+        version: 5.0.6
+      '@types/node':
+        specifier: 25.6.0
+        version: 25.6.0
+      svelte-check:
+        specifier: 4.3.2
+        version: 4.3.2(picomatch@4.0.4)(svelte@5.54.0(@typescript-eslint/types@8.59.1))(typescript@6.0.3)
+      tsx:
+        specifier: 4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vite:
+        specifier: 7.3.2
+        version: 7.3.2(@types/node@25.6.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(tsx@4.21.0)(yaml@2.8.3)
+
+  examples/web/svelte/ssr-examples/ssr-streaming:
+    dependencies:
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../../../../../packages/core
+      '@real-router/ssr-data-plugin':
+        specifier: workspace:^
+        version: link:../../../../../packages/ssr-data-plugin
+      '@real-router/svelte':
+        specifier: workspace:^
+        version: link:../../../../../packages/svelte
+      express:
+        specifier: 5.1.0
+        version: 5.1.0
+      svelte:
+        specifier: 5.54.0
+        version: 5.54.0(@typescript-eslint/types@8.59.1)
+    devDependencies:
+      '@playwright/test':
+        specifier: 1.58.2
+        version: 1.58.2
+      '@sveltejs/vite-plugin-svelte':
+        specifier: 6.2.4
+        version: 6.2.4(svelte@5.54.0(@typescript-eslint/types@8.59.1))(vite@7.3.2(@types/node@25.6.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(tsx@4.21.0)(yaml@2.8.3))
+      '@types/express':
+        specifier: 5.0.6
+        version: 5.0.6
+      '@types/node':
+        specifier: 25.6.0
+        version: 25.6.0
+      svelte-check:
+        specifier: 4.3.2
+        version: 4.3.2(picomatch@4.0.4)(svelte@5.54.0(@typescript-eslint/types@8.59.1))(typescript@6.0.3)
+      tsx:
+        specifier: 4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vite:
+        specifier: 7.3.2
+        version: 7.3.2(@types/node@25.6.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(tsx@4.21.0)(yaml@2.8.3)
+
   examples/web/vue:
     dependencies:
       '@real-router/vue':
@@ -13665,6 +13794,14 @@ packages:
   supports-preserve-symlinks-flag@1.0.0:
     resolution: {integrity: sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w==}
     engines: {node: '>= 0.4'}
+
+  svelte-check@4.3.2:
+    resolution: {integrity: sha512-71udP5w2kaSTcX8iV0hn3o2FWlabQHhJTJLIQrCqMsrcOeDUO2VhCQKKCA8AMVHSPwdxLEWkUWh9OKxns5PD9w==}
+    engines: {node: '>= 18.0.0'}
+    hasBin: true
+    peerDependencies:
+      svelte: ^4.0.0 || ^5.0.0-next.0
+      typescript: '>=5.0.0'
 
   svelte-check@4.4.5:
     resolution: {integrity: sha512-1bSwIRCvvmSHrlK52fOlZmVtUZgil43jNL/2H18pRpa+eQjzGt6e3zayxhp1S7GajPFKNM/2PMCG+DZFHlG9fw==}
@@ -22979,6 +23116,18 @@ snapshots:
       supports-color: 10.2.2
 
   supports-preserve-symlinks-flag@1.0.0: {}
+
+  svelte-check@4.3.2(picomatch@4.0.4)(svelte@5.54.0(@typescript-eslint/types@8.59.1))(typescript@6.0.3):
+    dependencies:
+      '@jridgewell/trace-mapping': 0.3.31
+      chokidar: 4.0.3
+      fdir: 6.5.0(picomatch@4.0.4)
+      picocolors: 1.1.1
+      sade: 1.8.1
+      svelte: 5.54.0(@typescript-eslint/types@8.59.1)
+      typescript: 6.0.3
+    transitivePeerDependencies:
+      - picomatch
 
   svelte-check@4.4.5(picomatch@4.0.4)(svelte@5.54.0(@typescript-eslint/types@8.59.1))(typescript@6.0.3):
     dependencies:

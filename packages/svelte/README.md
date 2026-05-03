@@ -448,9 +448,11 @@ Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 
 ## Examples
 
-16 runnable examples — each is a standalone Vite app. Run: `cd examples/web/svelte/basic && pnpm dev`
+19 runnable examples — each is a standalone Vite app. Run: `cd examples/web/svelte/basic && pnpm dev`
 
 [basic](../../examples/web/svelte/basic) · [nested-routes](../../examples/web/svelte/nested-routes) · [auth-guards](../../examples/web/svelte/auth-guards) · [data-loading](../../examples/web/svelte/data-loading) · [lazy-loading](../../examples/web/svelte/lazy-loading) · [async-guards](../../examples/web/svelte/async-guards) · [hash-routing](../../examples/web/svelte/hash-routing) · [persistent-params](../../examples/web/svelte/persistent-params) · [error-handling](../../examples/web/svelte/error-handling) · [dynamic-routes](../../examples/web/svelte/dynamic-routes) · [link-action](../../examples/web/svelte/link-action) · [lazy-loading-svelte](../../examples/web/svelte/lazy-loading-svelte) · [snippets-routing](../../examples/web/svelte/snippets-routing) · [reactive-source](../../examples/web/svelte/reactive-source) · [search-schema](../../examples/web/svelte/search-schema) · [combined](../../examples/web/svelte/combined)
+
+Server-side rendering: [ssr](../../examples/web/svelte/ssr-examples/ssr) · [ssr-streaming](../../examples/web/svelte/ssr-examples/ssr-streaming) · [ssg](../../examples/web/svelte/ssr-examples/ssg)
 
 ## Related Packages
 
