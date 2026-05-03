@@ -1,10 +1,12 @@
 import { browserPluginFactory } from "@real-router/browser-plugin";
 import { hydrateRouter } from "@real-router/core/utils";
 import { RouterProvider } from "@real-router/react";
+import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 import { hydrateRoot } from "react-dom/client";
 
 import { App } from "./App";
 import { createAppRouter } from "./router/createAppRouter";
+import { loaders } from "./router/loaders";
 
 declare global {
   interface Window {
@@ -16,7 +18,7 @@ const router = createAppRouter({
   isAuthenticated: document.cookie.includes("auth=1"),
 });
 
-router.usePlugin(browserPluginFactory());
+router.usePlugin(browserPluginFactory(), ssrDataPluginFactory(loaders));
 
 // Hydration (#563): use server's canonical state.path. serializeRouterState
 // strips state.transition (regenerated on commit) but keeps name/params/path
