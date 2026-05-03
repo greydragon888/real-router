@@ -224,4 +224,69 @@ test.describe("RSC SSR Example", () => {
     // Flight chunks for the same content are inline-injected for client takeover.
     expect(html).toContain("self.__FLIGHT_DATA");
   });
+
+  test("Scenario 10: browser back/forward navigation triggers /__rsc per step + correct DOM", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: "Home" })).toBeVisible();
+    await page.waitForLoadState("networkidle");
+
+    const rscRequests: string[] = [];
+
+    page.on("request", (req) => {
+      if (req.url().includes("/__rsc")) rscRequests.push(req.url());
+    });
+
+    // Forward: / → /users (via Link click).
+    await page.getByTestId("nav-users").click();
+    await expect(page).toHaveURL(/\/users$/);
+    await expect(page.getByTestId("users-list")).toBeVisible();
+
+    // Back: /users → /
+    await page.goBack();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole("heading", { name: "Home" })).toBeVisible();
+
+    // Forward (history): / → /users
+    await page.goForward();
+    await expect(page).toHaveURL(/\/users$/);
+    await expect(page.getByTestId("users-list")).toBeVisible();
+
+    // 3 navigations → 3 /__rsc fetches; the back step is also a navigation
+    // (browser-plugin emits popstate → router.navigateToState → subscribe fires).
+    expect(rscRequests.length).toBeGreaterThanOrEqual(3);
+
+    const usersRequests = rscRequests.filter((u) =>
+      u.includes("%2Fusers"),
+    ).length;
+    const homeRequests = rscRequests.filter((u) =>
+      u.endsWith("%2F"),
+    ).length;
+
+    expect(usersRequests).toBeGreaterThanOrEqual(2);
+    expect(homeRequests).toBeGreaterThanOrEqual(1);
+  });
+
+  test("Scenario 11: interleaved Link clicks — abort logic prevents stale Flight from winning", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+
+    // Click Users → starts /__rsc?route=/users fetch. Immediately click Home
+    // before the Users Flight payload arrives. App.tsx's AbortController must
+    // cancel the in-flight Users request so the final DOM is Home, not Users.
+    await page.getByTestId("nav-users").click();
+    await page.getByTestId("nav-home").click();
+
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole("heading", { name: "Home" })).toBeVisible();
+
+    // After dust settles: no users-list lingering, no race-imposed flicker
+    // back to Users.
+    await page.waitForLoadState("networkidle");
+    await expect(page.getByTestId("users-list")).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Home" })).toBeVisible();
+  });
 });

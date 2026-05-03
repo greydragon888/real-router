@@ -18,8 +18,22 @@ export function App({ router, payload }: AppProps): ReactNode {
   const [node, setNode] = useState<ReactNode>(initialNode);
 
   useEffect(() => {
-    return router.subscribe(({ route }) => {
-      fetch(`/__rsc?route=${encodeURIComponent(route.path)}`)
+    // Abort the previous in-flight Flight request when navigation changes.
+    // Prevents the stale-response-wins race when the user clicks Link A,
+    // then immediately Link B before A's fetch resolves: A would set the
+    // node last, displaying the wrong route.
+    let activeController: AbortController | null = null;
+
+    const unsubscribe = router.subscribe(({ route }) => {
+      activeController?.abort();
+
+      const controller = new AbortController();
+
+      activeController = controller;
+
+      fetch(`/__rsc?route=${encodeURIComponent(route.path)}`, {
+        signal: controller.signal,
+      })
         .then((response) => {
           if (!response.body) {
             throw new Error("RSC response missing body");
@@ -31,14 +45,21 @@ export function App({ router, payload }: AppProps): ReactNode {
           return createFromReadableStream<ReactNode>(response.body);
         })
         .then((newNode) => {
+          if (controller.signal.aborted) return;
           startTransition(() => {
             setNode(newNode);
           });
         })
         .catch((error: unknown) => {
+          if (controller.signal.aborted) return;
           console.error("[App] /__rsc fetch failed:", error);
         });
     });
+
+    return () => {
+      activeController?.abort();
+      unsubscribe();
+    };
   }, [router]);
 
   return (
