@@ -7,7 +7,13 @@ import type { RscLoaderFactoryMap } from "@real-router/rsc-server-plugin";
 
 export const loaders: RscLoaderFactoryMap<AppDependencies> = {
   home: () => () => <HomePage />,
-  "users.list": () => () => <UsersList />,
+  "users.list": () => (params) => {
+    const role =
+      params.role === "admin" || params.role === "user"
+        ? params.role
+        : undefined;
+    return <UsersList roleFilter={role} />;
+  },
   "users.profile": (_router, getDep) => async (params) => {
     const database = getDep("db");
     const id = params.id as string;

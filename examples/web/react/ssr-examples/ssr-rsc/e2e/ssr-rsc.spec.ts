@@ -289,4 +289,77 @@ test.describe("RSC SSR Example", () => {
     await expect(page.getByTestId("users-list")).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "Home" })).toBeVisible();
   });
+
+  test("Scenario 12: ?role=admin search param flows from URL → loader → Server Component", async ({
+    request,
+  }) => {
+    const response = await request.get("/users?role=admin");
+    const html = await response.text();
+
+    expect(response.status()).toBe(200);
+    expect(html).toContain('data-role-filter="admin"');
+    expect(html).toContain('data-user-id="1"');
+    expect(html).toContain("Alice Anderson");
+
+    // Bob (role:user) and Jane (role:user) must be excluded by the filter.
+    expect(html).not.toContain('data-user-id="2"');
+    expect(html).not.toContain('data-user-id="42"');
+    expect(html).toContain("Users (admin)");
+  });
+
+  test("Scenario 13: ?role=user filters Server Component to non-admin users", async ({
+    request,
+  }) => {
+    const response = await request.get("/users?role=user");
+    const html = await response.text();
+
+    expect(html).toContain('data-role-filter="user"');
+    expect(html).toContain('data-user-id="2"');
+    expect(html).toContain('data-user-id="42"');
+    expect(html).not.toContain('data-user-id="1"');
+  });
+
+  test("Scenario 14: no ?role param returns full unfiltered list", async ({
+    request,
+  }) => {
+    const response = await request.get("/users");
+    const html = await response.text();
+
+    expect(html).toContain('data-role-filter="all"');
+    expect(html).toContain('data-user-id="1"');
+    expect(html).toContain('data-user-id="2"');
+    expect(html).toContain('data-user-id="42"');
+  });
+
+  test("Scenario 15: search params survive client-side navigation via /__rsc", async ({
+    page,
+  }) => {
+    await page.goto("/users?role=admin");
+    await expect(page.getByTestId("users-list")).toBeVisible();
+    await expect(page.locator('[data-role-filter]')).toHaveAttribute(
+      "data-role-filter",
+      "admin",
+    );
+
+    // Now back to home, then forward back to /users?role=admin via history.
+    // The Flight payload from /__rsc?route=%2Fusers%3Frole%3Dadmin must
+    // carry the same filtered state.
+    const rscRequests: string[] = [];
+
+    page.on("request", (req) => {
+      if (req.url().includes("/__rsc")) rscRequests.push(req.url());
+    });
+
+    await page.getByTestId("nav-home").click();
+    await page.goBack();
+
+    await expect(page).toHaveURL(/\/users\?role=admin$/);
+    await expect(page.locator('[data-role-filter]')).toHaveAttribute(
+      "data-role-filter",
+      "admin",
+    );
+
+    // /__rsc?route=... preserves the query string.
+    expect(rscRequests.some((u) => u.includes("role%3Dadmin"))).toBe(true);
+  });
 });

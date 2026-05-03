@@ -2,15 +2,23 @@ import { database } from "../database";
 
 import type { ReactElement } from "react";
 
-export async function UsersList(): Promise<ReactElement> {
-  const users = await database.users.list();
+interface UsersListProps {
+  readonly roleFilter?: "admin" | "user";
+}
+
+export async function UsersList({
+  roleFilter,
+}: UsersListProps): Promise<ReactElement> {
+  const users = await database.users.list(
+    roleFilter ? { role: roleFilter } : undefined,
+  );
 
   return (
-    <section data-testid="users-list">
-      <h1>Users</h1>
+    <section data-testid="users-list" data-role-filter={roleFilter ?? "all"}>
+      <h1>{roleFilter ? `Users (${roleFilter})` : "Users"}</h1>
       <ul>
         {users.map((user) => (
-          <li key={user.id} data-user-id={user.id}>
+          <li key={user.id} data-user-id={user.id} data-user-role={user.role}>
             {user.name}
           </li>
         ))}
