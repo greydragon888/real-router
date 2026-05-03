@@ -1,8 +1,4 @@
-interface CurrentUser {
-  id: string;
-  name: string;
-  role: "admin" | "user";
-}
+import type { CurrentUser } from "../_known-users";
 
 export const routes = [
   { name: "home", path: "/" },

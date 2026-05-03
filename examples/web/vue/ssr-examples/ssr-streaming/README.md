@@ -8,7 +8,7 @@
 - **Vue 3 native streaming** via `vue/server-renderer.renderToWebStream` — server emits HTML chunks as the render tree resolves
 - **`<Suspense>` + `async setup()`** for deferred sections (reviews, related items) that render in via Vue's chunked SSR pipeline
 - **Per-route artificial delays** (600 ms reviews, 1200 ms related items) on **server only** — client hydration is instant via `Promise.resolve()`
-- **Full-reload navigation** via `<Link>` falling back to native `<a href>` (no `browser-plugin`) — every navigation is a fresh SSR render
+- **No `browser-plugin`** — each direct page load (typed URL, browser refresh, deep link, `page.goto()`) triggers a fresh SSR render with full streaming. `<Link>` components emit correct `<a href>` HTML for crawlers and modifier-key clicks (Cmd/Ctrl/middle-click → new tab). Normal left-clicks are intercepted by the adapter (`evt.preventDefault()` + `router.navigate()`) but without `browser-plugin` the URL never changes — the demo intentionally focuses on the SSR streaming pipeline rather than post-hydration CSR. For full SPA navigation on top of streaming SSR, layer `browser-plugin` on top (see [`ssr/`](../ssr) for the pattern).
 
 The router does **nothing streaming-specific**. All streaming behavior comes from Vue 3's native `<Suspense>` + `renderToWebStream` + `async setup()`. Real-Router's role is identical to non-streaming SSR: per-request `cloneRouter()`, `start(url)`, plugin-driven critical data via `state.context.data`.
 
@@ -97,24 +97,29 @@ Key constraints:
 pnpm dev          # Express + Vite middleware (HMR), http://localhost:3000
 pnpm build:app    # vue-tsc + vite build (client + ssr bundles)
 pnpm preview      # NODE_ENV=production tsx server/index.ts
-pnpm test:e2e     # Playwright — 9 acceptance scenarios
+pnpm test:e2e     # Playwright — 14 acceptance scenarios
 ```
 
 ## E2e Scenarios
 
-[`e2e/ssr-streaming.spec.ts`](e2e/ssr-streaming.spec.ts) — 9 Playwright scenarios mirroring the React example where the runtime allows:
+[`e2e/ssr-streaming.spec.ts`](e2e/ssr-streaming.spec.ts) — 14 Playwright scenarios mirroring the React example where the runtime allows, plus four Vue-specific invariants the React equivalent does not exercise:
 
 1. **Shell renders before deferred content** — `page.goto(..., { waitUntil: "commit" })` + critical content visible quickly
 2. **Streaming response contains resolved deferred content** — HTTP-level test verifying the streamed HTML contains both reviews and related sections
 3. **Deferred sections render after critical content** — browser visibility check
 4. **No hydration errors** — console clean of `hydrat`/`mismatch` warnings after stream completes
-5. **Every page is server-rendered with streaming** — full-reload navigation, fresh SSR per visit
+5. **Every page is server-rendered with streaming** — full-reload navigation via `page.goto()`, fresh SSR per visit
 6. **Critical loader data lands in `__SSR_STATE__` inline script** — round-trip via `serializeRouterState`
 7. **Per-request isolation under 9 concurrent loads** — `cloneRouter()` integrity
 8. **Deferred section data arrives in stream chunks** — verifies Suspense child markup is present in the response body
 9. **Suspense error containment** — `onErrorCaptured` catches a rejected Reviews fetch on hydration without affecting siblings
+10. **404 fallback** — unknown routes return 404 status with the NotFound page rendered through the streaming pipeline
+11. **Critical content precedes deferred sections** — positional invariant: resolved critical HTML appears in the response BEFORE the `<Suspense>`-rendered sections (Vue's blocking SSR Suspense is enforced)
+12. **Chunked transfer + per-Suspense timing** — `Transfer-Encoding: chunked` is set, `Content-Length` is absent, and body delivery wall-clock ≥ slowest Suspense delay (≥1100ms) — proves the response is genuinely streamed, not buffered
+13. **Empty deferred state** — when reviews/related-items resolve to `[]`, empty-state UI renders without errors and without hydration warnings
+14. **No hydration flicker** — server-rendered Suspense content is immediately present after commit; `reviews-fallback` / `related-fallback` markers never appear in the DOM (consequence of Vue's blocking SSR Suspense)
 
-Note: there is no Vue equivalent of React's `<!--$?-->` Suspense placeholder marker test, because Vue does not emit out-of-order placeholders.
+Note: there is no Vue equivalent of React's `<!--$?-->` Suspense placeholder marker test, because Vue does not emit out-of-order placeholders. Scenarios 11, 12, and 14 are the Vue-specific surrogates that pin down the actual streaming + blocking-Suspense contract.
 
 ## Why No `<Await>` / `defer()` Wrapper API?
 

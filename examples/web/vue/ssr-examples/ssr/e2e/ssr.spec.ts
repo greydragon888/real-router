@@ -509,7 +509,7 @@ test.describe("SSR (Vue)", () => {
     page,
   }) => {
     // Cookie injected before goto so entry-client.ts picks it up at boot
-    // (getCurrentUserFromDocument parses document.cookie before usePlugin).
+    // (lookupUserFromCookies(parseCookieHeader(document.cookie)) before usePlugin).
     await page.context().addCookies([
       { name: "userId", value: "1", url: "http://localhost:3000" },
     ]);

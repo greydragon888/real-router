@@ -10,13 +10,9 @@ import App from "./App.vue";
 import { createAppRouter } from "./router/createAppRouter";
 import { loaders } from "./router/loaders";
 
-const baseRouter = createAppRouter();
+import type { CurrentUser } from "./_known-users";
 
-export interface CurrentUser {
-  id: string;
-  name: string;
-  role: "admin" | "user";
-}
+const baseRouter = createAppRouter();
 
 interface RenderContext {
   currentUser: CurrentUser | null;

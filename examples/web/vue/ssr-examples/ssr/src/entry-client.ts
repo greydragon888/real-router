@@ -5,51 +5,17 @@ import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 import { createSSRApp, h } from "vue";
 
 import App from "./App.vue";
+import { lookupUserFromCookies, parseCookieHeader } from "./_known-users";
 import { createAppRouter } from "./router/createAppRouter";
 import { loaders } from "./router/loaders";
-
-import type { CurrentUser } from "./entry-server";
 
 declare global {
   // eslint-disable-next-line no-var
   var __SSR_STATE__: { path: string } | undefined;
 }
 
-const KNOWN_USERS: Partial<Record<string, CurrentUser>> = {
-  "1": { id: "1", name: "Alice", role: "admin" },
-  "2": { id: "2", name: "Bob", role: "user" },
-};
-
-function getCurrentUserFromDocument(): CurrentUser | null {
-  const cookies = Object.fromEntries(
-    document.cookie
-      .split(";")
-      .map((p) => p.trim())
-      .filter(Boolean)
-      .map((p) => {
-        const idx = p.indexOf("=");
-
-        return idx === -1
-          ? ([p, ""] as const)
-          : ([p.slice(0, idx), p.slice(idx + 1)] as const);
-      }),
-  );
-
-  const userId = cookies.userId;
-  const user = userId ? KNOWN_USERS[userId] : undefined;
-
-  if (user) {
-    return user;
-  }
-  if (cookies.auth === "1") {
-    return KNOWN_USERS["1"] ?? null;
-  }
-
-  return null;
-}
-
 const router = createAppRouter({
-  currentUser: getCurrentUserFromDocument(),
+  currentUser: lookupUserFromCookies(parseCookieHeader(document.cookie)),
 });
 
 router.usePlugin(browserPluginFactory(), ssrDataPluginFactory(loaders));

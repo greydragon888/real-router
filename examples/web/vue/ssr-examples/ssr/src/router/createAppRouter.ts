@@ -1,10 +1,8 @@
-import { createRouter } from "@real-router/core";
+import { createRouter, type Router } from "@real-router/core";
 
 import { routes } from "./routes";
 
-export function createAppRouter(
-  deps?: Record<string, unknown>,
-): ReturnType<typeof createRouter> {
+export function createAppRouter(deps?: Record<string, unknown>): Router {
   return createRouter(
     routes,
     { defaultRoute: "home", allowNotFound: true },
