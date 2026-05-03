@@ -42,6 +42,18 @@ const products = new Map<string, Product>([
       price: 0,
     },
   ],
+  // Test fixture for empty deferred-state scenario: real product with no
+  // reviews and no related items in the lookup tables; Reviews/RelatedItems
+  // resolve to [] without throwing, exercising the empty-state UI branches.
+  [
+    "5",
+    {
+      id: "5",
+      name: "Niche Cable Tester",
+      description: "Real product, just nobody has reviewed it yet.",
+      price: 29.99,
+    },
+  ],
 ]);
 
 export function getProduct(id: string): Product | undefined {
