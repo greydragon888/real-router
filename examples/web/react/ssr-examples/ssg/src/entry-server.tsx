@@ -12,6 +12,9 @@ import { App } from "./App";
 import { createAppRouter } from "./router/createAppRouter";
 import { entries } from "./router/entries";
 import { loaders } from "./router/loaders";
+import { NOT_FOUND_META, getMetaForState } from "./router/meta";
+
+import type { PageMeta } from "./router/meta";
 
 const baseRouter = createAppRouter();
 
@@ -19,6 +22,7 @@ interface RenderResult {
   html: string;
   ssrJson: string;
   statusCode: number;
+  meta: PageMeta;
 }
 
 export async function render(url: string): Promise<RenderResult> {
@@ -36,10 +40,14 @@ export async function render(url: string): Promise<RenderResult> {
       </RouterProvider>,
     );
 
+    const meta =
+      state.name === UNKNOWN_ROUTE ? NOT_FOUND_META : getMetaForState(state);
+
     return {
       html,
       ssrJson: serializeRouterState(state),
       statusCode,
+      meta,
     };
   } finally {
     router.dispose();

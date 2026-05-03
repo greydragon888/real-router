@@ -166,6 +166,81 @@ test.describe("SSG", () => {
     }
   });
 
+  test("per-page meta tags: home, users list, dynamic profile carry distinct title + description", async ({
+    request,
+  }) => {
+    const cases = [
+      {
+        path: "/",
+        title: "Home — Real-Router SSG",
+        description: "Welcome page of the Real-Router SSG demo.",
+      },
+      {
+        path: "/users/",
+        title: "All Users — Real-Router SSG",
+        description: "Browse the full list of pre-rendered users.",
+      },
+      {
+        path: "/users/1/",
+        title: "Alice — Real-Router SSG",
+        description: "Profile page for Alice (id: 1).",
+      },
+      {
+        path: "/users/3/",
+        title: "Charlie — Real-Router SSG",
+        description: "Profile page for Charlie (id: 3).",
+      },
+    ];
+
+    for (const { path, title, description } of cases) {
+      const response = await request.get(path);
+
+      expect(response.status(), path).toBe(200);
+
+      const html = await response.text();
+
+      expect(html, `${path} title`).toContain(`<title>${title}</title>`);
+      expect(html, `${path} description`).toContain(
+        `content="${description}"`,
+      );
+    }
+  });
+
+  test("404.html: pre-rendered fallback has not-found meta and no __SSR_STATE__", async ({
+    request,
+  }) => {
+    const response = await request.get("/404.html");
+
+    expect(response.status()).toBe(200);
+
+    const html = await response.text();
+
+    expect(html).toContain("<title>Page Not Found — Real-Router SSG</title>");
+    expect(html).toContain(
+      'content="The page you are looking for does not exist."',
+    );
+    // Error fallback should not ship per-request hydration state.
+    expect(html).not.toContain("window.__SSR_STATE__");
+  });
+
+  test("sitemap.xml: lists all pre-rendered URLs with site origin", async ({
+    request,
+  }) => {
+    const response = await request.get("/sitemap.xml");
+
+    expect(response.status()).toBe(200);
+    expect(response.headers()["content-type"]).toContain("xml");
+
+    const xml = await response.text();
+
+    expect(xml).toContain("<urlset");
+    expect(xml).toContain("<loc>https://example.com/</loc>");
+    expect(xml).toContain("<loc>https://example.com/users</loc>");
+    expect(xml).toContain("<loc>https://example.com/users/1</loc>");
+    expect(xml).toContain("<loc>https://example.com/users/2</loc>");
+    expect(xml).toContain("<loc>https://example.com/users/3</loc>");
+  });
+
   test("static output isolation: each pre-rendered URL ships its own resolved __SSR_STATE__ snapshot", async ({
     request,
   }) => {
