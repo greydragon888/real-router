@@ -416,6 +416,39 @@ interface RealRouterOptions {
 
 Restores scroll on back/forward, scrolls to top (or `#hash`) on push. Three modes: `"restore"` (default), `"top"`, `"native"`. Custom containers via `scrollContainer: () => HTMLElement | null`. The utility is created by `provideEnvironmentInitializer` and torn down via `inject(DestroyRef)`. Options are a snapshot at bootstrap — not reactive to runtime changes. See [Scroll Restoration guide](https://github.com/greydragon888/real-router/wiki/Scroll-Restoration) for details.
 
+## Server-Side Rendering
+
+For Angular SSR (`@angular/ssr` with `outputMode: "server"`) and SSG build-time render via `renderApplication`, use `provideRealRouterFactory` instead of `provideRealRouter`. The factory creates a per-request router clone via Angular's `REQUEST: InjectionToken<Request | null>`, runs `router.start(url)` through `provideAppInitializer`, and disposes the router on `DestroyRef`:
+
+```typescript
+import { provideRealRouterFactory } from "@real-router/angular";
+import { browserPluginFactory } from "@real-router/browser-plugin";
+import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
+
+const baseRouter = createRouter(routes);
+
+export const appConfig: ApplicationConfig = {
+  providers: [
+    provideRealRouterFactory({
+      baseRouter,
+      plugins: (request) =>
+        request
+          ? [ssrDataPluginFactory(loaders)]
+          : [browserPluginFactory(), ssrDataPluginFactory(loaders)],
+      deps: (request) => ({
+        currentUser: request
+          ? parseCookies(request.headers.get("cookie"))
+          : parseCookies(document.cookie),
+      }),
+    }),
+  ],
+};
+```
+
+Existing `provideRealRouter(router)` is unchanged — keep using it for SPA / post-hydrate scenarios. Both APIs ship in parallel; pick one for the whole application.
+
+See [CLAUDE.md → SSR Support](./CLAUDE.md#ssr-support) for the full decision matrix, lifecycle diagram, plugin separation guidance, and SSG `platformProviders` mock pattern.
+
 ## View Transitions
 
 Opt-in animated route transitions via the browser's [View Transitions API](https://developer.mozilla.org/en-US/docs/Web/API/View_Transitions_API):
