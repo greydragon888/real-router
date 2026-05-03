@@ -23,23 +23,45 @@ const paths = [...(await getStaticPaths()), "/users"];
 
 console.log(`Pre-rendering ${paths.length} routes...`);
 
+const failed: { url: string; error: string }[] = [];
+
 for (const url of paths) {
-  const result = await render(url);
+  try {
+    const result = await render(url);
 
-  const ssrScript = `<script>window.__SSR_STATE__=${result.ssrJson}</script>`;
+    const ssrScript = `<script>window.__SSR_STATE__=${result.ssrJson}</script>`;
 
-  const html = template
-    .replace("<!--ssr-outlet-->", result.html)
-    .replace("<!--ssr-state-->", ssrScript);
+    const html = template
+      .replace("<!--ssr-outlet-->", result.html)
+      .replace("<!--ssr-state-->", ssrScript);
 
-  const filePath =
-    url === "/"
-      ? path.resolve(dist, "index.html")
-      : path.resolve(dist, url.slice(1), "index.html");
+    const filePath =
+      url === "/"
+        ? path.resolve(dist, "index.html")
+        : path.resolve(dist, url.slice(1), "index.html");
 
-  mkdirSync(path.dirname(filePath), { recursive: true });
-  writeFileSync(filePath, html);
-  console.log(`  ${url} → ${path.relative(root, filePath)}`);
+    mkdirSync(path.dirname(filePath), { recursive: true });
+    writeFileSync(filePath, html);
+    console.log(`  ${url} → ${path.relative(root, filePath)}`);
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unknown error";
+
+    console.error(`  ${url} ✗ ${message}`);
+    failed.push({ url, error: message });
+  }
+}
+
+if (failed.length > 0) {
+  console.error(
+    `\nBuild failed: ${failed.length}/${paths.length} routes errored.`,
+  );
+
+  for (const { url, error } of failed) {
+    console.error(`  ${url}: ${error}`);
+  }
+
+  process.exit(1);
 }
 
 console.log("Done!");

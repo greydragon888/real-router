@@ -199,6 +199,49 @@ test.describe("Streaming SSR Example", () => {
     );
   });
 
+  test("Scenario 10: Suspense error containment — rejected reviews promise renders boundary fallback, rest of page unaffected", async ({
+    page,
+  }) => {
+    const errors: string[] = [];
+
+    page.on("console", (msg) => {
+      if (msg.type() === "error") errors.push(msg.text());
+    });
+
+    await page.goto("/products/4");
+
+    // Critical product data renders normally.
+    await expect(page.getByTestId("product-name")).toHaveText(
+      "Broken Reviews Demo",
+    );
+
+    // Reviews section caught by <ReviewsErrorBoundary>, swapped for fallback.
+    await expect(page.getByTestId("reviews-error")).toBeVisible();
+    await expect(page.getByTestId("reviews-error")).toContainText(
+      "Reviews service unavailable",
+    );
+
+    // Reviews section never appears (boundary supplanted it).
+    await expect(page.getByTestId("reviews-section")).toHaveCount(0);
+
+    // Sibling deferred section (related items) is unaffected.
+    await expect(page.getByTestId("related-section")).toBeVisible({
+      timeout: 5000,
+    });
+
+    await page.waitForLoadState("networkidle");
+
+    // No hydration errors. Some console warnings about the rejected promise
+    // are OK (componentDidCatch logs), but no React-level "rendered fewer hooks" or hydration mismatches.
+    const hydrationErrors = errors.filter(
+      (e) =>
+        e.toLowerCase().includes("hydrat") ||
+        e.toLowerCase().includes("mismatch"),
+    );
+
+    expect(hydrationErrors).toEqual([]);
+  });
+
   test("Scenario 8: deferred section data arrives in late stream chunks (Suspense templates)", async ({
     request,
   }) => {

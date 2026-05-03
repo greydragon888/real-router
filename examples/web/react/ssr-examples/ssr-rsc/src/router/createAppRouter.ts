@@ -17,6 +17,8 @@ export const routes: Route<AppDependencies>[] = [
       { name: "profile", path: "/:id" },
     ],
   },
+  // Error-path demonstration: loader rejects, entry catches, returns 500.
+  { name: "boom", path: "/boom" },
 ];
 
 export function createAppRouter(

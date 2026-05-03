@@ -26,6 +26,10 @@ function wrapInScript(json: string): string {
   return `<script>window.__SSR_STATE__=${json}</script>`;
 }
 
+function renderErrorPage(message: string): string {
+  return `<div data-testid="server-error"><h1>Server Error</h1><p>${message}</p></div>`;
+}
+
 export async function render(
   url: string,
   context: RenderContext,
@@ -57,8 +61,25 @@ export async function render(
       statusCode,
       redirect: null,
     };
-  } catch {
-    return { html: "", serializedData: "", statusCode: 302, redirect: "/" };
+  } catch (error) {
+    const code = (error as { code?: string }).code;
+
+    // Auth-guard rejection → 302 to home (UX-correct, not really an error).
+    if (code === "CANNOT_ACTIVATE") {
+      return { html: "", serializedData: "", statusCode: 302, redirect: "/" };
+    }
+
+    // Real error path — bubble loader/route errors to a 500 + error UI.
+    // Server-side, no reason to expose internal stack traces; client gets
+    // a deterministic shape so e2e can assert on it.
+    const message = error instanceof Error ? error.message : "Unknown error";
+
+    return {
+      html: renderErrorPage(message),
+      serializedData: "",
+      statusCode: 500,
+      redirect: null,
+    };
   } finally {
     router.dispose();
   }

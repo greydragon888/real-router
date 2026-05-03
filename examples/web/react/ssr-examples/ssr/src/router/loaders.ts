@@ -20,4 +20,8 @@ export const loaders: DataLoaderFactoryMap = {
     Promise.resolve<UserProfileData>({
       user: database.users.findById(params.id as string),
     }),
+  // Intentional throw — verifies that loader rejections propagate through
+  // router.start(), bypass partial render, and let entry-server.tsx
+  // translate the error into a 500 response with an error page.
+  boom: () => () => Promise.reject(new Error("Loader exploded for /boom")),
 };

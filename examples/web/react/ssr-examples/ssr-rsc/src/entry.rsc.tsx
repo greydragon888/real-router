@@ -57,6 +57,17 @@ async function handler(request: Request): Promise<Response> {
       ssrState: serializeRouterState(state, { excludeContext: ["rsc"] }),
       statusCode,
     });
+  } catch (error) {
+    // Loader rejection → 500 + Server Component error page (no Flight, plain HTML).
+    // Caller can refine for specific routing-vs-loader error codes; for the
+    // example we show a generic message.
+    const message = error instanceof Error ? error.message : "Unknown error";
+    const html = `<!doctype html><html><body><div data-testid="server-error"><h1>Server Error</h1><p>${message}</p></div></body></html>`;
+
+    return new Response(html, {
+      status: 500,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
   } finally {
     router.dispose();
   }

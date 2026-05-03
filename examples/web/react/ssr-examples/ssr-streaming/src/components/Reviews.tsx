@@ -22,6 +22,19 @@ const REVIEWS_BY_PRODUCT: Record<string, Review[]> = {
 const SERVER_REVIEWS_DELAY_MS = 600;
 
 function fetchReviews(productId: string): Promise<Review[]> {
+  // Demonstrates Suspense-boundary error containment for product id "4":
+  // the server resolves an empty reviews list (no error during SSR), but
+  // the client's hydration `use(rejectedPromise)` throws synchronously,
+  // and the wrapping <ReviewsErrorBoundary> catches it and replaces the
+  // SSR-rendered Reviews section with the error UI. Critical product data
+  // + sibling deferred (related items) render unaffected.
+  if (productId === "4") {
+    if (typeof globalThis.window === "undefined") {
+      return Promise.resolve([]);
+    }
+    return Promise.reject(new Error("Reviews service unavailable"));
+  }
+
   const reviews = REVIEWS_BY_PRODUCT[productId] ?? [];
 
   if (typeof globalThis.window === "undefined") {

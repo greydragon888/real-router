@@ -33,6 +33,18 @@ const products = new Map<string, Product>([
       price: 549,
     },
   ],
+  // Test fixture for Suspense error boundary scenario (id 4):
+  // Reviews loader rejects on this productId, but critical product data
+  // resolves normally — error containment verified end-to-end.
+  [
+    "4",
+    {
+      id: "4",
+      name: "Broken Reviews Demo",
+      description: "Reviews fetch is intentionally rejected for this product.",
+      price: 0,
+    },
+  ],
 ]);
 
 export function getProduct(id: string): Product | undefined {

@@ -15,4 +15,7 @@ export const loaders: RscLoaderFactoryMap<AppDependencies> = {
 
     return <UserProfile user={user} />;
   },
+  // Demonstrates loader error propagation: this loader rejects, the entry
+  // catches it and renders a 500 with a server-rendered error component.
+  boom: () => () => Promise.reject(new Error("Loader exploded for /boom")),
 };

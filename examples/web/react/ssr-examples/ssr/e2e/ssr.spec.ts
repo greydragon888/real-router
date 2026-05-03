@@ -300,6 +300,21 @@ test.describe("SSR", () => {
     }
   });
 
+  test("loader error: rejected loader returns 500 with server-error page", async ({
+    request,
+  }) => {
+    const response = await request.get("/boom");
+
+    expect(response.status()).toBe(500);
+
+    const html = await response.text();
+
+    expect(html).toContain('data-testid="server-error"');
+    expect(html).toContain("Loader exploded for /boom");
+    // No __SSR_STATE__ on error path — there is no resolved router state to ship.
+    expect(html).not.toContain("window.__SSR_STATE__");
+  });
+
   test("client navigation: ssr-data-plugin is SSR-only — loader does not re-run on navigate()", async ({
     page,
   }) => {

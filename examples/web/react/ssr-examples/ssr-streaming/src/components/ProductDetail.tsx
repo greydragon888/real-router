@@ -3,6 +3,7 @@ import { Suspense } from "react";
 
 import { RelatedItems } from "./RelatedItems";
 import { Reviews } from "./Reviews";
+import { ReviewsErrorBoundary } from "./ReviewsErrorBoundary";
 
 import type { ProductDetailData } from "../router/loaders";
 import type { ReactElement } from "react";
@@ -23,11 +24,13 @@ export function ProductDetail(): ReactElement {
       <p data-testid="product-price">${product.price}</p>
       <p data-testid="product-description">{product.description}</p>
 
-      <Suspense
-        fallback={<p data-testid="reviews-fallback">Loading reviews…</p>}
-      >
-        <Reviews productId={product.id} />
-      </Suspense>
+      <ReviewsErrorBoundary>
+        <Suspense
+          fallback={<p data-testid="reviews-fallback">Loading reviews…</p>}
+        >
+          <Reviews productId={product.id} />
+        </Suspense>
+      </ReviewsErrorBoundary>
 
       <Suspense
         fallback={<p data-testid="related-fallback">Loading related items…</p>}

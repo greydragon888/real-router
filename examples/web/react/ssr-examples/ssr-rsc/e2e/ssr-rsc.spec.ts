@@ -193,6 +193,21 @@ test.describe("RSC SSR Example", () => {
     expect(body).toContain("alice@example.com");
   });
 
+  test("Scenario 9: loader error → 500 with server-rendered error page (no Flight payload)", async ({
+    request,
+  }) => {
+    const response = await request.get("/boom");
+
+    expect(response.status()).toBe(500);
+
+    const html = await response.text();
+
+    expect(html).toContain('data-testid="server-error"');
+    expect(html).toContain("Loader exploded for /boom");
+    // Error path bypasses Flight rendering — no FLIGHT_DATA inline scripts.
+    expect(html).not.toContain("self.__FLIGHT_DATA");
+  });
+
   test("Scenario 8: SSR HTML reflects loader-driven Server Component output (Flight desuspended)", async ({
     request,
   }) => {
