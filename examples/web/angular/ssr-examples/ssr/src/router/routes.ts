@@ -19,6 +19,23 @@ export const routes: Route<AppDeps>[] = [
       },
     ],
   },
+  { name: "legacyUser", path: "/legacy-user/:id" },
+  { name: "slow", path: "/slow" },
+  // Mixed RenderMode demo:
+  //   /marketing → RenderMode.Prerender — built once at build time, served as
+  //                static HTML; no per-request server work, no auth, no data
+  //                that depends on the request.
+  //   /live      → RenderMode.Server   — rendered fresh per request, can read
+  //                cookies / headers via REQUEST DI.
+  { name: "marketing", path: "/marketing" },
+  { name: "live", path: "/live" },
+  // /gone is a sunset URL — the route is registered (so the SSR renderer
+  // produces an HTML body explaining the situation) but `app.routes.server.ts`
+  // pins its HTTP status to 410 Gone and adds a Sunset / Deprecation header
+  // pair. Demonstrates declarative HTTP status override via Angular's
+  // ServerRoute config — alternative to throwing a typed loader error and
+  // catching it in middleware (see /boom, /slow, /legacy-user/:id).
+  { name: "gone", path: "/gone" },
   {
     name: "dashboard",
     path: "/dashboard",

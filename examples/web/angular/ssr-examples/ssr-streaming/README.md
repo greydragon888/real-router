@@ -1,6 +1,8 @@
 # SSR Streaming Angular Example
 
-Real-Router with Angular 21 streaming SSR — `AngularNodeAppEngine` + `@defer` blocks + `withIncrementalHydration()` — and **zero router-specific streaming API**.
+Real-Router with Angular 21 SSR + `@defer` + `withIncrementalHydration()` — and **zero router-specific streaming API**.
+
+> **Terminology disclaimer.** "Streaming" in this example means **client-side incremental hydration**, not HTTP progressive flush. Angular 21's `AngularNodeAppEngine` does send the response with `Transfer-Encoding: chunked` (HTTP/1.1 default when the server doesn't know `Content-Length` upfront), but the body is rendered fully before any byte goes out: empirically the entire HTML lands in **one TCP frame, ~0 ms span** — there is no progressive flush, no `<!--$?-->`-style suspense markers, no out-of-order shell. The actual streaming win is that each `@defer` block ships as its own JS chunk and is downloaded + hydrated only when its trigger fires on the client. This is structurally different from React 19 / Solid streaming SSR (where the server progressively flushes HTML chunks as async data resolves). See "How This Differs From React / Vue / Svelte Streaming" below for the full comparison; reproduce the wire-format behavior with the Node `http.request` snippet at the bottom of this file.
 
 ## What This Demonstrates
 
@@ -8,8 +10,13 @@ Real-Router with Angular 21 streaming SSR — `AngularNodeAppEngine` + `@defer` 
 - **`@real-router/ssr-data-plugin` for critical data** — `state.context.data.product` resolves before the shell renders, mirrors React/Vue/Solid streaming examples.
 - **`@defer (on viewport)` for Reviews** — server emits `@placeholder` content; client downloads + hydrates the Reviews component when its placeholder enters the viewport.
 - **`@defer (on hover)` for RelatedItems** — server emits `@placeholder`; client downloads + hydrates only when the user hovers the placeholder area.
-- **`provideClientHydration(withIncrementalHydration())`** — Angular 21 stable feature; hydrates per-`@defer` block, not the whole tree atomically.
-- **AngularNodeAppEngine streaming** — `Response.body` is a `ReadableStream`; `writeResponseToNodeResponse` pipes chunks to the Node `res`.
+- **`@defer (on idle; prefetch on viewport; hydrate on idle)` for SpecSheet** — *decoupled triggers*. Chunk download starts as soon as the placeholder enters the viewport (prefetch), but the JS doesn't run on the main thread until `requestIdleCallback` fires (hydrate). Optimal for low-priority interactive content where TTI matters.
+- **`@defer (on interaction)` for Q&A** — chunk loads + hydrates only after the user clicks/focuses/keys-down on the placeholder button. Cheaper than `(on hover)` for content the user is unlikely to read on every visit.
+- **`@defer (when signal())` for Tech details** — predicate-based trigger. Unique to Angular: chunk loads + component hydrates when the bound signal flips truthy. **One-shot** — once activated, the component stays mounted even if the predicate flips back to false (use a regular `@if` for reactive show/hide).
+- **`@defer (on timer(1500ms))` for News banner** — pure-time-based trigger. Block hydrates 1.5 s after the placeholder enters the DOM, no user interaction needed.
+- **`@defer (on immediate)` for Analytics pixel** — code-split chunk that loads as soon as the app bootstraps. Equivalent to a regular eagerly-loaded component, but the chunk boundary keeps the main bundle small (useful for cache-bustable third-party SDKs).
+- **`provideClientHydration(withIncrementalHydration(), withEventReplay())`** — Angular 21 stable. Per-`@defer` block hydration **plus** event replay: clicks/keydowns issued before a block hydrates are captured globally and replayed once the component takes over. Verified by an e2e test that clicks "Mark all read" while the Reviews chunk is artificially delayed by 1.2 s — the click survives the gap and `data-marked` flips to `"true"` after hydration.
+- **`AngularNodeAppEngine` Web `Response`** — `Response.body` is a `ReadableStream` (Web Streams API) and `writeResponseToNodeResponse` pipes it to the Node `res` with `Transfer-Encoding: chunked` framing. **Don't confuse this with React 19 / Solid progressive streaming**: Angular fully renders the HTML before flushing the first byte (empirically: 1 TCP frame, ~0 ms span — the disclaimer above explains how to reproduce). Chunked transfer here is just HTTP/1.1 default framing for an unknown-length body, not out-of-order streaming.
 
 The router does **nothing streaming-specific**. All streaming behavior comes from Angular's native `@defer` blocks + `withIncrementalHydration()` + `AngularNodeAppEngine`. Real-Router's role is identical to non-streaming SSR: per-request `cloneRouter()`, `start(url)`, plugin-driven critical data via `state.context.data`.
 
@@ -19,11 +26,12 @@ Angular 21 streaming SSR is **structurally different** from React 19's `renderTo
 
 |  | React 19 | Vue 3 | Svelte 5 | **Angular 21** |
 | --- | --- | --- | --- | --- |
-| Streaming primitive | `renderToReadableStream` + `<Suspense>` | `renderToWebStream` + `<Suspense>` | `await render()` + `{#await}` | `AngularNodeAppEngine.handle()` + `Response.body` ReadableStream |
-| Out-of-order placeholders in shell | Yes — `<!--$?-->` markers + chunks | No — sequential, top-down | No — pending snippet only | Yes — `@placeholder` content shipped server-side, real component downloaded + hydrated on trigger |
+| Streaming primitive | `renderToReadableStream` + `<Suspense>` | `renderToWebStream` + `<Suspense>` | `await render()` + `{#await}` | `AngularNodeAppEngine.handle()` returning a Web `Response` |
+| Out-of-order placeholders in shell | Yes — `<!--$?-->` markers + chunks | No — sequential, top-down | No — pending snippet only | No — `@placeholder` is rendered into the same single HTML document; `@defer` is a *client-side* trigger boundary |
 | Selective hydration | Yes — hydrates resolved islands | No — atomic `app.mount()` | No — atomic `mount` / `hydrate` | **Yes — `withIncrementalHydration()` hydrates per-`@defer` block on its trigger** |
 | Server resolves async | progressive | blocking | pending only | full critical render server-side; deferred sections lazy on client |
-| Network model | streaming | streaming | RSC-like | streaming + lazy hydration |
+| HTTP wire format | `Transfer-Encoding: chunked` + progressive flush (multiple frames over time) | chunked + progressive flush | single payload | **chunked framing, single TCP frame** (no progressive flush — body rendered in full before flush) |
+| Network model | true HTTP streaming | true HTTP streaming | RSC-like | **lazy hydration only** (HTTP body arrives at once) |
 
 What this example actually demonstrates for Angular:
 
@@ -76,6 +84,50 @@ server-runner.mjs                 Node.js wrapper — see ssr/server-runner.mjs 
       <p data-testid="reviews-fallback">Loading reviews…</p>
     }
 
+    <!--
+      SpecSheet: prefetch chunk as soon as placeholder enters viewport,
+      but defer hydration to requestIdleCallback. Chunk download is
+      eager, JS execution is lazy.
+    -->
+    @defer (on idle; prefetch on viewport; hydrate on idle) {
+      <spec-sheet [productId]="p.id" />
+    } @placeholder {
+      <p data-testid="spec-fallback">Loading specs…</p>
+    }
+
+    <!-- Q&A: chunk loads only after the user clicks the placeholder button -->
+    @defer (on interaction; hydrate on interaction) {
+      <qa-section [productId]="p.id" />
+    } @placeholder {
+      <button type="button" data-testid="qa-trigger">Show customer Q&A</button>
+    }
+
+    <!--
+      Tech details: predicate-based @defer. Chunk loads + component
+      hydrates when showTech() flips truthy. One-shot — once activated,
+      stays mounted. (Use a regular @if for reactive show/hide.)
+    -->
+    <button type="button" data-testid="tech-toggle" (click)="toggleTech()">
+      {{ showTech() ? "Hide" : "Show" }} technical details
+    </button>
+    @defer (when showTech(); hydrate when showTech()) {
+      <tech-details [productId]="p.id" />
+    } @placeholder {
+      <p data-testid="tech-fallback">Click "Show" to load the spec table.</p>
+    }
+
+    <!-- News banner: appears 1500 ms after the placeholder enters the DOM -->
+    @defer (on timer(1500ms); hydrate on timer(1500ms)) {
+      <news-banner />
+    } @placeholder {
+      <p data-testid="news-fallback">Banner loading…</p>
+    }
+
+    <!-- Analytics pixel: own chunk for cache busting, hydrates immediately -->
+    @defer (on immediate; hydrate on immediate) {
+      <analytics-pixel [productId]="p.id" />
+    }
+
     <!-- RelatedItems: server emits @placeholder, client hydrates on hover -->
     @defer (on hover; hydrate on hover) {
       <related-items [productId]="p.id" />
@@ -104,7 +156,7 @@ pnpm test:e2e     # Playwright — 11 acceptance scenarios
 
 ## E2e Scenarios
 
-[`e2e/ssr-streaming.spec.ts`](e2e/ssr-streaming.spec.ts) — 11 Playwright scenarios mirroring the Vue baseline where the runtime allows, plus Angular-specific scenarios:
+[`e2e/ssr-streaming.spec.ts`](e2e/ssr-streaming.spec.ts) — 22 Playwright scenarios mirroring the Vue baseline where the runtime allows, plus Angular-specific scenarios:
 
 1. **Critical content visible immediately on commit** — wall-clock < 1500 ms
 2. **`@defer` placeholders are server-rendered** — raw HTTP response check via `request.get()`
@@ -117,8 +169,59 @@ pnpm test:e2e     # Playwright — 11 acceptance scenarios
 9. **Unknown route renders NotFound page** — `allowNotFound: true` returns 200 (see `ssr/` README for rationale)
 10. **Home → products navigation works after hydration** — CSR via realLink + browser-plugin
 11. **Response includes incremental hydration markers** — `ngh=` / `ng-server-context=` proof
+12. **Response headers** — `text/html; charset=utf-8`, no `x-powered-by` leak, status 200
+13. **Incremental hydration timing** — `Reviews` chunk loads at viewport, `RelatedItems` chunk loads only after hover. Network spy makes the contract explicit so the existing "appears after trigger" tests can't pass via eager preload.
+14. **`@error` block** — Playwright route-fetches each `/chunk-*.js` and aborts only the one whose body contains `reviews-section`; the bootstrap chunk and RelatedItems chunk pass through, so the page hydrates normally and only the Reviews `@defer` block falls back to its `@error` template.
+15. **`@loading` state** — same chunk-content matcher as scenario 14, but delays the Reviews chunk by 600 ms instead of failing it; the transient `reviews-loading` template becomes observable.
+16. **`@defer (on idle; prefetch on viewport)` for SpecSheet** — verifies the spec-sheet chunk loads (proves prefetch + hydrate trigger pair is wired) and the resolved component is visible with correct per-product data.
+17. **`@defer` placeholder taxonomy** — SSR HTML response contains `data-testid="spec-fallback"` (the placeholder) but does not contain `data-testid="spec-sheet"` (the resolved component). Confirms the placeholder text actually ships server-side rather than being client-only.
+18. **`withEventReplay()` survives slow hydration** — slow the Reviews chunk by 1.2 s, click "Mark all read" while the chunk is en route, wait for hydration. After hydration the button's `data-marked` attribute equals `"true"`. Without `withEventReplay()` the click would be lost and the assertion would fail.
+19. **`@defer (on interaction)`** — Q&A placeholder is a button; chunk loads + hydrates only after click. Network spy confirms zero `qa-section`-bearing chunks before the click, ≥1 after.
+20. **`@defer (when signal())`** — `tech-details` chunk does not load until the toggle button flips the signal. Verified end-to-end: placeholder visible, toggle, component visible, toggle back → component **stays** (one-shot semantics, documented).
+21. **`@defer (on timer(1500ms))`** — banner absent at 800 ms after page load, present by 3 s. Pure time-based trigger, no user input needed.
+22. **`@defer (on immediate)`** — analytics pixel visible right after bootstrap with `data-product="1"` attribute, proving both chunk-loading and input binding work.
 
-Note: there is no Angular equivalent of React's `<!--$?-->` Suspense placeholder marker test — Angular `@defer` uses a different boundary mechanism (component lazy chunks). Scenarios 2 and 11 are the Angular-specific surrogates.
+Note: there is no Angular equivalent of React's `<!--$?-->` Suspense placeholder marker test — Angular `@defer` uses a different boundary mechanism (component lazy chunks). Scenarios 2 and 11 are the Angular-specific surrogates. The "streaming" claim is on the **client** — Angular's incremental hydration loads each `@defer` chunk on demand. The HTTP body itself is delivered with `Transfer-Encoding: chunked` framing but in a single TCP frame after the server fully renders (no progressive flush); see scenario 13 for the actual streaming proof, and the snippet below to reproduce the wire-format behavior.
+
+### Reproduce the wire-format behavior
+
+```bash
+# Headers — note Transfer-Encoding: chunked, no Content-Length
+curl -sI http://localhost:4173/products/1
+
+# Single-frame delivery — outputs `chunks: 1` and a 0 ms span
+node --input-type=module -e '
+import { request } from "node:http";
+const t0 = Date.now();
+const chunks = [];
+await new Promise((resolve, reject) => {
+  const req = request("http://localhost:4173/products/1", (res) => {
+    res.on("data", (buf) => chunks.push({ ts: Date.now() - t0, size: buf.length }));
+    res.on("end", () => resolve());
+    res.on("error", reject);
+  });
+  req.on("error", reject); req.end();
+});
+console.log("chunks:", chunks.length, "span(ms):", (chunks.at(-1)?.ts ?? 0) - (chunks[0]?.ts ?? 0));
+console.log(chunks);
+'
+```
+
+## `@defer` Trigger Taxonomy
+
+Seven of Angular 21's `@defer` triggers are demonstrated in this example, each on a separate component so chunk-content fingerprinting cleanly distinguishes them in the e2e suite:
+
+| Trigger                                        | Component       | Use case                                                                 |
+| ---------------------------------------------- | --------------- | ------------------------------------------------------------------------ |
+| `(on viewport; hydrate on viewport)`           | `reviews`       | Below-the-fold content the user is likely to scroll to.                  |
+| `(on idle; prefetch on viewport; hydrate on idle)` | `spec-sheet` | Low-priority content. Decoupled triggers: prefetch eagerly, hydrate lazily. |
+| `(on interaction; hydrate on interaction)`     | `qa`            | Content the user is unlikely to read on every visit.                     |
+| `(when signal(); hydrate when signal())`       | `tech-details`  | Predicate-driven hydration (toggle, feature flag). **One-shot** — once activated, stays mounted. |
+| `(on timer(1500ms); hydrate on timer(1500ms))` | `news-banner`   | Time-delayed content that should appear after the page settles.          |
+| `(on immediate; hydrate on immediate)`         | `analytics-pixel` | Code-split chunk for a chunk boundary, no lazy trigger.                |
+| `(on hover; hydrate on hover)`                 | `related-items` | Content the user might browse but doesn't always need.                   |
+
+Notably **absent**: `(on never)` — Angular's roadmap mentions a "render server-side, never hydrate" trigger for static SEO content, but the 21.2 compiler rejects it (`NG5002: Unrecognized trigger type "never"`). Real-Router's library philosophy is to use only stable Angular features — when `(on never)` ships, we'll add a 23rd scenario.
 
 ## Why No `<Suspense>` / `defer()` Wrapper API?
 

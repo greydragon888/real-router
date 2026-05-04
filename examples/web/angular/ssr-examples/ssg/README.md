@@ -7,8 +7,9 @@ Static site generation with Real-Router, Angular 21, `@angular/ssr` build pipeli
 - **`provideRealRouterFactory({ baseRouter, plugins })`** — same factory as the runtime SSR example, with `REQUEST` flowing per URL through `AngularNodeAppEngine`'s request scope.
 - **Static path enumeration** via `getStaticPaths(router, entries)` from `@real-router/core/utils` — auto-discovers leaf routes from the router tree; dynamic routes (`users.profile`) get parameter sets via `entries.ts`.
 - **In-process SSR for build-time render** — `scripts/ssg-build.ts` boots the compiled `@angular/ssr` server in-process on a build-only port, fetches each URL, and persists the streamed HTML to `dist/.../browser/<url>/index.html`.
-- **Per-page meta tags** — `meta.ts` derives `<title>` + `<meta description>` from resolved router state; injected via the `<!--ssg-meta-->` placeholder in `index.html`.
+- **Per-page SEO meta** — `meta.ts` resolves a `PageMeta` per route (title, description, canonical path, og:type, og:image). `ssg-build.ts` injects `<title>`, `<meta description>`, `<link rel="canonical">`, OpenGraph (`og:type`/`title`/`description`/`url`/`image`) and `twitter:card` tags via the `<!--ssg-meta-->` placeholder. Each pre-rendered page ships a per-id canonical URL so search engines can deduplicate properly.
 - **404.html fallback + sitemap.xml** — generated as part of the build alongside route HTML files.
+- **Filesystem layout assertions** — the e2e suite reads `dist/.../browser/` directly to verify (a) every pre-rendered route maps to exactly one `index.html`, (b) `users/` contains only the ids declared in `entries.ts` (overfetch protection), and (c) `sitemap.xml` matches the on-disk set with no extras and nothing missing.
 - **Sirv for preview** — matches the existing Angular examples convention; serves the pre-rendered static files directly without a runtime SSR server.
 - **Client hydration** — `provideClientHydration()` re-attaches the static DOM after the JS bundle loads; `realLink` directive handles SPA navigation post-hydration.
 
@@ -64,6 +65,16 @@ Runtime (post-build, served by sirv):
     → provideClientHydration claims server-rendered DOM
     → No flash, no mismatch
 ```
+
+## Limitations and Trade-offs
+
+This is a deliberately small SSG demo. Things it does **not** do, and would-be users should know:
+
+- **Loader runs again on the client during hydration.** The same `ssr-data-plugin` is registered on both server and client (see `app.config.ts`). At build time the loader resolves data → static HTML is written. On first paint the JS bundle re-runs `start(url)` and the loader fires a second time. For the in-memory `database.ts` it is invisible; for a real `fetch()` it is one extra roundtrip per route. **No `__SSG_STATE__` blob is serialized into the static HTML** — adding one is application-level work, not a router feature. (See `ssr/README.md` → "No SSR-State Serialization" for the same trade-off in the runtime SSR example.)
+- **CSR navigation does not refetch loader data.** `ssr-data-plugin` intercepts `start()`, not `navigate()`. After hydration, clicking a `realLink` to `/users/2` fires `router.navigate()` → loader does **not** run → `state.context.data === undefined` → the user-profile component renders the "User not found" branch. This is the same SSR-only contract as the runtime `ssr/` example, verified in e2e scenario 15. If you want client-side data fetching after hydration, add `lifecycle-plugin` `onNavigate`.
+- **Not ISR.** No incremental regeneration, no on-demand revalidation, no cache invalidation. Build-time only — to update a page, rebuild and redeploy. ISR would require a runtime SSR server with a cache layer, which is out of scope for this example.
+- **404.html and sitemap.xml are application-level outputs**, not plugin features. `scripts/ssg-build.ts` calls `fetch('/__nonexistent')` → writes `404.html`, and assembles `sitemap.xml` from `getStaticPaths()`. Real-Router supplies the route enumeration (`getStaticPaths`); the SEO file generation is bespoke build script logic. Easy to copy into your own SSG pipeline, but don't expect it to work without the script.
+- **Sirv's 404 behavior depends on web-server config.** `sirv --single` falls back to `index.html` for unknown URLs. To serve `404.html` with HTTP 404 status (proper SEO signal) you need a real web server (nginx `try_files` rule, Cloudflare Pages `_redirects`, Netlify `_redirects`, etc.) — sirv preview cannot do this alone.
 
 ## Why "in-process SSR" instead of `renderApplication` direct?
 

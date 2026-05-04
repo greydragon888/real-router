@@ -25,6 +25,20 @@ app.use(
   }),
 );
 
+interface MaybeRedirect {
+  code?: string;
+  target?: string;
+  status?: number;
+}
+
+interface MaybeError {
+  code?: string;
+}
+
+function readErrorCode(error: unknown): string | undefined {
+  return (error as MaybeError | null)?.code;
+}
+
 app.use((req, res, next) => {
   angularApp
     .handle(req)
@@ -36,10 +50,38 @@ app.use((req, res, next) => {
       }
     })
     .catch((error: unknown) => {
-      const code = (error as { code?: string } | null)?.code;
+      const code = readErrorCode(error);
 
       if (code === "CANNOT_ACTIVATE") {
         res.redirect(302, "/");
+
+        return;
+      }
+
+      if (code === "LOADER_REDIRECT") {
+        const redirect = error as MaybeRedirect;
+        const target = redirect.target ?? "/";
+        const status = redirect.status ?? 302;
+
+        res.redirect(status, target);
+
+        return;
+      }
+
+      if (code === "LOADER_NOT_FOUND") {
+        res
+          .status(404)
+          .type("text/plain; charset=utf-8")
+          .send("Not Found");
+
+        return;
+      }
+
+      if (code === "LOADER_TIMEOUT") {
+        res
+          .status(504)
+          .type("text/plain; charset=utf-8")
+          .send("Gateway Timeout");
 
         return;
       }

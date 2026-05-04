@@ -55,8 +55,30 @@ function escapeHtml(value: string): string {
     .replaceAll('"', "&quot;");
 }
 
+function joinUrl(origin: string, path: string): string {
+  if (!path.startsWith("/")) return `${origin}/${path}`;
+
+  return `${origin}${path}`;
+}
+
 function renderMetaBlock(meta: PageMeta): string {
-  return `<title>${escapeHtml(meta.title)}</title>\n    <meta name="description" content="${escapeHtml(meta.description)}" />`;
+  const canonical = joinUrl(SITE_ORIGIN, meta.canonicalPath);
+  const ogImage = joinUrl(
+    SITE_ORIGIN,
+    meta.ogImagePath ?? "/og/default.png",
+  );
+
+  return [
+    `<title>${escapeHtml(meta.title)}</title>`,
+    `    <meta name="description" content="${escapeHtml(meta.description)}" />`,
+    `    <link rel="canonical" href="${escapeHtml(canonical)}" />`,
+    `    <meta property="og:type" content="${escapeHtml(meta.ogType)}" />`,
+    `    <meta property="og:title" content="${escapeHtml(meta.title)}" />`,
+    `    <meta property="og:description" content="${escapeHtml(meta.description)}" />`,
+    `    <meta property="og:url" content="${escapeHtml(canonical)}" />`,
+    `    <meta property="og:image" content="${escapeHtml(ogImage)}" />`,
+    `    <meta name="twitter:card" content="summary_large_image" />`,
+  ].join("\n");
 }
 
 function injectMeta(html: string, meta: PageMeta): string {

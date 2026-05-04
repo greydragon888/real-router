@@ -9,7 +9,10 @@ import {
 
 import { AdminComponent } from "./pages/admin.component";
 import { DashboardComponent } from "./pages/dashboard.component";
+import { GoneComponent } from "./pages/gone.component";
 import { HomeComponent } from "./pages/home.component";
+import { LiveComponent } from "./pages/live.component";
+import { MarketingComponent } from "./pages/marketing.component";
 import { NotFoundComponent } from "./pages/not-found.component";
 import { UserProfileComponent } from "./pages/user-profile.component";
 import { UsersListComponent } from "./pages/users-list.component";
@@ -27,6 +30,9 @@ import { UsersListComponent } from "./pages/users-list.component";
     UserProfileComponent,
     DashboardComponent,
     AdminComponent,
+    MarketingComponent,
+    LiveComponent,
+    GoneComponent,
     NotFoundComponent,
   ],
   template: `
@@ -35,6 +41,12 @@ import { UsersListComponent } from "./pages/users-list.component";
         <a realLink routeName="home">Home</a>
         {{ " | " }}
         <a realLink routeName="users">Users</a>
+        {{ " | " }}
+        <a realLink routeName="marketing" data-testid="nav-marketing">
+          Marketing
+        </a>
+        {{ " | " }}
+        <a realLink routeName="live" data-testid="nav-live">Live</a>
         {{ " | " }}
         <a realLink routeName="dashboard">Dashboard</a>
         {{ " | " }}
@@ -51,6 +63,15 @@ import { UsersListComponent } from "./pages/users-list.component";
                 <user-profile-page />
               </ng-template>
             </route-view>
+          </ng-template>
+          <ng-template routeMatch="marketing">
+            <marketing-page />
+          </ng-template>
+          <ng-template routeMatch="live">
+            <live-page />
+          </ng-template>
+          <ng-template routeMatch="gone">
+            <gone-page />
           </ng-template>
           <ng-template routeMatch="dashboard">
             <dashboard-page />

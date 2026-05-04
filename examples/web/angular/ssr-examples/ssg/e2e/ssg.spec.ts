@@ -1,4 +1,14 @@
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { test, expect } from "@playwright/test";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const BROWSER_DIST = resolve(
+  __dirname,
+  "../dist/ssg-angular-example/browser",
+);
 
 test.describe("SSG (Angular)", () => {
   test("static HTML contains pre-rendered home page", async ({ browser }) => {
@@ -264,5 +274,143 @@ test.describe("SSG (Angular)", () => {
     await page.click("text=Alice");
     await expect(page).toHaveURL(/\/users\/1\/?$/);
     await expect(page.getByTestId("user-not-found")).toBeVisible();
+  });
+
+  test("filesystem layout: dist contains exactly one index.html per pre-rendered route", async () => {
+    // Sanity-check the on-disk shape that a CDN would deploy. The build is
+    // expected to produce: index.html (home), users/index.html (list),
+    // users/{1,2,3}/index.html (profiles), 404.html, sitemap.xml. Any extra
+    // index.html under users/ would mean a bug in entries.ts or in
+    // getStaticPaths — overfetch would inflate CDN object count and ship
+    // stale/unintended pages.
+    expect(existsSync(BROWSER_DIST)).toBe(true);
+
+    expect(existsSync(resolve(BROWSER_DIST, "index.html"))).toBe(true);
+    expect(existsSync(resolve(BROWSER_DIST, "404.html"))).toBe(true);
+    expect(existsSync(resolve(BROWSER_DIST, "sitemap.xml"))).toBe(true);
+
+    expect(
+      existsSync(resolve(BROWSER_DIST, "users/index.html")),
+    ).toBe(true);
+
+    for (const id of ["1", "2", "3"]) {
+      expect(
+        existsSync(resolve(BROWSER_DIST, `users/${id}/index.html`)),
+        `users/${id}/index.html`,
+      ).toBe(true);
+    }
+  });
+
+  test("overfetch protection: only ids declared in entries.ts are pre-rendered", async () => {
+    // entries.ts returns {1, 2, 3} → exactly three /users/<id>/ subdirectories
+    // must exist. If getStaticPaths or entries grew silently, /users/4 would
+    // appear here and inflate sitemap.xml / dist.
+    const usersDir = resolve(BROWSER_DIST, "users");
+    const subdirs = readdirSync(usersDir).filter((name) =>
+      statSync(resolve(usersDir, name)).isDirectory(),
+    );
+
+    expect(subdirs.toSorted()).toEqual(["1", "2", "3"]);
+
+    expect(existsSync(resolve(usersDir, "4"))).toBe(false);
+    expect(existsSync(resolve(usersDir, "999"))).toBe(false);
+  });
+
+  test("canonical + OpenGraph meta: each pre-rendered route ships SEO-ready tags", async ({
+    request,
+  }) => {
+    // SSG output must include rel=canonical (deduplication signal for search
+    // engines) plus og:type / og:title / og:url / og:image (link previews on
+    // social platforms). These cost almost nothing to inject and are
+    // expected to be there even for a demo example.
+    const cases = [
+      {
+        path: "/",
+        canonical: "https://example.com/",
+        ogType: "website",
+      },
+      {
+        path: "/users/",
+        canonical: "https://example.com/users",
+        ogType: "website",
+      },
+      {
+        path: "/users/1/",
+        canonical: "https://example.com/users/1",
+        ogType: "profile",
+      },
+      {
+        path: "/users/3/",
+        canonical: "https://example.com/users/3",
+        ogType: "profile",
+      },
+    ];
+
+    for (const { path, canonical, ogType } of cases) {
+      const response = await request.get(path);
+
+      expect(response.status(), path).toBe(200);
+
+      const html = await response.text();
+
+      expect(html, `${path} canonical`).toContain(
+        `<link rel="canonical" href="${canonical}" />`,
+      );
+      expect(html, `${path} og:url`).toContain(
+        `<meta property="og:url" content="${canonical}" />`,
+      );
+      expect(html, `${path} og:type`).toContain(
+        `<meta property="og:type" content="${ogType}" />`,
+      );
+      expect(html, `${path} og:image present`).toContain(
+        'property="og:image"',
+      );
+      expect(html, `${path} twitter:card`).toContain(
+        '<meta name="twitter:card" content="summary_large_image" />',
+      );
+    }
+  });
+
+  test("canonical for profile is per-id (not the parent /users URL)", async () => {
+    // Detect a stale-meta regression where every dynamic page shares the
+    // parent canonical: that would tank SEO for individual profiles.
+    const aliceHtml = readFileSync(
+      resolve(BROWSER_DIST, "users/1/index.html"),
+      "utf8",
+    );
+    const charlieHtml = readFileSync(
+      resolve(BROWSER_DIST, "users/3/index.html"),
+      "utf8",
+    );
+
+    expect(aliceHtml).toContain(
+      '<link rel="canonical" href="https://example.com/users/1" />',
+    );
+    expect(charlieHtml).toContain(
+      '<link rel="canonical" href="https://example.com/users/3" />',
+    );
+
+    expect(aliceHtml).not.toContain(
+      '<link rel="canonical" href="https://example.com/users" />',
+    );
+  });
+
+  test("sitemap.xml matches the on-disk pre-rendered set (no extras, no missing)", async () => {
+    // Cross-check sitemap entries against the actual filesystem: every URL
+    // listed must correspond to a generated file, and every generated page
+    // must be listed.
+    const xml = readFileSync(resolve(BROWSER_DIST, "sitemap.xml"), "utf8");
+    const matches = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)];
+    const urls = matches.map((entry) => entry[1]);
+
+    expect(urls.toSorted()).toEqual(
+      [
+        "https://example.com/",
+        "https://example.com/users",
+        "https://example.com/users/1",
+        "https://example.com/users/2",
+        "https://example.com/users/3",
+      ].toSorted(),
+    );
   });
 });

@@ -1,4 +1,4 @@
-import { Component, Input } from "@angular/core";
+import { Component, Input, signal } from "@angular/core";
 
 interface Review {
   id: string;
@@ -27,6 +27,14 @@ const REVIEWS_BY_PRODUCT: Record<string, Review[]> = {
     } @else {
       <section data-testid="reviews-section">
         <h2>Reviews ({{ reviews.length }})</h2>
+        <button
+          type="button"
+          data-testid="reviews-mark-read"
+          [attr.data-marked]="markedRead() ? 'true' : 'false'"
+          (click)="onMarkRead()"
+        >
+          {{ markedRead() ? "All marked read" : "Mark all read" }}
+        </button>
         <ul>
           @for (r of reviews; track r.id) {
             <li [attr.data-review-id]="r.id">
@@ -42,7 +50,13 @@ const REVIEWS_BY_PRODUCT: Record<string, Review[]> = {
 export class ReviewsComponent {
   @Input({ required: true }) productId!: string;
 
+  readonly markedRead = signal(false);
+
   get reviews(): Review[] {
     return REVIEWS_BY_PRODUCT[this.productId] ?? [];
+  }
+
+  onMarkRead(): void {
+    this.markedRead.set(true);
   }
 }

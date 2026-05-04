@@ -456,4 +456,324 @@ test.describe("SSR (Angular)", () => {
 
     expect(marker).toBe(true);
   });
+
+  test("loader-driven 404: unknown /users/:id returns HTTP 404 (loader throws LoaderNotFound)", async ({
+    request,
+  }) => {
+    // The users.profile loader throws LoaderNotFound for ids that don't exist
+    // in the database. server.ts middleware maps the typed error to res
+    // status 404. Distinguishes between "route not registered" (UNKNOWN_ROUTE
+    // → 200 + NotFound page via allowNotFound:true) and "route matched but
+    // resource not found" (LOADER_NOT_FOUND → 404).
+    const response = await request.get("/users/9999");
+
+    expect(response.status()).toBe(404);
+    expect(response.headers()["content-type"]).toContain("text/plain");
+  });
+
+  test("loader-driven 404 for nested route: /users/9999/posts also returns 404", async ({
+    request,
+  }) => {
+    const response = await request.get("/users/9999/posts");
+
+    expect(response.status()).toBe(404);
+  });
+
+  test("loader-driven 301 redirect: /legacy-user/2 → /users/2 (loader throws LoaderRedirect)", async ({
+    request,
+  }) => {
+    const response = await request.get("/legacy-user/2", { maxRedirects: 0 });
+
+    expect(response.status()).toBe(301);
+    expect(response.headers().location).toBe("/users/2");
+  });
+
+  test("loader-driven 301 follows correctly to a hydrated profile", async ({
+    page,
+  }) => {
+    await page.goto("/legacy-user/3");
+
+    await expect(page).toHaveURL(/\/users\/3$/);
+    await expect(page.getByTestId("user-name")).toHaveText("Name: Charlie");
+  });
+
+  test("loader timeout: /slow returns 504 within budget (withTimeout fires before 5s delay)", async ({
+    request,
+  }) => {
+    // The "slow" loader sleeps 5000ms but is wrapped in withTimeout(250ms).
+    // Server middleware maps LOADER_TIMEOUT → 504 Gateway Timeout. Without
+    // timeout protection, an idle SSR worker would hang for the full delay
+    // and produce a 200 response with "this should never be seen" data.
+    const startedAt = Date.now();
+    const response = await request.get("/slow");
+    const elapsed = Date.now() - startedAt;
+
+    expect(response.status()).toBe(504);
+    expect(elapsed).toBeLessThan(2500);
+  });
+
+  test("CSR navigate spy: clicking a profile link issues NO new HTML request and leaves data undefined", async ({
+    page,
+  }) => {
+    // ssr-data-plugin intercepts only start(), not navigate(). When the user
+    // clicks a realLink, browser-plugin handles it client-side — no SSR
+    // round-trip, no loader rerun, data stays undefined ("User not found"
+    // template branch). This test makes that contract explicit by counting
+    // network HTML requests during the click instead of inferring from DOM
+    // alone.
+    await page.goto("/users");
+    await page.waitForLoadState("networkidle");
+
+    const documentRequests: string[] = [];
+
+    page.on("request", (req) => {
+      if (
+        req.resourceType() === "document" ||
+        req.resourceType() === "fetch" ||
+        req.resourceType() === "xhr"
+      ) {
+        documentRequests.push(req.url());
+      }
+    });
+
+    await page.click("text=Bob");
+    await expect(page).toHaveURL(/\/users\/2$/);
+    await expect(page.getByTestId("user-not-found")).toBeVisible();
+
+    const profileFetches = documentRequests.filter((url) =>
+      /\/users\/2$/.test(new URL(url).pathname),
+    );
+
+    expect(profileFetches).toEqual([]);
+  });
+
+  test("per-request isolation under mixed guards: /, /users, /dashboard, /admin, /users/1/posts in parallel with different auth contexts", async ({
+    browser,
+  }) => {
+    // Spin up three independent contexts (admin / regular user / anon) and
+    // fire five different routes in parallel. Each request must see only its
+    // own currentUser dependency; no cross-context bleed.
+    const [adminCtx, userCtx, anonCtx] = await Promise.all([
+      browser.newContext({
+        storageState: {
+          cookies: [
+            {
+              name: "userId",
+              value: "1",
+              domain: "localhost",
+              path: "/",
+              expires: -1,
+              httpOnly: false,
+              secure: false,
+              sameSite: "Lax",
+            },
+          ],
+          origins: [],
+        },
+      }),
+      browser.newContext({
+        storageState: {
+          cookies: [
+            {
+              name: "userId",
+              value: "2",
+              domain: "localhost",
+              path: "/",
+              expires: -1,
+              httpOnly: false,
+              secure: false,
+              sameSite: "Lax",
+            },
+          ],
+          origins: [],
+        },
+      }),
+      browser.newContext(),
+    ]);
+
+    try {
+      const responses = await Promise.all([
+        adminCtx.request.get("/admin"),
+        adminCtx.request.get("/users/1/posts"),
+        userCtx.request.get("/dashboard"),
+        userCtx.request.get("/admin", { maxRedirects: 0 }),
+        anonCtx.request.get("/users"),
+        anonCtx.request.get("/admin", { maxRedirects: 0 }),
+        anonCtx.request.get("/dashboard", { maxRedirects: 0 }),
+        anonCtx.request.get("/"),
+      ]);
+
+      const [
+        adminAdmin,
+        adminPosts,
+        userDashboard,
+        userAdmin,
+        anonUsers,
+        anonAdmin,
+        anonDashboard,
+        anonHome,
+      ] = responses;
+
+      expect(adminAdmin.status(), "admin → /admin").toBe(200);
+      expect(await adminAdmin.text()).toContain('data-testid="admin-page"');
+
+      expect(adminPosts.status(), "admin → /users/1/posts").toBe(200);
+      const adminPostsHtml = await adminPosts.text();
+
+      expect(adminPostsHtml).toContain('data-testid="user-posts"');
+      expect(adminPostsHtml).toContain("Hello world");
+
+      expect(userDashboard.status(), "user → /dashboard").toBe(200);
+      expect(await userDashboard.text()).toContain("Dashboard");
+
+      expect(userAdmin.status(), "user → /admin (role mismatch)").toBe(302);
+      expect(userAdmin.headers().location).toBe("/");
+
+      expect(anonUsers.status(), "anon → /users").toBe(200);
+      expect(await anonUsers.text()).toContain("Alice");
+
+      expect(anonAdmin.status(), "anon → /admin").toBe(302);
+      expect(anonAdmin.headers().location).toBe("/");
+
+      expect(anonDashboard.status(), "anon → /dashboard").toBe(302);
+      expect(anonDashboard.headers().location).toBe("/");
+
+      expect(anonHome.status(), "anon → /").toBe(200);
+      expect(await anonHome.text()).toContain("Welcome");
+    } finally {
+      await adminCtx.close();
+      await userCtx.close();
+      await anonCtx.close();
+    }
+  });
+
+  test("mixed RenderMode (Server): /live is rendered fresh per request — two consecutive responses have different timestamps", async ({
+    request,
+  }) => {
+    // /live is mapped to RenderMode.Server in app.routes.server.ts. Each
+    // request bootstraps the app fresh, so the renderedAt timestamp baked
+    // into the SSR'd HTML must change between consecutive calls.
+    const first = await request.get("/live");
+    const firstHtml = await first.text();
+    const firstMatch = firstHtml.match(/datetime="([^"]+)"/);
+
+    expect(firstMatch?.[1]).toBeTruthy();
+    expect(firstHtml).toContain('data-testid="live-page"');
+    expect(firstHtml).toContain("RenderMode: Server (fresh per request)");
+
+    // Force at least 5 ms gap so we don't compare two timestamps that
+    // happened to land in the same millisecond.
+    await new Promise((resolve) => setTimeout(resolve, 5));
+
+    const second = await request.get("/live");
+    const secondHtml = await second.text();
+    const secondMatch = secondHtml.match(/datetime="([^"]+)"/);
+
+    expect(secondMatch?.[1]).toBeTruthy();
+    expect(secondMatch?.[1]).not.toBe(firstMatch?.[1]);
+  });
+
+  test("mixed RenderMode (Client): /marketing is served as a CSR shell — no marketing-specific server HTML, identical bytes across requests", async ({
+    request,
+  }) => {
+    // /marketing is mapped to RenderMode.Client. Angular SSR returns the
+    // same prebuilt CSR shell (index.csr.html) for every Client-mode path —
+    // not a per-request render. The proof is bytewise identical responses
+    // and the absence of marketing-specific SSR'd content. The page becomes
+    // visible only after the JS bundle bootstraps client-side; that path is
+    // covered by the next test.
+    const first = await request.get("/marketing");
+    const firstHtml = await first.text();
+
+    const second = await request.get("/marketing");
+    const secondHtml = await second.text();
+
+    expect(first.status()).toBe(200);
+    expect(firstHtml).toBe(secondHtml);
+    expect(firstHtml).not.toContain('data-testid="marketing-page"');
+    expect(firstHtml).not.toContain('data-testid="marketing-tagline"');
+  });
+
+  test("mixed RenderMode (Client): /marketing renders content client-side after JS bootstrap", async ({
+    page,
+  }) => {
+    // After the CSR shell loads, the JS bundle runs `router.start("/marketing")`
+    // and the marketing-page component renders. Without JS the user would
+    // see the empty shell — that contract is covered by the previous test.
+    await page.goto("/marketing");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByTestId("marketing-page")).toBeVisible();
+    await expect(page.getByTestId("marketing-tagline")).toContainText(
+      "Per-request router scope",
+    );
+  });
+
+  test("mixed RenderMode: nav links to /live and /marketing both work via CSR (browser-plugin)", async ({
+    page,
+  }) => {
+    // RenderMode is a server-side directive. Once the JS bundle is running,
+    // browser-plugin handles all navigations identically — Server-rendered
+    // and Client-rendered routes are interchangeable from the user's POV.
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+
+    await page.click('[data-testid="nav-marketing"]');
+    await expect(page).toHaveURL(/\/marketing$/);
+    await expect(page.getByTestId("marketing-page")).toBeVisible();
+
+    await page.click('[data-testid="nav-live"]');
+    await expect(page).toHaveURL(/\/live$/);
+    await expect(page.getByTestId("live-page")).toBeVisible();
+  });
+
+  test("serverRoutes status override: /gone returns HTTP 410 + Sunset/Deprecation/Link headers + a real SSR body", async ({
+    request,
+  }) => {
+    // ServerRoute config in app.routes.server.ts pins /gone to status: 410
+    // and adds three sunset-related headers. The SSR renderer still runs,
+    // so the body explains the deprecation in human-readable form. This is
+    // the declarative alternative to throwing a typed loader error and
+    // catching it in middleware — useful when the status is a property of
+    // the URL itself (not of the resolved data).
+    const response = await request.get("/gone");
+
+    expect(response.status()).toBe(410);
+
+    const headers = response.headers();
+
+    expect(headers["sunset"]).toBe("Wed, 01 Jan 2025 00:00:00 GMT");
+    expect(headers["deprecation"]).toBe("true");
+    expect(headers["link"]).toBe('</marketing>; rel="successor-version"');
+    expect(headers["content-type"]).toContain("text/html");
+
+    const html = await response.text();
+
+    expect(html).toContain('data-testid="gone-page"');
+    expect(html).toContain("HTTP 410");
+    expect(html).toContain("our marketing page");
+    // Successor link is rendered as a realLink — verify the href resolves.
+    expect(html).toMatch(/<a [^>]*href="\/marketing"/);
+  });
+
+  test("serverRoutes status override vs loader-thrown error: /gone keeps SSR body, /users/9999 returns plain text", async ({
+    request,
+  }) => {
+    // Side-by-side comparison of the two HTTP-mapping strategies:
+    //   - /gone           → ServerRoute status:410 → full SSR HTML body
+    //   - /users/9999     → loader throws LoaderNotFound → middleware short-
+    //                       circuits with res.send("Not Found") (text/plain)
+    // Both are honest, the trade-off is body fidelity vs implementation
+    // simplicity. README documents when to pick which.
+    const [gone, missing] = await Promise.all([
+      request.get("/gone"),
+      request.get("/users/9999"),
+    ]);
+
+    expect(gone.status()).toBe(410);
+    expect(gone.headers()["content-type"]).toContain("text/html");
+
+    expect(missing.status()).toBe(404);
+    expect(missing.headers()["content-type"]).toContain("text/plain");
+  });
 });

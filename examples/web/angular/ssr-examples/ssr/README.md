@@ -12,8 +12,13 @@ Server-side rendering with Real-Router, Angular 21, `@angular/ssr` (`AngularNode
 - **Cookie-based auth-gated routes** — `dashboard` and `admin` protected by `canActivate` guards consuming `getDep("currentUser")`.
 - **Query params + nested loaders** — `?sort` on `/users`, leaf-route loader for `/users/:id/posts` returns combined parent + child data.
 - **Loader error → 500 page** — rejected loader in `provideAppInitializer` propagates → `bootstrapApplication` rejects → server returns 500 (Option A from RFC §10).
+- **Loader-driven HTTP semantics** — typed loader errors (`LoaderRedirect`, `LoaderNotFound`, `LoaderTimeout` in `_loader-errors.ts`) are caught by the express middleware and mapped to `301/302`, `404`, and `504` responses respectively. The plugin stays HTTP-agnostic; the application owns the bridge.
+  - `users.profile` throws `LoaderNotFound` for ids that don't exist → server returns 404 (vs `UNKNOWN_ROUTE` which is a 200 + NotFound page via `allowNotFound: true`).
+  - `legacyUser` (`/legacy-user/:id`) throws `LoaderRedirect("/users/:id", 301)` — demonstrates the canonical-URL pattern (Next.js-style `redirect()` from a loader).
+  - `slow` (`/slow`) demonstrates `withTimeout()` — the loader sleeps 5 s but is wrapped in a 250 ms budget, so the server responds 504 Gateway Timeout instead of hanging an SSR worker.
 - **Client-side navigation** — after hydration, `@real-router/browser-plugin` handles SPA navigation through `realLink` directive.
-- **Incremental hydration** — `provideClientHydration(withIncrementalHydration())` enables per-component hydration triggers.
+- **Incremental hydration + event replay** — `provideClientHydration(withIncrementalHydration(), withEventReplay())`. Event replay captures clicks/keydowns issued before a block hydrates and replays them once the component takes over. Critical for streaming SSR UX where the user can interact with placeholders before their JS arrives.
+- **Mixed `RenderMode`** — `app.routes.server.ts` maps `/marketing` to `RenderMode.Client` (CSR shell, identical bytes for every visitor, content materialises after JS bootstrap) and `/live` to `RenderMode.Server` (fresh per-request render with timestamp proof). All other paths default to `RenderMode.Server`. See "Mixed RenderMode" section below for the trade-offs and the unsupported `RenderMode.Prerender` known limitation.
 
 ## Architecture
 
@@ -21,6 +26,7 @@ Server-side rendering with Real-Router, Angular 21, `@angular/ssr` (`AngularNode
 src/
   _auth.ts               Cookie parsing → currentUser DI (works server + client)
   _known-users.ts        KNOWN_USERS table + parseCookieHeader + lookupUserFromCookies
+  _loader-errors.ts      LoaderRedirect / LoaderNotFound / LoaderTimeout + withTimeout helper
   database.ts            In-memory mock store
   app.config.ts          Shared providers: provideZonelessChangeDetection, provideRealRouterFactory
   app.config.server.ts   Server-only: provideServerRendering(withRoutes(serverRoutes))
@@ -28,11 +34,11 @@ src/
   app.component.ts       Root standalone component — <route-view> + <ng-template routeMatch>
   main.ts                Client entry — bootstrapApplication + provideClientHydration(withIncrementalHydration())
   main.server.ts         Server bootstrap — accepts BootstrapContext, returns bootstrapApplication
-  server.ts              Express + AngularNodeAppEngine + writeResponseToNodeResponse
+  server.ts              Express + AngularNodeAppEngine + LOADER_REDIRECT/NOT_FOUND/TIMEOUT mapping
   router/
     createBaseRouter.ts  createRouter(routes, options) — base for cloneRouter per request
-    routes.ts            Route definitions with auth guards
-    loaders.ts           Per-route data loaders
+    routes.ts            Route definitions with auth guards (incl. legacyUser, slow)
+    loaders.ts           Per-route data loaders (incl. NotFound + Redirect + withTimeout demos)
   pages/
     home, users-list, user-profile, user-posts, dashboard, admin, not-found (.component.ts)
 
@@ -67,13 +73,102 @@ Client (once, after hydration):
     → provideAppInitializer:
         await router.start(window.location.pathname + search)
         # browser-plugin's start interceptor wraps with location-derived path,
-        # ssr-data-plugin re-runs loader → state.context.data restored
+        # ssr-data-plugin runs the loader AGAIN on the client (no SSR-state
+        # blob is shipped — see "No SSR-State Serialization" below).
     → Angular claims server-rendered DOM (no flash, no mismatch)
 ```
+
+## No SSR-State Serialization (loader runs twice)
+
+This example does **not** ship a `window.__SSR_STATE__` blob. The same `ssr-data-plugin` is registered on both the server and the client (see `app.config.ts`), so:
+
+1. Server `start(url)` → loader runs → `state.context.data` populated → HTML rendered
+2. Client `start(url)` after hydration → loader runs **again** → `state.context.data` re-populated
+
+For the in-memory database in this demo it is invisible. **In a real app it is a second network roundtrip per route on first paint.** Mitigations the example does not show:
+
+- Serialize `state.context.data` server-side via `serializeRouterState()`, embed it as a `<script>__SSR_STATE__</script>` blob, and on the client register a custom plugin that hydrates `state.context.data` from that blob instead of re-running the loader.
+- Cache loader results inside the loader closure (per-request cache hits the second invocation).
+- Use `@real-router/lifecycle-plugin` `onNavigate` for client-side fetching with explicit cache control.
+
+The double-run is a deliberate simplification, not a router limitation. The plugin's contract is "intercept `start()`"; what `start()` does on the client is application-level policy.
 
 ## SSR-Only Plugin Contract
 
 The `@real-router/ssr-data-plugin` intercepts `router.start()`, **not** `router.navigate()`. After hydration, subsequent CSR navigations via `realLink` do NOT re-run loaders — `state.context.data` becomes `undefined` for the target route. This matches the Vue/Solid/Svelte/React `ssr/` examples. Use `lifecycle-plugin`'s `onNavigate` if you need data fetching on every navigation.
+
+The e2e suite verifies this contract with two assertions: (1) the DOM ends up showing the "User not found" branch after a CSR click, and (2) Playwright's `page.on("request")` confirms zero new HTML/document/fetch/xhr requests during the click — the data really did NOT come from a server roundtrip.
+
+## Mixed RenderMode
+
+`app.routes.server.ts` declares per-path render strategies. Order matters — patterns are first-match-wins, so specific paths come before the catch-all:
+
+```ts
+export const serverRoutes: ServerRoute[] = [
+  { path: "marketing", renderMode: RenderMode.Client },
+  { path: "live",      renderMode: RenderMode.Server },
+  { path: "**",        renderMode: RenderMode.Server },
+];
+```
+
+| Mode | What ships from server | Per-request work | Use case |
+|------|------------------------|------------------|----------|
+| `RenderMode.Server` (default) | Fresh HTML per request, REQUEST DI honored, loaders run | Yes — full bootstrap | Auth-aware pages, cookie-driven content, dynamic data |
+| `RenderMode.Client` | The same prebuilt CSR shell (`index.csr.html`) for every Client-mode path | No — static bytes only | Highly interactive pages where SSR adds latency without SEO value (admin, signed-in dashboards) |
+
+Behavior verified by e2e:
+- `/live` (Server) — two consecutive `request.get('/live')` produce different `datetime="..."` timestamps. Proves fresh per-request bootstrap.
+- `/marketing` (Client) — two consecutive `request.get('/marketing')` produce **bytewise identical** responses, neither contains `data-testid="marketing-page"`. The marketing content materializes only after `page.goto()` lets the JS bundle bootstrap and `router.start("/marketing")` runs client-side.
+
+### `RenderMode.Prerender` is **not** supported here
+
+Angular 21's `Prerender` pipeline bootstraps the app via `renderApplication` without supplying the `REQUEST` token. `provideRealRouterFactory`'s `useFactory` therefore sees `request === null` and `deriveStartPath()` falls back to `"/"` — every prerendered URL would resolve to the home route. Build-time pre-rendering for Real-Router-driven apps must use the in-process SSR pipeline shown in the `ssg/` example (boot `server.mjs` on a private port, `fetch` each URL through the live `AngularNodeAppEngine`, persist the HTML), not `RenderMode.Prerender`. Tracked alongside [#582](https://github.com/greydragon888/real-router/issues/582) — once `@angular/ssr` exposes the prerender URL through the application Injector, this constraint goes away.
+
+## Mapping Loader Errors to HTTP
+
+There are two complementary HTTP-status strategies in this example. Pick based on whether the status depends on URL alone or on resolved data.
+
+### Strategy A — declarative `ServerRoute` config (URL-based status)
+
+`app.routes.server.ts` lets you pin a status code (and headers) to a path pattern:
+
+```ts
+{
+  path: "gone",
+  renderMode: RenderMode.Server,
+  status: 410,
+  headers: {
+    "Sunset": "Wed, 01 Jan 2025 00:00:00 GMT",
+    "Deprecation": "true",
+    "Link": '</marketing>; rel="successor-version"',
+  },
+}
+```
+
+The SSR renderer still runs (so the body explains the deprecation in human-readable HTML), but the wire-level status and headers are pinned. **Use when the status is a property of the URL itself** — sunset endpoints, intentionally-410 placeholders, retired API redirect pages.
+
+### Strategy B — typed loader errors mapped in middleware (data-based status)
+
+`server.ts` middleware inspects the `code` field of any error thrown out of `bootstrapApplication`:
+
+| Error `code`       | HTTP response                                |
+| ------------------ | -------------------------------------------- |
+| `CANNOT_ACTIVATE`  | `302 Location: /` (auth guard rejected)      |
+| `LOADER_REDIRECT`  | `301/302 Location: error.target`             |
+| `LOADER_NOT_FOUND` | `404 Not Found` (text/plain)                 |
+| `LOADER_TIMEOUT`   | `504 Gateway Timeout` (text/plain)           |
+| anything else      | propagates to express default → `500`        |
+
+**Use when the status depends on resolved data** — `users.profile` loader looks the user up, throws `LoaderNotFound` if missing → 404; legacy URL loader throws `LoaderRedirect("/canonical/...")` → 301 with the canonical Location.
+
+### Side-by-side comparison
+
+The e2e suite verifies both strategies in one test (scenario 39): `/gone` returns `text/html` 410 with sunset headers + a real SSR body, while `/users/9999` returns `text/plain` 404 with a minimal body. Trade-off:
+
+- **Strategy A** ships a richer body (full SSR render through Angular) and integrates with build-time prerendering / CDN cache headers. Limited to status overrides knowable at routing time.
+- **Strategy B** carries any data-derived status, but the body in this example is `text/plain "Not Found"` for simplicity. Rendering a rich 404 from middleware would require a second `angularApp.handle()` pass against a `/__not-found` URL with `res.status(404)`.
+
+`withTimeout()` doesn't cancel the underlying loader work — only races the response. Long-running loaders continue to consume CPU/IO until they resolve. For real workloads, pair the timeout with `AbortController` in the loader.
 
 ## Why `provideRealRouterFactory` (not `provideRealRouter`)?
 

@@ -17,10 +17,19 @@ class NgRouterStub {}
 
 const baseRouter = createBaseRouter();
 
+// @angular/ssr's withRoutes() validates that every path declared in
+// app.routes.server.ts has a matching entry in the @angular/router config
+// provided by provideRouter(). Real-Router owns the actual routing — these
+// stubs only exist to satisfy that validation.
 export const appConfig: ApplicationConfig = {
   providers: [
     provideZonelessChangeDetection(),
-    provideRouter([{ path: "**", component: NgRouterStub }]),
+    provideRouter([
+      { path: "marketing", component: NgRouterStub },
+      { path: "live", component: NgRouterStub },
+      { path: "gone", component: NgRouterStub },
+      { path: "**", component: NgRouterStub },
+    ]),
     provideRealRouterFactory({
       baseRouter,
       plugins: (request) =>
