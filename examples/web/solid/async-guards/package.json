@@ -15,7 +15,7 @@
     "@real-router/browser-plugin": "workspace:^",
     "@real-router/core": "workspace:^",
     "@real-router/solid": "workspace:^",
-    "solid-js": "1.9.5"
+    "solid-js": "1.9.12"
   },
   "devDependencies": {
     "@playwright/test": "1.58.2",
