@@ -19,6 +19,11 @@ const baseRouter = createAppRouter();
 
 interface RenderContext {
   currentUser: CurrentUser | null;
+  /** AbortSignal fired when the client disconnects mid-render. Loaders
+   * can `getDep("abortSignal")` to cancel pending work and avoid
+   * leaking server resources after the response is no longer wanted.
+   * See /slow loader for the demonstrated pattern. */
+  abortSignal?: AbortSignal;
 }
 
 export interface RenderResult {
@@ -78,7 +83,13 @@ export async function render(
   url: string,
   context: RenderContext,
 ): Promise<RenderResult> {
-  const router = cloneRouter(baseRouter, { currentUser: context.currentUser });
+  const router = cloneRouter(baseRouter, {
+    currentUser: context.currentUser,
+    // abortSignal is request-scoped: server/index.ts creates a fresh
+    // AbortController per request and aborts on `req.on("close")`.
+    // Loaders read it via `getDep("abortSignal")` to cancel async work.
+    abortSignal: context.abortSignal,
+  } as Record<string, unknown>);
 
   router.usePlugin(ssrDataPluginFactory(loaders));
 

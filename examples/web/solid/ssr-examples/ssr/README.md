@@ -72,9 +72,19 @@ Trade-offs:
 - The `404`/`504` bodies are plain text rather than the SSR-rendered NotFound page. Rendering a rich 404 would require a second `renderToString()` pass with a different URL — kept simple in this demo.
 - `withTimeout()` doesn't cancel the underlying loader work — only races the response. Pair with `AbortController` for production workloads.
 
+## Production HTTP semantics: ETag, Cache-Control, AbortController
+
+`server/index.ts` adds three production-grade pieces on top of the basic SSR wiring:
+
+- **Strong `ETag`** — sha256 of the final HTML bytes, truncated to 16 base64url chars. Identical inputs yield identical hashes; conditional GET (`If-None-Match`) returns `304 Not Modified` with an empty body. Solid's home is static, so two consecutive GETs to `/` produce the same hash; `/users` and `/` produce distinct hashes (the test verifies content-derivation by route comparison).
+- **Per-route `Cache-Control`** — `src/router/cache-policies.ts` maps URL paths to directives: `/` → `public, s-maxage=3600, must-revalidate`, `/users` → `public, max-age=60`, `/users/:id` → `public, max-age=120`, `/dashboard` and `/admin` → `private, no-store`, `/legacy-user/:id` → 1-day cache for the redirect itself, `/slow`/`/boom`/`/async-page`/`/form` → `no-store`.
+- **`AbortController` per request** — `req.on("close")` aborts the controller; the `slow` loader pulls the signal via `getDep("abortSignal")` and clears its `setTimeout`. Without this wiring a 5 s loader holds the worker even after the client gives up. The e2e suite verifies the server releases the handler within 1 s (well under the 5 s loader delay).
+
+These are demonstrated end-to-end by 4 dedicated tests in `e2e/ssr.spec.ts` (Cache-Control routing, 304 on identical content, distinct routes → distinct hashes, AbortController fast release).
+
 ## E2e
 
-[`e2e/ssr.spec.ts`](e2e/ssr.spec.ts) — 36 Playwright scenarios:
+[`e2e/ssr.spec.ts`](e2e/ssr.spec.ts) — 46 Playwright scenarios:
 
 - 27 baseline (per-request isolation, hydration round-trip, loaders, guards, query params, nested loaders, 404, 500, CSR navigation, `<Link>` href in no-JS mode)
 - Solid-specific: `_$HY` hydration runtime variable injected via `generateHydrationScript()`; `data-hk-*` markers present in server-rendered HTML (proof `hydratable: true` is active)
@@ -82,6 +92,7 @@ Trade-offs:
 - **`<head>` injection** (2 tests): home title + reactive title for `/users?sort=`
 - **CSR navigate spy** (1 test): clicking a profile link issues zero document/fetch requests
 - **Mixed-guard concurrent** (1 test): admin × user × anon × 5 routes in parallel
+- **Cache-Control + ETag + AbortController** (4 tests): per-route Cache-Control directives match `src/router/cache-policies.ts`; `/users` 304 on conditional GET; `/` and `/users` yield distinct content hashes; `/slow` releases the handler in <1 s when the client disconnects (vs the 5 s loader delay)
 
 ## See Also
 

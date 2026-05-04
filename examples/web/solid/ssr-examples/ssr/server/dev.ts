@@ -6,6 +6,7 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 
 import { getCurrentUserFromCookies } from "./_auth";
+import { getCachePolicy } from "../src/router/cache-policies";
 
 import type { RenderResult } from "../src/entry-server";
 
@@ -42,13 +43,24 @@ async function startServer(): Promise<void> {
               name: string;
               role: "admin" | "user";
             } | null;
+            abortSignal?: AbortSignal;
           },
         ) => Promise<RenderResult>;
       };
 
       const currentUser = getCurrentUserFromCookies(request.headers.cookie);
 
-      const result = await module_.render(url, { currentUser });
+      const abortController = new AbortController();
+      request.on("close", () => {
+        if (!response.writableEnded) {
+          abortController.abort();
+        }
+      });
+
+      const result = await module_.render(url, {
+        currentUser,
+        abortSignal: abortController.signal,
+      });
 
       if (result.redirect) {
         response.redirect(result.statusCode, result.redirect);
@@ -73,6 +85,11 @@ async function startServer(): Promise<void> {
         .replace("<!--ssr-hydration-script-->", result.hydrationScript)
         .replace("<!--ssr-outlet-->", result.html)
         .replace("<!--ssr-state-->", result.serializedData);
+
+      const cacheControl = getCachePolicy(url);
+      if (cacheControl) {
+        response.set("Cache-Control", cacheControl);
+      }
 
       response
         .status(result.statusCode)
