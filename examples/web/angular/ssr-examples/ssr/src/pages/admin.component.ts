@@ -1,0 +1,12 @@
+import { Component } from "@angular/core";
+
+@Component({
+  selector: "admin-page",
+  template: `
+    <div data-testid="admin-page">
+      <h1>Admin</h1>
+      <p>Admin-only area. You see this only because your role is admin.</p>
+    </div>
+  `,
+})
+export class AdminComponent {}
