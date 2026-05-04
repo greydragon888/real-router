@@ -26,6 +26,9 @@ src/
   entry-client.ts     hydrateRouter() + createSSRApp().mount() with browser-plugin + ssr-data-plugin
   App.vue             Shared component tree (server + client)
   _loader-errors.ts   Typed loader errors (LoaderRedirect/NotFound/Timeout) + withTimeout()
+  components/
+    HeavyAnalytics.vue   Lazy-hydrated component (defineAsyncComponent + hydrateOnVisible)
+    SearchForm.vue       Form with useId() for SSR-stable label↔input pairing
   directives/
     track-view.ts     Vue custom directive (mounted/updated/unmounted) — IntersectionObserver demo
   router/
@@ -62,6 +65,15 @@ Client (once):
 The client-side `ssrDataPluginFactory` registration handles **hydration only**: `hydrateRouter(router, ssrState)` calls `router.start(state.path)` once, and the plugin's `start` interceptor re-runs the loader on the client to repopulate `state.context.data`. Post-hydration component tree sees the same data the server rendered — no flash, no mismatch.
 
 **SSR-only by design:** the plugin intercepts `start()`, **not** `navigate()`. After hydration, subsequent `<Link>` clicks do NOT re-run loaders — same contract as the React example.
+
+## Vue 3.5 lazy hydration + `useId()`
+
+Two Vue 3.5–specific surface-area pieces, mounted on the home page:
+
+- **Lazy hydration** — `src/components/HeavyAnalytics.vue` is wrapped via `defineAsyncComponent({ loader, hydrate: hydrateOnVisible() })`. Server fully renders the HTML (crawlers and JS-disabled clients see everything), but the client defers JS hydration until the component scrolls into view. Until the strategy fires, `onMounted` does NOT run, event handlers are not attached, and the component's separate JS chunk is not loaded — pure savings on time-to-interactive for content the user has not seen yet. Maps to Angular's `@defer (on viewport) + withIncrementalHydration()`. Other strategies available: `hydrateOnIdle()`, `hydrateOnInteraction()`, `hydrateOnMediaQuery()`, custom function.
+- **`useId()`** — `src/components/SearchForm.vue` uses `useId()` for `<label :for="...">` ↔ `<input :id="...">` pairing. Returns a stable per-component-instance ID; SSR and client produce identical values, so the a11y contract survives hydration. Hand-rolled IDs (`Math.random`, module-level counter, `crypto.randomUUID`) all break this contract — useId is the canonical fix. Maps to Solid's `createUniqueId()` and React's `useId()`.
+
+Verified by 5 e2e tests: SSR HTML present pre-hydration + counter unresponsive (×1), scroll-into-view fires hydration + counter responds (×1), code-split chunk exists on disk + is NOT preloaded by initial HTML (×1), label[for]=input[id] for both fields with distinct ids (×1), SSR-emitted id matches client DOM with zero hydration warnings (×1).
 
 ## Per-route meta + Vue custom directive
 

@@ -1,4 +1,11 @@
+import { readdirSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { test, expect } from "@playwright/test";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const DIST_ASSETS = path.resolve(__dirname, "../dist/client/assets");
 
 test.describe("SSR (Vue)", () => {
   test("server-rendered HTML contains expected content", async ({ browser }) => {
@@ -536,6 +543,175 @@ test.describe("SSR (Vue)", () => {
     );
 
     expect(marker).toBe(true);
+  });
+
+  test("Vue 3.5 lazy hydration: SSR ships full HeavyAnalytics HTML; pre-scroll the component is unhydrated (no event handlers, no onMounted)", async ({
+    page,
+    request,
+  }) => {
+    // Layered check — first verify the SSR contract via raw HTTP,
+    // then the client-side defer-hydration contract via the live
+    // browser.
+
+    // 1) Raw SSR HTML contains the full HeavyAnalytics markup —
+    //    crawlers and JS-disabled clients see everything.
+    const response = await request.get("/");
+    const html = await response.text();
+    expect(html).toContain('data-testid="heavy-analytics"');
+    expect(html).toContain('data-testid="heavy-counter"');
+    expect(html).toContain("Heavy Analytics (lazy-hydrated)");
+
+    // 2) On the live page, BEFORE scrolling: the section exists in
+    //    the DOM but onMounted has NOT run (no hydration marker)
+    //    and the click handler is not attached (counter stays 0).
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+
+    // The component is far below the fold. Without scrolling it
+    // into view, hydration should not have fired.
+    const hydratedAt = await page.evaluate(
+      () =>
+        (
+          window as Window & { __LAZY_HYDRATED_AT__?: number }
+        ).__LAZY_HYDRATED_AT__,
+    );
+
+    expect(hydratedAt).toBeUndefined();
+
+    // The button is in the DOM (server-rendered) — visible if we
+    // scroll, but we don't. Reading textContent works without
+    // scrolling.
+    const initialText = await page
+      .getByTestId("heavy-counter")
+      .textContent();
+    expect(initialText?.trim()).toBe("Clicked: 0");
+  });
+
+  test("Vue 3.5 lazy hydration: scrolling HeavyAnalytics into view fires hydration; counter then responds to clicks", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+
+    // Scroll the component into view → IntersectionObserver fires
+    // → defineAsyncComponent's loader resolves → hydration runs →
+    // onMounted stamps the marker → click handler is attached.
+    await page.getByTestId("heavy-analytics").scrollIntoViewIfNeeded();
+
+    await page.waitForFunction(
+      () =>
+        (
+          window as Window & { __LAZY_HYDRATED_AT__?: number }
+        ).__LAZY_HYDRATED_AT__ !== undefined,
+      undefined,
+      { timeout: 5000 },
+    );
+
+    // After hydration, the click handler responds reactively.
+    await page.getByTestId("heavy-counter").click();
+    await page.getByTestId("heavy-counter").click();
+
+    await expect(page.getByTestId("heavy-counter")).toHaveText("Clicked: 2");
+  });
+
+  test("Vue 3.5 lazy hydration: HeavyAnalytics ships in its own JS chunk (code-split via defineAsyncComponent loader) and is NOT preloaded", async ({
+    page,
+  }) => {
+    // Two-part check:
+    //   1) A separate chunk for HeavyAnalytics exists on disk —
+    //      verifies Vite split the dynamic import into its own
+    //      file. Walk dist/client/assets/ and assert the chunk
+    //      naming pattern matches.
+    //   2) The chunk is NOT preloaded by the initial HTML
+    //      (no <link rel="modulepreload"> for it, no eager <script>).
+    //      This is the actual win — the JS for the lazy component
+    //      is not paid for until hydration fires.
+    const files = readdirSync(DIST_ASSETS);
+    const heavyChunk = files.find((f) => /^HeavyAnalytics-/.test(f));
+
+    expect(heavyChunk).toBeDefined();
+
+    // Visit the page — verify the initial HTML does NOT preload
+    // the HeavyAnalytics chunk.
+    const response = await page.goto("/");
+    const html = (await response?.text()) ?? "";
+
+    expect(html).not.toContain(heavyChunk!);
+  });
+
+  test("Vue 3.5 useId: SearchForm label[for] matches input[id] after SSR (a11y contract)", async ({
+    request,
+  }) => {
+    // useId() returns a stable per-component-instance ID. Each
+    // <label :for="..."> must match the corresponding <input :id="...">
+    // in the SSR HTML, otherwise screen readers can't pair them.
+    const html = await (await request.get("/")).text();
+
+    // Extract query field's id and label[for] — verify they match.
+    // Vue serializes attributes in declaration order: `id` before
+    // `data-testid` for inputs, `for` before `data-testid` for labels.
+    const queryInputId = /<input\s+id="([^"]+)"[^>]*\sdata-testid="query-input"/.exec(
+      html,
+    )?.[1];
+    const queryLabelFor =
+      /<label\s+for="([^"]+)"[^>]*\sdata-testid="query-label"/.exec(html)?.[1];
+
+    expect(queryInputId).toBeDefined();
+    expect(queryLabelFor).toBe(queryInputId);
+
+    const sortInputId = /<select\s+id="([^"]+)"[^>]*\sdata-testid="sort-select"/.exec(
+      html,
+    )?.[1];
+    const sortLabelFor =
+      /<label\s+for="([^"]+)"[^>]*\sdata-testid="sort-label"/.exec(html)?.[1];
+
+    expect(sortInputId).toBeDefined();
+    expect(sortLabelFor).toBe(sortInputId);
+
+    // Distinct fields → distinct IDs (otherwise hand-rolled
+    // counter would have produced the same value for both).
+    expect(queryInputId).not.toBe(sortInputId);
+  });
+
+  test("Vue 3.5 useId: SSR-emitted ID survives hydration unchanged (no mismatch warning)", async ({
+    page,
+    request,
+  }) => {
+    // Capture the SSR id from raw HTTP, then read the same DOM
+    // attribute on the hydrated client. They must match exactly —
+    // useId is the contract.
+    const html = await (await request.get("/")).text();
+    const ssrInputId = /<input\s+id="([^"]+)"[^>]*\sdata-testid="query-input"/.exec(
+      html,
+    )?.[1];
+
+    expect(ssrInputId).toBeDefined();
+
+    const errors: string[] = [];
+    page.on("console", (msg) => {
+      if (msg.type() === "warning" || msg.type() === "error") {
+        errors.push(msg.text());
+      }
+    });
+
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+
+    const hydratedInputId = await page
+      .getByTestId("query-input")
+      .getAttribute("id");
+
+    expect(hydratedInputId).toBe(ssrInputId);
+
+    // Confirm Vue did not emit a hydration mismatch warning for
+    // this attribute (the canonical failure mode if useId were
+    // bypassed in favor of Math.random / non-deterministic IDs).
+    const mismatchWarnings = errors.filter(
+      (e) =>
+        e.toLowerCase().includes("hydration") ||
+        e.toLowerCase().includes("mismatch"),
+    );
+    expect(mismatchWarnings).toEqual([]);
   });
 
   test("Per-route meta: home title + description appear in raw SSR HTML head", async ({
