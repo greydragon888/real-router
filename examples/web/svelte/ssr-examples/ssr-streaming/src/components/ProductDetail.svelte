@@ -13,6 +13,16 @@
   const data = $derived(
     route.current.context.data as ProductDetailData | undefined,
   );
+
+  // Reactive override for the tracked product id, used to demonstrate
+  // the `use:trackView` action's `update` lifecycle hook. Clicking the
+  // button below flips `trackedId` from data.product.id to "999" — Svelte
+  // re-evaluates the action argument and calls `action.update({...})`.
+  // The action mutates its internal `currentProductId` without
+  // re-creating the IntersectionObserver, so the next intersect event
+  // (or the update call itself, which we log) uses the new id.
+  let manualOverride = $state<string | null>(null);
+  const trackedId = $derived(manualOverride ?? data?.product.id ?? "");
 </script>
 
 {#if !data}
@@ -21,7 +31,7 @@
   <article
     data-testid="product-detail"
     data-product-id={data.product.id}
-    use:trackView={{ productId: data.product.id }}
+    use:trackView={{ productId: trackedId }}
   >
     <h1 data-testid="product-name">{data.product.name}</h1>
     <p data-testid="product-price">${data.product.price}</p>
@@ -58,5 +68,13 @@
     <RelatedItems productId={data.product.id} />
 
     <ProductActions />
+
+    <button
+      type="button"
+      data-testid="override-tracked-id"
+      onclick={() => (manualOverride = "999")}
+    >
+      Override tracked id to 999
+    </button>
   </article>
 {/if}

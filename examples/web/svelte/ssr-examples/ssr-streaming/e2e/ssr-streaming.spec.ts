@@ -517,4 +517,60 @@ test.describe("Streaming SSR Example (Svelte)", () => {
     await expect(page.getByTestId("trigger-client-error")).toBeVisible();
     await expect(page.getByTestId("product-actions-error")).toHaveCount(0);
   });
+
+  test("Scenario 20: use:trackView update lifecycle — bound params change triggers action.update, observer reuses the same instance", async ({
+    page,
+  }) => {
+    // ProductDetail.svelte exposes `manualOverride` ($state) bound into
+    // the action's params via `trackedId`. Clicking the override button
+    // flips the derived value from data.product.id to "999". Svelte
+    // detects the new params reference and calls `action.update(next)`
+    // on the existing observer instance — NOT destroy + re-mount. The
+    // action logs every update call to window.__VIEW_UPDATE_LOG__ for
+    // observability; the test asserts the log contains an entry with
+    // the new id, proving the lifecycle hook fired.
+    await page.goto("/products/1");
+
+    await expect(page.getByTestId("product-name")).toHaveText(
+      "Mechanical Keyboard",
+    );
+    await expect(page.getByTestId("override-tracked-id")).toBeVisible();
+
+    // Clear any update log entries from initial mount (if Svelte calls
+    // update() once on hydration with the same params, log may have
+    // an entry with productId="1" already).
+    await page.evaluate(() => {
+      (window as Window & { __VIEW_UPDATE_LOG__?: unknown[] }).__VIEW_UPDATE_LOG__ = [];
+    });
+
+    await page.getByTestId("override-tracked-id").click();
+
+    // After click, manualOverride flips to "999" → trackedId derived
+    // re-evaluates → action.update({ productId: "999" }) fires → log
+    // entry pushed.
+    await page.waitForFunction(
+      () => {
+        const log = (
+          window as Window & {
+            __VIEW_UPDATE_LOG__?: { productId: string }[];
+          }
+        ).__VIEW_UPDATE_LOG__;
+
+        return log && log.some((entry) => entry.productId === "999");
+      },
+      undefined,
+      { timeout: 5000 },
+    );
+
+    const updateLog = await page.evaluate(
+      () =>
+        (
+          window as Window & {
+            __VIEW_UPDATE_LOG__?: { productId: string }[];
+          }
+        ).__VIEW_UPDATE_LOG__,
+    );
+
+    expect(updateLog?.some((entry) => entry.productId === "999")).toBe(true);
+  });
 });
