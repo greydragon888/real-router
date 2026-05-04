@@ -59,6 +59,19 @@ export function getMetaForState(state: {
         ogImagePath: `/og/users/${id ?? "default"}.png`,
       };
     }
+    case "users.profile.posts": {
+      const id = state.params.id as string | undefined;
+      const user = id ? database.users.findById(id) : undefined;
+      const name = user?.name ?? "Unknown user";
+
+      return {
+        title: `${name}'s posts — Real-Router Angular SSG`,
+        description: `Posts authored by ${name} (id: ${id ?? "?"}).`,
+        canonicalPath: `/users/${id ?? ""}/posts`,
+        ogType: "article",
+        ogImagePath: `/og/users/${id ?? "default"}-posts.png`,
+      };
+    }
     default: {
       return DEFAULTS;
     }

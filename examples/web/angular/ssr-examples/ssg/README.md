@@ -7,9 +7,10 @@ Static site generation with Real-Router, Angular 21, `@angular/ssr` build pipeli
 - **`provideRealRouterFactory({ baseRouter, plugins })`** — same factory as the runtime SSR example, with `REQUEST` flowing per URL through `AngularNodeAppEngine`'s request scope.
 - **Static path enumeration** via `getStaticPaths(router, entries)` from `@real-router/core/utils` — auto-discovers leaf routes from the router tree; dynamic routes (`users.profile`) get parameter sets via `entries.ts`.
 - **In-process SSR for build-time render** — `scripts/ssg-build.ts` boots the compiled `@angular/ssr` server in-process on a build-only port, fetches each URL, and persists the streamed HTML to `dist/.../browser/<url>/index.html`.
-- **Per-page SEO meta** — `meta.ts` resolves a `PageMeta` per route (title, description, canonical path, og:type, og:image). `ssg-build.ts` injects `<title>`, `<meta description>`, `<link rel="canonical">`, OpenGraph (`og:type`/`title`/`description`/`url`/`image`) and `twitter:card` tags via the `<!--ssg-meta-->` placeholder. Each pre-rendered page ships a per-id canonical URL so search engines can deduplicate properly.
+- **Per-page SEO meta** — `meta.ts` resolves a `PageMeta` per route (title, description, canonical path, og:type, og:image). `ssg-build.ts` injects `<title>`, `<meta description>`, `<link rel="canonical">`, OpenGraph (`og:type`/`title`/`description`/`url`/`image`) and `twitter:card` tags via the `<!--ssg-meta-->` placeholder. Each pre-rendered page ships a per-id canonical URL so search engines can deduplicate properly. Posts pages use `og:type=article`, profile pages use `og:type=profile`.
+- **Nested route pre-rendering** — `users/:id/posts` is generated for every id in `entries.ts` (in addition to the parent `/users/:id` profile). 8 static HTMLs total: home, list, 3 profiles, 3 posts pages. `getStaticPaths()` enumerates leaf routes only, so intermediate `/users/:id` paths are derived in `ssg-build.ts` from the leaf list.
 - **404.html fallback + sitemap.xml** — generated as part of the build alongside route HTML files.
-- **Filesystem layout assertions** — the e2e suite reads `dist/.../browser/` directly to verify (a) every pre-rendered route maps to exactly one `index.html`, (b) `users/` contains only the ids declared in `entries.ts` (overfetch protection), and (c) `sitemap.xml` matches the on-disk set with no extras and nothing missing.
+- **Filesystem layout assertions** — the e2e suite reads `dist/.../browser/` directly to verify (a) every pre-rendered route maps to exactly one `index.html` (incl. nested `/users/:id/posts/index.html`), (b) `users/` contains only the ids declared in `entries.ts` (overfetch protection), and (c) `sitemap.xml` matches the on-disk set (8 entries) with no extras and nothing missing.
 - **Sirv for preview** — matches the existing Angular examples convention; serves the pre-rendered static files directly without a runtime SSR server.
 - **Client hydration** — `provideClientHydration()` re-attaches the static DOM after the JS bundle loads; `realLink` directive handles SPA navigation post-hydration.
 
@@ -97,15 +98,21 @@ pnpm test:e2e     # Playwright tests
 
 ```
 dist/ssg-angular-example/browser/
-  index.html              ← /
+  index.html                  ← /
   users/
-    index.html            ← /users
-    1/index.html          ← /users/1
-    2/index.html          ← /users/2
-    3/index.html          ← /users/3
-  404.html                ← not-found fallback
-  sitemap.xml             ← all pre-rendered URLs
-  main.js                 ← client bundle (shared across all pages)
+    index.html                ← /users
+    1/
+      index.html              ← /users/1
+      posts/index.html        ← /users/1/posts
+    2/
+      index.html              ← /users/2
+      posts/index.html        ← /users/2/posts
+    3/
+      index.html              ← /users/3
+      posts/index.html        ← /users/3/posts
+  404.html                    ← not-found fallback
+  sitemap.xml                 ← all pre-rendered URLs (8 entries)
+  main.js                     ← client bundle (shared across all pages)
 ```
 
 ## Key Packages

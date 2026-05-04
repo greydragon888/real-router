@@ -5,6 +5,12 @@ export const routes: Route[] = [
   {
     name: "users",
     path: "/users",
-    children: [{ name: "profile", path: "/:id" }],
+    children: [
+      {
+        name: "profile",
+        path: "/:id",
+        children: [{ name: "posts", path: "/posts" }],
+      },
+    ],
   },
 ];

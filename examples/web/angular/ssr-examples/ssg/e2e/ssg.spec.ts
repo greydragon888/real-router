@@ -276,13 +276,13 @@ test.describe("SSG (Angular)", () => {
     await expect(page.getByTestId("user-not-found")).toBeVisible();
   });
 
-  test("filesystem layout: dist contains exactly one index.html per pre-rendered route", async () => {
+  test("filesystem layout: dist contains exactly one index.html per pre-rendered route + nested posts pages", async () => {
     // Sanity-check the on-disk shape that a CDN would deploy. The build is
     // expected to produce: index.html (home), users/index.html (list),
-    // users/{1,2,3}/index.html (profiles), 404.html, sitemap.xml. Any extra
-    // index.html under users/ would mean a bug in entries.ts or in
-    // getStaticPaths — overfetch would inflate CDN object count and ship
-    // stale/unintended pages.
+    // users/{1,2,3}/index.html (profiles), users/{1,2,3}/posts/index.html
+    // (nested posts pages), 404.html, sitemap.xml. Any extra index.html
+    // under users/ would mean a bug in entries.ts or in getStaticPaths —
+    // overfetch would inflate CDN object count and ship stale pages.
     expect(existsSync(BROWSER_DIST)).toBe(true);
 
     expect(existsSync(resolve(BROWSER_DIST, "index.html"))).toBe(true);
@@ -297,6 +297,10 @@ test.describe("SSG (Angular)", () => {
       expect(
         existsSync(resolve(BROWSER_DIST, `users/${id}/index.html`)),
         `users/${id}/index.html`,
+      ).toBe(true);
+      expect(
+        existsSync(resolve(BROWSER_DIST, `users/${id}/posts/index.html`)),
+        `users/${id}/posts/index.html`,
       ).toBe(true);
     }
   });
@@ -343,6 +347,11 @@ test.describe("SSG (Angular)", () => {
         path: "/users/3/",
         canonical: "https://example.com/users/3",
         ogType: "profile",
+      },
+      {
+        path: "/users/2/posts/",
+        canonical: "https://example.com/users/2/posts",
+        ogType: "article",
       },
     ];
 
@@ -408,9 +417,77 @@ test.describe("SSG (Angular)", () => {
         "https://example.com/",
         "https://example.com/users",
         "https://example.com/users/1",
+        "https://example.com/users/1/posts",
         "https://example.com/users/2",
+        "https://example.com/users/2/posts",
         "https://example.com/users/3",
+        "https://example.com/users/3/posts",
       ].toSorted(),
+    );
+  });
+
+  test("nested route pre-rendering: /users/:id/posts gets its own static HTML with loader data", async ({
+    request,
+  }) => {
+    // Intermediate (users.profile) AND leaf (users.profile.posts) routes
+    // both pre-render. Posts page must contain post titles in the static
+    // HTML — proves the nested-loader runs at build time and writes data
+    // into the bundled __SSR_STATE__ via the in-process SSR pipeline.
+    const response = await request.get("/users/1/posts/");
+
+    expect(response.status()).toBe(200);
+
+    const html = await response.text();
+
+    expect(html).toContain('data-testid="user-posts"');
+    expect(html).toContain("Hello world");
+    expect(html).toContain("On routing");
+  });
+
+  test("nested route empty state: /users/3/posts ships empty-posts UI", async ({
+    request,
+  }) => {
+    // User 3 has no posts in the in-memory database. The loader returns
+    // an empty array; the empty-state branch of UserPostsComponent must
+    // render at build time.
+    const response = await request.get("/users/3/posts/");
+    const html = await response.text();
+
+    expect(html).toContain('data-testid="user-posts-empty"');
+  });
+
+  test("nested route per-id title + canonical: /users/1/posts is distinct from /users/2/posts", async () => {
+    // Stale-meta regression check: each posts page must reference its own
+    // user id in title + canonical, not share the parent /users/:id URL.
+    const alicePosts = readFileSync(
+      resolve(BROWSER_DIST, "users/1/posts/index.html"),
+      "utf8",
+    );
+    const bobPosts = readFileSync(
+      resolve(BROWSER_DIST, "users/2/posts/index.html"),
+      "utf8",
+    );
+
+    expect(alicePosts).toContain(
+      "<title>Alice's posts — Real-Router Angular SSG</title>",
+    );
+    expect(alicePosts).toContain(
+      '<link rel="canonical" href="https://example.com/users/1/posts" />',
+    );
+    expect(alicePosts).toContain(
+      '<meta property="og:type" content="article" />',
+    );
+
+    expect(bobPosts).toContain(
+      "<title>Bob's posts — Real-Router Angular SSG</title>",
+    );
+    expect(bobPosts).toContain(
+      '<link rel="canonical" href="https://example.com/users/2/posts" />',
+    );
+
+    // Critically: posts page does NOT share the profile canonical.
+    expect(alicePosts).not.toContain(
+      '<link rel="canonical" href="https://example.com/users/1" />',
     );
   });
 });

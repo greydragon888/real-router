@@ -121,8 +121,19 @@ async function renderUrl(url: string): Promise<string> {
 }
 
 const baseRouter = createBaseRouter();
-const paths = [...(await getStaticPaths(baseRouter, entries)), "/users"];
-const dedupedPaths = Array.from(new Set(paths));
+
+// `getStaticPaths` enumerates leaf routes only — it returns
+// `/users/<id>/posts` for nested routes, but skips the intermediate
+// `/users/<id>` profile pages (which now have a child `posts`). Add them
+// explicitly so each user has both a profile page and a posts page.
+const leafPaths = await getStaticPaths(baseRouter, entries);
+const profilePaths = leafPaths
+  .map((p) => p.replace(/\/posts$/, ""))
+  .filter((p) => /\/users\/[^/]+$/.test(p));
+
+const dedupedPaths = Array.from(
+  new Set<string>([...leafPaths, ...profilePaths, "/users"]),
+);
 
 console.log(`Pre-rendering ${dedupedPaths.length} routes via in-process SSR...`);
 
