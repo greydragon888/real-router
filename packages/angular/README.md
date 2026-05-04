@@ -447,7 +447,15 @@ export const appConfig: ApplicationConfig = {
 
 Existing `provideRealRouter(router)` is unchanged — keep using it for SPA / post-hydrate scenarios. Both APIs ship in parallel; pick one for the whole application.
 
-See [CLAUDE.md → SSR Support](./CLAUDE.md#ssr-support) for the full decision matrix, lifecycle diagram, plugin separation guidance, and SSG `platformProviders` mock pattern.
+### Working examples
+
+| Example | Demonstrates |
+|---------|--------------|
+| [`examples/web/angular/ssr-examples/ssr/`](../../examples/web/angular/ssr-examples/ssr) | Classical SSR with cookie-based DI, auth guards, nested loaders |
+| [`examples/web/angular/ssr-examples/ssr-streaming/`](../../examples/web/angular/ssr-examples/ssr-streaming) | Streaming SSR with `@defer (on viewport)` + `@defer (on hover)` + `withIncrementalHydration()` |
+| [`examples/web/angular/ssr-examples/ssg/`](../../examples/web/angular/ssr-examples/ssg) | Static site generation via in-process AngularNodeAppEngine + `getStaticPaths()` |
+
+See [CLAUDE.md → SSR Support](./CLAUDE.md#ssr-support) for the full decision matrix, lifecycle diagram, plugin separation guidance, decision matrix, and known constraints.
 
 ## View Transitions
 

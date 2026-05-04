@@ -61,6 +61,7 @@ real-router/
 │   ├── solid/    (18 examples)    # Solid.js examples (incl. ssr-examples/ × 3 subgroup) + 9 e2e suites
 │   ├── vue/      (22 examples)    # Vue 3 SFC examples (incl. animation-examples/ × 4 + ssr-examples/ × 3 subgroups) + 9 e2e suites
 │   ├── svelte/   (19 examples)    # Svelte 5 examples (incl. ssr-examples/ × 3 subgroup) + 9 e2e suites
+│   ├── angular/  (11 examples)    # Angular 21+ examples (incl. ssr-examples/ × 3 subgroup using provideRealRouterFactory) + 8 e2e suites
 │   ├── electron/ (3 examples)     # Electron desktop: browser-plugin (app://), hash-plugin (file://), navigation-plugin
 │   └── tauri/    (2 examples)     # Tauri v2 desktop: browser-plugin, navigation-plugin
 ```
