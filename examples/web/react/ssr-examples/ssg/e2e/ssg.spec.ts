@@ -288,4 +288,36 @@ test.describe("SSG", () => {
       }),
     );
   });
+
+  test("Cache-Control: per-route policy from vite.config.ts ssgServe middleware (long for home, shorter for users list / profile)", async ({
+    request,
+  }) => {
+    const home = await request.get("/");
+    expect(home.headers()["cache-control"]).toContain("public");
+    expect(home.headers()["cache-control"]).toContain("s-maxage=3600");
+
+    const users = await request.get("/users/");
+    expect(users.headers()["cache-control"]).toContain("public");
+    expect(users.headers()["cache-control"]).toContain("max-age=60");
+
+    const profile = await request.get("/users/1/");
+    expect(profile.headers()["cache-control"]).toContain("public");
+    expect(profile.headers()["cache-control"]).toContain("max-age=120");
+  });
+
+  test("ETag: static-file layer emits weak ETag (auto from mtime), conditional GET returns 304", async ({
+    request,
+  }) => {
+    const first = await request.get("/users/");
+    expect(first.status()).toBe(200);
+
+    const etag = first.headers().etag;
+    expect(etag).toMatch(/^W?\/?".+"$/);
+
+    const conditional = await request.get("/users/", {
+      headers: { "If-None-Match": etag },
+    });
+    expect(conditional.status()).toBe(304);
+    expect((await conditional.body()).length).toBe(0);
+  });
 });

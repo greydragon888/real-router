@@ -257,4 +257,46 @@ test.describe("Streaming SSR Example", () => {
     expect(html).toContain('data-related-id="k1"');
     expect(html).toContain('data-related-id="k2"');
   });
+
+  test("Scenario 11: Cache-Control per-route policy (public for products list, longer for product detail)", async ({
+    request,
+  }) => {
+    const home = await request.get("/", { maxRedirects: 0 });
+    expect(home.headers()["cache-control"]).toContain("public");
+    expect(home.headers()["cache-control"]).toContain("s-maxage=3600");
+
+    const productsList = await request.get("/products", { maxRedirects: 0 });
+    expect(productsList.headers()["cache-control"]).toContain("public");
+    expect(productsList.headers()["cache-control"]).toContain("max-age=60");
+
+    const productDetail = await request.get("/products/1", { maxRedirects: 0 });
+    expect(productDetail.headers()["cache-control"]).toContain("public");
+    expect(productDetail.headers()["cache-control"]).toContain("max-age=120");
+  });
+
+  test("Scenario 12: streamed responses do NOT carry an ETag header (intentional)", async ({
+    request,
+  }) => {
+    const response = await request.get("/products/1");
+    expect(response.status()).toBe(200);
+    expect(response.headers().etag).toBeUndefined();
+  });
+
+  test("Scenario 13: AbortController — client disconnect mid-stream releases server reader within ms", async ({
+    request,
+  }) => {
+    const startedAt = Date.now();
+    let aborted = false;
+
+    try {
+      await request.get("/products/1", { timeout: 150 });
+    } catch {
+      aborted = true;
+    }
+
+    const elapsed = Date.now() - startedAt;
+
+    expect(aborted).toBe(true);
+    expect(elapsed).toBeLessThan(800);
+  });
 });

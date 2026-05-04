@@ -8,6 +8,17 @@ import {
 } from "vite";
 
 import { expressToFetchRequest, streamResponseToExpress } from "./_helpers";
+import { getCachePolicy } from "../src/router/cache-policies";
+
+function effectivePathForCache(originalUrl: string): string {
+  const u = new URL(originalUrl, "http://localhost");
+
+  if (u.pathname === "/__rsc") {
+    return u.searchParams.get("route") ?? "/";
+  }
+
+  return originalUrl;
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
@@ -28,17 +39,36 @@ async function startDevServer(): Promise<void> {
   const rscRunner = createServerModuleRunner(vite.environments.rsc);
 
   app.all(/.*/, async (request_, expressResponse, next) => {
+    const abortController = new AbortController();
+    request_.on("close", () => {
+      if (!expressResponse.writableEnded) {
+        abortController.abort();
+      }
+    });
+
     try {
       const rscModule =
         await rscRunner.import<typeof import("../src/entry.rsc")>(
           "/src/entry.rsc.tsx",
         );
 
-      const request = expressToFetchRequest(request_);
+      const request = expressToFetchRequest(request_, abortController.signal);
       const response = await rscModule.default.fetch(request);
+
+      const cacheControl = getCachePolicy(
+        effectivePathForCache(request_.originalUrl),
+      );
+
+      if (cacheControl && !response.headers.has("Cache-Control")) {
+        response.headers.set("Cache-Control", cacheControl);
+      }
 
       await streamResponseToExpress(response, expressResponse);
     } catch (error) {
+      if ((error as { name?: string } | null)?.name === "AbortError") {
+        return;
+      }
+
       vite.ssrFixStacktrace(error as Error);
       next(error);
     }

@@ -76,6 +76,17 @@ pnpm preview      # Serve pre-rendered static files
 pnpm test:e2e     # Playwright tests (5 specs)
 ```
 
+## Production HTTP semantics: Cache-Control + auto-ETag (no AbortController)
+
+The SSG preview layer adds one production-grade piece, and inherits another for free:
+
+- **Per-route `Cache-Control`** — the `ssgServe()` Vite preview plugin in `vite.config.ts` runs `getCachePolicy(url)` for every static request and intercepts `res.writeHead` so the policy survives Vite's own `Cache-Control: no-cache` default. Routes get: `/` → `public, s-maxage=3600, must-revalidate`, `/users/` → `public, max-age=60`, `/users/:id/` → `public, max-age=120`.
+- **Weak `ETag`** — Vite preview's static handler attaches a weak ETag derived from file mtime. Conditional GETs against pre-rendered HTML return `304 Not Modified` for free.
+
+`AbortController` is not applicable — SSG serves pre-rendered files; there is no per-request render to cancel. The runtime SSR example (`../ssr/`) demonstrates `AbortController` for that case.
+
+Demonstrated by 2 dedicated tests in `e2e/ssg.spec.ts`.
+
 ## Key Packages
 
 - `@real-router/core` — router + `cloneRouter()`

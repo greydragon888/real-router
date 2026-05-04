@@ -93,6 +93,19 @@ pnpm test:e2e
 
 In dev mode, [`server/dev.ts`](server/dev.ts) creates a `createServerModuleRunner(vite.environments.rsc)` to load `entry.rsc.tsx` per request (with HMR). In prod mode, [`server/index.ts`](server/index.ts) imports the pre-built `dist/rsc/index.js` once at startup.
 
+## Production HTTP semantics: Cache-Control + AbortController (no ETag)
+
+Both endpoints (`GET /:path` and `GET /__rsc?route=...`) get production-grade pieces tailored to the dual-shape architecture:
+
+- **Per-route `Cache-Control`** — `src/router/cache-policies.ts` maps URL paths to directives. The Flight endpoint extracts `route` from the query and applies the SAME policy as the underlying HTML route — so a CDN can cache both shapes (`/users/1` HTML and `/__rsc?route=/users/1` Flight) under their own keys with consistent freshness.
+- **`AbortController` per request** — `server/index.ts` creates a per-request controller, fires `.abort()` on `req.on("close")`, and threads the signal through `expressToFetchRequest(req, signal)` into the Web `Request`. The RSC handler observes disconnects via `request.signal`; loaders that read `getDep("abortSignal")` can also bail out.
+- **No ETag (intentional)** — both HTML and Flight responses are streamed; buffering for hashing would defeat streaming. Production setups rely on CDN-level caching with the CDN's own buffered ETag layer applied at the edge. Verified by Scenario 18.
+
+3 dedicated tests in `e2e/ssr-rsc.spec.ts`:
+- 16: Cache-Control per-route on HTML responses
+- 17: Same policy on `/__rsc` Flight responses (extracts `route` param)
+- 18: Honesty check — neither HTML nor Flight carries an `ETag` header
+
 ## See Also
 
 - [@real-router/rsc-server-plugin](../../../../../packages/rsc-server-plugin) — the plugin itself (Variant B: ReactNode payload, bundler-agnostic)

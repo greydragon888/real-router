@@ -18,11 +18,20 @@ function toFetchHeaders(nodeHeaders: express.Request["headers"]): Headers {
   return headers;
 }
 
-export function expressToFetchRequest(request: express.Request): Request {
+export function expressToFetchRequest(
+  request: express.Request,
+  signal?: AbortSignal,
+): Request {
   const url = `http://${request.headers.host}${request.originalUrl}`;
   const init: RequestInit & { duplex?: "half" } = {
     method: request.method,
     headers: toFetchHeaders(request.headers),
+    // Wire the per-request AbortSignal into the Web Request so the
+    // RSC handler (and any loaders that read it via getDep) can
+    // observe disconnects. Without this, mid-stream cancellation
+    // on `req.on("close")` is invisible to the handler — the
+    // server keeps doing work for a response no one will read.
+    signal,
   };
 
   if (request.method !== "GET" && request.method !== "HEAD") {

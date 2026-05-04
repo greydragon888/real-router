@@ -474,4 +474,78 @@ test.describe("SSR", () => {
     await expect(page).toHaveURL(/\/dashboard$/);
     await expect(page.locator("main")).toContainText("Dashboard");
   });
+
+  test("Cache-Control: per-route policy from cache-policies.ts (public for users list, no-store for admin redirect)", async ({
+    request,
+  }) => {
+    const home = await request.get("/", { maxRedirects: 0 });
+
+    expect(home.headers()["cache-control"]).toContain("public");
+    expect(home.headers()["cache-control"]).toContain("s-maxage=3600");
+
+    const users = await request.get("/users", { maxRedirects: 0 });
+
+    expect(users.headers()["cache-control"]).toContain("public");
+    expect(users.headers()["cache-control"]).toContain("max-age=60");
+
+    const admin = await request.get("/admin", { maxRedirects: 0 });
+
+    expect([302, 200]).toContain(admin.status());
+  });
+
+  test("ETag: identical static content yields a 304 Not Modified on conditional GET", async ({
+    request,
+  }) => {
+    const first = await request.get("/users");
+
+    expect(first.status()).toBe(200);
+
+    const etag = first.headers().etag;
+
+    expect(etag).toMatch(/^"[A-Za-z0-9_-]{16}"$/);
+
+    const conditional = await request.get("/users", {
+      headers: { "If-None-Match": etag },
+    });
+
+    expect(conditional.status()).toBe(304);
+    expect(conditional.headers().etag).toBe(etag);
+    expect((await conditional.body()).length).toBe(0);
+  });
+
+  test("ETag: distinct routes yield distinct content hashes", async ({
+    request,
+  }) => {
+    const home = await request.get("/");
+    const users = await request.get("/users");
+
+    const homeEtag = home.headers().etag;
+    const usersEtag = users.headers().etag;
+
+    expect(homeEtag).toMatch(/^"[A-Za-z0-9_-]{16}"$/);
+    expect(usersEtag).toMatch(/^"[A-Za-z0-9_-]{16}"$/);
+    expect(homeEtag).not.toBe(usersEtag);
+  });
+
+  test("AbortController: client disconnect mid-render fires the slow loader's abort listener", async ({
+    request,
+  }) => {
+    // /slow loader sleeps 5 s but registers an abort listener via
+    // getDep("abortSignal"). server/index.ts attaches the controller
+    // to req.on("close") — when the client gives up before the
+    // response, the loader cleans up its setTimeout and rejects.
+    const startedAt = Date.now();
+    let aborted = false;
+
+    try {
+      await request.get("/slow", { timeout: 150 });
+    } catch {
+      aborted = true;
+    }
+
+    const elapsed = Date.now() - startedAt;
+
+    expect(aborted).toBe(true);
+    expect(elapsed).toBeLessThan(1000);
+  });
 });

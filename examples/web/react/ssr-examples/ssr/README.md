@@ -64,6 +64,16 @@ pnpm preview      # Production server
 pnpm test:e2e     # Playwright tests
 ```
 
+## Production HTTP semantics: ETag, Cache-Control, AbortController
+
+`server/index.ts` adds three production-grade pieces on top of the basic SSR wiring:
+
+- **Strong `ETag`** — sha256 of the final HTML bytes, truncated to 16 base64url chars. Identical inputs yield identical hashes; conditional GET (`If-None-Match`) returns `304 Not Modified` with an empty body. Distinct routes yield distinct ETags.
+- **Per-route `Cache-Control`** — `src/router/cache-policies.ts` maps URL paths to directives: `/` → `public, s-maxage=3600, must-revalidate`, `/users` → `public, max-age=60`, `/users/:id` → `public, max-age=120`, `/dashboard` and `/admin` → `private, no-store`, `/slow`/`/boom` → `no-store`.
+- **`AbortController` per request** — `req.on("close")` aborts the controller; the `slow` loader pulls the signal via `getDep("abortSignal")` and clears its `setTimeout`. Without this wiring a 5 s loader holds the worker even after the client gives up.
+
+Demonstrated by 4 dedicated tests in `e2e/ssr.spec.ts`.
+
 ## Key Packages
 
 - `@real-router/core` — router + `cloneRouter()`

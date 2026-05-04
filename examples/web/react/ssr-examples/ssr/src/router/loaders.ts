@@ -48,4 +48,31 @@ export const loaders: DataLoaderFactoryMap = {
   // router.start(), bypass partial render, and let entry-server.tsx
   // translate the error into a 500 response with an error page.
   boom: () => () => Promise.reject(new Error("Loader exploded for /boom")),
+
+  // The `slow` loader pulls an `abortSignal` from per-request deps
+  // (registered by entry-server.tsx through cloneRouter). When the
+  // client disconnects mid-render, server/index.ts fires its
+  // AbortController, the signal flips, and this loader cleans up the
+  // setTimeout — preventing the leak that would otherwise hold the
+  // server worker for the full 5 s.
+  slow: (_router, getDep) => () => {
+    const signal = (
+      getDep as unknown as (key: string) => AbortSignal | undefined
+    )("abortSignal");
+
+    return new Promise<{ message: string }>((resolve, reject) => {
+      const id = setTimeout(() => {
+        resolve({ message: "this should never be seen" });
+      }, 5000);
+
+      signal?.addEventListener(
+        "abort",
+        () => {
+          clearTimeout(id);
+          reject(new Error("Aborted: client disconnected"));
+        },
+        { once: true },
+      );
+    });
+  },
 };

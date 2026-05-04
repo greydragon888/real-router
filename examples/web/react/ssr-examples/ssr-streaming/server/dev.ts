@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { createServer as createViteServer } from "vite";
 
+import { getCachePolicy } from "../src/router/cache-policies";
+
 import type { RenderResult } from "../src/entry-server";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -35,6 +37,13 @@ async function startDevServer(): Promise<void> {
         render: (url: string) => Promise<RenderResult>;
       };
 
+      const abortController = new AbortController();
+      request.on("close", () => {
+        if (!response.writableEnded) {
+          abortController.abort();
+        }
+      });
+
       const { stream, ssrJson, statusCode, cleanup } =
         await module_.render(url);
 
@@ -43,29 +52,45 @@ async function startDevServer(): Promise<void> {
       const [headPart, footerPart] =
         templateWithState.split("<!--ssr-outlet-->");
 
+      const cacheControl = getCachePolicy(url);
+
       response.status(statusCode);
       response.set("Content-Type", "text/html; charset=utf-8");
       response.set("Transfer-Encoding", "chunked");
+      if (cacheControl) {
+        response.set("Cache-Control", cacheControl);
+      }
       response.write(headPart);
 
       const reader = stream.getReader();
 
       try {
         for (;;) {
+          if (abortController.signal.aborted) {
+            break;
+          }
+
           const { done, value } = await reader.read();
 
           if (done) {
             break;
           }
 
+          if (response.writableEnded) {
+            break;
+          }
+
           response.write(Buffer.from(value));
         }
       } finally {
+        await reader.cancel().catch(() => undefined);
         reader.releaseLock();
       }
 
-      response.write(footerPart);
-      response.end();
+      if (!response.writableEnded) {
+        response.write(footerPart);
+        response.end();
+      }
       cleanup();
     } catch (error) {
       vite.ssrFixStacktrace(error as Error);

@@ -362,4 +362,53 @@ test.describe("RSC SSR Example", () => {
     // /__rsc?route=... preserves the query string.
     expect(rscRequests.some((u) => u.includes("role%3Dadmin"))).toBe(true);
   });
+
+  test("Scenario 16: Cache-Control on initial HTML response (per-route policy)", async ({
+    request,
+  }) => {
+    const home = await request.get("/", { maxRedirects: 0 });
+    expect(home.headers()["cache-control"]).toContain("public");
+    expect(home.headers()["cache-control"]).toContain("s-maxage=3600");
+
+    const users = await request.get("/users", { maxRedirects: 0 });
+    expect(users.headers()["cache-control"]).toContain("public");
+    expect(users.headers()["cache-control"]).toContain("max-age=60");
+
+    const profile = await request.get("/users/1", { maxRedirects: 0 });
+    expect(profile.headers()["cache-control"]).toContain("public");
+    expect(profile.headers()["cache-control"]).toContain("max-age=120");
+  });
+
+  test("Scenario 17: Cache-Control on /__rsc Flight responses uses the underlying route's policy", async ({
+    request,
+  }) => {
+    const flightHome = await request.get("/__rsc?route=/", {
+      headers: { Accept: "text/x-component" },
+    });
+    expect(flightHome.headers()["content-type"]).toContain("text/x-component");
+    expect(flightHome.headers()["cache-control"]).toContain("public");
+    expect(flightHome.headers()["cache-control"]).toContain("s-maxage=3600");
+
+    const flightProfile = await request.get("/__rsc?route=/users/1", {
+      headers: { Accept: "text/x-component" },
+    });
+    expect(flightProfile.headers()["content-type"]).toContain(
+      "text/x-component",
+    );
+    expect(flightProfile.headers()["cache-control"]).toContain("max-age=120");
+  });
+
+  test("Scenario 18: streamed responses (HTML and Flight) do NOT carry an ETag header", async ({
+    request,
+  }) => {
+    const html = await request.get("/users/1");
+    expect(html.status()).toBe(200);
+    expect(html.headers().etag).toBeUndefined();
+
+    const flight = await request.get("/__rsc?route=/users/1", {
+      headers: { Accept: "text/x-component" },
+    });
+    expect(flight.status()).toBe(200);
+    expect(flight.headers().etag).toBeUndefined();
+  });
 });
