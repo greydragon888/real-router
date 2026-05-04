@@ -31,16 +31,28 @@ async function startServer(): Promise<void> {
     const url = request.originalUrl;
 
     try {
-      const { html, head, ssrJson, statusCode } = await module_.renderPage(url);
+      const result = await module_.renderPage(url);
 
-      const ssrScript = `<script>window.__SSR_STATE__=${ssrJson}</script>`;
+      if (result.rawBody !== undefined) {
+        response
+          .status(result.statusCode)
+          .set(
+            "Content-Type",
+            result.contentType ?? "text/plain; charset=utf-8",
+          )
+          .send(result.rawBody);
+
+        return;
+      }
+
+      const ssrScript = `<script>window.__SSR_STATE__=${result.ssrJson}</script>`;
       const page = template
-        .replace("<!--ssr-head-->", head)
-        .replace("<!--ssr-outlet-->", html)
+        .replace("<!--ssr-head-->", result.head)
+        .replace("<!--ssr-outlet-->", result.html)
         .replace("<!--ssr-state-->", ssrScript);
 
       response
-        .status(statusCode)
+        .status(result.statusCode)
         .set("Content-Type", "text/html; charset=utf-8")
         .send(page);
     } catch (error) {

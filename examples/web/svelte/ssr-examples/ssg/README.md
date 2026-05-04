@@ -8,11 +8,13 @@
 - **Dynamic route entries** — `entries` map provides parameter sets for routes with `:id`
 - **Build-time pre-rendering** — `cloneRouter()` + `start(url)` + `await render()` for each URL
 - **Per-route data loading** via `@real-router/ssr-data-plugin` — loaders run at build time
-- **Per-page meta tags** — `meta.ts` derives `<title>` + `<meta description>` from resolved router state, server splices them via `<!--ssr-meta-->`. Svelte's `<svelte:head>` content (if used) lands in the same template via `<!--ssr-head-->`
+- **Per-page SEO meta** — `meta.ts` resolves a `PageMeta` per route (title, description, canonical path, og:type, og:image). `ssg-build.ts` injects `<title>`, `<meta description>`, `<link rel="canonical">`, OpenGraph (`og:type`/`title`/`description`/`url`/`image`) and `twitter:card` tags via the `<!--ssr-meta-->` placeholder. Svelte's `<svelte:head>` content lands in the same template via `<!--ssr-head-->`. Each pre-rendered page ships a per-id canonical URL.
+- **Nested route pre-rendering** — `users/:id/posts` is generated for every id in `entries.ts` (in addition to the parent `/users/:id` profile). 8 static HTMLs total: home, list, 3 profiles, 3 posts pages.
 - **Dual-mode entry-client** — explicit `if (rootElement.firstElementChild) hydrate(...) else mount(...)` branching, since Svelte 5 has no `mount({ hydrate: true })` opt-in
 - **404.html fallback + sitemap.xml** — generated as part of the build
 - **XSS-safe state serialization** via `serializeRouterState()` — data embedded in static HTML
 - **Client-side navigation** — after hydration, `@real-router/browser-plugin` handles SPA navigation
+- **Filesystem layout assertions + overfetch protection** — e2e reads `dist/` directly to verify (a) every pre-rendered route maps to exactly one `index.html`, (b) `users/` contains only the ids declared in `entries.ts` (overfetch protection), (c) `sitemap.xml` matches the on-disk set with no extras and nothing missing.
 
 ## Architecture
 
@@ -58,12 +60,26 @@ pnpm preview      # vite preview (serves dist/ statically with the ssgServe redi
 pnpm test:e2e     # Playwright
 ```
 
+## Limitations and Trade-offs
+
+- **Loader runs again on the client during hydration.** The same `ssr-data-plugin` is registered on both server and client (see `entry-client.ts`). Build-time loader resolves data → static HTML written. On first paint the JS bundle re-runs `start(url)` and the loader fires again. For the in-memory `database.ts` this is invisible; for a real `fetch()` it is one extra roundtrip per route. `__SSR_STATE__` carries the serialized state (path, params, context.data) — the client could in theory read it instead of re-fetching, but `ssr-data-plugin` doesn't ship that hook by default.
+- **CSR navigation does not refetch loader data.** `ssr-data-plugin` intercepts `start()`, not `navigate()`. After hydration, clicking a `Link` to `/users/2` fires `router.navigate()` → loader does **not** run → `state.context.data === undefined` → "User not found". Same SSR-only contract as the runtime `ssr/` example. Use `lifecycle-plugin onNavigate` for client-side fetching.
+- **Not ISR.** No incremental regeneration, no on-demand revalidation. Build-time only.
+- **404.html / sitemap.xml are application-level outputs**, not plugin features. `scripts/ssg-build.ts` calls `renderEntry('/__nonexistent')` and writes `404.html` + assembles `sitemap.xml` from `getStaticPaths()`. Easy to copy into your own SSG pipeline, but Real-Router doesn't ship a built-in.
+- **Vite preview / sirv 404 behavior depends on web-server config.** To serve `404.html` with HTTP 404 status (proper SEO signal) you need a real web server (nginx `try_files`, Cloudflare/Netlify `_redirects`).
+
 ## E2e Coverage
 
-[`e2e/ssg.spec.ts`](e2e/ssg.spec.ts) — Playwright suite mirroring the Vue baseline:
+[`e2e/ssg.spec.ts`](e2e/ssg.spec.ts) — 23 Playwright scenarios:
 
-- Cross-cutting (404.html, sitemap.xml, ssgServe redirect, dynamic-route data in HTML, no hydration mismatch, CSR navigation, absolute script paths) — same as Vue/Solid
+- 16 baseline (404.html, sitemap.xml, ssgServe redirect, dynamic-route data in HTML, no hydration mismatch, CSR navigation, absolute script paths, per-page title+description, build determinism)
 - Svelte-specific: dual-mode mount works (no hydration mismatch on pre-rendered pages, fresh mount in dev)
+- **Filesystem layout**: `existsSync` for every expected `index.html`, including nested `/users/:id/posts/index.html`
+- **Overfetch protection**: `readdirSync(users)` returns exactly `["1","2","3"]`, no `users/4` etc.
+- **Nested route pre-rendering**: `/users/1/posts/` ships post titles in static HTML; `/users/3/posts/` shows empty state (no posts in DB)
+- **Canonical + OpenGraph**: `rel=canonical`, `og:type/title/description/url/image`, `twitter:card` per route (incl. nested posts pages with `og:type=article`)
+- **Per-id canonical**: `users/1/index.html` has `canonical=https://example.com/users/1`, `users/3/index.html` has `https://example.com/users/3` — not the parent `/users` URL
+- **Sitemap ↔ filesystem cross-check**: every `<loc>` in `sitemap.xml` matches a generated file, no extras and nothing missing
 
 ## See Also
 

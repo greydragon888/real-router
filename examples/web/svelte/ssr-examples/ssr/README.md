@@ -11,6 +11,7 @@
 - **Per-request `cloneRouter()`** — guard plugins (`canActivate`) read deps via `cloneRouter(base, { currentUser })`, identical to other adapters
 - **`@real-router/browser-plugin` only on the client** — never registered in `entry-server.ts` (it touches `globalThis.history`/`window.location`)
 - **Snippet-based `RouteView`** — Svelte 5 named snippets matching route segments. `notFound` and `self` are reserved slot names
+- **Loader-driven HTTP semantics** — typed loader errors (`LoaderRedirect`, `LoaderNotFound`, `LoaderTimeout` in `src/_loader-errors.ts`) are caught by `renderPage()` and mapped to `301/302`, `404`, and `504` responses respectively. `users.profile` throws `LoaderNotFound` for unknown ids → 404 (vs `UNKNOWN_ROUTE` which is a 200 + NotFound page). `legacyUser` (`/legacy-user/:id`) throws `LoaderRedirect("/users/:id", 301)` — the canonical-URL pattern. `slow` (`/slow`) demonstrates `withTimeout()` — sleeps 5 s but is wrapped in a 250 ms budget, so server responds 504 instead of hanging an SSR worker.
 
 ## Architecture
 
@@ -52,13 +53,37 @@ pnpm preview      # NODE_ENV=production tsx server/index.ts
 pnpm test:e2e     # Playwright
 ```
 
+## Mapping Loader Errors to HTTP
+
+`renderPage()` in `src/entry-server.ts` inspects the `code` field of any error thrown out of `router.start()`:
+
+| Error `code`       | HTTP response                                |
+| ------------------ | -------------------------------------------- |
+| `CANNOT_ACTIVATE`  | `302 Location: /` (auth guard rejected)      |
+| `LOADER_REDIRECT`  | `301/302 Location: error.target`             |
+| `LOADER_NOT_FOUND` | `404 Not Found` (text/plain)                 |
+| `LOADER_TIMEOUT`   | `504 Gateway Timeout` (text/plain)           |
+| anything else      | propagates → 500 with `<server-error>` body  |
+
+Trade-offs:
+- The `404`/`504` bodies are plain text rather than the SSR-rendered NotFound page. Rendering a rich 404 would require a second `render()` pass with a different URL — kept simple in this demo.
+- `withTimeout()` doesn't cancel the underlying loader work — only races the response. For real workloads, pair the timeout with `AbortController` in the loader.
+
+## CSR-only contract is verified by network spy
+
+The e2e suite verifies the `ssr-data-plugin` contract (intercepts `start()`, not `navigate()`) with two assertions: (1) the DOM ends up showing the "User not found" branch after a CSR click, and (2) Playwright's `page.on("request")` confirms zero new HTML/document/fetch/xhr requests during the click — the data really did NOT come from a server roundtrip.
+
 ## E2e
 
-[`e2e/ssr.spec.ts`](e2e/ssr.spec.ts) — Playwright suite mirroring the Vue baseline plus Svelte-specific markers:
+[`e2e/ssr.spec.ts`](e2e/ssr.spec.ts) — 35 Playwright scenarios:
 
-- Cross-cutting (per-request isolation, hydration round-trip, loaders, guards, query params, nested loaders, 404, 500, CSR navigation, `<Link>` href in no-JS mode) — same as Vue
+- 25 baseline (per-request isolation, hydration round-trip, loaders, guards, query params, nested loaders, 404, 500, CSR navigation, `<Link>` href in no-JS mode)
 - Svelte-specific: no hydration mismatch warnings (Svelte 5 emits `[svelte] hydration_*` warnings on mismatch)
-- Svelte-specific: `head` field content from `<svelte:head>` blocks (when used) appears in pre-rendered HTML
+- **`<svelte:head>` per-route**: home page ships per-route `<title>` + `<meta description>` in raw SSR HTML; `/users` reflects the current `?sort` param via reactive `<svelte:head>`
+- **Loader-driven HTTP**: `/users/9999` → 404, `/users/9999/posts` → 404, `/legacy-user/2` → 301 + Location, `/legacy-user/3` follows to a hydrated profile, `/slow` → 504 within 2.5 s budget (5 s loader delay)
+- **CSR navigate spy**: clicking a profile link triggers zero document/fetch requests; `state.context.data` stays undefined
+- **Query params in `__SSR_STATE__`**: `?sort=desc` surfaces in the serialized blob
+- **Mixed-guard concurrent requests**: admin / user / anon contexts × 5 routes (admin, dashboard, users, profile, posts) in parallel — each context sees only its own `currentUser`
 
 ## See Also
 

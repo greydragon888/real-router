@@ -51,7 +51,19 @@ async function startServer(): Promise<void> {
       const result = await module_.renderPage(url, { currentUser });
 
       if (result.redirect) {
-        response.redirect(result.redirect);
+        response.redirect(result.statusCode, result.redirect);
+
+        return;
+      }
+
+      if (result.rawBody !== undefined) {
+        response
+          .status(result.statusCode)
+          .set(
+            "Content-Type",
+            result.contentType ?? "text/plain; charset=utf-8",
+          )
+          .send(result.rawBody);
 
         return;
       }

@@ -22,6 +22,24 @@ export interface RenderResult {
   serializedData: string;
   statusCode: number;
   redirect: string | null;
+  /** Pre-rendered body without going through the App template — used for typed loader errors that surface as plain-text HTTP responses. */
+  rawBody?: string;
+  /** Optional Content-Type override for rawBody responses. */
+  contentType?: string;
+}
+
+interface MaybeRedirect {
+  code?: string;
+  target?: string;
+  status?: number;
+}
+
+interface MaybeError {
+  code?: string;
+}
+
+function readErrorCode(error: unknown): string | undefined {
+  return (error as MaybeError | null)?.code;
 }
 
 function wrapInScript(json: string): string {
@@ -56,7 +74,7 @@ export async function renderPage(
       redirect: null,
     };
   } catch (error) {
-    const code = (error as { code?: string }).code;
+    const code = readErrorCode(error);
 
     if (code === "CANNOT_ACTIVATE") {
       return {
@@ -65,6 +83,42 @@ export async function renderPage(
         serializedData: "",
         statusCode: 302,
         redirect: "/",
+      };
+    }
+
+    if (code === "LOADER_REDIRECT") {
+      const redirect = error as MaybeRedirect;
+
+      return {
+        html: "",
+        head: "",
+        serializedData: "",
+        statusCode: redirect.status ?? 302,
+        redirect: redirect.target ?? "/",
+      };
+    }
+
+    if (code === "LOADER_NOT_FOUND") {
+      return {
+        html: "",
+        head: "",
+        serializedData: "",
+        statusCode: 404,
+        redirect: null,
+        rawBody: "Not Found",
+        contentType: "text/plain; charset=utf-8",
+      };
+    }
+
+    if (code === "LOADER_TIMEOUT") {
+      return {
+        html: "",
+        head: "",
+        serializedData: "",
+        statusCode: 504,
+        redirect: null,
+        rawBody: "Gateway Timeout",
+        contentType: "text/plain; charset=utf-8",
       };
     }
 

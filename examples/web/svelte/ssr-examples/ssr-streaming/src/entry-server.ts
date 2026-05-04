@@ -15,6 +15,18 @@ export interface RenderResult {
   head: string;
   ssrJson: string;
   statusCode: number;
+  /** Pre-rendered body that bypasses the App template. Used for typed loader errors. */
+  rawBody?: string;
+  /** Optional Content-Type override for rawBody responses. */
+  contentType?: string;
+}
+
+interface MaybeError {
+  code?: string;
+}
+
+function readErrorCode(error: unknown): string | undefined {
+  return (error as MaybeError | null)?.code;
 }
 
 export async function renderPage(url: string): Promise<RenderResult> {
@@ -38,6 +50,21 @@ export async function renderPage(url: string): Promise<RenderResult> {
       ssrJson: serializeRouterState(state),
       statusCode,
     };
+  } catch (error) {
+    const code = readErrorCode(error);
+
+    if (code === "LOADER_NOT_FOUND") {
+      return {
+        html: "",
+        head: "",
+        ssrJson: "",
+        statusCode: 404,
+        rawBody: "Not Found",
+        contentType: "text/plain; charset=utf-8",
+      };
+    }
+
+    throw error;
   } finally {
     router.dispose();
   }

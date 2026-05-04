@@ -539,4 +539,250 @@ test.describe("SSR (Svelte)", () => {
 
     expect(marker).toBe(true);
   });
+
+  test("loader-driven 404: unknown /users/:id returns HTTP 404 (loader throws LoaderNotFound)", async ({
+    request,
+  }) => {
+    // The users.profile loader throws LoaderNotFound for ids not in the
+    // database. renderPage() converts the typed error into rawBody + status:404
+    // and server/index.ts sends text/plain. This distinguishes "route not
+    // registered" (UNKNOWN_ROUTE → 404 via NotFound page) from "route
+    // matched but resource not found" (LOADER_NOT_FOUND → text/plain 404).
+    const response = await request.get("/users/9999");
+
+    expect(response.status()).toBe(404);
+    expect(response.headers()["content-type"]).toContain("text/plain");
+  });
+
+  test("loader-driven 404 for nested route: /users/9999/posts also returns 404", async ({
+    request,
+  }) => {
+    const response = await request.get("/users/9999/posts");
+
+    expect(response.status()).toBe(404);
+  });
+
+  test("loader-driven 301 redirect: /legacy-user/2 → /users/2 (loader throws LoaderRedirect)", async ({
+    request,
+  }) => {
+    const response = await request.get("/legacy-user/2", { maxRedirects: 0 });
+
+    expect(response.status()).toBe(301);
+    expect(response.headers().location).toBe("/users/2");
+  });
+
+  test("loader-driven 301 follows correctly to a hydrated profile", async ({
+    page,
+  }) => {
+    await page.goto("/legacy-user/3");
+
+    await expect(page).toHaveURL(/\/users\/3$/);
+    await expect(page.getByTestId("user-name")).toHaveText("Name: Charlie");
+  });
+
+  test("loader timeout: /slow returns 504 within budget (withTimeout fires before 5 s delay)", async ({
+    request,
+  }) => {
+    // The "slow" loader sleeps 5000 ms but is wrapped in withTimeout(250 ms).
+    // renderPage() maps LOADER_TIMEOUT → status:504 + rawBody. Without
+    // timeout protection, an idle SSR worker would hang for the full delay
+    // and produce a 200 response with stale data.
+    const startedAt = Date.now();
+    const response = await request.get("/slow");
+    const elapsed = Date.now() - startedAt;
+
+    expect(response.status()).toBe(504);
+    expect(elapsed).toBeLessThan(2500);
+  });
+
+  test("CSR navigate spy: clicking a profile link issues NO new HTML request and leaves data undefined", async ({
+    page,
+  }) => {
+    // ssr-data-plugin intercepts only start(), not navigate(). When the user
+    // clicks a Link, browser-plugin handles it client-side — no SSR
+    // round-trip, no loader rerun, data stays undefined ("User not found"
+    // template branch). This test makes that contract explicit by counting
+    // network HTML/fetch requests during the click.
+    await page.goto("/users");
+    await page.waitForLoadState("networkidle");
+
+    const documentRequests: string[] = [];
+
+    page.on("request", (req) => {
+      if (
+        req.resourceType() === "document" ||
+        req.resourceType() === "fetch" ||
+        req.resourceType() === "xhr"
+      ) {
+        documentRequests.push(req.url());
+      }
+    });
+
+    await page.click("text=Bob");
+    await expect(page).toHaveURL(/\/users\/2$/);
+    await expect(page.getByTestId("user-not-found")).toBeVisible();
+
+    const profileFetches = documentRequests.filter((url) =>
+      /\/users\/2$/.test(new URL(url).pathname),
+    );
+
+    expect(profileFetches).toEqual([]);
+  });
+
+  test("svelte:head injection: home page ships per-route <title> + <meta description> in SSR HTML", async ({
+    request,
+  }) => {
+    // Svelte's <svelte:head> contents are collected by render() into
+    // RenderOutput.head and the express middleware splices them into the
+    // <!--ssr-head--> placeholder of index.html. This test verifies the
+    // wire format directly (no JS, no hydration) — regressions in the head
+    // injection pipeline would silently break SEO.
+    const response = await request.get("/");
+    const html = await response.text();
+
+    expect(html).toContain("<title>Home — Real-Router Svelte SSR</title>");
+    expect(html).toMatch(
+      /<meta[^>]+name="description"[^>]+content="Welcome to the Real-Router SSR example/,
+    );
+  });
+
+  test("svelte:head per-route: /users title reflects current sort param", async ({
+    request,
+  }) => {
+    // <svelte:head> can reference reactive state — verify the `data.sort`
+    // expression flows from the loader through to the rendered <title>.
+    const ascending = await request.get("/users?sort=asc");
+    const ascendingHtml = await ascending.text();
+
+    expect(ascendingHtml).toContain(
+      "<title>All Users (sorted asc) — Real-Router Svelte SSR</title>",
+    );
+
+    const descending = await request.get("/users?sort=desc");
+    const descendingHtml = await descending.text();
+
+    expect(descendingHtml).toContain(
+      "<title>All Users (sorted desc) — Real-Router Svelte SSR</title>",
+    );
+  });
+
+  test("query params: ?sort=desc surfaces in __SSR_STATE__.params", async ({
+    page,
+  }) => {
+    // Existing "query params" test verifies DOM order; this test pins the
+    // wire-format guarantee that params land in __SSR_STATE__ for the client
+    // to use — separate concern from server-rendered HTML order.
+    await page.goto("/users?sort=desc");
+
+    const state = await page.evaluate(
+      () =>
+        (
+          globalThis as unknown as Window & {
+            __SSR_STATE__?: { params?: Record<string, unknown> };
+          }
+        ).__SSR_STATE__,
+    );
+
+    expect(state?.params?.sort).toBe("desc");
+  });
+
+  test("per-request isolation under mixed guards: /, /users, /dashboard, /admin, /users/1/posts in parallel with different auth contexts", async ({
+    browser,
+  }) => {
+    // Spin up three independent contexts (admin / regular user / anon) and
+    // fire five different routes in parallel. Each request must see only its
+    // own currentUser dependency; no cross-context bleed.
+    const BASE = "http://localhost:3000";
+
+    const [adminCtx, userCtx, anonCtx] = await Promise.all([
+      browser.newContext({
+        storageState: {
+          cookies: [
+            {
+              name: "userId",
+              value: "1",
+              domain: "localhost",
+              path: "/",
+              expires: -1,
+              httpOnly: false,
+              secure: false,
+              sameSite: "Lax",
+            },
+          ],
+          origins: [],
+        },
+      }),
+      browser.newContext({
+        storageState: {
+          cookies: [
+            {
+              name: "userId",
+              value: "2",
+              domain: "localhost",
+              path: "/",
+              expires: -1,
+              httpOnly: false,
+              secure: false,
+              sameSite: "Lax",
+            },
+          ],
+          origins: [],
+        },
+      }),
+      browser.newContext(),
+    ]);
+
+    try {
+      const [
+        adminAdmin,
+        adminPosts,
+        userDashboard,
+        userAdmin,
+        anonUsers,
+        anonAdmin,
+        anonDashboard,
+        anonHome,
+      ] = await Promise.all([
+        adminCtx.request.get(`${BASE}/admin`),
+        adminCtx.request.get(`${BASE}/users/1/posts`),
+        userCtx.request.get(`${BASE}/dashboard`),
+        userCtx.request.get(`${BASE}/admin`, { maxRedirects: 0 }),
+        anonCtx.request.get(`${BASE}/users`),
+        anonCtx.request.get(`${BASE}/admin`, { maxRedirects: 0 }),
+        anonCtx.request.get(`${BASE}/dashboard`, { maxRedirects: 0 }),
+        anonCtx.request.get(`${BASE}/`),
+      ]);
+
+      expect(adminAdmin.status(), "admin → /admin").toBe(200);
+      expect(await adminAdmin.text()).toContain('data-testid="admin-page"');
+
+      expect(adminPosts.status(), "admin → /users/1/posts").toBe(200);
+      const adminPostsHtml = await adminPosts.text();
+
+      expect(adminPostsHtml).toContain('data-testid="user-posts"');
+      expect(adminPostsHtml).toContain("Hello world");
+
+      expect(userDashboard.status(), "user → /dashboard").toBe(200);
+      expect(await userDashboard.text()).toContain("Dashboard");
+
+      expect(userAdmin.status(), "user → /admin (role mismatch)").toBe(302);
+      expect(userAdmin.headers().location).toBe("/");
+
+      expect(anonUsers.status(), "anon → /users").toBe(200);
+      expect(await anonUsers.text()).toContain("Alice");
+
+      expect(anonAdmin.status(), "anon → /admin").toBe(302);
+      expect(anonAdmin.headers().location).toBe("/");
+
+      expect(anonDashboard.status(), "anon → /dashboard").toBe(302);
+      expect(anonDashboard.headers().location).toBe("/");
+
+      expect(anonHome.status(), "anon → /").toBe(200);
+      expect(await anonHome.text()).toContain("Welcome");
+    } finally {
+      await adminCtx.close();
+      await userCtx.close();
+      await anonCtx.close();
+    }
+  });
 });

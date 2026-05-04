@@ -1,4 +1,11 @@
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { test, expect } from "@playwright/test";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const DIST = resolve(__dirname, "../dist");
 
 test.describe("SSG (Svelte)", () => {
   test("static HTML contains pre-rendered home page", async ({ browser }) => {
@@ -170,22 +177,22 @@ test.describe("SSG (Svelte)", () => {
     const cases = [
       {
         path: "/",
-        title: "Home — Real-Router SSG",
-        description: "Welcome page of the Real-Router SSG demo.",
+        title: "Home — Real-Router Svelte SSG",
+        description: "Welcome page of the Real-Router Svelte SSG demo.",
       },
       {
         path: "/users/",
-        title: "All Users — Real-Router SSG",
+        title: "All Users — Real-Router Svelte SSG",
         description: "Browse the full list of pre-rendered users.",
       },
       {
         path: "/users/1/",
-        title: "Alice — Real-Router SSG",
+        title: "Alice — Real-Router Svelte SSG",
         description: "Profile page for Alice (id: 1).",
       },
       {
         path: "/users/3/",
-        title: "Charlie — Real-Router SSG",
+        title: "Charlie — Real-Router Svelte SSG",
         description: "Profile page for Charlie (id: 3).",
       },
     ];
@@ -213,7 +220,9 @@ test.describe("SSG (Svelte)", () => {
 
     const html = await response.text();
 
-    expect(html).toContain("<title>Page Not Found — Real-Router SSG</title>");
+    expect(html).toContain(
+      "<title>Page Not Found — Real-Router Svelte SSG</title>",
+    );
     expect(html).toContain(
       'content="The page you are looking for does not exist."',
     );
@@ -368,5 +377,174 @@ test.describe("SSG (Svelte)", () => {
     await expect(page.locator("main")).toContainText("Alice");
     await expect(page.locator("main")).toContainText("ID: 1");
     await expect(page.locator("main")).toContainText("Name: Alice");
+  });
+
+  test("filesystem layout: dist contains exactly one index.html per pre-rendered route + nested posts pages", async () => {
+    // Filesystem-level assertion (not HTTP) — overfetch / missing-file
+    // regressions are hard to spot via fixtures alone. Verify the
+    // CDN-deployable shape directly: home, users list, 3 profiles, 3
+    // nested posts pages, plus 404.html and sitemap.xml.
+    expect(existsSync(DIST)).toBe(true);
+
+    expect(existsSync(resolve(DIST, "index.html"))).toBe(true);
+    expect(existsSync(resolve(DIST, "404.html"))).toBe(true);
+    expect(existsSync(resolve(DIST, "sitemap.xml"))).toBe(true);
+
+    expect(existsSync(resolve(DIST, "users/index.html"))).toBe(true);
+
+    for (const id of ["1", "2", "3"]) {
+      expect(
+        existsSync(resolve(DIST, `users/${id}/index.html`)),
+        `users/${id}/index.html`,
+      ).toBe(true);
+      expect(
+        existsSync(resolve(DIST, `users/${id}/posts/index.html`)),
+        `users/${id}/posts/index.html`,
+      ).toBe(true);
+    }
+  });
+
+  test("overfetch protection: only ids declared in entries.ts are pre-rendered", async () => {
+    // entries.ts → 3 ids. SSG must produce exactly 3 user subdirectories,
+    // not more. If getStaticPaths or entries grew silently, /users/4 would
+    // appear here and inflate sitemap.xml + dist size.
+    const usersDir = resolve(DIST, "users");
+    const subdirs = readdirSync(usersDir).filter((name) =>
+      statSync(resolve(usersDir, name)).isDirectory(),
+    );
+
+    expect(subdirs.toSorted()).toEqual(["1", "2", "3"]);
+    expect(existsSync(resolve(usersDir, "4"))).toBe(false);
+    expect(existsSync(resolve(usersDir, "999"))).toBe(false);
+  });
+
+  test("nested route pre-rendering: /users/:id/posts gets its own static HTML with loader data", async ({
+    request,
+  }) => {
+    // Intermediate (users.profile) AND leaf (users.profile.posts) routes
+    // both pre-render. Posts page must contain post titles in the static
+    // HTML — proves the nested-loader runs at build time and writes data
+    // into the bundled __SSR_STATE__.
+    const response = await request.get("/users/1/posts/");
+
+    expect(response.status()).toBe(200);
+
+    const html = await response.text();
+
+    expect(html).toContain('data-testid="user-posts"');
+    expect(html).toContain("Hello world");
+    expect(html).toContain("On routing");
+  });
+
+  test("nested route empty state: /users/3/posts ships empty-posts UI", async ({
+    request,
+  }) => {
+    // User 3 has no posts in the in-memory database. The loader returns
+    // an empty array; the empty-state branch of UserPosts.svelte must
+    // render at build time.
+    const response = await request.get("/users/3/posts/");
+    const html = await response.text();
+
+    expect(html).toContain('data-testid="user-posts-empty"');
+  });
+
+  test("canonical + OpenGraph meta: each pre-rendered route ships SEO-ready tags", async ({
+    request,
+  }) => {
+    // SSG output must include rel=canonical (deduplication for search
+    // engines) plus og:type / og:title / og:url / og:image (link previews
+    // on social platforms). These cost almost nothing to inject.
+    const cases = [
+      {
+        path: "/",
+        canonical: "https://example.com/",
+        ogType: "website",
+      },
+      {
+        path: "/users/",
+        canonical: "https://example.com/users",
+        ogType: "website",
+      },
+      {
+        path: "/users/1/",
+        canonical: "https://example.com/users/1",
+        ogType: "profile",
+      },
+      {
+        path: "/users/3/",
+        canonical: "https://example.com/users/3",
+        ogType: "profile",
+      },
+      {
+        path: "/users/2/posts/",
+        canonical: "https://example.com/users/2/posts",
+        ogType: "article",
+      },
+    ];
+
+    for (const { path, canonical, ogType } of cases) {
+      const response = await request.get(path);
+
+      expect(response.status(), path).toBe(200);
+
+      const html = await response.text();
+
+      expect(html, `${path} canonical`).toContain(
+        `<link rel="canonical" href="${canonical}" />`,
+      );
+      expect(html, `${path} og:url`).toContain(
+        `<meta property="og:url" content="${canonical}" />`,
+      );
+      expect(html, `${path} og:type`).toContain(
+        `<meta property="og:type" content="${ogType}" />`,
+      );
+      expect(html, `${path} og:image present`).toContain(
+        'property="og:image"',
+      );
+      expect(html, `${path} twitter:card`).toContain(
+        '<meta name="twitter:card" content="summary_large_image" />',
+      );
+    }
+  });
+
+  test("canonical for profile is per-id (not the parent /users URL)", async () => {
+    const aliceHtml = readFileSync(
+      resolve(DIST, "users/1/index.html"),
+      "utf8",
+    );
+    const charlieHtml = readFileSync(
+      resolve(DIST, "users/3/index.html"),
+      "utf8",
+    );
+
+    expect(aliceHtml).toContain(
+      '<link rel="canonical" href="https://example.com/users/1" />',
+    );
+    expect(charlieHtml).toContain(
+      '<link rel="canonical" href="https://example.com/users/3" />',
+    );
+
+    expect(aliceHtml).not.toContain(
+      '<link rel="canonical" href="https://example.com/users" />',
+    );
+  });
+
+  test("sitemap.xml matches the on-disk pre-rendered set (no extras, no missing)", async () => {
+    const xml = readFileSync(resolve(DIST, "sitemap.xml"), "utf8");
+    const matches = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)];
+    const urls = matches.map((entry) => entry[1]);
+
+    expect(urls.toSorted()).toEqual(
+      [
+        "https://example.com/",
+        "https://example.com/users",
+        "https://example.com/users/1",
+        "https://example.com/users/1/posts",
+        "https://example.com/users/2",
+        "https://example.com/users/2/posts",
+        "https://example.com/users/3",
+        "https://example.com/users/3/posts",
+      ].toSorted(),
+    );
   });
 });

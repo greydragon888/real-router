@@ -20,7 +20,13 @@ const { renderPage: renderEntry, getStaticPaths } = (await import(
     head: string;
     ssrJson: string;
     statusCode: number;
-    meta: { title: string; description: string };
+    meta: {
+      title: string;
+      description: string;
+      canonicalPath?: string;
+      ogType?: "website" | "profile" | "article";
+      ogImagePath?: string;
+    };
   }>;
   getStaticPaths: () => Promise<string[]>;
 };
@@ -28,6 +34,9 @@ const { renderPage: renderEntry, getStaticPaths } = (await import(
 interface MetaTags {
   title: string;
   description: string;
+  canonicalPath?: string;
+  ogType?: "website" | "profile" | "article";
+  ogImagePath?: string;
 }
 
 function escapeHtml(value: string): string {
@@ -38,8 +47,28 @@ function escapeHtml(value: string): string {
     .replaceAll('"', "&quot;");
 }
 
+function joinUrl(origin: string, p: string): string {
+  if (!p.startsWith("/")) return `${origin}/${p}`;
+
+  return `${origin}${p}`;
+}
+
 function renderMetaBlock(meta: MetaTags): string {
-  return `<title>${escapeHtml(meta.title)}</title>\n    <meta name="description" content="${escapeHtml(meta.description)}" />`;
+  const canonical = joinUrl(SITE_ORIGIN, meta.canonicalPath ?? "/");
+  const ogImage = joinUrl(SITE_ORIGIN, meta.ogImagePath ?? "/og/default.png");
+  const ogType = meta.ogType ?? "website";
+
+  return [
+    `<title>${escapeHtml(meta.title)}</title>`,
+    `    <meta name="description" content="${escapeHtml(meta.description)}" />`,
+    `    <link rel="canonical" href="${escapeHtml(canonical)}" />`,
+    `    <meta property="og:type" content="${escapeHtml(ogType)}" />`,
+    `    <meta property="og:title" content="${escapeHtml(meta.title)}" />`,
+    `    <meta property="og:description" content="${escapeHtml(meta.description)}" />`,
+    `    <meta property="og:url" content="${escapeHtml(canonical)}" />`,
+    `    <meta property="og:image" content="${escapeHtml(ogImage)}" />`,
+    `    <meta name="twitter:card" content="summary_large_image" />`,
+  ].join("\n");
 }
 
 function buildHtml(
@@ -62,7 +91,17 @@ function buildHtml(
     .replace("<!--ssr-state-->", ssrScript);
 }
 
-const paths = [...(await getStaticPaths()), "/users"];
+// `getStaticPaths` enumerates leaf routes only — it returns
+// `/users/<id>/posts` for nested routes, but skips the intermediate
+// `/users/<id>` profile pages (which have a child `posts`). Add them
+// explicitly so each user has both a profile page and a posts page.
+const leafPaths = await getStaticPaths();
+const profilePaths = leafPaths
+  .map((p) => p.replace(/\/posts$/, ""))
+  .filter((p) => /\/users\/[^/]+$/.test(p));
+const paths = Array.from(
+  new Set<string>([...leafPaths, ...profilePaths, "/users"]),
+);
 
 console.log(`Pre-rendering ${paths.length} routes...`);
 

@@ -12,6 +12,10 @@
   const otherSort = $derived(data.sort === "asc" ? "desc" : "asc");
 </script>
 
+<svelte:head>
+  <title>All Users (sorted {data.sort}) — Real-Router Svelte SSR</title>
+</svelte:head>
+
 <div>
   <h2>All Users</h2>
   <p data-testid="current-sort">Sorted: {data.sort}</p>
