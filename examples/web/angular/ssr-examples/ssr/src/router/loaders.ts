@@ -72,14 +72,33 @@ export const loaders: DataLoaderFactoryMap = {
     throw new LoaderRedirect(`/users/${id}`, 301);
   },
 
-  slow: () => () =>
-    withTimeout("slow", SLOW_LOADER_TIMEOUT_MS, () =>
-      new Promise<SlowData>((resolve) => {
-        setTimeout(() => {
+  // The `slow` loader pulls an `abortSignal` from per-request deps
+  // (registered by app.config.ts deps factory through the Express
+  // request object). When the client disconnects mid-render, server.ts
+  // fires its AbortController, the signal flips, and this loader
+  // cleans up the setTimeout — preventing the leak that would
+  // otherwise hold the worker for the full 5 s.
+  slow: (_router, getDep) => () =>
+    withTimeout("slow", SLOW_LOADER_TIMEOUT_MS, () => {
+      const signal = (
+        getDep as unknown as (key: string) => AbortSignal | undefined
+      )("abortSignal");
+
+      return new Promise<SlowData>((resolve, reject) => {
+        const id = setTimeout(() => {
           resolve({ message: "this should never be seen" });
         }, SLOW_LOADER_DELAY_MS);
-      }),
-    ),
+
+        signal?.addEventListener(
+          "abort",
+          () => {
+            clearTimeout(id);
+            reject(new Error("Aborted: client disconnected"));
+          },
+          { once: true },
+        );
+      });
+    }),
 
   boom: () => () => Promise.reject(new Error("Loader exploded for /boom")),
 };

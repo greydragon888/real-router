@@ -36,8 +36,16 @@ export const appConfig: ApplicationConfig = {
         request
           ? [ssrDataPluginFactory(loaders)]
           : [browserPluginFactory(), ssrDataPluginFactory(loaders)],
+      // server.ts attaches an AbortSignal to the Express request via
+      // (req as { abortSignal? }).abortSignal = controller.signal so
+      // the deps factory can forward it into Real-Router's per-request
+      // dep map. Loaders pull it via getDep("abortSignal") to cancel
+      // pending I/O when the client disconnects mid-render — see
+      // /slow loader for the demonstrated pattern.
       deps: (request) => ({
         currentUser: getCurrentUserFromRequest(request),
+        abortSignal: (request as { abortSignal?: AbortSignal } | undefined)
+          ?.abortSignal,
       }),
     }),
   ],

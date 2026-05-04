@@ -168,7 +168,17 @@ The e2e suite verifies both strategies in one test (scenario 39): `/gone` return
 - **Strategy A** ships a richer body (full SSR render through Angular) and integrates with build-time prerendering / CDN cache headers. Limited to status overrides knowable at routing time.
 - **Strategy B** carries any data-derived status, but the body in this example is `text/plain "Not Found"` for simplicity. Rendering a rich 404 from middleware would require a second `angularApp.handle()` pass against a `/__not-found` URL with `res.status(404)`.
 
-`withTimeout()` doesn't cancel the underlying loader work — only races the response. Long-running loaders continue to consume CPU/IO until they resolve. For real workloads, pair the timeout with `AbortController` in the loader.
+`withTimeout()` doesn't cancel the underlying loader work — only races the response. Long-running loaders continue to consume CPU/IO until they resolve. For real workloads, pair the timeout with `AbortController` in the loader (the `slow` loader does this — see next section).
+
+## Production HTTP semantics: ETag, Cache-Control, AbortController
+
+`server.ts` adds three production-grade pieces on top of the AngularNodeAppEngine pipeline:
+
+- **Strong `ETag`** — the Web Response from `angularApp.handle(req)` is buffered (`response.arrayBuffer()`), hashed (sha256 → 16 base64url chars), and the hash is set as the `ETag` header. Conditional GET (`If-None-Match`) returns `304 Not Modified` with an empty body. Distinct routes yield distinct ETags; identical routes with deterministic loaders yield the same ETag across requests.
+- **Per-route `Cache-Control`** — `src/router/cache-policies.ts` maps URL paths to directives: `/` → `public, s-maxage=3600, must-revalidate`, `/users` → `public, max-age=60`, `/users/:id` → `public, max-age=120`, `/dashboard` and `/admin` → `private, no-store`, `/legacy-user/:id` → 1-day cache for the redirect itself, `/slow`/`/boom` → `no-store`.
+- **`AbortController` per request** — the controller's signal is attached to the Express request object (`(req as { abortSignal? }).abortSignal = signal`) so the `provideRealRouterFactory({ deps })` factory in `app.config.ts` can forward it into Real-Router's per-request dep map. The `slow` loader pulls it via `getDep("abortSignal")` and clears its `setTimeout` on `req.on("close")`. Without this wiring a 5 s loader holds the worker even after the client gives up. The e2e suite verifies the server releases the handler within 1 s (well under the 5 s loader delay).
+
+These are demonstrated end-to-end by 4 dedicated tests in `e2e/ssr.spec.ts` (Cache-Control routing, 304 on identical content, distinct routes → distinct hashes, AbortController fast release).
 
 ## Why `provideRealRouterFactory` (not `provideRealRouter`)?
 
