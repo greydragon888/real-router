@@ -3802,6 +3802,9 @@ importers:
       '@real-router/ssr-data-plugin':
         specifier: workspace:^
         version: link:../../../../../packages/ssr-data-plugin
+      '@solidjs/meta':
+        specifier: 0.29.4
+        version: 0.29.4(solid-js@1.9.5)
       express:
         specifier: 5.1.0
         version: 5.1.0
@@ -17832,6 +17835,10 @@ snapshots:
   '@solidjs/meta@0.29.4(solid-js@1.9.12)':
     dependencies:
       solid-js: 1.9.12
+
+  '@solidjs/meta@0.29.4(solid-js@1.9.5)':
+    dependencies:
+      solid-js: 1.9.5
 
   '@solidjs/testing-library@0.8.10(solid-js@1.9.12)':
     dependencies:

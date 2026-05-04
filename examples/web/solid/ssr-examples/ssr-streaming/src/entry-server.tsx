@@ -17,6 +17,28 @@ export interface RenderResult {
   hydrationScript: string;
   statusCode: number;
   cleanup: () => void;
+  /** Pre-rendered body that bypasses the streaming pipeline — used for
+   * typed loader errors (LoaderNotFound) that surface as plain-text HTTP
+   * responses. When set, server/index.ts skips the stream branch. */
+  rawBody?: string;
+  /** Optional Content-Type override for rawBody responses. */
+  contentType?: string;
+}
+
+interface MaybeError {
+  code?: string;
+}
+
+function readErrorCode(error: unknown): string | undefined {
+  return (error as MaybeError | null)?.code;
+}
+
+function emptyStream(): ReadableStream<Uint8Array> {
+  return new ReadableStream({
+    start(controller) {
+      controller.close();
+    },
+  });
 }
 
 export async function render(url: string): Promise<RenderResult> {
@@ -24,7 +46,32 @@ export async function render(url: string): Promise<RenderResult> {
 
   router.usePlugin(ssrDataPluginFactory(loaders));
 
-  const state = await router.start(url);
+  let state;
+
+  try {
+    state = await router.start(url);
+  } catch (error) {
+    const code = readErrorCode(error);
+
+    if (code === "LOADER_NOT_FOUND") {
+      router.dispose();
+
+      return {
+        stream: emptyStream(),
+        ssrJson: "",
+        hydrationScript: "",
+        statusCode: 404,
+        cleanup: () => {},
+        rawBody: "Not Found",
+        contentType: "text/plain; charset=utf-8",
+      };
+    }
+
+    router.dispose();
+
+    throw error;
+  }
+
   const ssrJson = serializeRouterState(state);
   const statusCode = state.name === UNKNOWN_ROUTE ? 404 : 200;
   const hydrationScript = generateHydrationScript();

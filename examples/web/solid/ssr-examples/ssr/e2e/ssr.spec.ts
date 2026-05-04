@@ -565,4 +565,418 @@ test.describe("SSR (Solid)", () => {
 
     expect(marker).toBe(true);
   });
+
+  test("loader-driven 404: unknown /users/:id returns HTTP 404 (loader throws LoaderNotFound)", async ({
+    request,
+  }) => {
+    // The users.profile loader throws LoaderNotFound for ids not in the
+    // database. entry-server.tsx converts the typed error into rawBody +
+    // status:404; server/index.ts sends text/plain. Distinguishes "route
+    // not registered" (UNKNOWN_ROUTE → 404 + NotFound page) from "route
+    // matched but resource not found" (LOADER_NOT_FOUND → text/plain 404).
+    const response = await request.get("/users/9999");
+
+    expect(response.status()).toBe(404);
+    expect(response.headers()["content-type"]).toContain("text/plain");
+  });
+
+  test("loader-driven 404 for nested route: /users/9999/posts also returns 404", async ({
+    request,
+  }) => {
+    const response = await request.get("/users/9999/posts");
+
+    expect(response.status()).toBe(404);
+  });
+
+  test("loader-driven 301 redirect: /legacy-user/2 → /users/2 (loader throws LoaderRedirect)", async ({
+    request,
+  }) => {
+    const response = await request.get("/legacy-user/2", { maxRedirects: 0 });
+
+    expect(response.status()).toBe(301);
+    expect(response.headers().location).toBe("/users/2");
+  });
+
+  test("loader-driven 301 follows correctly to a hydrated profile", async ({
+    page,
+  }) => {
+    await page.goto("/legacy-user/3");
+
+    await expect(page).toHaveURL(/\/users\/3$/);
+    await expect(page.getByTestId("user-name")).toHaveText("Name: Charlie");
+  });
+
+  test("loader timeout: /slow returns 504 within budget (withTimeout fires before 5 s loader delay)", async ({
+    request,
+  }) => {
+    // The "slow" loader sleeps 5000 ms but is wrapped in withTimeout(250 ms).
+    // entry-server.tsx maps LOADER_TIMEOUT → status:504 + rawBody. Without
+    // timeout protection, an idle SSR worker would hang for the full delay
+    // and produce a 200 response with stale data.
+    const startedAt = Date.now();
+    const response = await request.get("/slow");
+    const elapsed = Date.now() - startedAt;
+
+    expect(response.status()).toBe(504);
+    expect(elapsed).toBeLessThan(2500);
+  });
+
+  test("head injection: home page ships per-route <title> + <meta description> in SSR HTML", async ({
+    request,
+  }) => {
+    // entry-server.tsx calls getMetaForState(state) and splices <title>
+    // + <meta description> into the <!--ssr-head--> placeholder. Verify
+    // the wire format directly (no JS, no hydration) — regressions in the
+    // head injection pipeline silently break SEO.
+    const response = await request.get("/");
+    const html = await response.text();
+
+    expect(html).toContain("<title>Home — Real-Router Solid SSR</title>");
+    expect(html).toMatch(
+      /<meta[^>]+name="description"[^>]+content="Welcome to the Real-Router Solid SSR example/,
+    );
+  });
+
+  test("head injection per-route: /users title reflects current ?sort param", async ({
+    request,
+  }) => {
+    // The `users` route's meta resolver reads state.params.sort; verify it
+    // actually flows through to the SSR'd <title>.
+    const ascending = await request.get("/users?sort=asc");
+    const ascendingHtml = await ascending.text();
+
+    expect(ascendingHtml).toContain(
+      "<title>All Users (sorted asc) — Real-Router Solid SSR</title>",
+    );
+
+    const descending = await request.get("/users?sort=desc");
+    const descendingHtml = await descending.text();
+
+    expect(descendingHtml).toContain(
+      "<title>All Users (sorted desc) — Real-Router Solid SSR</title>",
+    );
+  });
+
+  test("CSR navigate spy: clicking a profile link issues NO new HTML/document request and leaves data undefined", async ({
+    page,
+  }) => {
+    // ssr-data-plugin intercepts only start(), not navigate(). When the
+    // user clicks a Link, browser-plugin handles it client-side — no SSR
+    // round-trip, no loader rerun, data stays undefined ("User not found"
+    // template branch). This test makes that contract explicit by counting
+    // network HTML/fetch requests during the click instead of inferring
+    // from DOM alone.
+    await page.goto("/users");
+    await page.waitForLoadState("networkidle");
+
+    const documentRequests: string[] = [];
+
+    page.on("request", (req) => {
+      if (
+        req.resourceType() === "document" ||
+        req.resourceType() === "fetch" ||
+        req.resourceType() === "xhr"
+      ) {
+        documentRequests.push(req.url());
+      }
+    });
+
+    await page.click("text=Bob");
+    await expect(page).toHaveURL(/\/users\/2$/);
+    await expect(page.getByTestId("user-not-found")).toBeVisible();
+
+    const profileFetches = documentRequests.filter((url) =>
+      /\/users\/2$/.test(new URL(url).pathname),
+    );
+
+    expect(profileFetches).toEqual([]);
+  });
+
+  test("per-request isolation under mixed guards: /, /users, /dashboard, /admin, /users/1/posts in parallel with different auth contexts", async ({
+    browser,
+  }) => {
+    // Spin up three independent contexts (admin / regular user / anon) and
+    // fire five different routes in parallel. Each request must see only
+    // its own currentUser dependency; no cross-context bleed.
+    const BASE = "http://localhost:3000";
+
+    const [adminCtx, userCtx, anonCtx] = await Promise.all([
+      browser.newContext({
+        storageState: {
+          cookies: [
+            {
+              name: "userId",
+              value: "1",
+              domain: "localhost",
+              path: "/",
+              expires: -1,
+              httpOnly: false,
+              secure: false,
+              sameSite: "Lax",
+            },
+          ],
+          origins: [],
+        },
+      }),
+      browser.newContext({
+        storageState: {
+          cookies: [
+            {
+              name: "userId",
+              value: "2",
+              domain: "localhost",
+              path: "/",
+              expires: -1,
+              httpOnly: false,
+              secure: false,
+              sameSite: "Lax",
+            },
+          ],
+          origins: [],
+        },
+      }),
+      browser.newContext(),
+    ]);
+
+    try {
+      const [
+        adminAdmin,
+        adminPosts,
+        userDashboard,
+        userAdmin,
+        anonUsers,
+        anonAdmin,
+        anonDashboard,
+        anonHome,
+      ] = await Promise.all([
+        adminCtx.request.get(`${BASE}/admin`),
+        adminCtx.request.get(`${BASE}/users/1/posts`),
+        userCtx.request.get(`${BASE}/dashboard`),
+        userCtx.request.get(`${BASE}/admin`, { maxRedirects: 0 }),
+        anonCtx.request.get(`${BASE}/users`),
+        anonCtx.request.get(`${BASE}/admin`, { maxRedirects: 0 }),
+        anonCtx.request.get(`${BASE}/dashboard`, { maxRedirects: 0 }),
+        anonCtx.request.get(`${BASE}/`),
+      ]);
+
+      expect(adminAdmin.status(), "admin → /admin").toBe(200);
+      expect(await adminAdmin.text()).toContain('data-testid="admin-page"');
+
+      expect(adminPosts.status(), "admin → /users/1/posts").toBe(200);
+      const adminPostsHtml = await adminPosts.text();
+
+      expect(adminPostsHtml).toContain('data-testid="user-posts"');
+      expect(adminPostsHtml).toContain("Hello world");
+
+      expect(userDashboard.status(), "user → /dashboard").toBe(200);
+      expect(await userDashboard.text()).toContain("Dashboard");
+
+      expect(userAdmin.status(), "user → /admin (role mismatch)").toBe(302);
+      expect(userAdmin.headers().location).toBe("/");
+
+      expect(anonUsers.status(), "anon → /users").toBe(200);
+      expect(await anonUsers.text()).toContain("Alice");
+
+      expect(anonAdmin.status(), "anon → /admin").toBe(302);
+      expect(anonAdmin.headers().location).toBe("/");
+
+      expect(anonDashboard.status(), "anon → /dashboard").toBe(302);
+      expect(anonDashboard.headers().location).toBe("/");
+
+      expect(anonHome.status(), "anon → /").toBe(200);
+      expect(await anonHome.text()).toContain("Welcome");
+    } finally {
+      await adminCtx.close();
+      await userCtx.close();
+      await anonCtx.close();
+    }
+  });
+
+  test("renderToStringAsync: /async-page response awaits Suspense before flushing — body contains resolved content, not fallback", async ({
+    request,
+  }) => {
+    // entry-server.tsx now uses renderToStringAsync (the third Solid SSR
+    // mode). Pages with <Suspense> + createResource block the response
+    // until every boundary resolves. The /async-page route has a 500 ms
+    // server-side delay; the body therefore arrives ~500 ms in but is a
+    // single buffered string (no chunked transfer).
+    const startedAt = Date.now();
+    const response = await request.get("/async-page");
+    const elapsed = Date.now() - startedAt;
+
+    expect(response.status()).toBe(200);
+
+    // Response time must reflect the server-side await (≥400 ms floor
+    // for CI jitter; the loader sleeps 500 ms).
+    expect(elapsed).toBeGreaterThanOrEqual(400);
+
+    const html = await response.text();
+
+    // Resolved content present, fallback absent — proves the Suspense
+    // boundary completed server-side before the body was sent.
+    expect(html).toContain('data-testid="async-stats"');
+    expect(html).toContain("Visitors:");
+    expect(html).toContain("12,345");
+    expect(html).not.toContain('data-testid="async-stats-fallback"');
+  });
+
+  test("renderToStringAsync: pages without <Suspense> still resolve fast (no async overhead)", async ({
+    request,
+  }) => {
+    // Sync content (home page) takes the fast path through
+    // renderToStringAsync — no Suspense to await, resolves in the same
+    // tick. Sanity-check that switching from renderToString to
+    // renderToStringAsync did not regress the baseline.
+    const startedAt = Date.now();
+    const response = await request.get("/");
+    const elapsed = Date.now() - startedAt;
+
+    expect(response.status()).toBe(200);
+    expect(elapsed).toBeLessThan(300);
+  });
+
+  test("createUniqueId: SSR'd HTML has stable IDs that survive client hydration without mismatch", async ({
+    page,
+    request,
+  }) => {
+    // createUniqueId() generates the same ID on the server and the
+    // client (Solid threads a deterministic counter through the runtime).
+    // Read the SSR'd IDs from the wire response, then read them from the
+    // hydrated DOM, and assert equality. If Solid's id-generation
+    // diverged between server and client, htmlFor/aria-describedby
+    // bindings would silently break — that's exactly what
+    // createUniqueId prevents.
+    const response = await request.get("/form");
+    const html = await response.text();
+
+    // Extract input id + label htmlFor + aria-describedby.
+    const inputMatch = html.match(/id="(0[0-9a-f]+)"\s+data-testid="email-input"/);
+    const labelMatch = html.match(/for="(0[0-9a-f]+)"\s+data-testid="email-label"/);
+    const helpMatch = html.match(/id="(0[0-9a-f]+)"\s+data-testid="email-help"/);
+
+    expect(inputMatch?.[1]).toBeTruthy();
+    expect(labelMatch?.[1]).toBeTruthy();
+    expect(helpMatch?.[1]).toBeTruthy();
+
+    // Server-side: label.for === input.id (proves stable wiring).
+    expect(labelMatch![1]).toBe(inputMatch![1]);
+
+    const errors: string[] = [];
+
+    page.on("console", (msg) => {
+      if (msg.type() === "error" || msg.type() === "warning") {
+        errors.push(msg.text());
+      }
+    });
+
+    await page.goto("/form");
+    await page.waitForLoadState("networkidle");
+
+    // Client-side: same IDs must surface on the DOM after hydration.
+    const clientIds = await page.evaluate(() => ({
+      inputId: document
+        .querySelector('[data-testid="email-input"]')
+        ?.getAttribute("id"),
+      labelFor: document
+        .querySelector('[data-testid="email-label"]')
+        ?.getAttribute("for"),
+      helpId: document
+        .querySelector('[data-testid="email-help"]')
+        ?.getAttribute("id"),
+    }));
+
+    expect(clientIds.inputId).toBe(inputMatch![1]);
+    expect(clientIds.labelFor).toBe(labelMatch![1]);
+    expect(clientIds.helpId).toBe(helpMatch![1]);
+
+    // No hydration mismatch warnings — proves IDs were stable across
+    // server/client boundaries.
+    const hydrationIssues = errors.filter(
+      (text) =>
+        text.toLowerCase().includes("hydrat") ||
+        text.toLowerCase().includes("mismatch"),
+    );
+
+    expect(hydrationIssues).toEqual([]);
+  });
+
+  test("createUniqueId: every reload generates the same IDs (deterministic counter)", async ({
+    request,
+  }) => {
+    // Solid resets the id counter at the start of each render. Two
+    // consecutive requests to the same page must produce the same IDs.
+    const first = await request.get("/form");
+    const second = await request.get("/form");
+
+    const firstHtml = await first.text();
+    const secondHtml = await second.text();
+
+    const firstInputMatch = firstHtml.match(
+      /id="(0[0-9a-f]+)"\s+data-testid="email-input"/,
+    );
+    const secondInputMatch = secondHtml.match(
+      /id="(0[0-9a-f]+)"\s+data-testid="email-input"/,
+    );
+
+    expect(firstInputMatch?.[1]).toBe(secondInputMatch?.[1]);
+  });
+
+  test("AutoMeta + createEffect: document.title updates reactively after CSR navigation between routes", async ({
+    page,
+  }) => {
+    // `AutoMeta` reads route state via `useRoute()` and a Solid
+    // `createEffect` mutates `document.title` and the `<meta
+    // name="description">` element on every change. After CSR
+    // navigation home → users, the title must reflect the new route's
+    // entry from getMetaForState() — without manual document.title
+    // assignment in app code.
+    //
+    // (See AutoMeta.tsx for why we don't use @solidjs/meta's
+    // <Title>/<Meta> components: useAssets-based asset injection is
+    // not reliable in renderToStringAsync mode on Solid 1.9.5.)
+    await page.goto("/");
+
+    expect(await page.title()).toBe("Home — Real-Router Solid SSR");
+
+    // Click "Users" nav link → CSR navigation via browser-plugin.
+    await page.click('a[href="/users"]');
+    await expect(page).toHaveURL(/\/users$/);
+
+    // createEffect fires on the route change → document.title updates.
+    await expect
+      .poll(async () => page.title())
+      .toBe("All Users (sorted asc) — Real-Router Solid SSR");
+
+    // Navigate back to home via Link click.
+    await page.click('a[href="/"]');
+    await expect(page).toHaveURL("/");
+
+    await expect
+      .poll(async () => page.title())
+      .toBe("Home — Real-Router Solid SSR");
+  });
+
+  test("AutoMeta + createEffect: <meta name=\"description\"> content also updates on navigation", async ({
+    page,
+  }) => {
+    // The same createEffect updates the description meta tag in
+    // tandem with the title. Verify by reading the live DOM attribute
+    // after navigation.
+    await page.goto("/");
+
+    const initialDesc = await page
+      .locator('meta[name="description"]')
+      .getAttribute("content");
+
+    expect(initialDesc).toContain("Welcome to the Real-Router Solid SSR");
+
+    await page.click('a[href="/users"]');
+    await expect(page).toHaveURL(/\/users$/);
+
+    await expect
+      .poll(async () =>
+        page.locator('meta[name="description"]').getAttribute("content"),
+      )
+      .toContain("Browse the user list");
+  });
 });

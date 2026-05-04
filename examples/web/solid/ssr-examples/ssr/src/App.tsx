@@ -2,8 +2,11 @@ import { UNKNOWN_ROUTE } from "@real-router/core";
 import { Link, RouteView, useRoute } from "@real-router/solid";
 import { Show } from "solid-js";
 
+import { AutoMeta } from "./components/AutoMeta";
 import { Admin } from "./pages/Admin";
+import { AsyncPage } from "./pages/AsyncPage";
 import { Dashboard } from "./pages/Dashboard";
+import { Form } from "./pages/Form";
 import { Home } from "./pages/Home";
 import { NotFound } from "./pages/NotFound";
 import { UserProfile } from "./pages/UserProfile";
@@ -24,6 +27,7 @@ export function App(): JSX.Element {
 
   return (
     <div>
+      <AutoMeta />
       <nav>
         <Link routeName="home">Home</Link>
         {" | "}
@@ -59,6 +63,12 @@ export function App(): JSX.Element {
             </RouteView.Match>
             <RouteView.Match segment="admin">
               <Admin />
+            </RouteView.Match>
+            <RouteView.Match segment="asyncPage">
+              <AsyncPage />
+            </RouteView.Match>
+            <RouteView.Match segment="form">
+              <Form />
             </RouteView.Match>
           </RouteView>
         </Show>

@@ -359,4 +359,253 @@ test.describe("Streaming SSR Example (Solid)", () => {
     await expect(page.getByTestId("reviews-fallback")).toHaveCount(0);
     await expect(page.getByTestId("related-fallback")).toHaveCount(0);
   });
+
+  test("Scenario 16: loader-driven 404 — /products/9999 returns 404 + plain text (LoaderNotFound)", async ({
+    request,
+  }) => {
+    // The products.detail loader throws LoaderNotFound for ids not in the
+    // database. entry-server.tsx maps LOADER_NOT_FOUND → status:404 +
+    // text/plain, bypassing the streaming pipeline entirely (the body is
+    // sent as a buffered response, not chunked). Same contract as
+    // svelte/ssr-streaming and angular/ssr — gives streaming examples a
+    // clean way to short-circuit before the first chunk for missing data.
+    const response = await request.get("/products/9999");
+
+    expect(response.status()).toBe(404);
+    expect(response.headers()["content-type"]).toContain("text/plain");
+  });
+
+  test("Scenario 17 (Solid-unique): TCP frame timing — body arrives in MULTIPLE frames over time, real progressive flush", async () => {
+    // This is the empirical proof that Solid streaming is **actually
+    // streaming** at the HTTP level — unlike Angular and Svelte, where
+    // identical-shaped tests measure a single TCP frame with ~0 ms span
+    // (their "streaming" is really client-side incremental hydration).
+    //
+    // Solid emits the shell + critical content in the first frame, then
+    // a Reviews chunk after the 600 ms server-side delay, then a Related
+    // chunk after 1200 ms — all visible to a Node `http.request` consumer
+    // as separate `data` events. This test pins the contract: a regression
+    // that flips Solid to single-frame buffered SSR will fail noisily.
+    const { request: nodeRequest } = await import("node:http");
+
+    const startedAt = Date.now();
+    const chunks: { ts: number; size: number }[] = [];
+
+    await new Promise<void>((resolve, reject) => {
+      const req = nodeRequest("http://localhost:3000/products/1", (res) => {
+        res.on("data", (buf: Buffer) => {
+          chunks.push({ ts: Date.now() - startedAt, size: buf.length });
+        });
+        res.on("end", () => resolve());
+        res.on("error", reject);
+      });
+
+      req.on("error", reject);
+      req.end();
+    });
+
+    expect(chunks.length).toBeGreaterThanOrEqual(2);
+
+    // Span must cover at least one server-side delay (600 ms reviews) to
+    // prove progressive flush. Generous floor (400 ms) to absorb CI
+    // jitter; ceiling implicit in the streaming pipeline (~1.5 s for
+    // both deferred sections to resolve).
+    const span = chunks.at(-1)!.ts - chunks[0]!.ts;
+
+    expect(
+      span,
+      "expected progressive flush spanning at least the slowest server-side delay",
+    ).toBeGreaterThan(400);
+  });
+
+  test("Scenario 18 (Solid-unique): selective hydration — fallback HTML and resolved HTML arrive in different chunks", async () => {
+    // Reads chunks one by one and inspects content. The first frame must
+    // contain the `reviews-fallback` placeholder (shell). A later frame
+    // must contain `data-review-id=` for the resolved Reviews component
+    // (after the server-side 600 ms delay). This proves the chunks are
+    // not just multiple TCP frames of one buffered string — the SERVER
+    // genuinely emits resolved content separately from the shell.
+    const { request: nodeRequest } = await import("node:http");
+
+    const chunkBodies: string[] = [];
+
+    await new Promise<void>((resolve, reject) => {
+      const req = nodeRequest("http://localhost:3000/products/1", (res) => {
+        res.on("data", (buf: Buffer) => {
+          chunkBodies.push(buf.toString("utf8"));
+        });
+        res.on("end", () => resolve());
+        res.on("error", reject);
+      });
+
+      req.on("error", reject);
+      req.end();
+    });
+
+    expect(chunkBodies.length).toBeGreaterThanOrEqual(2);
+
+    // Find the FIRST chunk that contains the fallback marker — this is
+    // the shell. Resolved review markup MUST appear in a LATER chunk
+    // (proves selective hydration: server emits resolved sections
+    // separately, not all-at-once after the slowest Suspense resolves).
+    const fallbackChunkIndex = chunkBodies.findIndex((body) =>
+      body.includes('data-testid="reviews-fallback"'),
+    );
+
+    expect(fallbackChunkIndex, "fallback must appear in some chunk").toBeGreaterThanOrEqual(0);
+
+    const beforeAndIncludingFallback = chunkBodies
+      .slice(0, fallbackChunkIndex + 1)
+      .join("");
+    const afterFallback = chunkBodies
+      .slice(fallbackChunkIndex + 1)
+      .join("");
+
+    // Resolved review markup must NOT be in the fallback chunk or before.
+    expect(beforeAndIncludingFallback).not.toContain("data-review-id=");
+    // Resolved review markup MUST appear in a later chunk.
+    expect(afterFallback).toContain("data-review-id=");
+  });
+
+  test("Scenario 19: <ErrorBoundary> reset — clicking 'Try again' restores the original tree without remount", async ({
+    page,
+  }) => {
+    // Solid's <ErrorBoundary fallback={(err, reset) => ...}> exposes a
+    // `reset` callback that re-attempts the failed branch. Combined
+    // with our local `crashed` signal, click-to-recover works:
+    //   1. Click trigger → child throws → fallback renders
+    //   2. Click "Try again" → reset() + setCrashed(false) → original
+    //      tree is back, no full unmount
+    await page.goto("/products/1");
+
+    // Streaming pipeline: ProductActions is the last sibling. Wait for
+    // the trigger button to be hydrated before clicking.
+    await expect(page.getByTestId("trigger-client-error")).toBeVisible({
+      timeout: 7000,
+    });
+    await expect(page.getByTestId("product-actions-error")).toHaveCount(0);
+
+    await page.getByTestId("trigger-client-error").click();
+    await expect(page.getByTestId("product-actions-error")).toBeVisible({
+      timeout: 5000,
+    });
+    await expect(page.getByTestId("actions-error-message")).toContainText(
+      "Intentional reactive error",
+    );
+
+    // Critical content survives.
+    await expect(page.getByTestId("product-name")).toHaveText(
+      "Mechanical Keyboard",
+    );
+    await expect(page.getByTestId("reviews-section")).toBeVisible({
+      timeout: 5000,
+    });
+
+    await page.getByTestId("actions-error-reset").click();
+    await expect(page.getByTestId("trigger-client-error")).toBeVisible();
+    await expect(page.getByTestId("product-actions-error")).toHaveCount(0);
+  });
+
+  test("Scenario 22: HEAD request — early-exits the streaming pipeline (200 + Content-Type, empty body, fast)", async ({
+    request,
+  }) => {
+    // CDN probes / fetch(method: 'HEAD') should not trigger
+    // renderToStream. server/index.ts has an explicit `app.head()`
+    // handler that returns 200 + headers + empty body without invoking
+    // the entry-server.tsx render path. Verify timing < 200 ms (the
+    // GET path takes ≥1500 ms because of Suspense awaits with the
+    // nested breakdown).
+    const startedAt = Date.now();
+    const response = await request.fetch("/products/1", { method: "HEAD" });
+    const elapsed = Date.now() - startedAt;
+
+    expect(response.status()).toBe(200);
+    expect(response.headers()["content-type"]).toContain("text/html");
+    expect(elapsed).toBeLessThan(200);
+
+    const body = await response.body();
+
+    expect(body.length).toBe(0);
+  });
+
+  test("Scenario 20: onMount + isServer — populates window.__MOUNT_LOG__ on hydration; SSR HTML never references it", async ({
+    page,
+    request,
+  }) => {
+    // The action's body uses `window.__MOUNT_LOG__`. Solid's `onMount`
+    // hook + `isServer` constant guarantee the body never runs on the
+    // server. Verify both:
+    //   1. After hydration, window.__MOUNT_LOG__ is populated.
+    //   2. The raw SSR HTML response contains zero references to
+    //      __MOUNT_LOG__ — the side-effect statement is dead code on
+    //      the server.
+    const response = await request.get("/products/1");
+    const html = await response.text();
+
+    expect(html).not.toContain("__MOUNT_LOG__");
+
+    // SuspenseList delays the streaming pipeline up to ~1.2 s. Wait
+    // for the action element specifically — populated as soon as its
+    // onMount hook fires post-hydration of the actions chunk.
+    await page.goto("/products/1");
+    await expect(page.getByTestId("product-actions")).toBeVisible({
+      timeout: 7000,
+    });
+
+    // Poll for the log populated by onMount; allow up to 5 s after the
+    // actions chunk is visible to absorb any post-hydration scheduling.
+    const log = await page.waitForFunction(
+      () =>
+        (window as Window & { __MOUNT_LOG__?: { source: string }[] })
+          .__MOUNT_LOG__,
+      undefined,
+      { timeout: 5000 },
+    );
+
+    const logValue = (await log.jsonValue()) as { source: string }[];
+
+    expect(logValue.length).toBeGreaterThan(0);
+    expect(logValue.some((entry) => entry.source === "ProductActions")).toBe(
+      true,
+    );
+  });
+
+  test("Scenario 23: use:trackView directive — IntersectionObserver fires on hydration, populates window.__VIEW_LOG__", async ({
+    page,
+  }) => {
+    // `<article use:trackView={{ productId }}>` registers an
+    // IntersectionObserver on hydration. The article is in the
+    // viewport on page load → observer fires → log entry pushed.
+    // Same pattern as Svelte's `use:` action — Solid action body never
+    // runs on the server (verified by Scenario 24).
+    await page.goto("/products/2");
+
+    const log = await page.waitForFunction(
+      () =>
+        (window as Window & { __VIEW_LOG__?: { productId: string }[] })
+          .__VIEW_LOG__,
+      undefined,
+      { timeout: 7000 },
+    );
+
+    const logValue = (await log.jsonValue()) as { productId: string }[];
+
+    expect(logValue.length).toBeGreaterThan(0);
+    expect(logValue[0]?.productId).toBe("2");
+  });
+
+  test("Scenario 24: use:trackView is SSR-safe — server HTML never references window or __VIEW_LOG__", async ({
+    request,
+  }) => {
+    // Solid SSR runtime skips action invocations entirely. Verify by
+    // inspecting the wire response: no marker that the action ran, no
+    // inline reference to its globals. (Same SSR-safety guarantee as
+    // Svelte's `use:` actions.)
+    const response = await request.get("/products/1");
+    const html = await response.text();
+
+    expect(html).toContain('data-testid="product-detail"');
+    expect(html).not.toContain("__VIEW_LOG__");
+    expect(html).not.toContain("IntersectionObserver");
+  });
 });

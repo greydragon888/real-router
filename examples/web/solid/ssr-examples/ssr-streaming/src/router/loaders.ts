@@ -1,3 +1,4 @@
+import { LoaderNotFound } from "../_loader-errors";
 import { getProduct, listProducts } from "../database";
 
 import type { Product } from "../database";
@@ -19,7 +20,10 @@ export const loaders: DataLoaderFactoryMap = {
     const product = getProduct(id);
 
     if (!product) {
-      throw new Error(`Product ${id} not found`);
+      // Typed error → entry-server.tsx maps it to status:404 + plain text.
+      // Same pattern as the ssr/ example. The body is intentionally
+      // minimal — production apps would re-render with a different URL.
+      throw new LoaderNotFound(`product:${id}`);
     }
 
     return Promise.resolve({ product } satisfies ProductDetailData);

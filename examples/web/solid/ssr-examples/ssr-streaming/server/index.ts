@@ -27,12 +27,40 @@ async function startServer(): Promise<void> {
     render: (url: string) => Promise<RenderResult>;
   };
 
+  // HEAD requests must NOT trigger the streaming pipeline. CDN probes,
+  // health checks, and clients using `fetch(method: "HEAD")` only need
+  // response headers — running renderToStream just to discard the body
+  // wastes CPU and prolongs Suspense awaits. Send a minimal 200 with
+  // the right Content-Type and exit. Production HEAD handling could
+  // mirror GET status codes (loader 404 → 404, etc.) but for the demo
+  // a fixed 200 is sufficient to prove the early-exit contract.
+  app.head("/{*path}", (_request, response) => {
+    response
+      .status(200)
+      .set("Content-Type", "text/html; charset=utf-8")
+      .end();
+  });
+
   app.get("/{*path}", async (request, response, next) => {
     const url = request.originalUrl;
 
     try {
-      const { stream, ssrJson, hydrationScript, statusCode, cleanup } =
-        await module_.render(url);
+      const result = await module_.render(url);
+
+      // Typed loader-error short-circuit (e.g. LoaderNotFound for an
+      // unknown product id). Skip the streaming pipeline entirely and
+      // send a plain text/plain body with the right status.
+      if (result.rawBody !== undefined) {
+        response
+          .status(result.statusCode)
+          .set("Content-Type", result.contentType ?? "text/plain; charset=utf-8")
+          .send(result.rawBody);
+        result.cleanup();
+
+        return;
+      }
+
+      const { stream, ssrJson, hydrationScript, statusCode, cleanup } = result;
 
       const ssrScript = `<script>window.__SSR_STATE__=${ssrJson}</script>`;
       const templateWithStateAndHydration = template

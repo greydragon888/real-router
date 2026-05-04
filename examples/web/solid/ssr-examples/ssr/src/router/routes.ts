@@ -30,5 +30,9 @@ export const routes = [
         return user?.role === "admin";
       },
   },
+  { name: "legacyUser", path: "/legacy-user/:id" },
+  { name: "slow", path: "/slow" },
+  { name: "asyncPage", path: "/async-page" },
+  { name: "form", path: "/form" },
   { name: "boom", path: "/boom" },
 ];

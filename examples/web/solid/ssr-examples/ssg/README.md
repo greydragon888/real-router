@@ -8,9 +8,11 @@
 - **Dynamic route entries** — `entries` map provides parameter sets for routes with `:id`
 - **Build-time pre-rendering** — `cloneRouter()` + `start(url)` + `renderToString()` for each URL
 - **Per-route data loading** via `@real-router/ssr-data-plugin` — loaders run at build time
-- **Per-page meta tags** — `meta.ts` derives `<title>` + `<meta description>` from resolved router state
+- **Per-page SEO meta** — `meta.ts` resolves a `PageMeta` per route (title, description, canonical path, og:type, og:image). `ssg-build.ts` injects `<title>`, `<meta description>`, `<link rel="canonical">`, OpenGraph (`og:type`/`title`/`description`/`url`/`image`) and `twitter:card` tags. Profile pages use `og:type=profile`, posts pages use `article`. Each pre-rendered page ships a per-id canonical URL.
+- **Nested route pre-rendering** — `users/:id/posts` is generated for every id in `entries.ts` (in addition to the parent `/users/:id` profile). 8 static HTMLs total: home, list, 3 profiles, 3 posts pages. `getStaticPaths()` enumerates leaf routes only, so intermediate `/users/:id` paths are derived in `ssg-build.ts` from the leaf list.
 - **Solid hydration script** — `generateHydrationScript()` injected into every pre-rendered file so client `hydrate()` finds the SSR snapshot
 - **404.html fallback + sitemap.xml** — generated as part of the build
+- **Filesystem layout assertions + overfetch protection** — e2e reads `dist/` directly to verify (a) every pre-rendered route maps to exactly one `index.html` (incl. nested `/users/:id/posts/index.html`), (b) `users/` contains only the ids declared in `entries.ts`, (c) `sitemap.xml` matches the on-disk set with no extras and nothing missing.
 - **XSS-safe state serialization** via `serializeRouterState()` — data embedded in static HTML
 - **Dual-mode mount** — `entry-client.tsx` picks `hydrate` for SSG-rendered files and `render` for `vite dev`
 - **Client-side navigation** — after hydration, `@real-router/browser-plugin` handles SPA navigation

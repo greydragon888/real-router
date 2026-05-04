@@ -11,6 +11,12 @@
 - **Per-request `cloneRouter()`** — guard plugins (`canActivate`) read deps via `cloneRouter(base, { currentUser })` so concurrent requests do not bleed state
 - **`@real-router/browser-plugin` only on the client** — `entry-server.tsx` does not register it (it touches `globalThis.history`/`window.location`)
 - **`vite-plugin-solid({ ssr: true })`** — required. Sets `hydratable: true` for both client and server builds, plus `generate: 'ssr'` for the server bundle. Without it, the client bundle has no hydration markers and the first render mismatches
+- **Loader-driven HTTP semantics** — typed loader errors (`LoaderRedirect`, `LoaderNotFound`, `LoaderTimeout` in `src/_loader-errors.ts`) are caught by `entry-server.tsx` and mapped to `301/302`, `404`, and `504` responses. `users.profile` throws `LoaderNotFound` for unknown ids → 404; `legacyUser` (`/legacy-user/:id`) throws `LoaderRedirect("/users/:id", 301)` — canonical-URL pattern; `slow` (`/slow`) demonstrates `withTimeout()` — sleeps 5 s but is wrapped in 250 ms budget, server responds 504 instead of hanging.
+- **Per-route `<head>` injection** — `meta.ts` resolves `PageMeta` per route (title + description). `entry-server.tsx` splices the rendered head markup into the `<!--ssr-head-->` placeholder ahead of the body. `/users` reflects the current `?sort` param in its `<title>`.
+- **`renderToStringAsync` (third Solid SSR mode)** — `/async-page` uses `<Suspense>` + `createResource` with a 500 ms server-side delay. `entry-server.tsx` switched from `renderToString` → `renderToStringAsync`, which awaits every Suspense boundary before flushing. Pages without Suspense behave identically; pages with Suspense block the response until resolved (single buffered string, no chunked transfer).
+- **`createUniqueId` for SSR-safe stable IDs** — `/form` uses `createUniqueId()` for `<label htmlFor>` + `<input id>` + `aria-describedby` bindings. Server-rendered IDs are deterministic; client hydration sees the same values — no hydration mismatch, accessibility relations stay intact.
+- **Dynamic `<head>` updates after CSR navigation** — `<AutoMeta />` reads route state via `useRoute()` and a Solid `createEffect` mutates `document.title` + `<meta name="description">` reactively. After `/` → `/users` CSR navigation the head reflects the new route from `getMetaForState()` without manual DOM assignments.
+  - **Honest limitation about `@solidjs/meta`**: the package is installed but **not** wired through `<MetaProvider>` on the server. Its `useAssets`-based asset injection is designed for `renderToStream` (streaming SSR); under `renderToStringAsync` the rendered `<Title>`/`<Meta>` tags don't reliably surface in the final HTML output on Solid 1.9.5. Server-side head therefore stays on the manual `<!--ssr-head-->` injection. Client-side dynamic updates use the equivalent low-level `createEffect` pattern that `@solidjs/meta` would invoke internally on the client. See `components/AutoMeta.tsx` docstring for the full disclaimer.
 
 ## Architecture
 
@@ -50,13 +56,32 @@ pnpm preview      # NODE_ENV=production tsx server/index.ts
 pnpm test:e2e     # Playwright
 ```
 
+## Mapping Loader Errors to HTTP
+
+`entry-server.tsx` inspects the `code` field of any error thrown out of `router.start()`:
+
+| Error `code`       | HTTP response                                |
+| ------------------ | -------------------------------------------- |
+| `CANNOT_ACTIVATE`  | `302 Location: /` (auth guard rejected)      |
+| `LOADER_REDIRECT`  | `301/302 Location: error.target`             |
+| `LOADER_NOT_FOUND` | `404 Not Found` (text/plain)                 |
+| `LOADER_TIMEOUT`   | `504 Gateway Timeout` (text/plain)           |
+| anything else      | propagates → 500 with `<server-error>` body  |
+
+Trade-offs:
+- The `404`/`504` bodies are plain text rather than the SSR-rendered NotFound page. Rendering a rich 404 would require a second `renderToString()` pass with a different URL — kept simple in this demo.
+- `withTimeout()` doesn't cancel the underlying loader work — only races the response. Pair with `AbortController` for production workloads.
+
 ## E2e
 
-[`e2e/ssr.spec.ts`](e2e/ssr.spec.ts) — Playwright suite mirroring the Vue baseline, plus Solid-specific markers:
+[`e2e/ssr.spec.ts`](e2e/ssr.spec.ts) — 36 Playwright scenarios:
 
-- Cross-cutting (per-request isolation, hydration round-trip, loaders, guards, query params, nested loaders, 404, 500, CSR navigation, `<Link>` href in no-JS mode) — same as Vue
-- Solid-specific: `_$HY` hydration runtime variable injected via `generateHydrationScript()`
-- Solid-specific: `data-hk-*` markers present in server-rendered HTML (proof `hydratable: true` is active)
+- 27 baseline (per-request isolation, hydration round-trip, loaders, guards, query params, nested loaders, 404, 500, CSR navigation, `<Link>` href in no-JS mode)
+- Solid-specific: `_$HY` hydration runtime variable injected via `generateHydrationScript()`; `data-hk-*` markers present in server-rendered HTML (proof `hydratable: true` is active)
+- **Loader-driven HTTP** (4 tests): `/users/9999` → 404 (incl. nested `/posts`), `/legacy-user/2` → 301 + Location, `/legacy-user/3` follows to a hydrated profile, `/slow` → 504 within 2.5 s budget
+- **`<head>` injection** (2 tests): home title + reactive title for `/users?sort=`
+- **CSR navigate spy** (1 test): clicking a profile link issues zero document/fetch requests
+- **Mixed-guard concurrent** (1 test): admin × user × anon × 5 routes in parallel
 
 ## See Also
 

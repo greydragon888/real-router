@@ -35,8 +35,22 @@ async function startDevServer(): Promise<void> {
         render: (url: string) => Promise<RenderResult>;
       };
 
-      const { stream, ssrJson, hydrationScript, statusCode, cleanup } =
-        await module_.render(url);
+      const result = await module_.render(url);
+
+      if (result.rawBody !== undefined) {
+        response
+          .status(result.statusCode)
+          .set(
+            "Content-Type",
+            result.contentType ?? "text/plain; charset=utf-8",
+          )
+          .send(result.rawBody);
+        result.cleanup();
+
+        return;
+      }
+
+      const { stream, ssrJson, hydrationScript, statusCode, cleanup } = result;
 
       const ssrScript = `<script>window.__SSR_STATE__=${ssrJson}</script>`;
       const templateWithStateAndHydration = template

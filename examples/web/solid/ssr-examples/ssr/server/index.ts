@@ -45,12 +45,22 @@ async function startServer(): Promise<void> {
     const result = await module_.render(url, { currentUser });
 
     if (result.redirect) {
-      response.redirect(result.redirect);
+      response.redirect(result.statusCode, result.redirect);
+
+      return;
+    }
+
+    if (result.rawBody !== undefined) {
+      response
+        .status(result.statusCode)
+        .set("Content-Type", result.contentType ?? "text/plain; charset=utf-8")
+        .send(result.rawBody);
 
       return;
     }
 
     const page = template
+      .replace("<!--ssr-head-->", result.head)
       .replace("<!--ssr-hydration-script-->", result.hydrationScript)
       .replace("<!--ssr-outlet-->", result.html)
       .replace("<!--ssr-state-->", result.serializedData);

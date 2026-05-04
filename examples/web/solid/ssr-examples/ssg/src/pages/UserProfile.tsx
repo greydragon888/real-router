@@ -1,5 +1,7 @@
-import { useRoute } from "@real-router/solid";
+import { Link, RouteView, useRoute } from "@real-router/solid";
 import { Show } from "solid-js";
+
+import { UserPosts } from "./UserPosts";
 
 import type { UserProfileData } from "../router/loaders";
 import type { JSX } from "solid-js";
@@ -15,15 +17,29 @@ export function UserProfile(): JSX.Element {
       fallback={
         <div>
           <h2>User Profile</h2>
-          <p>User not found.</p>
+          <p data-testid="user-not-found">User not found.</p>
         </div>
       }
     >
       {(user) => (
-        <div>
+        <div data-testid="user-profile" data-user-id={user().id}>
           <h2>User Profile</h2>
-          <p>ID: {user().id}</p>
-          <p>Name: {user().name}</p>
+          <p data-testid="user-id">ID: {user().id}</p>
+          <p data-testid="user-name">Name: {user().name}</p>
+
+          <Link
+            routeName="users.profile.posts"
+            routeParams={{ id: user().id }}
+            data-testid="view-posts"
+          >
+            View posts
+          </Link>
+
+          <RouteView nodeName="users.profile">
+            <RouteView.Match segment="posts">
+              <UserPosts />
+            </RouteView.Match>
+          </RouteView>
         </div>
       )}
     </Show>
