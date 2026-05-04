@@ -7,8 +7,10 @@ import { createSSRApp, h } from "vue";
 import { renderToString } from "vue/server-renderer";
 
 import App from "./App.vue";
+import { trackView } from "./directives/track-view";
 import { createAppRouter } from "./router/createAppRouter";
 import { loaders } from "./router/loaders";
+import { getMetaForState, type PageMeta } from "./router/meta";
 
 import type { CurrentUser } from "./_known-users";
 
@@ -28,6 +30,9 @@ export interface RenderResult {
   serializedData: string;
   statusCode: number;
   redirect: string | null;
+  /** Pre-rendered <head> markup (title + meta tags + canonical + og).
+   * Spliced into the <!--ssr-meta--> placeholder by server/index.ts. */
+  head: string;
   /** Pre-rendered body that bypasses the App template — used for typed
    * loader errors that surface as plain-text HTTP responses. */
   rawBody?: string;
@@ -47,6 +52,25 @@ interface MaybeError {
 
 function readErrorCode(error: unknown): string | undefined {
   return (error as MaybeError | null)?.code;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function renderHeadFor(meta: PageMeta): string {
+  return [
+    `<title>${escapeHtml(meta.title)}</title>`,
+    `<meta name="description" content="${escapeHtml(meta.description)}" />`,
+    `<link rel="canonical" href="${escapeHtml(meta.canonical)}" />`,
+    `<meta property="og:title" content="${escapeHtml(meta.ogTitle)}" />`,
+    `<meta property="og:description" content="${escapeHtml(meta.ogDescription)}" />`,
+    `<meta property="og:url" content="${escapeHtml(meta.canonical)}" />`,
+  ].join("\n    ");
 }
 
 function wrapInScript(json: string): string {
@@ -79,13 +103,25 @@ export async function render(
       render: () => h(RouterProvider, { router }, { default: () => h(App) }),
     });
 
+    // Register the same directive used by the client app so SSR
+    // template references resolve. Vue skips directive hooks during
+    // SSR — the registration only prevents "Failed to resolve
+    // directive" warnings while keeping zero server-side overhead.
+    app.directive("track-view", trackView);
+
     const html = await renderToString(app);
+
+    const meta = getMetaForState({
+      name: state.name,
+      params: state.params as Record<string, unknown>,
+    });
 
     return {
       html,
       serializedData: wrapInScript(serializeRouterState(state)),
       statusCode,
       redirect: null,
+      head: renderHeadFor(meta),
     };
   } catch (error) {
     const code = readErrorCode(error);
@@ -96,6 +132,7 @@ export async function render(
         serializedData: "",
         statusCode: 302,
         redirect: "/",
+        head: "",
       };
     }
 
@@ -107,6 +144,7 @@ export async function render(
         serializedData: "",
         statusCode: redirect.status ?? 302,
         redirect: redirect.target ?? "/",
+        head: "",
       };
     }
 
@@ -116,6 +154,7 @@ export async function render(
         serializedData: "",
         statusCode: 404,
         redirect: null,
+        head: "",
         rawBody: "Not Found",
         contentType: "text/plain; charset=utf-8",
       };
@@ -127,6 +166,7 @@ export async function render(
         serializedData: "",
         statusCode: 504,
         redirect: null,
+        head: "",
         rawBody: "Gateway Timeout",
         contentType: "text/plain; charset=utf-8",
       };
@@ -139,6 +179,7 @@ export async function render(
       serializedData: "",
       statusCode: 500,
       redirect: null,
+      head: "",
     };
   } finally {
     router.dispose();

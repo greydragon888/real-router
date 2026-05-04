@@ -6,6 +6,7 @@ import { createSSRApp, h } from "vue";
 
 import App from "./App.vue";
 import { lookupUserFromCookies, parseCookieHeader } from "./_known-users";
+import { trackView } from "./directives/track-view";
 import { createAppRouter } from "./router/createAppRouter";
 import { loaders } from "./router/loaders";
 
@@ -27,5 +28,11 @@ await (ssrState ? hydrateRouter(router, ssrState) : router.start());
 const app = createSSRApp({
   render: () => h(RouterProvider, { router }, { default: () => h(App) }),
 });
+
+// Vue custom directive — body runs ONLY on the client (SSR pipeline
+// skips directive lifecycle hooks). Demonstrates Vue's directive
+// surface area: mounted/updated/unmounted hooks with reactive
+// binding. See src/directives/track-view.ts.
+app.directive("track-view", trackView);
 
 app.mount("#root");

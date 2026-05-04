@@ -73,6 +73,19 @@ dist/
     index-*.js            ← client bundle (shared across all pages)
 ```
 
+## Nested SSG + canonical/og + filesystem assertions
+
+Round Z extends the SSG demo to match Svelte/Solid/Angular coverage:
+
+- **Nested route pre-rendering** — `users.profile.posts` is a leaf route; `entries.ts` emits one URL per id for both `users.profile` and `users.profile.posts`. `getStaticPaths()` returns `/users/<id>/posts` (the leaves); `ssg-build.ts` derives the `/users/<id>` profile paths from those leaves and adds `/users` manually. Result: 8 pre-rendered URLs (1 home + 1 list + 3 profiles + 3 posts).
+- **Empty-state path** — Charlie has no posts. `/users/3/posts/index.html` ships the `data-testid="user-posts-empty"` UI rather than skipping the page.
+- **canonical + OpenGraph meta** — `meta.ts` emits absolute canonical URLs (per-id, NOT the parent `/users` URL) plus `og:title` / `og:description` / `og:url`. `ssg-build.ts`'s `renderMetaBlock()` writes a 6-tag block into `<!--ssr-meta-->` (title, description, canonical, og:title, og:description, og:url).
+- **Filesystem-layout assertion** — an e2e test walks `dist/` and verifies the EXACT set of HTML files: catches accidental regressions like extra dirs from stale entries, missing dirs from forgotten path additions, or files written outside the expected layout.
+- **Overfetch protection** — `dist/users/` contains only directories for ids declared in `entries.ts` (currently `1`, `2`, `3`). Verified by walking the filesystem.
+- **sitemap ↔ disk consistency** — every URL in `sitemap.xml` has a matching pre-rendered file. Drift between sitemap and on-disk is worse than failing the build — it ships a broken contract to crawlers.
+
+7 dedicated tests cover this surface (nested route × 2, canonical/og × 2, filesystem × 1, overfetch × 1, sitemap × 1).
+
 ## Loader-driven build: typed LoaderNotFound at build time
 
 `src/_loader-errors.ts` defines `LoaderNotFound`. The `users.profile` loader throws it for ids that aren't in the database. `scripts/ssg-build.ts` wraps every `render(url)` call in `try/catch` and pushes failures into a list; if any URL errored, the script exits with a non-zero code.

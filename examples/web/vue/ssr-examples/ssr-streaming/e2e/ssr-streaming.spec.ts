@@ -349,7 +349,61 @@ test.describe("Streaming SSR Example (Vue)", () => {
     await expect(page.getByTestId("related-section")).toBeVisible();
   });
 
-  test("Scenario 15: Loader-driven HTTP — /products/999 throws LoaderNotFound → 404 text/plain (no streaming for the error path)", async ({
+  test("Scenario 15: <Teleport> — initially closed modal contributes zero markup to the streamed HTML, but the teleport target node exists", async ({
+    request,
+  }) => {
+    // ProductSpecsModal uses `<Teleport to="#modal-target">` with a
+    // v-if-gated dialog. On initial render the modal is closed —
+    // <Teleport> emits nothing for that branch, so the streamed
+    // wire HTML must NOT contain the dialog markup. The
+    // #modal-target host element does exist (declared in index.html)
+    // so the client portal has a target to attach to after open.
+    const response = await request.get("/products/1");
+    const html = await response.text();
+
+    expect(response.status()).toBe(200);
+    // Host node lives in index.html, present in every response.
+    expect(html).toContain('id="modal-target"');
+    // Open-button is server-rendered (always visible).
+    expect(html).toContain('data-testid="open-specs-modal"');
+    // Dialog markup is NOT in the wire HTML — <Teleport> renders
+    // nothing for the `v-if=open` branch when open === false.
+    expect(html).not.toContain('data-testid="specs-modal"');
+  });
+
+  test("Scenario 16: <Teleport> — opening the modal mounts content into #modal-target, NOT inside #root", async ({
+    page,
+  }) => {
+    // Verifies the portal contract: when the user opens the modal,
+    // the dialog DOM is attached to #modal-target (a sibling of
+    // #root), not as a descendant of the article that contains the
+    // <ProductSpecsModal> usage. This is the core <Teleport>
+    // behaviour — declared inside ProductDetail.vue but rendered
+    // outside its DOM ancestry.
+    await page.goto("/products/1");
+    await page.waitForLoadState("networkidle");
+
+    // Closed at start — no dialog anywhere.
+    await expect(page.getByTestId("specs-modal")).toHaveCount(0);
+
+    await page.getByTestId("open-specs-modal").click();
+
+    // Now visible somewhere in the document.
+    await expect(page.getByTestId("specs-modal")).toBeVisible();
+
+    // Critically: the dialog is INSIDE #modal-target, OUTSIDE #root.
+    const insideTarget = await page.locator(
+      "#modal-target [data-testid='specs-modal']",
+    ).count();
+    expect(insideTarget).toBe(1);
+
+    const insideRoot = await page.locator(
+      "#root [data-testid='specs-modal']",
+    ).count();
+    expect(insideRoot).toBe(0);
+  });
+
+  test("Scenario 17: Loader-driven HTTP — /products/999 throws LoaderNotFound → 404 text/plain (no streaming for the error path)", async ({
     request,
   }) => {
     // products.detail loader calls getProduct(id); if the id is not
@@ -369,7 +423,7 @@ test.describe("Streaming SSR Example (Vue)", () => {
     expect(response.headers()["transfer-encoding"]).not.toBe("chunked");
   });
 
-  test("Scenario 16: Cache-Control: per-route policy from cache-policies.ts (public for products list, longer for product detail)", async ({
+  test("Scenario 18: Cache-Control: per-route policy from cache-policies.ts (public for products list, longer for product detail)", async ({
     request,
   }) => {
     // server/index.ts reads getCachePolicy(url) and emits the
@@ -400,7 +454,7 @@ test.describe("Streaming SSR Example (Vue)", () => {
     expect(productDetail.headers()["cache-control"]).toContain("max-age=120");
   });
 
-  test("Scenario 17: streamed responses do NOT carry an ETag header (intentional — would defeat streaming)", async ({
+  test("Scenario 19: streamed responses do NOT carry an ETag header (intentional — would defeat streaming)", async ({
     request,
   }) => {
     // Honesty check: confirm we're not silently emitting a useless or
@@ -415,7 +469,7 @@ test.describe("Streaming SSR Example (Vue)", () => {
     expect(response.headers().etag).toBeUndefined();
   });
 
-  test("Scenario 18: AbortController: client disconnect mid-stream releases the server reader within ms", async ({
+  test("Scenario 20: AbortController: client disconnect mid-stream releases the server reader within ms", async ({
     request,
   }) => {
     // /products/1 streams over ~1200 ms (RelatedItems is the slowest

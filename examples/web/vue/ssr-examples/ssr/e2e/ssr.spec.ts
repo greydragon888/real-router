@@ -538,6 +538,162 @@ test.describe("SSR (Vue)", () => {
     expect(marker).toBe(true);
   });
 
+  test("Per-route meta: home title + description appear in raw SSR HTML head", async ({
+    request,
+  }) => {
+    // entry-server.ts computes PageMeta from the matched router state
+    // and renderHeadFor() builds the <head> markup that's spliced
+    // into the <!--ssr-meta--> placeholder. The home meta block is
+    // baked into the wire HTML before any JS runs (test uses raw
+    // request, no JS engine).
+    const response = await request.get("/");
+    const html = await response.text();
+
+    expect(html).toContain("<title>Home — Real-Router Vue SSR</title>");
+    expect(html).toContain(
+      'name="description" content="Welcome to the Real-Router Vue SSR example."',
+    );
+  });
+
+  test("Per-route meta: /users meta reflects the active sort param", async ({
+    request,
+  }) => {
+    // getMetaForState() reads state.params.sort and folds it into the
+    // title — proves meta is computed from the resolved router state,
+    // not a static lookup.
+    const ascResponse = await request.get("/users");
+    const ascHtml = await ascResponse.text();
+
+    expect(ascHtml).toContain("All Users (sorted asc)");
+
+    const descResponse = await request.get("/users?sort=desc");
+    const descHtml = await descResponse.text();
+
+    expect(descHtml).toContain("All Users (sorted desc)");
+  });
+
+  test("Per-route meta: /users/:id includes the user's name in title and og:title", async ({
+    request,
+  }) => {
+    const response = await request.get("/users/1");
+    const html = await response.text();
+
+    // Title carries the user name + suffix.
+    expect(html).toContain("<title>Alice — Real-Router Vue SSR</title>");
+    // og:title is the bare name (no suffix) for cleaner social-card
+    // previews — verifies the two fields are decoupled in meta.ts.
+    expect(html).toMatch(/<meta property="og:title" content="Alice"\s*\/?>/);
+  });
+
+  test("Per-route meta: canonical is an absolute URL prefixed with SITE_ORIGIN", async ({
+    request,
+  }) => {
+    // canonical must be absolute (search engines and crawlers
+    // reject relative canonicals). The default SITE_ORIGIN is
+    // "https://example.com" — meta.ts's `abs()` helper prefixes the
+    // path. og:url mirrors canonical.
+    const response = await request.get("/users/2");
+    const html = await response.text();
+
+    expect(html).toMatch(
+      /<link rel="canonical" href="https:\/\/example\.com\/users\/2"\s*\/?>/,
+    );
+    expect(html).toMatch(
+      /<meta property="og:url" content="https:\/\/example\.com\/users\/2"\s*\/?>/,
+    );
+  });
+
+  test("Per-route meta: og:description carries route-specific copy (not the default fallback)", async ({
+    request,
+  }) => {
+    // Smoke-test that distinct routes produce distinct og:description
+    // values — guards against accidental fallthrough to DEFAULTS.
+    const homeResponse = await request.get("/");
+    const homeHtml = await homeResponse.text();
+
+    const profileResponse = await request.get("/users/1");
+    const profileHtml = await profileResponse.text();
+
+    const homeOg = /og:description" content="([^"]+)"/.exec(homeHtml)?.[1];
+    const profileOg = /og:description" content="([^"]+)"/.exec(profileHtml)?.[1];
+
+    expect(homeOg).toBeDefined();
+    expect(profileOg).toBeDefined();
+    expect(homeOg).not.toBe(profileOg);
+    expect(profileOg).toContain("Alice");
+  });
+
+  test("Custom directive: v-track-view update lifecycle fires when bound binding.value changes", async ({
+    page,
+  }) => {
+    // UserProfile.vue uses `v-track-view="{ productId: trackedId }"`.
+    // trackedId is a computed ref that initially resolves to the
+    // user id; clicking "Override tracked id" flips manualOverride
+    // to "999". Vue diffs the new binding object reference and calls
+    // the directive's `updated(el, binding)` hook, which pushes the
+    // new productId onto __VIEW_UPDATE_LOG__. The test reads that
+    // log to verify the lifecycle hook fired with the expected value
+    // — proves Vue's directive update path is exercised end-to-end.
+    await page.goto("/users/1");
+
+    await page.waitForLoadState("networkidle");
+
+    // Clear any update entries from initial mount-time updates.
+    await page.evaluate(() => {
+      (window as Window & { __VIEW_UPDATE_LOG__?: unknown[] }).__VIEW_UPDATE_LOG__ =
+        [];
+    });
+
+    await page.getByTestId("override-tracked-id").click();
+
+    await page.waitForFunction(
+      () => {
+        const log = (
+          window as Window & {
+            __VIEW_UPDATE_LOG__?: { productId: string }[];
+          }
+        ).__VIEW_UPDATE_LOG__;
+
+        return log && log.some((entry) => entry.productId === "999");
+      },
+      undefined,
+      { timeout: 5000 },
+    );
+
+    const updateLog = await page.evaluate(
+      () =>
+        (
+          window as Window & {
+            __VIEW_UPDATE_LOG__?: { productId: string }[];
+          }
+        ).__VIEW_UPDATE_LOG__,
+    );
+
+    expect(updateLog?.some((entry) => entry.productId === "999")).toBe(true);
+  });
+
+  test("Custom directive SSR-safety: directive body does not run during server render", async ({
+    request,
+  }) => {
+    // Vue intentionally skips custom directive lifecycle hooks during
+    // SSR (they are client-only). This means the body of mounted/
+    // updated/unmounted can reference IntersectionObserver and other
+    // browser-only APIs without crashing the server. We verify
+    // indirectly by asserting the SSR HTML for a route using the
+    // directive (/users/1) renders successfully and contains the
+    // expected DOM — proving no SSR error was thrown.
+    const response = await request.get("/users/1");
+
+    expect(response.status()).toBe(200);
+    const html = await response.text();
+
+    expect(html).toContain('data-testid="user-profile"');
+    // Directive doesn't appear as an attribute on the server-rendered
+    // element — Vue compiles directives away (only their effects are
+    // applied). What we verify here is just that the page rendered.
+    expect(html).toContain("Alice");
+  });
+
   test("Cache-Control: per-route policy from cache-policies.ts (public for users list, no-store for admin redirect)", async ({
     request,
   }) => {

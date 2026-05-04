@@ -2,6 +2,7 @@
 import { useRoute } from "@real-router/vue";
 import { computed } from "vue";
 
+import ProductSpecsModal from "./ProductSpecsModal.vue";
 import RelatedItems from "./RelatedItems.vue";
 import Reviews from "./Reviews.vue";
 import ReviewsErrorBoundary from "./ReviewsErrorBoundary.vue";
@@ -24,6 +25,11 @@ const data = computed<ProductDetailData | undefined>(
     <h1 data-testid="product-name">{{ data.product.name }}</h1>
     <p data-testid="product-price">${{ data.product.price }}</p>
     <p data-testid="product-description">{{ data.product.description }}</p>
+
+    <ProductSpecsModal
+      :productId="data.product.id"
+      :productName="data.product.name"
+    />
 
     <ReviewsErrorBoundary>
       <Suspense>

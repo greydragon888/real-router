@@ -7,6 +7,10 @@
   </head>
   <body>
     <div id="root"><!--ssr-outlet--></div>
+    <!-- <Teleport to="#modal-target"> mounts content into this node
+         outside the #root subtree, demonstrating Vue's portal pattern
+         across the streaming pipeline. -->
+    <div id="modal-target" data-testid="modal-target"></div>
     <!--ssr-state-->
     <script type="module" src="/src/entry-client.ts"></script>
   </body>

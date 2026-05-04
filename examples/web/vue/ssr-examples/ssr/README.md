@@ -58,6 +58,17 @@ The client-side `ssrDataPluginFactory` registration handles **hydration only**: 
 
 **SSR-only by design:** the plugin intercepts `start()`, **not** `navigate()`. After hydration, subsequent `<Link>` clicks do NOT re-run loaders — same contract as the React example.
 
+## Per-route meta + Vue custom directive
+
+`src/router/meta.ts` resolves a `PageMeta` block (`title`, `description`, `canonical`, `ogTitle`, `ogDescription`) from the matched router state. `entry-server.ts` calls `renderHeadFor(meta)` to produce the `<head>` markup; the server splices it into the `<!--ssr-meta-->` placeholder of the template before sending the response. canonical URLs are absolute (prefixed with `SITE_ORIGIN`, defaulting to `https://example.com`) — search engines and social-media crawlers reject relative canonicals.
+
+`src/directives/track-view.ts` exposes a Vue custom directive (`v-track-view`) that demonstrates the full directive lifecycle:
+- `mounted(el, binding)` — sets up an `IntersectionObserver`. SSR skips this hook entirely, so referencing browser-only APIs is safe (no `typeof window === "undefined"` guard needed).
+- `updated(el, binding)` — fires when the bound `binding.value` changes reactively. `UserProfile.vue` uses a `computed` that flips between `data.user.id` and `"999"` after a button click; Vue diffs the new binding and calls `updated()` with the new value.
+- `unmounted(el)` — disconnects the observer.
+
+Verified by 7 e2e tests in this file: meta per route (home title/description, sort-param interpolation, name in profile title + og:title, absolute canonical, distinct og:description), directive update lifecycle via `__VIEW_UPDATE_LOG__`, and SSR safety check confirming the directive body doesn't run server-side.
+
 ## Loader-driven HTTP: typed errors → 301/404/504
 
 `src/_loader-errors.ts` defines three named errors and a `withTimeout()` helper. Loaders throw them; `entry-server.ts` catches by `code`, maps each to a `RenderResult` shape; `server/index.ts` emits the corresponding HTTP status:

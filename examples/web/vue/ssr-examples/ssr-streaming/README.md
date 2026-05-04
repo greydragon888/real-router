@@ -91,6 +91,18 @@ Key constraints:
 - **Client returns `Promise.resolve(value)`** — `await` resolves synchronously on the next microtask, no hydration flash
 - **`onErrorCaptured` is the boundary** — `ReviewsErrorBoundary.vue` returns `false` from the hook to stop propagation, mirroring React's `componentDidCatch`
 
+## `<Teleport>` modal — streaming-safe portal pattern
+
+`src/components/ProductSpecsModal.vue` demonstrates Vue 3's `<Teleport>`: a button declared inside `<ProductDetail>` that mounts its dialog into `#modal-target` (a sibling of `#root` in `index.html`), not inside the article that hosts the trigger. Standard portal pattern — declared in one tree, rendered in another.
+
+The implementation uses the canonical streaming-safe variant: `<Teleport :disabled="!mounted">` paired with `onMounted(() => mounted.value = true)`. The reason is hydration consistency:
+- Server-side, `mounted = false` → `<Teleport>` is disabled → content (if any) renders inline at the declared site.
+- Client-side, `onMounted` fires AFTER hydration, flips `mounted`, the teleport activates, and any open content moves to `#modal-target`.
+
+Without `:disabled`, Vue's SSR Teleport emits placeholder markers that the streaming pipeline + hydration walker don't always match precisely — triggering `Hydration completed but contains mismatches.` This pattern is the recommended escape hatch.
+
+Verified by Scenarios 15 (closed modal contributes zero markup to streamed HTML, target node exists) and 16 (after click, dialog lives inside `#modal-target` and NOT inside `#root`).
+
 ## Loader-driven HTTP: typed LoaderNotFound for unknown ids
 
 `src/_loader-errors.ts` defines `LoaderNotFound` (same shape as the runtime SSR example). The `products.detail` loader throws it for ids not in the in-memory store; `entry-server.ts` catches the typed error BEFORE constructing the stream and returns a plain-text 404 result. This fixes a leak in the previous design — a generic `throw new Error()` bubbled past the streaming pipeline's catch path, `cleanup()` was never called, and the per-request router was held until GC. Now the catch path always disposes.
