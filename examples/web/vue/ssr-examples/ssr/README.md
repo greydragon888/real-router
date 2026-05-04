@@ -10,7 +10,7 @@ Server-side rendering with Real-Router, Vue 3, Express, and Vite — the Vue por
 - **Client hydration** — `hydrateRouter(router, __SSR_STATE__)` re-resolves router state by `state.path`; Vue `createSSRApp(...).mount()` reuses server-rendered DOM without mismatch
 - **Cookie-based DI + auth-gated routes** — dashboard and admin protected by `canActivate` guards consuming `getDep("currentUser")`
 - **Query params + nested loaders** — `?sort` on `/users`, leaf-route loader for `/users/:id/posts` returns combined parent + child data
-- **Loader error → 500 page** — rejected loader bubbles through `router.start()`, server returns deterministic error page
+- **Typed loader errors → HTTP** — `LoaderRedirect`/`LoaderNotFound`/`LoaderTimeout` thrown by loaders surface as `301`/`404`/`504`. Untyped rejections fall through to a deterministic 500 error page. Full table in the "Loader-driven HTTP" section below.
 - **Client-side navigation** — after hydration, `@real-router/browser-plugin` handles SPA navigation
 
 ## Architecture
@@ -22,12 +22,17 @@ server/
   index.ts            Express production server (serves built assets)
 src/
   database.ts         In-memory mock store
-  entry-server.ts     render(url, context) → { html, serializedData, statusCode, redirect }
+  entry-server.ts     render(url, context) → { html, head, serializedData, statusCode, redirect, rawBody?, contentType? }
   entry-client.ts     hydrateRouter() + createSSRApp().mount() with browser-plugin + ssr-data-plugin
   App.vue             Shared component tree (server + client)
+  _loader-errors.ts   Typed loader errors (LoaderRedirect/NotFound/Timeout) + withTimeout()
+  directives/
+    track-view.ts     Vue custom directive (mounted/updated/unmounted) — IntersectionObserver demo
   router/
-    routes.ts         Route definitions with auth guards
-    loaders.ts        Per-route data loaders
+    routes.ts         Route definitions with auth guards (incl. /slow, /legacy-user/:id)
+    loaders.ts        Per-route data loaders (typed errors + AbortSignal)
+    cache-policies.ts Per-route Cache-Control resolver
+    meta.ts           Per-route PageMeta (title/description/canonical/og*)
     createAppRouter.ts  Router factory with dependency injection
   pages/
     Home, UsersList, UserProfile, UserPosts, Dashboard, Admin, NotFound (.vue)

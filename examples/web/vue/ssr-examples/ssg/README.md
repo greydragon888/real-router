@@ -18,19 +18,21 @@ Static site generation with Real-Router, Vue 3, and Vite — the Vue port of the
 
 ```
 scripts/
-  ssg-build.ts        Build script: reads template → getStaticPaths → render → write HTML
+  ssg-build.ts        Build script: reads template → getStaticPaths → render → write HTML + sitemap.xml + 404.html
 src/
   entry-server.ts     render(url) + getStaticPaths() exports
   entry-client.ts     hydrate (SSG) or mount fresh (dev) detection
   App.vue             Shared component tree
+  _loader-errors.ts   Typed loader errors (LoaderRedirect/NotFound) — caught at build time
   router/
-    routes.ts         Route definitions (home, users, users.profile)
-    loaders.ts        Per-route data loaders
-    entries.ts        Parameter sets for dynamic routes (users.profile → id: 1, 2, 3)
-    meta.ts           Per-route meta tag resolver
+    routes.ts         Route definitions (home, users, users.profile, users.profile.posts)
+    loaders.ts        Per-route data loaders (LoaderNotFound for missing ids)
+    entries.ts        Parameter sets for dynamic routes (users.profile + users.profile.posts → ids 1, 2, 3)
+    meta.ts           Per-route meta tag resolver (title/description/canonical/og*)
     createAppRouter.ts  Router factory
   pages/
-    Home, UsersList, UserProfile, NotFound (.vue)
+    Home, UsersList, UserProfile, UserPosts, NotFound (.vue)
+vite.config.ts        ssgServe() preview plugin: Cache-Control + 301 trailing-slash
 ```
 
 ## SSG Flow
@@ -41,13 +43,21 @@ Build time:
     → walks route tree → finds leaf routes
     → static routes: buildPath(name, {})
     → dynamic routes: entries[name]() → buildPath(name, params) for each
-    → returns ["/", "/users/1", "/users/2", "/users/3"] (leaf-only — UsersList added manually)
+    → returns ["/", "/users/1/posts", "/users/2/posts", "/users/3/posts"]
+                              (leaf-only — non-leaf paths added below)
+
+  ssg-build.ts derives the parent-profile paths from the leaves:
+    leaf "/users/<id>/posts" → profile "/users/<id>"
+    Adds "/users" manually (intermediate UsersList route).
+    Final set: 8 URLs (1 home + 1 list + 3 profiles + 3 posts).
 
   For each URL:
     cloneRouter(base)
       → usePlugin(ssrDataPluginFactory(loaders))
       → start(url) → renderToString(createSSRApp(...)) → serializeRouterState()
       → write dist/{url}/index.html
+      (LoaderNotFound thrown by a loader → caught, counted as build failure,
+       process.exit(1) if any URL errored)
 
 Client (once):
   createAppRouter()
@@ -64,11 +74,20 @@ dist/
   index.html              ← /
   users/
     index.html            ← /users
-    1/index.html          ← /users/1
-    2/index.html          ← /users/2
-    3/index.html          ← /users/3
+    1/
+      index.html          ← /users/1
+      posts/
+        index.html        ← /users/1/posts
+    2/
+      index.html          ← /users/2
+      posts/
+        index.html        ← /users/2/posts
+    3/
+      index.html          ← /users/3
+      posts/
+        index.html        ← /users/3/posts (empty-state UI — Charlie has 0 posts)
   404.html                ← not-found fallback
-  sitemap.xml             ← all pre-rendered URLs
+  sitemap.xml             ← all 8 pre-rendered URLs
   assets/
     index-*.js            ← client bundle (shared across all pages)
 ```

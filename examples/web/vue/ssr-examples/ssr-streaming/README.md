@@ -101,7 +101,7 @@ The implementation uses the canonical streaming-safe variant: `<Teleport :disabl
 
 Without `:disabled`, Vue's SSR Teleport emits placeholder markers that the streaming pipeline + hydration walker don't always match precisely — triggering `Hydration completed but contains mismatches.` This pattern is the recommended escape hatch.
 
-Verified by Scenarios 15 (closed modal contributes zero markup to streamed HTML, target node exists) and 16 (after click, dialog lives inside `#modal-target` and NOT inside `#root`).
+Verified by Scenarios 15 and 16: closed modal contributes zero markup to the streamed HTML (target node still exists from `index.html`); after click, the dialog lives inside `#modal-target` and **not** inside `#root`.
 
 ## Loader-driven HTTP: typed LoaderNotFound for unknown ids
 
@@ -112,7 +112,7 @@ Verified by Scenarios 15 (closed modal contributes zero markup to streamed HTML,
 | `LOADER_NOT_FOUND` | `404 Not Found` (text/plain, no streaming)   |
 | anything else      | propagates → `next(error)` (Express default) |
 
-The error path bypasses the streaming pipeline entirely — `Transfer-Encoding: chunked` is absent, no `<Suspense>` fallback flicker, just a fast plain-text response. Verified by Scenario 15.
+The error path bypasses the streaming pipeline entirely — `Transfer-Encoding: chunked` is absent, no `<Suspense>` fallback flicker, just a fast plain-text response. Verified by Scenario 17.
 
 ## Production HTTP semantics: Cache-Control + AbortController (no ETag)
 
@@ -123,7 +123,7 @@ The error path bypasses the streaming pipeline entirely — `Transfer-Encoding: 
 
 **ETag is intentionally absent.** Strong ETag requires hashing the full body; a streaming pipeline never holds the body in memory as a single buffer, so adding ETag would mean buffering the whole stream first — which defeats streaming. Production setups typically rely on CDN-level shared caching (`s-maxage`) plus the CDN's own buffered ETag layer applied at the edge. See `src/router/cache-policies.ts` for the full rationale.
 
-These are demonstrated end-to-end by Scenarios 15 (Cache-Control routing), 16 (no-ETag honesty check), and 17 (AbortController mid-stream release).
+These are demonstrated end-to-end by Scenarios 18 (Cache-Control routing), 19 (no-ETag honesty check), and 20 (AbortController mid-stream release).
 
 ## Run
 
@@ -131,12 +131,12 @@ These are demonstrated end-to-end by Scenarios 15 (Cache-Control routing), 16 (n
 pnpm dev          # Express + Vite middleware (HMR), http://localhost:3000
 pnpm build:app    # vue-tsc + vite build (client + ssr bundles)
 pnpm preview      # NODE_ENV=production tsx server/index.ts
-pnpm test:e2e     # Playwright — 14 acceptance scenarios
+pnpm test:e2e     # Playwright — 20 acceptance scenarios
 ```
 
 ## E2e Scenarios
 
-[`e2e/ssr-streaming.spec.ts`](e2e/ssr-streaming.spec.ts) — 14 Playwright scenarios mirroring the React example where the runtime allows, plus four Vue-specific invariants the React equivalent does not exercise:
+[`e2e/ssr-streaming.spec.ts`](e2e/ssr-streaming.spec.ts) — 20 Playwright scenarios. Scenarios 1–14 mirror the React example where Vue 3's runtime allows it, plus three Vue-specific surrogates that pin down the actual blocking-Suspense + chunked-transfer contract; Scenarios 15–20 cover Vue-only or production-grade pieces (Teleport, typed loader errors, Cache-Control + AbortController):
 
 1. **Shell renders before deferred content** — `page.goto(..., { waitUntil: "commit" })` + critical content visible quickly
 2. **Streaming response contains resolved deferred content** — HTTP-level test verifying the streamed HTML contains both reviews and related sections
@@ -152,6 +152,12 @@ pnpm test:e2e     # Playwright — 14 acceptance scenarios
 12. **Chunked transfer + per-Suspense timing** — `Transfer-Encoding: chunked` is set, `Content-Length` is absent, and body delivery wall-clock ≥ slowest Suspense delay (≥1100ms) — proves the response is genuinely streamed, not buffered
 13. **Empty deferred state** — when reviews/related-items resolve to `[]`, empty-state UI renders without errors and without hydration warnings
 14. **No hydration flicker** — server-rendered Suspense content is immediately present after commit; `reviews-fallback` / `related-fallback` markers never appear in the DOM (consequence of Vue's blocking SSR Suspense)
+15. **`<Teleport>` initially closed** — modal contributes zero markup to streamed HTML; `#modal-target` host node exists in `index.html`
+16. **`<Teleport>` open** — clicking the trigger mounts dialog into `#modal-target` (sibling of `#root`), NOT inside `#root`
+17. **Loader-driven HTTP — `/products/999`** — `LoaderNotFound` short-circuits before stream construction, returns 404 text/plain (no `Transfer-Encoding: chunked`), `cleanup()` always runs (no router leak)
+18. **Cache-Control per route** — `/` → `s-maxage=3600`, `/products` → `max-age=60`, `/products/:id` → `max-age=120`
+19. **No ETag on streamed responses** — honest absence (would defeat streaming); ETag header is `undefined`
+20. **AbortController mid-stream** — request `timeout: 150ms`; server releases the stream-pump within 800ms (well under the 1200ms full-stream span)
 
 Note: there is no Vue equivalent of React's `<!--$?-->` Suspense placeholder marker test, because Vue does not emit out-of-order placeholders. Scenarios 11, 12, and 14 are the Vue-specific surrogates that pin down the actual streaming + blocking-Suspense contract.
 
