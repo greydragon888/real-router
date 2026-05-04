@@ -384,4 +384,56 @@ test.describe("SSG (Vue)", () => {
     await expect(page.locator("main")).toContainText("ID: 1");
     await expect(page.locator("main")).toContainText("Name: Alice");
   });
+
+  test("Cache-Control: per-route policy from vite.config.ts ssgServe middleware (long for home, shorter for users list / profile)", async ({
+    request,
+  }) => {
+    // The ssgServe Vite plugin attaches getCachePolicy() to every
+    // preview response. Static files therefore carry per-route
+    // Cache-Control directives matching the runtime SSR example:
+    //   /          → public, max-age=300, s-maxage=3600
+    //   /users/    → public, max-age=60
+    //   /users/:id/ → public, max-age=120
+    const home = await request.get("/");
+
+    expect(home.headers()["cache-control"]).toContain("public");
+    expect(home.headers()["cache-control"]).toContain("s-maxage=3600");
+
+    const users = await request.get("/users/");
+
+    expect(users.headers()["cache-control"]).toContain("public");
+    expect(users.headers()["cache-control"]).toContain("max-age=60");
+
+    const profile = await request.get("/users/1/");
+
+    expect(profile.headers()["cache-control"]).toContain("public");
+    expect(profile.headers()["cache-control"]).toContain("max-age=120");
+  });
+
+  test("ETag: static-file layer emits weak ETag (auto from mtime), conditional GET returns 304", async ({
+    request,
+  }) => {
+    // Vite preview's static handler attaches a weak ETag derived from
+    // file mtime. Pre-rendered SSG files are written once at build
+    // time, so two consecutive GETs hit the same mtime → same ETag →
+    // 304 on If-None-Match. We do NOT compute a content-derived
+    // strong ETag here (that's the job of the runtime SSR server) —
+    // the SSG layer only verifies the static handler's freshness
+    // contract.
+    const first = await request.get("/users/");
+
+    expect(first.status()).toBe(200);
+
+    const etag = first.headers().etag;
+
+    // Vite's static handler emits a weak ETag like W/"<size>-<mtime>".
+    expect(etag).toMatch(/^W?\/?".+"$/);
+
+    const conditional = await request.get("/users/", {
+      headers: { "If-None-Match": etag },
+    });
+
+    expect(conditional.status()).toBe(304);
+    expect((await conditional.body()).length).toBe(0);
+  });
 });

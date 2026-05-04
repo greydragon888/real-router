@@ -91,6 +91,17 @@ Key constraints:
 - **Client returns `Promise.resolve(value)`** — `await` resolves synchronously on the next microtask, no hydration flash
 - **`onErrorCaptured` is the boundary** — `ReviewsErrorBoundary.vue` returns `false` from the hook to stop propagation, mirroring React's `componentDidCatch`
 
+## Production HTTP semantics: Cache-Control + AbortController (no ETag)
+
+`server/index.ts` adds two production-grade pieces tailored to streaming:
+
+- **Per-route `Cache-Control`** — `src/router/cache-policies.ts` maps URL paths to directives: `/` → `public, s-maxage=3600`, `/products` → `public, max-age=60`, `/products/:id` → `public, max-age=120`.
+- **`AbortController` per request** — `req.on("close")` aborts the controller; the stream-pump loop checks `signal.aborted` between `reader.read()` calls and bails out via `reader.cancel()`. Cleanup (`router.dispose()`) runs in the `finally` block. Without this, a client disconnect would let the server keep pulling chunks from the ReadableStream until completion (~1200 ms for `/products/:id` due to RelatedItems' Suspense delay).
+
+**ETag is intentionally absent.** Strong ETag requires hashing the full body; a streaming pipeline never holds the body in memory as a single buffer, so adding ETag would mean buffering the whole stream first — which defeats streaming. Production setups typically rely on CDN-level shared caching (`s-maxage`) plus the CDN's own buffered ETag layer applied at the edge. See `src/router/cache-policies.ts` for the full rationale.
+
+These are demonstrated end-to-end by Scenarios 15 (Cache-Control routing), 16 (no-ETag honesty check), and 17 (AbortController mid-stream release).
+
 ## Run
 
 ```bash

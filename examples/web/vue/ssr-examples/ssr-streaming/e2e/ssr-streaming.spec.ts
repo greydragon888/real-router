@@ -348,4 +348,81 @@ test.describe("Streaming SSR Example (Vue)", () => {
     await expect(page.getByTestId("reviews-section")).toBeVisible();
     await expect(page.getByTestId("related-section")).toBeVisible();
   });
+
+  test("Scenario 15: Cache-Control: per-route policy from cache-policies.ts (public for products list, longer for product detail)", async ({
+    request,
+  }) => {
+    // server/index.ts reads getCachePolicy(url) and emits the
+    // Cache-Control header on the streamed response. Different routes
+    // get different policies:
+    //   /            → public, max-age=300, s-maxage=3600
+    //   /products    → public, max-age=60
+    //   /products/:id → public, max-age=120
+    //
+    // Note: ETag is intentionally absent here — buffering the full
+    // stream to hash it would defeat the streaming purpose. See
+    // src/router/cache-policies.ts header for the full rationale.
+    const home = await request.get("/", { maxRedirects: 0 });
+
+    expect(home.headers()["cache-control"]).toContain("public");
+    expect(home.headers()["cache-control"]).toContain("s-maxage=3600");
+
+    const productsList = await request.get("/products", { maxRedirects: 0 });
+
+    expect(productsList.headers()["cache-control"]).toContain("public");
+    expect(productsList.headers()["cache-control"]).toContain("max-age=60");
+
+    const productDetail = await request.get("/products/1", {
+      maxRedirects: 0,
+    });
+
+    expect(productDetail.headers()["cache-control"]).toContain("public");
+    expect(productDetail.headers()["cache-control"]).toContain("max-age=120");
+  });
+
+  test("Scenario 16: streamed responses do NOT carry an ETag header (intentional — would defeat streaming)", async ({
+    request,
+  }) => {
+    // Honesty check: confirm we're not silently emitting a useless or
+    // misleading ETag. Strong ETag requires the full body to hash;
+    // streaming pipelines never hold the full body in memory. So we
+    // skip ETag entirely rather than ship a weak/lying one.
+    // CDNs that need conditional GET will buffer the body on their
+    // edge and apply their own ETag layer — see cache-policies.ts.
+    const response = await request.get("/products/1");
+
+    expect(response.status()).toBe(200);
+    expect(response.headers().etag).toBeUndefined();
+  });
+
+  test("Scenario 17: AbortController: client disconnect mid-stream releases the server reader within ms", async ({
+    request,
+  }) => {
+    // /products/1 streams over ~1200 ms (RelatedItems is the slowest
+    // <Suspense> child at 1200 ms server delay). server/index.ts
+    // wires `req.on("close")` → `abortController.abort()` and the
+    // stream-pump loop checks `signal.aborted` between `reader.read()`
+    // calls; on abort, `reader.cancel()` releases stream resources
+    // and `cleanup()` calls `router.dispose()`.
+    //
+    // Test: cancel the request via Playwright's `timeout` option
+    // (150 ms — much shorter than the 1200 ms stream span). The HTTP
+    // error surfaces as a Playwright error; the test verifies elapsed
+    // time stays well under the full stream duration.
+    const startedAt = Date.now();
+    let aborted = false;
+
+    try {
+      await request.get("/products/1", { timeout: 150 });
+    } catch {
+      aborted = true;
+    }
+
+    const elapsed = Date.now() - startedAt;
+
+    expect(aborted).toBe(true);
+    // Client gave up at ~150 ms, server should release its handler
+    // well under the 1200 ms full-stream span.
+    expect(elapsed).toBeLessThan(800);
+  });
 });

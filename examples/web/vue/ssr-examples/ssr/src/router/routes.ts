@@ -30,5 +30,6 @@ export const routes = [
         return user?.role === "admin";
       },
   },
+  { name: "slow", path: "/slow" },
   { name: "boom", path: "/boom" },
 ];
