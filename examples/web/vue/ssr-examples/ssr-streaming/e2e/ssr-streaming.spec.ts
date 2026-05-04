@@ -349,7 +349,27 @@ test.describe("Streaming SSR Example (Vue)", () => {
     await expect(page.getByTestId("related-section")).toBeVisible();
   });
 
-  test("Scenario 15: Cache-Control: per-route policy from cache-policies.ts (public for products list, longer for product detail)", async ({
+  test("Scenario 15: Loader-driven HTTP — /products/999 throws LoaderNotFound → 404 text/plain (no streaming for the error path)", async ({
+    request,
+  }) => {
+    // products.detail loader calls getProduct(id); if the id is not
+    // in the in-memory store, it throws LoaderNotFound. entry-server
+    // catches the typed error BEFORE constructing the stream and
+    // returns { rawBody: "Not Found", statusCode: 404 } — server
+    // emits text/plain instead of streamed HTML, and crucially still
+    // calls cleanup() (the previous design leaked the router because
+    // the catch path skipped dispose()).
+    const response = await request.get("/products/999");
+
+    expect(response.status()).toBe(404);
+    expect(response.headers()["content-type"]).toContain("text/plain");
+    expect(await response.text()).toBe("Not Found");
+    // No streaming for the error path — Transfer-Encoding should not
+    // be chunked here.
+    expect(response.headers()["transfer-encoding"]).not.toBe("chunked");
+  });
+
+  test("Scenario 16: Cache-Control: per-route policy from cache-policies.ts (public for products list, longer for product detail)", async ({
     request,
   }) => {
     // server/index.ts reads getCachePolicy(url) and emits the
@@ -380,7 +400,7 @@ test.describe("Streaming SSR Example (Vue)", () => {
     expect(productDetail.headers()["cache-control"]).toContain("max-age=120");
   });
 
-  test("Scenario 16: streamed responses do NOT carry an ETag header (intentional — would defeat streaming)", async ({
+  test("Scenario 17: streamed responses do NOT carry an ETag header (intentional — would defeat streaming)", async ({
     request,
   }) => {
     // Honesty check: confirm we're not silently emitting a useless or
@@ -395,7 +415,7 @@ test.describe("Streaming SSR Example (Vue)", () => {
     expect(response.headers().etag).toBeUndefined();
   });
 
-  test("Scenario 17: AbortController: client disconnect mid-stream releases the server reader within ms", async ({
+  test("Scenario 18: AbortController: client disconnect mid-stream releases the server reader within ms", async ({
     request,
   }) => {
     // /products/1 streams over ~1200 ms (RelatedItems is the slowest

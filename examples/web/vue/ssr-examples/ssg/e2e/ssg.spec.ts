@@ -385,6 +385,40 @@ test.describe("SSG (Vue)", () => {
     await expect(page.locator("main")).toContainText("Name: Alice");
   });
 
+  test("Loader-driven build: render() throws LoaderNotFound for an id absent from the database (catches stale entries.ts entries at build time)", async () => {
+    // Import the compiled entry-server module that ssg-build.ts uses.
+    // Calling render('/users/9999') must reject with the typed
+    // LoaderNotFound error — proving that if entries.ts listed an
+    // id no longer in the database, the build script's try/catch
+    // would surface it as a failure (vs. silently emitting an empty
+    // "user not found" page).
+    // The compiled bundle doesn't ship type declarations; we build
+    // the spec for the public surface ourselves. ts-expect-error
+    // because vue-tsc -b can't resolve the .js file's types.
+    // @ts-expect-error — compiled artifact, no .d.ts
+    const module_ = (await import("../dist/server/entry-server.js")) as {
+      render: (url: string) => Promise<{
+        html: string;
+        ssrJson: string;
+        statusCode: number;
+        meta: { title: string; description: string };
+      }>;
+    };
+    const { render } = module_;
+
+    let caught: { code?: string; resource?: string } | undefined;
+
+    try {
+      await render("/users/9999");
+    } catch (error) {
+      caught = error as { code?: string; resource?: string };
+    }
+
+    expect(caught).toBeDefined();
+    expect(caught?.code).toBe("LOADER_NOT_FOUND");
+    expect(caught?.resource).toBe("user:9999");
+  });
+
   test("Cache-Control: per-route policy from vite.config.ts ssgServe middleware (long for home, shorter for users list / profile)", async ({
     request,
   }) => {

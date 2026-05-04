@@ -1,3 +1,4 @@
+import { LoaderNotFound, LoaderRedirect, withTimeout } from "../_loader-errors";
 import { database } from "../database";
 
 import type { Post, User } from "../database";
@@ -9,11 +10,11 @@ export interface UsersListData {
 }
 
 export interface UserProfileData {
-  user: User | undefined;
+  user: User;
 }
 
 export interface UserPostsData {
-  user: User | undefined;
+  user: User;
   posts: readonly Post[];
 }
 
@@ -21,7 +22,9 @@ export interface SlowData {
   message: string;
 }
 
+const PROFILE_TIMEOUT_MS = 1500;
 const SLOW_LOADER_DELAY_MS = 5000;
+const SLOW_LOADER_TIMEOUT_MS = 250;
 
 export const loaders: DataLoaderFactoryMap = {
   users: () => (params) => {
@@ -32,44 +35,69 @@ export const loaders: DataLoaderFactoryMap = {
       sort,
     });
   },
+
   "users.profile": () => (params) =>
-    Promise.resolve<UserProfileData>({
-      user: database.users.findById(params.id as string),
+    withTimeout("users.profile", PROFILE_TIMEOUT_MS, () => {
+      const id = params.id as string;
+      const user = database.users.findById(id);
+
+      if (!user) {
+        throw new LoaderNotFound(`user:${id}`);
+      }
+
+      return Promise.resolve<UserProfileData>({ user });
     }),
+
   "users.profile.posts": () => (params) => {
     const id = params.id as string;
+    const user = database.users.findById(id);
+
+    if (!user) {
+      throw new LoaderNotFound(`user:${id}`);
+    }
 
     return Promise.resolve<UserPostsData>({
-      user: database.users.findById(id),
+      user,
       posts: database.posts.listByAuthor(id),
     });
   },
+
+  legacyUser: () => (params) => {
+    const id = params.id as string;
+
+    throw new LoaderRedirect(`/users/${id}`, 301);
+  },
+
   // The `slow` loader pulls an `abortSignal` from per-request deps
   // (registered by entry-server.ts through cloneRouter). When the
   // client disconnects mid-render, server/index.ts fires its
   // AbortController, the signal flips, and this loader cleans up the
   // setTimeout — preventing the leak that would otherwise hold the
-  // server worker for the full 5 s. See README "AbortController
-  // wiring" section for the full rationale.
-  slow: (_router, getDep) => () => {
-    const signal = (
-      getDep as unknown as (key: string) => AbortSignal | undefined
-    )("abortSignal");
+  // server worker for the full 5 s. The `withTimeout` wrap races the
+  // loader against a 250 ms server-side timer; when the test fires a
+  // full request that doesn't disconnect, the timeout returns
+  // LoaderTimeout → 504 Gateway Timeout (mirrors the other adapters).
+  slow: (_router, getDep) => () =>
+    withTimeout("slow", SLOW_LOADER_TIMEOUT_MS, () => {
+      const signal = (
+        getDep as unknown as (key: string) => AbortSignal | undefined
+      )("abortSignal");
 
-    return new Promise<SlowData>((resolve, reject) => {
-      const id = setTimeout(() => {
-        resolve({ message: "this should never be seen" });
-      }, SLOW_LOADER_DELAY_MS);
+      return new Promise<SlowData>((resolve, reject) => {
+        const id = setTimeout(() => {
+          resolve({ message: "this should never be seen" });
+        }, SLOW_LOADER_DELAY_MS);
 
-      signal?.addEventListener(
-        "abort",
-        () => {
-          clearTimeout(id);
-          reject(new Error("Aborted: client disconnected"));
-        },
-        { once: true },
-      );
-    });
-  },
+        signal?.addEventListener(
+          "abort",
+          () => {
+            clearTimeout(id);
+            reject(new Error("Aborted: client disconnected"));
+          },
+          { once: true },
+        );
+      });
+    }),
+
   boom: () => () => Promise.reject(new Error("Loader exploded for /boom")),
 };

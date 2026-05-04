@@ -91,6 +91,17 @@ Key constraints:
 - **Client returns `Promise.resolve(value)`** — `await` resolves synchronously on the next microtask, no hydration flash
 - **`onErrorCaptured` is the boundary** — `ReviewsErrorBoundary.vue` returns `false` from the hook to stop propagation, mirroring React's `componentDidCatch`
 
+## Loader-driven HTTP: typed LoaderNotFound for unknown ids
+
+`src/_loader-errors.ts` defines `LoaderNotFound` (same shape as the runtime SSR example). The `products.detail` loader throws it for ids not in the in-memory store; `entry-server.ts` catches the typed error BEFORE constructing the stream and returns a plain-text 404 result. This fixes a leak in the previous design — a generic `throw new Error()` bubbled past the streaming pipeline's catch path, `cleanup()` was never called, and the per-request router was held until GC. Now the catch path always disposes.
+
+| Error `code`       | HTTP response                                |
+| ------------------ | -------------------------------------------- |
+| `LOADER_NOT_FOUND` | `404 Not Found` (text/plain, no streaming)   |
+| anything else      | propagates → `next(error)` (Express default) |
+
+The error path bypasses the streaming pipeline entirely — `Transfer-Encoding: chunked` is absent, no `<Suspense>` fallback flicker, just a fast plain-text response. Verified by Scenario 15.
+
 ## Production HTTP semantics: Cache-Control + AbortController (no ETag)
 
 `server/index.ts` adds two production-grade pieces tailored to streaming:

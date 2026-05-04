@@ -1,3 +1,4 @@
+import { LoaderNotFound } from "../_loader-errors";
 import { getProduct, listProducts } from "../database";
 
 import type { Product } from "../database";
@@ -14,12 +15,17 @@ export interface ProductDetailData {
 export const loaders: DataLoaderFactoryMap = {
   "products.list": () => () =>
     Promise.resolve({ products: listProducts() } satisfies ProductsListData),
+
   "products.detail": () => (params) => {
     const id = params.id as string;
     const product = getProduct(id);
 
     if (!product) {
-      throw new Error(`Product ${id} not found`);
+      // Typed error so server/index.ts can map it to 404 text/plain
+      // BEFORE starting the streamed render. Previously this threw a
+      // generic Error which surfaced as 500 + leaked the router (the
+      // catch path never called cleanup()).
+      throw new LoaderNotFound(`product:${id}`);
     }
 
     return Promise.resolve({ product } satisfies ProductDetailData);

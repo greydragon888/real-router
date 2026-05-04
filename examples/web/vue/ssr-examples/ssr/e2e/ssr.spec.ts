@@ -615,6 +615,86 @@ test.describe("SSR (Vue)", () => {
     expect(homeEtag).not.toBe(usersEtag);
   });
 
+  test("Loader-driven HTTP: /users/9999 throws LoaderNotFound → 404 text/plain", async ({
+    request,
+  }) => {
+    // users.profile loader calls database.users.findById(id); if the
+    // user is not in the in-memory store, it throws LoaderNotFound.
+    // entry-server.ts catches the typed error and returns
+    // { statusCode: 404, rawBody: "Not Found", contentType: "text/plain;..." }
+    // — so the response is 404 with plain-text body, NOT a hydrated
+    // HTML page with `data-testid="user-not-found"`.
+    const response = await request.get("/users/9999");
+
+    expect(response.status()).toBe(404);
+    expect(response.headers()["content-type"]).toContain("text/plain");
+    expect(await response.text()).toBe("Not Found");
+  });
+
+  test("Loader-driven HTTP: /users/9999/posts also throws LoaderNotFound → 404", async ({
+    request,
+  }) => {
+    // Nested loader: users.profile.posts checks the same user table.
+    // The leaf loader must throw LoaderNotFound for the same id, not
+    // silently render an empty posts list. Same response shape as the
+    // parent profile route.
+    const response = await request.get("/users/9999/posts");
+
+    expect(response.status()).toBe(404);
+    expect(response.headers()["content-type"]).toContain("text/plain");
+    expect(await response.text()).toBe("Not Found");
+  });
+
+  test("Loader-driven HTTP: /legacy-user/2 throws LoaderRedirect → 301 Location: /users/2", async ({
+    request,
+  }) => {
+    // legacyUser loader unconditionally throws
+    // `new LoaderRedirect("/users/<id>", 301)`. entry-server.ts maps
+    // that to { statusCode: 301, redirect: "/users/2" } and the
+    // express middleware emits 301 + Location header. We disable
+    // automatic redirect-following so the test sees the 301 itself.
+    const response = await request.get("/legacy-user/2", { maxRedirects: 0 });
+
+    expect(response.status()).toBe(301);
+    expect(response.headers().location).toBe("/users/2");
+  });
+
+  test("Loader-driven HTTP: /legacy-user/3 follows redirect → /users/3 hydrated profile", async ({
+    page,
+  }) => {
+    // End-to-end: visiting /legacy-user/3 in a real browser follows
+    // the 301 to /users/3 and renders Charlie's profile. Proves the
+    // typed error → server-side redirect chain works through the
+    // browser's native redirect handling (not just at the HTTP layer).
+    await page.goto("/legacy-user/3");
+
+    await expect(page).toHaveURL(/\/users\/3$/);
+    await expect(page.locator("main")).toContainText("ID: 3");
+    await expect(page.locator("main")).toContainText("Charlie");
+  });
+
+  test("Loader-driven HTTP: /slow throws LoaderTimeout → 504 Gateway Timeout for full request", async ({
+    request,
+  }) => {
+    // /slow has a 5 s loader behind a 250 ms withTimeout race. When
+    // the client lets the request finish (no abort), withTimeout
+    // wins, throws LoaderTimeout, entry-server.ts maps it to
+    // { statusCode: 504, rawBody: "Gateway Timeout" }. Companion to
+    // the AbortController test above: that one verifies the abort
+    // path; this one verifies the timeout path.
+    const startedAt = Date.now();
+    const response = await request.get("/slow");
+    const elapsed = Date.now() - startedAt;
+
+    expect(response.status()).toBe(504);
+    expect(response.headers()["content-type"]).toContain("text/plain");
+    expect(await response.text()).toBe("Gateway Timeout");
+    // Timeout fires at ~250 ms; total round-trip should land well
+    // under the 5 s loader delay (proves the race resolved the
+    // timeout side, not the loader side).
+    expect(elapsed).toBeLessThan(2500);
+  });
+
   test("AbortController: client disconnect mid-render fires the slow loader's abort listener", async ({
     request,
   }) => {
