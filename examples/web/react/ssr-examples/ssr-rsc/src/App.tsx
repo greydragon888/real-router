@@ -1,5 +1,6 @@
 "use client";
 
+import { type RscPayload } from "@real-router/rsc-server-plugin";
 import { createFromReadableStream } from "@vitejs/plugin-rsc/browser";
 import { startTransition, use, useEffect, useState } from "react";
 
@@ -9,18 +10,13 @@ import type { Router } from "@real-router/core";
 import type { ReactNode } from "react";
 import type { ReactFormState } from "react-dom/client";
 
-// Mirrors the rscPayload shape produced by entry.rsc.tsx. After
-// adding Server Actions, the Flight payload is no longer a bare
-// ReactNode but an object: `{ root, returnValue?, formState? }`.
-interface RscPayload {
-  root: ReactNode;
-  returnValue?: { ok: boolean; data: unknown };
-  formState?: ReactFormState;
-}
+// Canonical Flight payload type from @real-router/rsc-server-plugin.
+// Same shape as entry.rsc.tsx (producer) and entry.ssr.tsx / entry.browser.tsx.
+type AppPayload = RscPayload<unknown, ReactFormState>;
 
 interface AppProps {
   readonly router: Router;
-  readonly payload: Promise<RscPayload>;
+  readonly payload: Promise<AppPayload>;
 }
 
 export function App({ router, payload }: AppProps): ReactNode {
@@ -52,7 +48,7 @@ export function App({ router, payload }: AppProps): ReactNode {
             console.warn(`[App] /__rsc returned ${response.status}`);
           }
 
-          return createFromReadableStream<RscPayload>(response.body);
+          return createFromReadableStream<AppPayload>(response.body);
         })
         .then((newPayload) => {
           if (controller.signal.aborted) {

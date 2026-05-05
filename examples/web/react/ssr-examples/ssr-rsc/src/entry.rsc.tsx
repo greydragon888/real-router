@@ -1,7 +1,12 @@
 import { UNKNOWN_ROUTE } from "@real-router/core";
 import { cloneRouter } from "@real-router/core/api";
 import { serializeRouterState } from "@real-router/core/utils";
-import { rscServerPluginFactory } from "@real-router/rsc-server-plugin";
+import {
+  rscActionPluginFactory,
+  rscServerPluginFactory,
+  type RscActionResult,
+  type RscPayload,
+} from "@real-router/rsc-server-plugin";
 import {
   createTemporaryReferenceSet,
   decodeAction,
@@ -45,8 +50,7 @@ async function handler(request: Request): Promise<Response> {
 
   // Server Action handling — runs BEFORE rendering so the new render
   // reflects the mutation (single round-trip mutate + fetch).
-  let returnValue: { ok: boolean; data: unknown } | undefined;
-  let formState: ReactFormState | undefined;
+  let actionResult: RscActionResult<unknown, ReactFormState> | undefined;
   let temporaryReferences: unknown | undefined;
   let actionStatus: number | undefined;
 
@@ -73,9 +77,9 @@ async function handler(request: Request): Promise<Response> {
           args as unknown[],
         )) as unknown;
 
-        returnValue = { ok: true, data };
+        actionResult = { returnValue: { ok: true, data } };
       } catch (error) {
-        returnValue = { ok: false, data: error };
+        actionResult = { returnValue: { ok: false, data: error } };
         actionStatus = 500;
       }
     } else if (request.headers.get("content-type")?.includes("form")) {
@@ -88,7 +92,8 @@ async function handler(request: Request): Promise<Response> {
 
       try {
         const result = await decodedAction();
-        formState = await decodeFormState(result, formData);
+        const formState = await decodeFormState(result, formData);
+        actionResult = { formState };
       } catch {
         return new Response("Internal Server Error: server action failed", {
           status: 500,
@@ -104,7 +109,18 @@ async function handler(request: Request): Promise<Response> {
 
   const router = cloneRouter(baseRouter, { db: database });
 
-  router.usePlugin(rscServerPluginFactory(loaders));
+  // Two complementary plugins:
+  //   - rscServerPluginFactory → publishes the Server Component tree
+  //     to state.context.rsc (per-route, via loaders).
+  //   - rscActionPluginFactory → publishes the Server Action result
+  //     (returnValue/formState) to state.context.rscAction. The
+  //     result is captured above (in `actionResult`) before start();
+  //     the plugin reads it from the closure during the start
+  //     interceptor.
+  router.usePlugin(
+    rscServerPluginFactory(loaders),
+    rscActionPluginFactory(() => actionResult),
+  );
 
   try {
     const state = await router.start(pathname);
@@ -115,12 +131,14 @@ async function handler(request: Request): Promise<Response> {
       <p data-testid="not-found">Not Found</p>
     );
 
-    // RSC payload includes the action `returnValue`/`formState` so
-    // useActionState on the client receives the result.
-    const rscPayload = {
+    // RSC payload uses the canonical RscPayload<TReturn, TFormState>
+    // type from @real-router/rsc-server-plugin — same shape consumed
+    // by entry.ssr.tsx, App.tsx, and entry.browser.tsx. Single source
+    // of truth for the wire format.
+    const rscPayload: RscPayload<unknown, ReactFormState> = {
       root: rscNode,
-      returnValue,
-      formState,
+      returnValue: actionResult?.returnValue,
+      formState: actionResult?.formState,
     };
     const flightStream = renderRscToReadableStream(rscPayload, {
       temporaryReferences,

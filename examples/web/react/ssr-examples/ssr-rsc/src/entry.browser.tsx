@@ -1,5 +1,6 @@
 import { browserPluginFactory } from "@real-router/browser-plugin";
 import { hydrateRouter } from "@real-router/core/utils";
+import { type RscPayload } from "@real-router/rsc-server-plugin";
 import {
   createFromFetch,
   createFromReadableStream,
@@ -12,14 +13,11 @@ import { rscStream } from "rsc-html-stream/client";
 import { App } from "./App";
 import { createAppRouter } from "./router/createAppRouter";
 
-import type { ReactNode } from "react";
 import type { ReactFormState } from "react-dom/client";
 
-interface RscPayload {
-  root: ReactNode;
-  returnValue?: { ok: boolean; data: unknown };
-  formState?: ReactFormState;
-}
+// Canonical Flight payload type from @real-router/rsc-server-plugin.
+// Same shape as entry.rsc.tsx (producer) and entry.ssr.tsx / App.tsx.
+type AppPayload = RscPayload<unknown, ReactFormState>;
 
 declare global {
   var __SSR_STATE__: { path: string } | undefined;
@@ -58,14 +56,14 @@ setServerCallback(async (id: string, args: unknown[]) => {
     throw new Error("Server-action response missing body");
   }
 
-  const newPayload = await createFromFetch<RscPayload>(
+  const newPayload = await createFromFetch<AppPayload>(
     Promise.resolve(response),
   );
 
   return newPayload.returnValue?.data;
 });
 
-const initialPayload = createFromReadableStream<RscPayload>(
+const initialPayload = createFromReadableStream<AppPayload>(
   rscStream as ReadableStream<Uint8Array>,
 );
 
