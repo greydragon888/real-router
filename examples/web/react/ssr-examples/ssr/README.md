@@ -64,6 +64,26 @@ pnpm preview      # Production server
 pnpm test:e2e     # Playwright tests
 ```
 
+## Loader-driven HTTP: typed errors → 301/404/504
+
+`src/_loader-errors.ts` defines three named errors and a `withTimeout()` helper. Loaders throw them; `entry-server.tsx` catches by `code`, maps each to a `RenderResult` shape; `server/index.ts` emits the corresponding HTTP status:
+
+| Error `code`       | HTTP response                                |
+| ------------------ | -------------------------------------------- |
+| `CANNOT_ACTIVATE`  | `302 Location: /` (auth guard rejected)      |
+| `LOADER_REDIRECT`  | `301/302 Location: error.target`             |
+| `LOADER_NOT_FOUND` | `404 Not Found` (text/plain)                 |
+| `LOADER_TIMEOUT`   | `504 Gateway Timeout` (text/plain)           |
+| anything else      | propagates → 500 with `<server-error>` body  |
+
+Demonstrated routes:
+- `/users/9999` → `LoaderNotFound("user:9999")` → 404 text/plain
+- `/users/9999/posts` → same path, leaf loader checks the same store
+- `/legacy-user/:id` → `LoaderRedirect("/users/:id", 301)` → 301 + Location
+- `/slow` → 5 s loader behind a 250 ms `withTimeout()` race → `LoaderTimeout` → 504
+
+Trade-offs: `withTimeout()` doesn't cancel the underlying loader work — only races the response. Pair with the `AbortController` wiring (next section) for production. The `slow` loader does both.
+
 ## Production HTTP semantics: ETag, Cache-Control, AbortController
 
 `server/index.ts` adds three production-grade pieces on top of the basic SSR wiring:

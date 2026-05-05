@@ -363,6 +363,36 @@ test.describe("RSC SSR Example", () => {
     expect(rscRequests.some((u) => u.includes("role%3Dadmin"))).toBe(true);
   });
 
+  test("Scenario 16a: Loader-driven HTTP — /users/9999 throws LoaderNotFound → 404 text/plain (no Flight payload)", async ({
+    request,
+  }) => {
+    // users.profile loader throws LoaderNotFound for unknown ids.
+    // entry.rsc.tsx catches the typed error BEFORE constructing the
+    // Flight stream and returns a plain-text 404. cleanup() in
+    // finally still runs — no router leak.
+    const response = await request.get("/users/9999");
+
+    expect(response.status()).toBe(404);
+    expect(response.headers()["content-type"]).toContain("text/plain");
+    expect(await response.text()).toBe("Not Found");
+  });
+
+  test("Scenario 16b: Loader-driven HTTP — /__rsc?route=/users/9999 also returns 404 (Flight error path)", async ({
+    request,
+  }) => {
+    // Same typed-error path applies when navigating client-side via
+    // /__rsc — the handler catches LoaderNotFound and returns
+    // text/plain instead of a Flight stream. The client (App.tsx
+    // router.subscribe) sees a non-Flight content-type and can fall
+    // back to a hard navigation; what matters here is that the
+    // server-side semantics are correct.
+    const response = await request.get("/__rsc?route=/users/9999");
+
+    expect(response.status()).toBe(404);
+    expect(response.headers()["content-type"]).toContain("text/plain");
+    expect(await response.text()).toBe("Not Found");
+  });
+
   test("Scenario 16: Cache-Control on initial HTML response (per-route policy)", async ({
     request,
   }) => {

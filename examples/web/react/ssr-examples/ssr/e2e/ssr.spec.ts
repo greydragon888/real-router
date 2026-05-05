@@ -527,6 +527,65 @@ test.describe("SSR", () => {
     expect(homeEtag).not.toBe(usersEtag);
   });
 
+  test("Loader-driven HTTP: /users/9999 throws LoaderNotFound → 404 text/plain", async ({
+    request,
+  }) => {
+    // users.profile loader throws LoaderNotFound for missing ids;
+    // entry-server.tsx maps the typed error to
+    // { statusCode: 404, rawBody: "Not Found" }, so the response is
+    // 404 text/plain — NOT a hydrated HTML page with "user not found".
+    const response = await request.get("/users/9999");
+
+    expect(response.status()).toBe(404);
+    expect(response.headers()["content-type"]).toContain("text/plain");
+    expect(await response.text()).toBe("Not Found");
+  });
+
+  test("Loader-driven HTTP: /users/9999/posts also throws LoaderNotFound → 404", async ({
+    request,
+  }) => {
+    const response = await request.get("/users/9999/posts");
+
+    expect(response.status()).toBe(404);
+    expect(response.headers()["content-type"]).toContain("text/plain");
+    expect(await response.text()).toBe("Not Found");
+  });
+
+  test("Loader-driven HTTP: /legacy-user/2 throws LoaderRedirect → 301 Location: /users/2", async ({
+    request,
+  }) => {
+    const response = await request.get("/legacy-user/2", { maxRedirects: 0 });
+
+    expect(response.status()).toBe(301);
+    expect(response.headers().location).toBe("/users/2");
+  });
+
+  test("Loader-driven HTTP: /legacy-user/3 follows redirect → /users/3 hydrated profile", async ({
+    page,
+  }) => {
+    await page.goto("/legacy-user/3");
+
+    await expect(page).toHaveURL(/\/users\/3$/);
+    await expect(page.locator("main")).toContainText("ID: 3");
+  });
+
+  test("Loader-driven HTTP: /slow throws LoaderTimeout → 504 Gateway Timeout for full request", async ({
+    request,
+  }) => {
+    // /slow has a 5 s loader behind a 250 ms withTimeout race. When
+    // the client lets the request finish (no abort), withTimeout
+    // wins, throws LoaderTimeout, entry-server.tsx maps it to 504.
+    const startedAt = Date.now();
+    const response = await request.get("/slow");
+    const elapsed = Date.now() - startedAt;
+
+    expect(response.status()).toBe(504);
+    expect(response.headers()["content-type"]).toContain("text/plain");
+    expect(await response.text()).toBe("Gateway Timeout");
+    // Timeout fires at ~250 ms; total round-trip well under 5 s.
+    expect(elapsed).toBeLessThan(2500);
+  });
+
   test("AbortController: client disconnect mid-render fires the slow loader's abort listener", async ({
     request,
   }) => {

@@ -58,9 +58,28 @@ async function handler(request: Request): Promise<Response> {
       statusCode,
     });
   } catch (error) {
+    const code = (error as { code?: string } | null)?.code;
+
+    // Typed loader errors → plain-text Response with the right HTTP
+    // status. router.dispose() runs in the finally block so no leak
+    // regardless of which path we took.
+    if (code === "LOADER_NOT_FOUND") {
+      return new Response("Not Found", {
+        status: 404,
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      });
+    }
+
+    if (code === "LOADER_REDIRECT") {
+      const redirect = error as { target?: string; status?: number };
+
+      return new Response(null, {
+        status: redirect.status ?? 302,
+        headers: { Location: redirect.target ?? "/" },
+      });
+    }
+
     // Loader rejection → 500 + Server Component error page (no Flight, plain HTML).
-    // Caller can refine for specific routing-vs-loader error codes; for the
-    // example we show a generic message.
     const message = error instanceof Error ? error.message : "Unknown error";
     const html = `<!doctype html><html><body><div data-testid="server-error"><h1>Server Error</h1><p>${message}</p></div></body></html>`;
 

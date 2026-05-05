@@ -22,17 +22,29 @@ const userStore = new Map<string, User>([
   ],
 ]);
 
+// IDs that are explicitly treated as "not found" — used by Round Y
+// e2e tests to verify the typed-LoaderNotFound → 404 contract.
+// Other unknown ids are fabricated on demand (see findById fallback)
+// so per-request isolation tests can request /users/0…9 in parallel
+// without seeding the store.
+const EXPLICIT_MISSING_IDS = new Set(["9999"]);
+
 export const database = {
   users: {
-    findById: (id: string): Promise<User> =>
-      Promise.resolve(
+    findById: (id: string): Promise<User | undefined> => {
+      if (EXPLICIT_MISSING_IDS.has(id)) {
+        return Promise.resolve(undefined);
+      }
+
+      return Promise.resolve(
         userStore.get(id) ?? {
           id,
           name: `User ${id}`,
           email: `${id}@x.test`,
           role: "user",
         },
-      ),
+      );
+    },
     list: (filter?: { role?: "admin" | "user" }): Promise<User[]> => {
       const all = [...userStore.values()];
 

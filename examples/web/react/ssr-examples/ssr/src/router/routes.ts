@@ -42,7 +42,8 @@ export const routes = [
   // Demonstrates loader error propagation: this route's loader throws,
   // entry-server.tsx catches it and renders a 500 page.
   { name: "boom", path: "/boom" },
-  // Slow loader for AbortController demo — pulls signal via getDep
-  // and clears its setTimeout on client disconnect.
+  // Legacy redirect: loader throws LoaderRedirect → 301 + Location.
+  { name: "legacyUser", path: "/legacy-user/:id" },
+  // Slow loader for AbortController + LoaderTimeout demo.
   { name: "slow", path: "/slow" },
 ];

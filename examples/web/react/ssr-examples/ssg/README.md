@@ -76,6 +76,14 @@ pnpm preview      # Serve pre-rendered static files
 pnpm test:e2e     # Playwright tests (5 specs)
 ```
 
+## Loader-driven build: typed LoaderNotFound at build time
+
+`src/_loader-errors.ts` defines `LoaderNotFound`. The `users.profile` loader throws it for ids that aren't in the database. `scripts/ssg-build.ts` wraps every `render(url)` call in `try/catch` and pushes failures into a list; if any URL errored, the script exits with a non-zero code.
+
+This guards against a real failure mode: an id remains in `entries.ts` after the corresponding row is deleted from the database. Without the typed error, the loader would resolve `user: undefined`, the build would silently emit a "user not found" page for the stale id, and 404 would be served as a 200 with empty content. With it, the build aborts loudly.
+
+The contract is verified by an e2e test that imports the compiled `entry-server.js` and asserts `render('/users/9999')` rejects with `LoaderNotFound`.
+
 ## Production HTTP semantics: Cache-Control + auto-ETag (no AbortController)
 
 The SSG preview layer adds one production-grade piece, and inherits another for free:

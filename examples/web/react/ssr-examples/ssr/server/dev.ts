@@ -48,6 +48,8 @@ async function startServer(): Promise<void> {
           serializedData: string;
           statusCode: number;
           redirect: string | null;
+          rawBody?: string;
+          contentType?: string;
         }>;
       };
 
@@ -66,7 +68,19 @@ async function startServer(): Promise<void> {
       });
 
       if (result.redirect) {
-        response.redirect(result.redirect);
+        response.redirect(result.statusCode, result.redirect);
+
+        return;
+      }
+
+      if (result.rawBody !== undefined) {
+        response
+          .status(result.statusCode)
+          .set(
+            "Content-Type",
+            result.contentType ?? "text/plain; charset=utf-8",
+          )
+          .send(result.rawBody);
 
         return;
       }

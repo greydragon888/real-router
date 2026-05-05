@@ -108,6 +108,12 @@ function DataView({ promise }: { promise: Promise<Data> }) {
 }
 ```
 
+## Loader-driven HTTP: typed LoaderNotFound for unknown ids
+
+`src/_loader-errors.ts` defines `LoaderNotFound`. The `products.detail` loader throws it for ids not in the in-memory store; `entry-server.tsx` catches the typed error BEFORE constructing the stream and returns a plain-text 404 result. This fixes a leak in the previous design — a generic `throw new Error()` bubbled past the streaming pipeline's catch path, `cleanup()` was never called, and the per-request router was held until GC. Now the catch path always disposes (`finally` block in server).
+
+The error path bypasses the streaming pipeline entirely — `Transfer-Encoding: chunked` is absent, no `<Suspense>` fallback flicker, just a fast plain-text response. Verified by Scenario 11.
+
 ## Library Philosophy
 
 This example demonstrates Real-Router's library-first stance: **delegate to React 19 native primitives instead of inventing router-specific streaming APIs**. The `<Suspense>` boundary, `use(promise)`, and `renderToReadableStream` already form a complete streaming SSR contract — the router just provides per-request isolation and per-route critical data.

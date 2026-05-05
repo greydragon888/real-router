@@ -44,8 +44,25 @@ async function startDevServer(): Promise<void> {
         }
       });
 
-      const { stream, ssrJson, statusCode, cleanup } =
-        await module_.render(url);
+      const result = await module_.render(url);
+      const { ssrJson, statusCode, cleanup, stream, rawBody, contentType } =
+        result;
+
+      // Typed loader errors short-circuit to plain-text before stream
+      // construction — same path as production server.
+      if (rawBody !== undefined) {
+        response
+          .status(statusCode)
+          .set("Content-Type", contentType ?? "text/plain; charset=utf-8")
+          .send(rawBody);
+        cleanup();
+
+        return;
+      }
+
+      if (!stream) {
+        throw new Error("render() returned no stream and no rawBody");
+      }
 
       const ssrScript = `<script>window.__SSR_STATE__=${ssrJson}</script>`;
       const templateWithState = template.replace("<!--ssr-state-->", ssrScript);

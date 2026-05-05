@@ -54,6 +54,21 @@ async function startServer(): Promise<void> {
 
       cleanup = result.cleanup;
 
+      // Typed loader errors (LoaderNotFound) short-circuit before the
+      // stream is constructed — emit plain-text and skip pumping.
+      if (result.rawBody !== undefined) {
+        response
+          .status(result.statusCode)
+          .set("Content-Type", result.contentType ?? "text/plain; charset=utf-8")
+          .send(result.rawBody);
+
+        return;
+      }
+
+      if (!result.stream) {
+        throw new Error("render() returned no stream and no rawBody");
+      }
+
       const ssrScript = `<script>window.__SSR_STATE__=${result.ssrJson}</script>`;
       const templateWithState = template.replace("<!--ssr-state-->", ssrScript);
       const [headPart, footerPart] =
