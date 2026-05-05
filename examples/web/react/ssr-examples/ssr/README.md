@@ -15,19 +15,25 @@ Server-side rendering with Real-Router, React 19, Express, and Vite.
 
 ```
 server/
+  _auth.ts            Cookie → currentUser resolver (parses userId / legacy auth=1)
   dev.ts              Express + Vite dev middleware (HMR)
-  index.ts            Express production server (serves built assets)
+  index.ts            Express production server (sha256 ETag, Cache-Control, AbortController)
 src/
-  database.ts         In-memory mock store (single source of truth for users)
-  entry-server.tsx    render(url, context) → { html, serializedData, statusCode, redirect }
+  database.ts         In-memory mock store (single source of truth for users + posts)
+  entry-server.tsx    render(url, context) → { html, serializedData, statusCode, redirect, head, rawBody?, contentType? }
   entry-client.tsx    hydrateRouter() + hydrateRoot() with browser-plugin + ssr-data-plugin
   App.tsx             Shared component tree (server + client)
+  components/
+    SearchForm.tsx    useId-stable form labels (proves SSR/CSR id parity)
   router/
-    routes.ts         Route definitions with auth guard
-    loaders.ts        Per-route data loaders (consume database, write to state.context.data)
-    createAppRouter.ts  Router factory with dependency injection
+    routes.ts         Route definitions with auth + role guards (incl. legacyUser, slow)
+    loaders.ts        Per-route data loaders (typed errors via @real-router/ssr-data-plugin/errors)
+    createAppRouter.ts  Thin createRouter() wrapper that forwards deps as the third arg
+    meta.ts           Per-route PageMeta resolver (canonical absolute URL, og:title/description/url)
+    cache-policies.ts Per-URL Cache-Control mapping
   pages/
-    Home.tsx, UsersList.tsx, UserProfile.tsx, Dashboard.tsx, NotFound.tsx
+    Home.tsx, UsersList.tsx, UserProfile.tsx, UserPosts.tsx,
+    Dashboard.tsx, Admin.tsx, NotFound.tsx
 ```
 
 ## SSR Flow
@@ -78,7 +84,7 @@ React's useId emits IDs like `_R_u_` and `_R_uH1_` (internal format, stable per 
 
 ## Loader-driven HTTP: typed errors → 301/404/504
 
-`src/_loader-errors.ts` defines three named errors and a `withTimeout()` helper. Loaders throw them; `entry-server.tsx` catches by `code`, maps each to a `RenderResult` shape; `server/index.ts` emits the corresponding HTTP status:
+Typed loader errors live in `@real-router/ssr-data-plugin/errors` (hoisted from per-example `_loader-errors.ts` files in commit `e7ad413e`). The package exports `LoaderRedirect`, `LoaderNotFound`, `LoaderTimeout`, and a `withTimeout()` helper. Loaders throw them; `entry-server.tsx` catches by `code`, maps each to a `RenderResult` shape; `server/index.ts` emits the corresponding HTTP status:
 
 | Error `code`       | HTTP response                                |
 | ------------------ | -------------------------------------------- |
@@ -90,19 +96,28 @@ React's useId emits IDs like `_R_u_` and `_R_uH1_` (internal format, stable per 
 
 Demonstrated routes:
 - `/users/9999` → `LoaderNotFound("user:9999")` → 404 text/plain
-- `/users/9999/posts` → same path, leaf loader checks the same store
-- `/legacy-user/:id` → `LoaderRedirect("/users/:id", 301)` → 301 + Location
+- `/users/9999/posts` → leaf loader re-validates the parent user id; same `LoaderNotFound` path
+- `/legacy-user/:id` → `LoaderRedirect(\`/users/${id}\`, 301)` → 301 + Location (target is interpolated from params, not a template)
 - `/slow` → 5 s loader behind a 250 ms `withTimeout()` race → `LoaderTimeout` → 504
 
 Trade-offs: `withTimeout()` doesn't cancel the underlying loader work — only races the response. Pair with the `AbortController` wiring (next section) for production. The `slow` loader does both.
+
+## Auth + role gates
+
+Two layers of authorization, demonstrated end-to-end:
+
+- `/dashboard` — gated by `canActivate: () => getDep("currentUser") !== null`. Anonymous users get redirected to `/`. Verified by 2 e2e tests (anon → 302, authenticated → 200).
+- `/admin` — gated by a role-aware guard: `getDep("currentUser")?.role === "admin"`. Non-admin Bob (`userId=2`) gets a 302; admin Alice (`userId=1`) gets the admin page. Verified by 3 e2e tests (admin guard, non-admin redirect, dashboard allows non-admin).
+
+`server/_auth.ts` parses the `userId` cookie (or legacy `auth=1`) into a `CurrentUser` object on the server; `entry-client.tsx` mirrors the same logic over `document.cookie` so the post-hydration guard sees the same DI value as the SSR pass — otherwise client-side guard checks would diverge.
 
 ## Production HTTP semantics: ETag, Cache-Control, AbortController
 
 `server/index.ts` adds three production-grade pieces on top of the basic SSR wiring:
 
 - **Strong `ETag`** — sha256 of the final HTML bytes, truncated to 16 base64url chars. Identical inputs yield identical hashes; conditional GET (`If-None-Match`) returns `304 Not Modified` with an empty body. Distinct routes yield distinct ETags.
-- **Per-route `Cache-Control`** — `src/router/cache-policies.ts` maps URL paths to directives: `/` → `public, s-maxage=3600, must-revalidate`, `/users` → `public, max-age=60`, `/users/:id` → `public, max-age=120`, `/dashboard` and `/admin` → `private, no-store`, `/slow`/`/boom` → `no-store`.
-- **`AbortController` per request** — `req.on("close")` aborts the controller; the `slow` loader pulls the signal via `getDep("abortSignal")` and clears its `setTimeout`. Without this wiring a 5 s loader holds the worker even after the client gives up.
+- **Per-route `Cache-Control`** — `src/router/cache-policies.ts` maps URL paths to directives: `/` → `public, max-age=300, s-maxage=3600, must-revalidate`, `/users` → `public, max-age=60, must-revalidate`, `/users/:id` → `public, max-age=120, must-revalidate`, `/dashboard` and `/admin` → `private, no-store`, `/slow`/`/boom` → `no-store`.
+- **`AbortController` per request** — `req.on("close")` aborts the controller; `entry-server.tsx:91-95` forwards the signal into the per-request DI map via `cloneRouter(baseRouter, { currentUser, abortSignal })`. The `slow` loader retrieves it through `getDep("abortSignal")` and clears its `setTimeout`. Without this wiring a 5 s loader holds the worker even after the client gives up.
 
 Demonstrated by 4 dedicated tests in `e2e/ssr.spec.ts`.
 
