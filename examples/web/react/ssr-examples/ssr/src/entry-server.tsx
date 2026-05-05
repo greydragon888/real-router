@@ -8,6 +8,7 @@ import { renderToString } from "react-dom/server";
 import { App } from "./App";
 import { createAppRouter } from "./router/createAppRouter";
 import { loaders } from "./router/loaders";
+import { getMetaForState, type PageMeta } from "./router/meta";
 
 const baseRouter = createAppRouter();
 
@@ -30,6 +31,9 @@ export interface RenderResult {
   serializedData: string;
   statusCode: number;
   redirect: string | null;
+  /** Pre-rendered <head> markup (title + meta + canonical + og).
+   * Spliced into the <!--ssr-meta--> placeholder by server/index.ts. */
+  head: string;
   /** Pre-rendered body that bypasses the App template — used for typed
    * loader errors that surface as plain-text HTTP responses. */
   rawBody?: string;
@@ -49,6 +53,25 @@ interface MaybeError {
 
 function readErrorCode(error: unknown): string | undefined {
   return (error as MaybeError | null)?.code;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function renderHeadFor(meta: PageMeta): string {
+  return [
+    `<title>${escapeHtml(meta.title)}</title>`,
+    `<meta name="description" content="${escapeHtml(meta.description)}" />`,
+    `<link rel="canonical" href="${escapeHtml(meta.canonical)}" />`,
+    `<meta property="og:title" content="${escapeHtml(meta.ogTitle)}" />`,
+    `<meta property="og:description" content="${escapeHtml(meta.ogDescription)}" />`,
+    `<meta property="og:url" content="${escapeHtml(meta.canonical)}" />`,
+  ].join("\n    ");
 }
 
 function wrapInScript(json: string): string {
@@ -83,6 +106,11 @@ export async function render(
       </RouterProvider>,
     );
 
+    const meta = getMetaForState({
+      name: state.name,
+      params: state.params as Record<string, unknown>,
+    });
+
     // Hydration payload (#563): full server-resolved State (incl.
     // state.context.data from ssr-data-plugin). Client passes it to
     // hydrateRouter, which extracts state.path and calls router.start(path) —
@@ -93,13 +121,20 @@ export async function render(
       serializedData: wrapInScript(serializeRouterState(state)),
       statusCode,
       redirect: null,
+      head: renderHeadFor(meta),
     };
   } catch (error) {
     const code = readErrorCode(error);
 
     // Auth-guard rejection → 302 to home (UX-correct, not really an error).
     if (code === "CANNOT_ACTIVATE") {
-      return { html: "", serializedData: "", statusCode: 302, redirect: "/" };
+      return {
+        html: "",
+        serializedData: "",
+        statusCode: 302,
+        redirect: "/",
+        head: "",
+      };
     }
 
     if (code === "LOADER_REDIRECT") {
@@ -110,6 +145,7 @@ export async function render(
         serializedData: "",
         statusCode: redirect.status ?? 302,
         redirect: redirect.target ?? "/",
+        head: "",
       };
     }
 
@@ -119,6 +155,7 @@ export async function render(
         serializedData: "",
         statusCode: 404,
         redirect: null,
+        head: "",
         rawBody: "Not Found",
         contentType: "text/plain; charset=utf-8",
       };
@@ -130,6 +167,7 @@ export async function render(
         serializedData: "",
         statusCode: 504,
         redirect: null,
+        head: "",
         rawBody: "Gateway Timeout",
         contentType: "text/plain; charset=utf-8",
       };
@@ -143,6 +181,7 @@ export async function render(
       serializedData: "",
       statusCode: 500,
       redirect: null,
+      head: "",
     };
   } finally {
     router.dispose();

@@ -1,13 +1,14 @@
 import { database } from "../database";
 
-// Per-route metadata for the SSG pipeline. ssg-build.ts splices a
-// renderMetaBlock(meta) into the <!--ssr-meta--> placeholder of the
-// dist/index.html template before writing each static file.
+// Per-route metadata resolved at render time. The render() function
+// in entry-server.tsx inspects the matched router state, computes the
+// PageMeta block, and the express middleware splices it into the
+// `<!--ssr-meta-->` placeholder of the dist/client/index.html template.
 //
 // canonical is intentionally an ABSOLUTE URL — search engines and
-// social-media crawlers reject relative canonicals. The SITE_ORIGIN
-// env var (or fallback "https://example.com") prefixes the path.
-// og:title / og:description / og:url enable OpenGraph card previews.
+// social-media crawlers expect canonical to be absolute.
+// og:title / og:description / og:url enable OpenGraph card previews
+// when the page is shared to social platforms.
 
 export interface PageMeta {
   title: string;
@@ -29,25 +30,15 @@ function abs(path: string): string {
 }
 
 const DEFAULTS: PageMeta = {
-  title: "Real-Router — SSG Example",
-  description: "Static site generation demo with Real-Router and React 19.",
+  title: "Real-Router React SSR Example",
+  description:
+    "Server-side rendering with Real-Router and React 19 via Vite + Express.",
   canonical: SITE_ORIGIN,
-  ogTitle: "Real-Router SSG Example",
+  ogTitle: "Real-Router React SSR Example",
   ogDescription:
-    "Static site generation demo with Real-Router and React 19.",
+    "Server-side rendering with Real-Router and React 19 via Vite + Express.",
 };
 
-const NOT_FOUND_META: PageMeta = {
-  title: "Page Not Found — Real-Router SSG",
-  description: "The page you are looking for does not exist.",
-  canonical: abs("/404"),
-  ogTitle: "Page Not Found",
-  ogDescription: "The page you are looking for does not exist.",
-};
-
-// Resolve per-route meta tags from the resolved router state. Loaders' data
-// is already on state.context.data when this runs, so we can derive titles
-// from the actual rendered content (e.g. "User Alice — Profile").
 export function getMetaForState(state: {
   name: string;
   params: Record<string, unknown>;
@@ -55,20 +46,22 @@ export function getMetaForState(state: {
   switch (state.name) {
     case "home": {
       return {
-        title: "Home — Real-Router SSG",
-        description: "Welcome page of the Real-Router SSG demo.",
+        title: "Home — Real-Router React SSR",
+        description: "Welcome to the Real-Router React SSR example.",
         canonical: abs("/"),
         ogTitle: "Home",
-        ogDescription: "Welcome page of the Real-Router SSG demo.",
+        ogDescription: "Welcome to the Real-Router React SSR example.",
       };
     }
     case "users": {
+      const sort = state.params.sort === "desc" ? "desc" : "asc";
+
       return {
-        title: "All Users — Real-Router SSG",
-        description: "Browse the full list of pre-rendered users.",
+        title: `All Users (sorted ${sort}) — Real-Router React SSR`,
+        description: `Browse the user list, sorted ${sort}.`,
         canonical: abs("/users"),
         ogTitle: "All Users",
-        ogDescription: "Browse the full list of pre-rendered users.",
+        ogDescription: `Browse the user list, sorted ${sort}.`,
       };
     }
     case "users.profile": {
@@ -77,10 +70,8 @@ export function getMetaForState(state: {
       const name = user?.name ?? "Unknown user";
 
       return {
-        title: `${name} — Real-Router SSG`,
+        title: `${name} — Real-Router React SSR`,
         description: `Profile page for ${name} (id: ${id ?? "?"}).`,
-        // canonical is per-id (NOT the parent /users URL) — verifies
-        // each profile has its own canonical for SEO.
         canonical: abs(`/users/${id ?? ""}`),
         ogTitle: name,
         ogDescription: `Profile page for ${name}.`,
@@ -92,11 +83,29 @@ export function getMetaForState(state: {
       const name = user?.name ?? "Unknown user";
 
       return {
-        title: `${name}'s posts — Real-Router SSG`,
+        title: `${name}'s posts — Real-Router React SSR`,
         description: `Posts authored by ${name}.`,
         canonical: abs(`/users/${id ?? ""}/posts`),
         ogTitle: `${name}'s posts`,
         ogDescription: `Posts authored by ${name}.`,
+      };
+    }
+    case "dashboard": {
+      return {
+        title: "Dashboard — Real-Router React SSR",
+        description: "Authenticated dashboard.",
+        canonical: abs("/dashboard"),
+        ogTitle: "Dashboard",
+        ogDescription: "Authenticated dashboard.",
+      };
+    }
+    case "admin": {
+      return {
+        title: "Admin — Real-Router React SSR",
+        description: "Admin-only area.",
+        canonical: abs("/admin"),
+        ogTitle: "Admin",
+        ogDescription: "Admin-only area.",
       };
     }
     default: {
@@ -104,5 +113,3 @@ export function getMetaForState(state: {
     }
   }
 }
-
-export { NOT_FOUND_META };

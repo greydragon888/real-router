@@ -1,4 +1,11 @@
+import { existsSync, readdirSync, statSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { test, expect } from "@playwright/test";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const DIST_ROOT = path.resolve(__dirname, "../dist");
 
 test.describe("SSG", () => {
   test("static HTML contains pre-rendered home page", async ({ browser }) => {
@@ -287,6 +294,153 @@ test.describe("SSG", () => {
         );
       }),
     );
+  });
+
+  test("Nested SSG: /users/:id/posts gets its own pre-rendered HTML with loader data", async ({
+    request,
+  }) => {
+    // entries.ts emits one URL per id for both `users.profile` and
+    // `users.profile.posts`. The build script writes
+    // dist/users/<id>/posts/index.html for each. Alice has 2 posts;
+    // they must appear in the static HTML before any JS runs.
+    const response = await request.get("/users/1/posts/");
+    const html = await response.text();
+
+    expect(response.status()).toBe(200);
+    expect(html).toContain('data-testid="user-posts"');
+    expect(html).toContain("Hello world");
+    expect(html).toContain("On routing");
+  });
+
+  test("Nested SSG empty state: /users/3/posts ships empty-posts UI (Charlie has no posts)", async ({
+    request,
+  }) => {
+    // database/loaders.ts: Charlie (id "3") authored zero posts. The
+    // posts loader resolves with `posts: []`; UserPosts.tsx empty-state
+    // branch renders. Verifies the build doesn't skip empty arrays.
+    const response = await request.get("/users/3/posts/");
+    const html = await response.text();
+
+    expect(response.status()).toBe(200);
+    expect(html).toContain('data-testid="user-posts-empty"');
+    expect(html).toContain("No posts yet.");
+    expect(html).not.toContain("Hello world");
+  });
+
+  test("canonical + OpenGraph: each pre-rendered route ships SEO-ready tags", async ({
+    request,
+  }) => {
+    // Each profile gets a per-id canonical URL (NOT the parent
+    // /users URL) and matching og:url. Without per-page canonicals,
+    // search engines collapse all profile pages to one.
+    const response = await request.get("/users/2/");
+    const html = await response.text();
+
+    expect(html).toMatch(
+      /<link rel="canonical" href="https:\/\/example\.com\/users\/2"\s*\/?>/,
+    );
+    expect(html).toMatch(
+      /<meta property="og:url" content="https:\/\/example\.com\/users\/2"\s*\/?>/,
+    );
+    expect(html).toMatch(/<meta property="og:title" content="Bob"\s*\/?>/);
+    expect(html).toMatch(
+      /<meta property="og:description" content="Profile page for Bob\."\s*\/?>/,
+    );
+  });
+
+  test("canonical for profile is per-id (not the parent /users URL)", async ({
+    request,
+  }) => {
+    const aliceResponse = await request.get("/users/1/");
+    const aliceCanonical = /<link rel="canonical" href="([^"]+)"/.exec(
+      await aliceResponse.text(),
+    )?.[1];
+
+    const bobResponse = await request.get("/users/2/");
+    const bobCanonical = /<link rel="canonical" href="([^"]+)"/.exec(
+      await bobResponse.text(),
+    )?.[1];
+
+    expect(aliceCanonical).toBe("https://example.com/users/1");
+    expect(bobCanonical).toBe("https://example.com/users/2");
+    expect(aliceCanonical).not.toBe(bobCanonical);
+  });
+
+  test("filesystem layout: dist contains exactly one index.html per pre-rendered route + nested posts pages", async () => {
+    // Walks dist/ on disk and verifies the EXACT set of pre-rendered
+    // HTML files. Catches accidental regressions like
+    // (a) entries.ts ids no longer in the database (extra dirs),
+    // (b) a route added without an entry (missing dirs),
+    // (c) the build script writing files outside the expected layout.
+    const expected = new Set([
+      "index.html",
+      "users/index.html",
+      "users/1/index.html",
+      "users/2/index.html",
+      "users/3/index.html",
+      "users/1/posts/index.html",
+      "users/2/posts/index.html",
+      "users/3/posts/index.html",
+      "404.html",
+    ]);
+
+    function walk(dir: string, prefix: string): string[] {
+      const out: string[] = [];
+
+      for (const entry of readdirSync(dir)) {
+        const full = path.join(dir, entry);
+        const rel = prefix ? `${prefix}/${entry}` : entry;
+
+        if (statSync(full).isDirectory()) {
+          if (entry === "assets" || entry === "server") continue;
+          out.push(...walk(full, rel));
+        } else if (entry.endsWith(".html")) {
+          out.push(rel);
+        }
+      }
+
+      return out;
+    }
+
+    const actual = new Set(walk(DIST_ROOT, ""));
+
+    expect(actual).toEqual(expected);
+  });
+
+  test("overfetch protection: only ids declared in entries.ts are pre-rendered", async () => {
+    const dirs = readdirSync(path.resolve(DIST_ROOT, "users"))
+      .filter((entry) =>
+        statSync(path.resolve(DIST_ROOT, "users", entry)).isDirectory(),
+      )
+      .sort();
+
+    expect(dirs).toEqual(["1", "2", "3"]);
+  });
+
+  test("sitemap.xml matches the on-disk pre-rendered set (no extras, no missing)", async ({
+    request,
+  }) => {
+    // Drift between sitemap and on-disk is worse than failing the
+    // build: it ships a broken contract to crawlers.
+    const response = await request.get("/sitemap.xml");
+    const xml = await response.text();
+    const urls = [...xml.matchAll(/<loc>https:\/\/example\.com(\/[^<]*)<\/loc>/g)]
+      .map((m) => m[1] as string);
+
+    for (const url of urls) {
+      const filePath =
+        url === "/"
+          ? path.resolve(DIST_ROOT, "index.html")
+          : path.resolve(DIST_ROOT, url.slice(1), "index.html");
+
+      expect(
+        existsSync(filePath),
+        `sitemap claims ${url} exists, but ${filePath} is missing`,
+      ).toBe(true);
+    }
+
+    // 1 home + 1 users + 3 profiles + 3 posts = 8.
+    expect(urls).toHaveLength(8);
   });
 
   test("Loader-driven build: render() throws LoaderNotFound for an id absent from the database (catches stale entries.ts entries at build time)", async () => {

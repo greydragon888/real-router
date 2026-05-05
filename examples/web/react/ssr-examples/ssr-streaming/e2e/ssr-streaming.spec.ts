@@ -258,6 +258,51 @@ test.describe("Streaming SSR Example", () => {
     expect(html).toContain('data-related-id="k2"');
   });
 
+  test("Scenario 15: createPortal — initially closed modal contributes zero markup to streamed HTML, but the portal target node exists", async ({
+    request,
+  }) => {
+    // ProductSpecsModal uses React's createPortal with a `mounted`
+    // gate (useEffect flips it post-hydration). SSR ships only the
+    // trigger button — dialog markup is NOT in the streamed HTML.
+    // #modal-target lives in index.html so the client portal has a
+    // target to attach to after open.
+    const response = await request.get("/products/1");
+    const html = await response.text();
+
+    expect(response.status()).toBe(200);
+    expect(html).toContain('id="modal-target"');
+    expect(html).toContain('data-testid="open-specs-modal"');
+    expect(html).not.toContain('data-testid="specs-modal"');
+  });
+
+  test("Scenario 16: createPortal — opening the modal mounts content into #modal-target, NOT inside #root", async ({
+    page,
+  }) => {
+    // Verifies the portal contract: when the user opens the modal,
+    // the dialog DOM is attached to #modal-target (a sibling of
+    // #root), not as a descendant of the article that contains the
+    // <ProductSpecsModal> usage. This is the core createPortal
+    // behaviour — declared in one tree, rendered in another.
+    await page.goto("/products/1");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByTestId("specs-modal")).toHaveCount(0);
+
+    await page.getByTestId("open-specs-modal").click();
+
+    await expect(page.getByTestId("specs-modal")).toBeVisible();
+
+    const insideTarget = await page
+      .locator("#modal-target [data-testid='specs-modal']")
+      .count();
+    expect(insideTarget).toBe(1);
+
+    const insideRoot = await page
+      .locator("#root [data-testid='specs-modal']")
+      .count();
+    expect(insideRoot).toBe(0);
+  });
+
   test("Scenario 11: Loader-driven HTTP — /products/999 throws LoaderNotFound → 404 text/plain (no streaming for the error path)", async ({
     request,
   }) => {

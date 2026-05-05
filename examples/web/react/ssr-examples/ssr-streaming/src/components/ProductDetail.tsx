@@ -1,6 +1,7 @@
 import { useRoute } from "@real-router/react";
 import { Suspense } from "react";
 
+import { ProductSpecsModal } from "./ProductSpecsModal";
 import { RelatedItems } from "./RelatedItems";
 import { Reviews } from "./Reviews";
 import { ReviewsErrorBoundary } from "./ReviewsErrorBoundary";
@@ -23,6 +24,8 @@ export function ProductDetail(): ReactElement {
       <h1 data-testid="product-name">{product.name}</h1>
       <p data-testid="product-price">${product.price}</p>
       <p data-testid="product-description">{product.description}</p>
+
+      <ProductSpecsModal productId={product.id} productName={product.name} />
 
       <ReviewsErrorBoundary>
         <Suspense

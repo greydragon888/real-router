@@ -475,6 +475,85 @@ test.describe("SSR", () => {
     await expect(page.locator("main")).toContainText("Dashboard");
   });
 
+  test("Per-route meta: home title + description appear in raw SSR HTML head", async ({
+    request,
+  }) => {
+    // entry-server.tsx computes PageMeta from the matched router state
+    // and renderHeadFor() builds the <head> markup that's spliced
+    // into the <!--ssr-meta--> placeholder. The home meta block is
+    // baked into the wire HTML before any JS runs.
+    const response = await request.get("/");
+    const html = await response.text();
+
+    expect(html).toContain("<title>Home — Real-Router React SSR</title>");
+    expect(html).toContain(
+      'name="description" content="Welcome to the Real-Router React SSR example."',
+    );
+  });
+
+  test("Per-route meta: /users meta reflects the active sort param", async ({
+    request,
+  }) => {
+    // getMetaForState() reads state.params.sort and folds it into the
+    // title — proves meta is computed from the resolved router state.
+    const ascResponse = await request.get("/users");
+    const ascHtml = await ascResponse.text();
+
+    expect(ascHtml).toContain("All Users (sorted asc)");
+
+    const descResponse = await request.get("/users?sort=desc");
+    const descHtml = await descResponse.text();
+
+    expect(descHtml).toContain("All Users (sorted desc)");
+  });
+
+  test("Per-route meta: /users/:id includes the user's name in title and og:title", async ({
+    request,
+  }) => {
+    const response = await request.get("/users/1");
+    const html = await response.text();
+
+    expect(html).toContain("<title>Alice — Real-Router React SSR</title>");
+    expect(html).toMatch(/<meta property="og:title" content="Alice"\s*\/?>/);
+  });
+
+  test("Per-route meta: canonical is an absolute URL prefixed with SITE_ORIGIN", async ({
+    request,
+  }) => {
+    // canonical must be absolute (search engines and crawlers
+    // reject relative canonicals). The default SITE_ORIGIN is
+    // "https://example.com". og:url mirrors canonical.
+    const response = await request.get("/users/2");
+    const html = await response.text();
+
+    expect(html).toMatch(
+      /<link rel="canonical" href="https:\/\/example\.com\/users\/2"\s*\/?>/,
+    );
+    expect(html).toMatch(
+      /<meta property="og:url" content="https:\/\/example\.com\/users\/2"\s*\/?>/,
+    );
+  });
+
+  test("Per-route meta: og:description carries route-specific copy (not the default fallback)", async ({
+    request,
+  }) => {
+    // Smoke-test that distinct routes produce distinct og:description
+    // values — guards against accidental fallthrough to DEFAULTS.
+    const homeResponse = await request.get("/");
+    const homeHtml = await homeResponse.text();
+
+    const profileResponse = await request.get("/users/1");
+    const profileHtml = await profileResponse.text();
+
+    const homeOg = /og:description" content="([^"]+)"/.exec(homeHtml)?.[1];
+    const profileOg = /og:description" content="([^"]+)"/.exec(profileHtml)?.[1];
+
+    expect(homeOg).toBeDefined();
+    expect(profileOg).toBeDefined();
+    expect(homeOg).not.toBe(profileOg);
+    expect(profileOg).toContain("Alice");
+  });
+
   test("Cache-Control: per-route policy from cache-policies.ts (public for users list, no-store for admin redirect)", async ({
     request,
   }) => {

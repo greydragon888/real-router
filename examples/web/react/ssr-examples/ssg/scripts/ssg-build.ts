@@ -13,6 +13,14 @@ const SITE_ORIGIN =
 
 const template = readFileSync(path.resolve(dist, "index.html"), "utf8");
 
+interface MetaTags {
+  title: string;
+  description: string;
+  canonical: string;
+  ogTitle: string;
+  ogDescription: string;
+}
+
 const { render, getStaticPaths } = (await import(
   path.resolve(root, "dist/server/entry-server.js")
 )) as {
@@ -20,15 +28,10 @@ const { render, getStaticPaths } = (await import(
     html: string;
     ssrJson: string;
     statusCode: number;
-    meta: { title: string; description: string };
+    meta: MetaTags;
   }>;
   getStaticPaths: () => Promise<string[]>;
 };
-
-interface MetaTags {
-  title: string;
-  description: string;
-}
 
 function escapeHtml(value: string): string {
   return value
@@ -39,7 +42,14 @@ function escapeHtml(value: string): string {
 }
 
 function renderMetaBlock(meta: MetaTags): string {
-  return `<title>${escapeHtml(meta.title)}</title>\n    <meta name="description" content="${escapeHtml(meta.description)}" />`;
+  return [
+    `<title>${escapeHtml(meta.title)}</title>`,
+    `<meta name="description" content="${escapeHtml(meta.description)}" />`,
+    `<link rel="canonical" href="${escapeHtml(meta.canonical)}" />`,
+    `<meta property="og:title" content="${escapeHtml(meta.ogTitle)}" />`,
+    `<meta property="og:description" content="${escapeHtml(meta.ogDescription)}" />`,
+    `<meta property="og:url" content="${escapeHtml(meta.canonical)}" />`,
+  ].join("\n    ");
 }
 
 function renderPage(
@@ -60,9 +70,19 @@ function renderPage(
     .replace("<!--ssr-state-->", ssrScript);
 }
 
-// getStaticPaths returns only leaf routes. The non-leaf parent `users`
-// (UsersList) is also a meaningful page, so include `/users` manually.
-const paths = [...(await getStaticPaths()), "/users"];
+// `getStaticPaths` enumerates leaf routes only — it returns
+// `/users/<id>/posts` for nested routes, but skips the intermediate
+// `/users/<id>` profile pages (which have a child `posts`). Add them
+// explicitly so each user has both a profile page and a posts page.
+// `/users` (the parent UsersList route) is also not a leaf and is
+// added manually.
+const leafPaths = await getStaticPaths();
+const profilePaths = leafPaths
+  .map((p) => p.replace(/\/posts$/, ""))
+  .filter((p) => /\/users\/[^/]+$/.test(p));
+const paths = Array.from(
+  new Set<string>([...leafPaths, ...profilePaths, "/users"]),
+);
 
 console.log(`Pre-rendering ${paths.length} routes...`);
 

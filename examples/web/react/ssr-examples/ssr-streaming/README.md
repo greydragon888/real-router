@@ -108,6 +108,17 @@ function DataView({ promise }: { promise: Promise<Data> }) {
 }
 ```
 
+## `createPortal` modal — React-native portal pattern
+
+`src/components/ProductSpecsModal.tsx` demonstrates React's `createPortal`: a button declared inside `<ProductDetail>` that mounts its dialog into `#modal-target` (a sibling of `#root` in `index.html`), not inside the article that hosts the trigger. Standard portal pattern — declared in one tree, rendered in another.
+
+The implementation uses a `mounted` state gate (`useState(false)` + `useEffect(() => setMounted(true), [])`) to defer portal rendering until after hydration. Reasons:
+
+1. SSR cannot render portals — the target DOM node doesn't exist (we render to a string). React 19 skips portal output during `renderToReadableStream`, but the hydration walker would mismatch if the dialog were conditionally rendered based on a state that flips post-hydration.
+2. With `mounted` gate, SSR ships only the trigger button. Hydration completes without warnings. User clicks → `setOpen(true)` → React calls `createPortal(...)` with the live DOM node and the dialog appears in `#modal-target`.
+
+Verified by Scenarios 15 (closed modal contributes zero markup to streamed HTML, `#modal-target` host node exists from `index.html`) and 16 (after click, dialog lives inside `#modal-target` and **not** inside `#root`).
+
 ## Loader-driven HTTP: typed LoaderNotFound for unknown ids
 
 `src/_loader-errors.ts` defines `LoaderNotFound`. The `products.detail` loader throws it for ids not in the in-memory store; `entry-server.tsx` catches the typed error BEFORE constructing the stream and returns a plain-text 404 result. This fixes a leak in the previous design — a generic `throw new Error()` bubbled past the streaming pipeline's catch path, `cleanup()` was never called, and the per-request router was held until GC. Now the catch path always disposes (`finally` block in server).

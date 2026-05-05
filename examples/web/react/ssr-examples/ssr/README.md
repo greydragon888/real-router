@@ -64,6 +64,12 @@ pnpm preview      # Production server
 pnpm test:e2e     # Playwright tests
 ```
 
+## Per-route meta with canonical/og
+
+`src/router/meta.ts` resolves a `PageMeta` block (`title`, `description`, `canonical`, `ogTitle`, `ogDescription`) from the matched router state. `entry-server.tsx` calls `renderHeadFor(meta)` to produce the `<head>` markup; the server splices it into the `<!--ssr-meta-->` placeholder of the template before sending the response. canonical URLs are absolute (prefixed with `SITE_ORIGIN`, defaulting to `https://example.com`) — search engines and social-media crawlers reject relative canonicals.
+
+5 e2e tests verify: home title/description in raw SSR HTML, sort-param interpolation, name in profile title + og:title, absolute canonical, distinct og:description per route.
+
 ## Loader-driven HTTP: typed errors → 301/404/504
 
 `src/_loader-errors.ts` defines three named errors and a `withTimeout()` helper. Loaders throw them; `entry-server.tsx` catches by `code`, maps each to a `RenderResult` shape; `server/index.ts` emits the corresponding HTTP status:

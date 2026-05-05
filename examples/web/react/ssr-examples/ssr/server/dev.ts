@@ -48,6 +48,7 @@ async function startServer(): Promise<void> {
           serializedData: string;
           statusCode: number;
           redirect: string | null;
+          head: string;
           rawBody?: string;
           contentType?: string;
         }>;
@@ -86,6 +87,7 @@ async function startServer(): Promise<void> {
       }
 
       const page = template
+        .replace("<!--ssr-meta-->", result.head)
         .replace("<!--ssr-outlet-->", result.html)
         .replace("<!--ssr-state-->", result.serializedData);
 
