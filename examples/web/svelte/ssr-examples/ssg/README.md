@@ -20,16 +20,28 @@
 
 ```
 Build time (scripts/ssg-build.ts):
-  for each url in getStaticPaths(router) ∪ ["/users"]:
+  leafPaths    = getStaticPaths(router)              # leaves only:
+                                                     #   /, /users/<id>/posts × 3
+  profilePaths = derive(/users/<id>/posts → /users/<id>)
+  paths        = unique(leafPaths ∪ profilePaths ∪ ["/users"])  # 8 URLs
+
+  for each url in paths:
     cloneRouter(base) + ssr-data-plugin
       → start(url)
       → await render(App, { props: { router } })
-      → meta.ts(state)        → <title> + <meta description> via <!--ssr-meta-->
+      → meta.ts(state)        → <title>, description, canonical,
+                                 og:type/title/description/url/image,
+                                 twitter:card  via <!--ssr-meta-->
       → render output `head`  → injected via <!--ssr-head--> (covers <svelte:head>)
       → serializeRouterState(state) → window.__SSR_STATE__ inline script
       → write dist/<path>/index.html
-  + dist/404.html (static not-found template)
-  + dist/sitemap.xml
+      → router.dispose()                              # finally, per-URL clone
+  + dist/404.html (rendered from /__nonexistent — no __SSR_STATE__)
+  + dist/sitemap.xml (8 URLs with absolute SITE_ORIGIN prefix)
+
+  If any render() threw, the script collects failures and exits 1
+  — fail-fast guard against stale entries.ts ids producing silent 200s.
+  (Currently dormant — see "Loader contract" below.)
 
 Client (initial visit to a pre-rendered URL):
   createAppRouter()
@@ -45,19 +57,55 @@ Client (vite dev mode):
     → mount(...)                                    # firstElementChild is null in dev
 ```
 
+## Output
+
+```
+dist/
+  index.html              ← /
+  404.html                ← not-found template (no __SSR_STATE__);
+                            host platforms (Netlify/Vercel/CF Pages) auto-serve
+                            this for unknown paths
+  sitemap.xml             ← all 8 pre-rendered URLs with absolute SITE_ORIGIN
+  users/
+    index.html            ← /users
+    1/
+      index.html          ← /users/1
+      posts/
+        index.html        ← /users/1/posts (Alice — 2 posts)
+    2/
+      index.html          ← /users/2
+      posts/
+        index.html        ← /users/2/posts (Bob — 1 post)
+    3/
+      index.html          ← /users/3
+      posts/
+        index.html        ← /users/3/posts (Charlie — empty-state UI)
+  assets/
+    index-*.js            ← client bundle (shared across all pages)
+```
+
 ## Svelte-Specific Gotchas
 
 - **`hydrate` ≠ `mount` in Svelte 5.** Both live in `svelte`; they are different functions. `hydrate(App, { target, props })` claims existing DOM, `mount(App, { target, props })` mounts fresh. There is **no** `mount({ hydrate: true })` option in Svelte 5 — that's the deprecated Svelte 4 compat surface via `asClassComponent`. The dual-mode mount branches explicitly: `rootElement.firstElementChild ? hydrate(...) : mount(...)`
 - **Per-pre-rendered file `head` injection.** The build script splices the `head` field returned by `render()` into the `<!--ssr-head-->` placeholder of every page so per-page meta from `<svelte:head>` survives.
 - **`<Lazy>` ≠ SSR data.** `<Lazy>` uses `$effect` to start its loader, and `$effect` does not fire on the server — the SSR/SSG output renders **only** the fallback. For pre-rendered data, use `state.context.data` (via `ssr-data-plugin`)
+- **Loaders are tolerant, not strict.** Like Solid SSG (and unlike Vue/React/Angular siblings), the Svelte loaders return `user: undefined` for unknown ids instead of throwing `LoaderNotFound` from `@real-router/ssr-data-plugin/errors`. Pages handle the undefined branch in their snippet templates. The fail-fast guard in `ssg-build.ts` (collects `failed[]`, `process.exit(1)` on non-empty) is therefore dormant in this example — but available for production setups that adopt the typed-error path
+- **Snippet-driven `<RouteView>`.** Svelte 5's `<RouteView>` renders matched routes via `{#snippet name()}{/snippet}` blocks rather than component instances. `App.svelte` ships top-level snippets for `home`, `users`, `notFound`; `UserProfile.svelte` embeds a nested `<RouteView nodeName="users.profile">` with a `posts` snippet that renders `<UserPosts />`. There is no top-level `users.profile.posts` snippet in `App.svelte` — nesting is local to the parent component
 
 ## Run
 
 ```bash
-pnpm dev          # vite dev server (no SSG, client-only render)
-pnpm build:app    # svelte-check + vite client + vite ssr + tsx scripts/ssg-build.ts
-pnpm preview      # vite preview (serves dist/ statically with the ssgServe redirect plugin)
-pnpm test:e2e     # Playwright
+pnpm dev                            # vite dev server (no SSG, client-only render)
+                                    # `predev` hook runs `pnpm turbo run bundle --filter=...`
+                                    # so workspace deps are rebuilt before vite starts.
+SITE_ORIGIN=https://your.site \
+  pnpm build:app                    # svelte-check + vite client + vite ssr + tsx scripts/ssg-build.ts
+                                    # SITE_ORIGIN env var sets canonical URLs +
+                                    # sitemap origins (default: https://example.com).
+pnpm preview                        # vite preview — ssgServe() adds 301 trailing-slash
+                                    # redirects only; no Cache-Control / ETag overrides
+                                    # (unlike Vue/React siblings — see "E2e Coverage" below).
+pnpm test:e2e                       # Playwright
 ```
 
 ## Limitations and Trade-offs
@@ -80,6 +128,18 @@ pnpm test:e2e     # Playwright
 - **Canonical + OpenGraph**: `rel=canonical`, `og:type/title/description/url/image`, `twitter:card` per route (incl. nested posts pages with `og:type=article`)
 - **Per-id canonical**: `users/1/index.html` has `canonical=https://example.com/users/1`, `users/3/index.html` has `https://example.com/users/3` — not the parent `/users` URL
 - **Sitemap ↔ filesystem cross-check**: every `<loc>` in `sitemap.xml` matches a generated file, no extras and nothing missing
+
+**Not present in Svelte (vs Vue/React siblings):** `Cache-Control` + weak-ETag tests. Svelte `vite.config.ts` has no `getCachePolicy` — `ssgServe()` is redirect-only. Adding cache policies (and the corresponding e2e) is a follow-up; pattern lives in `examples/web/vue/ssr-examples/ssg/vite.config.ts`. Same divergence as Solid SSG.
+
+## Key Packages
+
+- `@real-router/core` — `createRouter()` + base router types
+- `@real-router/core/api` — `cloneRouter()` (subpath, NOT root export)
+- `@real-router/core/utils` — `getStaticPaths()`, `serializeRouterState()`, `hydrateRouter()`
+- `@real-router/ssr-data-plugin` — per-route data loading at build time
+- `@real-router/ssr-data-plugin/errors` — typed loader errors (currently unused here; available for strict mode)
+- `@real-router/svelte` — `RouterProvider`, `RouteView`, `Link`, `useRoute`
+- `@real-router/browser-plugin` — client-side URL sync after hydration
 
 ## See Also
 
