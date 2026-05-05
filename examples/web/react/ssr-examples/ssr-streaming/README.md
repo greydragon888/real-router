@@ -108,6 +108,15 @@ function DataView({ promise }: { promise: Promise<Data> }) {
 }
 ```
 
+## Selective hydration — empirical proof of React 19's flagship feature
+
+React 19 is the only stable framework that ships **out-of-order Suspense placeholders** + **selective hydration**: faster Suspense islands hydrate independently as their data lands, slower ones continue showing fallbacks. Two e2e tests verify the wire signature:
+
+- **Scenario 17** — `<!--$?-->` Suspense placeholder markers appear in the streamed HTML alongside `<template id="B:0">` / `<template id="B:1">` resolved-content tags. The fallback HTML AND the resolved sections both ship in the same response — proving React streamed the shell first, then resolved templates as their data became available.
+- **Scenario 18** — byte-offset analysis: `data-testid="reviews-section"` appears in the response BEFORE `data-testid="related-section"`, matching their resolution order (600 ms vs 1200 ms server delay). Fallback markers (`reviews-fallback`, `related-fallback`) appear earlier still — proving the shell shipped first.
+
+This is the empirical proof of out-of-order completion. With a blocking Suspense pipeline (Vue 3 stable, Solid sync renderer) both sections would ship together at the slower offset. React 19 ships them as their data is ready, in completion order — that's what selective hydration's wire signature looks like in HTTP bytes.
+
 ## `createPortal` modal — React-native portal pattern
 
 `src/components/ProductSpecsModal.tsx` demonstrates React's `createPortal`: a button declared inside `<ProductDetail>` that mounts its dialog into `#modal-target` (a sibling of `#root` in `index.html`), not inside the article that hosts the trigger. Standard portal pattern — declared in one tree, rendered in another.

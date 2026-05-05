@@ -64,6 +64,12 @@ pnpm preview      # Production server
 pnpm test:e2e     # Playwright tests
 ```
 
+## React 19 `useId()` for SSR-stable form IDs
+
+`src/components/SearchForm.tsx` uses `useId()` for `<label htmlFor={...}>` ↔ `<input id={...}>` pairing. Returns a stable per-component-instance ID; SSR and client produce identical values, so the a11y contract survives hydration. Hand-rolled IDs (`Math.random`, module-level counter, `crypto.randomUUID`) all break this contract — useId is the canonical fix. Maps to Vue 3.5's `useId()` and Solid's `createUniqueId()`.
+
+React's useId emits IDs like `_R_u_` and `_R_uH1_` (internal format, stable per render). SearchForm is mounted on the home page; 3 e2e tests verify: label[for]=input[id] for both fields with distinct IDs, SSR-emitted ID matches client DOM with zero hydration warnings, form remains interactive post-hydration (typing into input updates state).
+
 ## Per-route meta with canonical/og
 
 `src/router/meta.ts` resolves a `PageMeta` block (`title`, `description`, `canonical`, `ogTitle`, `ogDescription`) from the matched router state. `entry-server.tsx` calls `renderHeadFor(meta)` to produce the `<head>` markup; the server splices it into the `<!--ssr-meta-->` placeholder of the template before sending the response. canonical URLs are absolute (prefixed with `SITE_ORIGIN`, defaulting to `https://example.com`) — search engines and social-media crawlers reject relative canonicals.

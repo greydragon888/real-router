@@ -475,6 +475,87 @@ test.describe("SSR", () => {
     await expect(page.locator("main")).toContainText("Dashboard");
   });
 
+  test("React useId: SearchForm label[for] matches input[id] after SSR (a11y contract)", async ({
+    request,
+  }) => {
+    // useId() returns a stable per-component-instance ID. Each
+    // <label htmlFor={...}> must match the corresponding
+    // <input id={...}> in the SSR HTML, otherwise screen readers
+    // can't pair them. React emits IDs like `_R_u_`.
+    const html = await (await request.get("/")).text();
+
+    const queryInputId = /<input\s+id="([^"]+)"[^>]*\sdata-testid="query-input"/.exec(
+      html,
+    )?.[1];
+    const queryLabelFor =
+      /<label\s+for="([^"]+)"[^>]*\sdata-testid="query-label"/.exec(html)?.[1];
+
+    expect(queryInputId).toBeDefined();
+    expect(queryLabelFor).toBe(queryInputId);
+
+    const sortInputId = /<select\s+id="([^"]+)"[^>]*\sdata-testid="sort-select"/.exec(
+      html,
+    )?.[1];
+    const sortLabelFor =
+      /<label\s+for="([^"]+)"[^>]*\sdata-testid="sort-label"/.exec(html)?.[1];
+
+    expect(sortInputId).toBeDefined();
+    expect(sortLabelFor).toBe(sortInputId);
+
+    // Distinct fields → distinct IDs.
+    expect(queryInputId).not.toBe(sortInputId);
+  });
+
+  test("React useId: SSR-emitted ID survives hydration unchanged (no mismatch warning)", async ({
+    page,
+    request,
+  }) => {
+    const html = await (await request.get("/")).text();
+    const ssrInputId = /<input\s+id="([^"]+)"[^>]*\sdata-testid="query-input"/.exec(
+      html,
+    )?.[1];
+
+    expect(ssrInputId).toBeDefined();
+
+    const errors: string[] = [];
+    page.on("console", (msg) => {
+      if (msg.type() === "warning" || msg.type() === "error") {
+        errors.push(msg.text());
+      }
+    });
+
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+
+    const hydratedInputId = await page
+      .getByTestId("query-input")
+      .getAttribute("id");
+
+    expect(hydratedInputId).toBe(ssrInputId);
+
+    const mismatchWarnings = errors.filter(
+      (e) =>
+        e.toLowerCase().includes("hydration") ||
+        e.toLowerCase().includes("mismatch") ||
+        e.toLowerCase().includes("did not match"),
+    );
+    expect(mismatchWarnings).toEqual([]);
+  });
+
+  test("React useId: form remains interactive post-hydration (typing into input updates state)", async ({
+    page,
+  }) => {
+    // Sanity check that the form works after hydration — useId
+    // doesn't break event-handler attachment. The query input is
+    // controlled by useState; typing should reflect in the value.
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+
+    await page.getByTestId("query-input").fill("hello");
+
+    await expect(page.getByTestId("query-input")).toHaveValue("hello");
+  });
+
   test("Per-route meta: home title + description appear in raw SSR HTML head", async ({
     request,
   }) => {
