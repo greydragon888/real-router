@@ -167,7 +167,7 @@ Wiring on the client: when the action POST returns the new Flight payload, `setS
 
 Typed loader errors live in `@real-router/rsc-server-plugin/errors` (the RSC-plugin mirror of `@real-router/ssr-data-plugin/errors`, hoisted from per-example `_loader-errors.ts` files in commit `e7ad413e` / issue #594). `src/router/loaders.tsx` imports `LoaderNotFound` from that subpath; the `users.profile` loader throws it for ids not in the database (e.g. the explicitly-marked `/users/9999`). `entry.rsc.tsx` catches the typed error BEFORE constructing the Flight stream and returns a `Response` with `404 Not Found` + `text/plain` — the SAME shape regardless of whether the request came in as `GET /users/9999` (HTML) or `GET /__rsc?route=/users/9999` (Flight). `router.dispose()` always runs in `finally`, no leak.
 
-The RSC database (`src/database.ts`) fabricates fake users on-demand for unknown ids by default — so per-request isolation tests can hit `/users/0…9` in parallel without seeding the store. `EXPLICIT_MISSING_IDS` is the small set of ids that are guaranteed to return undefined; used by the Round Y tests and documented in the database file.
+The RSC database (`src/database.ts`) fabricates fake users on-demand for unknown ids by default — so per-request isolation tests can hit `/users/0…9` in parallel without seeding the store. `EXPLICIT_MISSING_IDS` is the small set of ids that are guaranteed to return undefined; used by the tests and documented in the database file.
 
 Verified by Scenarios 16a (HTML 404) and 16b (Flight 404).
 

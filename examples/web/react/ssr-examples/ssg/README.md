@@ -110,7 +110,7 @@ pnpm test:e2e                       # Playwright tests
 
 ## Nested SSG + canonical/og + filesystem assertions
 
-Round Z extends the SSG demo to match the other adapters' coverage:
+Router extends the SSG demo to match the other adapters' coverage:
 
 - **Nested route pre-rendering** — `users.profile.posts` is a leaf route; `entries.ts` emits one URL per id for both `users.profile` and `users.profile.posts`. `getStaticPaths()` returns `/users/<id>/posts` (the leaves); `ssg-build.ts` derives the `/users/<id>` profile paths from those leaves and adds `/users` manually. Result: 8 pre-rendered URLs (1 home + 1 list + 3 profiles + 3 posts).
 - **Empty-state path** — Charlie has no posts. `/users/3/posts/index.html` ships the `data-testid="user-posts-empty"` UI rather than skipping the page.

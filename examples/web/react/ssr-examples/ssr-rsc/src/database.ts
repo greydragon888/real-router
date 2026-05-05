@@ -22,7 +22,7 @@ const userStore = new Map<string, User>([
   ],
 ]);
 
-// IDs that are explicitly treated as "not found" — used by Round Y
+// IDs that are explicitly treated as "not found" — used by
 // e2e tests to verify the typed-LoaderNotFound → 404 contract.
 // Other unknown ids are fabricated on demand (see findById fallback)
 // so per-request isolation tests can request /users/0…9 in parallel

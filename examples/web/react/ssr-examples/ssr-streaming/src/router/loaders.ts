@@ -23,7 +23,7 @@ export const loaders: DataLoaderFactoryMap = {
       // Typed error so server/index.ts can map it to 404 text/plain
       // BEFORE starting the streamed render. Previously this threw a
       // generic Error which surfaced as 500 + leaked the router (the
-      // catch path never called cleanup()). The Round X work here also
+      // catch path never called cleanup()).
       // moved cleanup() into the finally block.
       throw new LoaderNotFound(`product:${id}`);
     }
