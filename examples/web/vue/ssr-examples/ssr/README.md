@@ -17,26 +17,31 @@ Server-side rendering with Real-Router, Vue 3, Express, and Vite — the Vue por
 
 ```
 server/
-  _auth.ts            Cookie parsing → currentUser DI
-  dev.ts              Express + Vite dev middleware (HMR)
-  index.ts            Express production server (serves built assets)
+  _auth.ts            Re-exports parseCookieHeader + lookupUserFromCookies from src/_known-users.ts
+                      (server entry point — cookie → currentUser resolver)
+  dev.ts              Express + Vite dev middleware (HMR); mirrors AbortController +
+                      Cache-Control wiring from index.ts (only ETag is prod-only)
+  index.ts            Express production server (sha256 ETag, Cache-Control, AbortController)
 src/
-  database.ts         In-memory mock store
+  _known-users.ts     KNOWN_USERS table + parseCookieHeader + lookupUserFromCookies;
+                      shared between server/_auth.ts and entry-client.ts so post-hydration
+                      guards see the same DI value as the SSR pass
+  database.ts         In-memory mock store (id "9999" intentionally absent — used by
+                      LoaderNotFound tests; any unknown id behaves the same)
   entry-server.ts     render(url, context) → { html, head, serializedData, statusCode, redirect, rawBody?, contentType? }
   entry-client.ts     hydrateRouter() + createSSRApp().mount() with browser-plugin + ssr-data-plugin
   App.vue             Shared component tree (server + client)
-  _loader-errors.ts   Typed loader errors (LoaderRedirect/NotFound/Timeout) + withTimeout()
   components/
     HeavyAnalytics.vue   Lazy-hydrated component (defineAsyncComponent + hydrateOnVisible)
     SearchForm.vue       Form with useId() for SSR-stable label↔input pairing
   directives/
     track-view.ts     Vue custom directive (mounted/updated/unmounted) — IntersectionObserver demo
   router/
-    routes.ts         Route definitions with auth guards (incl. /slow, /legacy-user/:id)
-    loaders.ts        Per-route data loaders (typed errors + AbortSignal)
+    routes.ts         Route definitions with auth + role guards (incl. /slow, /legacy-user/:id, /boom)
+    loaders.ts        Per-route data loaders (typed errors via @real-router/ssr-data-plugin/errors)
     cache-policies.ts Per-route Cache-Control resolver
     meta.ts           Per-route PageMeta (title/description/canonical/og*)
-    createAppRouter.ts  Router factory with dependency injection
+    createAppRouter.ts  Router factory that forwards deps to createRouter()
   pages/
     Home, UsersList, UserProfile, UserPosts, Dashboard, Admin, NotFound (.vue)
 ```
@@ -55,12 +60,16 @@ Server (per request):
     → dispose()
 
 Client (once):
-  createAppRouter({ currentUser: getCurrentUserFromDocument() })
+  createAppRouter({ currentUser: lookupUserFromCookies(parseCookieHeader(document.cookie)) })
     → usePlugin(browserPluginFactory(), ssrDataPluginFactory(loaders))
     → hydrateRouter(router, window.__SSR_STATE__)
       → reads state.path, calls router.start(path) → loader re-runs → state.context.data restored
     → createSSRApp(...).mount("#root")
 ```
+
+`server/_auth.ts` and `entry-client.ts` both consume the same `lookupUserFromCookies` / `parseCookieHeader` helpers from `src/_known-users.ts`. This parity is why post-hydration `canActivate` guards see the same `currentUser` DI value as the SSR pass — otherwise client-side guard checks would diverge.
+
+`serializeRouterState(state)` emits a minimal `{ path }` snapshot; `hydrateRouter(router, state)` calls `router.start(state.path)` once, and the plugin's `start` interceptor re-runs the loader on the client to repopulate `state.context.data`. Loader runs twice (once per side) — invisible for in-memory data, one extra fetch for real APIs.
 
 The client-side `ssrDataPluginFactory` registration handles **hydration only**: `hydrateRouter(router, ssrState)` calls `router.start(state.path)` once, and the plugin's `start` interceptor re-runs the loader on the client to repopulate `state.context.data`. Post-hydration component tree sees the same data the server rendered — no flash, no mismatch.
 
@@ -88,7 +97,7 @@ Verified by 7 e2e tests in this file: meta per route (home title/description, so
 
 ## Loader-driven HTTP: typed errors → 301/404/504
 
-`src/_loader-errors.ts` defines three named errors and a `withTimeout()` helper. Loaders throw them; `entry-server.ts` catches by `code`, maps each to a `RenderResult` shape; `server/index.ts` emits the corresponding HTTP status:
+Typed loader errors live in `@real-router/ssr-data-plugin/errors` (hoisted from per-example `_loader-errors.ts` files in commit `e7ad413e`). The package exports `LoaderRedirect`, `LoaderNotFound`, `LoaderTimeout`, and a `withTimeout()` helper. Loaders throw them; `entry-server.ts` catches by `code`, maps each to a `RenderResult` shape; `server/index.ts` emits the corresponding HTTP status:
 
 | Error `code`       | HTTP response                                |
 | ------------------ | -------------------------------------------- |
@@ -99,10 +108,11 @@ Verified by 7 e2e tests in this file: meta per route (home title/description, so
 | anything else      | propagates → 500 with `<server-error>` body  |
 
 Demonstrated routes:
-- `/users/9999` → `LoaderNotFound("user:9999")` → 404 text/plain
-- `/users/9999/posts` → same path, leaf loader checks the same store
-- `/legacy-user/:id` → `LoaderRedirect("/users/:id", 301)` → 301 + Location
+- `/users/9999` → `LoaderNotFound("user:9999")` → 404 text/plain (id `9999` is intentionally absent from `database.ts`; any unknown id behaves the same)
+- `/users/9999/posts` → leaf loader re-validates the parent user id; same `LoaderNotFound` path
+- `/legacy-user/:id` → `LoaderRedirect(\`/users/${id}\`, 301)` → 301 + Location (target interpolated from params)
 - `/slow` → 5 s loader behind a 250 ms `withTimeout()` race → `LoaderTimeout` → 504
+- `/boom` → loader throws a generic `Error` → falls through to the catch-all 500 with `<server-error>` body (untyped-rejection path; verified by an e2e test)
 
 Trade-offs:
 - The `404`/`504` bodies are plain text rather than the SSR-rendered NotFound page. Rendering a rich 404 would require a second `render()` pass with a different URL — kept simple in this demo.
@@ -113,7 +123,7 @@ Trade-offs:
 `server/index.ts` adds three production-grade pieces on top of the basic SSR wiring:
 
 - **Strong `ETag`** — sha256 of the final HTML bytes, truncated to 16 base64url chars. Identical inputs yield identical hashes; conditional GET (`If-None-Match`) returns `304 Not Modified` with an empty body. Distinct routes yield distinct ETags.
-- **Per-route `Cache-Control`** — `src/router/cache-policies.ts` maps URL paths to directives: `/` → `public, s-maxage=3600, must-revalidate`, `/users` → `public, max-age=60`, `/users/:id` → `public, max-age=120`, `/dashboard` and `/admin` → `private, no-store`, `/slow`/`/boom` → `no-store`.
+- **Per-route `Cache-Control`** — `src/router/cache-policies.ts` maps URL paths to directives: `/` → `public, max-age=300, s-maxage=3600, must-revalidate`, `/users` → `public, max-age=60, must-revalidate`, `/users/:id` → `public, max-age=120, must-revalidate`, `/dashboard` and `/admin` → `private, no-store`, `/slow`/`/boom` → `no-store`. (`server/dev.ts` mirrors the same Cache-Control wiring; only ETag is prod-only.)
 - **`AbortController` per request** — `req.on("close")` aborts the controller; the `slow` loader pulls the signal via `getDep("abortSignal")` and clears its `setTimeout`. Without this wiring a 5 s loader holds the worker even after the client gives up. The e2e suite verifies the server releases the handler within 1 s (well under the 5 s loader delay).
 
 These are demonstrated end-to-end by 4 dedicated tests in `e2e/ssr.spec.ts` (Cache-Control routing, 304 on identical content, distinct routes → distinct hashes, AbortController fast release).
@@ -129,9 +139,11 @@ pnpm test:e2e     # Playwright tests
 
 ## Key Packages
 
-- `@real-router/core` — router + `cloneRouter()`
+- `@real-router/core` — `createRouter()` + base router types
+- `@real-router/core/api` — `cloneRouter()` (subpath, NOT root export)
 - `@real-router/core/utils` — `serializeRouterState()`, `hydrateRouter()`
 - `@real-router/ssr-data-plugin` — per-route data loading
+- `@real-router/ssr-data-plugin/errors` — typed loader errors (`LoaderNotFound`, etc.)
 - `@real-router/vue` — `RouterProvider`, `RouteView`, `Link`, `useRoute`
 - `@real-router/browser-plugin` — client-side URL sync
 
