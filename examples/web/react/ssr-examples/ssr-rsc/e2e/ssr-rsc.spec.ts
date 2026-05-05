@@ -428,6 +428,100 @@ test.describe("RSC SSR Example", () => {
     expect(flightProfile.headers()["cache-control"]).toContain("max-age=120");
   });
 
+  test("Scenario 19: Server Action — form rendered with React 19 action-ref hidden fields (use server wired)", async ({
+    request,
+  }) => {
+    // The 'use server' directive on src/server-actions/updateUserEmail.ts
+    // turns the export into a server reference. React 19's
+    // `<form action={serverAction}>` then emits hidden inputs
+    // ($ACTION_REF_*, $ACTION_KEY) so the form can POST and the
+    // server can decode the action via decodeAction(formData) — this
+    // is the progressive-enhancement wire signature, working even
+    // before hydration / with JS disabled.
+    const response = await request.get("/users/1");
+    const html = await response.text();
+
+    expect(html).toContain('data-testid="edit-email-form"');
+    expect(html).toContain('name="$ACTION_REF_');
+    expect(html).toContain('name="$ACTION_KEY"');
+    expect(html).toMatch(
+      /<input type="hidden"[^>]*name="id"[^>]*value="1"/,
+    );
+    expect(html).toContain('value="alice@example.com"');
+  });
+
+  test("Scenario 20: Server Action — submitting the form mutates state and the page re-renders with the new email", async ({
+    page,
+  }) => {
+    // Full client-side path: hydrate, type new email, click Save.
+    // setServerCallback in entry.browser.tsx posts FormData with the
+    // x-rsc-action header; entry.rsc.tsx loads the action via
+    // loadServerAction, runs it, returns a fresh Flight payload.
+    // useActionState picks up the result and the page reflects the
+    // mutated state.
+    await page.goto("/users/1");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByTestId("user-email")).toHaveText(
+      "alice@example.com",
+    );
+
+    await page.getByTestId("email-input").fill("alice-updated@example.com");
+    await page.getByTestId("submit-email").click();
+
+    await expect(page.getByTestId("action-result")).toBeVisible();
+    await expect(page.getByTestId("action-result")).toHaveAttribute(
+      "data-ok",
+      "true",
+    );
+    await expect(page.getByTestId("action-result")).toContainText(
+      "alice-updated@example.com",
+    );
+
+    // Refresh — the in-memory database keeps the mutation; the
+    // Server Component re-renders with the new email.
+    await page.reload();
+    await expect(page.getByTestId("user-email")).toHaveText(
+      "alice-updated@example.com",
+    );
+
+    // Reset for test isolation.
+    await page.getByTestId("email-input").fill("alice@example.com");
+    await page.getByTestId("submit-email").click();
+    await expect(page.getByTestId("action-result")).toContainText(
+      "alice@example.com",
+    );
+  });
+
+  test("Scenario 21: Server Action — useActionState exposes validation errors (invalid email → ok=false)", async ({
+    page,
+  }) => {
+    // Server-side validation in updateUserEmail rejects emails
+    // without "@". useActionState surfaces the { ok: false, message }
+    // shape; the UI flips data-ok="false" on the result element.
+    await page.goto("/users/2");
+    await page.waitForLoadState("networkidle");
+
+    await page.getByTestId("email-input").fill("not-an-email");
+    await page.getByTestId("submit-email").click();
+
+    await expect(page.getByTestId("action-result")).toBeVisible();
+    await expect(page.getByTestId("action-result")).toHaveAttribute(
+      "data-ok",
+      "false",
+    );
+    await expect(page.getByTestId("action-result")).toContainText(
+      "Invalid email format",
+    );
+
+    // Critically: state did NOT mutate (validation rejected), so a
+    // page reload still shows Bob's original email.
+    await page.reload();
+    await expect(page.getByTestId("user-email")).toHaveText(
+      "bob@example.com",
+    );
+  });
+
   test("Scenario 18: streamed responses (HTML and Flight) do NOT carry an ETag header", async ({
     request,
   }) => {

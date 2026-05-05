@@ -1,3 +1,4 @@
+import { EditEmailForm } from "../client-components/EditEmailForm";
 import { RevalidateButton } from "../client-components/RevalidateButton";
 
 import type { User } from "../database";
@@ -9,6 +10,7 @@ export function UserProfile({ user }: Readonly<{ user: User }>): ReactElement {
       <h1 data-testid="user-name">{user.name}</h1>
       <p data-testid="user-email">{user.email}</p>
       <RevalidateButton />
+      <EditEmailForm userId={user.id} initialEmail={user.email} />
     </article>
   );
 }

@@ -93,6 +93,45 @@ pnpm test:e2e
 
 In dev mode, [`server/dev.ts`](server/dev.ts) creates a `createServerModuleRunner(vite.environments.rsc)` to load `entry.rsc.tsx` per request (with HMR). In prod mode, [`server/index.ts`](server/index.ts) imports the pre-built `dist/rsc/index.js` once at startup.
 
+## React 19 Server Actions
+
+`src/server-actions/updateUserEmail.ts` declares a Server Action with the `'use server'` directive — `@vitejs/plugin-rsc` marks every export as a server reference, so calling the function from the client triggers an HTTP POST that the server decodes and runs. The action itself only exists in the rsc bundle (not the client bundle), so it can read secrets, mutate the database, etc. without exposing implementation to the browser.
+
+`src/client-components/EditEmailForm.tsx` is a Client Component that wires the action into a form via React 19's `useActionState`:
+
+- **Without JS** (progressive enhancement): `<form action={updateUserEmail}>` posts FormData to the current URL. `entry.rsc.tsx` decodes via `decodeAction(formData)` (recovers the action from React-emitted hidden `$ACTION_REF_*` fields), runs it, and returns a fresh Flight payload. Works before hydration.
+- **With JS**: `setServerCallback` (in `entry.browser.tsx`) intercepts the call. POSTs the encoded args with the action id in the `x-rsc-action` header. `entry.rsc.tsx` dispatches via `loadServerAction(id)` + `decodeReply(body)`. The Flight payload includes `returnValue`/`formState`; `useActionState` threads them back into the form.
+- **`useFormStatus`** (in the `SubmitButton` child) reads the parent form's pending state — button disabled + label flips to "Saving..." during submission.
+
+Pipeline shape:
+
+```
+Client form                               entry.rsc.tsx
+─────────                                 ─────────────
+<form action={updateUserEmail}>           if (POST) {
+  setServerCallback(id, args) ─────────►    if (header x-rsc-action) {
+    POST /users/1                              decodeReply(body) → args
+    x-rsc-action: <id>                         loadServerAction(id) → fn
+    body: encodeReply(args)                    fn(...args) → returnValue
+                                            } else {
+                                              decodeAction(formData) → fn
+                                              fn() → formState
+                                            }
+                                          }
+                                          // re-render with mutation reflected
+                                          renderToReadableStream({ root, returnValue, formState })
+   ◄──── Flight + returnValue ─────────
+   useActionState picks up result
+   Server Component re-renders with
+   mutated user.email
+```
+
+3 dedicated tests in `e2e/ssr-rsc.spec.ts`:
+
+- **Scenario 19** — form renders with `$ACTION_REF_*` + `$ACTION_KEY` hidden fields (wire signature of `'use server'`).
+- **Scenario 20** — submitting the form mutates state, page re-renders with new email, mutation persists across reload (proves the Server Action wrote to the DB and the next render reflected it).
+- **Scenario 21** — server-side validation rejects invalid email → useActionState exposes `{ ok: false, message }` → no mutation; reload still shows original email.
+
 ## Loader-driven HTTP: typed LoaderNotFound for unknown ids (HTML and Flight)
 
 `src/_loader-errors.ts` defines `LoaderNotFound` and `LoaderRedirect`. The `users.profile` loader throws `LoaderNotFound` for ids not in the database (e.g. the explicitly-marked `/users/9999`). `entry.rsc.tsx` catches the typed error BEFORE constructing the Flight stream and returns a `Response` with `404 Not Found` + `text/plain` — the SAME shape regardless of whether the request came in as `GET /users/9999` (HTML) or `GET /__rsc?route=/users/9999` (Flight). `router.dispose()` always runs in `finally`, no leak.

@@ -2,11 +2,27 @@ import { UNKNOWN_ROUTE } from "@real-router/core";
 import { cloneRouter } from "@real-router/core/api";
 import { serializeRouterState } from "@real-router/core/utils";
 import { rscServerPluginFactory } from "@real-router/rsc-server-plugin";
-import { renderToReadableStream as renderRscToReadableStream } from "@vitejs/plugin-rsc/rsc";
+import {
+  createTemporaryReferenceSet,
+  decodeAction,
+  decodeFormState,
+  decodeReply,
+  loadServerAction,
+  renderToReadableStream as renderRscToReadableStream,
+} from "@vitejs/plugin-rsc/rsc";
 
 import { database } from "./database";
 import { createAppRouter } from "./router/createAppRouter";
 import { loaders } from "./router/loaders";
+
+import type { ReactFormState } from "react-dom/client";
+
+// Header used by `setServerCallback` (entry.browser.tsx) to send the
+// id of the server action being invoked from the hydrated client. If
+// absent on a POST, the request is a progressive-enhancement form
+// submit (no JS) and `decodeAction(formData)` extracts the action
+// from the FormData itself.
+const HEADER_ACTION_ID = "x-rsc-action";
 
 const baseRouter = createAppRouter();
 
@@ -14,14 +30,71 @@ async function handler(request: Request): Promise<Response> {
   const url = new URL(request.url);
 
   // Stage 4 e2e test infrastructure: mutation endpoint for revalidation scenario.
-  // In a real app, gate behind admin auth or remove entirely — this is example-only.
-  if (url.pathname.startsWith("/__test/users/") && request.method === "POST") {
+  if (
+    url.pathname.startsWith("/__test/users/") &&
+    request.method === "POST" &&
+    !request.headers.get(HEADER_ACTION_ID)
+  ) {
     const id = url.pathname.slice("/__test/users/".length);
     const { email } = (await request.json()) as { email: string };
 
     database.users.setEmail(id, email);
 
     return new Response(null, { status: 204 });
+  }
+
+  // Server Action handling — runs BEFORE rendering so the new render
+  // reflects the mutation (single round-trip mutate + fetch).
+  let returnValue: { ok: boolean; data: unknown } | undefined;
+  let formState: ReactFormState | undefined;
+  let temporaryReferences: unknown | undefined;
+  let actionStatus: number | undefined;
+
+  if (request.method === "POST") {
+    const actionId = request.headers.get(HEADER_ACTION_ID);
+
+    if (actionId) {
+      // Hydrated-client path: action invoked via `setServerCallback`
+      // with serialized args (FormData or text body). React passes
+      // `(prevState, formData)` for `useActionState`-bound forms.
+      const contentType = request.headers.get("content-type");
+      const body = contentType?.startsWith("multipart/form-data")
+        ? await request.formData()
+        : await request.text();
+
+      temporaryReferences = createTemporaryReferenceSet();
+
+      const args = await decodeReply(body, { temporaryReferences });
+      const action = await loadServerAction(actionId);
+
+      try {
+        const data = (await (action as (...a: unknown[]) => unknown).apply(
+          null,
+          args as unknown[],
+        )) as unknown;
+
+        returnValue = { ok: true, data };
+      } catch (error) {
+        returnValue = { ok: false, data: error };
+        actionStatus = 500;
+      }
+    } else if (request.headers.get("content-type")?.includes("form")) {
+      // Progressive-enhancement path: <form action={fn}> submitted
+      // before hydration (or with JS disabled). React encodes the
+      // server-action reference as a hidden form field; decodeAction
+      // recovers it from the FormData.
+      const formData = await request.formData();
+      const decodedAction = await decodeAction(formData);
+
+      try {
+        const result = await decodedAction();
+        formState = await decodeFormState(result, formData);
+      } catch {
+        return new Response("Internal Server Error: server action failed", {
+          status: 500,
+        });
+      }
+    }
   }
 
   const pathname =
@@ -35,14 +108,25 @@ async function handler(request: Request): Promise<Response> {
 
   try {
     const state = await router.start(pathname);
-    const statusCode = state.name === UNKNOWN_ROUTE ? 404 : 200;
+    const statusCode =
+      actionStatus ?? (state.name === UNKNOWN_ROUTE ? 404 : 200);
 
     const rscNode = state.context.rsc ?? (
       <p data-testid="not-found">Not Found</p>
     );
-    const flightStream = renderRscToReadableStream(rscNode);
 
-    if (url.pathname === "/__rsc") {
+    // RSC payload includes the action `returnValue`/`formState` so
+    // useActionState on the client receives the result.
+    const rscPayload = {
+      root: rscNode,
+      returnValue,
+      formState,
+    };
+    const flightStream = renderRscToReadableStream(rscPayload, {
+      temporaryReferences,
+    } as Record<string, unknown>);
+
+    if (url.pathname === "/__rsc" || request.method === "POST") {
       return new Response(flightStream, {
         status: statusCode,
         headers: { "Content-Type": "text/x-component" },
@@ -60,9 +144,6 @@ async function handler(request: Request): Promise<Response> {
   } catch (error) {
     const code = (error as { code?: string } | null)?.code;
 
-    // Typed loader errors → plain-text Response with the right HTTP
-    // status. router.dispose() runs in the finally block so no leak
-    // regardless of which path we took.
     if (code === "LOADER_NOT_FOUND") {
       return new Response("Not Found", {
         status: 404,
@@ -79,7 +160,6 @@ async function handler(request: Request): Promise<Response> {
       });
     }
 
-    // Loader rejection → 500 + Server Component error page (no Flight, plain HTML).
     const message = error instanceof Error ? error.message : "Unknown error";
     const html = `<!doctype html><html><body><div data-testid="server-error"><h1>Server Error</h1><p>${message}</p></div></body></html>`;
 

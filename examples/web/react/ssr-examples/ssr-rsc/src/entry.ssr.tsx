@@ -6,7 +6,18 @@ import { injectRSCPayload } from "rsc-html-stream/server";
 import { App } from "./App";
 import { createAppRouter } from "./router/createAppRouter";
 
+import type { ReactFormState } from "react-dom/client";
 import type { ReactNode } from "react";
+
+// Mirrors the rscPayload shape produced by entry.rsc.tsx. After
+// adding Server Actions, the Flight payload is no longer a bare
+// ReactNode but an object: `{ root, returnValue?, formState? }`.
+// The SSR pipeline reads `root` as the React tree to render.
+interface RscPayload {
+  root: ReactNode;
+  returnValue?: { ok: boolean; data: unknown };
+  formState?: ReactFormState;
+}
 
 interface RenderHTMLOptions {
   ssrState: string;
@@ -18,7 +29,7 @@ export async function renderHTML(
   { ssrState, statusCode }: RenderHTMLOptions,
 ): Promise<Response> {
   const [flightForSsr, flightForBrowser] = rscStream.tee();
-  const payload = createFromReadableStream<ReactNode>(flightForSsr);
+  const payload = createFromReadableStream<RscPayload>(flightForSsr);
 
   const router = createAppRouter();
 
