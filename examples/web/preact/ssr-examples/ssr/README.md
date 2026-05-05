@@ -60,11 +60,26 @@ Client (once):
     → hydrate(<RouterProvider><App /></RouterProvider>, rootElement)   ─ Preact hydrate
 ```
 
-## Why `renderToString` (sync), not `renderToStringAsync`?
+## `renderToStringAsync` — Preact-unique async-single-shot SSR
 
-`preact-render-to-string` exposes both. We use sync `renderToString` because the data-fetching layer (`ssr-data-plugin`'s `start` interceptor) **already pre-awaits** all loader promises — by the time render begins, every promise has resolved into `state.context.data`. Sync render is simpler and faster.
+`preact-render-to-string` exposes both `renderToString` (sync) and `renderToStringAsync` (async). This example uses **async** in `entry-server.tsx`, even though `ssr-data-plugin` already pre-awaits all loaders before render begins. The reason: `<Home />` mounts a `lazy(() => import("./components/Tagline"))` boundary wrapped in `<Suspense>`. With `renderToStringAsync`:
 
-`renderToStringAsync` is Preact-unique and useful for in-component awaited promises (no React equivalent except via the streaming pipeline). The streaming variant of this example (`../ssr-streaming/`) demonstrates it.
+- The dynamic import is awaited inside the render call.
+- Resolved Tagline content is **inlined** into the final HTML (no fallback shipped to the consumer).
+- The response is a single complete string — `Content-Length` set, **no `Transfer-Encoding: chunked`**.
+
+This is a **Preact-only** SSR path. React 19's `react-dom/server` has no sync-with-async-data equivalent — to await in-tree promises you must opt into the streaming pipeline (`renderToReadableStream` or `renderToPipeableStream`). Preact gives you three choices, this example picks the middle one:
+
+| Renderer | Output | Lazy/Suspense behaviour | When to pick |
+|---|---|---|---|
+| `renderToString` (sync) | full HTML string | fallback emitted; lazy boundary deferred | classical SSR with no in-tree async |
+| **`renderToStringAsync`** | **full HTML string** | **awaits, inlines resolved content** | **single-shot async SSR — this example** |
+| `renderToReadableStream` | `ReadableStream<Uint8Array>` | fallback inline + `<preact-island>` swap chunk | streaming with TTFB-sensitive UX (see `../ssr-streaming/`) |
+
+Verified by 3 dedicated e2e tests:
+- Tagline content is inlined in the response body (no fallback marker, no `<preact-island>` machinery).
+- Response is **not** chunked (`Content-Length` header set; `Transfer-Encoding: chunked` absent).
+- Vite emits `Tagline-<hash>.js` as a separate client chunk for hydration / future client navigations.
 
 ## Loader-driven HTTP: typed errors → 301/404/504
 

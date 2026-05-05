@@ -3,7 +3,7 @@ import { cloneRouter } from "@real-router/core/api";
 import { serializeRouterState } from "@real-router/core/utils";
 import { RouterProvider } from "@real-router/preact";
 import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
-import { renderToString } from "preact-render-to-string";
+import { renderToStringAsync } from "preact-render-to-string";
 
 import { App } from "./App";
 import { createAppRouter } from "./router/createAppRouter";
@@ -97,12 +97,18 @@ export async function render(
     const state = await router.start(url);
     const statusCode = state.name === UNKNOWN_ROUTE ? 404 : 200;
 
-    // preact-render-to-string@6.6.7 — sync render. For async loaders we
-    // already pre-await via ssr-data-plugin (start interceptor settles
-    // before render begins), so renderToString is sufficient. The async
-    // path (renderToStringAsync) is unique to Preact and useful for
-    // in-component awaited promises — not needed here.
-    const html = renderToString(
+    // preact-render-to-string@6.6.7 `renderToStringAsync` — Preact-only
+    // single-shot async render. Critical data is already settled via
+    // ssr-data-plugin's start() interceptor; the async path is here so
+    // any in-tree dynamic imports (e.g. lazy() loaded Tagline in
+    // Home.tsx) are awaited and inlined into the final HTML — no
+    // chunked transfer, no <preact-island> swap, just one coherent
+    // string. Streaming variant lives in ../ssr-streaming/.
+    //
+    // Why not `renderToString` (sync)? It would skip the lazy()
+    // boundary and ship the fallback in the final HTML — this app
+    // would still work but the demo of in-tree async would not.
+    const html = await renderToStringAsync(
       <RouterProvider router={router}>
         <App />
       </RouterProvider>,

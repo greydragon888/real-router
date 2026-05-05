@@ -6,7 +6,7 @@ Three example apps mirroring the structure of [`../../react/ssr-examples/`](../.
 
 | Subdir | Demonstrates |
 |---|---|
-| [`ssr/`](./ssr) | Classical per-request `cloneRouter` + `start` + `renderToString` + hydration. Auth-gated routes, typed loader errors → 301/404/504, `useId`-stable form labels, per-route meta + canonical/og, ETag + Cache-Control + AbortController. |
+| [`ssr/`](./ssr) | Classical per-request `cloneRouter` + `start` + **`renderToStringAsync`** + hydration. Auth-gated routes, typed loader errors → 301/404/504, `useId`-stable form labels, per-route meta + canonical/og, ETag + Cache-Control + AbortController. **Demonstrates `renderToStringAsync`** — Preact-unique async-single-shot SSR (lazy() awaited and inlined, no chunked transfer; React has no sync-with-async-data equivalent). |
 | [`ssr-streaming/`](./ssr-streaming) | `renderToReadableStream` (since `preact-render-to-string@6.5.x`) + `Transfer-Encoding: chunked`. Critical data via `ssr-data-plugin`. **Out-of-order code-split streaming** via `<Suspense>` + `lazy()` — `<preact-island>` custom element swaps fallback ↔ resolved at the HTML level (since `@6.6.x`). |
 | [`ssg/`](./ssg) | Build-time `getStaticPaths` + `renderToString` per URL + write HTML files. Nested SSG, dynamic entries, canonical/og, filesystem layout assertions, `404.html`, `sitemap.xml`, `LoaderNotFound` aborts the build. |
 
