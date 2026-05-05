@@ -13,20 +13,42 @@
 
 ## Honest divergence from React 19 streaming
 
-This example is **deliberately scaled down** vs `examples/web/react/ssr-examples/ssr-streaming/`. React 19's flagship streaming features depend on primitives Preact 10 lacks:
+This example demonstrates what Preact 10 streaming SSR **actually can do**, with honest divergences from React 19 documented:
 
 | React 19 feature | Preact 10 status | This example's approach |
 |---|---|---|
-| `<Suspense>` + `use(promise)` for in-component data deferral | ❌ no `use(promise)` hook | Sibling sections are sync-rendered from fixtures |
-| Out-of-order Suspense placeholders + selective hydration | ❌ docs note "hydration that can pause and wait for JS chunks. Solved in upcoming Preact v11" | Single in-order render |
-| Async function components inside `<Suspense>` (server-only render) | ⚠️ tested empirically — silent skip; renderer treats async returns as undefined | Components are plain sync functions |
-| `renderToReadableStream` Web Stream output | ✅ supported since `preact-render-to-string@6.5.x` | **Used here** for the streaming pipeline |
+| `renderToReadableStream` Web Stream output | ✅ since `preact-render-to-string@6.5.x` | **Used** as the pipeline |
+| `<Suspense>` + `lazy()` + dynamic import for code-split streaming | ✅ since `@6.6.x` (out-of-order via `<preact-island>` custom element) | **Used** for the specs section — see below |
+| `<Suspense>` + `use(promise)` for in-component data deferral | ❌ no `use(promise)` hook | Sibling sections (Reviews, RelatedItems) are sync-rendered from fixtures |
+| Async function components inside `<Suspense>` (server-only render) | ⚠️ empirically: renderer treats async returns as undefined and silently skips | Not used; sync siblings instead |
+| Selective hydration on individual islands | ⚠️ partial — out-of-order signature exists for `lazy()`; v11 promises broader story | `<preact-island>` swaps fallback → resolved on the client |
 
-What's left after subtracting unsupported features:
-- **Streaming pipeline works** — chunked HTTP transfer, smaller TTFB-relevant byte order
-- **Suspense fallback streaming for `lazy()` components** — would work the same way React 19's does, but this demo omits it for parity-of-shape with the React example. Add `lazy(() => import("./Big"))` if you want to see fallback streaming for code-split modules.
+### Out-of-order streaming with `<preact-island>` custom element
 
-If you need true data-deferred Suspense streaming with selective hydration on the client, **use the React adapter** for now. Preact v11 is expected to add `use(promise)` and out-of-order completion; this example will be revisited then.
+When `<Suspense fallback={…}><Lazy /></Suspense>` is rendered with `renderToReadableStream`, Preact emits:
+
+1. `<!--preact-island:-N-->` open marker + the inline fallback HTML.
+2. `<!--/preact-island:-N-->` close marker, then the rest of the page shell.
+3. Once the dynamic import resolves: a trailing `<div hidden>` with a small bootstrap `<script>` that defines a `<preact-island>` custom element, plus `<preact-island hidden data-target="-N">…resolved content…</preact-island>`.
+4. The custom element's `connectedCallback` removes the fallback nodes between the markers and inserts the resolved children in their place — without any framework intervention.
+
+This is functionally equivalent to React 19's `<!--$?-->` placeholder + `<template id="B:0">` mechanism, just with a different wire signature. **Verified end-to-end by 4 dedicated e2e tests** in `e2e/ssr-streaming.spec.ts`:
+- Resolved specs section is present in the streamed HTML.
+- Fallback presence ↔ bootstrap script presence (consistency invariant).
+- Vite emits `ProductSpecs` as a separate client chunk under `dist/client/assets/`.
+- Post-hydration DOM contains the resolved specs.
+
+### Module-cache caveat (the same pitfall React docs warn about)
+
+`lazy(() => import("./X"))` caches the resolved module at module scope. The fallback is therefore emitted **only on the first SSR after server start**; subsequent renders see the cached module synchronously and skip the fallback entirely. This is identical to `React.lazy`'s behaviour and the reason the React streaming guide recommends `useMemo`-per-render promises for visible-on-every-request streaming.
+
+The e2e suite asserts what holds **regardless of cache state** (resolved content present, code-split chunk on disk, fallback↔bootstrap consistency) plus filesystem-level proof that code-splitting really happened. We deliberately do not assert "fallback is always present" — that would be flaky against the cache.
+
+### What's still beyond Preact 10
+
+- **`use(promise)` for in-component data deferral** — design gap; v11 may add. Workaround: pre-resolve via `ssr-data-plugin` (which this example does for critical product data).
+- **True selective hydration of arbitrary Suspense boundaries** — only `lazy()` boundaries get the `<preact-island>` swap; broader story lands in v11.
+- **Async function components** — silent skip in `renderToReadableStream`; do not use them in Preact 10 streaming pipelines.
 
 ## Architecture
 
@@ -41,9 +63,10 @@ src/
   App.tsx             Shared component tree
   components/
     ProductsList.tsx  Product list (renders state.context.data.products)
-    ProductDetail.tsx Detail page (Reviews + RelatedItems siblings)
+    ProductDetail.tsx Detail page (Reviews + RelatedItems + lazy ProductSpecs)
     Reviews.tsx       Sync component reading module-level fixture
     RelatedItems.tsx  Sync component reading module-level fixture
+    ProductSpecs.tsx  Loaded via lazy(() => import(…)) — separate chunk, code-split streaming
   pages/
     Home.tsx, NotFound.tsx
   router/

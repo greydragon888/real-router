@@ -1,4 +1,10 @@
+import { readdirSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { expect, test } from "@playwright/test";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 test.describe("Preact streaming SSR — smoke", () => {
   test("home page is server-rendered", async ({ page }) => {
@@ -187,5 +193,84 @@ test.describe("Preact streaming SSR — smoke", () => {
       expect(r.status()).toBe(200);
       expect(r.headers()["transfer-encoding"]).toBe("chunked");
     }
+  });
+
+  test.describe("lazy() + Suspense — code-split streaming via <preact-island>", () => {
+    // Note on Preact 10's module-level cache:
+    // `lazy(() => import("./X"))` caches the resolved module at module
+    // scope. The Suspense fallback is therefore emitted ONLY on the
+    // first SSR after the server starts; subsequent renders see the
+    // cached module synchronously and skip the fallback. This matches
+    // React's `React.lazy` behaviour and is the reason the React
+    // streaming guide recommends `useMemo`-per-render promises for
+    // visible-on-every-request streaming. Tests below assert what
+    // holds REGARDLESS of cache state, plus filesystem-level proof
+    // that code-splitting really happened.
+
+    test("rendered specs section is present in the streamed HTML", async ({
+      request,
+    }) => {
+      // After the lazy import settles (always, by the time Express
+      // pipes the final byte), the resolved specs section must be in
+      // the response. Holds for first or warmed cache.
+      const html = await (await request.get("/products/1")).text();
+
+      expect(html).toContain('data-testid="specs-section"');
+      expect(html).toContain("Switch type");
+      expect(html).toContain("Cherry MX Brown");
+    });
+
+    test("if fallback is emitted, the <preact-island> bootstrap script is too (consistency)", async ({
+      request,
+    }) => {
+      // Cache-state-dependent assertion: when Preact's module cache
+      // is cold, server emits both the inline fallback AND the custom
+      // element bootstrap that swaps it for the resolved content.
+      // When the cache is warm (after the first SSR), the lazy module
+      // resolves synchronously, no fallback is emitted, no bootstrap
+      // script is needed. This test asserts the consistency of those
+      // two states — never one without the other — without depending
+      // on which state we're in.
+      const html = await (await request.get("/products/1")).text();
+      const hasFallback = html.includes('data-testid="specs-fallback"');
+      const hasBootstrap = html.includes('customElements.define("preact-island"');
+
+      expect(hasFallback).toBe(hasBootstrap);
+    });
+
+    test("ProductSpecs is emitted as a separate code-split chunk", () => {
+      // Filesystem-level proof: Vite saw the dynamic import and
+      // emitted a separate chunk under dist/client/assets/. This
+      // is the static guarantee — it doesn't depend on runtime
+      // cache state.
+      const assetsDir = path.resolve(
+        __dirname,
+        "..",
+        "dist",
+        "client",
+        "assets",
+      );
+      const files = readdirSync(assetsDir);
+      const specsChunk = files.find((f) => /^ProductSpecs-/.test(f));
+
+      expect(specsChunk).toBeTruthy();
+      expect(specsChunk).toMatch(/\.js$/);
+    });
+
+    test("post-hydration DOM shows resolved specs section", async ({
+      page,
+    }) => {
+      // After hydration, the resolved specs section is visible.
+      // (When the fallback is emitted, the <preact-island> custom
+      // element's connectedCallback swaps it for the resolved
+      // content; otherwise it was inlined directly.)
+      await page.goto("/products/1");
+      await page.waitForLoadState("networkidle");
+
+      await expect(
+        page.locator('[data-testid="specs-section"]'),
+      ).toBeVisible();
+      await expect(page.locator("text=Switch type")).toBeVisible();
+    });
   });
 });
