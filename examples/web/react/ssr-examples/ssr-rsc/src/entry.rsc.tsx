@@ -19,6 +19,7 @@ import {
 import { database } from "./database";
 import { createAppRouter } from "./router/createAppRouter";
 import { loaders } from "./router/loaders";
+import { NotificationBanner } from "./server-components/NotificationBanner";
 
 import type { ReactFormState } from "react-dom/client";
 
@@ -131,12 +132,31 @@ async function handler(request: Request): Promise<Response> {
       <p data-testid="not-found">Not Found</p>
     );
 
+    // Wrap the per-route Server Component tree with the global
+    // NotificationBanner Server Component. The banner reads
+    // state.context.rscAction (published by rscActionPluginFactory
+    // when the request handled a Server Action) and renders
+    // success/error feedback. For plain GET requests rscAction is
+    // undefined — banner returns null.
+    //
+    // This wrapping pattern demonstrates A2's value: any Server
+    // Component in the tree can react to mutation results without
+    // prop-drilling from the form component. The form (Client) still
+    // uses useActionState for its own per-form message; the banner
+    // is the cross-cutting UX layer on top.
+    const wrappedRoot = (
+      <>
+        <NotificationBanner action={state.context.rscAction} />
+        {rscNode}
+      </>
+    );
+
     // RSC payload uses the canonical RscPayload<TReturn, TFormState>
     // type from @real-router/rsc-server-plugin — same shape consumed
     // by entry.ssr.tsx, App.tsx, and entry.browser.tsx. Single source
     // of truth for the wire format.
     const rscPayload: RscPayload<unknown, ReactFormState> = {
-      root: rscNode,
+      root: wrappedRoot,
       returnValue: actionResult?.returnValue,
       formState: actionResult?.formState,
     };

@@ -535,4 +535,83 @@ test.describe("RSC SSR Example", () => {
     expect(flight.status()).toBe(200);
     expect(flight.headers().etag).toBeUndefined();
   });
+
+  test("Scenario 22: NotificationBanner — plain GET requests show no banner (rscAction is undefined)", async ({
+    request,
+  }) => {
+    // Plain GET → no Server Action ran → rscActionPluginFactory's
+    // closure returns undefined → state.context.rscAction stays
+    // undefined → NotificationBanner Server Component renders null.
+    const response = await request.get("/users/1");
+    const html = await response.text();
+
+    expect(response.status()).toBe(200);
+    expect(html).not.toContain('data-testid="notification-banner-success"');
+    expect(html).not.toContain('data-testid="notification-banner-error"');
+  });
+
+  test("Scenario 23: NotificationBanner — successful Server Action surfaces a success banner via state.context.rscAction (cross-component, no prop drilling)", async ({
+    page,
+  }) => {
+    // Submit the email-edit form (Client Component, owns useActionState).
+    // After the action succeeds, the page re-renders. The Server
+    // Component NotificationBanner — mounted by entry.rsc.tsx as a
+    // wrapper around state.context.rsc — reads state.context.rscAction
+    // and renders the success status. EditEmailForm's local
+    // action-result message ALSO appears (per-form UX), but the
+    // banner is the cross-cutting feedback that any page-level
+    // Server Component could provide.
+    await page.goto("/users/2");
+    await page.waitForLoadState("networkidle");
+
+    // No banner before submit.
+    await expect(page.getByTestId("notification-banner-success")).toHaveCount(
+      0,
+    );
+
+    await page.getByTestId("email-input").fill("bob-updated@example.com");
+    await page.getByTestId("submit-email").click();
+
+    // Both: the form's local message AND the global banner.
+    await expect(page.getByTestId("action-result")).toBeVisible();
+    await expect(page.getByTestId("notification-banner-success")).toBeVisible();
+    await expect(page.getByTestId("notification-banner-success")).toContainText(
+      "bob-updated@example.com",
+    );
+
+    // Reset DB for test isolation.
+    await page.getByTestId("email-input").fill("bob@example.com");
+    await page.getByTestId("submit-email").click();
+    await expect(page.getByTestId("action-result")).toContainText(
+      "bob@example.com",
+    );
+  });
+
+  test("Scenario 24: NotificationBanner — failed Server Action surfaces an error banner (validation rejected)", async ({
+    page,
+  }) => {
+    await page.goto("/users/1");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByTestId("notification-banner-error")).toHaveCount(0);
+
+    await page.getByTestId("email-input").fill("not-an-email");
+    await page.getByTestId("submit-email").click();
+
+    // Form's per-message: "Invalid email format".
+    // Banner: ✗ Action failed (cross-cutting, no per-form details).
+    await expect(page.getByTestId("notification-banner-error")).toBeVisible();
+    await expect(page.getByTestId("action-result")).toHaveAttribute(
+      "data-ok",
+      "false",
+    );
+
+    // Reload — fresh GET, no action → banner gone, original email
+    // unchanged (validation rejected the mutation).
+    await page.reload();
+    await expect(page.getByTestId("notification-banner-error")).toHaveCount(0);
+    await expect(page.getByTestId("user-email")).toHaveText(
+      "alice@example.com",
+    );
+  });
 });

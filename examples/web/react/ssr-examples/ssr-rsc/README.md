@@ -132,6 +132,20 @@ Client form                               entry.rsc.tsx
 - **Scenario 20** — submitting the form mutates state, page re-renders with new email, mutation persists across reload (proves the Server Action wrote to the DB and the next render reflected it).
 - **Scenario 21** — server-side validation rejects invalid email → useActionState exposes `{ ok: false, message }` → no mutation; reload still shows original email.
 
+### Cross-component action result via `rscActionPluginFactory`
+
+`@real-router/rsc-server-plugin` exposes `rscActionPluginFactory(getResult)` — a sibling plugin that publishes Server Action results to `state.context.rscAction`. Server Components anywhere in the render tree can react to mutations without prop-drilling from the form component.
+
+`src/server-components/NotificationBanner.tsx` is the demonstration: a Server Component that reads `state.context.rscAction`, renders a success/error banner if a mutation just ran, or `null` otherwise. `entry.rsc.tsx` wraps every page's Server Component tree with the banner — so any page can show post-mutation feedback even though the form lives in `EditEmailForm` (a Client Component on the user profile page).
+
+Wiring on the client: when the action POST returns the new Flight payload, `setServerCallback` (in `entry.browser.tsx`) dispatches a `rsc:server-action-response` `CustomEvent` with the new payload. `App.tsx` listens and replaces its tree state with `payload.root` — so the banner mounts immediately, no manual reload needed.
+
+3 dedicated tests:
+
+- **Scenario 22** — plain GET requests show no banner (rscAction is undefined; banner Server Component returns null).
+- **Scenario 23** — successful Server Action surfaces success banner via `state.context.rscAction`. Both the form's `useActionState` message AND the cross-cutting global banner are visible — the banner has access to the result without any prop being passed from the form.
+- **Scenario 24** — validation-rejected action surfaces error banner with the rejection message; reload (no action) → banner gone, original DB state intact.
+
 ## Loader-driven HTTP: typed LoaderNotFound for unknown ids (HTML and Flight)
 
 `src/_loader-errors.ts` defines `LoaderNotFound` and `LoaderRedirect`. The `users.profile` loader throws `LoaderNotFound` for ids not in the database (e.g. the explicitly-marked `/users/9999`). `entry.rsc.tsx` catches the typed error BEFORE constructing the Flight stream and returns a `Response` with `404 Not Found` + `text/plain` — the SAME shape regardless of whether the request came in as `GET /users/9999` (HTML) or `GET /__rsc?route=/users/9999` (Flight). `router.dispose()` always runs in `finally`, no leak.

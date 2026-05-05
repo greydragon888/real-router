@@ -19,9 +19,37 @@ interface AppProps {
   readonly payload: Promise<AppPayload>;
 }
 
+// Must match the constant in entry.browser.tsx that dispatches the
+// post-action Flight payload. Kept inline (string literal) instead
+// of a shared module export to avoid coupling App ("use client") to
+// the entry module.
+const SERVER_ACTION_RESPONSE_EVENT = "rsc:server-action-response";
+
 export function App({ router, payload }: AppProps): ReactNode {
   const initial = use(payload);
   const [node, setNode] = useState<ReactNode>(initial.root);
+
+  // Listen for the post-server-action payload dispatched by
+  // entry.browser.tsx's setServerCallback. Replace the tree state
+  // with the freshly-rendered root so Server Components that read
+  // state.context.rscAction (e.g. NotificationBanner) appear in the
+  // DOM without a manual reload. Without this, useActionState would
+  // pick up the result but the rest of the page would stay stale.
+  useEffect(() => {
+    const handler = (event: Event): void => {
+      const detail = (event as CustomEvent<AppPayload>).detail;
+
+      startTransition(() => {
+        setNode(detail.root);
+      });
+    };
+
+    window.addEventListener(SERVER_ACTION_RESPONSE_EVENT, handler);
+
+    return () => {
+      window.removeEventListener(SERVER_ACTION_RESPONSE_EVENT, handler);
+    };
+  }, []);
 
   useEffect(() => {
     // Abort the previous in-flight Flight request when navigation changes.
