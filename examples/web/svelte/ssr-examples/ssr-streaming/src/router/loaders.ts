@@ -1,4 +1,4 @@
-import { LoaderNotFound } from "../_loader-errors";
+import { LoaderNotFound } from "@real-router/ssr-data-plugin/errors";
 import { getProduct, listProducts } from "../database";
 
 import type { Product } from "../database";
@@ -21,9 +21,9 @@ export const loaders: DataLoaderFactoryMap = {
 
     if (!product) {
       // Typed error → entry-server.ts maps it to status:404 + plain text.
-      // Same pattern as ssr/_loader-errors.ts. The body is intentionally
-      // minimal (no SSR re-render of NotFound page) — keeping the demo
-      // simple. A production app could re-render with a different URL.
+      // The body is intentionally minimal (no SSR re-render of NotFound
+      // page) — keeping the demo simple. A production app could re-render
+      // with a different URL.
       throw new LoaderNotFound(`product:${id}`);
     }
 

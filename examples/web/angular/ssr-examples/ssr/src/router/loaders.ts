@@ -3,7 +3,7 @@ import {
   LoaderNotFound,
   LoaderRedirect,
   withTimeout,
-} from "../_loader-errors";
+} from "@real-router/ssr-data-plugin/errors";
 
 import type { Post, User } from "../database";
 import type { DataLoaderFactoryMap } from "@real-router/ssr-data-plugin";

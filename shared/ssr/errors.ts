@@ -1,11 +1,20 @@
-// Typed loader errors that the SSR middleware translates into HTTP semantics.
-//
-// The ssr-data-plugin is intentionally HTTP-agnostic — it only awaits the
-// loader and writes the resolved value to state.context.data. To bridge
-// loaders ↔ HTTP status codes, loaders throw one of these named errors and
-// the express middleware in server.ts maps each `code` to the right status
-// (302, 404, 504). This keeps the plugin pure while giving applications the
-// same expressiveness as Next.js `redirect()` / `notFound()`.
+/**
+ * Typed loader errors that SSR pipelines translate into HTTP semantics.
+ *
+ * The `ssr-data-plugin` and `rsc-server-plugin` are intentionally
+ * HTTP-agnostic — they only await the loader and write the resolved value
+ * to `state.context.<namespace>`. Loaders bridge to HTTP status codes by
+ * throwing one of these named errors; application-layer middleware catches
+ * them and maps each `code` to the right status (302/308, 404, 504).
+ *
+ * Structural discrimination via `code` (not `instanceof`) so consumers
+ * can match across realms / bundle boundaries without coupling to the
+ * class identity.
+ *
+ * Re-exported from both plugins under the `./errors` subpath:
+ * `@real-router/ssr-data-plugin/errors` and
+ * `@real-router/rsc-server-plugin/errors`.
+ */
 
 export class LoaderRedirect extends Error {
   readonly code = "LOADER_REDIRECT";
@@ -40,6 +49,12 @@ export class LoaderTimeout extends Error {
   }
 }
 
+/**
+ * Race a loader against a deadline. Resolves with the loader's value if it
+ * settles first, otherwise rejects with `LoaderTimeout`. The timer is
+ * cleared via `.finally()` on the work promise so a fast-path success
+ * does not leak the `setTimeout` handle.
+ */
 export function withTimeout<T>(
   routeName: string,
   ms: number,
@@ -59,19 +74,4 @@ export function withTimeout<T>(
       }, ms);
     }),
   ]);
-}
-
-export interface LoaderErrorLike {
-  code?: string;
-}
-
-export function isLoaderError(
-  error: unknown,
-  code: string,
-): error is LoaderErrorLike & { code: string } {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    (error as LoaderErrorLike).code === code
-  );
 }

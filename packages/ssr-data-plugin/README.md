@@ -90,6 +90,44 @@ cloneRouter → usePlugin → start(url) → data loaded → state.context.data 
 
 Client-side navigation and data fetching is the application's responsibility (React Query, Suspense, `useEffect`, etc.).
 
+## Typed Loader Errors (`@real-router/ssr-data-plugin/errors`)
+
+The plugin is HTTP-agnostic — it only awaits the loader and writes the result to `state.context.data`. To bridge loader failures to HTTP semantics (404, 30x, 504), import typed error classes from the `errors` subpath and let your handler catch them:
+
+```typescript
+import {
+  LoaderNotFound,
+  LoaderRedirect,
+  LoaderTimeout,
+  withTimeout,
+} from "@real-router/ssr-data-plugin/errors";
+
+const loaders: DataLoaderFactoryMap = {
+  "users.profile": () => (params) =>
+    withTimeout("users.profile", 250, async () => {
+      const user = await fetchUser(params.id);
+      if (!user) throw new LoaderNotFound(`user:${params.id}`);
+      return { user };
+    }),
+  "users.legacy": () => (params) => {
+    throw new LoaderRedirect(`/users/${params.id}`, 301);
+  },
+};
+
+// In the handler:
+try {
+  const state = await router.start(url);
+  return renderHtml(state);
+} catch (error) {
+  if (error?.code === "LOADER_NOT_FOUND") return res.status(404).send("Not Found");
+  if (error?.code === "LOADER_REDIRECT") return res.redirect(error.status, error.target);
+  if (error?.code === "LOADER_TIMEOUT") return res.status(504).send("Timeout");
+  throw error;
+}
+```
+
+Discriminator is the `code` field — match structurally without `instanceof`. Identical errors are also re-exported from `@real-router/rsc-server-plugin/errors` (same shared source) so RSC apps don't need to add a `ssr-data-plugin` dependency just to throw `LoaderNotFound`.
+
 ## Cleanup
 
 ```typescript

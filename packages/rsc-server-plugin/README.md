@@ -126,6 +126,38 @@ cloneRouter → usePlugin → start(url) → ReactNode resolved → state.contex
 
 Client-side data fetching is the application's responsibility (React Query, Suspense, RSC `/__rsc` endpoint).
 
+## Typed Loader Errors (`@real-router/rsc-server-plugin/errors`)
+
+Mirror of [`@real-router/ssr-data-plugin/errors`](../ssr-data-plugin/README.md#typed-loader-errors-real-routerssr-data-pluginerrors) — same shared source under `shared/ssr/errors.ts`. RSC apps can import error classes without adding `ssr-data-plugin` as a dependency:
+
+```typescript
+import {
+  LoaderNotFound,
+  LoaderRedirect,
+} from "@real-router/rsc-server-plugin/errors";
+
+const loaders: RscLoaderFactoryMap = {
+  "users.profile": (_router, getDep) => async (params) => {
+    const user = await getDep("db").users.findById(params.id);
+    if (!user) throw new LoaderNotFound(`user:${params.id}`);
+    return <UserProfile user={user} />;
+  },
+};
+
+// In the RSC fetch handler:
+try {
+  const state = await router.start(pathname);
+  return new Response(renderToReadableStream(buildRscPayload(state)));
+} catch (error) {
+  if (error?.code === "LOADER_NOT_FOUND") {
+    return new Response("Not Found", { status: 404 });
+  }
+  throw error;
+}
+```
+
+`LoaderNotFound`, `LoaderRedirect`, `LoaderTimeout`, `withTimeout` — same shape and structural `code` discriminator as the data-plugin counterparts.
+
 ## Cleanup
 
 ```typescript

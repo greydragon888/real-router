@@ -11,6 +11,17 @@
 | `DataLoaderFnFactory`    | type     | Factory signature: `(router, getDependency) => DataLoaderFn`       |
 | `DataLoaderFactoryMap`   | type     | Record of loader factories — pass to `ssrDataPluginFactory()`      |
 
+### Subpath: `@real-router/ssr-data-plugin/errors`
+
+| Export           | Kind     | Description                                                                            |
+| ---------------- | -------- | -------------------------------------------------------------------------------------- |
+| `LoaderRedirect` | class    | Throw from a loader to map to HTTP 30x. Fields: `target: string`, `status: 301\|302\|307\|308` |
+| `LoaderNotFound` | class    | Throw from a loader to map to HTTP 404. Field: `resource: string`                     |
+| `LoaderTimeout`  | class    | Thrown by `withTimeout()` when the deadline elapses. Fields: `route: string`, `ms: number` |
+| `withTimeout`    | function | `(routeName, ms, loader) => Promise<T>` — race a loader against a deadline             |
+
+Discriminator is structural (`error.code === "LOADER_NOT_FOUND" | "LOADER_REDIRECT" | "LOADER_TIMEOUT"`), so consumers don't need to import the classes to inspect — `instanceof` is optional. The errors are reusable across both `@real-router/ssr-data-plugin` and `@real-router/rsc-server-plugin` (same shared source under `shared/ssr/errors.ts`).
+
 ## How It Works
 
 1. `ssrDataPluginFactory(loaders)` validates loaders at factory call time, returns `PluginFactory`
@@ -47,9 +58,10 @@ src/
 ├── factory.ts     — ssrDataPluginFactory: thin adapter that validates + delegates to createSsrLoaderPlugin
 ├── validation.ts  — validateLoaders = createLoadersValidator(ERROR_PREFIX) — generic shared validator
 ├── types.ts       — DataLoaderFn, DataLoaderFnFactory, DataLoaderFactoryMap (public-facing types)
+├── errors.ts      — Re-export from shared-ssr/errors (LoaderRedirect, LoaderNotFound, LoaderTimeout, withTimeout)
 ├── constants.ts   — ERROR_PREFIX (LOGGER_CONTEXT — internal)
 ├── index.ts       — Public exports + module augmentation (@real-router/types for StateContext)
-└── shared-ssr/    — symlink → shared/ssr/ (createSsrLoaderPlugin + createLoadersValidator generics)
+└── shared-ssr/    — symlink → shared/ssr/ (createSsrLoaderPlugin, createLoadersValidator, errors)
 ```
 
 The `factory.ts` and `validation.ts` are intentionally tiny adapters — the actual try/catch + interceptor + claim logic lives in [`shared/ssr/`](../../../shared/ssr/) and is consumed by both `ssr-data-plugin` (T = `unknown`, namespace = `"data"`) and `rsc-server-plugin` (T = `ReactNode`, namespace = `"rsc"`).

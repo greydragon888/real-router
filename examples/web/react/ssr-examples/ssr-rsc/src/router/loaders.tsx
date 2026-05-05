@@ -1,4 +1,4 @@
-import { LoaderNotFound } from "../_loader-errors";
+import { LoaderNotFound } from "@real-router/rsc-server-plugin/errors";
 import { HomePage } from "../server-components/HomePage";
 import { UserProfile } from "../server-components/UserProfile";
 import { UsersList } from "../server-components/UsersList";

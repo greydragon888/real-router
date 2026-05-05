@@ -1,4 +1,4 @@
-import { LoaderNotFound } from "../_loader-errors";
+import { LoaderNotFound } from "@real-router/ssr-data-plugin/errors";
 import { database } from "../database";
 
 import type { Post, User } from "../database";
