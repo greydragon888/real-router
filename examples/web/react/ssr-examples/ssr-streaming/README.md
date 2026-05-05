@@ -8,7 +8,7 @@
 - **React 19 native streaming** via `renderToReadableStream` — server emits HTML shell + script chunks
 - **`<Suspense>` + `use(promise)`** for deferred sections (reviews, related items) that stream in after the shell
 - **Per-route artificial delays** (600 ms reviews, 1200 ms related items) on **server only** — client hydration is instant via `Promise.resolve()`
-- **Full-reload navigation** via `<Link>` falling back to native `<a href>` (no `browser-plugin`) — every navigation is a fresh SSR render with its own streaming demonstration
+- **Full-reload navigation** — `@real-router/browser-plugin` is intentionally not registered in `entry-client.tsx`, so `<Link>` clicks fall through to native `<a href>` and every navigation triggers a fresh SSR + streaming pipeline. Same trade-off as `react/ssr-examples/ssr-rsc/` (different reason: streaming demos are most valuable when each visit re-runs them).
 
 The router does **nothing streaming-specific**. All streaming behavior comes from React 19's native `<Suspense>` + `renderToReadableStream` + `use(promise)`. Real-Router's role is identical to non-streaming SSR: per-request `cloneRouter()`, `start(url)`, plugin-driven critical data via `state.context.data`.
 
@@ -20,9 +20,11 @@ Server (per request):
     → usePlugin(ssrDataPluginFactory(loaders))
     → start(url)                                  # critical data resolved (sync product)
     → renderToReadableStream(<RouterProvider><App /></RouterProvider>)
-                                                  # shell ready immediately (TTFB ~5ms)
-    → pipe stream chunks to res                   # fallbacks first, then deferred sections
-    → cleanup()                                   # router.dispose() after stream completes
+                                                  # shell ready BEFORE the slowest deferred section resolves
+    → server.ts sets Transfer-Encoding: chunked, pipes stream chunks to res
+                                                  # fallbacks first, then deferred sections
+    → cleanup()                                   # router.dispose() in finally — fires on success,
+                                                  # typed loader errors, and client-disconnect
 
 Client (initial hydration only):
   createAppRouter()
@@ -67,23 +69,37 @@ Key constraints:
 pnpm dev          # Express + Vite middleware (HMR), http://localhost:3000
 pnpm build:app    # vite build (client + ssr bundles)
 pnpm preview      # NODE_ENV=production tsx server/index.ts
-pnpm test:e2e     # Playwright — 5 acceptance scenarios
+pnpm test:e2e     # Playwright — 18 acceptance scenarios
 ```
 
 ## E2e Scenarios
 
-[`e2e/ssr-streaming.spec.ts`](e2e/ssr-streaming.spec.ts) — 5 Playwright scenarios:
+[`e2e/ssr-streaming.spec.ts`](e2e/ssr-streaming.spec.ts) — 18 Playwright scenarios. Highlights:
 
-1. **Shell renders before deferred content** — `page.goto(..., { waitUntil: "commit" })` + critical content visible in <750 ms
-2. **Streaming response contains BOTH fallbacks AND resolved content** — HTTP-level test verifying the streamed HTML contains `reviews-fallback` markers (`<!--$?-->`) AND `reviews-section` content
-3. **Deferred sections render after fallbacks** — browser visibility check (sections appear after Suspense streaming completes)
-4. **No hydration errors** — console clean of `hydrat`/`mismatch` warnings after stream completes
-5. **Every page is server-rendered with streaming** — full-reload navigation between pages, each visit triggers fresh SSR + streaming
+**Streaming basics (1-5)**
+1. Shell renders before deferred content — critical content visible in <750 ms
+2. Streamed response contains BOTH fallbacks AND resolved content (`reviews-fallback` markers + `reviews-section`)
+3. Deferred sections render after fallbacks (browser visibility check)
+4. No hydration errors — console clean of `hydrat`/`mismatch`
+5. Every page is server-rendered with streaming (full-reload navigation re-triggers streaming)
 
-```bash
-pnpm test:e2e
-# 5 passed (8.9s)
-```
+**State + isolation (6-9)**
+6. `__SSR_STATE__` carries critical product data
+7. Critical content rendered BEFORE `<Suspense>` boundaries in HTML byte order
+8. Reviews rendered with correct review ids per product
+9. Per-request isolation under 9 concurrent loads — proves `cloneRouter()` integrity
+
+**Suspense error containment (10) and loader-driven HTTP (11)**
+10. Product id "4" — server resolves empty reviews list, client `use(rejectedPromise)` throws → `ReviewsErrorBoundary` catches → sibling `<RelatedItems>` unaffected
+11. `/products/9999` — typed `LoaderNotFound` short-circuits the streaming pipeline → 404 text/plain (no chunked transfer)
+
+**Production HTTP semantics (12-14)**
+12. Per-route `Cache-Control` from `cache-policies.ts` — `/` `public, max-age=300, s-maxage=3600, must-revalidate`; `/products` `public, max-age=60`; `/products/:id` `public, max-age=120`
+13. **No `ETag`** (intentional) — streamed responses can't be hashed without buffering, which would defeat streaming. CDN-layer ETags handle this in production.
+14. `AbortController` per request fires on `req.on("close")` — stream pump exits, reader disposed, no router leak
+
+**createPortal (15-16)** — see "createPortal modal" section below
+**Selective hydration wire signature (17-18)** — see "Selective hydration" section below
 
 ## Why No `<Await>` / `defer()` Wrapper API?
 
@@ -110,12 +126,12 @@ function DataView({ promise }: { promise: Promise<Data> }) {
 
 ## Selective hydration — empirical proof of React 19's flagship feature
 
-React 19 is the only stable framework that ships **out-of-order Suspense placeholders** + **selective hydration**: faster Suspense islands hydrate independently as their data lands, slower ones continue showing fallbacks. Two e2e tests verify the wire signature:
+React 19 is one of the few stable frameworks that ships **out-of-order Suspense placeholders** + **selective hydration**: faster Suspense islands hydrate independently as their data lands, slower ones continue showing fallbacks. In this monorepo only Solid's `renderToStream` produces an equivalent wire signature; Vue 3 stable, Preact 10 (without `lazy()`), and Svelte 5 do not. Two e2e tests verify the wire signature:
 
 - **Scenario 17** — `<!--$?-->` Suspense placeholder markers appear in the streamed HTML alongside `<template id="B:0">` / `<template id="B:1">` resolved-content tags. The fallback HTML AND the resolved sections both ship in the same response — proving React streamed the shell first, then resolved templates as their data became available.
 - **Scenario 18** — byte-offset analysis: `data-testid="reviews-section"` appears in the response BEFORE `data-testid="related-section"`, matching their resolution order (600 ms vs 1200 ms server delay). Fallback markers (`reviews-fallback`, `related-fallback`) appear earlier still — proving the shell shipped first.
 
-This is the empirical proof of out-of-order completion. With a blocking Suspense pipeline (Vue 3 stable, Solid sync renderer) both sections would ship together at the slower offset. React 19 ships them as their data is ready, in completion order — that's what selective hydration's wire signature looks like in HTTP bytes.
+This is the empirical proof of out-of-order completion. Vue 3 stable's `renderToWebStream` ships everything together at the slowest offset; Solid's sync `renderToString` blocks entirely. Real out-of-order requires an async streaming renderer — React 19 ships sections as their data is ready, in completion order, and that's what selective hydration's wire signature looks like in HTTP bytes.
 
 ## `createPortal` modal — React-native portal pattern
 
@@ -128,11 +144,32 @@ The implementation uses a `mounted` state gate (`useState(false)` + `useEffect((
 
 Verified by Scenarios 15 (closed modal contributes zero markup to streamed HTML, `#modal-target` host node exists from `index.html`) and 16 (after click, dialog lives inside `#modal-target` and **not** inside `#root`).
 
+## Suspense error containment — `ReviewsErrorBoundary` + product id "4"
+
+`database.ts` declares `id: "4"` ("Broken Reviews Demo") as a fixture for testing Suspense error containment. The behaviour:
+
+- **Server**: `fetchReviews("4")` returns `Promise.resolve([])` — empty list, no error during SSR. The shell + fallbacks + sibling sections render normally.
+- **Client**: post-hydration `fetchReviews("4")` returns `Promise.reject(new Error("Reviews service unavailable"))`. `use(rejectedPromise)` throws synchronously inside the `<Reviews>` component.
+- `<ReviewsErrorBoundary>` (a class component wrapping `<Suspense>` for Reviews) catches the throw and replaces the SSR-rendered Reviews section with the error UI.
+- Critical product data + sibling deferred (`<RelatedItems>`) render unaffected.
+
+This proves React 19's Suspense + Error Boundary pair contains errors at the boundary granularity — one rejected promise doesn't tear down the page. Verified by Scenario 10.
+
 ## Loader-driven HTTP: typed LoaderNotFound for unknown ids
 
-`src/_loader-errors.ts` defines `LoaderNotFound`. The `products.detail` loader throws it for ids not in the in-memory store; `entry-server.tsx` catches the typed error BEFORE constructing the stream and returns a plain-text 404 result. This fixes a leak in the previous design — a generic `throw new Error()` bubbled past the streaming pipeline's catch path, `cleanup()` was never called, and the per-request router was held until GC. Now the catch path always disposes (`finally` block in server).
+Typed loader errors live in `@real-router/ssr-data-plugin/errors` (hoisted from per-example `_loader-errors.ts` files in commit `e7ad413e`). The `products.detail` loader imports `LoaderNotFound` and throws it for ids not in the in-memory store; `entry-server.tsx` catches the typed error BEFORE constructing the stream and returns a plain-text 404 result. This fixes a leak in the previous design — a generic `throw new Error()` bubbled past the streaming pipeline's catch path, `cleanup()` was never called, and the per-request router was held until GC. Now the catch path always disposes (`finally` block in server).
 
 The error path bypasses the streaming pipeline entirely — `Transfer-Encoding: chunked` is absent, no `<Suspense>` fallback flicker, just a fast plain-text response. Verified by Scenario 11.
+
+## Production HTTP semantics: Cache-Control + AbortController (no ETag)
+
+Streaming pipelines have a different production-grade footprint than classical SSR — the body is unhashable mid-flight, so ETag is intentionally absent. `server/index.ts` adds two pieces:
+
+- **Per-route `Cache-Control`** — `src/router/cache-policies.ts` maps URL paths to directives: `/` → `public, max-age=300, s-maxage=3600, must-revalidate`; `/products` → `public, max-age=60`; `/products/:id` → `public, max-age=120`. Headers are set BEFORE the stream starts (Express `res.setHeader` before the first `res.write`).
+- **No `ETag`** (intentional) — buffering the streamed HTML to hash it would defeat streaming (TTFB jumps to "after the slowest deferred section resolves"). Production CDNs add their own buffered ETag layer at the edge while still benefiting from the origin's chunked transfer.
+- **`AbortController` per request** — `req.on("close")` aborts the controller; the stream-pump loop exits within ~800 ms even if the client gives up mid-flight, the reader is disposed, and `cleanup()` runs in `finally` so the per-request router is never held past the connection. Without this wiring, a client who closed the tab during the 1.2 s related-items delay would still hold the worker until the loader settled.
+
+Verified by Scenarios 12, 13, 14 (Cache-Control values, no ETag header, AbortController fast-release).
 
 ## Library Philosophy
 
