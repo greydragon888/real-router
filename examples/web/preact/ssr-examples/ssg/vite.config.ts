@@ -73,5 +73,6 @@ export default defineConfig({
   appType: "mpa",
   resolve: {
     conditions: ["development"],
+    dedupe: ["preact", "preact/hooks", "preact/jsx-runtime"],
   },
 });

@@ -117,6 +117,76 @@ test.describe("Preact SSG — smoke", () => {
     await page.waitForLoadState("networkidle");
 
     await page.locator("nav >> text=Users").click();
-    await expect(page).toHaveURL("/users/");
+    // Client router uses /users; preview server redirects /users → /users/.
+    // Either is accepted — both serve the pre-rendered users/index.html.
+    await expect(page).toHaveURL(/\/users\/?$/);
+  });
+
+  test("hydration completes without console errors", async ({ page }) => {
+    const errors: string[] = [];
+    page.on("console", (msg) => {
+      if (msg.type() === "error") errors.push(msg.text());
+    });
+    page.on("pageerror", (err) => errors.push(err.message));
+
+    await page.goto("/users/1/");
+    await page.waitForLoadState("networkidle");
+
+    const hydrationErrors = errors.filter((m) =>
+      /hydrat|mismatch|__H/i.test(m),
+    );
+
+    expect(hydrationErrors).toEqual([]);
+  });
+
+  test("Cache-Control per route at preview: home gets long max-age", async ({
+    request,
+  }) => {
+    const response = await request.get("/");
+    expect(response.headers()["cache-control"]).toContain("s-maxage=3600");
+  });
+
+  test("Cache-Control: user profile path gets medium max-age", async ({
+    request,
+  }) => {
+    const response = await request.get("/users/1/");
+    expect(response.headers()["cache-control"]).toContain("max-age=120");
+  });
+
+  test("posts page renders with correct posts for each user with content", async ({
+    page,
+  }) => {
+    await page.goto("/users/1/posts/");
+    await expect(page.locator('[data-testid="user-posts"]')).toBeVisible();
+    await expect(page.locator('[data-post-id="p1"]')).toContainText(
+      "Hello world",
+    );
+    await expect(page.locator('[data-post-id="p2"]')).toContainText(
+      "On routing",
+    );
+
+    await page.goto("/users/2/posts/");
+    await expect(page.locator('[data-post-id="p3"]')).toContainText(
+      "SSR notes",
+    );
+  });
+
+  test("__SSR_STATE__ is embedded with full state.context.data", async ({
+    page,
+  }) => {
+    const response = await page.goto("/users/1/");
+    const html = await response!.text();
+
+    expect(html).toMatch(/window\.__SSR_STATE__=\{[^}]*"name":"users\.profile"/);
+    expect(html).toContain('"id":"1"');
+    expect(html).toContain('"name":"Alice"');
+  });
+
+  test("404.html: not embedded with __SSR_STATE__ (renders bare not-found)", () => {
+    const html = readFileSync(path.resolve(dist, "404.html"), "utf8");
+    // ssg-build.ts renders 404 without state — the not-found URL is
+    // not bound to any router state, so embedding it would mislead
+    // hydration if the file is served for an arbitrary missing path.
+    expect(html).not.toContain("window.__SSR_STATE__");
   });
 });
