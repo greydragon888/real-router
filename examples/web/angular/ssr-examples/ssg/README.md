@@ -5,7 +5,10 @@ Static site generation with Real-Router, Angular 21, `@angular/ssr` build pipeli
 ## What This Demonstrates
 
 - **`provideRealRouterFactory({ baseRouter, plugins })`** — same factory as the runtime SSR example, with `REQUEST` flowing per URL through `AngularNodeAppEngine`'s request scope.
-- **Static path enumeration** via `getStaticPaths(router, entries)` from `@real-router/core/utils` — auto-discovers leaf routes from the router tree; dynamic routes (`users.profile`) get parameter sets via `entries.ts`.
+- **`provideZonelessChangeDetection()`** — full Angular 21 zoneless mode; signals + `computed` drive change detection without `zone.js`. Pre-rendered HTML carries no `zone.js` artefacts (verified by `ssg.spec.ts:63-71` "zoneless proof").
+- **`provideServerRendering(withRoutes(serverRoutes), withAppShell(AppComponent))`** — server-side bootstrap. `withAppShell` registers `AppComponent` as the SSR root; without it `AngularNodeAppEngine` cannot serialize the component tree. SSG reuses the runtime SSR server in-process, so the same `withAppShell` requirement applies.
+- **`@angular/router` + `NgRouterStub`** — required peer for `@angular/ssr`'s URL matching pipeline (`@angular/ssr` rejects bootstraps without `provideRouter(...)`). `NgRouterStub` is a no-op standalone Component routed under `path: "**"` so all routing decisions fall through to Real-Router's `<route-view>`. Pure SSR-pipeline placeholder, never visible. Without this paragraph readers see "two routers in deps" and assume conflict.
+- **Static path enumeration** via `getStaticPaths(router, entries)` from `@real-router/core/utils` — auto-discovers leaf routes from the router tree; dynamic routes (`users.profile` and `users.profile.posts`) get parameter sets via `entries.ts`.
 - **In-process SSR for build-time render** — `scripts/ssg-build.ts` boots the compiled `@angular/ssr` server in-process on a build-only port, fetches each URL, and persists the streamed HTML to `dist/.../browser/<url>/index.html`.
 - **Per-page SEO meta** — `meta.ts` resolves a `PageMeta` per route (title, description, canonical path, og:type, og:image). `ssg-build.ts` injects `<title>`, `<meta description>`, `<link rel="canonical">`, OpenGraph (`og:type`/`title`/`description`/`url`/`image`) and `twitter:card` tags via the `<!--ssg-meta-->` placeholder. Each pre-rendered page ships a per-id canonical URL so search engines can deduplicate properly. Posts pages use `og:type=article`, profile pages use `og:type=profile`.
 - **Nested route pre-rendering** — `users/:id/posts` is generated for every id in `entries.ts` (in addition to the parent `/users/:id` profile). 8 static HTMLs total: home, list, 3 profiles, 3 posts pages. `getStaticPaths()` enumerates leaf routes only, so intermediate `/users/:id` paths are derived in `ssg-build.ts` from the leaf list.
@@ -30,10 +33,10 @@ src/
     createBaseRouter.ts  createRouter(routes, options)
     routes.ts            Route definitions (home, users, users.profile)
     loaders.ts           Per-route data loaders
-    entries.ts           Dynamic route parameter sets (users.profile → id: 1, 2, 3)
-    meta.ts              Per-route title + description resolver
+    entries.ts           Dynamic route parameter sets (users.profile + users.profile.posts → id: 1, 2, 3)
+    meta.ts              Per-route title + description + canonicalPath + ogType + ogImagePath
   pages/
-    home, users-list, user-profile, not-found (.component.ts)
+    home, users-list, user-profile, user-posts, not-found (.component.ts)
 
 scripts/
   ssg-build.ts           Build script — spins up server.mjs in-process, fetches each URL, writes static HTML
@@ -49,7 +52,13 @@ Build time:
 
   tsx scripts/ssg-build.ts
     → import server.mjs → app.listen(4174) — in-process SSR server
-    → getStaticPaths(baseRouter, entries) → ["/", "/users/1", "/users/2", "/users/3"] + manual "/users"
+    → getStaticPaths(baseRouter, entries) returns LEAVES only:
+        ["/", "/users/1/posts", "/users/2/posts", "/users/3/posts"]
+        (users.profile has children, so it is NOT a leaf)
+    → ssg-build.ts derives intermediate paths from the leaf list:
+        strip "/posts" suffix → ["/users/1", "/users/2", "/users/3"]
+        + manual "/users" (parent UsersList page)
+        → final 8 paths to render
     → For each URL:
         fetch(http://localhost:4174/<url>) → HTML via AngularNodeAppEngine
         → injectMeta(html, getMetaForState(state)) — per-page <title> + <meta description>
@@ -75,7 +84,8 @@ This is a deliberately small SSG demo. Things it does **not** do, and would-be u
 - **CSR navigation does not refetch loader data.** `ssr-data-plugin` intercepts `start()`, not `navigate()`. After hydration, clicking a `realLink` to `/users/2` fires `router.navigate()` → loader does **not** run → `state.context.data === undefined` → the user-profile component renders the "User not found" branch. This is the same SSR-only contract as the runtime `ssr/` example, verified in e2e scenario 15. If you want client-side data fetching after hydration, add `lifecycle-plugin` `onNavigate`.
 - **Not ISR.** No incremental regeneration, no on-demand revalidation, no cache invalidation. Build-time only — to update a page, rebuild and redeploy. ISR would require a runtime SSR server with a cache layer, which is out of scope for this example.
 - **404.html and sitemap.xml are application-level outputs**, not plugin features. `scripts/ssg-build.ts` calls `fetch('/__nonexistent')` → writes `404.html`, and assembles `sitemap.xml` from `getStaticPaths()`. Real-Router supplies the route enumeration (`getStaticPaths`); the SEO file generation is bespoke build script logic. Easy to copy into your own SSG pipeline, but don't expect it to work without the script.
-- **Sirv's 404 behavior depends on web-server config.** `sirv --single` falls back to `index.html` for unknown URLs. To serve `404.html` with HTTP 404 status (proper SEO signal) you need a real web server (nginx `try_files` rule, Cloudflare Pages `_redirects`, Netlify `_redirects`, etc.) — sirv preview cannot do this alone.
+- **Sirv's 404 behavior depends on web-server config.** This example uses `sirv` **without** `--single` — sirv returns 404 for unknown URLs, but does **not** automatically serve `404.html` with HTTP 404 status. To serve `404.html` with proper 404 status (SEO signal) you need a real web server (nginx `try_files` rule, Cloudflare Pages `_redirects`, Netlify `_redirects`, etc.) — sirv preview cannot do this alone.
+- **Build fails fast on any loader error.** `scripts/ssg-build.ts` collects errors per URL and exits with code 1 if **any** URL failed. No partial dist is produced. This is opposite of "skip-and-continue" SSG builders (e.g. some Hugo/Jekyll modes); the rationale is that a stale entry in `entries.ts` (id removed from the database) silently emitting a "user not found" page is worse than a loud build failure.
 
 ## Why "in-process SSR" instead of `renderApplication` direct?
 
@@ -85,14 +95,25 @@ The "boot the SSR server in-process and fetch URLs" approach reuses the **exact 
 
 Trade-off: requires `outputMode: "server"` and an `ssr.entry`, even for SSG. The `src/server.ts` placeholder satisfies this build invariant — it is **not** used at runtime (sirv serves the static files).
 
+## Required: `security.allowedHosts: ["localhost"]`
+
+`angular.json` pins `security.allowedHosts: ["localhost"]` for the application builder. Angular 21 SSR rejects unrecognized hosts by default (SSRF prevention) — without this allow-list, the in-process `AngularNodeAppEngine` would return 403 for every `fetch("http://localhost:4174/...")` call from `ssg-build.ts:105` and the **entire build would fail**. This is more critical for SSG than for runtime SSR because the build script itself depends on the localhost loopback.
+
+Production deployments don't need to extend this list — SSG output is static and served by any web server, with no runtime SSR requests.
+
 ## Running
 
 ```bash
-pnpm dev          # ng serve — Angular dev server (no SSG, just CSR)
-pnpm build:app    # ng build + tsx scripts/ssg-build.ts → static files in dist/.../browser/
-pnpm preview      # sirv dist/ssg-angular-example/browser --port 4173 --quiet
-pnpm test:e2e     # Playwright tests
+pnpm dev                            # ng serve — Angular dev server (no SSG, just CSR)
+SITE_ORIGIN=https://your.site \
+  pnpm build:app                    # ng build + tsx scripts/ssg-build.ts → static files in dist/.../browser/
+                                    # SITE_ORIGIN env-var sets canonical URLs in <link rel="canonical">
+                                    # and sitemap.xml; defaults to "https://example.com" if unset.
+pnpm preview                        # sirv dist/ssg-angular-example/browser --port 4173 --quiet
+pnpm test:e2e                       # Playwright tests
 ```
+
+The `predev` script runs `pnpm turbo run bundle --filter=...` first, so `pnpm dev` will rebuild any out-of-date workspace packages before starting `ng serve`.
 
 ## Output
 
