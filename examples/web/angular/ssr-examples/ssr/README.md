@@ -7,13 +7,17 @@ Server-side rendering with Real-Router, Angular 21, `@angular/ssr` (`AngularNode
 - **`provideRealRouterFactory({ baseRouter, plugins, deps })`** — per-request router scope via Angular's `REQUEST: InjectionToken<Request | null>`. Each request gets an isolated router clone via `cloneRouter(baseRouter, deps?.(request))`, started by `provideAppInitializer`, disposed via `DestroyRef.onDestroy`.
 - **Conditional `plugins` function form** — `browser-plugin` registered only on the client; the server registers `ssrDataPluginFactory(loaders)` only.
 - **Per-request DI deps** — `currentUser` derived from `request.headers.get("cookie")` on the server, from `document.cookie` on the client (after hydration).
-- **`@angular/ssr` modern API** — `AngularNodeAppEngine.handle(req)` + `writeResponseToNodeResponse` (NOT the deprecated `CommonEngine`).
+- **`@angular/ssr` modern API** — `AngularNodeAppEngine.handle(req)` returns a Web `Response`. `server.ts` buffers the body via `await response.arrayBuffer()` and writes it to the Node `res` with `res.end(buffer)`. Buffering (rather than `writeResponseToNodeResponse` streaming) is required so the response body can be hashed for the strong `ETag` header. NOT the deprecated `CommonEngine`.
+- **`provideZonelessChangeDetection()`** — full Angular 21 zoneless mode; signals + `computed` drive change detection without `zone.js`. E2e (`ssr.spec.ts:60-66` "zoneless proof") asserts no `zone.js` artefacts in the SSR HTML.
+- **`provideServerRendering(withRoutes(serverRoutes), withAppShell(AppComponent))`** — server-side bootstrap. `withAppShell` registers `AppComponent` as the SSR root; without it `AngularNodeAppEngine` cannot serialize the component tree.
+- **`@angular/router` + `NgRouterStub`** — required peer for `@angular/ssr`'s URL matching (`@angular/ssr` rejects bootstraps without `provideRouter(...)`). `NgRouterStub` is a no-op standalone Component routed under `path: "**"` so all routing decisions fall through to Real-Router's `<route-view>`. SSR-pipeline placeholder, never visible. Without this paragraph readers see "two routers in deps" and assume conflict.
 - **Server-side data loading** via `@real-router/ssr-data-plugin` — route loaders run during `router.start(url)` and write to `state.context.data`. Components read it via `injectRoute()` signal.
 - **Cookie-based auth-gated routes** — `dashboard` and `admin` protected by `canActivate` guards consuming `getDep("currentUser")`.
 - **Query params + nested loaders** — `?sort` on `/users`, leaf-route loader for `/users/:id/posts` returns combined parent + child data.
-- **Loader error → 500 page** — rejected loader in `provideAppInitializer` propagates → `bootstrapApplication` rejects → server returns 500 (Option A from RFC §10).
-- **Loader-driven HTTP semantics** — typed loader errors (`LoaderRedirect`, `LoaderNotFound`, `LoaderTimeout` in `_loader-errors.ts`) are caught by the express middleware and mapped to `301/302`, `404`, and `504` responses respectively. The plugin stays HTTP-agnostic; the application owns the bridge.
+- **Loader error → 500 page** — rejected loader in `provideAppInitializer` propagates → `bootstrapApplication` rejects → server returns 500. See [`.claude/rfc-angular-ssr-factory-ru.md`](../../../../../.claude/rfc-angular-ssr-factory-ru.md) for the full design rationale.
+- **Loader-driven HTTP semantics** — typed loader errors (`LoaderRedirect`, `LoaderNotFound`, `LoaderTimeout` from `@real-router/ssr-data-plugin/errors`) are caught by the express middleware and mapped to `301/302`, `404`, and `504` responses respectively. The plugin stays HTTP-agnostic; the application owns the bridge.
   - `users.profile` throws `LoaderNotFound` for ids that don't exist → server returns 404 (vs `UNKNOWN_ROUTE` which is a 200 + NotFound page via `allowNotFound: true`).
+  - `users.profile.posts` does the same — leaf loader re-validates the parent user id, so `/users/9999/posts` also surfaces as 404 (verified by `e2e/ssr.spec.ts:474-480`).
   - `legacyUser` (`/legacy-user/:id`) throws `LoaderRedirect("/users/:id", 301)` — demonstrates the canonical-URL pattern (Next.js-style `redirect()` from a loader).
   - `slow` (`/slow`) demonstrates `withTimeout()` — the loader sleeps 5 s but is wrapped in a 250 ms budget, so the server responds 504 Gateway Timeout instead of hanging an SSR worker.
 - **Client-side navigation** — after hydration, `@real-router/browser-plugin` handles SPA navigation through `realLink` directive.
@@ -26,23 +30,38 @@ Server-side rendering with Real-Router, Angular 21, `@angular/ssr` (`AngularNode
 src/
   _auth.ts               Cookie parsing → currentUser DI (works server + client)
   _known-users.ts        KNOWN_USERS table + parseCookieHeader + lookupUserFromCookies
-  _loader-errors.ts      LoaderRedirect / LoaderNotFound / LoaderTimeout + withTimeout helper
   database.ts            In-memory mock store
-  app.config.ts          Shared providers: provideZonelessChangeDetection, provideRealRouterFactory
-  app.config.server.ts   Server-only: provideServerRendering(withRoutes(serverRoutes))
-  app.routes.server.ts   ServerRoute[] — RenderMode.Server for all paths
+  app.config.ts          Shared providers — provideZonelessChangeDetection,
+                         provideRouter([NgRouterStub]) (peer required by @angular/ssr),
+                         provideRealRouterFactory({ baseRouter, plugins, deps })
+  app.config.server.ts   Server-only — provideServerRendering(withRoutes(serverRoutes),
+                         withAppShell(AppComponent))
+  app.routes.server.ts   ServerRoute[] — Mixed RenderMode: /marketing → Client,
+                         /live → Server, /gone → Server with status:410 + Sunset/
+                         Deprecation/Link headers, ** → Server (default)
   app.component.ts       Root standalone component — <route-view> + <ng-template routeMatch>
-  main.ts                Client entry — bootstrapApplication + provideClientHydration(withIncrementalHydration())
+  main.ts                Client entry — bootstrapApplication + provideClientHydration(
+                         withIncrementalHydration(), withEventReplay())
   main.server.ts         Server bootstrap — accepts BootstrapContext, returns bootstrapApplication
-  server.ts              Express + AngularNodeAppEngine + LOADER_REDIRECT/NOT_FOUND/TIMEOUT mapping
+  server.ts              Express + AngularNodeAppEngine; maps CANNOT_ACTIVATE → 302,
+                         LOADER_REDIRECT → 301/302, LOADER_NOT_FOUND → 404 text/plain,
+                         LOADER_TIMEOUT → 504 text/plain; buffers Web Response via
+                         arrayBuffer() for sha256 ETag; per-request AbortController
+                         attached to req.abortSignal
   router/
     createBaseRouter.ts  createRouter(routes, options) — base for cloneRouter per request
     routes.ts            Route definitions with auth guards (incl. legacyUser, slow)
-    loaders.ts           Per-route data loaders (incl. NotFound + Redirect + withTimeout demos)
+    loaders.ts           Per-route data loaders (incl. NotFound + Redirect + withTimeout demos);
+                         imports typed errors from @real-router/ssr-data-plugin/errors
+    cache-policies.ts    Per-URL Cache-Control mapping
   pages/
-    home, users-list, user-profile, user-posts, dashboard, admin, not-found (.component.ts)
+    home, users-list, user-profile, user-posts, dashboard, admin,
+    not-found, gone, live, marketing (.component.ts)
 
-server-runner.mjs        Node.js wrapper — imports `app` from compiled server.mjs and calls listen
+server-runner.mjs        Node.js wrapper — imports `app` from compiled server.mjs and calls listen.
+                         The compiled server.mjs's isMainModule check is fragile across
+                         @angular/ssr versions; the wrapper sidesteps that by binding
+                         app.handle to req/res directly.
 ```
 
 ## SSR Flow
@@ -163,7 +182,7 @@ The SSR renderer still runs (so the body explains the deprecation in human-reada
 
 ### Side-by-side comparison
 
-The e2e suite verifies both strategies in one test (scenario 39): `/gone` returns `text/html` 410 with sunset headers + a real SSR body, while `/users/9999` returns `text/plain` 404 with a minimal body. Trade-off:
+The e2e suite verifies both strategies in one test (`serverRoutes status override vs loader-thrown error` in `e2e/ssr.spec.ts`): `/gone` returns `text/html` 410 with sunset headers + a real SSR body, while `/users/9999` returns `text/plain` 404 with a minimal body. Trade-off:
 
 - **Strategy A** ships a richer body (full SSR render through Angular) and integrates with build-time prerendering / CDN cache headers. Limited to status overrides knowable at routing time.
 - **Strategy B** carries any data-derived status, but the body in this example is `text/plain "Not Found"` for simplicity. Rendering a rich 404 from middleware would require a second `angularApp.handle()` pass against a `/__not-found` URL with `res.status(404)`.
@@ -175,7 +194,7 @@ The e2e suite verifies both strategies in one test (scenario 39): `/gone` return
 `server.ts` adds three production-grade pieces on top of the AngularNodeAppEngine pipeline:
 
 - **Strong `ETag`** — the Web Response from `angularApp.handle(req)` is buffered (`response.arrayBuffer()`), hashed (sha256 → 16 base64url chars), and the hash is set as the `ETag` header. Conditional GET (`If-None-Match`) returns `304 Not Modified` with an empty body. Distinct routes yield distinct ETags; identical routes with deterministic loaders yield the same ETag across requests.
-- **Per-route `Cache-Control`** — `src/router/cache-policies.ts` maps URL paths to directives: `/` → `public, s-maxage=3600, must-revalidate`, `/users` → `public, max-age=60`, `/users/:id` → `public, max-age=120`, `/dashboard` and `/admin` → `private, no-store`, `/legacy-user/:id` → 1-day cache for the redirect itself, `/slow`/`/boom` → `no-store`.
+- **Per-route `Cache-Control`** — `src/router/cache-policies.ts` maps URL paths to directives: `/` → `public, max-age=300, s-maxage=3600, must-revalidate`, `/users` → `public, max-age=60, must-revalidate`, `/users/:id` → `public, max-age=120, must-revalidate`, `/dashboard` and `/admin` → `private, no-store`, `/legacy-user/:id` → 1-day cache for the redirect itself, `/slow`/`/boom` → `no-store`.
 - **`AbortController` per request** — the controller's signal is attached to the Express request object (`(req as { abortSignal? }).abortSignal = signal`) so the `provideRealRouterFactory({ deps })` factory in `app.config.ts` can forward it into Real-Router's per-request dep map. The `slow` loader pulls it via `getDep("abortSignal")` and clears its `setTimeout` on `req.on("close")`. Without this wiring a 5 s loader holds the worker even after the client gives up. The e2e suite verifies the server releases the handler within 1 s (well under the 5 s loader delay).
 
 These are demonstrated end-to-end by 4 dedicated tests in `e2e/ssr.spec.ts` (Cache-Control routing, 304 on identical content, distinct routes → distinct hashes, AbortController fast release).
@@ -205,6 +224,10 @@ pnpm test:e2e     # Playwright tests
 ## Why `server-runner.mjs`?
 
 `outputMode: "server"` produces a `server.mjs` whose `isMainModule(import.meta.url)` check SHOULD start a listener when invoked via `node server.mjs`. That path has been historically fragile across @angular/ssr versions (see plan §6.5.1 finding 3 — the original Angular implementation attempt couldn't get the standalone listener to fire). `server-runner.mjs` is a stable wrapper that explicitly imports `app` from the compiled server bundle and calls `listen()`.
+
+## Required: `security.allowedHosts: ["localhost"]`
+
+`angular.json` pins `security.allowedHosts: ["localhost"]` for the application builder. Angular 21 SSR rejects unrecognized hosts by default (SSRF prevention) — without this allow-list, the server returns 403 for every request to `http://localhost:4173/*`, and the e2e suite cannot run. Production deployments must extend this list to the actual hostnames they serve (e.g. `["my-app.example.com"]`).
 
 ## Key Packages
 
