@@ -2,7 +2,7 @@
 
 > Real-Router with Svelte 5 SSR + `{#await}` blocks for deferred data — and **zero router-specific streaming API**.
 
-> **Terminology disclaimer.** This example demonstrates **deferred-data SSR**, not HTTP streaming. Earlier README revisions called it "RSC-like" — that term oversells the pattern: React 19 RSC ships serialized component trees + a Flight protocol over chunked HTTP. Svelte 5's `{#await}` ships HTML with placeholder branches in a single buffered response — async resolution then runs entirely **on the client** after hydration. Empirical proof: the body lands in **one TCP frame, ~0 ms span** (e2e Scenario 12 reproduces this with `node:http`). For real progressive HTTP streaming, see the React 19 / Solid / Vue counterparts.
+> **Terminology disclaimer.** This example demonstrates **deferred-data SSR**, not HTTP streaming. Earlier README revisions called it "RSC-like" — that term oversells the pattern: React 19 RSC ships serialized component trees + a Flight protocol over chunked HTTP. Svelte 5's `{#await}` ships HTML with placeholder branches in a single buffered response — async resolution then runs entirely **on the client** after hydration. Empirical proof: the body lands in **one TCP frame, ~0 ms span** (e2e Scenario 12 reproduces this with `node:http`). The symmetric test in `examples/web/solid/ssr-examples/ssr-streaming/` (Scenario 17) measures **multiple frames spanning >400 ms** — empirical proof of true OOO over chunked HTTP. Svelte's `<50 ms` assertion inverts the assertion direction. For real progressive HTTP streaming, see the React 19 / Solid / Vue counterparts.
 
 ## What This Demonstrates
 
@@ -30,7 +30,7 @@ Svelte 5 stable does **not** implement chunked streaming with out-of-order place
 
 Practical consequence: the streamed HTML body **does not** contain `data-review-id="r1"` — Svelte ships the `reviews-fallback` placeholder, the `Promise.resolve(...)` finishes during client hydration, and the browser DOM updates to the resolved `reviews-section`. The HTTP-level proof in this example's e2e suite therefore checks for the **fallback** in the response, then asserts that the **resolved sections** become visible after `page.goto(...)`. Scenario 12 captures TCP frame timings via `node:http` to make the "no progressive flush" claim falsifiable.
 
-The plan-level decision behind this example is documented in [§5.3](../../../../../.claude/plan-ssr-dogfooding-solid-svelte-angular-ru.md): Outcome A (async SSR + native `{#await}` works) is the likely default for Svelte; Outcome B (skip streaming with documented gap) is the fallback if the integration breaks. This implementation is Outcome A.
+The plan-level decision behind this example is documented in [§5.3](../../../../../.claude/plan-ssr-dogfooding-solid-svelte-angular-ru.md): Outcome A (async SSR + `<svelte:boundary>` + `{#await}` works) is the likely default for Svelte; Outcome B (classical sync `render()` + `<svelte:boundary>` only for error handling, no streaming) is the fallback if Real-Router's lifecycle conflicts with async SSR. This implementation is Outcome A.
 
 ## Architecture
 
@@ -64,11 +64,16 @@ Client (initial hydration):
 - **Top-level `await` is gated behind `experimental.async: true`** in Svelte 5.54.x. Configured in both `vite.config.ts` (compiler, hot path) and `svelte.config.js` (svelte-check). Expect this flag to graduate to stable in a future Svelte minor; the e2e test `Scenario 16` pins current behaviour so a runtime flip surfaces honestly.
 - **`<svelte:boundary pending>` does NOT block server-side render in Svelte 5.54.** The boundary's `pending` snippet is shipped to the wire just like `{#await}` would; async resolution happens on the client. The 250 ms server-side delay in `ServerStats.svelte` is harmless because `render()` doesn't wait for it. If a future Svelte release adopts "server waits before flush" semantics, the test will fail noisily — by design.
 - **`$state.raw(value)` for immutable snapshots** is the Svelte 5 escape hatch when you hold a large data object that you replace wholesale rather than mutate. It skips the deep proxy that wraps regular `$state` and avoids per-property reactivity overhead. Useful for: cached loader payloads with thousands of items, large config blobs, snapshot-style undo stacks. Not used in this example because the in-memory fixtures are small — the proxy cost is invisible at this scale.
+- **No production-level HTTP semantics here.** `AbortController`, `ETag`, `Cache-Control`, HEAD-handler, and per-route `<svelte:head>` are out of scope — the focus is the deferred-data + boundary contract. The Vue/React streaming counterparts document those layers; the sibling `svelte/ssr-examples/ssr/` example uses `<svelte:head>`. The `head` slot is wired here (`entry-server.ts` → `<!--ssr-head-->`), so adding `<svelte:head>` to any page works without server changes — left empty by design
 
 ## Run
 
 ```bash
 pnpm dev          # Express + Vite middleware (HMR), http://localhost:3000
+                  # `predev` hook runs `pnpm turbo run bundle --filter=...`
+                  # so workspace deps (@real-router/svelte + plugins) are
+                  # rebuilt before the dev server starts — Vite reads
+                  # `dist/esm/` for `@real-router/*` imports.
 pnpm build:app    # svelte-check + vite build (client + ssr bundles)
 pnpm preview      # NODE_ENV=production tsx server/index.ts
 pnpm test:e2e     # Playwright
@@ -76,7 +81,7 @@ pnpm test:e2e     # Playwright
 
 ## E2e Coverage
 
-[`e2e/ssr-streaming.spec.ts`](e2e/ssr-streaming.spec.ts) — 19 Playwright scenarios:
+[`e2e/ssr-streaming.spec.ts`](e2e/ssr-streaming.spec.ts) — 20 Playwright scenarios (numbered 1–20; the file lists 1–14 then 16–19 then 15 then 20 — historical insertion order, not a gap):
 
 - 11 baseline (404, per-request isolation, hydration round-trip, critical data in `__SSR_STATE__`, no hydration warnings, error containment via `{:catch}`, empty deferred state) — mirrors Vue/Solid where the runtime allows
 - Svelte-specific: HTTP response carries the **pending fallback** (`reviews-fallback`, `related-fallback`); resolved sections appear in the browser after hydration
@@ -89,6 +94,7 @@ pnpm test:e2e     # Playwright
 - **Scenario 17 (new)**: `<svelte:boundary onerror>` callback — production observability hook fires before `@failed` renders. Spied via `console.error` (would be Sentry/Datadog in production). Asserts the error message reaches the callback verbatim.
 - **Scenario 18 (new)**: `use:trackView` action — `IntersectionObserver`-based view tracking, populates `window.__VIEW_LOG__` on hydration. Demonstrates the SSR-safe-by-construction property of Svelte actions (server runtime never invokes them, so `window` references can't crash render).
 - **Scenario 19 (new)**: SSR-safety proof for the same action — server response contains zero references to `__VIEW_LOG__` / `IntersectionObserver`. Closes the loop on "actions are safe in SSR" claim.
+- **Scenario 20 (new)**: `use:trackView` update lifecycle — `manualOverride` (`$state`) flips `trackedId` from `data.product.id` to `"999"` → `action.update({ productId: "999" })` fires on the existing observer instance, no remount. Verified via `window.__VIEW_UPDATE_LOG__` (separate from `__VIEW_LOG__` which tracks intersect events).
 - **Removed from Vue/Solid baseline:**
   - "Critical content precedes deferred sections" positional invariant — Svelte's pending model has no concept of "deferred sections in the response body"
   - "Chunked transfer + per-Suspense timing" — Svelte returns single-response HTML, no `Transfer-Encoding: chunked`
