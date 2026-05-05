@@ -231,4 +231,35 @@ test.describe("Preact SSG — smoke", () => {
 
     expect(errors.filter((e) => /hydrat|mismatch|__H/i.test(e))).toEqual([]);
   });
+
+  test("loader-driven build error: render('/users/9999') rejects with typed LoaderNotFound", async () => {
+    // Import the compiled entry-server module that ssg-build.ts uses.
+    // Calling render('/users/9999') must reject with the typed
+    // LoaderNotFound error — proving that if entries.ts listed an
+    // id no longer in the database, the build script's try/catch
+    // would surface it as a failure (process.exit(1)) rather than
+    // silently emitting an empty "user not found" page.
+    const distEntry = path.resolve(dist, "server/entry-server.js");
+    const module_ = (await import(distEntry)) as {
+      render: (url: string) => Promise<{
+        html: string;
+        ssrJson: string;
+        statusCode: number;
+        meta: { title: string; description: string };
+      }>;
+    };
+    const { render } = module_;
+
+    let caught: { code?: string; resource?: string } | undefined;
+
+    try {
+      await render("/users/9999");
+    } catch (error) {
+      caught = error as { code?: string; resource?: string };
+    }
+
+    expect(caught).toBeDefined();
+    expect(caught?.code).toBe("LOADER_NOT_FOUND");
+    expect(caught?.resource).toBe("user:9999");
+  });
 });
