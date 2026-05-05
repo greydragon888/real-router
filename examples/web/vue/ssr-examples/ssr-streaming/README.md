@@ -12,16 +12,16 @@
 
 The router does **nothing streaming-specific**. All streaming behavior comes from Vue 3's native `<Suspense>` + `renderToWebStream` + `async setup()`. Real-Router's role is identical to non-streaming SSR: per-request `cloneRouter()`, `start(url)`, plugin-driven critical data via `state.context.data`.
 
-## How This Differs From React `ssr-streaming`
+## How This Differs From React / Solid / Angular streaming
 
-Vue 3 SSR streaming is **structurally different** from React 19's `renderToReadableStream`:
+Vue 3 SSR streaming is **structurally different** from React 19's `renderToReadableStream`, Solid's `renderToStream`, and Angular's `@defer` + `withIncrementalHydration` model:
 
-| | React 19 | Vue 3 |
-| --- | --- | --- |
-| Streaming primitive | `renderToReadableStream` + `<Suspense>` | `renderToWebStream` + `<Suspense>` |
-| Out-of-order placeholders | Yes — `<!--$?-->` markers + `<template>` chunks replace them as they resolve | No — render is sequential, top-down |
-| Selective hydration | Yes — hydrates resolved islands as chunks arrive | No — `app.mount()` hydrates the whole tree atomically |
-| `<Suspense>` semantics in SSR | Non-blocking — emits fallback marker, real content follows in a later chunk | Blocking — render of content **after** the boundary waits for async children to resolve |
+| | React 19 | Vue 3 | Solid | Angular 21 |
+| --- | --- | --- | --- | --- |
+| Streaming primitive | `renderToReadableStream` + `<Suspense>` | `renderToWebStream` + `<Suspense>` | `renderToStream` + `<Suspense>` + `createResource` | `AngularNodeAppEngine.handle()` returning a Web `Response` |
+| Out-of-order placeholders in shell | Yes — `<!--$?-->` markers + `<template>` chunks | **No — sequential, top-down** | Yes — inline `<script>` patches replace fallbacks | No — `@placeholder` rendered into the same single document |
+| Selective hydration | Yes — hydrates resolved islands as chunks arrive | **No — `app.mount()` hydrates atomically** | Yes — selective per `<Suspense>` island | Yes — per-`@defer` block via `withIncrementalHydration()` |
+| `<Suspense>` semantics in SSR | Non-blocking — emits fallback marker, real content follows in a later chunk | **Blocking — content after the boundary waits for async children** | Non-blocking — both fallback marker + resolved chunk in same response | n/a — uses `@defer` instead of Suspense |
 
 What this example actually demonstrates for Vue:
 
@@ -29,7 +29,7 @@ What this example actually demonstrates for Vue:
 - **`<Suspense>` boundaries with `async setup()`** — used as the canonical Vue pattern for awaitable deferred data
 - **Per-request router isolation** under concurrent load — same guarantee as the React example
 
-It does **not** demonstrate React's "fallback now, real content later" pattern, because Vue 3 doesn't ship that pattern in the stable runtime. True out-of-order hydration is on the Vapor mode roadmap; until then, this example demonstrates Vue 3's actual SSR streaming model honestly.
+It does **not** demonstrate React's "fallback now, real content later" pattern, because Vue 3 stable runtime does not implement out-of-order Suspense in SSR. This example demonstrates Vue 3's actual blocking-Suspense + chunked-streaming model honestly, without promising APIs that don't exist.
 
 ## Architecture
 
@@ -101,11 +101,22 @@ The implementation uses the canonical streaming-safe variant: `<Teleport :disabl
 
 Without `:disabled`, Vue's SSR Teleport emits placeholder markers that the streaming pipeline + hydration walker don't always match precisely — triggering `Hydration completed but contains mismatches.` This pattern is the recommended escape hatch.
 
+The host `<div id="modal-target">` is declared directly in `index.html` (sibling of `#root`) — it ships in every server response (including `/`, `/products`, and 404 pages) regardless of whether any modal is open. This decouples the portal target from the Vue tree and keeps SSR output deterministic.
+
 Verified by Scenarios 15 and 16: closed modal contributes zero markup to the streamed HTML (target node still exists from `index.html`); after click, the dialog lives inside `#modal-target` and **not** inside `#root`.
+
+(Note: this streaming variant deliberately omits the cookie-based auth gates from sibling `vue/ssr/` — the streaming demos focus on `<Suspense>` semantics, not auth flow.)
+
+## Test fixtures: product ids 4 and 5
+
+Two of the products in `database.ts` exist specifically for streaming-edge-case testing:
+
+- **Product id `4` ("Broken Reviews Demo")** — `Reviews.vue:25-34` returns `Promise.resolve([])` on the server (stream completes successfully, no SSR error), but on the client `fetchReviews("4")` returns `Promise.reject(new Error("Reviews service unavailable"))`. The post-hydration throw is caught by `<ReviewsErrorBoundary>` (`onErrorCaptured` returning `false`); sibling `<RelatedItems>` keeps rendering. Verified by Scenario 9.
+- **Product id `5` ("Niche Cable Tester")** — a real product NOT present in `REVIEWS_BY_PRODUCT` / `RELATED_BY_PRODUCT`. Used to verify empty-state UI (Scenario 13) without conflating with the rejection path above.
 
 ## Loader-driven HTTP: typed LoaderNotFound for unknown ids
 
-`src/_loader-errors.ts` defines `LoaderNotFound` (same shape as the runtime SSR example). The `products.detail` loader throws it for ids not in the in-memory store; `entry-server.ts` catches the typed error BEFORE constructing the stream and returns a plain-text 404 result. This fixes a leak in the previous design — a generic `throw new Error()` bubbled past the streaming pipeline's catch path, `cleanup()` was never called, and the per-request router was held until GC. Now the catch path always disposes.
+Typed loader errors live in `@real-router/ssr-data-plugin/errors` (hoisted from per-example `_loader-errors.ts` files in commit `e7ad413e`). `src/router/loaders.ts` imports `LoaderNotFound` from the package; the `products.detail` loader throws it for ids not in the in-memory store. `entry-server.ts` catches the typed error BEFORE constructing the stream and returns a plain-text 404 result. This avoids a leak in the previous design — a generic `throw new Error()` could bubble past the streaming pipeline's catch path, `cleanup()` was never called, and the per-request router was held until GC. Now the catch path always disposes.
 
 | Error `code`       | HTTP response                                |
 | ------------------ | -------------------------------------------- |
@@ -118,8 +129,8 @@ The error path bypasses the streaming pipeline entirely — `Transfer-Encoding: 
 
 `server/index.ts` adds two production-grade pieces tailored to streaming:
 
-- **Per-route `Cache-Control`** — `src/router/cache-policies.ts` maps URL paths to directives: `/` → `public, s-maxage=3600`, `/products` → `public, max-age=60`, `/products/:id` → `public, max-age=120`.
-- **`AbortController` per request** — `req.on("close")` aborts the controller; the stream-pump loop checks `signal.aborted` between `reader.read()` calls and bails out via `reader.cancel()`. Cleanup (`router.dispose()`) runs in the `finally` block. Without this, a client disconnect would let the server keep pulling chunks from the ReadableStream until completion (~1200 ms for `/products/:id` due to RelatedItems' Suspense delay).
+- **Per-route `Cache-Control`** — `src/router/cache-policies.ts` maps URL paths to directives: `/` → `public, max-age=300, s-maxage=3600`, `/products` → `public, max-age=60`, `/products/:id` → `public, max-age=120`. (Note: unlike sibling `vue/ssr/`, the streaming variant does NOT add `must-revalidate` — chunked Flight bodies delegate freshness checks to the CDN edge layer.) `server/dev.ts` mirrors the same Cache-Control wiring.
+- **`AbortController` per request** — `req.on("close")` aborts the controller; the stream-pump loop checks `signal.aborted` between `reader.read()` calls and bails out via `reader.cancel()`. Cleanup (`router.dispose()`) runs in the `finally` block; the pump's `finally` also calls `reader.cancel().catch(...)` and `reader.releaseLock()` regardless of how the loop exits — required so `ReadableStream` locks don't block GC. Without this, a client disconnect would let the server keep pulling chunks from the stream until completion (~1200 ms for `/products/:id` due to RelatedItems' Suspense delay).
 
 **ETag is intentionally absent.** Strong ETag requires hashing the full body; a streaming pipeline never holds the body in memory as a single buffer, so adding ETag would mean buffering the whole stream first — which defeats streaming. Production setups typically rely on CDN-level shared caching (`s-maxage`) plus the CDN's own buffered ETag layer applied at the edge. See `src/router/cache-policies.ts` for the full rationale.
 
@@ -155,7 +166,7 @@ pnpm test:e2e     # Playwright — 20 acceptance scenarios
 15. **`<Teleport>` initially closed** — modal contributes zero markup to streamed HTML; `#modal-target` host node exists in `index.html`
 16. **`<Teleport>` open** — clicking the trigger mounts dialog into `#modal-target` (sibling of `#root`), NOT inside `#root`
 17. **Loader-driven HTTP — `/products/999`** — `LoaderNotFound` short-circuits before stream construction, returns 404 text/plain (no `Transfer-Encoding: chunked`), `cleanup()` always runs (no router leak)
-18. **Cache-Control per route** — `/` → `s-maxage=3600`, `/products` → `max-age=60`, `/products/:id` → `max-age=120`
+18. **Cache-Control per route** — `/` → `public, max-age=300, s-maxage=3600`, `/products` → `public, max-age=60`, `/products/:id` → `public, max-age=120`
 19. **No ETag on streamed responses** — honest absence (would defeat streaming); ETag header is `undefined`
 20. **AbortController mid-stream** — request `timeout: 150ms`; server releases the stream-pump within 800ms (well under the 1200ms full-stream span)
 
