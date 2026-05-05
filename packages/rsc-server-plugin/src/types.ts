@@ -84,8 +84,10 @@ export interface RscActionResult<TReturn = unknown, TFormState = unknown> {
  *   type AppPayload = RscPayload<{ id: string }, ReactFormState>;
  *   ```
  */
-export interface RscPayload<TReturn = unknown, TFormState = unknown>
-  extends RscActionResult<TReturn, TFormState> {
+export interface RscPayload<
+  TReturn = unknown,
+  TFormState = unknown,
+> extends RscActionResult<TReturn, TFormState> {
   /** Server Component tree to render. */
   root: ReactNode;
 }

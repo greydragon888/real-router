@@ -7,6 +7,7 @@ export type {
 } from "./types";
 
 export { rscServerPluginFactory } from "./factory";
+
 export { rscActionPluginFactory } from "./actionFactory";
 
 declare module "@real-router/types" {

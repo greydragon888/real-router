@@ -2,9 +2,9 @@
 "@real-router/rsc-server-plugin": minor
 ---
 
-Add `RscPayload<TReturn, TFormState>` type + `rscActionPluginFactory` for Server Action integration
+Add `RscPayload<TReturn, TFormState>` type + `rscActionPluginFactory` for Server Action integration (#593)
 
-The plugin gains two complementary pieces (see [RFC](.claude/rfc-rsc-server-plugin-payload-action.md)):
+The plugin gains two complementary pieces:
 
 - **`RscPayload<TReturn, TFormState>`** — canonical Flight payload shape (`{ root: ReactNode } & RscActionResult`). Single source of truth used by both producer (rsc entry) and consumers (ssr + browser entries) — eliminates ad-hoc duplication of the same interface in multiple files.
 - **`rscActionPluginFactory(getResult)`** — sibling plugin that claims the `"rscAction"` namespace. Publishes `{ returnValue?, formState? }` to `state.context.rscAction` via the `start` interceptor; coexists with `rscServerPluginFactory` (`"rsc"`) and `ssrDataPluginFactory` (`"data"`) on the same router.
