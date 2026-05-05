@@ -16,6 +16,9 @@ Real-Router with Angular 21 SSR + `@defer` + `withIncrementalHydration()` — an
 - **`@defer (on timer(1500ms))` for News banner** — pure-time-based trigger. Block hydrates 1.5 s after the placeholder enters the DOM, no user interaction needed.
 - **`@defer (on immediate)` for Analytics pixel** — code-split chunk that loads as soon as the app bootstraps. Equivalent to a regular eagerly-loaded component, but the chunk boundary keeps the main bundle small (useful for cache-bustable third-party SDKs).
 - **`provideClientHydration(withIncrementalHydration(), withEventReplay())`** — Angular 21 stable. Per-`@defer` block hydration **plus** event replay: clicks/keydowns issued before a block hydrates are captured globally and replayed once the component takes over. Verified by an e2e test that clicks "Mark all read" while the Reviews chunk is artificially delayed by 1.2 s — the click survives the gap and `data-marked` flips to `"true"` after hydration.
+- **`provideZonelessChangeDetection()`** — full Angular 21 zoneless mode; signals + `computed` drive change detection without `zone.js`. Compatible with `withIncrementalHydration()` + `ssr-data-plugin` end-to-end (no zone-related warnings on hydration).
+- **`provideServerRendering(withRoutes(serverRoutes), withAppShell(AppComponent))`** — server-side bootstrap. `withAppShell` registers `AppComponent` as the root for the SSR pipeline; without it `AngularNodeAppEngine` cannot serialize the component tree. `withRoutes` wires `RenderMode.Server` to all paths so every URL goes through per-request `cloneRouter()`.
+- **`@angular/router` + `NgRouterStub`** — required peer for `@angular/ssr`'s URL matching pipeline (`@angular/ssr` rejects bootstraps without `provideRouter(...)`). `NgRouterStub` is a no-op standalone Component routed under `path: "**"` so all routing decisions fall through to Real-Router's `<route-view>`. Pure SSR-pipeline placeholder, never visible.
 - **`AngularNodeAppEngine` Web `Response`** — `Response.body` is a `ReadableStream` (Web Streams API) and `writeResponseToNodeResponse` pipes it to the Node `res` with `Transfer-Encoding: chunked` framing. **Don't confuse this with React 19 / Solid progressive streaming**: Angular fully renders the HTML before flushing the first byte (empirically: 1 TCP frame, ~0 ms span — the disclaimer above explains how to reproduce). Chunked transfer here is just HTTP/1.1 default framing for an unknown-length body, not out-of-order streaming.
 
 The router does **nothing streaming-specific**. All streaming behavior comes from Angular's native `@defer` blocks + `withIncrementalHydration()` + `AngularNodeAppEngine`. Real-Router's role is identical to non-streaming SSR: per-request `cloneRouter()`, `start(url)`, plugin-driven critical data via `state.context.data`.
@@ -31,7 +34,7 @@ Angular 21 streaming SSR is **structurally different** from React 19's `renderTo
 | Selective hydration | Yes — hydrates resolved islands | No — atomic `app.mount()` | No — atomic `mount` / `hydrate` | **Yes — `withIncrementalHydration()` hydrates per-`@defer` block on its trigger** |
 | Server resolves async | progressive | blocking | pending only | full critical render server-side; deferred sections lazy on client |
 | HTTP wire format | `Transfer-Encoding: chunked` + progressive flush (multiple frames over time) | chunked + progressive flush | single payload | **chunked framing, single TCP frame** (no progressive flush — body rendered in full before flush) |
-| Network model | true HTTP streaming | true HTTP streaming | RSC-like | **lazy hydration only** (HTTP body arrives at once) |
+| Network model | true HTTP streaming | true HTTP streaming | deferred-data SSR (no chunked HTTP) | **lazy hydration only** (HTTP body arrives at once) |
 
 What this example actually demonstrates for Angular:
 
@@ -49,7 +52,7 @@ src/
   app.config.server.ts            Server-only — provideServerRendering(withRoutes(...) + withAppShell(AppComponent))
   app.routes.server.ts            ServerRoute[] with RenderMode.Server (per-request SSR)
   app.component.ts                Root standalone — <route-view> with home/products/notfound
-  main.ts                         Client entry — bootstrapApplication + provideClientHydration(withIncrementalHydration())
+  main.ts                         Client entry — bootstrapApplication + provideClientHydration(withIncrementalHydration(), withEventReplay())
   main.server.ts                  Server bootstrap — accepts BootstrapContext
   server.ts                       Express + AngularNodeAppEngine + writeResponseToNodeResponse
   router/
@@ -60,11 +63,19 @@ src/
     home, not-found (.component.ts)
   components/
     products-list.component.ts    Critical loader data renders server-side
-    product-detail.component.ts   Critical product info + @defer blocks for Reviews & RelatedItems
+    product-detail.component.ts   Critical product info + 7 @defer blocks (one per trigger)
     reviews.component.ts          Loaded + hydrated via @defer (on viewport)
     related-items.component.ts    Loaded + hydrated via @defer (on hover)
+    spec-sheet.component.ts       Loaded via @defer (on idle; prefetch on viewport; hydrate on idle)
+    qa.component.ts               Loaded via @defer (on interaction)
+    tech-details.component.ts     Loaded via @defer (when signal()) — predicate-driven, one-shot
+    news-banner.component.ts      Loaded via @defer (on timer(1500ms))
+    analytics-pixel.component.ts  Loaded via @defer (on immediate) — code-split chunk boundary
 
-server-runner.mjs                 Node.js wrapper — see ssr/server-runner.mjs for rationale
+server-runner.mjs                 Node.js wrapper. The compiled server.mjs's isMainModule check
+                                  is fragile across @angular/ssr versions; the wrapper imports
+                                  `app.handle` and binds it to Node's request/response stream.
+                                  See ssr/server-runner.mjs for the full rationale.
 ```
 
 ## Streaming Pattern
@@ -77,11 +88,22 @@ server-runner.mjs                 Node.js wrapper — see ssr/server-runner.mjs 
     <h1 data-testid="product-name">{{ p.name }}</h1>
     <p data-testid="product-price">${{ p.price }}</p>
 
-    <!-- Reviews: server emits @placeholder, client hydrates on viewport -->
+    <!--
+      Reviews: server emits @placeholder, client hydrates on viewport.
+      @loading kicks in if the chunk hasn't returned within 200ms after
+      the trigger fires; @error shows when the chunk import rejects.
+      Both are real Angular 21 @defer secondary blocks — backed by
+      e2e scenarios 14 (@error) and 15 (@loading) which artificially
+      slow / abort the chunk to make these branches observable.
+    -->
     @defer (on viewport; hydrate on viewport) {
       <reviews-section [productId]="p.id" />
     } @placeholder {
       <p data-testid="reviews-fallback">Loading reviews…</p>
+    } @loading (after 200ms; minimum 1s) {
+      <p data-testid="reviews-loading">Hydrating reviews…</p>
+    } @error {
+      <p data-testid="reviews-error">Reviews unavailable.</p>
     }
 
     <!--
@@ -151,7 +173,7 @@ Key constraints:
 pnpm dev          # ng serve — Angular dev server with HMR (no SSR)
 pnpm build:app    # ng build — outputs dist/ssr-streaming-angular-example/{browser,server}/
 pnpm preview      # node server-runner.mjs — runs Express + AngularNodeAppEngine on :4173
-pnpm test:e2e     # Playwright — 11 acceptance scenarios
+pnpm test:e2e     # Playwright — 22 acceptance scenarios
 ```
 
 ## E2e Scenarios
@@ -169,7 +191,7 @@ pnpm test:e2e     # Playwright — 11 acceptance scenarios
 9. **Unknown route renders NotFound page** — `allowNotFound: true` returns 200 (see `ssr/` README for rationale)
 10. **Home → products navigation works after hydration** — CSR via realLink + browser-plugin
 11. **Response includes incremental hydration markers** — `ngh=` / `ng-server-context=` proof
-12. **Response headers** — `text/html; charset=utf-8`, no `x-powered-by` leak, status 200
+12. **Response headers** — `text/html; charset=utf-8`, no `x-powered-by` leak, status 200. **Note:** the suite intentionally does **not** assert `Transfer-Encoding: chunked` (see test comment in `e2e/ssr-streaming.spec.ts`) — chunked framing is observed empirically via the Node `http.request` snippet at the bottom of this file, not via Playwright. Different Node HTTP runtimes / proxy chains can switch between chunked and `Content-Length` for the same body, so asserting on it would make the suite environment-dependent.
 13. **Incremental hydration timing** — `Reviews` chunk loads at viewport, `RelatedItems` chunk loads only after hover. Network spy makes the contract explicit so the existing "appears after trigger" tests can't pass via eager preload.
 14. **`@error` block** — Playwright route-fetches each `/chunk-*.js` and aborts only the one whose body contains `reviews-section`; the bootstrap chunk and RelatedItems chunk pass through, so the page hydrates normally and only the Reviews `@defer` block falls back to its `@error` template.
 15. **`@loading` state** — same chunk-content matcher as scenario 14, but delays the Reviews chunk by 600 ms instead of failing it; the transient `reviews-loading` template becomes observable.
