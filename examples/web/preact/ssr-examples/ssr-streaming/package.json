@@ -1,0 +1,30 @@
+{
+  "name": "ssr-streaming-preact-example",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "predev": "pnpm turbo run bundle --filter=...ssr-streaming-preact-example",
+    "dev": "tsx server/dev.ts",
+    "build:app": "vite build --outDir dist/client && vite build --ssr src/entry-server.tsx --outDir dist/server",
+    "preview": "NODE_ENV=production tsx server/index.ts",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@real-router/core": "workspace:^",
+    "@real-router/preact": "workspace:^",
+    "@real-router/ssr-data-plugin": "workspace:^",
+    "express": "5.1.0",
+    "preact": "10.28.2",
+    "preact-render-to-string": "6.6.7"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.58.2",
+    "@preact/preset-vite": "2.10.5",
+    "@types/express": "5.0.6",
+    "@types/node": "25.6.0",
+    "tsx": "4.21.0",
+    "typescript": "6.0.3",
+    "vite": "7.3.2"
+  }
+}

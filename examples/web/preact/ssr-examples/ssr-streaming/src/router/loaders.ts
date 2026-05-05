@@ -1,0 +1,31 @@
+import { LoaderNotFound } from "@real-router/ssr-data-plugin/errors";
+
+import { getProduct, listProducts } from "../database";
+
+import type { Product } from "../database";
+import type { DataLoaderFactoryMap } from "@real-router/ssr-data-plugin";
+
+export interface ProductsListData {
+  products: Product[];
+}
+
+export interface ProductDetailData {
+  product: Product;
+}
+
+export const loaders: DataLoaderFactoryMap = {
+  "products.list": () => () =>
+    Promise.resolve({ products: listProducts() } satisfies ProductsListData),
+  "products.detail": () => (params) => {
+    const id = params.id as string;
+    const product = getProduct(id);
+
+    if (!product) {
+      // Typed error so server/index.ts can map it to 404 text/plain
+      // BEFORE starting the streamed render. Cleanup runs in finally.
+      throw new LoaderNotFound(`product:${id}`);
+    }
+
+    return Promise.resolve({ product } satisfies ProductDetailData);
+  },
+};

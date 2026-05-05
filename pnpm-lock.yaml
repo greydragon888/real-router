@@ -1994,6 +1994,135 @@ importers:
         specifier: 7.3.2
         version: 7.3.2(@types/node@25.6.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(tsx@4.21.0)(yaml@2.8.3)
 
+  examples/web/preact/ssr-examples/ssg:
+    dependencies:
+      '@real-router/browser-plugin':
+        specifier: workspace:^
+        version: link:../../../../../packages/browser-plugin
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../../../../../packages/core
+      '@real-router/preact':
+        specifier: workspace:^
+        version: link:../../../../../packages/preact
+      '@real-router/ssr-data-plugin':
+        specifier: workspace:^
+        version: link:../../../../../packages/ssr-data-plugin
+      preact:
+        specifier: 10.28.2
+        version: 10.28.2
+      preact-render-to-string:
+        specifier: 6.6.7
+        version: 6.6.7(preact@10.28.2)
+    devDependencies:
+      '@playwright/test':
+        specifier: 1.58.2
+        version: 1.58.2
+      '@preact/preset-vite':
+        specifier: 2.10.5
+        version: 2.10.5(@babel/core@7.29.0)(preact@10.28.2)(rollup@4.60.2)(vite@7.3.2(@types/node@25.6.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(tsx@4.21.0)(yaml@2.8.3))
+      '@types/node':
+        specifier: 25.6.0
+        version: 25.6.0
+      tsx:
+        specifier: 4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vite:
+        specifier: 7.3.2
+        version: 7.3.2(@types/node@25.6.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(tsx@4.21.0)(yaml@2.8.3)
+
+  examples/web/preact/ssr-examples/ssr:
+    dependencies:
+      '@real-router/browser-plugin':
+        specifier: workspace:^
+        version: link:../../../../../packages/browser-plugin
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../../../../../packages/core
+      '@real-router/preact':
+        specifier: workspace:^
+        version: link:../../../../../packages/preact
+      '@real-router/ssr-data-plugin':
+        specifier: workspace:^
+        version: link:../../../../../packages/ssr-data-plugin
+      express:
+        specifier: 5.1.0
+        version: 5.1.0
+      preact:
+        specifier: 10.28.2
+        version: 10.28.2
+      preact-render-to-string:
+        specifier: 6.6.7
+        version: 6.6.7(preact@10.28.2)
+    devDependencies:
+      '@playwright/test':
+        specifier: 1.58.2
+        version: 1.58.2
+      '@preact/preset-vite':
+        specifier: 2.10.5
+        version: 2.10.5(@babel/core@7.29.0)(preact@10.28.2)(rollup@4.60.2)(vite@7.3.2(@types/node@25.6.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(tsx@4.21.0)(yaml@2.8.3))
+      '@types/express':
+        specifier: 5.0.6
+        version: 5.0.6
+      '@types/node':
+        specifier: 25.6.0
+        version: 25.6.0
+      tsx:
+        specifier: 4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vite:
+        specifier: 7.3.2
+        version: 7.3.2(@types/node@25.6.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(tsx@4.21.0)(yaml@2.8.3)
+
+  examples/web/preact/ssr-examples/ssr-streaming:
+    dependencies:
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../../../../../packages/core
+      '@real-router/preact':
+        specifier: workspace:^
+        version: link:../../../../../packages/preact
+      '@real-router/ssr-data-plugin':
+        specifier: workspace:^
+        version: link:../../../../../packages/ssr-data-plugin
+      express:
+        specifier: 5.1.0
+        version: 5.1.0
+      preact:
+        specifier: 10.28.2
+        version: 10.28.2
+      preact-render-to-string:
+        specifier: 6.6.7
+        version: 6.6.7(preact@10.28.2)
+    devDependencies:
+      '@playwright/test':
+        specifier: 1.58.2
+        version: 1.58.2
+      '@preact/preset-vite':
+        specifier: 2.10.5
+        version: 2.10.5(@babel/core@7.29.0)(preact@10.28.2)(rollup@4.60.2)(vite@7.3.2(@types/node@25.6.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(tsx@4.21.0)(yaml@2.8.3))
+      '@types/express':
+        specifier: 5.0.6
+        version: 5.0.6
+      '@types/node':
+        specifier: 25.6.0
+        version: 25.6.0
+      tsx:
+        specifier: 4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vite:
+        specifier: 7.3.2
+        version: 7.3.2(@types/node@25.6.0)(jiti@2.6.1)(less@4.6.4)(sass@1.99.0)(tsx@4.21.0)(yaml@2.8.3)
+
   examples/web/react:
     dependencies:
       '@real-router/react':
@@ -13288,6 +13417,11 @@ packages:
     engines: {node: '>=14.0.0'}
     hasBin: true
 
+  preact-render-to-string@6.6.7:
+    resolution: {integrity: sha512-3XdbsX3+vn9dQW+jJI/FsI9rlkgl6dbeUpqLsChak6jp3j3auFqBCkno7VChbMFs5Q8ylBj6DrUkKRwtVN3nvw==}
+    peerDependencies:
+      preact: '>=10 || >= 11.0.0-0'
+
   preact@10.25.4:
     resolution: {integrity: sha512-jLdZDb+Q+odkHJ+MpW/9U5cODzqnB+fy2EiHSZES7ldV5LK7yjlVzTp7R8Xy6W6y75kfK8iWYtFVH7lvjwrCMA==}
 
@@ -22528,6 +22662,10 @@ snapshots:
     dependencies:
       commander: 9.5.0
     optional: true
+
+  preact-render-to-string@6.6.7(preact@10.28.2):
+    dependencies:
+      preact: 10.28.2
 
   preact@10.25.4: {}
 
