@@ -106,6 +106,12 @@ pnpm test:e2e     # Playwright tests
 - **Bundle size**: ~3-4× smaller client bundle than the React equivalent (Preact 10 is ~3 KB gzipped).
 - **No RSC**: Preact does not support React Server Components — see [`../README.md`](../README.md).
 
+## Required: `resolve.dedupe` for Preact in monorepo Vite configs
+
+`vite.config.ts` pins `resolve.dedupe: ["preact", "preact/hooks", "preact/jsx-runtime"]`. Without this, `@real-router/preact`'s `preact` peer can resolve to a different copy than the example's pinned `preact`, producing **two hook runtimes in the same bundle**. Symptoms: `Cannot read properties of undefined (reading '__H')` thrown during hydration, and Preact wipes the server-rendered DOM on mount.
+
+This is the canonical Vite-monorepo-Preact pitfall — repeats whenever a new Preact example is added. All three SSR examples (`ssr/`, `ssr-streaming/`, `ssg/`) ship the same dedupe block.
+
 ## Key Packages
 
 - `@real-router/core` — router + `cloneRouter()`

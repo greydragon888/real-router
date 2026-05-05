@@ -102,6 +102,8 @@ pnpm test:e2e     # Playwright tests
 
 This guards against a real failure mode: an id remains in `entries.ts` after the corresponding row is deleted from the database. Without the typed error, the loader would resolve `user: undefined`, the build would silently emit a "user not found" page for the stale id, and 404 would be served as a 200 with empty content.
 
+The contract is verified by an e2e test that imports the compiled `dist/server/entry-server.js` and asserts `render('/users/9999')` rejects with the typed `LoaderNotFound` error (`code === "LOADER_NOT_FOUND"`, `resource === "user:9999"`).
+
 ## Per-route Cache-Control at preview time
 
 The `ssgServe()` Vite plugin in `vite.config.ts` runs `getCachePolicy(url)` for every static request and intercepts `res.writeHead` so the policy survives Vite's own `Cache-Control: no-cache` default. Vite preview's static handler attaches a weak ETag from file mtime — conditional GETs return `304 Not Modified` for free.
@@ -111,6 +113,10 @@ The `ssgServe()` Vite plugin in `vite.config.ts` runs `getCachePolicy(url)` for 
 - **Renderer**: `preact-render-to-string@6.6.7` `renderToString` instead of `react-dom/server`.
 - **Hydration**: `hydrate(vnode, parent)` from `preact` (parameter order reversed vs React); fresh-render path uses `render(vnode, parent)` from `preact` instead of React's `createRoot`.
 - **Vite plugin**: `@preact/preset-vite`. JSX import source set to `preact`.
+
+## Required: `resolve.dedupe` for Preact
+
+`vite.config.ts` pins `resolve.dedupe: ["preact", "preact/hooks", "preact/jsx-runtime"]` — required to avoid two-copies-of-preact in the bundle. See [`../ssr/README.md`](../ssr/README.md#required-resolvededupe-for-preact-in-monorepo-vite-configs) for the full explanation; same fix lands in all three SSR examples.
 
 ## Key Packages
 

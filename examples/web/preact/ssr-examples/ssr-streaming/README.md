@@ -120,6 +120,10 @@ pnpm test:e2e     # Playwright — 6 acceptance scenarios
 
 `@real-router/ssr-data-plugin/errors` exports `LoaderNotFound`. The `products.detail` loader throws it for unknown ids; `entry-server.tsx` catches BEFORE the stream is constructed and returns a plain-text 404 result. Without this typed-error path, a generic throw would bubble past the streaming pipeline's catch site and skip `cleanup()` — leaking the per-request router until GC.
 
+## Required: `resolve.dedupe` for Preact
+
+`vite.config.ts` pins `resolve.dedupe: ["preact", "preact/hooks", "preact/jsx-runtime"]` — required to avoid two-copies-of-preact in the bundle. See [`../ssr/README.md`](../ssr/README.md#required-resolvededupe-for-preact-in-monorepo-vite-configs) for the full explanation; same fix lands in all three SSR examples.
+
 ## See Also
 
 - [`../ssr/`](../ssr) — classical Preact SSR (sync `renderToString`), full feature parity with React equivalent
