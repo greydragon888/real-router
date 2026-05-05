@@ -149,4 +149,43 @@ test.describe("Preact streaming SSR — smoke", () => {
     expect(transferEncoding ?? "").not.toBe("chunked");
     expect(await response.text()).toBe("Not Found");
   });
+
+  test.describe("no-JS rendering — streamed HTML stands alone", () => {
+    test.use({ javaScriptEnabled: false });
+
+    test("product detail server-renders all sections without JS", async ({
+      page,
+    }) => {
+      // Streaming pipeline must produce complete HTML even when the
+      // client never runs JS. Sibling sections (Reviews, RelatedItems)
+      // are sync from fixtures, so their content lands in the same
+      // streamed response as the shell.
+      await page.goto("/products/1");
+      await expect(
+        page.locator('[data-testid="product-detail"]'),
+      ).toHaveAttribute("data-product-id", "1");
+      await expect(
+        page.locator('[data-testid="reviews-section"]'),
+      ).toBeVisible();
+      await expect(
+        page.locator('[data-testid="related-section"]'),
+      ).toBeVisible();
+    });
+  });
+
+  test("each page navigation triggers a fresh SSR (Transfer-Encoding: chunked on every visit)", async ({
+    request,
+  }) => {
+    // No browser-plugin in this example — every URL is a server hit.
+    // We verify three different URLs all return chunked transfer,
+    // proving the streaming pipeline runs on every navigation rather
+    // than swapping client trees in place.
+    const targets = ["/", "/products", "/products/2", "/products/3"];
+    const responses = await Promise.all(targets.map((u) => request.get(u)));
+
+    for (const r of responses) {
+      expect(r.status()).toBe(200);
+      expect(r.headers()["transfer-encoding"]).toBe("chunked");
+    }
+  });
 });
