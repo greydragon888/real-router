@@ -1,11 +1,12 @@
 import { createRouter } from "@real-router/core";
 import { cloneRouter, getPluginApi } from "@real-router/core/api";
+import { hydrateRouter, serializeRouterState } from "@real-router/core/utils";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { rscServerPluginFactory } from "../../src";
 
 import type { RscLoaderFactoryMap } from "../../src";
-import type { Router } from "@real-router/core";
+import type { Router, State } from "@real-router/core";
 import type { ReactNode } from "react";
 
 const routes = [
@@ -464,6 +465,94 @@ describe("@real-router/rsc-server-plugin", () => {
 
       expect(factory).not.toHaveBeenCalled();
       expect(state.context.rsc).toBeUndefined();
+    });
+  });
+
+  describe("Post-hydration loader skip (#596)", () => {
+    const buildServerState = (
+      overrides: Partial<State> & { context?: Record<string, unknown> },
+    ): State => ({
+      name: "users.profile",
+      params: { id: "42" },
+      path: "/users/42",
+      transition: {
+        phase: "activating",
+        reason: "success",
+        segments: { deactivated: [], activated: [], intersection: "" },
+      },
+      ...overrides,
+      context: overrides.context ?? {},
+    });
+
+    it("skips loader when hydrated state contains the rsc namespace value", async () => {
+      const loader = vi.fn().mockResolvedValue(node("ClientProfile"));
+      // Use a plain object payload (not a ReactNode with Symbol $$typeof) so
+      // it survives JSON round-trip. This isolates the post-hydration skip
+      // behaviour from React's own serialization concerns.
+      const serverPayload = { kind: "ServerProfile", id: "42" };
+
+      router.usePlugin(
+        rscServerPluginFactory({
+          "users.profile": () => loader,
+        } as unknown as RscLoaderFactoryMap),
+      );
+
+      const stateInput = buildServerState({
+        context: { rsc: serverPayload as unknown as ReactNode },
+      });
+      const state = await hydrateRouter(
+        router,
+        serializeRouterState(stateInput),
+      );
+
+      expect(loader).not.toHaveBeenCalled();
+      expect(state.context.rsc).toStrictEqual(serverPayload);
+    });
+
+    it("runs loader when hydrated context excludes rsc (typical SSR config)", async () => {
+      const loader = vi.fn().mockResolvedValue(node("ClientProfile"));
+
+      router.usePlugin(
+        rscServerPluginFactory({ "users.profile": () => loader }),
+      );
+
+      // Server uses excludeContext: ["rsc"] to strip the ReactNode payload —
+      // the rsc namespace is absent from hydrationState.context, so the client
+      // runs its loader as today.
+      const fullState = buildServerState({
+        context: { rsc: node("WontTravel"), data: { other: "stuff" } },
+      });
+      const json = serializeRouterState(fullState, {
+        excludeContext: ["rsc"],
+      });
+
+      const state = await hydrateRouter(router, json);
+
+      expect(loader).toHaveBeenCalledTimes(1);
+      expect(state.context.rsc).toStrictEqual(node("ClientProfile"));
+    });
+
+    it("runs loader for a different route on subsequent start()", async () => {
+      const loader = vi.fn().mockResolvedValue(node("Loaded"));
+
+      router.usePlugin(
+        rscServerPluginFactory({ "users.profile": () => loader }),
+      );
+
+      const json = serializeRouterState(
+        buildServerState({ context: { rsc: node("ServerProfile") } }),
+      );
+
+      await hydrateRouter(router, json);
+
+      expect(loader).not.toHaveBeenCalled();
+
+      router.stop();
+      const next = await router.start("/users/99");
+
+      expect(loader).toHaveBeenCalledTimes(1);
+      expect(loader).toHaveBeenCalledWith({ id: "99" });
+      expect(next.context.rsc).toStrictEqual(node("Loaded"));
     });
   });
 

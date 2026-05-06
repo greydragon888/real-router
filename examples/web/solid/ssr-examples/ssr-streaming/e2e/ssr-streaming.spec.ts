@@ -608,4 +608,26 @@ test.describe("Streaming SSR Example (Solid)", () => {
     expect(html).not.toContain("__VIEW_LOG__");
     expect(html).not.toContain("IntersectionObserver");
   });
+
+  test("post-hydration loader skip (#596): client makes zero loader-driven calls on first paint", async ({
+    page,
+  }) => {
+    await page.goto("/products/1");
+    await page.waitForLoadState("networkidle");
+
+    const counts = await page.evaluate(() => globalThis.__LOADER_CALLS__);
+
+    expect(counts).toEqual({});
+  });
+
+  test("post-hydration loader skip (#596): list route hydrates without loader fire", async ({
+    page,
+  }) => {
+    await page.goto("/products");
+    await page.waitForLoadState("networkidle");
+
+    const counts = await page.evaluate(() => globalThis.__LOADER_CALLS__);
+
+    expect(counts).toEqual({});
+  });
 });

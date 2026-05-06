@@ -1,11 +1,12 @@
 import { createRouter } from "@real-router/core";
 import { cloneRouter, getPluginApi } from "@real-router/core/api";
+import { hydrateRouter, serializeRouterState } from "@real-router/core/utils";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { ssrDataPluginFactory } from "../../src";
 
 import type { DataLoaderFactoryMap } from "../../src";
-import type { Router } from "@real-router/core";
+import type { Router, State } from "@real-router/core";
 
 const routes = [
   { name: "home", path: "/" },
@@ -426,6 +427,129 @@ describe("@real-router/ssr-data-plugin", () => {
       const state = await router.start("/");
 
       expect(factory).not.toHaveBeenCalled();
+      expect(state.context.data).toBeUndefined();
+    });
+  });
+
+  describe("Post-hydration loader skip (#596)", () => {
+    const buildServerState = (
+      overrides: Partial<State> & { context?: Record<string, unknown> },
+    ): State => ({
+      name: "users.profile",
+      params: { id: "42" },
+      path: "/users/42",
+      transition: {
+        phase: "activating",
+        reason: "success",
+        segments: { deactivated: [], activated: [], intersection: "" },
+      },
+      ...overrides,
+      context: overrides.context ?? {},
+    });
+
+    it("skips loader when hydrated state contains the namespace value", async () => {
+      const loader = vi.fn().mockResolvedValue({ from: "client-loader" });
+      const serverData = { from: "server-loader", id: "42" };
+
+      router.usePlugin(ssrDataPluginFactory({ "users.profile": () => loader }));
+
+      const serverState = buildServerState({ context: { data: serverData } });
+      const json = serializeRouterState(serverState);
+
+      const state = await hydrateRouter(router, json);
+
+      expect(loader).not.toHaveBeenCalled();
+      expect(state.context.data).toStrictEqual(serverData);
+    });
+
+    it("preserves nested data deeply on hydration write", async () => {
+      const loader = vi.fn();
+      const serverData = {
+        user: { id: "42", profile: { name: "Alice", tags: ["a", "b"] } },
+        meta: { fetchedAt: 123, nullField: null },
+      };
+
+      router.usePlugin(ssrDataPluginFactory({ "users.profile": () => loader }));
+
+      const json = serializeRouterState(
+        buildServerState({ context: { data: serverData } }),
+      );
+
+      const state = await hydrateRouter(router, json);
+
+      expect(state.context.data).toStrictEqual(serverData);
+    });
+
+    it("runs loader when hydrated state has no `data` namespace", async () => {
+      const loader = vi.fn().mockResolvedValue({ from: "client" });
+
+      router.usePlugin(ssrDataPluginFactory({ "users.profile": () => loader }));
+
+      const json = serializeRouterState(buildServerState({ context: {} }));
+      const state = await hydrateRouter(router, json);
+
+      expect(loader).toHaveBeenCalledTimes(1);
+      expect(state.context.data).toStrictEqual({ from: "client" });
+    });
+
+    it("runs loader when hydrated state is for a different route", async () => {
+      const loader = vi.fn().mockResolvedValue({ from: "client" });
+
+      router.usePlugin(ssrDataPluginFactory({ "users.profile": () => loader }));
+
+      // Server state names route "home", client navigates to /users/42 (mismatch).
+      const json = serializeRouterState(
+        buildServerState({
+          name: "home",
+          path: "/users/42",
+          context: { data: { from: "stale-server" } },
+        }),
+      );
+
+      const state = await hydrateRouter(router, json);
+
+      expect(loader).toHaveBeenCalledTimes(1);
+      expect(state.context.data).toStrictEqual({ from: "client" });
+    });
+
+    it("runs loader on subsequent start() after a hydration cycle", async () => {
+      const loader = vi.fn().mockResolvedValue({ from: "csr" });
+
+      router.usePlugin(ssrDataPluginFactory({ "users.profile": () => loader }));
+
+      const serverState = buildServerState({
+        context: { data: { from: "server" } },
+      });
+      const json = serializeRouterState(serverState);
+
+      await hydrateRouter(router, json);
+
+      expect(loader).not.toHaveBeenCalled();
+
+      router.stop();
+      const next = await router.start("/users/99");
+
+      expect(loader).toHaveBeenCalledTimes(1);
+      expect(loader).toHaveBeenCalledWith({ id: "99" });
+      expect(next.context.data).toStrictEqual({ from: "csr" });
+    });
+
+    it("treats explicit `data: undefined` in hydrated context as missing", async () => {
+      const loader = vi.fn().mockResolvedValue({ from: "client" });
+
+      router.usePlugin(ssrDataPluginFactory({ "users.profile": () => loader }));
+
+      // hasOwnProperty("data") is true, but value is undefined — still skip
+      // (server explicitly serialized `data: undefined` is impossible via JSON,
+      // but a sloppy programmatic state could). Accept either semantics; we
+      // currently use hasOwnProperty so loader is skipped.
+      const serverState = buildServerState({
+        context: { data: undefined },
+      });
+
+      const state = await hydrateRouter(router, serverState);
+
+      expect(loader).not.toHaveBeenCalled();
       expect(state.context.data).toBeUndefined();
     });
   });

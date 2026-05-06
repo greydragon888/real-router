@@ -1,0 +1,113 @@
+# Solid SSR Examples
+
+> Server-rendering with Real-Router and Solid 1.x across three delivery models — classical SSR, true out-of-order streaming SSR, and static site generation.
+
+Three standalone Vite apps. Each one is a real, e2e-tested dogfooding consumer of `@real-router/*` for a specific server-rendering shape; this document is the synthesis of what the router can and cannot do on Solid, sourced exclusively from the three child READMEs.
+
+| Subdir | Demonstrates |
+|---|---|
+| [`ssr/`](./ssr) | Classical per-request `cloneRouter(base, { currentUser, abortSignal })` → `ssr-data-plugin` → `start(url)` → **`renderToStringAsync`** (single buffered string; awaits `<Suspense>` + `createResource` boundaries; pages without Suspense behave like sync `renderToString`). `generateHydrationScript()` injected into `<head>` so client `_$HY` runtime finds the SSR snapshot; Solid `hydrate()` (not `render()`) claims the DOM. Auth + role gates via `canActivate` + DI; typed loader errors → 301/302/404/504; `createUniqueId()` for SSR-stable form IDs; per-route meta with reactive client-side updates via `createEffect`. Production HTTP: sha256 strong **ETag**, per-route `Cache-Control`, `AbortController` threaded into loader DI. 46 e2e scenarios. |
+| [`ssr-streaming/`](./ssr-streaming) | Solid native streaming via `renderToStream` + `<Suspense>` + `createResource` + `<ErrorBoundary>`. **True out-of-order placeholders + selective hydration** — the same model as React 19; the closest non-React analogue in this monorepo. Server emits `<template id="…">` chunks as resources resolve; tiny inline scripts splice them into the placeholders. `<ErrorBoundary>`'s `reset` callback path retries failed branches without remounting (Solid-distinct from React's key-change pattern). `onMount` + `isServer` are compile-time-safe; `use:trackView` custom directive demonstrated. 23 e2e scenarios including TCP-frame timing proof of real HTTP streaming. |
+| [`ssg/`](./ssg) | Build-time pre-rendering: `getStaticPaths(router, entries)` → `cloneRouter` + `start` + sync `renderToString` per URL → write `dist/{url}/index.html`. Nested SSG (8 paths total: 1 home + 1 list + 3 profiles + 3 posts). Per-page meta with 9 tags (title, description, canonical, og:type/title/description/url/image, twitter:card); profile pages use `og:type=profile`, posts use `article`. `404.html` + `sitemap.xml` + filesystem-layout assertions + overfetch protection + sitemap↔disk consistency. Dual-mode mount: `hydrate()` for SSG-rendered files, `render()` for `vite dev`. `appType: "mpa"` is load-bearing. |
+
+## Capabilities
+
+What Real-Router actually delivers on Solid across these three shapes, grouped by concern. Each item is sourced from one or more child READMEs.
+
+**Per-request isolation, with idempotent disposal.** `cloneRouter(base, deps?)` produces an isolated router per request; the three examples all dispose it in `finally`. The streaming example additionally guards against double-disposal: `onCompleteAll` (the `renderToStream` callback) AND the server-layer `finally { cleanup() }` both call `router.dispose()`, but a `disposed: boolean` guard ensures only the first call disposes — subsequent calls no-op. Concurrent guard plugins (`canActivate`) read DI via `cloneRouter(base, { currentUser, abortSignal })`; `entry-server` and `entry-client` mirror cookie parsing through shared `_known-users.ts` so post-hydration `canActivate` outcomes match the SSR pass.
+
+**Three Solid SSR rendering modes, one router contract.** The router is identical across pipelines; the renderer is the variable:
+
+| Renderer | Output | `<Suspense>` behaviour | Used in |
+|---|---|---|---|
+| `renderToString` (sync) | full HTML string | none — synchronous render only | `ssg/` |
+| `renderToStringAsync` | full HTML string | awaits every Suspense boundary, single buffered response | `ssr/` (e.g. `/async-page`) |
+| `renderToStream` | true OOO streaming | non-blocking, fallback first; `<template id="…">` chunks splice on resolution | `ssr-streaming/` |
+
+**Single data-loading plugin shape.** `@real-router/ssr-data-plugin` writes plain JSON-shaped data into `state.context.data` for all three pipelines. It is a start-interceptor plugin and ships a typed-errors subpath (`@real-router/ssr-data-plugin/errors`) with `LoaderNotFound`/`LoaderRedirect`/`LoaderTimeout` + `withTimeout` helper. **Note:** Solid SSG loaders deliberately do **not** opt into the typed-error path (see Limitations) — `ssr/` and `ssr-streaming/` do.
+
+**State serialization + hydration.** `serializeRouterState()` is XSS-safe; `hydrateRouter(router, ssrState)` deposits the parsed state into a one-shot scratchpad on `RouterInternals.hydrationState` and calls `router.start(state.path)` once on the client; `ssr-data-plugin`'s start interceptor reads the scratchpad and reuses the server-resolved `state.context.data` directly, skipping the loader call (#596). Solid's `hydrate()` (separate function from `render()`, both in `solid-js/web`) claims existing DOM. SSG additionally auto-detects: `if (rootElement.firstElementChild)` → `hydrate()`; else → `render()` — same `entry-client.tsx` works for SSG-built pages and Vite dev fallbacks.
+
+**Solid-mandatory wiring.** All three examples ship the same critical pieces, and the child READMEs document each one as load-bearing: `vite-plugin-solid({ ssr: true })` (sets `hydratable: true` for both client and server builds, `generate: 'ssr'` for the server bundle); `generateHydrationScript()` injected into `<head>` per request / per pre-rendered file (without it `_$HY` is undefined and Solid emits hydration mismatch warnings + falls back to a full re-render); double Vite `resolve.conditions` — both top-level AND `ssr.resolve.conditions` — to pick the `@real-router/internal-source` `.tsx` source; `ssr.noExternal: ["@real-router/solid"]` (streaming + SSG) so vite-plugin-solid recompiles the adapter through `babel-preset-solid` for SSR codegen; `appType: "mpa"` for SSG so each pre-rendered file ships at its own URL instead of being SPA-fallbacked to `dist/index.html`.
+
+**Typed HTTP error model (where opted in).** Loader errors have explicit codes that map to HTTP responses via the `entry-server` dispatch table: `CANNOT_ACTIVATE` → 302, `LOADER_REDIRECT` → 301/302, `LOADER_NOT_FOUND` → 404 text/plain, `LOADER_TIMEOUT` → 504 text/plain. Streaming pipeline catches `LoaderNotFound` **before** constructing the stream — short-circuit to plain-text 404 keeps `cleanup()` reachable.
+
+**Build-time path enumeration.** `getStaticPaths(router)` walks the route tree and returns **leaf** paths only. `ssg-build.ts` derives intermediate parent URLs from leaves (e.g. `/users/:id` from `/users/:id/posts`) and adds the `/users` list page manually. Result: 8 pre-rendered URLs.
+
+**Per-route HTTP semantics, per pipeline.** The HTTP envelope differs by pipeline:
+
+| Pipeline | `Cache-Control` | `ETag` | `AbortController` |
+|---|---|---|---|
+| `ssr/` (renderToStringAsync) | per-route, `must-revalidate` | strong sha256 (16 base64url chars) | threaded into loader DI; `slow` loader pulls via `getDep("abortSignal")` and clears its `setTimeout` |
+| `ssr-streaming/` (renderToStream) | not asserted in README | not asserted | `cleanup()` runs in `finally`/`onCompleteAll` so disposal never leaks |
+| `ssg/` (build-time) | **none** — `ssgServe()` is redirect-only | none | not applicable |
+
+The SSG envelope is the deliberate divergence point: the Vue/React siblings ship `Cache-Control` + weak ETag overrides via `ssgServe()`; Solid's `ssgServe()` only handles trailing-slash 301 redirects + absolute script paths. Adding cache policies is documented as a follow-up.
+
+**Solid-specific runtime semantics that apply universally.**
+
+- **Components run once.** Solid components do not re-execute on prop changes; signals propagate updates. For SSR this means the render tree resolves synchronously — no async setup hooks.
+- **Hooks return `Accessor<T>` even on the server.** `useRoute()` returns `Accessor<RouteState>` — read with `routeState().route.context.data`, not `.route.context.data` directly.
+- **`onMount` is SSR-safe by guarantee.** Solid runtime guarantees `onMount` callbacks never fire during `renderToString`/`renderToStream`. The adapter's `RouterProvider` uses `onMount` for `announceNavigation`/`scrollRestoration`/`viewTransitions` — all client-only by guarantee, no manual `isServer` branching needed.
+- **`isServer` is a compile-time constant.** DCE removes guarded blocks from the SSR bundle (verified by Scenario 20: wire response contains zero references to `window.__MOUNT_LOG__`).
+- **`use:` directives are SSR-safe by construction.** Solid SSR runtime skips action invocations entirely; action bodies can reference DOM-only APIs (e.g. `IntersectionObserver` in `use:trackView`) without crashing render. **Babel-preset quirk** documented: the directive must be **imported** in the consuming module even when TS flags it unused, because the babel transform consumes the binding before TS does.
+
+**`<ErrorBoundary>` first-class.** `<Suspense>`-wrapped sections that throw on the server (or client) render the `<ErrorBoundary>` fallback without affecting siblings. The `reset` callback path (`fallback={(err, reset) => …}`) re-attempts the failed branch without remounting the whole tree — Solid-distinct from React's `<ErrorBoundary>` which requires a `key` change to retry.
+
+**SEO/head plumbing.** Per-route `meta` resolver returns a `PageMeta` block; the server splices it into `<!--ssr-head-->`. SSG additionally renders 9 tags including OpenGraph + Twitter Card. Client-side dynamic head updates are wired via Solid's `createEffect` mutating `document.title` + `<meta>` tags reactively (`<AutoMeta />` component) — no `@solidjs/meta` dependency on the client path either, see Limitations for the server-side reason.
+
+## Limitations
+
+Each item is categorised: **(framework-side)** — Solid / vite-plugin-solid / Solid runtime constraint not under Real-Router's control; **(design choice)** — deliberate Real-Router (or plugin) omission with documented rationale, often closeable by user-side composition; **(example design choice)** — per-example scope narrowing or simplification, not a library/adapter constraint.
+
+- **(framework-side) `<RouteView.NotFound>` + multiple `<RouteView.Match>` siblings emit divergent hydration-key counters in vite-plugin-solid 2.11.x.** All three examples ship the same workaround: an app-level `<Show when={isKnown}>` (or `<Show when={!isUnknown} fallback={<NotFound />}>`) at the top of `App.tsx`. Track upstream.
+- **(framework-side) `<SuspenseList revealOrder>` + vite-plugin-solid 2.11.x = hydration mismatch.** Solid's runtime ships coordinated chunks correctly, but wrapping streaming Suspense boundaries in `<SuspenseList>` makes vite-plugin-solid emit divergent hydration-key counters; event handlers on subsequent siblings silently fail to attach. Documented as "tried, backed out" in `ssr-streaming/README.md`. Same root cause as the `<RouteView.NotFound>` workaround.
+- **(framework-side) Streaming + selective hydration require JavaScript.** Without JS, the user sees only the streamed shell with `Loading…` placeholders — Solid's splice scripts (`$df()`) need to execute. The "no-JS reads the full page" property of `ssr/` does **not** hold in `ssr-streaming/`. For applications that must work without JS, use `renderToStringAsync` (the `/async-page` route in `ssr/`).
+- **(framework-side) `<Show fallback>` is conditional rendering, NOT Suspense-aware.** Async errors (e.g. rejected `createResource`) propagate up through `<Suspense>`; using `<Show fallback={<…>}>` for an async fallback would never catch the error. Use `<ErrorBoundary>` for async error fallbacks.
+- **(framework-side) `pipe(NodeWritable)`, not `pipeTo(WritableStream)`.** The streaming example wires `pipe()` (Node-shape `{ write(chunk: string) }`) into a `TransformStream<Uint8Array>` via `TextEncoder` so the server reads chunks the same way as Vue's `renderToWebStream`. `pipeTo()` would force a `Readable.fromWeb` round-trip.
+- **(framework-side) `@solidjs/meta` does not reliably surface tags under `renderToStringAsync` on Solid 1.9.5.** The package's `useAssets`-based asset injection is designed for `renderToStream`. The `ssr/` example installs `@solidjs/meta` but **does not** wire it through `<MetaProvider>` on the server — server-side head stays on the manual `<!--ssr-head-->` injection; client-side dynamic updates use the equivalent low-level `createEffect` pattern that `@solidjs/meta` would invoke internally on the client.
+- **(framework-side) `withTimeout()` does not cancel underlying loader work.** It races a `LoaderTimeout` against the original promise but the slow loader keeps running. Pair with `AbortController` wiring (the `slow` loader in `ssr/` does both) for production.
+- **(design choice) No `<Await>` / `defer()` wrapper API.** Solid's `<Suspense>` + `createResource` + `<ErrorBoundary>` already provides the same ergonomics with one less abstraction layer (per `ssr-streaming/README.md` "Library Philosophy").
+- **(design choice) No router-specific streaming API.** Streaming behaviour comes from `renderToStream` + `<Suspense>` + `createResource`; the router's role in `ssr-streaming/` is identical to `renderToStringAsync` SSR.
+- **(design choice) `ssr-data-plugin` (boot-path) and `lifecycle-plugin onNavigate` (CSR navigation) split the lifecycle by phase, on purpose.** `ssr-data-plugin` intercepts `router.start()` — runs once during SSR; on the client, `hydrateRouter(router, ssrState)` deposits the parsed state into a one-shot scratchpad and the plugin reuses the server-resolved `state.context.data` directly (#596) instead of calling the loader again. CSR navigations via `<Link>` do NOT re-run its loader; that is `lifecycle-plugin.onNavigate`'s job, and the canonical CSR+SSR stack composes both plugins. Single-responsibility per plugin keeps SSG-only build scripts and pure-CSR SPAs from carrying interception code they don't use.
+- **(example design choice) Solid SSG loaders are tolerant, not strict.** Loaders are user code; `ssr-data-plugin` does not dictate throw-vs-return for unknown ids. The Solid SSG `loaders.ts` returns `user: undefined`; Vue/React/Angular SSG `loaders.ts` throw `LoaderNotFound`. Both contracts are valid — Solid chose the lenient one. The fail-fast guard in `ssg-build.ts` is wired but dormant; opting into the strict path is a one-file change.
+- **(example design choice) Solid SSG ships no `Cache-Control` / weak-ETag override.** `ssgServe()` is a per-example local Vite plugin (not a `@real-router/*` export); the Vue/React `ssg/` versions add a `getCachePolicy` lookup + `res.writeHead` interception, the Solid/Svelte versions are redirect-only. Adding cache policies is application-level work; pattern lives in `examples/web/vue/ssr-examples/ssg/vite.config.ts`.
+- **(example design choice) `404`/`504` response bodies are plain text, not the SSR-rendered NotFound page.** Rendering a rich 404 would require a second `renderToString*` pass against a different URL — the SSR demo deliberately keeps it simple. Application code that wants a styled 404 can do the second pass; nothing in `@real-router/*` blocks it.
+
+### Why no `ssr-rsc/`?
+
+Solid does not implement React Server Components. The `ssr-streaming/` README describes Solid's streaming model — `renderToStream` + `<Suspense>` + `createResource` — as "the closest non-React analogue" to React 19's out-of-order Suspense. That covers the OOO-streaming shape but not RSC's server-component-tree wire format. If you need RSC, use the React adapter — see [`../../react/ssr-examples/ssr-rsc/`](../../react/ssr-examples/ssr-rsc).
+
+## Solid-unique aspects
+
+What's specific to the Solid adapter, expressed as Real-Router integration points rather than Solid theory:
+
+- **Solid's streaming model is the closest non-React analogue in this monorepo.** True out-of-order placeholders + selective hydration via `_$HY` patches; the streaming README's comparison table contrasts it with React 19 (equivalent OOO + selective hydration), Vue 3 (no OOO, blocking SSR Suspense, atomic hydration), and Preact 10 (only `lazy()` boundaries get the `<preact-island>` swap). Real-Router is identical across all of them — the streaming behaviour is whatever the renderer ships.
+- **Three rendering modes give application authors a graceful no-JS escape hatch.** Solid offers `renderToStringAsync` (single buffered string with `<Suspense>` awaited), bridging the gap between the no-JS-friendly `ssr/` model and the JS-required `ssr-streaming/` model. React has no equivalent to `renderToStringAsync` — to await in-tree promises in React you must opt into a streaming pipeline.
+- **`use:` directives are SSR-safe by construction, with one babel quirk.** The Solid runtime skips action invocations entirely on the server, so action bodies can use DOM-only APIs without `isServer` guards. Just remember to import the directive symbol explicitly in the consuming module — `babel-preset-solid` consumes the binding before TS marks it used.
+
+## Empirical findings
+
+Findings that the three READMEs flag as non-obvious, empirically-verified, or footgun-class — distilled here so adapter-shopping readers don't have to re-discover them.
+
+1. **Solid streaming is *actually* streaming at the HTTP level — verified by TCP frame timing.** `ssr-streaming/` Scenario 17 uses `node:http` to count frames empirically: multiple TCP frames spanning >400 ms (matching the slowest server-side delay). In this monorepo, only React 19's `renderToReadableStream` produces the same multi-frame pattern. Svelte's `ssr-streaming` and Angular's `ssr-streaming` both measure 1 frame, ~0 ms span — their "streaming" is client-side incremental hydration, not progressive HTTP flush. Scenario 18 reinforces this with per-chunk content inspection: the fallback marker arrives in an early chunk, resolved review markup arrives in a later chunk — proving the server emits resolved sections separately from the shell.
+
+2. **`<RouteView.NotFound>` next to multiple `<RouteView.Match>` siblings triggers hydration mismatch in vite-plugin-solid 2.11.x.** All three Solid SSR examples ship the same top-level `<Show>` workaround in `App.tsx`. Same root cause as the `<SuspenseList>` issue (hk-counter divergence). Documented in every child README's "Solid-Specific Gotchas" section.
+
+3. **Double Vite `resolve.conditions` is non-obvious and load-bearing.** `vite.config.ts` must declare `@real-router/internal-source` in BOTH top-level `resolve.conditions` AND `ssr.resolve.conditions`. Without the latter, the SSR bundle picks up the published DOM-codegen `dist/` and crashes with **"Client-only API called on the server side"** before the first request reaches the loader. Critical non-obvious detail repeated in all three READMEs.
+
+4. **`appType: "mpa"` is load-bearing for SSG preview.** With Vite's default `appType: "spa"`, `vite preview` SPA-fallbacks every unknown URL to `dist/index.html` — the SSG outputs for `/users/1/`, `/users/2/posts/`, etc. would never be served. `mpa` mode disables that fallback so each pre-rendered file ships at its own URL.
+
+5. **Solid SSG diverges from sibling adapters by choice.** Loaders are tolerant (return `user: undefined` instead of throwing `LoaderNotFound`); `ssgServe()` does not override `Cache-Control` or attach a weak ETag. Both are documented divergences from the Vue/React/Svelte/Angular `ssg/` examples — not bugs, but explicit follow-ups for production setups.
+
+6. **`<ErrorBoundary>` `reset` retries without remounting (Solid-distinct from React).** Clicking "Try again" inside the fallback re-attempts the failed branch in place. React's `<ErrorBoundary>` requires a `key` change to retry — a different ergonomic shape that Real-Router does not abstract over.
+
+## See Also
+
+- [`@real-router/solid`](../../../../packages/solid) — adapter package (`RouterProvider`, `RouteView`, `Link`, `useRoute`)
+- [`@real-router/ssr-data-plugin`](../../../../packages/ssr-data-plugin) — JSON-shaped per-route data loading (used by all three pipelines)
+- [`@real-router/ssr-data-plugin/errors`](../../../../packages/ssr-data-plugin/src/errors.ts) — typed loader errors (`LoaderRedirect`, `LoaderNotFound`, `LoaderTimeout`, `withTimeout`)
+- [`@real-router/browser-plugin`](../../../../packages/browser-plugin) — client-side URL sync after hydration
+- [React SSR examples](../../react/ssr-examples) — the closest streaming + selective-hydration parallel; also covers RSC
+- [Vue SSR examples](../../vue/ssr-examples) — counterpart with blocking SSR Suspense + atomic hydration (contrast)
+- Solid docs: [`renderToString`](https://docs.solidjs.com/reference/rendering/render-to-string), [`renderToStringAsync`](https://docs.solidjs.com/reference/rendering/render-to-string-async), [`renderToStream`](https://docs.solidjs.com/reference/rendering/render-to-stream), [`hydrate`](https://docs.solidjs.com/reference/rendering/hydrate), [`generateHydrationScript`](https://docs.solidjs.com/reference/rendering/generate-hydration-script), [`<Suspense>`](https://docs.solidjs.com/reference/components/suspense), [`createResource`](https://docs.solidjs.com/reference/basic-reactivity/create-resource), [`<ErrorBoundary>`](https://docs.solidjs.com/reference/components/error-boundary)

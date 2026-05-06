@@ -1,4 +1,5 @@
 import { getPluginApi } from "@real-router/core/api";
+import { getInternals } from "@real-router/core/validation";
 
 import type {
   SsrLoaderFactoryMap,
@@ -42,6 +43,8 @@ export function createSsrLoaderPlugin<
       throw error;
     }
 
+    const internals = getInternals(router);
+
     const removeStartInterceptor = api.addInterceptor(
       "start",
       async (next, path) => {
@@ -49,7 +52,19 @@ export function createSsrLoaderPlugin<
         const loader = compiledLoaders.get(state.name);
 
         if (loader) {
-          claim.write(state, await loader(state.params));
+          const hydrationState = internals.hydrationState;
+          const hydratedContext = hydrationState?.context;
+
+          if (
+            hydrationState !== null &&
+            hydrationState.name === state.name &&
+            hydratedContext !== undefined &&
+            config.namespace in hydratedContext
+          ) {
+            claim.write(state, hydratedContext[config.namespace] as T);
+          } else {
+            claim.write(state, await loader(state.params));
+          }
         }
 
         return state;

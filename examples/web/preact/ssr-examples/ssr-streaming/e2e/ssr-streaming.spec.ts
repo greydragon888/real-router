@@ -273,4 +273,26 @@ test.describe("Preact streaming SSR — smoke", () => {
       await expect(page.locator("text=Switch type")).toBeVisible();
     });
   });
+
+  test.describe("Post-hydration loader skip (#596)", () => {
+    test("client makes zero loader-driven calls on first paint", async ({
+      page,
+    }) => {
+      await page.goto("/products/1");
+      await page.waitForLoadState("networkidle");
+
+      const counts = await page.evaluate(() => globalThis.__LOADER_CALLS__);
+
+      expect(counts).toEqual({});
+    });
+
+    test("list route hydrates without loader fire", async ({ page }) => {
+      await page.goto("/products");
+      await page.waitForLoadState("networkidle");
+
+      const counts = await page.evaluate(() => globalThis.__LOADER_CALLS__);
+
+      expect(counts).toEqual({});
+    });
+  });
 });

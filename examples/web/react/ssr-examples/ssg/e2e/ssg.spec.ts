@@ -505,4 +505,45 @@ test.describe("SSG", () => {
     expect(conditional.status()).toBe(304);
     expect((await conditional.body()).length).toBe(0);
   });
+
+  test("post-hydration loader skip (#596): client makes zero loader-driven calls on first paint", async ({
+    page,
+  }) => {
+    // entry-client.tsx wraps loader factories with a counter exposed on
+    // window.__LOADER_CALLS__. After the static HTML hydrates,
+    // ssr-data-plugin must reuse the pre-resolved `data` namespace from
+    // window.__SSR_STATE__ (baked into each pre-rendered HTML at build
+    // time) and skip every client-side loader invocation.
+    await page.goto("/users/1/");
+    await page.waitForLoadState("networkidle");
+
+    const counts = await page.evaluate(
+      () =>
+        (
+          globalThis as unknown as Window & {
+            __LOADER_CALLS__?: Record<string, number>;
+          }
+        ).__LOADER_CALLS__,
+    );
+
+    expect(counts).toEqual({});
+  });
+
+  test("post-hydration loader skip (#596): list route hydrates without loader fire", async ({
+    page,
+  }) => {
+    await page.goto("/users/");
+    await page.waitForLoadState("networkidle");
+
+    const counts = await page.evaluate(
+      () =>
+        (
+          globalThis as unknown as Window & {
+            __LOADER_CALLS__?: Record<string, number>;
+          }
+        ).__LOADER_CALLS__,
+    );
+
+    expect(counts).toEqual({});
+  });
 });

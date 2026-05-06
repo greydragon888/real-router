@@ -1,0 +1,113 @@
+# Svelte SSR Examples
+
+> Server-rendering with Real-Router and Svelte 5 across three delivery models — classical SSR, deferred-data SSR (often misnamed "streaming"), and static site generation.
+
+Three standalone Vite apps. Each one is a real, e2e-tested dogfooding consumer of `@real-router/*` for a specific server-rendering shape; this document is the synthesis of what the router can and cannot do on Svelte 5, sourced exclusively from the three child READMEs.
+
+> **Terminology note up front.** `ssr-streaming/` here is **deferred-data SSR**, not HTTP streaming. Svelte 5 stable returns a single buffered HTML response; `{#await}` ships the pending branch and async resolution runs on the client after hydration. The child README documents this explicitly with a `node:http` reproducer (1 TCP frame, ~0 ms span) and contrasts it with React 19 / Solid (multiple frames, >400 ms span — true progressive HTTP flush). Do not generalise from sibling adapters.
+
+| Subdir | Demonstrates |
+|---|---|
+| [`ssr/`](./ssr) | Classical per-request `cloneRouter(base, { currentUser, abortSignal })` → `ssr-data-plugin` → `start(url)` → `await render(App, { props })` (Svelte's `render()` is `PromiseLike`, so the same call covers sync + async paths uniformly). `svelte.hydrate(App, { target, props })` claims SSR'd DOM. `<svelte:head>` content lands in `RenderOutput.head` and is spliced through `<!--ssr-head-->`. Auth + role gates via `canActivate` + DI; typed loader errors → 301/302/404/504. Svelte 5 primitives demonstrated: `createSubscriber` (canonical bridge for `subscribe(callback)` APIs into the reactivity graph), `SvelteSet` (reactive collection wrapper). Production HTTP: sha256 strong **ETag**, per-route `Cache-Control`, `AbortController` threaded into loader DI. 43 e2e scenarios. |
+| [`ssr-streaming/`](./ssr-streaming) | **Deferred-data SSR** via Svelte 5's `{#await}` blocks (NOT chunked HTTP). Server emits the pending fallback in one buffered body; `{:then}` resolution runs on the client after hydration. `<svelte:boundary>` for reactive/render-time errors with `@failed` snippet + `reset` + `onerror` (production observability). `<svelte:boundary pending>` + top-level `await` (gated behind `experimental.async: true` in Svelte 5.54.x). `use:` actions exercised end-to-end including the `update` lifecycle (param change → `action.update()`, no remount). 20 e2e scenarios; Scenario 12 captures TCP-frame timing as falsifiable proof of "no progressive flush". |
+| [`ssg/`](./ssg) | Build-time pre-rendering: `getStaticPaths(router, entries)` → `cloneRouter` + `start` + `await render` per URL → write `dist/{url}/index.html`. Nested SSG (8 paths total: 1 home + 1 list + 3 profiles + 3 posts). Per-page meta with 9 tags (title, description, canonical, og:type/title/description/url/image, twitter:card); profile pages use `og:type=profile`, posts use `article`; `<svelte:head>` content additionally injected via `<!--ssr-head-->`. `404.html` + `sitemap.xml` + filesystem-layout assertions + overfetch protection + sitemap↔disk consistency. Dual-mode mount: explicit `if (rootElement.firstElementChild) hydrate(...) else mount(...)` (Svelte 5 has no `mount({ hydrate: true })`). |
+
+## Capabilities
+
+What Real-Router actually delivers on Svelte 5 across these three shapes, grouped by concern. Each item is sourced from one or more child READMEs.
+
+**Per-request isolation.** `cloneRouter(base, deps?)` produces an isolated router per request; the three examples all dispose it in `finally`. The DI seam carries `currentUser` (auth/role guards); `entry-server/_auth.ts` and `entry-client.ts` mirror cookie parsing through shared `_known-users.ts` so post-hydration `canActivate(getDep("currentUser"))` outcomes match the SSR pass.
+
+**Single data-loading plugin shape, with a Svelte SSG divergence.** `@real-router/ssr-data-plugin` writes plain JSON-shaped data into `state.context.data` for all three pipelines and ships a typed-errors subpath (`@real-router/ssr-data-plugin/errors`) with `LoaderNotFound`/`LoaderRedirect`/`LoaderTimeout` + `withTimeout`. **Note:** Svelte SSG loaders deliberately do **not** opt into the typed-error path (return `user: undefined` for unknown ids; pages handle the undefined branch in snippet templates). The `ssr/` and `ssr-streaming/` examples do use typed errors.
+
+**State serialization + hydration.** `serializeRouterState()` is XSS-safe; `hydrateRouter(router, ssrState)` deposits the parsed state into a one-shot scratchpad on `RouterInternals.hydrationState` and calls `router.start(state.path)` once on the client; `ssr-data-plugin`'s start interceptor reads the scratchpad and reuses the server-resolved `state.context.data` directly, skipping the loader call (#596).
+
+**`hydrate` ≠ `mount` in Svelte 5.** Both live as separate top-level exports of `svelte`. `hydrate(App, { target, props })` claims existing DOM; `mount(App, { target, props })` mounts fresh. There is **no** `mount({ hydrate: true })` option in Svelte 5 — that is the deprecated Svelte 4 compat surface via `asClassComponent`. SSG branches explicitly: `rootElement.firstElementChild ? hydrate(...) : mount(...)` — same `entry-client.ts` works for SSG-rendered files and Vite dev fallbacks.
+
+**`render()` is uniformly sync + async.** `RenderOutput = SyncRenderOutput & PromiseLike<SyncRenderOutput>` — the same call returns a sync object you can read directly *and* a thenable you can `await`. Using `await render(App, …)` covers both sync and async (top-level `await`, `<svelte:boundary pending>`) paths uniformly.
+
+**`<svelte:head>` declarative head injection.** Components contribute to `<head>` via `<svelte:head>` blocks; `render()` collects them into the `head` field. The server splices it through `<!--ssr-head-->`. SSG additionally renders 9 tags including OpenGraph + Twitter Card (per-id absolute canonical, not the parent URL). This is the Svelte alternative to manual `meta.ts` injection — and it composes with explicit `<!--ssr-meta-->` placeholders too (SSG uses both: `<svelte:head>` content AND a meta-resolver block).
+
+**Snippet-based `<RouteView>`.** Svelte 5 named snippets matching route segments. `notFound` and `self` are reserved slot names (see `RESERVED_SLOT_NAMES`). Inside a parent `<RouteView nodeName="users">`, the parent's *own* leaf renders into `self` while nested children render into snippets named after them.
+
+**Loader-driven HTTP error model (where opted in).** Loader errors map to HTTP responses via `entry-server.ts` dispatch: `CANNOT_ACTIVATE` → 302, `LOADER_REDIRECT` → 301/302, `LOADER_NOT_FOUND` → 404 text/plain, `LOADER_TIMEOUT` → 504 text/plain. The deferred-data pipeline (`ssr-streaming/`) catches `LoaderNotFound` **before** rendering — typed errors keep the contract identical to classical SSR. `withTimeout()` and `abortSignal` are orthogonal: the timeout bounds the response, the signal frees server resources on `req.on("close")`. The `slow` loader does both.
+
+**Svelte 5 reactive primitives applicable to SSR.**
+
+- **`createSubscriber` (Svelte 5)** — canonical way to integrate `subscribe(callback)` APIs (websocket, IntersectionObserver, MediaQueryList) into the reactivity graph; the SSR ships the initial value, the client lazily sets up the subscription on first read inside an effect/template. Analogous to React's `useSyncExternalStore` and Solid's `createResource`. Demonstrated by `clock.svelte.ts` on the home page of `ssr/`.
+- **`SvelteSet` / `SvelteMap` / `SvelteDate` / `SvelteURL` / `SvelteURLSearchParams`** — reactive collection wrappers; mutations notify the graph without immutable replacement. Demonstrated by `UsersList.svelte` selection state. **Client-only by example design** — never serialized to SSR (selection starts empty after hydration).
+- **`<svelte:boundary>` for reactive/render-time errors** — separate from `{#await}`'s `{:catch}`. The `@failed` snippet renders the fallback with a `reset` callback to recover; `onerror` callback fires for production observability. Demonstrated in `ssr-streaming/` Scenarios 15/17.
+- **`use:` actions** — server runtime skips invocations entirely, so action bodies can reference DOM-only APIs (e.g. `IntersectionObserver` in `use:trackView`) without crashing render. Mount/update/destroy lifecycle exercised end-to-end (Scenario 20: `action.update({ productId: "999" })` fires on the existing observer instance, no remount).
+- **`$state.raw(value)`** — Svelte 5 escape hatch for large data objects replaced wholesale; skips the deep proxy. Mentioned in `ssr-streaming/README.md` as available; not used in the example because in-memory fixtures are small.
+
+**Composables and context.** Composables (`useRoute`, `useNavigator`, etc.) return `{ current: T }` getters — read inside reactive contexts (template, `$derived`, `$effect`). `getContext` must be called during component init; calling it inside `$effect`, event handlers, or async callbacks throws.
+
+**Build-time path enumeration.** `getStaticPaths(router)` walks the route tree and returns **leaf** paths only. `ssg-build.ts` derives intermediate parent URLs from leaves (e.g. `/users/:id` from `/users/:id/posts`) and adds the `/users` list page manually. Result: 8 pre-rendered URLs.
+
+**Per-route HTTP semantics, per pipeline.** The HTTP envelope diverges sharply across the three pipelines:
+
+| Pipeline | `Cache-Control` | `ETag` | `AbortController` |
+|---|---|---|---|
+| `ssr/` (renderToString*) | per-route, `must-revalidate` | strong sha256 (16 base64url chars) | threaded into loader DI via `cloneRouter(base, { abortSignal })`; loader pulls via `getDep("abortSignal")` (manual `as unknown as` cast — `cloneRouter` deps map is `Record<string, unknown>`) |
+| `ssr-streaming/` (deferred-data) | **none — out of scope by design** | **none** | **none** |
+| `ssg/` (build-time) | **none** — `ssgServe()` is redirect-only | none | not applicable |
+
+The `ssr-streaming/` envelope is documented as "out of scope" — the example focuses on the deferred-data + boundary contract. The SSG envelope mirrors the same divergence as Solid SSG (`Cache-Control` + weak ETag are documented follow-ups; the pattern lives in Vue/React `ssg/` configs).
+
+## Limitations
+
+Each item is categorised: **(framework-side)** — Svelte 5 / vite-plugin-svelte / runtime constraint not under Real-Router's control; **(design choice)** — deliberate Real-Router (or plugin) omission with documented rationale, often closeable by user-side composition; **(example design choice)** — per-example scope narrowing or simplification, not a library/adapter constraint.
+
+- **(framework-side) Svelte 5 stable does NOT implement chunked HTTP streaming with out-of-order placeholders.** `svelte/server.render` returns a single buffered HTML response. `{#await}` ships the **pending** branch in the body; resolution runs on the client. No `Transfer-Encoding: chunked`, no `<template id="…">` OOO chunks, no selective hydration — `hydrate()` claims the full tree atomically. See "Why no `ssr-rsc/`?" below.
+- **(framework-side) `<svelte:boundary pending>` does NOT block server-side render in Svelte 5.54.** The boundary's `pending` snippet ships to the wire just like `{#await}` would; async resolution happens on the client. Documented as honestly testable (Scenario 16) — if a future Svelte release flips to "server waits before flush" semantics, the test fails noisily by design.
+- **(framework-side) Top-level `await` is gated behind `experimental.async: true`** in Svelte 5.54.x — configured in both `vite.config.ts` (compiler hot path) and `svelte.config.js` (svelte-check). Expected to graduate to stable in a future Svelte minor.
+- **(framework-side) Don't override Vite `resolve.conditions`.** Replacing the default list drops the implicit `"browser"` condition for the client build, and `import { hydrate } from "svelte"` resolves to `index-server.js` where `hydrate()` throws `lifecycle_function_unavailable`. Use `dedupe: ["svelte"]` only — see the inline comment in `ssr/vite.config.ts`.
+- **(framework-side) `<Lazy>` is not for SSR data.** It uses `$effect` to start its loader, and `$effect` does not fire on the server — so SSR/SSG output renders **only** the fallback. For SSR-critical data, use `state.context.data` (via `ssr-data-plugin`) or a top-level `await` in `<script>`.
+- **(framework-side) `withTimeout()` does not cancel underlying loader work.** It races a `LoaderTimeout` against the original promise but the slow loader keeps running. Pair with `AbortController` wiring (the `slow` loader in `ssr/` does both).
+- **(design choice) No router-specific streaming/deferred-data API.** `ssr-streaming/` delegates to Svelte 5's native `{#await}` + `<svelte:boundary>`; the router's role is identical to non-streaming SSR (per-request `cloneRouter`, `start(url)`, plugin-driven critical data). "Standalone Svelte SSR with deferred-data semantics through native primitives, without SvelteKit framework lock-in" — `ssr-streaming/README.md` Library Philosophy.
+- **(design choice) `ssr-streaming/` ships no production HTTP semantics.** `AbortController`, `ETag`, `Cache-Control`, HEAD-handler, and per-route `<svelte:head>` are intentionally out of scope — the example focuses on the deferred-data + boundary contract. The sibling `ssr/` ships the full prod envelope; this example stays narrow on purpose.
+- **(design choice) `ssr-data-plugin` (boot-path) and `lifecycle-plugin onNavigate` (CSR navigation) split the lifecycle by phase, on purpose.** `ssr-data-plugin` intercepts `router.start()` — runs once during SSR; on the client, `hydrateRouter(router, ssrState)` deposits the parsed state into a one-shot scratchpad and the plugin reuses the server-resolved `state.context.data` directly (#596) instead of calling the loader again. CSR navigations via `<Link>` do NOT re-run its loader; that is `lifecycle-plugin.onNavigate`'s job — explicitly documented as the canonical client-side path in the Svelte child READMEs. Single-responsibility per plugin keeps SSG-only build scripts and pure-CSR SPAs from carrying interception code they don't use.
+- **(example design choice) Svelte SSG loaders are tolerant, not strict.** Loaders are user code; `ssr-data-plugin` does not dictate throw-vs-return for unknown ids. The Svelte SSG `loaders.ts` returns `user: undefined` (pages handle the undefined branch via snippet templates); Vue/React/Angular SSG throw `LoaderNotFound`. Both contracts are valid — Svelte chose the lenient one (matching Solid). The fail-fast guard in `ssg-build.ts` is wired but dormant; opting into the strict path is a one-file change.
+- **(example design choice) Svelte SSG ships no `Cache-Control` / weak-ETag override.** `ssgServe()` is a per-example local Vite plugin (not a `@real-router/*` export); the Vue/React `ssg/` versions add a `getCachePolicy` lookup + `res.writeHead` interception, the Svelte/Solid versions are redirect-only. Adding cache policies is application-level work; pattern lives in `examples/web/vue/ssr-examples/ssg/vite.config.ts`.
+- **(example design choice) `404`/`504` response bodies are plain text, not the SSR-rendered NotFound page.** Rendering a rich 404 would require a second `render()` pass against a different URL — the demo deliberately keeps it simple. Application code that wants a styled 404 can do the second pass; nothing in `@real-router/*` blocks it. (Note: SSG additionally serves `404.html` with the correct HTTP status only if the host web server is configured for it — nginx `try_files`, Cloudflare/Netlify `_redirects` — that part is deployment-side.)
+- **(framework-side) `abortSignal` requires a manual cast in loader DI.** `cloneRouter` deps map is `Record<string, unknown>`, so loaders consuming `getDep("abortSignal")` need a manual `as unknown as (key) => AbortSignal | undefined` cast. Pattern documented in `ssr/src/router/loaders.ts`.
+
+### Why no `ssr-rsc/`?
+
+Svelte does not implement React Server Components. The `ssr-streaming/README.md` comparison table characterises Svelte 5's network model as "lazy hydration only — single response, server shell + client data" — there is no Flight-style server-component-tree wire format, and no chunked progressive flush in stable Svelte 5. The `{#await}` block + `<svelte:boundary>` form the closest native equivalent for async-aware SSR. If you need RSC, use the React adapter — see [`../../react/ssr-examples/ssr-rsc/`](../../react/ssr-examples/ssr-rsc).
+
+## Svelte-unique aspects
+
+What's specific to the Svelte 5 adapter, expressed as Real-Router integration points rather than Svelte theory:
+
+- **The "streaming" terminology trap.** `ssr-streaming/` is deferred-data SSR, not HTTP streaming — falsifiably so (Scenario 12: 1 TCP frame, ~0 ms span via `node:http`). Real-Router is identical to the classical `ssr/` example here; the only thing that differs is what each `{#await}` block ships in the body. Adapter-shopping readers expecting React-19 / Solid behaviour will be surprised — the README's terminology disclaimer is load-bearing.
+- **`<svelte:boundary>` is a separate axis from `{#await}` `{:catch}`.** `{:catch}` covers async loader rejections; `<svelte:boundary>` covers reactive/render-time errors with `@failed` snippet + `reset` + `onerror`. Application code combines them; the router contributes nothing extra.
+- **Snippet-based RouteView matches Svelte's idioms.** `{#snippet name()}{/snippet}` blocks named after route segments — `notFound` and `self` reserved. Nested `<RouteView nodeName="users">` inside `UserProfile.svelte` shows the local-nesting pattern (no top-level `users.profile.posts` snippet in `App.svelte`).
+- **Two render-output channels for `<head>`.** `RenderOutput.head` (auto-collected from `<svelte:head>` blocks) flows through `<!--ssr-head-->`; an explicit meta-resolver block flows through `<!--ssr-meta-->` (SSG uses both simultaneously). Either alone is fine; combined they let `<svelte:head>` cover per-component contributions and the meta-resolver cover route-level SEO.
+
+## Empirical findings
+
+Findings that the three READMEs flag as non-obvious, empirically-verified, or footgun-class — distilled here so adapter-shopping readers don't have to re-discover them.
+
+1. **Svelte 5 "streaming" SSR is, empirically, NOT streaming over HTTP.** `ssr-streaming/` Scenario 12 uses `node:http` to count frames: body lands in 1 TCP frame, ~0 ms span. The symmetric test in Solid `ssr-streaming/` (Scenario 17) measures multiple frames spanning >400 ms — true OOO over chunked HTTP. Svelte's `<50 ms` assertion inverts the assertion direction. Falsifiable proof of "no progressive flush", documented as a regression guard for any future Svelte release that ships actual HTTP streaming.
+
+2. **`<svelte:boundary pending>` does NOT block server-side render in Svelte 5.54.** Pending snippet ships to the wire; async resolution happens on the client. Scenario 16 pins this behaviour — if a future Svelte release flips to "server waits before flush", the test fails honestly.
+
+3. **Don't override Vite `resolve.conditions` — drops the implicit `"browser"` condition for the client build.** Symptom: `import { hydrate } from "svelte"` resolves to `index-server.js`, `hydrate()` throws `lifecycle_function_unavailable`. Use `dedupe: ["svelte"]` only. Critical non-obvious detail in `ssr/README.md` "Svelte-Specific Gotchas".
+
+4. **`render()` is `PromiseLike` even for sync components — `await render(...)` works uniformly.** `RenderOutput = SyncRenderOutput & PromiseLike<SyncRenderOutput>`. Calling `await render(App, …)` covers both top-level-await components and pure-sync components without branching. Documented as the canonical entry-point shape.
+
+5. **Svelte SSG diverges from Vue/React/Angular by example design.** Loaders are tolerant (return `undefined`); `ssgServe()` does not override `Cache-Control` or attach a weak ETag. Same divergence as Solid SSG — explicit follow-ups, not bugs.
+
+6. **`404.html` SEO status depends on the host web server.** The build emits `dist/404.html`, but Vite preview / `sirv` may serve it with HTTP 200 unless explicit `try_files`-equivalent is configured. Real production needs nginx `try_files`, Cloudflare/Netlify `_redirects`, etc.
+
+## See Also
+
+- [`@real-router/svelte`](../../../../packages/svelte) — adapter package (`RouterProvider`, `RouteView`, `Link`, `useRoute`, snippets)
+- [`@real-router/ssr-data-plugin`](../../../../packages/ssr-data-plugin) — JSON-shaped per-route data loading (used by all three pipelines; SSG opts out of typed errors)
+- [`@real-router/ssr-data-plugin/errors`](../../../../packages/ssr-data-plugin/src/errors.ts) — typed loader errors (`LoaderRedirect`, `LoaderNotFound`, `LoaderTimeout`, `withTimeout`)
+- [`@real-router/browser-plugin`](../../../../packages/browser-plugin) — client-side URL sync after hydration (`ssr/` and `ssg/`; `ssr-streaming/` deliberately omits)
+- [React SSR examples](../../react/ssr-examples) — full feature parity reference, plus `ssr-rsc/` for React Server Components
+- [Solid SSR examples](../../solid/ssr-examples) — counterpart with true OOO HTTP streaming + selective hydration (the streaming-divergence comparison)
+- [Vue SSR examples](../../vue/ssr-examples) — counterpart with chunked HTTP streaming + blocking SSR Suspense (contrast)
+- Svelte docs: [`render`](https://svelte.dev/docs/svelte/svelte-server), [`hydrate`](https://svelte.dev/docs/svelte/imperative-component-api), [`mount`](https://svelte.dev/docs/svelte/imperative-component-api), [`<svelte:head>`](https://svelte.dev/docs/svelte/svelte-head), [`<svelte:boundary>`](https://svelte.dev/docs/svelte/svelte-boundary), [`{#await}`](https://svelte.dev/docs/svelte/await)

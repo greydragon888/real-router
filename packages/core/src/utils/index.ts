@@ -4,7 +4,10 @@ export { hydrateRouter } from "./hydrateRouter";
 
 export { serializeRouterState } from "./serializeRouterState";
 
-export type { SerializeRouterStateOptions } from "./serializeRouterState";
+export type {
+  SerializedRouterState,
+  SerializeRouterStateOptions,
+} from "./serializeRouterState";
 
 export { serializeState } from "./serializeState";
 

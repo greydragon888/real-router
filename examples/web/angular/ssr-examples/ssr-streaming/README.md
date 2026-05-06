@@ -253,6 +253,10 @@ Real-Router intentionally does **not** ship a `<Suspense>` component or `defer()
 
 This example demonstrates Real-Router's library-first stance: **delegate to Angular 21 native primitives instead of inventing router-specific streaming APIs**. `@defer (on viewport)`, `@defer (on hover)`, `withIncrementalHydration()`, and `AngularNodeAppEngine` form the complete streaming SSR contract that Angular ships — the router just provides per-request isolation and per-route critical data.
 
+## Loader Runs Twice on First Paint
+
+Same caveat as the runtime SSR sibling: `ssr-data-plugin` is registered on both server and client, and `provideRealRouterFactory` calls `router.start(path)` directly from `provideAppInitializer` (not via `hydrateRouter()`), so the post-hydration loader-skip mechanism (#596) is bypassed — the `RouterInternals.hydrationState` scratchpad is never populated. The deferred `@defer` blocks own their own data fetching (independent of `ssr-data-plugin`), so the duplication is limited to the **critical** loader. See [`ssr/README.md`](../ssr/README.md) → "No SSR-State Serialization" for the full explanation and a `TransferState` mitigation sketch.
+
 ## See Also
 
 - [`@real-router/ssr-data-plugin`](../../../../../packages/ssr-data-plugin) — per-route critical data loading

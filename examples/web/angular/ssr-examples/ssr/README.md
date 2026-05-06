@@ -91,9 +91,11 @@ Client (once, after hydration):
         usePlugin(browserPluginFactory(), ssrDataPluginFactory(loaders))
     → provideAppInitializer:
         await router.start(window.location.pathname + search)
-        # browser-plugin's start interceptor wraps with location-derived path,
-        # ssr-data-plugin runs the loader AGAIN on the client (no SSR-state
-        # blob is shipped — see "No SSR-State Serialization" below).
+        # browser-plugin's start interceptor wraps with location-derived path.
+        # ssr-data-plugin runs the loader AGAIN on the client — no SSR-state
+        # blob is shipped, and provideRealRouterFactory bypasses hydrateRouter()
+        # so the post-hydration scratchpad (#596) is never populated.
+        # See "No SSR-State Serialization" below for the full explanation.
     → Angular claims server-rendered DOM (no flash, no mismatch)
 ```
 
@@ -104,13 +106,21 @@ This example does **not** ship a `window.__SSR_STATE__` blob. The same `ssr-data
 1. Server `start(url)` → loader runs → `state.context.data` populated → HTML rendered
 2. Client `start(url)` after hydration → loader runs **again** → `state.context.data` re-populated
 
-For the in-memory database in this demo it is invisible. **In a real app it is a second network roundtrip per route on first paint.** Mitigations the example does not show:
+For the in-memory database in this demo it is invisible. **In a real app it is a second network roundtrip per route on first paint.**
 
-- Serialize `state.context.data` server-side via `serializeRouterState()`, embed it as a `<script>__SSR_STATE__</script>` blob, and on the client register a custom plugin that hydrates `state.context.data` from that blob instead of re-running the loader.
-- Cache loader results inside the loader closure (per-request cache hits the second invocation).
-- Use `@real-router/lifecycle-plugin` `onNavigate` for client-side fetching with explicit cache control.
+### Why doesn't `#596` help here?
 
-The double-run is a deliberate simplification, not a router limitation. The plugin's contract is "intercept `start()`"; what `start()` does on the client is application-level policy.
+The post-hydration loader-skip optimization (#596) hooks into `hydrateRouter()`, which deposits the parsed `__SSR_STATE__` into a one-shot scratchpad on `RouterInternals.hydrationState` before delegating to `router.start()`. `ssr-data-plugin`'s start interceptor reads the scratchpad and reuses the server-resolved `state.context.data` instead of re-running the loader.
+
+Angular's `provideRealRouterFactory` (used in this example) **bypasses** `hydrateRouter()` entirely — it calls `router.start(path)` directly from `provideAppInitializer`, with the URL derived from `REQUEST` (server) or `window.location` (client). The scratchpad is never populated, so the plugin runs the loader as today.
+
+### Mitigations the example does not show
+
+- **Bridge `__SSR_STATE__` through Angular `TransferState`.** Serialize `state.context.data` server-side via `serializeRouterState()`, store it in `TransferState`, and on the client write into `getInternals(router).hydrationState` from a `provideEnvironmentInitializer` that runs **before** `provideAppInitializer` triggers `start()`. The plugin's interceptor would then pick it up and skip the loader.
+- **Cache loader results inside the loader closure** (per-request cache hits the second invocation).
+- **Use `@real-router/lifecycle-plugin` `onNavigate`** for client-side fetching with explicit cache control.
+
+The double-run is a deliberate simplification, not a router limitation. The plugin's contract is "intercept `start()`"; what `start()` does on the client is application-level policy. Wiring the `TransferState` ↔ `hydrationState` bridge for Angular SSR deserves its own helper and is outside the scope of this example.
 
 ## SSR-Only Plugin Contract
 

@@ -441,4 +441,31 @@ test.describe("Streaming SSR Example", () => {
     // together at the slower offset).
     expect(reviewsSection).toBeLessThan(relatedSection);
   });
+
+  test("post-hydration loader skip (#596): client makes zero loader-driven calls on first paint", async ({
+    page,
+  }) => {
+    // entry-client.tsx wraps loader factories with a counter exposed on
+    // globalThis.__LOADER_CALLS__. After streamed SSR completes and
+    // hydrateRouter runs, ssr-data-plugin must reuse the pre-resolved
+    // `data` namespace from globalThis.__SSR_STATE__ and skip every
+    // client-side loader invocation.
+    await page.goto("/products/1");
+    await page.waitForLoadState("networkidle");
+
+    const counts = await page.evaluate(() => globalThis.__LOADER_CALLS__);
+
+    expect(counts).toEqual({});
+  });
+
+  test("post-hydration loader skip (#596): list route hydrates without loader fire", async ({
+    page,
+  }) => {
+    await page.goto("/products");
+    await page.waitForLoadState("networkidle");
+
+    const counts = await page.evaluate(() => globalThis.__LOADER_CALLS__);
+
+    expect(counts).toEqual({});
+  });
 });

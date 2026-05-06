@@ -499,4 +499,26 @@ test.describe("Streaming SSR Example (Vue)", () => {
     // well under the 1200 ms full-stream span.
     expect(elapsed).toBeLessThan(800);
   });
+
+  test("post-hydration loader skip (#596): client makes zero loader-driven calls on first paint", async ({
+    page,
+  }) => {
+    await page.goto("/products/1");
+    await page.waitForLoadState("networkidle");
+
+    const counts = await page.evaluate(() => globalThis.__LOADER_CALLS__);
+
+    expect(counts).toEqual({});
+  });
+
+  test("post-hydration loader skip (#596): list route hydrates without loader fire", async ({
+    page,
+  }) => {
+    await page.goto("/products");
+    await page.waitForLoadState("networkidle");
+
+    const counts = await page.evaluate(() => globalThis.__LOADER_CALLS__);
+
+    expect(counts).toEqual({});
+  });
 });

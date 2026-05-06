@@ -64,11 +64,15 @@ Build time:
 
 Client (once):
   createAppRouter()
-    → usePlugin(browserPluginFactory())
+    → usePlugin(browserPluginFactory(), ssrDataPluginFactory(loaders))
     → hydrateRouter(router, window.__SSR_STATE__) or router.start()
+       → deposits parsed state in scratchpad, calls router.start(path)
+       → ssr-data-plugin reads state.context.data from scratchpad (#596) — loader skipped
     → hydrateRoot() or createRoot().render()
        (auto-detect via rootElement.firstElementChild)
 ```
+
+**Post-hydration loader skip (#596).** Build-time loader resolves data → static HTML written with embedded `__SSR_STATE__`. On first paint `hydrateRouter(router, ssrState)` deposits the parsed state into a one-shot scratchpad on `RouterInternals.hydrationState`; `ssr-data-plugin`'s start interceptor reads it and writes `state.context.data` directly — no second loader call, no extra roundtrip per route. Verified by `post-hydration loader skip (#596)` Playwright tests in [`e2e/ssg.spec.ts`](e2e/ssg.spec.ts).
 
 ## Output
 

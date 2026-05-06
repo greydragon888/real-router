@@ -56,9 +56,12 @@ Client (once):
   createAppRouter({ currentUser })
     → usePlugin(browserPluginFactory(), ssrDataPluginFactory(loaders))
     → hydrateRouter(router, window.__SSR_STATE__)
-      → reads state.path, calls router.start(path) → loader re-runs → state.context.data restored
+      → deposits parsed state in scratchpad, calls router.start(path)
+      → ssr-data-plugin reads state.context.data from scratchpad (#596) — loader skipped
     → hydrate(<RouterProvider><App /></RouterProvider>, rootElement)   ─ Preact hydrate
 ```
+
+The client-side `ssrDataPluginFactory` registration handles **hydration**: `hydrateRouter(router, ssrState)` deposits the parsed state into a one-shot internal scratchpad on `RouterInternals.hydrationState`, then calls `router.start(state.path)`. The plugin's `start` interceptor reads the scratchpad and reuses the server-resolved `state.context.data` instead of re-running the loader (#596) — no flash, no mismatch, no second round-trip on first paint. Verified by `post-hydration loader skip (#596)` Playwright tests in [`e2e/ssr.spec.ts`](e2e/ssr.spec.ts).
 
 ## `renderToStringAsync` — Preact-unique async-single-shot SSR
 

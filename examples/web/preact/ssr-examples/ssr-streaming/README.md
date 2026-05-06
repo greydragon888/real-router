@@ -92,9 +92,12 @@ Server (per request):
 Client:
   createAppRouter()
     → usePlugin(ssrDataPluginFactory(loaders))
-    → hydrateRouter(router, window.__SSR_STATE__) # rebuild via start(state.path)
+    → hydrateRouter(router, window.__SSR_STATE__) # deposits parsed state in scratchpad, calls start(state.path)
+                                                  # ssr-data-plugin reads context.data from scratchpad (#596) — loader skipped
     → hydrate(<RouterProvider><App /></RouterProvider>, root)
 ```
+
+**Post-hydration loader skip (#596).** `hydrateRouter()` deposits the parsed `__SSR_STATE__` into a one-shot scratchpad on `RouterInternals.hydrationState` before `router.start(state.path)`. `ssr-data-plugin`'s start interceptor reads the scratchpad and writes the server-resolved value to `state.context.data` directly, skipping the loader call. Result: zero loader-driven calls on first paint after hydration. Verified by `post-hydration loader skip (#596)` Playwright tests in [`e2e/ssr-streaming.spec.ts`](e2e/ssr-streaming.spec.ts).
 
 ## Run
 

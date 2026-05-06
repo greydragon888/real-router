@@ -200,9 +200,13 @@ test.describe("SSR (Solid)", () => {
     await context.close();
   });
 
-  test("loader fires on hydration: deep-link → full reload preserves data after JS boot", async ({
+  test("hydration: deep-link → full reload preserves loader-resolved data after JS boot (#596 reuses pre-resolved data)", async ({
     page,
   }) => {
+    // After hydrateRouter → router.start(state.path), ssr-data-plugin reads
+    // the pre-resolved value from globalThis.__SSR_STATE__.context.data and
+    // skips its loader (#596). Component renders identically — no flash, no
+    // mismatch, no extra round-trip to the in-memory database.
     await page.goto("/users/3");
     await page.waitForLoadState("networkidle");
 
@@ -227,6 +231,35 @@ test.describe("SSR (Solid)", () => {
     );
 
     expect(hydrationErrors).toEqual([]);
+  });
+
+  test("post-hydration loader skip (#596): client makes zero loader-driven calls on first paint", async ({
+    page,
+  }) => {
+    // entry-client.tsx wraps loader factories with a counter exposed on
+    // globalThis.__LOADER_CALLS__. After hydration, ssr-data-plugin must
+    // reuse the pre-resolved `data` namespace and skip every client-side
+    // loader call.
+    await page.goto("/users/2");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByTestId("user-profile")).toBeVisible();
+    await expect(page.getByTestId("user-name")).toHaveText("Name: Bob");
+
+    const counts = await page.evaluate(() => globalThis.__LOADER_CALLS__);
+
+    expect(counts).toEqual({});
+  });
+
+  test("post-hydration loader skip (#596): list route hydrates without loader fire", async ({
+    page,
+  }) => {
+    await page.goto("/users");
+    await page.waitForLoadState("networkidle");
+
+    const counts = await page.evaluate(() => globalThis.__LOADER_CALLS__);
+
+    expect(counts).toEqual({});
   });
 
   test("per-request isolation: 10 concurrent /users/:id requests return distinct, correct payloads", async ({

@@ -63,17 +63,18 @@ Client (once):
   createAppRouter({ currentUser: lookupUserFromCookies(parseCookieHeader(document.cookie)) })
     → usePlugin(browserPluginFactory(), ssrDataPluginFactory(loaders))
     → hydrateRouter(router, window.__SSR_STATE__)
-      → reads state.path, calls router.start(path) → loader re-runs → state.context.data restored
+      → deposits parsed state in scratchpad, calls router.start(path)
+      → ssr-data-plugin reads state.context.data from scratchpad (#596) — loader skipped
     → createSSRApp(...).mount("#root")
 ```
 
 `server/_auth.ts` and `entry-client.ts` both consume the same `lookupUserFromCookies` / `parseCookieHeader` helpers from `src/_known-users.ts`. This parity is why post-hydration `canActivate` guards see the same `currentUser` DI value as the SSR pass — otherwise client-side guard checks would diverge.
 
-`serializeRouterState(state)` emits a minimal `{ path }` snapshot; `hydrateRouter(router, state)` calls `router.start(state.path)` once, and the plugin's `start` interceptor re-runs the loader on the client to repopulate `state.context.data`. Loader runs twice (once per side) — invisible for in-memory data, one extra fetch for real APIs.
+`serializeRouterState(state)` emits a `{ name, params, path, context }` snapshot; `hydrateRouter(router, state)` deposits it into a one-shot internal scratchpad on `RouterInternals.hydrationState` and delegates to `router.start(state.path)`. The plugin's `start` interceptor reuses the server-resolved `state.context.data` from the scratchpad and skips the loader (#596) — invisible for in-memory data, one **avoided** fetch for real APIs. Verified by `post-hydration loader skip (#596)` Playwright tests in [`e2e/ssr.spec.ts`](e2e/ssr.spec.ts).
 
-The client-side `ssrDataPluginFactory` registration handles **hydration only**: `hydrateRouter(router, ssrState)` calls `router.start(state.path)` once, and the plugin's `start` interceptor re-runs the loader on the client to repopulate `state.context.data`. Post-hydration component tree sees the same data the server rendered — no flash, no mismatch.
+The client-side `ssrDataPluginFactory` registration handles **hydration**: post-hydration the component tree sees the same `state.context.data` the server rendered — no flash, no mismatch, no second round-trip.
 
-**SSR-only by design:** the plugin intercepts `start()`, **not** `navigate()`. After hydration, subsequent `<Link>` clicks do NOT re-run loaders — same contract as the React example.
+**SSR-only by design:** the plugin intercepts `start()`, **not** `navigate()`. After hydration, subsequent `<Link>` clicks do NOT trigger loaders — same contract as the React example.
 
 ## Vue 3.5 lazy hydration + `useId()`
 

@@ -638,4 +638,26 @@ test.describe("SSG (Vue)", () => {
     expect(conditional.status()).toBe(304);
     expect((await conditional.body()).length).toBe(0);
   });
+
+  test("post-hydration loader skip (#596): client makes zero loader-driven calls on first paint", async ({
+    page,
+  }) => {
+    await page.goto("/users/1/");
+    await page.waitForLoadState("networkidle");
+
+    const counts = await page.evaluate(() => globalThis.__LOADER_CALLS__);
+
+    expect(counts).toEqual({});
+  });
+
+  test("post-hydration loader skip (#596): list route hydrates without loader fire", async ({
+    page,
+  }) => {
+    await page.goto("/users/");
+    await page.waitForLoadState("networkidle");
+
+    const counts = await page.evaluate(() => globalThis.__LOADER_CALLS__);
+
+    expect(counts).toEqual({});
+  });
 });

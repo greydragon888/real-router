@@ -9,10 +9,17 @@ import { createAppRouter } from "./router/createAppRouter";
 import { loaders } from "./router/loaders";
 
 import type { CurrentUser } from "./entry-server";
+import type { DataLoaderFactoryMap } from "@real-router/ssr-data-plugin";
 
 declare global {
   interface Window {
     __SSR_STATE__?: { path: string };
+    /**
+     * Per-route loader invocation counter — set up before plugin registration
+     * so e2e tests can assert that the post-hydration loader-skip optimization
+     * (#596) leaves it empty after a deep-link page load.
+     */
+    __LOADER_CALLS__?: Record<string, number>;
   }
 }
 
@@ -56,7 +63,29 @@ const router = createAppRouter({
   currentUser: getCurrentUserFromDocument(),
 });
 
-router.usePlugin(browserPluginFactory(), ssrDataPluginFactory(loaders));
+const loaderCalls: Record<string, number> = {};
+
+window.__LOADER_CALLS__ = loaderCalls;
+
+const instrumentedLoaders: DataLoaderFactoryMap = Object.fromEntries(
+  Object.entries(loaders).map(([name, factory]) => [
+    name,
+    (r, getDep) => {
+      const loader = factory(r, getDep);
+
+      return (params) => {
+        loaderCalls[name] = (loaderCalls[name] ?? 0) + 1;
+
+        return loader(params);
+      };
+    },
+  ]),
+) as DataLoaderFactoryMap;
+
+router.usePlugin(
+  browserPluginFactory(),
+  ssrDataPluginFactory(instrumentedLoaders),
+);
 
 const ssrState = globalThis.__SSR_STATE__;
 

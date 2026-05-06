@@ -46,16 +46,19 @@ Build time (scripts/ssg-build.ts):
 Client (initial visit to a pre-rendered URL):
   createAppRouter()
     → usePlugin(browserPluginFactory(), ssrDataPluginFactory(loaders))
-    → hydrateRouter(router, window.__SSR_STATE__)   # rebuilds state via start(state.path)
+    → hydrateRouter(router, window.__SSR_STATE__)   # deposits parsed state in scratchpad, calls start(state.path)
+                                                    # ssr-data-plugin reads context.data from scratchpad (#596) — loader skipped
     → if (root.firstElementChild) hydrate(...) else render(...)   # dual-mode mount
                                                     # browser-plugin handles SPA nav after this
 
 Client (vite dev mode):
   createAppRouter()
     → usePlugin(browserPluginFactory(), ssrDataPluginFactory(loaders))
-    → router.start()   # no __SSR_STATE__ — fresh start
+    → router.start()   # no __SSR_STATE__ — fresh start, loader runs as today
     → render(...)      # firstElementChild is null in dev (no SSG content)
 ```
+
+**Post-hydration loader skip (#596).** Build-time loader resolves data → static HTML written with embedded `__SSR_STATE__`. On first paint `hydrateRouter(router, ssrState)` deposits the parsed state into a one-shot scratchpad on `RouterInternals.hydrationState`; `ssr-data-plugin`'s start interceptor reads it and writes `state.context.data` directly — no second loader call, no extra roundtrip per route. Verified by `post-hydration loader skip (#596)` Playwright tests in [`e2e/ssg.spec.ts`](e2e/ssg.spec.ts).
 
 ## Output
 

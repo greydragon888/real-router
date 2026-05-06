@@ -276,6 +276,7 @@ export class Router<
       },
       routerExtensions: [],
       contextClaimRecords: new Set(),
+      hydrationState: null,
     });
 
     // =========================================================================

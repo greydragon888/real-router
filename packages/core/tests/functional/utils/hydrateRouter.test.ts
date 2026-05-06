@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import { errorCodes } from "@real-router/core";
+import { getPluginApi } from "@real-router/core/api";
+import { getInternals } from "@real-router/core/validation";
 
 import { hydrateRouter } from "../../../src/utils/hydrateRouter";
 import { serializeRouterState } from "../../../src/utils/serializeRouterState";
@@ -78,5 +80,116 @@ describe("hydrateRouter", () => {
     ).rejects.toMatchObject({ code: errorCodes.ROUTE_NOT_FOUND });
 
     router2.stop();
+  });
+
+  describe("hydration scratchpad (#596)", () => {
+    it("exposes parsed state via getInternals().hydrationState during start interceptor", async () => {
+      const serverState: State = {
+        name: "users.view",
+        params: { id: "42" },
+        path: "/users/view/42",
+        context: { data: { user: { id: "42", name: "Alice" } } },
+        transition: {
+          phase: "activating",
+          reason: "success",
+          segments: { deactivated: [], activated: [], intersection: "" },
+        },
+      };
+
+      let observedDuringStart: ReturnType<
+        typeof getInternals
+      >["hydrationState"] = null;
+
+      const removeInterceptor = getPluginApi(router).addInterceptor(
+        "start",
+        async (next, path) => {
+          observedDuringStart = getInternals(router).hydrationState;
+
+          return next(path);
+        },
+      );
+
+      await hydrateRouter(router, serializeRouterState(serverState));
+
+      expect(observedDuringStart).not.toBeNull();
+      expect(observedDuringStart).toMatchObject({
+        name: "users.view",
+        params: { id: "42" },
+        path: "/users/view/42",
+        context: { data: { user: { id: "42", name: "Alice" } } },
+      });
+
+      removeInterceptor();
+    });
+
+    it("clears hydrationState after start resolves", async () => {
+      expect(getInternals(router).hydrationState).toBeNull();
+
+      await hydrateRouter(router, { path: "/users/list" });
+
+      expect(getInternals(router).hydrationState).toBeNull();
+    });
+
+    it("clears hydrationState even if start rejects", async () => {
+      const router2 = createTestRouter({ allowNotFound: false });
+
+      await expect(
+        hydrateRouter(router2, { path: "/nonexistent" }),
+      ).rejects.toMatchObject({ code: errorCodes.ROUTE_NOT_FOUND });
+
+      expect(getInternals(router2).hydrationState).toBeNull();
+
+      router2.stop();
+    });
+
+    it("returns null for pure CSR start() (no hydrateRouter)", async () => {
+      let observedDuringStart: ReturnType<
+        typeof getInternals
+      >["hydrationState"] = null;
+
+      const removeInterceptor = getPluginApi(router).addInterceptor(
+        "start",
+        async (next, path) => {
+          observedDuringStart = getInternals(router).hydrationState;
+
+          return next(path);
+        },
+      );
+
+      await router.start("/home");
+
+      expect(observedDuringStart).toBeNull();
+
+      removeInterceptor();
+    });
+
+    it("subsequent start() calls after hydrateRouter see null hydrationState", async () => {
+      await hydrateRouter(router, { path: "/users/list" });
+      router.stop();
+
+      let observedDuringSecondStart: ReturnType<
+        typeof getInternals
+      >["hydrationState"] = null;
+      let secondCallSeen = false;
+
+      const removeInterceptor = getPluginApi(router).addInterceptor(
+        "start",
+        async (next, path) => {
+          if (secondCallSeen) {
+            observedDuringSecondStart = getInternals(router).hydrationState;
+          }
+
+          secondCallSeen = true;
+
+          return next(path);
+        },
+      );
+
+      await router.start("/home");
+
+      expect(observedDuringSecondStart).toBeNull();
+
+      removeInterceptor();
+    });
   });
 });

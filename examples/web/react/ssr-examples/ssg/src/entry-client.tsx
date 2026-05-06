@@ -8,15 +8,40 @@ import { App } from "./App";
 import { createAppRouter } from "./router/createAppRouter";
 import { loaders } from "./router/loaders";
 
+import type { DataLoaderFactoryMap } from "@real-router/ssr-data-plugin";
+
 declare global {
   interface Window {
     __SSR_STATE__?: { path: string };
+    __LOADER_CALLS__?: Record<string, number>;
   }
 }
 
 const router = createAppRouter();
 
-router.usePlugin(browserPluginFactory(), ssrDataPluginFactory(loaders));
+const loaderCalls: Record<string, number> = {};
+
+window.__LOADER_CALLS__ = loaderCalls;
+
+const instrumentedLoaders: DataLoaderFactoryMap = Object.fromEntries(
+  Object.entries(loaders).map(([name, factory]) => [
+    name,
+    (r, getDep) => {
+      const loader = factory(r, getDep);
+
+      return (params) => {
+        loaderCalls[name] = (loaderCalls[name] ?? 0) + 1;
+
+        return loader(params);
+      };
+    },
+  ]),
+) as DataLoaderFactoryMap;
+
+router.usePlugin(
+  browserPluginFactory(),
+  ssrDataPluginFactory(instrumentedLoaders),
+);
 
 const ssrState = globalThis.__SSR_STATE__;
 
