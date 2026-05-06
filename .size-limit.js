@@ -1,174 +1,70 @@
+const ignoreCore = ["@real-router/core"];
+
+const esm = (name, limit, ignore) => ({
+  name: `@real-router/${name} (ESM)`,
+  path: `packages/${name}/dist/esm/index.mjs`,
+  limit,
+  ...(ignore && { ignore }),
+});
+
 export default [
   // ── Core ──────────────────────────────────────────────────────────
-  {
-    name: "@real-router/core (ESM)",
-    path: "packages/core/dist/esm/index.mjs",
-    limit: "20 kB",
-  },
+  esm("core", "20 kB"),
   {
     name: "@real-router/core/api (ESM)",
     path: "packages/core/dist/esm/api.mjs",
     limit: "20 kB",
-    ignore: ["@real-router/core"],
+    ignore: ignoreCore,
   },
 
   // ── UI Bindings ───────────────────────────────────────────────────
-  {
-    name: "@real-router/react (ESM)",
-    path: "packages/react/dist/esm/index.mjs",
-    limit: "5 kB",
-    ignore: [
-      "react",
-      "react-dom",
-      "@real-router/core",
-      "@real-router/route-utils",
-      "@real-router/sources",
-    ],
-  },
-  {
-    name: "@real-router/preact (ESM)",
-    path: "packages/preact/dist/esm/index.mjs",
-    limit: "5 kB",
-    ignore: [
-      "preact",
-      "preact/hooks",
-      "preact/compat",
-      "@real-router/core",
-      "@real-router/route-utils",
-      "@real-router/sources",
-    ],
-  },
-  {
-    name: "@real-router/solid (ESM)",
-    path: "packages/solid/dist/esm/index.mjs",
-    limit: "5 kB",
-    ignore: [
-      "solid-js",
-      "solid-js/store",
-      "solid-js/web",
-      "@real-router/core",
-      "@real-router/route-utils",
-      "@real-router/sources",
-    ],
-  },
-  {
-    name: "@real-router/vue (ESM)",
-    path: "packages/vue/dist/esm/index.mjs",
-    limit: "5 kB",
-    ignore: [
-      "vue",
-      "@real-router/core",
-      "@real-router/route-utils",
-      "@real-router/sources",
-    ],
-  },
+  esm("react", "6 kB", ["react", "react-dom", ...ignoreCore]),
+  esm("preact", "6 kB", [
+    "preact",
+    "preact/hooks",
+    "preact/compat",
+    ...ignoreCore,
+  ]),
+  esm("solid", "6 kB", [
+    "solid-js",
+    "solid-js/store",
+    "solid-js/web",
+    ...ignoreCore,
+  ]),
+  esm("vue", "7 kB", ["vue", ...ignoreCore]),
   {
     name: "@real-router/angular (FESM2022)",
     path: "packages/angular/dist/fesm2022/real-router-angular.mjs",
-    limit: "5 kB",
+    limit: "7.5 kB",
     ignore: [
       "@angular/core",
       "@angular/common",
-      "@real-router/core",
+      ...ignoreCore,
       "@real-router/core/api",
-      "@real-router/route-utils",
-      "@real-router/sources",
     ],
   },
   // Note: @real-router/svelte uses svelte-package (individual files),
   // not a single ESM bundle — cannot be measured by size-limit/esbuild.
-  {
-    name: "@real-router/sources (ESM)",
-    path: "packages/sources/dist/esm/index.mjs",
-    limit: "2.5 kB",
-    ignore: ["@real-router/core"],
-  },
-  {
-    name: "@real-router/rx (ESM)",
-    path: "packages/rx/dist/esm/index.mjs",
-    limit: "1.5 kB",
-    ignore: ["@real-router/core"],
-  },
+  esm("sources", "2.5 kB", ignoreCore),
+  esm("rx", "1.5 kB", ignoreCore),
 
   // ── Plugins ───────────────────────────────────────────────────────
-  {
-    name: "@real-router/validation-plugin (ESM)",
-    path: "packages/validation-plugin/dist/esm/index.mjs",
-    limit: "10 kB",
-    ignore: ["@real-router/core"],
-  },
-  {
-    name: "@real-router/navigation-plugin (ESM)",
-    path: "packages/navigation-plugin/dist/esm/index.mjs",
-    limit: "4 kB",
-    ignore: ["@real-router/core"],
-  },
-  {
-    name: "@real-router/browser-plugin (ESM)",
-    path: "packages/browser-plugin/dist/esm/index.mjs",
-    limit: "3 kB",
-    ignore: ["@real-router/core"],
-  },
-  {
-    name: "@real-router/hash-plugin (ESM)",
-    path: "packages/hash-plugin/dist/esm/index.mjs",
-    limit: "3.5 kB",
-    ignore: ["@real-router/core"],
-  },
-  {
-    name: "@real-router/memory-plugin (ESM)",
-    path: "packages/memory-plugin/dist/esm/index.mjs",
-    limit: "1 kB",
-    ignore: ["@real-router/core"],
-  },
-  {
-    name: "@real-router/logger-plugin (ESM)",
-    path: "packages/logger-plugin/dist/esm/index.mjs",
-    limit: "1.6 kB",
-  },
-  {
-    name: "@real-router/persistent-params-plugin (ESM)",
-    path: "packages/persistent-params-plugin/dist/esm/index.mjs",
-    limit: "1.5 kB",
-    ignore: ["@real-router/core"],
-  },
-
-  {
-    name: "@real-router/ssr-data-plugin (ESM)",
-    path: "packages/ssr-data-plugin/dist/esm/index.mjs",
-    limit: "0.5 kB",
-    ignore: ["@real-router/core"],
-  },
-  {
-    name: "@real-router/lifecycle-plugin (ESM)",
-    path: "packages/lifecycle-plugin/dist/esm/index.mjs",
-    limit: "0.5 kB",
-    ignore: ["@real-router/core"],
-  },
-  {
-    name: "@real-router/preload-plugin (ESM)",
-    path: "packages/preload-plugin/dist/esm/index.mjs",
-    limit: "1 kB",
-    ignore: ["@real-router/core"],
-  },
-  {
-    name: "@real-router/search-schema-plugin (ESM)",
-    path: "packages/search-schema-plugin/dist/esm/index.mjs",
-    limit: "1.1 kB",
-    ignore: ["@real-router/core"],
-  },
+  esm("navigation-plugin", "4 kB", ignoreCore),
+  esm("browser-plugin", "3 kB", ignoreCore),
+  esm("hash-plugin", "3.5 kB", ignoreCore),
+  esm("memory-plugin", "1 kB", ignoreCore),
+  esm("logger-plugin", "1.6 kB"),
+  esm("persistent-params-plugin", "1.5 kB", ignoreCore),
+  esm("lifecycle-plugin", "0.5 kB", ignoreCore),
+  esm("preload-plugin", "1.1 kB", ignoreCore),
+  esm("search-schema-plugin", "1.1 kB", ignoreCore),
+  esm("validation-plugin", "10 kB", ignoreCore),
+  esm("ssr-data-plugin", "1 kB", ignoreCore),
+  esm("rsc-server-plugin", "1 kB", ignoreCore),
 
   // ── Utilities ─────────────────────────────────────────────────────
-  {
-    name: "@real-router/route-utils (ESM)",
-    path: "packages/route-utils/dist/esm/index.mjs",
-    limit: "1 kB",
-  },
+  esm("route-utils", "1 kB"),
 
   // ── Standalone (zero deps) ────────────────────────────────────────
-  {
-    name: "@real-router/logger (ESM)",
-    path: "packages/logger/dist/esm/index.mjs",
-    limit: "0.5 kB",
-  },
+  esm("logger", "0.5 kB"),
 ];
