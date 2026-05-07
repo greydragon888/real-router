@@ -3,6 +3,8 @@ import {
   EnvironmentInjector,
   Injector,
   REQUEST,
+  TransferState,
+  makeStateKey,
   runInInjectionContext,
 } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
@@ -510,6 +512,78 @@ describe("provideRealRouterFactory", () => {
       await expect(
         TestBed.inject(ApplicationInitStatus).donePromise,
       ).rejects.toThrow();
+    });
+  });
+
+  describe("TransferState bridge (#599)", () => {
+    // Mirrors the post-hydration loader skip pattern verified in 5 other
+    // adapters via window.__SSR_STATE__ + hydrateRouter; Angular delivers
+    // the same payload through TransferState.
+
+    const ROUTER_STATE_KEY_NAME = "@real-router/angular:ssrState";
+
+    it("server-side write: TransferState gets the SSR-resolved router state after start()", async () => {
+      TestBed.configureTestingModule({
+        providers: [
+          {
+            provide: REQUEST,
+            useValue: new Request("http://localhost/users/42"),
+          },
+          provideRealRouterFactory({ baseRouter }),
+        ],
+      });
+
+      await TestBed.inject(ApplicationInitStatus).donePromise;
+
+      const transferState = TestBed.inject(TransferState);
+      const stored = transferState.get(
+        makeStateKey<string>(ROUTER_STATE_KEY_NAME),
+        null,
+      );
+
+      expect(stored).not.toBeNull();
+
+      const parsed = JSON.parse(stored!) as { name: string; path: string };
+
+      expect(parsed.name).toBe("users.profile");
+      expect(parsed.path).toBe("/users/42");
+    });
+
+    // Note: the client-side consume path (TransferState seed → hydrateRouter
+    // → loader skip on first paint) is verified end-to-end in
+    // examples/web/angular/ssr-examples/ssr/e2e — the full Angular SSR
+    // pipeline (server pass populating ng-state, client pass restoring it,
+    // hydrateRouter consuming the scratchpad) requires `provideClientHydration()`
+    // + a real `@angular/ssr` runtime that TestBed's bare module doesn't
+    // emulate faithfully. The functional contract of this provider is:
+    // 1) writes serialized state on the server, 2) falls back to start() on
+    // pure CSR — both covered below.
+
+    it("pure CSR (no TransferState seed, no REQUEST) falls back to router.start(path)", async () => {
+      // Empty TransferState + null REQUEST → regular start path. No
+      // TransferState write either (no client to hand off to).
+      TestBed.configureTestingModule({
+        providers: [
+          // No REQUEST.
+          provideRealRouterFactory({ baseRouter }),
+        ],
+      });
+
+      await TestBed.inject(ApplicationInitStatus).donePromise;
+
+      const transferState = TestBed.inject(TransferState);
+      const stored = transferState.get(
+        makeStateKey<string>(ROUTER_STATE_KEY_NAME),
+        null,
+      );
+
+      // Pure CSR: no SSR write into TransferState.
+      expect(stored).toBeNull();
+
+      // Router still bootstrapped successfully via the regular start path.
+      const router = TestBed.inject(ROUTER);
+
+      expect(router.isActive()).toBe(true);
     });
   });
 });

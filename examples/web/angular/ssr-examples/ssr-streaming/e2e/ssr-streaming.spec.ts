@@ -558,4 +558,30 @@ test.describe("Streaming SSR Example (Angular)", () => {
   // routes.ts + loaders.ts but Angular SSR does not serialize router State
   // into HTML, so a runtime assertion via __SSR_STATE__ regex isn't
   // applicable. Compile-time + cross-adapter coverage stands.
+
+  test("post-hydration loader skip (#599): client makes zero loader-driven calls under streaming SSR", async ({
+    page,
+  }) => {
+    // Sister test to ssr/ post-hydration loader skip — verifies the
+    // TransferState bridge keeps working when Angular's
+    // `withIncrementalHydration()` + `@defer` are active. The bridge writes
+    // serialized router state to TransferState during the
+    // `provideAppInitializer` callback, before `@defer` blocks even
+    // register their hydration triggers — so the client's app-initializer
+    // sees the seed and `hydrateRouter` consumes it without re-running
+    // ssr-data-plugin's loader.
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+
+    const counts = await page.evaluate(
+      () =>
+        (
+          globalThis as unknown as Window & {
+            __LOADER_CALLS__?: Record<string, number>;
+          }
+        ).__LOADER_CALLS__,
+    );
+
+    expect(counts).toEqual({});
+  });
 });

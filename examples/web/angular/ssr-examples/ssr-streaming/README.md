@@ -253,9 +253,9 @@ Real-Router intentionally does **not** ship a `<Suspense>` component or `defer()
 
 This example demonstrates Real-Router's library-first stance: **delegate to Angular 21 native primitives instead of inventing router-specific streaming APIs**. `@defer (on viewport)`, `@defer (on hover)`, `withIncrementalHydration()`, and `AngularNodeAppEngine` form the complete streaming SSR contract that Angular ships — the router just provides per-request isolation and per-route critical data.
 
-## Loader Runs Twice on First Paint
+## Post-hydration loader skip via TransferState bridge (#599)
 
-Same caveat as the runtime SSR sibling: `ssr-data-plugin` is registered on both server and client, and `provideRealRouterFactory` calls `router.start(path)` directly from `provideAppInitializer` (not via `hydrateRouter()`), so the post-hydration loader-skip mechanism (#596) is bypassed — the `RouterInternals.hydrationState` scratchpad is never populated. The deferred `@defer` blocks own their own data fetching (independent of `ssr-data-plugin`), so the duplication is limited to the **critical** loader. See [`ssr/README.md`](../ssr/README.md) → "No SSR-State Serialization" for the full explanation and a `TransferState` mitigation sketch.
+Same flow as the runtime SSR sibling: `provideRealRouterFactory` writes the SSR-resolved router state to Angular's `TransferState` after `await router.start(path)` resolves on the server, and the client's bootstrap reads the seed and calls `hydrateRouter(router, ssrJson)` instead of `router.start(path)` — `ssr-data-plugin`'s start interceptor reuses the server-resolved `state.context.data` without re-invoking the critical loader on first paint. Streaming-specific note: `withIncrementalHydration()` + `@defer` blocks register their own hydration triggers (viewport / hover / timer / immediate) **after** bootstrap completes, so the TransferState write timing is unaffected by deferred-block hydration. The deferred `@defer` blocks own their own data fetching (independent of `ssr-data-plugin`). See [`ssr/README.md`](../ssr/README.md) → "Post-hydration loader skip via TransferState bridge (#599)" for the full server↔client lifecycle. Verified end-to-end in `e2e/ssr-streaming.spec.ts` via `window.__LOADER_CALLS__` counter assertion.
 
 ## See Also
 

@@ -2,8 +2,10 @@ import {
   ApplicationRef,
   DestroyRef,
   REQUEST,
+  TransferState,
   inject,
   makeEnvironmentProviders,
+  makeStateKey,
   provideAppInitializer,
   provideEnvironmentInitializer,
   type EnvironmentProviders,
@@ -15,6 +17,7 @@ import {
   type Router,
 } from "@real-router/core";
 import { cloneRouter } from "@real-router/core/api";
+import { hydrateRouter, serializeRouterState } from "@real-router/core/utils";
 import { createRouteSource } from "@real-router/sources";
 
 import { createScrollRestoration, createViewTransitions } from "./dom-utils";
@@ -23,6 +26,23 @@ import { sourceToSignal } from "./sourceToSignal";
 
 import type { ScrollRestorationOptions } from "./dom-utils";
 import type { RouteSignals } from "./types";
+
+/**
+ * `TransferState` key carrying the SSR-resolved router state from server to
+ * client as an XSS-safe JSON string (produced by `serializeRouterState`).
+ * Populated server-side by the `provideAppInitializer` callback after
+ * `router.start()` resolves; consumed client-side after hydration. Mirrors the
+ * `<script>window.__SSR_STATE__ = …</script>` pattern used by every other
+ * adapter — Angular's idiomatic transport is `TransferState` (#599).
+ *
+ * Stored as `string`: `serializeRouterState(state)` already produces JSON;
+ * `hydrateRouter(router, json)` accepts a JSON string and parses it once
+ * internally. Storing the parsed object would force a double round-trip
+ * (TransferState wraps every value in JSON for transport).
+ *
+ * Internal implementation detail. Not re-exported.
+ */
+const ROUTER_STATE_KEY = makeStateKey<string>("@real-router/angular:ssrState");
 
 /**
  * Factory function for deriving per-request dependencies from an SSR `Request`.
@@ -180,21 +200,63 @@ export function provideRealRouterFactory<
         };
       },
     },
-    // Async `router.start(url)` — runs before the first component renders.
+    // Async bootstrap — runs before the first component renders. Three
+    // branches based on TransferState population:
+    //
+    //   1. **Client after hydration** — server populated TransferState with
+    //      the SSR-resolved router state. Consume it via `hydrateRouter`,
+    //      which deposits the parsed state into the one-shot
+    //      `RouterInternals.hydrationState` scratchpad before invoking
+    //      `router.start(state.path)`. SSR loader plugins
+    //      (`@real-router/ssr-data-plugin`, `@real-router/rsc-server-plugin`)
+    //      read the scratchpad and skip the loader on first paint — parity
+    //      with the other 5 adapters that consume `<script>__SSR_STATE__</script>` (#596, #599).
+    //
+    //   2. **Server / SSG** — TransferState empty; run the regular
+    //      `router.start(path)`. After it resolves, write the serialized
+    //      state back into TransferState so the matching client run lands
+    //      in branch 1. Angular's `TransferState` infrastructure
+    //      (provided by `provideClientHydration()`) carries this blob to
+    //      the client as a `<script id="ng-state">` payload.
+    //
+    //   3. **Pure CSR** — TransferState empty (never populated by a server
+    //      pass), and `inject(REQUEST, { optional: true })` returns null.
+    //      Falls into the same `router.start(path)` branch as server-side
+    //      but skips the TransferState write (no client to hand off to).
+    //
     // Errors propagate (Option A from RFC §10): the bootstrap fails and the
     // server returns 500. Custom error pages should be wired via
     // `RouterErrorBoundary` on subsequent renders.
     provideAppInitializer(async () => {
       const router = inject(ROUTER);
       const request = inject(REQUEST, { optional: true });
+      const transferState = inject(TransferState);
 
-      const path = deriveStartPath(request);
+      const ssrJson = transferState.get(ROUTER_STATE_KEY, null);
 
+      if (ssrJson !== null) {
+        // Branch 1: client after hydration — reuse server-resolved state.
+        await hydrateRouter(router, ssrJson);
+        // One-shot semantic, parity with `delete window.__SSR_STATE__`.
+        transferState.remove(ROUTER_STATE_KEY);
+
+        return;
+      }
+
+      // Branches 2 & 3: regular start.
       // Browser-plugin's `start` interceptor (when registered) wraps this call
       // with location-derived path. We always pass an explicit string — the
       // interceptor uses the explicit value because `next(path ?? location)`
       // short-circuits when `path` is non-nullish.
-      await router.start(path);
+      const path = deriveStartPath(request);
+      const state = await router.start(path);
+
+      if (request !== null) {
+        // Branch 2: running inside `@angular/ssr`'s request handler — write
+        // serialized state to TransferState so the matching client run can
+        // skip the loader on first paint.
+        transferState.set(ROUTER_STATE_KEY, serializeRouterState(state));
+      }
     }),
   ];
 
