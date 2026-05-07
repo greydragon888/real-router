@@ -47,10 +47,19 @@
 | 14  | `rsc-server-plugin` + `ssr-data-plugin` populate independently          | Registering both plugins on the same router populates `state.context.rsc` (ReactNode) and `state.context.data` (JSON) for the same `start()` call without cross-namespace mutation. Distinct namespaces (`"rsc"` vs `"data"`) coexist in `claimContextNamespace`. |
 | 15  | Tearing down one plugin does not invalidate the other's claim          | When one of the two plugins is unsubscribed, the other's namespace remains claimed and continues populating `state.context.<ns>` on subsequent `start()` calls. The freed namespace is re-claimable; the held namespace still throws on re-claim attempt. |
 
+## SSR Mode
+
+| #   | Invariant                                                  | Description                                                                                                                                                                                  |
+| --- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 16  | `getSsrRscMode` reflects the resolved mode                  | For any string-form `ssr: RscSsrMode` (`"full"` or `"client-only"`), `getSsrRscMode(state) === ssr` after `start()`. The plugin writes mode to `state.context.ssrRscMode` for every entry. |
+| 17  | `client-only` skips the loader                              | When `ssr === "client-only"` (or `false`), the loader is invoked exactly 0 times per `start()`, and `state.context.rsc` is `undefined`. Symmetric on server and client.                    |
+| 18  | Function-form resolver invoked once per `start()`           | A function-form `ssr: (state) => RscSsrMode` is called exactly once per navigation, with the resolved state.                                                                              |
+| 19  | Short form === `{ loader }` for mode `"full"`               | A factory `(r, getDep) => loader` and `{ loader: (r, getDep) => loader }` produce identical `state.context.rsc` and the same mode `"full"` after `start()`.                                 |
+
 ## Test Files
 
 | File                                          | Invariants | Category                                                                                                                                                |
 | --------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `tests/functional/rsc-loader.test.ts`         | full       | All categories — loader semantics, validation, teardown, error paths, ReactNode variants, sync/async, DI                                                |
-| `tests/property/rsc.properties.ts`            | 15         | Validation, loader invocation, loader arguments, data retrieval, prototype safety, teardown, isolation, factory invocation, **composition with ssr-data-plugin** |
+| `tests/property/rsc.properties.ts`            | 19         | Validation, loader invocation, loader arguments, data retrieval, prototype safety, teardown, isolation, factory invocation, **composition with ssr-data-plugin**, **SSR mode (×4)** |
 | `tests/stress/*.stress.ts`                    | runtime    | Per-request isolation, error handling, concurrent loaders, slow loaders, full lifecycle churn                                                          |

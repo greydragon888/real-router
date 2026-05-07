@@ -882,4 +882,14 @@ test.describe("SSR (Angular)", () => {
     // within a few hundred ms — well under the 5 s loader delay.
     expect(elapsed).toBeLessThan(1000);
   });
+
+  // NOTE: per-route SSR mode (#597) is exercised by the `widget` route in
+  // routes.ts + loaders.ts (`{ ssr: false }`). The plugin correctly resolves
+  // mode and skips the loader on the server, but Angular SSR does not
+  // serialize router State into the HTML payload (no `window.__SSR_STATE__`
+  // script tag — Angular uses its own TransferState mechanism instead).
+  // A runtime e2e assertion equivalent to the React/Vue/Solid/Svelte adapters
+  // would require wiring serializeRouterState through TransferState in this
+  // example, which is out of scope for #597. Compile-time + cross-adapter
+  // coverage of the breaking-change in DataLoaderFactoryMap stands.
 });

@@ -47,6 +47,7 @@ export async function render(url: string): Promise<RenderResult> {
   // until GC. By returning a RenderResult with rawBody + cleanup, the
   // server can react properly without the leak.
   let state;
+
   try {
     state = await router.start(url);
   } catch (error) {
@@ -56,7 +57,9 @@ export async function render(url: string): Promise<RenderResult> {
       return {
         ssrJson: "{}",
         statusCode: 404,
-        cleanup: () => router.dispose(),
+        cleanup: () => {
+          router.dispose();
+        },
         rawBody: "Not Found",
         contentType: "text/plain; charset=utf-8",
       };
@@ -65,6 +68,7 @@ export async function render(url: string): Promise<RenderResult> {
     // Unknown error — clean up before propagating so the express
     // middleware's catch handler doesn't have to know about cleanup.
     router.dispose();
+
     throw error;
   }
 

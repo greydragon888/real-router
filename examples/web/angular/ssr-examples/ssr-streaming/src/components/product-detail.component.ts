@@ -71,11 +71,7 @@ import type { ProductDetailData } from "../router/loaders";
           React/Vue/Svelte have no equivalent of "hydrate when this
           predicate becomes true".
         -->
-        <button
-          type="button"
-          data-testid="tech-toggle"
-          (click)="toggleTech()"
-        >
+        <button type="button" data-testid="tech-toggle" (click)="toggleTech()">
           {{ showTech() ? "Hide technical details" : "Show technical details" }}
         </button>
         @defer (when showTech(); hydrate when showTech()) {

@@ -10,9 +10,15 @@ import {
   NUM_RUNS,
   ROUTES,
 } from "./helpers";
-import { ssrDataPluginFactory } from "../../src";
+import { getSsrDataMode, ssrDataPluginFactory } from "../../src";
 
-import type { DataLoaderFactoryMap } from "../../src";
+import type { DataLoaderFactoryMap, SsrMode } from "../../src";
+
+const arbSsrMode: fc.Arbitrary<SsrMode> = fc.constantFrom<SsrMode>(
+  "full",
+  "data-only",
+  "client-only",
+);
 
 // =============================================================================
 // Loader Invocation: called once per start()
@@ -323,4 +329,111 @@ describe("validation: non-function loader values rejected", () => {
       ssrDataPluginFactory({ [key]: value } as unknown as DataLoaderFactoryMap),
     ).toThrow(TypeError);
   });
+});
+
+// =============================================================================
+// SSR Mode invariants
+// =============================================================================
+
+describe("ssr mode: getSsrDataMode reflects the resolved mode", () => {
+  test.prop([arbSsrMode, arbParamValue], { numRuns: NUM_RUNS.standard })(
+    "string-form ssr → getSsrDataMode returns the same mode",
+    async (mode, id) => {
+      const { router } = createSsrDataRouter({
+        "users.profile": { ssr: mode, loader: () => async () => ({ id }) },
+      });
+
+      const state = await router.start(`/users/${id}`);
+
+      expect(getSsrDataMode(state)).toBe(mode);
+
+      router.stop();
+    },
+  );
+});
+
+describe("ssr mode: client-only skips the loader", () => {
+  test.prop([arbParamValue], { numRuns: NUM_RUNS.standard })(
+    "loader is never invoked when mode='client-only'",
+    async (id) => {
+      let callCount = 0;
+
+      const { router } = createSsrDataRouter({
+        "users.profile": {
+          ssr: "client-only",
+          loader: () => () => {
+            callCount++;
+
+            return null;
+          },
+        },
+      });
+
+      const state = await router.start(`/users/${id}`);
+
+      expect(callCount).toBe(0);
+      expect(state.context.data).toBeUndefined();
+      expect(getSsrDataMode(state)).toBe("client-only");
+
+      router.stop();
+    },
+  );
+});
+
+describe("ssr mode: function-form resolver runs once per start()", () => {
+  test.prop([arbSsrMode, arbParamValue], { numRuns: NUM_RUNS.standard })(
+    "resolver invoked exactly once with the resolved state",
+    async (mode, id) => {
+      let resolverCalls = 0;
+
+      const { router } = createSsrDataRouter({
+        "users.profile": {
+          ssr: () => {
+            resolverCalls++;
+
+            return mode;
+          },
+          loader: () => async () => ({ id }),
+        },
+      });
+
+      await router.start(`/users/${id}`);
+
+      expect(resolverCalls).toBe(1);
+
+      router.stop();
+    },
+  );
+});
+
+describe("ssr mode: short form === { loader }", () => {
+  test.prop([arbLoaderData, arbParamValue], { numRuns: NUM_RUNS.standard })(
+    "short-form factory and { loader: factory } produce identical data + mode='full'",
+    async (data, id) => {
+      const baseShort = createRouter(ROUTES, { defaultRoute: "home" });
+      const baseObject = createRouter(ROUTES, { defaultRoute: "home" });
+
+      baseShort.usePlugin(
+        ssrDataPluginFactory({
+          "users.profile": () => async () => data,
+        }),
+      );
+
+      baseObject.usePlugin(
+        ssrDataPluginFactory({
+          "users.profile": { loader: () => async () => data },
+        }),
+      );
+
+      const stateShort = await baseShort.start(`/users/${id}`);
+      const stateObject = await baseObject.start(`/users/${id}`);
+
+      expect(stateShort.context.data).toStrictEqual(stateObject.context.data);
+      expect(getSsrDataMode(stateShort)).toBe("full");
+      expect(getSsrDataMode(stateObject)).toBe("full");
+
+      baseShort.stop();
+      baseObject.stop();
+    },
+  );
 });

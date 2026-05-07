@@ -1,44 +1,113 @@
 import { getPluginApi } from "@real-router/core/api";
 import { getInternals } from "@real-router/core/validation";
 
+import { ALL_SSR_MODES } from "./types.js";
+
 import type {
   SsrLoaderFactoryMap,
   SsrLoaderFn,
   SsrLoaderPluginConfig,
+  SsrMode,
+  SsrModeConfig,
 } from "./types.js";
 import type {
+  ContextNamespaceClaim,
   DefaultDependencies,
   Plugin,
   PluginFactory,
+  State,
 } from "@real-router/types";
+
+interface CompiledEntry<T> {
+  mode: SsrModeConfig | undefined;
+  loader: SsrLoaderFn<T> | undefined;
+}
+
+function rejectMode(
+  value: unknown,
+  allowed: readonly SsrMode[],
+  prefix: string,
+  route: string,
+): never {
+  throw new TypeError(
+    `${prefix} mode "${String(value)}" is not allowed for route "${route}". Allowed: ${allowed.join(", ")}`,
+  );
+}
+
+function resolveMode(
+  ssr: SsrModeConfig | undefined,
+  state: State,
+  allowed: readonly SsrMode[],
+  prefix: string,
+  route: string,
+): SsrMode {
+  if (ssr === undefined || ssr === true) return "full";
+
+  if (ssr === false) {
+    if (!allowed.includes("client-only")) {
+      rejectMode("client-only", allowed, prefix, route);
+    }
+
+    return "client-only";
+  }
+
+  const value = typeof ssr === "function" ? ssr(state) : ssr;
+
+  if (typeof value !== "string" || !allowed.includes(value as SsrMode)) {
+    rejectMode(value, allowed, prefix, route);
+  }
+
+  return value;
+}
 
 export function createSsrLoaderPlugin<
   T,
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(
-  loaders: SsrLoaderFactoryMap<T, Dependencies>,
+  loaders: SsrLoaderFactoryMap<T, SsrMode, Dependencies>,
   config: SsrLoaderPluginConfig,
 ): PluginFactory<Dependencies> {
   return (router, getDependency): Plugin => {
     const api = getPluginApi(router);
-    const claim = api.claimContextNamespace(config.namespace);
+    const allowed = config.allowedModes ?? ALL_SSR_MODES;
 
-    const compiledLoaders = new Map<string, SsrLoaderFn<T>>();
+    const dataClaim = api.claimContextNamespace(config.namespace);
+
+    let modeClaim: ContextNamespaceClaim;
 
     try {
-      for (const [name, factory] of Object.entries(loaders)) {
-        const loader = factory(router, getDependency);
+      modeClaim = api.claimContextNamespace(config.modeNamespace);
+    } catch (error) {
+      dataClaim.release();
 
-        if (typeof loader !== "function") {
-          throw new TypeError(
-            `${config.errorPrefix} factory for route "${name}" must return a function`,
-          );
+      throw error;
+    }
+
+    const compiled = new Map<string, CompiledEntry<T>>();
+
+    try {
+      for (const [name, raw] of Object.entries(loaders)) {
+        const obj = typeof raw === "function" ? { loader: raw } : raw;
+
+        let loader: SsrLoaderFn<T> | undefined;
+
+        if (obj.loader !== undefined) {
+          const fn = obj.loader(router, getDependency);
+
+          if (typeof fn !== "function") {
+            throw new TypeError(
+              `${config.errorPrefix} factory for route "${name}" must return a function`,
+            );
+          }
+
+          loader = fn;
         }
 
-        compiledLoaders.set(name, loader);
+        compiled.set(name, { mode: obj.ssr, loader });
       }
     } catch (error) {
-      claim.release();
+      dataClaim.release();
+      modeClaim.release();
 
       throw error;
     }
@@ -49,22 +118,32 @@ export function createSsrLoaderPlugin<
       "start",
       async (next, path) => {
         const state = await next(path);
-        const loader = compiledLoaders.get(state.name);
+        const entry = compiled.get(state.name);
 
-        if (loader) {
-          const hydrationState = internals.hydrationState;
-          const hydratedContext = hydrationState?.context;
+        if (!entry) return state;
 
-          if (
-            hydrationState !== null &&
-            hydrationState.name === state.name &&
-            hydratedContext !== undefined &&
-            config.namespace in hydratedContext
-          ) {
-            claim.write(state, hydratedContext[config.namespace] as T);
-          } else {
-            claim.write(state, await loader(state.params));
-          }
+        const mode = resolveMode(
+          entry.mode,
+          state,
+          allowed,
+          config.errorPrefix,
+          state.name,
+        );
+
+        modeClaim.write(state, mode);
+
+        if (mode === "client-only") return state;
+
+        const hydrationState = internals.hydrationState;
+
+        if (
+          hydrationState !== null &&
+          hydrationState.name === state.name &&
+          config.namespace in hydrationState.context
+        ) {
+          dataClaim.write(state, hydrationState.context[config.namespace] as T);
+        } else if (entry.loader !== undefined) {
+          dataClaim.write(state, await entry.loader(state.params));
         }
 
         return state;
@@ -74,7 +153,8 @@ export function createSsrLoaderPlugin<
     return {
       teardown() {
         removeStartInterceptor();
-        claim.release();
+        dataClaim.release();
+        modeClaim.release();
       },
     };
   };

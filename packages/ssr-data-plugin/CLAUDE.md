@@ -7,9 +7,12 @@
 | Export                   | Kind     | Description                                                        |
 | ------------------------ | -------- | ------------------------------------------------------------------ |
 | `ssrDataPluginFactory`   | function | Plugin factory — pass loaders map, returns `PluginFactory`         |
-| `DataLoaderFn`           | type     | Compiled loader signature: `(params) => Promise<unknown>`          |
+| `getSsrDataMode`         | function | Read `state.context.ssrDataMode` with `"full"` fallback            |
+| `DataLoaderFn`           | type     | Compiled loader signature: `(params) => Promise<unknown> \| unknown` |
 | `DataLoaderFnFactory`    | type     | Factory signature: `(router, getDependency) => DataLoaderFn`       |
-| `DataLoaderFactoryMap`   | type     | Record of loader factories — pass to `ssrDataPluginFactory()`      |
+| `DataRouteEntry`         | type     | Per-route entry: factory (short form) or `{ ssr?, loader? }` object |
+| `DataLoaderFactoryMap`   | type     | Record of route entries — pass to `ssrDataPluginFactory()`         |
+| `SsrMode`                | type     | `"full" \| "data-only" \| "client-only"` — published per-route      |
 
 ### Subpath: `@real-router/ssr-data-plugin/errors`
 
@@ -42,14 +45,56 @@ Intercepts only `start()`, not `navigate()`. Rationale:
 
 ```typescript
 ssrDataPluginFactory({
+  // Short form (backwards-compatible): factory directly. Mode defaults to "full".
   "home": () => () => fetchHomeData(),
-  "users.profile": () => async (params) => fetchUser(params.id),
-})
+
+  // Object form: { ssr?, loader? }.
+  "admin.dashboard": { ssr: false },                       // false → "client-only", no loader
+  "users.profile": {
+    ssr: "data-only",
+    loader: (router, getDep) => async (params) => fetchUser(params.id),
+  },
+  "docs.detail": {
+    // Function-form resolver, called once per start() before the loader.
+    ssr: (state) => state.params.format === "pdf" ? "client-only" : "full",
+    loader: (router, getDep) => async (params) => fetchDoc(params.id),
+  },
+});
 ```
 
-Loaders keyed by route name. Each value is a factory `(router, getDependency) => (params) => Promise<unknown>`. Factory runs once at `usePlugin()` time; the returned loader is cached. Uses `Object.entries()` at compilation time and `Map.get()` at runtime — no prototype chain leakage.
+Loaders/entries keyed by route name. Factory runs once at `usePlugin()` time; the returned loader is cached. Uses `Object.entries()` at compilation time and `Map.get()` at runtime — no prototype chain leakage.
 
-Validation at factory time: rejects `null`, non-objects, non-function values with `TypeError`.
+Validation at factory time: rejects `null`, non-objects, non-function values, unknown keys, invalid `ssr` types and string-form modes outside `allowedModes` with `TypeError`. Function-form `ssr` is validated at runtime per-navigation.
+
+## Per-route SSR Mode
+
+Three modes are supported:
+
+| `ssr` config                 | mode marker       | server/client loader behaviour |
+| ---------------------------- | ----------------- | ------------------------------ |
+| omitted / `true` / `"full"`  | `"full"`          | runs (composes with #596)       |
+| `"data-only"`                | `"data-only"`     | runs (composes with #596)       |
+| `false` / `"client-only"`    | `"client-only"`   | **skipped** unconditionally     |
+| `(state) => SsrMode`         | resolver result   | resolved per-navigation         |
+
+The mode is published to `state.context.ssrDataMode` (typed via module augmentation). Read it via `getSsrDataMode(state)`:
+
+```typescript
+import { getSsrDataMode } from "@real-router/ssr-data-plugin";
+
+const mode = getSsrDataMode(state);
+if (mode === "full") {
+  // render HTML server-side
+} else if (mode === "data-only") {
+  // ship JSON only, render shell HTML
+} else {
+  // mode === "client-only": no loader was called, app fetches client-side
+}
+```
+
+**`"client-only"` skips the loader unconditionally** — both on the server and on the client. The application is responsible for client-side fetching (React Query, `useEffect`, Suspense, etc.) when it detects the mode marker. This is the simplest semantic: no environment detection in the plugin, fully symmetric.
+
+The function-form resolver receives `state` **before** the mode is written to context, so resolvers should not read `state.context.ssrDataMode` (it will be `undefined`). Branch on `state.params`, `state.path`, or `state.name` instead.
 
 ## Module Structure
 
@@ -82,9 +127,9 @@ This is by design for SSR.
 
 Every `start()` triggers a fresh loader call. Caching is the caller's responsibility (e.g., within the loader function itself).
 
-### Teardown releases claim
+### Teardown releases both claims
 
-`unsubscribe()` removes the `start` interceptor and releases the `"data"` namespace claim. In SSR, `router.dispose()` triggers teardown automatically.
+`unsubscribe()` removes the `start` interceptor and releases **both** the `"data"` namespace and the `"ssrDataMode"` namespace claims. In SSR, `router.dispose()` triggers teardown automatically.
 
 ### Loader errors propagate
 

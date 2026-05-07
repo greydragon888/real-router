@@ -56,9 +56,8 @@ async function startDevServer(): Promise<void> {
       const templateWithStateAndHydration = template
         .replace("<!--ssr-hydration-script-->", hydrationScript)
         .replace("<!--ssr-state-->", ssrScript);
-      const [headPart, footerPart] = templateWithStateAndHydration.split(
-        "<!--ssr-outlet-->",
-      );
+      const [headPart, footerPart] =
+        templateWithStateAndHydration.split("<!--ssr-outlet-->");
 
       response.status(statusCode);
       response.set("Content-Type", "text/html; charset=utf-8");

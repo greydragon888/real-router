@@ -38,6 +38,7 @@ async function startDevServer(): Promise<void> {
       };
 
       const abortController = new AbortController();
+
       request.on("close", () => {
         if (!response.writableEnded) {
           abortController.abort();
@@ -77,6 +78,7 @@ async function startDevServer(): Promise<void> {
       if (cacheControl) {
         response.set("Cache-Control", cacheControl);
       }
+
       response.write(headPart);
 
       const reader = stream.getReader();
@@ -108,6 +110,7 @@ async function startDevServer(): Promise<void> {
         response.write(footerPart);
         response.end();
       }
+
       cleanup();
     } catch (error) {
       vite.ssrFixStacktrace(error as Error);

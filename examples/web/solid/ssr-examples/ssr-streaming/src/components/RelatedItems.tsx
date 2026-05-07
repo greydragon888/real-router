@@ -30,7 +30,9 @@ function fetchRelated(productId: string): Promise<RelatedItem[]> {
 
   if (typeof globalThis.window === "undefined") {
     return new Promise((resolve) =>
-      setTimeout(() => resolve(items), SERVER_RELATED_DELAY_MS),
+      setTimeout(() => {
+        resolve(items);
+      }, SERVER_RELATED_DELAY_MS),
     );
   }
 

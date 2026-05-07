@@ -18,16 +18,17 @@
 // buffered ETag layer. See ssr-streaming/cache-policies.ts for the
 // same trade-off.
 
-const CACHE_RULES: ReadonlyArray<{
+const CACHE_RULES: readonly {
   match: (path: string) => boolean;
   header: string;
-}> = [
+}[] = [
   {
     match: (p) => p === "/" || p === "",
     header: "public, max-age=300, s-maxage=3600",
   },
   {
-    match: (p) => p === "/users" || /^\/users\/?$/.test(p) || /^\/users\?/.test(p),
+    match: (p) =>
+      p === "/users" || /^\/users\/?$/.test(p) || p.startsWith("/users?"),
     header: "public, max-age=60",
   },
   {

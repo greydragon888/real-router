@@ -35,10 +35,7 @@ async function startServer(): Promise<void> {
   // mirror GET status codes (loader 404 → 404, etc.) but for the demo
   // a fixed 200 is sufficient to prove the early-exit contract.
   app.head("/{*path}", (_request, response) => {
-    response
-      .status(200)
-      .set("Content-Type", "text/html; charset=utf-8")
-      .end();
+    response.status(200).set("Content-Type", "text/html; charset=utf-8").end();
   });
 
   app.get("/{*path}", async (request, response, next) => {
@@ -53,7 +50,10 @@ async function startServer(): Promise<void> {
       if (result.rawBody !== undefined) {
         response
           .status(result.statusCode)
-          .set("Content-Type", result.contentType ?? "text/plain; charset=utf-8")
+          .set(
+            "Content-Type",
+            result.contentType ?? "text/plain; charset=utf-8",
+          )
           .send(result.rawBody);
         result.cleanup();
 
@@ -66,9 +66,8 @@ async function startServer(): Promise<void> {
       const templateWithStateAndHydration = template
         .replace("<!--ssr-hydration-script-->", hydrationScript)
         .replace("<!--ssr-state-->", ssrScript);
-      const [headPart, footerPart] = templateWithStateAndHydration.split(
-        "<!--ssr-outlet-->",
-      );
+      const [headPart, footerPart] =
+        templateWithStateAndHydration.split("<!--ssr-outlet-->");
 
       response.status(statusCode);
       response.set("Content-Type", "text/html; charset=utf-8");

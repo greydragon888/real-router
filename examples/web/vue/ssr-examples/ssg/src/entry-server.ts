@@ -4,8 +4,8 @@ import {
   getStaticPaths as getStaticPathsFromRouter,
   serializeRouterState,
 } from "@real-router/core/utils";
-import { RouterProvider } from "@real-router/vue";
 import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
+import { RouterProvider } from "@real-router/vue";
 import { createSSRApp, h } from "vue";
 import { renderToString } from "vue/server-renderer";
 

@@ -85,7 +85,42 @@ const loaders: RscLoaderFactoryMap = {
 };
 ```
 
-Routes without a matching loader leave `state.context.rsc` as `undefined`.
+Routes without a matching entry leave `state.context.rsc` as `undefined` and `getSsrRscMode(state)` falls back to `"full"`.
+
+## Per-route SSR mode
+
+`rsc-server-plugin` accepts the same `{ ssr?, loader? }` shape as `ssr-data-plugin`, but with a strict subset of `SsrMode`: only `"full"` and `"client-only"` are allowed. Passing `"data-only"` (RSC has no semantically meaningful "data without component") throws at factory time.
+
+```typescript
+const loaders: RscLoaderFactoryMap = {
+  home: () => () => <HomePage />,                                 // short form, defaults to "full"
+  "admin.dashboard": { ssr: false },                              // false → "client-only"
+  "docs.detail": {
+    ssr: (state) => state.params.format === "pdf" ? "client-only" : "full",
+    loader: () => () => <Doc />,
+  },
+};
+```
+
+| `ssr` value                  | mode marker       | loader behaviour          |
+| ---------------------------- | ----------------- | ------------------------- |
+| omitted / `true` / `"full"`  | `"full"`          | runs (composes with #596) |
+| `false` / `"client-only"`    | `"client-only"`   | **skipped** unconditionally |
+| `(state) => RscSsrMode`      | resolver result   | resolved per-navigation   |
+
+Read the resolved mode via `getSsrRscMode(state)` (returns `"full"` for routes without an entry):
+
+```typescript
+import { getSsrRscMode } from "@real-router/rsc-server-plugin";
+
+const mode = getSsrRscMode(state); // RscSsrMode = "full" | "client-only"
+
+if (mode === "full") {
+  const flight = renderToReadableStream(buildRscPayload(state));
+  // … pipe Flight + SSR HTML
+}
+// mode === "client-only" → no Server Component was rendered server-side
+```
 
 ## Why `ReactNode`, not Flight bytes?
 
@@ -125,6 +160,25 @@ cloneRouter → usePlugin → start(url) → ReactNode resolved → state.contex
 ```
 
 Client-side data fetching is the application's responsibility (React Query, Suspense, RSC `/__rsc` endpoint).
+
+## Post-hydration loader skip (#596)
+
+When the application uses `hydrateRouter()` from `@real-router/core/utils`, the
+parsed server-serialized state is briefly deposited on a one-shot internal
+scratchpad before `start()` runs. The plugin reads this scratchpad and
+**reuses the server-resolved value** if `state.context.rsc` is already present
+for the same route name — skipping the redundant client-side `ReactNode`
+resolution on first paint.
+
+In practice, RSC apps usually `excludeContext: ["rsc"]` from the JSON payload
+(a `ReactNode` tree contains functions/symbols and isn't JSON-serializable).
+In that case the scratchpad has no `rsc` namespace and the loader runs as
+today. The skip path matters when the bundler-specific Flight pipeline
+arranges to thread an already-resolved `ReactNode` through hydration.
+
+The skip is single-shot — only the first `start()` triggered by `hydrateRouter`
+consumes the scratchpad. Composes with per-route mode: `"client-only"` skips
+the loader regardless of scratchpad contents (mode wins).
 
 ## Typed Loader Errors (`@real-router/rsc-server-plugin/errors`)
 

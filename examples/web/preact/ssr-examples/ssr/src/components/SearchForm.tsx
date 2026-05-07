@@ -17,7 +17,12 @@ export function SearchForm(): JSX.Element {
   const [sort, setSort] = useState<"asc" | "desc">("asc");
 
   return (
-    <form data-testid="search-form" onSubmit={(e) => e.preventDefault()}>
+    <form
+      data-testid="search-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+      }}
+    >
       <fieldset>
         <legend>Search</legend>
 
@@ -29,7 +34,9 @@ export function SearchForm(): JSX.Element {
             id={queryId}
             type="text"
             value={query}
-            onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
+            onInput={(e) => {
+              setQuery((e.target as HTMLInputElement).value);
+            }}
             data-testid="query-input"
           />
         </div>
@@ -41,9 +48,9 @@ export function SearchForm(): JSX.Element {
           <select
             id={sortId}
             value={sort}
-            onChange={(e) =>
-              setSort((e.target as HTMLSelectElement).value as "asc" | "desc")
-            }
+            onChange={(e) => {
+              setSort((e.target as HTMLSelectElement).value as "asc" | "desc");
+            }}
             data-testid="sort-select"
           >
             <option value="asc">Ascending</option>

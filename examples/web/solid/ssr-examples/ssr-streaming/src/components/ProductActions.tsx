@@ -54,7 +54,10 @@ export function ProductActions(): JSX.Element {
   onMount(() => {
     if (!isServer) {
       window.__MOUNT_LOG__ = window.__MOUNT_LOG__ ?? [];
-      window.__MOUNT_LOG__.push({ source: "ProductActions", ts: Date.now() });
+      window.__MOUNT_LOG__.push({
+        source: "ProductActions",
+        ts: Date.now(),
+      });
     }
   });
 

@@ -59,10 +59,7 @@ export function EditEmailForm({ userId, initialEmail }: Props): JSX.Element {
       </label>
       <SubmitButton />
       {state ? (
-        <p
-          data-testid="action-result"
-          data-ok={state.ok ? "true" : "false"}
-        >
+        <p data-testid="action-result" data-ok={state.ok ? "true" : "false"}>
           {state.message}
         </p>
       ) : null}

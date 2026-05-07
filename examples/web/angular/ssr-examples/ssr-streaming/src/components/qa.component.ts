@@ -7,7 +7,10 @@ interface QAEntry {
 
 const QA_BY_PRODUCT: Record<string, QAEntry[]> = {
   "1": [
-    { q: "Is RGB lighting customizable?", a: "Yes — per-key, via the desktop app." },
+    {
+      q: "Is RGB lighting customizable?",
+      a: "Yes — per-key, via the desktop app.",
+    },
     { q: "Mac compatible?", a: "Yes, USB-C with on-board firmware." },
   ],
   "2": [{ q: "Can I disable the side buttons?", a: "Yes, in the driver." }],

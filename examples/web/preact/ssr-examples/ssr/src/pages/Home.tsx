@@ -1,4 +1,5 @@
 import { lazy, Suspense } from "preact/compat";
+
 import { SearchForm } from "../components/SearchForm";
 
 import type { JSX } from "preact";

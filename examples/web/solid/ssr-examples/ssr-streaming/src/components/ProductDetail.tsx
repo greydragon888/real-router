@@ -1,10 +1,10 @@
 import { useRoute } from "@real-router/solid";
 import { ErrorBoundary, Show, Suspense } from "solid-js";
 
-import { trackView } from "../actions/track-view";
 import { ProductActions } from "./ProductActions";
 import { RelatedItems } from "./RelatedItems";
 import { Reviews } from "./Reviews";
+import { trackView } from "../actions/track-view";
 
 import type { ProductDetailData } from "../router/loaders";
 import type { JSX } from "solid-js";
@@ -12,7 +12,7 @@ import type { JSX } from "solid-js";
 // `trackView` is imported but appears "unused" to TypeScript — that's a
 // requirement of Solid's babel-preset directive transform. See the
 // docstring in src/actions/track-view.ts for the full rationale.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+
 const _ensureTrackViewBinding = trackView;
 
 // NOTE — `<SuspenseList revealOrder>` is intentionally NOT used here.

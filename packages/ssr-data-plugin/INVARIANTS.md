@@ -53,9 +53,18 @@
 | --- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | Per-instance data independence                             | Two cloned routers using the same factory produce independent `state.context.data`. Each `usePlugin()` creates its own `compiledLoaders` Map and context claim.                                 |
 
+## SSR Mode
+
+| #   | Invariant                                                  | Description                                                                                                                                                                                    |
+| --- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `getSsrDataMode` reflects the resolved mode                 | For any string-form `ssr: SsrMode`, `getSsrDataMode(state) === ssr` after `start()`. Confirms the plugin writes the resolved mode to `state.context.ssrDataMode` for every registered route. |
+| 2   | `client-only` skips the loader                              | When `ssr === "client-only"` (or `false`), the loader is invoked exactly 0 times per `start()`, and `state.context.data` is `undefined`. Symmetric on server and client.                       |
+| 3   | Function-form resolver invoked once per `start()`           | A function-form `ssr: (state) => SsrMode` is called exactly once per navigation, with the resolved state. Result is the published mode.                                                       |
+| 4   | Short form === `{ loader }` for mode `"full"`               | A factory `(r, getDep) => loader` and `{ loader: (r, getDep) => loader }` produce identical `state.context.data` and the same mode `"full"` after `start()`.                                  |
+
 ## Test Files
 
 | File                                         | Invariants | Category                                                                            |
 | -------------------------------------------- | ---------- | ----------------------------------------------------------------------------------- |
 | `tests/functional/data-loader.test.ts`       | 3          | getDependency integration, no caching                                                                                     |
-| `tests/property/ssr-data.properties.ts`      | 13         | Validation, loader invocation, loader arguments, data retrieval, prototype safety, teardown, isolation, factory invocation |
+| `tests/property/ssr-data.properties.ts`      | 17         | Validation, loader invocation, loader arguments, data retrieval, prototype safety, teardown, isolation, factory invocation, **SSR mode (×4)** |

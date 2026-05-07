@@ -1,6 +1,5 @@
-import type { Route } from "@real-router/core";
-
 import type { CurrentUser } from "../_known-users";
+import type { Route } from "@real-router/core";
 
 export interface AppDeps {
   currentUser: CurrentUser | null;
@@ -51,4 +50,6 @@ export const routes: Route<AppDeps>[] = [
     },
   },
   { name: "boom", path: "/boom" },
+  // Per-route SSR mode demo (#597): server skips loader for `ssr: false`.
+  { name: "widget", path: "/widget" },
 ];

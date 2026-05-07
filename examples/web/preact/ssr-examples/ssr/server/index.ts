@@ -14,7 +14,10 @@ const root = path.resolve(__dirname, "..");
 // Strong ETag from the SSR'd HTML body. SHA-256 truncated to 16
 // base64url chars — collision-resistant, 22-byte total wire footprint.
 function computeStrongEtag(body: string): string {
-  const hash = createHash("sha256").update(body).digest("base64url").slice(0, 16);
+  const hash = createHash("sha256")
+    .update(body)
+    .digest("base64url")
+    .slice(0, 16);
 
   return `"${hash}"`;
 }
@@ -60,6 +63,7 @@ async function startServer(): Promise<void> {
     const currentUser = getCurrentUserFromCookies(request.headers.cookie);
 
     const abortController = new AbortController();
+
     request.on("close", () => {
       if (!response.writableEnded) {
         abortController.abort();

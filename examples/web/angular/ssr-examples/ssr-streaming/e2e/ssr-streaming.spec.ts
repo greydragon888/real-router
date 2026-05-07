@@ -553,4 +553,9 @@ test.describe("Streaming SSR Example (Angular)", () => {
       "1",
     );
   });
+
+  // See note in ssr/e2e/ssr.spec.ts: per-route SSR mode (#597) is wired in
+  // routes.ts + loaders.ts but Angular SSR does not serialize router State
+  // into HTML, so a runtime assertion via __SSR_STATE__ regex isn't
+  // applicable. Compile-time + cross-adapter coverage stands.
 });

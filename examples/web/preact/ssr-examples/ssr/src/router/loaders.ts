@@ -105,4 +105,9 @@ export const loaders: DataLoaderFactoryMap = {
         );
       });
     }),
+
+  // Per-route SSR mode (#597): `ssr: false` aliases to `"client-only"`.
+  // Server skips this entry's loader; mode marker is published to
+  // state.context.ssrDataMode so the application can branch on it.
+  widget: { ssr: false },
 };

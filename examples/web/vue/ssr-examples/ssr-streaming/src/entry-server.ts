@@ -1,8 +1,8 @@
 import { UNKNOWN_ROUTE } from "@real-router/core";
 import { cloneRouter } from "@real-router/core/api";
 import { serializeRouterState } from "@real-router/core/utils";
-import { RouterProvider } from "@real-router/vue";
 import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
+import { RouterProvider } from "@real-router/vue";
 import { createSSRApp, h } from "vue";
 import { renderToWebStream } from "vue/server-renderer";
 
@@ -48,6 +48,7 @@ export async function render(url: string): Promise<RenderResult> {
   // until GC. By returning a RenderResult with rawBody + cleanup, the
   // server can react properly without the leak.
   let state;
+
   try {
     state = await router.start(url);
   } catch (error) {
@@ -57,7 +58,9 @@ export async function render(url: string): Promise<RenderResult> {
       return {
         ssrJson: "{}",
         statusCode: 404,
-        cleanup: () => router.dispose(),
+        cleanup: () => {
+          router.dispose();
+        },
         rawBody: "Not Found",
         contentType: "text/plain; charset=utf-8",
       };
@@ -66,6 +69,7 @@ export async function render(url: string): Promise<RenderResult> {
     // Unknown error — clean up before propagating so the express
     // middleware's catch handler doesn't have to know about cleanup.
     router.dispose();
+
     throw error;
   }
 
@@ -73,8 +77,7 @@ export async function render(url: string): Promise<RenderResult> {
   const ssrJson = serializeRouterState(state);
 
   const app = createSSRApp({
-    render: () =>
-      h(RouterProvider, { router }, { default: () => h(App) }),
+    render: () => h(RouterProvider, { router }, { default: () => h(App) }),
   });
 
   const stream = renderToWebStream(app);

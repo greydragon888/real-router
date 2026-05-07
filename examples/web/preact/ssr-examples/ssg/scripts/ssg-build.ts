@@ -76,9 +76,7 @@ const leafPaths = await getStaticPaths();
 const profilePaths = leafPaths
   .map((p) => p.replace(/\/posts$/, ""))
   .filter((p) => /\/users\/[^/]+$/.test(p));
-const paths = Array.from(
-  new Set<string>([...leafPaths, ...profilePaths, "/users"]),
-);
+const paths = [...new Set<string>([...leafPaths, ...profilePaths, "/users"])];
 
 console.log(`Pre-rendering ${paths.length} routes...`);
 

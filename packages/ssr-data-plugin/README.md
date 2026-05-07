@@ -55,19 +55,62 @@ router.dispose();
 
 ## Configuration
 
-Loaders are keyed by **route name** (not path). Each value is a **factory function** `(router, getDependency) => loaderFn` that receives the router instance and a dependency getter. The factory runs once at plugin registration; the returned loader is cached. Each loader receives route `params` and returns a `Promise`:
+Entries are keyed by **route name** (not path). Each value is either a **factory function** `(router, getDependency) => loaderFn` (short form) or an object `{ ssr?, loader? }` with optional per-route SSR mode. The factory runs once at plugin registration; the returned loader is cached. Each loader receives route `params` and returns `Promise<unknown> | unknown`:
 
 ```typescript
 import type { DataLoaderFactoryMap } from "@real-router/ssr-data-plugin";
 
 const loaders: DataLoaderFactoryMap = {
+  // Short form — defaults to ssr: "full"
   home: () => async () => ({ featured: await fetchFeatured() }),
-  "users.profile": () => async (params) => ({ user: await fetchUser(params.id) }),
-  "users.list": () => async () => ({ users: await fetchUsers() }),
+
+  // Object form — opt out of server rendering for this route
+  "admin.dashboard": { ssr: false },
+
+  // Object form — server fetches data, app ships shell + JSON
+  "users.profile": {
+    ssr: "data-only",
+    loader: () => async (params) => ({ user: await fetchUser(params.id) }),
+  },
+
+  // Function-form resolver — mode resolved per-navigation
+  "docs.detail": {
+    ssr: (state) => state.params.format === "pdf" ? "client-only" : "full",
+    loader: () => async (params) => ({ doc: await fetchDoc(params.id) }),
+  },
 };
 ```
 
-Routes without a matching loader produce no data — `state.context.data` is `undefined`.
+Routes without a matching entry produce no data — `state.context.data` is `undefined` and `getSsrDataMode(state)` falls back to `"full"`.
+
+## Per-route SSR mode
+
+Three modes are supported. The plugin publishes the resolved mode to `state.context.ssrDataMode`; read it via `getSsrDataMode(state)`:
+
+| `ssr` value                  | mode marker       | loader behaviour          |
+| ---------------------------- | ----------------- | ------------------------- |
+| omitted / `true` / `"full"`  | `"full"`          | runs (composes with #596) |
+| `"data-only"`                | `"data-only"`     | runs (composes with #596) |
+| `false` / `"client-only"`    | `"client-only"`   | **skipped** unconditionally |
+| `(state) => SsrMode`         | resolver result   | resolved per-navigation   |
+
+`"client-only"` is **symmetric**: the loader is skipped on every `start()` call (server and client). The application reads `getSsrDataMode(state)` and triggers its own client-side fetch (React Query, `useEffect`, Suspense). This keeps the plugin free of environment detection.
+
+```typescript
+import { getSsrDataMode } from "@real-router/ssr-data-plugin";
+
+const state = await router.start(url);
+const mode = getSsrDataMode(state); // "full" | "data-only" | "client-only"
+
+if (mode === "full") {
+  return renderToString(<App router={router} />);
+}
+return `<div data-ssr-mode="${mode}"></div>`;
+```
+
+The function-form resolver receives `state` **before** the mode is written, so it should not read `state.context.ssrDataMode`. Branch on `state.params`, `state.path`, or `state.name`.
+
+See [`examples/web/react/ssr-examples/ssr-mixed/`](../../examples/web/react/ssr-examples/ssr-mixed) for a hybrid pipeline that demonstrates all three modes from a single `entry-server.tsx`.
 
 ## Accessing Data
 
@@ -89,6 +132,29 @@ cloneRouter → usePlugin → start(url) → data loaded → state.context.data 
 ```
 
 Client-side navigation and data fetching is the application's responsibility (React Query, Suspense, `useEffect`, etc.).
+
+## Post-hydration loader skip (#596)
+
+When the application uses `hydrateRouter()` from `@real-router/core/utils`, the
+parsed server-serialized state is briefly deposited on a one-shot internal
+scratchpad before `start()` runs. The plugin reads this scratchpad and
+**reuses the server-resolved value** if `state.context.data` is already present
+for the same route name — skipping the redundant client-side loader call on
+first paint.
+
+```typescript
+// Server: state.context.data populated by the loader, serialized into HTML
+const html = `<script>window.__SSR_STATE__=${serializeRouterState(state)}</script>`;
+
+// Client: hydrateRouter feeds the scratchpad, plugin sees it and skips re-load
+await hydrateRouter(router, window.__SSR_STATE__);
+// loader was NOT called — state.context.data === server's value
+```
+
+The skip is single-shot — only the first `start()` triggered by `hydrateRouter`
+consumes the scratchpad. Subsequent navigations run the loader normally.
+Composes with per-route mode: `"client-only"` skips the loader regardless of
+scratchpad contents (mode wins).
 
 ## Typed Loader Errors (`@real-router/ssr-data-plugin/errors`)
 
@@ -149,6 +215,7 @@ See [`examples/web/react/ssr-examples/ssr-streaming/`](../../examples/web/react/
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — Design decisions and data flow
 - [SSR Example](../../examples/web/react/ssr-examples/ssr) — Full working example (classical, non-streaming)
+- [SSR Mixed-mode Example](../../examples/web/react/ssr-examples/ssr-mixed) — Hybrid pipeline: full SSR + data-only + client-only on the same server
 - [Streaming SSR Example](../../examples/web/react/ssr-examples/ssr-streaming) — React 19 native streaming with `<Suspense>` + `use(promise)`
 - [Streaming SSR wiki guide](https://github.com/greydragon888/real-router/wiki/Streaming-SSR)
 

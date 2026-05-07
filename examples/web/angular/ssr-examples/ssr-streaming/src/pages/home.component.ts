@@ -10,9 +10,9 @@ import { RealLink } from "@real-router/angular";
       <p>
         Demonstrates Angular 21
         <code>&#64;defer (on viewport)</code> +
-        <code>&#64;defer (on hover)</code> with incremental hydration —
-        wired through <code>&#64;real-router/ssr-data-plugin</code> for
-        critical product data.
+        <code>&#64;defer (on hover)</code> with incremental hydration — wired
+        through <code>&#64;real-router/ssr-data-plugin</code> for critical
+        product data.
       </p>
       <p>
         <a realLink routeName="products.list" data-testid="nav-products">

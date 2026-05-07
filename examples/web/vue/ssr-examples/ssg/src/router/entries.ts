@@ -13,7 +13,8 @@ import { database } from "../database";
 const userIds = (): Promise<Record<string, string>[]> =>
   Promise.resolve(database.users.allIds().map((id) => ({ id })));
 
-export const entries: Record<string, () => Promise<Record<string, string>[]>> = {
-  "users.profile": userIds,
-  "users.profile.posts": userIds,
-};
+export const entries: Record<string, () => Promise<Record<string, string>[]>> =
+  {
+    "users.profile": userIds,
+    "users.profile.posts": userIds,
+  };

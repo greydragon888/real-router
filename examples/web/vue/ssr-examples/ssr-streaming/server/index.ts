@@ -44,6 +44,7 @@ async function startServer(): Promise<void> {
     // streaming purpose. See `cache-policies.ts` for the full
     // rationale.
     const abortController = new AbortController();
+
     request.on("close", () => {
       if (!response.writableEnded) {
         abortController.abort();
@@ -62,7 +63,10 @@ async function startServer(): Promise<void> {
       if (result.rawBody !== undefined) {
         response
           .status(result.statusCode)
-          .set("Content-Type", result.contentType ?? "text/plain; charset=utf-8")
+          .set(
+            "Content-Type",
+            result.contentType ?? "text/plain; charset=utf-8",
+          )
           .send(result.rawBody);
 
         return;
@@ -73,10 +77,7 @@ async function startServer(): Promise<void> {
       }
 
       const ssrScript = `<script>window.__SSR_STATE__=${result.ssrJson}</script>`;
-      const templateWithState = template.replace(
-        "<!--ssr-state-->",
-        ssrScript,
-      );
+      const templateWithState = template.replace("<!--ssr-state-->", ssrScript);
       const [headPart, footerPart] =
         templateWithState.split("<!--ssr-outlet-->");
 
@@ -88,6 +89,7 @@ async function startServer(): Promise<void> {
       if (cacheControl) {
         response.set("Cache-Control", cacheControl);
       }
+
       response.write(headPart);
 
       const reader = result.stream.getReader();

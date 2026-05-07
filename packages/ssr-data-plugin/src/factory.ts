@@ -12,6 +12,7 @@ export function ssrDataPluginFactory<
 
   return createSsrLoaderPlugin<unknown, Dependencies>(loaders, {
     namespace: "data",
+    modeNamespace: "ssrDataMode",
     errorPrefix: ERROR_PREFIX,
   });
 }

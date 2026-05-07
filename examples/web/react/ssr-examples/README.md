@@ -1,8 +1,8 @@
 # React SSR Examples
 
-> Server-rendering with Real-Router and React 19 across four delivery models — classical SSR, HTTP-streaming SSR, static site generation, and React Server Components.
+> Server-rendering with Real-Router and React 19 across five delivery models — classical SSR, HTTP-streaming SSR, static site generation, React Server Components, and hybrid per-route mode.
 
-Four standalone Vite apps. Each one is a real, e2e-tested dogfooding consumer of `@real-router/*` for a specific server-rendering shape; this document is the synthesis of what the router can and cannot do, sourced exclusively from the four child READMEs.
+Five standalone Vite apps. Each one is a real, e2e-tested dogfooding consumer of `@real-router/*` for a specific server-rendering shape; this document is the synthesis of what the router can and cannot do, sourced exclusively from the five child READMEs.
 
 | Subdir | Demonstrates |
 |---|---|
@@ -10,6 +10,7 @@ Four standalone Vite apps. Each one is a real, e2e-tested dogfooding consumer of
 | [`ssr-streaming/`](./ssr-streaming) | React 19 native streaming: `renderToReadableStream` + `<Suspense>` + `use(promise)` + selective hydration. `ssr-data-plugin` provides critical data resolved before the shell. Suspense Error Boundary contains rejected promises at the boundary granularity. `createPortal` modal with a `mounted` gate. Production HTTP: per-route `Cache-Control`, `AbortController`, **no ETag** (intentional — see Limitations). Notably ships **zero router-specific streaming API**. |
 | [`ssg/`](./ssg) | Build-time pre-rendering: `getStaticPaths(router, entries)` → `cloneRouter` + `start` + `renderToString` per URL → write `dist/{url}/index.html`. Nested SSG (`users.profile.posts` → 8 paths total), empty-state path, absolute canonical + og, filesystem-layout assertion, `404.html`, `sitemap.xml`. `LoaderNotFound` at build time fails the build loudly. Preview pipeline ships per-route `Cache-Control` (custom `ssgServe()` Vite middleware) + weak `ETag` from file mtime. |
 | [`ssr-rsc/`](./ssr-rsc) | React Server Components with `@real-router/rsc-server-plugin` (ReactNode payload variant) + `@vitejs/plugin-rsc`. Two-endpoint architecture: `GET /:path` (HTML + injected Flight) and `GET /__rsc?route=…` (raw Flight) flow through one `entry.rsc.tsx` fetch handler. Server/Client component boundary; React 19 Server Actions (`'use server'`, `useActionState`, progressive enhancement); cross-component action result via `rscActionPluginFactory` writing to `state.context.rscAction`. Race-safe client navigation: per-fetch `AbortController` cancels stale in-flight `/__rsc` requests. |
+| [`ssr-mixed/`](./ssr-mixed) | Per-route SSR mode (#597) — four routes × four config shapes on one `entry-server.tsx`: `home` short-form (full), `admin.dashboard` `{ ssr: false }` (client-only), `users.profile` `{ ssr: "data-only", loader }` (data-only), `docs.detail` `{ ssr: (state) => …, loader }` (function-form, branches on `?format=`). `entry-server.tsx` reads `getSsrDataMode(state)` and either `renderToString(<App/>)` (full) or emits `<div data-ssr-shell data-ssr-mode="…">` shell. 4 e2e scenarios verify each mode's HTTP response shape. Composes with #596: hydration scratchpad reuse for `full`/`data-only`; `client-only` skips loader unconditionally. |
 
 ## Capabilities
 
@@ -35,6 +36,8 @@ What Real-Router actually delivers across these four shapes, grouped by concern.
 | `ssr-rsc/` (Flight + injected HTML) | per-route on **both** endpoints, **no `must-revalidate`** | **none, intentional** | per-request controller fires on `req.on("close")`; signal in `request.signal` but not in loader DI by default |
 
 **Auth + role gates.** `canActivate` guards read DI via `getDep(...)`; `cloneRouter` is the injection seam (`cloneRouter(base, { currentUser, abortSignal })`). The post-hydration client must mirror server-side DI logic over `document.cookie` or the client guard diverges — handled in `entry-client.tsx`. `/dashboard` requires `currentUser`; `/admin` adds `role === "admin"`.
+
+**Per-route SSR mode (#597).** `@real-router/ssr-data-plugin` accepts a per-route `{ ssr?, loader? }` config that branches the server pipeline by `SsrMode`: `"full"` (run loader + render), `"data-only"` (run loader, ship JSON only, shell HTML), `"client-only"` (skip loader, ship shell, application fetches client-side). `ssr: false` aliases `"client-only"`; `ssr: true` aliases `"full"`. Function form `(state) => SsrMode` resolves per-navigation. The plugin publishes the resolved mode to `state.context.ssrDataMode`; `entry-server.tsx` reads it via `getSsrDataMode(state)` to branch between `renderToString(<App/>)` (full) and a shell `<div data-ssr-shell data-ssr-mode="…">` placeholder. The `ssr-mixed/` example demonstrates all four config shapes — short form + boolean alias + string-form + function-form — on one server. Composes with #596: hydration scratchpad reuse applies when mode allows the loader; `client-only` skips the loader unconditionally regardless of scratchpad contents (mode wins).
 
 **RSC integration without RSC-specific routing.** `rsc-server-plugin` writes a complete `ReactNode` per route into `state.context.rsc`. The router still uses the same `start(url)` lifecycle, the same loader error contract, the same `cloneRouter` isolation. The client-side single-listener pattern (`router.subscribe → fetch /__rsc`) carries `<Link>` clicks, programmatic `router.navigate({ reload: true })`, and `popstate` (history) through one code path.
 

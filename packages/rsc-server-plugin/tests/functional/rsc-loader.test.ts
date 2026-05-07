@@ -3,9 +3,9 @@ import { cloneRouter, getPluginApi } from "@real-router/core/api";
 import { hydrateRouter, serializeRouterState } from "@real-router/core/utils";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { rscServerPluginFactory } from "../../src";
+import { getSsrRscMode, rscServerPluginFactory } from "../../src";
 
-import type { RscLoaderFactoryMap } from "../../src";
+import type { RscLoaderFactoryMap, RscSsrMode } from "../../src";
 import type { Router, State } from "@real-router/core";
 import type { ReactNode } from "react";
 
@@ -66,13 +66,13 @@ describe("@real-router/rsc-server-plugin", () => {
       );
     });
 
-    it("should reject non-function loader values", () => {
+    it("should reject non-function, non-object entry values", () => {
       expect(() =>
         rscServerPluginFactory({
           home: "not-a-function" as unknown as RscLoaderFactoryMap["string"],
         }),
       ).toThrow(
-        '[@real-router/rsc-server-plugin] loader for route "home" must be a function',
+        '[@real-router/rsc-server-plugin] entry for route "home" must be a function or { ssr?, loader? } object',
       );
     });
 
@@ -582,6 +582,241 @@ describe("@real-router/rsc-server-plugin", () => {
       for (let i = 0; i < N; i++) {
         expect(results[i]).toStrictEqual(node("Profile", { id: String(i) }));
       }
+    });
+  });
+
+  describe("Per-route SSR mode", () => {
+    it("object form ssr: 'full' runs loader and writes mode='full'", async () => {
+      const homeNode = node("HomePage");
+      const loader = vi.fn().mockResolvedValue(homeNode);
+
+      router.usePlugin(
+        rscServerPluginFactory({
+          home: { ssr: "full", loader: () => loader },
+        }),
+      );
+
+      const state = await router.start("/");
+
+      expect(loader).toHaveBeenCalledTimes(1);
+      expect(state.context.rsc).toBe(homeNode);
+      expect(getSsrRscMode(state)).toBe("full");
+    });
+
+    it("object form ssr: 'client-only' skips loader and writes mode='client-only'", async () => {
+      const loader = vi.fn().mockResolvedValue(node("Skipped"));
+
+      router.usePlugin(
+        rscServerPluginFactory({
+          home: { ssr: "client-only", loader: () => loader },
+        }),
+      );
+
+      const state = await router.start("/");
+
+      expect(loader).not.toHaveBeenCalled();
+      expect(state.context.rsc).toBeUndefined();
+      expect(getSsrRscMode(state)).toBe("client-only");
+    });
+
+    it("ssr: true → 'full'; ssr: false → 'client-only'", async () => {
+      const loaderTrue = vi.fn().mockResolvedValue(node("True"));
+      const loaderFalse = vi.fn().mockResolvedValue(node("False"));
+
+      router.usePlugin(
+        rscServerPluginFactory({
+          home: { ssr: true, loader: () => loaderTrue },
+          "users.profile": { ssr: false, loader: () => loaderFalse },
+        }),
+      );
+
+      const home = await router.start("/");
+
+      expect(loaderTrue).toHaveBeenCalledTimes(1);
+      expect(getSsrRscMode(home)).toBe("full");
+
+      router.stop();
+      const profile = await router.start("/users/1");
+
+      expect(loaderFalse).not.toHaveBeenCalled();
+      expect(profile.context.rsc).toBeUndefined();
+      expect(getSsrRscMode(profile)).toBe("client-only");
+    });
+
+    it("function-form resolver runs once with the resolved state", async () => {
+      const resolver = vi.fn<(state: State) => RscSsrMode>(() => "full");
+      const loader = vi.fn().mockResolvedValue(node("Profile"));
+
+      router.usePlugin(
+        rscServerPluginFactory({
+          "users.profile": { ssr: resolver, loader: () => loader },
+        }),
+      );
+
+      const state = await router.start("/users/42");
+
+      expect(resolver).toHaveBeenCalledTimes(1);
+      expect(resolver).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "users.profile",
+          params: expect.objectContaining({ id: "42" }),
+        }),
+      );
+      expect(state.context.rsc).toStrictEqual(node("Profile"));
+      expect(loader).toHaveBeenCalledTimes(1);
+    });
+
+    it("rejects 'data-only' string at factory time", () => {
+      expect(() =>
+        rscServerPluginFactory({
+          home: {
+            ssr: "data-only",
+            loader: () => () => Promise.resolve(node("X")),
+          } as unknown as RscLoaderFactoryMap[string],
+        }),
+      ).toThrow(
+        '[@real-router/rsc-server-plugin] mode "data-only" is not allowed for route "home". Allowed: full, client-only',
+      );
+    });
+
+    it("function-form resolver returning 'data-only' rejects start()", async () => {
+      const loader = vi.fn();
+
+      router.usePlugin(
+        rscServerPluginFactory({
+          home: {
+            ssr: () => "data-only" as unknown as RscSsrMode,
+            loader: () => loader,
+          },
+        }),
+      );
+
+      await expect(router.start("/")).rejects.toThrow(
+        '[@real-router/rsc-server-plugin] mode "data-only" is not allowed for route "home". Allowed: full, client-only',
+      );
+
+      expect(loader).not.toHaveBeenCalled();
+      expect(router.getState()?.context.rsc).toBeUndefined();
+      expect(router.getState()?.context.ssrRscMode).toBeUndefined();
+    });
+
+    it("function-form resolver throws → start() rejects, no mode/rsc written", async () => {
+      const loader = vi.fn();
+
+      router.usePlugin(
+        rscServerPluginFactory({
+          home: {
+            ssr: () => {
+              throw new Error("rsc-resolver-boom");
+            },
+            loader: () => loader,
+          },
+        }),
+      );
+
+      await expect(router.start("/")).rejects.toThrow("rsc-resolver-boom");
+
+      expect(loader).not.toHaveBeenCalled();
+      expect(router.getState()?.context.rsc).toBeUndefined();
+      expect(router.getState()?.context.ssrRscMode).toBeUndefined();
+    });
+
+    it("validation rejects unknown keys", () => {
+      expect(() =>
+        rscServerPluginFactory({
+          home: {
+            ssr: "full",
+            garbage: 1,
+          } as unknown as RscLoaderFactoryMap[string],
+        }),
+      ).toThrow(
+        '[@real-router/rsc-server-plugin] unexpected key "garbage" in route "home" config',
+      );
+    });
+
+    it("validation rejects null entry", () => {
+      expect(() =>
+        rscServerPluginFactory({
+          home: null as unknown as RscLoaderFactoryMap[string],
+        }),
+      ).toThrow(
+        '[@real-router/rsc-server-plugin] entry for route "home" must be a function or { ssr?, loader? } object',
+      );
+    });
+
+    it("validation rejects array entry", () => {
+      expect(() =>
+        rscServerPluginFactory({
+          home: [] as unknown as RscLoaderFactoryMap[string],
+        }),
+      ).toThrow(
+        '[@real-router/rsc-server-plugin] entry for route "home" must be a function or { ssr?, loader? } object',
+      );
+    });
+
+    it("getSsrRscMode falls back to 'full' for routes without entry", async () => {
+      router.usePlugin(
+        rscServerPluginFactory({
+          "users.profile": () => () => Promise.resolve(node("Profile")),
+        }),
+      );
+
+      const state = await router.start("/");
+
+      expect(state.context.ssrRscMode).toBeUndefined();
+      expect(getSsrRscMode(state)).toBe("full");
+    });
+
+    it("teardown releases both 'rsc' and 'ssrRscMode' namespace claims", async () => {
+      const unsubscribe = router.usePlugin(
+        rscServerPluginFactory({
+          home: { ssr: "full", loader: () => () => node("Home") },
+        }),
+      );
+
+      await router.start("/");
+      unsubscribe();
+
+      expect(() =>
+        getPluginApi(router).claimContextNamespace("rsc"),
+      ).not.toThrow();
+      expect(() =>
+        getPluginApi(router).claimContextNamespace("ssrRscMode"),
+      ).not.toThrow();
+    });
+
+    it("releases 'rsc' namespace when 'ssrRscMode' is already claimed", () => {
+      const blockingClaim =
+        getPluginApi(router).claimContextNamespace("ssrRscMode");
+
+      expect(() =>
+        router.usePlugin(
+          rscServerPluginFactory({
+            home: () => () => Promise.resolve(node("Home")),
+          }),
+        ),
+      ).toThrow(/already claimed/);
+
+      expect(() =>
+        getPluginApi(router).claimContextNamespace("rsc"),
+      ).not.toThrow();
+
+      blockingClaim.release();
+    });
+  });
+
+  describe("Module augmentation visibility (type-level)", () => {
+    it("state.context.ssrRscMode is typed as RscSsrMode | undefined", async () => {
+      router.usePlugin(
+        rscServerPluginFactory({
+          home: { ssr: "client-only" },
+        }),
+      );
+
+      const state = await router.start("/");
+      const mode: RscSsrMode | undefined = state.context.ssrRscMode;
+
+      expect(mode).toBe("client-only");
     });
   });
 });

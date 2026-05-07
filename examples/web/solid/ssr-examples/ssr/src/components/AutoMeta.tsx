@@ -46,9 +46,9 @@ export function AutoMeta(): JSX.Element {
 
     document.title = meta.title;
 
-    const descTag = document.querySelector(
+    const descTag = document.querySelector<HTMLMetaElement>(
       'meta[name="description"]',
-    ) as HTMLMetaElement | null;
+    );
 
     if (descTag) {
       descTag.content = meta.description;

@@ -40,7 +40,10 @@ declare global {
   }
 }
 
-export function trackView(node: HTMLElement, params: () => TrackViewParams): void {
+export function trackView(
+  node: HTMLElement,
+  params: () => TrackViewParams,
+): void {
   let currentProductId = params().productId;
 
   const observer = new IntersectionObserver(([entry]) => {
@@ -65,5 +68,7 @@ export function trackView(node: HTMLElement, params: () => TrackViewParams): voi
 
   sync();
 
-  onCleanup(() => observer.disconnect());
+  onCleanup(() => {
+    observer.disconnect();
+  });
 }

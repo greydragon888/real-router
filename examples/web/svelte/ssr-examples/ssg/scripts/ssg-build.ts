@@ -48,7 +48,9 @@ function escapeHtml(value: string): string {
 }
 
 function joinUrl(origin: string, p: string): string {
-  if (!p.startsWith("/")) return `${origin}/${p}`;
+  if (!p.startsWith("/")) {
+    return `${origin}/${p}`;
+  }
 
   return `${origin}${p}`;
 }
@@ -99,9 +101,7 @@ const leafPaths = await getStaticPaths();
 const profilePaths = leafPaths
   .map((p) => p.replace(/\/posts$/, ""))
   .filter((p) => /\/users\/[^/]+$/.test(p));
-const paths = Array.from(
-  new Set<string>([...leafPaths, ...profilePaths, "/users"]),
-);
+const paths = [...new Set<string>([...leafPaths, ...profilePaths, "/users"])];
 
 console.log(`Pre-rendering ${paths.length} routes...`);
 

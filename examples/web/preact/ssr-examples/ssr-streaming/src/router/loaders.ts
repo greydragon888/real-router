@@ -28,4 +28,8 @@ export const loaders: DataLoaderFactoryMap = {
 
     return Promise.resolve({ product } satisfies ProductDetailData);
   },
+
+  // Per-route SSR mode (#597): `ssr: false` aliases to `"client-only"`.
+  // Server skips this entry's loader; mode marker travels via __SSR_STATE__.
+  widget: { ssr: false },
 };

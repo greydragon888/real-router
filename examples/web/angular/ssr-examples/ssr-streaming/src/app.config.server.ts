@@ -7,7 +7,10 @@ import { serverRoutes } from "./app.routes.server";
 
 const serverOnlyConfig: ApplicationConfig = {
   providers: [
-    provideServerRendering(withRoutes(serverRoutes), withAppShell(AppComponent)),
+    provideServerRendering(
+      withRoutes(serverRoutes),
+      withAppShell(AppComponent),
+    ),
   ],
 };
 

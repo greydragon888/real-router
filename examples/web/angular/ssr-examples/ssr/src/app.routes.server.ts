@@ -38,9 +38,9 @@ export const serverRoutes: ServerRoute[] = [
     renderMode: RenderMode.Server,
     status: 410,
     headers: {
-      "Sunset": "Wed, 01 Jan 2025 00:00:00 GMT",
-      "Deprecation": "true",
-      "Link": '</marketing>; rel="successor-version"',
+      Sunset: "Wed, 01 Jan 2025 00:00:00 GMT",
+      Deprecation: "true",
+      Link: '</marketing>; rel="successor-version"',
     },
   },
   {

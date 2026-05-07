@@ -39,6 +39,7 @@ async function startServer(): Promise<void> {
     // the RSC handler (and any loader reading getDep("abortSignal"))
     // can observe disconnects and stop work.
     const abortController = new AbortController();
+
     request_.on("close", () => {
       if (!expressResponse.writableEnded) {
         abortController.abort();

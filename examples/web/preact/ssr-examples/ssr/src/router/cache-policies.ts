@@ -3,10 +3,10 @@
 // max-age + s-maxage so CDNs can serve them; user-specific paths
 // (profile, dashboard, admin) are private with short or no cache.
 
-const CACHE_RULES: ReadonlyArray<{
+const CACHE_RULES: readonly {
   match: (path: string) => boolean;
   header: string;
-}> = [
+}[] = [
   {
     match: (p) => p === "/" || p === "",
     header: "public, max-age=300, s-maxage=3600, must-revalidate",

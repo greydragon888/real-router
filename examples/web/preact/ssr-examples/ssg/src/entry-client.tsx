@@ -8,12 +8,14 @@ import { App } from "./App";
 import { createAppRouter } from "./router/createAppRouter";
 import { loaders } from "./router/loaders";
 
-import type { DataLoaderFactoryMap } from "@real-router/ssr-data-plugin";
+import type {
+  DataLoaderFactoryMap,
+  DataLoaderFnFactory,
+} from "@real-router/ssr-data-plugin";
 
 declare global {
-  // eslint-disable-next-line no-var -- script-injected by ssg-build.ts
   var __SSR_STATE__: { path: string } | undefined;
-  // eslint-disable-next-line no-var -- e2e instrumentation (#596)
+
   var __LOADER_CALLS__: Record<string, number> | undefined;
 }
 
@@ -24,18 +26,20 @@ const loaderCalls: Record<string, number> = {};
 globalThis.__LOADER_CALLS__ = loaderCalls;
 
 const instrumentedLoaders: DataLoaderFactoryMap = Object.fromEntries(
-  Object.entries(loaders).map(([name, factory]) => [
-    name,
-    (r, getDep) => {
-      const loader = factory(r, getDep);
+  (Object.entries(loaders) as [string, DataLoaderFnFactory][]).map(
+    ([name, factory]) => [
+      name,
+      (r, getDep) => {
+        const loader = factory(r, getDep);
 
-      return (params) => {
-        loaderCalls[name] = (loaderCalls[name] ?? 0) + 1;
+        return (params) => {
+          loaderCalls[name] = (loaderCalls[name] ?? 0) + 1;
 
-        return loader(params);
-      };
-    },
-  ]),
+          return loader(params);
+        };
+      },
+    ],
+  ),
 ) as DataLoaderFactoryMap;
 
 router.usePlugin(
@@ -45,7 +49,9 @@ router.usePlugin(
 
 const ssrState = globalThis.__SSR_STATE__;
 
-await (ssrState ? hydrateRouter(router, ssrState) : router.start(window.location.pathname));
+await (ssrState
+  ? hydrateRouter(router, ssrState)
+  : router.start(globalThis.location.pathname));
 
 const rootElement = document.querySelector("#root");
 

@@ -12,10 +12,15 @@ import {
   NUM_RUNS,
   ROUTES,
 } from "./helpers";
-import { rscServerPluginFactory } from "../../src";
+import { getSsrRscMode, rscServerPluginFactory } from "../../src";
 
-import type { RscLoaderFactoryMap } from "../../src";
+import type { RscLoaderFactoryMap, RscSsrMode } from "../../src";
 import type { DataLoaderFactoryMap } from "@real-router/ssr-data-plugin";
+
+const arbRscSsrMode: fc.Arbitrary<RscSsrMode> = fc.constantFrom<RscSsrMode>(
+  "full",
+  "client-only",
+);
 
 // =============================================================================
 // Loader Invocation: called once per start()
@@ -423,6 +428,116 @@ describe("composition: rsc-server-plugin + ssr-data-plugin coexist", () => {
       expect(() => api.claimContextNamespace("data")).toThrow();
 
       router.dispose();
+    },
+  );
+});
+
+// =============================================================================
+// SSR Mode invariants (RSC: only "full" | "client-only" allowed)
+// =============================================================================
+
+describe("ssr mode: getSsrRscMode reflects the resolved mode", () => {
+  test.prop([arbRscSsrMode, arbParamValue], { numRuns: NUM_RUNS.standard })(
+    "string-form ssr → getSsrRscMode returns the same mode",
+    async (mode, id) => {
+      const { router } = createRscRouter({
+        "users.profile": {
+          ssr: mode,
+          loader: () => () => node("Profile", { id }),
+        },
+      });
+
+      const state = await router.start(`/users/${id}`);
+
+      expect(getSsrRscMode(state)).toBe(mode);
+
+      router.stop();
+    },
+  );
+});
+
+describe("ssr mode: client-only skips the loader", () => {
+  test.prop([arbParamValue], { numRuns: NUM_RUNS.standard })(
+    "loader is never invoked when mode='client-only'",
+    async (id) => {
+      let callCount = 0;
+
+      const { router } = createRscRouter({
+        "users.profile": {
+          ssr: "client-only",
+          loader: () => () => {
+            callCount++;
+
+            return node("WontRun");
+          },
+        },
+      });
+
+      const state = await router.start(`/users/${id}`);
+
+      expect(callCount).toBe(0);
+      expect(state.context.rsc).toBeUndefined();
+      expect(getSsrRscMode(state)).toBe("client-only");
+
+      router.stop();
+    },
+  );
+});
+
+describe("ssr mode: function-form resolver runs once per start()", () => {
+  test.prop([arbRscSsrMode, arbParamValue], { numRuns: NUM_RUNS.standard })(
+    "resolver invoked exactly once with the resolved state",
+    async (mode, id) => {
+      let resolverCalls = 0;
+
+      const { router } = createRscRouter({
+        "users.profile": {
+          ssr: () => {
+            resolverCalls++;
+
+            return mode;
+          },
+          loader: () => () => node("Profile", { id }),
+        },
+      });
+
+      await router.start(`/users/${id}`);
+
+      expect(resolverCalls).toBe(1);
+
+      router.stop();
+    },
+  );
+});
+
+describe("ssr mode: short form === { loader }", () => {
+  test.prop([arbReactNode, arbParamValue], { numRuns: NUM_RUNS.standard })(
+    "short-form factory and { loader: factory } produce identical rsc + mode='full'",
+    async (payload, id) => {
+      const baseShort = createRouter(ROUTES, { defaultRoute: "home" });
+      const baseObject = createRouter(ROUTES, { defaultRoute: "home" });
+
+      baseShort.usePlugin(
+        rscServerPluginFactory({
+          "users.profile": () => () => payload,
+        }),
+      );
+
+      baseObject.usePlugin(
+        rscServerPluginFactory({
+          "users.profile": { loader: () => () => payload },
+        }),
+      );
+
+      const stateShort = await baseShort.start(`/users/${id}`);
+      const stateObject = await baseObject.start(`/users/${id}`);
+
+      expect(stateShort.context.rsc).toStrictEqual(stateObject.context.rsc);
+      expect(getSsrRscMode(stateShort)).toBe("full");
+      expect(getSsrRscMode(stateObject)).toBe("full");
+
+      baseShort.stop();
+      baseObject.stop();
     },
   );
 });

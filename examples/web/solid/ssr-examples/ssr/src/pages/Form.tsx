@@ -25,7 +25,9 @@ export function Form(): JSX.Element {
       <h2>Subscribe</h2>
       <form>
         <p>
-          <label for={emailId} data-testid="email-label">Email address</label>
+          <label for={emailId} data-testid="email-label">
+            Email address
+          </label>
           <input
             type="email"
             id={emailId}
@@ -37,7 +39,11 @@ export function Form(): JSX.Element {
           </span>
         </p>
         <p>
-          <input type="checkbox" id={subscribeId} data-testid="subscribe-input" />
+          <input
+            type="checkbox"
+            id={subscribeId}
+            data-testid="subscribe-input"
+          />
           <label for={subscribeId} data-testid="subscribe-label">
             Send me weekly updates
           </label>

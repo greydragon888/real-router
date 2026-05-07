@@ -24,8 +24,7 @@ const DEFAULTS: PageMeta = {
   description: "Static site generation demo with Real-Router and Preact 10.",
   canonical: SITE_ORIGIN,
   ogTitle: "Real-Router Preact SSG Example",
-  ogDescription:
-    "Static site generation demo with Real-Router and Preact 10.",
+  ogDescription: "Static site generation demo with Real-Router and Preact 10.",
 };
 
 export const NOT_FOUND_META: PageMeta = {

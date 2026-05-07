@@ -7,4 +7,9 @@ export type {
   SsrLoaderFnFactory,
   SsrLoaderFactoryMap,
   SsrLoaderPluginConfig,
+  SsrMode,
+  SsrModeConfig,
+  SsrModeResolver,
+  SsrRouteEntry,
+  SsrRouteEntryObject,
 } from "./types.js";

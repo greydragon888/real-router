@@ -1088,4 +1088,23 @@ test.describe("SSR (Vue)", () => {
     // within a few hundred ms — well under the 5 s loader delay.
     expect(elapsed).toBeLessThan(1000);
   });
+
+  test("per-route SSR mode (#597): client-only entry skips loader", async ({
+    page,
+  }) => {
+    const response = await page.goto("/widget");
+    const html = await response!.text();
+    const match = html.match(/window\.__SSR_STATE__=({.*?})<\/script>/);
+
+    expect(match?.[1]).toBeDefined();
+
+    const state = JSON.parse(match![1]) as {
+      name: string;
+      context: { ssrDataMode?: string; data?: unknown };
+    };
+
+    expect(state.name).toBe("widget");
+    expect(state.context.ssrDataMode).toBe("client-only");
+    expect(state.context.data).toBeUndefined();
+  });
 });

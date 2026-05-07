@@ -8,7 +8,10 @@ import { App } from "./App";
 import { createAppRouter } from "./router/createAppRouter";
 import { loaders } from "./router/loaders";
 
-import type { DataLoaderFactoryMap } from "@real-router/ssr-data-plugin";
+import type {
+  DataLoaderFactoryMap,
+  DataLoaderFnFactory,
+} from "@real-router/ssr-data-plugin";
 
 declare global {
   interface Window {
@@ -24,18 +27,20 @@ const loaderCalls: Record<string, number> = {};
 window.__LOADER_CALLS__ = loaderCalls;
 
 const instrumentedLoaders: DataLoaderFactoryMap = Object.fromEntries(
-  Object.entries(loaders).map(([name, factory]) => [
-    name,
-    (r, getDep) => {
-      const loader = factory(r, getDep);
+  (Object.entries(loaders) as [string, DataLoaderFnFactory][]).map(
+    ([name, factory]) => [
+      name,
+      (r, getDep) => {
+        const loader = factory(r, getDep);
 
-      return (params) => {
-        loaderCalls[name] = (loaderCalls[name] ?? 0) + 1;
+        return (params) => {
+          loaderCalls[name] = (loaderCalls[name] ?? 0) + 1;
 
-        return loader(params);
-      };
-    },
-  ]),
+          return loader(params);
+        };
+      },
+    ],
+  ),
 ) as DataLoaderFactoryMap;
 
 router.usePlugin(
@@ -43,7 +48,7 @@ router.usePlugin(
   ssrDataPluginFactory(instrumentedLoaders),
 );
 
-const ssrState = globalThis.__SSR_STATE__;
+const ssrState = window.__SSR_STATE__;
 
 await (ssrState ? hydrateRouter(router, ssrState) : router.start());
 

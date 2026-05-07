@@ -1,5 +1,4 @@
 import { hydrateRouter } from "@real-router/core/utils";
-import { type RscPayload } from "@real-router/rsc-server-plugin";
 import { createFromReadableStream } from "@vitejs/plugin-rsc/ssr";
 import { renderToReadableStream } from "react-dom/server.edge";
 import { injectRSCPayload } from "rsc-html-stream/server";
@@ -7,6 +6,7 @@ import { injectRSCPayload } from "rsc-html-stream/server";
 import { App } from "./App";
 import { createAppRouter } from "./router/createAppRouter";
 
+import type { RscPayload } from "@real-router/rsc-server-plugin";
 import type { ReactFormState } from "react-dom/client";
 
 // `RscPayload<TReturn, TFormState>` from @real-router/rsc-server-plugin

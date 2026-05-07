@@ -39,7 +39,7 @@ app.use((req, res, next) => {
 });
 
 if (isMainModule(import.meta.url)) {
-  const port = Number(process.env["PORT"]) || 4173;
+  const port = Number(process.env.PORT) || 4173;
 
   app.listen(port, () => {
     console.log(`Angular SSR streaming server: http://localhost:${port}`);

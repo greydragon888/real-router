@@ -468,4 +468,23 @@ test.describe("Streaming SSR Example", () => {
 
     expect(counts).toEqual({});
   });
+
+  test("per-route SSR mode (#597): client-only entry skips loader", async ({
+    page,
+  }) => {
+    const response = await page.goto("/widget");
+    const html = await response!.text();
+    const match = html.match(/window\.__SSR_STATE__=({.*?})<\/script>/);
+
+    expect(match?.[1]).toBeDefined();
+
+    const state = JSON.parse(match![1]) as {
+      name: string;
+      context: { ssrDataMode?: string; data?: unknown };
+    };
+
+    expect(state.name).toBe("widget");
+    expect(state.context.ssrDataMode).toBe("client-only");
+    expect(state.context.data).toBeUndefined();
+  });
 });

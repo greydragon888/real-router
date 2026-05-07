@@ -42,6 +42,7 @@ export async function render(url: string): Promise<RenderResult> {
   // Critical-data resolution can throw typed loader errors. Map them
   // BEFORE constructing the stream so cleanup runs on every path.
   let state;
+
   try {
     state = await router.start(url);
   } catch (error) {
@@ -51,13 +52,16 @@ export async function render(url: string): Promise<RenderResult> {
       return {
         ssrJson: "{}",
         statusCode: 404,
-        cleanup: () => router.dispose(),
+        cleanup: () => {
+          router.dispose();
+        },
         rawBody: "Not Found",
         contentType: "text/plain; charset=utf-8",
       };
     }
 
     router.dispose();
+
     throw error;
   }
 

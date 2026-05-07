@@ -46,4 +46,7 @@ export const routes = [
   { name: "legacyUser", path: "/legacy-user/:id" },
   // Slow loader for AbortController + LoaderTimeout demo.
   { name: "slow", path: "/slow" },
+  // Per-route SSR mode demo (#597): server skips loader for `ssr: false`,
+  // ships shell HTML with `state.context.ssrDataMode === "client-only"`.
+  { name: "widget", path: "/widget" },
 ];

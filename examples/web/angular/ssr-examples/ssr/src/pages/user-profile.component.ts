@@ -49,8 +49,6 @@ export class UserProfileComponent {
 
   readonly data = computed<UserProfileData | undefined>(
     () =>
-      this.route.routeState().route.context.data as
-        | UserProfileData
-        | undefined,
+      this.route.routeState().route.context.data as UserProfileData | undefined,
   );
 }

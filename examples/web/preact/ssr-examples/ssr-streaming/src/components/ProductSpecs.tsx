@@ -20,7 +20,7 @@ const SPECS_BY_PRODUCT: Record<string, ProductSpec[]> = {
     { label: "Weight", value: "78 g" },
   ],
   "3": [
-    { label: "Panel", value: "27\" IPS, 3840×2160" },
+    { label: "Panel", value: '27" IPS, 3840×2160' },
     { label: "Refresh rate", value: "144 Hz" },
     { label: "HDR", value: "DisplayHDR 600" },
     { label: "Ports", value: "2× HDMI 2.1, 1× DP 1.4, 1× USB-C 90W PD" },

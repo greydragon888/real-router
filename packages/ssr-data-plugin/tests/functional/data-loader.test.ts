@@ -3,9 +3,9 @@ import { cloneRouter, getPluginApi } from "@real-router/core/api";
 import { hydrateRouter, serializeRouterState } from "@real-router/core/utils";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { ssrDataPluginFactory } from "../../src";
+import { getSsrDataMode, ssrDataPluginFactory } from "../../src";
 
-import type { DataLoaderFactoryMap } from "../../src";
+import type { DataLoaderFactoryMap, SsrMode } from "../../src";
 import type { Router, State } from "@real-router/core";
 
 const routes = [
@@ -19,6 +19,21 @@ const routes = [
     ],
   },
 ];
+
+const buildServerState = (
+  overrides: Partial<State> & { context?: Record<string, unknown> },
+): State => ({
+  name: "users.profile",
+  params: { id: "42" },
+  path: "/users/42",
+  transition: {
+    phase: "activating",
+    reason: "success",
+    segments: { deactivated: [], activated: [], intersection: "" },
+  },
+  ...overrides,
+  context: overrides.context ?? {},
+});
 
 describe("@real-router/ssr-data-plugin", () => {
   let router: Router;
@@ -56,13 +71,13 @@ describe("@real-router/ssr-data-plugin", () => {
       );
     });
 
-    it("should reject non-function loader values", () => {
+    it("should reject non-function, non-object entry values", () => {
       expect(() =>
         ssrDataPluginFactory({
           home: "not-a-function" as unknown as DataLoaderFactoryMap["string"],
         }),
       ).toThrow(
-        '[@real-router/ssr-data-plugin] loader for route "home" must be a function',
+        '[@real-router/ssr-data-plugin] entry for route "home" must be a function or { ssr?, loader? } object',
       );
     });
 
@@ -432,21 +447,6 @@ describe("@real-router/ssr-data-plugin", () => {
   });
 
   describe("Post-hydration loader skip (#596)", () => {
-    const buildServerState = (
-      overrides: Partial<State> & { context?: Record<string, unknown> },
-    ): State => ({
-      name: "users.profile",
-      params: { id: "42" },
-      path: "/users/42",
-      transition: {
-        phase: "activating",
-        reason: "success",
-        segments: { deactivated: [], activated: [], intersection: "" },
-      },
-      ...overrides,
-      context: overrides.context ?? {},
-    });
-
     it("skips loader when hydrated state contains the namespace value", async () => {
       const loader = vi.fn().mockResolvedValue({ from: "client-loader" });
       const serverData = { from: "server-loader", id: "42" };
@@ -579,6 +579,386 @@ describe("@real-router/ssr-data-plugin", () => {
       for (let i = 0; i < N; i++) {
         expect(results[i]).toStrictEqual({ id: String(i) });
       }
+    });
+  });
+
+  describe("Per-route SSR mode", () => {
+    it("object form ssr: 'full' runs loader and writes mode='full'", async () => {
+      const loader = vi.fn().mockResolvedValue({ ok: 1 });
+
+      router.usePlugin(
+        ssrDataPluginFactory({
+          home: { ssr: "full", loader: () => loader },
+        }),
+      );
+
+      const state = await router.start("/");
+
+      expect(loader).toHaveBeenCalledTimes(1);
+      expect(state.context.data).toStrictEqual({ ok: 1 });
+      expect(getSsrDataMode(state)).toBe("full");
+    });
+
+    it("object form ssr: 'data-only' runs loader and writes mode='data-only'", async () => {
+      const loader = vi.fn().mockResolvedValue({ payload: 42 });
+
+      router.usePlugin(
+        ssrDataPluginFactory({
+          home: { ssr: "data-only", loader: () => loader },
+        }),
+      );
+
+      const state = await router.start("/");
+
+      expect(loader).toHaveBeenCalledTimes(1);
+      expect(state.context.data).toStrictEqual({ payload: 42 });
+      expect(getSsrDataMode(state)).toBe("data-only");
+    });
+
+    it("object form ssr: 'client-only' skips loader and writes mode='client-only'", async () => {
+      const loader = vi.fn().mockResolvedValue({ skipped: true });
+
+      router.usePlugin(
+        ssrDataPluginFactory({
+          home: { ssr: "client-only", loader: () => loader },
+        }),
+      );
+
+      const state = await router.start("/");
+
+      expect(loader).not.toHaveBeenCalled();
+      expect(state.context.data).toBeUndefined();
+      expect(getSsrDataMode(state)).toBe("client-only");
+    });
+
+    it("ssr: true → 'full'; ssr: false → 'client-only'", async () => {
+      const loaderTrue = vi.fn().mockResolvedValue("a");
+      const loaderFalse = vi.fn().mockResolvedValue("b");
+
+      router.usePlugin(
+        ssrDataPluginFactory({
+          home: { ssr: true, loader: () => loaderTrue },
+          "users.profile": { ssr: false, loader: () => loaderFalse },
+        }),
+      );
+
+      const home = await router.start("/");
+
+      expect(loaderTrue).toHaveBeenCalledTimes(1);
+      expect(getSsrDataMode(home)).toBe("full");
+
+      router.stop();
+      const profile = await router.start("/users/1");
+
+      expect(loaderFalse).not.toHaveBeenCalled();
+      expect(profile.context.data).toBeUndefined();
+      expect(getSsrDataMode(profile)).toBe("client-only");
+    });
+
+    it("object form without loader writes mode but no data", async () => {
+      router.usePlugin(
+        ssrDataPluginFactory({
+          home: { ssr: "data-only" },
+        }),
+      );
+
+      const state = await router.start("/");
+
+      expect(state.context.data).toBeUndefined();
+      expect(getSsrDataMode(state)).toBe("data-only");
+    });
+
+    it("function-form resolver is called once per start() with the resolved state", async () => {
+      const resolver = vi.fn<(state: State) => SsrMode>(() => "full");
+      const loader = vi.fn().mockResolvedValue("x");
+
+      router.usePlugin(
+        ssrDataPluginFactory({
+          "users.profile": { ssr: resolver, loader: () => loader },
+        }),
+      );
+
+      const state = await router.start("/users/42");
+
+      expect(resolver).toHaveBeenCalledTimes(1);
+      expect(resolver).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "users.profile",
+          params: expect.objectContaining({ id: "42" }),
+        }),
+      );
+      expect(state.context.data).toBe("x");
+      expect(loader).toHaveBeenCalledTimes(1);
+    });
+
+    it("function-form resolver returning invalid mode rejects start() and writes nothing", async () => {
+      const loader = vi.fn();
+
+      router.usePlugin(
+        ssrDataPluginFactory({
+          home: {
+            ssr: () => "bogus" as unknown as SsrMode,
+            loader: () => loader,
+          },
+        }),
+      );
+
+      await expect(router.start("/")).rejects.toThrow(
+        '[@real-router/ssr-data-plugin] mode "bogus" is not allowed for route "home"',
+      );
+
+      expect(loader).not.toHaveBeenCalled();
+      expect(router.getState()?.context.data).toBeUndefined();
+      expect(router.getState()?.context.ssrDataMode).toBeUndefined();
+    });
+
+    it("function-form resolver throws → start() rejects, no mode/data written", async () => {
+      const loader = vi.fn();
+
+      router.usePlugin(
+        ssrDataPluginFactory({
+          home: {
+            ssr: () => {
+              throw new Error("resolver-boom");
+            },
+            loader: () => loader,
+          },
+        }),
+      );
+
+      await expect(router.start("/")).rejects.toThrow("resolver-boom");
+
+      expect(loader).not.toHaveBeenCalled();
+      expect(router.getState()?.context.data).toBeUndefined();
+      expect(router.getState()?.context.ssrDataMode).toBeUndefined();
+    });
+
+    it("validation rejects unknown keys", () => {
+      expect(() =>
+        ssrDataPluginFactory({
+          home: {
+            ssr: "full",
+            garbage: 1,
+          } as unknown as DataLoaderFactoryMap[string],
+        }),
+      ).toThrow(
+        '[@real-router/ssr-data-plugin] unexpected key "garbage" in route "home" config',
+      );
+    });
+
+    it("validation rejects non-function loader in object form", () => {
+      expect(() =>
+        ssrDataPluginFactory({
+          home: {
+            loader: "x",
+          } as unknown as DataLoaderFactoryMap[string],
+        }),
+      ).toThrow(
+        '[@real-router/ssr-data-plugin] loader for route "home" must be a function',
+      );
+    });
+
+    it("validation rejects wrong ssr type (number)", () => {
+      expect(() =>
+        ssrDataPluginFactory({
+          home: { ssr: 42 } as unknown as DataLoaderFactoryMap[string],
+        }),
+      ).toThrow(
+        '[@real-router/ssr-data-plugin] ssr for route "home" must be SsrMode string, boolean, or (state) => SsrMode',
+      );
+    });
+
+    it("validation rejects unknown mode string", () => {
+      expect(() =>
+        ssrDataPluginFactory({
+          home: {
+            ssr: "bogus",
+          } as unknown as DataLoaderFactoryMap[string],
+        }),
+      ).toThrow(
+        '[@real-router/ssr-data-plugin] mode "bogus" is not allowed for route "home". Allowed: full, data-only, client-only',
+      );
+    });
+
+    it("validation rejects null entry", () => {
+      expect(() =>
+        ssrDataPluginFactory({
+          home: null as unknown as DataLoaderFactoryMap[string],
+        }),
+      ).toThrow(
+        '[@real-router/ssr-data-plugin] entry for route "home" must be a function or { ssr?, loader? } object',
+      );
+    });
+
+    it("validation rejects array entry", () => {
+      expect(() =>
+        ssrDataPluginFactory({
+          home: [] as unknown as DataLoaderFactoryMap[string],
+        }),
+      ).toThrow(
+        '[@real-router/ssr-data-plugin] entry for route "home" must be a function or { ssr?, loader? } object',
+      );
+    });
+
+    it("getSsrDataMode falls back to 'full' for routes without plugin entry", async () => {
+      router.usePlugin(
+        ssrDataPluginFactory({
+          "users.profile": () => () => Promise.resolve("x"),
+        }),
+      );
+
+      const state = await router.start("/");
+
+      expect(state.context.ssrDataMode).toBeUndefined();
+      expect(getSsrDataMode(state)).toBe("full");
+    });
+
+    it("teardown releases both 'data' and 'ssrDataMode' namespace claims", async () => {
+      const unsubscribe = router.usePlugin(
+        ssrDataPluginFactory({
+          home: { ssr: "full", loader: () => () => Promise.resolve("data") },
+        }),
+      );
+
+      await router.start("/");
+      unsubscribe();
+
+      expect(() =>
+        getPluginApi(router).claimContextNamespace("data"),
+      ).not.toThrow();
+      expect(() =>
+        getPluginApi(router).claimContextNamespace("ssrDataMode"),
+      ).not.toThrow();
+    });
+
+    it("releases 'data' namespace when 'ssrDataMode' is already claimed", () => {
+      const blockingClaim =
+        getPluginApi(router).claimContextNamespace("ssrDataMode");
+
+      expect(() =>
+        router.usePlugin(
+          ssrDataPluginFactory({ home: () => () => Promise.resolve(1) }),
+        ),
+      ).toThrow(/already claimed/);
+
+      // Both namespaces should remain claim-able / claimed predictably:
+      // - 'data' must have been released before the throw
+      // - 'ssrDataMode' is still held by the manual blockingClaim
+      expect(() =>
+        getPluginApi(router).claimContextNamespace("data"),
+      ).not.toThrow();
+
+      blockingClaim.release();
+    });
+
+    it("prototype pollution: object-form on prototype is ignored", async () => {
+      const loader = vi.fn().mockResolvedValue("hacked");
+      const proto: DataLoaderFactoryMap = {
+        home: { ssr: "client-only", loader: () => loader },
+      };
+      const loaders = Object.create(proto) as DataLoaderFactoryMap;
+
+      router.usePlugin(ssrDataPluginFactory(loaders));
+      const state = await router.start("/");
+
+      expect(loader).not.toHaveBeenCalled();
+      expect(state.context.data).toBeUndefined();
+      expect(state.context.ssrDataMode).toBeUndefined();
+    });
+  });
+
+  describe("Per-route SSR mode + hydration (#596 composition)", () => {
+    it("hydration + ssr: 'full' → loader skipped, mode='full' written", async () => {
+      const loader = vi.fn();
+      const serverData = { from: "server" };
+
+      router.usePlugin(
+        ssrDataPluginFactory({
+          "users.profile": { ssr: "full", loader: () => loader },
+        }),
+      );
+
+      const json = serializeRouterState(
+        buildServerState({ context: { data: serverData } }),
+      );
+      const state = await hydrateRouter(router, json);
+
+      expect(loader).not.toHaveBeenCalled();
+      expect(state.context.data).toStrictEqual(serverData);
+      expect(getSsrDataMode(state)).toBe("full");
+    });
+
+    it("hydration + ssr: 'data-only' → loader skipped, mode='data-only' written", async () => {
+      const loader = vi.fn();
+      const serverData = { from: "server-data-only" };
+
+      router.usePlugin(
+        ssrDataPluginFactory({
+          "users.profile": { ssr: "data-only", loader: () => loader },
+        }),
+      );
+
+      const json = serializeRouterState(
+        buildServerState({ context: { data: serverData } }),
+      );
+      const state = await hydrateRouter(router, json);
+
+      expect(loader).not.toHaveBeenCalled();
+      expect(state.context.data).toStrictEqual(serverData);
+      expect(getSsrDataMode(state)).toBe("data-only");
+    });
+
+    it("hydration + ssr: 'client-only' (no server data) → loader skipped, mode='client-only'", async () => {
+      const loader = vi.fn().mockResolvedValue("client");
+
+      router.usePlugin(
+        ssrDataPluginFactory({
+          "users.profile": { ssr: "client-only", loader: () => loader },
+        }),
+      );
+
+      const json = serializeRouterState(buildServerState({ context: {} }));
+      const state = await hydrateRouter(router, json);
+
+      expect(loader).not.toHaveBeenCalled();
+      expect(state.context.data).toBeUndefined();
+      expect(getSsrDataMode(state)).toBe("client-only");
+    });
+
+    it("inconsistent server config (mode='client-only' but data present) → mode wins, scratchpad ignored", async () => {
+      const loader = vi.fn();
+
+      router.usePlugin(
+        ssrDataPluginFactory({
+          "users.profile": { ssr: "client-only", loader: () => loader },
+        }),
+      );
+
+      const json = serializeRouterState(
+        buildServerState({
+          context: { data: { from: "stale-server" }, ssrDataMode: "full" },
+        }),
+      );
+      const state = await hydrateRouter(router, json);
+
+      expect(loader).not.toHaveBeenCalled();
+      expect(state.context.data).toBeUndefined();
+      expect(getSsrDataMode(state)).toBe("client-only");
+    });
+  });
+
+  describe("Module augmentation visibility (type-level)", () => {
+    it("state.context.ssrDataMode is typed as SsrMode | undefined", async () => {
+      router.usePlugin(
+        ssrDataPluginFactory({
+          home: { ssr: "data-only" },
+        }),
+      );
+
+      const state = await router.start("/");
+      const mode: SsrMode | undefined = state.context.ssrDataMode;
+
+      expect(mode).toBe("data-only");
     });
   });
 });

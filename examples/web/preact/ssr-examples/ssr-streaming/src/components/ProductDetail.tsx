@@ -1,5 +1,5 @@
-import { lazy, Suspense } from "preact/compat";
 import { Link, useRoute } from "@real-router/preact";
+import { lazy, Suspense } from "preact/compat";
 
 import { RelatedItems } from "./RelatedItems";
 import { Reviews } from "./Reviews";
@@ -52,9 +52,7 @@ export function ProductDetail(): JSX.Element {
           empirically in the spec — chunked HTML contains both
           "specs-fallback" early AND "specs-section" later in the
           response body. */}
-      <Suspense
-        fallback={<p data-testid="specs-fallback">Loading specs...</p>}
-      >
+      <Suspense fallback={<p data-testid="specs-fallback">Loading specs...</p>}>
         <ProductSpecs productId={product.id} />
       </Suspense>
 

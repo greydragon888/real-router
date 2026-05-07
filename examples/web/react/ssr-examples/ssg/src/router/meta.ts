@@ -33,8 +33,7 @@ const DEFAULTS: PageMeta = {
   description: "Static site generation demo with Real-Router and React 19.",
   canonical: SITE_ORIGIN,
   ogTitle: "Real-Router SSG Example",
-  ogDescription:
-    "Static site generation demo with Real-Router and React 19.",
+  ogDescription: "Static site generation demo with Real-Router and React 19.",
 };
 
 const NOT_FOUND_META: PageMeta = {

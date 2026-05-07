@@ -40,6 +40,7 @@ async function startDevServer(): Promise<void> {
 
   app.all(/.*/, async (request_, expressResponse, next) => {
     const abortController = new AbortController();
+
     request_.on("close", () => {
       if (!expressResponse.writableEnded) {
         abortController.abort();

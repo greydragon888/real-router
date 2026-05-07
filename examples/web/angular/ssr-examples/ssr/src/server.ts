@@ -45,7 +45,10 @@ function readErrorCode(error: unknown): string | undefined {
 // chars — collision-resistant for any reasonable site size, 22-byte
 // total wire footprint.
 function computeStrongEtag(body: Uint8Array): string {
-  const hash = createHash("sha256").update(body).digest("base64url").slice(0, 16);
+  const hash = createHash("sha256")
+    .update(body)
+    .digest("base64url")
+    .slice(0, 16);
 
   return `"${hash}"`;
 }
@@ -58,6 +61,7 @@ app.use((req, res, next) => {
   // Real-Router per-request dep map. Loaders then `getDep("abortSignal")`
   // — see /slow loader for the demonstrated pattern.
   const abortController = new AbortController();
+
   (req as { abortSignal?: AbortSignal }).abortSignal = abortController.signal;
   req.on("close", () => {
     if (!res.writableEnded) {
@@ -133,10 +137,7 @@ app.use((req, res, next) => {
       }
 
       if (code === "LOADER_NOT_FOUND") {
-        res
-          .status(404)
-          .type("text/plain; charset=utf-8")
-          .send("Not Found");
+        res.status(404).type("text/plain; charset=utf-8").send("Not Found");
 
         return;
       }
@@ -155,7 +156,7 @@ app.use((req, res, next) => {
 });
 
 if (isMainModule(import.meta.url)) {
-  const port = Number(process.env["PORT"]) || 4173;
+  const port = Number(process.env.PORT) || 4173;
 
   app.listen(port, () => {
     console.log(`Angular SSR server: http://localhost:${port}`);

@@ -35,4 +35,6 @@ export const routes = [
   { name: "asyncPage", path: "/async-page" },
   { name: "form", path: "/form" },
   { name: "boom", path: "/boom" },
+  // Per-route SSR mode demo (#597): server skips loader for `ssr: false`.
+  { name: "widget", path: "/widget" },
 ];

@@ -44,7 +44,10 @@ async function startServer(): Promise<void> {
       if (result.rawBody !== undefined) {
         response
           .status(result.statusCode)
-          .set("Content-Type", result.contentType ?? "text/plain; charset=utf-8")
+          .set(
+            "Content-Type",
+            result.contentType ?? "text/plain; charset=utf-8",
+          )
           .send(result.rawBody);
 
         return;
@@ -55,6 +58,7 @@ async function startServer(): Promise<void> {
       const finalTail = (tail ?? "").replace("<!--ssr-state-->", stateScript);
 
       const cacheControl = getCachePolicy(url);
+
       if (cacheControl) {
         response.set("Cache-Control", cacheControl);
       }
@@ -64,9 +68,14 @@ async function startServer(): Promise<void> {
 
       if (result.stream) {
         const reader = result.stream.getReader();
+
         while (true) {
           const { done, value } = await reader.read();
-          if (done) break;
+
+          if (done) {
+            break;
+          }
+
           response.write(value);
         }
       }

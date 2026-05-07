@@ -1,4 +1,5 @@
 import { LoaderNotFound } from "@real-router/ssr-data-plugin/errors";
+
 import { getProduct, listProducts } from "../database";
 
 import type { Product } from "../database";
@@ -28,4 +29,8 @@ export const loaders: DataLoaderFactoryMap = {
 
     return Promise.resolve({ product } satisfies ProductDetailData);
   },
+
+  // Per-route SSR mode (#597): `ssr: false` aliases to `"client-only"`.
+  // Server skips this entry's loader; mode marker travels via __SSR_STATE__.
+  widget: { ssr: false },
 };

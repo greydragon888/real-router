@@ -17,7 +17,10 @@ const root = path.resolve(__dirname, "..");
 // base64url chars — collision-resistant for any reasonable site size,
 // 22-byte total wire footprint.
 function computeStrongEtag(body: string): string {
-  const hash = createHash("sha256").update(body).digest("base64url").slice(0, 16);
+  const hash = createHash("sha256")
+    .update(body)
+    .digest("base64url")
+    .slice(0, 16);
 
   return `"${hash}"`;
 }
@@ -61,6 +64,7 @@ async function startServer(): Promise<void> {
     // pattern. Without this wiring a 5 s loader would hold the worker
     // for the full delay even after the client gave up.
     const abortController = new AbortController();
+
     request.on("close", () => {
       if (!response.writableEnded) {
         abortController.abort();

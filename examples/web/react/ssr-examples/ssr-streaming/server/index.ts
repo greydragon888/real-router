@@ -41,6 +41,7 @@ async function startServer(): Promise<void> {
     // buffer, so honouring conditional GETs would mean buffering the
     // whole stream first — which defeats the streaming purpose.
     const abortController = new AbortController();
+
     request.on("close", () => {
       if (!response.writableEnded) {
         abortController.abort();
@@ -59,7 +60,10 @@ async function startServer(): Promise<void> {
       if (result.rawBody !== undefined) {
         response
           .status(result.statusCode)
-          .set("Content-Type", result.contentType ?? "text/plain; charset=utf-8")
+          .set(
+            "Content-Type",
+            result.contentType ?? "text/plain; charset=utf-8",
+          )
           .send(result.rawBody);
 
         return;
@@ -82,6 +86,7 @@ async function startServer(): Promise<void> {
       if (cacheControl) {
         response.set("Cache-Control", cacheControl);
       }
+
       response.write(headPart);
 
       const reader = result.stream.getReader();

@@ -65,8 +65,7 @@ export function getMetaForState(state: {
     case "asyncPage": {
       return {
         title: "Async Page — Real-Router Solid SSR",
-        description:
-          "Async-rendered page demonstrating renderToStringAsync.",
+        description: "Async-rendered page demonstrating renderToStringAsync.",
       };
     }
     case "form": {

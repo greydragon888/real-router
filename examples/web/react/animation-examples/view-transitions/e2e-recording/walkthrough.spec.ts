@@ -1,12 +1,8 @@
-import { expect, test } from "@playwright/test";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import {
-  applyPalette,
-  GIFEncoder,
-  quantize,
-  // eslint-disable-next-line import-x/extensions
-} from "gifenc/dist/gifenc.esm.js";
+
+import { expect, test } from "@playwright/test";
+import { applyPalette, GIFEncoder, quantize } from "gifenc/dist/gifenc.esm.js";
 import { PNG } from "pngjs";
 
 interface CapturedFrame {
@@ -44,6 +40,7 @@ test("view-transitions walkthrough → looped GIF", async ({ page, context }) =>
   const supportsVT = await page.evaluate(
     () => typeof document.startViewTransition === "function",
   );
+
   expect(supportsVT, "headless Chromium must support View Transitions").toBe(
     true,
   );
@@ -109,6 +106,7 @@ test("view-transitions walkthrough → looped GIF", async ({ page, context }) =>
 
   const sampled: CapturedFrame[] = [];
   let lastTimestamp = -Infinity;
+
   for (const frame of frames) {
     if ((frame.timestamp - lastTimestamp) * 1000 >= MIN_DELAY_MS) {
       sampled.push(frame);
@@ -144,11 +142,14 @@ test("view-transitions walkthrough → looped GIF", async ({ page, context }) =>
   encoder.finish();
 
   const outDir = path.resolve(process.cwd(), "recordings");
+
   fs.mkdirSync(outDir, { recursive: true });
   const outPath = path.join(outDir, "walkthrough.gif");
+
   fs.writeFileSync(outPath, Buffer.from(encoder.bytes()));
 
   const sizeKb = (fs.statSync(outPath).size / 1024).toFixed(1);
+
   console.log(
     `[GIF] saved ${sampled.length}/${frames.length} frames → ${outPath} (${sizeKb} KB)`,
   );

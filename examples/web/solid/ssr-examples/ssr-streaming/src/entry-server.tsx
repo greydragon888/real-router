@@ -86,7 +86,10 @@ export async function render(url: string): Promise<RenderResult> {
 
   let disposed = false;
   const cleanup = (): void => {
-    if (disposed) return;
+    if (disposed) {
+      return;
+    }
+
     disposed = true;
     router.dispose();
   };

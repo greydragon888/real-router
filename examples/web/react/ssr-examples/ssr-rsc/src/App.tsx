@@ -1,12 +1,12 @@
 "use client";
 
-import { type RscPayload } from "@real-router/rsc-server-plugin";
 import { createFromReadableStream } from "@vitejs/plugin-rsc/browser";
 import { startTransition, use, useEffect, useState } from "react";
 
 import { Layout } from "./client-components/Layout";
 
 import type { Router } from "@real-router/core";
+import type { RscPayload } from "@real-router/rsc-server-plugin";
 import type { ReactNode } from "react";
 import type { ReactFormState } from "react-dom/client";
 
@@ -44,10 +44,10 @@ export function App({ router, payload }: AppProps): ReactNode {
       });
     };
 
-    window.addEventListener(SERVER_ACTION_RESPONSE_EVENT, handler);
+    globalThis.addEventListener(SERVER_ACTION_RESPONSE_EVENT, handler);
 
     return () => {
-      window.removeEventListener(SERVER_ACTION_RESPONSE_EVENT, handler);
+      globalThis.removeEventListener(SERVER_ACTION_RESPONSE_EVENT, handler);
     };
   }, []);
 

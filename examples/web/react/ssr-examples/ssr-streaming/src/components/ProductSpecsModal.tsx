@@ -38,7 +38,9 @@ export function ProductSpecsModal({
       <button
         type="button"
         data-testid="open-specs-modal"
-        onClick={() => setOpen((prev) => !prev)}
+        onClick={() => {
+          setOpen((prev) => !prev);
+        }}
       >
         {open ? "Close" : "Open"} specs
       </button>
@@ -55,7 +57,9 @@ export function ProductSpecsModal({
               <button
                 type="button"
                 data-testid="close-specs-modal"
-                onClick={() => setOpen(false)}
+                onClick={() => {
+                  setOpen(false);
+                }}
               >
                 Close
               </button>

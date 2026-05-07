@@ -20,7 +20,11 @@ import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 import { createBaseRouter } from "../src/router/createBaseRouter";
 import { entries } from "../src/router/entries";
 import { loaders } from "../src/router/loaders";
-import { NOT_FOUND_META, getMetaForState, type PageMeta } from "../src/router/meta";
+import {
+  NOT_FOUND_META,
+  getMetaForState,
+  type PageMeta,
+} from "../src/router/meta";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
@@ -56,17 +60,16 @@ function escapeHtml(value: string): string {
 }
 
 function joinUrl(origin: string, path: string): string {
-  if (!path.startsWith("/")) return `${origin}/${path}`;
+  if (!path.startsWith("/")) {
+    return `${origin}/${path}`;
+  }
 
   return `${origin}${path}`;
 }
 
 function renderMetaBlock(meta: PageMeta): string {
   const canonical = joinUrl(SITE_ORIGIN, meta.canonicalPath);
-  const ogImage = joinUrl(
-    SITE_ORIGIN,
-    meta.ogImagePath ?? "/og/default.png",
-  );
+  const ogImage = joinUrl(SITE_ORIGIN, meta.ogImagePath ?? "/og/default.png");
 
   return [
     `<title>${escapeHtml(meta.title)}</title>`,
@@ -131,11 +134,13 @@ const profilePaths = leafPaths
   .map((p) => p.replace(/\/posts$/, ""))
   .filter((p) => /\/users\/[^/]+$/.test(p));
 
-const dedupedPaths = Array.from(
-  new Set<string>([...leafPaths, ...profilePaths, "/users"]),
-);
+const dedupedPaths = [
+  ...new Set<string>([...leafPaths, ...profilePaths, "/users"]),
+];
 
-console.log(`Pre-rendering ${dedupedPaths.length} routes via in-process SSR...`);
+console.log(
+  `Pre-rendering ${dedupedPaths.length} routes via in-process SSR...`,
+);
 
 const failed: { url: string; error: string }[] = [];
 

@@ -13,10 +13,10 @@
 // Cache-Control alone is still useful — it tells browsers and CDNs how
 // long the response is fresh, even without the conditional-GET 304.
 
-const CACHE_RULES: ReadonlyArray<{
+const CACHE_RULES: readonly {
   match: (path: string) => boolean;
   header: string;
-}> = [
+}[] = [
   // Home: cacheable and long-lived; same for everyone.
   {
     match: (p) => p === "/" || p === "",

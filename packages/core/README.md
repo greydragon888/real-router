@@ -128,14 +128,23 @@ import {
 
 ## Utilities
 
-SSR/SSG helpers imported from `@real-router/core/utils`.
+SSR/SSG/hydration helpers imported from `@real-router/core/utils`.
 
 ```typescript
-import { getStaticPaths, serializeState } from "@real-router/core/utils";
+import {
+  serializeRouterState,
+  hydrateRouter,
+  getStaticPaths,
+  serializeState,
+} from "@real-router/core/utils";
 
-// SSR: XSS-safe data embedding
-const json = serializeState({ name: "home", path: "/" });
-const html = `<script>window.__STATE__=${json}</script>`;
+// SSR: serialize the full resolved State (incl. plugin context namespaces)
+const state = await router.start(req.url);
+const html = `<script>window.__SSR_STATE__=${serializeRouterState(state)}</script>`;
+
+// Client: hydrate from server payload — runs router.start(state.path) under
+// a one-shot scratchpad so SSR plugins (#596) can skip the loader re-run
+await hydrateRouter(router, window.__SSR_STATE__);
 
 // SSG: enumerate all URLs for pre-rendering
 const paths = await getStaticPaths(router, {
@@ -144,11 +153,14 @@ const paths = await getStaticPaths(router, {
 // → ["/", "/users", "/users/1", "/users/2"]
 ```
 
-| Function                           | Purpose                                                                                     |
-| ---------------------------------- | ------------------------------------------------------------------------------------------- |
-| `serializeState(data)`             | XSS-safe JSON serialization for embedding in HTML `<script>` tags                           |
-| `getStaticPaths(router, entries?)` | Enumerate leaf routes and build URLs for SSG pre-rendering                                  |
-| `StaticPathEntries` (type)         | Type for the `entries` parameter: `Record<string, () => Promise<Record<string, string>[]>>` |
+| Function                                            | Purpose                                                                                                                                          |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `serializeRouterState(state, { excludeContext? })`  | XSS-safe JSON serialization of a router `State` for SSR → client transport. Strips `transition`; keeps `name`, `params`, `path`, `context`. Pass `excludeContext` to drop non-JSON-safe namespaces (e.g. `rsc`) |
+| `hydrateRouter(router, source)`                     | Hydrate a fresh router from the server-serialized payload. Deposits the parsed state onto a one-shot scratchpad consumed by SSR loader plugins (#596) so the first `start()` reuses server-resolved namespace values instead of re-running loaders |
+| `serializeState(data)`                              | XSS-safe JSON serialization for embedding arbitrary data in HTML `<script>` tags (lower-level than `serializeRouterState`)                       |
+| `getStaticPaths(router, entries?)`                  | Enumerate leaf routes and build URLs for SSG pre-rendering                                                                                       |
+| `SerializedRouterState` (type)                      | Parsed shape produced by `serializeRouterState` after `JSON.parse` — `Omit<State, "transition">`                                                |
+| `StaticPathEntries` (type)                          | Type for the `entries` parameter: `Record<string, () => Promise<Record<string, string>[]>>`                                                      |
 
 ### `getNavigator(router)` (main entry)
 

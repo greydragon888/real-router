@@ -69,9 +69,14 @@ async function startServer(): Promise<void> {
 
         if (result.stream) {
           const reader = result.stream.getReader();
+
           while (true) {
             const { done, value } = await reader.read();
-            if (done) break;
+
+            if (done) {
+              break;
+            }
+
             response.write(value);
           }
         }

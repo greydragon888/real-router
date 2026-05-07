@@ -33,7 +33,7 @@ const observers = new WeakMap<HTMLElement, IntersectionObserver>();
 
 export const trackView: Directive<HTMLElement, TrackViewBinding> = {
   mounted(el, binding) {
-    let currentProductId = binding.value.productId;
+    const currentProductId = binding.value.productId;
 
     const observer = new IntersectionObserver(
       (entries) => {

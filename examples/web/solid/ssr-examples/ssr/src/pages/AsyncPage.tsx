@@ -52,7 +52,9 @@ export function AsyncPage(): JSX.Element {
   return (
     <div data-testid="async-page">
       <h2>Async page (renderToStringAsync demo)</h2>
-      <p>Page-level data fetched via Suspense + createResource on the server.</p>
+      <p>
+        Page-level data fetched via Suspense + createResource on the server.
+      </p>
       <Suspense
         fallback={<p data-testid="async-stats-fallback">Loading stats…</p>}
       >

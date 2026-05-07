@@ -15,10 +15,10 @@
 //
 // Used by both server/index.ts (production) and server/dev.ts (dev).
 
-const CACHE_RULES: ReadonlyArray<{
+const CACHE_RULES: readonly {
   match: (path: string) => boolean;
   header: string;
-}> = [
+}[] = [
   // Home: cacheable and long-lived; same for everyone.
   {
     match: (p) => p === "/" || p === "",
@@ -44,7 +44,7 @@ const CACHE_RULES: ReadonlyArray<{
   },
   // Permanent redirect target — cache the redirect itself for 1 day.
   {
-    match: (p) => /^\/legacy-user\//.test(p),
+    match: (p) => p.startsWith("/legacy-user/"),
     header: "public, max-age=86400",
   },
   // Slow / boom / async-page / form: skip caching (demo / error /

@@ -1,6 +1,5 @@
 import { browserPluginFactory } from "@real-router/browser-plugin";
 import { hydrateRouter } from "@real-router/core/utils";
-import { type RscPayload } from "@real-router/rsc-server-plugin";
 import {
   createFromFetch,
   createFromReadableStream,
@@ -13,6 +12,7 @@ import { rscStream } from "rsc-html-stream/client";
 import { App } from "./App";
 import { createAppRouter } from "./router/createAppRouter";
 
+import type { RscPayload } from "@real-router/rsc-server-plugin";
 import type { ReactFormState } from "react-dom/client";
 
 // Canonical Flight payload type from @real-router/rsc-server-plugin.
@@ -52,7 +52,7 @@ const SERVER_ACTION_RESPONSE_EVENT = "rsc:server-action-response";
 // Component that reacts to rscAction) would stay stale until a
 // manual reload.
 setServerCallback(async (id: string, args: unknown[]) => {
-  const url = new URL(window.location.href);
+  const url = new URL(globalThis.location.href);
   const body = await encodeReply(args);
   const response = await fetch(url.toString(), {
     method: "POST",
@@ -73,7 +73,7 @@ setServerCallback(async (id: string, args: unknown[]) => {
     Promise.resolve(response),
   );
 
-  window.dispatchEvent(
+  globalThis.dispatchEvent(
     new CustomEvent<AppPayload>(SERVER_ACTION_RESPONSE_EVENT, {
       detail: newPayload,
     }),

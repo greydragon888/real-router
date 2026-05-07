@@ -51,6 +51,7 @@ async function startServer(): Promise<void> {
       const currentUser = getCurrentUserFromCookies(request.headers.cookie);
 
       const abortController = new AbortController();
+
       request.on("close", () => {
         if (!response.writableEnded) {
           abortController.abort();
@@ -87,6 +88,7 @@ async function startServer(): Promise<void> {
         .replace("<!--ssr-state-->", result.serializedData);
 
       const cacheControl = getCachePolicy(url);
+
       if (cacheControl) {
         response.set("Cache-Control", cacheControl);
       }

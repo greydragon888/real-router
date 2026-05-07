@@ -1,5 +1,21 @@
-import type { DefaultDependencies, Params, Router } from "@real-router/types";
+import type {
+  SsrLoaderFn,
+  SsrLoaderFnFactory,
+  SsrMode,
+  SsrRouteEntry,
+} from "./shared-ssr";
+import type { DefaultDependencies } from "@real-router/types";
 import type { ReactNode } from "react";
+
+/**
+ * SSR mode subset supported by `rsc-server-plugin`.
+ *
+ * `"data-only"` is intentionally excluded — RSC has no concept of "data
+ * without component" (the Flight payload IS the data + component). Using
+ * `"data-only"` with `rscServerPluginFactory` is a configuration error and
+ * is rejected at factory time.
+ */
+export type RscSsrMode = Exclude<SsrMode, "data-only">;
 
 /**
  * Compiled RSC loader signature.
@@ -9,7 +25,7 @@ import type { ReactNode } from "react";
  * many Server Components are synchronous — wrapping them in `Promise.resolve`
  * would be ceremonial.
  */
-export type RscLoaderFn = (params: Params) => Promise<ReactNode> | ReactNode;
+export type RscLoaderFn = SsrLoaderFn<ReactNode>;
 
 /**
  * Factory function for creating RSC loaders.
@@ -24,20 +40,31 @@ export type RscLoaderFn = (params: Params) => Promise<ReactNode> | ReactNode;
  */
 export type RscLoaderFnFactory<
   Dependencies extends DefaultDependencies = DefaultDependencies,
-> = (
-  router: Router<Dependencies>,
-  getDependency: <K extends keyof Dependencies>(key: K) => Dependencies[K],
-) => RscLoaderFn;
+> = SsrLoaderFnFactory<ReactNode, Dependencies>;
 
 /**
- * Map of route name → loader factory.
+ * Per-route entry: either a loader factory (short form) or
+ * `{ ssr?, loader? }` object form. Mode defaults to `"full"`.
+ *
+ * Allowed `ssr` values for RSC: `"full"` | `"client-only"` (and the
+ * `true` / `false` aliases). `"data-only"` is rejected at factory time.
+ *
+ * Function form `(state) => RscSsrMode` is resolved per-navigation,
+ * **before** the mode is written to context.
+ */
+export type RscRouteEntry<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+> = SsrRouteEntry<ReactNode, RscSsrMode, Dependencies>;
+
+/**
+ * Map of route name → entry (factory or `{ ssr?, loader? }`).
  *
  * Pass to `rscServerPluginFactory()`. Keys are route names (e.g. `"users.profile"`);
- * values are factories returning the compiled loader.
+ * values are factory or object-form route entries.
  */
 export type RscLoaderFactoryMap<
   Dependencies extends DefaultDependencies = DefaultDependencies,
-> = Record<string, RscLoaderFnFactory<Dependencies>>;
+> = Record<string, RscRouteEntry<Dependencies>>;
 
 /**
  * Server Action result published by `rscActionPluginFactory` to

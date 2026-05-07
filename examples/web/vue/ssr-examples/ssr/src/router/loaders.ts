@@ -3,6 +3,7 @@ import {
   LoaderRedirect,
   withTimeout,
 } from "@real-router/ssr-data-plugin/errors";
+
 import { database } from "../database";
 
 import type { Post, User } from "../database";
@@ -104,4 +105,8 @@ export const loaders: DataLoaderFactoryMap = {
     }),
 
   boom: () => () => Promise.reject(new Error("Loader exploded for /boom")),
+
+  // Per-route SSR mode (#597): `ssr: false` aliases to `"client-only"`.
+  // Server skips this entry's loader; mode marker travels via __SSR_STATE__.
+  widget: { ssr: false },
 };

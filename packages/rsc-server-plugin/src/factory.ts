@@ -45,6 +45,8 @@ export function rscServerPluginFactory<
 
   return createSsrLoaderPlugin<ReactNode, Dependencies>(loaders, {
     namespace: "rsc",
+    modeNamespace: "ssrRscMode",
     errorPrefix: ERROR_PREFIX,
+    allowedModes: ["full", "client-only"],
   });
 }

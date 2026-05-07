@@ -13,10 +13,10 @@
 // Compose this with ETag generation in server.ts: even for short
 // max-age, conditional GETs return 304 cheaply via If-None-Match.
 
-const CACHE_RULES: ReadonlyArray<{
+const CACHE_RULES: readonly {
   match: (path: string) => boolean;
   header: string;
-}> = [
+}[] = [
   // Home: cacheable and long-lived; same for everyone.
   {
     match: (p) => p === "/" || p === "",
@@ -42,7 +42,7 @@ const CACHE_RULES: ReadonlyArray<{
   },
   // Permanent redirect target — cache the redirect itself for 1 day.
   {
-    match: (p) => /^\/legacy-user\//.test(p),
+    match: (p) => p.startsWith("/legacy-user/"),
     header: "public, max-age=86400",
   },
   // Slow / boom: skip caching.

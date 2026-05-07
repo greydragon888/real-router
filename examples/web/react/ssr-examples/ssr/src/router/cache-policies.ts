@@ -13,10 +13,10 @@
 // Compose this with ETag generation in server/index.ts: even for short
 // max-age, conditional GETs return 304 cheaply via If-None-Match.
 
-const CACHE_RULES: ReadonlyArray<{
+const CACHE_RULES: readonly {
   match: (path: string) => boolean;
   header: string;
-}> = [
+}[] = [
   // Home: cacheable and long-lived; same for everyone.
   {
     match: (p) => p === "/" || p === "",

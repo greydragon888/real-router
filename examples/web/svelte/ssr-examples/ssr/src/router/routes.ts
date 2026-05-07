@@ -33,4 +33,6 @@ export const routes = [
   { name: "legacyUser", path: "/legacy-user/:id" },
   { name: "slow", path: "/slow" },
   { name: "boom", path: "/boom" },
+  // Per-route SSR mode demo (#597): server skips loader for `ssr: false`.
+  { name: "widget", path: "/widget" },
 ];

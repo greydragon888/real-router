@@ -9,7 +9,8 @@ const EMPTY_DATA: UsersListData = { users: [] };
 export function UsersList(): JSX.Element {
   const routeState = useRoute();
   const data = (): UsersListData =>
-    (routeState().route.context.data as UsersListData | undefined) ?? EMPTY_DATA;
+    (routeState().route.context.data as UsersListData | undefined) ??
+    EMPTY_DATA;
 
   return (
     <div>
