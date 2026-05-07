@@ -61,17 +61,25 @@ Build time:
         → final 8 paths to render
     → For each URL:
         fetch(http://localhost:4174/<url>) → HTML via AngularNodeAppEngine
+        # During the in-process server pass, provideRealRouterFactory's
+        # TransferState bridge (#599) writes serializeRouterState(state)
+        # into TransferState; @angular/ssr embeds it as
+        # <script id="ng-state" type="application/json">…</script>
+        # in the response body.
         → injectMeta(html, getMetaForState(state)) — per-page <title> + <meta description>
-        → writeFileSync(dist/.../browser/<url>/index.html)
+        → writeFileSync(dist/.../browser/<url>/index.html) — HTML carries the seeded ng-state
     → fetch /__nonexistent → write dist/.../browser/404.html
     → write sitemap.xml
     → process.exit(0) — terminates in-process listener
 
 Runtime (post-build, served by sirv):
   GET /users/1 → sirv → dist/.../browser/users/1/index.html
-    → static HTML loads in browser
+    → static HTML loads in browser (carries the prerender-time <script id="ng-state">)
     → main.js loads, bootstrapApplication runs
     → provideRealRouterFactory creates client router (browser-plugin + ssr-data-plugin)
+    → provideAppInitializer reads TransferState seed → calls
+      hydrateRouter(router, ssrJson) → ssr-data-plugin reuses build-time
+      state.context.data, loader is NOT re-invoked on first paint (#599)
     → provideClientHydration claims server-rendered DOM
     → No flash, no mismatch
 ```

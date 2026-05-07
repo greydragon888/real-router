@@ -19,7 +19,7 @@ Server-side rendering with Real-Router, Angular 21, `@angular/ssr` (`AngularNode
   - `users.profile` throws `LoaderNotFound` for ids that don't exist → server returns 404 (vs `UNKNOWN_ROUTE` which is a 200 + NotFound page via `allowNotFound: true`).
   - `users.profile.posts` does the same — leaf loader re-validates the parent user id, so `/users/9999/posts` also surfaces as 404 (verified by `e2e/ssr.spec.ts:474-480`).
   - `legacyUser` (`/legacy-user/:id`) throws `LoaderRedirect("/users/:id", 301)` — demonstrates the canonical-URL pattern (Next.js-style `redirect()` from a loader).
-  - `slow` (`/slow`) demonstrates `withTimeout()` — the loader sleeps 5 s but is wrapped in a 250 ms budget, so the server responds 504 Gateway Timeout instead of hanging an SSR worker.
+  - `slow` (`/slow`) demonstrates `withTimeout()` (#598) — the loader fetches `/__bench/slow-fetch` (a 5 s endpoint instrumented to count client-side aborts) with the composed `AbortSignal` that `withTimeout` passes in. The 250 ms deadline elapses well before the fetch can complete; `withTimeout` aborts the signal *before* rejecting with `LoaderTimeout`, so the upstream `fetch` is cancelled at the network layer (server's `req.on("close")` fires) and the SSR worker is freed. Server returns 504 Gateway Timeout. Verified by `withTimeout (#598) network cancellation` e2e.
 - **Client-side navigation** — after hydration, `@real-router/browser-plugin` handles SPA navigation through `realLink` directive.
 - **Incremental hydration + event replay** — `provideClientHydration(withIncrementalHydration(), withEventReplay())`. Event replay captures clicks/keydowns issued before a block hydrates and replays them once the component takes over. Critical for streaming SSR UX where the user can interact with placeholders before their JS arrives.
 - **Mixed `RenderMode`** — `app.routes.server.ts` maps `/marketing` to `RenderMode.Client` (CSR shell, identical bytes for every visitor, content materialises after JS bootstrap) and `/live` to `RenderMode.Server` (fresh per-request render with timestamp proof). All other paths default to `RenderMode.Server`. See "Mixed RenderMode" section below for the trade-offs and the unsupported `RenderMode.Prerender` known limitation.
@@ -75,6 +75,10 @@ Server (per request, via AngularNodeAppEngine):
         DestroyRef.onDestroy(router.dispose)        # cleanup after response
     → provideAppInitializer:
         await router.start(request.url)             # loaders run, state.context.data populated
+        # TransferState bridge (#599):
+        # transferState.set(ROUTER_STATE_KEY, serializeRouterState(state))
+        # The serialized state ends up in <script id="ng-state"> in the response
+        # body; the matching client run consumes it via hydrateRouter(...).
     → AppComponent renders
         <route-view> reads route.routeState() signal
         Pages read state.context.data via injectRoute()
