@@ -39,7 +39,7 @@ The middle one is **Preact-only**: React 19's `react-dom/server` has no sync-wit
 
 | Pipeline | `Cache-Control` | `ETag` | `AbortController` |
 |---|---|---|---|
-| `ssr/` (renderToStringAsync) | per-route | strong sha256 (16 base64url chars) | threaded into loader DI via `cloneRouter(base, { abortSignal })`; `slow` loader pulls via `getDep("abortSignal")` and clears its `setTimeout` |
+| `ssr/` (renderToStringAsync) | per-route | strong sha256 (16 base64url chars) | threaded into loader DI via `cloneRouter(base, { abortSignal })`; `slow` loader pulls via `getDep("abortSignal")` and forwards as `withTimeout(..., { upstreamSignal })` (#598) — composed signal cancels upstream `fetch` on deadline or client disconnect |
 | `ssr-streaming/` (renderToReadableStream) | per-route, applies to streamed responses | not asserted (streamed body) | `cleanup()` runs in `finally` so router disposal never leaks |
 | `ssg/` (build-time) | per-route via `ssgServe()` Vite middleware | weak, derived from file mtime by Vite preview | not applicable (pre-rendered) |
 
@@ -59,7 +59,7 @@ Each item is categorised: **(framework-side)** — Preact 10 / `preact-render-to
 - **(framework-side) Async function components silently skip in `renderToReadableStream`.** Empirically: the renderer treats async returns as `undefined` and emits no markup. Documented in `ssr-streaming/README.md` "What's still beyond Preact 10" — do not use async function components in Preact 10 streaming pipelines.
 - **(framework-side) Selective hydration is partial.** Out-of-order streaming exists for `lazy()` boundaries via `<preact-island>` (since 6.6.x), but arbitrary `<Suspense>` boundaries do not get the same swap mechanism. Broader story is announced for v11.
 - **(framework-side) No React Server Components.** Preact does not implement RSC. The `ssr/` README states this explicitly; there is no `ssr-rsc/` example in this directory tree. See "Why no `ssr-rsc/`?" below.
-- **(framework-side) `withTimeout()` does not cancel underlying loader work.** It races a `LoaderTimeout` against the original promise but the slow loader keeps running. Pair with `AbortController` wiring (the `slow` loader in `ssr/` does both) for production. Trade-off explicitly called out in `ssr/README.md`.
+- **(framework-side) `withTimeout()` cancellation is cooperative.** When the deadline elapses, the loader's `{ signal }` aborts *before* the race rejects with `LoaderTimeout`; loaders that thread `signal` into their I/O actually cancel the underlying work. Loaders that don't propagate the signal still run to completion in the background. The `slow` loader in `ssr/` composes the deadline with `options.upstreamSignal` (client-disconnect from per-request DI).
 - **(design choice) `ssr-data-plugin` (boot-path) and `lifecycle-plugin onNavigate` (CSR navigation) split the lifecycle by phase, on purpose.** `ssr-data-plugin` intercepts `router.start()` — runs once during SSR; on the client, `hydrateRouter(router, ssrState)` deposits the parsed state into a one-shot scratchpad and the plugin reuses the server-resolved `state.context.data` directly (#596) instead of calling the loader again. CSR navigations via `<Link>` do NOT re-run its loader; that is `lifecycle-plugin.onNavigate`'s job, and the canonical CSR+SSR stack composes both plugins. Single-responsibility per plugin keeps SSG-only build scripts and pure-CSR SPAs from carrying interception code they don't use.
 
 ### Why no `ssr-rsc/`?

@@ -81,7 +81,7 @@ pnpm test:e2e     # Playwright
 
 Trade-offs:
 - The `404`/`504` bodies are plain text rather than the SSR-rendered NotFound page. Rendering a rich 404 would require a second `renderToString()` pass with a different URL — kept simple in this demo.
-- `withTimeout()` doesn't cancel the underlying loader work — only races the response. Pair with `AbortController` for production workloads.
+- `withTimeout()` cancellation is cooperative (#598): the loader receives `{ signal }` that aborts *before* the race rejects with `LoaderTimeout`, so loaders threading `signal` into their I/O actually cancel the work. The `slow` loader composes the deadline with `options.upstreamSignal` (client disconnect from per-request DI).
 
 ## Production HTTP semantics: ETag, Cache-Control, AbortController
 
@@ -89,7 +89,7 @@ Trade-offs:
 
 - **Strong `ETag`** — sha256 of the final HTML bytes, truncated to 16 base64url chars. Identical inputs yield identical hashes; conditional GET (`If-None-Match`) returns `304 Not Modified` with an empty body. Solid's home is static, so two consecutive GETs to `/` produce the same hash; `/users` and `/` produce distinct hashes (the test verifies content-derivation by route comparison).
 - **Per-route `Cache-Control`** — `src/router/cache-policies.ts` maps URL paths to directives: `/` → `public, max-age=300, s-maxage=3600, must-revalidate`, `/users` → `public, max-age=60, must-revalidate`, `/users/:id` → `public, max-age=120, must-revalidate`, `/dashboard` and `/admin` → `private, no-store`, `/slow`/`/boom`/`/async-page`/`/form` → `no-store`. (Note: `/legacy-user/:id` has a `public, max-age=86400` policy declared, but Express `response.redirect()` short-circuits before `Cache-Control` is set — the directive is documented in `cache-policies.ts` as a placeholder for future redirect-with-cache scenarios.)
-- **`AbortController` per request** — `req.on("close")` aborts the controller; the `slow` loader pulls the signal via `getDep("abortSignal")` and clears its `setTimeout`. Without this wiring a 5 s loader holds the worker even after the client gives up. The e2e suite verifies the server releases the handler within 1 s (well under the 5 s loader delay).
+- **`AbortController` per request** — `req.on("close")` aborts the controller; the `slow` loader pulls the signal via `getDep("abortSignal")` and forwards it as `withTimeout(..., { upstreamSignal })`; the composed signal aborts on either the 250 ms deadline or client disconnect, and `fetch(..., { signal })` propagates the abort to the network layer (#598). Without this wiring a 5 s upstream `fetch` would hold the worker even after the client gives up. The e2e suite verifies the server releases the handler within 1 s and asserts via `/__bench/abort-count` that the upstream fetch is cancelled at the network layer.
 
 These are demonstrated end-to-end by 4 dedicated tests in `e2e/ssr.spec.ts` (Cache-Control routing, 304 on identical content, distinct routes → distinct hashes, AbortController fast release).
 

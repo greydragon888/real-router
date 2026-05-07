@@ -29,8 +29,8 @@ export interface UserPostsData {
 }
 
 const PROFILE_TIMEOUT_MS = 1500;
-const SLOW_LOADER_DELAY_MS = 5000;
 const SLOW_LOADER_TIMEOUT_MS = 250;
+const SLOW_FETCH_URL = "http://localhost:3000/__bench/slow-fetch";
 
 export const loaders: DataLoaderFactoryMap = {
   users: () => (params) => {
@@ -79,32 +79,28 @@ export const loaders: DataLoaderFactoryMap = {
   // translate the error into a 500 response with an error page.
   boom: () => () => Promise.reject(new Error("Loader exploded for /boom")),
 
-  // The `slow` loader pulls an `abortSignal` from per-request deps and
-  // races against a 250 ms withTimeout — for full requests (no abort)
-  // the timeout wins and surfaces as 504 Gateway Timeout. For client-
-  // disconnect requests, the signal aborts first and the loader cleans
-  // up its setTimeout (no leak).
-  slow: (_router, getDep) => () =>
-    withTimeout("slow", SLOW_LOADER_TIMEOUT_MS, () => {
-      const signal = (
-        getDep as unknown as (key: string) => AbortSignal | undefined
-      )("abortSignal");
+  // The `slow` loader makes a real HTTP fetch to /__bench/slow-fetch,
+  // which is instrumented to count client-side aborts (server/index.ts).
+  // The composed AbortSignal from withTimeout (#598) fires on the 250 ms
+  // deadline OR on client disconnect (upstreamSignal from the per-request
+  // deps), and `fetch(..., { signal })` propagates the abort to the
+  // network layer — the e2e test asserts that the bench counter ticks
+  // up when the deadline elapses, proving fetch is actually cancelled.
+  slow: (_router, getDep) => () => {
+    const upstreamSignal = (
+      getDep as unknown as (key: string) => AbortSignal | undefined
+    )("abortSignal");
 
-      return new Promise<{ message: string }>((resolve, reject) => {
-        const id = setTimeout(() => {
-          resolve({ message: "this should never be seen" });
-        }, SLOW_LOADER_DELAY_MS);
-
-        signal?.addEventListener(
-          "abort",
-          () => {
-            clearTimeout(id);
-            reject(new Error("Aborted: client disconnected"));
-          },
-          { once: true },
-        );
-      });
-    }),
+    return withTimeout(
+      "slow",
+      SLOW_LOADER_TIMEOUT_MS,
+      async ({ signal }) => {
+        const response = await fetch(SLOW_FETCH_URL, { signal });
+        return (await response.json()) as { message: string };
+      },
+      { upstreamSignal },
+    );
+  },
 
   // Per-route SSR mode (#597): `ssr: false` aliases to `"client-only"`.
   // Server skips this entry's loader; mode marker is published to

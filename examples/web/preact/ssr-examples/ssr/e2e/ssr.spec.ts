@@ -473,15 +473,10 @@ test.describe("Preact SSR — smoke", () => {
   test("AbortSignal propagation: client disconnect cancels slow loader (signal observable)", async ({
     page,
   }) => {
-    // Slow loader sleeps 5s but races against 250ms withTimeout AND
-    // listens on getDep("abortSignal"). When the client gives up
-    // mid-flight, server must observe abort and clearTimeout — not
-    // hold the worker for 5s.
-    //
-    // Playwright path: use page.goto with a short navigation timeout,
-    // then ensure server logs no errors AFTER the client gave up.
-    // (We can't directly observe server cleanup from the client, but
-    // we can assert wall-clock < full delay.)
+    // Slow loader fetches /__bench/slow-fetch with the composed
+    // AbortSignal from withTimeout (#598). When the client gives up
+    // mid-flight, the upstream signal aborts → composed signal aborts
+    // → fetch rejects, server-side worker is freed (no 5 s hang).
     const start = Date.now();
     try {
       await page.goto("/slow", { timeout: 600 });
@@ -489,9 +484,30 @@ test.describe("Preact SSR — smoke", () => {
       // Timeout: page nav aborted by playwright; signal fires server-side.
     }
     const elapsed = Date.now() - start;
-    // Wait a bit for server to process the abort, then verify timing
-    // came back well under the 5s slow-loader delay.
     expect(elapsed).toBeLessThan(2000);
+  });
+
+  test.describe.serial("withTimeout (#598) network cancellation", () => {
+    test("fetch inside withTimeout-wrapped loader is cancelled at the network layer when the deadline elapses", async ({
+      request,
+    }) => {
+      const before = (await (
+        await request.get("/__bench/abort-count")
+      ).json()) as { abortObserved: number };
+
+      const response = await request.get("/slow");
+      expect(response.status()).toBe(504);
+
+      await new Promise<void>((resolve) => setTimeout(resolve, 200));
+
+      const after = (await (
+        await request.get("/__bench/abort-count")
+      ).json()) as { abortObserved: number };
+
+      expect(after.abortObserved).toBeGreaterThanOrEqual(
+        before.abortObserved + 1,
+      );
+    });
   });
 
   // -------- Preact-unique: renderToStringAsync single-shot async SSR -------- //

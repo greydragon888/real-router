@@ -883,6 +883,29 @@ test.describe("SSR (Angular)", () => {
     expect(elapsed).toBeLessThan(1000);
   });
 
+  test.describe.serial("withTimeout (#598) network cancellation", () => {
+    test("fetch inside withTimeout-wrapped loader is cancelled at the network layer when the deadline elapses", async ({
+      request,
+    }) => {
+      const before = (await (
+        await request.get("/__bench/abort-count")
+      ).json()) as { abortObserved: number };
+
+      const response = await request.get("/slow");
+      expect(response.status()).toBe(504);
+
+      await new Promise<void>((resolve) => setTimeout(resolve, 200));
+
+      const after = (await (
+        await request.get("/__bench/abort-count")
+      ).json()) as { abortObserved: number };
+
+      expect(after.abortObserved).toBeGreaterThanOrEqual(
+        before.abortObserved + 1,
+      );
+    });
+  });
+
   // NOTE: per-route SSR mode (#597) is exercised by the `widget` route in
   // routes.ts + loaders.ts (`{ ssr: false }`). The plugin correctly resolves
   // mode and skips the loader on the server, but Angular SSR does not

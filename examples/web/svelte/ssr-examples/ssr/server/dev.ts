@@ -26,6 +26,23 @@ async function startServer(): Promise<void> {
 
   app.use(vite.middlewares);
 
+  // /__bench/* — instrumentation for the #598 e2e test (mirror of server/index.ts).
+  let abortObserved = 0;
+  app.get("/__bench/slow-fetch", (request, response) => {
+    const timer = setTimeout(() => {
+      response.json({ ok: true });
+    }, 5000);
+    request.on("close", () => {
+      if (!response.writableEnded) {
+        clearTimeout(timer);
+        abortObserved += 1;
+      }
+    });
+  });
+  app.get("/__bench/abort-count", (_request, response) => {
+    response.json({ abortObserved });
+  });
+
   app.get("/{*path}", async (request, response) => {
     const url = request.originalUrl;
 

@@ -1123,6 +1123,29 @@ test.describe("SSR (Solid)", () => {
     expect(elapsed).toBeLessThan(1000);
   });
 
+  test.describe.serial("withTimeout (#598) network cancellation", () => {
+    test("fetch inside withTimeout-wrapped loader is cancelled at the network layer when the deadline elapses", async ({
+      request,
+    }) => {
+      const before = (await (
+        await request.get("/__bench/abort-count")
+      ).json()) as { abortObserved: number };
+
+      const response = await request.get("/slow");
+      expect(response.status()).toBe(504);
+
+      await new Promise<void>((resolve) => setTimeout(resolve, 200));
+
+      const after = (await (
+        await request.get("/__bench/abort-count")
+      ).json()) as { abortObserved: number };
+
+      expect(after.abortObserved).toBeGreaterThanOrEqual(
+        before.abortObserved + 1,
+      );
+    });
+  });
+
   test("per-route SSR mode (#597): client-only entry skips loader", async ({
     page,
   }) => {

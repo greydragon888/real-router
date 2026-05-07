@@ -169,12 +169,24 @@ import {
 } from "@real-router/ssr-data-plugin/errors";
 
 const loaders: DataLoaderFactoryMap = {
-  "users.profile": () => (params) =>
-    withTimeout("users.profile", 250, async () => {
-      const user = await fetchUser(params.id);
-      if (!user) throw new LoaderNotFound(`user:${params.id}`);
-      return { user };
-    }),
+  "users.profile": (_router, getDep) => (params) => {
+    const upstreamSignal = (
+      getDep as unknown as (k: string) => AbortSignal | undefined
+    )("abortSignal");
+
+    return withTimeout(
+      "users.profile",
+      250,
+      async ({ signal }) => {
+        // signal aborts on the 250 ms deadline OR on client disconnect
+        // (upstream); fetch propagates the abort to the network layer.
+        const user = await fetchUser(params.id, { signal });
+        if (!user) throw new LoaderNotFound(`user:${params.id}`);
+        return { user };
+      },
+      { upstreamSignal },
+    );
+  },
   "users.legacy": () => (params) => {
     throw new LoaderRedirect(`/users/${params.id}`, 301);
   },

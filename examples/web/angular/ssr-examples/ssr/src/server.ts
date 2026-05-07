@@ -19,6 +19,28 @@ const angularApp = new AngularNodeAppEngine();
 
 app.disable("x-powered-by");
 
+// /__bench/* — instrumentation for the #598 e2e test. Loader fetches
+// /__bench/slow-fetch with the AbortSignal that withTimeout passes in;
+// the deadline (250 ms) elapses well before the endpoint responds (5 s),
+// so the fetch is aborted at the network layer. req.on("close") here
+// observes the disconnect and increments the counter exposed via
+// /__bench/abort-count. Registered BEFORE the catch-all Angular handler.
+let abortObserved = 0;
+app.get("/__bench/slow-fetch", (request, response) => {
+  const timer = setTimeout(() => {
+    response.json({ ok: true });
+  }, 5000);
+  request.on("close", () => {
+    if (!response.writableEnded) {
+      clearTimeout(timer);
+      abortObserved += 1;
+    }
+  });
+});
+app.get("/__bench/abort-count", (_request, response) => {
+  response.json({ abortObserved });
+});
+
 app.use(
   express.static(browserDistFolder, {
     maxAge: "1y",

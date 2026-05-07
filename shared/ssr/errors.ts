@@ -50,28 +50,74 @@ export class LoaderTimeout extends Error {
 }
 
 /**
- * Race a loader against a deadline. Resolves with the loader's value if it
- * settles first, otherwise rejects with `LoaderTimeout`. The timer is
- * cleared via `.finally()` on the work promise so a fast-path success
- * does not leak the `setTimeout` handle.
+ * Race a loader against a deadline, with cooperative cancellation.
+ *
+ * The loader is invoked with `{ signal }` — a composed `AbortSignal` that
+ * aborts on the first of:
+ * - the deadline elapsing (`internalController.abort()` fires synchronously
+ *   *before* the race rejects with `LoaderTimeout`, so a loader that
+ *   threads `signal` into its I/O — e.g. `fetch(url, { signal })` — can
+ *   actually cancel the underlying work);
+ * - `options.upstreamSignal` aborting (typically the request-scoped abort
+ *   wired by `cloneRouter(base, { abortSignal })` for client-disconnect).
+ *
+ * Composition uses `AbortSignal.any([upstream, internal])` (Node 20.3+).
+ * If `upstreamSignal` is already aborted at call time, the loader is *not*
+ * invoked and the timer is *not* started — the rejection mirrors
+ * `upstreamSignal.reason ?? new DOMException("Aborted", "AbortError")`.
+ *
+ * On deadline, the same `LoaderTimeout` instance is used as both the
+ * `signal.reason` and the rejection reason — they refer to one object.
+ * On upstream abort during execution, the race rejects with the loader's
+ * own error (typically `AbortError`), *not* `LoaderTimeout`.
+ *
+ * Cancellation is cooperative: loaders that don't propagate `signal` into
+ * their I/O still run to completion in the background — the race result
+ * is unaffected, but resources are not freed early.
+ *
+ * The `setTimeout` handle is cleared via `.finally()` on the work promise
+ * so a fast-path success doesn't leak it. `Promise.race`'s internal
+ * `Promise.resolve(p).then(resolve, reject)` consumes any late losing
+ * rejection — no `unhandledRejection` for late loader settlements.
+ *
+ * Requires Node 20.3+ for `AbortSignal.any`.
  */
 export function withTimeout<T>(
   routeName: string,
   ms: number,
-  loader: () => Promise<T>,
+  loader: (deps: { signal: AbortSignal }) => Promise<T>,
+  options?: { upstreamSignal?: AbortSignal | null },
 ): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
+  const upstream = options?.upstreamSignal;
 
-  const work = (async () => loader())().finally(() => {
+  if (upstream?.aborted) {
+    // `signal.reason` is normally set automatically by the spec
+    // (`controller.abort()` without an argument yields a `DOMException`),
+    // but the field is writable, so we fall back to a fresh `AbortError`
+    // if some caller produced an aborted signal with `reason === undefined`.
+    return Promise.reject(
+      upstream.reason ??
+        new DOMException("The operation was aborted.", "AbortError"),
+    );
+  }
+
+  const internal = new AbortController();
+  const composed = upstream
+    ? AbortSignal.any([upstream, internal.signal])
+    : internal.signal;
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    timer = setTimeout(() => {
+      const error = new LoaderTimeout(routeName, ms);
+      internal.abort(error);
+      reject(error);
+    }, ms);
+  });
+
+  const work = (async () => loader({ signal: composed }))().finally(() => {
     if (timer !== undefined) clearTimeout(timer);
   });
 
-  return Promise.race<T>([
-    work,
-    new Promise<T>((_, reject) => {
-      timer = setTimeout(() => {
-        reject(new LoaderTimeout(routeName, ms));
-      }, ms);
-    }),
-  ]);
+  return Promise.race<T>([work, timeoutPromise]);
 }

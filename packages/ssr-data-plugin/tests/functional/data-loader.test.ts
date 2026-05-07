@@ -4,6 +4,7 @@ import { hydrateRouter, serializeRouterState } from "@real-router/core/utils";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { getSsrDataMode, ssrDataPluginFactory } from "../../src";
+import { LoaderTimeout, withTimeout } from "../../src/errors";
 
 import type { DataLoaderFactoryMap, SsrMode } from "../../src";
 import type { Router, State } from "@real-router/core";
@@ -959,6 +960,158 @@ describe("@real-router/ssr-data-plugin", () => {
       const mode: SsrMode | undefined = state.context.ssrDataMode;
 
       expect(mode).toBe("data-only");
+    });
+  });
+
+  describe("withTimeout (#598)", () => {
+    it("invokes the loader with { signal: AbortSignal }", async () => {
+      let received: AbortSignal | undefined;
+
+      const value = await withTimeout("r", 1000, ({ signal }) => {
+        received = signal;
+
+        return Promise.resolve(42);
+      });
+
+      expect(value).toBe(42);
+      expect(received).toBeInstanceOf(AbortSignal);
+      expect(received?.aborted).toBe(false);
+    });
+
+    it("aborts the signal before the race rejects on timeout", async () => {
+      const abortSpy = vi.fn();
+      let signalRef: AbortSignal | undefined;
+
+      const promise = withTimeout(
+        "slow",
+        20,
+        ({ signal }) =>
+          new Promise<never>((_, reject) => {
+            signalRef = signal;
+            signal.addEventListener("abort", () => {
+              abortSpy();
+              reject(new Error("loader-saw-abort"));
+            });
+          }),
+      );
+
+      await expect(promise).rejects.toBeInstanceOf(LoaderTimeout);
+
+      expect(abortSpy).toHaveBeenCalledTimes(1);
+      expect(signalRef?.aborted).toBe(true);
+      expect(signalRef?.reason).toBeInstanceOf(LoaderTimeout);
+    });
+
+    it("fail-fasts when upstreamSignal is already aborted (no loader, no timer)", async () => {
+      vi.useFakeTimers();
+      try {
+        const upstream = new AbortController();
+
+        upstream.abort(new Error("pre-aborted"));
+
+        const loaderSpy = vi.fn();
+
+        await expect(
+          withTimeout("r", 1000, loaderSpy, {
+            upstreamSignal: upstream.signal,
+          }),
+        ).rejects.toThrow("pre-aborted");
+
+        expect(loaderSpy).not.toHaveBeenCalled();
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("upstream wins composed race (rejects with loader's error, not LoaderTimeout)", async () => {
+      const upstream = new AbortController();
+
+      const promise = withTimeout(
+        "r",
+        5000,
+        ({ signal }) =>
+          new Promise<never>((_, reject) => {
+            signal.addEventListener("abort", () => {
+              reject(new DOMException("aborted-by-upstream", "AbortError"));
+            });
+          }),
+        { upstreamSignal: upstream.signal },
+      );
+
+      setTimeout(() => {
+        upstream.abort();
+      }, 20);
+
+      await expect(promise).rejects.toMatchObject({
+        name: "AbortError",
+        message: "aborted-by-upstream",
+      });
+    });
+
+    it("timeout wins composed race (LoaderTimeout) when upstream stays alive", async () => {
+      const upstream = new AbortController();
+
+      const promise = withTimeout(
+        "r",
+        20,
+        ({ signal }) =>
+          new Promise<never>((_, reject) => {
+            signal.addEventListener("abort", () => {
+              reject(new Error("loader-saw-abort"));
+            });
+          }),
+        { upstreamSignal: upstream.signal },
+      );
+
+      await expect(promise).rejects.toBeInstanceOf(LoaderTimeout);
+      expect(upstream.signal.aborted).toBe(false);
+    });
+
+    it("clears the timer when the loader settles early (no setTimeout leak)", async () => {
+      vi.useFakeTimers();
+      try {
+        let timersAfterSettle = -1;
+
+        const promise = withTimeout("r", 10_000, () => Promise.resolve("ok"));
+
+        await promise.then(() => {
+          timersAfterSettle = vi.getTimerCount();
+        });
+
+        expect(timersAfterSettle).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("does not produce unhandledRejection when the loader settles late", async () => {
+      const unhandled: unknown[] = [];
+      const onUnhandled = (err: unknown) => unhandled.push(err);
+
+      process.on("unhandledRejection", onUnhandled);
+
+      try {
+        const promise = withTimeout(
+          "r",
+          20,
+          () =>
+            new Promise<never>((_, reject) => {
+              setTimeout(() => {
+                reject(new Error("late-loader-rejection"));
+              }, 100);
+            }),
+        );
+
+        await expect(promise).rejects.toBeInstanceOf(LoaderTimeout);
+
+        // Wait long enough for the loader's late rejection to settle.
+        await new Promise<void>((resolve) => setTimeout(resolve, 150));
+
+        expect(unhandled).toHaveLength(0);
+      } finally {
+        process.off("unhandledRejection", onUnhandled);
+      }
     });
   });
 });

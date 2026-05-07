@@ -104,7 +104,7 @@ Demonstrated routes: `/users/9999` (404), `/legacy-user/:id` → `/users/:id` (3
 
 - **Strong `ETag`** — sha256 of the final HTML bytes, truncated to 16 base64url chars. Conditional GET (`If-None-Match`) returns `304 Not Modified` with empty body.
 - **Per-route `Cache-Control`** — `src/router/cache-policies.ts` maps URL paths to directives. Auth-private paths get `private, no-store`; public paths get long max-age + s-maxage.
-- **`AbortController` per request** — `req.on("close")` aborts the controller; the `slow` loader pulls the signal via `getDep("abortSignal")` and clears its `setTimeout`. Without this wiring, a 5 s loader holds the worker even after the client gives up.
+- **`AbortController` per request** — `req.on("close")` aborts the controller; the `slow` loader pulls the signal via `getDep("abortSignal")` and forwards it as `withTimeout(..., { upstreamSignal })`; the composed signal aborts on either the 250 ms deadline or client disconnect, and `fetch(..., { signal })` propagates the abort to the network layer (#598). Without this wiring a 5 s upstream `fetch` would hold the worker even after the client gives up.
 
 ## Running
 

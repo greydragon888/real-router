@@ -101,7 +101,7 @@ Demonstrated routes:
 - `/legacy-user/:id` → `LoaderRedirect(\`/users/${id}\`, 301)` → 301 + Location (target is interpolated from params, not a template)
 - `/slow` → 5 s loader behind a 250 ms `withTimeout()` race → `LoaderTimeout` → 504
 
-Trade-offs: `withTimeout()` doesn't cancel the underlying loader work — only races the response. Pair with the `AbortController` wiring (next section) for production. The `slow` loader does both.
+`withTimeout()` cancellation is cooperative (#598). When the deadline elapses, the loader's `{ signal }` aborts *before* the race rejects with `LoaderTimeout`, so loader I/O honoring the signal — e.g. `fetch(url, { signal })` — actually cancels at the network layer (proven by the `withTimeout (#598) network cancellation` e2e). The `slow` loader composes the deadline with `options.upstreamSignal` (client disconnect) — composed signal aborts on whichever fires first.
 
 ## Auth + role gates
 
@@ -118,7 +118,7 @@ Two layers of authorization, demonstrated end-to-end:
 
 - **Strong `ETag`** — sha256 of the final HTML bytes, truncated to 16 base64url chars. Identical inputs yield identical hashes; conditional GET (`If-None-Match`) returns `304 Not Modified` with an empty body. Distinct routes yield distinct ETags.
 - **Per-route `Cache-Control`** — `src/router/cache-policies.ts` maps URL paths to directives: `/` → `public, max-age=300, s-maxage=3600, must-revalidate`, `/users` → `public, max-age=60, must-revalidate`, `/users/:id` → `public, max-age=120, must-revalidate`, `/dashboard` and `/admin` → `private, no-store`, `/slow`/`/boom` → `no-store`.
-- **`AbortController` per request** — `req.on("close")` aborts the controller; `entry-server.tsx:91-95` forwards the signal into the per-request DI map via `cloneRouter(baseRouter, { currentUser, abortSignal })`. The `slow` loader retrieves it through `getDep("abortSignal")` and clears its `setTimeout`. Without this wiring a 5 s loader holds the worker even after the client gives up.
+- **`AbortController` per request** — `req.on("close")` aborts the controller; `entry-server.tsx:91-95` forwards the signal into the per-request DI map via `cloneRouter(baseRouter, { currentUser, abortSignal })`. The `slow` loader retrieves it through `getDep("abortSignal")` and forwards it as `withTimeout(..., { upstreamSignal })`; the resulting composed signal aborts on either the 250 ms deadline or client disconnect, and `fetch(..., { signal })` propagates the abort to the network layer (#598). Without this wiring a 5 s upstream `fetch` would hold the worker even after the client gives up.
 
 Demonstrated by 4 dedicated tests in `e2e/ssr.spec.ts`.
 

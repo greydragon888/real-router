@@ -789,10 +789,12 @@ test.describe("SSR", () => {
   test("AbortController: client disconnect mid-render fires the slow loader's abort listener", async ({
     request,
   }) => {
-    // /slow loader sleeps 5 s but registers an abort listener via
-    // getDep("abortSignal"). server/index.ts attaches the controller
-    // to req.on("close") — when the client gives up before the
-    // response, the loader cleans up its setTimeout and rejects.
+    // /slow loader fetches /__bench/slow-fetch (5 s) with a composed
+    // AbortSignal that includes the per-request upstream signal.
+    // server/index.ts attaches the controller to req.on("close") —
+    // when the client gives up before the response, upstream aborts,
+    // the composed signal aborts, the fetch rejects, withTimeout
+    // returns the loader's error.
     const startedAt = Date.now();
     let aborted = false;
 
@@ -806,5 +808,37 @@ test.describe("SSR", () => {
 
     expect(aborted).toBe(true);
     expect(elapsed).toBeLessThan(1000);
+  });
+
+  test.describe.serial("withTimeout (#598) network cancellation", () => {
+    test("fetch inside withTimeout-wrapped loader is cancelled at the network layer when the deadline elapses", async ({
+      request,
+    }) => {
+      // /slow loader fetches /__bench/slow-fetch (5 s) with the signal
+      // that withTimeout passes in. The 250 ms deadline elapses well
+      // before the fetch can complete; withTimeout aborts its internal
+      // signal *before* rejecting with LoaderTimeout, so fetch is
+      // cancelled at the network layer. /__bench/slow-fetch's
+      // req.on("close") observes the disconnect and increments the
+      // counter, which we read through /__bench/abort-count.
+      const before = (await (
+        await request.get("/__bench/abort-count")
+      ).json()) as { abortObserved: number };
+
+      const response = await request.get("/slow");
+      expect(response.status()).toBe(504);
+
+      // Server's req.on("close") fires asynchronously after the response
+      // ends — give it a moment to settle.
+      await new Promise<void>((resolve) => setTimeout(resolve, 200));
+
+      const after = (await (
+        await request.get("/__bench/abort-count")
+      ).json()) as { abortObserved: number };
+
+      expect(after.abortObserved).toBeGreaterThanOrEqual(
+        before.abortObserved + 1,
+      );
+    });
   });
 });
