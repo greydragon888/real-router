@@ -43,7 +43,11 @@ pnpm test:e2e # Playwright assertions on each mode's HTTP response
   these routes must redirect to a separate Angular-rendered URL or boot a
   CSR-only entry — out of scope for this dogfooding example.
 - For `"full"` mode Angular's `provideClientHydration(withIncrementalHydration())`
-  works as in the canonical `ssr/` example.
+  works as in the canonical `ssr/` example, **including the post-hydration
+  loader skip via the TransferState bridge (#599)** — verified by the
+  `post-hydration loader skip (#599)` e2e test in `e2e/ssr-mixed.spec.ts`
+  (`window.__LOADER_CALLS__` stays empty after navigation to `/`, the only
+  short-form-loader full-mode route in this example).
 
 See [Data-Loading](https://github.com/greydragon888/real-router/wiki/Data-Loading)
 in the wiki for the full per-route mode reference.

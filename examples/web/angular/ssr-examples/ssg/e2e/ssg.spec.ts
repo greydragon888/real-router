@@ -490,4 +490,29 @@ test.describe("SSG (Angular)", () => {
       '<link rel="canonical" href="https://example.com/users/1" />',
     );
   });
+
+  test("post-hydration loader skip (#599): SSG-prerendered HTML carries TransferState seed; client skips loader on hydration", async ({
+    page,
+  }) => {
+    // SSG generates static HTML at build time via in-process AngularNodeAppEngine
+    // (scripts/ssg-build.ts). Each prerendered page contains
+    // `<script id="ng-state" type="application/json">…</script>` with the
+    // SSR-resolved router state — written by provideRealRouterFactory's
+    // TransferState bridge (#599) during the build pass. On client hydration,
+    // the same bridge consumes the seed via hydrateRouter(...) and ssr-data-plugin
+    // reuses the server-resolved state.context.data — counter stays empty.
+    await page.goto("/users/1");
+    await page.waitForLoadState("networkidle");
+
+    const counts = await page.evaluate(
+      () =>
+        (
+          globalThis as unknown as Window & {
+            __LOADER_CALLS__?: Record<string, number>;
+          }
+        ).__LOADER_CALLS__,
+    );
+
+    expect(counts).toEqual({});
+  });
 });

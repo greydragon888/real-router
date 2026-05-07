@@ -87,4 +87,28 @@ test.describe("ssr-mixed: per-route SSR mode (Angular)", () => {
     expect(pdfState.context.data).toBeUndefined();
     expect(pdfBody).toContain('data-ssr-mode="client-only"');
   });
+
+  test("post-hydration loader skip (#599): home (full mode) — TransferState bridge skips client-side loader", async ({
+    page,
+  }) => {
+    // Home is the only route in this example with a short-form loader factory
+    // routed through the full Angular SSR pipeline (other routes use object-form
+    // entries with explicit ssr modes; "client-only"/"data-only" shells bypass
+    // Angular bootstrap on the server entirely). The TransferState bridge in
+    // provideRealRouterFactory writes the SSR-resolved state on the server pass;
+    // the client bootstrap consumes it via hydrateRouter(...) — counter stays empty.
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+
+    const counts = await page.evaluate(
+      () =>
+        (
+          globalThis as unknown as Window & {
+            __LOADER_CALLS__?: Record<string, number>;
+          }
+        ).__LOADER_CALLS__,
+    );
+
+    expect(counts).toEqual({});
+  });
 });
