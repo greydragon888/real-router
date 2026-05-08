@@ -153,7 +153,7 @@ describe("useRouteNode", () => {
       expect(result().previousRoute?.params).toStrictEqual({ id: "1" });
     });
 
-    it("should handle reload option correctly", async () => {
+    it("should fire a fresh snapshot on reload (#605, transition.reload bypasses dedupe)", async () => {
       const { result } = renderHook(() => useRouteNode("users"), {
         wrapper: wrapper(router),
       });
@@ -165,8 +165,12 @@ describe("useRouteNode", () => {
 
       await router.navigate("users.list", {}, { reload: true });
 
+      // Reload is the user's explicit non-idempotent signal — observers
+      // see fresh refs so they react to context changes (e.g. data
+      // refreshed by `invalidate(router, "data")` + reload).
       expect(result().route?.name).toBe("users.list");
-      expect(result().route).toBe(initialRoute);
+      expect(result().route).not.toBe(initialRoute);
+      expect(result().route?.path).toBe(initialRoute?.path);
     });
   });
 

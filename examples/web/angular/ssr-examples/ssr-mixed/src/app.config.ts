@@ -45,10 +45,10 @@ function withLoaderCounter(map: DataLoaderFactoryMap): DataLoaderFactoryMap {
     const factory = entry as DataLoaderFnFactory;
     wrapped[routeName] = ((router, getDep) => {
       const inner = factory(router, getDep);
-      return (params) => {
+      return (params, ctx) => {
         win.__LOADER_CALLS__![routeName] =
           (win.__LOADER_CALLS__![routeName] ?? 0) + 1;
-        return inner(params);
+        return inner(params, ctx);
       };
     }) satisfies DataLoaderFnFactory;
   }

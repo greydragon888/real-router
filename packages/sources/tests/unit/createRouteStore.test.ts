@@ -89,17 +89,67 @@ describe("createRouteSources", () => {
     cleanup();
   });
 
-  it("stabilizeState skips update when both route and previousRoute paths unchanged", async () => {
+  it("stabilizeState skips update when navigation is idempotent (no reload, no path change)", async () => {
     const source = createRouteSource(router);
     const listener = vi.fn();
 
     source.subscribe(listener);
 
+    // Plain (non-reload) navigation to the same route is filtered by the
+    // router itself with SAME_STATES before reaching the source — caught
+    // here to keep the listener contract focused.
+    await expect(router.navigate("home")).rejects.toThrow();
+
+    expect(listener).toHaveBeenCalledTimes(0);
+  });
+
+  it("stabilizeState fires update on reload (#605, transition.reload bypasses dedupe)", async () => {
+    const source = createRouteSource(router);
+    const listener = vi.fn();
+
+    source.subscribe(listener);
+
+    // Reload is the user's explicit non-idempotent signal — every reload
+    // emits a fresh snapshot so observers see refreshed `state.context`
+    // (e.g. data refreshed by `invalidate(router, "data")` + reload).
     await router.navigate("home", {}, { reload: true });
 
     expect(listener).toHaveBeenCalledTimes(1);
 
     await router.navigate("home", {}, { reload: true });
+
+    expect(listener).toHaveBeenCalledTimes(2);
+  });
+
+  it("stabilizeState skips update when both route and previousRoute stabilize to prev (no reload, same paths)", async () => {
+    const source = createRouteSource(router);
+    const listener = vi.fn();
+
+    // Step 1: pre-fill source with route="/users" and previousRoute="/" by
+    // navigating before subscribe so the initial snapshot reflects post-nav.
+    await router.navigate("users");
+
+    source.subscribe(listener);
+
+    // Step 2: force-navigate to "/users" again — path unchanged. With my
+    // fix, transition.reload is unset → stabilizer returns prev for both
+    // route and previousRoute (matched paths). False branch hit, source
+    // listener NOT called.
+    await router.navigate("users", {}, { force: true } as Parameters<
+      typeof router.navigate
+    >[2]);
+
+    // After force-nav: prev.previousRoute had path "/" (initial), but
+    // next.previousRoute has path "/users". Paths differ → stabilizer
+    // returns next → update fires.
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    // Step 3: force-navigate again — now prev.previousRoute and
+    // next.previousRoute both have path "/users", and same for route.
+    // Both branches stabilize to prev → false branch hit.
+    await router.navigate("users", {}, { force: true } as Parameters<
+      typeof router.navigate
+    >[2]);
 
     expect(listener).toHaveBeenCalledTimes(1);
   });

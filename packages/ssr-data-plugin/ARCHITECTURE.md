@@ -21,24 +21,28 @@
 ```
 ssr-data-plugin/
 ├── src/
-│   ├── index.ts        — Public API (exports factory + types) + module augmentation
+│   ├── index.ts        — Public API (exports factory + invalidate + types) + module augmentation
 │   ├── factory.ts      — ssrDataPluginFactory: thin adapter over createSsrLoaderPlugin
+│   ├── invalidate.ts   — invalidate(router, "data"): typed wrapper over markStale
 │   ├── validation.ts   — validateLoaders = createLoadersValidator(ERROR_PREFIX)
 │   ├── types.ts        — DataLoaderFn, DataLoaderFnFactory, DataLoaderFactoryMap
 │   ├── constants.ts    — ERROR_PREFIX, LOGGER_CONTEXT
-│   └── shared-ssr/     — symlink → shared/ssr/ (contains the generic factory & validator)
+│   └── shared-ssr/     — symlink → shared/ssr/ (factory, validator, stale registry)
 ```
 
 ## Module Dependency Graph
 
 ```
 index.ts
-    └── factory.ts
-            ├── validation.ts
-            │       ├── shared-ssr/createLoadersValidator.ts
-            │       └── constants.ts
-            ├── shared-ssr/createSsrLoaderPlugin.ts
-            └── types.ts
+    ├── factory.ts
+    │       ├── validation.ts
+    │       │       ├── shared-ssr/createLoadersValidator.ts
+    │       │       └── constants.ts
+    │       ├── shared-ssr/createSsrLoaderPlugin.ts
+    │       │       └── shared-ssr/staleRegistry.ts (isStale + clearStale)
+    │       └── types.ts
+    └── invalidate.ts
+            └── shared-ssr/staleRegistry.ts (markStale)
 ```
 
 External dependencies:
@@ -54,10 +58,11 @@ The plugin's factory + validation logic lives in [`shared/ssr/`](../../shared/ss
 
 The shared module exports:
 
-- `createSsrLoaderPlugin<T, D>(loaders, { namespace, errorPrefix })` — generic factory implementing the validate-compile-loop + start-interceptor + claim/teardown pattern. Parameterised over loader return type `T` and dependency map `D`.
+- `createSsrLoaderPlugin<T, D>(loaders, { namespace, errorPrefix })` — generic factory implementing the validate-compile-loop + start-interceptor + subscribeLeave-handler + claim/teardown pattern. Parameterised over loader return type `T` and dependency map `D`.
 - `createLoadersValidator(errorPrefix)` — generic shape validator (non-null object → function values).
+- `markStale` / `isStale` / `clearStale` — per-router stale registry backing the `invalidate()` helper. WeakMap-keyed by router instance; `Set<string>` per router holds the stale namespaces.
 
-`@real-router/rsc-server-plugin` consumes the same helpers with a different namespace (`"rsc"`) and `T = ReactNode`. Because the shared logic is symlinked source (not a published package), bug fixes in one plugin's behaviour automatically apply to the other.
+`@real-router/rsc-server-plugin` consumes the same helpers with a different namespace (`"rsc"`) and `T = ReactNode`. Because the shared logic is symlinked source (not a published package), bug fixes in one plugin's behaviour automatically apply to the other. The stale registry is one shared `WeakMap` — but namespace isolation comes free from the Set value, so `invalidate(router, "data")` and `invalidate(router, "rsc")` operate independently.
 
 ## Factory Pattern
 
@@ -74,22 +79,26 @@ ssrDataPluginFactory(loaders)                ← factory.ts (~20 LOC)
                 │  Called by router.usePlugin():
                 │
                 ├── api = getPluginApi(router)
-                ├── claim = api.claimContextNamespace("data")
+                ├── dataClaim = api.claimContextNamespace("data")
+                ├── modeClaim = api.claimContextNamespace("ssrDataMode")
                 ├── try: compile factories → compiledLoaders Map
                 │       └── factory(router, getDependency) per entry
                 │       └── typeof check on each returned loader
-                │   catch: claim.release() + rethrow
-                ├── api.addInterceptor("start", ...)
-                │       └── claim.write(state, data)
+                │   catch: dataClaim.release() + modeClaim.release() + rethrow
+                ├── removeStartInterceptor = api.addInterceptor("start", ...)
+                │       └── scratchpad-hit OR await loader → dataClaim.write(state, data)
+                ├── removeLeaveListener = router.subscribeLeave(...)
+                │       └── peek isStale → await loader → clearStale + dataClaim.write
                 └── return { teardown }
-                        └── removeStartInterceptor() + claim.release()
+                        └── removeStartInterceptor() + removeLeaveListener()
+                            + dataClaim.release() + modeClaim.release()
 ```
 
 **Why a closure instead of a class?**
 
-- No mutable state — `claim` is the only binding, used for `write()` and `release()`
-- No cross-method coordination — the interceptor uses `claim.write()`, teardown uses `claim.release()`
-- Fewer files, fewer abstractions — proportional to the plugin's complexity
+- Bindings are write-once at construction (`dataClaim`, `modeClaim`, `compiledLoaders`, listener removers) — no instance state mutates after `usePlugin()` returns.
+- No cross-method coordination across instances — each binding is used by exactly one site (interceptor writes, teardown removes).
+- Fewer files, fewer abstractions — proportional to the plugin's complexity.
 
 ## Data Flow
 
@@ -113,6 +122,45 @@ router.start(url)
 ```
 
 The interceptor runs **after** route resolution. If guards block the navigation, `next()` rejects and the loader never runs.
+
+### subscribeLeave handler — CSR revalidation
+
+A second listener registered alongside the start interceptor consumes the per-router stale flag set by `invalidate(router, "data")`. Runs in the awaited LEAVE_APPROVE phase, so fresh data lands on `nextRoute.context` *before* `TRANSITION_SUCCESS` fires.
+
+```
+router.navigate(...) (any CSR navigation)
+        │
+        ▼
+  deactivation guards
+        │
+        ▼
+  sendLeaveApprove → awaitLeaveListeners
+        │
+        ▼
+  subscribeLeave handler
+        │
+        ├── isStale(router, "data")? no  → return (cheap WeakMap.get + Set.has)
+        │
+        ├── compiledLoaders.get(nextRoute.name)? none → return (flag preserved)
+        │
+        ├── modeClaim.write(nextRoute, mode)
+        │
+        ├── client-only / no-loader entry → return (flag preserved)
+        │
+        ├── data = await loader(nextRoute.params)
+        │
+        ├── signal.aborted? yes → return (flag preserved for the new nav)
+        │
+        ├── clearStale(router, "data")
+        └── dataClaim.write(nextRoute, data)
+        │
+        ▼
+  activation guards → completeTransition → TRANSITION_SUCCESS
+```
+
+**Peek-then-clear-after-write**: the flag is cleared only on a successful, non-cancelled loader write. This makes `invalidate()` survive every "non-refresh" outcome — no-entry hops, client-only mode, mode-only entries, cancellation by a newer navigation, and loader rejections all leave the flag for the next attempt.
+
+The flag itself lives in `shared/ssr/staleRegistry.ts` — a module-level `WeakMap<Router, Set<string>>` so per-router isolation comes free from WeakMap key identity (`cloneRouter()` clones get their own flag set).
 
 ### Accessing data
 
@@ -155,11 +203,17 @@ unsubscribe() or router.dispose()
         ├── removeStartInterceptor()
         │     └── array.splice — cannot throw
         │
-        └── claim.release()
-              └── releases "data" namespace, allowing other plugins to claim it
+        ├── removeLeaveListener()
+        │     └── array.splice on #leaveListeners — cannot throw
+        │
+        ├── dataClaim.release()
+        │     └── releases "data" namespace
+        │
+        └── modeClaim.release()
+              └── releases "ssrDataMode" namespace
 ```
 
-Both operations are synchronous and infallible. No try/catch needed (unlike `persistent-params-plugin` which calls `setRootPath` during teardown).
+All operations are synchronous and infallible. No try/catch needed (unlike `persistent-params-plugin` which calls `setRootPath` during teardown). The stale flag in the per-router `WeakMap` is **not** cleared on teardown — markStale entries are GC'd along with the router. A subsequent `usePlugin(ssrDataPluginFactory(...))` on the same router would inherit any pending flag (which is consistent with "the next refresh wins" semantics).
 
 ## Validation
 

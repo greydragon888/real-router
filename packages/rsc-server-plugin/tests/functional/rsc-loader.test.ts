@@ -3,7 +3,8 @@ import { cloneRouter, getPluginApi } from "@real-router/core/api";
 import { hydrateRouter, serializeRouterState } from "@real-router/core/utils";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { getSsrRscMode, rscServerPluginFactory } from "../../src";
+import { getSsrRscMode, invalidate, rscServerPluginFactory } from "../../src";
+import { markStale } from "../../src/shared-ssr";
 
 import type { RscLoaderFactoryMap, RscSsrMode } from "../../src";
 import type { Router, State } from "@real-router/core";
@@ -817,6 +818,518 @@ describe("@real-router/rsc-server-plugin", () => {
       const mode: RscSsrMode | undefined = state.context.ssrRscMode;
 
       expect(mode).toBe("client-only");
+    });
+  });
+
+  describe("invalidate(router, 'rsc') — CSR revalidation", () => {
+    it("re-runs RSC loader for the destination route on the next navigation after invalidate()", async () => {
+      const homeNode = node("HomePage", { v: 1 });
+      const listNode = node("UsersList", { v: 2 });
+
+      const homeLoader = vi.fn().mockResolvedValue(homeNode);
+      const listLoader = vi.fn().mockResolvedValue(listNode);
+
+      router.usePlugin(
+        rscServerPluginFactory({
+          home: () => homeLoader,
+          "users.list": () => listLoader,
+        }),
+      );
+
+      await router.start("/");
+
+      expect(homeLoader).toHaveBeenCalledTimes(1);
+      expect(listLoader).not.toHaveBeenCalled();
+
+      await router.navigate("users.list");
+
+      expect(listLoader).not.toHaveBeenCalled();
+      expect(router.getState()!.context.rsc).toBeUndefined();
+
+      const refreshed = node("UsersList", { v: 3 });
+
+      listLoader.mockResolvedValueOnce(refreshed);
+
+      invalidate(router, "rsc");
+      await router.navigate("users.list", {}, { reload: true });
+
+      expect(listLoader).toHaveBeenCalledTimes(1);
+      expect(router.getState()!.context.rsc).toBe(refreshed);
+    });
+
+    it("re-runs loader on a same-route reload (canonical revalidation pattern)", async () => {
+      let counter = 0;
+      const loader = vi.fn().mockImplementation(() => {
+        counter += 1;
+
+        return Promise.resolve(node("UserProfile", { v: counter }));
+      });
+
+      router.usePlugin(
+        rscServerPluginFactory({ "users.profile": () => loader }),
+      );
+
+      await router.start("/users/42");
+
+      expect(
+        (router.getState()!.context.rsc as { props: { v: number } }).props.v,
+      ).toBe(1);
+
+      invalidate(router, "rsc");
+      await router.navigate("users.profile", { id: "42" }, { reload: true });
+
+      expect(loader).toHaveBeenCalledTimes(2);
+      expect(
+        (router.getState()!.context.rsc as { props: { v: number } }).props.v,
+      ).toBe(2);
+    });
+
+    it("is idempotent — multiple invalidate() calls collapse to a single re-run", async () => {
+      const loader = vi.fn().mockResolvedValue(node("X"));
+
+      router.usePlugin(
+        rscServerPluginFactory({ "users.profile": () => loader }),
+      );
+      await router.start("/users/42");
+      loader.mockClear();
+
+      invalidate(router, "rsc");
+      invalidate(router, "rsc");
+      invalidate(router, "rsc");
+
+      await router.navigate("users.profile", { id: "42" }, { reload: true });
+
+      expect(loader).toHaveBeenCalledTimes(1);
+    });
+
+    it("preserves the flag when navigation lands on a route without an entry — next entry-route nav refreshes", async () => {
+      const homeNode = node("Home");
+      const loader = vi.fn().mockResolvedValue(homeNode);
+
+      router.usePlugin(rscServerPluginFactory({ home: () => loader }));
+      await router.start("/");
+      loader.mockClear();
+
+      invalidate(router, "rsc");
+
+      const intermediate = await router.navigate("users.list");
+
+      expect(loader).not.toHaveBeenCalled();
+      expect(intermediate.context.rsc).toBeUndefined();
+
+      // Flag survived the no-entry hop — reaching an entry route refreshes.
+      await router.navigate("home");
+
+      expect(loader).toHaveBeenCalledTimes(1);
+      expect(router.getState()!.context.rsc).toBe(homeNode);
+    });
+
+    it("writes the mode marker but skips the loader when the destination route resolves to client-only", async () => {
+      const loader = vi.fn().mockResolvedValue(node("Never"));
+
+      router.usePlugin(
+        rscServerPluginFactory({
+          "users.profile": { ssr: false, loader: () => loader },
+        }),
+      );
+      await router.start("/");
+
+      invalidate(router, "rsc");
+      const state = await router.navigate("users.profile", { id: "42" });
+
+      expect(loader).not.toHaveBeenCalled();
+      expect(getSsrRscMode(state)).toBe("client-only");
+      expect(state.context.rsc).toBeUndefined();
+    });
+
+    it("writes the mode marker even when the entry has no loader", async () => {
+      router.usePlugin(
+        rscServerPluginFactory({
+          "users.profile": { ssr: "full" },
+        }),
+      );
+      await router.start("/");
+
+      invalidate(router, "rsc");
+      const state = await router.navigate("users.profile", { id: "42" });
+
+      expect(getSsrRscMode(state)).toBe("full");
+      expect(state.context.rsc).toBeUndefined();
+    });
+
+    it("propagates loader rejection through the navigation that consumes the flag", async () => {
+      const loader = vi
+        .fn()
+        .mockResolvedValueOnce(node("Profile"))
+        .mockRejectedValueOnce(new Error("boom"));
+
+      router.usePlugin(
+        rscServerPluginFactory({ "users.profile": () => loader }),
+      );
+      await router.start("/users/42");
+
+      invalidate(router, "rsc");
+
+      await expect(
+        router.navigate("users.profile", { id: "42" }, { reload: true }),
+      ).rejects.toThrow("boom");
+    });
+
+    it("flag is consumed after one navigation — the navigation after that does not re-run the loader", async () => {
+      const loader = vi.fn().mockResolvedValue(node("X"));
+
+      router.usePlugin(
+        rscServerPluginFactory({
+          home: () => loader,
+          "users.list": () => loader,
+        }),
+      );
+      await router.start("/");
+      loader.mockClear();
+
+      invalidate(router, "rsc");
+      await router.navigate("users.list");
+
+      expect(loader).toHaveBeenCalledTimes(1);
+
+      await router.navigate("home");
+
+      expect(loader).toHaveBeenCalledTimes(1);
+    });
+
+    it("teardown removes the leave listener — invalidate() after unsubscribe is a no-op", async () => {
+      const loader = vi.fn().mockResolvedValue(node("X"));
+      const unsubscribe = router.usePlugin(
+        rscServerPluginFactory({
+          home: () => loader,
+          "users.list": () => loader,
+        }),
+      );
+
+      await router.start("/");
+      loader.mockClear();
+      unsubscribe();
+
+      invalidate(router, "rsc");
+      await router.navigate("users.list");
+
+      expect(loader).not.toHaveBeenCalled();
+    });
+
+    it("preserves the flag when navigation is cancelled mid-loader — next nav refreshes", async () => {
+      const slowNode = node("Slow");
+      const freshNode = node("Fresh");
+
+      let releaseSlowLoader: () => void = () => {};
+      const slowPromise = new Promise<ReactNode>((resolve) => {
+        releaseSlowLoader = () => {
+          resolve(slowNode);
+        };
+      });
+
+      const loader = vi
+        .fn()
+        .mockImplementationOnce(() => slowPromise)
+        .mockResolvedValueOnce(freshNode);
+
+      router.usePlugin(
+        rscServerPluginFactory({ "users.profile": () => loader }),
+      );
+      await router.start("/"); // home — no entry, loader untouched
+
+      invalidate(router, "rsc");
+
+      const ac = new AbortController();
+      const navA = router.navigate(
+        "users.profile",
+        { id: "42" },
+        { signal: ac.signal },
+      );
+
+      // Let the leave handler reach `await loader(…)`.
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      ac.abort();
+      releaseSlowLoader();
+
+      await expect(navA).rejects.toThrow();
+
+      expect(loader).toHaveBeenCalledTimes(1);
+
+      // Flag preserved — next navigation refreshes.
+      await router.navigate("users.profile", { id: "42" }, { reload: true });
+
+      expect(loader).toHaveBeenCalledTimes(2);
+      expect(router.getState()!.context.rsc).toBe(freshNode);
+    });
+
+    it("does not leak across namespaces — markStale on a foreign namespace is ignored by this plugin", async () => {
+      const loader = vi.fn().mockResolvedValue(node("X"));
+
+      router.usePlugin(
+        rscServerPluginFactory({ "users.profile": () => loader }),
+      );
+      await router.start("/users/42");
+      loader.mockClear();
+
+      // What ssr-data-plugin's invalidate would do:
+      markStale(router, "data");
+
+      await router.navigate("users.profile", { id: "42" }, { reload: true });
+
+      expect(loader).not.toHaveBeenCalled();
+
+      // Own namespace still works.
+      invalidate(router, "rsc");
+      await router.navigate("users.profile", { id: "42" }, { reload: true });
+
+      expect(loader).toHaveBeenCalledTimes(1);
+    });
+
+    it("preserves the flag when destination is client-only — next entry-with-loader nav refreshes", async () => {
+      const homeNode = node("Home", { v: 1 });
+      const refreshedNode = node("Home", { v: 2 });
+      const homeLoader = vi
+        .fn()
+        .mockResolvedValueOnce(homeNode)
+        .mockResolvedValueOnce(refreshedNode);
+      const profileLoader = vi.fn().mockResolvedValue(node("Never"));
+
+      router.usePlugin(
+        rscServerPluginFactory({
+          home: () => homeLoader,
+          "users.profile": { ssr: false, loader: () => profileLoader },
+        }),
+      );
+      await router.start("/");
+
+      expect(homeLoader).toHaveBeenCalledTimes(1);
+
+      invalidate(router, "rsc");
+      await router.navigate("users.profile", { id: "42" });
+
+      expect(profileLoader).not.toHaveBeenCalled();
+      expect(homeLoader).toHaveBeenCalledTimes(1);
+
+      await router.navigate("home");
+
+      expect(homeLoader).toHaveBeenCalledTimes(2);
+      expect(router.getState()!.context.rsc).toBe(refreshedNode);
+    });
+
+    it("preserves the flag when destination is a mode-only entry (no loader)", async () => {
+      const homeNode = node("Home", { v: 1 });
+      const refreshedNode = node("Home", { v: 2 });
+      const homeLoader = vi
+        .fn()
+        .mockResolvedValueOnce(homeNode)
+        .mockResolvedValueOnce(refreshedNode);
+
+      router.usePlugin(
+        rscServerPluginFactory({
+          home: () => homeLoader,
+          "users.profile": { ssr: "full" },
+        }),
+      );
+      await router.start("/");
+
+      invalidate(router, "rsc");
+      const profileState = await router.navigate("users.profile", {
+        id: "42",
+      });
+
+      expect(homeLoader).toHaveBeenCalledTimes(1);
+      expect(getSsrRscMode(profileState)).toBe("full");
+      expect(profileState.context.rsc).toBeUndefined();
+
+      await router.navigate("home");
+
+      expect(homeLoader).toHaveBeenCalledTimes(2);
+      expect(router.getState()!.context.rsc).toBe(refreshedNode);
+    });
+
+    it("preserves the flag when loader rejects — retry with succeeding loader refreshes", async () => {
+      const initialNode = node("Profile", { v: 1 });
+      const recoveredNode = node("Profile", { v: 2 });
+      const loader = vi
+        .fn()
+        .mockResolvedValueOnce(initialNode)
+        .mockRejectedValueOnce(new Error("transient"))
+        .mockResolvedValueOnce(recoveredNode);
+
+      router.usePlugin(
+        rscServerPluginFactory({ "users.profile": () => loader }),
+      );
+      await router.start("/users/42");
+
+      expect(loader).toHaveBeenCalledTimes(1);
+
+      invalidate(router, "rsc");
+
+      await expect(
+        router.navigate("users.profile", { id: "42" }, { reload: true }),
+      ).rejects.toThrow("transient");
+
+      expect(loader).toHaveBeenCalledTimes(2);
+
+      await router.navigate("users.profile", { id: "42" }, { reload: true });
+
+      expect(loader).toHaveBeenCalledTimes(3);
+      expect(router.getState()!.context.rsc).toBe(recoveredNode);
+    });
+
+    it("passes navigation signal as the second loader argument", async () => {
+      const initialNode = node("Initial");
+      const refreshedNode = node("Refreshed");
+
+      let observedSignal: AbortSignal | undefined;
+      let observedAbortedAtCall: boolean | undefined;
+
+      const loader = vi
+        .fn()
+        .mockResolvedValueOnce(initialNode)
+        .mockImplementationOnce(
+          async (
+            _params: unknown,
+            ctx: { signal: AbortSignal } | undefined,
+          ) => {
+            observedSignal = ctx?.signal;
+            observedAbortedAtCall = ctx?.signal.aborted;
+
+            return refreshedNode;
+          },
+        );
+
+      router.usePlugin(
+        rscServerPluginFactory({ "users.profile": () => loader }),
+      );
+      await router.start("/users/42");
+
+      // Start interceptor calls loader without context (SSR boot path).
+      const startCallArgs = loader.mock.calls[0];
+
+      expect(startCallArgs[1]).toBeUndefined();
+
+      invalidate(router, "rsc");
+      await router.navigate("users.profile", { id: "42" }, { reload: true });
+
+      // Leave handler passes { signal } from the navigation's controller.
+      expect(observedSignal).toBeInstanceOf(AbortSignal);
+      expect(observedAbortedAtCall).toBe(false);
+    });
+
+    it("loader's signal aborts when navigation is cancelled mid-flight", async () => {
+      let capturedSignal: AbortSignal | undefined;
+      let releaseSlowLoader: () => void = () => {};
+      const slowPromise = new Promise<ReactNode>((resolve) => {
+        releaseSlowLoader = () => {
+          resolve(node("Late"));
+        };
+      });
+      const freshNode = node("Fresh");
+
+      const loader = vi
+        .fn()
+        .mockImplementationOnce(
+          (_params: unknown, ctx: { signal: AbortSignal } | undefined) => {
+            capturedSignal = ctx?.signal;
+
+            return slowPromise;
+          },
+        )
+        .mockResolvedValueOnce(freshNode);
+
+      router.usePlugin(
+        rscServerPluginFactory({ "users.profile": () => loader }),
+      );
+      await router.start("/");
+
+      invalidate(router, "rsc");
+
+      const ac = new AbortController();
+      const navA = router.navigate(
+        "users.profile",
+        { id: "42" },
+        { signal: ac.signal },
+      );
+
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(capturedSignal).toBeInstanceOf(AbortSignal);
+      expect(capturedSignal?.aborted).toBe(false);
+
+      ac.abort();
+
+      expect(capturedSignal?.aborted).toBe(true);
+
+      releaseSlowLoader();
+
+      await expect(navA).rejects.toThrow();
+
+      await router.navigate("users.profile", { id: "42" }, { reload: true });
+
+      expect(router.getState()!.context.rsc).toBe(freshNode);
+    });
+
+    it("supports cancellation-aware loaders that abort early on signal", async () => {
+      const initialNode = node("Initial");
+      const recoveredNode = node("Recovered");
+
+      const loader = vi
+        .fn()
+        .mockResolvedValueOnce(initialNode)
+        .mockImplementationOnce(
+          async (
+            _params: unknown,
+            ctx: { signal: AbortSignal } | undefined,
+          ) => {
+            return new Promise<ReactNode>((resolve, reject) => {
+              const t = setTimeout(() => {
+                resolve(node("Late"));
+              }, 100);
+
+              ctx?.signal.addEventListener(
+                "abort",
+                () => {
+                  clearTimeout(t);
+                  reject(new DOMException("aborted", "AbortError"));
+                },
+                { once: true },
+              );
+            });
+          },
+        )
+        .mockResolvedValueOnce(recoveredNode);
+
+      router.usePlugin(
+        rscServerPluginFactory({ "users.profile": () => loader }),
+      );
+      await router.start("/users/42");
+
+      invalidate(router, "rsc");
+
+      const ac = new AbortController();
+      const navA = router.navigate(
+        "users.profile",
+        { id: "42" },
+        { reload: true, signal: ac.signal },
+      );
+
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      ac.abort();
+
+      await expect(navA).rejects.toThrow();
+
+      await router.navigate("users.profile", { id: "42" }, { reload: true });
+
+      expect(router.getState()!.context.rsc).toBe(recoveredNode);
     });
   });
 });

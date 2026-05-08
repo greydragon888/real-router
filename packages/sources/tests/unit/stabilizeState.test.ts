@@ -162,7 +162,7 @@ describe("stabilizeState", () => {
       expect(afterNav).toBe(initialSnapshot);
     });
 
-    it("reload to same route: stabilizeState preserves prev (same path)", async () => {
+    it("reload to same route: stabilizeState returns next (transition.reload === true bypasses dedupe, #605)", async () => {
       await router.navigate("users.view", { id: "42" });
 
       const prevRoute = router.getState()!;
@@ -173,7 +173,11 @@ describe("stabilizeState", () => {
 
       expect(prevRoute.path).toBe(nextRoute.path);
       expect(prevRoute).not.toBe(nextRoute);
-      expect(stabilizeState(prevRoute, nextRoute)).toBe(prevRoute);
+      // Reload is the user's explicit non-idempotent signal — observers
+      // should see fresh context (data refreshed by `invalidate()`-driven
+      // loader re-runs in SSR plugins).
+      expect(nextRoute.transition.reload).toBe(true);
+      expect(stabilizeState(prevRoute, nextRoute)).toBe(nextRoute);
     });
 
     it("navigate to different route: path changed → returns next", async () => {
@@ -243,6 +247,55 @@ describe("stabilizeState", () => {
       const base = api.makeState("home", {}, "/");
       const prev = makeStateWithHash(base, undefined);
       const next = makeStateWithHash(base, undefined);
+
+      expect(stabilizeState(prev, next)).toBe(prev);
+    });
+  });
+
+  // ===
+  // Reload-aware stabilization (#605)
+  // ===
+
+  describe("reload-aware stabilization (#605)", () => {
+    function withReload(state: State, reload: boolean): State {
+      return {
+        ...state,
+        transition: {
+          phase: "activating" as const,
+          reason: "success" as const,
+          segments: { deactivated: [], activated: [], intersection: "" },
+          ...(reload ? { reload: true } : {}),
+        },
+      };
+    }
+
+    it("same path, next.transition.reload === true → returns next (bypass dedupe)", () => {
+      const api = getPluginApi(router);
+      const base = api.makeState("home", {}, "/");
+      const prev = withReload(base, false);
+      const next = withReload(base, true);
+
+      expect(prev.path).toBe(next.path);
+      expect(stabilizeState(prev, next)).toBe(next);
+    });
+
+    it("same path, neither has reload → returns prev (legacy behavior)", () => {
+      const api = getPluginApi(router);
+      const base = api.makeState("home", {}, "/");
+      const prev = withReload(base, false);
+      const next = withReload(base, false);
+
+      expect(stabilizeState(prev, next)).toBe(prev);
+    });
+
+    it("same path, prev has reload (next does not) → returns prev", () => {
+      // Only `next.transition.reload` is consulted — the predecessor's
+      // reload flag is irrelevant; what matters is whether the current
+      // navigation was an explicit reload request.
+      const api = getPluginApi(router);
+      const base = api.makeState("home", {}, "/");
+      const prev = withReload(base, true);
+      const next = withReload(base, false);
 
       expect(stabilizeState(prev, next)).toBe(prev);
     });

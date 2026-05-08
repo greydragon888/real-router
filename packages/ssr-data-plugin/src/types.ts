@@ -39,4 +39,4 @@ export type DataLoaderFactoryMap<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 > = Record<string, DataRouteEntry<Dependencies>>;
 
-export { type SsrMode } from "./shared-ssr";
+export { type SsrLoaderContext, type SsrMode } from "./shared-ssr";

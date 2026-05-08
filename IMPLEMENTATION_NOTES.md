@@ -2693,3 +2693,94 @@ For hash, both URL plugins use a **lazy read** in `onTransitionSuccess`: on the 
 ### Hash-plugin limitation
 
 `#` is the route delimiter in hash-plugin → URL fragments are structurally incompatible. `pluginBuildUrl` accepts `hash` option for typing parity (TS interface merge needs identical signatures across all 3 URL plugins) but ignores it at runtime + emits one-time `console.warn`. Inline `let warned = false` pattern — existing `createWarnOnce` from `shared/browser-env/ssr-fallback.ts` has SSR-specific signature `(context) => (method) => void` and didn't fit.
+
+## `invalidate(router, namespace)` — CSR revalidation channel for SSR loader plugins (#605)
+
+### Problem
+
+Both `ssr-data-plugin` and `rsc-server-plugin` are deliberately **SSR-only by design** — they intercept only `start()`, never `navigate()`. The boot path is the only place fresh data is computed; `state.context.<ns>` is populated once and never refreshed without a full router re-boot. Application code that needed to refresh `state.context.data` after a mutation had only one escape hatch:
+
+```ts
+await router.navigate(state.name, state.params, { reload: true });
+```
+
+This works for the application-layer subscribe-based fetcher (the RSC example fetches `/__rsc?route=…` on every `TRANSITION_SUCCESS`), but it does **not** re-run the plugin's loader — and it has three distinct downsides for the user:
+
+1. Fires a fake transition: `onTransitionStart` / `onTransitionSuccess` plugins observe a navigation that didn't really happen.
+2. Pollutes `logger-plugin` history with "navigation" entries that were really cache-busts.
+3. No granularity for multi-namespace routes — a same-route reload is the **only** cache-bust available, and it forces *every* SSR plugin to re-run on this transition (or stay stale, since neither runs).
+
+The parity gap with Nuxt `useAsyncData(...).refresh()` and SolidStart `redirect("/path", { revalidate })` was the most-cited DX delta in the SSR competitive analysis.
+
+### Solution
+
+A `void` (fire-and-forget) helper exported from each plugin:
+
+```ts
+import { invalidate } from "@real-router/ssr-data-plugin";
+
+invalidate(router, "data"); // mark stale, do not block
+
+// Composes with the existing core API for an explicit synchronous round-trip:
+invalidate(router, "data");
+await router.navigate(state.name, state.params, { reload: true });
+```
+
+Mechanics:
+
+1. `markStale(router, namespace)` flips a per-router `Set<string>` flag stored in a module-level `WeakMap<Router, Set<string>>` (`shared/ssr/staleRegistry.ts`). Idempotent — `Set.add` deduplicates. Per-router isolation comes for free from the WeakMap key.
+2. The plugin's `subscribeLeave` listener — registered once at `usePlugin()` time — peeks the flag (`isStale`) in the awaited LEAVE_APPROVE phase of every navigation. Cheap when no flag is set: a `WeakMap.get` + `Set.has` early-return.
+3. **Peek-then-clear-after-write**. The flag is cleared (`clearStale`) only after the loader successfully resolves AND `signal.aborted` is false. Until that point the flag is preserved, so:
+   - **No-entry navigation** (route not in the loaders map) — listener no-ops, flag stays.
+   - **Client-only / mode-only entry** — mode marker written, no loader call, flag stays.
+   - **Cancelled navigation** (newer `navigate()` aborts the older controller) — late-resolving loader sees `signal.aborted`, skips the write, flag stays for the new navigation to consume.
+4. Mutations land on `nextRoute.context` directly. Both `state.context` namespaces remain shallowly mutable per the existing claim-write contract — `Object.freeze(toState)` in `completeTransition` is shallow and intentionally leaves `context` extensible.
+5. Activation guards run, `completeTransition` fires `TRANSITION_SUCCESS`, subscribers see fresh data.
+
+### Why deferred-to-next, not inject-into-current
+
+If the user calls `invalidate()` from inside a plugin lifecycle hook (`onTransitionStart`) of a navigation already in flight, the cleanest semantics are: "the in-flight transition completes unchanged; the **following** navigation re-runs the loader." This preserves the invariant **one transition = one `state.context` snapshot**, which `logger-plugin` and `validation-plugin` already rely on. Inject-into-current would require those plugins to know about and tolerate mid-transition writes — a large API-surface concession for a small DX gain.
+
+`subscribeLeave` is the right hook because:
+
+- It is the **only** awaited hook in the navigation pipeline (deactivation guards → leave-approve → activation guards → complete). Loader can run async; activation does not start until it resolves.
+- It fires **after** the same-state check (`isSameNavigation`) — so `navigate({ reload: true })` to the same path does cross the listener.
+- It receives `nextRoute` in the payload — exactly the state we need to mutate before completion.
+
+### Why a free function, not a method on the plugin
+
+Plugin instances are created by `usePlugin(factory)` and managed internally; the application code holds the router, not the plugin. A free `invalidate(router, namespace)` matches the shape of every other escape hatch (`router.navigate`, `cloneRouter`, `getStaticPaths`) and avoids requiring callers to thread a plugin reference through their app.
+
+The `namespace` argument is typed as a literal (`"data"` for ssr-data-plugin, `"rsc"` for rsc-server-plugin) at each plugin's export site, so typos surface at compile time. The literal also serves as in-source documentation at call sites: `invalidate(router, "data")` reads as "refresh the data namespace" without an import jump.
+
+### Trade-offs
+
+- **`subscribeLeave` always registered** — adds one leave listener per loader plugin even when `invalidate()` is never called. Forces `navigate()` onto the "with leave listeners" async path (~5 µs / nav with one no-op listener; see `core` Performance Notes). Acceptable: no-op early-return covers the steady state; lazy-registration would couple the registry to the plugin's lifecycle for a savings most apps will never measure.
+- **AbortSignal plumbed into the loader (#605, follow-up)** — `SsrLoaderFn<T>` now accepts an optional second argument `context?: { signal: AbortSignal }`. The leave handler passes the navigation's controller signal so cancellation-aware loaders can abort their in-flight work (fetch, DB query, …). Non-breaking via TypeScript contravariance — existing `(params) => ...` loaders ignore the second arg and still benefit from the post-await `signal.aborted` write-skip. Important pattern: a signal aborted *before* `addEventListener("abort", …)` does NOT auto-fire the listener, so cancellation-aware loaders must check `signal.aborted` upfront (see dogfooding `home` loader in each `ssr-mixed/` example for the canonical shape). The start interceptor does NOT pass a signal — SSR boot path apps that need request-scoped cancellation use the existing `getDep("abortSignal")` pattern from `createRequestScope` (#603) + `withTimeout({ upstreamSignal })` (#598).
+- **Cross-namespace not transactional** — calling `invalidate(router, "data")` and `invalidate(router, "rsc")` separately marks both flags, but they are consumed by their respective plugins' independent listeners on the same navigation. There is no "atomic group" — if one loader rejects, the other has already started. Acceptable for the small N of namespaces in practice (data + rsc + at most 1-2 application namespaces); a transactional group would warrant a separate API.
+- **Loader rejection leaves flag set** — if `entry.loader(...)` throws, the navigation rejects with that error and the flag is *not* cleared (clearStale runs after `await`). User retries → loader runs again. Matches the existing start-interceptor behavior (no caching of failures).
+
+### Test coverage
+
+13 functional scenarios per plugin (86 tests in ssr-data, 76 in rsc-server with the existing baseline), covering: cross-route re-run, same-route reload, idempotency, no-entry **flag preservation**, client-only mode (mode marker written, flag preserved), no-loader entry (mode marker, flag preserved), function-form `ssr` resolver re-evaluation, loader rejection propagation, single-consumption on success, teardown removes the listener, **cancellation safety** (abort during in-flight loader preserves flag), **namespace isolation** (`markStale` on a foreign namespace ignored by the plugin), **signal propagation** (start interceptor calls loader without context, leave handler passes `{ signal }`), **mid-flight signal abort** (`capturedSignal.aborted` flips synchronously when nav is cancelled), **cancellation-aware loader contract** (loader can `addEventListener("abort", …) → reject(AbortError)` to stop its in-flight work).
+
+### Public-API impact
+
+Non-breaking on the namespace contract. New named export (`invalidate`) on each of two plugins. No changes to `@real-router/types`. No changes to `@real-router/core`. Module augmentation untouched.
+
+**Behavioural change (#605, sources):** `stabilizeState` in `@real-router/sources` now returns `next` whenever `next.transition.reload === true`, even when path and `state.context.url.hash` match `prev`. Without this change, `useRoute()` consumers and any source built atop `createRouteSource` / `createRouteNodeSource` saw a stable snapshot ref on `navigate({ reload: true })` to the same path — so a reload that refreshed `state.context.data` via the plugin's `subscribeLeave` handler did NOT trigger a re-render. Reload is the user's explicit non-idempotent signal; bypassing dedupe matches that semantic.
+
+Two consequences for adapters and examples:
+- `useRoute()`, `useRouteNode()`, `useRouterTransition()`, and the Solid/Vue/Svelte/Angular signal/store equivalents now re-emit on every `{ reload: true }` navigation.
+- Sources tests previously asserting "second reload preserves snapshot ref" were updated to assert "every reload produces a fresh ref" (`createRouteStore.test.ts`, `createRouteNodeStore.test.ts`, `stabilizeState.test.ts` + parallel adapter tests). Two now-defensive guards (`createRouteNodeSource.ts`, `createTransitionSource.ts`) carry `/* v8 ignore */` annotations — their false branches became structurally unreachable but remain as guards for future stabilizer changes.
+
+### Dogfooding
+
+`mutation → invalidate → reload` is demonstrated end-to-end in **all six** `ssr-mixed/` examples (React, Preact, Solid, Vue, Svelte, Angular). The Home page exposes a `[data-testid="refresh-btn"]` button that calls `invalidate(router, "data") + router.navigate(state.name, state.params, { reload: true })`. The home loader carries a `fetchedAt: Date.now()` field with a 25 ms delay so the e2e cancel-safety scenario reliably crosses leave handlers.
+
+Two e2e scenarios per adapter (12 new tests total + 2 in `ssr-rsc/`):
+
+- **Happy path** — single click → fresh `fetchedAt > initial`. Verifies the loader re-runs and the new value lands on `state.context.data`.
+- **In-flight defer** — `page.evaluate(() => { btn.click(); btn.click(); })` fires two synchronous clicks. The second `navigate()` aborts the first via `#abortPreviousNavigation`; with cancel-safety, the first nav's late-resolving loader sees `signal.aborted` and skips the write, the flag stays set, the second nav's leave handler consumes it. End state has fresh `fetchedAt`.
+
+`ssr-rsc/` adds a parallel "Scenario 3b" exercising the same in-flight defer pattern through the `/__rsc` Flight refetch path, with `RevalidateButton` updated to call `invalidate(router, "rsc")` for API symmetry (no-op on the client router in this RSC architecture — server's per-request `cloneRouter` already creates a fresh router each Flight request).

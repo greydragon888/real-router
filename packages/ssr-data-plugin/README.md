@@ -123,7 +123,7 @@ const data = state.context.data; // loaded data, or undefined if no loader match
 
 The plugin claims the `"data"` namespace on `state.context` via the [claim-based API](https://github.com/greydragon888/real-router/wiki/plugin-architecture). Module augmentation on `@real-router/types` provides type safety for `state.context.data`.
 
-## SSR-Only by Design
+## SSR-Only by Design (with explicit CSR revalidation channel)
 
 This plugin intercepts `start()` only — not `navigate()`. In SSR, the flow is:
 
@@ -131,7 +131,48 @@ This plugin intercepts `start()` only — not `navigate()`. In SSR, the flow is:
 cloneRouter → usePlugin → start(url) → data loaded → state.context.data → renderToString
 ```
 
-Client-side navigation and data fetching is the application's responsibility (React Query, Suspense, `useEffect`, etc.).
+Client-side navigation does **not** re-run the loader by default — application-layer fetching (React Query, Suspense, `useEffect`) owns CSR data. The one explicit exception is the `invalidate()` revalidation channel below.
+
+## Client-side revalidation (`invalidate`)
+
+After a mutation, mark the `"data"` namespace stale on the router. The next navigation (including a same-route reload) re-runs the loader for the destination route and overwrites `state.context.data` before `TRANSITION_SUCCESS` fires — so subscribers see the fresh payload.
+
+```typescript
+import { invalidate } from "@real-router/ssr-data-plugin";
+
+// Fire-and-forget — stale until the user navigates somewhere.
+invalidate(router, "data");
+
+// Explicit await — pair with a same-route reload.
+invalidate(router, "data");
+await router.navigate(state.name, state.params, { reload: true });
+```
+
+The flag is **preserved** until a successful, non-cancelled loader write. So a navigation that lands on a route without a loader entry, a `client-only` route, a mode-only entry, or one that gets cancelled mid-loader (newer `navigate()` aborts the older controller) all leave the flag set for the next attempt. A loader rejection also leaves the flag set — retry re-runs the loader.
+
+Idempotent — multiple `invalidate()` calls between refreshes collapse to one re-run. Survives `cloneRouter()` boundaries: each clone has its own flag set. Surgical for multi-namespace routes — only `"data"` re-runs; a side-by-side [`@real-router/rsc-server-plugin`](https://www.npmjs.com/package/@real-router/rsc-server-plugin) keeps its cached `state.context.rsc` unless its own `invalidate()` was also called.
+
+### Cancellation-aware loaders
+
+The leave handler passes the navigation's `AbortController.signal` as the second loader argument so loaders can abort their in-flight work (fetch, DB query, …) when a newer navigation supersedes:
+
+```typescript
+"users.profile": () => async (params, ctx) => {
+  // Network layer cancels on rapid double-click — second click aborts
+  // the first nav's controller, fetch sees `signal.aborted` and rejects.
+  const response = await fetch(`/api/user/${params.id}`, {
+    signal: ctx?.signal,
+  });
+
+  return response.json();
+},
+```
+
+The start interceptor calls the loader without a context — SSR boot path apps thread a request-scoped signal via `cloneRouter(base, { abortSignal })` + `getDep("abortSignal")` + [`withTimeout({ upstreamSignal })`](https://github.com/greydragon888/real-router/wiki/SSR-Cancellation).
+
+**Robust loaders check `signal.aborted` upfront** — a signal aborted before `addEventListener("abort", …)` does NOT auto-fire the listener. Pattern documented in the `home` loader of every `ssr-mixed/` example.
+
+Non-breaking via TypeScript contravariance — existing `(params) => …` loaders without the second arg continue to work; they just don't observe cancellation.
 
 ## Post-hydration loader skip (#596)
 
@@ -227,7 +268,7 @@ See [`examples/web/react/ssr-examples/ssr-streaming/`](../../examples/web/react/
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — Design decisions and data flow
 - [SSR Example](../../examples/web/react/ssr-examples/ssr) — Full working example (classical, non-streaming)
-- [SSR Mixed-mode Example](../../examples/web/react/ssr-examples/ssr-mixed) — Hybrid pipeline: full SSR + data-only + client-only on the same server
+- [SSR Mixed-mode Example](../../examples/web/react/ssr-examples/ssr-mixed) — Hybrid pipeline: full SSR + data-only + client-only on the same server, **plus the canonical `mutation → invalidate → reload` dogfooding** (Home page Refresh button) replicated across all six adapters with paired `happy path` + `in-flight defer` e2e scenarios
 - [Streaming SSR Example](../../examples/web/react/ssr-examples/ssr-streaming) — React 19 native streaming with `<Suspense>` + `use(promise)`
 - [Streaming SSR wiki guide](https://github.com/greydragon888/real-router/wiki/Streaming-SSR)
 

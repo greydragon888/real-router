@@ -27,24 +27,28 @@
 ```
 rsc-server-plugin/
 ├── src/
-│   ├── index.ts        — Public API (exports factory + types) + module augmentation StateContext.rsc
+│   ├── index.ts        — Public API (exports factory + invalidate + types) + module augmentation StateContext.rsc
 │   ├── factory.ts      — rscServerPluginFactory: thin adapter over createSsrLoaderPlugin
+│   ├── invalidate.ts   — invalidate(router, "rsc"): typed wrapper over markStale
 │   ├── validation.ts   — validateLoaders = createLoadersValidator(ERROR_PREFIX)
 │   ├── types.ts        — RscLoaderFn, RscLoaderFnFactory, RscLoaderFactoryMap
 │   ├── constants.ts    — ERROR_PREFIX, LOGGER_CONTEXT
-│   └── shared-ssr/     — symlink → shared/ssr/ (contains the generic factory & validator)
+│   └── shared-ssr/     — symlink → shared/ssr/ (factory, validator, stale registry)
 ```
 
 ## Module Dependency Graph
 
 ```
 index.ts
-    └── factory.ts
-            ├── validation.ts
-            │       ├── shared-ssr/createLoadersValidator.ts
-            │       └── constants.ts
-            ├── shared-ssr/createSsrLoaderPlugin.ts
-            └── types.ts
+    ├── factory.ts
+    │       ├── validation.ts
+    │       │       ├── shared-ssr/createLoadersValidator.ts
+    │       │       └── constants.ts
+    │       ├── shared-ssr/createSsrLoaderPlugin.ts
+    │       │       └── shared-ssr/staleRegistry.ts (isStale + clearStale)
+    │       └── types.ts
+    └── invalidate.ts
+            └── shared-ssr/staleRegistry.ts (markStale)
 ```
 
 External dependencies:
@@ -148,6 +152,45 @@ router.start(url)
 
 The interceptor runs **after** route resolution. If guards block the navigation, `next()` rejects and the loader never runs.
 
+### subscribeLeave handler — CSR revalidation
+
+A second listener registered alongside the start interceptor consumes the per-router stale flag set by `invalidate(router, "rsc")`. Runs in the awaited LEAVE_APPROVE phase, so a fresh `ReactNode` lands on `nextRoute.context` *before* `TRANSITION_SUCCESS` fires.
+
+```
+router.navigate(...) (any CSR navigation)
+        │
+        ▼
+  deactivation guards
+        │
+        ▼
+  sendLeaveApprove → awaitLeaveListeners
+        │
+        ▼
+  subscribeLeave handler
+        │
+        ├── isStale(router, "rsc")? no  → return (cheap WeakMap.get + Set.has)
+        │
+        ├── compiledLoaders.get(nextRoute.name)? none → return (flag preserved)
+        │
+        ├── modeClaim.write(nextRoute, mode)
+        │
+        ├── client-only / no-loader entry → return (flag preserved)
+        │
+        ├── rsc = await loader(nextRoute.params)
+        │
+        ├── signal.aborted? yes → return (flag preserved for the new nav)
+        │
+        ├── clearStale(router, "rsc")
+        └── dataClaim.write(nextRoute, rsc)
+        │
+        ▼
+  activation guards → completeTransition → TRANSITION_SUCCESS
+```
+
+**Peek-then-clear-after-write**: the flag is cleared only on a successful, non-cancelled loader write. Every "non-refresh" outcome — no-entry hops, client-only mode, mode-only entries, cancellation by a newer navigation, loader rejections — leaves the flag set for the next attempt.
+
+The flag itself lives in `shared/ssr/staleRegistry.ts` — a module-level `WeakMap<Router, Set<string>>` shared with `ssr-data-plugin`. Per-router and per-namespace isolation comes free from the WeakMap key + Set value pairing: `invalidate(router, "data")` and `invalidate(router, "rsc")` are independent, and `cloneRouter()` clones get their own flag set.
+
 ### Accessing the RSC payload
 
 ```typescript
@@ -194,11 +237,17 @@ unsubscribe() or router.dispose()
         ├── removeStartInterceptor()
         │     └── array.splice — cannot throw
         │
-        └── claim.release()
-              └── releases "rsc" namespace, allowing other plugins to claim it
+        ├── removeLeaveListener()
+        │     └── array.splice on #leaveListeners — cannot throw
+        │
+        ├── dataClaim.release()
+        │     └── releases "rsc" namespace
+        │
+        └── modeClaim.release()
+              └── releases "ssrRscMode" namespace
 ```
 
-Both operations are synchronous and infallible.
+All operations are synchronous and infallible. The stale flag in the per-router `WeakMap` is **not** cleared on teardown — markStale entries are GC'd along with the router.
 
 ## Validation
 

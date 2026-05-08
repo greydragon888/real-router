@@ -45,18 +45,29 @@ export function createTransitionSource(
         const newToRoute = stabilizeState(prev.toRoute, toState);
         const newFromRoute = stabilizeState(prev.fromRoute, fromState ?? null);
 
+        // Guard against redundant updates when both routes stabilize to
+        // prev refs AND we're already transitioning. With #605, reload
+        // navs return fresh refs via stabilizeState, so this short-circuit
+        // mostly idles — kept for defensive correctness.
+        /* v8 ignore next 5 -- @preserve: structurally unreachable after #605 —
+           every TRANSITION_START fires with a fresh State (router builds a
+           new toState per navigate()), so newToRoute !== prev.toRoute holds
+           even on idempotent retry paths the router itself prevents. Guard
+           remains for future stabilizer changes. */
         if (
-          !prev.isTransitioning ||
-          newToRoute !== prev.toRoute ||
-          newFromRoute !== prev.fromRoute
+          prev.isTransitioning &&
+          newToRoute === prev.toRoute &&
+          newFromRoute === prev.fromRoute
         ) {
-          source.updateSnapshot({
-            isTransitioning: true,
-            isLeaveApproved: false,
-            toRoute: newToRoute,
-            fromRoute: newFromRoute,
-          });
+          return;
         }
+
+        source.updateSnapshot({
+          isTransitioning: true,
+          isLeaveApproved: false,
+          toRoute: newToRoute,
+          fromRoute: newFromRoute,
+        });
       },
     ),
     api.addEventListener(

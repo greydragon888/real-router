@@ -147,7 +147,7 @@ const ssrJson = serializeRouterState(state, { excludeContext: ["rsc"] });
 // JSON contains state.context.data and other namespaces, but not state.context.rsc
 ```
 
-## SSR-Only by Design
+## SSR-Only by Design (with explicit CSR revalidation channel)
 
 This plugin intercepts `start()` only — not `navigate()`. In SSR, the flow is:
 
@@ -159,7 +159,43 @@ cloneRouter → usePlugin → start(url) → ReactNode resolved → state.contex
                                                           Flight stream → HTTP
 ```
 
-Client-side data fetching is the application's responsibility (React Query, Suspense, RSC `/__rsc` endpoint).
+Client-side navigation does **not** re-run the RSC loader by default — application-layer fetching (React Query, Suspense, RSC `/__rsc` endpoint) owns CSR data. The one explicit exception is the `invalidate()` revalidation channel below.
+
+## Client-side revalidation (`invalidate`)
+
+After a mutation, mark the `"rsc"` namespace stale on the router. The next navigation (including a same-route reload) re-runs the RSC loader for the destination route and overwrites `state.context.rsc` before `TRANSITION_SUCCESS` fires — so subscribers see the fresh `ReactNode`.
+
+```typescript
+import { invalidate } from "@real-router/rsc-server-plugin";
+
+// Fire-and-forget — stale until the user navigates somewhere.
+invalidate(router, "rsc");
+
+// Explicit await — pair with a same-route reload.
+invalidate(router, "rsc");
+await router.navigate(state.name, state.params, { reload: true });
+```
+
+The flag is **preserved** until a successful, non-cancelled loader write. So a navigation that lands on a route without an entry, a `client-only` route, a mode-only entry, or one that gets cancelled mid-loader (newer `navigate()` aborts the older controller) all leave the flag set for the next attempt. A loader rejection also leaves the flag set — retry re-runs the loader.
+
+Idempotent — multiple `invalidate()` calls between refreshes collapse to one re-run. Surgical for multi-namespace routes — only `"rsc"` re-runs; a side-by-side [`@real-router/ssr-data-plugin`](https://www.npmjs.com/package/@real-router/ssr-data-plugin) keeps its cached `state.context.data` unless its own `invalidate()` was also called.
+
+### Cancellation-aware loaders
+
+The leave handler passes the navigation's `AbortController.signal` as the second loader argument so loaders can abort their in-flight work (DB query, RSC stream, …) when a newer navigation supersedes:
+
+```typescript
+"users.profile": (_router, getDep) => async (params, ctx) => {
+  const db = getDep("db");
+  const user = await db.users.findById(params.id, { signal: ctx?.signal });
+
+  return <UserProfile user={user} />;
+},
+```
+
+The start interceptor calls the loader without a context. **Robust loaders check `signal.aborted` upfront** — a signal aborted before `addEventListener("abort", …)` does NOT auto-fire the listener.
+
+Non-breaking via TypeScript contravariance — existing `(params) => …` loaders continue to compile and work unchanged.
 
 ## Post-hydration loader skip (#596)
 
@@ -225,7 +261,7 @@ In SSR, `router.dispose()` handles cleanup automatically.
 
 ## Example
 
-- [examples/web/react/ssr-examples/ssr-rsc](../../examples/web/react/ssr-examples/ssr-rsc) — End-to-end dogfooding example: Express + `@vitejs/plugin-rsc` + this plugin, with Flight injection, client navigation via `/__rsc?route=…`, and revalidation. 5-scenario Playwright suite covering initial HTML load, client nav, revalidation, 404, and per-request isolation under concurrent load.
+- [examples/web/react/ssr-examples/ssr-rsc](../../examples/web/react/ssr-examples/ssr-rsc) — End-to-end dogfooding example: Express + `@vitejs/plugin-rsc` + this plugin, with Flight injection, client navigation via `/__rsc?route=…`, and revalidation. The Playwright suite covers initial HTML load, client nav, revalidation **happy path + in-flight defer** (Scenarios 3 + 3b), 404, and per-request isolation under concurrent load. `RevalidateButton` calls `invalidate(router, "rsc")` for API symmetry — see [`src/client-components/RevalidateButton.tsx`](../../examples/web/react/ssr-examples/ssr-rsc/src/client-components/RevalidateButton.tsx).
 
 ## Documentation
 

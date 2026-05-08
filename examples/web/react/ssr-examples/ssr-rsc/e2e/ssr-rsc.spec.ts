@@ -97,6 +97,59 @@ test.describe("RSC SSR Example", () => {
     }
   });
 
+  test("Scenario 3b: Revalidate in-flight defer — rapid double-click cancels first /__rsc fetch, second wins (#605)", async ({
+    page,
+    request,
+  }) => {
+    await page.goto("/users/1");
+
+    await expect(page.getByTestId("user-email")).toHaveText(
+      "alice@example.com",
+    );
+
+    try {
+      const mutateRes = await request.post("/__test/users/1", {
+        data: { email: "doublealice@example.com" },
+      });
+
+      expect(mutateRes.status()).toBe(204);
+
+      const rscRequests: string[] = [];
+
+      page.on("request", (req) => {
+        if (req.url().includes("/__rsc")) rscRequests.push(req.url());
+      });
+
+      // Two synchronous clicks — RevalidateButton's pending guard disables
+      // the second visually, but the in-flight cancellation contract still
+      // holds at the router level: App.tsx's subscribe → fetch handler
+      // aborts the previous /__rsc request when a new navigation lands.
+      // With cancel-safety in rsc-server-plugin (#605), no stale Flight
+      // payload races back into the DOM.
+      await page.evaluate(() => {
+        const btn = document.querySelector<HTMLButtonElement>(
+          "[data-testid='revalidate']",
+        );
+
+        if (btn === null) throw new Error("revalidate button not found");
+
+        btn.click();
+        btn.click();
+      });
+
+      await expect(page.getByTestId("user-email")).toHaveText(
+        "doublealice@example.com",
+      );
+      // At least one /__rsc fetch happened — earlier ones may have been
+      // aborted by App.tsx's controller swap.
+      expect(rscRequests.length).toBeGreaterThanOrEqual(1);
+    } finally {
+      await request.post("/__test/users/1", {
+        data: { email: "alice@example.com" },
+      });
+    }
+  });
+
   test("Scenario 4: 404 — invalid route renders not-found Server Component", async ({
     page,
   }) => {

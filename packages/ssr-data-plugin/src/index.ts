@@ -3,12 +3,15 @@ export type {
   DataLoaderFactoryMap,
   DataLoaderFnFactory,
   DataRouteEntry,
+  SsrLoaderContext,
   SsrMode,
 } from "./types";
 
 export { ssrDataPluginFactory } from "./factory";
 
 export { getSsrDataMode } from "./getSsrDataMode";
+
+export { invalidate } from "./invalidate";
 
 declare module "@real-router/types" {
   interface StateContext {

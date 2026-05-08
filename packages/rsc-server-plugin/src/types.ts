@@ -7,6 +7,8 @@ import type {
 import type { DefaultDependencies } from "@real-router/types";
 import type { ReactNode } from "react";
 
+export { type SsrLoaderContext } from "./shared-ssr";
+
 /**
  * SSR mode subset supported by `rsc-server-plugin`.
  *

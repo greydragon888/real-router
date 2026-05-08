@@ -3,8 +3,9 @@ import { cloneRouter, getPluginApi } from "@real-router/core/api";
 import { hydrateRouter, serializeRouterState } from "@real-router/core/utils";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { getSsrDataMode, ssrDataPluginFactory } from "../../src";
+import { getSsrDataMode, invalidate, ssrDataPluginFactory } from "../../src";
 import { LoaderTimeout, withTimeout } from "../../src/errors";
+import { markStale } from "../../src/shared-ssr";
 
 import type { DataLoaderFactoryMap, SsrMode } from "../../src";
 import type { Router, State } from "@real-router/core";
@@ -1112,6 +1113,528 @@ describe("@real-router/ssr-data-plugin", () => {
       } finally {
         process.off("unhandledRejection", onUnhandled);
       }
+    });
+  });
+
+  describe("invalidate(router, 'data') — CSR revalidation", () => {
+    it("re-runs loader for the destination route on the next navigation after invalidate()", async () => {
+      const homeLoader = vi.fn().mockResolvedValue({ page: "home-v1" });
+      const listLoader = vi.fn().mockResolvedValue({ page: "list-v1" });
+
+      router.usePlugin(
+        ssrDataPluginFactory({
+          home: () => homeLoader,
+          "users.list": () => listLoader,
+        }),
+      );
+
+      await router.start("/");
+
+      expect(homeLoader).toHaveBeenCalledTimes(1);
+      expect(listLoader).not.toHaveBeenCalled();
+
+      // CSR navigation alone does NOT re-run the loader.
+      await router.navigate("users.list");
+
+      expect(listLoader).not.toHaveBeenCalled();
+      expect(router.getState()!.context.data).toBeUndefined();
+
+      // After invalidate(), the next navigation re-runs the loader for the
+      // *destination* route — even when navigating away to a different route.
+      listLoader.mockResolvedValueOnce({ page: "list-v2" });
+      invalidate(router, "data");
+      await router.navigate("users.list", {}, { reload: true });
+
+      expect(listLoader).toHaveBeenCalledTimes(1);
+      expect(router.getState()!.context.data).toStrictEqual({
+        page: "list-v2",
+      });
+    });
+
+    it("re-runs loader on a same-route reload (the canonical revalidation pattern)", async () => {
+      let counter = 0;
+      const loader = vi.fn().mockImplementation(() => {
+        counter += 1;
+
+        return Promise.resolve({ value: counter });
+      });
+
+      router.usePlugin(ssrDataPluginFactory({ "users.profile": () => loader }));
+
+      await router.start("/users/42");
+
+      expect(router.getState()!.context.data).toStrictEqual({ value: 1 });
+
+      invalidate(router, "data");
+      await router.navigate("users.profile", { id: "42" }, { reload: true });
+
+      expect(loader).toHaveBeenCalledTimes(2);
+      expect(router.getState()!.context.data).toStrictEqual({ value: 2 });
+    });
+
+    it("is idempotent — multiple invalidate() calls before the next navigation collapse to one re-run", async () => {
+      const loader = vi.fn().mockResolvedValue({ v: 1 });
+
+      router.usePlugin(ssrDataPluginFactory({ "users.profile": () => loader }));
+      await router.start("/users/42");
+      loader.mockClear();
+
+      invalidate(router, "data");
+      invalidate(router, "data");
+      invalidate(router, "data");
+
+      await router.navigate("users.profile", { id: "42" }, { reload: true });
+
+      expect(loader).toHaveBeenCalledTimes(1);
+    });
+
+    it("preserves the flag when navigation lands on a route without an entry — next entry-route nav refreshes", async () => {
+      const homeLoader = vi.fn().mockResolvedValue("home");
+
+      router.usePlugin(ssrDataPluginFactory({ home: () => homeLoader }));
+      await router.start("/");
+      homeLoader.mockClear();
+
+      invalidate(router, "data");
+
+      // users.list has no entry — leave handler is a no-op, flag preserved.
+      const intermediate = await router.navigate("users.list");
+
+      expect(homeLoader).not.toHaveBeenCalled();
+      expect(intermediate.context.data).toBeUndefined();
+
+      // Now reach a route with an entry — flag is consumed, loader runs.
+      await router.navigate("home");
+
+      expect(homeLoader).toHaveBeenCalledTimes(1);
+      expect(router.getState()!.context.data).toBe("home");
+    });
+
+    it("writes the mode marker but skips the loader when the destination route resolves to client-only", async () => {
+      const loader = vi.fn().mockResolvedValue("never");
+
+      router.usePlugin(
+        ssrDataPluginFactory({
+          "users.profile": { ssr: false, loader: () => loader },
+        }),
+      );
+      await router.start("/");
+
+      invalidate(router, "data");
+      const state = await router.navigate("users.profile", { id: "42" });
+
+      expect(loader).not.toHaveBeenCalled();
+      expect(getSsrDataMode(state)).toBe("client-only");
+      expect(state.context.data).toBeUndefined();
+    });
+
+    it("writes the mode marker even when the entry has no loader (mode-only entry)", async () => {
+      router.usePlugin(
+        ssrDataPluginFactory({
+          "users.profile": { ssr: "data-only" },
+        }),
+      );
+      await router.start("/");
+
+      invalidate(router, "data");
+      const state = await router.navigate("users.profile", { id: "42" });
+
+      expect(getSsrDataMode(state)).toBe("data-only");
+      expect(state.context.data).toBeUndefined();
+    });
+
+    it("supports function-form ssr resolver — re-evaluated per navigation", async () => {
+      const loader = vi.fn().mockResolvedValue({ ok: true });
+
+      router.usePlugin(
+        ssrDataPluginFactory({
+          "users.profile": {
+            ssr: (s) => (s.params.id === "1" ? "client-only" : "full"),
+            loader: () => loader,
+          },
+        }),
+      );
+      await router.start("/users/2");
+      loader.mockClear();
+
+      invalidate(router, "data");
+      const state1 = await router.navigate("users.profile", { id: "1" });
+
+      expect(loader).not.toHaveBeenCalled();
+      expect(getSsrDataMode(state1)).toBe("client-only");
+
+      invalidate(router, "data");
+      const state2 = await router.navigate(
+        "users.profile",
+        { id: "2" },
+        { reload: true },
+      );
+
+      expect(loader).toHaveBeenCalledTimes(1);
+      expect(getSsrDataMode(state2)).toBe("full");
+      expect(state2.context.data).toStrictEqual({ ok: true });
+    });
+
+    it("propagates loader rejection through the navigation that consumes the flag", async () => {
+      const loader = vi
+        .fn()
+        .mockResolvedValueOnce({ ok: true })
+        .mockRejectedValueOnce(new Error("boom"));
+
+      router.usePlugin(ssrDataPluginFactory({ "users.profile": () => loader }));
+      await router.start("/users/42");
+
+      invalidate(router, "data");
+
+      await expect(
+        router.navigate("users.profile", { id: "42" }, { reload: true }),
+      ).rejects.toThrow("boom");
+    });
+
+    it("flag is consumed after one navigation — the navigation after that does not re-run the loader", async () => {
+      const loader = vi.fn().mockResolvedValue({ v: 1 });
+
+      router.usePlugin(
+        ssrDataPluginFactory({
+          home: () => loader,
+          "users.list": () => loader,
+        }),
+      );
+      await router.start("/");
+      loader.mockClear();
+
+      invalidate(router, "data");
+
+      await router.navigate("users.list");
+
+      expect(loader).toHaveBeenCalledTimes(1);
+
+      // No new invalidate() — the next nav must NOT re-run the loader.
+      await router.navigate("home");
+
+      expect(loader).toHaveBeenCalledTimes(1);
+    });
+
+    it("teardown removes the leave listener — invalidate() after unsubscribe is a no-op", async () => {
+      const loader = vi.fn().mockResolvedValue({ v: 1 });
+      const unsubscribe = router.usePlugin(
+        ssrDataPluginFactory({
+          home: () => loader,
+          "users.list": () => loader,
+        }),
+      );
+
+      await router.start("/");
+      loader.mockClear();
+      unsubscribe();
+
+      invalidate(router, "data");
+      await router.navigate("users.list");
+
+      expect(loader).not.toHaveBeenCalled();
+    });
+
+    it("preserves the flag when navigation is cancelled mid-loader — next nav refreshes", async () => {
+      let releaseSlowLoader: () => void = () => {};
+      const slowPromise = new Promise<{ v: number }>((resolve) => {
+        releaseSlowLoader = () => {
+          resolve({ v: 1 });
+        };
+      });
+
+      const loader = vi
+        .fn()
+        .mockImplementationOnce(() => slowPromise)
+        .mockResolvedValueOnce({ v: 2 });
+
+      router.usePlugin(ssrDataPluginFactory({ "users.profile": () => loader }));
+      await router.start("/"); // home — no entry, loader not called
+
+      invalidate(router, "data");
+
+      const ac = new AbortController();
+      const navA = router.navigate(
+        "users.profile",
+        { id: "42" },
+        { signal: ac.signal },
+      );
+
+      // Let the leave handler reach `await loader(…)`.
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // Cancel A; resolve the awaited loader so the handler completes.
+      ac.abort();
+      releaseSlowLoader();
+
+      await expect(navA).rejects.toThrow();
+
+      expect(loader).toHaveBeenCalledTimes(1);
+
+      // Flag preserved — next navigation refreshes from the second mock.
+      await router.navigate("users.profile", { id: "42" }, { reload: true });
+
+      expect(loader).toHaveBeenCalledTimes(2);
+      expect(router.getState()!.context.data).toStrictEqual({ v: 2 });
+    });
+
+    it("does not leak across namespaces — markStale on a foreign namespace is ignored by this plugin", async () => {
+      const loader = vi.fn().mockResolvedValue({ v: 1 });
+
+      router.usePlugin(ssrDataPluginFactory({ "users.profile": () => loader }));
+      await router.start("/users/42");
+      loader.mockClear();
+
+      // Mark a foreign namespace (e.g. what rsc-server-plugin's invalidate
+      // would do). The ssr-data-plugin's listener checks "data" — sees no flag.
+      markStale(router, "rsc");
+
+      await router.navigate("users.profile", { id: "42" }, { reload: true });
+
+      expect(loader).not.toHaveBeenCalled();
+
+      // Own namespace still works.
+      invalidate(router, "data");
+      await router.navigate("users.profile", { id: "42" }, { reload: true });
+
+      expect(loader).toHaveBeenCalledTimes(1);
+    });
+
+    it("preserves the flag when destination is client-only — next entry-with-loader nav refreshes", async () => {
+      const homeLoader = vi
+        .fn()
+        .mockResolvedValueOnce("home-v1")
+        .mockResolvedValueOnce("home-v2");
+      const profileLoader = vi.fn().mockResolvedValue("never");
+
+      router.usePlugin(
+        ssrDataPluginFactory({
+          home: () => homeLoader,
+          "users.profile": { ssr: false, loader: () => profileLoader },
+        }),
+      );
+      await router.start("/");
+
+      expect(homeLoader).toHaveBeenCalledTimes(1);
+
+      invalidate(router, "data");
+      await router.navigate("users.profile", { id: "42" });
+
+      expect(profileLoader).not.toHaveBeenCalled();
+      expect(homeLoader).toHaveBeenCalledTimes(1);
+
+      await router.navigate("home");
+
+      expect(homeLoader).toHaveBeenCalledTimes(2);
+      expect(router.getState()!.context.data).toBe("home-v2");
+    });
+
+    it("preserves the flag when destination is a mode-only entry (no loader)", async () => {
+      const homeLoader = vi
+        .fn()
+        .mockResolvedValueOnce("home-v1")
+        .mockResolvedValueOnce("home-v2");
+
+      router.usePlugin(
+        ssrDataPluginFactory({
+          home: () => homeLoader,
+          "users.profile": { ssr: "data-only" },
+        }),
+      );
+      await router.start("/");
+
+      invalidate(router, "data");
+      const profileState = await router.navigate("users.profile", {
+        id: "42",
+      });
+
+      expect(homeLoader).toHaveBeenCalledTimes(1);
+      expect(getSsrDataMode(profileState)).toBe("data-only");
+
+      await router.navigate("home");
+
+      expect(homeLoader).toHaveBeenCalledTimes(2);
+      expect(router.getState()!.context.data).toBe("home-v2");
+    });
+
+    it("preserves the flag when loader rejects — retry with succeeding loader refreshes", async () => {
+      const loader = vi
+        .fn()
+        .mockResolvedValueOnce("initial")
+        .mockRejectedValueOnce(new Error("transient"))
+        .mockResolvedValueOnce("recovered");
+
+      router.usePlugin(ssrDataPluginFactory({ "users.profile": () => loader }));
+      await router.start("/users/42");
+
+      expect(loader).toHaveBeenCalledTimes(1);
+
+      invalidate(router, "data");
+
+      await expect(
+        router.navigate("users.profile", { id: "42" }, { reload: true }),
+      ).rejects.toThrow("transient");
+
+      expect(loader).toHaveBeenCalledTimes(2);
+
+      // Flag preserved through rejection — retry refreshes successfully.
+      await router.navigate("users.profile", { id: "42" }, { reload: true });
+
+      expect(loader).toHaveBeenCalledTimes(3);
+      expect(router.getState()!.context.data).toBe("recovered");
+    });
+
+    it("passes navigation signal as the second loader argument", async () => {
+      let observedSignal: AbortSignal | undefined;
+      let observedAbortedAtCall: boolean | undefined;
+
+      const loader = vi
+        .fn()
+        .mockResolvedValueOnce("initial")
+        .mockImplementationOnce(
+          async (
+            _params: unknown,
+            ctx: { signal: AbortSignal } | undefined,
+          ) => {
+            observedSignal = ctx?.signal;
+            observedAbortedAtCall = ctx?.signal.aborted;
+
+            return "refreshed";
+          },
+        );
+
+      router.usePlugin(ssrDataPluginFactory({ "users.profile": () => loader }));
+      await router.start("/users/42");
+
+      // Start interceptor calls loader without context (SSR boot path).
+      const startCallArgs = loader.mock.calls[0];
+
+      expect(startCallArgs[0]).toStrictEqual(
+        expect.objectContaining({ id: "42" }),
+      );
+      expect(startCallArgs[1]).toBeUndefined();
+
+      invalidate(router, "data");
+      await router.navigate("users.profile", { id: "42" }, { reload: true });
+
+      // Leave handler passes { signal } from the navigation's controller.
+      // Capture inside the loader because the controller is aborted during
+      // post-completion cleanup (signal.aborted flips to true after the
+      // navigation resolves).
+      expect(observedSignal).toBeInstanceOf(AbortSignal);
+      expect(observedAbortedAtCall).toBe(false);
+    });
+
+    it("loader's signal aborts when navigation is cancelled mid-flight", async () => {
+      let capturedSignal: AbortSignal | undefined;
+      let releaseSlowLoader: () => void = () => {};
+      const slowPromise = new Promise<{ v: number }>((resolve) => {
+        releaseSlowLoader = () => {
+          resolve({ v: 1 });
+        };
+      });
+
+      const loader = vi
+        .fn()
+        .mockImplementationOnce(
+          (_params: unknown, ctx: { signal: AbortSignal } | undefined) => {
+            capturedSignal = ctx?.signal;
+
+            return slowPromise;
+          },
+        )
+        .mockResolvedValueOnce({ v: 2 });
+
+      router.usePlugin(ssrDataPluginFactory({ "users.profile": () => loader }));
+      await router.start("/");
+
+      invalidate(router, "data");
+
+      const ac = new AbortController();
+      const navA = router.navigate(
+        "users.profile",
+        { id: "42" },
+        { signal: ac.signal },
+      );
+
+      // Reach `await loader(...)` in the leave handler.
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(capturedSignal).toBeInstanceOf(AbortSignal);
+      expect(capturedSignal?.aborted).toBe(false);
+
+      ac.abort();
+
+      // Navigation cancelled → loader's signal flips to aborted synchronously.
+      expect(capturedSignal?.aborted).toBe(true);
+
+      releaseSlowLoader();
+
+      await expect(navA).rejects.toThrow();
+
+      // Flag preserved because the cancelled nav skipped the write — next
+      // navigation refreshes with a fresh, non-aborted signal.
+      await router.navigate("users.profile", { id: "42" }, { reload: true });
+
+      expect(router.getState()!.context.data).toStrictEqual({ v: 2 });
+    });
+
+    it("supports cancellation-aware loaders that abort early on signal", async () => {
+      const loader = vi
+        .fn()
+        .mockResolvedValueOnce("initial")
+        .mockImplementationOnce(
+          async (
+            _params: unknown,
+            ctx: { signal: AbortSignal } | undefined,
+          ) => {
+            return new Promise<string>((resolve, reject) => {
+              const t = setTimeout(() => {
+                resolve("late");
+              }, 100);
+
+              ctx?.signal.addEventListener(
+                "abort",
+                () => {
+                  clearTimeout(t);
+                  reject(new DOMException("aborted", "AbortError"));
+                },
+                { once: true },
+              );
+            });
+          },
+        )
+        .mockResolvedValueOnce("recovered");
+
+      router.usePlugin(ssrDataPluginFactory({ "users.profile": () => loader }));
+      await router.start("/users/42");
+
+      invalidate(router, "data");
+
+      const ac = new AbortController();
+      const navA = router.navigate(
+        "users.profile",
+        { id: "42" },
+        { reload: true, signal: ac.signal },
+      );
+
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      ac.abort();
+
+      // Loader rejects with AbortError; navigation rejects.
+      await expect(navA).rejects.toThrow();
+
+      // Flag preserved (loader rejection bypasses clearStale). Retry
+      // succeeds with fresh, non-aborted signal.
+      await router.navigate("users.profile", { id: "42" }, { reload: true });
+
+      expect(router.getState()!.context.data).toBe("recovered");
     });
   });
 });

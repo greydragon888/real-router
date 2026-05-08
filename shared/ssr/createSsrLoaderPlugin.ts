@@ -1,6 +1,7 @@
 import { getPluginApi } from "@real-router/core/api";
 import { getInternals } from "@real-router/core/validation";
 
+import { clearStale, isStale } from "./staleRegistry.js";
 import { ALL_SSR_MODES } from "./types.js";
 
 import type {
@@ -150,9 +151,49 @@ export function createSsrLoaderPlugin<
       },
     );
 
+    // CSR revalidation channel for `invalidate(router, namespace)`.
+    // Runs in the awaited LEAVE_APPROVE phase so fresh data lands on
+    // `nextRoute.context` before `TRANSITION_SUCCESS` fires.
+    // Flag is cleared only after a successful, non-cancelled loader write —
+    // no-entry / client-only / cancelled navigations preserve it for retry.
+    const removeLeaveListener = router.subscribeLeave(
+      async ({ nextRoute, signal }) => {
+        if (!isStale(router, config.namespace)) return;
+
+        const entry = compiled.get(nextRoute.name);
+
+        if (!entry) return;
+
+        const mode = resolveMode(
+          entry.mode,
+          nextRoute,
+          allowed,
+          config.errorPrefix,
+          nextRoute.name,
+        );
+
+        modeClaim.write(nextRoute, mode);
+
+        if (mode === "client-only" || entry.loader === undefined) return;
+
+        // Pass the navigation's signal so cancellation-aware loaders can
+        // abort their in-flight work (fetch, DB query, etc.) when a newer
+        // navigation supersedes this one. The post-await `signal.aborted`
+        // check below remains as the final gate — loaders that ignore the
+        // signal still benefit from the cancel-safety contract (#605).
+        const data = await entry.loader(nextRoute.params, { signal });
+
+        if (signal.aborted) return;
+
+        clearStale(router, config.namespace);
+        dataClaim.write(nextRoute, data);
+      },
+    );
+
     return {
       teardown() {
         removeStartInterceptor();
+        removeLeaveListener();
         dataClaim.release();
         modeClaim.release();
       },

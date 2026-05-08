@@ -1,20 +1,52 @@
-import type { DataLoaderFactoryMap, SsrMode } from "@real-router/ssr-data-plugin";
-import type { State } from "@real-router/core";
+import type {
+  DataLoaderFactoryMap,
+  SsrLoaderContext,
+  SsrMode,
+} from "@real-router/ssr-data-plugin";
+import type { Params, State } from "@real-router/core";
 
 /**
  * Per-route SSR mode demonstration.
- *
- * - `home` — full SSR (default behaviour, short form).
- * - `admin.dashboard` — `ssr: false` (client-only): server skips the loader,
- *   ships shell HTML, client fetches via its own mechanism.
- * - `users.profile` — `ssr: "data-only"`: server runs the loader, ships JSON,
- *   but the application renders shell-only HTML.
- * - `docs.detail` — function-form resolver: mode depends on `format` param.
- *   `?format=pdf` → `client-only` (no point rendering PDFs server-side);
- *   `?format=html` (default) → `full`.
  */
 export const loaders: DataLoaderFactoryMap = {
-  home: () => () => ({ greeting: "Hello from full SSR" }),
+  // `fetchedAt` + `aborts` make every loader call observable in the DOM
+  // for the `invalidate(router, "data")` dogfooding (Home page Refresh
+  // button). The 25 ms delay widens the race window so rapid double-click
+  // reliably crosses leave handlers; the `signal.addEventListener("abort", …)`
+  // reject demonstrates the cancellation-aware loader contract (#605).
+  //
+  // Realistic pattern: handle BOTH already-aborted and aborts-during-await
+  // — a signal aborted before the listener is added does NOT auto-fire,
+  // so check `signal.aborted` upfront.
+  home: () => {
+    let aborts = 0;
+
+    return async (_params: Params, ctx?: SsrLoaderContext) => {
+      await new Promise<void>((resolve, reject) => {
+        const t = setTimeout(resolve, 25);
+
+        const onAbort = (): void => {
+          clearTimeout(t);
+          aborts += 1;
+          reject(new DOMException("aborted", "AbortError"));
+        };
+
+        if (ctx?.signal.aborted) {
+          onAbort();
+
+          return;
+        }
+
+        ctx?.signal.addEventListener("abort", onAbort, { once: true });
+      });
+
+      return {
+        greeting: "Hello from full SSR",
+        fetchedAt: Date.now(),
+        aborts,
+      };
+    };
+  },
 
   "admin.dashboard": { ssr: false },
 

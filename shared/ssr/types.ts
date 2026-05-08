@@ -36,7 +36,26 @@ export type SsrModeConfig<M extends SsrMode = SsrMode> =
   | boolean
   | SsrModeResolver<M>;
 
-export type SsrLoaderFn<T> = (params: Params) => Promise<T> | T;
+/**
+ * Optional context object passed to the loader. The `signal` field is the
+ * navigation's `AbortController.signal` when the plugin's `subscribeLeave`
+ * handler invokes the loader (#605 `invalidate()` → CSR refresh path);
+ * `undefined` from the `start` interceptor (SSR boot path — apps that need
+ * a request-scoped signal use `getDep("abortSignal")` injected via
+ * `cloneRouter(base, { abortSignal })`, see `createRequestScope` and
+ * `withTimeout({ upstreamSignal })` patterns).
+ *
+ * Loaders ignoring the second argument remain compatible (TypeScript
+ * contravariance).
+ */
+export interface SsrLoaderContext {
+  signal: AbortSignal;
+}
+
+export type SsrLoaderFn<T> = (
+  params: Params,
+  context?: SsrLoaderContext,
+) => Promise<T> | T;
 
 export type SsrLoaderFnFactory<
   T,
