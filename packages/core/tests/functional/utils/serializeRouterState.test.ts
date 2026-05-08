@@ -185,4 +185,115 @@ describe("serializeRouterState", () => {
       });
     });
   });
+
+  describe("custom serialize option (#606)", () => {
+    it("delegates to options.serialize for non-JSON types", () => {
+      const date = new Date("2026-05-08T10:00:00.000Z");
+
+      const state: State = {
+        name: "page",
+        params: {},
+        path: "/page",
+        context: { data: { when: date } } as unknown as State["context"],
+        transition: baseTransition,
+      };
+
+      const tag = (val: unknown): unknown => {
+        if (val instanceof Date) {
+          return { __t: "Date", v: val.toISOString() };
+        }
+
+        if (val !== null && typeof val === "object") {
+          const out: Record<string, unknown> = {};
+
+          for (const [k, v] of Object.entries(val as Record<string, unknown>)) {
+            out[k] = tag(v);
+          }
+
+          return out;
+        }
+
+        return val;
+      };
+
+      const serialize = (data: unknown): string => JSON.stringify(tag(data));
+
+      const json = serializeRouterState(state, { serialize });
+      const parsed = JSON.parse(json) as {
+        context: { data: { when: { __t: string; v: string } } };
+      };
+
+      expect(parsed.context.data.when).toStrictEqual({
+        __t: "Date",
+        v: date.toISOString(),
+      });
+    });
+
+    it("composes excludeContext + serialize: namespace stripped before custom serializer runs", () => {
+      const state: State = {
+        name: "page",
+        params: {},
+        path: "/page",
+        context: {
+          data: { a: 1 },
+          rsc: () => null,
+        } as unknown as State["context"],
+        transition: baseTransition,
+      };
+
+      let seenKeys: string[] = [];
+
+      const serialize = (data: unknown): string => {
+        seenKeys = Object.keys(
+          (data as { context: Record<string, unknown> }).context,
+        );
+
+        return JSON.stringify(data);
+      };
+
+      serializeRouterState(state, {
+        excludeContext: ["rsc"],
+        serialize,
+      });
+
+      expect(seenKeys).toStrictEqual(["data"]);
+    });
+
+    it("XSS-escape applies to custom serializer output", () => {
+      const state: State = {
+        name: "page",
+        params: {},
+        path: "/page",
+        context: {} as State["context"],
+        transition: baseTransition,
+      };
+
+      const serialize = (data: unknown): string =>
+        `${JSON.stringify(data)}<script>`;
+
+      const json = serializeRouterState(state, { serialize });
+
+      expect(json).not.toContain("<");
+      expect(json).not.toContain(">");
+      expect(json).toContain(String.raw`\u003c`);
+      expect(json).toContain(String.raw`\u003e`);
+    });
+
+    it("falls back to JSON.stringify when serialize is omitted", () => {
+      const state: State = {
+        name: "page",
+        params: {},
+        path: "/page",
+        context: { data: { a: 1 } } as unknown as State["context"],
+        transition: baseTransition,
+      };
+
+      const jsonNoOpt = serializeRouterState(state);
+      const jsonExplicitJson = serializeRouterState(state, {
+        serialize: JSON.stringify,
+      });
+
+      expect(jsonExplicitJson).toBe(jsonNoOpt);
+    });
+  });
 });

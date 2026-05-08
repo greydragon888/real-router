@@ -45,7 +45,7 @@ Symbols: ✓ built-in, ⚠ partial / via composition, ✗ not provided / out of 
 | **Parallel vs waterfall** | Per-route loaders are independent functions; orchestration is application-level | n/a |
 | **Race / cancellation** | `withTimeout()` (#598) passes `{ signal }` to the loader: composed `AbortSignal` aborts on the deadline OR on `options.upstreamSignal` (client disconnect from `cloneRouter(base, { abortSignal })` per-request DI), abort fires *before* race rejection — loaders threading `signal` into I/O actually cancel | n/a — no fetch layer at the router level |
 | **Hydration transport** | `serializeRouterState()` → inline `<script>window.__SSR_STATE__ = …</script>` (XSS-safe); client `hydrateRouter(router, ssrState)` re-runs `router.start(path)`. Svelte 5 explicit: `hydrate` ≠ `mount` (no `mount({ hydrate: true })` option); SSG dual-mode mount: `if (rootElement.firstElementChild) hydrate(...) else mount(...)` | ✗ — no hydration pipeline |
-| **Serialisation pluggability** | Fixed XSS-safe JSON | n/a |
+| **Serialisation pluggability** | Default `JSON.stringify`/`JSON.parse` (XSS-safe). Pluggable via `{ serialize, deserialize }` options on `serializeRouterState`/`hydrateRouter` for non-JSON types (Date / Map / Set / RegExp / BigInt) — pair with `devalue` or `superjson` (peer dep, not bundled). XSS-escape applies to custom-serializer output regardless (#606) | n/a |
 | **Mismatch handling** | Svelte's `hydrate()` claims existing DOM atomically; SSG dual-mode mount handles dev fallback | n/a |
 | **In-flight dedup** | ✗ not provided by core or `ssr-data-plugin`; compose with `lifecycle-plugin.onNavigate` + a CSR fetcher | ✗ |
 | **TTL / SWR cache** | ✗ not provided; per-route `Cache-Control` is the HTTP-side knob | ✗ |

@@ -1,5 +1,6 @@
 import { serializeState } from "./serializeState";
 
+import type { Serialize } from "./serializeState";
 import type { Params, State } from "@real-router/types";
 
 /**
@@ -24,6 +25,25 @@ export interface SerializeRouterStateOptions {
    * @default []
    */
   excludeContext?: readonly string[];
+
+  /**
+   * Custom serializer (e.g., `devalue.stringify` / `superjson.stringify`) to
+   * support non-JSON types in `state.params` and `state.context.<ns>` payloads
+   * (Date / Map / Set / RegExp / BigInt). Defaults to `JSON.stringify`.
+   *
+   * Pair with the matching `deserialize` on `hydrateRouter` to round-trip the
+   * extended types on the client.
+   *
+   * @default JSON.stringify
+   *
+   * @example
+   * ```typescript
+   * import * as devalue from "devalue";
+   *
+   * const json = serializeRouterState(state, { serialize: devalue.stringify });
+   * ```
+   */
+  serialize?: Serialize;
 }
 
 /**
@@ -55,6 +75,16 @@ export interface SerializeRouterStateOptions {
  * const state = await router.start(url);
  * const json = serializeRouterState(state, { excludeContext: ["rsc"] });
  * ```
+ *
+ * @example
+ * ```typescript
+ * // Non-JSON types (Date / Map / Set / RegExp / BigInt) via devalue (#606)
+ * import * as devalue from "devalue";
+ *
+ * const json = serializeRouterState(state, { serialize: devalue.stringify });
+ * // On the client:
+ * await hydrateRouter(router, json, { deserialize: devalue.parse });
+ * ```
  */
 export function serializeRouterState(
   state: State,
@@ -77,10 +107,14 @@ export function serializeRouterState(
     context = filtered;
   }
 
-  return serializeState({
+  const payload = {
     name: state.name,
     params: state.params,
     path: state.path,
     context,
-  });
+  };
+
+  return options?.serialize
+    ? serializeState(payload, { serialize: options.serialize })
+    : serializeState(payload);
 }

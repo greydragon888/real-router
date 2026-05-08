@@ -192,4 +192,126 @@ describe("hydrateRouter", () => {
       removeInterceptor();
     });
   });
+
+  describe("custom deserialize option (#606)", () => {
+    it("uses options.deserialize instead of JSON.parse", async () => {
+      const calls: string[] = [];
+
+      const deserialize = (json: string): unknown => {
+        calls.push(json);
+
+        return JSON.parse(json) as unknown;
+      };
+
+      const json = serializeRouterState({
+        name: "users.list",
+        params: {},
+        path: "/users/list",
+        context: {},
+        transition: {
+          phase: "activating",
+          reason: "success",
+          segments: { deactivated: [], activated: [], intersection: "" },
+        },
+      });
+
+      const result = await hydrateRouter(router, json, { deserialize });
+
+      expect(calls).toHaveLength(1);
+      expect(calls[0]).toBe(json);
+      expect(result.name).toBe("users.list");
+    });
+
+    it("does not call deserialize when source is an object", async () => {
+      let called = false;
+
+      const deserialize = (): unknown => {
+        called = true;
+
+        return null;
+      };
+
+      await hydrateRouter(router, { path: "/users/list" }, { deserialize });
+
+      expect(called).toBe(false);
+    });
+
+    it("round-trips Date in state.context via paired serialize/deserialize", async () => {
+      interface Tagged {
+        __t: "Date";
+        v: string;
+      }
+
+      const isTagged = (val: unknown): val is Tagged =>
+        typeof val === "object" &&
+        val !== null &&
+        (val as { __t?: unknown }).__t === "Date" &&
+        typeof (val as { v?: unknown }).v === "string";
+
+      const tag = (val: unknown): unknown => {
+        if (val instanceof Date) {
+          return { __t: "Date", v: val.toISOString() };
+        }
+
+        if (val !== null && typeof val === "object") {
+          const out: Record<string, unknown> = {};
+
+          for (const [k, v] of Object.entries(val as Record<string, unknown>)) {
+            out[k] = tag(v);
+          }
+
+          return out;
+        }
+
+        return val;
+      };
+
+      const serialize = (data: unknown): string => JSON.stringify(tag(data));
+
+      const deserialize = (json: string): unknown =>
+        JSON.parse(json, (_key, value: unknown) =>
+          isTagged(value) ? new Date(value.v) : value,
+        );
+
+      const date = new Date("2026-05-08T10:00:00.000Z");
+
+      const serverState: State = {
+        name: "users.list",
+        params: {},
+        path: "/users/list",
+        context: { data: { fetchedAt: date } } as State["context"],
+        transition: {
+          phase: "activating",
+          reason: "success",
+          segments: { deactivated: [], activated: [], intersection: "" },
+        },
+      };
+
+      const json = serializeRouterState(serverState, { serialize });
+
+      let observed: ReturnType<typeof getInternals>["hydrationState"] = null;
+
+      const removeInterceptor = getPluginApi(router).addInterceptor(
+        "start",
+        async (next, path) => {
+          observed = getInternals(router).hydrationState;
+
+          return next(path);
+        },
+      );
+
+      await hydrateRouter(router, json, { deserialize });
+
+      removeInterceptor();
+
+      const parsedContext = (observed as unknown as State).context as {
+        data: { fetchedAt: unknown };
+      };
+
+      expect(parsedContext.data.fetchedAt).toBeInstanceOf(Date);
+      expect((parsedContext.data.fetchedAt as Date).toISOString()).toBe(
+        date.toISOString(),
+      );
+    });
+  });
 });
