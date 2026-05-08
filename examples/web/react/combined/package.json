@@ -20,7 +20,7 @@
     "@real-router/persistent-params-plugin": "workspace:^",
     "@real-router/search-schema-plugin": "workspace:^",
     "@real-router/react": "workspace:^",
-    "zod": "3.24.4",
+    "zod": "4.4.3",
     "react": "19.2.0",
     "react-dom": "19.2.0"
   },

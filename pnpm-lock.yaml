@@ -255,8 +255,8 @@ importers:
         specifier: 3.5.13
         version: 3.5.13(typescript@6.0.3)
       zod:
-        specifier: 3.24.4
-        version: 3.24.4
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
       '@tanstack/router-core':
         specifier: 1.168.9
@@ -882,8 +882,8 @@ importers:
         specifier: 2.8.1
         version: 2.8.1
       zod:
-        specifier: 3.24.4
-        version: 3.24.4
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
       '@analogjs/vite-plugin-angular':
         specifier: 2.4.7
@@ -1477,8 +1477,8 @@ importers:
         specifier: 10.28.2
         version: 10.28.2
       zod:
-        specifier: 3.24.4
-        version: 3.24.4
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
       '@playwright/test':
         specifier: 1.58.2
@@ -1770,8 +1770,8 @@ importers:
         specifier: 10.28.2
         version: 10.28.2
       zod:
-        specifier: 3.24.4
-        version: 3.24.4
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
       '@playwright/test':
         specifier: 1.58.2
@@ -2121,8 +2121,8 @@ importers:
         specifier: 19.2.0
         version: 19.2.0(react@19.2.0)
       zod:
-        specifier: 3.24.4
-        version: 3.24.4
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
       '@playwright/test':
         specifier: 1.58.2
@@ -2705,8 +2705,8 @@ importers:
         specifier: 19.2.0
         version: 19.2.0(react@19.2.0)
       zod:
-        specifier: 3.24.4
-        version: 3.24.4
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
       '@playwright/test':
         specifier: 1.58.2
@@ -3145,8 +3145,8 @@ importers:
         specifier: 1.9.12
         version: 1.9.12
       zod:
-        specifier: 3.24.4
-        version: 3.24.4
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
       '@playwright/test':
         specifier: 1.58.2
@@ -3438,8 +3438,8 @@ importers:
         specifier: 1.9.12
         version: 1.9.12
       zod:
-        specifier: 3.24.4
-        version: 3.24.4
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
       '@playwright/test':
         specifier: 1.58.2
@@ -3794,8 +3794,8 @@ importers:
         specifier: 5.54.0
         version: 5.54.0(@typescript-eslint/types@8.59.1)
       zod:
-        specifier: 3.24.4
-        version: 3.24.4
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
       '@playwright/test':
         specifier: 1.58.2
@@ -4165,8 +4165,8 @@ importers:
         specifier: 5.54.0
         version: 5.54.0(@typescript-eslint/types@8.59.1)
       zod:
-        specifier: 3.24.4
-        version: 3.24.4
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
       '@playwright/test':
         specifier: 1.58.2
@@ -4489,8 +4489,8 @@ importers:
         specifier: 3.5.13
         version: 3.5.13(typescript@6.0.3)
       zod:
-        specifier: 3.24.4
-        version: 3.24.4
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
       '@playwright/test':
         specifier: 1.58.2
@@ -4865,8 +4865,8 @@ importers:
         specifier: 3.5.13
         version: 3.5.13(typescript@6.0.3)
       zod:
-        specifier: 3.24.4
-        version: 3.24.4
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
       '@playwright/test':
         specifier: 1.58.2
@@ -10969,6 +10969,10 @@ packages:
     resolution: {integrity: sha512-CTXd6rk/M3/ULNQj8FBqBWHYBVYybQ3VPBw0xGKFe3tuH7ytT6ACnvzpIQ3UZtB8yvUKC2cXn1a+x+5EVQLovA==}
     engines: {node: '>=14.14'}
 
+  fs-extra@11.3.5:
+    resolution: {integrity: sha512-eKpRKAovdpZtR1WopLHxlBWvAgPny3c4gX1G5Jhwmmw4XJj0ifSD5qB5TOo8hmA0wlRKDAOAhEE1yVPgs6Fgcg==}
+    engines: {node: '>=14.14'}
+
   fs-extra@7.0.1:
     resolution: {integrity: sha512-YJDaCJZEnBmcbw13fvdAM9AwNOJwOzrE4pqMqBq5nFiEqXUqHwlK4B+3pUw6JNvfSPtX05xFHtYy/1ni01eGCw==}
     engines: {node: '>=6 <7 || >=8'}
@@ -14167,14 +14171,11 @@ packages:
     peerDependencies:
       zod: ^3.25.28 || ^4
 
-  zod@3.24.4:
-    resolution: {integrity: sha512-OdqJE9UDRPwWsrHjLN2F8bPxvwJBK22EHLWtanu0LSYr5YqzsaaW3RMgmjwr8Rypg5k+meEJdSPXJZXE/yqOMg==}
-
   zod@4.3.6:
     resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
 
-  zod@4.4.1:
-    resolution: {integrity: sha512-a6ENMBBGZBsnlSebQ/eKCguSBeGKSf4O7BPnqVPmYGtpBYI7VSqoVqw+QcB7kPRjbqPwhYTpFbVj/RqNz/CT0Q==}
+  zod@4.4.3:
+    resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
 
 snapshots:
 
@@ -15221,7 +15222,7 @@ snapshots:
     dependencies:
       cross-dirname: 0.1.0
       debug: 4.4.3
-      fs-extra: 11.3.4
+      fs-extra: 11.3.5
       minimist: 1.2.8
       postject: 1.0.0-alpha.6
     transitivePeerDependencies:
@@ -15643,7 +15644,7 @@ snapshots:
       eslint: 10.2.1(jiti@2.6.1)
       ts-pattern: 5.9.0
       typescript: 6.0.3
-      zod: 4.4.1
+      zod: 4.4.3
     transitivePeerDependencies:
       - supports-color
 
@@ -20061,6 +20062,13 @@ snapshots:
       jsonfile: 6.2.1
       universalify: 2.0.1
 
+  fs-extra@11.3.5:
+    dependencies:
+      graceful-fs: 4.2.11
+      jsonfile: 6.2.1
+      universalify: 2.0.1
+    optional: true
+
   fs-extra@7.0.1:
     dependencies:
       graceful-fs: 4.2.11
@@ -20836,7 +20844,7 @@ snapshots:
       tinyglobby: 0.2.16
       unbash: 3.0.0
       yaml: 2.8.3
-      zod: 4.4.1
+      zod: 4.4.3
     transitivePeerDependencies:
       - '@emnapi/core'
       - '@emnapi/runtime'
@@ -21197,7 +21205,7 @@ snapshots:
 
   mutation-server-protocol@0.4.1:
     dependencies:
-      zod: 4.4.1
+      zod: 4.4.3
 
   mutation-testing-elements@3.7.2: {}
 
@@ -23507,8 +23515,6 @@ snapshots:
     dependencies:
       zod: 4.3.6
 
-  zod@3.24.4: {}
-
   zod@4.3.6: {}
 
-  zod@4.4.1: {}
+  zod@4.4.3: {}
