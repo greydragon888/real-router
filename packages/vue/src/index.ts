@@ -5,6 +5,10 @@ export { Link } from "./components/Link";
 
 export { RouterErrorBoundary } from "./components/RouterErrorBoundary";
 
+export { ClientOnly } from "./components/ClientOnly";
+
+export { ServerOnly } from "./components/ServerOnly";
+
 // Directives
 export { vLink } from "./directives/vLink";
 
@@ -37,6 +41,10 @@ export { RouterKey, NavigatorKey, RouteKey } from "./context";
 export type { LinkProps } from "./types";
 
 export type { RouterErrorBoundaryProps } from "./components/RouterErrorBoundary";
+
+export type { ClientOnlyProps } from "./components/ClientOnly";
+
+export type { ServerOnlyProps } from "./components/ServerOnly";
 
 export type { LinkDirectiveValue } from "./directives/vLink";
 

@@ -6201,6 +6201,9 @@ importers:
       preact:
         specifier: 10.25.4
         version: 10.25.4
+      preact-render-to-string:
+        specifier: 6.6.7
+        version: 6.6.7(preact@10.25.4)
 
   packages/preload-plugin:
     dependencies:
@@ -22962,6 +22965,10 @@ snapshots:
     dependencies:
       commander: 9.5.0
     optional: true
+
+  preact-render-to-string@6.6.7(preact@10.25.4):
+    dependencies:
+      preact: 10.25.4
 
   preact-render-to-string@6.6.7(preact@10.28.2):
     dependencies:

@@ -39,6 +39,10 @@ export { RouterErrorBoundary } from "./components/RouterErrorBoundary";
 
 export type { ErrorContext } from "./components/RouterErrorBoundary";
 
+export { ClientOnly } from "./components/ClientOnly";
+
+export { ServerOnly } from "./components/ServerOnly";
+
 export { NavigationAnnouncer } from "./components/NavigationAnnouncer";
 
 export { RouteMatch } from "./directives/RouteMatch";

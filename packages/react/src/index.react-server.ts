@@ -23,6 +23,10 @@ export type {
 
 export type { RouterErrorBoundaryProps } from "./components/RouterErrorBoundary";
 
+export type { ClientOnlyProps } from "./components/ClientOnly";
+
+export type { ServerOnlyProps } from "./components/ServerOnly";
+
 export type { Navigator } from "@real-router/core";
 
 export type { RouterTransitionSnapshot } from "@real-router/sources";

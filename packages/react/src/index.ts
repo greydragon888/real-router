@@ -7,6 +7,10 @@ export { Link } from "./components/Link";
 
 export { RouterErrorBoundary } from "./components/RouterErrorBoundary";
 
+export { ClientOnly } from "./components/ClientOnly";
+
+export { ServerOnly } from "./components/ServerOnly";
+
 // Hooks
 export { useRouter } from "./hooks/useRouter";
 
@@ -50,6 +54,10 @@ export type {
 } from "./components/modern/RouteView";
 
 export type { RouterErrorBoundaryProps } from "./components/RouterErrorBoundary";
+
+export type { ClientOnlyProps } from "./components/ClientOnly";
+
+export type { ServerOnlyProps } from "./components/ServerOnly";
 
 export type { Navigator } from "@real-router/core";
 

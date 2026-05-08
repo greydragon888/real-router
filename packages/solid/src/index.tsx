@@ -4,6 +4,10 @@ export { Link } from "./components/Link";
 
 export { RouterErrorBoundary } from "./components/RouterErrorBoundary";
 
+export { ClientOnly } from "./components/ClientOnly";
+
+export { ServerOnly } from "./components/ServerOnly";
+
 export { link } from "./directives/link";
 
 export { useRouter } from "./hooks/useRouter";
@@ -37,6 +41,10 @@ export { createStoreFromSource } from "./createStoreFromSource";
 export type { LinkProps, RouteState } from "./types";
 
 export type { RouterErrorBoundaryProps } from "./components/RouterErrorBoundary";
+
+export type { ClientOnlyProps } from "./components/ClientOnly";
+
+export type { ServerOnlyProps } from "./components/ServerOnly";
 
 export type { LinkDirectiveOptions } from "./directives/link";
 
