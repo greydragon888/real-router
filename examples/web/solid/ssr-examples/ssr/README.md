@@ -17,6 +17,7 @@
 - **`createUniqueId` for SSR-safe stable IDs** — `/form` uses `createUniqueId()` for `<label htmlFor>` + `<input id>` + `aria-describedby` bindings. Server-rendered IDs are deterministic; client hydration sees the same values — no hydration mismatch, accessibility relations stay intact.
 - **Dynamic `<head>` updates after CSR navigation** — `<AutoMeta />` reads route state via `useRoute()` and a Solid `createEffect` mutates `document.title` + `<meta name="description">` reactively. After `/` → `/users` CSR navigation the head reflects the new route from `getMetaForState()` without manual DOM assignments.
   - **Honest limitation about `@solidjs/meta`**: the package is installed but **not** wired through `<MetaProvider>` on the server. Its `useAssets`-based asset injection is designed for `renderToStream` (streaming SSR); under `renderToStringAsync` the rendered `<Title>`/`<Meta>` tags don't reliably surface in the final HTML output on Solid 1.9.5. Server-side head therefore stays on the manual `<!--ssr-head-->` injection. Client-side dynamic updates use the equivalent low-level `createEffect` pattern that `@solidjs/meta` would invoke internally on the client. See `components/AutoMeta.tsx` docstring for the full disclaimer.
+- **SSR boundaries demo** — `<ClientOnly>` + `<ServerOnly>` from `@real-router/solid` on the Home page (#604). `e2e/ssr-boundaries.spec.ts` verifies server HTML emits the SSR-side branch with JS disabled and the post-hydration DOM swaps both branches without `console.error` hydration mismatch warnings.
 
 ## Architecture
 

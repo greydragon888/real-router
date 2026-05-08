@@ -23,6 +23,7 @@ Server-side rendering with Real-Router, Angular 21, `@angular/ssr` (`AngularNode
 - **Client-side navigation** — after hydration, `@real-router/browser-plugin` handles SPA navigation through `realLink` directive.
 - **Incremental hydration + event replay** — `provideClientHydration(withIncrementalHydration(), withEventReplay())`. Event replay captures clicks/keydowns issued before a block hydrates and replays them once the component takes over. Critical for streaming SSR UX where the user can interact with placeholders before their JS arrives.
 - **Mixed `RenderMode`** — `app.routes.server.ts` maps `/marketing` to `RenderMode.Client` (CSR shell, identical bytes for every visitor, content materialises after JS bootstrap) and `/live` to `RenderMode.Server` (fresh per-request render with timestamp proof). All other paths default to `RenderMode.Server`. See "Mixed RenderMode" section below for the trade-offs and the unsupported `RenderMode.Prerender` known limitation.
+- **SSR boundaries demo** — `<client-only>` + `<server-only>` from `@real-router/angular` on the Home page (#604). `e2e/ssr-boundaries.spec.ts` verifies server HTML emits the SSR-side branch with JS disabled and the post-hydration DOM swaps both branches without console hydration mismatch warnings.
 
 ## Architecture
 

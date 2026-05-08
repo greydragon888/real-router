@@ -266,6 +266,24 @@ import { RouterErrorBoundary } from "@real-router/solid";
 
 Auto-resets on next successful navigation. Works with both `<Link>` and imperative `router.navigate()`.
 
+### `<ClientOnly>` / `<ServerOnly>`
+
+Paired SSR-aware boundaries. `<ClientOnly>` renders `fallback` on the server (and on the client first paint, to match SSR HTML), then swaps in `children` after mount. `<ServerOnly>` is the symmetric inverse.
+
+```tsx
+import { ClientOnly, ServerOnly } from "@real-router/solid";
+
+<ClientOnly fallback={<Skeleton />}>
+  <BrowserApiWidget />
+</ClientOnly>
+
+<ServerOnly>
+  <SeoMetaStrip />
+</ServerOnly>;
+```
+
+Implementation: `createSignal(false)` + `onMount(() => setMounted(true))` + `<Show>`. `onMount` is SSR-safe per Solid's runtime contract — it never fires during `renderToString`/`renderToStream`. End-to-end dogfooding lives in [`examples/web/solid/ssr-examples/ssr/`](../../examples/web/solid/ssr-examples/ssr/) (see `e2e/ssr-boundaries.spec.ts`).
+
 ## Directives
 
 ### `use:link`

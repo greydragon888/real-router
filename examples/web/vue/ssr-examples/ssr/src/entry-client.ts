@@ -30,8 +30,15 @@ const loaderCalls: Record<string, number> = {};
 globalThis.__LOADER_CALLS__ = loaderCalls;
 
 const instrumentedLoaders: DataLoaderFactoryMap = Object.fromEntries(
-  (Object.entries(loaders) as [string, DataLoaderFnFactory][]).map(
-    ([name, factory]) => [
+  Object.entries(loaders).map(([name, raw]) => {
+    // Per-route SSR mode (#597): non-function entries (`{ ssr: false }`,
+    // `{ ssr: "data-only", loader: … }`) pass through as-is. Only the
+    // function form needs the loader-call counter wrap.
+    if (typeof raw !== "function") return [name, raw];
+
+    const factory = raw as DataLoaderFnFactory;
+
+    return [
       name,
       (r, getDep) => {
         const loader = factory(r, getDep);
@@ -42,8 +49,8 @@ const instrumentedLoaders: DataLoaderFactoryMap = Object.fromEntries(
           return loader(params);
         };
       },
-    ],
-  ),
+    ];
+  }),
 ) as DataLoaderFactoryMap;
 
 router.usePlugin(

@@ -12,6 +12,7 @@ Server-side rendering with Real-Router, Vue 3, Express, and Vite — the Vue por
 - **Query params + nested loaders** — `?sort` on `/users`, leaf-route loader for `/users/:id/posts` returns combined parent + child data
 - **Typed loader errors → HTTP** — `LoaderRedirect`/`LoaderNotFound`/`LoaderTimeout` thrown by loaders surface as `301`/`404`/`504`. Untyped rejections fall through to a deterministic 500 error page. Full table in the "Loader-driven HTTP" section below.
 - **Client-side navigation** — after hydration, `@real-router/browser-plugin` handles SPA navigation
+- **SSR boundaries demo** — `<ClientOnly>` + `<ServerOnly>` from `@real-router/vue` on the Home page (#604). `e2e/ssr-boundaries.spec.ts` verifies server HTML emits the SSR-side branch with JS disabled and the post-hydration DOM swaps both branches without console hydration mismatch warnings.
 
 ## Architecture
 

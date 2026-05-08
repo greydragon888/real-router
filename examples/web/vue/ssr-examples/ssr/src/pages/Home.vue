@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ClientOnly, ServerOnly } from "@real-router/vue";
 import { defineAsyncComponent, hydrateOnVisible } from "vue";
 
 import SearchForm from "../components/SearchForm.vue";
@@ -33,5 +34,28 @@ const HeavyAnalytics = defineAsyncComponent({
     <SearchForm />
 
     <HeavyAnalytics />
+
+    <!-- Dogfooding: <ClientOnly> + <ServerOnly> SSR boundaries. -->
+    <section aria-labelledby="ssr-boundaries-heading">
+      <h2 id="ssr-boundaries-heading">SSR boundaries</h2>
+      <ClientOnly>
+        <p data-testid="ssr-boundaries-client">Mounted on the client</p>
+        <template #fallback>
+          <p data-testid="ssr-boundaries-client-fallback">
+            Loading client widget…
+          </p>
+        </template>
+      </ClientOnly>
+      <ServerOnly>
+        <p data-testid="ssr-boundaries-server">
+          Server-only content (e.g. SEO meta, zero-JS notice)
+        </p>
+        <template #fallback>
+          <p data-testid="ssr-boundaries-server-fallback">
+            Hidden after hydration
+          </p>
+        </template>
+      </ServerOnly>
+    </section>
   </div>
 </template>

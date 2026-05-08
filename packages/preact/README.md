@@ -245,6 +245,24 @@ import { RouterErrorBoundary } from "@real-router/preact";
 
 Auto-resets on next successful navigation. Works with both `<Link>` and imperative `router.navigate()`.
 
+### `<ClientOnly>` / `<ServerOnly>`
+
+Paired SSR-aware boundaries. `<ClientOnly>` renders `fallback` on the server (and on the client first paint, to match SSR HTML), then swaps in `children` after mount. `<ServerOnly>` is the symmetric inverse.
+
+```tsx
+import { ClientOnly, ServerOnly } from "@real-router/preact";
+
+<ClientOnly fallback={<Skeleton />}>
+  <BrowserApiWidget />
+</ClientOnly>
+
+<ServerOnly>
+  <SeoMetaStrip />
+</ServerOnly>;
+```
+
+Implementation: `useState(false)` + `useEffect(() => setMounted(true), [])` from `preact/hooks`. End-to-end dogfooding lives in [`examples/web/preact/ssr-examples/ssr/`](../../examples/web/preact/ssr-examples/ssr/) (see `e2e/ssr-boundaries.spec.ts`).
+
 ## Accessibility
 
 Enable screen reader announcements for route changes:

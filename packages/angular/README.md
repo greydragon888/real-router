@@ -288,6 +288,35 @@ WCAG-compliant screen reader announcements for route changes. Add it once near t
 
 See the [Accessibility](#accessibility) section for details.
 
+### `<client-only>` / `<server-only>`
+
+Paired SSR-aware boundaries. `<client-only>` renders the bound `fallback` `TemplateRef` on the server (and on the client first paint, to match SSR HTML), then swaps in the projected children after mount. `<server-only>` is the symmetric inverse.
+
+```typescript
+import { Component } from "@angular/core";
+import { ClientOnly, ServerOnly } from "@real-router/angular";
+
+@Component({
+  selector: "app-home",
+  template: `
+    <ng-template #loadingTpl>
+      <span>Loading…</span>
+    </ng-template>
+    <client-only [fallback]="loadingTpl">
+      <browser-api-widget />
+    </client-only>
+
+    <server-only>
+      <seo-meta-strip />
+    </server-only>
+  `,
+  imports: [ClientOnly, ServerOnly],
+})
+export class HomeComponent {}
+```
+
+Implementation: `signal(false)` + `afterNextRender(() => mounted.set(true))`. `afterNextRender` is a no-op on the server (Angular runtime guarantees), so SSR naturally lands on the SSR-side branch. End-to-end dogfooding lives in [`examples/web/angular/ssr-examples/ssr/`](../../examples/web/angular/ssr-examples/ssr/) (see `e2e/ssr-boundaries.spec.ts`).
+
 ## Directives
 
 ### `realLink`

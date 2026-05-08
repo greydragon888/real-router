@@ -281,6 +281,33 @@ Auto-resets on next successful navigation. Works with both `<Link>` and imperati
 
 **`onError` signature:** `(error, toRoute, fromRoute) => void`. Receives the `RouterError`, the attempted destination (`State | null`), and the previously active route (`State | null`). A throwing `onError` is caught by the boundary, logged via `console.error`, and never breaks reactivity.
 
+### `<ClientOnly>` / `<ServerOnly>`
+
+Paired SSR-aware boundaries. `<ClientOnly>` renders the `fallback` snippet on the server (and on the client first paint, to match SSR HTML), then swaps in the `children` snippet after mount. `<ServerOnly>` is the symmetric inverse.
+
+```svelte
+<script lang="ts">
+  import { ClientOnly, ServerOnly } from "@real-router/svelte";
+</script>
+
+<ClientOnly>
+  {#snippet children()}
+    <BrowserApiWidget />
+  {/snippet}
+  {#snippet fallback()}
+    <Skeleton />
+  {/snippet}
+</ClientOnly>
+
+<ServerOnly>
+  {#snippet children()}
+    <SeoMetaStrip />
+  {/snippet}
+</ServerOnly>
+```
+
+Implementation: `$state(false)` + `$effect(() => mounted = true)`. The Svelte compiler emits the rune as a no-op on the server, so server-side rendering naturally lands on the SSR-side branch. End-to-end dogfooding lives in [`examples/web/svelte/ssr-examples/ssr/`](../../examples/web/svelte/ssr-examples/ssr/) (see `e2e/ssr-boundaries.spec.ts`).
+
 ## Actions
 
 ### `createLinkAction`

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { ClientOnly, ServerOnly } from "@real-router/svelte";
+
   import { useClock } from "../utils/clock.svelte";
 
   // createSubscriber demo: SSR ships the initial server timestamp;
@@ -24,4 +26,33 @@
       {clock().toISOString()}
     </time>
   </p>
+
+  <!-- Dogfooding: <ClientOnly> + <ServerOnly> SSR boundaries. -->
+  <section aria-labelledby="ssr-boundaries-heading">
+    <h2 id="ssr-boundaries-heading">SSR boundaries</h2>
+    <ClientOnly>
+      {#snippet children()}
+        <p data-testid="ssr-boundaries-client">
+          Mounted on the client
+        </p>
+      {/snippet}
+      {#snippet fallback()}
+        <p data-testid="ssr-boundaries-client-fallback">
+          Loading client widget…
+        </p>
+      {/snippet}
+    </ClientOnly>
+    <ServerOnly>
+      {#snippet children()}
+        <p data-testid="ssr-boundaries-server">
+          Server-only content (e.g. SEO meta, zero-JS notice)
+        </p>
+      {/snippet}
+      {#snippet fallback()}
+        <p data-testid="ssr-boundaries-server-fallback">
+          Hidden after hydration
+        </p>
+      {/snippet}
+    </ServerOnly>
+  </section>
 </div>

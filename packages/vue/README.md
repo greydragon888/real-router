@@ -378,6 +378,31 @@ In a template:
 
 Auto-resets on next successful navigation. Works with both `<Link>` and imperative `router.navigate()`.
 
+### `<ClientOnly>` / `<ServerOnly>`
+
+Paired SSR-aware boundaries. `<ClientOnly>` renders the `fallback` slot on the server (and on the client first paint, to match SSR HTML), then swaps in the `default` slot after mount. `<ServerOnly>` is the symmetric inverse.
+
+```vue
+<script setup lang="ts">
+import { ClientOnly, ServerOnly } from "@real-router/vue";
+</script>
+
+<template>
+  <ClientOnly>
+    <BrowserApiWidget />
+    <template #fallback>
+      <Skeleton />
+    </template>
+  </ClientOnly>
+
+  <ServerOnly>
+    <SeoMetaStrip />
+  </ServerOnly>
+</template>
+```
+
+Implementation: `ref(false)` + `onMounted(() => mounted.value = true)`. Slots `default` (children) and `fallback`. End-to-end dogfooding lives in [`examples/web/vue/ssr-examples/ssr/`](../../examples/web/vue/ssr-examples/ssr/) (see `e2e/ssr-boundaries.spec.ts`).
+
 ## Directives
 
 ### `v-link`

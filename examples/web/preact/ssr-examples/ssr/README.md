@@ -14,6 +14,7 @@ Server-side rendering with Real-Router, Preact 10, Express, and Vite.
 - **Production HTTP semantics** — strong ETag (sha256 of body), per-route Cache-Control, AbortController on request close (cancels slow loaders)
 - **`useId()` for SSR-stable form IDs** — supported in `preact-render-to-string@6.6.5+` (Dec 2025), same hook name as React 18+; deterministic per-instance, no hydration mismatch
 - **Client-side navigation** — after hydration, `@real-router/browser-plugin` handles SPA navigation; `ssr-data-plugin` is registered on the client too so subsequent navigations re-resolve via `start` (hydration path), but the SSR-only contract holds for `navigate()`
+- **SSR boundaries demo** — `<ClientOnly>` + `<ServerOnly>` from `@real-router/preact` on the Home page (#604). `e2e/ssr-boundaries.spec.ts` verifies server HTML emits the SSR-side branch with JS disabled and the post-hydration DOM swaps both branches without `console.error` hydration mismatch warnings.
 
 ## Architecture
 

@@ -226,6 +226,26 @@ Auto-resets on next successful navigation. Works with both `<Link>` and imperati
 
 Available from both `@real-router/react` and `@real-router/react/legacy`.
 
+### `<ClientOnly>` / `<ServerOnly>`
+
+Paired SSR-aware boundaries. `<ClientOnly>` renders `fallback` on the server (and on the client first paint, to match SSR HTML), then swaps in `children` after mount. `<ServerOnly>` is the symmetric inverse.
+
+```tsx
+import { ClientOnly, ServerOnly } from "@real-router/react";
+
+<ClientOnly fallback={<Skeleton />}>
+  <BrowserApiWidget />
+</ClientOnly>
+
+<ServerOnly>
+  <SeoMetaStrip />
+</ServerOnly>
+```
+
+Implementation: `useState(false)` + `useEffect(() => setMounted(true), [])`. Server emits the SSR-side branch, client first paint matches it (no hydration mismatch), the post-mount effect triggers a single re-render that swaps the rendered branch.
+
+Available from both `@real-router/react` and `@real-router/react/legacy`. End-to-end dogfooding lives in [`examples/web/react/ssr-examples/ssr/`](../../examples/web/react/ssr-examples/ssr/) (see `e2e/ssr-boundaries.spec.ts`).
+
 ## React 18 Migration
 
 One import path change — all hooks and `Link` work identically:
