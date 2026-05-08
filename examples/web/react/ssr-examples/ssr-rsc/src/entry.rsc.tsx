@@ -1,6 +1,8 @@
 import { UNKNOWN_ROUTE } from "@real-router/core";
-import { cloneRouter } from "@real-router/core/api";
-import { serializeRouterState } from "@real-router/core/utils";
+import {
+  createRequestScope,
+  serializeRouterState,
+} from "@real-router/core/utils";
 import {
   rscActionPluginFactory,
   rscServerPluginFactory,
@@ -108,7 +110,16 @@ async function handler(request: Request): Promise<Response> {
       ? (url.searchParams.get("route") ?? "/")
       : url.pathname + url.search;
 
-  const router = cloneRouter(baseRouter, { db: database });
+  // Web Request shape — createRequestScope reads `request.signal` directly,
+  // no req.on("close") wiring needed. abortSignal is injected into deps
+  // for loaders that read getDep("abortSignal") (none today, but the
+  // pattern is consistent with the Node-runtime adapters). Explicit
+  // try/finally + await scope.dispose() is used (instead of `await using`)
+  // for compatibility with Node 22 LTS — see core JSDoc for the runtime
+  // matrix.
+  const scope = createRequestScope(request, baseRouter, {
+    db: database,
+  });
 
   // Two complementary plugins:
   //   - rscServerPluginFactory → publishes the Server Component tree
@@ -118,13 +129,13 @@ async function handler(request: Request): Promise<Response> {
   //     result is captured above (in `actionResult`) before start();
   //     the plugin reads it from the closure during the start
   //     interceptor.
-  router.usePlugin(
+  scope.router.usePlugin(
     rscServerPluginFactory(loaders),
     rscActionPluginFactory(() => actionResult),
   );
 
   try {
-    const state = await router.start(pathname);
+    const state = await scope.router.start(pathname);
     const statusCode =
       actionStatus ?? (state.name === UNKNOWN_ROUTE ? 404 : 200);
 
@@ -206,7 +217,7 @@ async function handler(request: Request): Promise<Response> {
       headers: { "Content-Type": "text/html; charset=utf-8" },
     });
   } finally {
-    router.dispose();
+    await scope.dispose();
   }
 }
 

@@ -24,7 +24,10 @@ async function startServer(): Promise<void> {
   const module_ = (await import(
     path.resolve(root, "dist/server/entry-server.js")
   )) as {
-    render: (url: string) => Promise<RenderResult>;
+    render: (
+      url: string,
+      ctx: { req: import("node:http").IncomingMessage },
+    ) => Promise<RenderResult>;
   };
 
   // HEAD requests must NOT trigger the streaming pipeline. CDN probes,
@@ -42,7 +45,7 @@ async function startServer(): Promise<void> {
     const url = request.originalUrl;
 
     try {
-      const result = await module_.render(url);
+      const result = await module_.render(url, { req: request });
 
       // Typed loader-error short-circuit (e.g. LoaderNotFound for an
       // unknown product id). Skip the streaming pipeline entirely and
@@ -55,12 +58,13 @@ async function startServer(): Promise<void> {
             result.contentType ?? "text/plain; charset=utf-8",
           )
           .send(result.rawBody);
-        result.cleanup();
+        await result.cleanup();
 
         return;
       }
 
-      const { stream, ssrJson, hydrationScript, statusCode, cleanup } = result;
+      const { stream, ssrJson, hydrationScript, statusCode, cleanup, signal } =
+        result;
 
       const ssrScript = `<script>window.__SSR_STATE__=${ssrJson}</script>`;
       const templateWithStateAndHydration = template
@@ -78,6 +82,10 @@ async function startServer(): Promise<void> {
 
       try {
         for (;;) {
+          if (signal.aborted) {
+            break;
+          }
+
           const { done, value } = await reader.read();
 
           if (done) {
@@ -92,7 +100,7 @@ async function startServer(): Promise<void> {
 
       response.write(footerPart);
       response.end();
-      cleanup();
+      await cleanup();
     } catch (error) {
       console.error(error);
       next(error);

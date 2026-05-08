@@ -7,8 +7,10 @@ import {
   isMainModule,
 } from "@angular/ssr/node";
 import { UNKNOWN_ROUTE } from "@real-router/core";
-import { cloneRouter } from "@real-router/core/api";
-import { serializeRouterState } from "@real-router/core/utils";
+import {
+  createRequestScope,
+  serializeRouterState,
+} from "@real-router/core/utils";
 import {
   getSsrDataMode,
   ssrDataPluginFactory,
@@ -48,11 +50,15 @@ function escapeHtmlAttribute(value: string): string {
  */
 app.use((req, res, next) => {
   const url = req.originalUrl ?? req.url ?? "/";
-  const router = cloneRouter(baseRouter);
+  // createRequestScope: AbortController + req.on("close") + cloneRouter +
+  // dispose, all in one. abortSignal is injected into deps so loaders can
+  // read getDep("abortSignal") for cooperative cancellation when the
+  // client disconnects mid-render.
+  const scope = createRequestScope(req, baseRouter);
 
-  router.usePlugin(ssrDataPluginFactory(loaders));
+  scope.router.usePlugin(ssrDataPluginFactory(loaders));
 
-  router
+  scope.router
     .start(url)
     .then((state) => {
       if (state.name === UNKNOWN_ROUTE) {
@@ -94,7 +100,7 @@ app.use((req, res, next) => {
       next(error);
     })
     .finally(() => {
-      router.dispose();
+      void scope.dispose();
     });
 });
 

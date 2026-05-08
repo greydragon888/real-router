@@ -1,6 +1,9 @@
 import { UNKNOWN_ROUTE } from "@real-router/core";
-import { cloneRouter } from "@real-router/core/api";
-import { serializeRouterState } from "@real-router/core/utils";
+import {
+  createRequestScope,
+  serializeRouterState,
+  type IncomingMessageLike,
+} from "@real-router/core/utils";
 import { RouterProvider } from "@real-router/solid";
 import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 import { generateHydrationScript, renderToStream } from "solid-js/web";
@@ -11,12 +14,19 @@ import { loaders } from "./router/loaders";
 
 const baseRouter = createAppRouter();
 
+export interface RenderContext {
+  req: IncomingMessageLike;
+}
+
 export interface RenderResult {
   stream: ReadableStream<Uint8Array>;
   ssrJson: string;
   hydrationScript: string;
   statusCode: number;
-  cleanup: () => void;
+  /** AbortSignal tied to request close — pump loop breaks early on
+   * client disconnect without buffering the rest of the stream. */
+  signal: AbortSignal;
+  cleanup: () => Promise<void>;
   /** Pre-rendered body that bypasses the streaming pipeline — used for
    * typed loader errors (LoaderNotFound) that surface as plain-text HTTP
    * responses. When set, server/index.ts skips the stream branch. */
@@ -41,33 +51,41 @@ function emptyStream(): ReadableStream<Uint8Array> {
   });
 }
 
-export async function render(url: string): Promise<RenderResult> {
-  const router = cloneRouter(baseRouter);
+export async function render(
+  url: string,
+  context: RenderContext,
+): Promise<RenderResult> {
+  // createRequestScope: AbortController + req.on("close") + cloneRouter +
+  // dispose, all in one. Cannot use `await using` here — the cloned
+  // router must outlive this function for the streaming pipeline; instead
+  // we hand `cleanup` (alias of scope.dispose) back to the server.
+  const scope = createRequestScope(context.req, baseRouter);
 
-  router.usePlugin(ssrDataPluginFactory(loaders));
+  scope.router.usePlugin(ssrDataPluginFactory(loaders));
 
   let state;
 
   try {
-    state = await router.start(url);
+    state = await scope.router.start(url);
   } catch (error) {
     const code = readErrorCode(error);
 
     if (code === "LOADER_NOT_FOUND") {
-      router.dispose();
+      await scope.dispose();
 
       return {
         stream: emptyStream(),
         ssrJson: "",
         hydrationScript: "",
         statusCode: 404,
-        cleanup: () => {},
+        signal: scope.signal,
+        cleanup: async () => {},
         rawBody: "Not Found",
         contentType: "text/plain; charset=utf-8",
       };
     }
 
-    router.dispose();
+    await scope.dispose();
 
     throw error;
   }
@@ -84,29 +102,22 @@ export async function render(url: string): Promise<RenderResult> {
   const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
   const writer = writable.getWriter();
 
-  let disposed = false;
-  const cleanup = (): void => {
-    if (disposed) {
-      return;
-    }
-
-    disposed = true;
-    router.dispose();
-  };
+  const cleanup = (): Promise<void> => scope.dispose();
 
   const { pipe } = renderToStream(
     () => (
-      <RouterProvider router={router}>
+      <RouterProvider router={scope.router}>
         <App />
       </RouterProvider>
     ),
     {
       // Fires when ALL Suspense boundaries resolve — close writer here so
       // server's getReader() loop terminates naturally. The caller's
-      // `finally { cleanup() }` is then idempotent via the `disposed` guard.
+      // `finally { await cleanup() }` is then idempotent via scope's
+      // internal `disposed` guard.
       onCompleteAll: () => {
         writer.close().catch(() => {});
-        cleanup();
+        void scope.dispose();
       },
     },
   );
@@ -126,5 +137,12 @@ export async function render(url: string): Promise<RenderResult> {
     },
   } as { write: (v: string) => void });
 
-  return { stream: readable, ssrJson, hydrationScript, statusCode, cleanup };
+  return {
+    stream: readable,
+    ssrJson,
+    hydrationScript,
+    statusCode,
+    signal: scope.signal,
+    cleanup,
+  };
 }

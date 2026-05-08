@@ -58,7 +58,7 @@ async function startServer(): Promise<void> {
               name: string;
               role: "admin" | "user";
             } | null;
-            abortSignal?: AbortSignal;
+            req: import("node:http").IncomingMessage;
           },
         ) => Promise<{
           html: string;
@@ -73,17 +73,9 @@ async function startServer(): Promise<void> {
 
       const currentUser = getCurrentUserFromCookies(request.headers.cookie);
 
-      const abortController = new AbortController();
-
-      request.on("close", () => {
-        if (!response.writableEnded) {
-          abortController.abort();
-        }
-      });
-
       const result = await module_.render(url, {
         currentUser,
-        abortSignal: abortController.signal,
+        req: request,
       });
 
       if (result.redirect) {

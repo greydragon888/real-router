@@ -32,10 +32,13 @@ async function startDevServer(): Promise<void> {
       template = await vite.transformIndexHtml(url, template);
 
       const module_ = (await vite.ssrLoadModule("/src/entry-server.ts")) as {
-        renderPage: (url: string) => Promise<RenderResult>;
+        renderPage: (
+          url: string,
+          ctx: { req: import("node:http").IncomingMessage },
+        ) => Promise<RenderResult>;
       };
 
-      const result = await module_.renderPage(url);
+      const result = await module_.renderPage(url, { req: request });
 
       if (result.rawBody !== undefined) {
         response

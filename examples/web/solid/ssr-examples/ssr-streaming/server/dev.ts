@@ -32,10 +32,13 @@ async function startDevServer(): Promise<void> {
       template = await vite.transformIndexHtml(url, template);
 
       const module_ = (await vite.ssrLoadModule("/src/entry-server.tsx")) as {
-        render: (url: string) => Promise<RenderResult>;
+        render: (
+          url: string,
+          ctx: { req: import("node:http").IncomingMessage },
+        ) => Promise<RenderResult>;
       };
 
-      const result = await module_.render(url);
+      const result = await module_.render(url, { req: request });
 
       if (result.rawBody !== undefined) {
         response
@@ -45,12 +48,13 @@ async function startDevServer(): Promise<void> {
             result.contentType ?? "text/plain; charset=utf-8",
           )
           .send(result.rawBody);
-        result.cleanup();
+        await result.cleanup();
 
         return;
       }
 
-      const { stream, ssrJson, hydrationScript, statusCode, cleanup } = result;
+      const { stream, ssrJson, hydrationScript, statusCode, cleanup, signal } =
+        result;
 
       const ssrScript = `<script>window.__SSR_STATE__=${ssrJson}</script>`;
       const templateWithStateAndHydration = template
@@ -68,6 +72,10 @@ async function startDevServer(): Promise<void> {
 
       try {
         for (;;) {
+          if (signal.aborted) {
+            break;
+          }
+
           const { done, value } = await reader.read();
 
           if (done) {
@@ -82,7 +90,7 @@ async function startDevServer(): Promise<void> {
 
       response.write(footerPart);
       response.end();
-      cleanup();
+      await cleanup();
     } catch (error) {
       vite.ssrFixStacktrace(error as Error);
       console.error(error);

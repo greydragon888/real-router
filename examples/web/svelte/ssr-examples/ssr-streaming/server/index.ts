@@ -24,14 +24,17 @@ async function startServer(): Promise<void> {
   const module_ = (await import(
     path.resolve(root, "dist/server/entry-server.js")
   )) as {
-    renderPage: (url: string) => Promise<RenderResult>;
+    renderPage: (
+      url: string,
+      ctx: { req: import("node:http").IncomingMessage },
+    ) => Promise<RenderResult>;
   };
 
   app.get("/{*path}", async (request, response, next) => {
     const url = request.originalUrl;
 
     try {
-      const result = await module_.renderPage(url);
+      const result = await module_.renderPage(url, { req: request });
 
       if (result.rawBody !== undefined) {
         response

@@ -26,13 +26,17 @@ async function startServer(): Promise<void> {
   const module_ = (await import(
     path.resolve(root, "dist/server/entry-server.js")
   )) as {
-    render: (url: string) => Promise<RenderResult>;
+    render: (
+      url: string,
+      ctx: { req: import("node:http").IncomingMessage },
+    ) => Promise<RenderResult>;
   };
 
   app.get("/{*path}", async (request, response, next) => {
     const url = request.originalUrl;
 
-    // AbortController per request — fired on client disconnect.
+    // AbortSignal lives inside RenderResult — createRequestScope (in
+    // entry-server) wires req.on("close") → controller.abort().
     // Used to bail out of the stream-pump loop early; otherwise we'd
     // keep pulling chunks from the ReadableStream and discarding them.
     // Note: ETag/If-None-Match is intentionally NOT wired here.
@@ -40,18 +44,10 @@ async function startServer(): Promise<void> {
     // streaming pipeline the body never exists in memory as a single
     // buffer, so honouring conditional GETs would mean buffering the
     // whole stream first — which defeats the streaming purpose.
-    const abortController = new AbortController();
-
-    request.on("close", () => {
-      if (!response.writableEnded) {
-        abortController.abort();
-      }
-    });
-
-    let cleanup: (() => void) | undefined;
+    let cleanup: (() => Promise<void>) | undefined;
 
     try {
-      const result = await module_.render(url);
+      const result = await module_.render(url, { req: request });
 
       cleanup = result.cleanup;
 
@@ -93,7 +89,7 @@ async function startServer(): Promise<void> {
 
       try {
         for (;;) {
-          if (abortController.signal.aborted) {
+          if (result.signal.aborted) {
             break;
           }
 
@@ -125,7 +121,7 @@ async function startServer(): Promise<void> {
       // ALWAYS dispose the router. The previous design only called
       // cleanup on the success path — a thrown error in render() or
       // mid-stream would leak the per-request router until GC.
-      cleanup?.();
+      await cleanup?.();
     }
   });
 

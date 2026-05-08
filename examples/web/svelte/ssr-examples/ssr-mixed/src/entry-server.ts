@@ -1,6 +1,9 @@
 import { UNKNOWN_ROUTE } from "@real-router/core";
-import { cloneRouter } from "@real-router/core/api";
-import { serializeRouterState } from "@real-router/core/utils";
+import {
+  createRequestScope,
+  serializeRouterState,
+  type IncomingMessageLike,
+} from "@real-router/core/utils";
 import {
   getSsrDataMode,
   ssrDataPluginFactory,
@@ -12,6 +15,10 @@ import { createAppRouter } from "./router/createAppRouter";
 import { loaders } from "./router/loaders";
 
 const baseRouter = createAppRouter();
+
+export interface RenderContext {
+  req: IncomingMessageLike;
+}
 
 export interface RenderResult {
   html: string;
@@ -27,13 +34,16 @@ function wrapInScript(json: string): string {
 /**
  * Render the app for the given URL, branching on per-route SSR mode.
  */
-export async function renderApp(url: string): Promise<RenderResult> {
-  const router = cloneRouter(baseRouter);
+export async function renderApp(
+  url: string,
+  context: RenderContext,
+): Promise<RenderResult> {
+  const scope = createRequestScope(context.req, baseRouter);
 
-  router.usePlugin(ssrDataPluginFactory(loaders));
+  scope.router.usePlugin(ssrDataPluginFactory(loaders));
 
   try {
-    const state = await router.start(url);
+    const state = await scope.router.start(url);
 
     if (state.name === UNKNOWN_ROUTE) {
       return {
@@ -47,7 +57,7 @@ export async function renderApp(url: string): Promise<RenderResult> {
     const mode = getSsrDataMode(state);
 
     if (mode === "full") {
-      const { head, body } = render(App, { props: { router } });
+      const { head, body } = render(App, { props: { router: scope.router } });
       return {
         html: body,
         head,
@@ -63,6 +73,6 @@ export async function renderApp(url: string): Promise<RenderResult> {
       statusCode: 200,
     };
   } finally {
-    router.dispose();
+    await scope.dispose();
   }
 }

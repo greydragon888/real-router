@@ -9,7 +9,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
 
 interface RenderModule {
-  renderApp: (url: string) => Promise<{
+  renderApp: (
+    url: string,
+    ctx: { req: import("node:http").IncomingMessage },
+  ) => Promise<{
     html: string;
     head: string;
     serializedData: string;
@@ -42,7 +45,7 @@ async function startServer(): Promise<void> {
         "/src/entry-server.ts",
       )) as RenderModule;
 
-      const result = await module_.renderApp(url);
+      const result = await module_.renderApp(url, { req: request });
 
       const page = template
         .replace("<!--ssr-head-->", result.head)

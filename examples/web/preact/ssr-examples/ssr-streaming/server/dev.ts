@@ -12,7 +12,8 @@ interface RenderResult {
   stream?: ReadableStream<Uint8Array>;
   ssrJson: string;
   statusCode: number;
-  cleanup: () => void;
+  signal: AbortSignal;
+  cleanup: () => Promise<void>;
   rawBody?: string;
   contentType?: string;
 }
@@ -39,10 +40,13 @@ async function startServer(): Promise<void> {
       template = await vite.transformIndexHtml(url, template);
 
       const module_ = (await vite.ssrLoadModule("/src/entry-server.tsx")) as {
-        render: (url: string) => Promise<RenderResult>;
+        render: (
+          url: string,
+          ctx: { req: import("node:http").IncomingMessage },
+        ) => Promise<RenderResult>;
       };
 
-      const result = await module_.render(url);
+      const result = await module_.render(url, { req: request });
 
       try {
         if (result.rawBody !== undefined) {
@@ -71,6 +75,10 @@ async function startServer(): Promise<void> {
           const reader = result.stream.getReader();
 
           while (true) {
+            if (result.signal.aborted) {
+              break;
+            }
+
             const { done, value } = await reader.read();
 
             if (done) {
@@ -84,7 +92,7 @@ async function startServer(): Promise<void> {
         response.write(finalTail);
         response.end();
       } finally {
-        result.cleanup();
+        await result.cleanup();
       }
     } catch (error) {
       vite.ssrFixStacktrace(error as Error);

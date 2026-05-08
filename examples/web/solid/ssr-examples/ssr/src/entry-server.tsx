@@ -1,6 +1,9 @@
 import { UNKNOWN_ROUTE } from "@real-router/core";
-import { cloneRouter } from "@real-router/core/api";
-import { serializeRouterState } from "@real-router/core/utils";
+import {
+  createRequestScope,
+  serializeRouterState,
+  type IncomingMessageLike,
+} from "@real-router/core/utils";
 import { RouterProvider } from "@real-router/solid";
 import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 import { generateHydrationScript, renderToStringAsync } from "solid-js/web";
@@ -16,11 +19,10 @@ const baseRouter = createAppRouter();
 
 interface RenderContext {
   currentUser: CurrentUser | null;
-  /** AbortSignal fired when the client disconnects mid-render. Loaders
-   * can `getDep("abortSignal")` to cancel pending work and avoid
-   * leaking server resources after the response is no longer wanted.
-   * See /slow loader for the demonstrated pattern. */
-  abortSignal?: AbortSignal;
+  /** Per-request handle. `createRequestScope` wires `AbortSignal` to its
+   * `"close"` event so loaders can `getDep("abortSignal")` and cancel
+   * pending work as soon as the client disconnects. */
+  req: IncomingMessageLike;
 }
 
 export interface RenderResult {
@@ -80,18 +82,20 @@ export async function render(
   url: string,
   context: RenderContext,
 ): Promise<RenderResult> {
-  const router = cloneRouter(baseRouter, {
+  // createRequestScope: AbortController + req.on("close") + cloneRouter +
+  // dispose, all in one. abortSignal is injected into deps so loaders can
+  // read getDep("abortSignal"). Explicit try/finally + await scope.dispose()
+  // is used (instead of `await using`) for compatibility with Node 22 LTS,
+  // where Symbol.asyncDispose is not yet a well-known symbol — see
+  // @real-router/core/utils/createRequestScope JSDoc for the runtime matrix.
+  const scope = createRequestScope(context.req, baseRouter, {
     currentUser: context.currentUser,
-    // abortSignal is request-scoped: server/index.ts creates a fresh
-    // AbortController per request and aborts on `req.on("close")`.
-    // Loaders read it via `getDep("abortSignal")` to cancel async work.
-    abortSignal: context.abortSignal,
-  } as Record<string, unknown>);
+  });
 
-  router.usePlugin(ssrDataPluginFactory(loaders));
+  scope.router.usePlugin(ssrDataPluginFactory(loaders));
 
   try {
-    const state = await router.start(url);
+    const state = await scope.router.start(url);
     const statusCode = state.name === UNKNOWN_ROUTE ? 404 : 200;
 
     // `renderToStringAsync` is the third Solid SSR mode (alongside
@@ -108,7 +112,7 @@ export async function render(
     // injection is unreliable for `renderToStringAsync` on Solid 1.9.5
     // — see `components/AutoMeta.tsx` for the full disclaimer.
     const html = await renderToStringAsync(() => (
-      <RouterProvider router={router}>
+      <RouterProvider router={scope.router}>
         <App />
       </RouterProvider>
     ));
@@ -190,6 +194,6 @@ export async function render(
       head: "",
     };
   } finally {
-    router.dispose();
+    await scope.dispose();
   }
 }

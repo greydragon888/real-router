@@ -26,35 +26,30 @@ async function startServer(): Promise<void> {
   const module_ = (await import(
     path.resolve(root, "dist/server/entry-server.js")
   )) as {
-    render: (url: string) => Promise<RenderResult>;
+    render: (
+      url: string,
+      ctx: { req: import("node:http").IncomingMessage },
+    ) => Promise<RenderResult>;
   };
 
   app.get("/{*path}", async (request, response, next) => {
     const url = request.originalUrl;
 
-    // AbortController per request — fired on client disconnect. Used
+    // AbortSignal lives inside RenderResult — createRequestScope (in
+    // entry-server.ts) wires req.on("close") → controller.abort(). Used
     // to bail out of the stream-pump loop early (otherwise we'd keep
-    // pulling chunks from the ReadableStream and discarding them).
-    // Also propagated to ssrDataPlugin loaders via cloneRouter deps —
-    // see entry-server.ts. Note: ETag/If-None-Match is intentionally
-    // NOT wired here. Computing a strong ETag requires hashing the
-    // full body; in a streaming pipeline the body never exists in
-    // memory as a single buffer, so honouring conditional GETs would
-    // mean buffering the whole stream first — which defeats the
-    // streaming purpose. See `cache-policies.ts` for the full
-    // rationale.
-    const abortController = new AbortController();
-
-    request.on("close", () => {
-      if (!response.writableEnded) {
-        abortController.abort();
-      }
-    });
-
-    let cleanup: (() => void) | undefined;
+    // pulling chunks from the ReadableStream and discarding them). The
+    // same signal is propagated to ssrDataPlugin loaders via
+    // cloneRouter deps. Note: ETag/If-None-Match is intentionally NOT
+    // wired here. Computing a strong ETag requires hashing the full
+    // body; in a streaming pipeline the body never exists in memory as
+    // a single buffer, so honouring conditional GETs would mean
+    // buffering the whole stream first — which defeats the streaming
+    // purpose. See `cache-policies.ts` for the full rationale.
+    let cleanup: (() => Promise<void>) | undefined;
 
     try {
-      const result = await module_.render(url);
+      const result = await module_.render(url, { req: request });
 
       cleanup = result.cleanup;
 
@@ -96,7 +91,7 @@ async function startServer(): Promise<void> {
 
       try {
         for (;;) {
-          if (abortController.signal.aborted) {
+          if (result.signal.aborted) {
             break;
           }
 
@@ -125,7 +120,7 @@ async function startServer(): Promise<void> {
       console.error(error);
       next(error);
     } finally {
-      cleanup?.();
+      await cleanup?.();
     }
   });
 

@@ -68,7 +68,7 @@ async function startServer(): Promise<void> {
           name: string;
           role: "admin" | "user";
         } | null;
-        abortSignal?: AbortSignal;
+        req: import("node:http").IncomingMessage;
       },
     ) => Promise<{
       html: string;
@@ -85,23 +85,13 @@ async function startServer(): Promise<void> {
     const url = request.originalUrl;
     const currentUser = getCurrentUserFromCookies(request.headers.cookie);
 
-    // AbortController per request — server fires .abort() if the client
-    // disconnects mid-render (browser tab closed, fetch cancelled,
-    // network drop). Loaders can listen via getDep("abortSignal") to
-    // cancel pending I/O — see /slow loader for the demonstrated
-    // pattern. Without this wiring a 5 s loader would hold the worker
-    // for the full delay even after the client gave up.
-    const abortController = new AbortController();
-
-    request.on("close", () => {
-      if (!response.writableEnded) {
-        abortController.abort();
-      }
-    });
-
+    // createRequestScope (inside render) wires AbortController +
+    // req.on("close") + cloneRouter + dispose. Loaders can read
+    // getDep("abortSignal") to cancel pending I/O when the client
+    // disconnects mid-render — see /slow loader for the pattern.
     const result = await module_.render(url, {
       currentUser,
-      abortSignal: abortController.signal,
+      req: request,
     });
 
     if (result.redirect) {

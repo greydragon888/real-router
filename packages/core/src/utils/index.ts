@@ -1,3 +1,12 @@
+export { createRequestScope } from "./createRequestScope";
+
+export type {
+  IncomingMessageLike,
+  RequestLike,
+  RequestScope,
+  RequestScopeSource,
+} from "./createRequestScope";
+
 export { getStaticPaths } from "./getStaticPaths";
 
 export { hydrateRouter } from "./hydrateRouter";

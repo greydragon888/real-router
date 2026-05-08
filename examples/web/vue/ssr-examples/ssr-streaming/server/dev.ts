@@ -34,20 +34,22 @@ async function startDevServer(): Promise<void> {
       template = await vite.transformIndexHtml(url, template);
 
       const module_ = (await vite.ssrLoadModule("/src/entry-server.ts")) as {
-        render: (url: string) => Promise<RenderResult>;
+        render: (
+          url: string,
+          ctx: { req: import("node:http").IncomingMessage },
+        ) => Promise<RenderResult>;
       };
 
-      const abortController = new AbortController();
-
-      request.on("close", () => {
-        if (!response.writableEnded) {
-          abortController.abort();
-        }
-      });
-
-      const result = await module_.render(url);
-      const { ssrJson, statusCode, cleanup, stream, rawBody, contentType } =
-        result;
+      const result = await module_.render(url, { req: request });
+      const {
+        ssrJson,
+        statusCode,
+        cleanup,
+        stream,
+        rawBody,
+        contentType,
+        signal,
+      } = result;
 
       // Typed loader errors short-circuit to plain-text before stream
       // construction — same path as production server.
@@ -56,7 +58,7 @@ async function startDevServer(): Promise<void> {
           .status(statusCode)
           .set("Content-Type", contentType ?? "text/plain; charset=utf-8")
           .send(rawBody);
-        cleanup();
+        await cleanup();
 
         return;
       }
@@ -85,7 +87,7 @@ async function startDevServer(): Promise<void> {
 
       try {
         for (;;) {
-          if (abortController.signal.aborted) {
+          if (signal.aborted) {
             break;
           }
 
@@ -111,7 +113,7 @@ async function startDevServer(): Promise<void> {
         response.end();
       }
 
-      cleanup();
+      await cleanup();
     } catch (error) {
       vite.ssrFixStacktrace(error as Error);
       console.error(error);

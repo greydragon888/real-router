@@ -9,7 +9,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
 
 interface RenderModule {
-  render: (url: string) => Promise<{
+  render: (
+    url: string,
+    ctx: { req: import("node:http").IncomingMessage },
+  ) => Promise<{
     html: string;
     hydrationScript: string;
     serializedData: string;
@@ -42,7 +45,7 @@ async function startServer(): Promise<void> {
         "/src/entry-server.tsx",
       )) as RenderModule;
 
-      const result = await module_.render(url);
+      const result = await module_.render(url, { req: request });
 
       const page = template
         .replace("<!--ssr-hydration-script-->", result.hydrationScript)

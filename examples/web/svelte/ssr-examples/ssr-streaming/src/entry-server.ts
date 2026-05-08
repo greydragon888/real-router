@@ -1,6 +1,9 @@
 import { UNKNOWN_ROUTE } from "@real-router/core";
-import { cloneRouter } from "@real-router/core/api";
-import { serializeRouterState } from "@real-router/core/utils";
+import {
+  createRequestScope,
+  serializeRouterState,
+  type IncomingMessageLike,
+} from "@real-router/core/utils";
 import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 import { render } from "svelte/server";
 
@@ -9,6 +12,10 @@ import { createAppRouter } from "./router/createAppRouter";
 import { loaders } from "./router/loaders";
 
 const baseRouter = createAppRouter();
+
+export interface RenderContext {
+  req: IncomingMessageLike;
+}
 
 export interface RenderResult {
   html: string;
@@ -29,20 +36,28 @@ function readErrorCode(error: unknown): string | undefined {
   return (error as MaybeError | null)?.code;
 }
 
-export async function renderPage(url: string): Promise<RenderResult> {
-  const router = cloneRouter(baseRouter);
+export async function renderPage(
+  url: string,
+  context: RenderContext,
+): Promise<RenderResult> {
+  // Explicit try/finally + await scope.dispose() (instead of `await using`)
+  // for compatibility with Node 22 LTS — see core JSDoc for the runtime
+  // matrix.
+  const scope = createRequestScope(context.req, baseRouter);
 
-  router.usePlugin(ssrDataPluginFactory(loaders));
+  scope.router.usePlugin(ssrDataPluginFactory(loaders));
 
   try {
-    const state = await router.start(url);
+    const state = await scope.router.start(url);
     const statusCode = state.name === UNKNOWN_ROUTE ? 404 : 200;
 
     // `await render(...)` covers both sync components and components with
     // top-level `await` / `<svelte:boundary pending>`. Svelte 5
     // RenderOutput is `SyncRenderOutput & PromiseLike<SyncRenderOutput>`,
     // so awaiting is safe even when no async work is happening.
-    const { head, body } = await render(App, { props: { router } });
+    const { head, body } = await render(App, {
+      props: { router: scope.router },
+    });
 
     return {
       html: body,
@@ -66,6 +81,6 @@ export async function renderPage(url: string): Promise<RenderResult> {
 
     throw error;
   } finally {
-    router.dispose();
+    await scope.dispose();
   }
 }
