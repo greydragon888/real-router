@@ -7,7 +7,7 @@
   "scripts": {
     "predev": "pnpm turbo run bundle --filter=...electron-react-example",
     "dev": "concurrently -k \"vite\" \"wait-on tcp:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron dist-electron/main.js\"",
-    "build": "vite build && tsc -p electron/tsconfig.json",
+    "build": "vite build && tsc -p electron/tsconfig.json && node electron/postbuild.mjs",
     "start": "electron dist-electron/main.js",
     "preview": "vite preview",
     "app:build": "pnpm build && electron-builder",
