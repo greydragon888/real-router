@@ -9,6 +9,8 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
+    "app:dev": "tauri dev",
+    "app:build": "tauri build",
     "test:e2e": "pnpm build && playwright test"
   },
   "dependencies": {

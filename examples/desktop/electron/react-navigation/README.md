@@ -9,8 +9,11 @@ pnpm install
 pnpm dev            # Vite HMR + Electron window pointed at it
 pnpm build          # tsc + vite build → dist/ + dist-electron/
 pnpm start          # launches Electron with the production bundle
+pnpm app:build      # native installer under release/ (.dmg / .exe / .AppImage)
 pnpm test:e2e       # Playwright via _electron.launch
 ```
+
+`app:build` runs `pnpm build` and then `electron-builder` with the `build` config in `package.json`. Output target is the host OS (macOS → `.dmg`, Windows → `.exe`, Linux → `.AppImage`). macOS `dmg` is unsigned (`mac.identity: null`), so it shows the Gatekeeper warning on first launch — fine for local demos, not for distribution.
 
 ## Why Electron, not Tauri, for `navigation-plugin`
 
