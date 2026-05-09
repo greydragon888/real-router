@@ -10,6 +10,11 @@
       "types": "./dist/index.d.ts",
       "svelte": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./ssr": {
+      "types": "./dist/ssr.d.ts",
+      "svelte": "./dist/ssr.js",
+      "default": "./dist/ssr.js"
     }
   },
   "files": [

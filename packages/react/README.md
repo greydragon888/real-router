@@ -231,7 +231,7 @@ Available from both `@real-router/react` and `@real-router/react/legacy`.
 Paired SSR-aware boundaries. `<ClientOnly>` renders `fallback` on the server (and on the client first paint, to match SSR HTML), then swaps in `children` after mount. `<ServerOnly>` is the symmetric inverse.
 
 ```tsx
-import { ClientOnly, ServerOnly } from "@real-router/react";
+import { ClientOnly, ServerOnly } from "@real-router/react/ssr";
 
 <ClientOnly fallback={<Skeleton />}>
   <BrowserApiWidget />

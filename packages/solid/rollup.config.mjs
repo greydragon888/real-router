@@ -14,26 +14,38 @@ const external = [
   "@real-router/route-utils",
 ];
 
+const sharedPlugins = [
+  nodeResolve({ extensions }),
+  babel({
+    extensions,
+    babelHelpers: "bundled",
+    babelrc: false,
+    presets: ["babel-preset-solid", "@babel/preset-typescript"],
+    exclude: "node_modules/**",
+  }),
+];
+
 /**
  * JS bundles (ESM + CJS) — compiled via babel-preset-solid
  */
-const jsBundles = {
+const indexJs = {
   input: "src/index.tsx",
   output: [
     { file: "dist/esm/index.mjs", format: "es" },
     { file: "dist/cjs/index.js", format: "cjs", exports: "named" },
   ],
   external,
-  plugins: [
-    nodeResolve({ extensions }),
-    babel({
-      extensions,
-      babelHelpers: "bundled",
-      babelrc: false,
-      presets: ["babel-preset-solid", "@babel/preset-typescript"],
-      exclude: "node_modules/**",
-    }),
+  plugins: sharedPlugins,
+};
+
+const ssrJs = {
+  input: "src/ssr.tsx",
+  output: [
+    { file: "dist/esm/ssr.mjs", format: "es" },
+    { file: "dist/cjs/ssr.js", format: "cjs", exports: "named" },
   ],
+  external,
+  plugins: sharedPlugins,
 };
 
 /**
@@ -53,6 +65,18 @@ const dtsBundles = [
     external,
     plugins: [dts()],
   },
+  {
+    input: "dist/types/ssr.d.ts",
+    output: { file: "dist/esm/ssr.d.mts", format: "es" },
+    external,
+    plugins: [dts()],
+  },
+  {
+    input: "dist/types/ssr.d.ts",
+    output: { file: "dist/cjs/ssr.d.ts", format: "cjs" },
+    external,
+    plugins: [dts()],
+  },
 ];
 
-export default [jsBundles, ...dtsBundles];
+export default [indexJs, ssrJs, ...dtsBundles];

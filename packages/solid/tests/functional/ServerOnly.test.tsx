@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@solidjs/testing-library";
 import { describe, it, expect } from "vitest";
 
-import { ServerOnly } from "@real-router/solid";
+import { ServerOnly } from "@real-router/solid/ssr";
 
 describe("ServerOnly", () => {
   it("renders fallback after mount when provided", async () => {

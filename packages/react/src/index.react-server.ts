@@ -1,4 +1,9 @@
 // React Server entry — type-only re-exports under `react-server` condition (RSC bundlers). See CLAUDE.md.
+//
+// SSR-feature prop types (`AwaitProps`, `StreamedProps`, `ClientOnlyProps`,
+// `ServerOnlyProps`) live in the `/ssr.react-server` entry — Server
+// Components that need them import from `@real-router/react/ssr` (resolves
+// to types only under the `react-server` condition).
 
 export type { LinkProps } from "./types";
 
@@ -22,10 +27,6 @@ export type {
 } from "./components/modern/RouteView";
 
 export type { RouterErrorBoundaryProps } from "./components/RouterErrorBoundary";
-
-export type { ClientOnlyProps } from "./components/ClientOnly";
-
-export type { ServerOnlyProps } from "./components/ServerOnly";
 
 export type { Navigator } from "@real-router/core";
 

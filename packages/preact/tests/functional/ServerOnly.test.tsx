@@ -3,7 +3,7 @@ import { hydrate } from "preact";
 import { renderToString } from "preact-render-to-string";
 import { describe, it, expect, vi } from "vitest";
 
-import { ServerOnly } from "@real-router/preact";
+import { ServerOnly } from "@real-router/preact/ssr";
 
 describe("ServerOnly", () => {
   describe("SSR (preact-render-to-string)", () => {

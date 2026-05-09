@@ -1,13 +1,13 @@
 // Legacy entry point — React 18+
+//
+// SSR-aware components/hooks live at `@real-router/react/legacy/ssr`
+// (subset of the React 19+ `/ssr` surface — `<Await>` is excluded since
+// it depends on `use(promise)`).
 
 // Components
 export { Link } from "./components/Link";
 
 export { RouterErrorBoundary } from "./components/RouterErrorBoundary";
-
-export { ClientOnly } from "./components/ClientOnly";
-
-export { ServerOnly } from "./components/ServerOnly";
 
 // Hooks
 export { useRouteNode } from "./hooks/useRouteNode";
@@ -29,10 +29,6 @@ export { RouterProvider } from "./RouterProvider";
 export type { LinkProps } from "./types";
 
 export type { RouterErrorBoundaryProps } from "./components/RouterErrorBoundary";
-
-export type { ClientOnlyProps } from "./components/ClientOnly";
-
-export type { ServerOnlyProps } from "./components/ServerOnly";
 
 export type { Navigator } from "@real-router/core";
 

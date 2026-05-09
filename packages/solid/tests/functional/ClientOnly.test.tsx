@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@solidjs/testing-library";
 import { describe, it, expect } from "vitest";
 
-import { ClientOnly } from "@real-router/solid";
+import { ClientOnly } from "@real-router/solid/ssr";
 
 describe("ClientOnly", () => {
   it("renders children after mount", async () => {

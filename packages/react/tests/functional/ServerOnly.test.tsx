@@ -3,7 +3,7 @@ import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { describe, it, expect, vi } from "vitest";
 
-import { ServerOnly } from "@real-router/react";
+import { ServerOnly } from "@real-router/react/ssr";
 
 import type { Root } from "react-dom/client";
 

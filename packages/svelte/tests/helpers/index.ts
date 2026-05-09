@@ -46,6 +46,36 @@ export function createTestRouterWithADefaultRouter(): Router {
   return router;
 }
 
+/**
+ * Mutate `router.getState()` to return a state snapshot with
+ * `state.context.ssrDataDeferred` populated. Mirrors the Solid adapter's
+ * `injectDeferred` helper. Used by `Await` / `useDeferred` tests to drive
+ * the deferred-promise consumer surface without a full
+ * `ssr-data-plugin + defer()` round-trip.
+ */
+export function injectDeferred(
+  router: Router,
+  map: Record<string, Promise<unknown>>,
+): void {
+  const state = router.getState();
+
+  if (!state) {
+    throw new Error(
+      "injectDeferred: router has no active state — call await router.start() first",
+    );
+  }
+
+  const mutated = {
+    ...state,
+    context: { ...state.context, ssrDataDeferred: map },
+  };
+
+  Object.defineProperty(router, "getState", {
+    value: () => mutated,
+    configurable: true,
+  });
+}
+
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export function renderWithRouter(
   router: Router,
