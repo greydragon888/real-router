@@ -4,7 +4,7 @@ import { TestBed } from "@angular/core/testing";
 import { By } from "@angular/platform-browser";
 import { describe, it, expect } from "vitest";
 
-import { ClientOnly } from "../../src/components/ClientOnly";
+import { ClientOnly } from "@real-router/angular/ssr";
 
 /**
  * JIT-mode caveat: signal `input()` template bindings (`[fallback]="tpl"`)

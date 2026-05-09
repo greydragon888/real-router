@@ -288,13 +288,15 @@ WCAG-compliant screen reader announcements for route changes. Add it once near t
 
 See the [Accessibility](#accessibility) section for details.
 
-### `<client-only>` / `<server-only>`
+### `<client-only>` / `<server-only>` (`@real-router/angular/ssr`)
 
 Paired SSR-aware boundaries. `<client-only>` renders the bound `fallback` `TemplateRef` on the server (and on the client first paint, to match SSR HTML), then swaps in the projected children after mount. `<server-only>` is the symmetric inverse.
 
+Imported from the `/ssr` subpath (ng-packagr secondary entry-point). The same `/ssr` entry also exposes `injectDeferred()` — see [packages/angular/CLAUDE.md](./CLAUDE.md) — for cross-adapter parity with `@real-router/{react,preact,solid,vue,svelte}/ssr`.
+
 ```typescript
 import { Component } from "@angular/core";
-import { ClientOnly, ServerOnly } from "@real-router/angular";
+import { ClientOnly, ServerOnly } from "@real-router/angular/ssr";
 
 @Component({
   selector: "app-home",

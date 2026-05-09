@@ -12,6 +12,9 @@ export type {
 
 export { sourceToSignal } from "./sourceToSignal";
 
+// Note: SSR-feature exports (`ClientOnly`, `ServerOnly`, `injectDeferred`)
+// have moved to the `/ssr` subpath — import them from
+// `@real-router/angular/ssr` to opt into the SSR-feature surface.
 export {
   injectRouter,
   injectNavigator,
@@ -38,10 +41,6 @@ export { RouteView } from "./components/RouteView";
 export { RouterErrorBoundary } from "./components/RouterErrorBoundary";
 
 export type { ErrorContext } from "./components/RouterErrorBoundary";
-
-export { ClientOnly } from "./components/ClientOnly";
-
-export { ServerOnly } from "./components/ServerOnly";
 
 export { NavigationAnnouncer } from "./components/NavigationAnnouncer";
 
