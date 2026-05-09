@@ -9,12 +9,29 @@
 | `ssrDataPluginFactory`   | function | Plugin factory — pass loaders map, returns `PluginFactory`         |
 | `getSsrDataMode`         | function | Read `state.context.ssrDataMode` with `"full"` fallback            |
 | `invalidate`             | function | `(router, "data") => void` — mark `"data"` stale; next navigation re-runs the loader |
+| `defer`                  | function | `(opts: { critical, deferred }) => DeferredPayload` — declares a critical/deferred split returned from a loader (#610) |
+| `isDeferred`             | function | Type guard — `true` iff value is a `defer()` payload                |
+| `DeferredPayload`        | type     | Branded `{ critical, deferred }` shape returned by `defer()`        |
 | `DataLoaderFn`           | type     | Compiled loader signature: `(params, context?: { signal: AbortSignal }) => Promise<unknown> \| unknown` |
 | `SsrLoaderContext`       | type     | `{ signal: AbortSignal }` — passed by the leave handler so cancellation-aware loaders can abort in-flight work |
 | `DataLoaderFnFactory`    | type     | Factory signature: `(router, getDependency) => DataLoaderFn`       |
 | `DataRouteEntry`         | type     | Per-route entry: factory (short form) or `{ ssr?, loader? }` object |
 | `DataLoaderFactoryMap`   | type     | Record of route entries — pass to `ssrDataPluginFactory()`         |
 | `SsrMode`                | type     | `"full" \| "data-only" \| "client-only"` — published per-route      |
+
+### Subpath: `@real-router/ssr-data-plugin/server`
+
+| Export                      | Kind     | Description                                                                                                  |
+| --------------------------- | -------- | ------------------------------------------------------------------------------------------------------------ |
+| `injectDeferredScripts`     | function | `(stream, deferredMap, opts?) => ReadableStream<Uint8Array>` — wraps an HTML stream with `<script>__rrDefer__("key", json)</script>` tags emitted as each promise resolves. Default `bootstrap: true` prepends the registry installer. |
+| `getDeferBootstrapScript`   | function | Returns the inline JS (no `<script>` wrapper) that installs `__rrDeferRegistry__` + `__rrDefer__` / `__rrDeferError__`. Embed once in `<head>` so React hydration sees a pristine `#root`. |
+| `InjectDeferredScriptsOptions` | type  | `{ serialize?: (v) => string; serializeError?: (e) => string; bootstrap?: boolean }` — opt-in `devalue.stringify` / `superjson.stringify` for non-JSON deferred payloads, custom error shape, or bootstrap suppression. |
+
+Server-only — Node `ReadableStream` / Web Streams. Application server (e.g.
+Express + Vite middleware) splits `index.html` by `<!--defer-bootstrap-->`
+in `<head>` for the bootstrap and `<!--ssr-outlet-->` inside `<div id="root">`
+for the React stream piped through `injectDeferredScripts`. See
+[examples/web/react/ssr-examples/ssr-streaming](../../examples/web/react/ssr-examples/ssr-streaming/).
 
 ### Subpath: `@real-router/ssr-data-plugin/errors`
 
@@ -114,9 +131,10 @@ src/
 ├── validation.ts  — validateLoaders = createLoadersValidator(ERROR_PREFIX) — generic shared validator
 ├── types.ts       — DataLoaderFn, DataLoaderFnFactory, DataLoaderFactoryMap (public-facing types)
 ├── errors.ts      — Re-export from shared-ssr/errors (LoaderRedirect, LoaderNotFound, LoaderTimeout, withTimeout)
+├── server.ts      — Server-side wire-format helpers: injectDeferredScripts, getDeferBootstrapScript (#610). Subpath: @real-router/ssr-data-plugin/server.
 ├── constants.ts   — ERROR_PREFIX (LOGGER_CONTEXT — internal)
-├── index.ts       — Public exports + module augmentation (@real-router/types for StateContext)
-└── shared-ssr/    — symlink → shared/ssr/ (createSsrLoaderPlugin, createLoadersValidator, errors)
+├── index.ts       — Public exports + module augmentation (@real-router/types for StateContext, including ssrDataDeferred / ssrDataDeferredKeys)
+└── shared-ssr/    — symlink → shared/ssr/ (createSsrLoaderPlugin, createLoadersValidator, errors, defer, deferRegistry)
 ```
 
 The `factory.ts` and `validation.ts` are intentionally tiny adapters — the actual try/catch + interceptor + claim logic lives in [`shared/ssr/`](../../../shared/ssr/) and is consumed by both `ssr-data-plugin` (T = `unknown`, namespace = `"data"`) and `rsc-server-plugin` (T = `ReactNode`, namespace = `"rsc"`).
@@ -140,6 +158,87 @@ Every `start()` triggers a fresh loader call. Caching is the caller's responsibi
 ### Teardown releases both claims
 
 `unsubscribe()` removes the `start` interceptor, removes the `subscribeLeave` revalidation listener, and releases **both** the `"data"` namespace and the `"ssrDataMode"` namespace claims. In SSR, `router.dispose()` triggers teardown automatically.
+
+### `defer({ critical, deferred })` — formal critical/deferred split (#610)
+
+Loaders may return `defer({ critical, deferred })` to declare a critical
+bundle (resolved before the shell renders) and a record of deferred promises
+(streamed after via inline `<script>__rrDefer__("key", json)</script>` chunks).
+
+```ts
+import { defer } from "@real-router/ssr-data-plugin";
+
+"products.detail": () => (params) => {
+  const product = getProduct(params.id);
+  if (!product) throw new LoaderNotFound(`product:${params.id}`);
+
+  return defer({
+    critical: { product },
+    deferred: {
+      reviews: fetchReviews(params.id),
+      related: fetchRelated(params.id),
+    },
+  });
+}
+```
+
+The plugin writes:
+
+- `state.context.data` — `critical` (existing contract, no consumer change)
+- `state.context.ssrDataDeferred` — `Record<string, Promise<unknown>>`. On the
+  server the actual loader-returned promises; on the client (post-hydration)
+  registry-backed promises that resolve as the inline settle scripts land.
+- `state.context.ssrDataDeferredKeys` — declared key list, included in the
+  SSR JSON state so the client plugin can reconstruct the map.
+
+Server pipeline:
+
+```ts
+import { renderToReadableStream } from "react-dom/server";
+import {
+  getDeferBootstrapScript,
+  injectDeferredScripts,
+} from "@real-router/ssr-data-plugin/server";
+
+const reactStream = await renderToReadableStream(<App />);
+const deferred =
+  (state.context as { ssrDataDeferred?: Record<string, Promise<unknown>> })
+    .ssrDataDeferred ?? {};
+
+// Wrap the React stream — settle scripts are interleaved in resolution order.
+const stream = injectDeferredScripts(reactStream, deferred, {
+  bootstrap: false, // emit bootstrap separately (cleaner React hydration)
+});
+
+const bootstrap = `<script>${getDeferBootstrapScript()}</script>`;
+// Embed `bootstrap` in <head>, pipe `stream` into <div id="root"> body.
+```
+
+Adapter consumers:
+
+- React: `useDeferred(key)` + `<Await>` / `<Streamed>` from `@real-router/react/ssr`
+  (see [packages/react/CLAUDE.md](../react/CLAUDE.md))
+- Preact: `useDeferred(key)` + `<Await>` / `<Streamed>` from `@real-router/preact/ssr`
+  (see [packages/preact/CLAUDE.md](../preact/CLAUDE.md))
+
+**Adapters that intentionally don't dogfood `defer()`:**
+
+- **Solid** — has native `createResource` + serialised resources; the framework's own splice protocol (`$df()`) interleaves with `<Suspense>` automatically, so the adapter's `<Await>` is available but `examples/web/solid/ssr-examples/ssr-streaming/` keeps the per-component `createResource` pattern (see that example's `loaders.ts` for the rationale).
+- **Vue** — `<Suspense>` + `async setup()` resolves promises *before* emitting each chunk (chunked-blocking, no progressive HTTP-flush), and inline `<script>__rrDefer__(…)` settle scripts inside the streamed body trip Vue's hydration walker ("Hydration completed but contains mismatches"). The Vue example uses per-component `await fetchX()` in `<script setup>` instead — same `<Await>` API ships in `@real-router/vue/ssr` for cases where the consumer has already adapted their data layer to a single deferred channel.
+- **Svelte** — native `{#await}` blocks have the same chunked-blocking semantics as Vue. The adapter exposes `<Await>` / `<Streamed>` via `@real-router/svelte/ssr` for symmetry, but the Svelte example uses `{#await}` directly.
+- **Angular** — uses `injectDeferred()` (signal-based, asymmetric — see [packages/angular/CLAUDE.md](../angular/CLAUDE.md)) when paired with `defer()`. The streaming example uses native `@defer` blocks + `withIncrementalHydration()` instead, since Angular's chunk loading and per-block hydration cover the same ground without needing the wire-format bridge.
+
+In short: `defer()` is an opt-in API for adapters whose framework lacks a native server-side promise integration (Preact) or whose ecosystem already aligns with the inline-settle-script transport (React via `<Suspense>` + `use()`). Pick the framework-native pattern when the adapter ships one.
+
+`devalue` / `superjson` integration: pass `{ serialize: devalue.stringify }`
+to `injectDeferredScripts` for non-JSON deferred payloads. Pair with
+`hydrateRouter(router, json, { deserialize: devalue.parse })` for the
+critical-data side.
+
+Composes with `invalidate(router, "data")`:
+`router.navigate({ reload: true })` after `invalidate(...)` re-runs the
+loader, overwrites both critical data and the deferred map. The new deferred
+promises replace the old ones in `state.context.ssrDataDeferred`.
 
 ### `invalidate(router, "data")` — CSR revalidation
 

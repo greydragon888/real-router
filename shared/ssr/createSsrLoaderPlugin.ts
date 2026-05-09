@@ -1,6 +1,8 @@
 import { getPluginApi } from "@real-router/core/api";
 import { getInternals } from "@real-router/core/validation";
 
+import { isDeferred } from "./defer.js";
+import { ensureRegistryPromise } from "./deferRegistry.js";
 import { clearStale, isStale } from "./staleRegistry.js";
 import { ALL_SSR_MODES } from "./types.js";
 
@@ -61,6 +63,28 @@ function resolveMode(
   return value;
 }
 
+interface CompiledDeferred {
+  promises: Record<string, Promise<unknown>>;
+  keys: string[];
+}
+
+function processLoaderResult<T>(
+  result: T,
+  hasDeferredSupport: boolean,
+): { critical: T; deferred: CompiledDeferred | null } {
+  if (hasDeferredSupport && isDeferred(result)) {
+    return {
+      critical: result.critical as T,
+      deferred: {
+        promises: result.deferred,
+        keys: Object.keys(result.deferred),
+      },
+    };
+  }
+
+  return { critical: result, deferred: null };
+}
+
 export function createSsrLoaderPlugin<
   T,
   Dependencies extends DefaultDependencies = DefaultDependencies,
@@ -68,6 +92,19 @@ export function createSsrLoaderPlugin<
   loaders: SsrLoaderFactoryMap<T, SsrMode, Dependencies>,
   config: SsrLoaderPluginConfig,
 ): PluginFactory<Dependencies> {
+  const hasDeferredSupport =
+    config.deferredNamespace !== undefined &&
+    config.deferredKeysNamespace !== undefined;
+
+  if (
+    (config.deferredNamespace !== undefined) !==
+    (config.deferredKeysNamespace !== undefined)
+  ) {
+    throw new TypeError(
+      `${config.errorPrefix} \`deferredNamespace\` and \`deferredKeysNamespace\` must be set together`,
+    );
+  }
+
   return (router, getDependency): Plugin => {
     const api = getPluginApi(router);
     const allowed = config.allowedModes ?? ALL_SSR_MODES;
@@ -75,6 +112,8 @@ export function createSsrLoaderPlugin<
     const dataClaim = api.claimContextNamespace(config.namespace);
 
     let modeClaim: ContextNamespaceClaim;
+    let deferredClaim: ContextNamespaceClaim | null = null;
+    let deferredKeysClaim: ContextNamespaceClaim | null = null;
 
     try {
       modeClaim = api.claimContextNamespace(config.modeNamespace);
@@ -82,6 +121,29 @@ export function createSsrLoaderPlugin<
       dataClaim.release();
 
       throw error;
+    }
+
+    if (hasDeferredSupport) {
+      try {
+        deferredClaim = api.claimContextNamespace(config.deferredNamespace!);
+      } catch (error) {
+        dataClaim.release();
+        modeClaim.release();
+
+        throw error;
+      }
+
+      try {
+        deferredKeysClaim = api.claimContextNamespace(
+          config.deferredKeysNamespace!,
+        );
+      } catch (error) {
+        dataClaim.release();
+        modeClaim.release();
+        deferredClaim.release();
+
+        throw error;
+      }
     }
 
     const compiled = new Map<string, CompiledEntry<T>>();
@@ -109,11 +171,67 @@ export function createSsrLoaderPlugin<
     } catch (error) {
       dataClaim.release();
       modeClaim.release();
+      deferredClaim?.release();
+      deferredKeysClaim?.release();
 
       throw error;
     }
 
     const internals = getInternals(router);
+
+    const writeLoaderResult = (state: State, value: T): void => {
+      const processed = processLoaderResult(value, hasDeferredSupport);
+
+      dataClaim.write(state, processed.critical);
+
+      if (processed.deferred !== null && deferredClaim && deferredKeysClaim) {
+        deferredClaim.write(state, processed.deferred.promises);
+        deferredKeysClaim.write(state, processed.deferred.keys);
+      }
+    };
+
+    const reconstructDeferredFromHydration = (
+      state: State,
+      hydrated: Record<string, unknown>,
+    ): void => {
+      if (!hasDeferredSupport || !deferredClaim || !deferredKeysClaim) return;
+
+      const keysRaw = hydrated[config.deferredKeysNamespace!];
+
+      if (!Array.isArray(keysRaw)) return;
+
+      const keys = keysRaw.filter(
+        (k): k is string =>
+          typeof k === "string" &&
+          // Defensive: drop reserved keys that would corrupt the prototype
+          // chain when assigned via `[key] = …`. `{ __proto__: x }` literal
+          // does the same thing and would trigger the setter on the fresh
+          // object below — turning useDeferred("then") into a function ref
+          // pulled from Promise.prototype. With a null-prototype object
+          // (below) `__proto__` is just a property, but skipping these
+          // keys outright keeps the surface predictable.
+          k !== "__proto__" &&
+          k !== "constructor" &&
+          k !== "prototype",
+      );
+
+      if (keys.length === 0) return;
+
+      // Null-prototype object so `[key] = …` cannot trigger the
+      // `Object.prototype.__proto__` setter, even if the filter above is
+      // bypassed by future refactors.
+      const promises = Object.create(null) as Record<
+        string,
+        Promise<unknown>
+      >;
+
+      for (const key of keys) {
+        promises[key] = ensureRegistryPromise(key);
+      }
+
+      deferredClaim.write(state, promises);
+      deferredKeysClaim.write(state, keys);
+    };
 
     const removeStartInterceptor = api.addInterceptor(
       "start",
@@ -143,8 +261,9 @@ export function createSsrLoaderPlugin<
           config.namespace in hydrationState.context
         ) {
           dataClaim.write(state, hydrationState.context[config.namespace] as T);
+          reconstructDeferredFromHydration(state, hydrationState.context);
         } else if (entry.loader !== undefined) {
-          dataClaim.write(state, await entry.loader(state.params));
+          writeLoaderResult(state, await entry.loader(state.params));
         }
 
         return state;
@@ -186,7 +305,7 @@ export function createSsrLoaderPlugin<
         if (signal.aborted) return;
 
         clearStale(router, config.namespace);
-        dataClaim.write(nextRoute, data);
+        writeLoaderResult(nextRoute, data);
       },
     );
 
@@ -196,6 +315,8 @@ export function createSsrLoaderPlugin<
         removeLeaveListener();
         dataClaim.release();
         modeClaim.release();
+        deferredClaim?.release();
+        deferredKeysClaim?.release();
       },
     };
   };

@@ -3,9 +3,19 @@ import { cloneRouter, getPluginApi } from "@real-router/core/api";
 import { hydrateRouter, serializeRouterState } from "@real-router/core/utils";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { getSsrDataMode, invalidate, ssrDataPluginFactory } from "../../src";
+import {
+  defer,
+  getSsrDataMode,
+  invalidate,
+  ssrDataPluginFactory,
+} from "../../src";
 import { LoaderTimeout, withTimeout } from "../../src/errors";
 import { markStale } from "../../src/shared-ssr";
+import {
+  __resetRegistryForTests,
+  ensureRegistryPromise,
+  getDeferBootstrapScript,
+} from "../../src/shared-ssr/deferRegistry";
 
 import type { DataLoaderFactoryMap, SsrMode } from "../../src";
 import type { Router, State } from "@real-router/core";
@@ -1635,6 +1645,321 @@ describe("@real-router/ssr-data-plugin", () => {
       await router.navigate("users.profile", { id: "42" }, { reload: true });
 
       expect(router.getState()!.context.data).toBe("recovered");
+    });
+  });
+
+  describe("defer() — critical/deferred split", () => {
+    afterEach(() => {
+      __resetRegistryForTests();
+    });
+
+    it("writes critical to context.data and promises to context.ssrDataDeferred", async () => {
+      const reviewsP = Promise.resolve([{ id: "r1" }]);
+      const relatedP = Promise.resolve([{ id: "k1" }]);
+
+      router.usePlugin(
+        ssrDataPluginFactory({
+          "users.profile": () => () =>
+            defer({
+              critical: { product: { id: "42" } },
+              deferred: { reviews: reviewsP, related: relatedP },
+            }),
+        }),
+      );
+
+      const state = await router.start("/users/42");
+
+      expect(state.context.data).toStrictEqual({ product: { id: "42" } });
+      expect(state.context.ssrDataDeferred).toStrictEqual({
+        reviews: reviewsP,
+        related: relatedP,
+      });
+      expect(state.context.ssrDataDeferredKeys).toStrictEqual([
+        "reviews",
+        "related",
+      ]);
+      expect(state.context.ssrDataDeferred!.reviews).toBe(reviewsP);
+    });
+
+    it("does not touch deferred namespaces when loader returns plain data", async () => {
+      router.usePlugin(
+        ssrDataPluginFactory({
+          "users.profile": () => () => Promise.resolve({ user: "Alice" }),
+        }),
+      );
+
+      const state = await router.start("/users/42");
+
+      expect(state.context.data).toStrictEqual({ user: "Alice" });
+      expect(state.context.ssrDataDeferred).toBeUndefined();
+      expect(state.context.ssrDataDeferredKeys).toBeUndefined();
+    });
+
+    it("supports empty deferred record", async () => {
+      router.usePlugin(
+        ssrDataPluginFactory({
+          "users.profile": () => () =>
+            defer({
+              critical: { user: "Bob" },
+              deferred: {},
+            }),
+        }),
+      );
+
+      const state = await router.start("/users/42");
+
+      expect(state.context.data).toStrictEqual({ user: "Bob" });
+      expect(state.context.ssrDataDeferred).toStrictEqual({});
+      expect(state.context.ssrDataDeferredKeys).toStrictEqual([]);
+    });
+
+    it("reconstructs deferred promises from registry on hydration scratchpad path", async () => {
+      const serverState = buildServerState({
+        context: {
+          data: { product: { id: "42" } },
+          ssrDataMode: "full" as SsrMode,
+          ssrDataDeferredKeys: ["reviews", "related"],
+        },
+      });
+
+      router.usePlugin(
+        ssrDataPluginFactory({
+          "users.profile": () => () => {
+            throw new Error("loader should be skipped after hydration");
+          },
+        }),
+      );
+
+      await hydrateRouter(router, serializeRouterState(serverState));
+
+      const state = router.getState()!;
+
+      expect(state.context.data).toStrictEqual({ product: { id: "42" } });
+      expect(state.context.ssrDataDeferredKeys).toStrictEqual([
+        "reviews",
+        "related",
+      ]);
+
+      const deferred = state.context.ssrDataDeferred;
+
+      expect(deferred).toBeDefined();
+      expect(deferred!.reviews).toBeInstanceOf(Promise);
+      expect(deferred!.related).toBeInstanceOf(Promise);
+
+      expect(deferred!.reviews).toBe(ensureRegistryPromise("reviews"));
+    });
+
+    it("settles registry-backed promises when bootstrap+settle scripts run", async () => {
+      const serverState = buildServerState({
+        context: {
+          data: { product: { id: "42" } },
+          ssrDataMode: "full" as SsrMode,
+          ssrDataDeferredKeys: ["reviews"],
+        },
+      });
+
+      router.usePlugin(
+        ssrDataPluginFactory({
+          "users.profile": () => () => Promise.resolve("never"),
+        }),
+      );
+
+      await hydrateRouter(router, serializeRouterState(serverState));
+
+      const deferred = router.getState()!.context.ssrDataDeferred!;
+
+      // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- const bootstrap script
+      new Function(getDeferBootstrapScript())();
+
+      const settle = (
+        globalThis as {
+          __rrDefer__?: (k: string, j: string) => void;
+        }
+      ).__rrDefer__;
+
+      expect(settle).toBeTypeOf("function");
+
+      settle!("reviews", JSON.stringify([{ id: "r1" }]));
+
+      await expect(deferred.reviews).resolves.toStrictEqual([{ id: "r1" }]);
+    });
+
+    it("ignores non-array ssrDataDeferredKeys in hydrated state", async () => {
+      const serverState = buildServerState({
+        context: {
+          data: { product: { id: "42" } },
+          ssrDataMode: "full" as SsrMode,
+          ssrDataDeferredKeys: "garbage" as unknown as string[],
+        },
+      });
+
+      router.usePlugin(
+        ssrDataPluginFactory({
+          "users.profile": () => () => Promise.resolve("never"),
+        }),
+      );
+
+      await hydrateRouter(router, serializeRouterState(serverState));
+
+      expect(router.getState()!.context.ssrDataDeferred).toBeUndefined();
+    });
+
+    it("filters non-string entries in ssrDataDeferredKeys defensively", async () => {
+      const serverState = buildServerState({
+        context: {
+          data: { product: { id: "42" } },
+          ssrDataMode: "full" as SsrMode,
+          ssrDataDeferredKeys: [
+            "reviews",
+            42,
+            null,
+            "related",
+          ] as unknown as string[],
+        },
+      });
+
+      router.usePlugin(
+        ssrDataPluginFactory({
+          "users.profile": () => () => Promise.resolve("never"),
+        }),
+      );
+
+      await hydrateRouter(router, serializeRouterState(serverState));
+
+      const state = router.getState()!;
+
+      // The hydrated value is what the plugin wrote — strings only.
+      expect(state.context.ssrDataDeferredKeys).toStrictEqual([
+        "reviews",
+        "related",
+      ]);
+      expect(Object.keys(state.context.ssrDataDeferred!)).toStrictEqual([
+        "reviews",
+        "related",
+      ]);
+    });
+
+    it("skips deferred reconstruction when keys array is empty", async () => {
+      const serverState = buildServerState({
+        context: {
+          data: { product: { id: "42" } },
+          ssrDataMode: "full" as SsrMode,
+          ssrDataDeferredKeys: [],
+        },
+      });
+
+      router.usePlugin(
+        ssrDataPluginFactory({
+          "users.profile": () => () => Promise.resolve("never"),
+        }),
+      );
+
+      await hydrateRouter(router, serializeRouterState(serverState));
+
+      expect(router.getState()!.context.ssrDataDeferred).toBeUndefined();
+    });
+
+    it("invalidate + reload re-runs loader and updates deferred promises", async () => {
+      const reviewsP1 = Promise.resolve([{ id: "old" }]);
+      const reviewsP2 = Promise.resolve([{ id: "new" }]);
+      let call = 0;
+
+      router.usePlugin(
+        ssrDataPluginFactory({
+          "users.profile": () => () => {
+            call++;
+
+            return defer({
+              critical: { user: "Alice" },
+              deferred: { reviews: call === 1 ? reviewsP1 : reviewsP2 },
+            });
+          },
+        }),
+      );
+
+      const state = await router.start("/users/42");
+
+      expect(state.context.ssrDataDeferred!.reviews).toBe(reviewsP1);
+
+      invalidate(router, "data");
+      await router.navigate("users.profile", { id: "42" }, { reload: true });
+
+      const refreshed = router.getState()!;
+
+      expect(refreshed.context.ssrDataDeferred!.reviews).toBe(reviewsP2);
+      expect(call).toBe(2);
+    });
+
+    it("filters reserved keys (__proto__, constructor, prototype) during hydration reconstruction", async () => {
+      const serverState = buildServerState({
+        context: {
+          data: { product: { id: "42" } },
+          ssrDataMode: "full" as SsrMode,
+          ssrDataDeferredKeys: [
+            "reviews",
+            "__proto__",
+            "constructor",
+            "prototype",
+            "related",
+          ] as unknown as string[],
+        },
+      });
+
+      router.usePlugin(
+        ssrDataPluginFactory({
+          "users.profile": () => () => Promise.resolve("never"),
+        }),
+      );
+
+      await hydrateRouter(router, serializeRouterState(serverState));
+
+      const state = router.getState()!;
+      const deferred = state.context.ssrDataDeferred!;
+
+      // Only safe keys land in the registry-backed map.
+      expect(state.context.ssrDataDeferredKeys).toStrictEqual([
+        "reviews",
+        "related",
+      ]);
+      expect(Object.keys(deferred)).toStrictEqual(["reviews", "related"]);
+
+      // Null-prototype object — `then` (would-be Promise.prototype lookup)
+      // is undefined, not the inherited function.
+      expect(Object.getPrototypeOf(deferred)).toBeNull();
+      expect((deferred as Record<string, unknown>).then).toBeUndefined();
+    });
+
+    it("rejects when only one of deferredNamespace / deferredKeysNamespace is configured", async () => {
+      // We can't easily call createSsrLoaderPlugin here since factory.ts hardcodes both,
+      // so call createSsrLoaderPlugin directly via shared-ssr import.
+      const { createSsrLoaderPlugin } =
+        await import("../../src/shared-ssr/index.js");
+
+      expect(() =>
+        createSsrLoaderPlugin(
+          {},
+          {
+            namespace: "data",
+            modeNamespace: "ssrDataMode",
+            deferredNamespace: "ssrDataDeferred",
+            // missing deferredKeysNamespace
+            errorPrefix: "[test]",
+          },
+        ),
+      ).toThrow(/must be set together/);
+
+      expect(() =>
+        createSsrLoaderPlugin(
+          {},
+          {
+            namespace: "data",
+            modeNamespace: "ssrDataMode",
+            deferredKeysNamespace: "ssrDataDeferredKeys",
+            // missing deferredNamespace
+            errorPrefix: "[test]",
+          },
+        ),
+      ).toThrow(/must be set together/);
     });
   });
 });

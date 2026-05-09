@@ -13,6 +13,8 @@ export function ssrDataPluginFactory<
   return createSsrLoaderPlugin<unknown, Dependencies>(loaders, {
     namespace: "data",
     modeNamespace: "ssrDataMode",
+    deferredNamespace: "ssrDataDeferred",
+    deferredKeysNamespace: "ssrDataDeferredKeys",
     errorPrefix: ERROR_PREFIX,
   });
 }

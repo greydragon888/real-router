@@ -24,6 +24,15 @@
       },
       "import": "./dist/esm/errors.mjs",
       "require": "./dist/cjs/errors.js"
+    },
+    "./server": {
+      "@real-router/internal-source": "./src/server.ts",
+      "types": {
+        "import": "./dist/esm/server.d.mts",
+        "require": "./dist/cjs/server.d.ts"
+      },
+      "import": "./dist/esm/server.mjs",
+      "require": "./dist/cjs/server.js"
     }
   },
   "files": [

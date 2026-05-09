@@ -93,4 +93,15 @@ export interface SsrLoaderPluginConfig {
   modeNamespace: string;
   errorPrefix: string;
   allowedModes?: readonly SsrMode[];
+  /**
+   * When set, the plugin recognises `defer()` payloads from loaders.
+   * Critical data is written to `<namespace>`, deferred promises to
+   * `<deferredNamespace>`, and the deferred key list (for client-side
+   * registry hydration) to `<deferredKeysNamespace>`.
+   *
+   * Both fields must be set together; one without the other rejects at
+   * factory-time.
+   */
+  deferredNamespace?: string;
+  deferredKeysNamespace?: string;
 }

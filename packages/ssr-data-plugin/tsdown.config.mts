@@ -5,6 +5,7 @@ export default createIsomorphicConfig({
     entry: {
       index: "src/index.ts",
       errors: "src/errors.ts",
+      server: "src/server.ts",
     },
   },
 });
