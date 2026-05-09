@@ -6,6 +6,10 @@ import {
 } from "@real-router/core/utils";
 import { RouterProvider } from "@real-router/react";
 import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
+import {
+  getDeferBootstrapScript,
+  injectDeferredScripts,
+} from "@real-router/ssr-data-plugin/server";
 import { renderToReadableStream } from "react-dom/server";
 
 import { App } from "./App";
@@ -34,6 +38,11 @@ export interface RenderResult {
   rawBody?: string;
   /** Optional Content-Type override for rawBody responses. */
   contentType?: string;
+  /** Inline `<script>` that installs the `__rrDeferRegistry__` + `__rrDefer__`
+   * functions before any settle script lands in the body. Empty string when
+   * the route has no deferred promises. Server inserts in `<head>` via
+   * `<!--defer-bootstrap-->` template substitution. */
+  deferBootstrap: string;
 }
 
 interface MaybeError {
@@ -56,13 +65,6 @@ export async function render(
 
   scope.router.usePlugin(ssrDataPluginFactory(loaders));
 
-  // Critical-data resolution can throw typed loader errors. Mapping
-  // them at this layer avoids the leak in the previous design: a
-  // generic throw bubbled past the streaming server's render() call
-  // site, the catch block never knew about `cleanup`, and
-  // router.dispose() was skipped — leaking the per-request router
-  // until GC. By returning a RenderResult with rawBody + cleanup, the
-  // server can react properly without the leak.
   let state;
 
   try {
@@ -78,11 +80,10 @@ export async function render(
         cleanup: () => scope.dispose(),
         rawBody: "Not Found",
         contentType: "text/plain; charset=utf-8",
+        deferBootstrap: "",
       };
     }
 
-    // Unknown error — clean up before propagating so the express
-    // middleware's catch handler doesn't have to know about cleanup.
     await scope.dispose();
 
     throw error;
@@ -90,9 +91,17 @@ export async function render(
 
   const statusCode = state.name === UNKNOWN_ROUTE ? 404 : 200;
 
-  const ssrJson = serializeRouterState(state);
+  // Strip live promises from the JSON state — they don't survive
+  // serialization. The deferred KEYS list (`ssrDataDeferredKeys`) IS shipped
+  // so the client-side plugin can reconstruct registry-backed promises after
+  // hydration. The ssrDataDeferred Map values are recovered from the inline
+  // <script>__rrDefer__("key", json)</script> tags injected by
+  // `injectDeferredScripts` below.
+  const ssrJson = serializeRouterState(state, {
+    excludeContext: ["ssrDataDeferred"],
+  });
 
-  const stream = await renderToReadableStream(
+  const reactStream = await renderToReadableStream(
     <RouterProvider router={scope.router}>
       <App />
     </RouterProvider>,
@@ -103,11 +112,29 @@ export async function render(
     },
   );
 
+  const deferredMap =
+    (state.context as { ssrDataDeferred?: Record<string, Promise<unknown>> })
+      .ssrDataDeferred ?? {};
+  const hasDeferred = Object.keys(deferredMap).length > 0;
+
+  // Bootstrap goes in <head> (template substitution) so React's hydration
+  // sees the pristine #root subtree it expects. The settle scripts emitted
+  // by injectDeferredScripts during the body stream are tolerated by React
+  // the same way as its own runtime instrumentation (`$RC`, `$RV`, etc.).
+  const stream = injectDeferredScripts(reactStream, deferredMap, {
+    bootstrap: false,
+  });
+
+  const deferBootstrap = hasDeferred
+    ? `<script>${getDeferBootstrapScript()}</script>`
+    : "";
+
   return {
     stream,
     ssrJson,
     statusCode,
     signal: scope.signal,
     cleanup: () => scope.dispose(),
+    deferBootstrap,
   };
 }

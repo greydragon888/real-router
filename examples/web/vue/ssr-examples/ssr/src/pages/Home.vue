@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ClientOnly, ServerOnly } from "@real-router/vue";
+import { ClientOnly, ServerOnly } from "@real-router/vue/ssr";
 import { defineAsyncComponent, hydrateOnVisible } from "vue";
 
 import SearchForm from "../components/SearchForm.vue";

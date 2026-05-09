@@ -4,9 +4,10 @@
 
 ## What This Demonstrates
 
-- **`@real-router/ssr-data-plugin` for critical data** — `state.context.data.product` resolves before shell renders
+- **`@real-router/ssr-data-plugin` for critical + deferred data** — `state.context.data.product` resolves before shell renders; reviews and related items are deferred via `defer({ critical, deferred })` and stream in via inline `<script>__rrDefer__("key", json)</script>` settle scripts emitted by `injectDeferredScripts`
+- **`@real-router/preact/ssr` consumer surface** — `<Await name="reviews">{(reviews) => …}</Await>` + `<Streamed>` (Suspense alias) backed by `useDeferred(key)`. Preact has no `use(promise)` analogue; `<Await>` implements the React 19 `use()` semantics via thenable-throwing + status tracking on the promise object
 - **Preact 10 streaming primitive** — `renderToReadableStream` from `preact-render-to-string/stream` (since 6.5.x, Jan 2025)
-- **HTTP-level streaming** — Express server pipes the readable-stream chunks; `Transfer-Encoding: chunked` confirmed in response headers
+- **HTTP-level streaming** — Express server pipes the readable-stream chunks; `Transfer-Encoding: chunked` confirmed in response headers; settle scripts ride the same chunked transfer
 - **Per-request `cloneRouter`** — each request gets an isolated router, disposed in `finally`
 - **Typed `LoaderNotFound`** — short-circuits to plain-text 404 BEFORE constructing the stream (no leak)
 - **Per-route `Cache-Control`** — applies to streaming responses too
@@ -19,9 +20,9 @@ This example demonstrates what Preact 10 streaming SSR **actually can do**, with
 |---|---|---|
 | `renderToReadableStream` Web Stream output | ✅ since `preact-render-to-string@6.5.x` | **Used** as the pipeline |
 | `<Suspense>` + `lazy()` + dynamic import for code-split streaming | ✅ since `@6.6.x` (out-of-order via `<preact-island>` custom element) | **Used** for the specs section — see below |
-| `<Suspense>` + `use(promise)` for in-component data deferral | ❌ no `use(promise)` hook | Sibling sections (Reviews, RelatedItems) are sync-rendered from fixtures |
-| Async function components inside `<Suspense>` (server-only render) | ⚠️ empirically: renderer treats async returns as undefined and silently skips | Not used; sync siblings instead |
-| Selective hydration on individual islands | ⚠️ partial — out-of-order signature exists for `lazy()`; v11 promises broader story | `<preact-island>` swaps fallback → resolved on the client |
+| `<Suspense>` + `use(promise)` for in-component data deferral | ❌ no `use(promise)` hook | **`<Await>` from `@real-router/preact/ssr`** — implements `use()` semantics via thenable-throw + `.status`/`.value`/`.reason` tagging on the deferred promise (same shape React 19's internal `use()` cache uses); reviews and related-items are wired through `defer({ deferred: { reviews, related } })` |
+| Async function components inside `<Suspense>` (server-only render) | ⚠️ empirically: renderer treats async returns as undefined and silently skips | Not used; `<Await>` synchronously throws the deferred promise instead |
+| Selective hydration on individual islands | ⚠️ partial — out-of-order signature exists for `lazy()`; v11 promises broader story | `<preact-island>` swaps fallback → resolved on the client; deferred-data promises resolve via `__rrDefer__` settle scripts independently |
 
 ### Out-of-order streaming with `<preact-island>` custom element
 
@@ -46,7 +47,7 @@ The e2e suite asserts what holds **regardless of cache state** (resolved content
 
 ### What's still beyond Preact 10
 
-- **`use(promise)` for in-component data deferral** — design gap; v11 may add. Workaround: pre-resolve via `ssr-data-plugin` (which this example does for critical product data).
+- **Native `use(promise)` for in-component data deferral** — design gap; v11 may add. **Workaround used here:** `<Await>` + `useDeferred()` from `@real-router/preact/ssr`. The mechanism is React 19's pre-`use()` Suspense-thenable convention — throw the promise from render, catch in `<Suspense>`, on second render-pass return tagged status. The same wire-format (`__rrDefer__("key", json)` settle scripts) used by React/Vue/Svelte/Solid/Angular's `defer()` flows through unchanged.
 - **True selective hydration of arbitrary Suspense boundaries** — only `lazy()` boundaries get the `<preact-island>` swap; broader story lands in v11.
 - **Async function components** — silent skip in `renderToReadableStream`; do not use them in Preact 10 streaming pipelines.
 

@@ -9,7 +9,7 @@ import { loaders } from "./router/loaders";
 
 import type {
   DataLoaderFactoryMap,
-  DataLoaderFnFactory,
+  DataRouteEntry,
 } from "@real-router/ssr-data-plugin";
 
 declare global {
@@ -25,19 +25,50 @@ const loaderCalls: Record<string, number> = {};
 globalThis.__LOADER_CALLS__ = loaderCalls;
 
 const instrumentedLoaders: DataLoaderFactoryMap = Object.fromEntries(
-  (Object.entries(loaders) as [string, DataLoaderFnFactory][]).map(
-    ([name, factory]) => [
-      name,
-      (r, getDep) => {
-        const loader = factory(r, getDep);
+  (Object.entries(loaders) as [string, DataRouteEntry][]).map(
+    ([name, entry]) => {
+      // Object-form entries `{ ssr, loader? }` (e.g. `widget: { ssr: false }`)
+      // pass through unchanged — the loader, if present, is wrapped below;
+      // bare `{ ssr }` entries declare a per-route SSR mode without a loader.
+      if (typeof entry !== "function") {
+        if (entry.loader === undefined) {
+          return [name, entry];
+        }
 
-        return (params) => {
-          loaderCalls[name] = (loaderCalls[name] ?? 0) + 1;
+        const factory = entry.loader;
 
-          return loader(params);
-        };
-      },
-    ],
+        return [
+          name,
+          {
+            ssr: entry.ssr,
+            loader: (r, getDep) => {
+              const loader = factory(r, getDep);
+
+              return (params) => {
+                loaderCalls[name] = (loaderCalls[name] ?? 0) + 1;
+
+                return loader(params);
+              };
+            },
+          },
+        ];
+      }
+
+      const factory = entry;
+
+      return [
+        name,
+        (r, getDep) => {
+          const loader = factory(r, getDep);
+
+          return (params) => {
+            loaderCalls[name] = (loaderCalls[name] ?? 0) + 1;
+
+            return loader(params);
+          };
+        },
+      ];
+    },
   ),
 ) as DataLoaderFactoryMap;
 

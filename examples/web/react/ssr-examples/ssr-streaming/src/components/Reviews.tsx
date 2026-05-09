@@ -1,62 +1,11 @@
-import { use, useMemo } from "react";
+import { Await } from "@real-router/react/ssr";
 
-interface Review {
-  id: string;
-  author: string;
-  rating: number;
-  text: string;
-}
+import { REVIEWS_KEY, type ReviewsDeferred } from "../router/loaders";
 
-const REVIEWS_BY_PRODUCT: Record<string, Review[]> = {
-  "1": [
-    { id: "r1", author: "Alice", rating: 5, text: "Best keyboard I've owned." },
-    { id: "r2", author: "Bob", rating: 4, text: "Great feel, slightly loud." },
-  ],
-  "2": [{ id: "r3", author: "Carol", rating: 5, text: "Wrist pain gone." }],
-  "3": [
-    { id: "r4", author: "Dave", rating: 5, text: "Colors are gorgeous." },
-    { id: "r5", author: "Eve", rating: 4, text: "Stand wobbles a bit." },
-  ],
-};
+import type { Review } from "../database";
+import type { ReactElement } from "react";
 
-const SERVER_REVIEWS_DELAY_MS = 600;
-
-function fetchReviews(productId: string): Promise<Review[]> {
-  // Demonstrates Suspense-boundary error containment for product id "4":
-  // the server resolves an empty reviews list (no error during SSR), but
-  // the client's hydration `use(rejectedPromise)` throws synchronously,
-  // and the wrapping <ReviewsErrorBoundary> catches it and replaces the
-  // SSR-rendered Reviews section with the error UI. Critical product data
-  // + sibling deferred (related items) render unaffected.
-  if (productId === "4") {
-    if (typeof globalThis.window === "undefined") {
-      return Promise.resolve([]);
-    }
-
-    return Promise.reject(new Error("Reviews service unavailable"));
-  }
-
-  const reviews = REVIEWS_BY_PRODUCT[productId] ?? [];
-
-  if (typeof globalThis.window === "undefined") {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(reviews);
-      }, SERVER_REVIEWS_DELAY_MS);
-    });
-  }
-
-  return Promise.resolve(reviews);
-}
-
-interface ReviewsProps {
-  readonly productId: string;
-}
-
-export function Reviews({ productId }: ReviewsProps): React.ReactElement {
-  const reviewsPromise = useMemo(() => fetchReviews(productId), [productId]);
-  const reviews = use(reviewsPromise);
-
+function ReviewList({ reviews }: { reviews: Review[] }): ReactElement {
   if (reviews.length === 0) {
     return <p data-testid="reviews-empty">No reviews yet.</p>;
   }
@@ -73,5 +22,20 @@ export function Reviews({ productId }: ReviewsProps): React.ReactElement {
         ))}
       </ul>
     </section>
+  );
+}
+
+/**
+ * Reads the deferred reviews promise published by the loader via
+ * `defer({ deferred: { reviews: fetchReviews(id) } })`. React 19's `use()`
+ * suspends the boundary while the promise is pending; the surrounding
+ * `<Suspense>` (or `<Streamed>`) renders its fallback. On error,
+ * `<ReviewsErrorBoundary>` catches via the React class boundary contract.
+ */
+export function Reviews(): ReactElement {
+  return (
+    <Await<Awaited<ReviewsDeferred>> name={REVIEWS_KEY}>
+      {(reviews) => <ReviewList reviews={reviews} />}
+    </Await>
   );
 }

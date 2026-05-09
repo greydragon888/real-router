@@ -1,29 +1,11 @@
+import { Await } from "@real-router/preact/ssr";
+
+import { RELATED_KEY, type RelatedDeferred } from "../router/loaders";
+
+import type { RelatedItem } from "../database";
 import type { JSX } from "preact";
 
-interface RelatedItem {
-  id: string;
-  name: string;
-}
-
-const RELATED_BY_PRODUCT: Record<string, RelatedItem[]> = {
-  "1": [
-    { id: "r-1", name: "Wrist rest" },
-    { id: "r-2", name: "Keycap puller" },
-  ],
-  "2": [{ id: "r-3", name: "Mouse pad" }],
-  "3": [
-    { id: "r-4", name: "USB-C cable" },
-    { id: "r-5", name: "Monitor arm" },
-  ],
-};
-
-interface RelatedItemsProps {
-  readonly productId: string;
-}
-
-export function RelatedItems({ productId }: RelatedItemsProps): JSX.Element {
-  const items = RELATED_BY_PRODUCT[productId] ?? [];
-
+function RelatedList({ items }: { items: RelatedItem[] }): JSX.Element {
   if (items.length === 0) {
     return <p data-testid="related-empty">No related items.</p>;
   }
@@ -37,5 +19,13 @@ export function RelatedItems({ productId }: RelatedItemsProps): JSX.Element {
         ))}
       </ul>
     </section>
+  );
+}
+
+export function RelatedItems(): JSX.Element {
+  return (
+    <Await<Awaited<RelatedDeferred>> name={RELATED_KEY}>
+      {(items) => <RelatedList items={items} />}
+    </Await>
   );
 }

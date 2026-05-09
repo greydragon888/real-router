@@ -1,4 +1,4 @@
-import { ClientOnly, ServerOnly } from "@real-router/preact";
+import { ClientOnly, ServerOnly } from "@real-router/preact/ssr";
 import { lazy, Suspense } from "preact/compat";
 
 import { SearchForm } from "../components/SearchForm";

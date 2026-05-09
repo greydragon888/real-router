@@ -1,4 +1,4 @@
-import { createResource, For } from "solid-js";
+import { createResource, For, Show } from "solid-js";
 
 import type { JSX } from "solid-js";
 
@@ -40,21 +40,24 @@ function fetchRelated(productId: string): Promise<RelatedItem[]> {
 }
 
 export function RelatedItems(props: { productId: string }): JSX.Element {
-  const [items] = createResource(() => props.productId, fetchRelated);
+  const [related] = createResource(() => props.productId, fetchRelated);
 
-  // After Suspense, items() is guaranteed defined — non-null assertion safe.
   return (
-    <section data-testid="related-section">
-      <h2>You might also like</h2>
-      <ul>
-        <For each={items() ?? []}>
-          {(item) => (
-            <li data-related-id={item.id}>
-              {item.name} — ${item.price}
-            </li>
-          )}
-        </For>
-      </ul>
-    </section>
+    <Show when={related()} keyed>
+      {(items) => (
+        <section data-testid="related-section">
+          <h2>You might also like</h2>
+          <ul>
+            <For each={items}>
+              {(item) => (
+                <li data-related-id={item.id}>
+                  {item.name} — ${item.price}
+                </li>
+              )}
+            </For>
+          </ul>
+        </section>
+      )}
+    </Show>
   );
 }

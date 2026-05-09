@@ -17,6 +17,7 @@ interface RenderResult {
   cleanup: () => Promise<void>;
   rawBody?: string;
   contentType?: string;
+  deferBootstrap: string;
 }
 
 async function startServer(): Promise<void> {
@@ -58,7 +59,11 @@ async function startServer(): Promise<void> {
       }
 
       const stateScript = `<script>window.__SSR_STATE__=${result.ssrJson}</script>`;
-      const [head, tail] = template.split("<!--ssr-outlet-->");
+      const templateWithBootstrap = template.replace(
+        "<!--defer-bootstrap-->",
+        result.deferBootstrap,
+      );
+      const [head, tail] = templateWithBootstrap.split("<!--ssr-outlet-->");
       const finalTail = (tail ?? "").replace("<!--ssr-state-->", stateScript);
 
       const cacheControl = getCachePolicy(url);

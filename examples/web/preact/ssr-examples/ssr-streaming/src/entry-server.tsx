@@ -6,6 +6,10 @@ import {
 } from "@real-router/core/utils";
 import { RouterProvider } from "@real-router/preact";
 import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
+import {
+  getDeferBootstrapScript,
+  injectDeferredScripts,
+} from "@real-router/ssr-data-plugin/server";
 import { renderToReadableStream } from "preact-render-to-string/stream";
 
 import { App } from "./App";
@@ -19,21 +23,17 @@ export interface RenderContext {
 }
 
 export interface RenderResult {
-  /** Streaming HTML pipeline. Absent when a typed loader error
-   * short-circuits to a plain-text response (see rawBody). */
   stream?: ReadableStream<Uint8Array>;
   ssrJson: string;
   statusCode: number;
-  /** AbortSignal tied to request close — pump loop breaks early on
-   * client disconnect without buffering the rest of the stream. */
   signal: AbortSignal;
   cleanup: () => Promise<void>;
-  /** Pre-rendered body that bypasses the streaming pipeline — used
-   * for typed loader errors (LoaderNotFound) that surface as
-   * text/plain HTTP responses. */
   rawBody?: string;
-  /** Optional Content-Type override for rawBody responses. */
   contentType?: string;
+  /** Inline `<script>` that installs the deferred-promise registry; embed in
+   * `<head>` via `<!--defer-bootstrap-->` template substitution. Empty when
+   * the route has no deferred data. */
+  deferBootstrap: string;
 }
 
 interface MaybeError {
@@ -48,16 +48,10 @@ export async function render(
   url: string,
   context: RenderContext,
 ): Promise<RenderResult> {
-  // createRequestScope: AbortController + req.on("close") + cloneRouter +
-  // dispose, all in one. Cannot use `await using` here — the cloned
-  // router must outlive this function for the streaming pipeline; instead
-  // we hand `cleanup` (alias of scope.dispose) back to the server.
   const scope = createRequestScope(context.req, baseRouter);
 
   scope.router.usePlugin(ssrDataPluginFactory(loaders));
 
-  // Critical-data resolution can throw typed loader errors. Map them
-  // BEFORE constructing the stream so cleanup runs on every path.
   let state;
 
   try {
@@ -73,6 +67,7 @@ export async function render(
         cleanup: () => scope.dispose(),
         rawBody: "Not Found",
         contentType: "text/plain; charset=utf-8",
+        deferBootstrap: "",
       };
     }
 
@@ -83,20 +78,28 @@ export async function render(
 
   const statusCode = state.name === UNKNOWN_ROUTE ? 404 : 200;
 
-  const ssrJson = serializeRouterState(state);
+  // Strip live promises from the JSON state.
+  const ssrJson = serializeRouterState(state, {
+    excludeContext: ["ssrDataDeferred"],
+  });
 
-  // preact-render-to-string@6.5+ exposes Web-Streams `renderToReadableStream`
-  // (and a Node-Streams `renderToPipeableStream` from the same subpath).
-  // Async function components inside <Suspense> resolve out-of-order in
-  // theory, but Preact v10 docs note v10 hydration can pause and wait
-  // for JS chunks (true selective hydration lands in v11). For v10, the
-  // wire signature is shell + fallback markers + resolved chunks in
-  // resolution order — see e2e tests for the empirical proof.
-  const stream = renderToReadableStream(
+  const reactStream = renderToReadableStream(
     <RouterProvider router={scope.router}>
       <App />
     </RouterProvider>,
   );
+
+  const deferredMap =
+    (state.context as { ssrDataDeferred?: Record<string, Promise<unknown>> })
+      .ssrDataDeferred ?? {};
+  const hasDeferred = Object.keys(deferredMap).length > 0;
+
+  const stream = injectDeferredScripts(reactStream, deferredMap, {
+    bootstrap: false,
+  });
+  const deferBootstrap = hasDeferred
+    ? `<script>${getDeferBootstrapScript()}</script>`
+    : "";
 
   return {
     stream,
@@ -104,5 +107,6 @@ export async function render(
     statusCode,
     signal: scope.signal,
     cleanup: () => scope.dispose(),
+    deferBootstrap,
   };
 }

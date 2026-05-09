@@ -47,6 +47,8 @@ export function ProductDetail(): JSX.Element {
           <p data-testid="product-price">${d.product.price}</p>
           <p data-testid="product-description">{d.product.description}</p>
 
+          <ProductActions />
+
           <ErrorBoundary
             fallback={(err: Error) => (
               <p data-testid="reviews-error">
@@ -68,8 +70,6 @@ export function ProductDetail(): JSX.Element {
           >
             <RelatedItems productId={d.product.id} />
           </Suspense>
-
-          <ProductActions />
         </article>
       )}
     </Show>

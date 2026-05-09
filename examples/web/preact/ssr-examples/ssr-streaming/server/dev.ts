@@ -16,6 +16,7 @@ interface RenderResult {
   cleanup: () => Promise<void>;
   rawBody?: string;
   contentType?: string;
+  deferBootstrap: string;
 }
 
 async function startServer(): Promise<void> {
@@ -65,7 +66,11 @@ async function startServer(): Promise<void> {
         // open root div) immediately, then pipe the streaming HTML, then
         // send the postlude (close + state + script tags).
         const stateScript = `<script>window.__SSR_STATE__=${result.ssrJson}</script>`;
-        const [head, tail] = template.split("<!--ssr-outlet-->");
+        const templateWithBootstrap = template.replace(
+          "<!--defer-bootstrap-->",
+          result.deferBootstrap,
+        );
+        const [head, tail] = templateWithBootstrap.split("<!--ssr-outlet-->");
         const finalTail = (tail ?? "").replace("<!--ssr-state-->", stateScript);
 
         response.status(result.statusCode).set("Content-Type", "text/html");

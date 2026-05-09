@@ -10,6 +10,7 @@ import { loaders } from "./router/loaders";
 import type {
   DataLoaderFactoryMap,
   DataLoaderFnFactory,
+  DataRouteEntry,
 } from "@real-router/ssr-data-plugin";
 
 declare global {
@@ -23,20 +24,46 @@ const loaderCalls: Record<string, number> = {};
 
 globalThis.__LOADER_CALLS__ = loaderCalls;
 
+// Wrap each loader factory with a call counter for the post-hydration
+// loader-skip e2e tests. Object-form entries (e.g. `widget: { ssr: false }`)
+// have no factory to wrap — pass them through untouched. Without this guard
+// the wrapper crashes at `factory(...)` during plugin registration, breaking
+// hydration entirely.
 const instrumentedLoaders: DataLoaderFactoryMap = Object.fromEntries(
-  (Object.entries(loaders) as [string, DataLoaderFnFactory][]).map(
-    ([name, factory]) => [
-      name,
-      (r, getDep) => {
+  (Object.entries(loaders) as [string, DataRouteEntry][]).map(
+    ([name, entry]) => {
+      if (typeof entry === "function") {
+        const factory = entry as DataLoaderFnFactory;
+        const wrapped: DataLoaderFnFactory = (r, getDep) => {
+          const loader = factory(r, getDep);
+
+          return (params, ctx) => {
+            loaderCalls[name] = (loaderCalls[name] ?? 0) + 1;
+
+            return loader(params, ctx);
+          };
+        };
+
+        return [name, wrapped];
+      }
+
+      if (typeof entry.loader !== "function") {
+        return [name, entry];
+      }
+
+      const factory = entry.loader;
+      const wrapped: DataLoaderFnFactory = (r, getDep) => {
         const loader = factory(r, getDep);
 
-        return (params) => {
+        return (params, ctx) => {
           loaderCalls[name] = (loaderCalls[name] ?? 0) + 1;
 
-          return loader(params);
+          return loader(params, ctx);
         };
-      },
-    ],
+      };
+
+      return [name, { ...entry, loader: wrapped }];
+    },
   ),
 ) as DataLoaderFactoryMap;
 

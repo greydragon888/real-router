@@ -1,52 +1,11 @@
-import { use, useMemo } from "react";
+import { Await } from "@real-router/react/ssr";
 
-interface RelatedItem {
-  id: string;
-  name: string;
-  price: number;
-}
+import { RELATED_KEY, type RelatedDeferred } from "../router/loaders";
 
-const RELATED_BY_PRODUCT: Record<string, RelatedItem[]> = {
-  "1": [
-    { id: "k1", name: "Wrist Rest", price: 24.99 },
-    { id: "k2", name: "Keycap Puller", price: 6.5 },
-  ],
-  "2": [
-    { id: "m1", name: "Mouse Pad", price: 14.99 },
-    { id: "m2", name: "USB-C Hub", price: 39.99 },
-  ],
-  "3": [
-    { id: "d1", name: "Monitor Arm", price: 79 },
-    { id: "d2", name: "USB-C Cable", price: 12.99 },
-  ],
-};
+import type { RelatedItem } from "../database";
+import type { ReactElement } from "react";
 
-const SERVER_RELATED_DELAY_MS = 1200;
-
-function fetchRelated(productId: string): Promise<RelatedItem[]> {
-  const items = RELATED_BY_PRODUCT[productId] ?? [];
-
-  if (typeof globalThis.window === "undefined") {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(items);
-      }, SERVER_RELATED_DELAY_MS);
-    });
-  }
-
-  return Promise.resolve(items);
-}
-
-interface RelatedItemsProps {
-  readonly productId: string;
-}
-
-export function RelatedItems({
-  productId,
-}: RelatedItemsProps): React.ReactElement {
-  const itemsPromise = useMemo(() => fetchRelated(productId), [productId]);
-  const items = use(itemsPromise);
-
+function RelatedList({ items }: { items: RelatedItem[] }): ReactElement {
   return (
     <section data-testid="related-section">
       <h2>You might also like</h2>
@@ -58,5 +17,18 @@ export function RelatedItems({
         ))}
       </ul>
     </section>
+  );
+}
+
+/**
+ * Reads the deferred related-items promise published by the loader. Same
+ * `<Suspense>` integration as `<Reviews>` but separate boundary — selective
+ * hydration: each Suspense child resolves independently in HTML byte order.
+ */
+export function RelatedItems(): ReactElement {
+  return (
+    <Await<Awaited<RelatedDeferred>> name={RELATED_KEY}>
+      {(items) => <RelatedList items={items} />}
+    </Await>
   );
 }

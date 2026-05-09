@@ -1,5 +1,5 @@
 import { Component } from "@angular/core";
-import { ClientOnly, ServerOnly } from "@real-router/angular";
+import { ClientOnly, ServerOnly } from "@real-router/angular/ssr";
 
 @Component({
   selector: "home-page",

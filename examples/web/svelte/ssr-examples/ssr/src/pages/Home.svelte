@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ClientOnly, ServerOnly } from "@real-router/svelte";
+  import { ClientOnly, ServerOnly } from "@real-router/svelte/ssr";
 
   import { useClock } from "../utils/clock.svelte";
 

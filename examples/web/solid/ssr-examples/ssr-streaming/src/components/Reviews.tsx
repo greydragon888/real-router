@@ -23,14 +23,14 @@ const REVIEWS_BY_PRODUCT: Record<string, Review[]> = {
 
 const SERVER_REVIEWS_DELAY_MS = 600;
 
+// Suspense-boundary error containment for product id "4": both server and
+// client reject. Solid serializes the server-resolved resource value to the
+// client (unlike Vue's `<Suspense>` + `async setup()` which re-runs the
+// fetcher on hydration), so the rejection must originate on the server side
+// for the streamed HTML to ship the `<ErrorBoundary>` fallback. The error
+// is therefore observable in both no-JS HTML and the hydrated DOM —
+// symmetric with the streaming model.
 function fetchReviews(productId: string): Promise<Review[]> {
-  // Suspense-boundary error containment for product id "4": both server and
-  // client reject. Solid serializes the server-resolved resource value to
-  // the client (unlike Vue's `<Suspense>` + `async setup()` which re-runs
-  // the fetcher on hydration), so the rejection must originate on the
-  // server side for the streamed HTML to ship the `<ErrorBoundary>`
-  // fallback. The error is therefore observable in both no-JS HTML and the
-  // hydrated DOM — symmetric with the streaming model.
   if (productId === "4") {
     return Promise.reject(new Error("Reviews service unavailable"));
   }

@@ -1,17 +1,17 @@
 import { useRoute } from "@real-router/react";
-import { Suspense } from "react";
+import { Streamed } from "@real-router/react/ssr";
 
 import { ProductSpecsModal } from "./ProductSpecsModal";
 import { RelatedItems } from "./RelatedItems";
 import { Reviews } from "./Reviews";
 import { ReviewsErrorBoundary } from "./ReviewsErrorBoundary";
 
-import type { ProductDetailData } from "../router/loaders";
+import type { ProductDetailCriticalData } from "../router/loaders";
 import type { ReactElement } from "react";
 
 export function ProductDetail(): ReactElement {
   const { route } = useRoute();
-  const data = route.context.data as ProductDetailData | undefined;
+  const data = route.context.data as ProductDetailCriticalData | undefined;
 
   if (!data) {
     return <p data-testid="product-not-found">Product not found.</p>;
@@ -28,18 +28,18 @@ export function ProductDetail(): ReactElement {
       <ProductSpecsModal productId={product.id} productName={product.name} />
 
       <ReviewsErrorBoundary>
-        <Suspense
+        <Streamed
           fallback={<p data-testid="reviews-fallback">Loading reviews…</p>}
         >
-          <Reviews productId={product.id} />
-        </Suspense>
+          <Reviews />
+        </Streamed>
       </ReviewsErrorBoundary>
 
-      <Suspense
+      <Streamed
         fallback={<p data-testid="related-fallback">Loading related items…</p>}
       >
-        <RelatedItems productId={product.id} />
-      </Suspense>
+        <RelatedItems />
+      </Streamed>
     </article>
   );
 }

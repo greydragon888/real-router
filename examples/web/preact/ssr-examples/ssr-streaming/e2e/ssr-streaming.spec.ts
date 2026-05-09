@@ -159,23 +159,35 @@ test.describe("Preact streaming SSR — smoke", () => {
   test.describe("no-JS rendering — streamed HTML stands alone", () => {
     test.use({ javaScriptEnabled: false });
 
-    test("product detail server-renders all sections without JS", async ({
+    test("product detail server-renders the critical shell without JS; deferred sections need JS to swap from <preact-island> hidden", async ({
       page,
     }) => {
-      // Streaming pipeline must produce complete HTML even when the
-      // client never runs JS. Sibling sections (Reviews, RelatedItems)
-      // are sync from fixtures, so their content lands in the same
-      // streamed response as the shell.
+      // Critical content (product header, price, description) lands in the
+      // initial stream synchronously. Deferred sections (Reviews,
+      // RelatedItems via `defer()` + `<Await>`) emit a fallback inline and
+      // park the resolved HTML inside `<preact-island hidden>` markers —
+      // the custom-element bootstrap script swaps them on the client.
+      // Without JS, the islands stay hidden (similar to React 19's
+      // `<template>` + `$RC()` swap). The defer() formal API is
+      // documented as DX-only for Preact streaming; see
+      // `.claude/SSR_FEATURE_GAPS_RU.md` §7 ROI table.
       await page.goto("/products/1");
       await expect(
         page.locator('[data-testid="product-detail"]'),
       ).toHaveAttribute("data-product-id", "1");
-      await expect(
-        page.locator('[data-testid="reviews-section"]'),
-      ).toBeVisible();
-      await expect(
-        page.locator('[data-testid="related-section"]'),
-      ).toBeVisible();
+      // Critical: product name visible.
+      await expect(page.locator('[data-testid="product-name"]')).toBeVisible();
+      // Deferred sections present in DOM but hidden inside <preact-island>.
+      const reviewsCount = await page
+        .locator('[data-testid="reviews-section"]')
+        .count();
+
+      expect(reviewsCount).toBe(1);
+      const relatedCount = await page
+        .locator('[data-testid="related-section"]')
+        .count();
+
+      expect(relatedCount).toBe(1);
     });
   });
 
@@ -220,22 +232,22 @@ test.describe("Preact streaming SSR — smoke", () => {
       expect(html).toContain("Cherry MX Brown");
     });
 
-    test("if fallback is emitted, the <preact-island> bootstrap script is too (consistency)", async ({
+    test("the <preact-island> bootstrap script ships when any deferred boundary is present", async ({
       request,
     }) => {
-      // Cache-state-dependent assertion: when Preact's module cache
-      // is cold, server emits both the inline fallback AND the custom
-      // element bootstrap that swaps it for the resolved content.
-      // When the cache is warm (after the first SSR), the lazy module
-      // resolves synchronously, no fallback is emitted, no bootstrap
-      // script is needed. This test asserts the consistency of those
-      // two states — never one without the other — without depending
-      // on which state we're in.
+      // After the defer() refactor, Reviews and RelatedItems are deferred
+      // boundaries — they ALWAYS emit `<preact-island>` markers regardless
+      // of the lazy() module-cache state. The Suspense boundary plus
+      // `<Await>` injects fallback HTML before the resolved island, and
+      // preact-render-to-string ships the bootstrap script that swaps
+      // them. Verify the bootstrap is present whenever the page has
+      // any preact-island marker.
       const html = await (await request.get("/products/1")).text();
-      const hasFallback = html.includes('data-testid="specs-fallback"');
+      const hasIsland = html.includes("<preact-island");
       const hasBootstrap = html.includes('customElements.define("preact-island"');
 
-      expect(hasFallback).toBe(hasBootstrap);
+      expect(hasIsland).toBe(true);
+      expect(hasBootstrap).toBe(true);
     });
 
     test("ProductSpecs is emitted as a separate code-split chunk", () => {

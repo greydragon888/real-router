@@ -10,7 +10,7 @@ Server-side rendering with Real-Router, React 19, Express, and Vite.
 - **Client hydration** — `hydrateRouter(router, __SSR_STATE__)` re-resolves router state by `state.path`; `hydrateRoot()` reuses server-rendered DOM without mismatch
 - **Auth-gated routes** — dashboard page protected by `canActivate` guard with server-side dependency injection
 - **Client-side navigation** — after hydration, `@real-router/browser-plugin` handles SPA navigation; `ssr-data-plugin` is registered on the client too so subsequent navigations re-run loaders
-- **SSR boundaries demo** — `<ClientOnly>` + `<ServerOnly>` from `@real-router/react` on the Home page (#604). `e2e/ssr-boundaries.spec.ts` verifies server HTML emits the SSR-side branch with JS disabled and the post-hydration DOM swaps both branches without `console.error` hydration mismatch warnings.
+- **SSR boundaries demo** — `<ClientOnly>` + `<ServerOnly>` from `@real-router/react/ssr` on the Home page (#604). `e2e/ssr-boundaries.spec.ts` verifies server HTML emits the SSR-side branch with JS disabled and the post-hydration DOM swaps both branches without `console.error` hydration mismatch warnings.
 
 ## Architecture
 

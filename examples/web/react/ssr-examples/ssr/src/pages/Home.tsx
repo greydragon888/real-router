@@ -1,4 +1,4 @@
-import { ClientOnly, ServerOnly } from "@real-router/react";
+import { ClientOnly, ServerOnly } from "@real-router/react/ssr";
 
 import { SearchForm } from "../components/SearchForm";
 
