@@ -341,6 +341,7 @@ describe("RSC Loader Stress", () => {
 
   it("stop() during slow loader: no crash", async () => {
     const base = createRouter(routes, { defaultRoute: "home" });
+    let survived = 0;
 
     for (let i = 0; i < 50; i++) {
       const clone = cloneRouter(base);
@@ -362,8 +363,13 @@ describe("RSC Loader Stress", () => {
       await Promise.allSettled([promise]);
 
       clone.dispose();
+      survived += 1;
     }
 
-    expect(true).toBe(true);
+    // The real invariant is "no crash / no timeout for 50 iterations" —
+    // the loop reaching its end already proves it. Asserting on a counter
+    // (instead of `expect(true).toBe(true)`) makes the success criterion
+    // visible at the assertion site.
+    expect(survived).toBe(50);
   });
 });

@@ -284,6 +284,29 @@ describe("@real-router/rsc-server-plugin", () => {
       expect(state.context.rsc).toBe(homeNode);
     });
 
+    it("auto-flattens nested promises (Promise<Promise<ReactNode>>) to the inner value", async () => {
+      // Edge case: a TS-cast bypass returns a doubly-wrapped promise.
+      // JS Promise.resolve adopts thenable state, so `await` collapses
+      // both layers — state.context.rsc lands as the inner ReactNode,
+      // not a Promise. Document the auto-flattening as a contract so a
+      // future refactor that introduces wait-only-once logic can't
+      // silently break this case.
+      const inner = node("Inner", { v: 42 });
+      const nestedLoader = (): unknown =>
+        Promise.resolve(Promise.resolve(inner));
+
+      router.usePlugin(
+        rscServerPluginFactory({
+          home: () => nestedLoader as () => ReactNode,
+        }),
+      );
+
+      const state = await router.start("/");
+
+      expect(state.context.rsc).toBe(inner);
+      expect(state.context.rsc).not.toBeInstanceOf(Promise);
+    });
+
     it("should handle async element return", async () => {
       const homeNode = node("HomePage");
 
@@ -1151,6 +1174,45 @@ describe("@real-router/rsc-server-plugin", () => {
 
       expect(loader).toHaveBeenCalledTimes(2);
       expect(router.getState()!.context.rsc).toBe(freshNode);
+    });
+
+    it("does not leak across cloneRouter() boundaries — invalidate(parent) doesn't trigger child loader", async () => {
+      // The stale registry is `WeakMap<Router, Set<string>>`, so per-router
+      // isolation should come free from the WeakMap key identity. Verify
+      // that `invalidate(childA)` is consumed only by childA's leave
+      // handler — childB navigation stays cold.
+      const base = createRouter(routes, { defaultRoute: "home" });
+      const childA = cloneRouter(base);
+      const childB = cloneRouter(base);
+
+      const loaderA = vi.fn().mockResolvedValue(node("A"));
+      const loaderB = vi.fn().mockResolvedValue(node("B"));
+
+      childA.usePlugin(rscServerPluginFactory({ home: () => loaderA }));
+      childB.usePlugin(rscServerPluginFactory({ home: () => loaderB }));
+
+      await childA.start("/");
+      await childB.start("/");
+
+      loaderA.mockClear();
+      loaderB.mockClear();
+
+      // Mark only childA stale.
+      invalidate(childA, "rsc");
+
+      // childB navigation reloads — but its own stale flag is clean,
+      // so the leave handler must no-op.
+      await childB.navigate("home", {}, { reload: true });
+
+      expect(loaderB).not.toHaveBeenCalled();
+
+      // childA navigation reloads — its flag is set, leave handler runs.
+      await childA.navigate("home", {}, { reload: true });
+
+      expect(loaderA).toHaveBeenCalledTimes(1);
+
+      childA.dispose();
+      childB.dispose();
     });
 
     it("does not leak across namespaces — markStale on a foreign namespace is ignored by this plugin", async () => {
