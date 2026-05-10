@@ -2,7 +2,7 @@ import { createRouter } from "@real-router/core";
 import { cloneRouter } from "@real-router/core/api";
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 
-import { rscServerPluginFactory } from "../../src";
+import { invalidate, rscServerPluginFactory } from "../../src";
 
 import type { RscLoaderFactoryMap } from "../../src";
 import type { Router } from "@real-router/core";
@@ -238,6 +238,105 @@ describe("RSC Loader Stress", () => {
       router.stop();
       unsub();
     }
+  });
+
+  it("100 iterations of navigate-during-teardown: subscribeLeave race does not crash", async () => {
+    // Race contract: invalidate(...) marks the namespace stale, the next
+    // navigate triggers the leave handler which awaits the loader, and
+    // unsubscribe() removes the listener. If teardown lands while the
+    // handler is mid-await, the post-await `claim.write` could land on
+    // a released claim. The handler must either complete cleanly or fail
+    // in a way the navigate() promise can settle — never crash the loop.
+    const base = createRouter(routes, { defaultRoute: "home" });
+    let crashes = 0;
+    let releaseSlowLoader: (() => void) | undefined;
+
+    for (let i = 0; i < 100; i++) {
+      const clone = cloneRouter(base);
+      const slowPromise = new Promise<ReactNode>((resolve) => {
+        releaseSlowLoader = (): void => {
+          resolve(node("Slow", { i }));
+        };
+      });
+
+      const unsub = clone.usePlugin(
+        rscServerPluginFactory({
+          home: () => () => Promise.resolve(node("Home", { i })),
+          "users.profile": () => () => slowPromise,
+        }),
+      );
+
+      try {
+        await clone.start("/"); // home — primes the leave-handler path
+
+        invalidate(clone, "rsc");
+        const navPromise = clone.navigate("users.profile", { id: String(i) });
+
+        // Yield enough microtasks to land inside `await loader(…)` of the
+        // leave handler.
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+
+        // Tear down WHILE the handler is awaiting the loader. The handler
+        // continues to completion; its post-await `claim.write` may throw
+        // if core enforces release strictly, in which case navPromise
+        // rejects — that's allowed, just not a process crash.
+        unsub();
+        releaseSlowLoader?.();
+
+        await Promise.allSettled([navPromise]);
+      } catch {
+        crashes++;
+      } finally {
+        clone.dispose();
+      }
+    }
+
+    expect(crashes).toBe(0);
+  });
+
+  it("1000 cycles with WeakRef on rsc payload: no leak past GC", async () => {
+    // RSC payloads carry closures, so leaks can be more memorable than for
+    // plain JSON. Mirrors ssr-data-plugin's data-loader-stress.stress.ts:144
+    // with a ReactNode-shaped payload.
+    const base = createRouter(routes, { defaultRoute: "home" });
+    const refs: WeakRef<object>[] = [];
+
+    for (let i = 0; i < 1000; i++) {
+      const clone = cloneRouter(base);
+
+      clone.usePlugin(
+        rscServerPluginFactory({
+          "users.profile": () => (params) =>
+            // Build a fresh payload object each call so WeakRef can observe
+            // collection — a constant payload would be retained module-side.
+            Promise.resolve(node("Profile", { id: params.id, capture: i })),
+        }),
+      );
+
+      const state = await clone.start(`/users/${i}`);
+      const rsc = state.context.rsc as object | undefined;
+
+      if (rsc !== undefined) {
+        refs.push(new WeakRef(rsc));
+      }
+
+      clone.dispose();
+    }
+
+    // Two-pass GC + breathing room — V8 is non-deterministic, so we tolerate
+    // a small residue. Threshold mirrors ssr-data-plugin's 200/1000.
+    globalThis.gc?.();
+
+    await new Promise((r) => {
+      setTimeout(r, 50);
+    });
+    globalThis.gc?.();
+
+    const alive = refs.filter((r) => r.deref() !== undefined).length;
+
+    expect(alive).toBeLessThan(200);
   });
 
   it("stop() during slow loader: no crash", async () => {
