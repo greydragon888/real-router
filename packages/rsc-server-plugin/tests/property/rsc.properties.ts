@@ -12,9 +12,18 @@ import {
   NUM_RUNS,
   ROUTES,
 } from "./helpers";
-import { getSsrRscMode, rscServerPluginFactory } from "../../src";
+import {
+  getSsrRscMode,
+  rscActionPluginFactory,
+  rscServerPluginFactory,
+} from "../../src";
 
-import type { RscLoaderFactoryMap, RscSsrMode } from "../../src";
+import type {
+  RscActionResult,
+  RscLoaderFactoryMap,
+  RscSsrMode,
+} from "../../src";
+import type { State } from "@real-router/core";
 import type { DataLoaderFactoryMap } from "@real-router/ssr-data-plugin";
 
 const arbRscSsrMode: fc.Arbitrary<RscSsrMode> = fc.constantFrom<RscSsrMode>(
@@ -506,6 +515,121 @@ describe("ssr mode: function-form resolver runs once per start()", () => {
       expect(resolverCalls).toBe(1);
 
       router.stop();
+    },
+  );
+});
+
+describe("ssr mode: getSsrRscMode is a pure read-side guard", () => {
+  // Helper: build a minimal `State` with arbitrary `ssrRscMode` in context.
+  // No router involvement — `getSsrRscMode` only reads `state.context`.
+  const stateWith = (ssrRscMode: unknown): State => ({
+    name: "any",
+    params: {},
+    path: "/",
+    transition: {
+      phase: "activating",
+      reason: "success",
+      segments: { deactivated: [], activated: [], intersection: "" },
+    },
+    context: { ssrRscMode } as Record<string, unknown>,
+  });
+
+  test.prop([fc.constantFrom<RscSsrMode>("full", "client-only")], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "transparency: for any allowed mode m, getSsrRscMode(state{ssrRscMode:m}) === m",
+    (m) => {
+      expect(getSsrRscMode(stateWith(m))).toBe(m);
+    },
+  );
+
+  // Anything that is NOT in ALLOWED_RSC_MODES — including "data-only", random
+  // strings, falsy non-nullish values, null, objects, numbers — must collapse
+  // to "full". Without this guard, downstream `mode === "full"` branches
+  // silently misbehave on cast-bypassed garbage.
+  const arbForeignMode = fc.oneof(
+    fc.constant(undefined),
+    fc.constant(null),
+    fc.constant(0),
+    fc.constant(""),
+    fc.constant(false),
+    fc.constant("data-only"),
+    fc.string().filter((s) => s !== "full" && s !== "client-only"),
+    fc.integer(),
+    fc.boolean(),
+    fc.object(),
+  );
+
+  test.prop([arbForeignMode], { numRuns: NUM_RUNS.thorough })(
+    "guard: any non-allowed value collapses to 'full'",
+    (foreign) => {
+      expect(getSsrRscMode(stateWith(foreign))).toBe("full");
+    },
+  );
+});
+
+// =============================================================================
+// rscActionPluginFactory invocation count
+// =============================================================================
+
+describe("rscAction: getResult invoked exactly N times for N start() calls", () => {
+  test.prop([arbParamValue, fc.integer({ min: 1, max: 5 })], {
+    numRuns: NUM_RUNS.standard,
+  })("on the same router: counter increments per start", async (id, n) => {
+    let calls = 0;
+    const router = createRouter(ROUTES, { defaultRoute: "home" });
+
+    router.usePlugin(
+      rscActionPluginFactory(
+        (): RscActionResult => ({
+          returnValue: { ok: true, data: { id, call: ++calls } },
+        }),
+      ),
+    );
+
+    for (let i = 0; i < n; i++) {
+      const state = await router.start("/");
+
+      expect(
+        (state.context.rscAction?.returnValue?.data as { call: number }).call,
+      ).toBe(i + 1);
+
+      router.stop();
+    }
+
+    expect(calls).toBe(n);
+  });
+
+  test.prop([fc.integer({ min: 1, max: 5 })], { numRuns: NUM_RUNS.standard })(
+    "skip semantics: undefined return leaves rscAction undefined for that start",
+    async (n) => {
+      let calls = 0;
+      const router = createRouter(ROUTES, { defaultRoute: "home" });
+
+      router.usePlugin(
+        rscActionPluginFactory((): RscActionResult | undefined => {
+          calls += 1;
+
+          // Return undefined on every other call.
+          return calls % 2 === 0
+            ? { returnValue: { ok: true, data: calls } }
+            : undefined;
+        }),
+      );
+
+      for (let i = 1; i <= n; i++) {
+        const state = await router.start("/");
+
+        if (i % 2 === 0) {
+          expect(state.context.rscAction?.returnValue?.data).toBe(i);
+        } else {
+          expect(state.context.rscAction).toBeUndefined();
+        }
+
+        router.stop();
+      }
+
+      expect(calls).toBe(n);
     },
   );
 });
