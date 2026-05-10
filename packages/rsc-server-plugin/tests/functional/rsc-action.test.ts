@@ -188,9 +188,13 @@ describe("@real-router/rsc-server-plugin — rscActionPluginFactory", () => {
     it("rejects double-registration of rscActionPluginFactory (namespace claim collision)", () => {
       router.usePlugin(rscActionPluginFactory(() => undefined));
 
+      // Match the same `/already claimed/i` shape the rsc-loader test uses
+      // so a cosmetic change to the core message can't slip through here
+      // alone. The previous /rscAction|namespace|claim/i was loose enough
+      // to match almost any TypeError message.
       expect(() => {
         router.usePlugin(rscActionPluginFactory(() => undefined));
-      }).toThrow(/rscAction|namespace|claim/i);
+      }).toThrow(/already claimed/i);
     });
   });
 

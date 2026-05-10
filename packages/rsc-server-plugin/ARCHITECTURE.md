@@ -28,12 +28,11 @@
 rsc-server-plugin/
 ├── src/
 │   ├── index.ts            — Public API + StateContext module augmentation (rsc, rscAction, ssrRscMode)
-│   ├── factory.ts          — rscServerPluginFactory: thin adapter over createSsrLoaderPlugin
+│   ├── factory.ts          — rscServerPluginFactory: thin adapter over createSsrLoaderPlugin (validateLoaders inlined)
 │   ├── actionFactory.ts    — rscActionPluginFactory: claims "rscAction" namespace, publishes Server Action result
 │   ├── buildRscPayload.ts  — buildRscPayload(state, rootOverride?): wire-format helper for { root, returnValue, formState }
 │   ├── invalidate.ts       — invalidate(router, "rsc"): typed wrapper over markStale
 │   ├── getSsrRscMode.ts    — getSsrRscMode(state): runtime-guarded reader of state.context.ssrRscMode
-│   ├── validation.ts       — validateLoaders = createLoadersValidator(ERROR_PREFIX, ALLOWED_RSC_MODES)
 │   ├── types.ts            — RscLoaderFn, RscLoaderFnFactory, RscLoaderFactoryMap, RscActionResult, RscPayload
 │   ├── errors.ts           — Re-export of LoaderRedirect / LoaderNotFound / LoaderTimeout / withTimeout (subpath: /errors)
 │   ├── constants.ts        — ERROR_PREFIX, ALLOWED_RSC_MODES (single source of truth shared by factory/validation/getter)
@@ -46,8 +45,7 @@ rsc-server-plugin/
 index.ts
     ├── factory.ts
     │       ├── constants.ts (ERROR_PREFIX, ALLOWED_RSC_MODES)
-    │       ├── validation.ts → shared-ssr/createLoadersValidator.ts
-    │       │                  ↳ constants.ts (ALLOWED_RSC_MODES)
+    │       ├── shared-ssr/createLoadersValidator.ts (inlined validateLoaders binding)
     │       ├── shared-ssr/createSsrLoaderPlugin.ts
     │       │       ├── shared-ssr/staleRegistry.ts (isStale + clearStale)
     │       │       └── shared-ssr/defer.ts (isDeferred — ssr-data-only path; no-op for rsc)
