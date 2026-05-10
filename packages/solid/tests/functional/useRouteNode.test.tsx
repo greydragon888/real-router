@@ -1,3 +1,4 @@
+import { createRouter } from "@real-router/core";
 import { getRoutesApi } from "@real-router/core/api";
 import { renderHook } from "@solidjs/testing-library";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
@@ -363,6 +364,29 @@ describe("useRouteNode", () => {
 
       expect(result().route?.name).toBe("users.view");
       expect(result().previousRoute?.name).toBe("items");
+    });
+  });
+
+  describe("Empty route tree (#3.4 defensive)", () => {
+    it("does not throw when subscribing to root node on a router with no routes", () => {
+      const emptyRouter = createRouter([]);
+
+      const wrapEmpty = (props: { children: JSX.Element }) => (
+        <RouterProvider router={emptyRouter}>{props.children}</RouterProvider>
+      );
+
+      // The hook is the public surface for createRouteNodeSource(router, "")
+      // — must produce an undefined route + undefined previousRoute snapshot
+      // without throwing, even when the route tree is empty (e.g. a router
+      // that's been replaced via getRoutesApi().replace([])).
+      expect(() => {
+        const { result } = renderHook(() => useRouteNode(""), {
+          wrapper: wrapEmpty,
+        });
+
+        expect(result().route).toBeUndefined();
+        expect(result().previousRoute).toBeUndefined();
+      }).not.toThrow();
     });
   });
 });

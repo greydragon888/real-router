@@ -213,6 +213,18 @@ describe("useRouterTransition", () => {
     expect(result().toRoute).toBeNull();
   });
 
+  // KNOWN LIMITATION (pinning current behavior, not endorsing it):
+  // The transition source replays only the LATEST snapshot to new
+  // subscribers. A consumer that mounts AFTER `TRANSITION_START` (but
+  // before TRANSITION_SUCCESS/CANCEL) sees the IDLE snapshot — there is
+  // no replay of the in-flight TRANSITION_START frame. Ideally the
+  // source would surface the live transition immediately on subscribe.
+  // See `useRouteEnter`-style abort+revisit pattern for the symmetric
+  // shape on the route side. Until the source is reworked, this test
+  // pins existing behavior so a regression to "captures mid-transition"
+  // would surface as a deliberate test update, not silent breakage.
+  it.todo("ideally captures mid-transition state on subscribe");
+
   it("reports IDLE when mounted mid-transition (known limitation)", async () => {
     const lifecycle = getLifecycleApi(router);
     let resolveGuard!: (value: boolean) => void;

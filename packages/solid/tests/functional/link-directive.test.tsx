@@ -450,7 +450,12 @@ describe("link directive", () => {
 
       await user.click(screen.getByTestId("link"));
 
-      expect(screen.getByTestId("link")).not.toHaveClass("active");
+      const linkElement = screen.getByTestId("link");
+
+      expect(linkElement).not.toHaveClass("active");
+      // Stronger: directive must not set ANY class attribute when
+      // activeClassName is omitted (catches accidental `class="other"`).
+      expect(linkElement.getAttribute("class")).toBeNull();
     });
   });
 

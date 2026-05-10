@@ -621,4 +621,80 @@ describe("Link component", () => {
 
     expect(screen.getByTestId("link")).toHaveClass("active");
   });
+
+  describe("buildHref edge cases", () => {
+    it("combines hash and query params in href (#3.1 defensive)", () => {
+      render(
+        () => (
+          <Link
+            routeName="items.item"
+            routeParams={{ id: "42", q: "search" }}
+            hash="section-2"
+            data-testid="link"
+          >
+            Combined
+          </Link>
+        ),
+        { wrapper },
+      );
+
+      const href = screen.getByTestId("link").getAttribute("href") ?? "";
+
+      // Both query and fragment must end up in the rendered href.
+      expect(href).toContain("/items/42");
+      expect(href).toContain("q=search");
+      expect(href).toContain("#section-2");
+      // Query precedes fragment per RFC 3986.
+      expect(href.indexOf("#")).toBeGreaterThan(href.indexOf("?"));
+    });
+
+    it("encodes Unicode params via percent-encoding (#3.2 defensive)", () => {
+      render(
+        () => (
+          <Link
+            routeName="items.item"
+            routeParams={{ id: "café-🚀-Привет" }}
+            data-testid="link"
+          >
+            Unicode
+          </Link>
+        ),
+        { wrapper },
+      );
+
+      const href = screen.getByTestId("link").getAttribute("href") ?? "";
+
+      // Decoded round-trip must equal the original — verifies the encoder
+      // produced valid UTF-8 percent-encoding (multi-byte chars + surrogate
+      // pairs for emoji + non-Latin Cyrillic). startsWith() in the matcher
+      // is UTF-16-safe but the URL-side encoding has to round-trip.
+      expect(decodeURIComponent(href)).toContain("café-🚀-Привет");
+    });
+
+    it("serializes numeric params correctly (#3.3 defensive)", async () => {
+      render(
+        () => (
+          <Link
+            routeName="items.item"
+            routeParams={{ id: 6 }}
+            data-testid="link"
+          >
+            Numeric
+          </Link>
+        ),
+        { wrapper },
+      );
+
+      const href = screen.getByTestId("link").getAttribute("href") ?? "";
+
+      // Number must end up as a percent-safe ASCII string in the URL.
+      expect(href).toContain("/items/6");
+
+      // And the navigation must round-trip (number is stored as such in
+      // params, but URL serialization is the string "6").
+      await router.navigate("items.item", { id: 6 }).catch(() => {});
+
+      expect(router.getState()?.params).toStrictEqual({ id: 6 });
+    });
+  });
 });

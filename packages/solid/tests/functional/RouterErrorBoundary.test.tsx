@@ -404,17 +404,23 @@ describe("RouterErrorBoundary", () => {
   });
 
   it("resetError then same cached error", async () => {
+    const observedErrors: RouterError[] = [];
+
     render(
       () => (
         <RouterErrorBoundary
-          fallback={(error, resetError) => (
-            <div data-testid="fallback">
-              {error.code}
-              <button data-testid="dismiss" onClick={resetError}>
-                Dismiss
-              </button>
-            </div>
-          )}
+          fallback={(error, resetError) => {
+            observedErrors.push(error);
+
+            return (
+              <div data-testid="fallback">
+                {error.code}
+                <button data-testid="dismiss" onClick={resetError}>
+                  Dismiss
+                </button>
+              </div>
+            );
+          }}
         >
           <div data-testid="children">App</div>
         </RouterErrorBoundary>
@@ -445,5 +451,12 @@ describe("RouterErrorBoundary", () => {
     expect(screen.getByTestId("fallback").textContent).toContain(
       errorCodes.SAME_STATES,
     );
+
+    // Identity check — the dedup invariant requires that the error object
+    // surfaced after reset is the SAME reference as the one cached before
+    // dismissal (createDismissableError shares a single error source). If
+    // the implementation ever clones the error, this assertion fails.
+    expect(observedErrors.length).toBeGreaterThanOrEqual(2);
+    expect(observedErrors.at(-1)).toBe(observedErrors[0]);
   });
 });

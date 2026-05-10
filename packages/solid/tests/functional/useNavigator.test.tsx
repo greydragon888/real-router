@@ -26,27 +26,41 @@ describe("useNavigator hook", () => {
     router.stop();
   });
 
-  it("should expose all documented methods with proper behavior", () => {
+  it("should expose all documented methods with proper behavior", async () => {
     const { result } = renderHook(() => useNavigator(), {
       wrapper: wrapper(router),
     });
 
-    // Each method is verified by actual behavior, not typeof.
     expect(result.getState()?.name).toBe("test");
     expect(result.isActiveRoute("test")).toBe(true);
     expect(result.isLeaveApproved()).toBe(false);
 
-    const unsubscribe = result.subscribe(() => {});
+    const subscribeCallback = vi.fn();
+    const unsubscribe = result.subscribe(subscribeCallback);
 
-    expect(unsubscribe).toBeTypeOf("function");
+    await result.navigate("about");
+
+    expect(subscribeCallback).toHaveBeenCalledTimes(1);
 
     unsubscribe();
 
-    const unsubscribeLeave = result.subscribeLeave(() => {});
+    await result.navigate("home");
 
-    expect(unsubscribeLeave).toBeTypeOf("function");
+    // Behavior — after unsubscribe the listener must NOT fire again.
+    expect(subscribeCallback).toHaveBeenCalledTimes(1);
+
+    const leaveCallback = vi.fn();
+    const unsubscribeLeave = result.subscribeLeave(leaveCallback);
+
+    await result.navigate("about");
+
+    expect(leaveCallback).toHaveBeenCalledTimes(1);
 
     unsubscribeLeave();
+
+    await result.navigate("home");
+
+    expect(leaveCallback).toHaveBeenCalledTimes(1);
   });
 
   it("should have working navigate method", async () => {
