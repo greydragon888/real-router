@@ -27,13 +27,17 @@
 ```
 rsc-server-plugin/
 ├── src/
-│   ├── index.ts        — Public API (exports factory + invalidate + types) + module augmentation StateContext.rsc
-│   ├── factory.ts      — rscServerPluginFactory: thin adapter over createSsrLoaderPlugin
-│   ├── invalidate.ts   — invalidate(router, "rsc"): typed wrapper over markStale
-│   ├── validation.ts   — validateLoaders = createLoadersValidator(ERROR_PREFIX)
-│   ├── types.ts        — RscLoaderFn, RscLoaderFnFactory, RscLoaderFactoryMap
-│   ├── constants.ts    — ERROR_PREFIX, LOGGER_CONTEXT
-│   └── shared-ssr/     — symlink → shared/ssr/ (factory, validator, stale registry)
+│   ├── index.ts            — Public API + StateContext module augmentation (rsc, rscAction, ssrRscMode)
+│   ├── factory.ts          — rscServerPluginFactory: thin adapter over createSsrLoaderPlugin
+│   ├── actionFactory.ts    — rscActionPluginFactory: claims "rscAction" namespace, publishes Server Action result
+│   ├── buildRscPayload.ts  — buildRscPayload(state, rootOverride?): wire-format helper for { root, returnValue, formState }
+│   ├── invalidate.ts       — invalidate(router, "rsc"): typed wrapper over markStale
+│   ├── getSsrRscMode.ts    — getSsrRscMode(state): runtime-guarded reader of state.context.ssrRscMode
+│   ├── validation.ts       — validateLoaders = createLoadersValidator(ERROR_PREFIX, ALLOWED_RSC_MODES)
+│   ├── types.ts            — RscLoaderFn, RscLoaderFnFactory, RscLoaderFactoryMap, RscActionResult, RscPayload
+│   ├── errors.ts           — Re-export of LoaderRedirect / LoaderNotFound / LoaderTimeout / withTimeout (subpath: /errors)
+│   ├── constants.ts        — ERROR_PREFIX, ALLOWED_RSC_MODES (single source of truth shared by factory/validation/getter)
+│   └── shared-ssr/         — symlink → shared/ssr/ (factory, validator, stale registry, errors)
 ```
 
 ## Module Dependency Graph
@@ -41,23 +45,31 @@ rsc-server-plugin/
 ```
 index.ts
     ├── factory.ts
-    │       ├── validation.ts
-    │       │       ├── shared-ssr/createLoadersValidator.ts
-    │       │       └── constants.ts
+    │       ├── constants.ts (ERROR_PREFIX, ALLOWED_RSC_MODES)
+    │       ├── validation.ts → shared-ssr/createLoadersValidator.ts
+    │       │                  ↳ constants.ts (ALLOWED_RSC_MODES)
     │       ├── shared-ssr/createSsrLoaderPlugin.ts
-    │       │       └── shared-ssr/staleRegistry.ts (isStale + clearStale)
+    │       │       ├── shared-ssr/staleRegistry.ts (isStale + clearStale)
+    │       │       └── shared-ssr/defer.ts (isDeferred — ssr-data-only path; no-op for rsc)
     │       └── types.ts
-    └── invalidate.ts
-            └── shared-ssr/staleRegistry.ts (markStale)
+    ├── actionFactory.ts
+    │       ├── constants.ts (ERROR_PREFIX)
+    │       └── @real-router/core/api (getPluginApi)
+    ├── buildRscPayload.ts → types.ts (RscActionResult, RscPayload)
+    ├── invalidate.ts → shared-ssr/staleRegistry.ts (markStale)
+    └── getSsrRscMode.ts → constants.ts (ALLOWED_RSC_MODES) + types.ts (RscSsrMode)
+
+errors.ts → shared-ssr/errors.ts (LoaderRedirect, LoaderNotFound, LoaderTimeout, withTimeout)
 ```
 
 External dependencies:
 
-| Dependency           | What it provides                                  | Used in                                |
-| -------------------- | ------------------------------------------------- | -------------------------------------- |
-| `@real-router/core`  | `getPluginApi`, types (`PluginFactory`, `Plugin`) | `shared-ssr/createSsrLoaderPlugin.ts`  |
-| `@real-router/types` | `StateContext` (module augmentation target)      | `index.ts`                             |
-| `react`              | `ReactNode` type only (peer dep)                  | `types.ts`, `index.ts`                 |
+| Dependency                        | What it provides                                                              | Used in                                |
+| --------------------------------- | ----------------------------------------------------------------------------- | -------------------------------------- |
+| `@real-router/core/api`           | `getPluginApi`                                                                | `actionFactory.ts`, `shared-ssr/createSsrLoaderPlugin.ts` |
+| `@real-router/core/validation`    | `getInternals` (read-only access to internals.hydrationState scratchpad)      | `shared-ssr/createSsrLoaderPlugin.ts`  |
+| `@real-router/types`              | `StateContext` (module augmentation target), `Plugin`, `PluginFactory`, `State` | `index.ts`, all factories              |
+| `react`                           | `ReactNode` type only (peer dep)                                              | `types.ts`, `index.ts`, `buildRscPayload.ts` |
 
 **No** `react-server-dom-*`, **no** `@vitejs/plugin-rsc`, **no** `react-dom`.
 
@@ -120,6 +132,67 @@ rscServerPluginFactory(loaders)              ← factory.ts (~25 LOC incl. JSDoc
                         └── removeStartInterceptor() + claim.release()
 ```
 
+## Sibling: `rscActionPluginFactory` (Server Actions)
+
+For RSC apps that ship Server Actions, a second plugin in this package
+publishes the action result to `state.context.rscAction` using the same
+claim-based pattern. It coexists with `rscServerPluginFactory` on the
+same router (distinct namespaces — `"rsc"` vs `"rscAction"`).
+
+```
+rscActionPluginFactory(getResult)             ← actionFactory.ts (~80 LOC incl. JSDoc)
+        │
+        │  factory-time:
+        │    1. typeof getResult === "function"  → else throw TypeError
+        │
+        └── PluginFactory closure
+                │
+                │  Called by router.usePlugin():
+                │
+                ├── api = getPluginApi(router)
+                ├── claim = api.claimContextNamespace("rscAction")
+                ├── api.addInterceptor("start", async (next, path) => {
+                │       state = await next(path);
+                │       result = getResult();
+                │
+                │       per-start runtime guard:
+                │         result === undefined          → return state (skip-write)
+                │         typeof result !== "object" |
+                │           result === null |
+                │           Array.isArray(result) |
+                │           result.then === function    → throw TypeError
+                │
+                │       claim.write(state, result);
+                │       return state;
+                │   })
+                └── return { teardown: removeStartInterceptor + claim.release }
+```
+
+**Why a separate factory?** Server Action results are produced *outside*
+the loader pipeline (typically in the request fetch handler, before the
+router exists for that request). They have no per-route mapping, so they
+don't fit `RscLoaderFactoryMap`. Closing over a `let actionResult` in
+the request handler is the natural API.
+
+**Two layers of validation, mirroring `rscServerPluginFactory(loaders)`:**
+
+- Factory-time: `getResult` is a function (eager fail before the namespace
+  is claimed).
+- Per-start runtime: the *return value* must be `undefined` or a
+  plain object (not Promise/thenable, not array, not primitive). The
+  most common consumer mistake is wiring an `async getResult` — the
+  guard surfaces that as a typed error pointing back at the call site.
+
+### `buildRscPayload(state, rootOverride?)` — wire-format helper
+
+`buildRscPayload` reads `state.context.rsc` and `state.context.rscAction`
+and returns a `RscPayload<TReturn, TFormState>` ready for the bundler's
+Flight renderer. `returnValue` and `formState` are **omitted** (not set
+to `undefined`) when their source is missing — the result type-checks
+under `exactOptionalPropertyTypes: true` consumers without ceremony.
+A strict `=== undefined` `rootOverride` check preserves an explicit
+`null` override as "render nothing" instead of collapsing to the default.
+
 ## Data Flow
 
 ### start() interceptor
@@ -181,7 +254,7 @@ router.navigate(...) (any CSR navigation)
         ├── signal.aborted? yes → return (flag preserved for the new nav)
         │
         ├── clearStale(router, "rsc")
-        └── dataClaim.write(nextRoute, rsc)
+        └── claim.write(nextRoute, rsc)   ← writes ReactNode to nextRoute.context.rsc
         │
         ▼
   activation guards → completeTransition → TRANSITION_SUCCESS
