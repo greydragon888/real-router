@@ -98,11 +98,11 @@ describe("RouterErrorBoundary", () => {
 
     it("SSR: returns initial snapshot", () => {
       const freshRouter = createRouter([{ name: "home", path: "/" }]);
-      let result: any;
+      let result!: ErrorState;
 
       renderWithRouter(freshRouter, ErrorCapture, {
         onCapture: (r: unknown) => {
-          result = r;
+          result = r as ErrorState;
         },
       });
 

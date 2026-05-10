@@ -7,6 +7,11 @@ import { renderWithRouter } from "../helpers";
 import TransitionCapture from "../helpers/TransitionCapture.svelte";
 
 import type { Router } from "@real-router/core";
+import type { RouterTransitionSnapshot } from "@real-router/sources";
+
+interface TransitionState {
+  readonly current: RouterTransitionSnapshot;
+}
 
 describe("useRouterTransition", () => {
   let router: Router;
@@ -25,11 +30,11 @@ describe("useRouterTransition", () => {
   });
 
   it("isTransitioning === false initially", () => {
-    let result: any;
+    let result!: TransitionState;
 
     renderWithRouter(router, TransitionCapture, {
       onCapture: (r: unknown) => {
-        result = r;
+        result = r as TransitionState;
       },
     });
 
@@ -46,11 +51,11 @@ describe("useRouterTransition", () => {
       });
     });
 
-    let result: any;
+    let result!: TransitionState;
 
     renderWithRouter(router, TransitionCapture, {
       onCapture: (r: unknown) => {
-        result = r;
+        result = r as TransitionState;
       },
     });
 
@@ -69,11 +74,11 @@ describe("useRouterTransition", () => {
   });
 
   it("isTransitioning === false upon TRANSITION_SUCCESS", async () => {
-    let result: any;
+    let result!: TransitionState;
 
     renderWithRouter(router, TransitionCapture, {
       onCapture: (r: unknown) => {
-        result = r;
+        result = r as TransitionState;
       },
     });
 
@@ -88,11 +93,11 @@ describe("useRouterTransition", () => {
 
     lifecycle.addActivateGuard("dashboard", () => () => false);
 
-    let result: any;
+    let result!: TransitionState;
 
     renderWithRouter(router, TransitionCapture, {
       onCapture: (r: unknown) => {
-        result = r;
+        result = r as TransitionState;
       },
     });
 
@@ -103,11 +108,11 @@ describe("useRouterTransition", () => {
   });
 
   it("toRoute and fromRoute === null when no transition", () => {
-    let result: any;
+    let result!: TransitionState;
 
     renderWithRouter(router, TransitionCapture, {
       onCapture: (r: unknown) => {
-        result = r;
+        result = r as TransitionState;
       },
     });
 
@@ -125,11 +130,11 @@ describe("useRouterTransition", () => {
       });
     });
 
-    let result: any;
+    let result!: TransitionState;
 
     renderWithRouter(router, TransitionCapture, {
       onCapture: (r: unknown) => {
-        result = r;
+        result = r as TransitionState;
       },
     });
 
@@ -153,11 +158,11 @@ describe("useRouterTransition", () => {
 
   it("SSR: always returns IDLE_SNAPSHOT", () => {
     const freshRouter = createRouter([{ name: "home", path: "/" }]);
-    let result: any;
+    let result!: TransitionState;
 
     renderWithRouter(freshRouter, TransitionCapture, {
       onCapture: (r: unknown) => {
-        result = r;
+        result = r as TransitionState;
       },
     });
 
