@@ -21,13 +21,15 @@
 ```
 ssr-data-plugin/
 ├── src/
-│   ├── index.ts        — Public API (exports factory + invalidate + types) + module augmentation
-│   ├── factory.ts      — ssrDataPluginFactory: thin adapter over createSsrLoaderPlugin
-│   ├── invalidate.ts   — invalidate(router, "data"): typed wrapper over markStale
-│   ├── validation.ts   — validateLoaders = createLoadersValidator(ERROR_PREFIX)
-│   ├── types.ts        — DataLoaderFn, DataLoaderFnFactory, DataLoaderFactoryMap
-│   ├── constants.ts    — ERROR_PREFIX, LOGGER_CONTEXT
-│   └── shared-ssr/     — symlink → shared/ssr/ (factory, validator, stale registry)
+│   ├── index.ts            — Public API + StateContext module augmentation (data, ssrDataMode, ssrDataDeferred, ssrDataDeferredKeys)
+│   ├── factory.ts          — ssrDataPluginFactory: thin adapter over createSsrLoaderPlugin (validateLoaders inlined)
+│   ├── invalidate.ts       — invalidate(router, "data"): typed wrapper over markStale
+│   ├── getSsrDataMode.ts   — getSsrDataMode(state): runtime-guarded reader of state.context.ssrDataMode
+│   ├── server.ts           — injectDeferredScripts + getDeferBootstrapScript: streaming wire-format helpers (subpath: /server)
+│   ├── errors.ts           — Re-export of LoaderRedirect / LoaderNotFound / LoaderTimeout / withTimeout (subpath: /errors)
+│   ├── types.ts            — DataLoaderFn, DataLoaderFnFactory, DataLoaderFactoryMap, DataRouteEntry, SsrLoaderContext, SsrMode
+│   ├── constants.ts        — ERROR_PREFIX (LOGGER_CONTEXT — internal)
+│   └── shared-ssr/         — symlink → shared/ssr/ (createSsrLoaderPlugin, createLoadersValidator, defer, deferRegistry, staleRegistry, errors)
 ```
 
 ## Module Dependency Graph
@@ -35,22 +37,27 @@ ssr-data-plugin/
 ```
 index.ts
     ├── factory.ts
-    │       ├── validation.ts
-    │       │       ├── shared-ssr/createLoadersValidator.ts
-    │       │       └── constants.ts
+    │       ├── constants.ts (ERROR_PREFIX)
+    │       ├── shared-ssr/createLoadersValidator.ts (inlined validateLoaders binding)
     │       ├── shared-ssr/createSsrLoaderPlugin.ts
-    │       │       └── shared-ssr/staleRegistry.ts (isStale + clearStale)
+    │       │       ├── shared-ssr/staleRegistry.ts (isStale + clearStale)
+    │       │       └── shared-ssr/defer.ts (isDeferred — slow-path branch in writeLoaderResult)
     │       └── types.ts
-    └── invalidate.ts
-            └── shared-ssr/staleRegistry.ts (markStale)
+    ├── invalidate.ts → shared-ssr/staleRegistry.ts (markStale)
+    ├── getSsrDataMode.ts → shared-ssr (ALL_SSR_MODES, SsrMode)
+    └── (re-exports defer, isDeferred, DeferredPayload from shared-ssr)
+
+server.ts → shared-ssr (formatSettleScript, getDeferBootstrapScript)
+errors.ts → shared-ssr/errors.ts (LoaderRedirect, LoaderNotFound, LoaderTimeout, withTimeout)
 ```
 
 External dependencies:
 
-| Dependency           | What it provides                                           | Used in                   |
-| -------------------- | ---------------------------------------------------------- | ------------------------- |
-| `@real-router/core`  | `getPluginApi`, types (`PluginFactory`, `Plugin`)          | `shared-ssr/createSsrLoaderPlugin.ts` |
-| `@real-router/types` | `StateContext` (module augmentation target)                | `index.ts`                |
+| Dependency                        | What it provides                                                                | Used in                                |
+| --------------------------------- | ------------------------------------------------------------------------------- | -------------------------------------- |
+| `@real-router/core/api`           | `getPluginApi`                                                                  | `shared-ssr/createSsrLoaderPlugin.ts`  |
+| `@real-router/core/validation`    | `getInternals` (read-only access to internals.hydrationState scratchpad)        | `shared-ssr/createSsrLoaderPlugin.ts`  |
+| `@real-router/types`              | `StateContext` (module augmentation target), `Plugin`, `PluginFactory`, `State` | `index.ts`, all factories              |
 
 ## Shared SSR Scaffolding
 
