@@ -70,10 +70,6 @@ export function createSsrLoaderPlugin<
   loaders: SsrLoaderFactoryMap<T, SsrMode, Dependencies>,
   config: SsrLoaderPluginConfig,
 ): PluginFactory<Dependencies> {
-  const hasDeferredSupport =
-    config.deferredNamespace !== undefined &&
-    config.deferredKeysNamespace !== undefined;
-
   if (
     (config.deferredNamespace !== undefined) !==
     (config.deferredKeysNamespace !== undefined)
@@ -82,6 +78,19 @@ export function createSsrLoaderPlugin<
       `${config.errorPrefix} \`deferredNamespace\` and \`deferredKeysNamespace\` must be set together`,
     );
   }
+
+  // Bundle the two namespace strings into a single nullable object so
+  // downstream code narrows via `if (deferredConfig !== null)` instead
+  // of the `config.deferredNamespace!` non-null assertion that TS can't
+  // derive from the XOR check above.
+  const deferredConfig =
+    config.deferredNamespace !== undefined &&
+    config.deferredKeysNamespace !== undefined
+      ? {
+          valueNamespace: config.deferredNamespace,
+          keysNamespace: config.deferredKeysNamespace,
+        }
+      : null;
 
   return (router, getDependency): Plugin => {
     const api = getPluginApi(router);
@@ -104,17 +113,21 @@ export function createSsrLoaderPlugin<
 
     let dataClaim: ContextNamespaceClaim;
     let modeClaim: ContextNamespaceClaim;
-    let deferredClaim: ContextNamespaceClaim | null = null;
-    let deferredKeysClaim: ContextNamespaceClaim | null = null;
+    let deferredClaims: {
+      value: ContextNamespaceClaim;
+      keys: ContextNamespaceClaim;
+    } | null = null;
     const compiled = new Map<string, CompiledEntry<T>>();
 
     try {
       dataClaim = claim(config.namespace);
       modeClaim = claim(config.modeNamespace);
 
-      if (hasDeferredSupport) {
-        deferredClaim = claim(config.deferredNamespace!);
-        deferredKeysClaim = claim(config.deferredKeysNamespace!);
+      if (deferredConfig !== null) {
+        deferredClaims = {
+          value: claim(deferredConfig.valueNamespace),
+          keys: claim(deferredConfig.keysNamespace),
+        };
       }
 
       for (const [name, raw] of Object.entries(loaders)) {
@@ -152,10 +165,10 @@ export function createSsrLoaderPlugin<
     // fast path allocation-free and the slow path (defer payload) at one
     // intentional `Object.keys(...)` array allocation per loader.
     const writeLoaderResult = (state: State, value: T): void => {
-      if (hasDeferredSupport && isDeferred(value)) {
+      if (deferredClaims !== null && isDeferred(value)) {
         dataClaim.write(state, value.critical as T);
-        deferredClaim!.write(state, value.deferred);
-        deferredKeysClaim!.write(state, Object.keys(value.deferred));
+        deferredClaims.value.write(state, value.deferred);
+        deferredClaims.keys.write(state, Object.keys(value.deferred));
 
         return;
       }
@@ -167,9 +180,9 @@ export function createSsrLoaderPlugin<
       state: State,
       hydrated: Record<string, unknown>,
     ): void => {
-      if (!hasDeferredSupport || !deferredClaim || !deferredKeysClaim) return;
+      if (deferredConfig === null || deferredClaims === null) return;
 
-      const keysRaw = hydrated[config.deferredKeysNamespace!];
+      const keysRaw = hydrated[deferredConfig.keysNamespace];
 
       if (!Array.isArray(keysRaw)) return;
 
@@ -202,8 +215,8 @@ export function createSsrLoaderPlugin<
         promises[key] = ensureRegistryPromise(key);
       }
 
-      deferredClaim.write(state, promises);
-      deferredKeysClaim.write(state, keys);
+      deferredClaims.value.write(state, promises);
+      deferredClaims.keys.write(state, keys);
     };
 
     const removeStartInterceptor = api.addInterceptor(
@@ -296,8 +309,8 @@ export function createSsrLoaderPlugin<
         removeLeaveListener();
         dataClaim.release();
         modeClaim.release();
-        deferredClaim?.release();
-        deferredKeysClaim?.release();
+        deferredClaims?.value.release();
+        deferredClaims?.keys.release();
       },
     };
   };
