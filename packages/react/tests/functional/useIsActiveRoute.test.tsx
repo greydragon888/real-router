@@ -260,6 +260,14 @@ describe("useIsActiveRoute", () => {
         { wrapper: (props) => wrapper({ ...props, router }) },
       );
 
+      // Sample at start, two intermediate points, and the end so a mid-loop
+      // flip-flop in the active source can't slip through with only the final
+      // assertion catching it.
+      const intermediateCheckpoints = [0, 250, 500, 750];
+      // For each checkpoint i, after navigate(i % 2 === 0 ? "home" : "users.view"),
+      // the hook value should be (i % 2 === 1).
+      const observedSamples: { index: number; active: boolean }[] = [];
+
       // Perform 1000 navigations (last one will be to users.view since 999 is odd)
       for (let i = 0; i < 1000; i++) {
         await act(() =>
@@ -267,7 +275,18 @@ describe("useIsActiveRoute", () => {
             id: "123",
           }),
         );
+
+        if (intermediateCheckpoints.includes(i)) {
+          observedSamples.push({ index: i, active: result.current });
+        }
       }
+
+      expect(observedSamples).toStrictEqual(
+        intermediateCheckpoints.map((index) => ({
+          index,
+          active: index % 2 === 1,
+        })),
+      );
 
       // Final check should be correct (i=999 is odd, so last navigation is users.view)
       expect(result.current).toBe(true);
@@ -311,11 +330,23 @@ describe("useIsActiveRoute", () => {
         },
       );
 
-      // Change routeName multiple times
+      // Sample mid-loop so a regression that returns a non-boolean (NaN,
+      // undefined, null) at any intermediate iteration doesn't silently pass.
+      const intermediateCheckpoints = [0, 25, 50, 75];
+      const observedTypes: { index: number; type: string }[] = [];
+
       for (let i = 0; i < 100; i++) {
         currentIndex = (currentIndex + 1) % routes.length;
         rerender({ routeName: routes[currentIndex] });
+
+        if (intermediateCheckpoints.includes(i)) {
+          observedTypes.push({ index: i, type: typeof result.current });
+        }
       }
+
+      expect(observedTypes).toStrictEqual(
+        intermediateCheckpoints.map((index) => ({ index, type: "boolean" })),
+      );
 
       // Anchor on a known-inactive name to verify no memory corruption:
       // the hook must still return false (boolean) for a non-matching route.

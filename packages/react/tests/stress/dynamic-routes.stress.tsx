@@ -134,7 +134,66 @@ describe("R8 — dynamic route tree mutations mid-session", () => {
     forceGC();
   });
 
-  it("8.4: add → navigate → remove same route concurrently — no UB", async () => {
+  it("8.4: useRouteNode reflects zombie state cleanly after removeRoute", async () => {
+    const routesApi = getRoutesApi(router);
+
+    routesApi.add({ name: "ephemeral", path: "/ephemeral" });
+
+    let snapshot: { name: string | undefined } = { name: undefined };
+    const ZombieConsumer: FC = () => {
+      const { route } = useRouteNode("ephemeral");
+
+      snapshot = { name: route?.name };
+
+      return <div data-testid="zombie">{route?.name ?? "inactive"}</div>;
+    };
+
+    ZombieConsumer.displayName = "ZombieConsumer";
+
+    render(
+      <RouterProvider router={router}>
+        <ZombieConsumer />
+      </RouterProvider>,
+    );
+
+    await act(async () => {
+      await router.navigate("ephemeral");
+    });
+
+    expect(snapshot.name).toBe("ephemeral");
+
+    // Move off the doomed route, then drop it from the route table.
+    await act(async () => {
+      await router.navigate("route0");
+    });
+    routesApi.remove("ephemeral");
+
+    // useRouteNode("ephemeral") must report inactive — no zombie reference
+    // to a route that no longer exists in the tree, no thrown errors.
+    expect(snapshot.name).toBeUndefined();
+
+    // Re-mounting a fresh consumer for the dropped route also reports inactive.
+    let secondSnapshot: { name: string | undefined } = { name: undefined };
+    const FreshConsumer: FC = () => {
+      const { route } = useRouteNode("ephemeral");
+
+      secondSnapshot = { name: route?.name };
+
+      return null;
+    };
+
+    FreshConsumer.displayName = "FreshConsumer";
+
+    render(
+      <RouterProvider router={router}>
+        <FreshConsumer />
+      </RouterProvider>,
+    );
+
+    expect(secondSnapshot.name).toBeUndefined();
+  });
+
+  it("8.5: add → navigate → remove same route concurrently — no UB", async () => {
     const routesApi = getRoutesApi(router);
     const nav = getNavigator(router);
 

@@ -1,5 +1,3 @@
-// packages/react/src/hooks/useRouter.tsx
-
 import { useContext } from "react";
 
 import { RouterContext } from "../context";

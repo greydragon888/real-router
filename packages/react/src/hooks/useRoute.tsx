@@ -1,5 +1,3 @@
-// packages/react/src/hooks/useRoute.tsx
-
 import { useContext } from "react";
 
 import { RouteContext } from "../context";

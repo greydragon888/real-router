@@ -90,15 +90,15 @@ describe("useNavigator hook", () => {
 
     await result.current.navigate("about");
 
-    expect(callback).toHaveBeenCalled();
-
-    const callCount = callback.mock.calls.length;
+    expect(callback).toHaveBeenCalledTimes(1);
 
     unsubscribe();
 
+    const countAfterUnsubscribe = callback.mock.calls.length;
+
     await result.current.navigate("home");
 
-    expect(callback).toHaveBeenCalledTimes(callCount);
+    expect(callback).toHaveBeenCalledTimes(countAfterUnsubscribe);
   });
 
   it("should throw error if used outside RouterProvider", () => {

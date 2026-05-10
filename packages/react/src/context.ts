@@ -1,5 +1,3 @@
-// packages/react/src/context.ts
-
 import { createContext } from "react";
 
 import type { RouteContext as RouteContextType } from "./types";

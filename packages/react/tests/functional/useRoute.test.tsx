@@ -51,12 +51,13 @@ describe("useRoute hook", () => {
   });
 
   it("should return current route", async () => {
-    vi.spyOn(router, "subscribe");
+    const subscribeSpy = vi.spyOn(router, "subscribe");
 
     const { result } = renderHook(() => useRoute(), {
       wrapper: wrapper(router),
     });
 
+    expect(subscribeSpy).toHaveBeenCalled();
     expect(result.current.route.name).toStrictEqual("test");
 
     await act(async () => {

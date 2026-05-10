@@ -61,10 +61,11 @@ describe("buildActiveClassName — Property Tests", () => {
           baseClassName,
         );
 
-        if (result === undefined) {
-          return;
-        }
-
+        // arbActiveClassName always produces a non-empty token, so the
+        // active-concat path always returns a defined string. A regression
+        // that returns undefined here would silently pass without this
+        // explicit assertion.
+        expect(result).toBeDefined();
         expect(result).not.toContain("  ");
       },
     );

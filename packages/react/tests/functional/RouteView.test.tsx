@@ -54,7 +54,7 @@ describe("RouteView", () => {
       );
 
       expect(screen.queryByTestId("users")).not.toBeInTheDocument();
-      expect(container.innerHTML).toBe("");
+      expect(container).toBeEmptyDOMElement();
     });
 
     it("should support exact matching — matches exact route only", async () => {
@@ -87,7 +87,7 @@ describe("RouteView", () => {
       );
 
       expect(screen.queryByTestId("users-exact")).not.toBeInTheDocument();
-      expect(container.innerHTML).toBe("");
+      expect(container).toBeEmptyDOMElement();
     });
 
     it("should support startsWith matching by default", async () => {
@@ -181,7 +181,7 @@ describe("RouteView", () => {
       );
 
       expect(screen.queryByTestId("users")).not.toBeInTheDocument();
-      expect(container.innerHTML).toBe("");
+      expect(container).toBeEmptyDOMElement();
     });
 
     it("should never match a Match with empty segment string (safety: early return)", async () => {
@@ -198,7 +198,7 @@ describe("RouteView", () => {
       );
 
       expect(screen.queryByTestId("empty-match")).not.toBeInTheDocument();
-      expect(container.innerHTML).toBe("");
+      expect(container).toBeEmptyDOMElement();
     });
   });
 
@@ -266,7 +266,7 @@ describe("RouteView", () => {
 
       expect(screen.queryByTestId("users")).not.toBeInTheDocument();
       expect(screen.queryByTestId("not-found")).not.toBeInTheDocument();
-      expect(container.innerHTML).toBe("");
+      expect(container).toBeEmptyDOMElement();
     });
 
     it("should use last NotFound when multiple are present", async () => {
@@ -322,7 +322,7 @@ describe("RouteView", () => {
       );
 
       expect(screen.queryByTestId("users")).not.toBeInTheDocument();
-      expect(container.innerHTML).toBe("");
+      expect(container).toBeEmptyDOMElement();
     });
   });
 
@@ -381,7 +381,7 @@ describe("RouteView", () => {
         </RouterProvider>,
       );
 
-      expect(container.innerHTML).toBe("");
+      expect(container).toBeEmptyDOMElement();
     });
 
     it("position-independent: Self before Match is still ignored when descendant is active", async () => {
@@ -624,7 +624,7 @@ describe("RouteView", () => {
         </RouterProvider>,
       );
 
-      expect(container.innerHTML).toBe("");
+      expect(container).toBeEmptyDOMElement();
     });
   });
 
@@ -634,13 +634,13 @@ describe("RouteView", () => {
         <RouteView.Match segment="x">content</RouteView.Match>,
       );
 
-      expect(container.innerHTML).toBe("");
+      expect(container).toBeEmptyDOMElement();
     });
 
     it("Self renders null when used standalone", () => {
       const { container } = render(<RouteView.Self>content</RouteView.Self>);
 
-      expect(container.innerHTML).toBe("");
+      expect(container).toBeEmptyDOMElement();
     });
 
     it("NotFound renders null when used standalone", () => {
@@ -648,7 +648,7 @@ describe("RouteView", () => {
         <RouteView.NotFound>content</RouteView.NotFound>,
       );
 
-      expect(container.innerHTML).toBe("");
+      expect(container).toBeEmptyDOMElement();
     });
   });
 
@@ -665,7 +665,7 @@ describe("RouteView", () => {
       );
 
       expect(screen.queryByTestId("users")).not.toBeInTheDocument();
-      expect(container.innerHTML).toBe("");
+      expect(container).toBeEmptyDOMElement();
     });
   });
 
@@ -696,7 +696,7 @@ describe("RouteView", () => {
       expect(screen.getByTestId("view")).toBeInTheDocument();
     });
 
-    it("should not re-render when navigating outside nodeName", async () => {
+    it("should unmount the matched Match when navigating outside nodeName", async () => {
       await router.start("/users/list");
 
       render(
@@ -759,8 +759,14 @@ describe("RouteView", () => {
         await router.navigate("users.view", { id: "1" });
       });
 
-      expect(screen.getByTestId("list")).toBeInTheDocument();
-      expect(screen.getByTestId("list")).not.toBeVisible();
+      // Use queryByTestId for the presence check: if keepAlive ever unmounts the
+      // element instead of hiding it via Activity, the failure should read
+      // "expected element in document" rather than the misleading
+      // "Unable to find element" thrown by getByTestId.
+      const hiddenList = screen.queryByTestId("list");
+
+      expect(hiddenList).toBeInTheDocument();
+      expect(hiddenList).not.toBeVisible();
       expect(screen.getByTestId("view")).toBeVisible();
     });
 
@@ -833,8 +839,10 @@ describe("RouteView", () => {
         await router.navigate("users.view", { id: "1" });
       });
 
-      expect(screen.getByTestId("list")).toBeInTheDocument();
-      expect(screen.getByTestId("list")).not.toBeVisible();
+      const hiddenListMulti = screen.queryByTestId("list");
+
+      expect(hiddenListMulti).toBeInTheDocument();
+      expect(hiddenListMulti).not.toBeVisible();
       expect(screen.getByTestId("view")).toBeVisible();
     });
 
@@ -1423,7 +1431,7 @@ describe("RouteView", () => {
       );
 
       expect(screen.queryByTestId("list")).not.toBeInTheDocument();
-      expect(container.innerHTML).toBe("");
+      expect(container).toBeEmptyDOMElement();
     });
 
     it("scoped RouteView (nodeName='users') renders when route enters its subtree", async () => {

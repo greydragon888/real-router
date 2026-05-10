@@ -96,6 +96,7 @@ describe("RouterProvider component", () => {
     });
 
     expect(router.subscribe).toHaveBeenCalledTimes(1);
+    expect(router.subscribe).toHaveBeenCalledWith(expect.any(Function));
 
     unmount();
 

@@ -372,7 +372,7 @@ describe("Link component", () => {
       await user.click(screen.getByTestId("link"));
       await user.keyboard("{/Meta}");
 
-      expect(onClickMock).toHaveBeenCalled();
+      expect(onClickMock).toHaveBeenCalledTimes(1);
 
       expect(router.navigate).not.toHaveBeenCalled();
       expect(router.getState()?.name).toStrictEqual(currentRouteName);
@@ -398,7 +398,7 @@ describe("Link component", () => {
 
       await user.click(screen.getByTestId("link"));
 
-      expect(onClickMock).toHaveBeenCalled();
+      expect(onClickMock).toHaveBeenCalledTimes(1);
 
       expect(router.navigate).not.toHaveBeenCalled();
       expect(router.getState()?.name).toStrictEqual(currentRouteName);
