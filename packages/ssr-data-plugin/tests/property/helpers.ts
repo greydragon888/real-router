@@ -45,8 +45,20 @@ export const arbSimpleRouteName = fc.constantFrom(
   "users.list",
 );
 
-/** Param values for the users.profile route */
-export const arbParamValue = fc.stringMatching(/^[a-z0-9]{1,8}$/);
+/**
+ * Param values for the users.profile route.
+ *
+ * Extended from `[a-z0-9]{1,8}` to `[\w.-]{1,16}` (Word + dot + dash),
+ * the URL-safe punctuation that real-world route params routinely
+ * contain. Length stays bounded so generated paths remain readable in
+ * fast-check shrunk failure reports.
+ *
+ * NOT extended: percent-encoding (`%20`), URL-special chars (`?`, `#`,
+ * `:`, `/`), Unicode. Those would change route-matching semantics —
+ * the path-matcher's responsibility — and exercising them here would
+ * test core's URL parsing, not this plugin.
+ */
+export const arbParamValue = fc.stringMatching(/^[\w.-]{1,16}$/);
 
 /** Arbitrary JSON-serializable data returned by loaders */
 export const arbLoaderData = fc.oneof(
