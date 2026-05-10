@@ -1,18 +1,22 @@
 import { NgTemplateOutlet } from "@angular/common";
-import { Component, computed, effect, input, output } from "@angular/core";
+import {
+  Component,
+  computed,
+  DestroyRef,
+  effect,
+  inject,
+  input,
+  output,
+} from "@angular/core";
 import { createDismissableError } from "@real-router/sources";
 
 import { injectRouter } from "../functions/injectRouter";
 import { sourceToSignal } from "../sourceToSignal";
 
+import type { ErrorContext } from "../types";
 import type { TemplateRef } from "@angular/core";
 import type { RouterError, State } from "@real-router/core";
 import type { DismissableErrorSnapshot } from "@real-router/sources";
-
-export interface ErrorContext {
-  $implicit: RouterError;
-  resetError: () => void;
-}
 
 @Component({
   selector: "router-error-boundary",
@@ -55,7 +59,8 @@ export class RouterErrorBoundary {
   );
 
   constructor() {
-    effect(() => {
+    const destroyRef = inject(DestroyRef);
+    const effectRef = effect(() => {
       const snap = this.snapshot();
 
       if (snap.error) {
@@ -65,6 +70,10 @@ export class RouterErrorBoundary {
           fromRoute: snap.fromRoute,
         });
       }
+    });
+
+    destroyRef.onDestroy(() => {
+      effectRef.destroy();
     });
   }
 }

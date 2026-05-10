@@ -40,8 +40,6 @@ export { RouteView } from "./components/RouteView";
 
 export { RouterErrorBoundary } from "./components/RouterErrorBoundary";
 
-export type { ErrorContext } from "./components/RouterErrorBoundary";
-
 export { NavigationAnnouncer } from "./components/NavigationAnnouncer";
 
 export { RouteMatch } from "./directives/RouteMatch";
@@ -54,7 +52,7 @@ export { RealLink } from "./directives/RealLink";
 
 export { RealLinkActive } from "./directives/RealLinkActive";
 
-export type { RouteSignals } from "./types";
+export type { RouteSignals, ErrorContext } from "./types";
 
 export type {
   RouteSnapshot,

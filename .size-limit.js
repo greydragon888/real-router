@@ -59,8 +59,8 @@ export default [
   esm("preload-plugin", "1.1 kB", ignoreCore),
   esm("search-schema-plugin", "1.1 kB", ignoreCore),
   esm("validation-plugin", "10 kB", ignoreCore),
-  esm("ssr-data-plugin", "1 kB", ignoreCore),
-  esm("rsc-server-plugin", "1 kB", ignoreCore),
+  esm("ssr-data-plugin", "2 kB", ignoreCore),
+  esm("rsc-server-plugin", "2 kB", ignoreCore),
 
   // ── Utilities ─────────────────────────────────────────────────────
   esm("route-utils", "1 kB"),

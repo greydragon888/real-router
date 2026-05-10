@@ -49,10 +49,14 @@ describe("RealLink directive", () => {
 
       fixture.detectChanges();
 
-      const anchor = fixture.nativeElement.querySelector("a");
+      const anchor = fixture.nativeElement.querySelector(
+        "a",
+      ) as HTMLAnchorElement;
 
-      expect(anchor).not.toBeNull();
       expect(anchor.hasAttribute("href")).toBe(false);
+      expect(anchor.textContent).toBe("Link");
+      expect(anchor.hasAttribute("role")).toBe(false);
+      expect(anchor.hasAttribute("tabindex")).toBe(false);
 
       spy.mockRestore();
     });
