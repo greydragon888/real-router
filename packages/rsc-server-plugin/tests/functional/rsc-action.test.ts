@@ -161,6 +161,52 @@ describe("@real-router/rsc-server-plugin — rscActionPluginFactory", () => {
     });
   });
 
+  describe("Validation", () => {
+    it("rejects null getResult at factory time", () => {
+      expect(() =>
+        rscActionPluginFactory(null as unknown as () => undefined),
+      ).toThrow(
+        "[@real-router/rsc-server-plugin] getResult must be a function",
+      );
+    });
+
+    it("rejects undefined getResult at factory time", () => {
+      expect(() =>
+        rscActionPluginFactory(undefined as unknown as () => undefined),
+      ).toThrow(
+        "[@real-router/rsc-server-plugin] getResult must be a function",
+      );
+    });
+
+    it("rejects non-function getResult (string) at factory time", () => {
+      expect(() =>
+        rscActionPluginFactory("oops" as unknown as () => undefined),
+      ).toThrow(TypeError);
+    });
+
+    it("rejects non-function getResult (object) at factory time", () => {
+      expect(() =>
+        rscActionPluginFactory({ ok: true } as unknown as () => undefined),
+      ).toThrow(TypeError);
+    });
+
+    it("does NOT claim the rscAction namespace when getResult is invalid", () => {
+      expect(() =>
+        rscActionPluginFactory(null as unknown as () => undefined),
+      ).toThrow();
+
+      // Validation runs before the closure that claims the namespace, so the
+      // namespace must still be available.
+      expect(() =>
+        router.usePlugin(rscActionPluginFactory(() => undefined)),
+      ).not.toThrow();
+    });
+
+    it("accepts an arrow function returning undefined", () => {
+      expect(() => rscActionPluginFactory(() => undefined)).not.toThrow();
+    });
+  });
+
   describe("Teardown", () => {
     it("teardown releases the rscAction claim allowing re-registration", async () => {
       const teardown1 = router.usePlugin(

@@ -1,5 +1,7 @@
 import { getPluginApi } from "@real-router/core/api";
 
+import { ERROR_PREFIX } from "./constants";
+
 import type { RscActionResult } from "./types";
 import type {
   DefaultDependencies,
@@ -53,6 +55,18 @@ export function rscActionPluginFactory<
 >(
   getResult: () => RscActionResult<TReturn, TFormState> | undefined,
 ): PluginFactory<Dependencies> {
+  // Mirror the factory-time validation that `rscServerPluginFactory` and
+  // `ssrDataPluginFactory` already perform on their loaders map: a TS-cast
+  // bypass or a JS consumer can smuggle a non-function through, and the
+  // failure would otherwise surface much later inside the start interceptor
+  // as `TypeError: getResult is not a function`, after the `"rscAction"`
+  // namespace has already been claimed and the start interceptor has been
+  // registered. Failing eagerly with a typed, prefixed error keeps the API
+  // consistent across all factories in this package.
+  if (typeof getResult !== "function") {
+    throw new TypeError(`${ERROR_PREFIX} getResult must be a function`);
+  }
+
   return (router): Plugin => {
     const api = getPluginApi(router);
     const claim = api.claimContextNamespace("rscAction");
