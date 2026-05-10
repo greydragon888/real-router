@@ -13,6 +13,8 @@ export { rscServerPluginFactory } from "./factory";
 
 export { rscActionPluginFactory } from "./actionFactory";
 
+export { buildRscPayload } from "./buildRscPayload";
+
 export { getSsrRscMode } from "./getSsrRscMode";
 
 export { invalidate } from "./invalidate";
