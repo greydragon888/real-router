@@ -63,28 +63,6 @@ function resolveMode(
   return value;
 }
 
-interface CompiledDeferred {
-  promises: Record<string, Promise<unknown>>;
-  keys: string[];
-}
-
-function processLoaderResult<T>(
-  result: T,
-  hasDeferredSupport: boolean,
-): { critical: T; deferred: CompiledDeferred | null } {
-  if (hasDeferredSupport && isDeferred(result)) {
-    return {
-      critical: result.critical as T,
-      deferred: {
-        promises: result.deferred,
-        keys: Object.keys(result.deferred),
-      },
-    };
-  }
-
-  return { critical: result, deferred: null };
-}
-
 export function createSsrLoaderPlugin<
   T,
   Dependencies extends DefaultDependencies = DefaultDependencies,
@@ -179,15 +157,23 @@ export function createSsrLoaderPlugin<
 
     const internals = getInternals(router);
 
+    // Hot path on every successful start() / subscribeLeave refresh. The
+    // previous shape ran a `processLoaderResult` helper that always allocated
+    // a `{ critical, deferred }` wrapper object — wasted on the common
+    // plain-data path (and on every call from `rsc-server-plugin`, which
+    // never opts into deferred support). Inlining the branch keeps the
+    // fast path allocation-free and the slow path (defer payload) at one
+    // intentional `Object.keys(...)` array allocation per loader.
     const writeLoaderResult = (state: State, value: T): void => {
-      const processed = processLoaderResult(value, hasDeferredSupport);
+      if (hasDeferredSupport && isDeferred(value)) {
+        dataClaim.write(state, value.critical as T);
+        deferredClaim!.write(state, value.deferred);
+        deferredKeysClaim!.write(state, Object.keys(value.deferred));
 
-      dataClaim.write(state, processed.critical);
-
-      if (processed.deferred !== null && deferredClaim && deferredKeysClaim) {
-        deferredClaim.write(state, processed.deferred.promises);
-        deferredKeysClaim.write(state, processed.deferred.keys);
+        return;
       }
+
+      dataClaim.write(state, value);
     };
 
     const reconstructDeferredFromHydration = (
