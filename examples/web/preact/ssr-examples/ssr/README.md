@@ -99,6 +99,16 @@ Verified by 3 dedicated e2e tests:
 
 Demonstrated routes: `/users/9999` (404), `/legacy-user/:id` → `/users/:id` (301), `/slow` (504 via `withTimeout` race), `/boom` (500).
 
+## Render-time HTTP status: `<HttpStatusCode />` dogfood
+
+Complementary HTTP-status path for render-time decisions (where the status is decided by the rendered component, not by a loader). `src/pages/NotFound.tsx` mounts `<HttpStatusCode code={404}/>` from `@real-router/preact/ssr`; `entry-server.tsx` creates a per-request `createHttpStatusSink()`, wraps the rendered tree in `<HttpStatusProvider sink={sink}>`, and reads `sink.code ?? 200` after `renderToStringAsync` to set `RenderResult.statusCode`.
+
+Replaces the prior `state.name === UNKNOWN_ROUTE ? 404 : 200` server-side check with a render-time signal: NotFound declares its own status, decoupling HTTP semantics from server-side state inspection. Loader-driven errors (`LoaderRedirect`/`LoaderNotFound`/`LoaderTimeout`) still use the existing typed-error catch path — `<HttpStatusCode>` covers only the render-time fork (glob `*` route → NotFound page).
+
+`<HttpStatusCode>` returns `null` (no DOM); the provider is a thin context wrapper. On the client the same component tree hydrates — without a provider mounted, `useContext` returns null and the component is a silent no-op (no DOM, no hydration warnings). Preact emits no per-component DOM markers (unlike Vue/Solid), so no client-side provider symmetry mount is needed in `entry-client.tsx`.
+
+3 dedicated e2e tests verify the dogfood: render-time path on JS-disabled fetch (`/totally-unknown` → 404 + NotFound HTML; no `code="404"` attribute leak); no phantom 404 leak across requests; clean hydration with zero `HttpStatusCode|HttpStatusProvider|hydrat|mismatch` warnings.
+
 ## Production HTTP semantics
 
 `server/index.ts` adds three production-grade pieces:

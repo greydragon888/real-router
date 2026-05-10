@@ -189,7 +189,7 @@ pnpm test:e2e     # Playwright — 22 acceptance scenarios
 6. **Every page is server-rendered (full-reload navigation)** — typed URL / refresh / deep-link
 7. **Critical loader data lands in the SSR HTML response** — round-trip via `state.context.data`
 8. **Per-request isolation** under 9 concurrent loads — `cloneRouter()` integrity
-9. **Unknown route renders NotFound page** — `allowNotFound: true` returns 200 (see `ssr/` README for rationale)
+9. **Unknown route renders NotFound page** — `allowNotFound: true` returns 200 by default. (The classical `ssr/` example dogfoods `<http-status-code [code]="404"/>` from `@real-router/angular/ssr` to override this to 404; the streaming example intentionally keeps the default 200 — the streaming pipeline + `<http-status-code>` REQUEST_CONTEXT wiring would compose, but they're orthogonal concerns and would muddy the streaming demo.)
 10. **Home → products navigation works after hydration** — CSR via realLink + browser-plugin
 11. **Response includes incremental hydration markers** — `ngh=` / `ng-server-context=` proof
 12. **Response headers** — `text/html; charset=utf-8`, no `x-powered-by` leak, status 200. **Note:** the suite intentionally does **not** assert `Transfer-Encoding: chunked` (see test comment in `e2e/ssr-streaming.spec.ts`) — chunked framing is observed empirically via the Node `http.request` snippet at the bottom of this file, not via Playwright. Different Node HTTP runtimes / proxy chains can switch between chunked and `Content-Length` for the same body, so asserting on it would make the suite environment-dependent.

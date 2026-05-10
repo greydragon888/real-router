@@ -1,10 +1,13 @@
-import { UNKNOWN_ROUTE } from "@real-router/core";
 import {
   createRequestScope,
   serializeRouterState,
   type IncomingMessageLike,
 } from "@real-router/core/utils";
 import { RouterProvider } from "@real-router/react";
+import {
+  HttpStatusProvider,
+  createHttpStatusSink,
+} from "@real-router/react/ssr";
 import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 import { renderToString } from "react-dom/server";
 
@@ -101,15 +104,25 @@ export async function render(
 
   scope.router.usePlugin(ssrDataPluginFactory(loaders));
 
+  // Per-request HTTP status sink. The NotFound page mounts
+  // `<HttpStatusCode code={404}/>` which writes through `<HttpStatusProvider>`
+  // into this sink during render. After `renderToString` completes we read
+  // `sink.code ?? 200` and apply it to the response — render-time decision
+  // (vs. inspecting `state.name === UNKNOWN_ROUTE` server-side).
+  const httpStatusSink = createHttpStatusSink();
+
   try {
     const state = await scope.router.start(url);
-    const statusCode = state.name === UNKNOWN_ROUTE ? 404 : 200;
 
     const html = renderToString(
-      <RouterProvider router={scope.router}>
-        <App />
-      </RouterProvider>,
+      <HttpStatusProvider sink={httpStatusSink}>
+        <RouterProvider router={scope.router}>
+          <App />
+        </RouterProvider>
+      </HttpStatusProvider>,
     );
+
+    const statusCode = httpStatusSink.code ?? 200;
 
     const meta = getMetaForState({
       name: state.name,

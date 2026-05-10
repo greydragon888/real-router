@@ -16,7 +16,8 @@ Server-side rendering with Real-Router, Angular 21, `@angular/ssr` (`AngularNode
 - **Query params + nested loaders** — `?sort` on `/users`, leaf-route loader for `/users/:id/posts` returns combined parent + child data.
 - **Loader error → 500 page** — rejected loader in `provideAppInitializer` propagates → `bootstrapApplication` rejects → server returns 500. See [`.claude/rfc-angular-ssr-factory-ru.md`](../../../../../.claude/rfc-angular-ssr-factory-ru.md) for the full design rationale.
 - **Loader-driven HTTP semantics** — typed loader errors (`LoaderRedirect`, `LoaderNotFound`, `LoaderTimeout` from `@real-router/ssr-data-plugin/errors`) are caught by the express middleware and mapped to `301/302`, `404`, and `504` responses respectively. The plugin stays HTTP-agnostic; the application owns the bridge.
-  - `users.profile` throws `LoaderNotFound` for ids that don't exist → server returns 404 (vs `UNKNOWN_ROUTE` which is a 200 + NotFound page via `allowNotFound: true`).
+  - `users.profile` throws `LoaderNotFound` for ids that don't exist → server returns 404 (loader-driven path; rendered as `text/plain`).
+  - `UNKNOWN_ROUTE` (`/nonexistent`) renders the `NotFoundComponent`, which mounts `<http-status-code [code]="404"/>` from `@real-router/angular/ssr` — the component injects `HTTP_STATUS_SINK` (provided per-request via Angular's `REQUEST_CONTEXT` token, see `app.config.ts`) and writes 404 in `ngOnInit`. `server.ts` reads `httpStatusSink.code` after `AngularNodeAppEngine.handle` resolves and lets it override `response.status`. This is the **render-time HTTP status path** — the status is decided by the rendered component, not by inspecting the request URL or `state.name === UNKNOWN_ROUTE` server-side.
   - `users.profile.posts` does the same — leaf loader re-validates the parent user id, so `/users/9999/posts` also surfaces as 404 (verified by `e2e/ssr.spec.ts:474-480`).
   - `legacyUser` (`/legacy-user/:id`) throws `LoaderRedirect("/users/:id", 301)` — demonstrates the canonical-URL pattern (Next.js-style `redirect()` from a loader).
   - `slow` (`/slow`) demonstrates `withTimeout()` (#598) — the loader fetches `/__bench/slow-fetch` (a 5 s endpoint instrumented to count client-side aborts) with the composed `AbortSignal` that `withTimeout` passes in. The 250 ms deadline elapses well before the fetch can complete; `withTimeout` aborts the signal *before* rejecting with `LoaderTimeout`, so the upstream `fetch` is cancelled at the network layer (server's `req.on("close")` fires) and the SSR worker is freed. Server returns 504 Gateway Timeout. Verified by `withTimeout (#598) network cancellation` e2e.
@@ -205,6 +206,21 @@ The e2e suite verifies both strategies in one test (`serverRoutes status overrid
 - **Strategy B** carries any data-derived status, but the body in this example is `text/plain "Not Found"` for simplicity. Rendering a rich 404 from middleware would require a second `angularApp.handle()` pass against a `/__not-found` URL with `res.status(404)`.
 
 `withTimeout()` cancellation is cooperative (#598): the loader receives `{ signal }` that aborts *before* the race rejects with `LoaderTimeout`, so loader I/O honoring the signal (`fetch(url, { signal })`, DB drivers, etc.) actually cancels the underlying work. Loaders that don't propagate the signal still run to completion in the background. The `slow` loader composes the deadline with `options.upstreamSignal` (client disconnect from per-request DI) — composed signal aborts on whichever fires first.
+
+### Strategy C — render-time `<http-status-code [code]>` component (component-based status)
+
+Third HTTP-status path for status decisions made by the rendered Component itself, not by routing config (Strategy A) or by a loader exception (Strategy B). `src/pages/not-found.component.ts` mounts `<http-status-code [code]="404"/>` from `@real-router/angular/ssr`; the component's `ngOnInit` injects the optional `HTTP_STATUS_SINK` token and writes `code` to it.
+
+Closes a previous Angular known-limitation: `Real-Router`'s `allowNotFound: true` resolves `UNKNOWN_ROUTE` without throwing, so Angular renders NotFound and the route would emit 200 by default. The render-time component now lets the NotFound page declare its own 404 — `server.ts` reads `httpStatusSink.code` after `AngularNodeAppEngine.handle` resolves and overrides `response.status` accordingly.
+
+**Per-request wiring (Angular-specific):** the sink must be passed via the second arg of `handle(req, requestContext)` — Angular surfaces it through the `REQUEST_CONTEXT` token. Attaching to `req` directly does NOT work: `AngularNodeAppEngine.handle` constructs a fresh Web `Request` from the Express `IncomingMessage` and discards every custom property (verified via `node -e` against `@angular/ssr`'s `createWebRequestFromNodeRequest`). Wiring:
+
+- `server.ts`: `const httpStatusSink = createHttpStatusSink(); angularApp.handle(req, { httpStatusSink });` — then `res.statusCode = httpStatusSink.code ?? response.status;`
+- `app.config.ts`: factory `{ provide: HTTP_STATUS_SINK, useFactory: () => { const ctx = inject(REQUEST_CONTEXT, { optional: true }); return (ctx as { httpStatusSink? } | null)?.httpStatusSink ?? createHttpStatusSink(); } }`
+
+**JIT/AOT note:** the component's `code` input is declared as `input<number>()` (not `input.required<number>()`) because `input.required` trips `NG0950` in JIT/TestBed even after `componentRef.setInput`. `ngOnInit` skips the write when `code()` is `undefined`. AOT (production build, including this example) binds the value normally and the skip never fires.
+
+3 dedicated e2e tests verify the dogfood: render-time path on JS-disabled fetch (`/nonexistent` → 404 + NotFound HTML; verifies `<http-status-code></http-status-code>` host element is present but no `code="404"` attribute leaks); no phantom 404 leak across requests (per-request DI scope structurally prevents shared mutable sink state); clean hydration with zero `HttpStatusCode|HttpStatusProvider|hydrat|mismatch` warnings. The previous `unknown route renders NotFound page` test (which expected 200) was updated to expect 404 — the dogfood closed that specific Angular known-limitation.
 
 ## Production HTTP semantics: ETag, Cache-Control, AbortController
 

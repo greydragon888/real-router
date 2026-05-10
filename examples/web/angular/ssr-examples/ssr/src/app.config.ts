@@ -1,10 +1,17 @@
 import {
   Component,
+  REQUEST_CONTEXT,
+  inject,
   provideZonelessChangeDetection,
   type ApplicationConfig,
 } from "@angular/core";
 import { provideRouter } from "@angular/router";
 import { provideRealRouterFactory } from "@real-router/angular";
+import {
+  HTTP_STATUS_SINK,
+  createHttpStatusSink,
+  type HttpStatusSink,
+} from "@real-router/angular/ssr";
 import { browserPluginFactory } from "@real-router/browser-plugin";
 import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 
@@ -70,6 +77,31 @@ export const appConfig: ApplicationConfig = {
       { path: "gone", component: NgRouterStub },
       { path: "**", component: NgRouterStub },
     ]),
+    // Per-request HTTP status sink. server.ts passes the sink as the
+    // `requestContext` argument to `AngularNodeAppEngine.handle(req, ctx)`
+    // — Angular's built-in REQUEST_CONTEXT DI token surfaces it here.
+    // `<http-status-code [code]="N"/>` mounted by not-found.component.ts
+    // writes through `HTTP_STATUS_SINK` into the same sink the server
+    // reads after render. Pure CSR (no REQUEST_CONTEXT) gets a throwaway
+    // client-side sink — `<http-status-code>` is a silent no-op anyway
+    // because nothing reads it on the client.
+    //
+    // Why REQUEST_CONTEXT and not REQUEST? `AngularNodeAppEngine.handle`
+    // converts the Express IncomingMessage into a fresh Web `Request`
+    // object via `createWebRequestFromNodeRequest`, which discards every
+    // custom property attached to the Node request. Angular exposes the
+    // `requestContext` second arg via REQUEST_CONTEXT exactly to bridge
+    // this gap.
+    {
+      provide: HTTP_STATUS_SINK,
+      useFactory: (): HttpStatusSink => {
+        const ctx = inject(REQUEST_CONTEXT, { optional: true });
+        const fromContext = (ctx as { httpStatusSink?: HttpStatusSink } | null)
+          ?.httpStatusSink;
+
+        return fromContext ?? createHttpStatusSink();
+      },
+    },
     provideRealRouterFactory({
       baseRouter,
       plugins: (request) =>

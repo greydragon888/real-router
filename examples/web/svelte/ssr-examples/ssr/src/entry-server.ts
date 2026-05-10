@@ -1,10 +1,10 @@
-import { UNKNOWN_ROUTE } from "@real-router/core";
 import {
   createRequestScope,
   serializeRouterState,
   type IncomingMessageLike,
 } from "@real-router/core/utils";
 import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
+import { createHttpStatusSink } from "@real-router/svelte/ssr";
 import { render } from "svelte/server";
 
 import App from "./App.svelte";
@@ -73,15 +73,24 @@ export async function renderPage(
 
   scope.router.usePlugin(ssrDataPluginFactory(loaders));
 
+  // Per-request HTTP status sink. The NotFound page mounts
+  // `<HttpStatusCode code={404}/>` which writes through `<HttpStatusProvider>`
+  // (mounted by `App.svelte` when given a sink prop) into this sink during
+  // render. After `render()` completes we read `sink.code ?? 200` and apply
+  // it to the response — render-time decision (vs. inspecting
+  // `state.name === UNKNOWN_ROUTE` server-side).
+  const httpStatusSink = createHttpStatusSink();
+
   try {
     const state = await scope.router.start(url);
-    const statusCode = state.name === UNKNOWN_ROUTE ? 404 : 200;
 
     // Svelte 5 RenderOutput is PromiseLike — `await` covers both sync
     // (no top-level await/no <svelte:boundary pending>) and async paths.
     const { head, body } = await render(App, {
-      props: { router: scope.router },
+      props: { router: scope.router, httpStatusSink },
     });
+
+    const statusCode = httpStatusSink.code ?? 200;
 
     return {
       html: body,

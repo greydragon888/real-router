@@ -84,6 +84,16 @@ Trade-offs:
 - The `404`/`504` bodies are plain text rather than the SSR-rendered NotFound page. Rendering a rich 404 would require a second `renderToString()` pass with a different URL — kept simple in this demo.
 - `withTimeout()` cancellation is cooperative (#598): the loader receives `{ signal }` that aborts *before* the race rejects with `LoaderTimeout`, so loaders threading `signal` into their I/O actually cancel the work. The `slow` loader composes the deadline with `options.upstreamSignal` (client disconnect from per-request DI).
 
+## Render-time HTTP status: `<HttpStatusCode />` dogfood
+
+Complementary HTTP-status path for render-time decisions (where the status is decided by the rendered component, not by a loader). `src/pages/NotFound.tsx` mounts `<HttpStatusCode code={404}/>` from `@real-router/solid/ssr`; `entry-server.tsx` creates a per-request `createHttpStatusSink()`, wraps the rendered tree in `<HttpStatusProvider sink={sink}>`, and reads `sink.code ?? 200` after `renderToStringAsync` to set `RenderResult.statusCode`.
+
+Replaces the prior `state.name === UNKNOWN_ROUTE ? 404 : 200` server-side check with a render-time signal: NotFound declares its own status, decoupling HTTP semantics from server-side state inspection. Loader-driven errors still use the typed-error catch path.
+
+**Solid-specific: client-side provider mount required for hydration symmetry.** Solid emits `data-hk` markers per component boundary in the SSR output. If `<HttpStatusProvider>` is mounted on the server but NOT on the client, the marker counter drifts → `Hydration Mismatch. Unable to find DOM nodes for hydration key …` and 5 client-navigation tests start failing. Fix: `entry-client.tsx` creates a throwaway `createHttpStatusSink()` and wraps the `<RouterProvider>` in `<HttpStatusProvider sink={…}>` symmetrically — the client sink is never read (status was already set on the wire), but its presence keeps the marker count balanced. Same architectural fix Vue uses; React/Preact don't need it (no per-component DOM markers).
+
+3 dedicated e2e tests verify the dogfood: render-time path on JS-disabled fetch (`/nonexistent` → 404 + NotFound HTML; no `code="404"` attribute leak); no phantom 404 leak across requests; clean hydration with zero `HttpStatusCode|HttpStatusProvider|hydrat|mismatch` warnings.
+
 ## Production HTTP semantics: ETag, Cache-Control, AbortController
 
 `server/index.ts` adds three production-grade pieces on top of the basic SSR wiring:

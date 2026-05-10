@@ -104,6 +104,24 @@ Demonstrated routes:
 
 `withTimeout()` cancellation is cooperative (#598). When the deadline elapses, the loader's `{ signal }` aborts *before* the race rejects with `LoaderTimeout`, so loader I/O honoring the signal — e.g. `fetch(url, { signal })` — actually cancels at the network layer (proven by the `withTimeout (#598) network cancellation` e2e). The `slow` loader composes the deadline with `options.upstreamSignal` (client disconnect) — composed signal aborts on whichever fires first.
 
+## Render-time HTTP status: `<HttpStatusCode />` dogfood
+
+Complementary HTTP-status path for render-time decisions (where the status is decided by the rendered component, not by a loader). `src/pages/NotFound.tsx` mounts `<HttpStatusCode code={404}/>` from `@real-router/react/ssr`; `entry-server.tsx` creates a per-request `createHttpStatusSink()`, wraps the rendered tree in `<HttpStatusProvider sink={sink}>`, and reads `sink.code ?? 200` after `renderToString` to set `RenderResult.statusCode`.
+
+Replaces the prior `state.name === UNKNOWN_ROUTE ? 404 : 200` server-side check with a render-time signal: the NotFound component declares its own status, decoupling HTTP semantics from server-side state inspection. Loader-driven errors (`LoaderRedirect`/`LoaderNotFound`/`LoaderTimeout`) still use the existing typed-error catch path — `<HttpStatusCode>` covers only the render-time fork (glob `*` route → NotFound page).
+
+`<HttpStatusCode>` returns `null` (no DOM); `<HttpStatusProvider>` is a thin context wrapper that emits its children verbatim. On the client the same component tree hydrates — without a provider mounted, `useContext` returns null and the component is a silent no-op (no DOM, no hydration warnings). React 18 compatible — `<HttpStatusContext.Provider value>` (not the React 19 shorthand) is intentionally used so the same component file works under `/legacy/ssr` too.
+
+3 dedicated e2e tests verify the dogfood:
+
+| Scenario | What it asserts |
+|---|---|
+| `404 is set by render-time component, not server-side state inspection` | JS-disabled fetch to `/nonexistent` returns 404 + NotFound HTML; no `code="404"` attribute leaks (component renders null) |
+| `existing routes still return 200 (no phantom 404 leak)` | After visiting `/nonexistent`, subsequent `/` and `/users` requests return 200 — sentinel against shared mutable sink state across requests |
+| `client hydrates the rendered NotFound page without warnings` | With JS enabled, hydrating `/nonexistent` produces zero `console.error`/`console.warn` matching `/HttpStatusCode\|HttpStatusProvider\|hydrat\|mismatch/i` — confirms silent no-op on client side |
+
+**JSDoc-documented constraints** (in the `@real-router/react` package): NaN/0/<100/>999 codes throw at `res.end()` (loud, not silent corruption); `Object.freeze(sink)` would throw on assignment under ESM strict mode; `<HttpStatusCode>` inside a late-resolving `<Suspense>` boundary in `renderToReadableStream` would write to the sink AFTER headers flush — mount in the shell or `await stream.allReady` (this `ssr/` example uses synchronous `renderToString`, no streaming concern).
+
 ## Auth + role gates
 
 Two layers of authorization, demonstrated end-to-end:

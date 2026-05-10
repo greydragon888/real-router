@@ -7,6 +7,10 @@ import {
   createNodeRequestHandler,
   isMainModule,
 } from "@angular/ssr/node";
+import {
+  createHttpStatusSink,
+  type HttpStatusSink,
+} from "@real-router/angular/ssr";
 import express from "express";
 
 import { getCachePolicy } from "./router/cache-policies";
@@ -91,8 +95,22 @@ app.use((req, res, next) => {
     }
   });
 
+  // Per-request HTTP status sink. `<http-status-code [code]="N"/>` writes
+  // through `HTTP_STATUS_SINK` (provided per-request in `app.config.ts` via
+  // a factory that reads this very sink off Angular's `REQUEST_CONTEXT`
+  // token — the second arg to `AngularNodeAppEngine.handle`). After
+  // Angular finishes rendering we read sink.code below and let it override
+  // Angular's response.status — render-time status decision.
+  //
+  // Why REQUEST_CONTEXT and not REQUEST? `AngularNodeAppEngine.handle`
+  // converts the Express IncomingMessage to a fresh Web `Request` object,
+  // which discards every custom property attached to the original Node
+  // request. `REQUEST_CONTEXT` is Angular's built-in DI hook for
+  // per-request metadata exactly to bridge this gap.
+  const httpStatusSink: HttpStatusSink = createHttpStatusSink();
+
   angularApp
-    .handle(req)
+    .handle(req, { httpStatusSink })
     .then(async (response) => {
       if (!response) {
         next();
@@ -136,7 +154,12 @@ app.use((req, res, next) => {
         return;
       }
 
-      res.statusCode = response.status;
+      // Render-time status override: <http-status-code> writes the desired
+      // code into httpStatusSink during rendering; here we honour it (else
+      // fall back to Angular's response.status). Loader-driven errors fall
+      // through to the catch branch below, so this only applies to the
+      // happy path + render-time decisions like the NotFound page.
+      res.statusCode = httpStatusSink.code ?? response.status;
       res.end(buffer);
     })
     .catch((error: unknown) => {

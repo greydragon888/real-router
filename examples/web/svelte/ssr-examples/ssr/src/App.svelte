@@ -1,5 +1,9 @@
 <script lang="ts">
   import { Link, RouteView, RouterProvider } from "@real-router/svelte";
+  import {
+    HttpStatusProvider,
+    type HttpStatusSink,
+  } from "@real-router/svelte/ssr";
 
   import Admin from "./pages/Admin.svelte";
   import Dashboard from "./pages/Dashboard.svelte";
@@ -10,46 +14,64 @@
 
   import type { Router } from "@real-router/core";
 
-  const { router }: { router: Router } = $props();
+  // `httpStatusSink` is server-side only — server passes a sink, client
+  // hydration omits the prop. NotFound.svelte mounts <HttpStatusCode/> which
+  // writes through HttpStatusProvider into this sink during render.
+  const {
+    router,
+    httpStatusSink,
+  }: { router: Router; httpStatusSink?: HttpStatusSink } = $props();
 </script>
 
-<RouterProvider {router}>
-  <div>
-    <nav>
-      <Link routeName="home">Home</Link>
-      {" | "}
-      <Link routeName="users">Users</Link>
-      {" | "}
-      <Link routeName="dashboard">Dashboard</Link>
-      {" | "}
-      <Link routeName="admin" data-testid="nav-admin">Admin</Link>
-    </nav>
-    <main>
-      <RouteView nodeName="">
-        {#snippet home()}
-          <Home />
-        {/snippet}
-        {#snippet users()}
-          <h1>Users</h1>
-          <RouteView nodeName="users">
-            {#snippet self()}
-              <UsersList />
-            {/snippet}
-            {#snippet profile()}
-              <UserProfile />
-            {/snippet}
-          </RouteView>
-        {/snippet}
-        {#snippet dashboard()}
-          <Dashboard />
-        {/snippet}
-        {#snippet admin()}
-          <Admin />
-        {/snippet}
-        {#snippet notFound()}
-          <NotFound />
-        {/snippet}
-      </RouteView>
-    </main>
-  </div>
-</RouterProvider>
+{#snippet appBody()}
+  <RouterProvider {router}>
+    <div>
+      <nav>
+        <Link routeName="home">Home</Link>
+        {" | "}
+        <Link routeName="users">Users</Link>
+        {" | "}
+        <Link routeName="dashboard">Dashboard</Link>
+        {" | "}
+        <Link routeName="admin" data-testid="nav-admin">Admin</Link>
+      </nav>
+      <main>
+        <RouteView nodeName="">
+          {#snippet home()}
+            <Home />
+          {/snippet}
+          {#snippet users()}
+            <h1>Users</h1>
+            <RouteView nodeName="users">
+              {#snippet self()}
+                <UsersList />
+              {/snippet}
+              {#snippet profile()}
+                <UserProfile />
+              {/snippet}
+            </RouteView>
+          {/snippet}
+          {#snippet dashboard()}
+            <Dashboard />
+          {/snippet}
+          {#snippet admin()}
+            <Admin />
+          {/snippet}
+          {#snippet notFound()}
+            <NotFound />
+          {/snippet}
+        </RouteView>
+      </main>
+    </div>
+  </RouterProvider>
+{/snippet}
+
+{#if httpStatusSink}
+  <HttpStatusProvider sink={httpStatusSink}>
+    {#snippet children()}
+      {@render appBody()}
+    {/snippet}
+  </HttpStatusProvider>
+{:else}
+  {@render appBody()}
+{/if}

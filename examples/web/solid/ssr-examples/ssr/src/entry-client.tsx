@@ -1,6 +1,10 @@
 import { browserPluginFactory } from "@real-router/browser-plugin";
 import { hydrateRouter } from "@real-router/core/utils";
 import { RouterProvider } from "@real-router/solid";
+import {
+  HttpStatusProvider,
+  createHttpStatusSink,
+} from "@real-router/solid/ssr";
 import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 import { hydrate } from "solid-js/web";
 
@@ -63,12 +67,22 @@ await (ssrState ? hydrateRouter(router, ssrState) : router.start());
 
 const rootElement = document.querySelector("#root");
 
+// Mount <HttpStatusProvider> on the client too so the hydrated component
+// tree structurally matches the server-rendered DOM. Solid emits hydration
+// markers (`data-hk`) for every component boundary; if the client tree has
+// one fewer boundary than the SSR HTML, every subsequent marker drifts and
+// hydration walker fails. The client sink is never read, so a throwaway is
+// fine.
+const httpStatusSink = createHttpStatusSink();
+
 if (rootElement) {
   hydrate(
     () => (
-      <RouterProvider router={router}>
-        <App />
-      </RouterProvider>
+      <HttpStatusProvider sink={httpStatusSink}>
+        <RouterProvider router={router}>
+          <App />
+        </RouterProvider>
+      </HttpStatusProvider>
     ),
     rootElement,
   );

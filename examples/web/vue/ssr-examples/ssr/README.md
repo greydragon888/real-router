@@ -120,6 +120,18 @@ Trade-offs:
 - The `404`/`504` bodies are plain text rather than the SSR-rendered NotFound page. Rendering a rich 404 would require a second `render()` pass with a different URL — kept simple in this demo.
 - `withTimeout()` cancellation is cooperative (#598): the loader receives `{ signal }` that aborts *before* the race rejects with `LoaderTimeout`, so loaders threading `signal` into their I/O actually cancel the work. The `slow` loader composes the deadline with `options.upstreamSignal` (client disconnect from per-request DI) — composed signal aborts on whichever fires first.
 
+## Render-time HTTP status: `<HttpStatusCode />` dogfood
+
+Complementary HTTP-status path for render-time decisions (where the status is decided by the rendered component, not by a loader). `src/pages/NotFound.vue` mounts `<HttpStatusCode :code="404"/>` from `@real-router/vue/ssr`; `entry-server.ts` creates a per-request `createHttpStatusSink()`, wraps the rendered tree in `<HttpStatusProvider :sink>`, and reads `sink.code ?? 200` after `renderToString` to set `RenderResult.statusCode`.
+
+Replaces the prior `state.name === UNKNOWN_ROUTE ? 404 : 200` server-side check with a render-time signal: NotFound declares its own status, decoupling HTTP semantics from server-side state inspection. Loader-driven errors still use the typed-error catch path.
+
+`<HttpStatusCode>` writes `props.code` to the injected sink in `setup()` and renders `null`. The provider uses `provide(HTTP_STATUS_KEY, props.sink)` over a Vue `InjectionKey` symbol.
+
+**Vue-specific: client-side provider mount required for hydration symmetry.** Vue emits `<!--[-->` / `<!--]-->` fragment markers around `<HttpStatusProvider>`'s slot in the SSR output. If the provider is mounted on the server but NOT on the client, Vue logs `Hydration completed but contains mismatches.` Fix: `entry-client.ts` creates a throwaway `createHttpStatusSink()` and wraps the `<RouterProvider>` in `<HttpStatusProvider :sink>` symmetrically — the client sink is never read (status was already set on the wire), but its presence keeps the marker count balanced. Same architectural fix Solid uses; React/Preact don't need it (no fragment markers around context providers).
+
+3 dedicated e2e tests verify the dogfood: render-time path on JS-disabled fetch (`/nonexistent` → 404 + NotFound HTML; no `code="404"` attribute leak); no phantom 404 leak across requests; clean hydration with zero `HttpStatusCode|HttpStatusProvider|hydrat|mismatch` warnings.
+
 ## Production HTTP semantics: ETag, Cache-Control, AbortController
 
 `server/index.ts` adds three production-grade pieces on top of the basic SSR wiring:

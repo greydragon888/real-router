@@ -125,6 +125,18 @@ Trade-offs:
 - The `404`/`504` bodies are plain text rather than the SSR-rendered NotFound page. Rendering a rich 404 would require a second `render()` pass with a different URL — kept simple in this demo.
 - `withTimeout()` cancellation is cooperative (#598): the loader receives `{ signal }` that aborts *before* the race rejects with `LoaderTimeout`. The composed signal includes `options.upstreamSignal` (client disconnect from per-request DI), so a single listener inside the loader frees server resources on either deadline OR client-close.
 
+## Render-time HTTP status: `<HttpStatusCode />` dogfood
+
+Complementary HTTP-status path for render-time decisions (where the status is decided by the rendered component, not by a loader). `src/pages/NotFound.svelte` mounts `<HttpStatusCode code={404}/>` from `@real-router/svelte/ssr`; `entry-server.ts` creates a per-request `createHttpStatusSink()`, passes it as a prop into `App.svelte`, which conditionally wraps the body in `<HttpStatusProvider {sink}>` (`{#if httpStatusSink}` branch). After `await render(App, { props: { router, httpStatusSink } })` resolves, server reads `sink.code ?? 200` to set `RenderResult.statusCode`.
+
+Replaces the prior `state.name === UNKNOWN_ROUTE ? 404 : 200` server-side check with a render-time signal: NotFound declares its own status, decoupling HTTP semantics from server-side state inspection. Loader-driven errors still use the typed-error catch path.
+
+`<HttpStatusCode>` writes `code` to the injected sink at component init via `getContext(HTTP_STATUS_KEY)` and renders nothing. The provider uses `setContext(HTTP_STATUS_KEY, sink)`. Both have `// svelte-ignore state_referenced_locally` since the writes are intentional one-time-at-init (replacing the sink mid-render isn't a supported usage pattern — server reads it once after `render()`).
+
+**Svelte-specific: client-side provider mount NOT needed.** Svelte 5's hydration walker tolerates `{#if}`-branch asymmetry between server and client (verified by zero hydration warnings in the e2e). `App.svelte`'s `{#if httpStatusSink}` is server-only; client `entry-client.ts` doesn't pass the prop, so the `{:else}` branch fires and there's no provider. This contrasts with Vue/Solid, which require symmetric provider mounting for marker counter parity. Documented inline in `App.svelte`.
+
+3 dedicated e2e tests verify the dogfood: render-time path on JS-disabled fetch (`/nonexistent` → 404 + NotFound HTML; no `code="404"` attribute leak); no phantom 404 leak across requests; clean hydration with zero `HttpStatusCode|HttpStatusProvider|hydrat|mismatch` warnings.
+
 ## Production HTTP semantics: ETag, Cache-Control, AbortController
 
 `server/index.ts` adds three production-grade pieces on top of the basic SSR wiring:

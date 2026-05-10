@@ -101,6 +101,84 @@ test.describe("SSR (Svelte)", () => {
     await expect(page.locator("main")).toContainText("Not Found");
   });
 
+  test("HttpStatusCode dogfood: 404 is set by render-time component, not server-side state inspection", async ({
+    browser,
+  }) => {
+    // JS-disabled context proves the contract is server-side: NotFound page
+    // mounts <HttpStatusCode code={404}/> during svelte/server render(),
+    // App.svelte's <HttpStatusProvider {sink}> captures the value into the
+    // per-request sink, entry-server reads `sink.code ?? 200` and applies
+    // it. No client hydration involved — the 404 must arrive on first byte.
+    const context = await browser.newContext({ javaScriptEnabled: false });
+    const page = await context.newPage();
+    const response = await page.goto("/nonexistent");
+
+    expect(response!.status()).toBe(404);
+
+    const html = await response!.text();
+
+    // NotFound page rendered (proves render path was actually taken — not a
+    // server-side short-circuit before render). If `<HttpStatusCode>` had
+    // failed to write to the sink, the response would be 200 here, not 404.
+    expect(html).toContain("404 — Not Found");
+
+    // <HttpStatusCode> renders no DOM in Svelte (template is empty after
+    // the script-time getContext write) — no element/attribute bearing
+    // the component's name should leak into the served HTML.
+    expect(html).not.toContain("HttpStatusCode");
+    expect(html).not.toContain("http-status-code");
+    expect(html).not.toMatch(/code\s*=\s*["']?404["']?/);
+
+    await context.close();
+  });
+
+  test("HttpStatusCode dogfood: existing routes still return 200 (no phantom 404 leak)", async ({
+    page,
+  }) => {
+    // Sentinel: prove the per-request sink is fresh on every request and
+    // not somehow shared from a previous /nonexistent visit. If this test
+    // were to fail with status 404, the sink would be leaking across
+    // requests (module-level mutable state instead of request-scoped).
+    await page.goto("/nonexistent");
+
+    const homeResponse = await page.goto("/");
+
+    expect(homeResponse!.status()).toBe(200);
+
+    const usersResponse = await page.goto("/users");
+
+    expect(usersResponse!.status()).toBe(200);
+  });
+
+  test("HttpStatusCode dogfood: client hydrates the rendered NotFound page without warnings", async ({
+    page,
+  }) => {
+    // With JS enabled the client hydrates the same DOM the server emitted
+    // for /nonexistent. Client-side App.svelte does not pass
+    // `httpStatusSink` so HttpStatusProvider is never mounted; the
+    // <HttpStatusCode> inside NotFound reads `getContext` → undefined →
+    // silent no-op. This test verifies the silent no-op path produces no
+    // Svelte/hydration warnings.
+    const errors: string[] = [];
+    const warnings: string[] = [];
+
+    page.on("console", (msg) => {
+      if (msg.type() === "error") errors.push(msg.text());
+      if (msg.type() === "warning") warnings.push(msg.text());
+    });
+
+    const response = await page.goto("/nonexistent");
+
+    expect(response!.status()).toBe(404);
+    await expect(page.locator("main")).toContainText("Not Found");
+
+    const noisy = [...errors, ...warnings].filter((m) =>
+      /HttpStatusCode|HttpStatusProvider|hydrat|mismatch/i.test(m),
+    );
+
+    expect(noisy).toHaveLength(0);
+  });
+
   test("server injects __SSR_STATE__ into HTML", async ({ page }) => {
     const response = await page.goto("/users");
     const html = await response!.text();

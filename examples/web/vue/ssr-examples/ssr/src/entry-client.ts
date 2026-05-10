@@ -2,6 +2,10 @@ import { browserPluginFactory } from "@real-router/browser-plugin";
 import { hydrateRouter } from "@real-router/core/utils";
 import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 import { RouterProvider } from "@real-router/vue";
+import {
+  HttpStatusProvider,
+  createHttpStatusSink,
+} from "@real-router/vue/ssr";
 import { createSSRApp, h } from "vue";
 
 import { lookupUserFromCookies, parseCookieHeader } from "./_known-users";
@@ -62,8 +66,23 @@ const ssrState = globalThis.__SSR_STATE__;
 
 await (ssrState ? hydrateRouter(router, ssrState) : router.start());
 
+// Mount <HttpStatusProvider> on the client too so the hydrated component
+// tree structurally matches the server-rendered DOM (Vue tracks component
+// boundaries with `<!---->` comment markers — omitting the wrapper here
+// trips the hydration walker on `<HttpStatusCode/>`-bearing pages like
+// NotFound). The client sink is never read, so a throwaway is fine.
+const httpStatusSink = createHttpStatusSink();
+
 const app = createSSRApp({
-  render: () => h(RouterProvider, { router }, { default: () => h(App) }),
+  render: () =>
+    h(
+      HttpStatusProvider,
+      { sink: httpStatusSink },
+      {
+        default: () =>
+          h(RouterProvider, { router }, { default: () => h(App) }),
+      },
+    ),
 });
 
 // Vue custom directive — body runs ONLY on the client (SSR pipeline

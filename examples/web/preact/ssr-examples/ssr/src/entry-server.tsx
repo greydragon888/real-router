@@ -1,10 +1,13 @@
-import { UNKNOWN_ROUTE } from "@real-router/core";
 import {
   createRequestScope,
   serializeRouterState,
   type IncomingMessageLike,
 } from "@real-router/core/utils";
 import { RouterProvider } from "@real-router/preact";
+import {
+  HttpStatusProvider,
+  createHttpStatusSink,
+} from "@real-router/preact/ssr";
 import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 import { renderToStringAsync } from "preact-render-to-string";
 
@@ -101,9 +104,15 @@ export async function render(
 
   scope.router.usePlugin(ssrDataPluginFactory(loaders));
 
+  // Per-request HTTP status sink. The NotFound page mounts
+  // `<HttpStatusCode code={404}/>` which writes through `<HttpStatusProvider>`
+  // into this sink during render. After `renderToStringAsync` completes we
+  // read `sink.code ?? 200` and apply it to the response — render-time
+  // decision (vs. inspecting `state.name === UNKNOWN_ROUTE` server-side).
+  const httpStatusSink = createHttpStatusSink();
+
   try {
     const state = await scope.router.start(url);
-    const statusCode = state.name === UNKNOWN_ROUTE ? 404 : 200;
 
     // preact-render-to-string@6.6.7 `renderToStringAsync` — Preact-only
     // single-shot async render. Critical data is already settled via
@@ -117,10 +126,14 @@ export async function render(
     // boundary and ship the fallback in the final HTML — this app
     // would still work but the demo of in-tree async would not.
     const html = await renderToStringAsync(
-      <RouterProvider router={scope.router}>
-        <App />
-      </RouterProvider>,
+      <HttpStatusProvider sink={httpStatusSink}>
+        <RouterProvider router={scope.router}>
+          <App />
+        </RouterProvider>
+      </HttpStatusProvider>,
     );
+
+    const statusCode = httpStatusSink.code ?? 200;
 
     const meta = getMetaForState({
       name: state.name,

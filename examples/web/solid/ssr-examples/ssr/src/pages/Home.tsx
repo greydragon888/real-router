@@ -1,4 +1,4 @@
-import { ClientOnly, ServerOnly } from "@real-router/solid";
+import { ClientOnly, ServerOnly } from "@real-router/solid/ssr";
 import { isServer } from "solid-js/web";
 
 import type { JSX } from "solid-js";

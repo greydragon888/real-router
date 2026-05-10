@@ -115,15 +115,75 @@ test.describe("SSR (Angular)", () => {
     await expect(page.locator("main")).toContainText("Dashboard");
   });
 
-  test("unknown route renders NotFound page", async ({ page }) => {
-    // Real-Router's allowNotFound: true config resolves UNKNOWN_ROUTE without
-    // throwing, so the response is 200 with NotFound content. Mapping to HTTP
-    // 404 status would require pre-checking the URL before bootstrap or
-    // intercepting the rendered HTML — see README "Known Limitations".
+  test("unknown route renders NotFound page with 404 status", async ({
+    page,
+  }) => {
+    // Real-Router's allowNotFound: true config resolves UNKNOWN_ROUTE
+    // without throwing, so Angular renders NotFound and emits 200 by
+    // default. The 404 here is supplied by `<http-status-code [code]="404"/>`
+    // mounted in NotFoundComponent: it injects HTTP_STATUS_SINK (provided
+    // per-request via REQUEST_CONTEXT in app.config.ts) and writes 404
+    // during ngOnInit. server.ts then reads `httpStatusSink.code` after
+    // AngularNodeAppEngine.handle resolves and overrides
+    // `response.status` accordingly. Without the dogfooded
+    // <http-status-code> the response would still be 200.
     const response = await page.goto("/nonexistent");
 
-    expect(response!.status()).toBe(200);
+    expect(response!.status()).toBe(404);
     await expect(page.locator("main")).toContainText("Not Found");
+  });
+
+  test("HttpStatusCode dogfood: 404 is set by render-time component, not server-side state inspection", async ({
+    browser,
+  }) => {
+    // JS-disabled context proves the contract is server-side: NotFound
+    // component mounts <http-status-code [code]="404"/> during AOT-compiled
+    // SSR render, the component's ngOnInit writes through HTTP_STATUS_SINK
+    // into the per-request sink (passed via REQUEST_CONTEXT), server.ts
+    // reads `sink.code ?? response.status` and applies it. No client
+    // hydration involved — the 404 must arrive on first byte.
+    const context = await browser.newContext({ javaScriptEnabled: false });
+    const page = await context.newPage();
+    const response = await page.goto("/nonexistent");
+
+    expect(response!.status()).toBe(404);
+
+    const html = await response!.text();
+
+    // NotFound page rendered (proves render path was actually taken — not a
+    // server-side short-circuit before render).
+    expect(html).toContain("404 — Not Found");
+
+    // Angular emits the host element <http-status-code></http-status-code>
+    // because the @Component directive is real DOM. The template is empty
+    // ("" in the @Component decorator) so no children appear inside the
+    // host. Verify both: the host element is present (Angular sees the
+    // selector), but no `code` attribute leaks (signal input is internal).
+    expect(html).toContain("<http-status-code></http-status-code>");
+    expect(html).not.toMatch(/<http-status-code[^>]*code\s*=\s*["']?404["']?/);
+
+    await context.close();
+  });
+
+  test("HttpStatusCode dogfood: existing routes still return 200 (no phantom 404 leak)", async ({
+    page,
+  }) => {
+    // Sentinel: prove the per-request sink is fresh on every request and
+    // not somehow shared from a previous /nonexistent visit. If this test
+    // were to fail with status 404, the sink would be leaking across
+    // requests (module-level mutable state instead of request-scoped) —
+    // the sink lives inside the per-request DI Injector spun up by
+    // AngularNodeAppEngine.handle, so cross-request leak should be
+    // structurally impossible.
+    await page.goto("/nonexistent");
+
+    const homeResponse = await page.goto("/");
+
+    expect(homeResponse!.status()).toBe(200);
+
+    const usersResponse = await page.goto("/users");
+
+    expect(usersResponse!.status()).toBe(200);
   });
 
   test("loader output for users list flows through SSR HTML", async ({

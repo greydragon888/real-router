@@ -1,4 +1,3 @@
-import { UNKNOWN_ROUTE } from "@real-router/core";
 import {
   createRequestScope,
   serializeRouterState,
@@ -6,6 +5,10 @@ import {
 } from "@real-router/core/utils";
 import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 import { RouterProvider } from "@real-router/vue";
+import {
+  HttpStatusProvider,
+  createHttpStatusSink,
+} from "@real-router/vue/ssr";
 import { createSSRApp, h } from "vue";
 import { renderToString } from "vue/server-renderer";
 
@@ -99,13 +102,30 @@ export async function render(
 
   scope.router.usePlugin(ssrDataPluginFactory(loaders));
 
+  // Per-request HTTP status sink. The NotFound page mounts
+  // `<HttpStatusCode :code="404"/>` which writes through `<HttpStatusProvider>`
+  // into this sink during render. After `renderToString` completes we read
+  // `sink.code ?? 200` and apply it to the response — render-time decision
+  // (vs. inspecting `state.name === UNKNOWN_ROUTE` server-side).
+  const httpStatusSink = createHttpStatusSink();
+
   try {
     const state = await scope.router.start(url);
-    const statusCode = state.name === UNKNOWN_ROUTE ? 404 : 200;
 
     const app = createSSRApp({
       render: () =>
-        h(RouterProvider, { router: scope.router }, { default: () => h(App) }),
+        h(
+          HttpStatusProvider,
+          { sink: httpStatusSink },
+          {
+            default: () =>
+              h(
+                RouterProvider,
+                { router: scope.router },
+                { default: () => h(App) },
+              ),
+          },
+        ),
     });
 
     // Register the same directive used by the client app so SSR
@@ -115,6 +135,8 @@ export async function render(
     app.directive("track-view", trackView);
 
     const html = await renderToString(app);
+
+    const statusCode = httpStatusSink.code ?? 200;
 
     const meta = getMetaForState({
       name: state.name,

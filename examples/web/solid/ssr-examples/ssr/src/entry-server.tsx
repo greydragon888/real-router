@@ -1,10 +1,13 @@
-import { UNKNOWN_ROUTE } from "@real-router/core";
 import {
   createRequestScope,
   serializeRouterState,
   type IncomingMessageLike,
 } from "@real-router/core/utils";
 import { RouterProvider } from "@real-router/solid";
+import {
+  HttpStatusProvider,
+  createHttpStatusSink,
+} from "@real-router/solid/ssr";
 import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 import { generateHydrationScript, renderToStringAsync } from "solid-js/web";
 
@@ -94,9 +97,15 @@ export async function render(
 
   scope.router.usePlugin(ssrDataPluginFactory(loaders));
 
+  // Per-request HTTP status sink. The NotFound page mounts
+  // `<HttpStatusCode code={404}/>` which writes through `<HttpStatusProvider>`
+  // into this sink during render. After `renderToStringAsync` completes we
+  // read `sink.code ?? 200` and apply it to the response — render-time
+  // decision (vs. inspecting `state.name === UNKNOWN_ROUTE` server-side).
+  const httpStatusSink = createHttpStatusSink();
+
   try {
     const state = await scope.router.start(url);
-    const statusCode = state.name === UNKNOWN_ROUTE ? 404 : 200;
 
     // `renderToStringAsync` is the third Solid SSR mode (alongside
     // sync `renderToString` and streaming `renderToStream`). It awaits
@@ -112,10 +121,14 @@ export async function render(
     // injection is unreliable for `renderToStringAsync` on Solid 1.9.5
     // — see `components/AutoMeta.tsx` for the full disclaimer.
     const html = await renderToStringAsync(() => (
-      <RouterProvider router={scope.router}>
-        <App />
-      </RouterProvider>
+      <HttpStatusProvider sink={httpStatusSink}>
+        <RouterProvider router={scope.router}>
+          <App />
+        </RouterProvider>
+      </HttpStatusProvider>
     ));
+
+    const statusCode = httpStatusSink.code ?? 200;
 
     const meta = getMetaForState({
       name: state.name,
