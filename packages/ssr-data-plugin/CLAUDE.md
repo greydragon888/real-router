@@ -308,6 +308,12 @@ return async (_params, ctx) => {
 
 Non-breaking change via TypeScript contravariance — existing `(params) => …` loaders without the second arg compile and run unchanged.
 
+### Hydration scratchpad: presence wins (`{ data: undefined }` skips the loader)
+
+The post-hydration scratchpad-skip path uses `config.namespace in hydrationState.context` — `in`, not `!== undefined`. Contract: **scratchpad presence wins**. If the server explicitly serialised a value into `state.context.data` (even an `undefined` left over from a programmatic state object that never went through `JSON.stringify`), the plugin treats that as the server's authoritative answer and skips re-running the loader on the client.
+
+In practice this only matters for in-memory hydration paths — JSON-roundtrip strips `undefined` values, so a typical `serializeRouterState(state)` → `<script>window.__SSR_STATE__=…</script>` → `hydrateRouter` flow can't carry `data: undefined` across. The contract is documented here so a future refactor that flips to `!== undefined` knows it's a behaviour change, not a bug fix. Frozen by `tests/functional/data-loader.test.ts` "treats explicit `data: undefined` in hydrated context as missing" (the test name is from the user's perspective: "no value", and the plugin honours that as "server said: no value, stop here").
+
 ### Loader errors propagate
 
 If a loader throws, the error propagates through the `start()` promise. The caller's `try/catch` handles it — same as any async guard failure.

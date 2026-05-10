@@ -231,6 +231,14 @@ export function createSsrLoaderPlugin<
         if (
           hydrationState !== null &&
           hydrationState.name === state.name &&
+          // `in` — not `!== undefined` — is intentional. The contract is
+          // "scratchpad presence wins": if the server explicitly serialised
+          // a value into this namespace (even an `undefined` left over from
+          // a programmatic state object), the plugin treats that as the
+          // server's authoritative answer and skips re-running the loader
+          // on the client. JSON-roundtrip strips `undefined` values, so in
+          // practice this only matters for in-memory hydration paths —
+          // see CLAUDE.md "Gotchas → Hydration scratchpad: presence wins".
           config.namespace in hydrationState.context
         ) {
           dataClaim.write(state, hydrationState.context[config.namespace] as T);
