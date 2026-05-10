@@ -148,11 +148,11 @@ Framework-agnostic port of the `routeSelector` pattern from `@real-router/solid`
 
 ## Dependencies
 
-| Dependency                 | Type    | Purpose                                                        |
-| -------------------------- | ------- | -------------------------------------------------------------- |
-| `@real-router/route-utils` | runtime | `areRoutesRelated` for active-route filtering                  |
-| `@real-router/types`       | runtime | `Router`, `State`, `Params`, `SubscribeState` type definitions |
-| `@real-router/core`        | dev     | `createRouter` for tests                                       |
+| Dependency                 | Type    | Purpose                                                                                                          |
+| -------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------- |
+| `@real-router/route-utils` | runtime | `areRoutesRelated` for active-route filtering                                                                    |
+| `@real-router/types`       | runtime | `Router`, `State`, `Params`, `SubscribeState` type definitions                                                   |
+| `@real-router/core`        | runtime | `events` constants and `getPluginApi` for `createTransitionSource` / `createErrorSource` event subscriptions     |
 
 ## Performance Characteristics
 

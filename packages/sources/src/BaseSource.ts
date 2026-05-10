@@ -66,9 +66,9 @@ export class BaseSource<T> {
     }
 
     this.#currentSnapshot = snapshot;
-    this.#listeners.forEach((listener) => {
+    for (const listener of this.#listeners) {
       listener();
-    });
+    }
   }
 
   destroy(): void {

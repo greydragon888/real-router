@@ -200,14 +200,22 @@ describe("createRouteSources", () => {
     expect(listener1).not.toHaveBeenCalled();
   });
 
-  it("destroy: idempotent", () => {
+  it("destroy: idempotent — snapshot ref stable after N destroys", () => {
     const source = createRouteSource(router);
+    const beforeDestroy = source.getSnapshot();
 
     source.destroy();
 
+    const afterFirst = source.getSnapshot();
+
+    expect(afterFirst).toBe(beforeDestroy);
+
     expect(() => {
       source.destroy();
+      source.destroy();
     }).not.toThrow();
+
+    expect(source.getSnapshot()).toBe(afterFirst);
   });
 
   it("post-destroy: getSnapshot still returns last snapshot", async () => {

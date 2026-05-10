@@ -74,12 +74,18 @@ describe("createActiveRouteSources", () => {
   it("areRoutesRelated filter: listener NOT called for unrelated navigations", async () => {
     const source = createActiveRouteSource(router, "users");
     const spy = vi.spyOn(router, "isActiveRoute");
+    const listener = vi.fn();
+
+    source.subscribe(listener);
 
     // Navigate home → admin (unrelated to users)
     await router.navigate("admin");
 
     // isActiveRoute should NOT be called inside subscriber (filtered by areRoutesRelated)
     expect(spy).not.toHaveBeenCalled();
+    // Subscriber should also receive zero notifications — the early-return
+    // path skips updateSnapshot entirely.
+    expect(listener).not.toHaveBeenCalled();
     expect(source.getSnapshot()).toBe(false);
   });
 
@@ -166,6 +172,27 @@ describe("createActiveRouteSources", () => {
     expect(listener).not.toHaveBeenCalled();
   });
 
+  it("boolean dedup: listener NOT called when navigation is related but boolean unchanged", async () => {
+    // Same-subtree navigation that hits the related-route fast-path AND
+    // exercises the Object.is dedup: both source and target are inside the
+    // users subtree, so areRoutesRelated returns true; isActiveRoute("users")
+    // returns true on both sides → updateSnapshot skipped.
+    await router.navigate("users.view", { id: "1" });
+
+    const source = createActiveRouteSource(router, "users");
+
+    expect(source.getSnapshot()).toBe(true);
+
+    const listener = vi.fn();
+
+    source.subscribe(listener);
+
+    await router.navigate("users.view", { id: "2" });
+
+    expect(source.getSnapshot()).toBe(true);
+    expect(listener).not.toHaveBeenCalled();
+  });
+
   it("destroy: is a no-op on shared cached source (listener still receives updates)", async () => {
     const source = createActiveRouteSource(router, "admin");
     const listener = vi.fn();
@@ -179,14 +206,20 @@ describe("createActiveRouteSources", () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
-  it("destroy: idempotent", () => {
+  it("destroy: idempotent — snapshot value stable across N destroys (cached no-op)", () => {
     const source = createActiveRouteSource(router, "admin");
+    const beforeDestroy = source.getSnapshot();
 
     source.destroy();
 
+    expect(source.getSnapshot()).toBe(beforeDestroy);
+
     expect(() => {
       source.destroy();
+      source.destroy();
     }).not.toThrow();
+
+    expect(source.getSnapshot()).toBe(beforeDestroy);
   });
 
   it("previousRoute is undefined on first navigation: isPrevRelated is falsy", async () => {

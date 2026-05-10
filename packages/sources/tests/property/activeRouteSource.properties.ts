@@ -172,9 +172,12 @@ describe("boolean tracking", () => {
         ignoreQueryParams,
       });
 
-      if (sourceStrict.getSnapshot()) {
-        expect(sourceLoose.getSnapshot()).toStrictEqual(true);
-      }
+      // Filter out cases where strict-mode is inactive — `fc.pre` discards
+      // them so we don't silent-pass when the implication's antecedent
+      // never holds. Bumps shrink quality on regressions.
+      fc.pre(sourceStrict.getSnapshot());
+
+      expect(sourceLoose.getSnapshot()).toStrictEqual(true);
 
       sourceStrict.destroy();
       sourceLoose.destroy();
@@ -252,25 +255,21 @@ describe("areRoutesRelated filter", () => {
 
       source.subscribe(listener);
 
-      const initiallyActive = source.getSnapshot();
+      // Router starts at "home" → admin.dashboard is inactive regardless
+      // of strict/ignoreQueryParams; navigating to admin.dashboard always
+      // flips the boolean. Construction guarantees a change, so no
+      // conditional expects.
+      expect(source.getSnapshot()).toBe(false);
 
       await router.navigate("admin.dashboard");
 
-      const afterEnter = source.getSnapshot();
-
-      if (afterEnter !== initiallyActive) {
-        expect(listener).toHaveBeenCalledTimes(1);
-      }
-
-      const callsAfterEnter = listener.mock.calls.length;
+      expect(source.getSnapshot()).toBe(true);
+      expect(listener).toHaveBeenCalledTimes(1);
 
       await router.navigate("home");
 
-      const afterExit = source.getSnapshot();
-
-      if (afterExit !== afterEnter) {
-        expect(listener).toHaveBeenCalledTimes(callsAfterEnter + 1);
-      }
+      expect(source.getSnapshot()).toBe(false);
+      expect(listener).toHaveBeenCalledTimes(2);
 
       source.destroy();
       router.stop();

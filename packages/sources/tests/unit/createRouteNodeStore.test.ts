@@ -181,14 +181,20 @@ describe("createRouteNodeSources", () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
-  it("destroy: idempotent", () => {
+  it("destroy: idempotent — snapshot ref stable across N destroys (cached source no-op)", () => {
     const source = createRouteNodeSource(router, "users");
+    const beforeDestroy = source.getSnapshot();
 
     source.destroy();
 
+    expect(source.getSnapshot()).toBe(beforeDestroy);
+
     expect(() => {
       source.destroy();
+      source.destroy();
     }).not.toThrow();
+
+    expect(source.getSnapshot()).toBe(beforeDestroy);
   });
 
   it("post-destroy: getSnapshot still returns up-to-date snapshot", async () => {
@@ -272,8 +278,18 @@ describe("createRouteNodeSources", () => {
 
     await router.navigate("users");
 
-    source.subscribe(() => {});
+    // Snapshot is still stale — onFirstSubscribe hasn't run yet.
+    expect(source.getSnapshot().route).toBeUndefined();
 
+    // Capture snapshot before AND inside the listener: the listener fires
+    // synchronously within subscribe() iff onFirstSubscribe's reconciliation
+    // calls updateSnapshot. Without that flush, this listener would never
+    // fire here (no router event between subscribe and assertion).
+    const listener = vi.fn();
+
+    source.subscribe(listener);
+
+    expect(listener).toHaveBeenCalledTimes(1);
     expect(source.getSnapshot().route?.name).toBe("users");
   });
 

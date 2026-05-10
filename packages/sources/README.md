@@ -43,7 +43,7 @@ const unsubscribe = source.subscribe(() => {
 | `createRouteSource(router)`                             | `{ route, previousRoute }`                         | not cached                                    |
 | `createRouteNodeSource(router, node)`                   | `{ route, previousRoute }`                         | per-router + per-nodeName                     |
 | `createActiveRouteSource(router, name, params?, opts?)` | `boolean`                                          | per-router + canonical-args                   |
-| `createTransitionSource(router)`                        | `{ isTransitioning, toRoute, fromRoute }`          | not cached (advanced)                         |
+| `createTransitionSource(router)`                        | `{ isTransitioning, isLeaveApproved, toRoute, fromRoute }` | not cached (advanced)                 |
 | `getTransitionSource(router)`                           | same as above                                      | **per-router** — recommended for integrations |
 | `createErrorSource(router)`                             | `{ error, toRoute, fromRoute, version }`           | not cached (advanced)                         |
 | `getErrorSource(router)`                                | same as above                                      | **per-router** — recommended for integrations |
@@ -127,7 +127,8 @@ import { getTransitionSource } from "@real-router/sources";
 const source = getTransitionSource(router);
 
 source.subscribe(() => {
-  const { isTransitioning, toRoute, fromRoute } = source.getSnapshot();
+  const { isTransitioning, isLeaveApproved, toRoute, fromRoute } =
+    source.getSnapshot();
   if (isTransitioning) {
     showSpinner();
   } else {

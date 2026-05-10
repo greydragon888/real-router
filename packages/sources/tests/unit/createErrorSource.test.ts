@@ -83,6 +83,10 @@ describe("createErrorSource", () => {
     });
 
     const source = createErrorSource(router);
+    const initialSnapshot = source.getSnapshot();
+    const listener = vi.fn();
+
+    source.subscribe(listener);
 
     const p1 = router.navigate("dashboard");
 
@@ -100,6 +104,11 @@ describe("createErrorSource", () => {
 
     expect(snapshot.error).toBeNull();
     expect(snapshot.version).toBe(0);
+    // Snapshot is the same INITIAL ref — TRANSITION_CANCEL never reaches
+    // the source. Plus the listener was never invoked: the source ignores
+    // CANCEL entirely (no error path, no success-clear path).
+    expect(snapshot).toBe(initialSnapshot);
+    expect(listener).not.toHaveBeenCalled();
   });
 
   it("destroy() unsubscribes from events", async () => {
@@ -150,7 +159,9 @@ describe("createErrorSource", () => {
 
     await router.navigate("dashboard").catch(() => {});
 
-    expect(listener).toHaveBeenCalled();
+    // Exactly one notification: TRANSITION_ERROR fires once per failed
+    // navigation, and the source updates the snapshot exactly once.
+    expect(listener).toHaveBeenCalledTimes(1);
     expect(source.getSnapshot().error).not.toBeNull();
   });
 
@@ -213,14 +224,20 @@ describe("createErrorSource", () => {
     expect(listener).not.toHaveBeenCalled();
   });
 
-  it("destroy is idempotent", () => {
+  it("destroy is idempotent — snapshot ref stable after N destroys", () => {
     const source = createErrorSource(router);
+    const beforeDestroy = source.getSnapshot();
 
     source.destroy();
 
+    expect(source.getSnapshot()).toBe(beforeDestroy);
+
     expect(() => {
       source.destroy();
+      source.destroy();
     }).not.toThrow();
+
+    expect(source.getSnapshot()).toBe(beforeDestroy);
   });
 
   it("post-destroy: getSnapshot returns last value", async () => {

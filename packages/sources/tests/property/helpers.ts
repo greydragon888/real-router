@@ -66,6 +66,14 @@ export const arbNodeName = fc.constantFrom(
   ...(NODE_NAMES as unknown as [string, ...string[]]),
 );
 
+// Pseudo-stateful params builder: a module-level counter ensures consecutive
+// calls to `users.view` / `users.edit` produce distinct `id` values, so
+// back-to-back navigations don't trip SAME_STATES. The counter makes the
+// arbitrary mildly non-deterministic across shrinking attempts (same seed
+// can produce different ids), but in practice the failing-input shape is
+// preserved — the failure mode the audit warned about is shrink-replay
+// noise, not false negatives. Tests that need strict determinism should
+// thread `fc.integer()` through their own arbitrary.
 export const paramsForRoute = (() => {
   let counter = 0;
 
@@ -99,10 +107,10 @@ export const arbNavigation: fc.Arbitrary<NavigationAction> = arbRouteName.map(
 
 export const arbNavigationSeq = fc.array(arbNavigation, {
   minLength: 1,
-  maxLength: 10,
+  maxLength: 20,
 });
 
-export const arbListenerCount = fc.integer({ min: 1, max: 5 });
+export const arbListenerCount = fc.integer({ min: 1, max: 10 });
 
 export const arbActiveOptions = fc.record(
   {
@@ -168,6 +176,12 @@ export async function executeNavigations(
 
 export const NUM_RUNS = {
   standard: 100,
+  // Used for lifecycle (subscribe/unsubscribe) properties that need a few
+  // shrinking cycles — kept lower than `standard` because shrinking is
+  // dominated by setup/teardown of fresh routers.
   lifecycle: 50,
-  async: 30,
+  // Async navigation tests serialise heavily on microtasks; bumping to 50
+  // gives more coverage of guard-resolve / cancel races without ballooning
+  // the suite duration.
+  async: 50,
 } as const;

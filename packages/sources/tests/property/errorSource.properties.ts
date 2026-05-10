@@ -22,7 +22,7 @@ const arbGuardableRoute = fc.constantFrom(
 );
 
 describe("createErrorSource — version monotonicity", () => {
-  test.prop([fc.array(arbGuardableRoute, { minLength: 1, maxLength: 5 })], {
+  test.prop([fc.array(arbGuardableRoute, { minLength: 1, maxLength: 25 })], {
     numRuns: NUM_RUNS.standard,
   })(
     "error snapshot version increments monotonically on each error",

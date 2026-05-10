@@ -169,3 +169,5 @@
 | `tests/property/activeRouteSource.properties.ts` | 14         | `createActiveRouteSource` boolean tracking, areRoutesRelated filter optimization, and destroy behavior       |
 | `tests/property/transitionSource.properties.ts`  | 16         | `createTransitionSource` state machine transitions, concurrent navigation, and destroy behavior              |
 | `tests/property/errorSource.properties.ts`       | 6          | `createErrorSource` error tracking, version monotonicity, and destroy behavior                               |
+| `tests/property/stabilizeState.properties.ts`    | 6          | `stabilizeState` reflexivity, path-equivalence, idempotency, and nullish-handling invariants                  |
+| `tests/property/computeSnapshot.properties.ts`   | 4          | `computeSnapshot` reference stability, idempotency, root dominance, subtree containment                       |

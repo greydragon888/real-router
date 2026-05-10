@@ -133,7 +133,9 @@ describe("structural sharing", () => {
 
       await router.navigate("admin.settings");
 
-      expect(listener.mock.calls.length).toBeGreaterThanOrEqual(1);
+      // Sync nav (no async guards): START + LEAVE_APPROVE + SUCCESS = 3
+      // notifications. Final state is IDLE singleton.
+      expect(listener).toHaveBeenCalledTimes(3);
       expect(source.getSnapshot().isTransitioning).toBe(false);
     });
   });

@@ -22,12 +22,13 @@ export function createErrorSource(
   router: Router,
 ): RouterSource<RouterErrorSnapshot> {
   let errorVersion = 0;
+  let hasError = false;
 
   const source = new BaseSource(INITIAL_SNAPSHOT, {
     onDestroy: () => {
-      unsubs.forEach((unsub) => {
+      for (const unsub of unsubs) {
         unsub();
-      });
+      }
     },
   });
 
@@ -43,6 +44,7 @@ export function createErrorSource(
         err: RouterError,
       ) => {
         errorVersion++;
+        hasError = true;
         source.updateSnapshot({
           error: err,
           toRoute: toState ?? null,
@@ -56,7 +58,8 @@ export function createErrorSource(
       // Skip if no error — avoids unnecessary re-renders.
       // BaseSource.updateSnapshot() always notifies listeners (new object = new ref),
       // and useSyncExternalStore compares via Object.is().
-      if (source.getSnapshot().error !== null) {
+      if (hasError) {
+        hasError = false;
         source.updateSnapshot({
           error: null,
           toRoute: null,

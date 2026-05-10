@@ -24,9 +24,9 @@ export function createTransitionSource(
 ): RouterSource<RouterTransitionSnapshot> {
   const source = new BaseSource(IDLE_SNAPSHOT, {
     onDestroy: () => {
-      unsubs.forEach((unsub) => {
+      for (const unsub of unsubs) {
         unsub();
-      });
+      }
     },
   });
 
@@ -74,12 +74,28 @@ export function createTransitionSource(
       events.TRANSITION_LEAVE_APPROVE,
       (toState: State, fromState?: State) => {
         const prev = source.getSnapshot();
+        const newToRoute = stabilizeState(prev.toRoute, toState);
+        const newFromRoute = stabilizeState(prev.fromRoute, fromState ?? null);
+
+        /* v8 ignore next 7 -- @preserve: defensive guard — the router emits
+           TRANSITION_LEAVE_APPROVE once per navigation pipeline (after
+           deactivation guards pass, before activation guards run), so a
+           same-paths duplicate LEAVE_APPROVE is structurally unreachable.
+           Guard remains so plugin-driven re-entrant flows can't allocate
+           duplicate snapshot literals. */
+        if (
+          prev.isLeaveApproved &&
+          newToRoute === prev.toRoute &&
+          newFromRoute === prev.fromRoute
+        ) {
+          return;
+        }
 
         source.updateSnapshot({
           isTransitioning: true,
           isLeaveApproved: true,
-          toRoute: stabilizeState(prev.toRoute, toState),
-          fromRoute: stabilizeState(prev.fromRoute, fromState ?? null),
+          toRoute: newToRoute,
+          fromRoute: newFromRoute,
         });
       },
     ),
