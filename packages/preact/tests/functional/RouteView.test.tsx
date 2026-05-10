@@ -106,6 +106,40 @@ describe("RouteView", () => {
       expect(container.innerHTML).toBe("");
     });
 
+    it.each([
+      ["users/", "trailing slash"],
+      ["users?id=1", "query separator"],
+      ["users#section", "hash separator"],
+      ["/users", "leading slash"],
+    ])(
+      "should reject segments containing URL special characters: %s (%s)",
+      async (segment) => {
+        await router.start("/users/list");
+
+        // `startsWithSegment` from `@real-router/route-utils` throws on chars
+        // outside [a-zA-Z0-9._-]. The throw propagates through render — the
+        // documented user contract is that `segment` is a dot-delimited route
+        // name, never a URL path. Capture this as a regression-locked error.
+        const consoleError = vi
+          .spyOn(console, "error")
+          .mockImplementation(() => {});
+
+        expect(() =>
+          render(
+            <RouterProvider router={router}>
+              <RouteView nodeName="">
+                <RouteView.Match segment={segment}>
+                  <div data-testid="bad-segment">Bad</div>
+                </RouteView.Match>
+              </RouteView>
+            </RouterProvider>,
+          ),
+        ).toThrow(/Segment contains invalid characters/);
+
+        consoleError.mockRestore();
+      },
+    );
+
     it("should support startsWith matching by default", async () => {
       await router.start("/users/list");
 

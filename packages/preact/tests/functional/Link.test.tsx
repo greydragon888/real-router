@@ -459,6 +459,28 @@ describe("Link component", () => {
       expect(router.getState()?.name).toStrictEqual("one-more-test");
       expect(screen.getByTestId("link")).toHaveClass("active");
     });
+
+    it("should fall back to baseClassName when activeClassName is whitespace-only", async () => {
+      render(
+        <Link
+          routeName="one-more-test"
+          className="base"
+          activeClassName="   "
+          data-testid="link"
+        >
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      expect(screen.getByTestId("link")).toHaveClass("base");
+
+      await user.click(screen.getByTestId("link"));
+
+      // Active, but `parseTokens(' ')` → []; result must equal baseClassName,
+      // not " base" (no double-space, no leading whitespace, no extra tokens).
+      expect(screen.getByTestId("link").className).toBe("base");
+    });
   });
 
   describe("event handlers", () => {
