@@ -13,12 +13,15 @@ import {
 import {
   defer,
   getSsrDataMode,
+  invalidate,
   isDeferred,
   ssrDataPluginFactory,
 } from "../../src";
+import { clearStale, isStale, markStale } from "../../src/shared-ssr";
 import { escapeForScript } from "../../src/shared-ssr/deferRegistry";
 
 import type { DataLoaderFactoryMap, SsrMode } from "../../src";
+import type { State } from "@real-router/core";
 
 const arbSsrMode: fc.Arbitrary<SsrMode> = fc.constantFrom<SsrMode>(
   "full",
@@ -621,6 +624,222 @@ describe("defer(): roundtrip + reserved-keys reject", () => {
       // objects with random keys, nested dicts, arrays. None should
       // accidentally be brand-marked as a defer payload.
       expect(isDeferred(value)).toBe(false);
+    },
+  );
+});
+
+// =============================================================================
+// markStale + isStale + clearStale: stale-registry algebra
+// =============================================================================
+//
+// The stale registry is a `WeakMap<Router, Set<string>>` keyed by router
+// instance. Three operations:
+//   - markStale(router, ns)  — add `ns` to the router's set (idempotent)
+//   - isStale(router, ns)    — peek (no mutation)
+//   - clearStale(router, ns) — remove `ns` from the set (idempotent)
+//
+// Algebraic invariants the implementation must hold:
+//   1. Idempotency: N marks ⟺ 1 mark; isStale stays true after N peeks.
+//   2. Mark-then-clear ⟹ isStale === false (round trip).
+//   3. Per-router isolation: marks on router A never visible on router B.
+//   4. Per-namespace isolation: mark "data" doesn't leak to mark "rsc".
+
+const arbNamespace = fc.stringMatching(/^[a-z]{1,8}$/);
+
+describe("stale registry: idempotency + isolation invariants", () => {
+  test.prop([arbNamespace, fc.integer({ min: 1, max: 10 })], {
+    numRuns: NUM_RUNS.standard,
+  })("idempotency: markStale × N is the same as markStale × 1", (ns, n) => {
+    const router = createRouter(ROUTES, { defaultRoute: "home" });
+
+    for (let i = 0; i < n; i++) {
+      markStale(router, ns);
+    }
+
+    expect(isStale(router, ns)).toBe(true);
+
+    clearStale(router, ns);
+
+    expect(isStale(router, ns)).toBe(false);
+  });
+
+  test.prop([arbNamespace], { numRuns: NUM_RUNS.standard })(
+    "round trip: markStale → isStale=true → clearStale → isStale=false",
+    (ns) => {
+      const router = createRouter(ROUTES, { defaultRoute: "home" });
+
+      expect(isStale(router, ns)).toBe(false);
+
+      markStale(router, ns);
+
+      expect(isStale(router, ns)).toBe(true);
+
+      clearStale(router, ns);
+
+      expect(isStale(router, ns)).toBe(false);
+    },
+  );
+
+  test.prop([arbNamespace, fc.integer({ min: 1, max: 5 })], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "clearStale is idempotent: N≥1 clears collapse to a single clear",
+    (ns, n) => {
+      const router = createRouter(ROUTES, { defaultRoute: "home" });
+
+      markStale(router, ns);
+      for (let i = 0; i < n; i++) {
+        clearStale(router, ns);
+      }
+
+      expect(isStale(router, ns)).toBe(false);
+    },
+  );
+
+  test.prop([arbNamespace], { numRuns: NUM_RUNS.standard })(
+    "per-router isolation: markStale(A, ns) never affects isStale(B, ns)",
+    (ns) => {
+      const routerA = createRouter(ROUTES, { defaultRoute: "home" });
+      const routerB = createRouter(ROUTES, { defaultRoute: "home" });
+
+      markStale(routerA, ns);
+
+      expect(isStale(routerA, ns)).toBe(true);
+      expect(isStale(routerB, ns)).toBe(false);
+    },
+  );
+
+  test.prop([arbNamespace, arbNamespace], { numRuns: NUM_RUNS.standard })(
+    "per-namespace isolation: markStale(r, A) never affects isStale(r, B)",
+    (nsA, nsB) => {
+      // Skip degenerate equal-namespace draws — same-ns is the trivial
+      // "marking ns leaves ns marked" property already covered.
+      fc.pre(nsA !== nsB);
+
+      const router = createRouter(ROUTES, { defaultRoute: "home" });
+
+      markStale(router, nsA);
+
+      expect(isStale(router, nsA)).toBe(true);
+      expect(isStale(router, nsB)).toBe(false);
+    },
+  );
+});
+
+// =============================================================================
+// getSsrDataMode: pure-function transparency + foreign-value collapse
+// =============================================================================
+
+describe("getSsrDataMode: pure read-side guard", () => {
+  // Build a minimal `State` with arbitrary `ssrDataMode` in context.
+  // No router involvement — getSsrDataMode only reads `state.context`.
+  const stateWith = (ssrDataMode: unknown): State => ({
+    name: "any",
+    params: {},
+    path: "/",
+    transition: {
+      phase: "activating",
+      reason: "success",
+      segments: { deactivated: [], activated: [], intersection: "" },
+    },
+    context: { ssrDataMode } as Record<string, unknown>,
+  });
+
+  test.prop([fc.constantFrom<SsrMode>("full", "data-only", "client-only")], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "transparency: for any allowed mode m, getSsrDataMode(state{ssrDataMode:m}) === m",
+    (m) => {
+      expect(getSsrDataMode(stateWith(m))).toBe(m);
+    },
+  );
+
+  // Anything that is NOT in ALL_SSR_MODES — including foreign strings,
+  // falsy non-nullish values, null, objects, numbers — must collapse to
+  // "full". Without this guard, downstream `mode === "full"` branches
+  // silently misbehave on cast-bypassed garbage.
+  const arbForeignMode = fc.oneof(
+    fc.constant(undefined),
+    fc.constant(null),
+    fc.constant(0),
+    fc.constant(""),
+    fc.constant(false),
+    fc
+      .string()
+      .filter((s) => s !== "full" && s !== "data-only" && s !== "client-only"),
+    fc.integer(),
+    fc.boolean(),
+    fc.object(),
+  );
+
+  test.prop([arbForeignMode], { numRuns: NUM_RUNS.thorough })(
+    "guard: any non-allowed value collapses to 'full'",
+    (foreign) => {
+      expect(getSsrDataMode(stateWith(foreign))).toBe("full");
+    },
+  );
+});
+
+// =============================================================================
+// invalidate: per-router cloneRouter() isolation under the WeakMap key contract
+// =============================================================================
+
+describe("invalidate: per-router isolation across cloneRouter() boundaries", () => {
+  test.prop([arbParamValue, arbParamValue], { numRuns: NUM_RUNS.standard })(
+    "invalidate(childA, 'data') never triggers childB loader",
+    async (idA, idB) => {
+      // The stale registry is `WeakMap<Router, Set<string>>`, so per-router
+      // isolation should come free from the WeakMap key identity. Verify
+      // that `invalidate(childA)` is consumed only by childA's leave
+      // handler — childB navigation stays cold even on the same base.
+      const base = createRouter(ROUTES, { defaultRoute: "home" });
+      const childA = cloneRouter(base);
+      const childB = cloneRouter(base);
+
+      let aCalls = 0;
+      let bCalls = 0;
+
+      childA.usePlugin(
+        ssrDataPluginFactory({
+          home: () => () => {
+            aCalls += 1;
+
+            return Promise.resolve({ id: idA });
+          },
+        }),
+      );
+      childB.usePlugin(
+        ssrDataPluginFactory({
+          home: () => () => {
+            bCalls += 1;
+
+            return Promise.resolve({ id: idB });
+          },
+        }),
+      );
+
+      await childA.start("/");
+      await childB.start("/");
+
+      // After start: each loader called once for its own router.
+      expect(aCalls).toBe(1);
+      expect(bCalls).toBe(1);
+
+      invalidate(childA, "data");
+
+      // childB navigation reloads — its own stale flag is clean,
+      // so the leave handler must no-op.
+      await childB.navigate("home", {}, { reload: true });
+
+      expect(bCalls).toBe(1);
+
+      // childA navigation reloads — flag is set, leave handler runs.
+      await childA.navigate("home", {}, { reload: true });
+
+      expect(aCalls).toBe(2);
+
+      childA.dispose();
+      childB.dispose();
     },
   );
 });

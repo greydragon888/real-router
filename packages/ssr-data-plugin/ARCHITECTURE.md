@@ -290,7 +290,7 @@ This tests:
 | Teardown under load         | `dispose()` of one clone corrupts another's state          |
 | Loader dispatch correctness | Wrong `state.name` → wrong loader called under concurrency |
 
-Property-based tests (27 invariants in `tests/property/`) complement functional and stress tests — see INVARIANTS.md for the full list, including the security-critical `escapeForScript` family (`numRuns: 1000`) and the `defer()` payload-constructor invariants. The stress test covers the one dimension unit tests cannot: concurrent access patterns that mirror real SSR server load.
+Property-based tests (35 invariants in `tests/property/`) complement functional and stress tests — see INVARIANTS.md for the full list, including the security-critical `escapeForScript` family (`numRuns: 1000`), the `defer()` payload-constructor invariants, the stale-registry algebra (`markStale`/`isStale`/`clearStale` idempotency + per-router/per-namespace isolation), the `getSsrDataMode` read-side guard, and `invalidate()` cloneRouter isolation. The stress test covers the one dimension unit tests cannot: concurrent access patterns that mirror real SSR server load.
 
 ## Related Documents
 

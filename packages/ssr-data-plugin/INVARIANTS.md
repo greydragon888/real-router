@@ -82,9 +82,32 @@
 | 4   | Isolation: post-`defer` mutations to caller's map don't leak               | `defer()` works on a shallow clone of the deferred record — late additions to the user's map (e.g. `userMap.evil = badPromise`) never appear in `payload.deferred`. Locks the validation contract: only the snapshot at call time. |
 | 5   | `isDeferred` rejects non-`defer()` values                                  | For any value the user could plausibly pass (primitives, plain objects, arrays, nested dicts), `isDeferred(value)` returns `false`. Prevents accidental brand collision via `Symbol.for` on third-party code.                       |
 
+## `markStale` / `isStale` / `clearStale` (stale-registry algebra)
+
+| #   | Invariant                                                | Description                                                                                                                                                     |
+| --- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Idempotency: markStale × N ≡ markStale × 1               | For any namespace `ns` and any `N ≥ 1`, calling `markStale(router, ns)` N times leaves the flag set; `clearStale(router, ns)` once clears it.                |
+| 2   | Round trip: mark → peek=true → clear → peek=false        | The three operations form a clean lifecycle: initial state is unset, mark sets, peek observes without mutation, clear unsets.                               |
+| 3   | Idempotency of clearStale: N≥1 clears ≡ 1 clear          | Multiple `clearStale` calls between marks never resurrect the flag.                                                                                            |
+| 4   | Per-router isolation                                     | `markStale(routerA, ns)` does not affect `isStale(routerB, ns)` for any pair of routers — comes free from the `WeakMap<Router, Set<string>>` key identity. |
+| 5   | Per-namespace isolation                                  | `markStale(router, A)` does not affect `isStale(router, B)` when `A !== B` — the per-router Set is keyed by namespace string.                              |
+
+## `getSsrDataMode` (pure read-side guard)
+
+| #   | Invariant                                                | Description                                                                                                                                                                                                                            |
+| --- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Transparency for allowed modes                           | For any `m ∈ {"full", "data-only", "client-only"}`, `getSsrDataMode({context: {ssrDataMode: m}}) === m`. Confirms the read mirrors what the plugin's `start` interceptor / `subscribeLeave` handler writes.                          |
+| 2   | Foreign-value collapse to `"full"`                       | For any value outside `ALL_SSR_MODES` — `undefined`, `null`, `0`, `""`, `false`, arbitrary strings, integers, booleans, objects — `getSsrDataMode(state)` returns `"full"`. Defends downstream `mode === "full"` branches against TS-cast bypass. |
+
+## `invalidate` per-router isolation
+
+| #   | Invariant                                                                        | Description                                                                                                                                                                                                  |
+| --- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | `invalidate(childA, "data")` never triggers childB's loader on the next nav      | The stale registry is `WeakMap<Router, Set<string>>` — per-router isolation comes free from the WeakMap key identity. Two clones from the same base router prove the invariant end-to-end through `subscribeLeave`. |
+
 ## Test Files
 
 | File                                         | Invariants | Category                                                                            |
 | -------------------------------------------- | ---------- | ----------------------------------------------------------------------------------- |
 | `tests/functional/data-loader.test.ts`       | 3          | getDependency integration, no caching                                                                                     |
-| `tests/property/ssr-data.properties.ts`      | 27         | Validation, loader invocation, loader arguments, data retrieval, prototype safety, teardown, isolation, factory invocation, SSR mode (×4), **`escapeForScript` (×5)**, **`defer()` (×5)** |
+| `tests/property/ssr-data.properties.ts`      | 35         | Validation, loader invocation, loader arguments, data retrieval, prototype safety, teardown, isolation, factory invocation, SSR mode (×4), `escapeForScript` (×5), `defer()` (×5), **stale registry (×5)**, **getSsrDataMode (×2)**, **invalidate cloneRouter isolation (×1)** |
