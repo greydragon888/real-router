@@ -1,4 +1,4 @@
-import { ERROR_PREFIX } from "./constants";
+import { ALLOWED_RSC_MODES, ERROR_PREFIX } from "./constants";
 import { createSsrLoaderPlugin } from "./shared-ssr";
 import { validateLoaders } from "./validation";
 
@@ -47,6 +47,6 @@ export function rscServerPluginFactory<
     namespace: "rsc",
     modeNamespace: "ssrRscMode",
     errorPrefix: ERROR_PREFIX,
-    allowedModes: ["full", "client-only"],
+    allowedModes: ALLOWED_RSC_MODES,
   });
 }

@@ -1,3 +1,5 @@
+import { ALLOWED_RSC_MODES } from "./constants";
+
 import type { RscSsrMode } from "./types";
 import type { State } from "@real-router/types";
 
@@ -11,7 +13,18 @@ import type { State } from "@real-router/types";
  *
  * The mode is written to `state.context.ssrRscMode` by the plugin's `start`
  * interceptor for every route registered in the loaders map.
+ *
+ * Defensive read: if `state.context.ssrRscMode` was set to something outside
+ * `ALLOWED_RSC_MODES` by a TS-cast bypass or a foreign writer, the function
+ * collapses it to `"full"` rather than returning the bad value. Without this
+ * guard, a downstream `mode === "full"` branch would silently misbehave for
+ * `0`, `false`, `""`, `null`, or any unknown string.
  */
 export function getSsrRscMode(state: State): RscSsrMode {
-  return (state.context as { ssrRscMode?: RscSsrMode }).ssrRscMode ?? "full";
+  const raw = (state.context as { ssrRscMode?: unknown }).ssrRscMode;
+
+  return typeof raw === "string" &&
+    ALLOWED_RSC_MODES.includes(raw as RscSsrMode)
+    ? (raw as RscSsrMode)
+    : "full";
 }

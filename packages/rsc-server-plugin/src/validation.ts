@@ -1,7 +1,7 @@
-import { ERROR_PREFIX } from "./constants";
+import { ALLOWED_RSC_MODES, ERROR_PREFIX } from "./constants";
 import { createLoadersValidator } from "./shared-ssr";
 
-export const validateLoaders = createLoadersValidator(ERROR_PREFIX, [
-  "full",
-  "client-only",
-]);
+export const validateLoaders = createLoadersValidator(
+  ERROR_PREFIX,
+  ALLOWED_RSC_MODES,
+);

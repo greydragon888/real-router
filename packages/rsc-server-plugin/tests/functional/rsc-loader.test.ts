@@ -821,6 +821,59 @@ describe("@real-router/rsc-server-plugin", () => {
     });
   });
 
+  describe("getSsrRscMode runtime guard against TS-cast bypass", () => {
+    const stateWith = (ssrRscMode: unknown): State => ({
+      name: "users.profile",
+      params: { id: "42" },
+      path: "/users/42",
+      transition: {
+        phase: "activating",
+        reason: "success",
+        segments: { deactivated: [], activated: [], intersection: "" },
+      },
+      context: { ssrRscMode } as Record<string, unknown>,
+    });
+
+    it("returns 'full' for ssrRscMode === undefined (route without entry)", () => {
+      expect(getSsrRscMode(stateWith(undefined))).toBe("full");
+    });
+
+    it("returns 'full' for ssrRscMode === null (foreign-writer garbage)", () => {
+      expect(getSsrRscMode(stateWith(null))).toBe("full");
+    });
+
+    it("returns 'full' for ssrRscMode === 0 (falsy non-nullish bypass)", () => {
+      expect(getSsrRscMode(stateWith(0))).toBe("full");
+    });
+
+    it("returns 'full' for ssrRscMode === false (boolean bypass)", () => {
+      expect(getSsrRscMode(stateWith(false))).toBe("full");
+    });
+
+    it("returns 'full' for ssrRscMode === '' (empty string bypass)", () => {
+      expect(getSsrRscMode(stateWith(""))).toBe("full");
+    });
+
+    it("returns 'full' for ssrRscMode === 'data-only' (foreign mode string)", () => {
+      // RSC plugin disallows data-only at factory time, but a TS-cast bypass
+      // could still write it directly into state.context. The reader must
+      // treat it as garbage rather than propagating the foreign value.
+      expect(getSsrRscMode(stateWith("data-only"))).toBe("full");
+    });
+
+    it("returns 'full' for ssrRscMode === 'bogus' (arbitrary string)", () => {
+      expect(getSsrRscMode(stateWith("bogus"))).toBe("full");
+    });
+
+    it("preserves the value for ssrRscMode === 'full'", () => {
+      expect(getSsrRscMode(stateWith("full"))).toBe("full");
+    });
+
+    it("preserves the value for ssrRscMode === 'client-only'", () => {
+      expect(getSsrRscMode(stateWith("client-only"))).toBe("client-only");
+    });
+  });
+
   describe("invalidate(router, 'rsc') — CSR revalidation", () => {
     it("re-runs RSC loader for the destination route on the next navigation after invalidate()", async () => {
       const homeNode = node("HomePage", { v: 1 });
