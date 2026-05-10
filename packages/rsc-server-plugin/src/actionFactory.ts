@@ -9,6 +9,23 @@ import type {
   PluginFactory,
 } from "@real-router/types";
 
+function describeBadResult(value: unknown): string {
+  if (value === null) {
+    return "null";
+  }
+  if (Array.isArray(value)) {
+    return "array";
+  }
+  if (
+    typeof value === "object" &&
+    typeof (value as { then?: unknown }).then === "function"
+  ) {
+    return "Promise/thenable — wire your action result synchronously";
+  }
+
+  return typeof value;
+}
+
 /**
  * Plugin factory that publishes a Server Action result to
  * `state.context.rscAction`. Pair with `rscServerPluginFactory` —
@@ -75,11 +92,33 @@ export function rscActionPluginFactory<
       "start",
       async (next, path) => {
         const state = await next(path);
-        const result = getResult();
+        // Read as `unknown`: the TS contract pins it to RscActionResult, but
+        // we run a defensive shape guard below for cast-bypassed garbage.
+        const result: unknown = getResult();
 
-        if (result !== undefined) {
-          claim.write(state, result);
+        if (result === undefined) {
+          return state;
         }
+
+        // Symmetry-with-loaders runtime guard. The TS contract is
+        // `() => RscActionResult | undefined`, but the most common consumer
+        // mistake is wiring an `async` getResult — TS allows it via cast,
+        // and the resulting Promise would land in `state.context.rscAction`
+        // and break every downstream `result.returnValue` access. Reject
+        // any non-plain-object up-front so the failure points back at the
+        // call site instead of bubbling out of an unrelated render later.
+        if (
+          typeof result !== "object" ||
+          result === null ||
+          Array.isArray(result) ||
+          typeof (result as { then?: unknown }).then === "function"
+        ) {
+          throw new TypeError(
+            `${ERROR_PREFIX} getResult must return an RscActionResult object or undefined (got ${describeBadResult(result)})`,
+          );
+        }
+
+        claim.write(state, result as RscActionResult<TReturn, TFormState>);
 
         return state;
       },

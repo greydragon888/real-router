@@ -207,6 +207,120 @@ describe("@real-router/rsc-server-plugin — rscActionPluginFactory", () => {
     });
   });
 
+  describe("Validation — getResult() return shape (per-start runtime)", () => {
+    it("rejects a Promise return (typical async-getResult mistake)", async () => {
+      router.usePlugin(
+        rscActionPluginFactory(
+          () =>
+            Promise.resolve({
+              returnValue: { ok: true, data: 1 },
+            }) as unknown as RscActionResult,
+        ),
+      );
+
+      await expect(router.start("/")).rejects.toThrow(
+        /Promise\/thenable — wire your action result synchronously/,
+      );
+    });
+
+    it("rejects a duck-typed thenable return", async () => {
+      /* eslint-disable unicorn/no-thenable --
+       * Intentional: this test exercises the duck-type branch of the runtime
+       * guard. `unicorn/no-thenable` matches both object-literal `then` and
+       * dynamic assignment of a function-valued `then` property. The whole
+       * point of the test is to construct exactly that shape and assert
+       * the guard rejects it. */
+      const buildThenable = (): RscActionResult => {
+        const target: Record<string, unknown> = {};
+        const thenKey = ["t", "h", "e", "n"].join("");
+
+        target[thenKey] = (): undefined => undefined;
+
+        return target as unknown as RscActionResult;
+      };
+      /* eslint-enable unicorn/no-thenable */
+
+      router.usePlugin(rscActionPluginFactory(buildThenable));
+
+      await expect(router.start("/")).rejects.toThrow(/Promise\/thenable/);
+    });
+
+    it("rejects a string return", async () => {
+      router.usePlugin(
+        rscActionPluginFactory(() => "oops" as unknown as RscActionResult),
+      );
+
+      await expect(router.start("/")).rejects.toThrow(
+        /getResult must return an RscActionResult object or undefined \(got string\)/,
+      );
+    });
+
+    it("rejects a number return", async () => {
+      router.usePlugin(
+        rscActionPluginFactory(() => 42 as unknown as RscActionResult),
+      );
+
+      await expect(router.start("/")).rejects.toThrow(/got number/);
+    });
+
+    it("rejects a boolean return", async () => {
+      router.usePlugin(
+        rscActionPluginFactory(() => true as unknown as RscActionResult),
+      );
+
+      await expect(router.start("/")).rejects.toThrow(/got boolean/);
+    });
+
+    it("rejects a null return", async () => {
+      router.usePlugin(
+        rscActionPluginFactory(() => null as unknown as RscActionResult),
+      );
+
+      await expect(router.start("/")).rejects.toThrow(/got null/);
+    });
+
+    it("rejects an array return", async () => {
+      router.usePlugin(
+        rscActionPluginFactory(() => [1, 2, 3] as unknown as RscActionResult),
+      );
+
+      await expect(router.start("/")).rejects.toThrow(/got array/);
+    });
+
+    it("accepts an empty object (no fields set)", async () => {
+      router.usePlugin(rscActionPluginFactory(() => ({}) as RscActionResult));
+
+      const state = await router.start("/");
+
+      expect(state.context.rscAction).toStrictEqual({});
+    });
+
+    it("accepts a payload whose returnValue.data has a `then` field (string, not function)", async () => {
+      // Defensive: the duck-type guard rejects only when the *root* result
+      // has `.then === function`. A user who legitimately needs a `then`
+      // field nested somewhere inside data — e.g. modelling an event
+      // schedule keyed by "then" — must not be rejected.
+      const dataWithThenField = JSON.parse(
+        '{"then":"ok-this-is-just-a-string"}',
+      ) as { then: string };
+
+      router.usePlugin(
+        rscActionPluginFactory(() => ({
+          returnValue: {
+            ok: true,
+            data: dataWithThenField,
+          },
+        })),
+      );
+
+      const state = await router.start("/");
+
+      expect(
+        (state.context.rscAction?.returnValue?.data as { then: string }).then,
+      ).toBe("ok-this-is-just-a-string");
+    });
+  });
+
   describe("Teardown", () => {
     it("teardown releases the rscAction claim allowing re-registration", async () => {
       const teardown1 = router.usePlugin(
