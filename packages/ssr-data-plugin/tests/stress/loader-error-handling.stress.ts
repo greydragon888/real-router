@@ -212,6 +212,7 @@ describe("Loader Error Handling Under Stress", () => {
 
   it("stop() during slow loader: no crash", async () => {
     const base = createRouter(routes, { defaultRoute: "home" });
+    let survived = 0;
 
     for (let i = 0; i < 50; i++) {
       const clone = cloneRouter(base);
@@ -233,9 +234,14 @@ describe("Loader Error Handling Under Stress", () => {
       await Promise.allSettled([promise]);
 
       clone.dispose();
+      survived += 1;
     }
 
-    // If loop completed without crash/timeout — all 50 iterations survived
-    expect(true).toBe(true);
+    // The real invariant is "no crash / no timeout for 50 iterations" —
+    // the loop reaching its end already proves it. Asserting on a counter
+    // (instead of the prior `expect(true).toBe(true)` placeholder) makes
+    // the success criterion visible at the assertion site. Symmetric with
+    // the equivalent change in rsc-server-plugin/tests/stress/rsc-stress.stress.ts.
+    expect(survived).toBe(50);
   });
 });
