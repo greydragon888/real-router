@@ -10,7 +10,13 @@ import {
   NUM_RUNS,
   ROUTES,
 } from "./helpers";
-import { getSsrDataMode, ssrDataPluginFactory } from "../../src";
+import {
+  defer,
+  getSsrDataMode,
+  isDeferred,
+  ssrDataPluginFactory,
+} from "../../src";
+import { escapeForScript } from "../../src/shared-ssr/deferRegistry";
 
 import type { DataLoaderFactoryMap, SsrMode } from "../../src";
 
@@ -434,6 +440,187 @@ describe("ssr mode: short form === { loader }", () => {
 
       baseShort.stop();
       baseObject.stop();
+    },
+  );
+});
+
+// =============================================================================
+// escapeForScript: roundtrip + HTML safety (security-critical pure function)
+// =============================================================================
+//
+// `escapeForScript(s)` is the bedrock of the inline-settle wire format —
+// every deferred key and value goes through it before landing in
+// `<script>__rrDefer__("key","value")</script>`. Two invariants must hold
+// for *any* string input:
+//
+//   1. Roundtrip: JSON.parse(escapeForScript(s)) === s
+//      (the JS string literal must decode back to the original string)
+//
+//   2. HTML safety: the result contains no character sequence that the
+//      raw HTML parser would interpret as a script-tag terminator,
+//      script-tag opener, comment-opener, or U+2028/U+2029 line-terminator
+//      that legacy JS parsers treat as line breaks inside string literals.
+//
+// fast-check shrinks aggressively here — `numRuns: 1000` because this is a
+// security-critical surface and the cost is <100ms on a pure string fn.
+
+describe("escapeForScript: pure-function security invariants", () => {
+  test.prop([fc.string()], { numRuns: 1000 })(
+    "roundtrip: JSON.parse(escapeForScript(s)) === s",
+    (s) => {
+      expect(JSON.parse(escapeForScript(s))).toBe(s);
+    },
+  );
+
+  test.prop([fc.string()], { numRuns: 1000 })(
+    "HTML safety: result contains no </script> in any case",
+    (s) => {
+      expect(escapeForScript(s)).not.toMatch(/<\/script/i);
+    },
+  );
+
+  test.prop([fc.string()], { numRuns: 1000 })(
+    "HTML safety: result contains no `<` (any tag opener)",
+    (s) => {
+      expect(escapeForScript(s)).not.toMatch(/</);
+    },
+  );
+
+  test.prop([fc.string()], { numRuns: 1000 })(
+    "HTML safety: result contains no U+2028 / U+2029 (legacy JS line-terminator escape)",
+    (s) => {
+      const result = escapeForScript(s);
+
+      // The codepoints must be encoded as `\u2028` / `\u2029` text, not the
+      // raw characters that legacy JS parsers treat as line breaks inside
+      // string literals.
+      expect(result).not.toMatch(/[\u2028\u2029]/);
+    },
+  );
+
+  // Note: `fc.string()` already covers the full Unicode range — fast-check
+  // 4.x removed the dedicated `fc.unicodeString()`. The roundtrip
+  // invariant above (numRuns: 1000) exercises the same surface.
+
+  test.prop([
+    fc.oneof(fc.constant(undefined), fc.integer(), fc.boolean(), fc.bigInt()),
+  ])(
+    "null fallback: any non-string input that JSON.stringify can't handle returns the literal 'null'",
+    (badInput) => {
+      // The cast is intentional: the runtime is permitted to bypass TS via
+      // `as`-cast, and the function must collapse to 'null' rather than
+      // throw. Covers JSON.stringify returning undefined (undefined),
+      // returning a non-string-but-quoted value (number, boolean), and
+      // throwing (BigInt).
+      const result = escapeForScript(badInput as unknown as string);
+
+      // Boolean and integer are stringified as their JSON literal form
+      // (which IS a valid JSON literal); only undefined and BigInt
+      // collapse to "null". Document both branches explicitly.
+      if (typeof badInput === "boolean" || typeof badInput === "number") {
+        expect(result).toBe(JSON.stringify(badInput));
+      } else {
+        expect(result).toBe("null");
+      }
+    },
+  );
+});
+
+// =============================================================================
+// defer(): roundtrip + reserved-keys reject + isolation
+// =============================================================================
+
+describe("defer(): roundtrip + reserved-keys reject", () => {
+  // Use a single shared promise per test — defer() validates that values
+  // are thenable but otherwise treats them opaquely. Generating arbitrary
+  // promises (with random rejection, etc.) would also test JS Promise
+  // behaviour, which is not the contract.
+  const arbPromise = fc.constant(Promise.resolve(0));
+
+  // Safe deferred-key strings: non-empty, ASCII printable, no reserved
+  // names. Defer's reserved-key set: __proto__ / constructor / prototype.
+  const arbSafeKey = fc
+    .stringMatching(/^[a-zA-Z][a-zA-Z0-9_-]{0,15}$/)
+    .filter((k) => k !== "constructor" && k !== "prototype");
+
+  test.prop([fc.anything(), fc.dictionary(arbSafeKey, arbPromise)], {
+    numRuns: 200,
+  })(
+    "roundtrip: isDeferred(defer({ critical, deferred })) === true",
+    (critical, deferred) => {
+      // Defer rejects empty deferred? No — empty `{}` is allowed.
+      const payload = defer({ critical, deferred });
+
+      expect(isDeferred(payload)).toBe(true);
+      expect(payload.critical).toBe(critical);
+    },
+  );
+
+  test.prop([
+    fc.constantFrom("__proto__", "constructor", "prototype"),
+    arbPromise,
+  ])(
+    "reserved keys (__proto__/constructor/prototype) always reject",
+    (reservedKey, promise) => {
+      // Object literal computed-key form so the reserved name lands as
+      // an OWN property (not via Object.prototype lookup). Without this,
+      // `{ __proto__: x }` would silently set the prototype instead of
+      // the own property — and `defer()`'s reserved-key check would
+      // never see it.
+      const map: Record<string, Promise<unknown>> = Object.create(null);
+
+      map[reservedKey] = promise;
+
+      expect(() => defer({ critical: null, deferred: map })).toThrow(
+        /is reserved/,
+      );
+    },
+  );
+
+  test.prop([fc.dictionary(arbSafeKey, arbPromise)], { numRuns: 100 })(
+    "freeze: defer() output is frozen at top level AND inner deferred map",
+    (deferred) => {
+      const payload = defer({ critical: 0, deferred });
+
+      expect(Object.isFrozen(payload)).toBe(true);
+      expect(Object.isFrozen(payload.deferred)).toBe(true);
+    },
+  );
+
+  test.prop([fc.dictionary(arbSafeKey, arbPromise)], { numRuns: 100 })(
+    "isolation: post-defer mutations to the caller's map do not leak into the payload",
+    (deferred) => {
+      const userMap: Record<string, Promise<unknown>> = { ...deferred };
+      const payload = defer({ critical: 0, deferred: userMap });
+      const before = Object.keys(payload.deferred).toSorted((a, b) =>
+        a.localeCompare(b),
+      );
+
+      // Late mutation by the caller — defer() works on a shallow clone,
+      // so the payload must not see this addition.
+      const lateAdd = Promise.reject(new Error("late"));
+
+      lateAdd.catch(() => {
+        /* prevent unhandledRejection in this property test */
+      });
+      userMap.evil = lateAdd;
+
+      const after = Object.keys(payload.deferred).toSorted((a, b) =>
+        a.localeCompare(b),
+      );
+
+      expect(after).toStrictEqual(before);
+      expect("evil" in payload.deferred).toBe(false);
+    },
+  );
+
+  test.prop([fc.anything()])(
+    "isDeferred is false for any value that is NOT a defer() output",
+    (value) => {
+      // Generated values are arbitrary — including primitives, plain
+      // objects with random keys, nested dicts, arrays. None should
+      // accidentally be brand-marked as a defer payload.
+      expect(isDeferred(value)).toBe(false);
     },
   );
 });

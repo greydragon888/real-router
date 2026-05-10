@@ -62,9 +62,29 @@
 | 3   | Function-form resolver invoked once per `start()`           | A function-form `ssr: (state) => SsrMode` is called exactly once per navigation, with the resolved state. Result is the published mode.                                                       |
 | 4   | Short form === `{ loader }` for mode `"full"`               | A factory `(r, getDep) => loader` and `{ loader: (r, getDep) => loader }` produce identical `state.context.data` and the same mode `"full"` after `start()`.                                  |
 
+## `escapeForScript` (security-critical pure function — `numRuns: 1000`)
+
+| #   | Invariant                                          | Description                                                                                                                                                                                                                                |
+| --- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Roundtrip                                          | For any string `s`, `JSON.parse(escapeForScript(s)) === s`. The wire format must decode back to the original input losslessly.                                                                                                            |
+| 2   | HTML safety: no `</script>` (case-insensitive)     | The output never contains a script-tag-terminator the raw HTML parser would honour, regardless of input casing. Direct defence against the canonical `"</script><script>alert(1)</script>"`-in-payload XSS.                              |
+| 3   | HTML safety: no `<` (any tag opener)               | Stronger form of (2) — the result contains zero `<` chars. The raw HTML parser cannot start a new tag, comment, or CDATA section anywhere inside the literal.                                                                              |
+| 4   | HTML safety: no U+2028 / U+2029                    | The legacy JS line-terminator codepoints must be encoded as ` ` / ` ` text inside the literal — never the raw chars, which pre-ES2019 parsers treat as line breaks inside string literals (and would terminate the literal). |
+| 5   | Null fallback                                      | For non-string inputs JSON.stringify can't handle (`undefined`, `BigInt`), `escapeForScript` returns the literal `'null'` rather than throwing. Numbers / booleans pass through as their JSON literal form.                              |
+
+## `defer()` (wire-format payload constructor)
+
+| #   | Invariant                                                                  | Description                                                                                                                                                                                                                          |
+| --- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | Roundtrip / brand                                                          | `isDeferred(defer({ critical, deferred }))` is always `true`, and the returned `payload.critical === critical` (referential equality). Confirms the brand symbol installs and the critical reference passes through unmolested.    |
+| 2   | Reserved-keys reject (`__proto__` / `constructor` / `prototype`)           | For any of the three reserved-name strings used as a deferred-map key, `defer()` throws with `/is reserved/`. Defence-in-depth against prototype-chain corruption when the client-side plugin reconstructs the deferred map.       |
+| 3   | Freeze: payload + inner deferred map                                       | `Object.isFrozen(payload)` and `Object.isFrozen(payload.deferred)` both `true`. The wire-format value is immutable to consumers.                                                                                                       |
+| 4   | Isolation: post-`defer` mutations to caller's map don't leak               | `defer()` works on a shallow clone of the deferred record — late additions to the user's map (e.g. `userMap.evil = badPromise`) never appear in `payload.deferred`. Locks the validation contract: only the snapshot at call time. |
+| 5   | `isDeferred` rejects non-`defer()` values                                  | For any value the user could plausibly pass (primitives, plain objects, arrays, nested dicts), `isDeferred(value)` returns `false`. Prevents accidental brand collision via `Symbol.for` on third-party code.                       |
+
 ## Test Files
 
 | File                                         | Invariants | Category                                                                            |
 | -------------------------------------------- | ---------- | ----------------------------------------------------------------------------------- |
 | `tests/functional/data-loader.test.ts`       | 3          | getDependency integration, no caching                                                                                     |
-| `tests/property/ssr-data.properties.ts`      | 17         | Validation, loader invocation, loader arguments, data retrieval, prototype safety, teardown, isolation, factory invocation, **SSR mode (×4)** |
+| `tests/property/ssr-data.properties.ts`      | 27         | Validation, loader invocation, loader arguments, data retrieval, prototype safety, teardown, isolation, factory invocation, SSR mode (×4), **`escapeForScript` (×5)**, **`defer()` (×5)** |
