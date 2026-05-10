@@ -13,3 +13,9 @@ export type { ServerOnlyProps } from "./components/ServerOnly";
 export type { AwaitProps } from "./components/Await";
 
 export type { StreamedProps } from "./components/Streamed";
+
+export type { HttpStatusCodeProps } from "./components/HttpStatusCode";
+
+export type { HttpStatusProviderProps } from "./components/HttpStatusProvider";
+
+export type { HttpStatusSink } from "./utils/createHttpStatusSink";

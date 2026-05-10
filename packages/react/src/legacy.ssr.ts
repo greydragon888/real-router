@@ -11,8 +11,15 @@ export { ServerOnly } from "./components/ServerOnly";
 
 export { Streamed } from "./components/Streamed";
 
+export { HttpStatusCode } from "./components/HttpStatusCode";
+
+export { HttpStatusProvider } from "./components/HttpStatusProvider";
+
 // Hooks
 export { useDeferred } from "./hooks/useDeferred";
+
+// Utilities
+export { createHttpStatusSink } from "./utils/createHttpStatusSink";
 
 // Types
 export type { ClientOnlyProps } from "./components/ClientOnly";
@@ -20,3 +27,9 @@ export type { ClientOnlyProps } from "./components/ClientOnly";
 export type { ServerOnlyProps } from "./components/ServerOnly";
 
 export type { StreamedProps } from "./components/Streamed";
+
+export type { HttpStatusCodeProps } from "./components/HttpStatusCode";
+
+export type { HttpStatusProviderProps } from "./components/HttpStatusProvider";
+
+export type { HttpStatusSink } from "./utils/createHttpStatusSink";

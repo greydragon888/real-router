@@ -18,5 +18,18 @@ export { ClientOnly } from "./components/ClientOnly";
 
 export { ServerOnly } from "./components/ServerOnly";
 
+export { HttpStatusCode } from "./components/HttpStatusCode";
+
 // Functions
 export { injectDeferred } from "./functions/injectDeferred";
+
+export { provideHttpStatusSink } from "./functions/provideHttpStatusSink";
+
+// Utilities
+export {
+  HTTP_STATUS_SINK,
+  createHttpStatusSink,
+} from "./utils/createHttpStatusSink";
+
+// Types
+export type { HttpStatusSink } from "./utils/createHttpStatusSink";

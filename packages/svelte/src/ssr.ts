@@ -14,5 +14,15 @@ export { default as Await } from "./components/Await.svelte";
 
 export { default as Streamed } from "./components/Streamed.svelte";
 
+export { default as HttpStatusCode } from "./components/HttpStatusCode.svelte";
+
+export { default as HttpStatusProvider } from "./components/HttpStatusProvider.svelte";
+
 // Composables
 export { useDeferred } from "./composables/useDeferred.svelte";
+
+// Utilities
+export { createHttpStatusSink } from "./utils/createHttpStatusSink";
+
+// Types
+export type { HttpStatusSink } from "./utils/createHttpStatusSink";
