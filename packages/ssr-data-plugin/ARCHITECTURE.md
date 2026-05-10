@@ -290,7 +290,7 @@ This tests:
 | Teardown under load         | `dispose()` of one clone corrupts another's state          |
 | Loader dispatch correctness | Wrong `state.name` → wrong loader called under concurrency |
 
-Property-based tests (13 invariants in `tests/property/`) complement functional and stress tests — see INVARIANTS.md for the full list. The stress test covers the one dimension unit tests cannot: concurrent access patterns that mirror real SSR server load.
+Property-based tests (17 invariants in `tests/property/`) complement functional and stress tests — see INVARIANTS.md for the full list. The stress test covers the one dimension unit tests cannot: concurrent access patterns that mirror real SSR server load.
 
 ## Related Documents
 
