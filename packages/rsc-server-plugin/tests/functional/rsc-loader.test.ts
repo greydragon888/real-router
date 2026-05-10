@@ -586,6 +586,41 @@ describe("@real-router/rsc-server-plugin", () => {
     });
   });
 
+  describe("Single-instance enforcement (gotcha)", () => {
+    it("rejects double-registration of rscServerPluginFactory on the same router", () => {
+      router.usePlugin(
+        rscServerPluginFactory({ home: () => () => node("First") }),
+      );
+
+      // The "rsc" namespace is exclusive — the second factory tries to
+      // claim it again and core's collision detector throws.
+      expect(() => {
+        router.usePlugin(
+          rscServerPluginFactory({ home: () => () => node("Second") }),
+        );
+      }).toThrow(/already claimed/i);
+    });
+
+    it("releases the rsc namespace on teardown so a fresh factory can re-register", async () => {
+      const unsubscribe1 = router.usePlugin(
+        rscServerPluginFactory({ home: () => () => node("First") }),
+      );
+
+      unsubscribe1();
+
+      // Same router, fresh factory after teardown — no claim collision.
+      const unsubscribe2 = router.usePlugin(
+        rscServerPluginFactory({ home: () => () => node("Second") }),
+      );
+
+      const state = await router.start("/");
+
+      expect(state.context.rsc).toStrictEqual(node("Second"));
+
+      unsubscribe2();
+    });
+  });
+
   describe("Per-route SSR mode", () => {
     it("object form ssr: 'full' runs loader and writes mode='full'", async () => {
       const homeNode = node("HomePage");

@@ -113,6 +113,39 @@ describe("@real-router/rsc-server-plugin — rscActionPluginFactory", () => {
 
       expect(state.context.rscAction).toStrictEqual(result);
     });
+
+    it("on the SAME router, .stop() + .start() re-evaluates getResult and reflects the new closure value", async () => {
+      // Original test exercised the closure via creating a fresh router
+      // between starts — that masked the on-same-router contract. This
+      // version keeps the router instance fixed so any cached result inside
+      // the start interceptor would be exposed.
+      let counter = 0;
+
+      router.usePlugin(
+        rscActionPluginFactory(
+          (): RscActionResult => ({
+            returnValue: { ok: true, data: ++counter },
+          }),
+        ),
+      );
+
+      const first = await router.start("/");
+
+      expect(first.context.rscAction?.returnValue?.data).toBe(1);
+
+      router.stop();
+
+      const second = await router.start("/");
+
+      expect(second.context.rscAction?.returnValue?.data).toBe(2);
+
+      router.stop();
+
+      const third = await router.start("/");
+
+      expect(third.context.rscAction?.returnValue?.data).toBe(3);
+      expect(counter).toBe(3);
+    });
   });
 
   describe("Composition with rscServerPluginFactory", () => {
