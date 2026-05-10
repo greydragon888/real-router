@@ -4,6 +4,7 @@ import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 import { defineComponent, h, ref } from "vue";
 
 import { Link } from "../../src/components/Link";
+import { EMPTY_PARAMS } from "../../src/constants";
 import { RouterProvider } from "../../src/RouterProvider";
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
@@ -118,11 +119,18 @@ describe("Link component", () => {
         shiftKey: false,
       });
 
-      expect(router.navigate).toHaveBeenCalledWith(
-        "one-more-test",
-        expect.any(Object),
-        expect.any(Object),
-      );
+      expect(router.navigate).toHaveBeenCalledTimes(1);
+
+      const [name, params, options] = (
+        router.navigate as ReturnType<typeof vi.fn>
+      ).mock.calls[0] as [string, object, object];
+
+      expect(name).toBe("one-more-test");
+      // params identity is preserved through navigateWithHash → singleton.
+      expect(params).toBe(EMPTY_PARAMS);
+      // navigateWithHash spreads `extraOptions` into a fresh object, so we
+      // assert the structural shape rather than identity.
+      expect(options).toStrictEqual({});
     });
 
     it("should render undefined href and log error for empty routeName", () => {
@@ -401,11 +409,15 @@ describe("Link component", () => {
       await wrapper.find("a").trigger("click");
       await flushPromises();
 
-      expect(router.navigate).toHaveBeenCalledWith(
-        "one-more-test",
-        expect.any(Object),
-        expect.any(Object),
-      );
+      expect(router.navigate).toHaveBeenCalledTimes(1);
+
+      const [name, params, options] = (
+        router.navigate as ReturnType<typeof vi.fn>
+      ).mock.calls[0] as [string, object, object];
+
+      expect(name).toBe("one-more-test");
+      expect(params).toBe(EMPTY_PARAMS);
+      expect(options).toStrictEqual({});
     });
 
     it("should render correctly without routeParams and routeOptions props", () => {

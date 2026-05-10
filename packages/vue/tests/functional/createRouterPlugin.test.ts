@@ -22,11 +22,29 @@ describe("createRouterPlugin", () => {
     router.stop();
   });
 
-  it("should return a Vue plugin with install method", () => {
+  it("should return a Vue plugin whose install wires the router context", () => {
     const plugin = createRouterPlugin(router);
 
-    expect(plugin).toBeDefined();
     expect(plugin.install).toBeTypeOf("function");
+
+    let injectedRouter: Router | undefined;
+
+    const TestComponent = defineComponent({
+      setup() {
+        injectedRouter = inject(RouterKey);
+
+        return () => h("div");
+      },
+    });
+
+    const app = createApp(TestComponent);
+
+    app.use(plugin);
+    app.mount(document.createElement("div"));
+
+    expect(injectedRouter).toBe(router);
+
+    app.unmount();
   });
 
   it("should provide RouterKey", () => {

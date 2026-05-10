@@ -42,7 +42,11 @@ export function pushDirectiveRouter(router: Router): () => void {
 /**
  * Backwards-compatible alias. Replaces the active router unconditionally and
  * does NOT participate in the stack — use {@link pushDirectiveRouter} from
- * provider code instead. Kept for tests and direct callers.
+ * provider code instead. Not exported from the package entry; retained for
+ * unit tests and rare standalone-directive setups (where v-link is mounted
+ * outside any RouterProvider).
+ *
+ * @internal
  */
 export function setDirectiveRouter(router: Router | null): void {
   if (router === null) {

@@ -253,18 +253,20 @@ tests/
 
 ## Stress Test Coverage
 
-43 stress tests across 9 files in `tests/stress/` validate behavior under extreme conditions:
+54 stress tests across 11 files in `tests/stress/` validate behavior under extreme conditions:
 
 | Category                | Tests (file count) | Test count | What they verify                                                                                                                                                                        |
 | ----------------------- | ------------------ | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Mount/unmount lifecycle | 1 file             | 9 tests    | useRouteNode/useRoute/Link/useRouterTransition × 200 mount/unmount cycles — bounded heap; 50 components remount + re-subscribe; conditional toggle × 100 + post-toggle navigation works; router stop/restart; navigate during teardown; 10 000 navigate cycles — bounded heap |
+| Mount/unmount lifecycle | 1 file             | 10 tests   | useRouteNode/useRoute/Link/useRouterTransition × 200 mount/unmount cycles — bounded heap; 50 components remount + re-subscribe; conditional toggle × 100 + post-toggle navigation works; router stop/restart; navigate during teardown; 10 000 navigate cycles — bounded heap; rapid `start/stop` × 100 with no navigations between — no FSM/event-bus leak |
+| Memory mount/unmount    | 1 file             | 3 tests    | Steady-state heap baselines for `useRouterTransition`/`useRouteNode`/`RouterErrorBoundary` (delta-per-iter reported)                                                                    |
 | Subscription fanout     | 1 file             | 4 tests    | 50 useRouteNode on different nodes — only relevant re-render; 20 useRoute + 30 useRouteNode('') — all update; 30 useRouteNode('users') — granular scoping; concurrent mount/unmount     |
 | Link mass rendering     | 1 file             | 6 tests    | 200 Links mount — correct DOM; active class toggle; 50 round-robin navigations; deep routeParams; 50 rapid clicks; 100 dynamic routeName updates                                        |
-| keepAlive cycling       | 1 file             | 4 tests    | 10 keepAlive segments × 100 round-robin navs — state preserved via Vue `<KeepAlive>`; wrapper cache bounded (markRaw reuse); mixed keepAlive/non-keepAlive — both modes count > 0; DOM element count stability |
+| keepAlive cycling       | 1 file             | 5 tests    | 10 keepAlive segments × 100 round-robin navs — state preserved via Vue `<KeepAlive>`; wrapper cache bounded (markRaw reuse); mixed keepAlive/non-keepAlive — both modes count > 0; DOM element count stability |
 | v-link directive        | 1 file             | 4 tests    | 200 v-link elements — cursor:pointer + role + tabindex; mount/unmount × 100 cycles — bounded heap (WeakMap cleanup); v-link update × 100 — final-route navigation still works; click navigation after mass mount |
 | Deep tree context       | 1 file             | 4 tests    | 30-deep useRouteNode — only relevant nodes re-render; useRouter — 0 re-renders; wide tree 25 leaves — all re-render; nested RouterProviders — isolated                                  |
-| Transition hook         | 1 file             | 4 tests    | 50 async guard cycles — isTransitioning true→false; 50 concurrent — last wins; 20 consumers — consistent; navigate + cancel × 50 — never stuck                                          |
-| shouldUpdateCache       | 1 file             | 4 tests    | 200 unique node names — cache scales; 100 same-node — cache hit; router stop + GC + new router; 2 routers × 50 nodes — isolated                                                         |
+| Transition hook         | 1 file             | 6 tests    | 50 async guard cycles — isTransitioning true→false; 50 concurrent — last wins; 20 consumers — consistent; navigate + cancel × 50 — never stuck; mid-transition `router.stop()` — no unhandled rejections; mixed-duration concurrent guards (10/40/80 ms) — no zombie isTransitioning, last navigate wins |
+| shouldUpdateCache       | 1 file             | 5 tests    | 200 unique node names — cache scales; 100 same-node — cache hit; router stop + GC + new router; 2 routers × 50 nodes — isolated                                                         |
+| Suspense + lazy         | 1 file             | 3 tests    | 50 navs across two lazy `<RouteView.Match fallback>` segments — fallbacks never stuck after resolve; 100 mount/unmount cycles of a lazy Match — bounded heap; 50 fallback→content cycles per segment — bounded heap |
 | Combined SPA            | 1 file             | 4 tests    | Full app with RouteView + Links + useRouteNode + 200 navs; transition progress; keepAlive tabs + 30 Links; remount after unmount                                                        |
 
 ## See Also
