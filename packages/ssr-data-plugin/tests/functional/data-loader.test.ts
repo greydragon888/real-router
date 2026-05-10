@@ -959,6 +959,56 @@ describe("@real-router/ssr-data-plugin", () => {
     });
   });
 
+  describe("getSsrDataMode runtime guard against TS-cast bypass", () => {
+    const stateWith = (ssrDataMode: unknown): State => ({
+      name: "users.profile",
+      params: { id: "42" },
+      path: "/users/42",
+      transition: {
+        phase: "activating",
+        reason: "success",
+        segments: { deactivated: [], activated: [], intersection: "" },
+      },
+      context: { ssrDataMode } as Record<string, unknown>,
+    });
+
+    it("returns 'full' for ssrDataMode === undefined (route without entry)", () => {
+      expect(getSsrDataMode(stateWith(undefined))).toBe("full");
+    });
+
+    it("returns 'full' for ssrDataMode === null (foreign-writer garbage)", () => {
+      expect(getSsrDataMode(stateWith(null))).toBe("full");
+    });
+
+    it("returns 'full' for ssrDataMode === 0 (falsy non-nullish bypass)", () => {
+      expect(getSsrDataMode(stateWith(0))).toBe("full");
+    });
+
+    it("returns 'full' for ssrDataMode === false (boolean bypass)", () => {
+      expect(getSsrDataMode(stateWith(false))).toBe("full");
+    });
+
+    it("returns 'full' for ssrDataMode === '' (empty string bypass)", () => {
+      expect(getSsrDataMode(stateWith(""))).toBe("full");
+    });
+
+    it("returns 'full' for ssrDataMode === 'bogus' (foreign mode string)", () => {
+      expect(getSsrDataMode(stateWith("bogus"))).toBe("full");
+    });
+
+    it("preserves the value for ssrDataMode === 'full'", () => {
+      expect(getSsrDataMode(stateWith("full"))).toBe("full");
+    });
+
+    it("preserves the value for ssrDataMode === 'data-only'", () => {
+      expect(getSsrDataMode(stateWith("data-only"))).toBe("data-only");
+    });
+
+    it("preserves the value for ssrDataMode === 'client-only'", () => {
+      expect(getSsrDataMode(stateWith("client-only"))).toBe("client-only");
+    });
+  });
+
   describe("Module augmentation visibility (type-level)", () => {
     it("state.context.ssrDataMode is typed as SsrMode | undefined", async () => {
       router.usePlugin(

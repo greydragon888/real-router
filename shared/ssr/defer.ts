@@ -119,13 +119,23 @@ export function defer<
   });
 }
 
-/** Type guard — `true` iff `value` is a payload returned by `defer()`. */
+/** Type guard — `true` iff `value` is a payload returned by `defer()`.
+ *
+ * The brand check uses `Object.hasOwn(value, DEFER_BRAND)` rather than a
+ * plain property read so a prototype-chain inheritance bypass —
+ * `Object.create({ [DEFER_BRAND]: true })` — does not falsely tag an
+ * object as a deferred payload. The brand symbol is a `Symbol.for(...)`,
+ * so a brand-marked object inherited by accident from a foreign realm
+ * could otherwise sneak past `defer()`'s validation and land in
+ * `processLoaderResult`'s slow path with no `critical`/`deferred` fields.
+ */
 export function isDeferred(
   value: unknown,
 ): value is DeferredPayload<unknown, Record<string, Promise<unknown>>> {
   return (
     value !== null &&
     typeof value === "object" &&
+    Object.hasOwn(value, DEFER_BRAND) &&
     (value as Record<symbol, unknown>)[DEFER_BRAND] === true
   );
 }

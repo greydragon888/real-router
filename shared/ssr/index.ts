@@ -15,6 +15,8 @@ export {
   escapeForScript,
 } from "./deferRegistry.js";
 
+export { ALL_SSR_MODES } from "./types.js";
+
 export type {
   SsrLoaderContext,
   SsrLoaderFn,

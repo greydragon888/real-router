@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { defer, isDeferred } from "../../src";
+import { DEFER_BRAND } from "../../src/shared-ssr";
 
 describe("defer()", () => {
   describe("happy path", () => {
@@ -205,6 +206,29 @@ describe("defer()", () => {
   describe("isDeferred()", () => {
     it("returns false for null", () => {
       expect(isDeferred(null)).toBe(false);
+    });
+
+    it("returns false for inherited brand (prototype-chain bypass)", () => {
+      // The brand symbol is a `Symbol.for(...)` — anyone in the same
+      // realm can fabricate it. The defence is `Object.hasOwn`: an object
+      // that inherits the brand from its prototype must NOT be tagged
+      // as a defer() payload, otherwise a foreign-prototype attack could
+      // smuggle a no-`critical`/no-`deferred` value into the slow path
+      // of processLoaderResult.
+      const proto = { [DEFER_BRAND]: true };
+      const inherited = Object.create(proto) as Record<symbol, unknown>;
+
+      // Sanity: the brand IS visible via prototype lookup.
+      expect(inherited[DEFER_BRAND]).toBe(true);
+
+      // But isDeferred must reject because the brand isn't OWN.
+      expect(isDeferred(inherited)).toBe(false);
+    });
+
+    it("returns true only when the brand is an OWN property", () => {
+      const own: Record<symbol, unknown> = { [DEFER_BRAND]: true };
+
+      expect(isDeferred(own)).toBe(true);
     });
 
     it("returns false for undefined", () => {
