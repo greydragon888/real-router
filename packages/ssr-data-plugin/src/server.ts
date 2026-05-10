@@ -59,6 +59,57 @@ function safeSerializeError(
 }
 
 /**
+ * Build the settle-promise array that emits `<script>__rrDefer__(...)</script>`
+ * (or `__rrDeferError__`) chunks via `safeEnqueue` as each deferred promise
+ * settles.
+ *
+ * Extracted from `injectDeferredScripts` so the streaming wrapper's `start`
+ * callback reads top-down without a 35-line inline `entries.map` body.
+ *
+ * `Promise.resolve(thenable)` adopts the thenable's state under the standard
+ * Promise machinery. This buys two safety properties:
+ *   1. A duck-typed thenable whose `.then(...)` throws synchronously
+ *      (`defer()` only validates `typeof .then === "function"`, not that the
+ *      implementation behaves) is converted into a rejection instead of
+ *      escaping `entries.map` and crashing the stream's `start` callback.
+ *   2. Native promises pass through unchanged — `Promise.resolve(p)` returns
+ *      `p` for native promises (per spec).
+ */
+function buildSettlePromises(
+  entries: [string, Promise<unknown>][],
+  encoder: TextEncoder,
+  serialize: Serializer,
+  serializeError: (error: unknown) => string,
+  safeEnqueue: (chunk: Uint8Array) => void,
+): Promise<void>[] {
+  return entries.map(([key, promise]) =>
+    Promise.resolve(promise).then(
+      (value) => {
+        try {
+          // Mirror serializeState's `?? "null"` fallback (#606): a serializer
+          // that returns undefined for unsupported inputs becomes `null` on
+          // the wire instead of a confusing TypeError crash inside
+          // escapeForScript. Throws (e.g. BigInt without a custom serializer,
+          // circular refs) still route to the error-settle path below.
+          const json = serialize(value) ?? "null";
+
+          safeEnqueue(encoder.encode(formatSettleScript(key, json, false)));
+        } catch (error) {
+          const errJson = safeSerializeError(serializeError, error);
+
+          safeEnqueue(encoder.encode(formatSettleScript(key, errJson, true)));
+        }
+      },
+      (error: unknown) => {
+        const errJson = safeSerializeError(serializeError, error);
+
+        safeEnqueue(encoder.encode(formatSettleScript(key, errJson, true)));
+      },
+    ),
+  );
+}
+
+/**
  * Wraps an HTML `ReadableStream` (e.g. from React's `renderToReadableStream`)
  * with inline `<script>__rrDefer__("key", json)</script>` chunks emitted as
  * each promise in `deferred` resolves.
@@ -114,43 +165,12 @@ export function injectDeferredScripts(
         );
       }
 
-      // `Promise.resolve(thenable)` adopts the thenable's state under the
-      // standard Promise machinery. This buys two safety properties:
-      //   1. A duck-typed thenable whose `.then(...)` throws synchronously
-      //      (`defer()` only validates `typeof .then === "function"`, not
-      //      that the implementation behaves) is converted into a rejection
-      //      instead of escaping `entries.map` and crashing the stream's
-      //      `start` callback.
-      //   2. Native promises pass through unchanged — `Promise.resolve(p)`
-      //      returns `p` for native promises (per spec).
-      const settlePromises = entries.map(([key, promise]) =>
-        Promise.resolve(promise).then(
-          (value) => {
-            try {
-              // Mirror serializeState's `?? "null"` fallback (#606): a
-              // serializer that returns undefined for unsupported inputs
-              // (`JSON.stringify(undefined)`, `JSON.stringify(() => 1)`)
-              // becomes `null` on the wire instead of a confusing TypeError
-              // crash inside escapeForScript. Throws (e.g. BigInt without
-              // a custom serializer, circular refs) still route to the
-              // error-settle path below.
-              const json = serialize(value) ?? "null";
-
-              safeEnqueue(encoder.encode(formatSettleScript(key, json, false)));
-            } catch (error) {
-              const errJson = safeSerializeError(serializeError, error);
-
-              safeEnqueue(
-                encoder.encode(formatSettleScript(key, errJson, true)),
-              );
-            }
-          },
-          (error: unknown) => {
-            const errJson = safeSerializeError(serializeError, error);
-
-            safeEnqueue(encoder.encode(formatSettleScript(key, errJson, true)));
-          },
-        ),
+      const settlePromises = buildSettlePromises(
+        entries,
+        encoder,
+        serialize,
+        serializeError,
+        safeEnqueue,
       );
 
       upstreamReader = htmlStream.getReader();

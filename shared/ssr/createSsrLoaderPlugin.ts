@@ -87,46 +87,36 @@ export function createSsrLoaderPlugin<
     const api = getPluginApi(router);
     const allowed = config.allowedModes ?? ALL_SSR_MODES;
 
-    const dataClaim = api.claimContextNamespace(config.namespace);
+    // Sequential claim acquisition with all-or-nothing rollback. Any
+    // failure (collision, validation error during compile loop) releases
+    // every claim acquired so far and rethrows. This replaces the
+    // previous 4 nested try/catch blocks with progressively-longer
+    // release lists — same semantics, one shared rollback path.
+    const acquired: ContextNamespaceClaim[] = [];
+    const claim = (namespace: string): ContextNamespaceClaim => {
+      const c = api.claimContextNamespace(namespace);
+      acquired.push(c);
+      return c;
+    };
+    const rollback = (): void => {
+      for (const c of acquired) c.release();
+    };
 
+    let dataClaim: ContextNamespaceClaim;
     let modeClaim: ContextNamespaceClaim;
     let deferredClaim: ContextNamespaceClaim | null = null;
     let deferredKeysClaim: ContextNamespaceClaim | null = null;
-
-    try {
-      modeClaim = api.claimContextNamespace(config.modeNamespace);
-    } catch (error) {
-      dataClaim.release();
-
-      throw error;
-    }
-
-    if (hasDeferredSupport) {
-      try {
-        deferredClaim = api.claimContextNamespace(config.deferredNamespace!);
-      } catch (error) {
-        dataClaim.release();
-        modeClaim.release();
-
-        throw error;
-      }
-
-      try {
-        deferredKeysClaim = api.claimContextNamespace(
-          config.deferredKeysNamespace!,
-        );
-      } catch (error) {
-        dataClaim.release();
-        modeClaim.release();
-        deferredClaim.release();
-
-        throw error;
-      }
-    }
-
     const compiled = new Map<string, CompiledEntry<T>>();
 
     try {
+      dataClaim = claim(config.namespace);
+      modeClaim = claim(config.modeNamespace);
+
+      if (hasDeferredSupport) {
+        deferredClaim = claim(config.deferredNamespace!);
+        deferredKeysClaim = claim(config.deferredKeysNamespace!);
+      }
+
       for (const [name, raw] of Object.entries(loaders)) {
         const obj = typeof raw === "function" ? { loader: raw } : raw;
 
@@ -147,10 +137,7 @@ export function createSsrLoaderPlugin<
         compiled.set(name, { mode: obj.ssr, loader });
       }
     } catch (error) {
-      dataClaim.release();
-      modeClaim.release();
-      deferredClaim?.release();
-      deferredKeysClaim?.release();
+      rollback();
 
       throw error;
     }
