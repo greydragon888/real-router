@@ -2,6 +2,17 @@ import { renderHook, act } from "@testing-library/react";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import {
+  Link as MainLink,
+  RouterErrorBoundary as MainRouterErrorBoundary,
+  useRouteNode as MainUseRouteNode,
+  useRoute as MainUseRoute,
+  useNavigator as MainUseNavigator,
+  useRouter as MainUseRouter,
+  useRouteUtils as MainUseRouteUtils,
+  useRouterTransition as MainUseRouterTransition,
+  RouterProvider as MainRouterProvider,
+} from "@real-router/react";
+import {
   Link,
   RouterErrorBoundary,
   useRouteNode,
@@ -36,8 +47,8 @@ describe("legacy entry point (@real-router/react/legacy)", () => {
 
   describe("exports availability", () => {
     it("should export all components", () => {
-      expect(Link).toBeTypeOf("object");
-      expect(RouterErrorBoundary).toBeTypeOf("function");
+      expect(Link).toBe(MainLink);
+      expect(RouterErrorBoundary).toBe(MainRouterErrorBoundary);
     });
 
     it("should not export RouteView (React 19.2+ only)", async () => {
@@ -49,12 +60,12 @@ describe("legacy entry point (@real-router/react/legacy)", () => {
     });
 
     it("should export all hooks", () => {
-      expect(useRouteNode).toBeTypeOf("function");
-      expect(useRoute).toBeTypeOf("function");
-      expect(useNavigator).toBeTypeOf("function");
-      expect(useRouter).toBeTypeOf("function");
-      expect(useRouteUtils).toBeTypeOf("function");
-      expect(useRouterTransition).toBeTypeOf("function");
+      expect(useRouteNode).toBe(MainUseRouteNode);
+      expect(useRoute).toBe(MainUseRoute);
+      expect(useNavigator).toBe(MainUseNavigator);
+      expect(useRouter).toBe(MainUseRouter);
+      expect(useRouteUtils).toBe(MainUseRouteUtils);
+      expect(useRouterTransition).toBe(MainUseRouterTransition);
     });
 
     it("should not export raw context objects", async () => {
@@ -68,7 +79,7 @@ describe("legacy entry point (@real-router/react/legacy)", () => {
     });
 
     it("should export RouterProvider", () => {
-      expect(RouterProvider).toBeTypeOf("function");
+      expect(RouterProvider).toBe(MainRouterProvider);
     });
 
     it("should export LinkProps type", () => {
@@ -94,7 +105,7 @@ describe("legacy entry point (@real-router/react/legacy)", () => {
         wrapper: (props) => wrapper({ ...props, router }),
       });
 
-      expect(result.current).toStrictEqual(router);
+      expect(result.current).toBe(router);
     });
 
     it("should provide route state via useRouteNode", async () => {
@@ -107,7 +118,7 @@ describe("legacy entry point (@real-router/react/legacy)", () => {
       });
 
       expect(result.current.route?.name).toBe("test");
-      expect(result.current.navigator).toBeTypeOf("object");
+      expect(result.current.navigator.navigate).toBe(router.navigate);
     });
   });
 

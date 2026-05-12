@@ -28,7 +28,7 @@ describe("Link component", () => {
     router.stop();
   });
 
-  it("should renders component, href and children correctly", () => {
+  it("should render component, href and children correctly", () => {
     render(
       <Link routeName="one-more-test" data-testid="link">
         Test
@@ -182,6 +182,8 @@ describe("Link component", () => {
       const consoleError = vi
         .spyOn(console, "error")
         .mockImplementation(() => {});
+      // BigInt is intentionally incompatible with Record<string,string> — the double
+      // cast is required to exercise shallowEqual's Object.is path: Object.is(1n, 2n) === false.
       const bigintParams1 = { id: 1n } as unknown as Record<string, string>;
       const bigintParams2 = { id: 2n } as unknown as Record<string, string>;
 
@@ -197,7 +199,12 @@ describe("Link component", () => {
         { wrapper },
       );
 
-      // Different BigInt values → Object.is(1n, 2n) === false → rerender.
+      const link = screen.getByTestId("link");
+
+      // BigInt coerces to string in URI encoding: {id: 1n} → "/items/1"
+      expect(link).toHaveAttribute("href", "/items/1");
+
+      // Different BigInt values → Object.is(1n, 2n) === false → areLinkPropsEqual returns false → re-render.
       rerender(
         <Link
           routeName="items.item"
@@ -209,7 +216,8 @@ describe("Link component", () => {
         </Link>,
       );
 
-      expect(screen.getByTestId("link")).toBeInTheDocument();
+      // Href changed to /items/2, proving Link re-rendered with new params.
+      expect(link).toHaveAttribute("href", "/items/2");
 
       consoleError.mockRestore();
     });
@@ -226,7 +234,12 @@ describe("Link component", () => {
         { wrapper },
       );
 
-      // undefined → defined: shallowEqual hits `!a || !b` branch → false → rerender.
+      const link = screen.getByTestId("link");
+
+      // No params → buildPath("items.item", undefined) fails (required :id missing) → no href.
+      expect(link).not.toHaveAttribute("href");
+
+      // undefined → defined: shallowEqual hits `!a || !b` branch → false → re-render.
       rerender(
         <Link
           routeName="items.item"
@@ -238,7 +251,8 @@ describe("Link component", () => {
         </Link>,
       );
 
-      expect(screen.getByTestId("link")).toBeInTheDocument();
+      // Href present, proving Link re-rendered with defined params.
+      expect(link).toHaveAttribute("href", "/items/7");
 
       // defined → undefined: same asymmetric branch on the other side.
       rerender(
@@ -251,7 +265,96 @@ describe("Link component", () => {
         </Link>,
       );
 
-      expect(screen.getByTestId("link")).toBeInTheDocument();
+      // Href gone again, proving Link re-rendered with undefined params.
+      expect(link).not.toHaveAttribute("href");
+    });
+
+    it("should re-render when routeParams contain Symbol/Date/Map/nested-object values with different references", () => {
+      // Covers CLAUDE.md L388-394 gotcha: shallowEqual uses Object.is per key,
+      // so Symbol / Date / Map / nested-object values that look "the same"
+      // structurally but are different references do NOT bail out memo().
+      // Observable: `router.buildPath` is called from `buildHref` on every Link
+      // render (no useMemo since §8.2). A rerender with a different-ref params
+      // bumps the call count; a bail-out would keep it flat.
+      const buildPathSpy = vi.spyOn(router, "buildPath");
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
+      const cases: { name: string; refA: unknown; refB: unknown }[] = [
+        // Symbols are unique per construction — same description, different identity.
+        { name: "Symbol", refA: Symbol("x"), refB: Symbol("x") },
+        // Distinct Date instances even when they encode the same epoch.
+        {
+          name: "Date",
+          refA: new Date(2026, 0, 1),
+          refB: new Date(2026, 0, 1),
+        },
+        // Distinct Map instances with identical entries.
+        {
+          name: "Map",
+          refA: new Map([["k", "v"]]),
+          refB: new Map([["k", "v"]]),
+        },
+        // Nested objects — CLAUDE.md L391-394 explicitly calls out "different
+        // refs → re-render". Consumers stabilize via useMemo if needed.
+        {
+          name: "nested object",
+          refA: { filters: [1, 2] },
+          refB: { filters: [1, 2] },
+        },
+      ];
+
+      const { rerender } = render(
+        <Link
+          routeName="items.item"
+          routeParams={
+            { id: "1", n: cases[0].refA } as unknown as Record<string, string>
+          }
+          data-testid="link"
+        >
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      for (const { name, refA, refB } of cases) {
+        // First, rerender with the "A" reference to establish a baseline
+        // (covers all four cases on the same Link instance).
+        rerender(
+          <Link
+            routeName="items.item"
+            routeParams={
+              { id: "1", n: refA } as unknown as Record<string, string>
+            }
+            data-testid="link"
+          >
+            Test
+          </Link>,
+        );
+
+        const callsBefore = buildPathSpy.mock.calls.length;
+
+        // Rerender with the "B" reference — same structural content, different identity.
+        rerender(
+          <Link
+            routeName="items.item"
+            routeParams={
+              { id: "1", n: refB } as unknown as Record<string, string>
+            }
+            data-testid="link"
+          >
+            Test
+          </Link>,
+        );
+
+        expect(
+          buildPathSpy.mock.calls.length,
+          `memo() must NOT bail out for ${name} value identity change`,
+        ).toBeGreaterThan(callsBefore);
+      }
+
+      consoleError.mockRestore();
     });
 
     it("should default ignoreQueryParams=true when prop omitted (gotcha)", async () => {
@@ -502,7 +605,7 @@ describe("Link component", () => {
     });
 
     it("should handle routeOptions updates", async () => {
-      vi.spyOn(router, "navigate").mockResolvedValue({} as never);
+      vi.spyOn(router, "navigate").mockResolvedValue(router.getState()!);
 
       const { rerender } = render(
         <Link
@@ -521,8 +624,8 @@ describe("Link component", () => {
 
       expect(router.navigate).toHaveBeenCalledWith(
         "one-more-test",
-        expect.any(Object),
-        expect.objectContaining({ replace: true }),
+        {},
+        { replace: true },
       );
 
       vi.mocked(router.navigate).mockClear();
@@ -541,8 +644,8 @@ describe("Link component", () => {
 
       expect(router.navigate).toHaveBeenCalledWith(
         "one-more-test",
-        expect.any(Object),
-        expect.objectContaining({ reload: true }),
+        {},
+        { reload: true },
       );
     });
   });
@@ -651,12 +754,6 @@ describe("Link component", () => {
     expect(screen.getByTestId("link")).not.toHaveAttribute("href");
     expect(consoleError).toHaveBeenCalledWith(
       expect.stringMatching(/@@nonexistent-route/),
-    );
-
-    const callArg = consoleError.mock.calls[0]?.[0] as unknown;
-
-    expect(typeof callArg === "string" ? callArg : "").toMatch(
-      /@@nonexistent-route/,
     );
 
     consoleError.mockRestore();

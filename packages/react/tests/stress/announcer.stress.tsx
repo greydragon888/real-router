@@ -1,4 +1,4 @@
-import { cleanup, render } from "@testing-library/react";
+import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { RouterProvider } from "@real-router/react";
@@ -112,5 +112,50 @@ describe("R9 — announceNavigation toggle stress", () => {
 
     routerA.stop();
     routerB.stop();
+  });
+
+  it("9.4: 200 rapid navigations through the announcer state machine — single node, clean teardown (#14)", async () => {
+    // The announcer is a four-state machine: `lastAnnouncedText` +
+    // `pendingText` + `safariTimeoutId` + double rAF. Rapid navigations
+    // overlap announcement attempts; if the cleanup doesn't reset
+    // pendingText / clearTimeout the Safari buffer, the announcer can
+    // mutate the DOM after destroy() or leave a stale timer.
+    const router = createStressRouter(10);
+
+    await router.start("/route0");
+
+    const { unmount } = render(
+      <RouterProvider router={router} announceNavigation>
+        <div data-testid="anchor" />
+      </RouterProvider>,
+    );
+
+    expect(document.querySelectorAll(ANNOUNCER_SEL)).toHaveLength(1);
+
+    // 200 navigations through a round-robin of 10 routes (some adjacent
+    // pairs duplicate, exercising same-name and different-name paths).
+    for (let i = 0; i < 200; i++) {
+      await act(async () => {
+        await router.navigate(`route${i % 10}`).catch(() => {});
+      });
+    }
+
+    // Invariant: still exactly one announcer node — nothing duplicated
+    // even after 200 transitions firing the subscribe callback.
+    expect(document.querySelectorAll(ANNOUNCER_SEL)).toHaveLength(1);
+
+    unmount();
+
+    // Cleanup: announcer DOM gone; no further mutations possible.
+    expect(document.querySelectorAll(ANNOUNCER_SEL)).toHaveLength(0);
+
+    // Post-unmount navigations must not resurrect the announcer node.
+    await act(async () => {
+      await router.navigate("route1").catch(() => {});
+    });
+
+    expect(document.querySelectorAll(ANNOUNCER_SEL)).toHaveLength(0);
+
+    router.stop();
   });
 });

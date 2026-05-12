@@ -67,22 +67,33 @@ export function createScrollRestoration(
   const behavior: ScrollBehavior = options?.behavior ?? "auto";
   const storageKey = options?.storageKey ?? DEFAULT_STORAGE_KEY;
 
+  // Write-through in-memory cache: parse sessionStorage once per provider
+  // mount, then mutate in-memory. Avoids a JSON.parse + JSON.stringify pair
+  // on every subscribeLeave / pagehide event.
+  let store: Record<string, number> | undefined;
+
   const loadStore = (): Record<string, number> => {
+    if (store !== undefined) {
+      return store;
+    }
+
     try {
       const raw = sessionStorage.getItem(storageKey);
 
-      return raw ? (JSON.parse(raw) as Record<string, number>) : {};
+      store = raw ? (JSON.parse(raw) as Record<string, number>) : {};
     } catch {
-      return {};
+      store = {};
     }
+
+    return store;
   };
 
   const putPos = (key: string, pos: number): void => {
     try {
-      const store = loadStore();
+      const cached = loadStore();
 
-      store[key] = pos;
-      sessionStorage.setItem(storageKey, JSON.stringify(store));
+      cached[key] = pos;
+      sessionStorage.setItem(storageKey, JSON.stringify(cached));
     } catch {
       // Ignore quota / security errors.
     }

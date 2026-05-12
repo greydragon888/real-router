@@ -44,10 +44,10 @@ describe("useNavigator hook", () => {
         "subscribe",
       ]),
     );
-    expect(result.current.navigate).toBeTypeOf("function");
-    expect(result.current.getState).toBeTypeOf("function");
-    expect(result.current.isActiveRoute).toBeTypeOf("function");
-    expect(result.current.subscribe).toBeTypeOf("function");
+    expect(result.current.navigate).toBe(router.navigate);
+    expect(result.current.getState).toBe(router.getState);
+    expect(result.current.isActiveRoute).toBe(router.isActiveRoute);
+    expect(result.current.subscribe).toBe(router.subscribe);
   });
 
   it("should have working navigate method", async () => {
@@ -67,8 +67,8 @@ describe("useNavigator hook", () => {
     const state = result.current.getState();
 
     expect(state).not.toBeNull();
-    expect(state!.name).toBeTypeOf("string");
-    expect(state!.name.length).toBeGreaterThan(0);
+    // navigator.getState() must return the same state as router.getState().
+    expect(state).toStrictEqual(router.getState());
   });
 
   it("should have working isActiveRoute method", () => {

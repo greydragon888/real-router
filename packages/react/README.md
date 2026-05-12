@@ -17,14 +17,16 @@ npm install @real-router/react @real-router/core @real-router/browser-plugin
 
 ## Entry Points
 
-| Import Path                 | React Version | Runtime           | Includes                                               |
-| --------------------------- | ------------- | ----------------- | ------------------------------------------------------ |
-| `@real-router/react`        | 19.2+         | DOM               | Full API (hooks, `Link`, `RouteView` with `keepAlive`) |
-| `@real-router/react/legacy` | 18+           | DOM               | All hooks and `Link`, no `RouteView`                   |
-| `@real-router/react/ink`    | 19.2+         | Terminal (Ink 7+) | Hooks, `InkRouterProvider`, `InkLink`, no `RouteView`  |
-| `@real-router/react`        | 19+           | RSC bundler (`react-server` condition) | Type-only re-exports for Server Components — no hooks, no components, no `RouterProvider` |
+| Import Path                        | React Version | Runtime                                | Includes                                                                                                                                                |
+| ---------------------------------- | ------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@real-router/react`               | 19.2+         | DOM                                    | Full client API (hooks, `Link`, `RouteView` with `keepAlive`, `RouterErrorBoundary`). **No SSR-feature components** — those live at `/ssr`.             |
+| `@real-router/react/ssr`           | 19.2+         | DOM (SSR-aware)                        | `<ClientOnly>`, `<ServerOnly>`, `<Await>`, `<Streamed>`, `useDeferred`, `<HttpStatusCode>`, `<HttpStatusProvider>`, `createHttpStatusSink` |
+| `@real-router/react/legacy`        | 18+           | DOM                                    | Client API for React 18 (no `RouteView`, no SSR helpers)                                                                                                |
+| `@real-router/react/legacy/ssr`    | 18+           | DOM (SSR-aware)                        | SSR-feature subset for React 18 — same as `/ssr` minus `<Await>` (which depends on React 19's `use(promise)`)                                           |
+| `@real-router/react/ink`           | 19.2+         | Terminal (Ink 7+)                      | Hooks, `InkRouterProvider`, `InkLink` — no `Link`, no `RouteView`, no `announceNavigation`                                                              |
+| `@real-router/react` (`react-server` condition) | 19+ | RSC bundler                            | **Type-only** re-exports for Server Components — no client runtime. Same condition applies to `/ssr` for prop types.                                    |
 
-All entries share the same underlying hook code. `/legacy` excludes React 19.2 `<Activity>`; `/ink` excludes DOM-bound primitives (`<a>`-based `Link`, `announceNavigation`) and replaces them with keyboard-driven terminal equivalents.
+All client entries share the same underlying hook code. `/legacy` excludes React 19.2 `<Activity>`; `/ink` excludes DOM-bound primitives (`<a>`-based `Link`, `announceNavigation`) and replaces them with keyboard-driven terminal equivalents. The `/ssr` split keeps server-only prop types out of the client TypeScript context for apps that don't touch SSR (bundle cost is ≈ 0 thanks to `"sideEffects": false`).
 
 The root export resolves to a **type-only entry** when bundlers apply the `react-server` condition (Vite RSC, Webpack RSC, Turbopack, Parcel) — Server Components can import public API types without pulling client-only code into the server bundle. Per-request data fetching is handled by [@real-router/rsc-server-plugin](https://www.npmjs.com/package/@real-router/rsc-server-plugin), not this entry. See [RSC Integration wiki guide](https://github.com/greydragon888/real-router/wiki/RSC-Integration).
 
@@ -205,6 +207,31 @@ const LazyDashboard = lazy(() => import("./Dashboard"));
 
 `fallback` and `keepAlive` work together — `<Activity>` wraps the whole match including the `<Suspense>` boundary.
 
+#### `RouteView.Self`
+
+Renders when the active route name **exactly equals** the parent `<RouteView>`'s `nodeName`. Use it for leaf views where the parent route itself is the destination — e.g. `/users` rendering a directory page while `/users/:id` renders inside a nested `<RouteView nodeName="users">`.
+
+```tsx
+<RouteView nodeName="users">
+  <RouteView.Self>
+    <UsersIndex /> {/* rendered for route name === "users" */}
+  </RouteView.Self>
+  <RouteView.Match segment="profile">
+    <UserProfile /> {/* rendered for "users.profile" and descendants */}
+  </RouteView.Match>
+  <RouteView.NotFound>
+    <NotFoundPage />
+  </RouteView.NotFound>
+</RouteView>
+```
+
+| Prop       | Type        | Description                                                                                  |
+| ---------- | ----------- | -------------------------------------------------------------------------------------------- |
+| `fallback` | `ReactNode` | Symmetric with `RouteView.Match` — wraps `children` in `<Suspense>` when defined.            |
+| `children` | `ReactNode` | Content to render when the active route name equals the parent `<RouteView>`'s `nodeName`.   |
+
+First-wins: if multiple `<RouteView.Self>` elements appear, only the first contributes to the rendered output (same precedence semantics as `<RouteView.NotFound>`). An activating `<RouteView.Match>` suppresses both `Self` and `NotFound`.
+
 ### `<RouterErrorBoundary>`
 
 Declarative error handling for navigation errors. Shows a fallback **alongside** children (not instead of) when a guard rejects or a route is not found.
@@ -244,7 +271,75 @@ import { ClientOnly, ServerOnly } from "@real-router/react/ssr";
 
 Implementation: `useState(false)` + `useEffect(() => setMounted(true), [])`. Server emits the SSR-side branch, client first paint matches it (no hydration mismatch), the post-mount effect triggers a single re-render that swaps the rendered branch.
 
-Available from both `@real-router/react` and `@real-router/react/legacy`. End-to-end dogfooding lives in [`examples/web/react/ssr-examples/ssr/`](../../examples/web/react/ssr-examples/ssr/) (see `e2e/ssr-boundaries.spec.ts`).
+Available from `@real-router/react/ssr` and `@real-router/react/legacy/ssr`. End-to-end dogfooding lives in [`examples/web/react/ssr-examples/ssr/`](../../examples/web/react/ssr-examples/ssr/) (see `e2e/ssr-boundaries.spec.ts`).
+
+### `<Streamed>` / `<Await>` / `useDeferred`
+
+Three pieces of the deferred-data pipeline (paired with [`@real-router/ssr-data-plugin`](https://www.npmjs.com/package/@real-router/ssr-data-plugin)'s `defer()` API). `<Streamed>` is a cross-adapter alias for `<Suspense>` so route bundles can use the same boundary name across Solid/Vue/Svelte/React. `<Await<T> name="key">` reads the deferred promise the loader published under that key and hands the resolved value to a render-prop. `useDeferred<T>(key)` returns the same promise for callers that want to compose with `use()` or a third-party suspense library.
+
+```tsx
+import { Streamed, Await, useDeferred } from "@real-router/react/ssr";
+
+// Render-prop form — works in React 19.2+ via internal `use(promise)`.
+<Streamed fallback={<Spinner />}>
+  <Await<Review[]> name="reviews">
+    {(reviews) => <ReviewList items={reviews} />}
+  </Await>
+</Streamed>;
+
+// Manual form — works on React 18+ (`/legacy/ssr` entry).
+function Reviews() {
+  const reviews = use(useDeferred<Review[]>("reviews"));
+  return <ReviewList items={reviews} />;
+}
+```
+
+`<Await>` is React 19.2+ only (depends on `use(promise)`); `<Streamed>` and `useDeferred` ship in both `/ssr` and `/legacy/ssr`. End-to-end example: [`examples/web/react/ssr-examples/ssr-streaming/`](../../examples/web/react/ssr-examples/ssr-streaming/).
+
+### `<HttpStatusCode>` / `<HttpStatusProvider>` / `createHttpStatusSink`
+
+Render-time HTTP status declaration for SSR responses. Mount `<HttpStatusCode code={N} />` inside a route component (typical use: a `<RouteView.NotFound>` glob page) — it writes `N` to the nearest `<HttpStatusProvider>`'s sink during render and returns `null`. After `renderToString` / `renderToReadableStream`, read `sink.code` and pass it to your response.
+
+```tsx
+// app.tsx
+import { HttpStatusCode } from "@real-router/react/ssr";
+
+function NotFound() {
+  return (
+    <>
+      <HttpStatusCode code={404} />
+      <h1>Page not found</h1>
+    </>
+  );
+}
+
+// entry-server.tsx
+import { renderToString } from "react-dom/server";
+import {
+  HttpStatusProvider,
+  createHttpStatusSink,
+} from "@real-router/react/ssr";
+
+const sink = createHttpStatusSink();
+const html = renderToString(
+  <HttpStatusProvider sink={sink}>
+    <RouterProvider router={router}>
+      <App />
+    </RouterProvider>
+  </HttpStatusProvider>,
+);
+response.status(sink.code ?? 200).send(html);
+```
+
+| Export                           | Kind      | Purpose                                                                                                                                                  |
+| -------------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<HttpStatusCode code={N}/>`     | component | Writes `code` to the optional context sink during render. Last write wins across multiple instances. No-op without a provider.                            |
+| `<HttpStatusProvider sink={…}>`  | component | Supplies an `HttpStatusSink` to descendant `<HttpStatusCode />` via React context.                                                                       |
+| `createHttpStatusSink()`         | utility   | Returns a fresh `{ code: number \| undefined }` sink — construct one per request on the server, read `sink.code` after rendering.                         |
+
+Loader-driven errors (`LoaderNotFound` → 404, `LoaderRedirect` → 30x) keep working as before; this component covers render-time decisions only. **Streaming SSR caveat**: mount `<HttpStatusCode>` in the shell (above every `<Suspense>` that could delay it), or `await stream.allReady` before reading `sink.code` — once the response status flushes, later writes are lost.
+
+Available from `@real-router/react/ssr` and `@real-router/react/legacy/ssr`.
 
 ## React 18 Migration
 

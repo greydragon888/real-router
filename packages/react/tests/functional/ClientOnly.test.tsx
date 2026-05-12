@@ -46,7 +46,9 @@ describe("ClientOnly", () => {
       expect(screen.queryByTestId("fallback")).not.toBeInTheDocument();
     });
 
-    it("renders nothing initially when no fallback (post-mount shows children)", async () => {
+    it("shows children after mount when no fallback provided", async () => {
+      // Initial null render (before useEffect fires) is verified by the SSR suite's
+      // "renders nothing when no fallback is provided" test above.
       render(
         <ClientOnly>
           <span data-testid="children">client content</span>

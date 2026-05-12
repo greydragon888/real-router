@@ -200,7 +200,13 @@ export function shallowEqual(
   const nextRecord = next as Record<string, unknown>;
 
   for (const key of prevKeys) {
-    if (!Object.is(prevRecord[key], nextRecord[key])) {
+    // hasOwnProperty guard: without it, a key missing in `next` reads as
+    // `undefined` and falsely matches `prev[key] === undefined`. Same shape
+    // as React's shallowEqual (packages/shared/shallowEqual.js).
+    if (
+      !Object.prototype.hasOwnProperty.call(next, key) ||
+      !Object.is(prevRecord[key], nextRecord[key])
+    ) {
       return false;
     }
   }

@@ -614,6 +614,13 @@ describe("createScrollRestoration", () => {
 
   it("scrollContainer resolved lazily — late-mounted element is used on next event", () => {
     let element: HTMLElement | null = null;
+
+    // Pre-populate before instance creation (mirrors production: previous-session
+    // putPos wrote to sessionStorage before the next page's createScrollRestoration
+    // initialises). The write-through cache reads sessionStorage once on first
+    // loadStore() — data must be present at that point.
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "about:{}": 150 }));
+
     const fake = makeFakeRouter(makeState("home"));
     const sr = track(
       createScrollRestoration(fake.router, { scrollContainer: () => element }),
@@ -637,7 +644,6 @@ describe("createScrollRestoration", () => {
 
     element.scrollTo = elementScrollToSpy as unknown as typeof element.scrollTo;
 
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "about:{}": 150 }));
     fake.emit(
       makeState(
         "about",

@@ -1,5 +1,5 @@
 import { createActiveRouteSource } from "@real-router/sources";
-import { useSyncExternalStore } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 
 import { useRouter } from "./useRouter";
 
@@ -20,15 +20,26 @@ export function useIsActiveRoute(
   // `hash` argument (#532) is part of the cache key when defined: a Link
   // pointing to `/settings#account` shares its source only with other
   // consumers using the same routeName + params + hash.
+  //
+  // The useMemo wrap skips `canonicalJson(params)` + cache lookup on every
+  // render when all primitive deps and the `params` reference are stable —
+  // the common case once memo()+shallowEqual has bailed out further up
+  // (or when the parent re-renders for a non-Link reason). For inline
+  // `params={{id:1}}` the dep changes per render and the lookup still
+  // runs, but that path was already the slow path before this memo.
   // exactOptionalPropertyTypes forbids `{ hash: undefined }` literally, so
   // we conditionally include the key only when the caller passed a value.
-  const store = createActiveRouteSource(
-    router,
-    routeName,
-    params,
-    hash === undefined
-      ? { strict, ignoreQueryParams }
-      : { strict, ignoreQueryParams, hash },
+  const store = useMemo(
+    () =>
+      createActiveRouteSource(
+        router,
+        routeName,
+        params,
+        hash === undefined
+          ? { strict, ignoreQueryParams }
+          : { strict, ignoreQueryParams, hash },
+      ),
+    [router, routeName, params, strict, ignoreQueryParams, hash],
   );
 
   return useSyncExternalStore(

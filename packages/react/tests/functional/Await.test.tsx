@@ -1,6 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { Suspense } from "react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RouterProvider } from "@real-router/react";
 import { Await } from "@real-router/react/ssr";
@@ -44,10 +44,7 @@ function injectDeferred(
     context: { ...state.context, ssrDataDeferred: map },
   };
 
-  Object.defineProperty(router, "getState", {
-    value: () => mutated,
-    configurable: true,
-  });
+  vi.spyOn(router, "getState").mockReturnValue(mutated);
 }
 
 describe("<Await>", () => {
@@ -104,7 +101,7 @@ describe("<Await>", () => {
     expect(screen.queryByTestId("list")).not.toBeInTheDocument();
   });
 
-  it("suspends forever (renders fallback) when the deferred key is missing", () => {
+  it("suspends forever (renders fallback) when the deferred key is missing", async () => {
     // No injectDeferred — useDeferred returns the never-promise.
     render(
       <RouterProvider router={router}>
@@ -115,6 +112,16 @@ describe("<Await>", () => {
         </Suspense>
       </RouterProvider>,
     );
+
+    expect(screen.getByTestId("fallback")).toBeInTheDocument();
+    expect(screen.queryByTestId("value")).not.toBeInTheDocument();
+
+    // Verify the fallback persists — the promise must never settle.
+    // A regression returning a quickly-resolving or -rejecting promise would
+    // flip the DOM state within this window.
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 50));
+    });
 
     expect(screen.getByTestId("fallback")).toBeInTheDocument();
     expect(screen.queryByTestId("value")).not.toBeInTheDocument();

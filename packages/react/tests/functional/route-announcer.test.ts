@@ -79,7 +79,11 @@ describe("route-announcer — resolveText fallback chain", () => {
   }
 
   function announcerText(): string {
-    return document.querySelector(ANNOUNCER_SEL)?.textContent ?? "";
+    const element = document.querySelector(ANNOUNCER_SEL);
+
+    expect(element).not.toBeNull();
+
+    return element!.textContent;
   }
 
   it("falls back to <h1> textContent when present (control case)", async () => {
@@ -183,6 +187,41 @@ describe("route-announcer — resolveText fallback chain", () => {
     expect(announcerText()).toBe("Custom: about");
 
     announcer.destroy();
+  });
+
+  it("falls through to default chain + logs error when getAnnouncementText throws (review-2026-05-10 §5.7)", async () => {
+    // Defensive: a user-provided callback running inside router.subscribe's
+    // loop must not be allowed to tear down sibling listeners. Wrapping
+    // the call in try/catch keeps the announcer alive and routes to the
+    // built-in fallback chain (h1 → title → route.name).
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const throwingGetText = vi.fn(() => {
+      throw new Error("user-code threw");
+    });
+
+    const announcer = createRouteAnnouncer(router, {
+      getAnnouncementText: throwingGetText,
+    });
+
+    flush();
+    await navigate("home"); // primer
+
+    appendHeading("Visible Fallback Heading");
+
+    await navigate("about");
+
+    // Callback was invoked and threw; announcer caught and fell through
+    // to the h1 textContent.
+    expect(throwingGetText).toHaveBeenCalled();
+    expect(announcerText()).toBe("Navigated to Visible Fallback Heading");
+    // Error was logged so consumers can diagnose, but did not propagate.
+    expect(errSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[real-router] getAnnouncementText threw"),
+      expect.any(Error),
+    );
+
+    announcer.destroy();
+    errSpy.mockRestore();
   });
 
   it("respects custom prefix option", async () => {

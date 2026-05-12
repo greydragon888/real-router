@@ -44,10 +44,10 @@ describe("useRoute hook", () => {
         "subscribe",
       ]),
     );
-    expect(result.current.navigator.navigate).toBeTypeOf("function");
-    expect(result.current.navigator.getState).toBeTypeOf("function");
-    expect(result.current.navigator.isActiveRoute).toBeTypeOf("function");
-    expect(result.current.navigator.subscribe).toBeTypeOf("function");
+    expect(result.current.navigator.navigate).toBe(router.navigate);
+    expect(result.current.navigator.getState).toBe(router.getState);
+    expect(result.current.navigator.isActiveRoute).toBe(router.isActiveRoute);
+    expect(result.current.navigator.subscribe).toBe(router.subscribe);
   });
 
   it("should return current route", async () => {
@@ -113,6 +113,6 @@ describe("useRoute hook", () => {
     const params: TypedParams = result.current.route.params;
 
     expect(result.current.route.name).toStrictEqual("test");
-    expect(params).toBeDefined();
+    expect(params).toStrictEqual({});
   });
 });

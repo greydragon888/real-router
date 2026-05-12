@@ -66,7 +66,7 @@ describe("RouterProvider component", () => {
       wrapper,
     });
 
-    expect(result.current?.route?.name).toStrictEqual("test");
+    expect(result.current!.route!.name).toStrictEqual("test");
   });
 
   it("should updates context on router state change", async () => {
@@ -74,14 +74,14 @@ describe("RouterProvider component", () => {
       wrapper,
     });
 
-    expect(result.current?.route?.name).toStrictEqual("test");
+    expect(result.current!.route!.name).toStrictEqual("test");
 
     await act(async () => {
       await router.navigate("one-more-test");
     });
 
-    expect(result.current?.route?.name).toStrictEqual("one-more-test");
-    expect(result.current?.previousRoute?.name).toStrictEqual("test");
+    expect(result.current!.route!.name).toStrictEqual("one-more-test");
+    expect(result.current!.previousRoute?.name).toStrictEqual("test");
   });
 
   it("should calls unsubscribe on unmount", () => {

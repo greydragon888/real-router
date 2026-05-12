@@ -11,70 +11,97 @@
 └── @real-router/route-utils  # Route tree queries (getRouteUtils, getChain, getSiblings)
 ```
 
-## Dual Entry Points
+## Entry Points
 
-Two entry points via `package.json` subpath exports. Single codebase, no duplicated logic.
+Six entry points via `package.json` subpath exports — five named subpaths plus a `react-server` condition layered on the root and `/ssr`. Single codebase, no duplicated logic.
 
 ```
-@real-router/react          →  src/index.ts    →  Full API (React 19.2+)
-@real-router/react/legacy   →  src/legacy.ts   →  Same API minus React 19.2-only components (React 18+)
+@real-router/react              →  src/index.ts                  →  Client API (React 19.2+)
+@real-router/react/ssr          →  src/ssr.ts                    →  SSR-aware components/hooks (React 19.2+)
+@real-router/react/legacy       →  src/legacy.ts                 →  Client API for React 18+
+@real-router/react/legacy/ssr   →  src/legacy.ssr.ts             →  SSR subset for React 18+ (no <Await>)
+@real-router/react/ink          →  src/ink.ts                    →  Terminal target (Ink 7+, React 19.2+)
+
+# Under the `react-server` bundler condition (Vite/Webpack RSC, Turbopack, Parcel):
+@real-router/react              →  src/index.react-server.ts    →  Type-only re-exports
+@real-router/react/ssr          →  src/ssr.react-server.ts      →  Type-only SSR prop types
 ```
 
-Both files are pure re-exports. The difference: `index.ts` includes `components/modern/*` exports (e.g. `RouteView` with `keepAlive` support via React Activity), `legacy.ts` does not.
+All client entries are thin re-export files — no duplicated logic. The `/legacy` entries exclude React 19.2-only primitives (`<Activity>` for `RouteView keepAlive`, `use(promise)` for `<Await>`). The `/ssr` split keeps server-only prop types out of the client TypeScript context for apps that don't touch SSR (bundle cost ≈ 0 thanks to `"sideEffects": false`).
 
 **Build output** (tsdown multi-entry with shared chunks):
 
 ```
 dist/
 ├── esm/
-│   ├── index.mjs         # Main entry
+│   ├── index.mjs              # Main entry (React 19.2+)
 │   ├── index.d.mts
-│   ├── legacy.mjs        # Legacy entry
+│   ├── ssr.mjs                # SSR-feature subpath
+│   ├── ssr.d.mts
+│   ├── legacy.mjs             # Legacy entry (React 18+)
 │   ├── legacy.d.mts
-│   └── chunk-*.mjs       # Shared code (auto-extracted by tsdown)
-└── cjs/
-    ├── index.js
-    ├── index.d.ts
-    ├── legacy.js
-    └── legacy.d.ts
+│   ├── legacy.ssr.mjs         # Legacy SSR subset
+│   ├── legacy.ssr.d.mts
+│   ├── ink.mjs                # Ink entry (Ink 7+)
+│   ├── ink.d.mts
+│   └── chunk-*.mjs            # Shared code (auto-extracted)
+└── cjs/                       # Mirror of esm/ for CJS consumers
 ```
 
 ## Source Structure
 
 ```
 src/
-├── index.ts                    # Main entry point (React 19.2+)
-├── legacy.ts                   # Legacy entry point (React 18+)
-├── RouterProvider.tsx           # Context provider — wires router to React tree
-├── context.ts                  # Three React contexts (RouterContext, RouteContext, NavigatorContext)
-├── types.ts                    # RouteState, RouteContext, LinkProps
-├── constants.ts                # EMPTY_PARAMS, EMPTY_OPTIONS (frozen singletons)
-├── dom-utils/                  # Shared DOM helpers (symlink → shared/dom-utils/)
-│   ├── link-utils.ts           # shouldNavigate, buildHref, buildActiveClassName, applyLinkA11y
-│   ├── route-announcer.ts      # createRouteAnnouncer (WCAG aria-live)
-│   ├── scroll-restore.ts       # createScrollRestoration (opt-in scroll capture + restore)
-│   ├── view-transitions.ts     # createViewTransitions (opt-in View Transitions API integration)
+├── index.ts                       # Main entry: client API (React 19.2+)
+├── ssr.ts                         # SSR-feature subpath (React 19.2+)
+├── legacy.ts                      # Legacy entry: client API (React 18+)
+├── legacy.ssr.ts                  # Legacy SSR subset (React 18+, no <Await>)
+├── ink.ts                         # Ink entry: terminal UI runtime
+├── index.react-server.ts          # RSC type-only entry (root, react-server condition)
+├── ssr.react-server.ts            # RSC type-only entry (/ssr, react-server condition)
+├── RouterProvider.tsx             # Context provider — announcer / scroll / VT effects
+├── context.ts                     # createContext<T | null>(null) for Router/Route/Navigator
+├── types.ts                       # RouteContext, LinkProps (DOM)
+├── ink-types.ts                   # InkLinkProps, InkRouterProviderProps (terminal)
+├── constants.ts                   # EMPTY_PARAMS, EMPTY_OPTIONS (frozen singletons)
+├── dom-utils/                     # Shared DOM helpers (symlink → shared/dom-utils/)
+│   ├── link-utils.ts              # shouldNavigate, buildHref, navigateWithHash, buildActiveClassName, applyLinkA11y, shallowEqual
+│   ├── route-announcer.ts         # createRouteAnnouncer (WCAG aria-live, double-rAF state machine)
+│   ├── scroll-restore.ts          # createScrollRestoration (opt-in scroll capture + restore)
+│   ├── view-transitions.ts        # createViewTransitions (subscribeLeave-based VT integration)
+│   ├── direction-tracker.ts       # createDirectionTracker (back/forward annotation)
 │   └── index.ts
 ├── hooks/
-│   ├── useRouter.tsx           # Router instance from context (never re-renders)
-│   ├── useRoute.tsx            # Full route state from context (every navigation)
-│   ├── useNavigator.tsx        # Navigator from context (never re-renders)
-│   ├── useRouteNode.tsx        # Node-scoped subscription (cached createRouteNodeSource from sources)
-│   ├── useIsActiveRoute.tsx    # Active state subscription (cached createActiveRouteSource)
-│   ├── useRouteUtils.tsx       # RouteUtils from route tree (never re-renders)
-│   ├── useRouterTransition.tsx # Transition lifecycle (cached getTransitionSource)
-│   ├── useRouteExit.tsx        # Wrap subscribeLeave with abort + same-route + latest-handler guards
-│   └── useRouteEnter.tsx       # Fire on nav-driven mount via useRoute() snapshot + route.transition.from
-└── components/
-    ├── Link.tsx                # memo'd link with custom areLinkPropsEqual + active state
-    ├── RouterErrorBoundary.tsx  # Declarative navigation error handling
-    └── modern/
-        └── RouteView/          # React 19.2-only — declarative route matching with keepAlive
-            ├── index.ts        # Barrel re-exports
-            ├── RouteView.tsx   # RouteViewRoot + compound export (RouteView.Match, RouteView.NotFound)
-            ├── types.ts        # RouteViewProps, MatchProps, NotFoundProps
-            ├── components.tsx  # Match, NotFound marker components
-            └── helpers.tsx     # collectElements, buildRenderList, isSegmentMatch
+│   ├── useRouter.tsx              # Router instance from context (never re-renders)
+│   ├── useRoute.tsx               # Full route state — RouteHookResult<P> with non-nullable route (throws if undefined)
+│   ├── useNavigator.tsx           # Navigator from context (never re-renders)
+│   ├── useRouteNode.tsx           # Node-scoped subscription (cached createRouteNodeSource)
+│   ├── useIsActiveRoute.tsx       # Active state subscription (useMemo-wrapped createActiveRouteSource)
+│   ├── useRouteUtils.tsx          # RouteUtils from route tree (never re-renders)
+│   ├── useRouterTransition.tsx    # Transition lifecycle (cached getTransitionSource)
+│   ├── useRouteExit.tsx           # Wrap subscribeLeave with reentrant abort + same-route skip + latest-handler ref + StrictMode dedupe
+│   ├── useRouteEnter.tsx          # Fire on nav-driven mount via useRoute() snapshot + route.transition.from
+│   └── useDeferred.tsx            # /ssr — reads state.context.ssrDataDeferred[key] (ssr-data-plugin)
+├── components/
+│   ├── Link.tsx                   # memo'd link with custom areLinkPropsEqual + active state; inline onClick (no useCallback)
+│   ├── InkLink.tsx                # /ink — focusable text link via useFocus + useInput
+│   ├── InkRouterProvider.tsx      # /ink — wrapper that omits announceNavigation
+│   ├── RouterErrorBoundary.tsx    # Declarative navigation error handling (useLayoutEffect for onErrorRef, useMemo'd source)
+│   ├── ClientOnly.tsx             # /ssr — server fallback → client children swap after mount
+│   ├── ServerOnly.tsx             # /ssr — symmetric inverse of ClientOnly
+│   ├── Streamed.tsx               # /ssr — cross-adapter <Suspense> alias
+│   ├── Await.tsx                  # /ssr — React 19.2+ render-prop wrapper for deferred data (use(promise))
+│   ├── HttpStatusCode.tsx         # /ssr — render-time HTTP status (writes to sink in context)
+│   ├── HttpStatusProvider.tsx     # /ssr — provides HttpStatusSink via React context
+│   └── modern/
+│       └── RouteView/             # React 19.2-only — declarative route matching with keepAlive
+│           ├── index.ts           # Barrel re-exports
+│           ├── RouteView.tsx      # RouteViewRoot + compound export (.Match, .Self, .NotFound)
+│           ├── types.ts           # RouteViewProps, MatchProps, SelfProps, NotFoundProps
+│           ├── components.tsx     # Match, Self, NotFound marker components
+│           └── helpers.tsx        # collectElements (Children.forEach), buildRenderList, processMatch, isSegmentMatch
+└── utils/
+    └── createHttpStatusSink.ts    # /ssr — fresh { code: undefined } sink per request
 ```
 
 ### Shared DOM Utilities (`dom-utils/`)

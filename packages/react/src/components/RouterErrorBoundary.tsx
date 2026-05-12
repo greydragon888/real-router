@@ -1,10 +1,16 @@
 import { createDismissableError } from "@real-router/sources";
-import { useEffect, useRef, useSyncExternalStore } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useSyncExternalStore,
+} from "react";
 
 import { useRouter } from "../hooks/useRouter";
 
 import type { RouterError, State } from "@real-router/core";
-import type { ReactNode, JSX } from "react";
+import type { ReactElement, ReactNode } from "react";
 
 export interface RouterErrorBoundaryProps {
   readonly children: ReactNode;
@@ -20,9 +26,12 @@ export function RouterErrorBoundary({
   children,
   fallback,
   onError,
-}: RouterErrorBoundaryProps): JSX.Element {
+}: RouterErrorBoundaryProps): ReactElement {
   const router = useRouter();
-  const store = createDismissableError(router);
+  // Per-router cached in @real-router/sources — the WeakMap lookup is cheap,
+  // but useMemo avoids it entirely on stable-router re-renders (the common
+  // case for boundaries mounted in app shells).
+  const store = useMemo(() => createDismissableError(router), [router]);
   const snapshot = useSyncExternalStore(
     store.subscribe,
     store.getSnapshot,
@@ -31,8 +40,14 @@ export function RouterErrorBoundary({
 
   const onErrorRef = useRef(onError);
 
-  // eslint-disable-next-line @eslint-react/refs -- "latest ref" pattern: sync callback to ref to avoid effect re-runs
-  onErrorRef.current = onError;
+  // "Latest ref" pattern shared with useRouteEnter/useRouteExit: sync the
+  // callback to the ref via useLayoutEffect (synchronous, post-render,
+  // pre-paint) so the snapshot effect below reads the freshest callback
+  // without listing `onError` as a dep — and StrictMode's double-effect
+  // pass writes the same value twice harmlessly.
+  useLayoutEffect(() => {
+    onErrorRef.current = onError;
+  });
 
   useEffect(() => {
     if (snapshot.error) {

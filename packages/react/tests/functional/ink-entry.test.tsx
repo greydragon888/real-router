@@ -2,6 +2,15 @@ import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
+  RouterErrorBoundary as MainRouterErrorBoundary,
+  useRouteNode as MainUseRouteNode,
+  useRoute as MainUseRoute,
+  useNavigator as MainUseNavigator,
+  useRouter as MainUseRouter,
+  useRouteUtils as MainUseRouteUtils,
+  useRouterTransition as MainUseRouterTransition,
+} from "@real-router/react";
+import {
   InkLink,
   InkRouterProvider,
   RouterErrorBoundary,
@@ -36,18 +45,21 @@ describe("ink entry point (@real-router/react/ink)", () => {
 
   describe("exports availability", () => {
     it("should export all components", () => {
-      expect(InkLink).toBeTypeOf("object");
-      expect(InkRouterProvider).toBeTypeOf("function");
-      expect(RouterErrorBoundary).toBeTypeOf("function");
+      // InkLink is memo() — verify React component structure, not just typeof.
+      expect(InkLink).toHaveProperty("$$typeof", Symbol.for("react.memo"));
+      // InkRouterProvider is ink-entry-specific (no Main* counterpart to compare with).
+      // Check function name so a renamed/stub export fails explicitly.
+      expect(InkRouterProvider.name).toBe("InkRouterProvider");
+      expect(RouterErrorBoundary).toBe(MainRouterErrorBoundary);
     });
 
     it("should export all hooks", () => {
-      expect(useRouteNode).toBeTypeOf("function");
-      expect(useRoute).toBeTypeOf("function");
-      expect(useNavigator).toBeTypeOf("function");
-      expect(useRouter).toBeTypeOf("function");
-      expect(useRouteUtils).toBeTypeOf("function");
-      expect(useRouterTransition).toBeTypeOf("function");
+      expect(useRouteNode).toBe(MainUseRouteNode);
+      expect(useRoute).toBe(MainUseRoute);
+      expect(useNavigator).toBe(MainUseNavigator);
+      expect(useRouter).toBe(MainUseRouter);
+      expect(useRouteUtils).toBe(MainUseRouteUtils);
+      expect(useRouterTransition).toBe(MainUseRouterTransition);
     });
 
     it("should not export DOM-bound APIs", async () => {

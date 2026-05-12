@@ -210,30 +210,22 @@ describe("useRouteExit", () => {
       signal: AbortSignal;
     }) => void)[] = [];
 
-    const fakeRouter = Object.create(router) as Router;
+    vi.spyOn(router, "subscribeLeave").mockImplementation((listener) => {
+      const simplified = listener as (typeof leaveListeners)[number];
 
-    Object.assign(fakeRouter, {
-      subscribeLeave(
-        listener: (payload: {
-          route: { name: string };
-          nextRoute: { name: string };
-          signal: AbortSignal;
-        }) => void,
-      ) {
-        leaveListeners.push(listener);
+      leaveListeners.push(simplified);
 
-        return () => {
-          const index = leaveListeners.indexOf(listener);
+      return () => {
+        const index = leaveListeners.indexOf(simplified);
 
-          if (index !== -1) {
-            leaveListeners.splice(index, 1);
-          }
-        };
-      },
+        if (index !== -1) {
+          leaveListeners.splice(index, 1);
+        }
+      };
     });
 
     render(
-      <RouterProvider router={fakeRouter}>
+      <RouterProvider router={router}>
         <Probe handler={handler} />
       </RouterProvider>,
     );

@@ -120,7 +120,9 @@ describe("InkLink", () => {
   });
 
   it("swallows navigate rejection — does not throw", async () => {
-    vi.spyOn(router, "navigate").mockRejectedValue(new Error("boom"));
+    const navigateSpy = vi
+      .spyOn(router, "navigate")
+      .mockRejectedValue(new Error("boom"));
 
     const { stdin } = render(
       <InkRouterProvider router={router}>
@@ -132,11 +134,15 @@ describe("InkLink", () => {
 
     await flushInk();
 
-    expect(() => {
-      stdin.write(ENTER);
-    }).not.toThrow();
-
+    stdin.write(ENTER);
     await flushInk();
+
+    // Navigate was attempted with the correct route; rejection was caught internally.
+    expect(navigateSpy).toHaveBeenCalledWith(
+      "about",
+      expect.any(Object),
+      expect.any(Object),
+    );
   });
 
   it("does not navigate when not focused", async () => {
@@ -241,6 +247,8 @@ describe("InkLink", () => {
   it("bails out of re-render when memo-compared props are stable", async () => {
     let outerRenders = 0;
     const params = { id: "1" };
+    // Spy before render to capture all InkLink-driven isActiveRoute calls.
+    const isActiveRouteSpy = vi.spyOn(router, "isActiveRoute");
 
     const Harness = ({ counter }: { counter: number }) => {
       outerRenders++;
@@ -263,7 +271,12 @@ describe("InkLink", () => {
     rerender(<Harness counter={2} />);
     await flushInk();
 
+    // Harness always re-renders (counter prop changes each time).
     expect(outerRenders).toBeGreaterThan(1);
+    // InkLink's memo bails out when props are stable: isActiveRoute is called on
+    // mount only, not on subsequent Harness re-renders — proving the bail-out.
+    expect(isActiveRouteSpy.mock.calls.length).toBeLessThan(outerRenders);
+    // Ink frame still updates because the non-memoised Harness Text changed.
     expect(lastFrame()).toContain("tick:2");
     expect(lastFrame()).toContain("stable");
   });
@@ -277,8 +290,10 @@ describe("InkLink", () => {
 
     await flushInk();
 
-    const frame = lastFrame() ?? "";
+    const frame = lastFrame();
 
+    // If Ink produced no output, lastFrame() returns undefined — catch that before proceeding.
+    expect(frame).toBeDefined();
     expect(frame).toContain("Bare");
 
     // No ANSI foreground-color escape when no color props are set.

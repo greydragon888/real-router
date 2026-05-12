@@ -133,7 +133,17 @@ function resolveText(
   h1: HTMLElement | null,
 ): string {
   if (getCustomText) {
-    return getCustomText(route);
+    try {
+      return getCustomText(route);
+    } catch (error) {
+      // A throwing consumer callback inside the router's subscribe loop
+      // would tear down sibling listeners — log and fall through to the
+      // built-in resolution chain so the announcer keeps working.
+      console.error(
+        "[real-router] getAnnouncementText threw; falling back to default resolution.",
+        error,
+      );
+    }
   }
 
   const h1Text = (h1?.textContent ?? "").trim();

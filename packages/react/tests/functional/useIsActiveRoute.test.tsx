@@ -1,3 +1,4 @@
+import { errorCodes } from "@real-router/core";
 import { getRoutesApi } from "@real-router/core/api";
 import { act, renderHook } from "@testing-library/react";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
@@ -53,31 +54,24 @@ describe("useIsActiveRoute", () => {
   });
 
   it("should skip unrelated route updates", async () => {
-    let checkCount = 0;
-
-    // Mock isActive to count calls
-    const originalIsActive = router.isActiveRoute.bind(router);
-
-    vi.spyOn(router, "isActiveRoute").mockImplementation((...args) => {
-      checkCount++;
-
-      return originalIsActive(...args);
-    });
+    // Call-count coupling here is intentional: isActiveRoute NOT being called
+    // for unrelated route changes IS the optimization invariant under test.
+    const isActiveRouteSpy = vi.spyOn(router, "isActiveRoute");
 
     const { result } = renderHook(
       () => useIsActiveRoute("users.view", { id: "123" }),
       { wrapper: (props) => wrapper({ ...props, router }) },
     );
 
-    const initialCheckCount = checkCount;
+    const callsBefore = isActiveRouteSpy.mock.calls.length;
 
     await act(async () => {
       await router.navigate("home");
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
-    // Should skip check for unrelated route
-    expect(checkCount).toBe(initialCheckCount);
+    // No additional isActiveRoute calls after navigating to an unrelated route.
+    expect(isActiveRouteSpy).toHaveBeenCalledTimes(callsBefore);
     expect(result.current).toBe(false);
   });
 
@@ -246,7 +240,9 @@ describe("useIsActiveRoute", () => {
 
       // Navigate to ensure we have a fresh state, then check with string again
       await act(async () => {
-        await router.navigate("users.view", { id: "123" }).catch(() => {});
+        await expect(
+          router.navigate("users.view", { id: "123" }),
+        ).rejects.toMatchObject({ code: errorCodes.SAME_STATES });
       });
 
       expect(stringParam.current).toBe(true);
@@ -373,7 +369,8 @@ describe("useIsActiveRoute", () => {
         { wrapper: (props) => wrapper({ ...props, router }) },
       );
 
-      expect(result.current).toBeTypeOf("boolean");
+      // Route name matches (users.view active) but params differ (circular ≠ {id:"123"}) → false.
+      expect(result.current).toBe(false);
     });
 
     it("should keep stable reference across re-renders when same non-serializable value is passed", () => {
@@ -401,14 +398,15 @@ describe("useIsActiveRoute", () => {
         { wrapper: (props) => wrapper({ ...props, router }) },
       );
 
-      // First render establishes initial stableRef for BigInt params.
-      expect(result.current).toBeTypeOf("boolean");
+      // First render: route name matches but 1n ≠ "123" (string) → false.
+      expect(result.current).toBe(false);
 
       // New object, still non-serializable → catch branch must update stableRef.current.
       params = { id: 2n };
       rerender();
 
-      expect(result.current).toBeTypeOf("boolean");
+      // 2n ≠ "123" → still false; stableRef updated to new object identity.
+      expect(result.current).toBe(false);
     });
   });
 
@@ -463,7 +461,9 @@ describe("useIsActiveRoute", () => {
       ]);
 
       await act(async () => {
-        await router.navigate("users.view", { id: "123" }).catch(() => {});
+        await expect(
+          router.navigate("users.view", { id: "123" }),
+        ).rejects.toMatchObject({ code: errorCodes.SAME_STATES });
       });
 
       // Check "user" is not active when "users.view" is
