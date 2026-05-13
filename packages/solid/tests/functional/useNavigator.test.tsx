@@ -70,7 +70,9 @@ describe("useNavigator hook", () => {
 
     const state = await result.navigate("items");
 
-    expect(state).toStrictEqual(expect.objectContaining({ name: "items" }));
+    expect(state).toStrictEqual(
+      expect.objectContaining({ name: "items", params: {}, path: "/items" }),
+    );
   });
 
   it("should have working getState method", () => {

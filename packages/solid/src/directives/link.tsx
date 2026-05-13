@@ -60,6 +60,14 @@ export function link<P extends Params = Params>(
     });
   }
 
+  // §8.1 audit fix (LOW #11) — hoist `routeParams`/`routeOptions` `??`
+  // resolution out of the click handler. The directive accessor is read once
+  // at init (documented "use:link Options Are Captured Once"), so these
+  // defaults can be resolved here and reused across every click without
+  // re-evaluating the `??` chain.
+  const resolvedRouteParams = (options.routeParams ?? EMPTY_PARAMS) as P;
+  const resolvedRouteOptions = options.routeOptions ?? EMPTY_OPTIONS;
+
   // Click handler
   function handleClick(evt: MouseEvent) {
     if (!shouldNavigate(evt)) {
@@ -70,11 +78,7 @@ export function link<P extends Params = Params>(
     }
 
     router
-      .navigate(
-        options.routeName,
-        options.routeParams ?? (EMPTY_PARAMS as P),
-        options.routeOptions ?? EMPTY_OPTIONS,
-      )
+      .navigate(options.routeName, resolvedRouteParams, resolvedRouteOptions)
       .catch(() => {});
   }
 

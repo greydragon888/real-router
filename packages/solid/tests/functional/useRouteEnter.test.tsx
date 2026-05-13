@@ -11,7 +11,8 @@
 //
 // All other tests mirror the React suite 1:1.
 
-import { renderHook } from "@solidjs/testing-library";
+import { render, renderHook } from "@solidjs/testing-library";
+import { createSignal } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RouterProvider, useRouteEnter } from "@real-router/solid";
@@ -19,8 +20,23 @@ import { RouterProvider, useRouteEnter } from "@real-router/solid";
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
 import type { Router } from "@real-router/core";
-import type { UseRouteEnterOptions } from "@real-router/solid";
+import type {
+  RouteEnterContext,
+  RouteEnterHandler,
+  UseRouteEnterOptions,
+} from "@real-router/solid";
 import type { JSX } from "solid-js";
+
+function ProbeEnter(
+  props: Readonly<{
+    handler: RouteEnterHandler;
+    options?: UseRouteEnterOptions;
+  }>,
+): JSX.Element {
+  useRouteEnter(props.handler, props.options);
+
+  return <div data-testid="probe" />;
+}
 
 const wrapper = (router: Router) => (props: { children: JSX.Element }) => (
   <RouterProvider router={router}>{props.children}</RouterProvider>
@@ -65,7 +81,7 @@ describe("useRouteEnter", () => {
 
     expect(handler).toHaveBeenCalledTimes(1);
 
-    const ctx = handler.mock.calls[0][0];
+    const ctx: RouteEnterContext = handler.mock.calls[0][0];
 
     expect(ctx.route.name).toBe("about");
     expect(ctx.previousRoute.name).toBe("test");
@@ -152,6 +168,35 @@ describe("useRouteEnter", () => {
     await router.navigate("users.view", { id: "1", q: "x" });
 
     expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it("handler is captured at init — replacing the handler reference has no effect (gotcha #1)", async () => {
+    // Solid components run **once** at mount; `useRouteEnter(handler)` reads
+    // its argument synchronously during init and stores it in a closure on
+    // the createEffect listener. Swapping the prop/signal that produced the
+    // handler later must NOT reach the live effect.
+    //
+    // Mirrors the React "uses the latest handler reference without resubscribing"
+    // test inverted — React DOES swap via handlerRef; Solid does NOT.
+    const initialHandler = vi.fn();
+    const swappedHandler = vi.fn();
+    const [handler, setHandler] =
+      createSignal<typeof initialHandler>(initialHandler);
+
+    render(() => (
+      <RouterProvider router={router}>
+        <ProbeEnter handler={handler()} />
+      </RouterProvider>
+    ));
+
+    // Swap the signal BEFORE navigating — useRouteEnter already captured
+    // `initialHandler` at component init, so this update is invisible.
+    setHandler(() => swappedHandler);
+
+    await router.navigate("about");
+
+    expect(initialHandler).toHaveBeenCalledTimes(1);
+    expect(swappedHandler).not.toHaveBeenCalled();
   });
 
   it("does not fire on unmount", async () => {

@@ -41,6 +41,10 @@ describe("M1 — Link mount/unmount memory leak probe", () => {
 
     const heapAfter = takeHeapSnapshot();
 
-    expect(heapAfter - heapBefore).toBeLessThan(100 * MB);
+    // Heap budget aligned with React/Preact equivalents (§7.4 audit note —
+    // 100MB was overly generous and would have masked a slow leak; the
+    // tightened 50MB matches the sibling adapters and still leaves headroom
+    // over the steady-state ~5-15MB delta observed in CI for 10000 cycles).
+    expect(heapAfter - heapBefore).toBeLessThan(50 * MB);
   }, 120_000);
 });

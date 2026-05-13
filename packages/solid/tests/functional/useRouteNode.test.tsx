@@ -30,8 +30,8 @@ describe("useRouteNode", () => {
       wrapper: wrapper(router),
     });
 
-    expect(result().route).toStrictEqual(undefined);
-    expect(result().previousRoute).toStrictEqual(undefined);
+    expect(result().route).toBeUndefined();
+    expect(result().previousRoute).toBeUndefined();
   });
 
   it("should not return a null route with a default route and the router started", async () => {
@@ -65,7 +65,7 @@ describe("useRouteNode", () => {
 
     await router.start();
 
-    expect(result().route?.name).toStrictEqual(undefined);
+    expect(result().route?.name).toBeUndefined();
 
     await router.navigate("items");
 
@@ -205,8 +205,9 @@ describe("useRouteNode", () => {
         wrapper: wrapper(router),
       });
 
-      await router.start();
-      await router.navigate("users.list").catch(() => {});
+      // Explicit path prevents JSDOM from carrying URL state from prior tests.
+      await router.start("/");
+      await router.navigate("users.list");
 
       expect(usersResult().route?.name).toBe("users.list");
       expect(itemsResult().route).toBeUndefined();

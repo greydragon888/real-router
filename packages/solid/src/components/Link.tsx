@@ -55,11 +55,17 @@ export function Link<P extends Params = Params>(
   // doesn't know about hash — when `hash` prop is set, fall back to the slow
   // path so the source's hash comparison kicks in. Tab-style UI is opt-in via
   // the prop, so the fast path stays open for the typical Link case.
+  //
+  // §8.1 audit fix: read `props.routeParams === undefined` directly instead of
+  // `local.routeParams === EMPTY_PARAMS`. The latter went through `mergeProps`
+  // proxy and relied on a hidden contract (mergeProps preserves the default
+  // sentinel identity when consumer omits the field). The new check is
+  // explicit: "fast path kicks in when consumer did not supply routeParams".
   const useFastPath =
     local.hash === undefined &&
     !local.activeStrict &&
     local.ignoreQueryParams &&
-    local.routeParams === EMPTY_PARAMS;
+    props.routeParams === undefined;
 
   const buildActiveOptions = () => {
     const base = {

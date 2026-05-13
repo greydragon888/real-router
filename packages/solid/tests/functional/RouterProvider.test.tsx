@@ -35,7 +35,7 @@ describe("RouterProvider component", () => {
       wrapper,
     });
 
-    expect(result?.router).toStrictEqual(router);
+    expect(result?.router).toBe(router);
   });
 
   it("should render child component", () => {
@@ -53,7 +53,7 @@ describe("RouterProvider component", () => {
       wrapper,
     });
 
-    expect(result!().route!.name).toStrictEqual("test");
+    expect(result!().route?.name).toStrictEqual("test");
   });
 
   it("should update context on router state change", async () => {
@@ -61,12 +61,12 @@ describe("RouterProvider component", () => {
       wrapper,
     });
 
-    expect(result!().route!.name).toStrictEqual("test");
+    expect(result!().route?.name).toStrictEqual("test");
 
     await router.navigate("one-more-test");
 
-    expect(result!().route!.name).toStrictEqual("one-more-test");
-    expect(result!().previousRoute!.name).toStrictEqual("test");
+    expect(result!().route?.name).toStrictEqual("one-more-test");
+    expect(result!().previousRoute?.name).toStrictEqual("test");
   });
 
   it("should call unsubscribe on unmount", () => {
@@ -103,9 +103,7 @@ describe("RouterProvider component", () => {
 
   it("should render without children", () => {
     const { container } = render(() => (
-      <RouterProvider router={router}>
-        {undefined as unknown as JSX.Element}
-      </RouterProvider>
+      <RouterProvider router={router}>{undefined}</RouterProvider>
     ));
 
     expect(container.innerHTML).toBe("");

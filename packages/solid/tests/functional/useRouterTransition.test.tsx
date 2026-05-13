@@ -1,4 +1,4 @@
-import { createRouter } from "@real-router/core";
+import { createRouter, errorCodes } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
 import { render, screen, renderHook } from "@solidjs/testing-library";
 import { fireEvent } from "@testing-library/dom";
@@ -88,7 +88,9 @@ describe("useRouterTransition", () => {
       wrapper: wrapper(router),
     });
 
-    await router.navigate("dashboard").catch(() => {});
+    await expect(router.navigate("dashboard")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_ACTIVATE,
+    });
 
     expect(result().isTransitioning).toBe(false);
   });
@@ -115,7 +117,10 @@ describe("useRouterTransition", () => {
 
     resolveGuard(true);
     await p2;
-    await p1.catch(() => {});
+
+    await expect(p1).rejects.toMatchObject({
+      code: errorCodes.TRANSITION_CANCELLED,
+    });
 
     expect(result().isTransitioning).toBe(false);
   });
@@ -207,7 +212,10 @@ describe("useRouterTransition", () => {
 
     resolveGuard(true);
     await p2;
-    await p1.catch(() => {});
+
+    await expect(p1).rejects.toMatchObject({
+      code: errorCodes.TRANSITION_CANCELLED,
+    });
 
     expect(result().isTransitioning).toBe(false);
     expect(result().toRoute).toBeNull();

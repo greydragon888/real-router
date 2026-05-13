@@ -24,31 +24,32 @@ export function isSegmentMatch(
   return startsWithSegment(routeName, fullSegmentName);
 }
 
-function isMatchMarker(value: unknown): value is MatchMarker {
+// §8.1 audit fix (LOW #9) — three isXxxMarker functions had identical
+// structure differing only by the Symbol checked. `isMarker` parameterizes
+// the check; the three specialized helpers stay as named exports for
+// readability and TypeScript narrowing, but delegate through one body.
+function isMarker<M extends { $$type: symbol }>(
+  value: unknown,
+  marker: M["$$type"],
+): value is M {
   return (
     value != null &&
     typeof value === "object" &&
     "$$type" in value &&
-    value.$$type === MATCH_MARKER
+    value.$$type === marker
   );
+}
+
+function isMatchMarker(value: unknown): value is MatchMarker {
+  return isMarker<MatchMarker>(value, MATCH_MARKER);
 }
 
 function isSelfMarker(value: unknown): value is SelfMarker {
-  return (
-    value != null &&
-    typeof value === "object" &&
-    "$$type" in value &&
-    value.$$type === SELF_MARKER
-  );
+  return isMarker<SelfMarker>(value, SELF_MARKER);
 }
 
 function isNotFoundMarker(value: unknown): value is NotFoundMarker {
-  return (
-    value != null &&
-    typeof value === "object" &&
-    "$$type" in value &&
-    value.$$type === NOT_FOUND_MARKER
-  );
+  return isMarker<NotFoundMarker>(value, NOT_FOUND_MARKER);
 }
 
 export function collectElements(

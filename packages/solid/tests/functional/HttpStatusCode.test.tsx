@@ -101,7 +101,8 @@ describe("HttpStatusCode", () => {
     it("renders without throwing and writes nothing observable", () => {
       const { container } = render(() => <HttpStatusCode code={404} />);
 
-      expect(container.textContent).toBe("");
+      // No DOM output at all — not just no text.
+      expect(container.innerHTML).toBe("");
     });
   });
 

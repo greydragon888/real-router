@@ -1,3 +1,4 @@
+import { errorCodes } from "@real-router/core";
 import { renderHook } from "@solidjs/testing-library";
 import { createEffect } from "solid-js";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
@@ -6,7 +7,7 @@ import { RouterProvider, useRoute } from "@real-router/solid";
 
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
-import type { Params, Router } from "@real-router/core";
+import type { Params, Router, RouterError } from "@real-router/core";
 import type { JSX } from "solid-js";
 
 const wrapper = (router: Router) => (props: { children: JSX.Element }) => (
@@ -84,7 +85,11 @@ describe("useRoute hook", () => {
     let effectRunCount = 0;
 
     // Ensure known starting route
-    await router.navigate("test").catch(() => {});
+    await router.navigate("test").catch((error: unknown) => {
+      if ((error as RouterError).code !== errorCodes.SAME_STATES) {
+        throw error;
+      }
+    });
 
     renderHook(
       () => {
@@ -113,7 +118,11 @@ describe("useRoute hook", () => {
   it("should propagate generic params type without runtime change", async () => {
     type TypedParams = { id: string; tab: string } & Params;
 
-    await router.navigate("test").catch(() => {});
+    await router.navigate("test").catch((error: unknown) => {
+      if ((error as RouterError).code !== errorCodes.SAME_STATES) {
+        throw error;
+      }
+    });
 
     const { result } = renderHook(() => useRoute<TypedParams>(), {
       wrapper: wrapper(router),
@@ -122,6 +131,7 @@ describe("useRoute hook", () => {
     const params: TypedParams = result().route.params;
 
     expect(result().route.name).toStrictEqual("test");
-    expect(params).toBeDefined();
+    // Route "test" has no declared params — generic is purely a compile-time cast.
+    expect(params).toStrictEqual({});
   });
 });

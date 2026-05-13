@@ -11,43 +11,59 @@
 └── @real-router/route-utils  # Route tree queries (getRouteUtils, getChain, getSiblings)
 ```
 
-## Single Entry Point
+## Entry Points
 
-One entry point. Solid has no equivalent of React's `<Activity>` API, so no modern/legacy split is needed.
+Two subpath exports — the main client-only entry plus a dedicated `/ssr` subpath that bundles the server-render boundary components and deferred-data helpers. No modern/legacy split (Solid has no equivalent of React's `<Activity>` API).
 
 ```
-@real-router/solid  →  src/index.tsx  →  Full API (Solid.js 1.7+)
+@real-router/solid       →  src/index.tsx  →  Client API (RouterProvider, Link, RouteView, hooks…)
+@real-router/solid/ssr   →  src/ssr.tsx    →  SSR-feature surface: ClientOnly/ServerOnly/Streamed/Await,
+                                              useDeferred, HttpStatusCode/HttpStatusProvider,
+                                              createHttpStatusSink
 ```
 
-**Build output** (rollup + babel-preset-solid):
+**Why split `/ssr`?** Type isolation — server-only prop types stay out of the client TS context for apps that don't render on the server. DX clarity — `from "@real-router/solid/ssr"` self-documents SSR intent. Bundle cost is ≈ 0 (`"sideEffects": false` + tree-shaking).
+
+**Build output** (rollup + babel-preset-solid, dual-entry):
 
 ```
 dist/
 ├── esm/
 │   ├── index.mjs
-│   └── index.d.mts
+│   ├── index.d.mts
+│   ├── ssr.mjs
+│   └── ssr.d.mts
 └── cjs/
     ├── index.js
-    └── index.d.ts
+    ├── index.d.ts
+    ├── ssr.js
+    └── ssr.d.ts
 ```
 
 ## Source Structure
 
 ```
 src/
-├── index.tsx                   # Single entry point
+├── index.tsx                   # Main entry — client API
+├── ssr.tsx                     # /ssr subpath — server-render boundary components, deferred-data hooks, HTTP status sink
 ├── RouterProvider.tsx          # Context provider — wires router to Solid tree
 ├── context.ts                  # Two Solid contexts (RouterContext, RouteContext)
 ├── types.ts                    # RouteState, LinkProps
 ├── constants.ts                # EMPTY_PARAMS, EMPTY_OPTIONS (frozen singletons)
+├── directives.d.ts             # JSX.Directives augmentation for use:link
 ├── dom-utils/                  # Symlink → shared/dom-utils/ (see root CLAUDE.md)
-│   ├── link-utils.ts           # shouldNavigate, buildHref, buildActiveClassName, applyLinkA11y
+│   ├── link-utils.ts           # shouldNavigate, buildHref, navigateWithHash, buildActiveClassName, applyLinkA11y, shallowEqual
 │   ├── route-announcer.ts      # createRouteAnnouncer (a11y aria-live region)
 │   ├── scroll-restore.ts       # createScrollRestoration (opt-in scroll capture + restore)
 │   ├── view-transitions.ts     # createViewTransitions (opt-in View Transitions API integration)
+│   ├── direction-tracker.ts    # createDirectionTracker (back/forward annotation)
 │   └── index.ts                # barrel
+├── utils/
+│   └── createHttpStatusSink.ts # /ssr — fresh { code: undefined } sink per request
 ├── createSignalFromSource.ts   # Signal bridge — converts RouterSource to Solid Accessor
 ├── createStoreFromSource.ts    # Store bridge — converts RouterSource to Solid store (reconcile)
+├── directives/
+│   └── link.tsx                # use:link directive
 ├── hooks/
 │   ├── useRouter.tsx           # Router + Navigator from context (never reactive)
 │   ├── useNavigator.tsx        # Navigator from context (never reactive)
@@ -58,16 +74,23 @@ src/
 │   ├── useRouteUtils.tsx       # RouteUtils from route tree (never reactive)
 │   ├── useRouterTransition.tsx # Transition lifecycle (cached getTransitionSource)
 │   ├── useRouteExit.tsx        # Wrap subscribeLeave with abort + same-route guards (handler captured at hook call)
-│   └── useRouteEnter.tsx       # Fire on nav-driven mount via useRoute() accessor + route.transition.from
+│   ├── useRouteEnter.tsx       # Fire on nav-driven mount via useRoute() accessor + route.transition.from
+│   └── useDeferred.tsx         # /ssr — reads state.context.ssrDataDeferred[key] (ssr-data-plugin)
 └── components/
     ├── Link.tsx                # Reactive link with classList-based active state
-    ├── RouterErrorBoundary.tsx  # Declarative navigation error handling
+    ├── RouterErrorBoundary.tsx # Declarative navigation error handling
+    ├── ClientOnly.tsx          # /ssr — createSignal(false) + onMount + <Show>; server emits fallback, client swaps to children after mount
+    ├── ServerOnly.tsx          # /ssr — symmetric inverse of ClientOnly
+    ├── Streamed.tsx            # /ssr — cross-adapter <Suspense> alias
+    ├── Await.tsx               # /ssr — createResource over a deferred promise (pairs with defer() from ssr-data-plugin)
+    ├── HttpStatusCode.tsx      # /ssr — writes code into the nearest sink during render
+    ├── HttpStatusProvider.tsx  # /ssr — provides HttpStatusSink via Solid context
     └── RouteView/              # Declarative route matching (no keepAlive)
         ├── index.ts            # Barrel re-exports
-        ├── RouteView.tsx       # RouteViewRoot + compound export (RouteView.Match, RouteView.NotFound)
-        ├── types.ts            # RouteViewProps, MatchProps, NotFoundProps
-        ├── components.tsx      # Match, NotFound marker objects with Symbol-based type system
-        └── helpers.tsx         # collectElements, buildRenderList, isSegmentMatch
+        ├── RouteView.tsx       # RouteViewRoot + compound export (RouteView.Match, RouteView.Self, RouteView.NotFound)
+        ├── types.ts            # RouteViewProps, MatchProps, SelfProps, NotFoundProps
+        ├── components.tsx      # Match, Self, NotFound marker objects with Symbol-based type system
+        └── helpers.tsx         # collectElements, buildRenderList (Match first-wins, Self/NotFound appended), isSegmentMatch
 ```
 
 ## Key Differences from React and Preact Adapters
@@ -83,7 +106,7 @@ src/
 | Params stabilization        | `canonicalJson` in sources         | `canonicalJson` in sources                 | `canonicalJson` in sources                              |
 | Active class on Link        | `className` string concat          | `className` string concat                  | `classList` object                                      |
 | `keepAlive` / Activity      | React 19.2+                        | Not available                              | Not available                                           |
-| Entry points                | Main + Legacy                      | Single                                     | Single                                                  |
+| Entry points                | Main + Legacy + /ssr (+ /ink, RSC) | Single                                     | Main + /ssr                                             |
 | Build tool                  | tsdown                             | tsdown                                     | rollup + babel-preset-solid                             |
 | Peer dependency             | `react` >= 19.0.0                  | `preact` >= 10.0.0                         | `solid-js` >= 1.7.0                                     |
 | RouteView child detection   | React element type checking        | `toChildArray` + element type checking     | Symbol-based marker objects (`$$type`)                  |
@@ -174,9 +197,11 @@ RouterErrorBoundary
 
 **`classList` for active state:** Solid's `classList` prop accepts `{ [className]: boolean }` and updates the DOM attribute directly without string concatenation.
 
-**RouteView.Match with `fallback`:** When `fallback` prop is provided, `Match` wraps its children in a `<Suspense>` boundary (from `solid-js`) with that fallback. Use this with `lazy()` from `solid-js` to code-split route components.
+**RouteView.Match with `fallback`:** When `fallback` prop is provided, `Match` wraps its children in a `<Suspense>` boundary (from `solid-js`) with that fallback. Use this with `lazy()` from `solid-js` to code-split route components. `RouteView.Self` accepts the same optional `fallback` prop with identical Suspense semantics.
 
-**RouteView marker objects:** `Match` and `NotFound` are not real JSX elements — they return plain objects with a `$$type` Symbol property. `RouteView` uses `children()` from `solid-js` to resolve the child accessor, then `collectElements` walks the result and checks `$$type` to identify markers. This avoids React-style element type checking (`element.type === Match`) which doesn't work in Solid.
+**RouteView marker objects:** `Match`, `Self`, and `NotFound` are not real JSX elements — they return plain objects with a `$$type` Symbol property. `RouteView` uses `children()` from `solid-js` to resolve the child accessor, then `collectElements` walks the result and checks `$$type` to identify markers. This avoids React-style element type checking (`element.type === Match`) which doesn't work in Solid.
+
+**Precedence inside `buildRenderList`:** `<Match>` first-wins (duplicate segments short-circuit via `processMatch.alreadyActive`). `<Self>` fires only when the active route name equals the parent's `nodeName` **exactly** and no `<Match>` activated; only the first `<Self>` contributes. `<NotFound>` fires only when the active route is `UNKNOWN_ROUTE` and no `<Match>` activated; `<Self>` wins over `<NotFound>` in the narrow edge case where both would fire (`nodeName === UNKNOWN_ROUTE`).
 
 ```
 RouteView

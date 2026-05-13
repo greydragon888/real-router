@@ -1,9 +1,13 @@
-import { createRouter } from "@real-router/core";
+import { createRouter, errorCodes } from "@real-router/core";
 import { getRoutesApi } from "@real-router/core/api";
 import { render, screen } from "@solidjs/testing-library";
 import { describe, it, expect, vi } from "vitest";
 
 import { Link, RouterProvider } from "@real-router/solid";
+
+import { takeHeapSnapshot, MB, forceGC } from "./helpers";
+
+import type { RouterError } from "@real-router/core";
 
 /**
  * Audit section 7, scenario #4: a Link is mounted pointing at a route, then
@@ -125,6 +129,106 @@ describe("S12 — removeRoute mid-session (Solid)", () => {
 
     router.stop();
   });
+
+  // §7.1 audit scenario #4 — "traverseToLast к удалённому route mid-session".
+  //
+  // `router.traverseToLast(routeName)` is a `navigation-plugin` extension that
+  // ultimately routes through `router.navigate(name, params)`. The Solid
+  // adapter does not depend on `navigation-plugin`, so this stress test
+  // exercises the underlying mechanism — repeated `router.navigate()` calls
+  // against a removed route name — to lock the same resilience properties
+  // `traverseToLast` would hit:
+  //
+  //   1. Every navigation to a removed route rejects with ROUTE_NOT_FOUND.
+  //   2. The router FSM stays consistent: a subsequent navigation to a
+  //      valid route still succeeds without retry-state bleed.
+  //   3. Heap stays stable across 200+ rejected navigations — rejected
+  //      promises do not retain transition state or listeners.
+  //
+  // Note: jsdom + browser-plugin is the Solid test environment, but the
+  // route-not-found rejection path is plugin-agnostic — it surfaces from
+  // core's transition pipeline before any URL-level work happens.
+  it("12.4: stress — 200 traverse-style navigations to a removed route, FSM + heap stable", async () => {
+    const router = createRouter(
+      [
+        { name: "home", path: "/" },
+        { name: "users", path: "/users" },
+        { name: "removed", path: "/removed" },
+      ],
+      { defaultRoute: "home" },
+    );
+
+    await router.start("/");
+
+    // Build a small history trail that includes "removed" before deleting it.
+    // This mirrors the traverseToLast precondition: history entries point at
+    // the route, but the route is gone from the tree.
+    await router.navigate("removed");
+    await router.navigate("home");
+    await router.navigate("removed");
+    await router.navigate("home");
+
+    expect(router.getState()?.name).toBe("home");
+
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
+    getRoutesApi(router).remove("removed");
+
+    const heapBefore = takeHeapSnapshot();
+
+    const ITERATIONS = 200;
+    let rejectedCount = 0;
+    let unexpectedThrow = 0;
+
+    for (let i = 0; i < ITERATIONS; i++) {
+      try {
+        await router.navigate("removed");
+        // Reaching here means the navigation succeeded — that would be a
+        // regression (route was removed; navigate MUST reject).
+        unexpectedThrow++;
+      } catch (error) {
+        const code = (error as RouterError).code;
+
+        if (code === errorCodes.ROUTE_NOT_FOUND) {
+          rejectedCount++;
+        } else if (code === errorCodes.SAME_STATES) {
+          // First few iterations may reject with SAME_STATES if the FSM
+          // is already trying to settle a prior rejection — accept it.
+          rejectedCount++;
+        } else {
+          unexpectedThrow++;
+        }
+      }
+    }
+
+    expect(rejectedCount).toBe(ITERATIONS);
+    expect(unexpectedThrow).toBe(0);
+
+    // FSM stays consistent — state must still equal "home" (the navigation
+    // before removal). No partial commit, no stale toState.
+    expect(router.getState()?.name).toBe("home");
+
+    // Router must still accept a valid navigation post-stress — no FSM lock.
+    await router.navigate("users");
+
+    expect(router.getState()?.name).toBe("users");
+
+    forceGC();
+
+    const heapAfter = takeHeapSnapshot();
+    const delta = heapAfter - heapBefore;
+
+    // 200 rejected promises + transition error events × FSM bookkeeping
+    // should not accumulate measurable heap. 10MB is a generous budget;
+    // a real leak (e.g. uncollected rejection handlers or stale error
+    // snapshots) would blow well past this.
+    expect(delta).toBeLessThan(10 * MB);
+
+    consoleError.mockRestore();
+    router.stop();
+  }, 60_000);
 
   it("12.3: N Links with round-robin removal — none crash when target route vanishes", async () => {
     const N = 50;

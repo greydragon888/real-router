@@ -12,6 +12,7 @@
 // All other tests mirror the React suite 1:1.
 
 import { render, renderHook } from "@solidjs/testing-library";
+import { createSignal } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RouterProvider, useRouteExit } from "@real-router/solid";
@@ -19,7 +20,11 @@ import { RouterProvider, useRouteExit } from "@real-router/solid";
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
 import type { Router } from "@real-router/core";
-import type { RouteExitHandler, UseRouteExitOptions } from "@real-router/solid";
+import type {
+  RouteExitContext,
+  RouteExitHandler,
+  UseRouteExitOptions,
+} from "@real-router/solid";
 import type { JSX } from "solid-js";
 
 const wrapper = (router: Router) => (props: { children: JSX.Element }) => (
@@ -52,7 +57,7 @@ describe("useRouteExit", () => {
 
     expect(handler).toHaveBeenCalledTimes(1);
 
-    const ctx = handler.mock.calls[0][0];
+    const ctx: RouteExitContext = handler.mock.calls[0][0];
 
     expect(ctx.route.name).toBe("test");
     expect(ctx.nextRoute.name).toBe("about");
@@ -163,46 +168,61 @@ describe("useRouteExit", () => {
 
     await router.navigate("about");
 
-    expect(receivedSignal).toBeDefined();
     expect(receivedSignal).toBeInstanceOf(AbortSignal);
     expect(receivedSignal?.aborted).toBe(false);
   });
 
+  it("handler is captured at init — replacing the handler reference has no effect (gotcha #1)", async () => {
+    // Solid components run **once** at mount; `useRouteExit(handler)` reads
+    // its argument synchronously during init and stores it in a closure on
+    // the subscribeLeave listener. Swapping the prop/signal that produced
+    // the handler later must NOT reach the live subscription.
+    //
+    // Mirrors the React "uses the latest handler reference without resubscribing"
+    // test inverted — React DOES swap via handlerRef; Solid does NOT.
+    const initialHandler = vi.fn();
+    const swappedHandler = vi.fn();
+    const [handler, setHandler] =
+      createSignal<typeof initialHandler>(initialHandler);
+
+    render(() => (
+      <RouterProvider router={router}>
+        <ProbeExit handler={handler()} />
+      </RouterProvider>
+    ));
+
+    // Swap the signal BEFORE navigating — useRouteExit already captured
+    // `initialHandler` at component init, so this update is invisible to
+    // the subscribed listener.
+    setHandler(() => swappedHandler);
+
+    await router.navigate("about");
+
+    expect(initialHandler).toHaveBeenCalledTimes(1);
+    expect(swappedHandler).not.toHaveBeenCalled();
+  });
+
   it("skips the handler when signal is already aborted (reentrant abort)", () => {
-    // Stub the router with a controllable subscribeLeave so we can inject
-    // a pre-aborted signal — exercises the early-return branch that's
-    // hard to reproduce via real navigation timing.
+    // Stub subscribeLeave via spy so we can inject a pre-aborted signal.
+    // This exercises the early-return branch that's hard to reproduce via
+    // real navigation timing without races.
     const handler = vi.fn();
-    const leaveListeners: ((payload: {
-      route: { name: string };
-      nextRoute: { name: string };
-      signal: AbortSignal;
-    }) => void)[] = [];
+    const leaveListeners: Parameters<Router["subscribeLeave"]>[0][] = [];
 
-    const fakeRouter = Object.create(router) as Router;
+    vi.spyOn(router, "subscribeLeave").mockImplementation((listener) => {
+      leaveListeners.push(listener);
 
-    Object.assign(fakeRouter, {
-      subscribeLeave(
-        listener: (payload: {
-          route: { name: string };
-          nextRoute: { name: string };
-          signal: AbortSignal;
-        }) => void,
-      ) {
-        leaveListeners.push(listener);
+      return () => {
+        const index = leaveListeners.indexOf(listener);
 
-        return () => {
-          const index = leaveListeners.indexOf(listener);
-
-          if (index !== -1) {
-            leaveListeners.splice(index, 1);
-          }
-        };
-      },
+        if (index !== -1) {
+          leaveListeners.splice(index, 1);
+        }
+      };
     });
 
     render(() => (
-      <RouterProvider router={fakeRouter}>
+      <RouterProvider router={router}>
         <ProbeExit handler={handler} />
       </RouterProvider>
     ));
@@ -212,9 +232,9 @@ describe("useRouteExit", () => {
     controller.abort();
 
     for (const listener of leaveListeners) {
-      listener({
-        route: { name: "test" },
-        nextRoute: { name: "about" },
+      void listener({
+        route: router.getState()!,
+        nextRoute: router.getState()!,
         signal: controller.signal,
       });
     }
