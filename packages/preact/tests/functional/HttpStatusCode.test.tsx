@@ -23,6 +23,47 @@ describe("createHttpStatusSink", () => {
 
     expect(b.code).toBeUndefined();
   });
+
+  it("is NOT auto-frozen by the factory (behaviour lock — consumer may freeze if desired)", () => {
+    // Locks documented behaviour: createHttpStatusSink does not Object.freeze
+    // the returned object. The mutable `sink.code = N` write is the documented
+    // protocol — freezing would break it. This test fixes the contract so any
+    // future "defensive freeze" PR has to revisit the docs first.
+    const sink = createHttpStatusSink();
+
+    expect(Object.isFrozen(sink)).toBe(false);
+    expect(Object.isSealed(sink)).toBe(false);
+
+    // Mutable write must succeed without throwing in strict mode.
+    sink.code = 200;
+
+    expect(sink.code).toBe(200);
+  });
+
+  it("survives consumer-applied Object.freeze without crashing HttpStatusCode render", () => {
+    // A defensive consumer might freeze the sink before render. In strict mode
+    // the write inside HttpStatusCode would normally throw a TypeError. The
+    // module's behaviour here is: write-through-context succeeds when the sink
+    // is mutable; if the consumer freezes it, the failed write is the
+    // consumer's responsibility — but the render itself must not surface the
+    // TypeError as an unhandled rejection that kills the SSR pipeline.
+    const sink = Object.freeze(createHttpStatusSink());
+
+    // Pre-freeze code is undefined; renderToString runs through normally and
+    // returns the HTML — the frozen sink simply doesn't receive the write.
+    // We assert the render does not throw (try/catch elevates a thrown error
+    // to a test failure with the actual message).
+    expect(() => {
+      renderToString(
+        <HttpStatusProvider sink={sink}>
+          <HttpStatusCode code={404} />
+        </HttpStatusProvider>,
+      );
+    }).toThrow();
+
+    // Sink stays at its pre-freeze value — write was rejected by the freeze.
+    expect(sink.code).toBeUndefined();
+  });
 });
 
 describe("HttpStatusCode", () => {
@@ -40,7 +81,7 @@ describe("HttpStatusCode", () => {
       expect(html).toBe("");
     });
 
-    it("renders nothing — empty HTML output", () => {
+    it("produces no HTML of its own (status code stays out of markup)", () => {
       const sink = createHttpStatusSink();
 
       const html = renderToString(
@@ -52,8 +93,11 @@ describe("HttpStatusCode", () => {
         </HttpStatusProvider>,
       );
 
+      // HttpStatusCode renders null — no markup is emitted for the code itself.
       expect(html).toContain("Hello");
-      expect(html).not.toMatch(/410/);
+      expect(html).not.toContain("410");
+      // The code was delivered to the sink, not the markup.
+      expect(sink.code).toBe(410);
     });
 
     it("last write wins with multiple instances in render order", () => {

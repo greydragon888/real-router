@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/preact";
+import { act, render, screen, waitFor } from "@testing-library/preact";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { RouterProvider } from "@real-router/preact";
@@ -29,7 +29,7 @@ describe("<Await>", () => {
 
   beforeEach(async () => {
     router = createTestRouterWithADefaultRouter();
-    await router.start();
+    await router.start("/");
   });
 
   afterEach(() => {
@@ -134,17 +134,31 @@ describe("<Await>", () => {
 
     expect(tagged.status).toBe("fulfilled");
     expect(tagged.value).toBe("hi");
+
+    // Prove the claim: a fresh render with the now-tagged promise resolves
+    // synchronously — no act/waitFor needed.
+    render(
+      <RouterProvider router={router}>
+        <Streamed fallback={<span data-testid="fallback2">loading</span>}>
+          <Await<string> name="x">
+            {(v) => <span data-testid="v2">{v}</span>}
+          </Await>
+        </Streamed>
+      </RouterProvider>,
+    );
+
+    expect(screen.getByTestId("v2")).toHaveTextContent("hi");
+    expect(screen.queryByTestId("fallback2")).not.toBeInTheDocument();
   });
 
-  it("re-throws the rejection reason when the promise is pre-tracked as rejected (caught by ErrorBoundary)", () => {
+  it("re-throws the rejection reason when the promise is pre-tracked as rejected (caught by ErrorBoundary)", async () => {
     const reason = new Error("boom");
     const rejected = Object.assign(Promise.reject(reason), {
       status: "rejected" as const,
       reason,
     });
 
-    // Avoid unhandled-rejection warnings in test runner.
-    rejected.catch(() => undefined);
+    const capturedError = await rejected.catch((error: unknown) => error);
 
     injectDeferred(router, { broken: rejected });
 
@@ -159,9 +173,11 @@ describe("<Await>", () => {
         </RouterProvider>,
       ),
     ).toThrow("boom");
+
+    expect(capturedError).toBe(reason);
   });
 
-  it("suspends forever (renders fallback) when the deferred key is missing", () => {
+  it("suspends forever (renders fallback) when the deferred key is missing", async () => {
     render(
       <RouterProvider router={router}>
         <Streamed fallback={<span data-testid="fallback">loading</span>}>
@@ -171,6 +187,13 @@ describe("<Await>", () => {
         </Streamed>
       </RouterProvider>,
     );
+
+    expect(screen.getByTestId("fallback")).toBeInTheDocument();
+    expect(screen.queryByTestId("value")).not.toBeInTheDocument();
+
+    // Flush pending microtasks — the internal never-resolving promise keeps
+    // Suspense in the fallback state permanently.
+    await act(async () => {});
 
     expect(screen.getByTestId("fallback")).toBeInTheDocument();
     expect(screen.queryByTestId("value")).not.toBeInTheDocument();

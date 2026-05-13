@@ -1,14 +1,15 @@
-import { getNavigator } from "@real-router/core";
 import { createRouteNodeSource } from "@real-router/sources";
 import { useMemo } from "preact/hooks";
 
 import { useSyncExternalStore } from "../useSyncExternalStore";
+import { useNavigator } from "./useNavigator";
 import { useRouter } from "./useRouter";
 
 import type { RouteContext } from "../types";
 
 export function useRouteNode(nodeName: string): RouteContext {
   const router = useRouter();
+  const navigator = useNavigator();
 
   const store = useMemo(
     () => createRouteNodeSource(router, nodeName),
@@ -20,8 +21,6 @@ export function useRouteNode(nodeName: string): RouteContext {
     store.getSnapshot,
     store.getSnapshot,
   );
-
-  const navigator = useMemo(() => getNavigator(router), [router]);
 
   return useMemo(
     (): RouteContext => ({ navigator, route, previousRoute }),

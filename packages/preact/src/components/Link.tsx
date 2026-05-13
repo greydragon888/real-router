@@ -57,10 +57,7 @@ export const Link: FunctionComponent<LinkProps> = memo(
     // change caught by shallowEqual), so they're safe to use directly in hook
     // deps without useStableValue.
 
-    // Hash-aware active (#532): when `hash` prop is set, isActive requires
-    // both route AND hash to match. Tab-style UI (multiple links sharing
-    // routeName but differing in hash) needs this to avoid marking all tabs
-    // active by route-name alone.
+    // Hash-aware active (#532) — see useIsActiveRoute for the contract.
     const isActive = useIsActiveRoute(
       routeName,
       routeParams,

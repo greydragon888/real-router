@@ -25,6 +25,7 @@ describe("ClientOnly", () => {
         </ClientOnly>,
       );
 
+      expect(view).toBe("");
       expect(view).not.toContain("client content");
     });
   });
@@ -73,7 +74,7 @@ describe("ClientOnly", () => {
 
   describe("hydration (renderToString → hydrate)", () => {
     it("hydrates without mismatch warnings, then swaps to children", async () => {
-      const errSpy = vi.spyOn(console, "error");
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       const tree = (
         <ClientOnly fallback={<span data-testid="fallback">loading</span>}>
           <span data-testid="children">client content</span>
@@ -91,12 +92,7 @@ describe("ClientOnly", () => {
         expect(screen.getByTestId("children")).toBeInTheDocument();
       });
 
-      const hydrationErrors = errSpy.mock.calls.filter(
-        ([msg]: readonly unknown[]) =>
-          typeof msg === "string" && /hydrat/i.test(msg),
-      );
-
-      expect(hydrationErrors).toHaveLength(0);
+      expect(errSpy).not.toHaveBeenCalled();
 
       mountPoint.remove();
       errSpy.mockRestore();

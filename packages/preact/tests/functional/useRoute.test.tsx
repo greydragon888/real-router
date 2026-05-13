@@ -20,7 +20,7 @@ describe("useRoute hook", () => {
   beforeEach(async () => {
     router = createTestRouterWithADefaultRouter();
 
-    await router.start();
+    await router.start("/");
   });
 
   afterEach(() => {
@@ -32,11 +32,14 @@ describe("useRoute hook", () => {
       wrapper: wrapper(router),
     });
 
-    expect(result.current.navigator).toBeTypeOf("object");
-    expect(result.current.navigator.navigate).toBeTypeOf("function");
-    expect(result.current.navigator.getState).toBeTypeOf("function");
-    expect(result.current.navigator.isActiveRoute).toBeTypeOf("function");
-    expect(result.current.navigator.subscribe).toBeTypeOf("function");
+    expect(result.current.navigator).toStrictEqual(
+      expect.objectContaining({
+        navigate: expect.any(Function),
+        getState: expect.any(Function),
+        isActiveRoute: expect.any(Function),
+        subscribe: expect.any(Function),
+      }),
+    );
   });
 
   it("should return current route", async () => {
@@ -54,9 +57,6 @@ describe("useRoute hook", () => {
   });
 
   it("should return previousRoute after navigation", async () => {
-    // Ensure we start on a known route
-    await router.navigate("test");
-
     const { result } = renderHook(() => useRoute(), {
       wrapper: wrapper(router),
     });
@@ -90,8 +90,6 @@ describe("useRoute hook", () => {
   it("should propagate generic params type without runtime change", async () => {
     type TypedParams = { id: string; tab: string } & Params;
 
-    await router.navigate("test");
-
     const { result } = renderHook(() => useRoute<TypedParams>(), {
       wrapper: wrapper(router),
     });
@@ -99,6 +97,6 @@ describe("useRoute hook", () => {
     const params: TypedParams = result.current.route.params;
 
     expect(result.current.route.name).toStrictEqual("test");
-    expect(params).toBeDefined();
+    expect(params).toStrictEqual({});
   });
 });

@@ -1,6 +1,6 @@
 import { createDismissableError } from "@real-router/sources";
 import { Fragment } from "preact";
-import { useEffect, useRef } from "preact/hooks";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
 
 import { useRouter } from "../hooks/useRouter";
 import { useSyncExternalStore } from "../useSyncExternalStore";
@@ -27,7 +27,7 @@ export function RouterErrorBoundary({
   onError,
 }: RouterErrorBoundaryProps): VNode {
   const router = useRouter();
-  const store = createDismissableError(router);
+  const store = useMemo(() => createDismissableError(router), [router]);
   const snapshot = useSyncExternalStore(
     store.subscribe,
     store.getSnapshot,
@@ -36,9 +36,14 @@ export function RouterErrorBoundary({
 
   const onErrorRef = useRef(onError);
 
-  // eslint-disable-next-line @eslint-react/refs -- "latest ref" pattern: sync callback to ref to avoid effect re-runs
-  onErrorRef.current = onError;
+  useLayoutEffect(() => {
+    onErrorRef.current = onError;
+  });
 
+  // snapshot.version is the @real-router/sources dismissable-error invariant:
+  // it is the only field that monotonically advances on each new error episode
+  // (snapshot.error/toRoute/fromRoute are correlated reads within the same
+  // version frame), so depending on it covers all error fields by construction.
   useEffect(() => {
     if (snapshot.error) {
       onErrorRef.current?.(

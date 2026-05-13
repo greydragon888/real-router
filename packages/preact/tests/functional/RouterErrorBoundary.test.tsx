@@ -66,7 +66,11 @@ describe("RouterErrorBoundary", () => {
     );
 
     await act(async () => {
-      await router.navigate("dashboard").catch(() => {});
+      const navErr = await router
+        .navigate("dashboard")
+        .catch((error: unknown) => error);
+
+      expect(navErr).toMatchObject({ code: errorCodes.CANNOT_ACTIVATE });
     });
 
     expect(screen.getByTestId("children")).toBeInTheDocument();
@@ -88,7 +92,11 @@ describe("RouterErrorBoundary", () => {
     );
 
     await act(async () => {
-      await router.navigate("dashboard").catch(() => {});
+      const navErr = await router
+        .navigate("dashboard")
+        .catch((error: unknown) => error);
+
+      expect(navErr).toMatchObject({ code: errorCodes.CANNOT_ACTIVATE });
     });
 
     expect(screen.getByTestId("fallback").textContent).toBe(
@@ -111,7 +119,11 @@ describe("RouterErrorBoundary", () => {
     );
 
     await act(async () => {
-      await router.navigate("dashboard").catch(() => {});
+      const navErr = await router
+        .navigate("dashboard")
+        .catch((error: unknown) => error);
+
+      expect(navErr).toMatchObject({ code: errorCodes.CANNOT_ACTIVATE });
     });
 
     expect(screen.getByTestId("fallback")).toBeInTheDocument();
@@ -146,7 +158,11 @@ describe("RouterErrorBoundary", () => {
     );
 
     await act(async () => {
-      await router.navigate("dashboard").catch(() => {});
+      const navErr = await router
+        .navigate("dashboard")
+        .catch((error: unknown) => error);
+
+      expect(navErr).toMatchObject({ code: errorCodes.CANNOT_ACTIVATE });
     });
 
     expect(screen.getByTestId("fallback")).toBeInTheDocument();
@@ -180,7 +196,11 @@ describe("RouterErrorBoundary", () => {
     );
 
     await act(async () => {
-      await router.navigate("dashboard").catch(() => {});
+      const navErr = await router
+        .navigate("dashboard")
+        .catch((error: unknown) => error);
+
+      expect(navErr).toMatchObject({ code: errorCodes.CANNOT_ACTIVATE });
     });
 
     expect(screen.getByTestId("fallback")).toBeInTheDocument();
@@ -190,7 +210,11 @@ describe("RouterErrorBoundary", () => {
     expect(screen.queryByTestId("fallback")).not.toBeInTheDocument();
 
     await act(async () => {
-      await router.navigate("settings").catch(() => {});
+      const navErr = await router
+        .navigate("settings")
+        .catch((error: unknown) => error);
+
+      expect(navErr).toMatchObject({ code: errorCodes.CANNOT_ACTIVATE });
     });
 
     expect(screen.getByTestId("fallback")).toBeInTheDocument();
@@ -214,7 +238,11 @@ describe("RouterErrorBoundary", () => {
     );
 
     await act(async () => {
-      await router.navigate("dashboard").catch(() => {});
+      const navErr = await router
+        .navigate("dashboard")
+        .catch((error_: unknown) => error_);
+
+      expect(navErr).toMatchObject({ code: errorCodes.CANNOT_ACTIVATE });
     });
 
     expect(onError).toHaveBeenCalledTimes(1);
@@ -260,7 +288,11 @@ describe("RouterErrorBoundary", () => {
     render(<TestWrapper />, { wrapper });
 
     await act(async () => {
-      await router.navigate("dashboard").catch(() => {});
+      const navErr = await router
+        .navigate("dashboard")
+        .catch((error: unknown) => error);
+
+      expect(navErr).toMatchObject({ code: errorCodes.CANNOT_ACTIVATE });
     });
 
     expect(onError).toHaveBeenCalledTimes(1);
@@ -322,7 +354,11 @@ describe("RouterErrorBoundary", () => {
     );
 
     await act(async () => {
-      await router.navigate("dashboard").catch(() => {});
+      const navErr = await router
+        .navigate("dashboard")
+        .catch((error: unknown) => error);
+
+      expect(navErr).toMatchObject({ code: errorCodes.CANNOT_ACTIVATE });
     });
 
     expect(screen.getByTestId("outer-fallback")).toBeInTheDocument();
@@ -351,7 +387,11 @@ describe("RouterErrorBoundary", () => {
     unmount();
 
     await act(async () => {
-      await router.navigate("dashboard").catch(() => {});
+      const navErr = await router
+        .navigate("dashboard")
+        .catch((error: unknown) => error);
+
+      expect(navErr).toMatchObject({ code: errorCodes.CANNOT_ACTIVATE });
     });
 
     expect(screen.queryByTestId("fallback")).not.toBeInTheDocument();
@@ -375,7 +415,11 @@ describe("RouterErrorBoundary", () => {
     );
 
     await act(async () => {
-      await router.navigate("dashboard").catch(() => {});
+      const navErr = await router
+        .navigate("dashboard")
+        .catch((error_: unknown) => error_);
+
+      expect(navErr).toMatchObject({ code: errorCodes.CANNOT_ACTIVATE });
     });
 
     expect(onError).toHaveBeenCalledTimes(1);
@@ -409,7 +453,11 @@ describe("RouterErrorBoundary", () => {
     );
 
     await act(async () => {
-      await router.navigate("home").catch(() => {});
+      const navErr = await router
+        .navigate("home")
+        .catch((error: unknown) => error);
+
+      expect(navErr).toMatchObject({ code: errorCodes.SAME_STATES });
     });
 
     await waitFor(() => {
@@ -425,7 +473,11 @@ describe("RouterErrorBoundary", () => {
     expect(screen.queryByTestId("fallback")).not.toBeInTheDocument();
 
     await act(async () => {
-      await router.navigate("home").catch(() => {});
+      const navErr = await router
+        .navigate("home")
+        .catch((error: unknown) => error);
+
+      expect(navErr).toMatchObject({ code: errorCodes.SAME_STATES });
     });
 
     await waitFor(() => {

@@ -1,13 +1,13 @@
 import { createRouter } from "@real-router/core";
 import { screen, render, act, fireEvent } from "@testing-library/preact";
 import { userEvent } from "@testing-library/user-event";
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { Link, RouterProvider } from "@real-router/preact";
 
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Router, State } from "@real-router/core";
 import type { ComponentChildren } from "preact";
 
 describe("Link component", () => {
@@ -177,6 +177,35 @@ describe("Link component", () => {
       expect(screen.getByTestId("link")).not.toHaveClass("active");
     });
 
+    it("should default ignoreQueryParams to true when prop is omitted (gotcha)", async () => {
+      const linkRouteName = "items.item";
+      const linkRouteParams = { id: 6 };
+
+      render(
+        <Link
+          routeName={linkRouteName}
+          routeParams={linkRouteParams}
+          activeClassName="active"
+          data-testid="link"
+        >
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      await act(async () => {
+        await router.navigate(linkRouteName, {
+          ...linkRouteParams,
+          page: 2,
+        });
+      });
+
+      // Without an explicit `ignoreQueryParams` prop, the default is `true`:
+      // the link is active even though the current URL carries `?page=2` that
+      // the link does not declare. Locks the documented CLAUDE.md gotcha.
+      expect(screen.getByTestId("link")).toHaveClass("active");
+    });
+
     it("should add active class based on activeStrict", async () => {
       const activeClassName = "active";
       const parentRouteName = "items";
@@ -274,6 +303,51 @@ describe("Link component", () => {
 
       expect(router.navigate).not.toHaveBeenCalled();
       expect(router.getState()?.name).toStrictEqual(currentRouteName);
+    });
+
+    it("should not navigate on altKey click", async () => {
+      vi.spyOn(router, "navigate");
+
+      render(
+        <Link routeName="one-more-test" data-testid="link">
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      fireEvent.click(screen.getByTestId("link"), { altKey: true });
+
+      expect(router.navigate).not.toHaveBeenCalled();
+    });
+
+    it("should not navigate on shiftKey click", async () => {
+      vi.spyOn(router, "navigate");
+
+      render(
+        <Link routeName="one-more-test" data-testid="link">
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      fireEvent.click(screen.getByTestId("link"), { shiftKey: true });
+
+      expect(router.navigate).not.toHaveBeenCalled();
+    });
+
+    it("should not navigate on ctrlKey click", async () => {
+      vi.spyOn(router, "navigate");
+
+      render(
+        <Link routeName="one-more-test" data-testid="link">
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      fireEvent.click(screen.getByTestId("link"), { ctrlKey: true });
+
+      expect(router.navigate).not.toHaveBeenCalled();
     });
 
     it("should not navigate when onClick prevents default", async () => {
@@ -398,7 +472,7 @@ describe("Link component", () => {
     });
 
     it("should handle routeOptions updates", async () => {
-      vi.spyOn(router, "navigate").mockResolvedValue({} as never);
+      vi.spyOn(router, "navigate").mockResolvedValue({} as State);
 
       const { rerender } = render(
         <Link
@@ -545,7 +619,7 @@ describe("Link component", () => {
       // Reordered keys — must also hit the deep-equal bail-out.
       rerender(<Harness params={{ page: 2, id: "1" }} />);
 
-      expect(renderCount).toBeGreaterThan(rendersAfterFirst);
+      expect(renderCount).toBe(rendersAfterFirst + 2);
       expect(screen.getByTestId("link")).toHaveAttribute(
         "href",
         "/users/1?page=2",
@@ -562,6 +636,49 @@ describe("Link component", () => {
       );
     });
 
+    it("should re-render when routeParams contains a nested object with new ref (gotcha)", () => {
+      // Locks the CLAUDE.md gotcha: shallowEqual compares routeParams values
+      // via Object.is per key. A nested object has a fresh reference each
+      // render even when its values are equal — Link cannot bail out without
+      // a deep compare, so the consumer must stabilise via `useMemo` if they
+      // care about the re-render. This test confirms the documented behaviour.
+      const linkRenders = vi.fn();
+
+      function ProbedLink({
+        params,
+      }: Readonly<{
+        params: Record<string, string | Record<string, string>>;
+      }>) {
+        linkRenders();
+
+        return (
+          <Link
+            routeName="users.view"
+            routeParams={params}
+            data-testid="nested-link"
+          >
+            Profile (nested params)
+          </Link>
+        );
+      }
+
+      const nested = { sort: "asc" };
+      const { rerender } = render(
+        <ProbedLink params={{ id: "1", filters: nested }} />,
+        { wrapper },
+      );
+
+      const baseline = linkRenders.mock.calls.length;
+
+      // Each rerender constructs a fresh nested `filters` object literal —
+      // shallowEqual sees different refs at the `filters` key and lets the
+      // wrapper through. Number of Link instantiations grows accordingly.
+      rerender(<ProbedLink params={{ id: "1", filters: { sort: "asc" } }} />);
+      rerender(<ProbedLink params={{ id: "1", filters: { sort: "asc" } }} />);
+
+      expect(linkRenders.mock.calls.length).toBeGreaterThan(baseline);
+    });
+
     it("should not throw when routeParams contains a circular reference", () => {
       interface Circular {
         id: string;
@@ -575,7 +692,8 @@ describe("Link component", () => {
         render(
           <Link
             routeName="users.view"
-            routeParams={circular as unknown as Record<string, string>}
+            // @ts-expect-error -- Circular has no index signature; testing runtime resilience with structurally invalid params
+            routeParams={circular}
             data-testid="link"
           >
             Profile
@@ -585,6 +703,12 @@ describe("Link component", () => {
       }).not.toThrow();
 
       expect(screen.getByTestId("link")).toBeInTheDocument();
+      // href IS present: buildHref's catch branch did not fire; circular `self`
+      // gets stringified as "[object Object]" in the query string (loose mode).
+      expect(screen.getByTestId("link")).toHaveAttribute(
+        "href",
+        "/users/1?self=%5Bobject%20Object%5D",
+      );
     });
 
     it("should not throw when routeParams contains a BigInt value", () => {
@@ -592,7 +716,8 @@ describe("Link component", () => {
         render(
           <Link
             routeName="users.view"
-            routeParams={{ id: 1n } as unknown as Record<string, string>}
+            // @ts-expect-error -- bigint is not a valid Params value; testing runtime resilience
+            routeParams={{ id: 1n }}
             data-testid="link"
           >
             Profile
@@ -602,6 +727,7 @@ describe("Link component", () => {
       }).not.toThrow();
 
       expect(screen.getByTestId("link")).toBeInTheDocument();
+      expect(screen.getByTestId("link")).toHaveAttribute("href", "/users/1");
     });
 
     it("should not throw when routeParams contains NaN or Infinity", () => {
@@ -609,12 +735,7 @@ describe("Link component", () => {
         render(
           <Link
             routeName="users.view"
-            routeParams={
-              { id: Number.NaN, page: Infinity } as unknown as Record<
-                string,
-                string
-              >
-            }
+            routeParams={{ id: Number.NaN, page: Infinity }}
             data-testid="link"
           >
             Profile
@@ -623,10 +744,12 @@ describe("Link component", () => {
         );
       }).not.toThrow();
 
-      // JSON.stringify(NaN) === "null" — both values serialize to null, so
-      // the resulting href uses "null" for :id. The point is that no throw
-      // escapes and the component still mounts.
       expect(screen.getByTestId("link")).toBeInTheDocument();
+      // NaN path segment → "NaN"; Infinity query param → "Infinity" (loose mode).
+      expect(screen.getByTestId("link")).toHaveAttribute(
+        "href",
+        "/users/NaN?page=Infinity",
+      );
     });
 
     it("should treat two distinct circular-ref params as unequal (comparator catch branch)", () => {
@@ -644,7 +767,8 @@ describe("Link component", () => {
       const { rerender } = render(
         <Link
           routeName="users.view"
-          routeParams={first as unknown as Record<string, string>}
+          // @ts-expect-error -- Circular has no index signature; testing runtime resilience with structurally invalid params
+          routeParams={first}
           data-testid="link"
         >
           Profile
@@ -656,7 +780,8 @@ describe("Link component", () => {
         rerender(
           <Link
             routeName="users.view"
-            routeParams={second as unknown as Record<string, string>}
+            // @ts-expect-error -- Circular has no index signature; testing runtime resilience with structurally invalid params
+            routeParams={second}
             data-testid="link"
           >
             Profile
@@ -665,10 +790,17 @@ describe("Link component", () => {
       }).not.toThrow();
 
       expect(screen.getByTestId("link")).toBeInTheDocument();
+      // href changed to reflect `second` (id "2") — proves memo did NOT bail out:
+      // shallowEqual(first, second) is false because id "1" ≠ "2", so a re-render
+      // happened and buildHref was called with the new params.
+      expect(screen.getByTestId("link")).toHaveAttribute(
+        "href",
+        "/users/2?self=%5Bobject%20Object%5D",
+      );
     });
   });
 
-  it("should render without href and log error for invalid routeName", () => {
+  it("should render without href and log error for invalid routeName", async () => {
     const consoleError = vi
       .spyOn(console, "error")
       .mockImplementation(() => {});
@@ -686,10 +818,18 @@ describe("Link component", () => {
       expect.stringContaining("@@nonexistent-route"),
     );
 
+    // Clicking a no-href link fires navigate (which rejects for unknown route),
+    // but the .catch(() => {}) in handleClick swallows the error — router state
+    // stays unchanged, confirming the click is a no-op from the user's view.
+    fireEvent.click(screen.getByTestId("link"));
+    await Promise.resolve();
+
+    expect(router.getState()?.name).toBe("test");
+
     consoleError.mockRestore();
   });
 
-  it("should handle empty routeName gracefully", () => {
+  it("should handle empty routeName gracefully", async () => {
     const consoleError = vi
       .spyOn(console, "error")
       .mockImplementation(() => {});
@@ -705,6 +845,268 @@ describe("Link component", () => {
     expect(screen.getByTestId("link")).not.toHaveAttribute("href");
     expect(consoleError).toHaveBeenCalled();
 
+    // Same no-op contract: clicking leaves the router state unchanged.
+    fireEvent.click(screen.getByTestId("link"));
+    await Promise.resolve();
+
+    expect(router.getState()?.name).toBe("test");
+
     consoleError.mockRestore();
+  });
+
+  describe("hash prop (buildHref edge cases)", () => {
+    it("hash prop appends encoded fragment to href", () => {
+      render(
+        <Link routeName="one-more-test" hash="section" data-testid="link">
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      const href = screen.getByTestId("link").getAttribute("href");
+
+      expect(href).toMatch(/#section$/);
+    });
+
+    it("hash with leading '#' strips the prefix (hash='#section' === hash='section')", () => {
+      const { rerender } = render(
+        <Link routeName="one-more-test" hash="section" data-testid="link">
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      const hrefWithout = screen.getByTestId("link").getAttribute("href");
+
+      rerender(
+        <Link routeName="one-more-test" hash="#section" data-testid="link">
+          Test
+        </Link>,
+      );
+
+      const hrefWith = screen.getByTestId("link").getAttribute("href");
+
+      expect(hrefWith).toBe(hrefWithout);
+    });
+
+    it("empty hash prop produces no fragment in href", () => {
+      render(
+        <Link routeName="one-more-test" hash="" data-testid="link">
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      const href = screen.getByTestId("link").getAttribute("href");
+
+      expect(href).not.toContain("#");
+    });
+
+    it("hash containing '#' encodes inner '#' as %23", () => {
+      // A fragment value that itself contains a '#' must be encoded as %23
+      // so the browser does not interpret it as a second fragment delimiter.
+      render(
+        <Link routeName="one-more-test" hash="a#b" data-testid="link">
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      const href = screen.getByTestId("link").getAttribute("href");
+
+      // Inner '#' must be %23; the URL must have exactly one real '#'.
+      expect(href).toMatch(/%23/);
+      expect(href?.split("#").length).toBe(2);
+    });
+
+    it("buildActiveClassName: duplicate tokens in base are NOT deduped (behaviour lock)", async () => {
+      // Confirmed gotcha: `buildActiveClassName(true, "active", "x x")` keeps both "x"
+      // tokens from base — it only dedups the active class itself, not duplicates in base.
+      render(
+        <Link
+          routeName="one-more-test"
+          className="x x"
+          activeClassName="y"
+          data-testid="link"
+        >
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      await act(async () => {
+        await router.navigate("one-more-test");
+      });
+
+      // "x x" base preserved verbatim; "y" appended once.
+      expect(screen.getByTestId("link").className).toBe("x x y");
+    });
+
+    it("buildHref falls back to buildPath when buildUrl returns undefined", () => {
+      // `buildUrl` may exist on the router yet return `undefined` for routes
+      // that fall outside its URL universe (e.g. unmatched name, no-base
+      // configuration). buildHref must not propagate `undefined` to the
+      // anchor's `href` — it falls through to `buildPath()` so the link
+      // still resolves to a navigable path.
+      router.buildUrl = ((): string | undefined =>
+        undefined) as Router["buildUrl"];
+      const buildPathSpy = vi.spyOn(router, "buildPath");
+
+      render(
+        <Link routeName="one-more-test" data-testid="link">
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      expect(buildPathSpy).toHaveBeenCalled();
+      expect(screen.getByTestId("link")).toHaveAttribute("href", "/test");
+    });
+
+    it("buildActiveClassName: empty activeClassName ('') falls through to base only (no active suffix)", async () => {
+      // Locks the branch `isActive && activeClassName` — when activeClassName
+      // is an empty string, the active-tokens path is skipped entirely and
+      // the base className is returned unchanged, regardless of active state.
+      render(
+        <Link
+          routeName="one-more-test"
+          className="base"
+          activeClassName=""
+          data-testid="link"
+        >
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      // Inactive: base preserved.
+      expect(screen.getByTestId("link").className).toBe("base");
+
+      await act(async () => {
+        await router.navigate("one-more-test");
+      });
+
+      // Active: still just "base" — empty activeClassName contributes nothing.
+      expect(screen.getByTestId("link").className).toBe("base");
+    });
+  });
+
+  describe("hash tri-state navigation (#532)", () => {
+    it("should call router.navigate without `hash` option when hash prop is undefined (preserve)", async () => {
+      const navigateSpy = vi.spyOn(router, "navigate");
+
+      render(
+        <Link routeName="one-more-test" data-testid="link">
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      await user.click(screen.getByTestId("link"));
+
+      // navigateWithHash only sets `opts.hash` when the prop is defined;
+      // omitting it preserves the browser's current fragment (tri-state).
+      const call = navigateSpy.mock.calls.find(
+        ([name]) => name === "one-more-test",
+      );
+
+      expect(call).toBeDefined();
+
+      const opts = call?.[2] as Record<string, unknown> | undefined;
+
+      expect(opts?.hash).toBeUndefined();
+    });
+
+    it("should call router.navigate with `hash: ''` when hash prop is empty (clear)", async () => {
+      const navigateSpy = vi.spyOn(router, "navigate");
+
+      render(
+        <Link routeName="one-more-test" hash="" data-testid="link">
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      await user.click(screen.getByTestId("link"));
+
+      const call = navigateSpy.mock.calls.find(
+        ([name]) => name === "one-more-test",
+      );
+
+      expect(call).toBeDefined();
+
+      const opts = call?.[2] as Record<string, unknown> | undefined;
+
+      expect(opts?.hash).toBe("");
+    });
+
+    it("should auto-add force + hashChange when navigating same route+params with new hash", async () => {
+      // Pre-condition: land on the destination route with hash="a" so the
+      // next click is a same-route+params navigation that only differs in
+      // hash — exactly the SAME_STATES bypass case navigateWithHash handles.
+      await act(async () => {
+        await router.navigate("one-more-test", {}, { hash: "a" });
+      });
+
+      const navigateSpy = vi.spyOn(router, "navigate");
+
+      render(
+        <Link routeName="one-more-test" hash="b" data-testid="link">
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      await user.click(screen.getByTestId("link"));
+
+      const call = navigateSpy.mock.calls.find(
+        ([name]) => name === "one-more-test",
+      );
+
+      expect(call).toBeDefined();
+
+      const opts = call?.[2] as Record<string, unknown> | undefined;
+
+      expect(opts?.hash).toBe("b");
+      expect(opts?.force).toBe(true);
+      expect(opts?.hashChange).toBe(true);
+    });
+
+    it("should make active state hash-aware when hash prop is set (tab-style UI)", async () => {
+      // Two Links share the same routeName but differ in `hash`. Navigate to
+      // the route with hash="profile" — only the matching link lights up.
+      // This validates the hash-aware active source documented in CLAUDE.md.
+      render(
+        <>
+          <Link
+            routeName="one-more-test"
+            hash="profile"
+            activeClassName="active"
+            data-testid="link-profile"
+          >
+            Profile
+          </Link>
+          <Link
+            routeName="one-more-test"
+            hash="account"
+            activeClassName="active"
+            data-testid="link-account"
+          >
+            Account
+          </Link>
+        </>,
+        { wrapper },
+      );
+
+      expect(screen.getByTestId("link-profile")).not.toHaveClass("active");
+      expect(screen.getByTestId("link-account")).not.toHaveClass("active");
+
+      await act(async () => {
+        await router.navigate("one-more-test", {}, { hash: "profile" });
+      });
+
+      expect(screen.getByTestId("link-profile")).toHaveClass("active");
+      expect(screen.getByTestId("link-account")).not.toHaveClass("active");
+    });
   });
 });

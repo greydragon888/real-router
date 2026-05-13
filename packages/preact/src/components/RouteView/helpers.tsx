@@ -70,24 +70,22 @@ function renderSlot(
   return <Fragment key={key}>{content}</Fragment>;
 }
 
-function recordFallback(child: VNode, slots: FallbackSlots): boolean {
+function isFallbackKind(child: VNode): boolean {
+  return child.type === NotFound || child.type === Self;
+}
+
+function assignFallbackSlot(child: VNode, slots: FallbackSlots): void {
   if (child.type === NotFound) {
     slots.notFoundChildren = (child.props as NotFoundProps).children;
 
-    return true;
+    return;
   }
 
-  if (child.type === Self) {
-    if (!slots.selfFound) {
-      slots.selfChildren = (child.props as SelfProps).children;
-      slots.selfFallback = (child.props as SelfProps).fallback;
-      slots.selfFound = true;
-    }
-
-    return true;
+  if (!slots.selfFound) {
+    slots.selfChildren = (child.props as SelfProps).children;
+    slots.selfFallback = (child.props as SelfProps).fallback;
+    slots.selfFound = true;
   }
-
-  return false;
 }
 
 function processMatch(
@@ -150,7 +148,9 @@ export function buildRenderList(
   const rendered: VNode[] = [];
 
   for (const child of elements) {
-    if (recordFallback(child, slots)) {
+    if (isFallbackKind(child)) {
+      assignFallbackSlot(child, slots);
+
       continue;
     }
 

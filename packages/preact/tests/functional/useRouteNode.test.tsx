@@ -1,3 +1,4 @@
+import { errorCodes } from "@real-router/core";
 import { getRoutesApi } from "@real-router/core/api";
 import { renderHook, act } from "@testing-library/preact";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
@@ -30,10 +31,11 @@ describe("useRouteNode", () => {
       wrapper: (props) => wrapper({ ...props, router }),
     });
 
-    expect(result.current.navigator).toBeTypeOf("object");
-    expect(result.current.navigator.navigate).toBeTypeOf("function");
-    expect(result.current.route).toStrictEqual(undefined);
-    expect(result.current.previousRoute).toStrictEqual(undefined);
+    expect(result.current.navigator).toStrictEqual(
+      expect.objectContaining({ navigate: expect.any(Function) }),
+    );
+    expect(result.current.route).toBeUndefined();
+    expect(result.current.previousRoute).toBeUndefined();
   });
 
   it("should not return a null route with a default route and the router started", async () => {
@@ -42,7 +44,7 @@ describe("useRouteNode", () => {
     });
 
     await act(async () => {
-      await router.start();
+      await router.start("/");
     });
 
     expect(result.current.route?.name).toStrictEqual("test");
@@ -54,7 +56,7 @@ describe("useRouteNode", () => {
     });
 
     await act(async () => {
-      await router.start();
+      await router.start("/");
     });
 
     expect(result.current.route?.name).toStrictEqual("test");
@@ -72,10 +74,10 @@ describe("useRouteNode", () => {
     });
 
     await act(async () => {
-      await router.start();
+      await router.start("/");
     });
 
-    expect(result.current.route?.name).toStrictEqual(undefined);
+    expect(result.current.route?.name).toBeUndefined();
 
     await act(async () => {
       await router.navigate("items");
@@ -104,7 +106,7 @@ describe("useRouteNode", () => {
     });
 
     await act(async () => {
-      await router.start();
+      await router.start("/");
     });
 
     expect(result.current.route).toBeUndefined();
@@ -136,7 +138,7 @@ describe("useRouteNode", () => {
 
   it("should return stable reference when nothing changes", async () => {
     await act(async () => {
-      await router.start();
+      await router.start("/");
     });
 
     const { result: rootResult, rerender: rerenderRoot } = renderHook(
@@ -173,7 +175,7 @@ describe("useRouteNode", () => {
       });
 
       await act(async () => {
-        await router.start();
+        await router.start("/");
       });
       await act(async () => {
         await router.navigate("items.item", { id: "1" });
@@ -201,7 +203,7 @@ describe("useRouteNode", () => {
       });
 
       await act(async () => {
-        await router.start();
+        await router.start("/");
       });
       await act(async () => {
         await router.navigate("users.view", { id: "1" });
@@ -226,7 +228,7 @@ describe("useRouteNode", () => {
       });
 
       await act(async () => {
-        await router.start();
+        await router.start("/");
       });
       await act(async () => {
         await router.navigate("users.list");
@@ -255,7 +257,9 @@ describe("useRouteNode", () => {
 
       expect(result.current.route).toBeUndefined();
       expect(result.current.previousRoute).toBeUndefined();
-      expect(result.current.navigator).toBeDefined();
+      expect(result.current.navigator).toStrictEqual(
+        expect.objectContaining({ navigate: expect.any(Function) }),
+      );
     });
 
     it("should handle root node when navigating to non-existent route", async () => {
@@ -264,17 +268,17 @@ describe("useRouteNode", () => {
       });
 
       await act(async () => {
-        await router.start();
+        await router.start("/");
       });
 
       const initialRoute = result.current.route;
 
       await act(async () => {
-        try {
-          await router.navigate("non-existent-route");
-        } catch {
-          /* Expected */
-        }
+        const err = await router
+          .navigate("non-existent-route")
+          .catch((error: unknown) => error);
+
+        expect(err).toMatchObject({ code: errorCodes.ROUTE_NOT_FOUND });
       });
 
       expect(result.current.route).toBe(initialRoute);
@@ -292,10 +296,10 @@ describe("useRouteNode", () => {
       );
 
       await act(async () => {
-        await router.start();
+        await router.start("/");
       });
       await act(async () => {
-        await router.navigate("users.list").catch(() => {});
+        await router.navigate("users.list");
       });
 
       expect(result.current.route?.name).toBe("users.list");
@@ -319,7 +323,7 @@ describe("useRouteNode", () => {
       });
 
       await act(async () => {
-        await router.start();
+        await router.start("/");
       });
       await act(async () => {
         await router.navigate("users.view", { id: "123" });
@@ -351,10 +355,10 @@ describe("useRouteNode", () => {
       });
 
       await act(async () => {
-        await router.start();
+        await router.start("/");
       });
       await act(async () => {
-        await router.navigate("users.list").catch(() => {});
+        await router.navigate("users.list");
       });
 
       expect(usersResult.current.route?.name).toBe("users.list");
@@ -395,7 +399,7 @@ describe("useRouteNode", () => {
       });
 
       await act(async () => {
-        await router.start();
+        await router.start("/");
       });
       await act(async () => {
         await router.navigate("admin");
@@ -428,7 +432,7 @@ describe("useRouteNode", () => {
       );
 
       await act(async () => {
-        await router.start();
+        await router.start("/");
       });
       await act(async () => {
         await router.navigate("users.list");
@@ -467,7 +471,7 @@ describe("useRouteNode", () => {
       });
 
       await act(async () => {
-        await router.start();
+        await router.start("/");
       });
       await act(async () => {
         await router.navigate("users.list");
@@ -499,7 +503,7 @@ describe("useRouteNode", () => {
       );
 
       await act(async () => {
-        await router.start();
+        await router.start("/");
       });
       await act(async () => {
         await router.navigate("users.list");
@@ -530,7 +534,7 @@ describe("useRouteNode", () => {
       });
 
       await act(async () => {
-        await router.start();
+        await router.start("/");
       });
 
       await act(async () => {
@@ -559,7 +563,7 @@ describe("useRouteNode", () => {
       });
 
       await act(async () => {
-        await router.start();
+        await router.start("/");
       });
 
       expect(result.current.previousRoute).toBeUndefined();
@@ -577,7 +581,7 @@ describe("useRouteNode", () => {
       });
 
       await act(async () => {
-        await router.start();
+        await router.start("/");
       });
       await act(async () => {
         await router.navigate("users.view", { id: "123" });
@@ -600,7 +604,7 @@ describe("useRouteNode", () => {
       });
 
       await act(async () => {
-        await router.start();
+        await router.start("/");
       });
 
       const chain: {

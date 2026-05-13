@@ -1,3 +1,4 @@
+import { errorCodes } from "@real-router/core";
 import { getRoutesApi } from "@real-router/core/api";
 import { act, renderHook } from "@testing-library/preact";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
@@ -198,7 +199,7 @@ describe("useIsActiveRoute", () => {
       expect(emptyParams.current).toBe(true);
 
       const { result: undefinedParams } = renderHook(
-        () => useIsActiveRoute("users.list", undefined as never),
+        () => useIsActiveRoute("users.list"),
         { wrapper: (props) => wrapper({ ...props, router }) },
       );
 
@@ -240,11 +241,25 @@ describe("useIsActiveRoute", () => {
 
       expect(stringParam.current).toBe(true);
 
+      // URL params are always parsed as strings — numeric 123 does not match
+      // the stored string "123", so the hook returns false for number inputs.
+      const { result: numericParam } = renderHook(
+        () => useIsActiveRoute("users.view", { id: 123 }),
+        { wrapper: (props) => wrapper({ ...props, router }) },
+      );
+
+      expect(numericParam.current).toBe(false);
+
       await act(async () => {
-        await router.navigate("users.view", { id: "123" }).catch(() => {});
+        const navErr = await router
+          .navigate("users.view", { id: "123" })
+          .catch((error: unknown) => error);
+
+        expect(navErr).toMatchObject({ code: errorCodes.SAME_STATES });
       });
 
       expect(stringParam.current).toBe(true);
+      expect(numericParam.current).toBe(false);
     });
   });
 
@@ -367,7 +382,11 @@ describe("useIsActiveRoute", () => {
       ]);
 
       await act(async () => {
-        await router.navigate("users.view", { id: "123" }).catch(() => {});
+        const navErr = await router
+          .navigate("users.view", { id: "123" })
+          .catch((error: unknown) => error);
+
+        expect(navErr).toMatchObject({ code: errorCodes.SAME_STATES });
       });
 
       const { result: userRoute } = renderHook(

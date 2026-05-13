@@ -11,61 +11,83 @@
 └── @real-router/route-utils  # Route tree queries (getRouteUtils, getChain, getSiblings)
 ```
 
-## Single Entry Point
+## Entry Points (Subpath Exports)
 
-One entry point — Preact has no equivalent of React's `<Activity>` API, so no modern/legacy split is needed.
+Two entry points via `package.json` `exports`. No modern/legacy split (Preact has no equivalent of React's `<Activity>` API), but SSR-aware components/hooks live behind a `/ssr` subpath for type isolation and DX clarity — same split rationale as `@real-router/react/ssr`.
+
+| Entry Point | Import Path | Description |
+|---|---|---|
+| Main | `@real-router/preact` | Client API: hooks, `RouterProvider`, `RouteView`, `Link`, `RouterErrorBoundary` |
+| SSR | `@real-router/preact/ssr` | 8 SSR-feature exports: `<ClientOnly>`, `<ServerOnly>`, `<Await>`, `<Streamed>`, `<HttpStatusCode>`, `<HttpStatusProvider>`, `useDeferred`, `createHttpStatusSink` |
 
 ```
-@real-router/preact  →  src/index.ts  →  Full API (Preact 10+)
+@real-router/preact       →  src/index.ts  →  Client API (Preact 10+)
+@real-router/preact/ssr   →  src/ssr.ts    →  SSR-feature surface (Preact 10+)
 ```
 
-**Build output** (tsdown single entry):
+**Build output** (tsdown dual entry):
 
 ```
 dist/
 ├── esm/
 │   ├── index.mjs
-│   └── index.d.mts
+│   ├── index.d.mts
+│   ├── ssr.mjs
+│   ├── ssr.d.mts
+│   └── useRoute-*.mjs       # Shared chunk hoisted by tsdown
 └── cjs/
     ├── index.js
-    └── index.d.ts
+    ├── index.d.ts
+    ├── ssr.js
+    └── ssr.d.ts
 ```
 
 ## Source Structure
 
 ```
 src/
-├── index.ts                    # Single entry point (Preact 10+)
+├── index.ts                    # Main entry — client API (Preact 10+)
+├── ssr.ts                      # SSR-feature subpath — 8 exports mirroring @real-router/react/ssr
 ├── RouterProvider.tsx           # Context provider — wires router to Preact tree
-├── context.ts                  # Three Preact contexts (RouterContext, RouteContext, NavigatorContext)
+├── context.ts                  # Three Preact contexts + createUseContextOrThrow factory
 ├── types.ts                    # RouteState, RouteContext, LinkProps
 ├── constants.ts                # EMPTY_PARAMS, EMPTY_OPTIONS (frozen singletons)
 ├── useSyncExternalStore.ts     # Polyfill — Preact has no native useSyncExternalStore
 ├── dom-utils/                  # Symlink → shared/dom-utils/ (shared across all framework adapters)
 │   ├── index.ts                # Barrel re-exports
-│   ├── link-utils.ts           # shouldNavigate, buildHref, buildActiveClassName, applyLinkA11y
+│   ├── link-utils.ts           # shouldNavigate, buildHref, navigateWithHash, buildActiveClassName, applyLinkA11y, shallowEqual
 │   ├── route-announcer.ts      # createRouteAnnouncer — WCAG aria-live announcements
 │   ├── scroll-restore.ts       # createScrollRestoration — opt-in scroll capture + restore
-│   └── view-transitions.ts     # createViewTransitions — opt-in View Transitions API integration
+│   ├── view-transitions.ts     # createViewTransitions — opt-in View Transitions API integration
+│   └── direction-tracker.ts    # createDirectionTracker — back/forward annotation
+├── utils/
+│   └── createHttpStatusSink.ts # /ssr — fresh { code: undefined } sink per request
 ├── hooks/
 │   ├── useRouter.tsx           # Router instance from context (never re-renders)
 │   ├── useRoute.tsx            # Full route state from context (every navigation)
 │   ├── useNavigator.tsx        # Navigator from context (never re-renders)
 │   ├── useRouteNode.tsx        # Node-scoped subscription (cached createRouteNodeSource from sources)
-│   ├── useIsActiveRoute.tsx    # Active state subscription (cached createActiveRouteSource)
+│   ├── useIsActiveRoute.tsx    # Active state subscription (cached createActiveRouteSource, useMemo-wrapped opts + source)
 │   ├── useRouteUtils.tsx       # RouteUtils from route tree (never re-renders)
 │   ├── useRouterTransition.tsx # Transition lifecycle (cached getTransitionSource)
 │   ├── useRouteExit.tsx        # Wrap subscribeLeave with abort + same-route + latest-handler guards
-│   └── useRouteEnter.tsx       # Fire on nav-driven mount via useRoute() snapshot + route.transition.from
+│   ├── useRouteEnter.tsx       # Fire on nav-driven mount via useRoute() snapshot + route.transition.from
+│   └── useDeferred.tsx         # /ssr — reads state.context.ssrDataDeferred[key] (ssr-data-plugin)
 └── components/
     ├── Link.tsx                # memo'd link with custom areLinkPropsEqual + active state
     ├── RouterErrorBoundary.tsx  # Declarative navigation error handling
+    ├── ClientOnly.tsx          # /ssr — server fallback → client children swap after mount
+    ├── ServerOnly.tsx          # /ssr — symmetric inverse of ClientOnly
+    ├── Streamed.tsx            # /ssr — cross-adapter <Suspense> alias (preact/compat)
+    ├── Await.tsx               # /ssr — <Await name="key">{(v) => …}</Await> via Suspense-thenable convention
+    ├── HttpStatusCode.tsx      # /ssr — render-time HTTP status (sink write)
+    ├── HttpStatusProvider.tsx  # /ssr — provides HttpStatusSink via Preact context
     └── RouteView/              # Declarative route matching (no keepAlive)
         ├── index.ts            # Barrel re-exports
-        ├── RouteView.tsx       # RouteViewRoot + compound export (RouteView.Match, RouteView.NotFound)
-        ├── types.ts            # RouteViewProps, MatchProps, NotFoundProps
-        ├── components.tsx      # Match, NotFound marker components
-        └── helpers.tsx         # collectElements, buildRenderList, isSegmentMatch
+        ├── RouteView.tsx       # RouteViewRoot + compound export (RouteView.Match, RouteView.Self, RouteView.NotFound)
+        ├── types.ts            # RouteViewProps, MatchProps, SelfProps, NotFoundProps
+        ├── components.tsx      # Match, Self, NotFound marker components
+        └── helpers.tsx         # collectElements, buildRenderList, isSegmentMatch, processMatch, isFallbackKind, assignFallbackSlot, appendFallback
 ```
 
 ## Key Differences from React Adapter
@@ -78,7 +100,8 @@ src/
 | `memo()`                    | `react`                            | `preact/compat`                                     |
 | `Children.toArray`          | `react`                            | `toChildArray` from `preact`                        |
 | `Activity` API / keepAlive  | React 19.2+                        | Not available — RouteView renders active match only |
-| Entry points                | Main + Legacy                      | Single                                              |
+| `fallback` / `Suspense`     | `react`                            | `preact/compat` (experimental)                      |
+| Entry points                | Main + Legacy + `/ssr` + `/legacy/ssr` + `/ink` + RSC | Main + `/ssr`                            |
 
 ### useSyncExternalStore Polyfill
 

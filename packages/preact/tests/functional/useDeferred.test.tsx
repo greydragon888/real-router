@@ -20,7 +20,7 @@ describe("useDeferred", () => {
 
   beforeEach(async () => {
     router = createTestRouterWithADefaultRouter();
-    await router.start();
+    await router.start("/");
   });
 
   afterEach(() => {
@@ -52,14 +52,15 @@ describe("useDeferred", () => {
       wrapper: wrapper(router),
     });
 
-    expect(result.current).toBeInstanceOf(Promise);
+    let settled = false;
 
-    const winner = await Promise.race([
-      result.current.then(() => "settled"),
-      Promise.resolve("microtask"),
-    ]);
+    void result.current.then(() => {
+      settled = true;
+    });
 
-    expect(winner).toBe("microtask");
+    await Promise.resolve();
+
+    expect(settled).toBe(false);
   });
 
   it("returns a forever-pending promise when ssrDataDeferred is undefined", async () => {
@@ -67,12 +68,15 @@ describe("useDeferred", () => {
       wrapper: wrapper(router),
     });
 
-    const winner = await Promise.race([
-      result.current.then(() => "settled"),
-      Promise.resolve("microtask"),
-    ]);
+    let settled = false;
 
-    expect(winner).toBe("microtask");
+    void result.current.then(() => {
+      settled = true;
+    });
+
+    await Promise.resolve();
+
+    expect(settled).toBe(false);
   });
 
   it("returns a stable Promise reference across renders within one navigation", () => {

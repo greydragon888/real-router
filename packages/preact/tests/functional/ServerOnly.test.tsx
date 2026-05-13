@@ -59,7 +59,7 @@ describe("ServerOnly", () => {
 
   describe("hydration (renderToString → hydrate)", () => {
     it("hydrates without mismatch warnings, then swaps to fallback", async () => {
-      const errSpy = vi.spyOn(console, "error");
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       const tree = (
         <ServerOnly fallback={<span data-testid="fallback">client view</span>}>
           <span data-testid="children">server content</span>
@@ -77,12 +77,7 @@ describe("ServerOnly", () => {
         expect(screen.getByTestId("fallback")).toBeInTheDocument();
       });
 
-      const hydrationErrors = errSpy.mock.calls.filter(
-        ([msg]: readonly unknown[]) =>
-          typeof msg === "string" && /hydrat/i.test(msg),
-      );
-
-      expect(hydrationErrors).toHaveLength(0);
+      expect(errSpy).not.toHaveBeenCalled();
 
       mountPoint.remove();
       errSpy.mockRestore();

@@ -150,8 +150,7 @@ describe("useRouterTransition", () => {
       await Promise.resolve();
     });
 
-    expect(result.current.toRoute).not.toBeNull();
-    expect(result.current.toRoute!.name).toBe("dashboard");
+    expect(result.current.toRoute?.name).toBe("dashboard");
 
     await act(async () => {
       resolveGuard(true);
@@ -179,8 +178,7 @@ describe("useRouterTransition", () => {
       await Promise.resolve();
     });
 
-    expect(result.current.fromRoute).not.toBeNull();
-    expect(result.current.fromRoute!.name).toBe("home");
+    expect(result.current.fromRoute?.name).toBe("home");
 
     await act(async () => {
       resolveGuard(true);
@@ -219,7 +217,8 @@ describe("useRouterTransition", () => {
       await Promise.resolve();
     });
 
-    expect(result.current.toRoute!.name).toBe("dashboard");
+    expect(result.current.toRoute).not.toBeNull();
+    expect(result.current.toRoute?.name).toBe("dashboard");
 
     await act(async () => {
       const p2 = router.navigate("settings");

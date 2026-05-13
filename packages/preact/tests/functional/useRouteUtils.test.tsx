@@ -21,7 +21,7 @@ describe("useRouteUtils hook", () => {
 
   beforeEach(async () => {
     router = createTestRouterWithADefaultRouter();
-    await router.start();
+    await router.start("/");
   });
 
   afterEach(() => {
@@ -34,9 +34,6 @@ describe("useRouteUtils hook", () => {
     });
 
     expect(result.current).toBeInstanceOf(RouteUtils);
-    expect(result.current.getChain).toBeTypeOf("function");
-    expect(result.current.getSiblings).toBeTypeOf("function");
-    expect(result.current.isDescendantOf).toBeTypeOf("function");
   });
 
   it("should return same instance on re-render (WeakMap cache)", () => {
@@ -69,6 +66,7 @@ describe("useRouteUtils hook", () => {
 
     const siblings = result.current.getSiblings("users.list");
 
+    expect(siblings).toHaveLength(2);
     expect(siblings).toContain("users.view");
     expect(siblings).toContain("users.edit");
     expect(siblings).not.toContain("users.list");
