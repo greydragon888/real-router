@@ -87,7 +87,6 @@ export function injectRouteEnter(
 
   const { routeState } = injectRoute();
   const skipSameRoute = options?.skipSameRoute ?? true;
-  let lastHandledRoute: State | null = null;
 
   effect(() => {
     const { route, previousRoute } = routeState();
@@ -99,24 +98,25 @@ export function injectRouteEnter(
     //   - **Skip-same-route**: query-only navigations have
     //     `transition.from === route.name`. Opt-out via
     //     `skipSameRoute: false`.
-    //   - **Defensive dedupe + missing `previousRoute`**: same `route`
-    //     ref between effect re-runs is unexpected on Angular (the
-    //     signal only fires on real reference changes); `!previousRoute`
-    //     is unreachable once `transition.from` is set (core populates
-    //     them together). Both kept for parity with React; v8-ignored.
     if (!route.transition.from) {
       return;
     }
     if (skipSameRoute && route.transition.from === route.name) {
       return;
     }
-    /* v8 ignore start */
-    if (lastHandledRoute === route || !previousRoute) {
-      return;
+    // `previousRoute` is guaranteed populated whenever `route.transition.from`
+    // is set — core writes them together. `lastHandledRoute === route` would
+    // imply the signal re-fired with the same reference, which Angular signals
+    // never do (signals dedup by Object.is). Both invariants hold structurally;
+    // they were kept here only for parity with the React adapter's defensive
+    // pre-effects-rewrite path. Removed in line with audit §8.1 (unreachable
+    // code with v8-ignore is a maintenance smell).
+    if (!previousRoute) {
+      throw new Error(
+        "injectRouteEnter: transition.from set but previousRoute missing — core invariant violated",
+      );
     }
-    /* v8 ignore stop */
 
-    lastHandledRoute = route;
     handler({ route, previousRoute });
   });
 }

@@ -3,11 +3,9 @@ import {
   Component,
   computed,
   contentChildren,
-  inject,
+  effect,
   input,
   signal,
-  DestroyRef,
-  type OnInit,
   type TemplateRef,
 } from "@angular/core";
 import { UNKNOWN_ROUTE } from "@real-router/core";
@@ -35,7 +33,7 @@ const EMPTY_SNAPSHOT: RouteSnapshot = Object.freeze({
   `,
   imports: [NgTemplateOutlet],
 })
-export class RouteView implements OnInit {
+export class RouteView {
   readonly nodeName = input<string>("", { alias: "routeNode" });
 
   readonly matches = contentChildren(RouteMatch, { descendants: true });
@@ -59,10 +57,16 @@ export class RouteView implements OnInit {
       }
     }
 
-    // Self has priority over NotFound. First-wins to mirror NotFound's
-    // last-wins inversion would be inconsistent with React/Preact/Solid/Vue
-    // adapters where Self is "first wins"; Angular's contentChildren returns
-    // declaration order, so picking [0] gives first-wins.
+    // Template priority: Self → NotFound (after Match has already been
+    // resolved above). Selection rules differ on purpose:
+    //   - **Self uses first-wins** (`.at(0)`) for parity with React /
+    //     Preact / Solid / Vue, where the first matching `<Self>` token
+    //     in declaration order wins. Angular's `contentChildren` returns
+    //     declaration order, so `[0]` reproduces that semantic.
+    //   - **NotFound uses last-wins** (`.at(-1)`) intentionally — the
+    //     fallback should be the most-recently-declared template so that
+    //     consumers can override an inherited `<ng-template routeNotFound>`
+    //     simply by re-declaring it lower in the projected content.
     if (routeName === this.nodeName()) {
       const first = this.selfs().at(0);
 
@@ -96,21 +100,37 @@ export class RouteView implements OnInit {
   });
 
   private readonly router = injectRouter();
-  private readonly destroyRef = inject(DestroyRef);
   private readonly routeState = signal<RouteSnapshot>(EMPTY_SNAPSHOT);
 
-  ngOnInit(): void {
-    const source = createRouteNodeSource(this.router, this.nodeName());
+  constructor() {
+    // Reactive source-creation effect (#630 fix). Previously this setup
+    // lived in `ngOnInit` with a one-time `this.nodeName()` read — meaning
+    // `createRouteNodeSource` captured nodeName at mount and never
+    // recreated on input change. If `<route-view [routeNode]="signal()">`
+    // is bound to a signal in AOT, the original bug surface: source stays
+    // bound to the original nodeName even after the input updates.
+    //
+    // Moving setup into `effect()` makes the source creation reactive to
+    // `nodeName()` changes; previous source is torn down via `onCleanup`,
+    // new one wired up. `matchEntries` (a separate `computed`) already
+    // tracks `nodeName()` reactively, so the template-priority logic stays
+    // consistent with the (possibly-changed) nodeName.
+    //
+    // Effect cleanup is bound to the injection-context's DestroyRef
+    // automatically (no need for explicit `inject(DestroyRef)` plumbing).
+    effect((onCleanup) => {
+      const source = createRouteNodeSource(this.router, this.nodeName());
 
-    this.routeState.set(source.getSnapshot());
-
-    const unsub = source.subscribe(() => {
       this.routeState.set(source.getSnapshot());
-    });
 
-    this.destroyRef.onDestroy(() => {
-      unsub();
-      source.destroy();
+      const unsub = source.subscribe(() => {
+        this.routeState.set(source.getSnapshot());
+      });
+
+      onCleanup(() => {
+        unsub();
+        source.destroy();
+      });
     });
   }
 }

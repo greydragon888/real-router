@@ -4,6 +4,7 @@ import {
   shouldReplaceHistory,
   buildUrl,
   urlToPath,
+  createPluginBuildUrl,
   createStartInterceptor,
   createReplaceHistoryState,
   encodeHashFragment,
@@ -35,7 +36,6 @@ import type {
 } from "./types";
 import type {
   NavigationOptions,
-  Params,
   Router,
   State,
   Plugin,
@@ -133,22 +133,7 @@ export class NavigationPlugin {
     // bar entry: by the time onTransitionSuccess fires the browser already
     // reflects the destination URL.
 
-    const pluginBuildUrl = (
-      route: string,
-      params?: Params,
-      opts?: { hash?: string },
-    ) => {
-      const path = router.buildPath(route, params);
-      const url = buildUrl(path, options.base);
-
-      if (opts?.hash === undefined) {
-        return url;
-      }
-
-      const norm = normalizeHashInput(opts.hash);
-
-      return norm ? `${url}#${encodeHashFragment(norm)}` : url;
-    };
+    const pluginBuildUrl = createPluginBuildUrl(router, options.base);
 
     this.#removeExtensions = api.extendRouter({
       buildUrl: pluginBuildUrl,

@@ -1,3 +1,4 @@
+import { assertInInjectionContext } from "@angular/core";
 import { createActiveRouteSource } from "@real-router/sources";
 
 import { sourceToSignal } from "../sourceToSignal";
@@ -11,6 +12,8 @@ export function injectIsActiveRoute(
   params?: Params,
   options?: { strict?: boolean; ignoreQueryParams?: boolean; hash?: string },
 ): Signal<boolean> {
+  assertInInjectionContext(injectIsActiveRoute);
+
   const router = injectRouter();
   const strict = options?.strict ?? false;
   const ignoreQueryParams = options?.ignoreQueryParams ?? true;

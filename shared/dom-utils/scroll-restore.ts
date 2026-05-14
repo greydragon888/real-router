@@ -92,6 +92,15 @@ export function createScrollRestoration(
     try {
       const cached = loadStore();
 
+      // Skip-same-value: when a route is left at the same scroll position it
+      // already holds in the cache (e.g. tab-switching without scrolling),
+      // both the in-memory write and the JSON.stringify + setItem pair are
+      // no-ops. Eliminates redundant serialization on the navigation hot
+      // path for the common "click tabs without scrolling" case.
+      if (cached[key] === pos) {
+        return;
+      }
+
       cached[key] = pos;
       sessionStorage.setItem(storageKey, JSON.stringify(cached));
     } catch {

@@ -136,6 +136,91 @@ describe("injectRouteExit", () => {
     expect(navigated).toBe(true);
   });
 
+  // Gotcha #1 from CLAUDE.md ("injectRouteExit / injectRouteEnter Handler Is
+  // Captured At Injection Time") — pins the documented contract that the
+  // handler reference is captured at injection time and NOT swapped between
+  // change-detection cycles. Closes review-2026-05-10 §4 #1 ⚠️ Partial gap.
+  //
+  // The host component holds two distinct handler refs; we navigate after
+  // swapping the public ref → only the original (captured) handler fires.
+  it("captures handler at injection time — swapping a ref after init has no effect", async () => {
+    const originalHandler = vi.fn();
+    const swappedHandler = vi.fn();
+
+    @Component({ template: "" })
+    class HostComponent {
+      handler: () => void = originalHandler;
+
+      readonly attached = (() => {
+        // Closure over `this.handler` would still snapshot the property at
+        // call-time — but the documented contract is that the function ref
+        // passed to `injectRouteExit(...)` is itself captured, NOT a getter
+        // that re-reads. The common pattern is to pass a class method (or
+        // arrow-property). Passing `this.handler` directly here mirrors that.
+        injectRouteExit(this.handler);
+
+        return true;
+      })();
+    }
+
+    TestBed.configureTestingModule({
+      providers: [provideRealRouter(router)],
+      imports: [HostComponent],
+    });
+    const fixture = TestBed.createComponent(HostComponent);
+
+    fixture.detectChanges();
+
+    // Swap the public handler reference AFTER injection.
+    fixture.componentInstance.handler = swappedHandler;
+
+    await router.navigate("about");
+
+    expect(originalHandler).toHaveBeenCalledTimes(1);
+    expect(swappedHandler).not.toHaveBeenCalled();
+  });
+
+  // Sister test for the documented escape hatch: reading signals INSIDE the
+  // handler body makes the handler reactive without swapping its identity.
+  it("captured handler reads latest signal values inside its body across navigations", async () => {
+    const observed: (string | null)[] = [];
+
+    @Component({ template: "" })
+    class HostComponent {
+      readonly attached = (() => {
+        injectRouteExit(() => {
+          observed.push(this.state);
+        });
+
+        return true;
+      })();
+
+      private state: string | null = "initial";
+
+      setState(value: string | null): void {
+        this.state = value;
+      }
+    }
+
+    TestBed.configureTestingModule({
+      providers: [provideRealRouter(router)],
+      imports: [HostComponent],
+    });
+    const fixture = TestBed.createComponent(HostComponent);
+
+    fixture.detectChanges();
+
+    await router.navigate("about");
+    fixture.componentInstance.setState("changed");
+    await router.navigate("home");
+    fixture.componentInstance.setState("changed-again");
+    await router.navigate("users.list");
+
+    // Three navigations → three observed values, each picking up the latest
+    // `this.state` at the moment the handler runs.
+    expect(observed).toStrictEqual(["initial", "changed", "changed-again"]);
+  });
+
   it("unsubscribes when the injection context is destroyed", async () => {
     const handler = vi.fn();
 
@@ -174,7 +259,7 @@ describe("injectRouteExit", () => {
 
     expect(receivedSignal).toBeDefined();
     expect(receivedSignal).toBeInstanceOf(AbortSignal);
-    expect(receivedSignal?.aborted).toBe(false);
+    expect(receivedSignal!.aborted).toBe(false);
   });
 
   it("skips the handler when signal is already aborted (reentrant abort)", () => {

@@ -1,4 +1,5 @@
 import { encodeHashFragment, normalizeHashInput } from "./url-context.js";
+import { buildUrl } from "./url-utils.js";
 
 import type {
   NavigationOptions,
@@ -41,6 +42,27 @@ export function createStartInterceptor(
   return api.addInterceptor("start", (next, path) =>
     next(path ?? browser.getLocation()),
   );
+}
+
+// Shared `buildUrl` extension for browser-plugin and navigation-plugin.
+// Composes router.buildPath + base prefixing + tri-state hash (#532) into the
+// single function the plugins register via `api.extendRouter({ buildUrl })`.
+export function createPluginBuildUrl(
+  router: Router,
+  base: string,
+): (route: string, params?: Params, opts?: { hash?: string }) => string {
+  return (route, params, opts) => {
+    const path = router.buildPath(route, params);
+    const url = buildUrl(path, base);
+
+    if (opts?.hash === undefined) {
+      return url;
+    }
+
+    const norm = normalizeHashInput(opts.hash);
+
+    return norm ? `${url}#${encodeHashFragment(norm)}` : url;
+  };
 }
 
 export function createReplaceHistoryState(

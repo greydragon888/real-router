@@ -27,6 +27,7 @@
   },
   "scripts": {
     "test": "vitest",
+    "test:properties": "vitest run --config vitest.config.properties.mts",
     "test:stress": "vitest -c vitest.config.stress.mts",
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache src/ ssr/ tests/ --fix --max-warnings 0",

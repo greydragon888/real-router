@@ -4,7 +4,9 @@ import {
   Injector,
   REQUEST,
   TransferState,
+  inject,
   makeStateKey,
+  provideAppInitializer,
   runInInjectionContext,
 } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
@@ -583,6 +585,92 @@ describe("provideRealRouterFactory", () => {
       // Router still bootstrapped successfully via the regular start path.
       const router = TestBed.inject(ROUTER);
 
+      expect(router.isActive()).toBe(true);
+    });
+
+    // Closes review-2026-05-10 §5.7 ⛔ MED ("TransferState client read
+    // (hydrateRouter) — unit test missing"). Pre-seeds TransferState with
+    // an SSR-rendered router payload BEFORE bootstrap; verifies the
+    // client-side branch: (1) `hydrateRouter` consumes the JSON, (2) the
+    // one-shot TransferState entry is REMOVED after consumption (parity
+    // with `delete window.__SSR_STATE__` in other adapters), (3) router
+    // state matches the seeded payload's `name`/`params` (NOT the path
+    // that would have been derived from `window.location` / REQUEST).
+    it("client-side hydration: pre-seeded TransferState → hydrateRouter consumes + removes entry", async () => {
+      const seededState = JSON.stringify({
+        name: "users.profile",
+        params: { id: "999" },
+        path: "/users/999",
+        context: {},
+      });
+
+      // Seed TransferState via `provideAppInitializer` registered BEFORE
+      // `provideRealRouterFactory`. App initializers run in registration
+      // order; the seeding one writes to TransferState first, then the
+      // factory's initializer reads it and consumes via `hydrateRouter`.
+      TestBed.configureTestingModule({
+        providers: [
+          {
+            provide: REQUEST,
+            useValue: null,
+          },
+          // Seed initializer — runs first.
+          provideAppInitializer(() => {
+            const ts = inject(TransferState);
+
+            ts.set(makeStateKey<string>(ROUTER_STATE_KEY_NAME), seededState);
+          }),
+          // Then the factory's provideAppInitializer reads the seed.
+          provideRealRouterFactory({ baseRouter }),
+        ],
+      });
+
+      await TestBed.inject(ApplicationInitStatus).donePromise;
+
+      // (1) Router state matches the seeded payload, NOT a CSR-derived path.
+      const router = TestBed.inject(ROUTER);
+      const state = router.getState();
+
+      expect(state?.name).toBe("users.profile");
+      expect(state?.params).toStrictEqual({ id: "999" });
+
+      // (2) TransferState entry was REMOVED after consumption (one-shot
+      // semantic — `transferState.remove(ROUTER_STATE_KEY)` at line 241).
+      const transferState = TestBed.inject(TransferState);
+      const stillStored = transferState.get(
+        makeStateKey<string>(ROUTER_STATE_KEY_NAME),
+        null,
+      );
+
+      expect(stillStored).toBeNull();
+
+      // (3) Router is active and reads the hydrated state — no `start()`
+      // was called (which would have used baseRouter's defaultRoute path,
+      // not the seeded "users.profile" route).
+      expect(router.isActive()).toBe(true);
+    });
+  });
+
+  // Closes review-2026-05-10 §5.7 ⛔ LOW: deriveStartPath fallback "/" when
+  // neither REQUEST nor window.location is meaningful. In JSDOM `window`
+  // exists and `location.pathname` defaults to "/", so this branch is
+  // exercised implicitly by the "REQUEST is optional — falls back to
+  // window.location on client" test (line 154-173). Explicit pin-test
+  // for the case where REQUEST is null and `window.location.pathname` is
+  // exactly "/" — verifies the fallback resolves "home" as the active
+  // route.
+  describe("deriveStartPath fallback (review §5.7 LOW)", () => {
+    it("no REQUEST + window.location='/' → router starts at 'home' (defaultRoute)", async () => {
+      // jsdom defaults to http://localhost/ → pathname = "/".
+      TestBed.configureTestingModule({
+        providers: [provideRealRouterFactory({ baseRouter })],
+      });
+
+      await TestBed.inject(ApplicationInitStatus).donePromise;
+
+      const router = TestBed.inject(ROUTER);
+
+      expect(router.getState()?.name).toBe("home");
       expect(router.isActive()).toBe(true);
     });
   });

@@ -1,5 +1,4 @@
 import {
-  ApplicationRef,
   DestroyRef,
   REQUEST,
   TransferState,
@@ -20,7 +19,10 @@ import { cloneRouter } from "@real-router/core/api";
 import { hydrateRouter, serializeRouterState } from "@real-router/core/utils";
 import { createRouteSource } from "@real-router/sources";
 
-import { createScrollRestoration, createViewTransitions } from "./dom-utils";
+import {
+  installScrollRestoration,
+  installViewTransitions,
+} from "./internal/install";
 import { NAVIGATOR, ROUTE, ROUTER } from "./providers";
 import { sourceToSignal } from "./sourceToSignal";
 
@@ -263,36 +265,13 @@ export function provideRealRouterFactory<
   if (scrollRestoration) {
     providers.push(
       provideEnvironmentInitializer(() => {
-        const router = inject(ROUTER);
-        const sr = createScrollRestoration(router, scrollRestoration);
-
-        inject(DestroyRef).onDestroy(() => {
-          sr.destroy();
-        });
+        installScrollRestoration(scrollRestoration);
       }),
     );
   }
 
   if (viewTransitions === true) {
-    providers.push(
-      provideEnvironmentInitializer(() => {
-        const router = inject(ROUTER);
-        const appRef = inject(ApplicationRef);
-
-        // Mirror `provideRealRouter` — force synchronous CD before VT capture.
-        // See providers.ts for the full rationale (rAF + VT timing).
-        const offTick = router.subscribe(() => {
-          appRef.tick();
-        });
-
-        const vt = createViewTransitions(router);
-
-        inject(DestroyRef).onDestroy(() => {
-          offTick();
-          vt.destroy();
-        });
-      }),
-    );
+    providers.push(provideEnvironmentInitializer(installViewTransitions));
   }
 
   return makeEnvironmentProviders(providers);

@@ -1,3 +1,4 @@
+/* eslint-disable vitest/expect-expect -- type-only tests using `expectTypeOf<>()` provide compile-time assertions without runtime expect() calls */
 import { TestBed } from "@angular/core/testing";
 import { createRouter } from "@real-router/core";
 import { describe, it, expect, expectTypeOf } from "vitest";
@@ -16,22 +17,16 @@ describe("RouteSignals type surface", () => {
       readonly routeState: Signal<RouteSnapshot>;
       readonly navigator: Navigator;
     }>();
-
-    expect(true).toBe(true);
   });
 
   it("routeState is a readonly Signal (not a WritableSignal)", () => {
     expectTypeOf<RouteSignals["routeState"]>().toEqualTypeOf<
       Signal<RouteSnapshot>
     >();
-
-    expect(true).toBe(true);
   });
 
   it("navigator is the core Navigator type", () => {
     expectTypeOf<RouteSignals["navigator"]>().toEqualTypeOf<Navigator>();
-
-    expect(true).toBe(true);
   });
 });
 
@@ -41,8 +36,6 @@ describe("ErrorContext type surface", () => {
       $implicit: RouterError;
       resetError: () => void;
     }>();
-
-    expect(true).toBe(true);
   });
 });
 
@@ -55,8 +48,6 @@ describe("RouteView routeNode alias contract", () => {
   // `examples/web/angular/*` and the `.d.ts` snapshot below.
   it("RouteView exposes 'nodeName' as a callable signal returning string", () => {
     expectTypeOf<RouteView["nodeName"]>().toExtend<() => string>();
-
-    expect(true).toBe(true);
   });
 
   it("instantiated RouteView has nodeName signal callable with default value", async () => {

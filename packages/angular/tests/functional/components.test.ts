@@ -789,3 +789,15 @@ describe("NavigationAnnouncer component", () => {
     expect(element.textContent.trim()).toBe("");
   });
 });
+
+// Closes [#630] — RouteView source-creation also captured at ngOnInit;
+// same architectural fix applied to recreate `createRouteNodeSource` when
+// `nodeName()` input changes. JIT-mode tests pin structural change only;
+// full reactive-input verification requires AOT.
+describe("RouteView — #630 architectural fix (constructor + effect)", () => {
+  it("does NOT implement OnInit (ngOnInit removed in favor of constructor + effect)", () => {
+    expect(
+      (RouteView.prototype as unknown as { ngOnInit?: () => void }).ngOnInit,
+    ).toBeUndefined();
+  });
+});

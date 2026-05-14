@@ -12,10 +12,29 @@ export interface RouteAnnouncerOptions {
   getAnnouncementText?: (route: State) => string;
 }
 
+const NOOP_INSTANCE: { destroy: () => void } = Object.freeze({
+  destroy: () => {
+    /* no-op */
+  },
+});
+
 export function createRouteAnnouncer(
   router: Router,
   options?: RouteAnnouncerOptions,
 ): { destroy: () => void } {
+  // Defensive SSR / non-browser guard: in SSR (Node.js) or non-DOM
+  // environments, `document` is undefined and the announcer cannot
+  // attach its aria-live region. Return a frozen NOOP_INSTANCE — same
+  // pattern as `createDirectionTracker`, `createScrollRestoration`, and
+  // `createViewTransitions`. Without this guard, `NavigationAnnouncer`
+  // component construction would throw `ReferenceError: document is not
+  // defined` under `@angular/ssr` rendering, tearing down the whole SSR
+  // bootstrap. Closes review-2026-05-10 §5.10 ⛔ "NavigationAnnouncer
+  // SSR mode" MED.
+  if (typeof document === "undefined") {
+    return NOOP_INSTANCE;
+  }
+
   const prefix = options?.prefix ?? "Navigated to ";
   const getCustomText = options?.getAnnouncementText;
 
@@ -117,7 +136,21 @@ function getOrCreateAnnouncer(): HTMLElement {
   element.setAttribute("aria-atomic", "true");
   element.setAttribute(ANNOUNCER_ATTR, "");
 
-  document.body.prepend(element);
+  // Defensive SSR / pre-`<body>` guard: in some environments (early
+  // injection, deferred-body documents, certain SSR rehydration paths)
+  // `document.body` can be null when the announcer is constructed.
+  // `document.body.prepend(...)` would throw `TypeError: Cannot read
+  // properties of null`, tearing down the consumer's RouterProvider /
+  // NavigationAnnouncer mount. Fallback to `documentElement` keeps the
+  // announcer working for SR users; visual-hidden styling means there is
+  // no visible artifact regardless of mount point.
+  //
+  // TS dom lib types `document.body` as `HTMLElement` (non-null), but
+  // runtime can return null per spec. The `as` cast narrows the type to
+  // include null so the `??` short-circuit is type-safe.
+  ((document.body as HTMLElement | null) ?? document.documentElement).prepend(
+    element,
+  );
 
   return element;
 }

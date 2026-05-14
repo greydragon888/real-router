@@ -47,6 +47,7 @@ export type {
 export {
   createStartInterceptor,
   createReplaceHistoryState,
+  createPluginBuildUrl,
   shouldReplaceHistory,
 } from "./plugin-utils.js";
 

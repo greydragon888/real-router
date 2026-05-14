@@ -1,13 +1,5 @@
 import { NgTemplateOutlet } from "@angular/common";
-import {
-  Component,
-  computed,
-  DestroyRef,
-  effect,
-  inject,
-  input,
-  output,
-} from "@angular/core";
+import { Component, computed, effect, input, output } from "@angular/core";
 import { createDismissableError } from "@real-router/sources";
 
 import { injectRouter } from "../functions/injectRouter";
@@ -59,8 +51,13 @@ export class RouterErrorBoundary {
   );
 
   constructor() {
-    const destroyRef = inject(DestroyRef);
-    const effectRef = effect(() => {
+    // `effect()` registers itself with the current injection context's
+    // `DestroyRef` and tears down automatically when the component is
+    // destroyed. The earlier manual `effectRef.destroy()` wired through
+    // `inject(DestroyRef).onDestroy(...)` duplicated that built-in cleanup
+    // (audit §8.1 LOW — confirmed: no behavior change without the manual
+    // path).
+    effect(() => {
       const snap = this.snapshot();
 
       if (snap.error) {
@@ -70,10 +67,6 @@ export class RouterErrorBoundary {
           fromRoute: snap.fromRoute,
         });
       }
-    });
-
-    destroyRef.onDestroy(() => {
-      effectRef.destroy();
     });
   }
 }
