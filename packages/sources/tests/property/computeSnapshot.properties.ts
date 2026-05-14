@@ -49,11 +49,13 @@ describe("computeSnapshot — invariants", () => {
 
       const route = router.getState();
 
-      if (route === undefined) {
-        router.stop();
+      router.stop();
 
-        return;
-      }
+      // Discard runs where navigation didn't land on a defined route — these
+      // don't exercise the property under test. Using `fc.pre` lets fast-check
+      // shrink toward inputs that actually run the assertions, instead of
+      // silently treating "no route" as a passing run.
+      fc.pre(route !== undefined);
 
       const next = { route, previousRoute: undefined };
 
@@ -61,8 +63,6 @@ describe("computeSnapshot — invariants", () => {
       const twice = computeSnapshot(once, router, nodeName, next);
 
       expect(twice).toBe(once);
-
-      router.stop();
     },
   );
 
@@ -138,6 +138,74 @@ describe("computeSnapshot — invariants", () => {
       const snap = computeSnapshot(INITIAL_SNAPSHOT, router, nodeName);
 
       expect(snap.route).toBeUndefined();
+      // previousRoute carries forward from the INITIAL_SNAPSHOT we feed in;
+      // an unrelated-route transition must not invent a previousRoute either.
+      expect(snap.previousRoute).toBeUndefined();
+      // Reference identity: when the node is inactive, computeSnapshot returns
+      // INITIAL_SNAPSHOT verbatim (path through stabilizeState short-circuit).
+      expect(snap).toBe(INITIAL_SNAPSHOT);
+
+      router.stop();
+    },
+  );
+});
+
+describe("computeSnapshot — nodeName containment monotonicity", () => {
+  test.prop([arbRouteName], { numRuns: NUM_RUNS.standard })(
+    "leaf-active ⇒ ancestor-active: snap(node=A.B) defined ⇒ snap(node=A) defined",
+    async (routeName) => {
+      // Only meaningful for nested routes — top-level routes have no ancestor.
+      fc.pre(routeName.includes("."));
+
+      const router = await createStartedRouter();
+
+      await router.navigate(routeName, paramsForRoute(routeName)).catch(() => {
+        // ignore
+      });
+
+      const leafName = routeName;
+      const ancestorName = leafName.slice(0, leafName.lastIndexOf("."));
+
+      const leafSnap = computeSnapshot(INITIAL_SNAPSHOT, router, leafName);
+      const ancestorSnap = computeSnapshot(
+        INITIAL_SNAPSHOT,
+        router,
+        ancestorName,
+      );
+
+      if (leafSnap.route !== undefined) {
+        expect(ancestorSnap.route).toBeDefined();
+        // And the ancestor sees the same active route, since both contain it.
+        expect(ancestorSnap.route?.name).toBe(leafSnap.route.name);
+      }
+
+      router.stop();
+    },
+  );
+
+  test.prop([arbRouteName], { numRuns: NUM_RUNS.standard })(
+    "root (node='') is always at-least-as-active as any specific nodeName",
+    async (routeName) => {
+      fc.pre(routeName !== "home");
+
+      const router = await createStartedRouter();
+
+      await router.navigate(routeName, paramsForRoute(routeName)).catch(() => {
+        // ignore
+      });
+
+      const rootSnap = computeSnapshot(INITIAL_SNAPSHOT, router, "");
+      const nodeSnap = computeSnapshot(INITIAL_SNAPSHOT, router, routeName);
+
+      // Root is always active when a route is active → if nodeSnap.route is
+      // defined, rootSnap.route must equal it (root contains every node).
+      if (nodeSnap.route === undefined) {
+        // Root may still be defined (router has some route) even when the
+        // specific node isn't related — root is a superset.
+        expect(rootSnap.route).toBe(router.getState());
+      } else {
+        expect(rootSnap.route).toBe(nodeSnap.route);
+      }
 
       router.stop();
     },

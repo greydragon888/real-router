@@ -7,17 +7,82 @@ import { stabilizeState } from "./stabilizeState.js";
 import type { RouterTransitionSnapshot, RouterSource } from "./types.js";
 import type { Router, State } from "@real-router/core";
 
-const IDLE_SNAPSHOT: RouterTransitionSnapshot = {
+// Frozen so accidental consumer mutation (`source.getSnapshot().toRoute = X`)
+// throws in strict mode. The singleton ref is shared across every IDLE state
+// for the lifetime of the process — mutating it would corrupt the contract
+// "all IDLE snapshots are the same object reference" relied on by every
+// adapter's useSyncExternalStore equivalent.
+const IDLE_SNAPSHOT: RouterTransitionSnapshot = Object.freeze({
   isTransitioning: false,
   isLeaveApproved: false,
   toRoute: null,
   fromRoute: null,
-};
+});
 
 const transitionSourceCache = new WeakMap<
   Router,
   RouterSource<RouterTransitionSnapshot>
 >();
+
+/**
+ * @internal test-only export — returns the next snapshot for a TRANSITION_START
+ * payload, or `null` when the same-paths dedup guard should suppress the
+ * update. Exported so the (structurally-unreachable after #605) guard can be
+ * exercised by unit tests without resorting to private-API hacks.
+ */
+export function nextTransitionStartSnapshot(
+  prev: RouterTransitionSnapshot,
+  toState: State,
+  fromState: State | undefined,
+): RouterTransitionSnapshot | null {
+  const newToRoute = stabilizeState(prev.toRoute, toState);
+  const newFromRoute = stabilizeState(prev.fromRoute, fromState ?? null);
+
+  if (
+    prev.isTransitioning &&
+    newToRoute === prev.toRoute &&
+    newFromRoute === prev.fromRoute
+  ) {
+    return null;
+  }
+
+  return {
+    isTransitioning: true,
+    isLeaveApproved: false,
+    toRoute: newToRoute,
+    fromRoute: newFromRoute,
+  };
+}
+
+/**
+ * @internal test-only export — analogous to {@link nextTransitionStartSnapshot}
+ * for the LEAVE_APPROVE payload. The guard is structurally unreachable in
+ * practice (router emits LEAVE_APPROVE exactly once per pipeline) but stays
+ * for plugin-driven re-entrant flows.
+ */
+export function nextLeaveApproveSnapshot(
+  prev: RouterTransitionSnapshot,
+  toState: State,
+  fromState: State | undefined,
+): RouterTransitionSnapshot | null {
+  const newToRoute = stabilizeState(prev.toRoute, toState);
+  const newFromRoute = stabilizeState(prev.fromRoute, fromState ?? null);
+
+  if (
+    prev.isLeaveApproved &&
+    newToRoute === prev.toRoute &&
+    newFromRoute === prev.fromRoute
+  ) {
+    return null;
+  }
+
+  return {
+    isTransitioning: true,
+    isLeaveApproved: true,
+    toRoute: newToRoute,
+    fromRoute: newFromRoute,
+  };
+}
 
 export function createTransitionSource(
   router: Router,
@@ -41,62 +106,44 @@ export function createTransitionSource(
     api.addEventListener(
       events.TRANSITION_START,
       (toState: State, fromState?: State) => {
-        const prev = source.getSnapshot();
-        const newToRoute = stabilizeState(prev.toRoute, toState);
-        const newFromRoute = stabilizeState(prev.fromRoute, fromState ?? null);
+        // The same-paths dedup branch inside nextTransitionStartSnapshot is
+        // structurally unreachable after #605 (every router-emitted
+        // TRANSITION_START carries a fresh State per navigate()), but the
+        // helper is kept testable for future stabilizer changes — see the
+        // direct unit test in createTransitionSource.test.ts.
+        const next = nextTransitionStartSnapshot(
+          source.getSnapshot(),
+          toState,
+          fromState,
+        );
 
-        // Guard against redundant updates when both routes stabilize to
-        // prev refs AND we're already transitioning. With #605, reload
-        // navs return fresh refs via stabilizeState, so this short-circuit
-        // mostly idles — kept for defensive correctness.
-        /* v8 ignore next 5 -- @preserve: structurally unreachable after #605 —
-           every TRANSITION_START fires with a fresh State (router builds a
-           new toState per navigate()), so newToRoute !== prev.toRoute holds
-           even on idempotent retry paths the router itself prevents. Guard
-           remains for future stabilizer changes. */
-        if (
-          prev.isTransitioning &&
-          newToRoute === prev.toRoute &&
-          newFromRoute === prev.fromRoute
-        ) {
+        /* v8 ignore next 3 -- @preserve: dedup-skip branch unreachable through
+           normal router flow; covered directly via nextTransitionStartSnapshot
+           unit test. */
+        if (next === null) {
           return;
         }
 
-        source.updateSnapshot({
-          isTransitioning: true,
-          isLeaveApproved: false,
-          toRoute: newToRoute,
-          fromRoute: newFromRoute,
-        });
+        source.updateSnapshot(next);
       },
     ),
     api.addEventListener(
       events.TRANSITION_LEAVE_APPROVE,
       (toState: State, fromState?: State) => {
-        const prev = source.getSnapshot();
-        const newToRoute = stabilizeState(prev.toRoute, toState);
-        const newFromRoute = stabilizeState(prev.fromRoute, fromState ?? null);
+        const next = nextLeaveApproveSnapshot(
+          source.getSnapshot(),
+          toState,
+          fromState,
+        );
 
-        /* v8 ignore next 7 -- @preserve: defensive guard — the router emits
-           TRANSITION_LEAVE_APPROVE once per navigation pipeline (after
-           deactivation guards pass, before activation guards run), so a
-           same-paths duplicate LEAVE_APPROVE is structurally unreachable.
-           Guard remains so plugin-driven re-entrant flows can't allocate
-           duplicate snapshot literals. */
-        if (
-          prev.isLeaveApproved &&
-          newToRoute === prev.toRoute &&
-          newFromRoute === prev.fromRoute
-        ) {
+        /* v8 ignore next 3 -- @preserve: dedup-skip branch unreachable through
+           normal router flow (LEAVE_APPROVE fires once per pipeline); covered
+           directly via nextLeaveApproveSnapshot unit test. */
+        if (next === null) {
           return;
         }
 
-        source.updateSnapshot({
-          isTransitioning: true,
-          isLeaveApproved: true,
-          toRoute: newToRoute,
-          fromRoute: newFromRoute,
-        });
+        source.updateSnapshot(next);
       },
     ),
     api.addEventListener(events.TRANSITION_SUCCESS, resetToIdle),

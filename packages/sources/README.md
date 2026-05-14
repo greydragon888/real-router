@@ -68,6 +68,8 @@ Cached factories (`createRouteNodeSource`, `createActiveRouteSource`, `getTransi
 
 Non-cached factories (`createRouteSource`, `createTransitionSource`, `createErrorSource`) return a fresh instance every call with real teardown on `destroy()` — use when you need an isolated source.
 
+All route-state sources (`createRouteSource`, `createRouteNodeSource`, `createActiveRouteSource`) deduplicate via `stabilizeState`: same-path non-reload transitions preserve the snapshot reference and skip listener notifications. Reload navigations bypass dedup. See [INVARIANTS.md](./INVARIANTS.md) #6.
+
 ### Lazy vs Eager Subscription
 
 - `createRouteSource`, `createRouteNodeSource`, `createActiveRouteSource` — **lazy**: subscribe to the router on first listener, unsubscribe when all removed
@@ -80,10 +82,18 @@ Non-cached factories (`createRouteSource`, `createTransitionSource`, `createErro
 const source = createActiveRouteSource(router, "users", undefined, {
   strict: false, // default: false — match descendants too
   ignoreQueryParams: true, // default: true
+  hash: undefined, // default: undefined — ignore URL fragment.
+  //                 string → match iff state.context.url.hash equals it (#532).
 });
 ```
 
-Params are hashed with `canonicalJson()`, so `{a: 1, b: 2}` and `{b: 2, a: 1}` hit the same cache entry. `BigInt`/`Symbol`/circular refs fall back to a fresh non-cached source.
+| Option              | Type        | Default       | Effect                                                                                                                                                                                                                                                       |
+| ------------------- | ----------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `strict`            | `boolean`   | `false`       | When `false`, parent route is active when the current route is a descendant; when `true`, only an exact name match is active.                                                                                                                                  |
+| `ignoreQueryParams` | `boolean`   | `true`        | Whether to drop query-string params before comparing.                                                                                                                                                                                                          |
+| `hash`              | `string`    | `undefined`   | When set, source is active iff route matches **and** `state.context.url.hash` equals this value. Requires a URL-publishing plugin (browser/navigation); under hash-plugin or memory-plugin (no `context.url` namespace), a non-`undefined` hash is always `false`. |
+
+Params are hashed with `canonicalJson()`, so `{a: 1, b: 2}` and `{b: 2, a: 1}` hit the same cache entry. `BigInt`/circular refs fall back to a fresh non-cached source with a working `destroy()` — call it to release the router subscription.
 
 ## Usage Examples
 

@@ -20,14 +20,12 @@ const activeSourceCache = new WeakMap<
  * (`{ a:1, b:2 }` and `{ b:2, a:1 }` hit the same cache entry via
  * `canonicalJson`).
  *
- * `destroy()` is a no-op — shared sources live with the router. The router
- * subscription stays active while any consumer subscribes; when the router
- * is garbage-collected, the WeakMap entry releases automatically.
+ * For cached entries `destroy()` is a no-op — shared sources live with the
+ * router and release automatically on router GC (WeakMap entry).
  *
- * Edge cases: `Symbol`/`BigInt` in params bypass `canonicalJson` and produce
- * an unstable cache key — these will simply miss the cache and create a new
- * source on each call. Practical params are primitives, so this is not a
- * concern in real usage.
+ * `BigInt`/circular params can't be serialized → the source bypasses the cache
+ * and `destroy()` becomes a real teardown that detaches the underlying
+ * `router.subscribe` handle.
  */
 export function createActiveRouteSource(
   router: Router,
@@ -49,13 +47,23 @@ export function createActiveRouteSource(
     // if unusual, fragment).
     const hashKey = hash === undefined ? "" : `#${hash}`;
 
+    // Delimiter `|` is safe because route names use `.` as the segment
+    // separator (`users.list`, not `users|list`) and canonicalJson-encoded
+    // params escape `"` (so any literal `|` inside params lives inside a
+    // quoted JSON string and can't be confused with our delimiter). If route
+    // names ever grow a `|` character, this composite key would become
+    // ambiguous — change the separator to a control char or hash-encode each
+    // field.
     key = `${routeName}|${canonicalJson(params)}|${String(strict)}|${String(ignoreQueryParams)}|${hashKey}`;
   } catch {
     key = undefined;
   }
 
   if (key === undefined) {
-    const source = buildActiveRouteSource(
+    // Non-cached fallback (canonicalJson threw on BigInt / circular / etc.).
+    // Return the real source — `destroy()` must unwind the router subscription;
+    // otherwise the wrapper leaks for the lifetime of the router.
+    return buildActiveRouteSource(
       router,
       routeName,
       params,
@@ -63,12 +71,6 @@ export function createActiveRouteSource(
       ignoreQueryParams,
       hash,
     );
-
-    return {
-      subscribe: source.subscribe,
-      getSnapshot: source.getSnapshot,
-      destroy: noopDestroy,
-    };
   }
 
   let perRouter = activeSourceCache.get(router);
@@ -165,13 +167,20 @@ function buildActiveRouteSource(
     hash,
   );
 
-  const source = new BaseSource(initialValue);
+  let routerUnsubscribe: (() => void) | undefined;
 
-  // Eager connection: subscribe to router immediately. This source is only
-  // ever reached through the cached public `createActiveRouteSource`, whose
-  // returned wrapper has a no-op destroy. The source lives with the router;
-  // the router.subscribe handle is released on router GC.
-  router.subscribe((next) => {
+  const source = new BaseSource(initialValue, {
+    onDestroy: () => {
+      routerUnsubscribe?.();
+      routerUnsubscribe = undefined;
+    },
+  });
+
+  // Eager connection: subscribe to router immediately. For the cached path,
+  // the returned wrapper has a no-op destroy and the handle lives with the
+  // router (released on router GC). For the non-cached fallback (BigInt /
+  // circular params), the handle is unwound through `onDestroy` above.
+  routerUnsubscribe = router.subscribe((next) => {
     const isNewRelated = areRoutesRelated(routeName, next.route.name);
     const isPrevRelated =
       next.previousRoute &&

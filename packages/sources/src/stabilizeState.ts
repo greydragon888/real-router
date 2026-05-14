@@ -66,5 +66,14 @@ function readContextHash(state: State | null | undefined): string | undefined {
 }
 
 function readReloadFlag(state: State | null | undefined): boolean {
-  return state?.transition.reload === true;
+  // Defensive read: `transition` is mandatory in the public State type, but a
+  // plugin returning a malformed state (or a future fork) shouldn't crash the
+  // stabilizer with a TypeError. We cast to a structurally-loose shape so the
+  // optional chain is permitted; the runtime guard preserves dedup (false =
+  // not-a-reload) for malformed inputs.
+  const transition = (
+    state as { transition?: { reload?: boolean } } | null | undefined
+  )?.transition;
+
+  return transition?.reload === true;
 }

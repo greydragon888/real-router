@@ -117,10 +117,10 @@ describe("createDismissableError", () => {
 
     const secondSnap = source.getSnapshot();
 
-    expect(secondSnap.error).not.toBeNull();
     expect(secondSnap.version).toBeGreaterThan(firstSnap.version);
-    // Same error code (same behaviour — core may reuse the error instance)
-    expect(secondSnap.error!.code).toBe(firstError!.code);
+    // Core reuses the RouterError instance for repeated identical failures
+    // (ROUTE_NOT_FOUND on the same target) — assert reference identity.
+    expect(secondSnap.error).toBe(firstError);
 
     unsub();
   });
@@ -137,9 +137,38 @@ describe("createDismissableError", () => {
 
     source.getSnapshot().resetError();
 
-    expect(notifications.length).toBeGreaterThanOrEqual(2);
-    expect(notifications[0]).toBe("ROUTE_NOT_FOUND");
-    expect(notifications.at(-1)).toBeNull();
+    // Exactly two notifications: ROUTE_NOT_FOUND emitted by the error event,
+    // then null emitted by resetError() advancing dismissedVersion.
+    expect(notifications).toStrictEqual(["ROUTE_NOT_FOUND", null]);
+
+    unsub();
+  });
+
+  it("resetError() is a no-op when already dismissed at the current version (audit §8.3)", async () => {
+    const source = createDismissableError(router);
+    const notifications: (string | null)[] = [];
+
+    const unsub = source.subscribe(() => {
+      notifications.push(source.getSnapshot().error?.code ?? null);
+    });
+
+    await expect(router.navigate("nonexistent")).rejects.toThrow();
+
+    // First resetError advances dismissedVersion → emits one notification.
+    source.getSnapshot().resetError();
+
+    const snapshotAfterFirstReset = source.getSnapshot();
+    const notificationsAfterFirstReset = notifications.length;
+
+    // Three additional resetError() calls — all no-ops because dismissedVersion
+    // is already at or above the live error-source version. No extra snapshot
+    // allocations, no extra listener calls.
+    source.getSnapshot().resetError();
+    source.getSnapshot().resetError();
+    source.getSnapshot().resetError();
+
+    expect(source.getSnapshot()).toBe(snapshotAfterFirstReset);
+    expect(notifications).toHaveLength(notificationsAfterFirstReset);
 
     unsub();
   });

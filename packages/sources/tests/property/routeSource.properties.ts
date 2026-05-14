@@ -2,6 +2,7 @@ import { fc, test } from "@fast-check/vitest";
 import { describe, expect, vi } from "vitest";
 
 import {
+  avoidsSameStateNavigations,
   createStartedRouter,
   arbNavigation,
   arbNavigationSeq,
@@ -128,16 +129,7 @@ describe("snapshot tracking", () => {
   test.prop([arbNavigationSeq], { numRuns: NUM_RUNS.async })(
     "source listener is called at most once per navigation",
     async (navigations) => {
-      fc.pre(
-        navigations[0].name !== "home" &&
-          navigations.every(
-            (nav, i) =>
-              i === 0 ||
-              nav.name !== navigations[i - 1].name ||
-              nav.name === "users.view" ||
-              nav.name === "users.edit",
-          ),
-      );
+      fc.pre(avoidsSameStateNavigations(navigations));
 
       const router = await createStartedRouter();
       const source = createRouteSource(router);
@@ -335,6 +327,68 @@ describe("lazy-connection", () => {
 
 // ===
 
+describe("subscribe order (listener added before onFirstSubscribe)", () => {
+  test.prop([arbListenerCount], { numRuns: NUM_RUNS.standard })(
+    "first listener is registered BEFORE onFirstSubscribe runs (no missed notifications)",
+    async (extraListeners) => {
+      // Drive the BaseSource invariant: if `onFirstSubscribe` itself triggered
+      // an `updateSnapshot`, the just-added listener must observe it. We can't
+      // see onFirstSubscribe directly, but we can prove the contract via the
+      // "reconcile on reconnect" path that exercises it (#605 reload bypass).
+      const router = await createStartedRouter();
+
+      // Prime the router to a non-initial state so reconnect has something
+      // distinct to reconcile against.
+      await router.navigate("users.list");
+
+      const source = createRouteSource(router);
+      const unsubs: (() => void)[] = [];
+
+      for (let i = 0; i < extraListeners; i++) {
+        unsubs.push(source.subscribe(() => {}));
+      }
+
+      // After all listeners subscribe, every getSnapshot() must reflect the
+      // current router state — the first subscribe seeds the router connection
+      // and any subsequent listener sees the same snapshot.
+      expect(source.getSnapshot().route?.name).toBe("users.list");
+
+      for (const u of unsubs) {
+        u();
+      }
+
+      router.stop();
+    },
+  );
+
+  test.prop([arbNavigation], { numRuns: NUM_RUNS.async })(
+    "subscribe → navigate → unsubscribe → subscribe: post-reconnect listener receives next nav",
+    async (nav) => {
+      fc.pre(nav.name !== "home" && nav.name !== "admin.dashboard");
+
+      const router = await createStartedRouter();
+      const source = createRouteSource(router);
+
+      const unsub1 = source.subscribe(vi.fn());
+
+      await router.navigate(nav.name, nav.params);
+
+      unsub1();
+
+      const listener2 = vi.fn();
+      const unsub2 = source.subscribe(listener2);
+
+      await router.navigate("admin.dashboard");
+
+      // The re-subscribed listener must see the post-reconnect navigation.
+      expect(listener2).toHaveBeenCalledTimes(1);
+
+      unsub2();
+      router.stop();
+    },
+  );
+});
+
 describe("destroy", () => {
   test.prop([arbNavigation, arbNavigation], { numRuns: NUM_RUNS.async })(
     "destroy() removes router subscription",
@@ -350,6 +404,41 @@ describe("destroy", () => {
       await router.navigate(navA.name, navA.params);
       source.destroy();
       await router.navigate(navB.name, navB.params);
+
+      expect(listener).toHaveBeenCalledTimes(1);
+
+      router.stop();
+    },
+  );
+
+  test.prop([arbNavigation, fc.integer({ min: 2, max: 10 })], {
+    numRuns: NUM_RUNS.async,
+  })(
+    "1 pre-destroy nav → destroy → N post-destroy navs: listener still called exactly once",
+    async (preDestroyNav, postDestroyCount) => {
+      fc.pre(preDestroyNav.name !== "home" && preDestroyNav.name !== "users");
+
+      const router = await createStartedRouter();
+      const source = createRouteSource(router);
+      const listener = vi.fn();
+
+      source.subscribe(listener);
+
+      // Single pre-destroy navigation — exactly one listener call.
+      await router.navigate(preDestroyNav.name, preDestroyNav.params);
+
+      expect(listener).toHaveBeenCalledTimes(1);
+
+      source.destroy();
+
+      // N post-destroy navigations — listener count must stay at 1.
+      const targets = ["users.list", "admin.dashboard", "search"];
+
+      for (let i = 0; i < postDestroyCount; i++) {
+        await router
+          .navigate(targets[i % targets.length], { q: "x", page: "1" })
+          .catch(() => {});
+      }
 
       expect(listener).toHaveBeenCalledTimes(1);
 
@@ -385,16 +474,7 @@ describe("destroy", () => {
   test.prop([arbNavigationSeq], { numRuns: NUM_RUNS.async })(
     "getSnapshot() after destroy returns last snapshot before destroy",
     async (navigations) => {
-      fc.pre(
-        navigations[0].name !== "home" &&
-          navigations.every(
-            (nav, i) =>
-              i === 0 ||
-              nav.name !== navigations[i - 1].name ||
-              nav.name === "users.view" ||
-              nav.name === "users.edit",
-          ),
-      );
+      fc.pre(avoidsSameStateNavigations(navigations));
 
       const router = await createStartedRouter();
       const source = createRouteSource(router);
@@ -417,15 +497,8 @@ describe("destroy", () => {
     "subscribe() after destroy returns no-op unsubscribe, listener not called",
     async (navigations, postDestroyNav) => {
       fc.pre(
-        navigations[0].name !== "home" &&
-          postDestroyNav.name !== "home" &&
-          navigations.every(
-            (nav, i) =>
-              i === 0 ||
-              nav.name !== navigations[i - 1].name ||
-              nav.name === "users.view" ||
-              nav.name === "users.edit",
-          ),
+        avoidsSameStateNavigations(navigations) &&
+          postDestroyNav.name !== "home",
       );
 
       const router = await createStartedRouter();

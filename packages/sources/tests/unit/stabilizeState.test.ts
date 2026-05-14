@@ -300,4 +300,50 @@ describe("stabilizeState", () => {
       expect(stabilizeState(prev, next)).toBe(prev);
     });
   });
+
+  describe("defensive reload-flag read (audit §5.G)", () => {
+    it("state with missing `.transition` does not throw (dedups normally)", () => {
+      // Type-erased input simulating a malformed state from a plugin or
+      // future fork. The dedup path must NOT throw TypeError when
+      // `state.transition` is undefined.
+      const malformed = {
+        name: "home",
+        params: {},
+        path: "/",
+        context: {},
+        // transition: missing
+      } as unknown as State;
+
+      // path-equal → dedup branch reads transition.reload. With the defensive
+      // optional chain, the read returns false (not-a-reload) and we dedup.
+      expect(() => stabilizeState(malformed, malformed)).not.toThrow();
+
+      // Different references, same path, no transition → still dedups to prev.
+      const malformed2 = {
+        name: "home",
+        params: {},
+        path: "/",
+        context: {},
+      } as unknown as State;
+
+      expect(stabilizeState(malformed, malformed2)).toBe(malformed);
+    });
+
+    it("state with missing `.transition` and different path returns next", () => {
+      const malformedA = {
+        name: "home",
+        params: {},
+        path: "/",
+        context: {},
+      } as unknown as State;
+      const malformedB = {
+        name: "users",
+        params: {},
+        path: "/users",
+        context: {},
+      } as unknown as State;
+
+      expect(stabilizeState(malformedA, malformedB)).toBe(malformedB);
+    });
+  });
 });

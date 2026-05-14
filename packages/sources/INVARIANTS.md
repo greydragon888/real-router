@@ -26,6 +26,13 @@
 | 6   | K subscribe/unsubscribe cycles produce zero leaked subscriptions    | Repeated mount/unmount cycles leave no dangling router subscriptions. The spy call count equals the number of cycles.                                   |
 | 7   | Double-unsubscribe is safe and does not affect remaining listeners  | Calling a returned unsubscribe function twice is a no-op the second time. Other active listeners continue to receive updates normally.                  |
 
+## createRouteSource — Subscribe Order
+
+| #   | Invariant                                                                                | Description                                                                                                                              |
+| --- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | First listener is registered BEFORE `onFirstSubscribe` runs                              | Synchronous `updateSnapshot` triggered from inside `onFirstSubscribe` reaches the just-added listener — verified via post-prime snapshot identity. |
+| 2   | `subscribe → navigate → unsubscribe → subscribe` reconnects without missing navigations  | The re-subscribed listener observes a subsequent navigation exactly once, confirming the reconnect path re-arms the listener set.        |
+
 ## createRouteSource — Destroy
 
 | #   | Invariant                                           | Description                                                                                                                                              |
@@ -60,6 +67,15 @@
 | 4   | Snapshot is current after multiple mount/unmount cycles with navigations | Across repeated subscribe/navigate/unsubscribe/resubscribe cycles, the snapshot always reflects the actual current router state on reconnection.  |
 | 5   | Double-unsubscribe is safe and does not affect remaining listeners       | Calling a returned unsubscribe function twice is a no-op the second time. Other active listeners continue to receive updates normally.            |
 
+## createRouteNodeSource — Cache Identity
+
+| #   | Invariant                                                                                  | Description                                                                                                                |
+| --- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `createRouteNodeSource(router, name)` returns the same instance for the same `(router, name)` key | Per-router × per-nodeName caching is reference-stable.                                                            |
+| 2   | Different nodeNames on the same router yield different instances                           | Cache differentiation on the nodeName dimension.                                                                          |
+| 3   | Different routers are isolated: same nodeName yields independent instances                 | WeakMap keying prevents cross-router cache collisions.                                                                     |
+| 4   | Different-router subscriptions are isolated                                                | A navigation on one router does not notify subscribers of a source bound to a different router (same nodeName).            |
+
 ## createRouteNodeSource — Destroy
 
 | #   | Invariant                                       | Description                                                                                                       |
@@ -88,6 +104,15 @@
 | 2   | Listener not called for navigations between unrelated routes          | When navigating between routes that have no relationship to the tracked route, the listener is never invoked.                                                        |
 | 3   | Listener called when navigating to and from watched route             | When navigating into or out of the tracked route (and the boolean value changes), the listener is invoked.                                                           |
 
+## createActiveRouteSource — Cache Identity (canonicalJson-keyed)
+
+| #   | Invariant                                                                                  | Description                                                                                                                       |
+| --- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Params equivalent under `canonicalJson` hit the same cache entry                           | `{a:1, b:2}` and reordered `{b:2, a:1}` deterministically yield the same source instance.                                         |
+| 2   | Different routers are isolated under the same `(name, params, options)` key                | WeakMap keying prevents cross-router cache collisions.                                                                            |
+| 3   | Hash-aware monotonicity under no-url-plugin fixture                                        | When `opts.hash !== undefined` and the router has no URL-publishing plugin, the snapshot is `false` across every navigation (#532). |
+| 4   | Hash-aware variants are cache-isolated from hash-less variants                             | The same `(name, params, options-without-hash)` and `(name, params, options-with-hash)` calls return different instances.         |
+
 ## createActiveRouteSource — Destroy
 
 | #   | Invariant                                                   | Description                                                                                                                 |
@@ -102,7 +127,7 @@
 
 | #   | Invariant                                                            | Description                                                                                                                                        |
 | --- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Initial snapshot is IDLE regardless of prior router state            | `getSnapshot()` returns `{ isTransitioning: false, toRoute: null, fromRoute: null }` at creation time, no matter what navigations occurred before. |
+| 1   | Initial snapshot is IDLE regardless of prior router state            | `getSnapshot()` returns `{ isTransitioning: false, isLeaveApproved: false, toRoute: null, fromRoute: null }` at creation time, no matter what navigations occurred before. |
 | 2   | isTransitioning is true and toRoute set at TRANSITION_START          | When a navigation begins (observable via an async guard), `isTransitioning` is `true` and `toRoute.name` equals the navigation target.             |
 | 3   | Snapshot returns to IDLE after each successful navigation            | After every completed navigation, the snapshot is back to the IDLE state.                                                                          |
 | 4   | Snapshot returns to IDLE after guard rejection (TRANSITION_ERROR)    | When a guard rejects a navigation, the snapshot returns to IDLE after the error event.                                                             |
@@ -119,6 +144,14 @@
 | 2   | Final snapshot is IDLE after all concurrent navigations settle           | After firing multiple navigations concurrently and awaiting all of them, the snapshot is always IDLE.                                                           |
 | 3   | toRoute reflects current navigation target during concurrent transitions | While the first navigation is in progress, `toRoute.name` matches its target. After the second navigation takes over and completes, `isTransitioning` is false. |
 
+## createTransitionSource — isLeaveApproved Monotonicity
+
+| #   | Invariant                                                                | Description                                                                                                                          |
+| --- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | `isLeaveApproved` goes `true` on `TRANSITION_LEAVE_APPROVE`, then `false` on `TRANSITION_SUCCESS` | The flag tracks the activation-pending window; SUCCESS restores IDLE.                                                |
+| 2   | `isLeaveApproved` resets to `false` on `TRANSITION_ERROR` (activate-guard rejection) | Any terminal error event restores IDLE.                                                                                       |
+| 3   | `isLeaveApproved` resets to `false` on `TRANSITION_CANCEL`               | A concurrent navigation that cancels the current one restores IDLE.                                                                  |
+
 ## createTransitionSource — Destroy
 
 | #   | Invariant                                                         | Description                                                                                                                   |
@@ -131,14 +164,35 @@
 
 ## stabilizeState — State Stabilization
 
-| #   | Invariant                                            | Description                                                                       |
-| --- | ---------------------------------------------------- | --------------------------------------------------------------------------------- |
-| 1   | `stabilizeState(a, a) === a`                         | Same reference is returned immediately.                                           |
-| 2   | `prev.path === next.path → result === prev`          | When paths match (same canonical URL), the previous State reference is preserved. |
-| 3   | `prev.path !== next.path → result === next`          | When paths differ, the new State is returned.                                     |
-| 4   | `stabilizeState(undefined, undefined) === undefined` | Both nullish values return prev.                                                  |
-| 5   | `stabilizeState(undefined, state) === state`         | Transition from nullish to State returns next.                                    |
-| 6   | `stabilizeState(state, undefined) === undefined`     | Transition from State to nullish returns next.                                    |
+| #   | Invariant                                                  | Description                                                                                         |
+| --- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| 1   | `stabilizeState(a, a) === a`                               | Same reference is returned immediately.                                                             |
+| 2   | `prev.path === next.path → result === prev`                | When paths match (same canonical URL), the previous State reference is preserved.                   |
+| 3   | `prev.path !== next.path → result === next`                | When paths differ, the new State is returned.                                                       |
+| 4   | `stabilizeState(undefined, undefined) === undefined`       | Both nullish values return prev.                                                                    |
+| 5   | `stabilizeState(undefined, state) === state`               | Transition from nullish to State returns next.                                                      |
+| 6   | `stabilizeState(state, undefined) === undefined`           | Transition from State to nullish returns next.                                                      |
+| 7   | Hash-aware: same path, different hash → returns `next`     | Synthetic path-equal states with differing `state.context.url.hash` surface as a fresh render (#532). |
+| 8   | Hash-aware: same path, same hash → returns `prev` (dedup)  | Two path-and-hash-equal states stabilize to the prev reference.                                     |
+| 9   | Hash-aware: presence flip (undefined ↔ string) → returns `next` | Adding or removing a hash claim is a render-relevant change in either direction.                  |
+| 10  | Reload-aware (synthetic): `next.transition.reload=true` → returns `next` | Verified directly on path-equal synthetic states, not just observed via router output (#605). |
+| 11  | Reload-aware (synthetic): `next.transition.reload=false` → returns `prev` | Non-reload navs to the same path dedup normally.                                            |
+| 12  | Reload-aware is one-way                                    | `prev.transition.reload=true` alone does not bypass dedup — only `next.reload=true` triggers it.    |
+
+---
+
+## computeSnapshot — Node Snapshot Builder
+
+| #   | Invariant                                                       | Description                                                                                                                          |
+| --- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | Reference stability without `next`                              | `computeSnapshot(snap, router, node)` then re-fed (`computeSnapshot(first, router, node)`) returns the same reference (idempotent).   |
+| 2   | Idempotency under same `next`                                   | `f(snap, router, node, next) === f(f(...), ...)` when `next` is fixed.                                                                |
+| 3   | Root dominance                                                  | `nodeName === ""` → `result.route === router.getState()`.                                                                             |
+| 4   | Subtree containment                                             | When the navigated route exactly matches the node, `result.route` is defined and equals the navigated route.                          |
+| 5   | False-positive subtree match                                    | `node="users"` + current `"users.list"` is active (parent contains child).                                                            |
+| 6   | Unrelated route                                                 | `result.route` is `undefined`, `previousRoute` carries the input value, and the result equals `currentSnapshot` by reference.         |
+| 7   | leaf-active ⇒ ancestor-active (containment monotonicity)         | If `computeSnapshot(.., node="users.list").route` is defined, then `computeSnapshot(.., node="users").route` is also defined and equals it. |
+| 8   | Root is at-least-as-active as any specific nodeName              | When a specific node is inactive, the root snapshot still reflects `router.getState()`; when active, both snapshots share the same route reference. |
 
 ---
 
@@ -157,17 +211,73 @@
 | --- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | 1   | Post-destroy listeners not notified on new errors                | After `destroy()`, new navigation errors do not invoke any subscribed listener.                                               |
 | 2   | Post-destroy getSnapshot returns last snapshot before destroy    | `getSnapshot()` returns the snapshot that was current at destroy time, preserving the last known state.                       |
+| 3   | Long-run version monotonicity (≥100 errors)                      | Across sequences of 100+ navigation errors, the snapshot `version` is strictly increasing — no plateau, no rollback.          |
+| 4   | `TRANSITION_SUCCESS` does NOT advance `version`                  | A successful navigation clears `error`/`toRoute`/`fromRoute` but the `version` field is sticky (only `TRANSITION_ERROR` advances it). |
+| 5   | `TRANSITION_CANCEL` leaves snapshot reference unchanged          | A concurrent navigation that cancels another does not produce any error event; the source's snapshot reference is preserved.   |
+
+---
+
+## canonicalJson — Cache-Key Stability
+
+| #   | Invariant                                                     | Description                                                                                                                                                  |
+| --- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | Key-order invariance                                          | `canonicalJson(x) === canonicalJson(reorder(x))` for any deep reordering of object keys.                                                                     |
+| 2   | Determinism                                                   | Repeated calls with the same input produce the same string.                                                                                                  |
+| 3   | Idempotency under JSON round-trip                             | `canonicalJson(JSON.parse(canonicalJson(x))) === canonicalJson(x)`.                                                                                          |
+| 4   | Structural collisions match canonical equality                | Two records collide on `canonicalJson` iff they are structurally identical up to key order (oracle: independent sorted-JSON encoder).                        |
+| 5   | Deep-recursion stability                                      | Nested structures (objects within objects within arrays) terminate without throwing and the result round-trips back to itself through `canonicalJson`.        |
+
+---
+
+## normalizeActiveOptions — Defaults & Idempotency
+
+| #   | Invariant                                                  | Description                                                                                                       |
+| --- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| 1   | Idempotency                                                | `normalize(normalize(x))` structurally equals `normalize(x)`.                                                     |
+| 2   | Default-fill semantics                                     | Missing booleans default to `DEFAULT_ACTIVE_OPTIONS`; missing `hash` stays `undefined` (the "ignore hash" sentinel). |
+| 3   | DEFAULT_ACTIVE_OPTIONS immutability                        | Repeated normalizations do not mutate the frozen defaults.                                                        |
+| 4   | Explicit values pass through                               | Any explicitly-provided field is returned verbatim, regardless of defaults.                                       |
+
+---
+
+## createDismissableError — Dismissal Wrapper
+
+| #   | Invariant                                                                       | Description                                                                                                                              |
+| --- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Version non-decreasing across error / reset / getSnapshot cycles                | Across any random sequence of error events and `resetError()` calls, the snapshot's `version` is non-decreasing.                          |
+| 2   | After `resetError()`, error is null until a new error arrives                   | Immediately after `resetError()`, `error`, `toRoute`, and `fromRoute` are all `null` until the next `TRANSITION_ERROR` event.            |
+| 3   | `resetError()` is idempotent                                                    | Back-to-back `resetError()` calls produce the same snapshot — `version` does not change, `error` stays `null`.                            |
+| 4   | Subscribers fire only on state-relevant actions                                 | Listener call count is at least the number of (error events + first reset after each error) — purely cosmetic operations don't notify.   |
+| 5   | `createDismissableError(router)` is per-router cached                           | Repeated calls return the same instance for the same router.                                                                              |
+
+---
+
+## createActiveNameSelector — Shared Active-Name Checker
+
+| #   | Invariant                                                                       | Description                                                                                                                              |
+| --- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Cache identity                                                                  | `createActiveNameSelector(router)` returns the same instance for the same router.                                                        |
+| 2   | `isActive(name)` mirrors the documented non-strict semantics                    | After any sequence of navigations, `isActive(name)` equals `current.name === name \|\| current.name.startsWith(name + ".")` (oracle).    |
+| 3   | Listener fires only on per-name flips                                           | The number of listener calls equals the number of times the active state for the watched name actually changed across navigations.        |
+| 4   | Multiple listeners on the same name see identical notification counts           | Two independent listeners on the same `(router, name)` are called the same number of times.                                              |
+| 5   | Listeners for disjoint names don't fire on each other's flips                   | When `nameA` and `nameB` occupy different top-level subtrees, navigations changing one's active state don't notify the other's listeners. |
+| 6   | Unsubscribe → re-subscribe restores active state from current router state      | After full unsubscribe, navigation, and re-subscribe, `isActive(name)` reflects the live router state (not the pre-disconnect cache).    |
+| 7   | `destroy()` on the cached selector is a no-op — selector remains usable          | After `destroy()`, `subscribe(name, listener)` still returns a function and `isActive(name)` still returns a boolean.                     |
 
 ---
 
 ## Test Files
 
-| File                                             | Invariants | Category                                                                                                     |
-| ------------------------------------------------ | ---------- | ------------------------------------------------------------------------------------------------------------ |
-| `tests/property/routeSource.properties.ts`       | 18         | `createRouteSource` snapshot tracking, lazy-connection lifecycle, and destroy behavior                       |
-| `tests/property/routeNodeSource.properties.ts`   | 19         | `createRouteNodeSource` node scoping, lazy-connection with reconnection reconciliation, and destroy behavior |
-| `tests/property/activeRouteSource.properties.ts` | 14         | `createActiveRouteSource` boolean tracking, areRoutesRelated filter optimization, and destroy behavior       |
-| `tests/property/transitionSource.properties.ts`  | 16         | `createTransitionSource` state machine transitions, concurrent navigation, and destroy behavior              |
-| `tests/property/errorSource.properties.ts`       | 6          | `createErrorSource` error tracking, version monotonicity, and destroy behavior                               |
-| `tests/property/stabilizeState.properties.ts`    | 6          | `stabilizeState` reflexivity, path-equivalence, idempotency, and nullish-handling invariants                  |
-| `tests/property/computeSnapshot.properties.ts`   | 4          | `computeSnapshot` reference stability, idempotency, root dominance, subtree containment                       |
+| File                                                       | Invariants | Category                                                                                                     |
+| ---------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------ |
+| `tests/property/routeSource.properties.ts`                 | 21         | `createRouteSource` snapshot tracking, lazy-connection, subscribe-order (BaseSource pre-onFirstSubscribe), destroy |
+| `tests/property/routeNodeSource.properties.ts`             | 23         | `createRouteNodeSource` node scoping, lazy-connection + reconnection, cache identity (per-router × nodeName), destroy |
+| `tests/property/activeRouteSource.properties.ts`           | 16         | `createActiveRouteSource` boolean tracking (hash-aware via `arbActiveOptions`), filter, cache identity (canonicalJson + hash isolation), destroy |
+| `tests/property/transitionSource.properties.ts`            | 20         | `createTransitionSource` state machine, isLeaveApproved monotonicity, concurrent navigation (async-guard cancellation), destroy |
+| `tests/property/errorSource.properties.ts`                 | 9          | `createErrorSource` error tracking, version monotonicity (incl. long-run + SUCCESS-doesn't-advance), CANCEL no-op, destroy |
+| `tests/property/stabilizeState.properties.ts`              | 15         | `stabilizeState` reflexivity, path/hash/reload-aware path-equivalence (incl. synthetic states), idempotency, nullish-handling |
+| `tests/property/computeSnapshot.properties.ts`             | 11         | `computeSnapshot` reference stability, idempotency, root dominance, subtree containment, unrelated-route, containment monotonicity |
+| `tests/property/canonicalJson.properties.ts`               | 5          | `canonicalJson` key-order invariance, determinism, idempotency, structural collisions, deep-recursion         |
+| `tests/property/normalizeActiveOptions.properties.ts`      | 5          | `normalizeActiveOptions` idempotency, default-fill, defaults immutability, explicit pass-through              |
+| `tests/property/createDismissableError.properties.ts`      | 5          | `createDismissableError` version monotonicity, reset semantics, idempotency, listener fidelity, cache identity |
+| `tests/property/createActiveNameSelector.properties.ts`    | 7          | `createActiveNameSelector` cache identity, oracle alignment, per-name listener isolation, reconnection, destroy |

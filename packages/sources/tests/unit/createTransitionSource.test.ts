@@ -3,7 +3,12 @@ import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import { createTransitionSource } from "../../src";
+import {
+  nextLeaveApproveSnapshot,
+  nextTransitionStartSnapshot,
+} from "../../src/createTransitionSource";
 
+import type { RouterTransitionSnapshot } from "../../src";
 import type { Router, State } from "@real-router/core";
 
 describe("createTransitionSource", () => {
@@ -392,6 +397,148 @@ describe("createTransitionSource", () => {
     source.destroy();
   });
 
+  function fakeState(path: string, name = "x"): State {
+    return {
+      name,
+      params: {},
+      path,
+      transition: { phase: "activating", segments: [], reload: false },
+      context: {},
+    } as unknown as State;
+  }
+
+  describe("nextTransitionStartSnapshot (dedup guard, direct unit)", () => {
+    it("returns next snapshot from IDLE (initial transition entry)", () => {
+      const idle: RouterTransitionSnapshot = {
+        isTransitioning: false,
+        isLeaveApproved: false,
+        toRoute: null,
+        fromRoute: null,
+      };
+      const toState = fakeState("/a", "a");
+      const fromState = fakeState("/", "home");
+
+      const next = nextTransitionStartSnapshot(idle, toState, fromState);
+
+      expect(next).toStrictEqual({
+        isTransitioning: true,
+        isLeaveApproved: false,
+        toRoute: toState,
+        fromRoute: fromState,
+      });
+    });
+
+    it("returns null (dedup skip) when re-entered with path-equal States", () => {
+      const toState = fakeState("/a", "a");
+      const fromState = fakeState("/", "home");
+      const prev: RouterTransitionSnapshot = {
+        isTransitioning: true,
+        isLeaveApproved: false,
+        toRoute: toState,
+        fromRoute: fromState,
+      };
+
+      // Fresh State refs with the same paths — stabilizeState collapses them
+      // back to prev.toRoute/prev.fromRoute → guard fires.
+      const toStateAgain = fakeState("/a", "a");
+      const fromStateAgain = fakeState("/", "home");
+
+      expect(
+        nextTransitionStartSnapshot(prev, toStateAgain, fromStateAgain),
+      ).toBeNull();
+    });
+
+    it("returns next snapshot when paths differ even while transitioning", () => {
+      const stateA = fakeState("/a", "a");
+      const prev: RouterTransitionSnapshot = {
+        isTransitioning: true,
+        isLeaveApproved: false,
+        toRoute: stateA,
+        fromRoute: null,
+      };
+      const stateB = fakeState("/b", "b");
+
+      const next = nextTransitionStartSnapshot(prev, stateB, undefined);
+
+      expect(next).not.toBeNull();
+      expect(next?.toRoute).toBe(stateB);
+      expect(next?.fromRoute).toBeNull();
+    });
+
+    it("returns next snapshot when prev is not transitioning (precondition unmet)", () => {
+      const stateA = fakeState("/a", "a");
+      const prev: RouterTransitionSnapshot = {
+        isTransitioning: false,
+        isLeaveApproved: false,
+        toRoute: stateA,
+        fromRoute: null,
+      };
+      const stateAClone = fakeState("/a", "a");
+
+      // Even though path-equal, guard requires prev.isTransitioning=true.
+      const next = nextTransitionStartSnapshot(prev, stateAClone, undefined);
+
+      expect(next).not.toBeNull();
+      expect(next?.isTransitioning).toBe(true);
+    });
+  });
+
+  describe("nextLeaveApproveSnapshot (dedup guard, direct unit)", () => {
+    it("returns next snapshot with isLeaveApproved=true on first call", () => {
+      const toState = fakeState("/a", "a");
+      const fromState = fakeState("/", "home");
+      const prev: RouterTransitionSnapshot = {
+        isTransitioning: true,
+        isLeaveApproved: false,
+        toRoute: toState,
+        fromRoute: fromState,
+      };
+
+      const next = nextLeaveApproveSnapshot(prev, toState, fromState);
+
+      expect(next).toStrictEqual({
+        isTransitioning: true,
+        isLeaveApproved: true,
+        toRoute: toState,
+        fromRoute: fromState,
+      });
+    });
+
+    it("returns null (dedup skip) when called twice with path-equal States after LEAVE_APPROVE", () => {
+      const toState = fakeState("/a", "a");
+      const fromState = fakeState("/", "home");
+      const prev: RouterTransitionSnapshot = {
+        isTransitioning: true,
+        isLeaveApproved: true,
+        toRoute: toState,
+        fromRoute: fromState,
+      };
+
+      expect(
+        nextLeaveApproveSnapshot(
+          prev,
+          fakeState("/a", "a"),
+          fakeState("/", "home"),
+        ),
+      ).toBeNull();
+    });
+
+    it("returns next snapshot when prev.isLeaveApproved=false (precondition unmet)", () => {
+      const toState = fakeState("/a", "a");
+      const prev: RouterTransitionSnapshot = {
+        isTransitioning: true,
+        isLeaveApproved: false,
+        toRoute: toState,
+        fromRoute: null,
+      };
+
+      const next = nextLeaveApproveSnapshot(prev, toState, undefined);
+
+      expect(next).not.toBeNull();
+      expect(next?.isLeaveApproved).toBe(true);
+    });
+  });
+
   it("repeated IDLE_SNAPSHOT (success after success) shares the same singleton ref", async () => {
     const source = createTransitionSource(router);
     const initialIdle = source.getSnapshot();
@@ -403,16 +550,14 @@ describe("createTransitionSource", () => {
 
     // Sync nav with no async guards: START → LEAVE_APPROVE → SUCCESS = 3
     // notifications. After SUCCESS, snapshot is the IDLE singleton again.
-    const callsAfterFirst = listener.mock.calls.length;
-
+    expect(listener).toHaveBeenCalledTimes(3);
     expect(source.getSnapshot()).toBe(initialIdle);
 
     await router.navigate("settings");
 
-    // Same 3 notifications for the second navigation. The audit-relevant
-    // assertion: no spurious extra notifications from "IDLE → IDLE" — the
-    // source visits IDLE exactly once between transitions.
-    expect(listener).toHaveBeenCalledTimes(callsAfterFirst * 2);
+    // Second navigation emits the same 3 events, no spurious "IDLE → IDLE"
+    // notification in between → total stays at 6.
+    expect(listener).toHaveBeenCalledTimes(6);
     expect(source.getSnapshot()).toBe(initialIdle);
   });
 
@@ -586,5 +731,46 @@ describe("createTransitionSource", () => {
     // the events never fire (false negative). Sync nav fires both events.
     expect(startAssert).toHaveBeenCalledTimes(1);
     expect(leaveApproveAssert).toHaveBeenCalledTimes(1);
+  });
+
+  describe("IDLE_SNAPSHOT immutability (audit §5.K)", () => {
+    it("initial getSnapshot() returns a frozen object", () => {
+      const source = createTransitionSource(router);
+      const idle = source.getSnapshot();
+
+      expect(Object.isFrozen(idle)).toBe(true);
+
+      source.destroy();
+    });
+
+    it("attempting to mutate a property throws in strict mode", () => {
+      const source = createTransitionSource(router);
+      const idle = source.getSnapshot();
+
+      expect(() => {
+        (idle as unknown as { toRoute: unknown }).toRoute = { hijacked: true };
+      }).toThrow(TypeError);
+      // Snapshot reference is unchanged.
+      expect(source.getSnapshot().toRoute).toBeNull();
+
+      source.destroy();
+    });
+
+    it("IDLE singleton across navigations stays frozen (every IDLE return is the same frozen ref)", async () => {
+      const source = createTransitionSource(router);
+      const initialIdle = source.getSnapshot();
+
+      await router.navigate("dashboard");
+
+      expect(source.getSnapshot()).toBe(initialIdle);
+      expect(Object.isFrozen(source.getSnapshot())).toBe(true);
+
+      await router.navigate("settings");
+
+      expect(source.getSnapshot()).toBe(initialIdle);
+      expect(Object.isFrozen(source.getSnapshot())).toBe(true);
+
+      source.destroy();
+    });
   });
 });

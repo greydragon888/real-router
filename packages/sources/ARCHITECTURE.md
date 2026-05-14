@@ -17,7 +17,7 @@ src/
 ├── canonicalJson.ts             — Key-order-stable JSON serialization (cache keys for active-route)
 ├── normalizeActiveOptions.ts    — DEFAULT_ACTIVE_OPTIONS + normalizeActiveOptions helper
 ├── computeSnapshot.ts           — Same-reference snapshot optimization for route nodes
-├── stabilizeState.ts            — Path-based State ref stabilization (not exported)
+├── stabilizeState.ts            — State ref stabilization keyed on path + url.hash + transition.reload (not exported)
 ├── types.ts                     — Public type definitions
 └── index.ts                     — Public exports
 ```
@@ -115,7 +115,7 @@ Determines whether a node is active for a given route and builds the `{ route, p
 
 ### `stabilizeState`
 
-Path-based State reference stabilization. Compares `prev.path` with `next.path`. When paths match, returns `prev`; otherwise returns `next`. O(1) string comparison. Used by `computeSnapshot`, `createRouteSource`, and `createTransitionSource`.
+State reference stabilization keyed on `path` **+** `state.context.url.hash` (#532) **+** `state.transition.reload` (#605). When all three match, returns `prev`; otherwise returns `next`. Reload navigations always bypass dedup (`next.transition.reload === true` returns `next` even on path-equal navs). Hash differences also surface as a fresh render so tab-style UIs (`/settings#profile` → `/settings#billing`) re-render. O(1) comparisons. Used by `computeSnapshot`, `createRouteSource`, and `createTransitionSource`.
 
 ### `canonicalJson`
 

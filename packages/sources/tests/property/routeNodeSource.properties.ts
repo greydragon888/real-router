@@ -393,6 +393,79 @@ describe("lazy-connection and reconnection", () => {
   );
 });
 
+describe("cache identity (per-router × per-nodeName)", () => {
+  test.prop([arbNodeName, fc.integer({ min: 2, max: 5 })], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "createRouteNodeSource(router, name) returns the same instance for the same key",
+    async (nodeName, callCount) => {
+      const router = await createStartedRouter();
+      const first = createRouteNodeSource(router, nodeName);
+
+      for (let i = 1; i < callCount; i++) {
+        expect(createRouteNodeSource(router, nodeName)).toBe(first);
+      }
+
+      router.stop();
+    },
+  );
+
+  test.prop([arbNodeName, arbNodeName], { numRuns: NUM_RUNS.standard })(
+    "different nodeNames on the same router yield different instances",
+    async (nameA, nameB) => {
+      fc.pre(nameA !== nameB);
+
+      const router = await createStartedRouter();
+      const a = createRouteNodeSource(router, nameA);
+      const b = createRouteNodeSource(router, nameB);
+
+      expect(a).not.toBe(b);
+
+      router.stop();
+    },
+  );
+
+  test.prop([arbNodeName], { numRuns: NUM_RUNS.standard })(
+    "different routers are isolated: same nodeName yields independent instances",
+    async (nodeName) => {
+      const routerA = await createStartedRouter();
+      const routerB = await createStartedRouter();
+
+      const a = createRouteNodeSource(routerA, nodeName);
+      const b = createRouteNodeSource(routerB, nodeName);
+
+      expect(a).not.toBe(b);
+
+      routerA.stop();
+      routerB.stop();
+    },
+  );
+
+  test.prop([arbNavigation], { numRuns: NUM_RUNS.async })(
+    "different-router isolation: navigation on one router doesn't notify subscribers of the other",
+    async (nav) => {
+      fc.pre(nav.name !== "home");
+
+      const routerA = await createStartedRouter();
+      const routerB = await createStartedRouter();
+      const sourceA = createRouteNodeSource(routerA, "");
+      const sourceB = createRouteNodeSource(routerB, "");
+      const listenerB = vi.fn();
+      const unsubA = sourceA.subscribe(() => {});
+      const unsubB = sourceB.subscribe(listenerB);
+
+      await routerA.navigate(nav.name, nav.params).catch(() => {});
+
+      expect(listenerB).not.toHaveBeenCalled();
+
+      unsubA();
+      unsubB();
+      routerA.stop();
+      routerB.stop();
+    },
+  );
+});
+
 describe("destroy (cached shared source — no-op)", () => {
   test.prop([arbNodeName, arbDestroyCount], { numRuns: NUM_RUNS.standard })(
     "destroy is idempotent on cached source",

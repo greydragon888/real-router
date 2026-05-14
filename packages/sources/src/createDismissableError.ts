@@ -68,7 +68,18 @@ export function createDismissableError(
   let unsubFromError: (() => void) | null = null;
 
   function resetError(): void {
-    dismissedVersion = errorSource.getSnapshot().version;
+    const currentVersion = errorSource.getSnapshot().version;
+
+    // No-op guard: if we already dismissed at this version (or are even ahead
+    // of the live error stream), there's nothing to clear. Skipping prevents
+    // a redundant snapshot allocation + listener notification under tight
+    // resetError(); resetError() patterns — common when a RouterErrorBoundary
+    // user clicks "dismiss" while another dismiss is already in flight.
+    if (currentVersion <= dismissedVersion) {
+      return;
+    }
+
+    dismissedVersion = currentVersion;
     source.updateSnapshot(computeSnapshot());
   }
 

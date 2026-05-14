@@ -8,6 +8,7 @@ import {
   arbRouteName,
   createStartedRouter,
   executeNavigations,
+  expectedActive,
   NUM_RUNS,
   paramsForRoute,
 } from "./helpers";
@@ -30,7 +31,14 @@ describe("boolean tracking", () => {
       );
 
       expect(source.getSnapshot()).toStrictEqual(
-        router.isActiveRoute(routeName, params, strict, ignoreQueryParams),
+        expectedActive(
+          router,
+          routeName,
+          params,
+          strict,
+          ignoreQueryParams,
+          options.hash,
+        ),
       );
 
       source.destroy();
@@ -58,7 +66,14 @@ describe("boolean tracking", () => {
       await executeNavigations(router, navigations).catch(() => undefined);
 
       expect(source.getSnapshot()).toStrictEqual(
-        router.isActiveRoute(routeName, params, strict, ignoreQueryParams),
+        expectedActive(
+          router,
+          routeName,
+          params,
+          strict,
+          ignoreQueryParams,
+          options.hash,
+        ),
       );
 
       source.destroy();
@@ -91,11 +106,13 @@ describe("boolean tracking", () => {
 
       for (const nav of navigations) {
         await router.navigate(nav.name, nav.params).catch(() => undefined);
-        const newValue = router.isActiveRoute(
+        const newValue = expectedActive(
+          router,
           routeName,
           params,
           strict,
           ignoreQueryParams,
+          options.hash,
         );
 
         if (newValue !== prevValue) {
@@ -208,7 +225,14 @@ describe("areRoutesRelated filter", () => {
         await router.navigate(nav.name, nav.params).catch(() => undefined);
 
         expect(source.getSnapshot()).toStrictEqual(
-          router.isActiveRoute(routeName, params, strict, ignoreQueryParams),
+          expectedActive(
+            router,
+            routeName,
+            params,
+            strict,
+            ignoreQueryParams,
+            options.hash,
+          ),
         );
       }
 
@@ -243,6 +267,11 @@ describe("areRoutesRelated filter", () => {
   test.prop([arbActiveOptions], { numRuns: NUM_RUNS.standard })(
     "listener called when navigating to and from watched route",
     async (options) => {
+      // The fixture router has no URL-publishing plugin → context.url is
+      // undefined → a hash-aware source is permanently false. Skip those
+      // runs so the route-name-flip assertions below stay meaningful.
+      fc.pre(options.hash === undefined);
+
       const router = await createStartedRouter();
 
       const source = createActiveRouteSource(
@@ -272,6 +301,130 @@ describe("areRoutesRelated filter", () => {
       expect(listener).toHaveBeenCalledTimes(2);
 
       source.destroy();
+      router.stop();
+    },
+  );
+});
+
+describe("cache identity (canonicalJson-keyed)", () => {
+  // Generates two equivalent params objects: a base record and the same keys
+  // reversed. canonicalJson-keyed caching must recognise both as the same.
+  const arbParamsPair = fc
+    .dictionary(
+      fc.string({ minLength: 1, maxLength: 6 }),
+      fc.string({ maxLength: 6 }),
+      {
+        maxKeys: 5,
+      },
+    )
+    .map((dict) => {
+      const reversed: Record<string, string> = {};
+
+      for (const [key, val] of Object.entries(dict).toReversed()) {
+        reversed[key] = val;
+      }
+
+      return { a: dict, b: reversed } as const;
+    });
+
+  test.prop([arbRouteName, arbParamsPair, arbActiveOptions], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "params equivalent under canonicalJson hit the same cache entry",
+    async (routeName, { a, b }, options) => {
+      const router = await createStartedRouter();
+      const sourceA = createActiveRouteSource(router, routeName, a, options);
+      const sourceB = createActiveRouteSource(router, routeName, b, options);
+
+      expect(sourceA).toBe(sourceB);
+
+      router.stop();
+    },
+  );
+
+  test.prop([arbRouteName, arbActiveOptions], { numRuns: NUM_RUNS.standard })(
+    "different routers are isolated under the same (name, params, options)",
+    async (routeName, options) => {
+      const routerA = await createStartedRouter();
+      const routerB = await createStartedRouter();
+
+      const sourceA = createActiveRouteSource(
+        routerA,
+        routeName,
+        paramsForRoute(routeName),
+        options,
+      );
+      const sourceB = createActiveRouteSource(
+        routerB,
+        routeName,
+        paramsForRoute(routeName),
+        options,
+      );
+
+      expect(sourceA).not.toBe(sourceB);
+
+      routerA.stop();
+      routerB.stop();
+    },
+  );
+});
+
+describe("hash-aware monotonicity (#532)", () => {
+  test.prop(
+    [
+      arbRouteName,
+      fc.string({ minLength: 1, maxLength: 8 }).filter((s) => !s.includes("#")),
+      arbNavigationSeq,
+    ],
+    { numRuns: NUM_RUNS.standard },
+  )(
+    "hash-aware source returns false under no-url-plugin fixture across any nav sequence",
+    async (routeName, hash, navigations) => {
+      // The fixture router has no URL-publishing plugin → context.url is
+      // always undefined → readContextHash returns "". With a non-empty hash
+      // option, computeActive is structurally false regardless of route match.
+      // Monotonicity claim: the boolean stays false through every navigation.
+      const router = await createStartedRouter();
+      const source = createActiveRouteSource(
+        router,
+        routeName,
+        paramsForRoute(routeName),
+        { hash },
+      );
+
+      expect(source.getSnapshot()).toBe(false);
+
+      for (const nav of navigations) {
+        await router.navigate(nav.name, nav.params).catch(() => undefined);
+
+        expect(source.getSnapshot()).toBe(false);
+      }
+
+      router.stop();
+    },
+  );
+
+  test.prop([arbRouteName, arbActiveOptions], { numRuns: NUM_RUNS.standard })(
+    "hash-aware variants are cache-isolated from hash-less variants",
+    async (routeName, baseOptions) => {
+      fc.pre(baseOptions.hash === undefined);
+
+      const router = await createStartedRouter();
+      const baseline = createActiveRouteSource(
+        router,
+        routeName,
+        paramsForRoute(routeName),
+        baseOptions,
+      );
+      const withHash = createActiveRouteSource(
+        router,
+        routeName,
+        paramsForRoute(routeName),
+        { ...baseOptions, hash: "anchor" },
+      );
+
+      expect(baseline).not.toBe(withHash);
+
       router.stop();
     },
   );

@@ -127,13 +127,126 @@ describe("stabilizeState — reload-aware (#605)", () => {
 
       router.stop();
 
-      if (
-        prev !== next &&
-        prev.path === next.path &&
-        next.transition.reload === true
-      ) {
-        expect(stabilizeState(prev, next)).toBe(next);
-      }
+      // Use fc.pre (instead of a silent `if`) so fast-check sees discards and
+      // can shrink toward inputs that actually exercise the reload branch.
+      fc.pre(prev !== next);
+      fc.pre(prev.path === next.path);
+      fc.pre(next.transition.reload === true);
+
+      expect(stabilizeState(prev, next)).toBe(next);
+    },
+  );
+});
+
+describe("stabilizeState — hash-aware (#532)", () => {
+  // Build path-equal states that differ only in `state.context.url.hash`.
+  // The stabilizer must surface `next` when hash differs, and return `prev`
+  // when both path and hash match.
+  function withHash(base: State, hash: string | undefined): State {
+    const context = { ...base.context, url: { hash } };
+
+    return { ...base, context, transition: { ...base.transition } } as State;
+  }
+
+  test.prop(
+    [
+      arbRouteName,
+      fc.string({ minLength: 0, maxLength: 8 }).filter((s) => !s.includes("#")),
+      fc.string({ minLength: 0, maxLength: 8 }).filter((s) => !s.includes("#")),
+    ],
+    { numRuns: NUM_RUNS.standard },
+  )(
+    "same path, different hash → returns next",
+    async (routeName, hashA, hashB) => {
+      fc.pre(hashA !== hashB);
+
+      const baseState = await makeStateFromRouter(routeName);
+      const prev = withHash(baseState, hashA);
+      const next = withHash(baseState, hashB);
+
+      expect(prev.path).toBe(next.path);
+      expect(stabilizeState(prev, next)).toBe(next);
+    },
+  );
+
+  test.prop(
+    [
+      arbRouteName,
+      fc.string({ minLength: 0, maxLength: 8 }).filter((s) => !s.includes("#")),
+    ],
+    { numRuns: NUM_RUNS.standard },
+  )("same path, same hash → returns prev (dedup)", async (routeName, hash) => {
+    const baseState = await makeStateFromRouter(routeName);
+    const prev = withHash(baseState, hash);
+    const next = withHash(baseState, hash);
+
+    expect(prev).not.toBe(next);
+    expect(prev.path).toBe(next.path);
+    expect(stabilizeState(prev, next)).toBe(prev);
+  });
+
+  test.prop([arbRouteName], { numRuns: NUM_RUNS.standard })(
+    "prev has hash, next doesn't (or vice versa) → returns next",
+    async (routeName) => {
+      const baseState = await makeStateFromRouter(routeName);
+      const withHashState = withHash(baseState, "anchor");
+      const withoutHashState = withHash(baseState, undefined);
+
+      // Either direction must surface `next`: removing or adding a hash
+      // changes effective URL identity, so render must update.
+      expect(stabilizeState(withHashState, withoutHashState)).toBe(
+        withoutHashState,
+      );
+      expect(stabilizeState(withoutHashState, withHashState)).toBe(
+        withHashState,
+      );
+    },
+  );
+});
+
+describe("stabilizeState — reload-aware (broader PBT)", () => {
+  function withReload(base: State, reload: boolean): State {
+    return {
+      ...base,
+      transition: { ...base.transition, reload },
+    } as State;
+  }
+
+  test.prop([arbRouteName], { numRuns: NUM_RUNS.standard })(
+    "fully-synthetic reload state: prev.path === next.path, next.reload=true → returns next",
+    async (routeName) => {
+      const baseState = await makeStateFromRouter(routeName);
+      const prev = withReload(baseState, false);
+      const next = withReload(baseState, true);
+
+      expect(prev).not.toBe(next);
+      expect(prev.path).toBe(next.path);
+      expect(stabilizeState(prev, next)).toBe(next);
+    },
+  );
+
+  test.prop([arbRouteName], { numRuns: NUM_RUNS.standard })(
+    "synthetic non-reload state: prev.path === next.path → returns prev (dedup)",
+    async (routeName) => {
+      const baseState = await makeStateFromRouter(routeName);
+      const prev = withReload(baseState, false);
+      const next = withReload(baseState, false);
+
+      expect(prev).not.toBe(next);
+      expect(stabilizeState(prev, next)).toBe(prev);
+    },
+  );
+
+  test.prop([arbRouteName], { numRuns: NUM_RUNS.standard })(
+    "reload-bypass is one-way: prev.reload=true alone doesn't bypass dedup",
+    async (routeName) => {
+      const baseState = await makeStateFromRouter(routeName);
+      const prev = withReload(baseState, true);
+      const next = withReload(baseState, false);
+
+      // Only `next.transition.reload === true` triggers the bypass. A trailing
+      // non-reload nav after a reload must dedup normally.
+      expect(stabilizeState(prev, next)).toBe(prev);
     },
   );
 });

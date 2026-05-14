@@ -51,6 +51,36 @@ describe("createErrorSource — version monotonicity", () => {
       source.destroy();
     },
   );
+
+  test.prop([fc.array(arbGuardableRoute, { minLength: 100, maxLength: 200 })], {
+    numRuns: 20,
+  })(
+    "version monotonicity holds over long sequences (≥100 errors)",
+    async (routes) => {
+      const router = await createStartedRouter();
+      const lifecycle = getLifecycleApi(router);
+
+      for (const route of new Set(routes)) {
+        lifecycle.addActivateGuard(route, () => () => false);
+      }
+
+      const source = createErrorSource(router);
+      const versions: number[] = [source.getSnapshot().version];
+
+      for (const route of routes) {
+        await router.navigate(route, paramsForRoute(route)).catch(() => {});
+        versions.push(source.getSnapshot().version);
+      }
+
+      // Strictly increasing across the entire sequence — no plateau, no rollback.
+      for (let i = 1; i < versions.length; i++) {
+        expect(versions[i]).toBeGreaterThan(versions[i - 1]);
+      }
+
+      router.stop();
+      source.destroy();
+    },
+  );
 });
 
 describe("createErrorSource — error cleared on success", () => {
@@ -77,6 +107,75 @@ describe("createErrorSource — error cleared on success", () => {
       expect(source.getSnapshot().error).toBeNull();
       expect(source.getSnapshot().toRoute).toBeNull();
       expect(source.getSnapshot().fromRoute).toBeNull();
+
+      router.stop();
+      source.destroy();
+    },
+  );
+
+  test.prop([arbGuardableRoute, arbRouteName], { numRuns: NUM_RUNS.standard })(
+    "TRANSITION_SUCCESS does NOT advance error.version (only TRANSITION_ERROR does)",
+    async (errorRoute, successRoute) => {
+      fc.pre(errorRoute !== successRoute && successRoute !== "home");
+
+      const router = await createStartedRouter();
+      const lifecycle = getLifecycleApi(router);
+
+      lifecycle.addActivateGuard(errorRoute, () => () => false);
+
+      const source = createErrorSource(router);
+
+      await router
+        .navigate(errorRoute, paramsForRoute(errorRoute))
+        .catch(() => {});
+
+      const versionAfterError = source.getSnapshot().version;
+
+      await router.navigate(successRoute, paramsForRoute(successRoute));
+
+      // SUCCESS clears error/toRoute/fromRoute but version is sticky.
+      expect(source.getSnapshot().version).toBe(versionAfterError);
+
+      router.stop();
+      source.destroy();
+    },
+  );
+});
+
+describe("createErrorSource — TRANSITION_CANCEL leaves snapshot unchanged", () => {
+  test.prop([arbRouteName], { numRuns: NUM_RUNS.async })(
+    "TRANSITION_CANCEL does not change error snapshot reference",
+    async (routeName) => {
+      fc.pre(routeName !== "home");
+
+      const router = await createStartedRouter();
+      const lifecycle = getLifecycleApi(router);
+      let resolveGuard!: (value: boolean) => void;
+
+      lifecycle.addActivateGuard(routeName, () => () => {
+        return new Promise<boolean>((resolve) => {
+          resolveGuard = resolve;
+        });
+      });
+
+      const source = createErrorSource(router);
+      const snapshotBeforeCancel = source.getSnapshot();
+
+      const cancelTarget =
+        routeName === "admin.settings" ? "users.list" : "admin.settings";
+
+      const p1 = router.navigate(routeName, paramsForRoute(routeName));
+
+      await Promise.resolve();
+
+      const p2 = router.navigate(cancelTarget);
+
+      resolveGuard(true);
+      await p2;
+      await p1.catch(() => {});
+
+      // CANCEL is not an error → snapshot reference must be unchanged.
+      expect(source.getSnapshot()).toBe(snapshotBeforeCancel);
 
       router.stop();
       source.destroy();
