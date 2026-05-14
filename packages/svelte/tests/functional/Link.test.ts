@@ -9,7 +9,7 @@ import {
   renderWithRouter,
 } from "../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Router, State } from "@real-router/core";
 
 describe("Link component", () => {
   let router: Router;
@@ -127,7 +127,7 @@ describe("Link component", () => {
     });
 
     it("should navigate when custom onclick does not prevent default", () => {
-      vi.spyOn(router, "navigate").mockResolvedValue({} as never);
+      vi.spyOn(router, "navigate").mockResolvedValue({} as State);
 
       renderWithRouter(router, Link, {
         routeName: "one-more-test",

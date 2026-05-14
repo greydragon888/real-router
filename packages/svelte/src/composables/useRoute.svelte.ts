@@ -3,10 +3,16 @@ import { ROUTE_KEY, getContextOrThrow } from "../context";
 import type { RouteContext } from "../types";
 import type { Params, State } from "@real-router/core";
 
-export const useRoute = <P extends Params = Params>(): Omit<
-  RouteContext<P>,
-  "route"
-> & { route: { readonly current: State<P> } } => {
+/**
+ * `useRoute()`'s return type: same shape as `RouteContext<P>` but with
+ * `route.current` narrowed to non-nullable `State<P>` (the composable's
+ * `if (!ctx.route.current) throw` guard makes this safe).
+ */
+type ActiveRouteContext<P extends Params> = Omit<RouteContext<P>, "route"> & {
+  route: { readonly current: State<P> };
+};
+
+export const useRoute = <P extends Params = Params>(): ActiveRouteContext<P> => {
   const ctx = getContextOrThrow<RouteContext>(ROUTE_KEY, "useRoute");
 
   if (!ctx.route.current) {
@@ -15,7 +21,5 @@ export const useRoute = <P extends Params = Params>(): Omit<
     );
   }
 
-  return ctx as Omit<RouteContext<P>, "route"> & {
-    route: { readonly current: State<P> };
-  };
+  return ctx as ActiveRouteContext<P>;
 };

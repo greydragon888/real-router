@@ -111,6 +111,6 @@ describe("useNavigator composable", () => {
       render(NavigatorCapture, {
         props: { onCapture: () => {} },
       }),
-    ).toThrow();
+    ).toThrow("useNavigator must be used within a RouterProvider");
   });
 });

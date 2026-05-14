@@ -38,7 +38,7 @@ describe("RouterProvider — viewTransitions", () => {
   afterEach(() => {
     router.stop();
 
-    delete (document as any).startViewTransition;
+    Reflect.deleteProperty(document, "startViewTransition");
     vi.unstubAllGlobals();
   });
 

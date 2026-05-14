@@ -11,10 +11,12 @@
 // All other tests mirror the React suite 1:1.
 
 import { render } from "@testing-library/svelte";
+import { userEvent } from "@testing-library/user-event";
 import { flushSync } from "svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createTestRouterWithADefaultRouter } from "../helpers";
+import RouteEnterHandlerSwapTest from "../helpers/RouteEnterHandlerSwapTest.svelte";
 import RouteEnterTest from "../helpers/RouteEnterTest.svelte";
 
 import type { Router } from "@real-router/core";
@@ -137,5 +139,35 @@ describe("useRouteEnter", () => {
     flushSync();
 
     expect(handler).not.toHaveBeenCalled();
+  });
+
+  // Locks CLAUDE.md gotcha #1 / audit §4 #1: Svelte composables run once at
+  // init, so `handler` is captured in closure at the call site. Swapping the
+  // handler reference between renders has NO effect — the originally captured
+  // handler keeps firing. Mirror of the useRouteExit handler-swap test.
+  it("handler is captured at init — later handler-swap is ignored", async () => {
+    const handlerA = vi.fn();
+    const handlerB = vi.fn();
+
+    render(RouteEnterHandlerSwapTest, {
+      props: { router, handlerA, handlerB },
+    });
+
+    const swapButton = document.querySelector("[data-testid='swap']")!;
+
+    await userEvent.click(swapButton);
+    flushSync();
+
+    await router.navigate("about");
+    flushSync();
+
+    expect(handlerA).toHaveBeenCalledTimes(1);
+    expect(handlerB).not.toHaveBeenCalled();
+
+    await router.navigate("test");
+    flushSync();
+
+    expect(handlerA).toHaveBeenCalledTimes(2);
+    expect(handlerB).not.toHaveBeenCalled();
   });
 });

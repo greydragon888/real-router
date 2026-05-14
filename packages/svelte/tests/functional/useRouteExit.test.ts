@@ -12,10 +12,12 @@
 // All other tests mirror the React suite 1:1.
 
 import { render } from "@testing-library/svelte";
+import { userEvent } from "@testing-library/user-event";
 import { flushSync } from "svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createTestRouterWithADefaultRouter } from "../helpers";
+import RouteExitHandlerSwapTest from "../helpers/RouteExitHandlerSwapTest.svelte";
 import RouteExitTest from "../helpers/RouteExitTest.svelte";
 
 import type { Router } from "@real-router/core";
@@ -184,5 +186,41 @@ describe("useRouteExit", () => {
     }
 
     expect(handler).not.toHaveBeenCalled();
+  });
+
+  // Locks CLAUDE.md gotcha #1 / audit §4 #1: Svelte composables run once at
+  // init, so `handler` is captured in closure at the call site. Swapping the
+  // handler reference between renders has NO effect — the originally captured
+  // handler keeps firing. This contrasts with React/Preact, where
+  // `useRouteExit` keeps a `handlerRef` updated on every render.
+  it("handler is captured at init — later handler-swap is ignored", async () => {
+    const handlerA = vi.fn();
+    const handlerB = vi.fn();
+
+    render(RouteExitHandlerSwapTest, {
+      props: { router, handlerA, handlerB },
+    });
+
+    // Toggle the prop from handlerA to handlerB via the "swap" button.
+    // RouteExitProbe receives the new prop, but `useRouteExit` already
+    // captured `handlerA` at init, so subsequent leave events fire `handlerA`.
+    const swapButton = document.querySelector("[data-testid='swap']")!;
+
+    await userEvent.click(swapButton);
+    flushSync();
+
+    await router.navigate("about");
+    flushSync();
+
+    expect(handlerA).toHaveBeenCalledTimes(1);
+    expect(handlerB).not.toHaveBeenCalled();
+
+    // A second navigation confirms the captured handler is stable — not just
+    // a one-shot artifact.
+    await router.navigate("test");
+    flushSync();
+
+    expect(handlerA).toHaveBeenCalledTimes(2);
+    expect(handlerB).not.toHaveBeenCalled();
   });
 });
