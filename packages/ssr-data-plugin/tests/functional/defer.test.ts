@@ -84,6 +84,76 @@ describe("defer()", () => {
       expect(payload.deferred.p1).toBe(p1);
       expect(payload.deferred.p2).toBe(p2);
     });
+
+    it("accepts critical === undefined and is properly branded", () => {
+      // Edge case — wire-format-wise, `critical: undefined` serialises to
+      // `null` (via JSON.stringify's contract) or is omitted entirely from
+      // the JSON output depending on the consumer's serializer. The
+      // structural shape and branding must hold regardless.
+      const payload = defer({
+        critical: undefined,
+        deferred: { x: Promise.resolve(1) },
+      });
+
+      expect(isDeferred(payload)).toBe(true);
+      expect(payload.critical).toBeUndefined();
+      expect(Object.keys(payload.deferred)).toStrictEqual(["x"]);
+    });
+
+    it("handles a mix of native promises and duck-typed thenables in the same deferred map", () => {
+      const native = Promise.resolve("n");
+      const noopFn = (): void => undefined;
+      const thenable = Object.assign(Object.create(null), {
+        // eslint-disable-next-line unicorn/no-thenable -- intentional duck-type
+        then: noopFn,
+      }) as unknown as Promise<unknown>;
+
+      const payload = defer({
+        critical: 0,
+        deferred: { n: native, t: thenable },
+      });
+
+      expect(isDeferred(payload)).toBe(true);
+      expect(payload.deferred.n).toBe(native);
+      expect(payload.deferred.t).toBe(thenable);
+    });
+
+    it("supports a large deferred map (1000 keys) without throwing or losing entries", () => {
+      // Smoke test — no algorithmic claim beyond "no O(N²) regression in
+      // the validation loop will trip the watchdog". 1000 keys takes
+      // ~milliseconds on CI.
+      const deferred: Record<string, Promise<number>> = {};
+      const keys: string[] = [];
+
+      for (let i = 0; i < 1000; i++) {
+        const k = `k${i}`;
+
+        deferred[k] = Promise.resolve(i);
+        keys.push(k);
+      }
+
+      const payload = defer({ critical: null, deferred });
+
+      expect(isDeferred(payload)).toBe(true);
+      expect(Object.keys(payload.deferred)).toHaveLength(1000);
+      expect(Object.keys(payload.deferred)).toStrictEqual(keys);
+    });
+
+    it("strict-mode mutation of the frozen deferred map throws", () => {
+      // Module-level strict mode applies to all ESM test files. Frozen
+      // objects throw on property assignment under strict — the test
+      // documents this so a future change that swaps `Object.freeze` for
+      // `Object.preventExtensions` (or just leaves the map mutable) would
+      // surface here rather than as a downstream wire-format corruption.
+      const payload = defer({
+        critical: null,
+        deferred: { x: Promise.resolve(1) },
+      });
+
+      expect(() => {
+        (payload.deferred as Record<string, unknown>).evil = Promise.resolve(2);
+      }).toThrow(TypeError);
+    });
   });
 
   describe("validation", () => {
@@ -194,12 +264,18 @@ describe("defer()", () => {
         then: noopFn,
       }) as unknown as Promise<unknown>;
 
-      expect(() =>
-        defer({
-          critical: 1,
-          deferred: { x: thenable },
-        }),
-      ).not.toThrow();
+      const payload = defer({
+        critical: 1,
+        deferred: { x: thenable },
+      });
+
+      // Branding must survive even when the deferred value is a duck-type
+      // (not a native Promise). Without this check a regression where the
+      // validator silently rejects thenables — or where branding is gated
+      // on `instanceof Promise` — would slip past `not.toThrow()`.
+      expect(isDeferred(payload)).toBe(true);
+      expect(payload.critical).toBe(1);
+      expect(payload.deferred.x).toBe(thenable);
     });
   });
 

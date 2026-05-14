@@ -197,6 +197,14 @@ consumes the scratchpad. Subsequent navigations run the loader normally.
 Composes with per-route mode: `"client-only"` skips the loader regardless of
 scratchpad contents (mode wins).
 
+**Mode marker is always written.** Even on a scratchpad-hit the plugin still
+calls `claim.write(state, mode)` for `state.context.ssrDataMode` before the
+loader-skip branch runs. So a route configured `ssr: "full"` keeps
+`getSsrDataMode(state) === "full"` on the client after hydration even when the
+loader was skipped — UI conditionals that branch on `ssrDataMode` don't need
+to special-case the post-hydration first paint. Symmetric on the rsc-server-plugin
+side (`state.context.ssrRscMode`).
+
 ## Typed Loader Errors (`@real-router/ssr-data-plugin/errors`)
 
 The plugin is HTTP-agnostic — it only awaits the loader and writes the result to `state.context.data`. To bridge loader failures to HTTP semantics (404, 30x, 504), import typed error classes from the `errors` subpath and let your handler catch them:

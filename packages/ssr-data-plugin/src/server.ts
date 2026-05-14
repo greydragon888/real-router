@@ -110,6 +110,62 @@ function buildSettlePromises(
 }
 
 /**
+ * Emit the bootstrap `<script>` once, gated on `(includeBootstrap, entries)`.
+ * Lifted out of the `start` callback so the streaming wrapper reads
+ * top-down: bootstrap → upstream forwarding → settle awaits → close.
+ *
+ * Returns nothing — side-effect call into `safeEnqueue`. Kept as a function
+ * (instead of inlining a 4-line `if`) so the reader can ignore the bootstrap
+ * concern entirely when scanning `injectDeferredScripts`.
+ */
+function bootstrapForwarder(
+  includeBootstrap: boolean,
+  entryCount: number,
+  encoder: TextEncoder,
+  safeEnqueue: (chunk: Uint8Array) => void,
+): void {
+  if (includeBootstrap && entryCount > 0) {
+    safeEnqueue(
+      encoder.encode(`<script>${getDeferBootstrapScript()}</script>`),
+    );
+  }
+}
+
+/**
+ * Pump every chunk from the upstream HTML reader into `safeEnqueue` until
+ * the reader is exhausted (`done: true`) or the consumer cancels the
+ * downstream stream (`cancelledRef.value === true`).
+ *
+ * Resolves to `{ error: null }` on success; `{ error: unknown }` on a
+ * reader-level throw that the caller propagates via `controller.error(...)`.
+ * Splitting the loop out of `start` keeps the upstream-reader +
+ * settle-promise orchestration linear in the caller. The error is passed
+ * through verbatim — matches the previous `controller.error(error)` shape
+ * where non-Error throws stayed non-Error.
+ */
+async function htmlForwarder(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  cancelledRef: { value: boolean },
+  safeEnqueue: (chunk: Uint8Array) => void,
+): Promise<{ error: unknown }> {
+  try {
+    while (!cancelledRef.value) {
+      const { done, value } = await reader.read();
+
+      if (done) {
+        break;
+      }
+
+      safeEnqueue(value);
+    }
+
+    return { error: null };
+  } catch (error) {
+    return { error };
+  }
+}
+
+/**
  * Wraps an HTML `ReadableStream` (e.g. from React's `renderToReadableStream`)
  * with inline `<script>__rrDefer__("key", json)</script>` chunks emitted as
  * each promise in `deferred` resolves.
@@ -137,9 +193,11 @@ export function injectDeferredScripts(
 
   // Tracked outside the `start` callback so the `cancel` callback can reach
   // the active reader and release its lock + propagate cancellation upstream
-  // when the consumer aborts mid-stream (e.g. client disconnect).
+  // when the consumer aborts mid-stream (e.g. client disconnect). The
+  // cancelled flag travels via a `{ value }` wrapper so `htmlForwarder` reads
+  // it through the same reference after each loop turn.
   let upstreamReader: ReadableStreamDefaultReader<Uint8Array> | null = null;
-  let cancelled = false;
+  const cancelledRef = { value: false };
 
   return new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -159,11 +217,12 @@ export function injectDeferredScripts(
         }
       };
 
-      if (includeBootstrap && entries.length > 0) {
-        safeEnqueue(
-          encoder.encode(`<script>${getDeferBootstrapScript()}</script>`),
-        );
-      }
+      bootstrapForwarder(
+        includeBootstrap,
+        entries.length,
+        encoder,
+        safeEnqueue,
+      );
 
       const settlePromises = buildSettlePromises(
         entries,
@@ -175,28 +234,15 @@ export function injectDeferredScripts(
 
       upstreamReader = htmlStream.getReader();
 
-      try {
-        for (;;) {
-          /* v8 ignore next 3 -- @preserve: defensive break when cancel fires
-             between iterations; in practice `reader.cancel()` causes the next
-             read() to return `{ done: true }` first, so this rarely wins the
-             race. Kept as a safety net in case future refactors add long-running
-             work between read and the next loop turn. */
-          if (cancelled) {
-            break;
-          }
+      const forwardResult = await htmlForwarder(
+        upstreamReader,
+        cancelledRef,
+        safeEnqueue,
+      );
 
-          const { done, value } = await upstreamReader.read();
-
-          if (done) {
-            break;
-          }
-
-          safeEnqueue(value);
-        }
-      } catch (error) {
+      if (forwardResult.error !== null) {
         closed = true;
-        controller.error(error);
+        controller.error(forwardResult.error);
         upstreamReader.releaseLock();
         upstreamReader = null;
 
@@ -219,15 +265,15 @@ export function injectDeferredScripts(
       //   - `closed === true` — `safeEnqueue` caught `controller.enqueue()`'s
       //     throw on a cancelled controller; closing again would re-throw
       //     "Invalid state: Controller is already closed".
-      //   - `cancelled === true` — consumer called `reader.cancel()`; the
-      //     stream is already in the closed state per WHATWG, so
+      //   - `cancelledRef.value === true` — consumer called `reader.cancel()`;
+      //     the stream is already in the closed state per WHATWG, so
       //     `controller.close()` would throw the same error. The throw is
       //     normally swallowed by ReadableStream's start-callback rejection
       //     handling (cancelled streams suppress start errors), but skipping
       //     the call is cleaner and avoids spurious unhandled-rejection
       //     warnings under stricter runtimes.
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      if (!closed && !cancelled) {
+      if (!closed && !cancelledRef.value) {
         controller.close();
       }
     },
@@ -236,7 +282,7 @@ export function injectDeferredScripts(
       // (or other) HTML stream stops producing chunks. Without this, the
       // upstream renderer keeps running until its internal AbortSignal
       // fires (or never), wasting work after the client disconnected.
-      cancelled = true;
+      cancelledRef.value = true;
 
       // The else-branch of the null check is a defensive fallback for the
       // cancel-before-start race. WHATWG runs start() synchronously during

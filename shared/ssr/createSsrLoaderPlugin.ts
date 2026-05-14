@@ -18,12 +18,61 @@ import type {
   DefaultDependencies,
   Plugin,
   PluginFactory,
+  Router,
   State,
 } from "@real-router/types";
 
 interface CompiledEntry<T> {
   mode: SsrModeConfig | undefined;
   loader: SsrLoaderFn<T> | undefined;
+}
+
+/**
+ * Compile a `SsrLoaderFactoryMap` into a `Map<name, CompiledEntry>`.
+ *
+ * Extracted from the inline `for (const [name, raw] of …)` body that lived
+ * inside `createSsrLoaderPlugin` so the main function reads top-down:
+ * claims are acquired, compilation runs against this helper, and any throw
+ * bubbles to the shared `rollback()` path. Tested in isolation by the same
+ * functional + property suites that pin the previous inline behaviour.
+ *
+ * The compile step is pure — it touches no router state other than via the
+ * caller-provided `router` + `getDependency` arguments, and it only walks
+ * own-enumerable entries (`Object.entries`) so prototype pollution stays
+ * structurally impossible.
+ */
+function compile<
+  T,
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+>(
+  loaders: SsrLoaderFactoryMap<T, SsrMode, Dependencies>,
+  router: Router<Dependencies>,
+  getDependency: <K extends keyof Dependencies>(key: K) => Dependencies[K],
+  errorPrefix: string,
+): Map<string, CompiledEntry<T>> {
+  const compiled = new Map<string, CompiledEntry<T>>();
+
+  for (const [name, raw] of Object.entries(loaders)) {
+    const obj = typeof raw === "function" ? { loader: raw } : raw;
+
+    let loader: SsrLoaderFn<T> | undefined;
+
+    if (obj.loader !== undefined) {
+      const fn = obj.loader(router, getDependency);
+
+      if (typeof fn !== "function") {
+        throw new TypeError(
+          `${errorPrefix} factory for route "${name}" must return a function`,
+        );
+      }
+
+      loader = fn;
+    }
+
+    compiled.set(name, { mode: obj.ssr, loader });
+  }
+
+  return compiled;
 }
 
 function rejectMode(
@@ -117,7 +166,7 @@ export function createSsrLoaderPlugin<
       value: ContextNamespaceClaim;
       keys: ContextNamespaceClaim;
     } | null = null;
-    const compiled = new Map<string, CompiledEntry<T>>();
+    let compiled: Map<string, CompiledEntry<T>>;
 
     try {
       dataClaim = claim(config.namespace);
@@ -130,25 +179,7 @@ export function createSsrLoaderPlugin<
         };
       }
 
-      for (const [name, raw] of Object.entries(loaders)) {
-        const obj = typeof raw === "function" ? { loader: raw } : raw;
-
-        let loader: SsrLoaderFn<T> | undefined;
-
-        if (obj.loader !== undefined) {
-          const fn = obj.loader(router, getDependency);
-
-          if (typeof fn !== "function") {
-            throw new TypeError(
-              `${config.errorPrefix} factory for route "${name}" must return a function`,
-            );
-          }
-
-          loader = fn;
-        }
-
-        compiled.set(name, { mode: obj.ssr, loader });
-      }
+      compiled = compile(loaders, router, getDependency, config.errorPrefix);
     } catch (error) {
       rollback();
 

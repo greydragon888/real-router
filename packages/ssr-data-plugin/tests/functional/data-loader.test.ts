@@ -1568,12 +1568,15 @@ describe("@real-router/ssr-data-plugin", () => {
       await router.start("/users/42");
 
       // Start interceptor calls loader without context (SSR boot path).
-      const startCallArgs = loader.mock.calls[0];
-
-      expect(startCallArgs[0]).toStrictEqual(
-        expect.objectContaining({ id: "42" }),
-      );
-      expect(startCallArgs[1]).toBeUndefined();
+      // Pinning the full args tuple via `toStrictEqual([{ id: "42" }])` is
+      // strictly stronger than `startCallArgs[0]` + `startCallArgs[1]`:
+      // it asserts BOTH the params payload AND the arity (single arg, no
+      // ctx). The previous shape would have passed even if the start path
+      // started leaking a synthetic ctx, as long as it shaped up to
+      // `undefined` for `[1]`. Note: `toHaveBeenCalledWith(params, undefined)`
+      // would NOT work here — vitest treats `f(x)` and `f(x, undefined)`
+      // as distinct by arity, and the start path passes a single argument.
+      expect(loader.mock.calls[0]).toStrictEqual([{ id: "42" }]);
 
       invalidate(router, "data");
       await router.navigate("users.profile", { id: "42" }, { reload: true });
@@ -1793,10 +1796,13 @@ describe("@real-router/ssr-data-plugin", () => {
       const deferred = state.context.ssrDataDeferred;
 
       expect(deferred).toBeDefined();
-      expect(deferred!.reviews).toBeInstanceOf(Promise);
-      expect(deferred!.related).toBeInstanceOf(Promise);
-
+      // Reference identity with the registry-backed promise is strictly
+      // stronger than `toBeInstanceOf(Promise)` (every registry entry IS a
+      // Promise, so the `instanceof` check is implied). Drop the redundant
+      // assertion and pin the contract that matters: same promise instance
+      // as the one the registry hands out for this key.
       expect(deferred!.reviews).toBe(ensureRegistryPromise("reviews"));
+      expect(deferred!.related).toBe(ensureRegistryPromise("related"));
     });
 
     it("settles registry-backed promises when bootstrap+settle scripts run", async () => {
@@ -1818,6 +1824,16 @@ describe("@real-router/ssr-data-plugin", () => {
 
       const deferred = router.getState()!.context.ssrDataDeferred!;
 
+      // Bootstrap idempotency contract: running the bootstrap script AFTER
+      // the plugin populated `ssrDataDeferred` must NOT rebuild the registry
+      // — otherwise the just-captured `deferred.reviews` reference would be
+      // orphaned (registry would create a fresh promise, and the `settle!`
+      // call below would resolve THAT promise, leaving our captured one
+      // pending forever). The bootstrap therefore early-returns when
+      // `globalThis.__rrDeferRegistry__` already exists, which is what we
+      // implicitly rely on here. If a future refactor flips the bootstrap
+      // to "always rebuild", this test will hang on the final
+      // `await deferred.reviews` — that hang IS the regression signal.
       // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- const bootstrap script
       new Function(getDeferBootstrapScript())();
 
@@ -1974,9 +1990,13 @@ describe("@real-router/ssr-data-plugin", () => {
       expect(Object.keys(deferred)).toStrictEqual(["reviews", "related"]);
 
       // Null-prototype object — `then` (would-be Promise.prototype lookup)
-      // is undefined, not the inherited function.
+      // is undefined, not the inherited function. Same applies to
+      // `constructor`, which on a regular `{}` would point to `Object` via
+      // the prototype chain — under `Object.create(null)` it's a plain
+      // own-property miss (`undefined`), proving the chain really is broken.
       expect(Object.getPrototypeOf(deferred)).toBeNull();
       expect((deferred as Record<string, unknown>).then).toBeUndefined();
+      expect((deferred as Record<string, unknown>).constructor).toBeUndefined();
     });
 
     it("rejects when only one of deferredNamespace / deferredKeysNamespace is configured", async () => {
@@ -2010,6 +2030,32 @@ describe("@real-router/ssr-data-plugin", () => {
           },
         ),
       ).toThrow(/must be set together/);
+    });
+  });
+
+  describe("markStale edge cases", () => {
+    it("markStale(router, '') is a silent no-op for downstream isStale('data')", async () => {
+      // Document the contract: `markStale` does not validate the namespace
+      // string. An empty-string namespace successfully lands in the per-
+      // router Set (the underlying Set#add accepts any string), but a
+      // subsequent `isStale(router, "data")` peek returns `false` — the
+      // plugin's `subscribeLeave` listener is keyed on its own namespace
+      // and never observes a foreign mark. The shape mirrors the broader
+      // per-namespace orthogonality guarantee documented in CLAUDE.md.
+      const loader = vi.fn().mockResolvedValue({ page: "v1" });
+
+      router.usePlugin(ssrDataPluginFactory({ home: () => loader }));
+      await router.start("/");
+
+      expect(loader).toHaveBeenCalledTimes(1);
+
+      // A no-op mark — leave-listener gate is "data", not "".
+      markStale(router, "");
+
+      // A regular navigation must NOT re-run the loader.
+      await router.navigate("home", {}, { reload: true });
+
+      expect(loader).toHaveBeenCalledTimes(1);
     });
   });
 });
