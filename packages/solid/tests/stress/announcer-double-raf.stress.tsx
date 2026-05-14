@@ -82,7 +82,7 @@ describe("AR1 — route-announcer double-rAF race (§7.3 #24)", () => {
 
     for (let i = 0; i < ITERATIONS; i++) {
       // Map index to non-repeating route — avoid SAME_STATES rejections.
-      const target = `route${(prevIdx + 1) % 49 + 1}`;
+      const target = `route${((prevIdx + 1) % 49) + 1}`;
 
       prevIdx = ((prevIdx + 1) % 49) + 1;
       await router.navigate(target);

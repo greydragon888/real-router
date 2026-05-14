@@ -688,11 +688,13 @@ describe("RouteView", () => {
 
       // Level-3 marker resolves on navigation.
       await router.navigate("users.list");
+
       expect(screen.getByTestId("users")).toBeInTheDocument();
       expect(screen.queryByTestId("items")).not.toBeInTheDocument();
 
       // Level-2 marker resolves on navigation.
       await router.navigate("items");
+
       expect(screen.getByTestId("items")).toBeInTheDocument();
       expect(screen.queryByTestId("users")).not.toBeInTheDocument();
 

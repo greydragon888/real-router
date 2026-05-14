@@ -89,10 +89,9 @@ describe("isSegmentMatch — Property Tests (Solid RouteView)", () => {
     // alone would treat "users2" as descendant of "users". The dot is the
     // namespace separator; without it on the boundary, the prefix is
     // accidental.
-    test.prop(
-      [arbSegmentName, fc.stringMatching(/^[a-z0-9]{1,5}$/)],
-      { numRuns: NUM_RUNS.thorough },
-    )(
+    test.prop([arbSegmentName, fc.stringMatching(/^[a-z0-9]{1,5}$/)], {
+      numRuns: NUM_RUNS.thorough,
+    })(
       "isSegmentMatch('parent<suffix>', 'parent', false) === false when suffix has no leading dot",
       (parent, suffix) => {
         // suffix must not start with a dot — that would form a valid
@@ -262,7 +261,7 @@ describe("buildRenderList — Property Tests (Solid RouteView, §6.2 Inv 8)", ()
         const rendered = buildRenderList(markers, routeName, "");
 
         // Exactly 1 element — the Match — must win. Self/NotFound suppressed.
-        expect(rendered.length).toBe(1);
+        expect(rendered).toHaveLength(1);
       },
     );
 
@@ -293,7 +292,7 @@ describe("buildRenderList — Property Tests (Solid RouteView, §6.2 Inv 8)", ()
         // by construction.
         const rendered = buildRenderList(markers, UNKNOWN_ROUTE, "");
 
-        expect(rendered.length).toBe(1);
+        expect(rendered).toHaveLength(1);
       },
     );
   });

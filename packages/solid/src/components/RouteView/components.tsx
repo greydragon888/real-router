@@ -51,7 +51,7 @@ function createMarker<M extends RouteViewMarker>(
 ): JSX.Element {
   const result = {
     $$type: type,
-    ...(extras ?? {}),
+    ...extras,
     get children(): JSX.Element {
       return getChildren();
     },
@@ -61,15 +61,11 @@ function createMarker<M extends RouteViewMarker>(
 }
 
 export function Match(props: MatchProps): JSX.Element {
-  return createMarker<MatchMarker>(
-    MATCH_MARKER,
-    () => props.children,
-    {
-      segment: props.segment,
-      exact: props.exact ?? false,
-      fallback: props.fallback,
-    },
-  );
+  return createMarker<MatchMarker>(MATCH_MARKER, () => props.children, {
+    segment: props.segment,
+    exact: props.exact ?? false,
+    fallback: props.fallback,
+  });
 }
 
 Match.displayName = "RouteView.Match";

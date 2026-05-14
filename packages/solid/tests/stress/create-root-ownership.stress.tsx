@@ -22,9 +22,11 @@ import type { RouterSource } from "@real-router/sources";
  * `createRoot` invocation is an isolated owner — dispose must release
  * the subscription, and N rounds of create-dispose must not leak.
  */
-function buildSubscribingSource<T>(
-  initial: T,
-): { source: RouterSource<T>; emit: (v: T) => void; listenerCount: () => number } {
+function buildSubscribingSource<T>(initial: T): {
+  source: RouterSource<T>;
+  emit: (v: T) => void;
+  listenerCount: () => number;
+} {
   let current = initial;
   const callbacks = new Set<() => void>();
 

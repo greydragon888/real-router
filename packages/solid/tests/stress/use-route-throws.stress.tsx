@@ -58,8 +58,7 @@ describe("UR1 — useRoute throws on stopped router (§7.3 #21)", () => {
 
         // The throw message MUST mention useRoute and lifecycle hint —
         // catching the documented contract.
-        const message =
-          error instanceof Error ? error.message : String(error);
+        const message = error instanceof Error ? error.message : String(error);
 
         if (
           !message.includes("useRoute") ||
@@ -88,7 +87,7 @@ describe("UR1 — useRoute throws on stopped router (§7.3 #21)", () => {
 
     let throws = 0;
     let mounts = 0;
-    const unmounters: Array<() => void> = [];
+    const unmounters: (() => void)[] = [];
 
     for (let i = 0; i < 50; i++) {
       // Odd cycles: stopped — must throw.

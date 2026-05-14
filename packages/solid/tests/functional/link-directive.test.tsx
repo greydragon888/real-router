@@ -673,6 +673,7 @@ describe("link directive", () => {
 
       // Sanity: directive's handler is currently bound — click triggers nav.
       await user.click(linkElement);
+
       expect(navigateSpy).toHaveBeenCalledTimes(1);
       expect(consumerSpy).toHaveBeenCalledTimes(1);
 
@@ -705,9 +706,7 @@ describe("link directive", () => {
       // A consumer's onClick that inspects evt.defaultPrevented must see
       // false — the directive's handler must coexist cleanly without
       // mutating the event for the consumer's view.
-      const consumerSpy = vi.fn(
-        (evt: MouseEvent) => evt.defaultPrevented,
-      );
+      const consumerSpy = vi.fn((evt: MouseEvent) => evt.defaultPrevented);
       const navigateSpy = vi.spyOn(router, "navigate");
 
       render(

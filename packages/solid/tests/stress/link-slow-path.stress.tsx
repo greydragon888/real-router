@@ -58,6 +58,7 @@ describe("LSP1 — Link slow-path init-capture (§7.3 #19)", () => {
 
     // Navigate to route1 — captured matches, Link should be active.
     await router.navigate("route1");
+
     expect(link.classList.contains("active")).toBe(true);
 
     // Now stress: 150 cycles. Each cycle flips the signal to a route

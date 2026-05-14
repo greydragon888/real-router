@@ -80,9 +80,9 @@ describe("EBR1 — RouterErrorBoundary auto-reset stress (§7.3 #25)", () => {
         expect(screen.getByTestId("fallback")).toBeInTheDocument();
       });
 
-      const fallbackEl = screen.getByTestId("fallback");
+      const fallbackElement = screen.getByTestId("fallback");
 
-      expect(fallbackEl.textContent).toContain(errorCodes.CANNOT_ACTIVATE);
+      expect(fallbackElement.textContent).toContain(errorCodes.CANNOT_ACTIVATE);
 
       // Success path — alternate between "home" and "users" to avoid
       // SAME_STATES rejection on the success leg (the router stays on

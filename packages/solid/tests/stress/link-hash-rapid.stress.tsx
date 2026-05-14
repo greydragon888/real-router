@@ -86,6 +86,7 @@ describe("LH1 — Link hash rapid changes (§7.3 #20, #532)", () => {
     // Router still navigable to a sibling route — proves FSM not locked
     // by 200 force-flagged same-route hash navs.
     await router.navigate("route1");
+
     expect(router.getState()?.name).toBe("route1");
 
     forceGC();
@@ -121,18 +122,7 @@ describe("LH1 — Link hash rapid changes (§7.3 #20, #532)", () => {
     ));
 
     const heapBefore = takeHeapSnapshot();
-    const HASHES = [
-      "a",
-      "b",
-      "c",
-      "d",
-      "e",
-      "f",
-      "g",
-      "h",
-      "i",
-      "j",
-    ] as const;
+    const HASHES = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"] as const;
 
     for (let i = 0; i < 150; i++) {
       const hash = HASHES[i % HASHES.length];

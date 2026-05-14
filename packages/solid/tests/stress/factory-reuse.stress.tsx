@@ -44,6 +44,7 @@ describe("F1 — factory reuse (100 router instances)", () => {
 
     for (let i = 0; i < 1000; i++) {
       const router = createStressRouter(3);
+
       await router.start("/route0");
       await router.navigate("users.list");
       router.stop();

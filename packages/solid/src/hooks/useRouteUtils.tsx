@@ -38,7 +38,7 @@ export const useRouteUtils = (): RouteUtils => {
 
   const cached = routeUtilsCache.get(router);
 
-  if (cached && cached.tree === tree) {
+  if (cached?.tree === tree) {
     return cached.utils;
   }
 

@@ -26,9 +26,7 @@ describe("V1 — viewTransitions + mid-transition router.stop() (§7.2 #9)", () 
     // `subscribeLeave` listeners leak across `router.stop()`, the resolve
     // chain emits a rejection that this handler catches.
     const unhandled: unknown[] = [];
-    const onUnhandled = (
-      event: Event & { reason?: unknown },
-    ): void => {
+    const onUnhandled = (event: Event & { reason?: unknown }): void => {
       unhandled.push(event.reason);
       event.preventDefault();
     };

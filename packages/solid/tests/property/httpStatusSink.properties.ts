@@ -92,36 +92,38 @@ describe("createHttpStatusSink — Property Tests (Solid)", () => {
     // sink contract is "plain mutable cell, last write wins" — locked by
     // this property so a future refactor cannot accidentally introduce
     // first-write or accumulator semantics.
-    test.prop([fc.array(fc.integer({ min: 100, max: 599 }), { minLength: 1, maxLength: 8 })], {
-      numRuns: NUM_RUNS.thorough,
-    })(
-      "after N writes, sink.code === the last value written",
-      (codes) => {
-        const sink = createHttpStatusSink();
-
-        for (const code of codes) {
-          sink.code = code;
-        }
-
-        expect(sink.code).toBe(codes[codes.length - 1]);
+    test.prop(
+      [
+        fc.array(fc.integer({ min: 100, max: 599 }), {
+          minLength: 1,
+          maxLength: 8,
+        }),
+      ],
+      {
+        numRuns: NUM_RUNS.thorough,
       },
-    );
+    )("after N writes, sink.code === the last value written", (codes) => {
+      const sink = createHttpStatusSink();
+
+      for (const code of codes) {
+        sink.code = code;
+      }
+
+      expect(sink.code).toBe(codes.at(-1));
+    });
 
     test.prop([fc.integer({ min: 100, max: 599 })], {
       numRuns: NUM_RUNS.standard,
-    })(
-      "writing undefined after a numeric code resets to undefined",
-      (code) => {
-        const sink = createHttpStatusSink();
+    })("writing undefined after a numeric code resets to undefined", (code) => {
+      const sink = createHttpStatusSink();
 
-        sink.code = code;
+      sink.code = code;
 
-        expect(sink.code).toBe(code);
+      expect(sink.code).toBe(code);
 
-        sink.code = undefined;
+      sink.code = undefined;
 
-        expect(sink.code).toBeUndefined();
-      },
-    );
+      expect(sink.code).toBeUndefined();
+    });
   });
 });

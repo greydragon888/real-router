@@ -169,7 +169,9 @@ describe("RouterProvider — announceNavigation", () => {
 
   it("§5.7 — internal `@@`-prefixed route name is dropped from text resolution", async () => {
     document.title = "";
-    document.querySelectorAll("h1").forEach((h1) => h1.remove());
+    document.querySelectorAll("h1").forEach((h1) => {
+      h1.remove();
+    });
 
     render(() => (
       <RouterProvider router={router} announceNavigation>
@@ -194,7 +196,9 @@ describe("RouterProvider — announceNavigation", () => {
 
   it("§5.7 — no h1 present + no document.title → falls back to routeName", async () => {
     document.title = "";
-    document.querySelectorAll("h1").forEach((h1) => h1.remove());
+    document.querySelectorAll("h1").forEach((h1) => {
+      h1.remove();
+    });
 
     render(() => (
       <RouterProvider router={router} announceNavigation>
@@ -241,7 +245,7 @@ describe("RouterProvider — announceNavigation", () => {
 
     render(() => (
       <RouterProvider router={router} announceNavigation>
-        <h1 ref={h1Ref!} tabIndex={-3}>
+        <h1 ref={h1Ref} tabIndex={-3}>
           Home
         </h1>
       </RouterProvider>
@@ -253,7 +257,7 @@ describe("RouterProvider — announceNavigation", () => {
 
     // The announcer's manageFocus only sets tabindex if absent; pre-existing
     // -3 must survive untouched.
-    expect(h1Ref!.getAttribute("tabindex")).toBe("-3");
+    expect(h1Ref.getAttribute("tabindex")).toBe("-3");
   });
 
   it("§5.7 — destroy() during rAF → isDestroyed guard prevents DOM write", async () => {
@@ -310,13 +314,14 @@ describe("RouterProvider — announceNavigation", () => {
     // announcer factory. This locks the shared/dom-utils contract that a
     // throwing custom resolver is caught and logged — it does NOT tear
     // down the announcer subscription.
-    const { createRouteAnnouncer } = await import(
-      "../../src/dom-utils/route-announcer.js"
-    );
+    const { createRouteAnnouncer } =
+      await import("../../src/dom-utils/route-announcer.js");
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     document.title = "ServerTitle";
-    document.querySelectorAll("h1").forEach((h1) => h1.remove());
+    document.querySelectorAll("h1").forEach((h1) => {
+      h1.remove();
+    });
 
     const handle = createRouteAnnouncer(router, {
       getAnnouncementText: () => {

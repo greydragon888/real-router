@@ -71,6 +71,7 @@ describe("L1 — concurrent Link clicks with force:true (§7.2 #13)", () => {
 
     // Router still navigable to a sibling — proves the FSM wasn't locked.
     await router.navigate("route2");
+
     expect(router.getState()?.name).toBe("route2");
 
     // Heap budget: 300 navigation promises + transition events;
@@ -87,19 +88,39 @@ describe("L1 — concurrent Link clicks with force:true (§7.2 #13)", () => {
 
     render(() => (
       <RouterProvider router={router}>
-        <Link routeName="route0" routeOptions={{ force: true }} data-testid="l-0">
+        <Link
+          routeName="route0"
+          routeOptions={{ force: true }}
+          data-testid="l-0"
+        >
           0
         </Link>
-        <Link routeName="route1" routeOptions={{ force: true }} data-testid="l-1">
+        <Link
+          routeName="route1"
+          routeOptions={{ force: true }}
+          data-testid="l-1"
+        >
           1
         </Link>
-        <Link routeName="route2" routeOptions={{ force: true }} data-testid="l-2">
+        <Link
+          routeName="route2"
+          routeOptions={{ force: true }}
+          data-testid="l-2"
+        >
           2
         </Link>
-        <Link routeName="route3" routeOptions={{ force: true }} data-testid="l-3">
+        <Link
+          routeName="route3"
+          routeOptions={{ force: true }}
+          data-testid="l-3"
+        >
           3
         </Link>
-        <Link routeName="route4" routeOptions={{ force: true }} data-testid="l-4">
+        <Link
+          routeName="route4"
+          routeOptions={{ force: true }}
+          data-testid="l-4"
+        >
           4
         </Link>
       </RouterProvider>

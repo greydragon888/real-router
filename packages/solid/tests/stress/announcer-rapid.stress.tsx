@@ -69,6 +69,7 @@ describe("A1 — announceNavigation rapid navigations (§7.2 #14)", () => {
       // Initial state is route0, and consecutive targets always differ
       // by ±1 modulo the route count (no same-target collisions).
       const idx = 1 + (i % 48);
+
       await router.navigate(`route${idx}`);
     }
 
