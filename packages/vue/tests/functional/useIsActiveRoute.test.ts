@@ -60,7 +60,7 @@ describe("useIsActiveRoute", () => {
 
   it("should handle non-strict mode", () => {
     const { result } = mountWithRouter(router, () =>
-      useIsActiveRoute("users", {}, false),
+      useIsActiveRoute("users", {}, { strict: false }),
     );
 
     expect(result.value).toBe(true);
@@ -68,7 +68,7 @@ describe("useIsActiveRoute", () => {
 
   it("should handle strict mode", () => {
     const { result } = mountWithRouter(router, () =>
-      useIsActiveRoute("users", {}, true),
+      useIsActiveRoute("users", {}, { strict: true }),
     );
 
     expect(result.value).toBe(false);
@@ -117,13 +117,13 @@ describe("useIsActiveRoute", () => {
     await flushPromises();
 
     const { result: nonStrict } = mountWithRouter(router, () =>
-      useIsActiveRoute("settings", {}, false),
+      useIsActiveRoute("settings", {}, { strict: false }),
     );
 
     expect(nonStrict.value).toBe(true);
 
     const { result: strict } = mountWithRouter(router, () =>
-      useIsActiveRoute("settings", {}, true),
+      useIsActiveRoute("settings", {}, { strict: true }),
     );
 
     expect(strict.value).toBe(false);
@@ -145,7 +145,13 @@ describe("useIsActiveRoute", () => {
     await router.start("/users/list?page=2");
 
     const { result } = mountWithRouter(router, () =>
-      useIsActiveRoute("users.list", { page: "3" }, false, false),
+      // ignoreQueryParams=false (query params affect active state);
+      // strict omitted — defaults to false (non-exact).
+      useIsActiveRoute(
+        "users.list",
+        { page: "3" },
+        { ignoreQueryParams: false },
+      ),
     );
 
     expect(result.value).toBe(false);

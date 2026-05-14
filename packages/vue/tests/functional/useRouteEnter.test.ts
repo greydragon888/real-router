@@ -162,4 +162,57 @@ describe("useRouteEnter", () => {
 
     expect(handler).not.toHaveBeenCalled();
   });
+
+  // CLAUDE.md gotcha #1 — Handler captured at init (Vue-specific contract)
+  //
+  // Symmetric with the `useRouteExit` regression: Vue captures the handler
+  // closure-style in `setup()`; the inner `watch(route)` reads `route.value`
+  // (reactive) but always invokes the original handler reference. Mutating
+  // a parent-supplied wrapper object after mount must not swap which function
+  // the watcher invokes.
+  it("CLAUDE.md gotcha #1: handler is captured at setup() — late reassignment has no effect", async () => {
+    const originalHandler = vi.fn();
+    const replacementHandler = vi.fn();
+
+    const Probe = defineComponent({
+      props: {
+        handlerRef: {
+          type: Object as () => { current: RouteEnterHandler },
+          required: true,
+        },
+      },
+      setup(probeProps) {
+        // Capture the function reference at setup-time. Vue does NOT re-run
+        // setup() when the parent's prop value mutates (the prop object
+        // identity is itself stable here — only its `.current` property is
+        // reassigned).
+        useRouteEnter(probeProps.handlerRef.current);
+
+        return () => h("div", { "data-testid": "probe" });
+      },
+    });
+
+    const handlerRef = { current: originalHandler as RouteEnterHandler };
+
+    mount(
+      defineComponent({
+        setup: () => () =>
+          h(
+            RouterProvider,
+            { router },
+            { default: () => h(Probe, { handlerRef }) },
+          ),
+      }),
+    );
+
+    // Reassign before any navigation — but AFTER setup() has captured the
+    // original. The watcher inside useRouteEnter holds the original closure.
+    handlerRef.current = replacementHandler;
+
+    await router.navigate("about");
+    await flushPromises();
+
+    expect(originalHandler).toHaveBeenCalledTimes(1);
+    expect(replacementHandler).not.toHaveBeenCalled();
+  });
 });

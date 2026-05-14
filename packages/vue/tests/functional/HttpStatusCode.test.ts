@@ -64,6 +64,26 @@ describe("createHttpStatusSink", () => {
 
     expect(b.code).toBeUndefined();
   });
+
+  // Review §5.9 — `Object.freeze(sink)` is the documented anti-pattern: the
+  // sink MUST stay mutable so `<HttpStatusCode>` can write `code` during
+  // render. Freezing makes the write throw under ESM strict-mode semantics.
+  // Lock the failure mode so a future refactor that silently de-freezes
+  // (e.g. swapping to a plain readonly type guard) is caught immediately.
+  it("Object.freeze(sink) → write throws TypeError under strict mode (documented anti-pattern)", () => {
+    // ESM modules run under strict mode by default in Vite/Vitest, so a
+    // direct assignment to a frozen property must throw rather than silently
+    // no-op. Documented in CLAUDE.md: "Don't `Object.freeze` the sink".
+    //
+    // We cast to a mutable shape because Object.freeze narrows TS to
+    // `Readonly<HttpStatusSink>` and the type checker would otherwise block
+    // the very assignment we want to *observe* failing at runtime.
+    const sink = Object.freeze(createHttpStatusSink()) as HttpStatusSink;
+
+    expect(() => {
+      sink.code = 404;
+    }).toThrow(TypeError);
+  });
 });
 
 describe("HttpStatusCode", () => {

@@ -260,8 +260,8 @@ describe("RouterErrorBoundary", () => {
     ];
 
     expect(error.code).toBe(errorCodes.CANNOT_ACTIVATE);
-    expect(toRoute).not.toBeNull();
-    expect(fromRoute).not.toBeNull();
+    expect((toRoute as { name: string } | null)?.name).toBe("dashboard");
+    expect((fromRoute as { name: string } | null)?.name).toBe("home");
   });
 
   it("onError not called on re-render", async () => {
@@ -386,7 +386,10 @@ describe("RouterErrorBoundary", () => {
     expect(wrapper.find("[data-testid='outer-fallback']").exists()).toBe(true);
     expect(wrapper.find("[data-testid='inner-fallback']").exists()).toBe(true);
     expect(wrapper.find("[data-testid='outer-fallback']").text()).toBe(
-      wrapper.find("[data-testid='inner-fallback']").text(),
+      errorCodes.CANNOT_ACTIVATE,
+    );
+    expect(wrapper.find("[data-testid='inner-fallback']").text()).toBe(
+      errorCodes.CANNOT_ACTIVATE,
     );
   });
 

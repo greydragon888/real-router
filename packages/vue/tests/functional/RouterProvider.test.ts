@@ -1,5 +1,5 @@
 import { mount, flushPromises } from "@vue/test-utils";
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 import { defineComponent, h, inject, ref } from "vue";
 
 import { RouterKey, RouteKey } from "../../src/context";
@@ -39,7 +39,7 @@ describe("RouterProvider component", () => {
       }),
     );
 
-    expect(capturedRouter).toStrictEqual(router);
+    expect(capturedRouter).toBe(router);
   });
 
   it("should render child component", () => {
@@ -77,7 +77,7 @@ describe("RouterProvider component", () => {
       }),
     );
 
-    expect(routeContext?.route.value?.name).toStrictEqual("test");
+    expect(routeContext?.route.value?.name).toBe("test");
   });
 
   it("should update context on router state change", async () => {
@@ -98,13 +98,13 @@ describe("RouterProvider component", () => {
       }),
     );
 
-    expect(routeContext?.route.value?.name).toStrictEqual("test");
+    expect(routeContext?.route.value?.name).toBe("test");
 
     await router.navigate("one-more-test");
     await flushPromises();
 
-    expect(routeContext?.route.value?.name).toStrictEqual("one-more-test");
-    expect(routeContext?.previousRoute.value?.name).toStrictEqual("test");
+    expect(routeContext?.route.value?.name).toBe("one-more-test");
+    expect(routeContext?.previousRoute.value?.name).toBe("test");
   });
 
   it("should call unsubscribe on unmount", () => {

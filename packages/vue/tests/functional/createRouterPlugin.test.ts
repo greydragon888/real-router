@@ -1,5 +1,5 @@
 import { mount } from "@vue/test-utils";
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 import { createApp, defineComponent, h, inject } from "vue";
 
 import { useRoute } from "../../src/composables/useRoute";
@@ -82,6 +82,9 @@ describe("createRouterPlugin", () => {
 
     expect(injectedNavigator).toBeDefined();
     expect(injectedNavigator).toHaveProperty("navigate");
+    expect((injectedNavigator as { navigate: unknown }).navigate).toBeTypeOf(
+      "function",
+    );
   });
 
   it("should provide RouteKey with reactive route state", () => {
@@ -154,7 +157,11 @@ describe("createRouterPlugin", () => {
     });
 
     expect(capturedRouter).toBe(router);
-    expect(capturedRoute).toBeDefined();
+
+    const routeCtx = capturedRoute as ReturnType<typeof useRoute>;
+
+    expect(routeCtx.route.value).toBeDefined();
+    expect(routeCtx.navigator.navigate).toBeTypeOf("function");
   });
 
   it("should work with app.use() pattern", () => {

@@ -9,6 +9,13 @@ import { RouterProvider } from "../../src/RouterProvider";
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
 import type { Router } from "@real-router/core";
+import type { Component } from "vue";
+
+// Link is exported with a strictly-typed `props` shape from defineComponent.
+// Tests want to pass arbitrary prop bags (Record<string, unknown>) so they
+// can sweep edge cases without per-test generic juggling. Widening once to
+// `Component` here keeps the rest of the file `as any`-free.
+const LinkAsComponent = Link as unknown as Component;
 
 function mountLink(
   router: Router,
@@ -23,7 +30,7 @@ function mountLink(
           { router },
           {
             default: () =>
-              h(Link as any, props, { default: () => slotContent }),
+              h(LinkAsComponent, props, { default: () => slotContent }),
           },
         ),
     }),
@@ -91,6 +98,52 @@ describe("Link component", () => {
 
       expect(wrapper.find("a").classes()).toContain("active");
     });
+
+    // CLAUDE.md gotcha #17 — `ignoreQueryParams` Default
+    //
+    // The default is `ignoreQueryParams: true` (delegated through
+    // `createActiveRouteSource` via `DEFAULT_ACTIVE_OPTIONS`). Practical
+    // consequence: `<Link routeName="users" />` remains active even when the
+    // current URL has different query params than the Link target.
+    //
+    // No prior direct regression at the Link layer (only `useIsActiveRoute`
+    // covers the default via its own test); this locks the Link → composable
+    // chain so the prop's omission yields the documented behaviour.
+    it("CLAUDE.md gotcha #17: active state ignores query params by default", async () => {
+      // Re-start the router with a URL that carries a query param.
+      router.stop();
+      await router.start("/users/list?page=2");
+
+      // Link target = "users.list" with NO routeParams; current URL has
+      // ?page=2. With the documented default (ignoreQueryParams: true), the
+      // Link still lights up active.
+      const wrapper = mountLink(router, {
+        routeName: "users.list",
+        activeClassName: "active",
+      });
+
+      await flushPromises();
+
+      expect(wrapper.find("a").classes()).toContain("active");
+    });
+
+    it("CLAUDE.md gotcha #17 inverse: explicit ignoreQueryParams=false drops active when query differs", async () => {
+      router.stop();
+      await router.start("/users/list?page=2");
+
+      // Same setup as above but the consumer opts INTO strict query matching.
+      // With no `routeParams` on the Link (expected empty), query params from
+      // current URL (page=2) do NOT match → inactive.
+      const wrapper = mountLink(router, {
+        routeName: "users.list",
+        activeClassName: "active",
+        ignoreQueryParams: false,
+      });
+
+      await flushPromises();
+
+      expect(wrapper.find("a").classes()).not.toContain("active");
+    });
   });
 
   describe("clickHandler", () => {
@@ -141,8 +194,10 @@ describe("Link component", () => {
       const wrapper = mountLink(router, { routeName: "" });
 
       expect(wrapper.find("a").attributes("href")).toBeUndefined();
+      // Lock the full canonical error message from shared/dom-utils/link-utils.ts,
+      // not just a "Route """ fragment — protects against accidental rewording.
       expect(consoleError).toHaveBeenCalledWith(
-        expect.stringContaining(`Route ""`),
+        '[real-router] Route "" is not defined. The element will render without an href attribute.',
       );
 
       consoleError.mockRestore();
@@ -176,7 +231,7 @@ describe("Link component", () => {
               {
                 default: () =>
                   h(
-                    Link as any,
+                    LinkAsComponent,
                     {
                       routeName: "one-more-test",
                       // Vue's compiled template emits this shape for multiple
@@ -216,7 +271,7 @@ describe("Link component", () => {
               {
                 default: () =>
                   h(
-                    Link as any,
+                    LinkAsComponent,
                     {
                       routeName: "one-more-test",
                       onClick: [handler1, handler2],
@@ -250,7 +305,7 @@ describe("Link component", () => {
               {
                 default: () =>
                   h(
-                    Link as any,
+                    LinkAsComponent,
                     {
                       routeName: "one-more-test",
                       onClick: [null, handler, undefined],
@@ -280,7 +335,7 @@ describe("Link component", () => {
               {
                 default: () =>
                   h(
-                    Link as any,
+                    LinkAsComponent,
                     { routeName: "one-more-test", onClick: onClickMock },
                     { default: () => "Test" },
                   ),
@@ -310,7 +365,7 @@ describe("Link component", () => {
               {
                 default: () =>
                   h(
-                    Link as any,
+                    LinkAsComponent,
                     { routeName: "one-more-test", onClick: onClickMock },
                     { default: () => "Test" },
                   ),
@@ -461,7 +516,7 @@ describe("Link component", () => {
     expect(link.exists()).toBe(true);
     expect(link.attributes("href")).toBeUndefined();
     expect(consoleError).toHaveBeenCalledWith(
-      expect.stringContaining("@@nonexistent-route"),
+      '[real-router] Route "@@nonexistent-route" is not defined. The element will render without an href attribute.',
     );
 
     consoleError.mockRestore();

@@ -14,5 +14,7 @@ describe("<Streamed>", () => {
     });
 
     expect(wrapper.find('[data-testid="ready"]').exists()).toBe(true);
+    // Fallback must NOT be visible when nothing suspends
+    expect(wrapper.find('[data-testid="fallback"]').exists()).toBe(false);
   });
 });

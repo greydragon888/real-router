@@ -178,6 +178,19 @@ export const vLink: Directive<HTMLElement, LinkDirectiveValue> = {
   },
 
   updated(element, binding) {
+    // Hot-path guard: Vue invokes `updated` on every parent re-render even
+    // when the directive's binding value reference has not changed. Without
+    // this short-circuit, every parent rerender (which is the common case on
+    // Link-heavy pages — any unrelated state change triggers the parent's
+    // render fn) would detach + reattach the click/keydown listeners.
+    // Comparing references is enough: when consumers pass a stable
+    // `LinkDirectiveValue` object (the recommended pattern, since Vue's
+    // template compiler hoists `v-link="{ name: 'home' }"` to a stable
+    // literal), this guard collapses the work to zero.
+    if (binding.value === binding.oldValue) {
+      return;
+    }
+
     const router = getDirectiveRouter();
 
     detachHandlers(element);

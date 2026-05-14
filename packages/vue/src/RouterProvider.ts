@@ -13,6 +13,41 @@ import type { ScrollRestorationOptions } from "./dom-utils";
 import type { Router } from "@real-router/core";
 import type { PropType } from "vue";
 
+interface Disposable {
+  destroy: () => void;
+}
+
+/**
+ * Watch a dependency tuple and (re)create a toggleable utility (announcer /
+ * scroll-restorer / view-transitions). The factory returns `undefined` to
+ * mean "feature disabled" — no utility is created and no cleanup is wired.
+ * When a utility IS returned, its `destroy()` is registered via `onCleanup`,
+ * so flipping any dep (incl. the feature flag) tears down the previous
+ * instance before constructing the next.
+ *
+ * Extracted from three near-identical `watch(... { immediate: true })` blocks
+ * (announceNavigation / scrollRestoration / viewTransitions) — DRY without
+ * losing the per-utility dep tuple shape.
+ */
+function watchToggleableUtility<D extends readonly unknown[]>(
+  deps: () => D,
+  factory: (current: D) => Disposable | undefined,
+): void {
+  watch(
+    deps,
+    (current, _prev, onCleanup) => {
+      const utility = factory(current);
+
+      if (utility) {
+        onCleanup(() => {
+          utility.destroy();
+        });
+      }
+    },
+    { immediate: true },
+  );
+}
+
 export const RouterProvider = defineComponent({
   name: "RouterProvider",
   props: {
@@ -33,30 +68,20 @@ export const RouterProvider = defineComponent({
     },
   },
   setup(props, { slots }) {
-    // Reactive announceNavigation: setting prop true/false at runtime now
+    // Reactive announceNavigation: setting prop true/false at runtime
     // creates/destroys the announcer accordingly. Prior implementation read
     // the prop only inside onMounted, so toggling it post-mount silently no-op'd.
-    watch(
+    watchToggleableUtility(
       () => [props.router, props.announceNavigation] as const,
-      ([router, enabled], _prev, onCleanup) => {
-        if (!enabled) {
-          return;
-        }
-
-        const announcer = createRouteAnnouncer(router);
-
-        onCleanup(() => {
-          announcer.destroy();
-        });
-      },
-      { immediate: true },
+      ([router, enabled]) =>
+        enabled ? createRouteAnnouncer(router) : undefined,
     );
 
     // Watch by primitives so inline `{ mode: "restore" }` doesn't thrash.
     // scrollContainer is a getter invoked lazily on every event inside the
     // utility — swapping its reference doesn't change the resolved element,
     // so we intentionally omit it from watched sources.
-    watch(
+    watchToggleableUtility(
       () =>
         [
           props.router,
@@ -66,45 +91,26 @@ export const RouterProvider = defineComponent({
           props.scrollRestoration?.behavior,
           props.scrollRestoration?.storageKey,
         ] as const,
-      (
-        [router, enabled, mode, anchorScrolling, behavior, storageKey],
-        _prev,
-        onCleanup,
-      ) => {
+      ([router, enabled, mode, anchorScrolling, behavior, storageKey]) => {
         if (!enabled) {
           return;
         }
 
-        const sr = createScrollRestoration(router, {
+        return createScrollRestoration(router, {
           mode,
           anchorScrolling,
           behavior,
           storageKey,
           scrollContainer: props.scrollRestoration?.scrollContainer,
         });
-
-        onCleanup(() => {
-          sr.destroy();
-        });
       },
-      { immediate: true },
     );
 
     // Reactive viewTransitions: toggling prop creates/destroys the utility.
-    watch(
+    watchToggleableUtility(
       () => [props.router, props.viewTransitions] as const,
-      ([router, enabled], _prev, onCleanup) => {
-        if (!enabled) {
-          return;
-        }
-
-        const vt = createViewTransitions(router);
-
-        onCleanup(() => {
-          vt.destroy();
-        });
-      },
-      { immediate: true },
+      ([router, enabled]) =>
+        enabled ? createViewTransitions(router) : undefined,
     );
 
     // Push this provider's router on the v-link directive stack so nested

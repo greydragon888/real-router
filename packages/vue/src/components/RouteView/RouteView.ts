@@ -8,7 +8,11 @@ import {
 } from "vue";
 
 import { Match, NotFound, Self } from "./components";
-import { buildRenderList, collectElements } from "./helpers";
+import {
+  buildRenderList,
+  collectElements,
+  isKeepAliveEnabled,
+} from "./helpers";
 import { useRouteNode } from "../../composables/useRouteNode";
 
 import type { Component, VNode } from "vue";
@@ -66,14 +70,23 @@ function wrapWithSuspense(content: VNode, fallback: unknown): VNode {
   );
 }
 
-const emptyKeepAlivePlaceholder = markRaw(
-  defineComponent({
-    name: "KeepAlive-placeholder",
-    render() {
-      return null;
-    },
-  }),
-);
+// Lazy-initialised — only allocated when a per-Match keepAlive path needs to
+// keep the cache slot "occupied" with a no-render placeholder. Apps without
+// keepAlive never pay the markRaw + defineComponent allocation at import.
+let emptyKeepAlivePlaceholderInstance: Component | null = null;
+
+function getEmptyKeepAlivePlaceholder(): Component {
+  emptyKeepAlivePlaceholderInstance ??= markRaw(
+    defineComponent({
+      name: "KeepAlive-placeholder",
+      render() {
+        return null;
+      },
+    }),
+  );
+
+  return emptyKeepAlivePlaceholderInstance;
+}
 
 function renderWithRootKA(
   activeChild: VNode,
@@ -90,17 +103,6 @@ function renderWithRootKA(
   });
 
   return wrapWithSuspense(keepAliveContent, fallback);
-}
-
-// Vue compiles boolean-shorthand template attributes (`<Match keepAlive>`) to
-// an empty string instead of `true`, and converts them to `true` only when the
-// receiving component's prop is declared with `type: Boolean`. `Match` is a
-// marker component (`render: null`) — its props are inspected on the VNode
-// without ever going through Vue's prop-casting pipeline, so the raw `""` (or
-// the hyphenated attribute name) reaches us here. Accept the same trio Vue's
-// runtime does.
-function isKeepAliveEnabled(value: unknown): boolean {
-  return value === true || value === "" || value === "keep-alive";
 }
 
 function renderWithPerMatchKA(
@@ -137,7 +139,9 @@ function renderWithPerMatchKA(
   /* v8 ignore stop */
 
   return h(Fragment, [
-    h(KeepAlive, null, { default: () => h(emptyKeepAlivePlaceholder) }),
+    h(KeepAlive, null, {
+      default: () => h(getEmptyKeepAlivePlaceholder()),
+    }),
     wrapWithSuspense(h(Fragment, content), fallback),
   ]);
 }
@@ -158,33 +162,6 @@ const RouteViewComponent = defineComponent({
     const routeContext = useRouteNode(props.nodeName);
     const wrapperCache = new Map<string, Component>();
 
-    // Cache per-Match `keepAlive` detection by slot output identity. Slot
-    // contents change reference only when the parent re-renders with new
-    // children, so steady-state navigations skip the O(n) `.some(...)` scan.
-    let lastSlotOutput: unknown = null;
-    let lastHasPerMatchKA = false;
-
-    function detectPerMatchKA(elements: VNode[], slotOutput: unknown): boolean {
-      /* v8 ignore next 3 -- @preserve: Vue's compiled slot wrapper allocates a
-         new array per render call in JSDOM tests; identity-cache hits in
-         production where parent compiled templates share slot output, but
-         is unobservable through TestBed-style assertions. */
-      if (slotOutput === lastSlotOutput) {
-        return lastHasPerMatchKA;
-      }
-
-      lastSlotOutput = slotOutput;
-      lastHasPerMatchKA = elements.some(
-        (element) =>
-          element.type === Match &&
-          isKeepAliveEnabled(
-            (element.props as { keepAlive?: unknown } | null)?.keepAlive,
-          ),
-      );
-
-      return lastHasPerMatchKA;
-    }
-
     return (): VNode | null => {
       const route = routeContext.route.value;
 
@@ -197,7 +174,11 @@ const RouteViewComponent = defineComponent({
 
       collectElements(slotOutput, elements);
 
-      const { rendered, fallback } = buildRenderList(
+      // `hasPerMatchKA` is a side-channel produced by the same pipeline pass
+      // that builds `rendered` — closes the audit §8.1 "double iteration"
+      // finding. The previous identity-cache on `slotOutput` is no longer
+      // needed: per-render cost is one O(n) walk instead of two.
+      const { rendered, fallback, hasPerMatchKA } = buildRenderList(
         elements,
         route.name,
         props.nodeName,
@@ -222,8 +203,6 @@ const RouteViewComponent = defineComponent({
         return null;
       }
       /* v8 ignore stop */
-
-      const hasPerMatchKA = detectPerMatchKA(elements, slotOutput);
 
       if (hasPerMatchKA) {
         return renderWithPerMatchKA(activeChild, wrapperCache, fallback);

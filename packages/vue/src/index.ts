@@ -43,6 +43,7 @@ export type { LinkDirectiveValue } from "./directives/vLink";
 export type {
   RouteViewProps,
   RouteViewMatchProps,
+  RouteViewSelfProps,
   RouteViewNotFoundProps,
 } from "./components/RouteView";
 

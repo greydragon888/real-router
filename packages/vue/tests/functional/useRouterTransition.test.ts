@@ -108,8 +108,12 @@ describe("useRouterTransition", () => {
   it("toRoute and fromRoute === null when no transition", () => {
     const { result } = mountWithRouter(router, () => useRouterTransition());
 
-    expect(result.value.toRoute).toBeNull();
-    expect(result.value.fromRoute).toBeNull();
+    // Full IDLE shape: both route fields are null and transition is not active
+    expect(result.value).toMatchObject({
+      toRoute: null,
+      fromRoute: null,
+      isTransitioning: false,
+    });
   });
 
   it("snapshot returns to IDLE shape after a successful transition (not just idle on mount)", async () => {

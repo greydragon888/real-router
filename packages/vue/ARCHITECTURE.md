@@ -35,32 +35,51 @@ dist/
 
 ```
 src/
-├── index.ts                    # Single entry point
+├── index.ts                    # Main entry — client API
+├── ssr.ts                      # /ssr — SSR-feature subpath (8 exports)
 ├── RouterProvider.ts           # Context provider — wires router to Vue tree
-├── context.ts                  # Three InjectionKeys (RouterKey, NavigatorKey, RouteKey)
-├── types.ts                    # RouteState, RouteContext, LinkProps
+├── context.ts                  # Triple Injection Key Pattern (public: RouterKey/NavigatorKey/RouteKey) + @internal HTTP_STATUS_KEY for /ssr
+├── types.ts                    # RouteState, RouteContext, LinkProps (with hash for #532)
 ├── constants.ts                # EMPTY_PARAMS, EMPTY_OPTIONS (frozen singletons)
 ├── createRouterPlugin.ts       # Vue Plugin factory (for app.use())
 ├── useRefFromSource.ts         # Ref bridge — converts RouterSource to ShallowRef
+├── setupRouteProvision.ts      # Internal — shared route subscription setup (RouterProvider + createRouterPlugin)
 ├── composables/
 │   ├── useRouter.ts            # Router instance from inject (never reactive)
 │   ├── useNavigator.ts         # Navigator from inject (never reactive)
-│   ├── useRoute.ts             # Full route context from inject (every navigation)
-│   ├── useRouteNode.ts         # Node-scoped subscription via useRefFromSource
+│   ├── useRoute.ts             # Full route context from inject (every navigation) — Readonly<Ref<State>>
+│   ├── useRouteNode.ts         # Node-scoped subscription via useRefFromSource (computed over shallowRef snapshot)
 │   ├── useIsActiveRoute.ts     # Active state subscription (internal — used by Link)
 │   ├── useRouteUtils.ts        # RouteUtils from route tree (never reactive)
 │   ├── useRouterTransition.ts  # Transition lifecycle ShallowRef (isTransitioning, toRoute, fromRoute)
 │   ├── useRouteExit.ts         # Wrap subscribeLeave with abort + same-route guards (handler captured in setup())
-│   └── useRouteEnter.ts        # Fire on nav-driven mount via watch(route) + route.transition.from
-└── components/
-    ├── Link.ts                 # defineComponent + h('a'), computed href/class, active state
-    ├── RouterErrorBoundary.ts   # Declarative navigation error handling
-    └── RouteView/              # Declarative route matching with native keepAlive support
-        ├── index.ts            # Barrel re-exports
-        ├── RouteView.ts        # RouteViewComponent + compound export (RouteView.Match, RouteView.NotFound)
-        ├── types.ts            # RouteViewProps, MatchProps, NotFoundProps
-        ├── components.ts       # Match, NotFound marker components (render: null)
-        └── helpers.ts          # collectElements, buildRenderList, isSegmentMatch
+│   ├── useRouteEnter.ts        # Fire on nav-driven mount via watch(route) + route.transition.from
+│   └── useDeferred.ts          # /ssr — reads state.context.ssrDataDeferred[key]
+├── components/
+│   ├── Link.ts                 # defineComponent + h('a'), computed href/class, hash-aware active state
+│   ├── RouterErrorBoundary.ts  # Declarative navigation error handling (uses createDismissableError)
+│   ├── ClientOnly.ts           # /ssr — ref(false) + onMounted swap (slots: default/fallback)
+│   ├── ServerOnly.ts           # /ssr — symmetric inverse of ClientOnly
+│   ├── Streamed.ts             # /ssr — cross-adapter <Suspense> alias
+│   ├── Await.ts                # /ssr — async setup() over deferred[key], scoped slot delivery
+│   ├── HttpStatusCode.ts       # /ssr — writes sink.code via inject(HTTP_STATUS_KEY)
+│   ├── HttpStatusProvider.ts   # /ssr — provides HttpStatusSink via InjectionKey
+│   └── RouteView/              # Declarative route matching with native keepAlive support
+│       ├── index.ts            # Barrel re-exports (RouteView + props types incl. RouteViewSelfProps)
+│       ├── RouteView.ts        # RouteViewComponent + compound export (RouteView.Match, RouteView.Self, RouteView.NotFound)
+│       ├── types.ts            # RouteViewProps, RouteViewMatchProps, RouteViewSelfProps, RouteViewNotFoundProps
+│       ├── components.ts       # Match, Self, NotFound marker components (render: null)
+│       └── helpers.ts          # collectElements, buildRenderList, evaluateMatch, isSegmentMatch (exported for PBT)
+├── directives/
+│   └── vLink.ts                # v-link directive (router stack for nested providers; LIFO push/pop)
+├── dom-utils/                  # Symlink → shared/dom-utils/ (cross-adapter DOM helpers)
+│   ├── index.ts                # Barrel
+│   ├── link-utils.ts           # shouldNavigate, buildHref, navigateWithHash (#532), buildActiveClassName, shallowEqual, applyLinkA11y
+│   ├── route-announcer.ts      # createRouteAnnouncer — WCAG aria-live announcements
+│   ├── scroll-restore.ts       # createScrollRestoration — opt-in scroll capture + restore
+│   └── view-transitions.ts     # createViewTransitions — subscribeLeave-based VT integration
+└── utils/
+    └── createHttpStatusSink.ts # /ssr — fresh { code: undefined } sink per request
 ```
 
 ## Key Differences from React, Preact, and Solid Adapters

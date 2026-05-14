@@ -262,6 +262,40 @@ describe("RouteView", () => {
 
       expect(wrapper.find("[data-testid='users']").exists()).toBe(false);
     });
+
+    // Review §5.8 — leading-dot segment must NOT match. `isSegmentMatch`
+    // delegates to `startsWithSegment(routeName, fullSegmentName)`, which
+    // applies segment-boundary rules. A leading "." in `segment` makes
+    // the boundary check fail on every route (e.g. ".users" never
+    // matches "users.list" because the routeName starts with "u", not
+    // ".u"). Lock as a regression — the alternative would be a silent
+    // substring confusion bug.
+    it("Match with leading-dot segment ('.users') never matches (segment-boundary rule)", async () => {
+      await router.start("/users/list");
+
+      const wrapper = mountRouteView(
+        router,
+        h(
+          RouteView,
+          { nodeName: "" },
+          {
+            default: () =>
+              h(
+                RouteView.Match,
+                { segment: ".users" },
+                {
+                  default: () =>
+                    h("div", { "data-testid": "dot-users" }, "Dot Users"),
+                },
+              ),
+          },
+        ),
+      );
+
+      // ".users" starts with a dot; startsWithSegment refuses to match
+      // since routeName "users.list" does not begin with ".users".
+      expect(wrapper.find("[data-testid='dot-users']").exists()).toBe(false);
+    });
   });
 
   describe("Self", () => {
@@ -1284,6 +1318,166 @@ describe("RouteView", () => {
       );
 
       expect(wrapper.find("[data-testid='users']").exists()).toBe(true);
+    });
+  });
+
+  describe('CLAUDE.md gotcha #11 — Empty segment="" Never Matches', () => {
+    // `<RouteView.Match segment="">` feeds `fullSegmentName=""` into
+    // `startsWithSegment(routeName, fullSegmentName)`, which is documented to
+    // return `false` for any empty `fullSegmentName` (defensive guard in
+    // `@real-router/route-utils`). The result: `<Match segment="">` silently
+    // never renders. Use `<RouteView.Self>` (or set `segment` to the real
+    // route name) when you want "this exact node" behaviour.
+    //
+    // No runtime warning is emitted — the gotcha is purely behavioural.
+    // This regression test locks the silent-no-match outcome.
+    it('Match with segment="" never renders, even when routeName is also empty', async () => {
+      await router.start("/home");
+
+      const wrapper = mountRouteView(
+        router,
+        h(
+          RouteView,
+          { nodeName: "" },
+          {
+            default: () =>
+              h(
+                RouteView.Match,
+                { segment: "" },
+                {
+                  default: () =>
+                    h("div", { "data-testid": "empty-match" }, "Empty"),
+                },
+              ),
+          },
+        ),
+      );
+
+      // Documented behaviour: empty fullSegmentName ("" + "" join) is rejected
+      // by route-utils' startsWithSegment — Match silently does not render.
+      expect(wrapper.find("[data-testid='empty-match']").exists()).toBe(false);
+    });
+
+    it('Match with segment="" never renders even when nodeName is non-empty (fullSegmentName="users." is also rejected)', async () => {
+      await router.start("/users/list");
+
+      const wrapper = mountRouteView(
+        router,
+        h(
+          RouteView,
+          { nodeName: "users" },
+          {
+            default: () => [
+              // segment="" produces fullSegmentName="users." (trailing dot) which
+              // is NOT equal to "users.list" and does NOT prefix-match it under
+              // segment-boundary rules — Match never activates.
+              h(
+                RouteView.Match,
+                { segment: "" },
+                {
+                  default: () =>
+                    h("div", { "data-testid": "empty-match" }, "Empty"),
+                },
+              ),
+              // Sanity: a sibling Match with the correct (relative) segment
+              // does activate — `nodeName="users"` + `segment="list"` →
+              // fullSegmentName="users.list" which matches the active route.
+              // Confirms the test is wired correctly and only the empty-segment
+              // Match is the one being rejected.
+              h(
+                RouteView.Match,
+                { segment: "list" },
+                {
+                  default: () => h("div", { "data-testid": "list" }, "List"),
+                },
+              ),
+            ],
+          },
+        ),
+      );
+
+      expect(wrapper.find("[data-testid='empty-match']").exists()).toBe(false);
+      expect(wrapper.find("[data-testid='list']").exists()).toBe(true);
+    });
+
+    it('Self renders instead — the documented replacement for segment=""', async () => {
+      await router.start("/home");
+
+      const wrapper = mountRouteView(
+        router,
+        h(
+          RouteView,
+          { nodeName: "home" },
+          {
+            default: () =>
+              h(RouteView.Self, null, {
+                default: () => h("div", { "data-testid": "self" }, "Self"),
+              }),
+          },
+        ),
+      );
+
+      // Self is the documented replacement for the segment="" pattern when
+      // you want "render when the route is exactly this node".
+      expect(wrapper.find("[data-testid='self']").exists()).toBe(true);
+    });
+  });
+
+  describe("CLAUDE.md gotcha #14 — keepAlive wrappers are markRaw'd", () => {
+    // RouteView creates one wrapper component per segment via
+    // `markRaw(defineComponent(...))` (see RouteView.ts:34-41). `markRaw`
+    // sets the `__v_skip` flag (Vue's `ReactiveFlags.SKIP`), which makes
+    // `reactive()` / `shallowReactive()` skip the object instead of proxying
+    // it. Without `markRaw`, Vue would attempt to proxy the component
+    // definition whenever it flows through reactive state — wasted work and,
+    // critically, an identity hazard for `<KeepAlive>` caching (which keys
+    // by component-reference identity; a proxy would have a different
+    // identity than the raw definition and break cache reuse).
+    //
+    // Direct test: locate the per-segment wrapper component in the mounted
+    // tree by its `KeepAlive-<segment>` name and assert that its component
+    // definition carries the `__v_skip` marker.
+    it("KeepAlive wrapper components carry the `__v_skip` markRaw marker", async () => {
+      await router.start("/users/list");
+
+      const view = mountRouteView(
+        router,
+        h(
+          RouteView,
+          { nodeName: "", keepAlive: true },
+          {
+            default: () =>
+              h(
+                RouteView.Match,
+                { segment: "users" },
+                {
+                  default: () =>
+                    h("div", { "data-testid": "users-content" }, "Users"),
+                },
+              ),
+          },
+        ),
+      );
+
+      await flushPromises();
+
+      // Locate the wrapper instance generated by createWrapperComponent
+      // (RouteView.ts:34). The wrapper is named `KeepAlive-${segment}` and is
+      // the immediate parent of the matched user content.
+      const wrapperInstance = view.findComponent({ name: "KeepAlive-users" });
+
+      expect(wrapperInstance.exists()).toBe(true);
+
+      // Vue 3 keeps the original component definition (the object passed to
+      // `defineComponent`) on `vm.$.type` — that's the same reference that
+      // was wrapped with `markRaw`. The marker `__v_skip === true` is set on
+      // the definition itself by `markRaw` (see Vue's `ReactiveFlags.SKIP`).
+      const vmInternal = wrapperInstance.vm.$ as {
+        type: Record<string, unknown>;
+      };
+      const componentDefinition = vmInternal.type;
+
+      expect(componentDefinition.__v_skip).toBe(true);
     });
   });
 });

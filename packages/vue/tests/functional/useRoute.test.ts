@@ -57,12 +57,12 @@ describe("useRoute composable", () => {
   it("should return current route", async () => {
     const { result } = mountWithRouter(router, () => useRoute());
 
-    expect(result.route.value.name).toStrictEqual("test");
+    expect(result.route.value.name).toBe("test");
 
     await router.navigate("items");
     await flushPromises();
 
-    expect(result.route.value.name).toStrictEqual("items");
+    expect(result.route.value.name).toBe("items");
   });
 
   it("should throw error if router instance was not passed to provider", () => {
@@ -189,6 +189,8 @@ describe("useRoute composable", () => {
       }),
     );
 
-    expect(typedParams).toBeDefined();
+    // Generic type params are erased at runtime — verify the params object shape.
+    expect(typedParams).toBeTypeOf("object");
+    expect(typedParams).not.toBeNull();
   });
 });

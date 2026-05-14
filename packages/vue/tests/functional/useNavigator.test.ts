@@ -116,9 +116,9 @@ describe("useNavigator composable", () => {
 
     await result.navigate("about");
 
-    expect(callback).toHaveBeenCalled();
-
     const callCount = callback.mock.calls.length;
+
+    expect(callCount).toBeGreaterThan(0);
 
     unsubscribe();
 

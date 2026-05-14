@@ -6,10 +6,18 @@ import type { RouteContext } from "../types";
 import type { Params, State } from "@real-router/core";
 import type { Ref } from "vue";
 
-export const useRoute = <P extends Params = Params>(): Omit<
+/**
+ * Return shape for `useRoute()` — `RouteContext<P>` with `route` narrowed
+ * to the non-nullable variant. The composable throws when `route.value`
+ * would be `undefined`, so consumers can read `.value.params.x` without a
+ * nullable guard. Extracted from inline duplication at two call sites.
+ */
+export type UseRouteReturn<P extends Params = Params> = Omit<
   RouteContext<P>,
   "route"
-> & { route: Readonly<Ref<State<P>>> } => {
+> & { route: Readonly<Ref<State<P>>> };
+
+export const useRoute = <P extends Params = Params>(): UseRouteReturn<P> => {
   const routeContext = inject(RouteKey);
 
   if (!routeContext) {
@@ -22,7 +30,5 @@ export const useRoute = <P extends Params = Params>(): Omit<
     );
   }
 
-  return routeContext as Omit<RouteContext<P>, "route"> & {
-    route: Readonly<Ref<State<P>>>;
-  };
+  return routeContext as UseRouteReturn<P>;
 };
