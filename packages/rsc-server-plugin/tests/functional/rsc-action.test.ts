@@ -60,14 +60,26 @@ describe("@real-router/rsc-server-plugin — rscActionPluginFactory", () => {
     });
 
     it("captures formState when set (progressive enhancement path)", async () => {
-      const formState = ["form-key", "ok"] as unknown;
-      const result: RscActionResult = { formState };
+      // Use the canonical `react-dom/client.ReactFormState` shape
+      // (`[stateKey: string, status: "ok" | "error"]`) rather than the
+      // previous `unknown` blob. Structural assertion proves the plugin
+      // passes the full tuple through — both elements and the order —
+      // rather than only reference identity.
+      type FormStatePair = readonly [string, "ok" | "error"];
+      const formState: FormStatePair = ["form-key", "ok"];
+      const result: RscActionResult<unknown, FormStatePair> = { formState };
 
-      router.usePlugin(rscActionPluginFactory(() => result));
+      router.usePlugin(
+        rscActionPluginFactory<unknown, FormStatePair>(() => result),
+      );
 
       const state = await router.start("/");
 
       expect(state.context.rscAction?.formState).toBe(formState);
+      expect(state.context.rscAction?.formState).toStrictEqual([
+        "form-key",
+        "ok",
+      ]);
     });
 
     it("captures both returnValue and formState when set", async () => {
@@ -84,15 +96,25 @@ describe("@real-router/rsc-server-plugin — rscActionPluginFactory", () => {
     });
 
     it("captures error returnValue (ok=false)", async () => {
-      const result: RscActionResult = {
-        returnValue: { ok: false, data: new Error("validation failed") },
+      // Previously asserted only `ok` — that left the `data` channel
+      // unverified for the error path. A passing test that doesn't read
+      // `.data` would also pass under a regression that drops `.data`.
+      // The error instance is preserved by reference (no JSON detour
+      // happens here — `claim.write` stores the live object).
+      const failure = new Error("validation failed");
+      const result: RscActionResult<Error> = {
+        returnValue: { ok: false, data: failure },
       };
 
-      router.usePlugin(rscActionPluginFactory(() => result));
+      router.usePlugin(rscActionPluginFactory<Error>(() => result));
 
       const state = await router.start("/");
 
       expect(state.context.rscAction?.returnValue?.ok).toBe(false);
+      expect(state.context.rscAction?.returnValue?.data).toBe(failure);
+      expect(
+        (state.context.rscAction?.returnValue?.data as Error).message,
+      ).toBe("validation failed");
     });
 
     it("re-evaluates getResult on each start (closure captures live mutation)", async () => {
@@ -330,6 +352,46 @@ describe("@real-router/rsc-server-plugin — rscActionPluginFactory", () => {
       const state = await router.start("/");
 
       expect(state.context.rscAction).toStrictEqual({});
+    });
+
+    it("preserves extra fields on the result object (caller must strip secrets via excludeContext)", async () => {
+      // The runtime guard rejects non-objects, arrays, and thenables, but
+      // it does NOT enforce the RscActionResult shape. Any extra fields
+      // sneak through as-is — `state.context.rscAction` carries the full
+      // object surface. Document the behaviour so callers know that:
+      //   1. extending the result with auxiliary data works without
+      //      runtime errors (forward-compatible — TS narrows what they
+      //      can read, but the value survives),
+      //   2. server-only fields (e.g. credentials, internal IDs) MUST be
+      //      stripped at serialisation time via
+      //      `serializeRouterState(state, { excludeContext: ["rscAction"] })`
+      //      because they would otherwise reach the client.
+      router.usePlugin(
+        rscActionPluginFactory(
+          () =>
+            ({
+              returnValue: { ok: true, data: { id: 1 } },
+              formState: ["form", "ok"],
+              // Extra fields that bypass the shape: forward-compat slot
+              // + server-side secret leak risk.
+              meta: { traceId: "abc-123" },
+              secret: "internal-token",
+            }) as unknown as RscActionResult,
+        ),
+      );
+
+      const state = await router.start("/");
+      const action = state.context.rscAction as unknown as {
+        returnValue?: { ok: boolean; data: { id: number } };
+        formState?: unknown;
+        meta?: { traceId: string };
+        secret?: string;
+      };
+
+      expect(action.returnValue).toStrictEqual({ ok: true, data: { id: 1 } });
+      expect(action.formState).toStrictEqual(["form", "ok"]);
+      expect(action.meta).toStrictEqual({ traceId: "abc-123" });
+      expect(action.secret).toBe("internal-token");
     });
 
     it("accepts a payload whose returnValue.data has a `then` field (string, not function)", async () => {

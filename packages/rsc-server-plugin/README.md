@@ -5,7 +5,7 @@
 [![bundle size](https://deno.bundlejs.com/?q=@real-router/rsc-server-plugin&treeshake=[*]&badge=detailed)](https://bundlejs.com/?q=@real-router/rsc-server-plugin&treeshake=[*])
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](../../LICENSE)
 
-> Per-route `ReactNode` (RSC payload) loading for [Real-Router](https://github.com/greydragon888/real-router). Intercepts `start()` to load Server Components before Flight rendering. **Bundler-agnostic** — works with `@vitejs/plugin-rsc`, `react-server-dom-webpack`, `react-server-dom-turbopack`, `react-server-dom-parcel`.
+> Per-route `ReactNode` (RSC payload) loading for [Real-Router](https://github.com/greydragon888/real-router). Intercepts `start()` to load Server Components before Flight rendering. **Bundler-agnostic** — the plugin **never imports** a Flight renderer; the caller picks one of `@vitejs/plugin-rsc`, `react-server-dom-webpack`, `react-server-dom-turbopack`, or `react-server-dom-parcel`. Examples in this README and in the [wiki](https://github.com/greydragon888/real-router/wiki/RSC-Integration) use the Vite import path (`@vitejs/plugin-rsc/rsc`); other bundlers expose the same `renderToReadableStream` shape under their own paths (`react-server-dom-webpack/server.edge`, `react-server-dom-turbopack/server`, `react-server-dom-parcel/server`) — swap the import, keep the call site.
 
 ```typescript
 // Without plugin: manual per-route Server Component dispatch
@@ -259,9 +259,76 @@ unsubscribe();
 
 In SSR, `router.dispose()` handles cleanup automatically.
 
+## Server Actions (`rscActionPluginFactory`)
+
+For RSC apps that ship Server Actions, this package also exports a **second factory** — `rscActionPluginFactory(getResult)` — that publishes the action result (`returnValue` / `formState`) to `state.context.rscAction`. It claims a separate `"rscAction"` namespace, so it composes with `rscServerPluginFactory` and `ssr-data-plugin` on the same router. Action results are produced *outside* the loader pipeline (typically in the request fetch handler, before the router exists for that request), so they're surfaced via a closure-captured resolver rather than a per-route map.
+
+```typescript
+import {
+  buildRscPayload,
+  rscActionPluginFactory,
+  rscServerPluginFactory,
+  type RscActionResult,
+} from "@real-router/rsc-server-plugin";
+// Vite path — swap for `react-server-dom-{webpack,turbopack,parcel}/server.*`
+// when you use a different bundler. The plugin itself imports nothing here.
+import {
+  decodeAction,
+  decodeFormState,
+  decodeReply,
+  loadServerAction,
+  renderToReadableStream,
+} from "@vitejs/plugin-rsc/rsc";
+
+let actionResult: RscActionResult | undefined;
+
+if (request.method === "POST") {
+  const isFormPost = request.headers
+    .get("content-type")
+    ?.includes("multipart/form-data");
+
+  if (isFormPost) {
+    // Progressive enhancement path — POST without JS.
+    const formData = await request.formData();
+    const decoded = await decodeAction(formData);
+    const result = await decoded();
+    const formState = await decodeFormState(result, formData);
+
+    actionResult = formState ? { formState } : undefined;
+  } else {
+    // Hydrated client path — setServerCallback dispatched the call.
+    const actionId = request.headers.get("rsc-action") ?? "";
+    const fn = await loadServerAction(actionId);
+    const args = await decodeReply(await request.text());
+
+    actionResult = { returnValue: { ok: true, data: await fn(...args) } };
+  }
+}
+
+const router = cloneRouter(baseRouter, requestDeps);
+
+router.usePlugin(
+  rscServerPluginFactory(loaders),
+  rscActionPluginFactory(() => actionResult), // closure captures live mutation
+);
+
+const state = await router.start(new URL(request.url).pathname);
+const flight = renderToReadableStream(buildRscPayload(state));
+```
+
+Rules:
+
+- `getResult` is **validated at factory time** as a function — a TS-cast bypass that smuggles `null`/`async` through throws `TypeError` synchronously, **before** the `"rscAction"` namespace is claimed.
+- The return value is **validated per `start()`** — must be `undefined` (skip the write) or a plain object. Arrays, primitives, and `Promise`/thenables are rejected with a typed message pointing back at the call site. The most common consumer mistake is wiring an `async` getResult; the runtime guard surfaces that explicitly.
+- `state.context.rscAction` is **JSON-friendly** — `serializeRouterState(state)` works without `excludeContext`. Pass `excludeContext: ["rsc", "rscAction"]` only if the result carries server-only secrets you don't want to ship to the client.
+- The two plugins coexist regardless of registration order; both namespaces are exclusive (double-registration throws `RouterError(CONTEXT_NAMESPACE_ALREADY_CLAIMED)`).
+- `buildRscPayload(state, rootOverride?)` reads `state.context.rsc` + `state.context.rscAction` and returns the canonical `RscPayload<TReturn, TFormState>` Flight shape. `returnValue` / `formState` are **omitted** (not set to `undefined`) when their source is missing — type-safe under `exactOptionalPropertyTypes: true`.
+
+For the full integration recipe (HTML + `/__rsc` endpoints, dev/prod bundler config, Flight injection), see the [Wiki: RSC Integration](https://github.com/greydragon888/real-router/wiki/RSC-Integration) guide.
+
 ## Example
 
-- [examples/web/react/ssr-examples/ssr-rsc](../../examples/web/react/ssr-examples/ssr-rsc) — End-to-end dogfooding example: Express + `@vitejs/plugin-rsc` + this plugin, with Flight injection, client navigation via `/__rsc?route=…`, and revalidation. The Playwright suite covers initial HTML load, client nav, revalidation **happy path + in-flight defer** (Scenarios 3 + 3b), 404, and per-request isolation under concurrent load. `RevalidateButton` calls `invalidate(router, "rsc")` for API symmetry — see [`src/client-components/RevalidateButton.tsx`](../../examples/web/react/ssr-examples/ssr-rsc/src/client-components/RevalidateButton.tsx).
+- [examples/web/react/ssr-examples/ssr-rsc](../../examples/web/react/ssr-examples/ssr-rsc) — End-to-end dogfooding example: Express + `@vitejs/plugin-rsc` + this plugin, with Flight injection, client navigation via `/__rsc?route=…`, revalidation, and **Server Actions** wired through `rscActionPluginFactory` (see `entry.rsc.tsx` + `NotificationBanner.tsx`). The Playwright suite covers initial HTML load, client nav, revalidation **happy path + in-flight defer** (Scenarios 3 + 3b), 404, per-request isolation under concurrent load, and the Server Action GET-pass-through case. `RevalidateButton` calls `invalidate(router, "rsc")` for API symmetry — see [`src/client-components/RevalidateButton.tsx`](../../examples/web/react/ssr-examples/ssr-rsc/src/client-components/RevalidateButton.tsx).
 
 ## Documentation
 

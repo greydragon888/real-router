@@ -1,5 +1,6 @@
 import { createRouter } from "@real-router/core";
 import { cloneRouter } from "@real-router/core/api";
+import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
@@ -9,6 +10,7 @@ import {
   type RscLoaderFactoryMap,
 } from "../../src";
 
+import type { DataLoaderFactoryMap } from "@real-router/ssr-data-plugin";
 import type { ReactNode } from "react";
 
 const noop = (): void => undefined;
@@ -195,5 +197,66 @@ describe("RSC Action Stress", () => {
     }));
 
     expect(projected).toStrictEqual(expected);
+  });
+
+  it("500 concurrent three-plugin composition (rsc + ssr-data + rscAction): all namespaces populate, no cross-leak", async () => {
+    // The canonical RSC + SSR + Server Action shape is three plugins on
+    // the same router, all populating distinct namespaces during a
+    // single `start()` call. The previous suite only stressed two-plugin
+    // (`rsc-server-plugin` + `rscActionPluginFactory`). This case
+    // verifies the full triplet under the same per-request-isolation
+    // contract: each clone owns its own action closure and its own data
+    // loader payload — no smearing of `data`, `rsc`, or `rscAction`
+    // across 500 simultaneous requests.
+    const base = createRouter(routes, { defaultRoute: "home" });
+
+    const rscLoaders: RscLoaderFactoryMap = {
+      "users.profile": () => (params) =>
+        Promise.resolve(node("Profile", { userId: params.id })),
+    };
+    const dataLoaders: DataLoaderFactoryMap = {
+      "users.profile": () => async (params) => ({
+        prefsId: params.id,
+        marker: "ssr-data",
+      }),
+    };
+
+    const results = await Promise.all(
+      Array.from({ length: 500 }, async (_, i) => {
+        const clone = cloneRouter(base);
+
+        clone.usePlugin(
+          rscServerPluginFactory(rscLoaders),
+          ssrDataPluginFactory(dataLoaders),
+          rscActionPluginFactory(
+            (): RscActionResult => ({
+              returnValue: { ok: true, data: { reqId: i } },
+            }),
+          ),
+        );
+
+        const state = await clone.start(`/users/${i}`);
+        const rsc = state.context.rsc;
+        const data = state.context.data;
+        const action = state.context.rscAction as
+          | { returnValue?: { data: { reqId: number } } }
+          | undefined;
+
+        clone.dispose();
+
+        return { rsc, data, reqId: action?.returnValue?.data.reqId };
+      }),
+    );
+
+    for (let i = 0; i < 500; i++) {
+      expect(results[i].rsc).toStrictEqual(
+        node("Profile", { userId: String(i) }),
+      );
+      expect(results[i].data).toStrictEqual({
+        prefsId: String(i),
+        marker: "ssr-data",
+      });
+      expect(results[i].reqId).toBe(i);
+    }
   });
 });

@@ -372,4 +372,77 @@ describe("RSC Loader Stress", () => {
     // visible at the assertion site.
     expect(survived).toBe(50);
   });
+
+  it("100 concurrent navigate() racing with invalidate(): no crash, loader sees fresh signal", async () => {
+    // Concurrent CSR revalidation under a single router: every iteration
+    // marks the namespace stale, fires N parallel `navigate()`, and waits
+    // for them all to settle. Core's transition pipeline serialises
+    // concurrent navigations (newer aborts older); the rsc-server-plugin
+    // leave handler races against those aborts. The contract under
+    // stress is "the FSM still terminates, and the surviving navigation
+    // either resolves with a fresh ReactNode or rejects deterministically
+    // — never crashes the loop or leaves the router stuck."
+    const router = createRouter(routes, { defaultRoute: "home" });
+    const loaderCalls: number[] = [];
+    let loaderSeq = 0;
+
+    router.usePlugin(
+      rscServerPluginFactory({
+        "users.profile": () => async (params, ctx) => {
+          const seq = ++loaderSeq;
+
+          // Microtask-yielded loader so a newer navigate() can cancel
+          // us mid-flight via the ctx.signal. Robust loaders check
+          // upfront — we mirror that to spot the cancellation early.
+          await Promise.resolve();
+
+          if (ctx?.signal.aborted) {
+            throw new Error(`aborted-${seq}`);
+          }
+
+          loaderCalls.push(seq);
+
+          return node("Profile", { id: params.id, seq });
+        },
+      }),
+    );
+
+    await router.start("/users/0");
+
+    expect(loaderCalls).toStrictEqual([1]); // start interceptor
+
+    let crashes = 0;
+
+    for (let i = 0; i < 100; i++) {
+      invalidate(router, "rsc");
+
+      const fleet = Array.from({ length: 4 }, (_, k) =>
+        router
+          .navigate("users.profile", { id: `i${i}-${k}` }, { reload: true })
+          // Concurrent navigations cancel each other; rejection is
+          // expected, crash is not.
+          .catch(() => undefined),
+      );
+
+      try {
+        await Promise.allSettled(fleet);
+      } catch {
+        crashes++;
+      }
+    }
+
+    expect(crashes).toBe(0);
+
+    // The leave handler clears the stale flag only after a successful
+    // non-cancelled write. With 100 invalidate() + 4 racing navigations
+    // each, at least one navigation per outer iteration must have won
+    // — otherwise the flag would still be set and the loader counter
+    // would be lower than the iteration count. We bound below at 100
+    // (one winner per iteration), and above at the original start +
+    // every leave attempt (1 + 100*4).
+    expect(loaderCalls.length).toBeGreaterThanOrEqual(100 + 1);
+    expect(loaderCalls.length).toBeLessThanOrEqual(1 + 100 * 4);
+
+    router.stop();
+  });
 });

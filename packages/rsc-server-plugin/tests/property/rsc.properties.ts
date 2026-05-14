@@ -1,7 +1,10 @@
 import { fc, test } from "@fast-check/vitest";
 import { createRouter } from "@real-router/core";
 import { getPluginApi, cloneRouter } from "@real-router/core/api";
-import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
+import {
+  invalidate as invalidateData,
+  ssrDataPluginFactory,
+} from "@real-router/ssr-data-plugin";
 
 import {
   arbSimpleRouteName,
@@ -14,6 +17,7 @@ import {
 } from "./helpers";
 import {
   getSsrRscMode,
+  invalidate,
   rscActionPluginFactory,
   rscServerPluginFactory,
 } from "../../src";
@@ -435,6 +439,112 @@ describe("composition: rsc-server-plugin + ssr-data-plugin coexist", () => {
 
       expect(() => api.claimContextNamespace("rsc")).not.toThrow();
       expect(() => api.claimContextNamespace("data")).toThrow();
+
+      router.dispose();
+    },
+  );
+});
+
+// =============================================================================
+// Invariant 20 — per-namespace orthogonality of `invalidate(...)`.
+//
+// `invalidate(router, "rsc")` and `invalidate(router, "data")` are
+// namespace-scoped: each plugin's `subscribeLeave` listener gates on
+// `isStale(router, <own-namespace>)`. Marking one namespace must never
+// trigger the other plugin's loader.
+//
+// The randomised sequence below exercises arbitrary interleavings of
+// `"rsc"` and `"data"` marks across N navigations. Invariants asserted
+// per run:
+//
+//   • when only data-plugin's namespace is invalidated, the rsc loader
+//     fires exactly the count of navigations where it was either the
+//     initial start() or a real `"rsc"` invalidate had been queued.
+//   • the data loader symmetrically fires only for `"data"` marks.
+//   • cross-namespace marks (e.g. `invalidate(router, "rsc")` while
+//     watching the data plugin) are silently ignored — no spurious
+//     loader call.
+//
+// The audit specifies a single-direction test ("marking 'data' never
+// triggers rsc"); we cover both directions for symmetry, because the
+// cost of the second case is a few more lines and the alternative
+// (asymmetric coverage) would invite a future regression where one
+// direction silently misbehaves.
+// =============================================================================
+
+describe("invalidate: per-namespace orthogonality", () => {
+  type Mark = "rsc" | "data";
+
+  // 1..10 marks, one navigation per mark — the audit's suggested shape.
+  const arbMarkSequence = fc.array(fc.constantFrom<Mark>("rsc", "data"), {
+    minLength: 1,
+    maxLength: 10,
+  });
+
+  test.prop([arbMarkSequence], { numRuns: NUM_RUNS.standard })(
+    "marking 'data' never triggers the rsc loader (and vice versa)",
+    async (sequence) => {
+      let rscCalls = 0;
+      let dataCalls = 0;
+
+      const base = createRouter(ROUTES, { defaultRoute: "home" });
+      const router = cloneRouter(base);
+
+      router.usePlugin(
+        rscServerPluginFactory({
+          "users.profile": () => () => {
+            rscCalls++;
+
+            return node("Profile");
+          },
+        }),
+        ssrDataPluginFactory({
+          "users.profile": () => () => {
+            dataCalls++;
+
+            return { sentinel: true };
+          },
+        }),
+      );
+
+      // Initial start() fires both interceptors exactly once — both
+      // plugins claim distinct namespaces and both `start` interceptors
+      // run on the awaited next(path).
+      await router.start("/users/seed");
+
+      expect(rscCalls).toBe(1);
+      expect(dataCalls).toBe(1);
+
+      const rscBaseline = rscCalls;
+      const dataBaseline = dataCalls;
+
+      let nav = 0;
+      let expectedRscDelta = 0;
+      let expectedDataDelta = 0;
+
+      for (const mark of sequence) {
+        if (mark === "rsc") {
+          invalidate(router, "rsc");
+          // Each invalidate(rsc) + navigation = exactly one rsc loader
+          // re-run (idempotent within one transition).
+          expectedRscDelta += 1;
+        } else {
+          invalidateData(router, "data");
+          expectedDataDelta += 1;
+        }
+
+        nav += 1;
+        // Reload to the same route — guarantees the leave handler fires
+        // (a same-state guard would otherwise short-circuit).
+        await router.navigate(
+          "users.profile",
+          { id: `n${nav}` },
+          { reload: true },
+        );
+      }
+
+      expect(rscCalls - rscBaseline).toBe(expectedRscDelta);
+      expect(dataCalls - dataBaseline).toBe(expectedDataDelta);
 
       router.dispose();
     },

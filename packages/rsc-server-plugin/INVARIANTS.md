@@ -47,6 +47,12 @@
 | 14  | `rsc-server-plugin` + `ssr-data-plugin` populate independently          | Registering both plugins on the same router populates `state.context.rsc` (ReactNode) and `state.context.data` (JSON) for the same `start()` call without cross-namespace mutation. Distinct namespaces (`"rsc"` vs `"data"`) coexist in `claimContextNamespace`. |
 | 15  | Tearing down one plugin does not invalidate the other's claim          | When one of the two plugins is unsubscribed, the other's namespace remains claimed and continues populating `state.context.<ns>` on subsequent `start()` calls. The freed namespace is re-claimable; the held namespace still throws on re-claim attempt. |
 
+## Revalidation channel (`invalidate`)
+
+| #   | Invariant                                                  | Description                                                                                                                                                                                                                                                                                                                            |
+| --- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 20  | Per-namespace orthogonality of `invalidate(...)`             | Marking `"data"` via `invalidate(router, "data")` never triggers the rsc loader, and marking `"rsc"` via `invalidate(router, "rsc")` never triggers the data loader. Each plugin's `subscribeLeave` listener gates on `isStale(router, <own-namespace>)`. Symmetric, exercised by a randomised interleaving of marks under one router.   |
+
 ## SSR Mode
 
 | #   | Invariant                                                  | Description                                                                                                                                                                                  |
@@ -61,5 +67,5 @@
 | File                                          | Invariants | Category                                                                                                                                                |
 | --------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `tests/functional/rsc-loader.test.ts`         | full       | All categories — loader semantics, validation, teardown, error paths, ReactNode variants, sync/async, DI                                                |
-| `tests/property/rsc.properties.ts`            | 19         | Validation, loader invocation, loader arguments, data retrieval, prototype safety, teardown, isolation, factory invocation, **composition with ssr-data-plugin**, **SSR mode (×4)** |
+| `tests/property/rsc.properties.ts`            | 20         | Validation, loader invocation, loader arguments, data retrieval, prototype safety, teardown, isolation, factory invocation, **composition with ssr-data-plugin**, **per-namespace `invalidate` orthogonality**, **SSR mode (×4)** |
 | `tests/stress/*.stress.ts`                    | runtime    | Per-request isolation, error handling, concurrent loaders, slow loaders, full lifecycle churn                                                          |

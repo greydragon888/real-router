@@ -1358,9 +1358,13 @@ describe("@real-router/rsc-server-plugin", () => {
       await router.start("/users/42");
 
       // Start interceptor calls loader without context (SSR boot path).
-      const startCallArgs = loader.mock.calls[0];
-
-      expect(startCallArgs[1]).toBeUndefined();
+      // Asserting the full args tuple — `toStrictEqual([{ id: "42" }])` —
+      // instead of only the second-index access pins both the params
+      // payload AND the absence of a ctx argument (length === 1).
+      // `toHaveBeenCalledWith(params, undefined)` would NOT work here —
+      // vitest treats `f(x)` and `f(x, undefined)` as distinct call
+      // shapes by arity, and the start path passes a single argument.
+      expect(loader.mock.calls[0]).toStrictEqual([{ id: "42" }]);
 
       invalidate(router, "rsc");
       await router.navigate("users.profile", { id: "42" }, { reload: true });
