@@ -71,6 +71,9 @@
 | 3   | HTML safety: no `<` (any tag opener)               | Stronger form of (2) — the result contains zero `<` chars. The raw HTML parser cannot start a new tag, comment, or CDATA section anywhere inside the literal.                                                                              |
 | 4   | HTML safety: no U+2028 / U+2029                    | The legacy JS line-terminator codepoints must be encoded as ` ` / ` ` text inside the literal — never the raw chars, which pre-ES2019 parsers treat as line breaks inside string literals (and would terminate the literal). |
 | 5   | Null fallback                                      | For non-string inputs JSON.stringify can't handle (`undefined`, `BigInt`), `escapeForScript` returns the literal `'null'` rather than throwing. Numbers / booleans pass through as their JSON literal form.                              |
+| 6   | Deterministic                                      | For any string `s`, two calls to `escapeForScript(s)` return strictly equal strings. Referential transparency — required for cache layers and idempotent SSR replay.                                                                       |
+| 7   | Non-shrinking length                               | For any string `s`, `escapeForScript(s).length >= s.length`. Cheap canary that no transformation pass silently drops chars (catches a regression that removes U+2028 without escaping it).                                                |
+| 8   | Injective                                          | For any pair `(a, b)`, `escapeForScript(a) === escapeForScript(b)` ⇒ `a === b`. Implied by roundtrip but pinned explicitly so a future compaction pass that normalises whitespace and silently collides deferred-map keys fails fast.    |
 
 ## `defer()` (wire-format payload constructor)
 
@@ -81,6 +84,39 @@
 | 3   | Freeze: payload + inner deferred map                                       | `Object.isFrozen(payload)` and `Object.isFrozen(payload.deferred)` both `true`. The wire-format value is immutable to consumers.                                                                                                       |
 | 4   | Isolation: post-`defer` mutations to caller's map don't leak               | `defer()` works on a shallow clone of the deferred record — late additions to the user's map (e.g. `userMap.evil = badPromise`) never appear in `payload.deferred`. Locks the validation contract: only the snapshot at call time. |
 | 5   | `isDeferred` rejects non-`defer()` values                                  | For any value the user could plausibly pass (primitives, plain objects, arrays, nested dicts), `isDeferred(value)` returns `false`. Prevents accidental brand collision via `Symbol.for` on third-party code.                       |
+| 6   | `isDeferred` rejects inherited brand                                       | `isDeferred(Object.create({ [DEFER_BRAND]: true })) === false`. The brand check uses `Object.hasOwn` so a prototype-chain bypass — branding via inheritance — cannot smuggle an object past `processLoaderResult`'s slow path.   |
+| 7   | `isDeferred` brand-only-plain contract                                     | `isDeferred({ [DEFER_BRAND]: true }) === true`. The guard is a brand check, not a structural check. Pinned to lock the current contract — any future refactor that requires `critical`/`deferred` fields to count must update this. |
+| 8   | Promise identity preserved for every own key                               | For every `k` in the deferred input map, `payload.deferred[k] === input.deferred[k]`. The settle pipeline depends on observing the same Promise instance `.catch()` was attached to in the validator loop — a deep-clone regression breaks this without breaking primitive-payload roundtrip tests. |
+| 9   | Key-order preserved                                                        | `Object.keys(payload.deferred)` strictly equals `Object.keys(input.deferred)`. Locks the contract that `state.context.ssrDataDeferredKeys` (declared order) matches the order consumers iterate via `useDeferred()`.                                                                                |
+
+## `withTimeout` (race semantics — `numRuns: 50`)
+
+| #   | Invariant                                                | Description                                                                                                                                                                              |
+| --- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Fast-path returns loader value                            | For any T (incl. NaN, objects, arrays), when the loader resolves before the deadline, `withTimeout(route, ms, () => Promise.resolve(v))` resolves to a value structurally equal to `v`. |
+| 2   | Deadline-path rejects with `LoaderTimeout(route, ms)`     | When the loader never settles, the rejection is a `LoaderTimeout` carrying the supplied `route` + `ms` (so HTTP middleware can map to 504 with route context).                          |
+| 3   | Pre-aborted upstream short-circuit                        | When `upstreamSignal` is already aborted at call time, the loader is NEVER invoked, regardless of route name / timeout — the rejection mirrors `upstreamSignal.reason`.                  |
+
+## `validateLoaders` (factory-time structural gate — `numRuns: 50`)
+
+| #   | Invariant                                                | Description                                                                                                                                                                              |
+| --- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Accepts empty `{}`                                        | `ssrDataPluginFactory({})` never throws — no routes registered is a valid configuration.                                                                                                |
+| 2   | Accepts maps of valid short-form factories                | For any record of short-form factories `(r, getDep) => () => ...`, validation passes regardless of key set.                                                                              |
+| 3   | Accepts any `{ ssr, loader }` with allowed mode string    | For each `m ∈ {"full", "data-only", "client-only"}`, validation of `{ home: { ssr: m, loader } }` passes.                                                                                |
+| 4   | Rejects unknown top-level keys in object-form entries     | For any string `k ∉ {"ssr", "loader"}`, `{ home: { [k]: 1 } }` throws `TypeError /unexpected key/`.                                                                                       |
+| 5   | Rejects string-form `ssr` outside `ALL_SSR_MODES`         | For any string `s ∉ ALL_SSR_MODES`, `{ home: { ssr: s } }` throws `TypeError /is not allowed/`.                                                                                          |
+| 6   | Idempotency                                               | Calling the factory N times with the same loader map behaves identically — no factory-time state accumulates across calls (guards against a future cache that could relax validation).   |
+
+## `formatSettleScript` + `getDeferBootstrapScript` (composition HTML safety — `numRuns: 500`)
+
+| #   | Invariant                                                | Description                                                                                                                                                                              |
+| --- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `formatSettleScript` body never contains `</script`       | For any (key, value, isError) input triple, the script body never contains a script-tag terminator. Pins the composition point — escapeForScript is the encoder, formatSettleScript is the assembler. |
+| 2   | `formatSettleScript` output never contains raw U+2028/2029 | Same guarantee as `escapeForScript` invariant 4, but at the composition layer.                                                                                                          |
+| 3   | `getDeferBootstrapScript` is deterministic                | The bootstrap is a const string — two calls return strictly equal output. Canary against accidental environment-coupling (timestamps, counters).                                         |
+| 4   | `getDeferBootstrapScript` is HTML-safe                    | The bootstrap body contains no `</script` and no raw U+2028/U+2029.                                                                                                                     |
+| 5   | `formatSettleScript` routes by `isError`                  | For `isError === true`, the output contains `__rrDeferError__(` and NOT `__rrDefer__(`; for `isError === false`, the reverse. Pinned because a flipped branch silently turns errors into successful resolutions on the client.                                                                                |
 
 ## `markStale` / `isStale` / `clearStale` (stale-registry algebra)
 
@@ -98,6 +134,8 @@
 | --- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | Transparency for allowed modes                           | For any `m ∈ {"full", "data-only", "client-only"}`, `getSsrDataMode({context: {ssrDataMode: m}}) === m`. Confirms the read mirrors what the plugin's `start` interceptor / `subscribeLeave` handler writes.                          |
 | 2   | Foreign-value collapse to `"full"`                       | For any value outside `ALL_SSR_MODES` — `undefined`, `null`, `0`, `""`, `false`, arbitrary strings, integers, booleans, objects — `getSsrDataMode(state)` returns `"full"`. Defends downstream `mode === "full"` branches against TS-cast bypass. |
+| 3   | Totality                                                 | For ANY input (incl. `BigInt`, `Symbol`, arrays, functions, nested objects), `getSsrDataMode` terminates and returns a value in `ALL_SSR_MODES`. Necessary precondition for the foreign-collapse property — if the function diverged or threw on some input class, the collapse property could not even run. |
+| 4   | Idempotency                                              | Two calls to `getSsrDataMode(state)` on the same state return strictly equal modes. Pinned because `state.context` is mutable in principle — a future refactor that adds a "mode resolution cache" must not couple the cache to call ordering. |
 
 ## `invalidate` per-router isolation
 
@@ -110,4 +148,4 @@
 | File                                         | Invariants | Category                                                                            |
 | -------------------------------------------- | ---------- | ----------------------------------------------------------------------------------- |
 | `tests/functional/data-loader.test.ts`       | 3          | getDependency integration, no caching                                                                                     |
-| `tests/property/ssr-data.properties.ts`      | 35         | Validation, loader invocation, loader arguments, data retrieval, prototype safety, teardown, isolation, factory invocation, SSR mode (×4), `escapeForScript` (×5), `defer()` (×5), **stale registry (×5)**, **getSsrDataMode (×2)**, **invalidate cloneRouter isolation (×1)** |
+| `tests/property/ssr-data.properties.ts`      | 58         | Validation, loader invocation, loader arguments, data retrieval, prototype safety, teardown, isolation, factory invocation, SSR mode (×4), `escapeForScript` (×8), `defer()` / `isDeferred` (×9), stale registry (×5), `getSsrDataMode` (×4), `invalidate` cloneRouter isolation (×1), `withTimeout` (×3), `validateLoaders` (×6), `formatSettleScript`/`getDeferBootstrapScript` (×5) |

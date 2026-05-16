@@ -33,13 +33,14 @@ import { createRouter } from "@real-router/core";
 import { cloneRouter } from "@real-router/core/api";
 import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 import type { DataLoaderFactoryMap } from "@real-router/ssr-data-plugin";
+import { routes } from "./routes"; // your app's route tree
 
 const loaders: DataLoaderFactoryMap = {
   "users.profile": () => async (params) => fetchUser(params.id),
   "users.list": () => async () => fetchUsers(),
 };
 
-// Base router — created once
+// Base router — created once at module load
 const baseRouter = createRouter(routes, { defaultRoute: "home", allowNotFound: true });
 
 // Per-request SSR
@@ -254,6 +255,74 @@ try {
 ```
 
 Discriminator is the `code` field — match structurally without `instanceof`. Identical errors are also re-exported from `@real-router/rsc-server-plugin/errors` (same shared source) so RSC apps don't need to add a `ssr-data-plugin` dependency just to throw `LoaderNotFound`.
+
+## Deferred data with `defer()` (#610)
+
+Loaders may return a `defer({ critical, deferred })` payload to split the response into a **critical** bundle (resolved before the shell renders) and a **deferred** record of named promises (streamed after via inline `<script>__rrDefer__("key", json)</script>` tags). React 19's `<Suspense>` + `use(promise)` and the cross-framework `<Await>` / `useDeferred(key)` adapters consume the deferred map natively:
+
+```typescript
+import { defer, LoaderNotFound } from "@real-router/ssr-data-plugin";
+
+"products.detail": () => (params) => {
+  const product = getProduct(params.id);
+  if (!product) throw new LoaderNotFound(`product:${params.id}`);
+
+  return defer({
+    critical: { product },                                  // awaited, lands in state.context.data
+    deferred: {                                             // streamed, lands in state.context.ssrDataDeferred
+      reviews: fetchReviews(params.id),
+      related: fetchRelated(params.id),
+    },
+  });
+};
+```
+
+The plugin writes:
+
+- `state.context.data` — `critical` (existing contract; consumers reading `state.context.data` see no change)
+- `state.context.ssrDataDeferred` — `Record<string, Promise<unknown>>`. Server: real loader-returned promises. Client (post-hydration): registry-backed promises that resolve as inline settle scripts land.
+- `state.context.ssrDataDeferredKeys` — declared key list. Included in the serialized SSR state so the client plugin can reconstruct the deferred map on hydration.
+
+**Reserved keys.** `defer()` throws `TypeError(/is reserved/)` for `__proto__`, `constructor`, or `prototype` as deferred-map keys — defence-in-depth against prototype-chain corruption during client-side reconstruction.
+
+**Shallow-clone freeze.** `defer()` freezes a shallow clone of the deferred map. The caller's reference stays mutable, but post-call mutations cannot smuggle entries past the reserved-key / thenable validation pass. An eagerly-rejected promise gets a defensive no-op `.catch(() => {})` attached so a synchronous rejection doesn't trip `process.on("unhandledRejection")` before `injectDeferredScripts` attaches its real `.then`.
+
+## Streaming SSR pipeline (`/server` subpath)
+
+Pair `defer()`-returning loaders with `injectDeferredScripts` on the server to interleave the React stream with `<script>__rrDefer__(...)</script>` settle tags as each promise resolves:
+
+```typescript
+import { renderToReadableStream } from "react-dom/server";
+import {
+  getDeferBootstrapScript,
+  injectDeferredScripts,
+} from "@real-router/ssr-data-plugin/server";
+
+const reactStream = await renderToReadableStream(<App />);
+const deferred =
+  (state.context as { ssrDataDeferred?: Record<string, Promise<unknown>> })
+    .ssrDataDeferred ?? {};
+
+// Wrap the React stream — settle scripts interleave in resolution order.
+const stream = injectDeferredScripts(reactStream, deferred, {
+  bootstrap: false, // emit bootstrap separately for cleaner React hydration
+});
+
+// Embed the bootstrap once in <head>:
+const bootstrap = `<script>${getDeferBootstrapScript()}</script>`;
+```
+
+### `InjectDeferredScriptsOptions`
+
+| Option           | Type                            | Default          | Purpose                                                                                                                                          |
+| ---------------- | ------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `serialize`      | `Serializer` = `(v) => string`  | `JSON.stringify` | Custom value serializer. Pass `devalue.stringify` / `superjson.stringify` for Date / Map / Set / BigInt payloads. Output must `JSON.parse` cleanly on the client. |
+| `serializeError` | `(error: unknown) => string`    | `JSON.stringify({ name, message })` | Custom error serializer. Output lands in `__rrDeferError__("key", json)`. The bootstrap reconstructs an `Error` with `{ name, message }`.       |
+| `bootstrap`      | `boolean`                       | `true`           | When `true`, prepends `<script>${getDeferBootstrapScript()}</script>` to the stream. Set `false` to embed the bootstrap separately in `<head>` (cleaner React hydration). |
+
+`Serializer` is exported from `@real-router/ssr-data-plugin/server` so application code (e.g. wrappers around `devalue` / `superjson`) can type-annotate its custom serializer.
+
+See [`examples/web/react/ssr-examples/ssr-streaming/`](../../examples/web/react/ssr-examples/ssr-streaming) for the full pipeline and the [Streaming SSR wiki guide](https://github.com/greydragon888/real-router/wiki/Streaming-SSR) for design background.
 
 ## Cleanup
 

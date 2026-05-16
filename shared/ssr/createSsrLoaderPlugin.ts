@@ -250,25 +250,42 @@ export function createSsrLoaderPlugin<
       deferredClaims.keys.write(state, keys);
     };
 
+    // Shared between start interceptor (SSR boot path) and subscribeLeave
+    // handler (CSR revalidation path). Returns the compiled entry only
+    // when:
+    //   1. the route is registered in this plugin's loaders map, AND
+    //   2. the resolved mode is NOT "client-only".
+    // In both successful cases the mode marker is published to
+    // `state.context[modeNamespace]` BEFORE returning. Callers then own
+    // the loader-invocation strategy (start path also checks the hydration
+    // scratchpad; leave path gates on `entry.loader !== undefined`).
+    const prepareEntry = (state: State): CompiledEntry<T> | null => {
+      const entry = compiled.get(state.name);
+
+      if (!entry) return null;
+
+      const mode = resolveMode(
+        entry.mode,
+        state,
+        allowed,
+        config.errorPrefix,
+        state.name,
+      );
+
+      modeClaim.write(state, mode);
+
+      if (mode === "client-only") return null;
+
+      return entry;
+    };
+
     const removeStartInterceptor = api.addInterceptor(
       "start",
       async (next, path) => {
         const state = await next(path);
-        const entry = compiled.get(state.name);
+        const entry = prepareEntry(state);
 
-        if (!entry) return state;
-
-        const mode = resolveMode(
-          entry.mode,
-          state,
-          allowed,
-          config.errorPrefix,
-          state.name,
-        );
-
-        modeClaim.write(state, mode);
-
-        if (mode === "client-only") return state;
+        if (entry === null) return state;
 
         const hydrationState = internals.hydrationState;
 
@@ -304,21 +321,9 @@ export function createSsrLoaderPlugin<
       async ({ nextRoute, signal }) => {
         if (!isStale(router, config.namespace)) return;
 
-        const entry = compiled.get(nextRoute.name);
+        const entry = prepareEntry(nextRoute);
 
-        if (!entry) return;
-
-        const mode = resolveMode(
-          entry.mode,
-          nextRoute,
-          allowed,
-          config.errorPrefix,
-          nextRoute.name,
-        );
-
-        modeClaim.write(nextRoute, mode);
-
-        if (mode === "client-only" || entry.loader === undefined) return;
+        if (entry === null || entry.loader === undefined) return;
 
         // Pass the navigation's signal so cancellation-aware loaders can
         // abort their in-flight work (fetch, DB query, etc.) when a newer

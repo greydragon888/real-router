@@ -81,6 +81,27 @@ export class LoaderTimeout extends Error {
  * rejection — no `unhandledRejection` for late loader settlements.
  *
  * Requires Node 20.3+ for `AbortSignal.any`.
+ *
+ * ### `ms` corner cases (Node `setTimeout` clamping)
+ *
+ * `ms` is forwarded verbatim to `setTimeout`, which means `Infinity`, `NaN`,
+ * and negative values are **NOT** safe sentinels for "no deadline":
+ *
+ * - `withTimeout("r", Infinity, …)` — Node clamps to `1` ms and emits a
+ *   `TimeoutOverflowWarning`. The race rejects with `LoaderTimeout` after
+ *   1 ms, not "never". Use a separate code path (e.g. invoke the loader
+ *   directly without wrapping) when you genuinely want no deadline.
+ * - `withTimeout("r", NaN, …)` — same: Node clamps to `1` ms with a
+ *   warning.
+ * - `withTimeout("r", -1, …)` — Node clamps to `1` ms with a warning.
+ * - `withTimeout("r", 0, …)` — fires on the next tick. A synchronous-
+ *   resolving loader (`() => Promise.resolve(v)`) typically wins the race,
+ *   but any async I/O loses. Treat `0` as "fire immediately" rather than
+ *   "no deadline".
+ *
+ * No runtime guard is added — the clamping is a Node-level concern and
+ * adding `if (!Number.isFinite(ms) || ms < 0) throw` would be a breaking
+ * change for callers relying on the current clamp semantics.
  */
 export function withTimeout<T>(
   routeName: string,

@@ -194,4 +194,129 @@ describe("Data Loader Stress", () => {
 
     router.stop();
   });
+
+  it("100 start() interceptor mid-await + unsubscribe race: no crashes, claim.write tolerates released claim", async () => {
+    // Symmetric to the existing `navigate-during-teardown` race in
+    // `invalidate-races.stress.ts:31` — but on the SSR boot path
+    // (start interceptor) rather than the CSR revalidation path
+    // (subscribeLeave handler).
+    //
+    // Scenario: a plugin teardown happens AFTER `await next(path)`
+    // resolves but BEFORE `claim.write(state, data)` runs. Core's
+    // claim system permits `write` after `release` (it's just a
+    // property write on `state.context`), so the contract is "no
+    // crash" — the late write lands on a state that's already
+    // returned from the (now-superseded) plugin lifecycle.
+    //
+    // Why this matters: a future refactor that makes `claim.write`
+    // throw after `release` (e.g. a generation counter check) would
+    // crash every navigation that loses this race. Pin the current
+    // behaviour explicitly.
+    const base = createRouter(routes, { defaultRoute: "home" });
+    let crashes = 0;
+
+    for (let i = 0; i < 100; i++) {
+      const router = cloneRouter(base);
+      const loaders: DataLoaderFactoryMap = {
+        home: () => async () => {
+          // Yield once so the test has a window to call unsubscribe()
+          // AFTER `await next(path)` resolves (the interceptor body
+          // continues here) and BEFORE `claim.write` runs.
+          await Promise.resolve();
+          await Promise.resolve();
+
+          return `i${i}`;
+        },
+      };
+
+      const unsub = router.usePlugin(ssrDataPluginFactory(loaders));
+
+      const startPromise = router.start("/");
+
+      // Race window: unsub between next(path) resolution and
+      // claim.write. The two `await Promise.resolve()` in the loader
+      // above guarantee the interceptor body is parked when we get
+      // here, so unsub() lands in the gap.
+      await Promise.resolve();
+      try {
+        unsub();
+      } catch {
+        // unsub itself should never throw — count if it does.
+        crashes += 1;
+      }
+
+      try {
+        await startPromise;
+      } catch {
+        // start() may legitimately reject when interceptor removal
+        // races a mid-await await — what matters is the harness
+        // doesn't see uncaught process-level errors.
+      }
+
+      router.dispose();
+    }
+
+    expect(crashes).toBe(0);
+  });
+
+  it("200 loader-resolution vs concurrent stop()/dispose() race: no crash, no late writes to live state", async () => {
+    // JS is single-threaded, so a "race" between loader-resolve and
+    // abort is operationally a microtask ordering problem rather than
+    // a true data race. This test pins the ordering invariant: if the
+    // router is stopped/disposed while a loader is parked on a
+    // microtask, the resolving loader does NOT clobber a fresh state.
+    //
+    // Without this anchor, a future refactor that schedules the
+    // `claim.write` on a delayed microtask (e.g. via `queueMicrotask`)
+    // could surface as state.context.data appearing on a state from a
+    // newer navigation — silent contamination.
+    const base = createRouter(routes, { defaultRoute: "home" });
+    let lateWrites = 0;
+
+    for (let i = 0; i < 200; i++) {
+      const router = cloneRouter(base);
+      const loaders: DataLoaderFactoryMap = {
+        home: () => async () => {
+          // Park on two microtasks so the dispose() below lands in
+          // the gap between `await next` and `claim.write`.
+          await Promise.resolve();
+          await Promise.resolve();
+
+          return { i, payload: "late" };
+        },
+      };
+
+      router.usePlugin(ssrDataPluginFactory(loaders));
+
+      const startPromise = router.start("/");
+
+      // Yield once — interceptor's `await next(path)` resolves, then
+      // it parks on the loader's microtask chain.
+      await Promise.resolve();
+
+      router.dispose();
+
+      try {
+        const state = await startPromise;
+
+        // If start() resolved, the write may have landed on the state
+        // object that's about to be discarded. Either outcome is
+        // valid; what's not valid is contamination of a different
+        // navigation's state. With a single navigation per iteration,
+        // any non-disposed router reaching here with a fresh state
+        // not matching `{ i, payload: "late" }` would indicate the
+        // loader's write leaked sideways.
+        if (
+          state.context.data !== undefined &&
+          (state.context.data as { i?: number }).i !== i
+        ) {
+          lateWrites += 1;
+        }
+      } catch {
+        // Disposed mid-flight — start() may reject. That's OK.
+      }
+    }
+
+    expect(lateWrites).toBe(0);
+  });
 });

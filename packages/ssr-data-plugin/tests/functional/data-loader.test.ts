@@ -720,6 +720,10 @@ describe("@real-router/ssr-data-plugin", () => {
       );
 
       expect(loader).not.toHaveBeenCalled();
+      // `?.` is intentional here: a rejected `start()` leaves the FSM in a
+      // pre-init state, so `getState()` returns `undefined`. The assertion
+      // remains meaningful — "no state at all" passes "data is undefined"
+      // just like "state with data: undefined" would.
       expect(router.getState()?.context.data).toBeUndefined();
       expect(router.getState()?.context.ssrDataMode).toBeUndefined();
     });
@@ -1059,8 +1063,13 @@ describe("@real-router/ssr-data-plugin", () => {
       await expect(promise).rejects.toBeInstanceOf(LoaderTimeout);
 
       expect(abortSpy).toHaveBeenCalledTimes(1);
-      expect(signalRef?.aborted).toBe(true);
-      expect(signalRef?.reason).toBeInstanceOf(LoaderTimeout);
+      // Pin signalRef to a real AbortSignal first: without this, a regression
+      // where the loader never sees `{ signal }` (signalRef stays undefined)
+      // would still pass the `?.aborted === true` short-circuit (`undefined`
+      // would just stay falsy and the assertion never asks for `true`).
+      expect(signalRef).toBeInstanceOf(AbortSignal);
+      expect(signalRef!.aborted).toBe(true);
+      expect(signalRef!.reason).toBeInstanceOf(LoaderTimeout);
     });
 
     it("fail-fasts when upstreamSignal is already aborted (no loader, no timer)", async () => {
@@ -1428,7 +1437,11 @@ describe("@real-router/ssr-data-plugin", () => {
       ac.abort();
       releaseSlowLoader();
 
-      await expect(navA).rejects.toThrow();
+      // Pin the error: ac.abort() makes router reject navA with an
+      // AbortError-shaped DOMException. A bare `rejects.toThrow()` would
+      // accept *any* error — including a regression that lets the loader
+      // result silently land on a cancelled state.
+      await expect(navA).rejects.toThrow(/cancel|abort/i);
 
       expect(loader).toHaveBeenCalledTimes(1);
 
@@ -1636,7 +1649,7 @@ describe("@real-router/ssr-data-plugin", () => {
 
       releaseSlowLoader();
 
-      await expect(navA).rejects.toThrow();
+      await expect(navA).rejects.toThrow(/cancel|abort/i);
 
       // Flag preserved because the cancelled nav skipped the write — next
       // navigation refreshes with a fresh, non-aborted signal.
@@ -1691,12 +1704,67 @@ describe("@real-router/ssr-data-plugin", () => {
       ac.abort();
 
       // Loader rejects with AbortError; navigation rejects.
-      await expect(navA).rejects.toThrow();
+      await expect(navA).rejects.toThrow(/cancel|abort/i);
 
       // Flag preserved (loader rejection bypasses clearStale). Retry
       // succeeds with fresh, non-aborted signal.
       await router.navigate("users.profile", { id: "42" }, { reload: true });
 
+      expect(router.getState()!.context.data).toBe("recovered");
+    });
+
+    it("pre-aborted nav signal: leave handler never runs; loader is NOT invoked; stale flag preserved", async () => {
+      // CLAUDE.md "Cancellation-aware loaders" documents two distinct cancel
+      // surfaces:
+      //   1. Mid-flight abort — signal flips DURING the leave handler's
+      //      `await entry.loader(...)`. Covered by the two prior tests
+      //      (loader receives signal, observes abort via addEventListener,
+      //      navigation rejects).
+      //   2. Pre-aborted navigation signal — `navigate(..., { signal })` is
+      //      called with a signal that's ALREADY aborted at call time. Core
+      //      rejects this synchronously with TRANSITION_CANCELLED in the
+      //      navigation pipeline (see core's `abort-signal.test.ts` case 1);
+      //      the leave handler never runs, so the loader is not invoked.
+      //
+      // This anchor pins surface (2) for the ssr-data-plugin specifically:
+      // a stale flag set BEFORE a pre-aborted navigate() must survive
+      // (the cancelled nav doesn't consume it), so a follow-up nav with
+      // a fresh signal still refreshes.
+      const loader = vi
+        .fn()
+        .mockResolvedValueOnce("initial")
+        .mockResolvedValueOnce("recovered");
+
+      router.usePlugin(ssrDataPluginFactory({ "users.profile": () => loader }));
+      await router.start("/users/42");
+
+      expect(loader).toHaveBeenCalledTimes(1);
+
+      invalidate(router, "data");
+
+      const ac = new AbortController();
+
+      ac.abort(new Error("pre-aborted"));
+
+      await expect(
+        router.navigate(
+          "users.profile",
+          { id: "42" },
+          { reload: true, signal: ac.signal },
+        ),
+      ).rejects.toThrow(/cancel|abort|pre-aborted/i);
+
+      // Surface (2): leave handler never ran — loader was not invoked a
+      // second time. If a future refactor lets pre-aborted nav signals
+      // reach the leave handler, this assert would catch it (loader
+      // would be called twice).
+      expect(loader).toHaveBeenCalledTimes(1);
+
+      // Stale flag preserved across the cancelled navigation — a
+      // follow-up nav with a non-aborted signal consumes the flag.
+      await router.navigate("users.profile", { id: "42" }, { reload: true });
+
+      expect(loader).toHaveBeenCalledTimes(2);
       expect(router.getState()!.context.data).toBe("recovered");
     });
   });
@@ -1795,12 +1863,10 @@ describe("@real-router/ssr-data-plugin", () => {
 
       const deferred = state.context.ssrDataDeferred;
 
-      expect(deferred).toBeDefined();
       // Reference identity with the registry-backed promise is strictly
       // stronger than `toBeInstanceOf(Promise)` (every registry entry IS a
-      // Promise, so the `instanceof` check is implied). Drop the redundant
-      // assertion and pin the contract that matters: same promise instance
-      // as the one the registry hands out for this key.
+      // Promise, so the `instanceof` check is implied). The `!.` below also
+      // covers the undefined case — no separate `toBeDefined()` needed.
       expect(deferred!.reviews).toBe(ensureRegistryPromise("reviews"));
       expect(deferred!.related).toBe(ensureRegistryPromise("related"));
     });
@@ -1842,8 +1908,6 @@ describe("@real-router/ssr-data-plugin", () => {
           __rrDefer__?: (k: string, j: string) => void;
         }
       ).__rrDefer__;
-
-      expect(settle).toBeTypeOf("function");
 
       settle!("reviews", JSON.stringify([{ id: "r1" }]));
 

@@ -25,7 +25,8 @@
 | --------------------------- | -------- | ------------------------------------------------------------------------------------------------------------ |
 | `injectDeferredScripts`     | function | `(stream, deferredMap, opts?) => ReadableStream<Uint8Array>` — wraps an HTML stream with `<script>__rrDefer__("key", json)</script>` tags emitted as each promise resolves. Default `bootstrap: true` prepends the registry installer. |
 | `getDeferBootstrapScript`   | function | Returns the inline JS (no `<script>` wrapper) that installs `__rrDeferRegistry__` + `__rrDefer__` / `__rrDeferError__`. Embed once in `<head>` so React hydration sees a pristine `#root`. |
-| `InjectDeferredScriptsOptions` | type  | `{ serialize?: (v) => string; serializeError?: (e) => string; bootstrap?: boolean }` — opt-in `devalue.stringify` / `superjson.stringify` for non-JSON deferred payloads, custom error shape, or bootstrap suppression. |
+| `InjectDeferredScriptsOptions` | type  | `{ serialize?: Serializer; serializeError?: (e: unknown) => string; bootstrap?: boolean }` — opt-in `devalue.stringify` / `superjson.stringify` for non-JSON deferred payloads, custom error shape, or bootstrap suppression. |
+| `Serializer`               | type     | `(value: unknown) => string` — alias for `injectDeferredScripts`'s `serialize` slot. Stable contract: must produce a JSON-parseable string (`JSON.parse(serializer(v))` round-trips on the client). Default is `JSON.stringify`. |
 
 Server-only — Node `ReadableStream` / Web Streams. Application server (e.g.
 Express + Vite middleware) splits `index.html` by `<!--defer-bootstrap-->`
@@ -37,7 +38,7 @@ for the React stream piped through `injectDeferredScripts`. See
 
 | Export           | Kind     | Description                                                                            |
 | ---------------- | -------- | -------------------------------------------------------------------------------------- |
-| `LoaderRedirect` | class    | Throw from a loader to map to HTTP 30x. Fields: `target: string`, `status: 301\|302\|307\|308` |
+| `LoaderRedirect` | class    | Throw from a loader to map to HTTP 30x. Fields: `target: string`, `status: 301\|302\|307\|308` (default `302`) |
 | `LoaderNotFound` | class    | Throw from a loader to map to HTTP 404. Field: `resource: string`                     |
 | `LoaderTimeout`  | class    | Thrown by `withTimeout()` when the deadline elapses. Fields: `route: string`, `ms: number` |
 | `withTimeout`    | function | `(routeName, ms, loader, options?) => Promise<T>` — race against a deadline; passes `{ signal }` to the loader for cooperative cancellation; optional `options.upstreamSignal` composes via `AbortSignal.any` (Node 20.3+) |
@@ -127,17 +128,16 @@ The function-form resolver receives `state` **before** the mode is written to co
 
 ```
 src/
-├── factory.ts     — ssrDataPluginFactory: thin adapter that validates + delegates to createSsrLoaderPlugin
-├── validation.ts  — validateLoaders = createLoadersValidator(ERROR_PREFIX) — generic shared validator
-├── types.ts       — DataLoaderFn, DataLoaderFnFactory, DataLoaderFactoryMap (public-facing types)
+├── factory.ts     — ssrDataPluginFactory: thin adapter that inlines validateLoaders (createLoadersValidator(ERROR_PREFIX)) + delegates to createSsrLoaderPlugin
+├── types.ts       — DataLoaderFn, DataLoaderFnFactory, DataLoaderFactoryMap, DataRouteEntry, SsrLoaderContext, SsrMode (public-facing types)
 ├── errors.ts      — Re-export from shared-ssr/errors (LoaderRedirect, LoaderNotFound, LoaderTimeout, withTimeout)
-├── server.ts      — Server-side wire-format helpers: injectDeferredScripts, getDeferBootstrapScript (#610). Subpath: @real-router/ssr-data-plugin/server.
+├── server.ts      — Server-side wire-format helpers: injectDeferredScripts, getDeferBootstrapScript, Serializer (#610). Subpath: @real-router/ssr-data-plugin/server.
 ├── constants.ts   — ERROR_PREFIX (LOGGER_CONTEXT — internal)
 ├── index.ts       — Public exports + module augmentation (@real-router/types for StateContext, including ssrDataDeferred / ssrDataDeferredKeys)
-└── shared-ssr/    — symlink → shared/ssr/ (createSsrLoaderPlugin, createLoadersValidator, errors, defer, deferRegistry)
+└── shared-ssr/    — symlink → shared/ssr/ (createSsrLoaderPlugin, createLoadersValidator, errors, defer, deferRegistry, staleRegistry, types)
 ```
 
-The `factory.ts` and `validation.ts` are intentionally tiny adapters — the actual try/catch + interceptor + claim logic lives in [`shared/ssr/`](../../../shared/ssr/) and is consumed by both `ssr-data-plugin` (T = `unknown`, namespace = `"data"`) and `rsc-server-plugin` (T = `ReactNode`, namespace = `"rsc"`).
+The `factory.ts` is intentionally tiny (`validateLoaders` is a single-line binding inlined here after the deleted `validation.ts`) — the actual try/catch + interceptor + claim logic lives in [`shared/ssr/`](../../../shared/ssr/) and is consumed by both `ssr-data-plugin` (T = `unknown`, namespace = `"data"`) and `rsc-server-plugin` (T = `ReactNode`, namespace = `"rsc"`).
 
 ## Gotchas
 
@@ -155,9 +155,16 @@ This is by design for SSR.
 
 Every `start()` triggers a fresh loader call. Caching is the caller's responsibility (e.g., within the loader function itself).
 
-### Teardown releases both claims
+### Teardown releases four claims
 
-`unsubscribe()` removes the `start` interceptor, removes the `subscribeLeave` revalidation listener, and releases **both** the `"data"` namespace and the `"ssrDataMode"` namespace claims. In SSR, `router.dispose()` triggers teardown automatically.
+`unsubscribe()` removes the `start` interceptor, removes the `subscribeLeave` revalidation listener, and releases **all four** namespace claims:
+
+- `"data"` — loader's resolved value (or `defer().critical`)
+- `"ssrDataMode"` — resolved per-route SSR mode
+- `"ssrDataDeferred"` — record of deferred promises from `defer()`
+- `"ssrDataDeferredKeys"` — declared deferred-key list (SSR-serializable)
+
+All four are claimed during `usePlugin()` and released in lock-step on teardown — partial-rollback on factory compilation error is verified by `tests/functional/data-loader.test.ts` "releases ... namespace when ... is already claimed". In SSR, `router.dispose()` triggers teardown automatically.
 
 ### `defer({ critical, deferred })` — formal critical/deferred split (#610)
 
@@ -190,6 +197,15 @@ The plugin writes:
   registry-backed promises that resolve as the inline settle scripts land.
 - `state.context.ssrDataDeferredKeys` — declared key list, included in the
   SSR JSON state so the client plugin can reconstruct the map.
+
+**Reserved deferred-map keys.** `defer()` rejects with `TypeError(/is reserved/)` for any of `__proto__`, `constructor`, `prototype`. These names would corrupt the prototype chain during client-side reconstruction (`ensureRegistryPromise(key)` runs through `Object.create(null)`-backed maps already as defence-in-depth, but rejecting upstream keeps the wire-format symmetric — server payload === client reconstruction).
+
+**Shallow-clone freeze (security invariant).** `defer()` freezes a **shallow clone** of the deferred map, not the caller's own reference. Two guarantees follow:
+
+1. `Object.freeze()` doesn't surprise the caller — they still hold a mutable reference.
+2. Post-`defer()` mutations to the caller's map (e.g. `userMap.evil = somePromise` or `userMap.__proto__ = ...`) **cannot** smuggle entries that bypass the reserved-key / thenable validation pass. The validator inspects the snapshot at call time; the payload uses an independent frozen clone.
+
+Promise references inside the clone are preserved (shallow), so the settle pipeline observes the same `Promise` instances the validator's defensive `.catch(() => {})` was attached to (defends against `unhandledRejection` for eagerly-rejected promises before `injectDeferredScripts` attaches its real `.then`).
 
 Server pipeline:
 

@@ -170,6 +170,114 @@ describe("injectDeferredScripts stress", () => {
     }
   });
 
+  it("500 concurrent streams with random upstream HTML errors: no double-releaseLock, no unhandled rejections", async () => {
+    // Functional `server.test.ts:287` covers the single-stream
+    // upstream-HTML-throws path. This stress amplifies the surface to
+    // expose the race between two cleanup branches in `server.ts`:
+    //
+    //   1. The `forwardResult.error` branch — `controller.error(err)`
+    //      called from the forward loop when `upstreamReader.read()`
+    //      rejects.
+    //   2. The `cancel(reason)` callback — `upstreamReader.cancel()`
+    //      called when the consumer cancels the wrapped stream.
+    //
+    // Both reach `releaseLock()` on the same reader. Under parallelism,
+    // one stream's error completion can interleave with another's
+    // cancellation; the implementation wraps these in `try/catch`
+    // (`server.ts:304-313`) so the second `releaseLock()` is a no-op
+    // rather than a TypeError. This stress confirms the cleanup is
+    // crash-free under load and produces zero unhandled rejections.
+    const seenUnhandled: unknown[] = [];
+    const trackUnhandled = (reason: unknown): void => {
+      seenUnhandled.push(reason);
+    };
+
+    process.on("unhandledRejection", trackUnhandled);
+
+    try {
+      const outcomes = await Promise.all(
+        Array.from({ length: 500 }, async (_, i) => {
+          // Roughly 1/3 throw upstream, 1/3 are consumer-cancelled
+          // mid-stream, 1/3 drain normally — picks a balanced mix.
+          const mode = i % 3;
+          const html = new ReadableStream<Uint8Array>({
+            async start(controller) {
+              const encoder = new TextEncoder();
+
+              controller.enqueue(encoder.encode(`<html data-i="${i}">`));
+              await Promise.resolve();
+
+              if (mode === 0) {
+                // Upstream throws — exercises the `controller.error`
+                // branch in server.ts forward loop.
+                controller.error(new Error(`upstream-boom-${i}`));
+
+                return;
+              }
+
+              controller.enqueue(encoder.encode(`body-${i}`));
+              await Promise.resolve();
+              controller.enqueue(encoder.encode(`</html>`));
+              controller.close();
+            },
+          });
+          const stream = injectDeferredScripts(
+            html,
+            buildMixedDeferred(i, false),
+            { bootstrap: false },
+          );
+
+          if (mode === 1) {
+            // Consumer cancels mid-stream — exercises `cancel(reason)`
+            // and its `releaseLock()` path in tandem with mode-0
+            // siblings hitting their `releaseLock()` paths.
+            const reader = stream.getReader();
+
+            await reader.read();
+            await reader.cancel("consumer-abort");
+            try {
+              reader.releaseLock();
+            } catch {
+              // already released by cancel() — expected
+            }
+
+            return "cancelled" as const;
+          }
+
+          try {
+            const out = await drain(stream);
+
+            return mode === 0 ? "upstream-error" : out;
+          } catch (error) {
+            return mode === 0
+              ? "upstream-error"
+              : `unexpected:${String(error)}`;
+          }
+        }),
+      );
+
+      // Each outcome is one of three sentinel shapes; none must be
+      // `unexpected:...` (which would indicate a non-mode-0 stream
+      // crashed with an error other than the upstream-boom).
+      const unexpected = outcomes.filter((o) =>
+        typeof o === "string" ? o.startsWith("unexpected:") : false,
+      );
+
+      expect(unexpected).toStrictEqual([]);
+
+      // Settle pending microtasks so any unhandledRejection has time to
+      // fire before assertion.
+      await new Promise((r) => setTimeout(r, 30));
+
+      // No double-releaseLock, no late-rejection leak. The eager-reject
+      // promise in `buildMixedDeferred` is sibling-caught, so it should
+      // not reach `unhandledRejection` either.
+      expect(seenUnhandled).toStrictEqual([]);
+    } finally {
+      process.off("unhandledRejection", trackUnhandled);
+    }
+  });
+
   it("2000 concurrent injectDeferredScripts streams complete without crash", async () => {
     // High-fanout smoke — 2000 parallel streams, each tiny, each with one
     // immediately-resolved deferred. Verifies the helper survives mass

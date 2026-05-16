@@ -4,6 +4,12 @@ import { injectDeferredScripts } from "../../src/server";
 
 const decoder = new TextDecoder();
 
+// Shared bootstrap signature. Pinning the prefix in one place ensures that
+// a refactor of `getDeferBootstrapScript()` cannot accidentally desync the
+// positive/negative regressions across `prepends`, `bootstrap:false`, and
+// `empty-deferred` cases — all three reads through this constant.
+const BOOTSTRAP_REGEX = /^<script>\(function\(g\)\{/;
+
 function createHtmlStream(chunks: string[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
 
@@ -57,7 +63,7 @@ describe("injectDeferredScripts", () => {
         injectDeferredScripts(html, { reviews: Promise.resolve(["r1"]) }),
       );
 
-      expect(out).toMatch(/^<script>\(function\(g\)\{/);
+      expect(out).toMatch(BOOTSTRAP_REGEX);
       expect(out).toContain("<body>shell</body>");
       expect(out).toContain('__rrDefer__("reviews"');
     });
@@ -72,7 +78,7 @@ describe("injectDeferredScripts", () => {
         ),
       );
 
-      expect(out).not.toMatch(/^<script>\(function\(g\)\{/);
+      expect(out).not.toMatch(BOOTSTRAP_REGEX);
       expect(out).toContain("<body>shell</body>");
       expect(out).toContain('__rrDefer__("reviews"');
     });
@@ -81,7 +87,7 @@ describe("injectDeferredScripts", () => {
       const html = createHtmlStream(["<body>x</body>"]);
       const out = await consume(injectDeferredScripts(html, {}));
 
-      expect(out).not.toContain("<script>(function(g)");
+      expect(out).not.toMatch(BOOTSTRAP_REGEX);
     });
 
     it("settles in resolution order, not declaration order", async () => {
