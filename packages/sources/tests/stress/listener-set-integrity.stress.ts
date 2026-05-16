@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 import { createRouteSource, createRouteNodeSource } from "@real-router/sources";
 
@@ -147,5 +147,65 @@ describe("S1: Listener set integrity", () => {
     await router.navigate("about");
 
     expect(callCount).toBe(0);
+  });
+
+  // Audit-2026-05-16 §7 #3 — subscribe storm at 10× the previous size.
+  it("S1.8: RouteSource: 10 000 concurrent listeners all receive every notification (subscribe storm)", async () => {
+    const source = createRouteSource(router);
+    const COUNT = 10_000;
+    const calls: number[] = Array.from({ length: COUNT }).fill(0) as number[];
+    const unsubs: (() => void)[] = Array.from({ length: COUNT });
+
+    for (let i = 0; i < COUNT; i++) {
+      unsubs[i] = source.subscribe(() => {
+        calls[i]++;
+      });
+    }
+
+    await router.navigate("about");
+    await router.navigate("users.list");
+
+    // Every listener observed both navigations — no skip, no fan-out failure.
+    for (let i = 0; i < COUNT; i++) {
+      expect(calls[i]).toBe(2);
+    }
+
+    for (let i = 0; i < COUNT; i++) {
+      unsubs[i]();
+    }
+
+    // After unsubscribe storm, a third nav must trigger zero further calls.
+    await router.navigate("admin.dashboard");
+    for (let i = 0; i < COUNT; i++) {
+      expect(calls[i]).toBe(2);
+    }
+  });
+
+  // Audit-2026-05-16 §7 #12 — snapshot identity preservation under no-op events.
+  it("S1.9: 10 000 idempotent navigations preserve snapshot reference (stabilizeState dedup at scale)", async () => {
+    const source = createRouteSource(router);
+    const listener = vi.fn();
+    const unsub = source.subscribe(listener);
+
+    // Land on a stable route first; subsequent identical navigates with the
+    // same params + no reload should be deduped by stabilizeState and produce
+    // no listener notifications (every snapshot reads the same reference).
+    await router.navigate("admin.dashboard");
+
+    const stableSnapshot = source.getSnapshot();
+    const callsAfterFirstNav = listener.mock.calls.length;
+
+    for (let i = 0; i < 10_000; i++) {
+      // Same route + same params + reload=false → SAME_STATES throws inside
+      // navigate but is swallowed (catch). Either way, no fresh snapshot.
+      await router.navigate("admin.dashboard").catch(() => {});
+    }
+
+    // Snapshot ref unchanged — stabilizeState short-circuited every emit.
+    expect(source.getSnapshot()).toBe(stableSnapshot);
+    // Listener call count unchanged from the post-first-nav baseline.
+    expect(listener).toHaveBeenCalledTimes(callsAfterFirstNav);
+
+    unsub();
   });
 });

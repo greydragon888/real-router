@@ -314,6 +314,7 @@ describe("createTransitionSource", () => {
 
     await Promise.resolve();
 
+    expect(source.getSnapshot().toRoute).not.toBeNull();
     expect(source.getSnapshot().toRoute!.name).toBe("dashboard");
 
     // New navigation cancels previous
@@ -343,7 +344,7 @@ describe("createTransitionSource", () => {
     ]);
   });
 
-  it("skip update when reentrant navigation produces TRANSITION_START with same paths", async () => {
+  it("reentrant TRANSITION_START produces fresh snapshots each call (post-#605 dedup is unreachable, but every snapshot must be a new reference)", async () => {
     const lifecycle = getLifecycleApi(router);
     const resolvers: ((value: boolean) => void)[] = [];
 
@@ -365,12 +366,23 @@ describe("createTransitionSource", () => {
     }));
 
     const source = createTransitionSource(router);
+    // Capture the IDLE_SNAPSHOT singleton before any nav — used below as the
+    // reference for the post-settle assertion. The singleton is module-private
+    // (`createTransitionSource.ts:15`), so we observe it through the public
+    // initial snapshot rather than importing it directly.
+    const idleSnapshot = source.getSnapshot();
     const startEvents = vi.fn();
     const api = getPluginApi(router);
 
     api.addEventListener(events.TRANSITION_START, startEvents);
 
-    const listener = vi.fn();
+    // Capture the snapshot the listener observes at each notification — this
+    // turns the listener into a reference-by-reference trace we can assert
+    // against, instead of just counting calls.
+    const snapshotTrace: RouterTransitionSnapshot[] = [];
+    const listener = vi.fn(() => {
+      snapshotTrace.push(source.getSnapshot());
+    });
 
     source.subscribe(listener);
 
@@ -384,15 +396,42 @@ describe("createTransitionSource", () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(source.getSnapshot().isTransitioning).toBe(false);
+    // 1. Reentrancy actually happened — the plugin fired the second nav, so
+    //    the router emitted at least two TRANSITION_START events.
+    expect(startEvents).toHaveBeenCalledTimes(2);
 
-    // Two TRANSITION_START events fire (the original + the reentrant one),
-    // confirming the dedup branch was actually exercised. The source-level
-    // listener is called fewer times than 2*N (one per emitted event) — the
-    // exact count depends on which guard rejects first, but it must be at
-    // least 1 (initial START update) and never zero.
-    expect(startEvents.mock.calls.length).toBeGreaterThanOrEqual(2);
-    expect(listener.mock.calls.length).toBeGreaterThanOrEqual(1);
+    // 2. The source settled back to IDLE after all transitions resolved.
+    expect(source.getSnapshot()).toBe(idleSnapshot);
+    expect(source.getSnapshot().isTransitioning).toBe(false);
+    expect(source.getSnapshot().isLeaveApproved).toBe(false);
+
+    // 3. The listener observed every state-changing snapshot — at minimum the
+    //    initial entry into a transitioning state plus the final reset to IDLE.
+    expect(listener.mock.calls.length).toBeGreaterThanOrEqual(2);
+
+    // 4. **Snapshot identity invariant (covers the dedup contract via its
+    //    observable consequence):** no two adjacent notifications produced
+    //    the same snapshot reference. If `nextTransitionStartSnapshot`
+    //    returned `null` from the dedup guard, `source.updateSnapshot` would
+    //    be skipped and the listener would not fire — so a duplicate-ref
+    //    notification can never appear in this trace. Conversely, a
+    //    regression that made the guard always return the previous snapshot
+    //    (instead of `null`) would surface here as two identical refs in
+    //    a row.
+    expect(snapshotTrace.length).toBeGreaterThan(0);
+
+    for (let i = 1; i < snapshotTrace.length; i++) {
+      expect(snapshotTrace[i]).not.toBe(snapshotTrace[i - 1]);
+    }
+
+    // 5. The trace passed through a transitioning state at some point — the
+    //    initial TRANSITION_START (or the post-reentrant one) flipped the
+    //    source to `isTransitioning: true` before the final settle.
+    expect(snapshotTrace.some((s) => s.isTransitioning)).toBe(true);
+    // 6. The final emitted snapshot is the singleton IDLE — proves the
+    //    SUCCESS/CANCEL collapse path ran and the source converged cleanly
+    //    via the shared `IDLE_SNAPSHOT` constant (captured at construction).
+    expect(snapshotTrace.at(-1)).toBe(idleSnapshot);
 
     source.destroy();
   });

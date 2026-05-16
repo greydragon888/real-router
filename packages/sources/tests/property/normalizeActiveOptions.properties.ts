@@ -82,4 +82,48 @@ describe("normalizeActiveOptions — invariants", () => {
       hash: undefined,
     });
   });
+
+  // Pure-function PBT — bumped to 1000 runs for the new invariants.
+  const PURE_RUNS = 1000;
+
+  function localeSortKeys(keys: string[]): string[] {
+    return keys.toSorted((a, b) => a.localeCompare(b));
+  }
+
+  function localeSortEntries(
+    entries: [string, unknown][],
+  ): [string, unknown][] {
+    return entries.toSorted(([a], [b]) => a.localeCompare(b));
+  }
+
+  test.prop([arbActiveOptions], { numRuns: PURE_RUNS })(
+    "input non-mutation: normalize(x) does not mutate x (audit §2/§6 MEDIUM)",
+    (options) => {
+      // Capture observable shape without depending on the prototype chain
+      // (fast-check may shrink to `{__proto__: null}` records).
+      const beforeKeys = localeSortKeys(Object.keys(options));
+      const beforeEntries = localeSortEntries(Object.entries(options));
+
+      normalizeActiveOptions(options);
+      normalizeActiveOptions(options);
+
+      expect(localeSortKeys(Object.keys(options))).toStrictEqual(beforeKeys);
+      expect(localeSortEntries(Object.entries(options))).toStrictEqual(
+        beforeEntries,
+      );
+    },
+  );
+
+  test.prop([arbActiveOptions], { numRuns: PURE_RUNS })(
+    "totality: output always has exactly three own keys — strict, ignoreQueryParams, hash",
+    (options) => {
+      const result = normalizeActiveOptions(options);
+
+      expect(localeSortKeys(Object.keys(result))).toStrictEqual([
+        "hash",
+        "ignoreQueryParams",
+        "strict",
+      ]);
+    },
+  );
 });

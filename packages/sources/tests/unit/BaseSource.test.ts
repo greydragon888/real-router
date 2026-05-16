@@ -119,6 +119,52 @@ describe("BaseSource — subscribe order", () => {
     expect(listener2).toHaveBeenCalledTimes(1);
   });
 
+  it("isolates listener exceptions — surviving listeners still notified, error rethrown asynchronously", async () => {
+    const source = new BaseSource<number>(0);
+    const survivor = vi.fn();
+    const thrown = new Error("boom");
+
+    // Capture the asynchronously re-thrown error before vitest's default
+    // uncaughtException handler fails the test.
+    const rethrown: unknown[] = [];
+    const previousListeners = [...process.listeners("uncaughtException")];
+
+    process.removeAllListeners("uncaughtException");
+    const captureHandler = (error: unknown): void => {
+      rethrown.push(error);
+    };
+
+    process.on("uncaughtException", captureHandler);
+
+    try {
+      source.subscribe(() => {
+        throw thrown;
+      });
+      source.subscribe(survivor);
+
+      expect(() => {
+        source.updateSnapshot(1);
+      }).not.toThrow();
+
+      // Surviving listener still receives the notification even though the
+      // first listener threw — invariant "after updateSnapshot all listeners
+      // see the new snapshot" holds.
+      expect(survivor).toHaveBeenCalledTimes(1);
+      expect(source.getSnapshot()).toBe(1);
+
+      // Drain the microtask queue so the queueMicrotask(throw) lands.
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(rethrown).toStrictEqual([thrown]);
+    } finally {
+      process.removeListener("uncaughtException", captureHandler);
+      for (const listener of previousListeners) {
+        process.on("uncaughtException", listener);
+      }
+    }
+  });
+
   it("double-unsubscribe deletes the listener idempotently (other listeners unaffected)", () => {
     const source = new BaseSource<number>(0);
     const survivor = vi.fn();

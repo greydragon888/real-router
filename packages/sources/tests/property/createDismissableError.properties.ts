@@ -118,7 +118,13 @@ describe("createDismissableError — invariants", () => {
       const listener = vi.fn();
       const unsub = source.subscribe(listener);
 
-      let expectedMinCalls = 0;
+      // Mirror `createDismissableError`'s private `dismissedVersion` (starts
+      // at -1) so the oracle can predict the no-op-guard exactly. `resetError`
+      // notifies iff `currentVersion > dismissedVersion`; the FIRST reset ever
+      // after construction is therefore notified (currentVersion === 0,
+      // dismissedVersion === -1) even though no error has occurred yet.
+      let mockDismissedVersion = -1;
+      let expectedCalls = 0;
 
       for (const action of actions) {
         if (action.kind === "error") {
@@ -126,31 +132,23 @@ describe("createDismissableError — invariants", () => {
 
           await router.navigate(action.route).catch(() => {});
 
-          // Each ROUTE_NOT_FOUND advances the underlying error source version,
-          // which propagates one notification through createDismissableError.
           if (source.getSnapshot().version > before) {
-            expectedMinCalls++;
+            expectedCalls++;
           }
         } else if (action.kind === "reset") {
-          const before = source.getSnapshot();
+          const currentVersion = source.getSnapshot().version;
 
           source.getSnapshot().resetError();
 
-          // resetError() notifies listeners only when it actually changes the
-          // snapshot (it does — even a no-op reset clears the error field and
-          // the source emits, see createDismissableError.ts).
-          if (
-            before.error !== null ||
-            source.getSnapshot().error !== before.error
-          ) {
-            expectedMinCalls++;
+          if (currentVersion > mockDismissedVersion) {
+            expectedCalls++;
+            mockDismissedVersion = currentVersion;
           }
         }
       }
 
-      expect(listener.mock.calls.length).toBeGreaterThanOrEqual(
-        expectedMinCalls,
-      );
+      // Exact count after the P1 no-op-guard fix in `createDismissableError`.
+      expect(listener).toHaveBeenCalledTimes(expectedCalls);
 
       unsub();
       router.stop();
@@ -167,6 +165,40 @@ describe("createDismissableError — invariants", () => {
         expect(createDismissableError(router)).toBe(first);
       }
 
+      router.stop();
+    },
+  );
+
+  test.prop([arbMissingRoute, fc.integer({ min: 2, max: 8 })], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "resetError() no-op-guard: extra resets after dismissal don't notify listeners (audit §6 MEDIUM)",
+    async (route, extraResets) => {
+      const router = await createStartedRouter();
+      const source = createDismissableError(router);
+      const listener = vi.fn();
+      const unsub = source.subscribe(listener);
+
+      // Trigger ONE error to advance version.
+      await router.navigate(route).catch(() => {});
+      const callsAfterError = listener.mock.calls.length;
+
+      // First reset transitions dismissedVersion to currentVersion — must
+      // notify (error → null transition).
+      source.getSnapshot().resetError();
+      const callsAfterFirstReset = listener.mock.calls.length;
+
+      expect(callsAfterFirstReset).toBeGreaterThan(callsAfterError);
+
+      // Subsequent resets find `currentVersion <= dismissedVersion` → must NOT
+      // notify the listener again.
+      for (let i = 0; i < extraResets; i++) {
+        source.getSnapshot().resetError();
+      }
+
+      expect(listener).toHaveBeenCalledTimes(callsAfterFirstReset);
+
+      unsub();
       router.stop();
     },
   );

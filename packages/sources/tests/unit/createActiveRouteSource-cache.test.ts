@@ -78,6 +78,19 @@ describe("createActiveRouteSource (per-router + canonical-args cache)", () => {
     expect(b).toBe(c);
   });
 
+  it("params === undefined and params === {} are distinct cache keys (audit §1 MEDIUM)", () => {
+    // canonicalJson(undefined) → "undefined" (string) vs canonicalJson({}) → "{}"
+    // so these two calls produce different cache entries and different instances.
+    const withUndefined = createActiveRouteSource(router, "users");
+    const withEmpty = createActiveRouteSource(router, "users", {});
+
+    expect(withUndefined).not.toBe(withEmpty);
+
+    // Both are functional sources.
+    expect(withUndefined.getSnapshot()).toBe(false);
+    expect(withEmpty.getSnapshot()).toBe(false);
+  });
+
   it("different routeName produces different instance", () => {
     const a = createActiveRouteSource(router, "users");
     const b = createActiveRouteSource(router, "home");
@@ -106,8 +119,8 @@ describe("createActiveRouteSource (per-router + canonical-args cache)", () => {
 
     // Each call produces a fresh non-cached source (canonicalJson throws on BigInt).
     expect(a).not.toBe(b);
-    // Snapshot still works.
-    expect(typeof a.getSnapshot()).toBe("boolean");
+    // Snapshot is false (router is on "/", not an active "users" route).
+    expect(a.getSnapshot()).toBe(false);
 
     a.destroy();
     b.destroy();
@@ -123,7 +136,8 @@ describe("createActiveRouteSource (per-router + canonical-args cache)", () => {
     const b = createActiveRouteSource(router, "users", mapParams);
 
     expect(a).not.toBe(b);
-    expect(typeof a.getSnapshot()).toBe("boolean");
+    // Snapshot is false (router is on "/", not an active "users" route).
+    expect(a.getSnapshot()).toBe(false);
 
     a.destroy();
     b.destroy();
@@ -139,6 +153,68 @@ describe("createActiveRouteSource (per-router + canonical-args cache)", () => {
 
     a.destroy();
     b.destroy();
+  });
+
+  it("circular params fall back to non-cached source (canonicalJson throws TypeError on cycle, audit §5)", () => {
+    // After the canonicalJson rewrite to explicit canonicalize() with path-based
+    // cycle detection, a self-cycle throws TypeError("circular structure") —
+    // createActiveRouteSource catches it and returns a fresh non-cached source
+    // with a working destroy(). Prior to the rewrite the implementation threw
+    // RangeError via stack overflow; the documented contract was inconsistent
+    // with the actual error type.
+    const cyclic: Record<string, unknown> = {};
+
+    cyclic.self = cyclic;
+    const cyclicParams = cyclic as unknown as Record<string, string>;
+
+    const a = createActiveRouteSource(router, "users", cyclicParams);
+    const b = createActiveRouteSource(router, "users", cyclicParams);
+
+    // Each call goes through the catch-fallback path → independent instances.
+    expect(a).not.toBe(b);
+    // Source is functional — snapshot computes against the live router state.
+    expect(typeof a.getSnapshot()).toBe("boolean");
+    expect(typeof b.getSnapshot()).toBe("boolean");
+
+    a.destroy();
+    b.destroy();
+  });
+
+  it("params with `__proto__` own key do NOT collide with params that omit it (audit §5)", () => {
+    // canonicalJson uses Object.create(null) for the sorted record so
+    // `__proto__` is treated as a regular own property. The cache key
+    // therefore distinguishes between {__proto__: x, b: 1} and {b: 1}.
+    const withProto = Object.fromEntries([
+      ["__proto__", "x"],
+      ["b", "1"],
+    ]) as Record<string, string>;
+    const withoutProto = { b: "1" };
+
+    const a = createActiveRouteSource(router, "users", withProto);
+    const b = createActiveRouteSource(router, "users", withoutProto);
+
+    expect(a).not.toBe(b);
+
+    // Same shape with `__proto__` → same cache entry (identity preserved).
+    const aAgain = createActiveRouteSource(
+      router,
+      "users",
+      Object.fromEntries([
+        ["__proto__", "x"],
+        ["b", "1"],
+      ]) as Record<string, string>,
+    );
+
+    expect(aAgain).toBe(a);
+
+    // Different `__proto__` values → different cache entries.
+    const withDifferentProto = Object.fromEntries([
+      ["__proto__", "y"],
+      ["b", "1"],
+    ]) as Record<string, string>;
+    const c = createActiveRouteSource(router, "users", withDifferentProto);
+
+    expect(c).not.toBe(a);
   });
 
   it("RegExp-valued params do NOT collide with empty-params cache entry (audit §5.B)", () => {

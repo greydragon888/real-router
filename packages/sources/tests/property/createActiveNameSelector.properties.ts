@@ -1,4 +1,5 @@
 import { fc, test } from "@fast-check/vitest";
+import { createRouter } from "@real-router/core";
 import { describe, expect, vi } from "vitest";
 
 import {
@@ -184,7 +185,6 @@ describe("createActiveNameSelector — invariants", () => {
       const selector = createActiveNameSelector(router);
 
       const unsub = selector.subscribe(name, () => {});
-      const initial = selector.isActive(name);
 
       unsub();
 
@@ -195,7 +195,6 @@ describe("createActiveNameSelector — invariants", () => {
       // Reconnection re-seeds active state from router; the snapshot must
       // match the oracle, independent of the pre-disconnect value.
       expect(selector.isActive(name)).toBe(oracleIsActive(router, name));
-      expect(typeof initial).toBe("boolean");
 
       unsub2();
       router.stop();
@@ -213,9 +212,210 @@ describe("createActiveNameSelector — invariants", () => {
 
       const unsub = selector.subscribe(name, () => {});
 
-      expect(typeof selector.isActive(name)).toBe("boolean");
+      expect(selector.isActive(name)).toBe(oracleIsActive(router, name));
 
       unsub();
+      router.stop();
+    },
+  );
+});
+
+// =============================================================================
+// Audit §2/§6 HIGH — prefix collision, subscription sharing, pre-subscribe path.
+// =============================================================================
+
+async function createConflictRouter(): Promise<Router> {
+  const router = createRouter([
+    { name: "u", path: "/u" },
+    {
+      name: "users",
+      path: "/users",
+      children: [{ name: "list", path: "/list" }],
+    },
+    { name: "usersAdmin", path: "/usersAdmin" },
+  ]);
+
+  await router.start("/u");
+
+  return router;
+}
+
+describe("createActiveNameSelector — prefix `.` boundary (audit §6 HIGH)", () => {
+  test.prop(
+    [
+      fc.tuple(
+        fc.constantFrom("u", "users", "usersAdmin"),
+        fc.constantFrom("u", "users", "usersAdmin"),
+      ),
+    ],
+    { numRuns: NUM_RUNS.standard },
+  )(
+    "names with a shared prefix but no `.`-boundary do not falsely activate each other",
+    async ([watchedName, currentRoute]) => {
+      fc.pre(watchedName !== currentRoute);
+
+      const router = await createConflictRouter();
+      const selector = createActiveNameSelector(router);
+      const unsub = selector.subscribe(watchedName, () => {});
+
+      await router.navigate(currentRoute).catch(() => undefined);
+
+      // None of {u, users, usersAdmin} are `.`-ancestors of each other — so
+      // navigating to one must not activate the others. Regressing the
+      // boundary to `startsWith(name)` without the trailing dot would flip
+      // "users" active when the user navigates to "usersAdmin".
+      expect(selector.isActive(watchedName)).toBe(false);
+
+      unsub();
+      router.stop();
+    },
+  );
+
+  test("explicit regression: subscribe('users') stays false after navigate('usersAdmin')", async () => {
+    const router = await createConflictRouter();
+    const selector = createActiveNameSelector(router);
+    const listener = vi.fn();
+    const unsub = selector.subscribe("users", listener);
+
+    await router.navigate("usersAdmin");
+
+    expect(selector.isActive("users")).toBe(false);
+    // No false-positive listener call either — the per-name diff guard must
+    // recognise "users" is still inactive after the navigation.
+    expect(listener).not.toHaveBeenCalled();
+
+    unsub();
+    router.stop();
+  });
+
+  test("explicit regression: subscribe('users') flips true after navigate('users.list')", async () => {
+    const router = await createConflictRouter();
+    const selector = createActiveNameSelector(router);
+    const listener = vi.fn();
+    const unsub = selector.subscribe("users", listener);
+
+    await router.navigate("users.list");
+
+    expect(selector.isActive("users")).toBe(true);
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    unsub();
+    router.stop();
+  });
+});
+
+describe("createActiveNameSelector — subscription sharing (audit §6 HIGH)", () => {
+  test.prop(
+    [
+      fc.uniqueArray(
+        fc.constantFrom(
+          "users",
+          "users.list",
+          "admin",
+          "admin.dashboard",
+          "search",
+        ),
+        { minLength: 2, maxLength: 5 },
+      ),
+    ],
+    { numRuns: NUM_RUNS.lifecycle },
+  )(
+    "K listeners on K distinct names produce EXACTLY ONE router.subscribe call",
+    async (names) => {
+      const router = await createStartedRouter();
+      const subscribeSpy = vi.spyOn(router, "subscribe");
+      // Selector is cached per-router; create it AFTER spying so we count
+      // every router.subscribe the selector makes during its lifetime.
+      const selector = createActiveNameSelector(router);
+
+      const baselineCalls = subscribeSpy.mock.calls.length;
+      const unsubs = names.map((name) => selector.subscribe(name, () => {}));
+
+      // After K subscribe(name) calls, the selector must have opened exactly
+      // ONE router subscription (it shares the listener across all names).
+      expect(subscribeSpy.mock.calls.length - baselineCalls).toBe(1);
+
+      for (const u of unsubs) {
+        u();
+      }
+
+      router.stop();
+      subscribeSpy.mockRestore();
+    },
+  );
+
+  test.prop(
+    [
+      fc.uniqueArray(
+        fc.constantFrom(
+          "users",
+          "users.list",
+          "admin",
+          "admin.dashboard",
+          "search",
+        ),
+        { minLength: 2, maxLength: 5 },
+      ),
+    ],
+    { numRuns: NUM_RUNS.lifecycle },
+  )(
+    "last-unsubscribe disconnects: after every listener is removed, the router subscription is released exactly once",
+    async (names) => {
+      const router = await createStartedRouter();
+      const realSubscribe = router.subscribe.bind(router);
+      const routerUnsubSpy = vi.fn();
+
+      // Wrap router.subscribe so we can count when the selector releases its
+      // shared subscription. Must be installed BEFORE the selector is created.
+      vi.spyOn(router, "subscribe").mockImplementation((listener) => {
+        const unsub = realSubscribe(listener);
+
+        return () => {
+          routerUnsubSpy();
+          unsub();
+        };
+      });
+
+      const selector = createActiveNameSelector(router);
+      const unsubs = names.map((name) => selector.subscribe(name, () => {}));
+
+      for (const u of unsubs) {
+        u();
+      }
+
+      // After all selector consumers detach, the selector must release its
+      // single router.subscribe handle exactly once.
+      expect(routerUnsubSpy).toHaveBeenCalledTimes(1);
+
+      router.stop();
+      vi.restoreAllMocks();
+    },
+  );
+
+  test.prop([arbRouteName], { numRuns: NUM_RUNS.lifecycle })(
+    "isActive(name) before any subscribe() returns the correct boolean (pre-subscribe / fallback path)",
+    async (navTarget) => {
+      const router = await createStartedRouter();
+      const selector = createActiveNameSelector(router);
+
+      await router.navigate(navTarget).catch(() => undefined);
+
+      // No `.subscribe()` was called — exercises the fallback branch in
+      // `isActive` that consults `router.getState()` directly because the
+      // `activeByName` cache is empty.
+      const current = router.getState();
+
+      if (current) {
+        const expected =
+          current.name === navTarget ||
+          current.name.startsWith(`${navTarget}.`);
+
+        expect(selector.isActive(navTarget)).toBe(expected);
+      } else {
+        // Router failed to land — selector should mirror native semantics.
+        expect(selector.isActive(navTarget)).toBe(false);
+      }
+
       router.stop();
     },
   );

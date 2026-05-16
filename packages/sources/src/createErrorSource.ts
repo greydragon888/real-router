@@ -2,6 +2,7 @@ import { events } from "@real-router/core";
 import { getPluginApi } from "@real-router/core/api";
 
 import { BaseSource } from "./BaseSource";
+import { noopDestroy } from "./internal/noopDestroy.js";
 
 import type { RouterErrorSnapshot, RouterSource } from "./types.js";
 import type { Router, State, RouterError } from "@real-router/core";
@@ -107,8 +108,4 @@ export function getErrorSource(
   }
 
   return cached;
-}
-
-function noopDestroy(): void {
-  // Shared cached source — external destroy() is a no-op.
 }

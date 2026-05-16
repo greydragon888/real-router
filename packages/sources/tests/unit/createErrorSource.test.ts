@@ -24,12 +24,13 @@ describe("createErrorSource", () => {
 
   it("getSnapshot() returns initial snapshot", () => {
     const source = createErrorSource(router);
-    const snapshot = source.getSnapshot();
 
-    expect(snapshot.error).toBeNull();
-    expect(snapshot.toRoute).toBeNull();
-    expect(snapshot.fromRoute).toBeNull();
-    expect(snapshot.version).toBe(0);
+    expect(source.getSnapshot()).toStrictEqual({
+      error: null,
+      toRoute: null,
+      fromRoute: null,
+      version: 0,
+    });
   });
 
   it("TRANSITION_ERROR updates snapshot", async () => {

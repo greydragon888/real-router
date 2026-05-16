@@ -1,4 +1,4 @@
-import { createRouter } from "@real-router/core";
+import { createRouter, errorCodes } from "@real-router/core";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import { createRouteSource } from "../../src";
@@ -98,7 +98,9 @@ describe("createRouteSources", () => {
     // Plain (non-reload) navigation to the same route is filtered by the
     // router itself with SAME_STATES before reaching the source — caught
     // here to keep the listener contract focused.
-    await expect(router.navigate("home")).rejects.toThrow();
+    await expect(router.navigate("home")).rejects.toThrow(
+      errorCodes.SAME_STATES,
+    );
 
     expect(listener).toHaveBeenCalledTimes(0);
   });

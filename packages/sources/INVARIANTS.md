@@ -226,6 +226,11 @@
 | 3   | Idempotency under JSON round-trip                             | `canonicalJson(JSON.parse(canonicalJson(x))) === canonicalJson(x)`.                                                                                          |
 | 4   | Structural collisions match canonical equality                | Two records collide on `canonicalJson` iff they are structurally identical up to key order (oracle: independent sorted-JSON encoder).                        |
 | 5   | Deep-recursion stability                                      | Nested structures (objects within objects within arrays) terminate without throwing and the result round-trips back to itself through `canonicalJson`.        |
+| 6   | Throw-contract: `Map` / `Set` / `WeakMap` / `WeakSet` / `RegExp`     | These instances would otherwise collapse to `"{}"` and silently collide on cache keys. `canonicalJson` throws `TypeError` eagerly at any nesting depth so callers fall back to a fresh non-cached source. |
+| 7   | Throw-contract: `BigInt`                                       | `JSON.stringify` rejects `BigInt`; `canonicalJson` propagates that `TypeError` at any nesting depth so the cache fallback runs.                                |
+| 8   | Throw-contract: circular references                            | Native `JSON.stringify` throws `TypeError` on a cycle, but the canonicalising replacer copies each level into a fresh object — the native cycle detector never sees the original graph. `canonicalJson` runs its own path-based detection (`Set<object>` with finally-cleanup) so cycles surface as `TypeError("circular structure")` while DAGs (shared refs reachable via independent branches) serialise normally. |
+| 9   | `__proto__` key preservation (no prototype pollution / no collision) | `__proto__` is treated as a regular own property — the canonical output of `{ __proto__: 1, b: 2 }` differs from `{ b: 2 }` and from `{ __proto__: 2, b: 2 }`. Implementation uses `Object.create(null)` for the sorted record. |
+| 10  | Locale independence (byte-order key comparison)                 | Object keys are sorted with raw `<` / `>` comparisons rather than `localeCompare`, so the canonical form does not drift across Node ICU builds or system locales. Different insertion orders of the same key set produce identical canonical strings. |
 
 ---
 
@@ -237,6 +242,8 @@
 | 2   | Default-fill semantics                                     | Missing booleans default to `DEFAULT_ACTIVE_OPTIONS`; missing `hash` stays `undefined` (the "ignore hash" sentinel). |
 | 3   | DEFAULT_ACTIVE_OPTIONS immutability                        | Repeated normalizations do not mutate the frozen defaults.                                                        |
 | 4   | Explicit values pass through                               | Any explicitly-provided field is returned verbatim, regardless of defaults.                                       |
+| 5   | Input non-mutation                                         | `normalize(x)` does not mutate its input — repeated normalisations leave the input's keys, values, and ordering structurally identical to the pre-call snapshot. |
+| 6   | Output totality                                            | Result always has exactly three own keys — `strict`, `ignoreQueryParams`, `hash` — regardless of which fields the input supplied. |
 
 ---
 
@@ -249,6 +256,7 @@
 | 3   | `resetError()` is idempotent                                                    | Back-to-back `resetError()` calls produce the same snapshot — `version` does not change, `error` stays `null`.                            |
 | 4   | Subscribers fire only on state-relevant actions                                 | Listener call count is at least the number of (error events + first reset after each error) — purely cosmetic operations don't notify.   |
 | 5   | `createDismissableError(router)` is per-router cached                           | Repeated calls return the same instance for the same router.                                                                              |
+| 6   | `resetError()` no-op-guard: extra resets after dismissal do not notify          | When `currentVersion <= dismissedVersion`, `resetError()` short-circuits without bumping listener notifications — only the first reset after each fresh error fires the listener. |
 
 ---
 
@@ -263,6 +271,32 @@
 | 5   | Listeners for disjoint names don't fire on each other's flips                   | When `nameA` and `nameB` occupy different top-level subtrees, navigations changing one's active state don't notify the other's listeners. |
 | 6   | Unsubscribe → re-subscribe restores active state from current router state      | After full unsubscribe, navigation, and re-subscribe, `isActive(name)` reflects the live router state (not the pre-disconnect cache).    |
 | 7   | `destroy()` on the cached selector is a no-op — selector remains usable          | After `destroy()`, `subscribe(name, listener)` still returns a function and `isActive(name)` still returns a boolean.                     |
+| 8   | `.`-boundary prefix-match: no false-positive on shared string prefix             | Names that share a string prefix without a trailing dot do not activate each other. E.g. `subscribe("users", ...)` stays `false` after `navigate("usersAdmin")` and flips `true` only after a descendant like `navigate("users.list")`. |
+| 9   | Subscription sharing: K listeners on K distinct names produce exactly ONE `router.subscribe` call | The selector keeps a single shared router subscription regardless of how many distinct names consumers subscribe to — the headline value-prop over per-name `createActiveRouteSource`. |
+| 10  | Last-unsubscribe releases the router subscription exactly once                  | After every selector consumer detaches, the shared `router.subscribe` handle is unsubscribed exactly once. |
+| 11  | `isActive(name)` works before any `subscribe(...)` — fallback path is correct   | The pre-subscribe path consults `router.getState()` directly when the `activeByName` cache is empty, returning the same boolean as the post-subscribe path.    |
+
+---
+
+## stabilizeState — Transitivity, Defensive Read, Hash × Reload
+
+| #   | Invariant                                                                       | Description                                                                                                                              |
+| --- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Transitivity for path-equal triples                                             | For three path-equal, non-reload states `a, b, c`: `stab(stab(a, b), c) === stab(a, stab(b, c)) === a`. Chained stabilizations in `createRouteSource` therefore collapse a sequence of N idempotent navigations to a single snapshot reference. |
+| 2   | Hash flip beats `reload=false` (branch order)                                   | When `prev.path === next.path` but the hashes differ, the stabilizer returns `next` regardless of `next.transition.reload === false`. The hash check happens before the reload check in `src/stabilizeState.ts:46-58`. |
+| 3   | `reload=true` beats hash-equal                                                  | When the hashes match but `next.transition.reload === true`, the stabilizer returns `next` — the reload bypass overrides the dedup. |
+| 4   | hash `undefined` ↔ `""` is observable (cross-plugin semantics)                  | Different plugins write hash differently: hash-plugin omits `state.context.url` entirely (read as `undefined`); browser-plugin writes `{ hash: "" }`. The stabilizer treats these as distinct, returning `next` on the mismatch — documented as expected cross-plugin behaviour. |
+| 5   | Defensive read on malformed state                                               | A state lacking the mandatory `transition` field does not crash `readReloadFlag`. The defensive cast returns `false` (not-a-reload), so dedup proceeds normally. |
+
+---
+
+## BaseSource — Notification Pipeline (direct instrumentation)
+
+| #   | Invariant                                                                       | Description                                                                                                                              |
+| --- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Listener added BEFORE `onFirstSubscribe` runs                                   | A synchronous `updateSnapshot()` called from inside `onFirstSubscribe` reaches the listener registered by the very same `subscribe(...)` call. Verified by direct instrumentation (no router setup). |
+| 2   | `onFirstSubscribe` fires exactly once per full disconnect → reconnect cycle     | Across N cycles of `subscribe → unsub`, `onFirstSubscribe` is called exactly N times. |
+| 3   | Listener exception isolation                                                    | If a listener throws inside `notify()`, the remaining listeners still observe the update. The thrown error is re-thrown asynchronously via `queueMicrotask(() => { throw e; })`, so global error handlers / test harnesses still surface it. |
 
 ---
 
@@ -275,9 +309,10 @@
 | `tests/property/activeRouteSource.properties.ts`           | 16         | `createActiveRouteSource` boolean tracking (hash-aware via `arbActiveOptions`), filter, cache identity (canonicalJson + hash isolation), destroy |
 | `tests/property/transitionSource.properties.ts`            | 20         | `createTransitionSource` state machine, isLeaveApproved monotonicity, concurrent navigation (async-guard cancellation), destroy |
 | `tests/property/errorSource.properties.ts`                 | 9          | `createErrorSource` error tracking, version monotonicity (incl. long-run + SUCCESS-doesn't-advance), CANCEL no-op, destroy |
-| `tests/property/stabilizeState.properties.ts`              | 15         | `stabilizeState` reflexivity, path/hash/reload-aware path-equivalence (incl. synthetic states), idempotency, nullish-handling |
-| `tests/property/computeSnapshot.properties.ts`             | 11         | `computeSnapshot` reference stability, idempotency, root dominance, subtree containment, unrelated-route, containment monotonicity |
-| `tests/property/canonicalJson.properties.ts`               | 5          | `canonicalJson` key-order invariance, determinism, idempotency, structural collisions, deep-recursion         |
-| `tests/property/normalizeActiveOptions.properties.ts`      | 5          | `normalizeActiveOptions` idempotency, default-fill, defaults immutability, explicit pass-through              |
-| `tests/property/createDismissableError.properties.ts`      | 5          | `createDismissableError` version monotonicity, reset semantics, idempotency, listener fidelity, cache identity |
-| `tests/property/createActiveNameSelector.properties.ts`    | 7          | `createActiveNameSelector` cache identity, oracle alignment, per-name listener isolation, reconnection, destroy |
+| `tests/property/stabilizeState.properties.ts`              | 20         | `stabilizeState` reflexivity, path/hash/reload-aware path-equivalence, idempotency, nullish-handling, transitivity, hash×reload interaction, defensive read |
+| `tests/property/computeSnapshot.properties.ts`             | 15         | `computeSnapshot` reference stability, idempotency, root dominance, subtree containment, unrelated-route, containment monotonicity, `.`-boundary prefix-match |
+| `tests/property/canonicalJson.properties.ts`               | 14         | `canonicalJson` key-order invariance, determinism, idempotency, structural collisions, deep-recursion, throw-contract (Map/Set/Weak\*/RegExp/BigInt), DAG vs cycle, `__proto__` preservation, locale-independence (1000 runs/test) |
+| `tests/property/normalizeActiveOptions.properties.ts`      | 7          | `normalizeActiveOptions` idempotency, default-fill, defaults immutability, explicit pass-through, input non-mutation, output totality (1000 runs/test) |
+| `tests/property/createDismissableError.properties.ts`      | 6          | `createDismissableError` version monotonicity, reset semantics, idempotency, listener fidelity, cache identity, `resetError` no-op-guard |
+| `tests/property/createActiveNameSelector.properties.ts`    | 13         | `createActiveNameSelector` cache identity, oracle alignment, per-name listener isolation, reconnection, destroy, `.`-boundary prefix-match, subscription sharing (one router.subscribe for N names), last-unsubscribe disconnect, pre-subscribe fallback path |
+| `tests/property/baseSource.properties.ts`                  | 3          | `BaseSource` subscribe-order (listener added BEFORE `onFirstSubscribe`), `onFirstSubscribe` once-per-cycle, listener exception isolation in `notify()` (1000 runs/test) |

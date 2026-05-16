@@ -1,5 +1,6 @@
 import { BaseSource } from "./BaseSource";
 import { getErrorSource } from "./createErrorSource";
+import { noopDestroy } from "./internal/noopDestroy.js";
 
 import type { DismissableErrorSnapshot, RouterSource } from "./types.js";
 import type { Router } from "@real-router/core";
@@ -40,8 +41,12 @@ export function createDismissableError(
   const errorSource = getErrorSource(router);
 
   let dismissedVersion = -1;
+  // Hoisted up here so the `onFirstSubscribe` closure below can read/write
+  // it before `disconnect()`'s declaration. JS hoisting makes the original
+  // post-declaration order legal, but reading top-to-bottom is clearer.
+  let unsubFromError: (() => void) | null = null;
 
-  const computeSnapshot = (): DismissableErrorSnapshot => {
+  const buildDismissableSnapshot = (): DismissableErrorSnapshot => {
     const snap = errorSource.getSnapshot();
     const isDismissed = snap.version <= dismissedVersion;
 
@@ -54,18 +59,19 @@ export function createDismissableError(
     };
   };
 
-  const source = new BaseSource<DismissableErrorSnapshot>(computeSnapshot(), {
-    onFirstSubscribe: () => {
-      unsubFromError = errorSource.subscribe(() => {
-        source.updateSnapshot(computeSnapshot());
-      });
+  const source = new BaseSource<DismissableErrorSnapshot>(
+    buildDismissableSnapshot(),
+    {
+      onFirstSubscribe: () => {
+        unsubFromError = errorSource.subscribe(() => {
+          source.updateSnapshot(buildDismissableSnapshot());
+        });
+      },
+      onLastUnsubscribe: () => {
+        disconnect();
+      },
     },
-    onLastUnsubscribe: () => {
-      disconnect();
-    },
-  });
-
-  let unsubFromError: (() => void) | null = null;
+  );
 
   function resetError(): void {
     const currentVersion = errorSource.getSnapshot().version;
@@ -80,7 +86,7 @@ export function createDismissableError(
     }
 
     dismissedVersion = currentVersion;
-    source.updateSnapshot(computeSnapshot());
+    source.updateSnapshot(buildDismissableSnapshot());
   }
 
   function disconnect(): void {
@@ -99,8 +105,4 @@ export function createDismissableError(
   dismissableCache.set(router, wrapper);
 
   return wrapper;
-}
-
-function noopDestroy(): void {
-  // Shared cached source — external destroy() is a no-op.
 }

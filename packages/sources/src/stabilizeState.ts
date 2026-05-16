@@ -1,3 +1,5 @@
+import { readContextHash } from "./internal/readContextHash.js";
+
 import type { State } from "@real-router/core";
 
 /**
@@ -57,12 +59,6 @@ export function stabilizeState<T extends State | null | undefined>(
   }
 
   return prev;
-}
-
-function readContextHash(state: State | null | undefined): string | undefined {
-  const ctx = state?.context as { url?: { hash?: string } } | undefined;
-
-  return ctx?.url?.hash;
 }
 
 function readReloadFlag(state: State | null | undefined): boolean {

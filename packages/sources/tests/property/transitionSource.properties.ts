@@ -193,7 +193,7 @@ describe("createTransitionSource — state machine", () => {
       for (const nav of navSeq) {
         await router.navigate(nav.name, nav.params).catch(() => {});
 
-        expect(Object.is(source.getSnapshot(), initialIdle)).toBe(true);
+        expect(source.getSnapshot()).toBe(initialIdle);
       }
 
       router.stop();

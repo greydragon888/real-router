@@ -1,5 +1,6 @@
 import { BaseSource } from "./BaseSource";
 import { computeSnapshot } from "./computeSnapshot.js";
+import { noopDestroy } from "./internal/noopDestroy.js";
 
 import type { RouteNodeSnapshot, RouterSource } from "./types.js";
 import type { Router } from "@real-router/core";
@@ -126,8 +127,4 @@ function buildRouteNodeSource(
   );
 
   return source;
-}
-
-function noopDestroy(): void {
-  // Shared cached source — external destroy() is a no-op.
 }

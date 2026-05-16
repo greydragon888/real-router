@@ -1,5 +1,7 @@
 import { areRoutesRelated } from "@real-router/route-utils";
 
+import { noopDestroy } from "./internal/noopDestroy.js";
+
 import type { Router } from "@real-router/core";
 
 export interface ActiveNameSelector {
@@ -177,8 +179,4 @@ export function createActiveNameSelector(router: Router): ActiveNameSelector {
   selectorCache.set(router, selector);
 
   return selector;
-}
-
-function noopDestroy(): void {
-  // Shared cached selector — external destroy() is a no-op.
 }

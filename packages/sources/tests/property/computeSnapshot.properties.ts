@@ -1,4 +1,5 @@
 import { fc, test } from "@fast-check/vitest";
+import { createRouter } from "@real-router/core";
 import { describe, expect } from "vitest";
 
 import {
@@ -94,7 +95,7 @@ describe("computeSnapshot — invariants", () => {
 
       const snap = computeSnapshot(INITIAL_SNAPSHOT, router, routeName);
 
-      expect(snap.route).toBeDefined();
+      expect(snap.route).not.toBeNull();
       expect(snap.route?.name).toBe(routeName);
 
       router.stop();
@@ -212,6 +213,99 @@ describe("computeSnapshot — nodeName containment monotonicity", () => {
   );
 });
 
+describe("computeSnapshot — prefix `.` boundary (audit §2/§6 HIGH gap)", () => {
+  // The fixture router lacks conflicting names like "users" / "usersAdmin",
+  // so the dot-boundary invariant (`name.startsWith(nodeName + ".")`) is not
+  // exercised by the main suite. Build a tiny custom router that does.
+  async function createConflictRouter() {
+    const router = createRouter([
+      { name: "u", path: "/u" },
+      {
+        name: "users",
+        path: "/users",
+        children: [{ name: "list", path: "/list" }],
+      },
+      { name: "usersAdmin", path: "/usersAdmin" },
+    ]);
+
+    await router.start("/u");
+
+    return router;
+  }
+
+  test.prop([fc.constantFrom("u", "users", "usersAdmin")], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "nodeName matches own current route name (exact) — route is defined",
+    async (target) => {
+      const router = await createConflictRouter();
+
+      await router.navigate(target).catch(() => undefined);
+
+      const snap = computeSnapshot(INITIAL_SNAPSHOT, router, target);
+
+      expect(snap.route?.name).toBe(target);
+
+      router.stop();
+    },
+  );
+
+  test.prop(
+    [
+      fc.tuple(
+        fc.constantFrom("u", "users", "usersAdmin"),
+        fc.constantFrom("u", "users", "usersAdmin"),
+      ),
+    ],
+    { numRuns: NUM_RUNS.standard },
+  )(
+    "nodeName='users' is NOT activated by current route 'usersAdmin' — `.`-boundary holds",
+    async ([nodeName, currentRoute]) => {
+      fc.pre(nodeName !== currentRoute);
+
+      const router = await createConflictRouter();
+
+      await router.navigate(currentRoute).catch(() => undefined);
+
+      const snap = computeSnapshot(INITIAL_SNAPSHOT, router, nodeName);
+
+      // None of {u, users, usersAdmin} share a `.`-prefix with another:
+      // "usersAdmin" doesn't start with "users." (only with "users"), and the
+      // selector contract requires the trailing dot. So nodeName !== current
+      // must imply route === undefined.
+      expect(snap.route).toBeUndefined();
+
+      router.stop();
+    },
+  );
+
+  test("explicit regression: nodeName='users' + currentRoute='usersAdmin' → undefined", async () => {
+    const router = await createConflictRouter();
+
+    await router.navigate("usersAdmin");
+
+    const snap = computeSnapshot(INITIAL_SNAPSHOT, router, "users");
+
+    // If the implementation regresses to `name.startsWith(nodeName)` without
+    // the trailing dot, this becomes a false positive.
+    expect(snap.route).toBeUndefined();
+
+    router.stop();
+  });
+
+  test("explicit regression: nodeName='users' + currentRoute='users.list' → defined (true descendant)", async () => {
+    const router = await createConflictRouter();
+
+    await router.navigate("users.list");
+
+    const snap = computeSnapshot(INITIAL_SNAPSHOT, router, "users");
+
+    expect(snap.route?.name).toBe("users.list");
+
+    router.stop();
+  });
+});
+
 describe("computeSnapshot — boundary cases (audit §6.2)", () => {
   test("nodeName='users' + currentRoute='search' → no false positive (route is undefined)", async () => {
     const router = await createStartedRouter();
@@ -248,4 +342,100 @@ describe("computeSnapshot — boundary cases (audit §6.2)", () => {
 
     router.stop();
   });
+});
+
+// =============================================================================
+// Audit 2026-05-16 §6 (MEDIUM) — computeSnapshot hash-flip propagation
+// `computeSnapshot` delegates to `stabilizeState` for `route`/`previousRoute`.
+// When `next.route` shares the same `path` as `currentSnapshot.route` but a
+// different `state.context.url.hash`, the stabilizer must return `next.route`
+// (not `currentSnapshot.route`). A regression that drops hash from the
+// stabilizer's identity check would manifest here as `snap.route` keeping
+// the old reference even though the URL fragment flipped — useRoute
+// consumers building tab-style UIs would not re-render.
+// =============================================================================
+
+describe("computeSnapshot — hash-flip propagation through stabilizeState (audit §6 MEDIUM)", () => {
+  function withHash<P extends import("@real-router/core").Params>(
+    state: import("@real-router/core").State<P>,
+    hash: string,
+  ): import("@real-router/core").State<P> {
+    const ctx = state.context as Record<string, unknown>;
+    const url = (ctx.url as Record<string, unknown> | undefined) ?? {};
+
+    return {
+      ...state,
+      context: { ...ctx, url: { ...url, hash } },
+    } as import("@real-router/core").State<P>;
+  }
+
+  test.prop([arbRouteName], { numRuns: NUM_RUNS.standard })(
+    "same path + different hash → snap.route is the new (next) reference, not the old (current) one",
+    async (routeName) => {
+      const router = await createStartedRouter();
+
+      await router.navigate(routeName, paramsForRoute(routeName)).catch(() => {
+        // ignore SAME_STATES on `home`
+      });
+
+      const baseRoute = router.getState();
+
+      fc.pre(baseRoute !== undefined);
+
+      const oldRoute = withHash(baseRoute, "alpha");
+      const newRoute = withHash(baseRoute, "beta");
+
+      // Seed the current snapshot with `oldRoute` (post-stabilization).
+      const seeded = computeSnapshot(INITIAL_SNAPSHOT, router, "", {
+        route: oldRoute,
+        previousRoute: undefined,
+      });
+
+      expect(seeded.route).toBe(oldRoute);
+
+      const flipped = computeSnapshot(seeded, router, "", {
+        route: newRoute,
+        previousRoute: undefined,
+      });
+
+      // The hash flip must propagate — snap.route is the NEW reference.
+      expect(flipped.route).toBe(newRoute);
+      expect(flipped).not.toBe(seeded);
+
+      router.stop();
+    },
+  );
+
+  test.prop([arbRouteName], { numRuns: NUM_RUNS.standard })(
+    "same path + same hash → snap.route stays the cached reference (no spurious update)",
+    async (routeName) => {
+      const router = await createStartedRouter();
+
+      await router.navigate(routeName, paramsForRoute(routeName)).catch(() => {
+        // ignore
+      });
+
+      const baseRoute = router.getState();
+
+      fc.pre(baseRoute !== undefined);
+
+      const oldRoute = withHash(baseRoute, "section");
+      const newRouteSameHash = withHash(baseRoute, "section");
+
+      const seeded = computeSnapshot(INITIAL_SNAPSHOT, router, "", {
+        route: oldRoute,
+        previousRoute: undefined,
+      });
+      const second = computeSnapshot(seeded, router, "", {
+        route: newRouteSameHash,
+        previousRoute: undefined,
+      });
+
+      // Stabilizer should keep the cached reference (path + hash match).
+      expect(second).toBe(seeded);
+      expect(second.route).toBe(oldRoute);
+
+      router.stop();
+    },
+  );
 });

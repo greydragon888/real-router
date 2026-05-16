@@ -204,14 +204,14 @@ describe("stabilizeState — hash-aware (#532)", () => {
   );
 });
 
-describe("stabilizeState — reload-aware (broader PBT)", () => {
-  function withReload(base: State, reload: boolean): State {
-    return {
-      ...base,
-      transition: { ...base.transition, reload },
-    } as State;
-  }
+function withReload(base: State, reload: boolean): State {
+  return {
+    ...base,
+    transition: { ...base.transition, reload },
+  } as State;
+}
 
+describe("stabilizeState — reload-aware (broader PBT)", () => {
   test.prop([arbRouteName], { numRuns: NUM_RUNS.standard })(
     "fully-synthetic reload state: prev.path === next.path, next.reload=true → returns next",
     async (routeName) => {
@@ -249,6 +249,99 @@ describe("stabilizeState — reload-aware (broader PBT)", () => {
       expect(stabilizeState(prev, next)).toBe(prev);
     },
   );
+});
+
+describe("stabilizeState — transitivity, defensive read, hash×reload (audit §2/§6 MEDIUM)", () => {
+  function withHash(base: State, hash: string | undefined): State {
+    const ctx = base.context as Record<string, unknown>;
+    const url = (ctx.url as Record<string, unknown> | undefined) ?? {};
+
+    return {
+      ...base,
+      context: { ...ctx, url: { ...url, hash } },
+    } as State;
+  }
+
+  test.prop([arbRouteName], { numRuns: NUM_RUNS.standard })(
+    "transitivity for path-equal triples: stab(stab(a, b), c) === stab(a, b) (all path-equal, no reload)",
+    async (routeName) => {
+      const base = await makeStateFromRouter(routeName);
+      const a = clonePathEquivalent(base);
+      const b = clonePathEquivalent(base);
+      const c = clonePathEquivalent(base);
+
+      // Path-equal triple, no reload — stabilizer must always collapse to the
+      // first state ref. Chained calls in createRouteSource rely on this so a
+      // sequence of N idempotent navigations produces ONE snapshot ref.
+      const left = stabilizeState(stabilizeState(a, b), c);
+      const right = stabilizeState(a, stabilizeState(b, c));
+
+      expect(left).toBe(a);
+      expect(right).toBe(a);
+    },
+  );
+
+  test.prop([arbRouteName], { numRuns: NUM_RUNS.standard })(
+    "hash flip beats reload=false: same path + hash diff → returns next regardless of reload",
+    async (routeName) => {
+      const base = await makeStateFromRouter(routeName);
+      const prev = withReload(withHash(base, "alpha"), false);
+      const next = withReload(withHash(base, "beta"), false);
+
+      expect(stabilizeState(prev, next)).toBe(next);
+    },
+  );
+
+  test.prop([arbRouteName], { numRuns: NUM_RUNS.standard })(
+    "hash same + reload=true: reload wins, returns next",
+    async (routeName) => {
+      const base = await makeStateFromRouter(routeName);
+      const prev = withReload(withHash(base, "shared"), false);
+      const next = withReload(withHash(base, "shared"), true);
+
+      expect(stabilizeState(prev, next)).toBe(next);
+    },
+  );
+
+  test.prop([arbRouteName], { numRuns: NUM_RUNS.standard })(
+    "hash undefined ↔ '' is observable: stabilizer treats them as different (cross-plugin semantics)",
+    async (routeName) => {
+      const base = await makeStateFromRouter(routeName);
+      // hash-plugin runtime: no `url` namespace at all → readContextHash → undefined.
+      // browser-plugin runtime: writes `{ hash: "" }` → readContextHash → "".
+      // The stabilizer's behaviour on this mismatch determines whether a
+      // cross-plugin transition de-duplicates or emits a fresh state.
+      const ctxA: Record<string, unknown> = { ...(base.context as object) };
+
+      delete ctxA.url;
+      const prev = { ...base, context: ctxA } as State;
+      const next = withHash(base, "");
+
+      // Path equal, hash undefined vs "" differs → returns next.
+      expect(stabilizeState(prev, next)).toBe(next);
+    },
+  );
+
+  test("defensive read: malformed state without `.transition` does not throw", () => {
+    // Synthetic state lacking the mandatory `transition` field — a plugin
+    // misbehaving (or a future fork) shouldn't crash readReloadFlag.
+    const malformed = {
+      path: "/x",
+      name: "x",
+      params: {},
+      context: {},
+    } as unknown as State;
+    const malformedNext = {
+      path: "/x",
+      name: "x",
+      params: {},
+      context: {},
+    } as unknown as State;
+
+    // Path equal, no transition → defensive false on both → returns prev.
+    expect(() => stabilizeState(malformed, malformedNext)).not.toThrow();
+    expect(stabilizeState(malformed, malformedNext)).toBe(malformed);
+  });
 });
 
 describe("stabilizeState — boundary cases (audit §6.1)", () => {

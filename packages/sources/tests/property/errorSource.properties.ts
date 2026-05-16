@@ -277,3 +277,112 @@ describe("createErrorSource — destroy", () => {
     },
   );
 });
+
+// =============================================================================
+// Audit 2026-05-16 §6 (MEDIUM) — version persists across SUCCESS
+// After the sequence [error, success, error], the second error's version must
+// be STRICTLY greater than the first error's version. A `TRANSITION_SUCCESS`
+// event resets `error` to `null` but must NOT decrement / reset the version
+// counter — otherwise consumers using `version` as a "new error happened"
+// signal would miss the second error.
+// =============================================================================
+
+describe("createErrorSource — version persists across SUCCESS (audit §6 MEDIUM)", () => {
+  test.prop([arbGuardableRoute, arbGuardableRoute, arbGuardableRoute], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "[error, success, error]: second-error version is strictly greater than first-error version",
+    async (errorRoute1, successRoute, errorRoute2) => {
+      // successRoute must NOT be guarded and must differ from the boot route
+      // so the SUCCESS event actually fires. Guard only the error routes.
+      fc.pre(
+        successRoute !== errorRoute1 &&
+          successRoute !== errorRoute2 &&
+          errorRoute1 !== errorRoute2,
+      );
+
+      const router = await createStartedRouter();
+      const lifecycle = getLifecycleApi(router);
+
+      lifecycle.addActivateGuard(errorRoute1, () => () => false);
+      lifecycle.addActivateGuard(errorRoute2, () => () => false);
+
+      const source = createErrorSource(router);
+
+      const baselineVersion = source.getSnapshot().version;
+
+      // First error.
+      await router
+        .navigate(errorRoute1, paramsForRoute(errorRoute1))
+        .catch(() => {});
+
+      const firstErrorVersion = source.getSnapshot().version;
+
+      expect(firstErrorVersion).toBeGreaterThan(baselineVersion);
+      expect(source.getSnapshot().error).not.toBeNull();
+
+      // Intervening SUCCESS — resets `error` to null but must NOT touch the
+      // version counter. successRoute is unguarded so navigation succeeds.
+      await router.navigate(successRoute, paramsForRoute(successRoute));
+
+      const afterSuccessVersion = source.getSnapshot().version;
+
+      expect(afterSuccessVersion).toBe(firstErrorVersion);
+      expect(source.getSnapshot().error).toBeNull();
+
+      // Second error.
+      await router
+        .navigate(errorRoute2, paramsForRoute(errorRoute2))
+        .catch(() => {});
+
+      const secondErrorVersion = source.getSnapshot().version;
+
+      // STRICTLY greater than the first error — the counter advanced even
+      // though SUCCESS was in between.
+      expect(secondErrorVersion).toBeGreaterThan(firstErrorVersion);
+      expect(source.getSnapshot().error).not.toBeNull();
+
+      source.destroy();
+      router.stop();
+    },
+  );
+
+  test.prop([arbGuardableRoute, arbGuardableRoute], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "single SUCCESS between two errors of the same route still advances version",
+    async (errorRoute, successRoute) => {
+      fc.pre(successRoute !== errorRoute);
+
+      const router = await createStartedRouter();
+      const lifecycle = getLifecycleApi(router);
+
+      lifecycle.addActivateGuard(errorRoute, () => () => false);
+
+      const source = createErrorSource(router);
+
+      await router
+        .navigate(errorRoute, paramsForRoute(errorRoute))
+        .catch(() => {});
+      const v1 = source.getSnapshot().version;
+
+      await router
+        .navigate(successRoute, paramsForRoute(successRoute))
+        .catch(() => {});
+
+      // SUCCESS does not change version.
+      expect(source.getSnapshot().version).toBe(v1);
+
+      // Different params so SAME_STATES is not hit when re-navigating to errorRoute.
+      const params2 = paramsForRoute(errorRoute, 999_999);
+
+      await router.navigate(errorRoute, params2).catch(() => {});
+      const v2 = source.getSnapshot().version;
+
+      expect(v2).toBeGreaterThan(v1);
+
+      source.destroy();
+      router.stop();
+    },
+  );
+});

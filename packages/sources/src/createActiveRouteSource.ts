@@ -2,6 +2,8 @@ import { areRoutesRelated } from "@real-router/route-utils";
 
 import { BaseSource } from "./BaseSource";
 import { canonicalJson } from "./canonicalJson.js";
+import { noopDestroy } from "./internal/noopDestroy.js";
+import { readContextHash } from "./internal/readContextHash.js";
 import { normalizeActiveOptions } from "./normalizeActiveOptions.js";
 
 import type { ActiveRouteSourceOptions, RouterSource } from "./types.js";
@@ -47,6 +49,13 @@ export function createActiveRouteSource(
     // if unusual, fragment).
     const hashKey = hash === undefined ? "" : `#${hash}`;
 
+    // `params === undefined` is the common Link case (`<Link to="users">`
+    // with no params). Skip canonicalJson(undefined) — it returns the literal
+    // string "undefined" and template interpolation would just embed it. An
+    // explicit empty sentinel avoids the call and shaves the cache-key by 9
+    // characters per Link.
+    const paramsKey = params === undefined ? "" : canonicalJson(params);
+
     // Delimiter `|` is safe because route names use `.` as the segment
     // separator (`users.list`, not `users|list`) and canonicalJson-encoded
     // params escape `"` (so any literal `|` inside params lives inside a
@@ -54,7 +63,7 @@ export function createActiveRouteSource(
     // names ever grow a `|` character, this composite key would become
     // ambiguous — change the separator to a control char or hash-encode each
     // field.
-    key = `${routeName}|${canonicalJson(params)}|${String(strict)}|${String(ignoreQueryParams)}|${hashKey}`;
+    key = `${routeName}|${paramsKey}|${String(strict)}|${String(ignoreQueryParams)}|${hashKey}`;
   } catch {
     key = undefined;
   }
@@ -104,20 +113,6 @@ export function createActiveRouteSource(
 }
 
 /**
- * Reads the URL fragment published by browser/navigation plugins on the given
- * router state. Returns `""` when no plugin claims the `"url"` namespace
- * (hash-plugin runtime, memory-plugin, SSR) — `undefined` is reserved for
- * "no published fragment yet" and not visible at the source layer.
- */
-function readContextHash(router: Router): string {
-  const ctx = router.getState()?.context as
-    | { url?: { hash?: string } }
-    | undefined;
-
-  return ctx?.url?.hash ?? "";
-}
-
-/**
  * Combines route-name match with optional hash match (#532).
  *
  * - Route-name match: `router.isActiveRoute(name, params, strict, ignoreQueryParams)`.
@@ -147,7 +142,11 @@ function computeActive(
     return true;
   }
 
-  return readContextHash(router) === hash;
+  // `readContextHash` returns `undefined` when no URL plugin claimed the
+  // namespace (hash-plugin runtime, memory-plugin, SSR). For hash-equality
+  // matching we collapse that to `""` — a hash-aware Link with no URL plugin
+  // can only match when the consumer also asked for `hash: ""`.
+  return (readContextHash(router.getState()) ?? "") === hash;
 }
 
 function buildActiveRouteSource(
@@ -221,8 +220,4 @@ function buildActiveRouteSource(
   });
 
   return source;
-}
-
-function noopDestroy(): void {
-  // Shared cached source — external destroy() is a no-op.
 }

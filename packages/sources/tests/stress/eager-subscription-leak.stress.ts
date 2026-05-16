@@ -162,4 +162,66 @@ describe("S3. Eager subscription — shared cached sources do not leak", () => {
       source.destroy();
     }).not.toThrow();
   });
+
+  // Audit-2026-05-16 §7 #5 — eager source with 0 listeners.
+  // `createTransitionSource` / `createErrorSource` subscribe to router events
+  // immediately at construction. When the consumer never calls
+  // `source.subscribe`, the router-level subscription stays open until the
+  // source's `destroy()` runs. The cached `get*` wrappers add a no-op destroy,
+  // so the router subscription survives for the router's lifetime — which is
+  // intentional (the WeakMap entry releases on router GC). The two scenarios
+  // below pin both ends of the contract:
+  //   - explicit destroy() on a non-cached eager source releases the router
+  //     subscription even when no consumer ever subscribed;
+  //   - the cached `getTransitionSource` keeps a single subscription open
+  //     across many calls without leaking heap, regardless of subscribers.
+
+  it("S3.7: non-cached eager source with 0 listeners — destroy() detaches from router events (post-destroy navigations do not move the snapshot)", async () => {
+    // createTransitionSource subscribes through `getPluginApi(router).addEventListener`
+    // — not `router.subscribe` — so we observe detach through behaviour: the
+    // pre-destroy snapshot must stay frozen across subsequent navigations.
+    const source = createTransitionSource(router);
+
+    // Eagerly settled (router state is at "home" post-start; no transition).
+    const snapshotBeforeDestroy = source.getSnapshot();
+
+    expect(snapshotBeforeDestroy.isTransitioning).toBe(false);
+
+    source.destroy();
+
+    // Run several navigations — without detach, the eager listener would
+    // keep firing TRANSITION_START / SUCCESS and the source snapshot would
+    // churn through transitioning states.
+    for (let i = 0; i < 5; i++) {
+      await router.navigate(i % 2 === 0 ? "users.list" : "about");
+    }
+
+    // Snapshot reference is frozen — destroy() detached the event listener,
+    // so no further router events reach the source.
+    expect(source.getSnapshot()).toBe(snapshotBeforeDestroy);
+  });
+
+  it("S3.8: cached getTransitionSource with 0 listeners — heap stays bounded across 1 000 router events", async () => {
+    const heapBaseline = takeHeapSnapshot();
+    const shared = getTransitionSource(router);
+
+    // Never call shared.subscribe — exercise the "eager but unsubscribed-from"
+    // path. The router still emits events; the source still updates its
+    // private snapshot; no listeners fire.
+    const routes = ["users.list", "about", "admin.dashboard", "home"];
+
+    for (let i = 0; i < 1000; i++) {
+      await router.navigate(routes[i % routes.length]);
+    }
+
+    // Snapshot is observable post-loop — the source IS alive (cached, shared)
+    // and its eager subscription forwarded every event through updateSnapshot.
+    expect(shared.getSnapshot().isTransitioning).toBe(false);
+
+    const heapAfter = takeHeapSnapshot();
+
+    // Two-orders-of-magnitude lower than a leak: each event would otherwise
+    // need to retain ≥1KB to breach 1MB at 1000 iterations.
+    expect(heapAfter - heapBaseline).toBeLessThan(MB);
+  });
 });

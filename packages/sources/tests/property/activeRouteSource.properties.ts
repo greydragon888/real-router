@@ -465,6 +465,10 @@ describe("destroy (cached shared source — no-op)", () => {
 
       source.destroy();
 
+      // The snapshot reflects current router state (cached source ignores
+      // external destroy()) — value can be `true` when the watched route IS
+      // currently active (e.g. `home` after `start("/")`). The contract is
+      // "still returns a boolean", which the assertion below enforces.
       expect(typeof source.getSnapshot()).toBe("boolean");
 
       router.stop();

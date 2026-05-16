@@ -2,6 +2,7 @@ import { events } from "@real-router/core";
 import { getPluginApi } from "@real-router/core/api";
 
 import { BaseSource } from "./BaseSource";
+import { noopDestroy } from "./internal/noopDestroy.js";
 import { stabilizeState } from "./stabilizeState.js";
 
 import type { RouterTransitionSnapshot, RouterSource } from "./types.js";
@@ -188,8 +189,4 @@ export function getTransitionSource(
   }
 
   return cached;
-}
-
-function noopDestroy(): void {
-  // Shared cached source — external destroy() is a no-op.
 }
