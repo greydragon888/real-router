@@ -2,7 +2,7 @@
 "@real-router/react": minor
 ---
 
-`/ssr` and `/legacy/ssr` subpath split for SSR-feature exports (#609 / Stage 0a)
+`/ssr` and `/legacy/ssr` subpath split for SSR-feature exports (#609)
 
 All SSR-aware components and hooks have moved out of the main entry into a
 dedicated `/ssr` subpath:
