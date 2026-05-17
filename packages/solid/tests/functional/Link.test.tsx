@@ -652,8 +652,15 @@ describe("Link component", () => {
       expect(href).not.toBeNull();
       // Both query and fragment must end up in the rendered href.
       expect(href).toContain("/items/42");
-      expect(href).toContain("q=search");
+      expect(href).toContain("?q=search"); // explicit `?` lead — substring
+      // "q=search" alone could match e.g. ".q=search" without the marker.
       expect(href).toContain("#section-2");
+      // Sprint C.1 — pre-conditions for the ordering check: indexOf
+      // returns -1 for missing characters, and `-1 > -1` is false, so
+      // the assertion below works ONLY because both characters exist.
+      // Explicit pin removes the silent failure mode.
+      expect(href).toMatch(/\?/);
+      expect(href).toMatch(/#/);
       // Query precedes fragment per RFC 3986.
       expect(href!.indexOf("#")).toBeGreaterThan(href!.indexOf("?"));
     });

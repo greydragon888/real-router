@@ -345,6 +345,61 @@ describe("buildActiveClassName — Property Tests (Solid)", () => {
       expect(result).toBe("a b c");
     });
   });
+
+  describe("Invariant 9: Order preservation — base tokens keep relative order (Sprint B.1 — audit-6 Stage-2 #2)", () => {
+    // Production contract: when `isActive=true` and the result merges
+    // base + active tokens, base tokens MUST keep their relative order
+    // from the input. Active tokens are appended at the end (after
+    // dedup against base). A refactor switching to set-based merge
+    // (e.g. `[...new Set([...active, ...base])]`) would invert the
+    // order and silently break CSS specificity-by-source-order in
+    // consumer style sheets.
+    test.prop(
+      [
+        arbActiveClassName,
+        // Non-padded, no-duplicate base for clean order comparison.
+        fc
+          .array(arbToken, { minLength: 2, maxLength: 5 })
+          .map((tokens) => [...new Set(tokens)] as string[])
+          .filter((tokens) => tokens.length >= 2)
+          .map((tokens) => tokens.join(" ")),
+      ],
+      { numRuns: NUM_RUNS.thorough },
+    )(
+      "base tokens preserve relative order in the output (active appended)",
+      (active, base) => {
+        const result = buildActiveClassName(true, active, base);
+        const resultTokens = result!.split(/\s+/).filter(Boolean);
+        const baseTokens = base.split(/\s+/).filter(Boolean);
+
+        // Extract base tokens from result in their result-order.
+        const baseInResult = resultTokens.filter((t) => baseTokens.includes(t));
+
+        expect(baseInResult).toStrictEqual(baseTokens);
+      },
+    );
+  });
+
+  describe("Invariant 10: Subset relation — every base token survives in the active result (Sprint B.1)", () => {
+    // Audit-2 #43 MEDIUM (Conservation of base tokens). A refactor
+    // that filters base by some predicate (e.g. "drop tokens with
+    // hyphens") would silently drop CSS classes from the rendered
+    // element. Lock `set(base) ⊆ set(output)` when isActive=true.
+    test.prop([arbActiveClassName, arbBaseClassName], {
+      numRuns: NUM_RUNS.thorough,
+    })(
+      "every token in base also appears in result when isActive=true",
+      (active, base) => {
+        const result = buildActiveClassName(true, active, base) ?? "";
+        const baseTokens = new Set(base.split(/\s+/).filter(Boolean));
+        const resultTokens = new Set(result.split(/\s+/).filter(Boolean));
+
+        for (const token of baseTokens) {
+          expect(resultTokens.has(token)).toBe(true);
+        }
+      },
+    );
+  });
 });
 
 // =============================================================================
@@ -769,6 +824,161 @@ describe("buildHref — Property Tests (Solid)", () => {
         expect(href).toBe(`${path}#${hash}`);
       },
     );
+  });
+
+  describe("Invariant 12b: pre-encoded hash is NOT double-encoded (Mini-sprint E.1 — audit-5 MEDIUM)", () => {
+    // Consumers copy hashes out of `location.hash` (percent-encoded)
+    // and pass them back into `<Link hash>`. Pre-fix, this produced
+    // `"%20"` → `"%2520"` double-encoding → anchor lookup broken.
+    // Post-fix, encodeFragmentInline detects pre-encoded input via
+    // PERCENT_ESCAPE_PROBE regex and round-trips through
+    // decodeURIComponent → encodeURI for idempotency.
+    test.prop([fc.string({ minLength: 1, maxLength: 12 })], {
+      numRuns: NUM_RUNS.standard,
+    })("passing `%20foo` produces fragment with `%20`, NOT `%2520`", (path) => {
+      const router = makeFakeRouter(undefined, () => `/${path}`);
+      const href = buildHref(router, "any", {}, { hash: "%20foo" });
+
+      expect(href).toBeDefined();
+      expect(href!).toContain("%20foo");
+      expect(href!).not.toContain("%2520");
+    });
+
+    test("multi-token pre-encoded hash retains its encoding (RFC-canonical form)", () => {
+      const router = makeFakeRouter(undefined, () => "/x");
+      const href = buildHref(router, "any", {}, { hash: "tab%20A%2Csection" });
+
+      // Idempotency through decodeURIComponent + encodeURI normalizes
+      // to RFC-canonical encoding: `%20` (space — must escape) stays,
+      // but `%2C` (comma) decodes to `,` and encodeURI leaves it as
+      // a literal because `,` is a sub-delim (RFC 3986 §3.5 allows it
+      // in fragments). This is correct and lossless — `,` and `%2C`
+      // resolve identically in any URL parser.
+      expect(href).toBe("/x#tab%20A,section");
+    });
+
+    test("idempotency: feeding helper output back yields same encoding", () => {
+      const router = makeFakeRouter(undefined, () => "/x");
+      // Plain input → first encode adds percent-escapes.
+      const first = buildHref(router, "any", {}, { hash: "a b" });
+
+      expect(first).toBe("/x#a%20b");
+
+      // Feed the encoded fragment back — must NOT double-encode.
+      const fragment1 = first!.slice("/x#".length); // "a%20b"
+      const second = buildHref(router, "any", {}, { hash: fragment1 });
+
+      // Idempotent — second pass produces the same string.
+      expect(second).toBe(first);
+    });
+
+    test("malformed %XX falls through to plain encoding (no throw)", () => {
+      // `%ZZ` and `%2` are NOT valid percent-escape triples
+      // (decodeURIComponent throws). The helper must catch and
+      // fall through to plain encodeURI, which percent-encodes the
+      // literal `%`.
+      const router = makeFakeRouter(undefined, () => "/x");
+      const href = buildHref(router, "any", {}, { hash: "bad%ZZ" });
+
+      // encodeURI does not throw on malformed `%`; it encodes the
+      // literal `%` itself to `%25`. Result: `/x#bad%25ZZ`.
+      expect(href).toBe("/x#bad%25ZZ");
+    });
+  });
+
+  describe("Invariant 13: call-count — buildPath NOT invoked when buildUrl returns a valid string (Sprint B.1 — audit-6 Stage-2 #4)", () => {
+    // Locked contract: when `buildUrl` is present AND returns a valid
+    // non-empty string, `buildPath` is never called. A regression that
+    // always invoked both (e.g. for debug logging) would waste a route
+    // resolution per Link emit AND surface edge cases where the two
+    // disagree (custom plugin overrides). Pin the early-return shape.
+    test.prop(
+      [
+        fc.string({ minLength: 1, maxLength: 12 }),
+        fc.string({ minLength: 1, maxLength: 12 }),
+      ],
+      { numRuns: NUM_RUNS.standard },
+    )(
+      "buildUrl returns valid string → buildPath is never called",
+      (url, fallbackPath) => {
+        const buildUrlSpy = vi.fn().mockReturnValue(url);
+        const buildPathSpy = vi.fn().mockReturnValue(fallbackPath);
+        const router = makeFakeRouter(buildUrlSpy, buildPathSpy);
+
+        const href = buildHref(router, "any", {});
+
+        expect(href).toBe(url);
+        expect(buildUrlSpy).toHaveBeenCalledTimes(1);
+        expect(buildPathSpy).not.toHaveBeenCalled();
+      },
+    );
+
+    test.prop([fc.string({ minLength: 1, maxLength: 12 })], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "buildUrl returns '' → buildPath IS called exactly once (fallback)",
+      (fallbackPath) => {
+        const buildUrlSpy = vi.fn().mockReturnValue("");
+        const buildPathSpy = vi.fn().mockReturnValue(fallbackPath);
+        const router = makeFakeRouter(buildUrlSpy, buildPathSpy);
+
+        const href = buildHref(router, "any", {});
+
+        expect(href).toBe(fallbackPath);
+        expect(buildUrlSpy).toHaveBeenCalledTimes(1);
+        // No retry, no double-call — fallback fires ONCE.
+        expect(buildPathSpy).toHaveBeenCalledTimes(1);
+      },
+    );
+  });
+
+  describe("Invariant 14: empty routeName behaviour (Sprint B.1 — audit-6 Stage-2 #5)", () => {
+    // `<Link routeName="">` is documented as misuse (CLAUDE.md
+    // gotcha #16 — sentinel always-active in unstarted state). But
+    // raw `buildHref(router, "", {})` is still legitimate via custom
+    // plugins. Pin the answer: it dispatches to the same buildUrl/
+    // buildPath path with the literal empty string — no special
+    // short-circuit, no synthesised URL.
+    test("empty routeName + buildUrl returning a path → same path", () => {
+      const router = makeFakeRouter(
+        () => "/synthetic",
+        () => "/fallback",
+      );
+      const href = buildHref(router, "", {});
+
+      // No empty-name short-circuit — buildUrl is called and its
+      // result is returned verbatim. A regression that early-returned
+      // undefined for empty name would fail here.
+      expect(href).toBe("/synthetic");
+    });
+
+    test("empty routeName + buildUrl returning empty → buildPath fallback used", () => {
+      const router = makeFakeRouter(
+        () => "",
+        () => "/fallback",
+      );
+      const href = buildHref(router, "", {});
+
+      // Same defensive fall-through as for any other routeName.
+      expect(href).toBe("/fallback");
+    });
+
+    test("empty routeName + both empty → undefined + error (Sprint A.1 / P0.1 defensive)", () => {
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      const router = makeFakeRouter(
+        () => "",
+        () => "",
+      );
+      const href = buildHref(router, "", {});
+
+      // Defensive: empty path is treated as no-href (audit P0.1).
+      expect(href).toBeUndefined();
+      expect(consoleError).toHaveBeenCalled();
+
+      consoleError.mockRestore();
+    });
   });
 });
 

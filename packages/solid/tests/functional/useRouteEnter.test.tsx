@@ -217,4 +217,51 @@ describe("useRouteEnter", () => {
 
     expect(handler).not.toHaveBeenCalled();
   });
+
+  // Mini-sprint F.4 (audit-6 Stage-2 #22) — lastHandledRoute dedup.
+  // The hook keeps a closed-over `lastHandledRoute: State | null` and
+  // checks `if (lastHandledRoute === route) return;` before invoking
+  // the handler. This guards against the (theoretically unreachable
+  // on Solid, kept for parity with React) case where the same route
+  // ref drives a second effect activation. The contract: even if the
+  // same `route` reference appears twice in the effect's run sequence,
+  // the handler fires AT MOST ONCE per unique route ref.
+  it("dedups by route reference — same route ref never triggers handler twice (Mini-sprint F.4)", async () => {
+    const handler = vi.fn();
+
+    renderHook(
+      () => {
+        useRouteEnter(handler, { skipSameRoute: false });
+      },
+      { wrapper: wrapper(router) },
+    );
+
+    // First real navigation — handler fires once.
+    await router.navigate("about");
+
+    expect(handler).toHaveBeenCalledTimes(1);
+
+    // Capture the route ref the handler just received.
+    const firstCallRoute = (handler.mock.calls[0]?.[0] as RouteEnterContext)
+      .route;
+
+    expect(firstCallRoute.name).toBe("about");
+
+    // Now navigate to a NEW route and back. Each navigation gives a
+    // FRESH route object (router emits new State per navigation), so
+    // dedup never blocks legitimate flow.
+    await router.navigate("test");
+    await router.navigate("about");
+
+    expect(handler).toHaveBeenCalledTimes(3);
+
+    // The "about" route the handler received on the third call is a
+    // DIFFERENT reference than the first call — confirms the dedup
+    // guard never accidentally suppresses a real re-entry.
+    const thirdCallRoute = (handler.mock.calls[2]?.[0] as RouteEnterContext)
+      .route;
+
+    expect(thirdCallRoute.name).toBe("about");
+    expect(thirdCallRoute).not.toBe(firstCallRoute);
+  });
 });

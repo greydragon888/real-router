@@ -172,11 +172,18 @@ describe("createSignalFromSource", () => {
 
     createSignalFromSource(source);
 
-    // Pin down the exact signal — this is Solid's onCleanup ownership warning.
-    // Match on `cleanup` keyword only — solid-js wording may shift across
-    // minor versions; the semantic anchor is the cleanup-without-owner concept.
+    // Sprint C.1 — stricter wording lock. Solid 1.x emits
+    // "cleanups created outside a `createRoot` or `render` will never
+    // be run" when onCleanup is called without an owner. The previous
+    // `/cleanup/i` matched any warning containing that word; the new
+    // matcher pins three load-bearing tokens from the actual Solid
+    // message — "cleanups created outside" + ("createRoot" OR "render")
+    // — so a regression that swaps the warning (e.g. for "owner
+    // missing") fails loudly.
     expect(consoleWarn).toHaveBeenCalledTimes(1);
-    expect(consoleWarn).toHaveBeenCalledWith(expect.stringMatching(/cleanup/i));
+    expect(consoleWarn).toHaveBeenCalledWith(
+      expect.stringMatching(/cleanups created outside.*(createRoot|render)/i),
+    );
 
     consoleWarn.mockRestore();
   });
@@ -208,5 +215,59 @@ describe("createSignalFromSource", () => {
 
     // After dispose, the signal no longer receives updates — listener removed.
     expect(readValue?.()).toBe(1);
+  });
+
+  // Mini-sprint E.5 (audit-5 §4.2 #7) — defensive initial-snapshot
+  // read. A throwing `getSnapshot()` at init pre-fix would propagate
+  // up and tear down the reactive owner. Post-fix: the bridge catches
+  // + logs and falls back to `undefined`, letting the accessor
+  // construct cleanly. The next emit refreshes the value as normal.
+  it("does NOT throw when source.getSnapshot() throws at init (Mini-sprint E.5)", () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
+    let throwOnNextSnapshot = true;
+    const source = {
+      subscribe: () => () => {
+        /* no-op */
+      },
+      getSnapshot: () => {
+        if (throwOnNextSnapshot) {
+          throw new Error("boom-at-init");
+        }
+
+        return 42;
+      },
+      destroy: vi.fn(),
+    };
+
+    let accessor: (() => number) | undefined;
+
+    expect(() => {
+      createRoot(() => {
+        accessor = createSignalFromSource(source);
+      });
+    }).not.toThrow();
+
+    // Accessor constructed despite the init throw. Initial value
+    // defaulted to undefined.
+    expect(accessor).toBeDefined();
+    expect(accessor!()).toBeUndefined();
+
+    // The defensive guard logged the error so it's not silent.
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining("initial getSnapshot threw"),
+      expect.any(Error),
+    );
+
+    // The post-subscribe re-sync ALSO ran inside createRoot — that
+    // call hits getSnapshot once more, which by this point in the
+    // test was still throwing. The setValue updater is invoked
+    // lazily by Solid, so we won't observe it without an emit. What
+    // we lock here is "no throw, accessor exists".
+    throwOnNextSnapshot = false;
+
+    consoleError.mockRestore();
   });
 });

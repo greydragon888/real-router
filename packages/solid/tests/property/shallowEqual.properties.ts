@@ -398,4 +398,50 @@ describe("shallowEqual — Property Tests (Solid)", () => {
       ).toBe(false);
     });
   });
+
+  describe("Invariant 13: Symbol-keyed properties are IGNORED (Mini-sprint E.3 — audit-5 #3)", () => {
+    // The helper iterates `Object.keys()`, which returns only enumerable
+    // own STRING keys per spec. Symbol-keyed properties are not visible
+    // to the comparison — two records that differ ONLY in a Symbol-keyed
+    // value compare as equal.
+    //
+    // This is documented (intentional) — `Reflect.ownKeys()` would
+    // extend the contract to symbols at the cost of an extra allocation
+    // per call. Lock the current behaviour so a future "fix" that
+    // switches to Reflect.ownKeys becomes a conscious decision, not a
+    // silent refactor.
+    test("two records differing only in Symbol-keyed value compare EQUAL (documenting)", () => {
+      const brand = Symbol("brand");
+      const a = { id: "x", [brand]: 1 };
+      const b = { id: "x", [brand]: 2 };
+
+      // Different symbol values, but Object.keys returns ["id"] for
+      // both — the symbol slot is invisible to shallowEqual.
+      expect(shallowEqual(a, b)).toBe(true);
+    });
+
+    test("string-keyed and symbol-keyed mix: only string keys participate", () => {
+      const tag = Symbol("tag");
+      const a = { id: "x", count: 1, [tag]: "ignored-a" };
+      const b = { id: "x", count: 1, [tag]: "ignored-b" };
+
+      expect(shallowEqual(a, b)).toBe(true);
+
+      // Sanity: a real difference in a STRING-keyed value IS detected.
+      const c = { id: "y", count: 1, [tag]: "ignored-a" };
+
+      expect(shallowEqual(a, c)).toBe(false);
+    });
+
+    test("Symbol-only records compare as equal regardless of symbol values", () => {
+      const s1 = Symbol("a");
+      const s2 = Symbol("b");
+      // No string keys at all → Object.keys returns [], key-count
+      // short-circuit returns true immediately.
+      const a = { [s1]: 1, [s2]: 2 };
+      const b = { [s1]: 99, [s2]: 99 };
+
+      expect(shallowEqual(a, b)).toBe(true);
+    });
+  });
 });

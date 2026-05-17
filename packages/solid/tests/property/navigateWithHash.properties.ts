@@ -313,4 +313,81 @@ describe("navigateWithHash — Property Tests (Solid)", () => {
       },
     );
   });
+
+  describe("Invariant 8: extra options spread fidelity (Mini-sprint F.1 — audit-6 Stage-2)", () => {
+    // Locked contract: navigateWithHash builds `opts = { ...extraOptions }`
+    // and then conditionally writes `hash` / `force` / `hashChange`. ALL
+    // other keys from extraOptions MUST pass through to router.navigate
+    // unchanged. A regression that filtered keys (e.g. via a per-key
+    // allowlist) or accidentally renamed something would break consumer
+    // plugins that piggyback custom navigation options (e.g.
+    // `analytics`, `replace`, `preserveQuery`).
+    test.prop(
+      [
+        arbRouteName,
+        // Arbitrary set of "foreign" extra options — non-empty so we
+        // have something to check fidelity of. Avoid collision with
+        // reserved keys (`hash`, `force`, `hashChange`) which DO get
+        // overwritten by the helper's same-route branch.
+        fc.dictionary(
+          fc
+            .stringMatching(/^[a-z]{1,8}$/)
+            .filter(
+              (key) =>
+                key !== "hash" && key !== "force" && key !== "hashChange",
+            ),
+          fc.oneof(
+            fc.string({ maxLength: 8 }),
+            fc.integer(),
+            fc.boolean(),
+            fc.constantFrom(null),
+          ),
+          { minKeys: 1, maxKeys: 4 },
+        ),
+      ],
+      { numRuns: NUM_RUNS.thorough },
+    )(
+      "all non-reserved extraOptions keys pass through to router.navigate verbatim",
+      (routeName, extra) => {
+        const { router, calls } = makeRouter(undefined);
+
+        void navigateWithHash(
+          router,
+          routeName,
+          {},
+          undefined,
+          extra as NavigationOptions,
+        );
+
+        expect(calls).toHaveLength(1);
+
+        for (const key of Object.keys(extra)) {
+          expect((calls[0].opts as Record<string, unknown>)[key]).toStrictEqual(
+            extra[key],
+          );
+        }
+      },
+    );
+
+    test("extra option with reserved-key NAME survives if not overwritten by same-route diff-hash branch", () => {
+      // Cross-route navigation does NOT trigger the auto-bypass, so
+      // even `force` passed via extraOptions passes through verbatim
+      // (no override path fires). Locked.
+      const { router, calls } = makeRouter({
+        name: "home",
+        params: {},
+        hash: "",
+      });
+
+      void navigateWithHash(router, "other", {}, undefined, {
+        force: true,
+        myCustomKey: 42,
+      } as NavigationOptions & { myCustomKey?: number });
+
+      expect(calls).toHaveLength(1);
+      expect(calls[0].opts.force).toBe(true);
+      // `myCustomKey` survives spread.
+      expect((calls[0].opts as Record<string, unknown>).myCustomKey).toBe(42);
+    });
+  });
 });

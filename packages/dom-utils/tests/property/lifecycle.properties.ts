@@ -379,4 +379,112 @@ describe("Lifecycle factories — destroy idempotency PBT (audit-2026-05-17 §6 
       },
     );
   });
+
+  // ===========================================================================
+  // Mini-sprint F.2 (audit-6 Stage-2 #20) — NOOP_INSTANCE SSR matrix.
+  // Each of the 4 lifecycle factories has an SSR guard at the top:
+  //   `if (typeof document === "undefined") return NOOP_INSTANCE;`
+  // (or `typeof globalThis.window === "undefined"` for scroll-restore).
+  // The NOOP_INSTANCE is a module-scoped frozen singleton — every SSR
+  // call returns the SAME reference. Locks the singleton-ness so a
+  // refactor that allocates per-call (or removes the SSR guard) fails
+  // immediately.
+  // ===========================================================================
+  describe("NOOP_INSTANCE on SSR — all 4 factories return the SAME frozen singleton (Mini-sprint F.2)", () => {
+    afterEach(() => {
+      // vi.stubGlobal("document", undefined) inside each test installs
+      // a stub; vi.unstubAllGlobals() restores the jsdom defaults. The
+      // parent describe also calls unstubAllGlobals — duplicate is
+      // safe (idempotent) and provides defence-in-depth if the nested
+      // describe's afterEach is reordered in a future Vitest version.
+      vi.unstubAllGlobals();
+    });
+
+    test("createRouteAnnouncer: SSR → frozen singleton, identical across N calls", () => {
+      vi.stubGlobal("document", undefined);
+
+      const { router } = createMockRouter();
+      const refs = Array.from({ length: 5 }, () =>
+        createRouteAnnouncer(router),
+      );
+
+      // All references identical → singleton.
+      for (const ref of refs) {
+        expect(ref).toBe(refs[0]);
+      }
+
+      // Frozen — destroy is callable (no-op) and the object can't
+      // grow new properties.
+      expect(Object.isFrozen(refs[0])).toBe(true);
+      expect(() => {
+        refs[0].destroy();
+      }).not.toThrow();
+    });
+
+    test("createDirectionTracker: SSR → frozen singleton", () => {
+      vi.stubGlobal("document", undefined);
+
+      const { router } = createMockRouter();
+      const a = createDirectionTracker(router);
+      const b = createDirectionTracker(router);
+
+      expect(a).toBe(b);
+      expect(Object.isFrozen(a)).toBe(true);
+      expect(() => {
+        a.destroy();
+      }).not.toThrow();
+    });
+
+    test("createViewTransitions: SSR (no document) → frozen singleton", () => {
+      vi.stubGlobal("document", undefined);
+
+      const { router } = createMockRouter();
+      const a = createViewTransitions(router);
+      const b = createViewTransitions(router);
+
+      expect(a).toBe(b);
+      expect(Object.isFrozen(a)).toBe(true);
+      expect(() => {
+        a.destroy();
+      }).not.toThrow();
+    });
+
+    test("createViewTransitions: jsdom-present but NO startViewTransition → frozen singleton (same NOOP)", () => {
+      // Locks the second guard clause:
+      //   typeof document.startViewTransition !== "function"
+      // returns the SAME NOOP_INSTANCE as the no-document path.
+      // Without this lock, a refactor that splits the two guards into
+      // separate NOOPs would still pass the SSR-only test above.
+      const a = createViewTransitions(createMockRouter().router);
+      const b = createViewTransitions(createMockRouter().router);
+
+      expect(a).toBe(b);
+      expect(Object.isFrozen(a)).toBe(true);
+    });
+
+    test("createScrollRestoration: SSR (no window) → frozen singleton", () => {
+      vi.stubGlobal("window", undefined);
+
+      const { router } = createMockRouter();
+      const a = createScrollRestoration(router);
+      const b = createScrollRestoration(router);
+
+      expect(a).toBe(b);
+      expect(Object.isFrozen(a)).toBe(true);
+      expect(() => {
+        a.destroy();
+      }).not.toThrow();
+    });
+
+    test("createScrollRestoration: mode='native' → frozen singleton (no install)", () => {
+      // The "native" mode also returns NOOP_INSTANCE — separate code
+      // path from SSR. Pin both routes to the SAME singleton.
+      const { router } = createMockRouter();
+      const a = createScrollRestoration(router, { mode: "native" });
+      const b = createScrollRestoration(router, { mode: "native" });
+
+      expect(a).toBe(b);
+      expect(Object.isFrozen(a)).toBe(true);
+    });
+  });
 });

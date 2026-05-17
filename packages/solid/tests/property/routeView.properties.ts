@@ -34,6 +34,7 @@ import {
 import { isRouteActive } from "../../src/RouterProvider";
 
 import type { RouteViewMarker } from "../../src/components/RouteView/components";
+import type { JSX } from "solid-js";
 
 // Alpha-only segment name to keep `parent + suffix` constructions free of
 // hyphens/underscores that would alter the dot-boundary semantics being
@@ -175,6 +176,24 @@ describe("isSegmentMatch — Property Tests (Solid RouteView)", () => {
         expect(isSegmentMatch(routeName, segment, false)).toBe(
           isRouteActive(segment, routeName),
         );
+      },
+    );
+  });
+
+  describe("Invariant 10: exact/non-exact agree on identical inputs (Sprint B.2 — audit-6 Stage-2 #9)", () => {
+    // When `routeName === fullSegmentName`, both `exact=true` and
+    // `exact=false` MUST return true: strict equality is a subset of
+    // prefix matching with dot-boundary. A regression that special-
+    // cased one mode but not the other would surface here. Together
+    // with Invariant 8 (monotonicity strict→non-exact for ANY input),
+    // this nails down the truth table corner for identical args.
+    test.prop([arbDottedName], { numRuns: NUM_RUNS.standard })(
+      "isSegmentMatch(x, x, true) === isSegmentMatch(x, x, false) === true",
+      (name) => {
+        fc.pre(name.length > 0);
+
+        expect(isSegmentMatch(name, name, true)).toBe(true);
+        expect(isSegmentMatch(name, name, false)).toBe(true);
       },
     );
   });
@@ -410,6 +429,120 @@ describe("buildRenderList — Property Tests (Solid RouteView, §6.2 Inv 8)", ()
     });
   });
 
+  describe("Invariant 10b: Self ⊥ Match same-route consistency (Sprint B.2 — audit-6 Stage-2 #7)", () => {
+    // When the active route name EQUALS the parent nodeName AND there
+    // exists a Match marker whose `fullSegmentName` also equals the
+    // routeName, both candidates would individually qualify:
+    //   - Self: `routeName === nodeName`
+    //   - Match: `isSegmentMatch(routeName, fullSegmentName, exact)`
+    // Precedence rule: Match wins (Match comes first in the
+    // !activeMatchFound branch). Self is suppressed even though it
+    // would otherwise fire.
+    //
+    // Locks the mutual exclusion. A refactor that lifted Self's
+    // verdict out of the Match check (e.g. always-fire when
+    // `routeName === nodeName`) would silently emit BOTH markers,
+    // breaking single-render contract (Invariant 8).
+    test("active route === nodeName + matching Match for same name → only Match renders", () => {
+      // nodeName="users.profile", active route="users.profile".
+      // Self would fire on route===nodeName. Match with segment="profile"
+      // under nodeName="users.profile" would also fire (exact match on
+      // fullSegmentName="users.profile.profile" — but wait, that's
+      // wrong combo). Let me think:
+      //
+      // For Self+Match to BOTH qualify on the SAME routeName, we need:
+      //   routeName === nodeName  (Self qualifies)
+      //   AND
+      //   isSegmentMatch(routeName, `${nodeName}.${segment}`, exact) is true
+      //
+      // With nodeName === routeName, fullSegmentName=`${routeName}.${segment}`.
+      // For non-exact match, isSegmentMatch checks if routeName starts
+      // with fullSegmentName + ".". But fullSegmentName is LONGER than
+      // routeName here, so it CANNOT match.
+      //
+      // The only way both qualify is with `nodeName === ""` and Match's
+      // segment matches the routeName exactly (Self requires routeName
+      // === "" too, edge case).
+      //
+      // Realistic intersection: nodeName="" + routeName="" + Self + Match
+      // segment="" — but empty segment is now guarded (Sprint A.2).
+      //
+      // So in practice: Self ⊥ Match is a NON-CROSSING contract for
+      // normal inputs. The mutual exclusion is enforced by the
+      // `!activeMatchFound` guard: if any Match wins, Self is skipped.
+      // Test that contract directly: with a Match that wins for a
+      // descendant route, Self does NOT fire even when Self would
+      // qualify under a different routeName.
+      const self: RouteViewMarker = {
+        $$type: SELF_MARKER,
+        children: "SELF" as never,
+        fallback: undefined,
+      };
+      const match: RouteViewMarker = {
+        $$type: MATCH_MARKER,
+        segment: "list",
+        exact: false,
+        children: "MATCH" as never,
+        fallback: undefined,
+      };
+
+      // Active route is "users.list", which is a descendant of nodeName
+      // "users". Match("list") matches → fires. Self requires
+      // routeName === nodeName ("users.list" !== "users") → would NOT
+      // fire here anyway. Pin: rendered is just [MATCH].
+      const rendered1 = buildRenderList([self, match], "users.list", "users");
+
+      expect(rendered1).toHaveLength(1);
+      expect(rendered1[0]).toBe("MATCH");
+
+      // Now: active route === nodeName === "users". Self qualifies.
+      // Match("list") requires fullSegmentName="users.list" which is
+      // NOT a prefix of "users" → Match does NOT fire. Self wins.
+      const rendered2 = buildRenderList([self, match], "users", "users");
+
+      expect(rendered2).toHaveLength(1);
+      expect(rendered2[0]).toBe("SELF");
+    });
+
+    test("property fuzz: at most one of {Self, Match} ever renders simultaneously", () => {
+      // For randomly-constructed Self + Match against arbitrary route
+      // states, the renderList NEVER contains BOTH "SELF" and "MATCH"
+      // sentinels. Documents that the helper is single-render.
+      const self: RouteViewMarker = {
+        $$type: SELF_MARKER,
+        children: "SELF" as never,
+        fallback: undefined,
+      };
+      const match: RouteViewMarker = {
+        $$type: MATCH_MARKER,
+        segment: "list",
+        exact: false,
+        children: "MATCH" as never,
+        fallback: undefined,
+      };
+
+      // Spot-check a few interesting combinations.
+      const cases: [string, string][] = [
+        ["users", "users"],
+        ["users.list", "users"],
+        ["users.list.detail", "users"],
+        ["admin", "users"],
+        ["users.other", "users"],
+      ];
+
+      for (const [routeName, nodeName] of cases) {
+        const rendered = buildRenderList([self, match], routeName, nodeName);
+
+        expect(rendered.length).toBeLessThanOrEqual(1);
+
+        // Either result element is "SELF" OR "MATCH", never both.
+        if (rendered.length === 1) {
+          expect(["SELF", "MATCH"]).toContain(rendered[0]);
+        }
+      }
+    });
+  });
+
   describe("Invariant 11: empty markers → empty result", () => {
     // Defensive baseline — locks that `buildRenderList([], any, any)`
     // never spawns a phantom element.
@@ -474,6 +607,138 @@ describe("buildRenderList — Property Tests (Solid RouteView, §6.2 Inv 8)", ()
 
       expect(rendered).toHaveLength(1);
       expect(rendered[0]).toBe("NOTFOUND-ONLY");
+    });
+  });
+
+  describe("Invariant 13a: order-independence — Self/NotFound position vs Match does not change verdict (Sprint A.4 — audit-2 #32 MEDIUM)", () => {
+    // Sprint A.4 refactor of buildRenderList accumulates Self/NotFound
+    // independently of Match traversal. This invariant locks the
+    // structural property: shuffling Self and NotFound markers around
+    // the matching Match marker MUST yield the same renderList.
+    test.prop([arbSegmentName, arbSegmentName], { numRuns: NUM_RUNS.thorough })(
+      "moving Self/NotFound to start, middle, or end of marker list yields the same renderList",
+      (segment, child) => {
+        fc.pre(segment !== child);
+
+        const matchMarker: RouteViewMarker = {
+          $$type: MATCH_MARKER,
+          segment,
+          exact: false,
+          children: "MATCHED" as never,
+          fallback: undefined,
+        };
+        const selfMarker: RouteViewMarker = {
+          $$type: SELF_MARKER,
+          children: "SELF" as never,
+          fallback: undefined,
+        };
+        const notFoundMarker: RouteViewMarker = {
+          $$type: NOT_FOUND_MARKER,
+          children: "NF" as never,
+        };
+        const routeName = `${segment}.${child}`;
+
+        const variantA = [selfMarker, notFoundMarker, matchMarker];
+        const variantB = [matchMarker, selfMarker, notFoundMarker];
+        const variantC = [selfMarker, matchMarker, notFoundMarker];
+        const variantD = [notFoundMarker, matchMarker, selfMarker];
+
+        const renderA = buildRenderList(variantA, routeName, "");
+        const renderB = buildRenderList(variantB, routeName, "");
+        const renderC = buildRenderList(variantC, routeName, "");
+        const renderD = buildRenderList(variantD, routeName, "");
+
+        // All four positions of Self/NotFound around the Match yield
+        // the identical render (Match wins).
+        expect(renderA).toStrictEqual(renderB);
+        expect(renderA).toStrictEqual(renderC);
+        expect(renderA).toStrictEqual(renderD);
+        // And the verdict IS the Match (precedence preserved).
+        expect(renderA).toHaveLength(1);
+        expect(renderA[0]).toBe("MATCHED");
+      },
+    );
+
+    test("relative order between TWO Match markers still matters — first-Match-wins (sanity)", () => {
+      // Order-independence applies to Self/NotFound vs Match, NOT to
+      // Match vs Match. The first matching Match still wins.
+      const firstMatch: RouteViewMarker = {
+        $$type: MATCH_MARKER,
+        segment: "users",
+        exact: false,
+        children: "FIRST" as never,
+        fallback: undefined,
+      };
+      const secondMatch: RouteViewMarker = {
+        $$type: MATCH_MARKER,
+        segment: "users",
+        exact: false,
+        children: "SECOND" as never,
+        fallback: undefined,
+      };
+
+      const order1 = buildRenderList(
+        [firstMatch, secondMatch],
+        "users.list",
+        "",
+      );
+      const order2 = buildRenderList(
+        [secondMatch, firstMatch],
+        "users.list",
+        "",
+      );
+
+      expect(order1[0]).toBe("FIRST");
+      expect(order2[0]).toBe("SECOND");
+      // And they differ — Match precedence DOES depend on position.
+      expect(order1).not.toStrictEqual(order2);
+    });
+  });
+
+  describe("Invariant 13: empty-segment Match never matches, never crashes (Sprint A.2)", () => {
+    // audit-2026-05-17 §5 MEDIUM — `<Match segment="">` produces a
+    // malformed `fullSegmentName` (either `""` with empty nodeName, or
+    // `"nodeName."` with trailing dot). Without the guard, the latter
+    // crashes `startsWithSegment` in @real-router/route-utils with
+    // TypeError, taking down the render. Locked: empty-segment Match
+    // returns null (no match, no throw) for any routeName / nodeName.
+    test.prop([arbDottedName, arbAlphaSegmentName], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "buildRenderList with `<Match segment=''>` returns [] (never matches, never throws)",
+      (routeName, nodeName) => {
+        const emptyMatch: RouteViewMarker = {
+          $$type: MATCH_MARKER,
+          segment: "",
+          exact: false,
+          children: "EMPTY" as never,
+          fallback: undefined,
+        };
+
+        expect(() => {
+          const rendered = buildRenderList([emptyMatch], routeName, nodeName);
+
+          // No match, no exception.
+          expect(rendered).toStrictEqual([]);
+        }).not.toThrow();
+      },
+    );
+
+    test("explicit: `<Match segment=''>` under non-empty nodeName does NOT throw TypeError", () => {
+      const emptyMatch: RouteViewMarker = {
+        $$type: MATCH_MARKER,
+        segment: "",
+        exact: false,
+        children: "EMPTY" as never,
+        fallback: undefined,
+      };
+
+      // Without the guard, this used to throw via startsWithSegment(
+      // "users.profile", "users.", false) — trailing dot is invalid
+      // input per route-utils invariants.
+      expect(() => {
+        buildRenderList([emptyMatch], "users.profile", "users");
+      }).not.toThrow();
     });
   });
 });
@@ -686,5 +951,289 @@ describe("collectElements — Property Tests (§6.4 №6, §6.5 №5)", () => {
         }
       },
     );
+  });
+
+  describe("Conservation: |result| ≤ |flattened children| (Sprint B.3 — audit-6 Stage-2 #10)", () => {
+    // collectElements MUST NOT spawn phantom markers — every entry in
+    // the result originated from the input tree. A regression that
+    // emitted a fallback marker on null inputs (or duplicated markers
+    // across nested arrays) would break this bound and silently
+    // double-render `<Match>` blocks in RouteView. The cap is the
+    // count of marker-shaped leaves after flattening.
+    test.prop(
+      [
+        fc.array(
+          fc.oneof(
+            fc.string({ maxLength: 4 }).map((id) => sampleMatch(id)),
+            fc.constantFrom(null, undefined),
+            fc.array(
+              fc.string({ maxLength: 4 }).map((id) => sampleMatch(id)),
+              { maxLength: 3 },
+            ),
+          ),
+          { maxLength: 6 },
+        ),
+      ],
+      { numRuns: NUM_RUNS.thorough },
+    )("|result| ≤ count of marker leaves in flattened input", (input) => {
+      const result: RouteViewMarker[] = [];
+
+      collectElements(input, result);
+
+      // Count marker leaves manually for the bound. Anything that is
+      // an object with a Symbol $$type is a marker.
+      const flatten = (value: unknown): unknown[] => {
+        if (Array.isArray(value)) {
+          return value.flatMap((v) => flatten(v));
+        }
+
+        return [value];
+      };
+      const leafMarkers = flatten(input).filter(
+        (v): boolean =>
+          typeof v === "object" &&
+          v !== null &&
+          typeof (v as { $$type?: unknown }).$$type === "symbol",
+      );
+
+      expect(result.length).toBeLessThanOrEqual(leafMarkers.length);
+    });
+  });
+
+  describe("Reference passthrough: result entries are the SAME objects as inputs (Sprint B.3 — audit-6 Stage-2 #10)", () => {
+    // The collector pushes input markers directly into the accumulator
+    // — it never clones, wraps, or otherwise replaces them. Downstream
+    // (buildRenderList → renderMatch) compares by ref to identify
+    // first-Match-wins / first-Self-wins precedence. A regression that
+    // shallow-cloned markers would break that comparison silently.
+    test.prop(
+      [fc.array(fc.string({ minLength: 1, maxLength: 4 }), { maxLength: 6 })],
+      { numRuns: NUM_RUNS.standard },
+    )(
+      "every marker in the result is the EXACT same object reference as in input",
+      (ids) => {
+        const markers = ids.map((id) => sampleMatch(id));
+        const result: RouteViewMarker[] = [];
+
+        collectElements(markers, result);
+
+        // Each result element matches the input by reference (Object.is).
+        expect(result).toHaveLength(markers.length);
+
+        result.forEach((m, i) => {
+          expect(m).toBe(markers[i]);
+        });
+      },
+    );
+
+    test("nested input: nested markers preserve ref through flattening", () => {
+      const m1 = sampleMatch("a");
+      const m2 = sampleMatch("b");
+      const m3 = sampleMatch("c");
+
+      const result: RouteViewMarker[] = [];
+
+      collectElements([m1, [m2, [m3]]], result);
+
+      // Refs preserved even through nesting.
+      expect(result[0]).toBe(m1);
+      expect(result[1]).toBe(m2);
+      expect(result[2]).toBe(m3);
+    });
+  });
+});
+
+// =============================================================================
+// Sprint G (audit-8 §8b HIGH #4) — behavior equivalence between the
+// optimized `buildRenderList` (candidate-set pre-pass) and a reference
+// linear-walk implementation that uses isSegmentMatch unchanged. If the
+// optimization ever diverges from the reference (e.g. a refactor that
+// caches incorrectly, or breaks first-Match-wins under specific marker
+// combinations), this PBT catches it. The pre-pass cache key is
+// `${routeName} ${nodeName}` — collision-free for any real route name
+// (route names cannot contain spaces per @real-router/core's segment
+// validation).
+// =============================================================================
+
+/**
+ * Reference impl helpers — split out to keep cognitive complexity
+ * under the lint threshold. The shape mirrors the pre-Sprint-G
+ * `buildRenderList` walk + isSegmentMatch dispatch.
+ */
+function referenceMatchAttempt(
+  child: RouteViewMarker,
+  routeName: string,
+  nodeName: string,
+): JSX.Element | null {
+  if (child.$$type !== MATCH_MARKER) {
+    return null;
+  }
+
+  const match = child as {
+    $$type: typeof MATCH_MARKER;
+    segment: string;
+    exact: boolean;
+    children: JSX.Element;
+  };
+
+  if (!match.segment) {
+    return null;
+  }
+
+  const fullSegmentName = nodeName
+    ? `${nodeName}.${match.segment}`
+    : match.segment;
+
+  if (!isSegmentMatch(routeName, fullSegmentName, match.exact)) {
+    return null;
+  }
+
+  return match.children;
+}
+
+/**
+ * Reference implementation — the pre-Sprint-G `buildRenderList` shape.
+ * Walks markers linearly, calls `isSegmentMatch` per Match marker. Kept
+ * here ONLY for behavior-equivalence verification — production code now
+ * uses the candidate-set version.
+ */
+function referenceBuildRenderList(
+  elements: RouteViewMarker[],
+  routeName: string,
+  nodeName: string,
+): JSX.Element[] {
+  let selfMarker: RouteViewMarker | null = null;
+  let notFoundChildren: JSX.Element | null = null;
+  let matchRendered: JSX.Element | null = null;
+
+  for (const child of elements) {
+    if (child.$$type === NOT_FOUND_MARKER) {
+      notFoundChildren = (child as { children: JSX.Element }).children;
+    } else if (child.$$type === SELF_MARKER) {
+      selfMarker ??= child;
+    } else if (matchRendered === null) {
+      matchRendered = referenceMatchAttempt(child, routeName, nodeName);
+    }
+  }
+
+  const rendered: JSX.Element[] = [];
+
+  if (matchRendered !== null) {
+    rendered.push(matchRendered);
+  } else if (selfMarker !== null && routeName === nodeName) {
+    rendered.push((selfMarker as { children: JSX.Element }).children);
+  } else if (routeName === UNKNOWN_ROUTE && notFoundChildren !== null) {
+    rendered.push(notFoundChildren);
+  }
+
+  return rendered;
+}
+
+describe("buildRenderList — Sprint G behavior equivalence (audit-8 §8b HIGH #4)", () => {
+  // Marker arbitrary that includes ALL three types in arbitrary
+  // proportions and order, plus realistic exact / non-exact and
+  // realistic segment names.
+  const arbMatchMarkerForEq: fc.Arbitrary<RouteViewMarker> = fc
+    .record({
+      segment: fc.oneof(
+        fc.constant(""), // exercise empty-segment guard
+        arbAlphaSegmentName,
+      ),
+      exact: fc.boolean(),
+      sentinel: fc.string({ minLength: 1, maxLength: 8 }),
+    })
+    .map(
+      ({ segment, exact, sentinel }): RouteViewMarker => ({
+        $$type: MATCH_MARKER,
+        segment,
+        exact,
+        // Embed sentinel into children so we can compare result by
+        // value when render-list elements come back. The renderMatch
+        // helper passes children through unchanged for non-Suspense
+        // markers.
+        children: `M:${sentinel}` as never,
+        fallback: undefined,
+      }),
+    );
+
+  const arbSelfMarkerForEq: fc.Arbitrary<RouteViewMarker> = fc
+    .string({ minLength: 1, maxLength: 8 })
+    .map(
+      (sentinel): RouteViewMarker => ({
+        $$type: SELF_MARKER,
+        children: `S:${sentinel}` as never,
+        fallback: undefined,
+      }),
+    );
+
+  const arbNotFoundMarkerForEq: fc.Arbitrary<RouteViewMarker> = fc
+    .string({ minLength: 1, maxLength: 8 })
+    .map(
+      (sentinel): RouteViewMarker => ({
+        $$type: NOT_FOUND_MARKER,
+        children: `N:${sentinel}` as never,
+      }),
+    );
+
+  const arbAnyMarkerForEq: fc.Arbitrary<RouteViewMarker> = fc.oneof(
+    { weight: 4, arbitrary: arbMatchMarkerForEq },
+    { weight: 1, arbitrary: arbSelfMarkerForEq },
+    { weight: 1, arbitrary: arbNotFoundMarkerForEq },
+  );
+
+  test.prop(
+    [
+      fc.array(arbAnyMarkerForEq, { minLength: 0, maxLength: 8 }),
+      fc.oneof(fc.constant(UNKNOWN_ROUTE), arbDottedName, fc.constant("")),
+      fc.oneof(fc.constant(""), arbAlphaSegmentName),
+    ],
+    { numRuns: 1000 },
+  )(
+    "optimized buildRenderList ≡ reference linear walk for arbitrary (markers, routeName, nodeName)",
+    (markers, routeName, nodeName) => {
+      const optimized = buildRenderList(markers, routeName, nodeName);
+      const reference = referenceBuildRenderList(markers, routeName, nodeName);
+
+      // toStrictEqual compares the JSX-element placeholders (sentinel
+      // strings embedded in `children`) — for non-Suspense markers,
+      // renderMatch/renderSelf return `children` verbatim, so the two
+      // results must match by-value.
+      expect(optimized).toStrictEqual(reference);
+    },
+  );
+
+  // Companion explicit pin — covers a couple of high-signal cases
+  // that the property generator might shrink to but that read more
+  // clearly as named examples.
+  test("equivalence on nested ancestor chain (routeName='a.b.c.d', Match segment='b.c')", () => {
+    const m: RouteViewMarker = {
+      $$type: MATCH_MARKER,
+      segment: "b.c",
+      exact: false,
+      children: "B-C" as never,
+      fallback: undefined,
+    };
+
+    const optimized = buildRenderList([m], "a.b.c.d", "a");
+    const reference = referenceBuildRenderList([m], "a.b.c.d", "a");
+
+    expect(optimized).toStrictEqual(reference);
+    expect(optimized).toHaveLength(1);
+  });
+
+  test("equivalence on exact match (routeName='users.list', Match segment='list' exact=true)", () => {
+    const m: RouteViewMarker = {
+      $$type: MATCH_MARKER,
+      segment: "list",
+      exact: true,
+      children: "EXACT" as never,
+      fallback: undefined,
+    };
+
+    const optimized = buildRenderList([m], "users.list", "users");
+    const reference = referenceBuildRenderList([m], "users.list", "users");
+
+    expect(optimized).toStrictEqual(reference);
+    expect(optimized[0]).toBe("EXACT");
   });
 });

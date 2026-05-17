@@ -263,10 +263,15 @@ describe("createStoreFromSource", () => {
 
     createStoreFromSource(source);
 
-    // Match on `cleanup` keyword only — solid-js wording may shift across
-    // minor versions; the semantic anchor is the cleanup-without-owner concept.
+    // Sprint C.1 — stricter wording lock (mirror of
+    // createSignalFromSource.test.tsx): Solid 1.x emits
+    // "cleanups created outside a `createRoot` or `render` will never
+    // be run". Pin three load-bearing tokens from the actual message
+    // so a regression that swaps the warning fails loudly here.
     expect(consoleWarn).toHaveBeenCalledTimes(1);
-    expect(consoleWarn).toHaveBeenCalledWith(expect.stringMatching(/cleanup/i));
+    expect(consoleWarn).toHaveBeenCalledWith(
+      expect.stringMatching(/cleanups created outside.*(createRoot|render)/i),
+    );
 
     consoleWarn.mockRestore();
   });

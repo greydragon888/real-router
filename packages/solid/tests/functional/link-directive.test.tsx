@@ -361,6 +361,58 @@ describe("link directive", () => {
 
       preventDefaultSpy.mockRestore();
     });
+
+    it("should respect upstream preventDefault — does NOT navigate when an earlier listener cancelled the event (Mini-sprint E.2)", async () => {
+      // The directive attaches its click listener via addEventListener,
+      // so consumer-registered listeners on the SAME element fire in
+      // registration order. If the consumer's listener calls
+      // preventDefault to opt out of navigation, the directive must
+      // honour that — symmetric with <Link>'s onClick + defaultPrevented
+      // check.
+      const navigateSpy = vi.spyOn(router, "navigate");
+
+      let element: HTMLAnchorElement | null = null;
+
+      render(
+        () => (
+          <a
+            ref={(element_) => {
+              element = element_;
+            }}
+            use:link={{ routeName: "one-more-test" }}
+            data-testid="link"
+          >
+            Test
+          </a>
+        ),
+        { wrapper },
+      );
+
+      // Register a listener BEFORE the directive's listener would
+      // process the event. In Solid, the directive's addEventListener
+      // fires after the JSX render commit; calling addEventListener
+      // here registers AFTER it in DOM order... so we use the JSX
+      // `onClick` prop, which uses addEventListener internally and is
+      // registered before the directive's call.
+      // BUT — actually the directive runs use:link during render,
+      // attaching the listener immediately. Solid JSX onClick props
+      // are attached via addEventListener too, in JSX-attribute
+      // evaluation order. To deterministically register a listener
+      // BEFORE the directive's, we add it manually to the captured
+      // ref via `useCapture: true` (capture phase fires first).
+      const earlyListener = vi.fn((event: Event) => {
+        event.preventDefault();
+      });
+
+      element!.addEventListener("click", earlyListener, { capture: true });
+
+      await user.click(screen.getByTestId("link"));
+
+      expect(earlyListener).toHaveBeenCalledTimes(1);
+      // Navigation suppressed — directive saw defaultPrevented=true
+      // and returned early.
+      expect(navigateSpy).not.toHaveBeenCalled();
+    });
   });
 
   // The link directive attaches only a click handler — it has no keydown listener.
@@ -707,12 +759,14 @@ describe("link directive", () => {
       // Order is JSX-property handler first (DOM-property handler runs before
       // addEventListener queue), but the assertion below just locks that
       // BOTH ran on a single click.
+      // Sprint C.1 — strict args: directive uses EMPTY_PARAMS / EMPTY_OPTIONS
+      // sentinels (frozen module singletons), so params/options are exactly
+      // `{}` references. expect.any(Object) accepted any shape including a
+      // regression where the directive forwarded foreign objects.
       expect(consumerSpy).toHaveBeenCalledTimes(1);
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "one-more-test",
-        expect.any(Object),
-        expect.any(Object),
-      );
+      expect(consumerSpy).toHaveBeenCalledWith(expect.any(MouseEvent));
+      expect(navigateSpy).toHaveBeenCalledTimes(1);
+      expect(navigateSpy).toHaveBeenCalledWith("one-more-test", {}, {});
     });
 
     it("after unmount, JSX onClick remains on element while directive listener is removed", async () => {

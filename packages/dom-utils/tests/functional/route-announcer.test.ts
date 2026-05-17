@@ -96,7 +96,13 @@ describe("createRouteAnnouncer", () => {
     router.stop();
   });
 
-  it("4 — getAnnouncementText: empty string suppresses; non-empty overrides fallbacks", async () => {
+  it("4 — getAnnouncementText: empty string FALLS BACK to default chain; non-empty overrides fallbacks (Mini-sprint E.4)", async () => {
+    // Mini-sprint E.4 (audit-5 §4.2 #4) — empty-string fallback.
+    // Prior behaviour: a custom resolver returning `""` silently
+    // suppressed the announcement, leaving screen-reader users with
+    // no feedback for routes outside the consumer's map. Now an empty
+    // / falsy custom result falls through to the default resolution
+    // chain (h1 → document.title → route.name).
     const router = makeRouter();
     const ann = setupAnnouncer(router, {
       getAnnouncementText: (route) =>
@@ -112,10 +118,14 @@ describe("createRouteAnnouncer", () => {
     document.body.append(h1);
     document.title = "Title Content";
 
+    // route="contact" → custom returns "" → falls through. h1 is
+    // present, so the default chain announces the h1 text.
     await router.navigate("contact");
 
-    expect(getAnnouncerElement()?.textContent).toBe("");
+    expect(getAnnouncerElement()?.textContent).toBe("Navigated to H1 Content");
 
+    // route="about" → custom returns "Custom: about" — non-empty
+    // path wins, overriding the fallback chain.
     await router.navigate("about");
 
     expect(getAnnouncerElement()?.textContent).toBe("Custom: about");

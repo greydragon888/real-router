@@ -277,4 +277,51 @@ describe("isRouteActive — Property Tests (Solid RouterProvider)", () => {
       expect(isRouteActive("users.", "users.x")).toBe(false);
     });
   });
+
+  describe("Invariant 9: Sentinel defense — explicit edge cases for hostile real route names (Mini-sprint F.3 — audit-6 Stage-2 #19)", () => {
+    // Invariant 7 already PBT-locks the contract `isRouteActive("",
+    // currentRoute) === false` for `arbDottedName`-generated names.
+    // Audit-6 Stage-2 #19 asks for a STRONGER lock — explicit
+    // adversarial route names that a focused generator might miss:
+    // single-char names, deep dotted chains, names with hyphens/
+    // digits/underscores and unusual character classes. None of
+    // these should activate a sentinel-empty Link.
+    const HOSTILE_NAMES = [
+      "x",
+      "0",
+      "a-b-c-d",
+      "users.posts.comments.0.author.profile",
+      "USERS",
+      "users_list",
+      "-",
+      "_",
+    ];
+
+    for (const hostile of HOSTILE_NAMES) {
+      test(`sentinel safe: isRouteActive("", "${hostile}") === false`, () => {
+        // Lock per-case (8 assertions) so a regression that special-
+        // cased ANY of these falls out immediately rather than blending
+        // into a PBT counterexample.
+        expect(isRouteActive("", hostile)).toBe(false);
+      });
+    }
+
+    test("sentinel safe — wide-fuzz PBT: ANY non-empty currentRoute (not starting with `.`) NEVER activates Link with empty linkRouteName", () => {
+      // Stronger fc generator than Invariant 7's `arbDottedName`: any
+      // non-empty string that does NOT start with `.` (the only
+      // strings that COULD match `currentRoute.startsWith("..")` are
+      // `.`-prefixed). 500 runs over the whole string domain.
+      fc.assert(
+        fc.property(
+          fc
+            .string({ minLength: 1, maxLength: 64 })
+            .filter((s) => !s.startsWith(".")),
+          (currentRoute) => {
+            expect(isRouteActive("", currentRoute)).toBe(false);
+          },
+        ),
+        { numRuns: 500 },
+      );
+    });
+  });
 });

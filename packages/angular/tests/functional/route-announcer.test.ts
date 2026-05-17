@@ -308,7 +308,14 @@ describe("createRouteAnnouncer", () => {
     announcer.destroy();
   });
 
-  it("skips empty announcement text from custom handler", async () => {
+  it("empty announcement text from custom handler falls back to default chain (Mini-sprint E.4)", async () => {
+    // Behaviour change: pre-E.4, an empty-string return from
+    // `getAnnouncementText` silently suppressed the announcement,
+    // leaving screen-reader users without feedback. Post-E.4, an
+    // empty / null / undefined custom result falls through to the
+    // default resolution chain (h1 → document.title → route.name).
+    // Lock the new behaviour for the Angular adapter to keep it in
+    // sync with shared/dom-utils.
     const announcer = createRouteAnnouncer(router, {
       getAnnouncementText: () => "",
     });
@@ -318,7 +325,9 @@ describe("createRouteAnnouncer", () => {
 
     await triggerAnnouncement(router);
 
-    expect(element.textContent).toBe("");
+    // Falls back to the default chain — route.name "about" wins
+    // (no h1, document.title cleared in beforeEach).
+    expect(element.textContent).toBe("Navigated to about");
 
     announcer.destroy();
   });

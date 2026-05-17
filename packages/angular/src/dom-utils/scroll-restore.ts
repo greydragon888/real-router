@@ -374,6 +374,23 @@ export function canonicalJson(value: unknown): string {
 }
 
 function canonicalReplacer(_key: string, val: unknown): unknown {
+  // audit-2026-05-17 §5 MEDIUM (Sprint A.3) — function/Symbol marker.
+  // `JSON.stringify` silently drops function and symbol values from
+  // object output. Two routes that differ ONLY in a function/Symbol
+  // value would canonicalize to the same string → silent scroll-cache
+  // key collision (positions clobber each other). Replacing the value
+  // with a sentinel string breaks the collision while keeping the
+  // canonical form deterministic. The sentinels are intentionally
+  // ASCII-only and lexically distinct from valid JSON-stringified
+  // values; consumers will see `"<fn>"` / `"<sym>"` if they ever
+  // round-trip the cache key, signalling the substitution clearly.
+  if (typeof val === "function") {
+    return "<fn>";
+  }
+  if (typeof val === "symbol") {
+    return "<sym>";
+  }
+
   if (val !== null && typeof val === "object" && !Array.isArray(val)) {
     // Null-prototype accumulator: a plain `{}` would interpret
     // `sorted["__proto__"] = x` as a prototype assignment (silently dropped

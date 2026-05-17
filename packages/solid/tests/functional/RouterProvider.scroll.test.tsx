@@ -79,11 +79,25 @@ describe("RouterProvider — scrollRestoration", () => {
 
     globalThis.dispatchEvent(new Event("pagehide"));
 
-    const saved = JSON.parse(
-      sessionStorage.getItem(STORAGE_KEY) ?? "{}",
-    ) as Record<string, number>;
+    // Sprint C.1 — explicit storage assertion. The previous version
+    // used `?? "{}"` fallback which would silently coerce a missing
+    // key into an empty object, and `Object.values().toContain(310)`
+    // wasn't tied to a specific (route, params) key. Lock both: the
+    // storage entry MUST exist, AND it MUST be keyed by the active
+    // route's `keyOf` (= `${name}:{}` for empty params).
+    const raw = sessionStorage.getItem(STORAGE_KEY);
 
-    expect(Object.values(saved)).toContain(310);
+    expect(raw).not.toBeNull();
+
+    const saved = JSON.parse(raw!) as Record<string, number>;
+    const currentName = router.getState()?.name;
+
+    expect(currentName).toBeDefined();
+
+    // Pin: stored under "${routeName}:{}" key (empty params → "{}").
+    const expectedKey = `${currentName!}:{}`;
+
+    expect(saved[expectedKey]).toBe(310);
 
     unmount();
   });

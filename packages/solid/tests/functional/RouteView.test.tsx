@@ -57,6 +57,31 @@ describe("RouteView", () => {
       expect(container.innerHTML).toBe("");
     });
 
+    // audit-2026-05-17 Sprint A.2 — empty-segment Match guard.
+    // Without the early-return in processMatchChild, `<Match segment="">`
+    // under a non-empty parent nodeName produces fullSegmentName
+    // `"nodeName."` which crashes startsWithSegment in @real-router/route-utils
+    // with TypeError ("segment must not end with a dot"). This test locks
+    // the guard: empty-segment Match silently never matches.
+    it("`<Match segment=''>` does NOT crash and never matches (Sprint A.2)", async () => {
+      await router.start("/users/list");
+
+      const { container } = render(() => (
+        <RouterProvider router={router}>
+          <RouteView nodeName="users">
+            <RouteView.Match segment="">
+              <div data-testid="empty-segment">Should not render</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>
+      ));
+
+      // No exception thrown during render — render() returns normally.
+      // No match: container is empty.
+      expect(screen.queryByTestId("empty-segment")).not.toBeInTheDocument();
+      expect(container.innerHTML).toBe("");
+    });
+
     it("should support exact matching — matches exact route only", async () => {
       await router.start("/users");
 

@@ -19,7 +19,7 @@ import { RouterProvider, useRouteExit } from "@real-router/solid";
 
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Router, State } from "@real-router/core";
 import type {
   RouteExitContext,
   RouteExitHandler,
@@ -253,3 +253,91 @@ function ProbeExit(
 
   return <div data-testid="probe" />;
 }
+
+describe("useRouteExit — explicit guard pins (Mini-sprint F.5 — audit-6 Stage-2 #23)", () => {
+  let router: Router;
+
+  beforeEach(async () => {
+    router = createTestRouterWithADefaultRouter();
+    await router.start("/users/1");
+  });
+
+  afterEach(() => {
+    router.stop();
+  });
+
+  // Pin the EXACT documented use-case for `skipSameRoute=true` —
+  // sort/filter/pagination navigations on the same route DO change
+  // params but should NOT trigger the exit handler (component stays
+  // mounted, no "leave animation" desired).
+  it("skipSameRoute=true (default) skips on PARAMS-only navigation (sort/filter usecase)", async () => {
+    const handler = vi.fn();
+
+    renderHook(
+      () => {
+        useRouteExit(handler);
+      },
+      { wrapper: wrapper(router) },
+    );
+
+    // Same route name, different params → counts as same-route for
+    // the exit handler.
+    await router.navigate("users.view", { id: "1", sort: "asc" });
+
+    expect(handler).not.toHaveBeenCalled();
+
+    // Now ACTUAL cross-route → handler fires.
+    await router.navigate("about");
+
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  // The order of guards inside useRouteExit:
+  //   if (skipSameRoute && route.name === nextRoute.name) return;
+  //   if (signal.aborted) return;
+  //   return handler(...);
+  // Both guards must independently short-circuit. Pin the
+  // signal.aborted guard with an explicit injected listener (the
+  // existing test at line 205 uses leaveListeners array — same pattern).
+  it("signal.aborted guard short-circuits even when skipSameRoute would NOT apply (cross-route)", () => {
+    const handler = vi.fn();
+    const leaveListeners: ((payload: {
+      route: State;
+      nextRoute: State;
+      signal: AbortSignal;
+    }) => void | Promise<void>)[] = [];
+
+    vi.spyOn(router, "subscribeLeave").mockImplementation((listener) => {
+      leaveListeners.push(listener);
+
+      return () => {
+        leaveListeners.splice(leaveListeners.indexOf(listener), 1);
+      };
+    });
+
+    render(() => (
+      <RouterProvider router={router}>
+        <ProbeExit handler={handler} />
+      </RouterProvider>
+    ));
+
+    const controller = new AbortController();
+
+    controller.abort();
+
+    // Cross-route nav (users.view → about) — skipSameRoute would NOT
+    // suppress. But signal.aborted is true → handler still skipped.
+    // Locks the order: signal-aborted check runs regardless of name.
+    const aboutState = { ...router.getState()!, name: "about" } as State;
+
+    for (const listener of leaveListeners) {
+      void listener({
+        route: router.getState()!,
+        nextRoute: aboutState,
+        signal: controller.signal,
+      });
+    }
+
+    expect(handler).not.toHaveBeenCalled();
+  });
+});

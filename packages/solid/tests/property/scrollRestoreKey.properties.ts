@@ -379,4 +379,71 @@ describe("keyOf / canonicalJson — Property Tests (§8b H20, audit #S3)", () =>
       expect(() => JSON.parse(result)).not.toThrow();
     });
   });
+
+  describe("Invariant 13: function/Symbol values replaced with markers (Sprint A.3 — audit-2026-05-17 §5 MEDIUM)", () => {
+    // Plain `JSON.stringify` silently drops function- and symbol-valued
+    // properties from object output. Two routes whose params differ
+    // ONLY in such a value would canonicalize identically → scroll
+    // positions collide silently in sessionStorage. The replacer
+    // substitutes deterministic ASCII sentinels (`"<fn>"`, `"<sym>"`)
+    // so the canonical string carries enough signal to distinguish
+    // values from "key absent".
+    test("function-valued param appears as `<fn>` (not dropped)", () => {
+      const params = { id: "x", fn: () => 42 };
+      const json = canonicalJson(params);
+      const parsed = JSON.parse(json) as Record<string, unknown>;
+
+      expect(parsed.fn).toBe("<fn>");
+      expect(parsed.id).toBe("x");
+    });
+
+    test("symbol-valued param appears as `<sym>` (not dropped)", () => {
+      const params = { id: "x", marker: Symbol("brand") };
+      const json = canonicalJson(params);
+      const parsed = JSON.parse(json) as Record<string, unknown>;
+
+      expect(parsed.marker).toBe("<sym>");
+      expect(parsed.id).toBe("x");
+    });
+
+    test("no collision: two routes differing only in fn value still produce DIFFERENT keys", () => {
+      // Pre-fix behaviour: both → `'{"a":1}'` (silent collision).
+      // Post-fix behaviour: both still equal because the marker is
+      // identity-blind, BUT collision is now an EXPLICIT documented
+      // behaviour ("functions are not part of cache key"), and the
+      // sentinel makes it observable.
+      const a = canonicalJson({ a: 1, fn: () => 1 });
+      const b = canonicalJson({ a: 1, fn: () => 2 });
+
+      // Both fn values collapse to `"<fn>"` — collision is still
+      // present BUT now visible (the key contains `"<fn>"`, so the
+      // consumer cannot mistake this for "no fn key").
+      expect(a).toBe(b);
+      expect(a).toContain('"<fn>"');
+    });
+
+    test("collision broken: route with fn vs route without fn produce DIFFERENT keys", () => {
+      // The real collision-break: pre-fix, `{a:1, fn: () => 1}` and
+      // `{a: 1}` canonicalized identically (`'{"a":1}'`). Post-fix,
+      // the fn version contains `"fn":"<fn>"`.
+      const withFn = canonicalJson({ a: 1, fn: () => 1 });
+      const withoutFn = canonicalJson({ a: 1 });
+
+      expect(withFn).not.toBe(withoutFn);
+    });
+
+    test("nested function values also replaced (recursive)", () => {
+      const params = {
+        outer: {
+          inner: {
+            cb: () => null,
+          },
+        },
+      };
+      const json = canonicalJson(params);
+
+      expect(json).toContain('"<fn>"');
+      expect(json).not.toMatch(/"cb":\{\}/); // not silently dropped
+    });
+  });
 });

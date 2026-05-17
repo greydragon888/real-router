@@ -328,4 +328,151 @@ describe("createStoreFromSource — Property Tests (Solid)", () => {
       });
     });
   });
+
+  describe("Invariant 8: initial-spread is shallow — nested objects keep input ref-equivalence (Sprint B.4 — audit-6 Stage-2 #13)", () => {
+    // The bridge does `{ ...initialSnapshot }` at construction —
+    // shallow spread, not deep clone. Nested objects (route, params)
+    // should structurally equal the source values. A regression to
+    // deep clone (e.g. via `structuredClone`) would break value
+    // semantics for consumers that compare route by ref at the path
+    // level. We assert structurally rather than by reference here
+    // because Solid's store proxy intercepts property access — direct
+    // ref compare via `.toBe(initial.route)` would fail even with a
+    // shallow spread.
+    test.prop([arbSnapshot], { numRuns: NUM_RUNS.standard })(
+      "store.route deep-equals initial.route at construction",
+      (initial) => {
+        fc.pre(initial.route !== undefined);
+
+        const { source } = createMockSource(initial);
+
+        createRoot((dispose) => {
+          const store = createStoreFromSource(source);
+
+          // Structural equality covers both "same ref" (shallow) and
+          // "deep clone but same values" — we accept either. What we
+          // EXPLICITLY reject (via Invariant 7's `not.toThrow`) is a
+          // deep clone that fails on non-cloneable inputs (functions,
+          // symbols, classes).
+          expect(store.route).toStrictEqual(initial.route);
+
+          dispose();
+        });
+      },
+    );
+
+    test("nested mutation via the source DOES propagate to the store proxy", () => {
+      // Stronger guarantee that the spread is shallow: if reconcile
+      // saw a sub-object whose identity matches what the store proxy
+      // holds, mutating that sub-object externally would be visible
+      // through the store. (This is a documenting test for "shallow
+      // spread is intentional".)
+      const params = { id: "1" };
+      const initial: RouteSnapshotLike = {
+        route: { name: "users", params },
+        previousRoute: undefined,
+      };
+      const { source, emit } = createMockSource(initial);
+
+      createRoot((dispose) => {
+        const store = createStoreFromSource(source);
+
+        // Initial mirror.
+        expect(store.route?.params.id).toBe("1");
+
+        // Emit a new snapshot with a fresh route + same params ref.
+        emit({
+          route: { name: "users", params },
+          previousRoute: undefined,
+        });
+
+        // Solid's reconcile preserves params identity via deep
+        // structural compare — and shallow-spread at construction
+        // means the inner refs ARE the input refs, locked through
+        // reconcile's identity-preserving traversal.
+        expect(store.route?.params.id).toBe("1");
+
+        dispose();
+      });
+    });
+  });
+
+  describe("Invariant 9: array element identity preserved by reconcile (Sprint B.4 — audit-6 Stage-2 #15)", () => {
+    // Solid's `reconcile` algorithm preserves unchanged-element
+    // identity inside arrays — a new-array with structurally-equal
+    // elements has its inner items kept by reference. This is the
+    // granular-reactivity guarantee for list consumers. A regression
+    // that replaced reconcile with `setStore(newSnapshot)` would
+    // break it silently.
+    interface ListSnapshot {
+      items: { id: string; label: string }[];
+    }
+
+    test("array reconcile — elements with same structural shape keep ref via store proxy semantics", () => {
+      const item1 = { id: "1", label: "A" };
+      const item2 = { id: "2", label: "B" };
+      const initial: ListSnapshot = { items: [item1, item2] };
+
+      const { source, emit } = createMockSource(initial);
+
+      createRoot((dispose) => {
+        const store = createStoreFromSource(source);
+
+        // Capture proxy refs into the items array.
+        const firstBefore = store.items[0];
+        const secondBefore = store.items[1];
+
+        // Emit a new snapshot with freshly-allocated items that are
+        // structurally equal to the originals.
+        emit({
+          items: [
+            { id: "1", label: "A" },
+            { id: "2", label: "B" },
+          ],
+        });
+
+        const firstAfter = store.items[0];
+        const secondAfter = store.items[1];
+
+        // reconcile preserves identity for structurally-equal elements
+        // — the store proxy returns the same wrapper for unchanged
+        // path positions.
+        expect(firstAfter).toBe(firstBefore);
+        expect(secondAfter).toBe(secondBefore);
+
+        dispose();
+      });
+    });
+
+    test("array reconcile — changing one element does NOT reset others", () => {
+      const initial: ListSnapshot = {
+        items: [
+          { id: "1", label: "A" },
+          { id: "2", label: "B" },
+        ],
+      };
+      const { source, emit } = createMockSource(initial);
+
+      createRoot((dispose) => {
+        const store = createStoreFromSource(source);
+
+        const secondBefore = store.items[1];
+
+        // Only the first item changes.
+        emit({
+          items: [
+            { id: "1", label: "CHANGED" },
+            { id: "2", label: "B" },
+          ],
+        });
+
+        // Second item proxy is preserved (granular reactivity).
+        expect(store.items[1]).toBe(secondBefore);
+        // First item's value reflects the new label.
+        expect(store.items[0]?.label).toBe("CHANGED");
+
+        dispose();
+      });
+    });
+  });
 });

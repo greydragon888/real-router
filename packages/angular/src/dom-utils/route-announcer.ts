@@ -167,7 +167,20 @@ function resolveText(
 ): string {
   if (getCustomText) {
     try {
-      return getCustomText(route);
+      const customText = getCustomText(route);
+
+      // Mini-sprint E.4 (audit-5 §4.2 #4) — empty-string fallback.
+      // A consumer pattern like
+      //   getAnnouncementText: (route) => myMap[route.name] ?? ""
+      // returns `""` for routes outside the map. The subscribe loop
+      // then sees an empty text and silently no-announces — screen
+      // readers stay quiet without any signal to the developer. Treat
+      // a falsy custom result (`""` / `null` / `undefined`) as
+      // "consumer doesn't have a name for this route" and fall through
+      // to the default resolution chain (h1 → title → route name).
+      if (customText) {
+        return customText;
+      }
     } catch (error) {
       // A throwing consumer callback inside the router's subscribe loop
       // would tear down sibling listeners — log and fall through to the

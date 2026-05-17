@@ -24,7 +24,7 @@
 
 import { fc, test } from "@fast-check/vitest";
 import { createRenderEffect, createRoot } from "solid-js";
-import { describe, expect } from "vitest";
+import { describe, expect, vi } from "vitest";
 
 import { arbExtendedPrimitive, createMockSource, NUM_RUNS } from "./helpers";
 import { createSignalFromSource } from "../../src/createSignalFromSource";
@@ -132,6 +132,54 @@ describe("createSignalFromSource — Property Tests (Solid)", () => {
         dispose();
       });
     });
+
+    // Sprint C.1 — explicit pin-test for the 0 / -0 dropout that
+    // Invariant 3 above filters away via `fc.pre`. The bridge uses
+    // Solid's default `createSignal` equality (`===`, not Object.is),
+    // so emitting `-0` over a `0` (or vice versa) is silently
+    // suppressed. Lock both directions: even after the source has
+    // mutated its snapshot to `-0`, the accessor still reports `0`.
+    // A regression that switched to Object.is equality (which DOES
+    // distinguish `0` from `-0`) would surface here.
+    test("0 → -0 emit is dropped by `===` equality (Solid signal default)", () => {
+      const { source, emit } = createMockSource<number>(0);
+
+      createRoot((dispose) => {
+        const accessor = createSignalFromSource(source);
+
+        expect(Object.is(accessor(), 0)).toBe(true);
+
+        // Emit `-0`: getSnapshot now returns `-0`, but `0 === -0` is
+        // true → signal does NOT update.
+        emit(-0);
+
+        // Accessor returns the OLD value (0), not the emitted -0.
+        // Object.is distinguishes them: this assertion FAILS if the
+        // bridge silently switched to Object.is equality.
+        expect(Object.is(accessor(), 0)).toBe(true);
+        expect(Object.is(accessor(), -0)).toBe(false);
+
+        dispose();
+      });
+    });
+
+    test("-0 → 0 emit is also dropped (symmetric)", () => {
+      const { source, emit } = createMockSource<number>(-0);
+
+      createRoot((dispose) => {
+        const accessor = createSignalFromSource(source);
+
+        expect(Object.is(accessor(), -0)).toBe(true);
+
+        emit(0);
+
+        // Symmetric: starting from -0, an emit of +0 also suppressed.
+        expect(Object.is(accessor(), -0)).toBe(true);
+        expect(Object.is(accessor(), 0)).toBe(false);
+
+        dispose();
+      });
+    });
   });
 
   describe("Invariant 4: default `===` equality — no spurious notify on same-reference re-emit", () => {
@@ -219,7 +267,13 @@ describe("createSignalFromSource — Property Tests (Solid)", () => {
     // recoverable runtime state, so swallowing it would hide bugs. Lock the
     // throw-through behaviour so a future defensive `try { … } catch { }`
     // refactor surfaces here.
-    test("getSnapshot() throw at init bubbles up to createRoot owner", () => {
+    test("getSnapshot() throw at init is CAUGHT — accessor defaults to undefined (Mini-sprint E.5)", () => {
+      // Behaviour change: pre-E.5, an init-phase getSnapshot throw
+      // bubbled up to the createRoot owner and tore down the entire
+      // reactive subtree. Post-E.5, the bridge catches + logs + falls
+      // back to `undefined` so the accessor still constructs; the
+      // next emit refreshes the value. Documented in
+      // createSignalFromSource.ts:9-17.
       const boom = new Error("snapshot boom");
       const source: RouterSource<unknown> = {
         subscribe: () => () => {},
@@ -229,12 +283,29 @@ describe("createSignalFromSource — Property Tests (Solid)", () => {
         destroy: () => {},
       };
 
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      let accessor: (() => unknown) | undefined;
+
       expect(() => {
         createRoot((dispose) => {
-          createSignalFromSource(source);
+          accessor = createSignalFromSource(source);
           dispose();
         });
-      }).toThrow(boom);
+      }).not.toThrow();
+
+      // Init-phase fallback in action.
+      expect(accessor).toBeDefined();
+      // The defensive guard logged so the throw isn't silent.
+      // (Two logs may fire — initial + post-subscribe re-sync.)
+      expect(consoleError.mock.calls.length).toBeGreaterThanOrEqual(1);
+      expect(consoleError).toHaveBeenCalledWith(
+        expect.stringContaining("getSnapshot threw"),
+        boom,
+      );
+
+      consoleError.mockRestore();
     });
 
     test("subscribe() throw after createSignal is constructed bubbles up", () => {
@@ -283,6 +354,82 @@ describe("createSignalFromSource — Property Tests (Solid)", () => {
 
         // Both cleaned up together when the shared owner disposes.
         expect(listeners()).toBe(0);
+      });
+    });
+  });
+
+  describe("Invariant 8: subscribe-then-emit ordering — value between subscribe and post-subscribe re-sync is NOT lost (Sprint B.5 — audit-6 Stage-2 #12)", () => {
+    // Race window: the bridge does
+    //   const unsubscribe = source.subscribe(() => setValue(sync));
+    //   setValue(sync);   // ← post-subscribe re-sync
+    // If a cached lazy source reconciles its snapshot synchronously
+    // inside `subscribe()` (lazy onFirstSubscribe pattern), the
+    // listener fires BEFORE `subscribe()` returns. The bridge's
+    // explicit post-subscribe re-sync (`setValue(sync)`) is then a
+    // no-op due to Solid's `===` equality. The accessor must
+    // converge to the post-reconcile value regardless of which path
+    // delivered it. This invariant pins both code paths.
+
+    test("source emits synchronously inside subscribe() — accessor reflects post-emit snapshot", () => {
+      let current = 1;
+      const callbacks = new Set<() => void>();
+      const source: RouterSource<number> = {
+        subscribe: (cb) => {
+          callbacks.add(cb);
+          // Simulate lazy reconcile: bump value AND notify the
+          // listener that was just registered.
+          current = 99;
+          cb();
+
+          return () => {
+            callbacks.delete(cb);
+          };
+        },
+        getSnapshot: () => current,
+        destroy: vi.fn(),
+      };
+
+      createRoot((dispose) => {
+        const accessor = createSignalFromSource(source);
+
+        // Initial getSnapshot saw `1`; subscribe-time reconcile
+        // bumped to `99` AND notified the listener (which called
+        // setValue(sync) → reads `99`). The accessor MUST reflect
+        // the latest value, not the stale initial.
+        expect(accessor()).toBe(99);
+
+        dispose();
+      });
+    });
+
+    test("source mutates state inside subscribe() WITHOUT notifying — post-subscribe re-sync catches it", () => {
+      // Legacy / racy lazy source: mutates current snapshot during
+      // `subscribe()` but does NOT call back the listener. The
+      // bridge's explicit `setValue(sync)` after `subscribe()`
+      // returns picks up the new value.
+      let current = 5;
+      const source: RouterSource<number> = {
+        subscribe: () => {
+          // Mutate snapshot but DON'T notify — silent reconcile.
+          current = 42;
+
+          return () => {
+            /* no-op */
+          };
+        },
+        getSnapshot: () => current,
+        destroy: vi.fn(),
+      };
+
+      createRoot((dispose) => {
+        const accessor = createSignalFromSource(source);
+
+        // Initial getSnapshot returned `5` → signal value was `5`.
+        // Inside subscribe(), source mutated to `42` but did NOT
+        // notify. Post-subscribe `setValue(sync)` re-reads → `42`.
+        expect(accessor()).toBe(42);
+
+        dispose();
       });
     });
   });

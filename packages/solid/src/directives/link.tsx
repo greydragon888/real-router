@@ -74,6 +74,18 @@ export function link<P extends Params = Params>(
       return;
     }
 
+    // Mini-sprint E.2 (audit-5 §4.2 #2) — respect upstream
+    // preventDefault. `<Link>` checks `local.onClick(evt); if
+    // (evt.defaultPrevented) return;` because it owns the React-style
+    // onClick prop. The directive has no equivalent prop, but the
+    // consumer may register their OWN click listener on the same
+    // element (DOM event order is "addEventListener queue, in
+    // registration order"). If their listener called preventDefault
+    // to opt-out of navigation, the directive must honour that.
+    if (evt.defaultPrevented) {
+      return;
+    }
+
     // Symmetric with <Link> (#P0.6 audit): on an <a target="_blank"> the
     // browser opens the URL in a new tab/window natively. Intercepting the
     // click via preventDefault + router.navigate would suppress the new

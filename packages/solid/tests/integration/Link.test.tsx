@@ -342,4 +342,57 @@ describe("Link - Integration Tests", () => {
       expect(screen.getByTestId("link")).toHaveClass("active");
     });
   });
+
+  // Sprint C.3 — UI-level lock for the empty-routeName sentinel
+  // (audit-4 LOW recommendation #2 + CLAUDE.md Gotcha #16). PBT in
+  // routerProvider.properties.ts already lock the `isRouteActive("","")`
+  // helper answer; this integration test exercises the full Link →
+  // RouterProvider → routeSelector pipeline so a regression in any
+  // layer (selector wrapping, sentinel value change, Link-side
+  // short-circuit) becomes visible at the UI boundary.
+  describe("Empty routeName sentinel (Gotcha #16)", () => {
+    it("Link routeName='' is active BEFORE router.start() (sentinel `''` matches)", () => {
+      // Use a router that hasn't been started — override the wrapper's
+      // implicit start from beforeEach by stopping immediately.
+      router.stop();
+
+      render(
+        () => (
+          <Link routeName="" activeClassName="active" data-testid="empty-link">
+            Home
+          </Link>
+        ),
+        { wrapper },
+      );
+
+      // Sentinel: with no active route, routeSelector falls back to
+      // the empty string. Link with routeName='' compares equal to
+      // the sentinel and renders as active.
+      expect(screen.getByTestId("empty-link")).toHaveClass("active");
+    });
+
+    it("Link routeName='' becomes INACTIVE after router commits a real route", async () => {
+      // Stop and re-mount; then start to commit a non-empty route name.
+      router.stop();
+
+      render(
+        () => (
+          <Link routeName="" activeClassName="active" data-testid="empty-link">
+            Home
+          </Link>
+        ),
+        { wrapper },
+      );
+
+      // Before start — active (sentinel match).
+      expect(screen.getByTestId("empty-link")).toHaveClass("active");
+
+      await router.start("/");
+
+      // After start the route name is non-empty (default route
+      // resolved). Sentinel no longer matches → link flips to
+      // inactive.
+      expect(screen.getByTestId("empty-link")).not.toHaveClass("active");
+    });
+  });
 });

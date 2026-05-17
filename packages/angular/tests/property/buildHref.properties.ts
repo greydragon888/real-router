@@ -614,20 +614,30 @@ describe("buildHref — Property Tests", () => {
   });
 
   // ===========================================================================
-  // Audit 2026-05-16 §6.2 #1 (HIGH) — encodeFragmentInline non-idempotency
+  // Mini-sprint E.1 (audit-2026-05-17 §5 MEDIUM) — encodeFragmentInline IS
+  // NOW IDEMPOTENT for pre-encoded inputs. Previously double-encoded `%` →
+  // `%25` (audit-2026-05-16 §6.2 #1). The fix: detect `%XX` triples in the
+  // input, decode + re-encode for idempotency. Malformed escapes fall
+  // through to plain encoding.
   // ===========================================================================
-  describe("Invariant 13: encodeFragmentInline is NOT idempotent for inputs containing `%` or `#` (audit §6.2 #1)", () => {
-    // Fragment-side contract: callers MUST NOT feed an already-encoded fragment
-    // back through `buildHref`. The %-encoding round-trip would double-encode
-    // `%` into `%25`, breaking the rendered href.
-    //
-    // Drift sentinel (Invariant 12 above) checks the formula, but does not
-    // prove the function is non-idempotent on the wire — this test does.
-    test.prop(
-      [fc.constantFrom("a#b", "a%20b", "%FF", "%25foo", "a%xy", "ab#cd%ef")],
-      { numRuns: NUM_RUNS.standard },
-    )(
-      "buildHref called twice with the wire fragment from the first call changes the output (% gets re-encoded into %25)",
+  describe("Invariant 13: encodeFragmentInline IS idempotent for pre-encoded inputs (Mini-sprint E.1)", () => {
+    // Pre-fix: feeding a wire fragment back through `buildHref` produced
+    // `%2520` from `%20` (double-encoding).
+    // Post-fix: the helper detects the percent-escape pattern, decodes,
+    // and re-encodes — yielding the same output on the second pass.
+    // Inputs split across two paths inside encodeFragmentInline:
+    //   - Valid percent-escape triples (decodeURIComponent succeeds) →
+    //     round-trip yields canonical encoding (e.g. `%20` survives).
+    //   - Invalid percent-escape triples — `decodeURIComponent` throws
+    //     on malformed UTF-8 (`%FF` is NOT a valid UTF-8 lead, `%ef`
+    //     alone isn't either) → fall through to plain encodeURI,
+    //     which percent-encodes the literal `%` to `%25`.
+    // Either way, the result is IDEMPOTENT — feeding it back produces
+    // the same string.
+    test.prop([fc.constantFrom("a#b", "a%20b", "%FF", "%25foo", "ab#cd%ef")], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "buildHref called twice with the wire fragment from the first call yields IDENTICAL output",
       (rawHash) => {
         const router = {
           buildUrl: undefined,
@@ -640,15 +650,13 @@ describe("buildHref — Property Tests", () => {
 
         const onceFragment = once.slice(once.indexOf("#") + 1);
 
-        fc.pre(onceFragment.includes("%") || onceFragment.includes("#"));
-
-        // Feed the WIRE fragment back in as a decoded hash — encodeURI now
-        // sees raw `%` characters and re-encodes them as `%25`. The output
-        // diverges from the first call.
+        // Feed the WIRE fragment back in as a decoded hash. The helper
+        // either decodes + re-encodes (valid UTF-8 escapes) or falls
+        // through to plain encodeURI (malformed) — both paths are
+        // idempotent at the wire boundary.
         const twice = buildHref(router, "any", {}, { hash: onceFragment });
 
-        expect(twice).not.toBe(once);
-        expect(twice!.slice(twice!.indexOf("#") + 1)).toContain("%25");
+        expect(twice).toBe(once);
       },
     );
   });
@@ -872,24 +880,29 @@ describe("buildHref — Property Tests", () => {
   });
 
   // ===========================================================================
-  // Audit 2026-05-16 §5.2 Bug 6 (LOW) — `encodeFragmentInline` double-encodes
-  // strings that already contain `%XX` sequences. This is by design: the
-  // `<Link hash>` API accepts a DECODED fragment string. The pin below
-  // documents the contract so a future "smart re-encoder" refactor surfaces
-  // as a regression.
+  // Mini-sprint E.1 (audit-2026-05-17 §5 MEDIUM) — `encodeFragmentInline`
+  // pre-encoded-input idempotency. Pre-fix: `<Link hash="%20foo">` produced
+  // wire `%2520foo` (double-encoded). Post-fix: the helper detects the
+  // percent-escape triple, decodes, and re-encodes. Round-trip yields
+  // canonical encoding.
   // ===========================================================================
-  describe("Invariant 17: encodeFragmentInline double-encodes pre-encoded input (Bug 6 pin — DECODED contract)", () => {
-    test("hash='a%20b' produces wire fragment 'a%2520b' (% itself is encoded as %25)", () => {
+  describe("Invariant 17: encodeFragmentInline is IDEMPOTENT on pre-encoded input (Mini-sprint E.1)", () => {
+    test("hash='a%20b' produces wire fragment 'a%20b' verbatim (no double-encoding)", () => {
       const router = {
         buildUrl: undefined,
         buildPath: () => "/p",
       } as unknown as Router;
       const result = buildHref(router, "any", {}, { hash: "a%20b" });
 
-      expect(result).toBe("/p#a%2520b");
+      expect(result).toBe("/p#a%20b");
     });
 
-    test("hash='%FF' produces wire fragment '%25FF' (raw % → %25, F/F unchanged)", () => {
+    test("hash='%FF' (invalid UTF-8 escape) falls through to plain encoding → '%25FF'", () => {
+      // `%FF` is NOT a valid UTF-8 sequence — decodeURIComponent
+      // throws "URI malformed". The helper's try/catch falls through
+      // to plain encodeURI, which percent-encodes the literal `%`.
+      // This case is still idempotent — feeding `%25FF` back produces
+      // `%25FF` (the `%25` decodes to `%`, encodeURI re-encodes it).
       const router = {
         buildUrl: undefined,
         buildPath: () => "/p",
@@ -897,6 +910,19 @@ describe("buildHref — Property Tests", () => {
       const result = buildHref(router, "any", {}, { hash: "%FF" });
 
       expect(result).toBe("/p#%25FF");
+    });
+
+    test("malformed %XX (e.g. '%xy') falls through to plain encoding (% → %25)", () => {
+      // `%xy` is NOT a valid percent-escape (decodeURIComponent throws).
+      // The helper catches the throw and falls through to plain encodeURI,
+      // which encodes the literal `%` as `%25`. Result: `%25xy`.
+      const router = {
+        buildUrl: undefined,
+        buildPath: () => "/p",
+      } as unknown as Router;
+      const result = buildHref(router, "any", {}, { hash: "%xy" });
+
+      expect(result).toBe("/p#%25xy");
     });
   });
 });

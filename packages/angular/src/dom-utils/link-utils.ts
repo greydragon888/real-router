@@ -15,14 +15,41 @@ export function shouldNavigate(evt: MouseEvent): boolean {
   );
 }
 
+// Matches a single percent-escape triple (`%` + two hex digits). Used as
+// the "already-encoded" probe in `encodeFragmentInline` below — see the
+// idempotency rationale there.
+const PERCENT_ESCAPE_PROBE = /%[\dA-Fa-f]{2}/;
+
 /**
  * RFC 3986 fragment encoding: preserve sub-delims (`&`, `=`, `?`, `:`),
  * encode space, `%`, control chars, non-ASCII via encodeURI; defensively
  * escape `#` (encodeURI does not). Mirrors `encodeHashFragment` in
  * `shared/browser-env/url-context.ts` — duplicated here because the
  * shared/dom-utils symlink graph does not reach shared/browser-env.
+ *
+ * **Idempotency for pre-encoded input (audit-2026-05-17 §5 MEDIUM E.1).**
+ * The doc-comment on `<Link hash>` says the value is a "decoded fragment
+ * without leading #". But realistic consumers copy hashes out of
+ * `location.hash` (which is percent-encoded) and pass them back, so the
+ * naive `encodeURI("%20")` would double-encode into `"%2520"` and break
+ * anchor lookup. We detect a percent-escape triple in the input and, if
+ * present, decode + re-encode for idempotency. Malformed `%XX` (e.g.
+ * `"%2"` or `"%ZZ"`) makes `decodeURIComponent` throw — in that case we
+ * fall through to plain `encodeURI`, which never throws.
  */
 function encodeFragmentInline(decoded: string): string {
+  if (PERCENT_ESCAPE_PROBE.test(decoded)) {
+    try {
+      const roundtrip = decodeURIComponent(decoded);
+
+      return encodeURI(roundtrip).replaceAll("#", "%23");
+    } catch {
+      // Malformed `%XX` — fall through to the plain encoding path.
+      // encodeURI does not throw on malformed escapes; it treats the
+      // `%` as a literal and percent-encodes it (`%2` → `%252`).
+    }
+  }
+
   return encodeURI(decoded).replaceAll("#", "%23");
 }
 
@@ -220,6 +247,29 @@ export function buildActiveClassName(
   return baseClassName ?? undefined;
 }
 
+/**
+ * One-level structural equality using `Object.is` per key.
+ *
+ * **String-keyed properties only (Mini-sprint E.3 — audit-5 §4.2 #3).**
+ * Implementation walks `Object.keys()` which by spec returns only
+ * enumerable own STRING keys. Symbol-keyed properties — created via
+ * `obj[Symbol("brand")] = value` or `{ [Symbol(...)]: value }` — are
+ * NOT compared. Two records that differ only in a Symbol-keyed value
+ * will compare as equal.
+ *
+ * This is intentional: route params and Link options are documented as
+ * string-keyed primitives (string | number | boolean) — Symbol-keyed
+ * metadata (e.g. brand markers, private state) doesn't belong in a
+ * cache-key comparison. Switching to `Reflect.ownKeys()` would extend
+ * the contract to symbols at the cost of one extra allocation per call
+ * (Reflect.ownKeys composes string-keys + symbol-keys arrays). If a
+ * consumer relies on symbol-keyed metadata for navigation
+ * disambiguation, they should encode it into a string key instead.
+ *
+ * Mirrors React's `shallowEqual` (packages/shared/shallowEqual.js) in
+ * both the string-keys-only semantics and the `hasOwnProperty` guard
+ * below.
+ */
 export function shallowEqual(
   prev: object | undefined,
   next: object | undefined,
@@ -259,10 +309,25 @@ export function applyLinkA11y(element: HTMLElement | null | undefined): void {
   if (!element) {
     return;
   }
-  if (
-    element instanceof HTMLAnchorElement ||
-    element instanceof HTMLButtonElement
-  ) {
+
+  // Cross-realm safety (audit-2026-05-17 §5 HIGH #4):
+  // `instanceof HTMLAnchorElement` compares against the constructor from
+  // the CURRENT realm. An element created in a different window (iframe
+  // contentDocument, micro-frontend, embedded widget) fails the check
+  // even when it IS a real anchor — the helper would then inject
+  // role="link" + tabindex="0" on top of native anchor semantics,
+  // breaking screen reader output ("link link") and focus order.
+  //
+  // tagName is realm-agnostic and is uppercase for HTML-namespaced
+  // elements in any document. SVG `<a>` has lowercase tagName plus a
+  // different prototype (SVGAElement) — skipping it here is wrong by
+  // accident: SVG anchors don't have keyboard activation semantics the
+  // helper would add. But they also don't reach this helper in
+  // practice (router Link components emit HTML anchors). Lock the
+  // uppercase compare to keep the contract narrow.
+  const tag = element.tagName;
+
+  if (tag === "A" || tag === "BUTTON") {
     return;
   }
   if (!element.hasAttribute("role")) {
