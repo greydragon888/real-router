@@ -102,6 +102,39 @@ describe("shouldNavigate — Property Tests (Angular RealLink)", () => {
         expect(shouldNavigate(evt)).toBe(false);
       },
     );
+
+    // Audit 2026-05-16 §2.1: the standard mouse button enum is integer-only,
+    // but a synthetic event can carry a fractional value (`new MouseEvent("",
+    // { button: 0.5 })` doesn't throw — DOM coerces; some libraries pass the
+    // value through verbatim). Strict `button === 0` must reject every
+    // fractional sample, even ones inside the "valid range" [0, 5].
+    //
+    // Note: `0 === -0` is `true` in JavaScript (only `Object.is` distinguishes
+    // them), so `button === -0` would still navigate; the generator filters
+    // out exact integers — fractional values can never collide with 0.
+    test.prop(
+      [
+        fc
+          .double({
+            min: -5,
+            max: 5,
+            noNaN: true,
+            noDefaultInfinity: true,
+          })
+          .filter((n) => !Number.isInteger(n)),
+      ],
+      { numRuns: NUM_RUNS.standard },
+    )("fractional button (e.g. 0.5, 1.5, -0.0001) → false", (button) => {
+      const evt = {
+        button,
+        metaKey: false,
+        altKey: false,
+        ctrlKey: false,
+        shiftKey: false,
+      } as unknown as MouseEvent;
+
+      expect(shouldNavigate(evt)).toBe(false);
+    });
   });
 
   describe("Invariant 4: meta and cmd modifiers behave identically", () => {
@@ -172,6 +205,46 @@ describe("shouldNavigate — Property Tests (Angular RealLink)", () => {
 
       expect(shouldNavigate(evt)).toBe(false);
     });
+  });
+
+  // Audit 2026-05-16 §6.1 — `shouldNavigate` must NOT mutate the event
+  // object. The function is consumed inside Angular `(click)` handlers where
+  // the same MouseEvent reference may be observed by sibling listeners; a
+  // mutation here would silently leak into unrelated subscribers.
+  describe("Invariant 9: shouldNavigate does not mutate the event (audit §6.1)", () => {
+    function snapshot(evt: Record<string, unknown>): Record<string, unknown> {
+      return {
+        button: evt.button,
+        metaKey: evt.metaKey,
+        altKey: evt.altKey,
+        ctrlKey: evt.ctrlKey,
+        shiftKey: evt.shiftKey,
+      };
+    }
+
+    test.prop([arbMouseEventProps], { numRuns: NUM_RUNS.standard })(
+      "standard event shape — no field is modified",
+      (props) => {
+        const evt = { ...props } as unknown as Record<string, unknown>;
+        const before = snapshot(evt);
+
+        shouldNavigate(evt as unknown as MouseEvent);
+
+        expect(snapshot(evt)).toStrictEqual(before);
+      },
+    );
+
+    test.prop([arbMouseEventPropsExtended], { numRuns: NUM_RUNS.standard })(
+      "hostile event shape (unknown-typed button) — no field is modified",
+      (props) => {
+        const evt = { ...props } as unknown as Record<string, unknown>;
+        const before = snapshot(evt);
+
+        shouldNavigate(evt as unknown as MouseEvent);
+
+        expect(snapshot(evt)).toStrictEqual(before);
+      },
+    );
   });
 
   // Closes review-2026-05-10 §5.1 ⛔ ("event без `button`" LOW): the strict-
@@ -438,6 +511,206 @@ describe("buildActiveClassName — Property Tests (Angular RealLink/RealLinkActi
       },
     );
   });
+
+  // ===========================================================================
+  // Audit 2026-05-16 §6.2 #4 (HIGH) — multi-token strict idempotency
+  // The single-token PBT above collapses Inv 8 into the trivial `dedup` case.
+  // Multi-token active classes are the realistic input (e.g., "btn primary
+  // active") — they exercise the Set-based dedup loop and the order-preserving
+  // append path in `buildActiveClassName`.
+  // ===========================================================================
+  describe("Invariant 8 (multi-token): apply-twice == apply-once for non-trivial active classes (audit §6.2 #4)", () => {
+    test.prop([arbMultiTokenActiveClassName, arbBaseClassName], {
+      numRuns: NUM_RUNS.thorough,
+    })(
+      "buildActiveClassName(true, multi-active, buildActiveClassName(true, multi-active, base)) === buildActiveClassName(true, multi-active, base)",
+      (activeClassName, baseClassName) => {
+        const once = buildActiveClassName(true, activeClassName, baseClassName);
+        const twice = buildActiveClassName(true, activeClassName, once);
+
+        expect(twice).toBe(once);
+      },
+    );
+
+    test.prop(
+      [
+        arbMultiTokenActiveClassName,
+        arbBaseClassName,
+        fc.integer({ min: 2, max: 6 }),
+      ],
+      { numRuns: NUM_RUNS.standard },
+    )(
+      "N-fold idempotency: N repeated applications converge to the same string after the first",
+      (activeClassName, baseClassName, n) => {
+        let current = buildActiveClassName(
+          true,
+          activeClassName,
+          baseClassName,
+        );
+
+        for (let i = 0; i < n; i++) {
+          current = buildActiveClassName(true, activeClassName, current);
+        }
+
+        expect(current).toBe(
+          buildActiveClassName(true, activeClassName, baseClassName),
+        );
+      },
+    );
+
+    test.prop([arbMultiTokenActiveClassName, arbBaseClassName], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "every active token appears in the result, and dedup runs against base tokens",
+      (activeClassName, baseClassName) => {
+        const result = buildActiveClassName(
+          true,
+          activeClassName,
+          baseClassName,
+        );
+        const tokens = result?.split(/\s+/).filter(Boolean) ?? [];
+        const seen = new Set(tokens);
+
+        // Every active token survives (not dropped by the Set-based loop).
+        for (const t of activeClassName.split(/\s+/).filter(Boolean)) {
+          expect(seen.has(t)).toBe(true);
+        }
+        // No `undefined`, no empty tokens leaked through.
+        for (const t of tokens) {
+          expect(t).toMatch(/\S/);
+        }
+      },
+    );
+  });
+
+  // ===========================================================================
+  // Audit 2026-05-16 §6.1 — `buildActiveClassName` Inv 6 (multi-token base):
+  // the existing Inv 6 PBT covers single-token base only ("base + multi-token
+  // active"). The realistic Angular case is `<a realLink class="btn primary"
+  // activeClassName="active highlight">` — multi-token base, multi-token
+  // active. The stable-sort contract is: every base token appears in the
+  // result IN ORDER, then every active token appears in the result IN ORDER,
+  // dedup'd against base.
+  // ===========================================================================
+  describe("Invariant 6 (multi-token base): stable sort — multi-token base preserves order, active tokens appended in order (audit §6.1)", () => {
+    test.prop([arbMultiTokenActiveClassName, arbMultiTokenActiveClassName], {
+      numRuns: NUM_RUNS.thorough,
+    })(
+      "every base token appears in input order, then every new active token in input order, dedup'd",
+      (activeClassName, baseClassName) => {
+        const result = buildActiveClassName(
+          true,
+          activeClassName,
+          baseClassName,
+        );
+
+        expect(result).toBeDefined();
+
+        const baseTokens = baseClassName.split(/\s+/).filter(Boolean);
+        const activeTokens = activeClassName.split(/\s+/).filter(Boolean);
+
+        const expected: string[] = [];
+        const seen = new Set<string>();
+
+        for (const t of baseTokens) {
+          if (!seen.has(t)) {
+            expected.push(t);
+            seen.add(t);
+          }
+        }
+
+        // NOTE: parseTokens (Set-based dedup, see Inv 5b fast/slow asymmetry)
+        // applies a SINGLE seen-set seeded from baseTokens — duplicate base
+        // tokens are preserved verbatim (no Set dedup on the base side), while
+        // intra-active duplicates are absorbed once they hit `seen`. Mirror
+        // that asymmetry here.
+        const seenFromBase = new Set<string>(baseTokens);
+
+        const baseVerbatim = [...baseTokens];
+
+        for (const t of activeTokens) {
+          if (!seenFromBase.has(t)) {
+            baseVerbatim.push(t);
+            seenFromBase.add(t);
+          }
+        }
+
+        expect(result).toBe(baseVerbatim.join(" "));
+      },
+    );
+
+    test.prop([arbMultiTokenActiveClassName, arbMultiTokenActiveClassName], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "base-only order: the FIRST occurrence of each distinct base token preserves input order",
+      (activeClassName, baseClassName) => {
+        const result = buildActiveClassName(
+          true,
+          activeClassName,
+          baseClassName,
+        );
+        const resultTokens = result!.split(/\s+/).filter(Boolean);
+        const baseTokens = baseClassName.split(/\s+/).filter(Boolean);
+
+        // For each base token, its FIRST occurrence in the result must
+        // follow the order of FIRST occurrences in the input. `indexOf`
+        // returns the first position on both sides, so the comparison is
+        // well-defined even when base contains duplicate tokens (the fast
+        // path preserves them verbatim — first-position semantics apply).
+        const seen = new Set<string>();
+        const firstInInput = baseTokens.filter((t) => {
+          if (seen.has(t)) {
+            return false;
+          }
+
+          seen.add(t);
+
+          return true;
+        });
+
+        const positions = firstInInput.map((t) => resultTokens.indexOf(t));
+
+        for (let i = 1; i < positions.length; i++) {
+          expect(positions[i]).toBeGreaterThan(positions[i - 1]);
+        }
+      },
+    );
+
+    test.prop([arbMultiTokenActiveClassName, arbMultiTokenActiveClassName], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "all active tokens appear AFTER all base tokens (relative position contract)",
+      (activeClassName, baseClassName) => {
+        const result = buildActiveClassName(
+          true,
+          activeClassName,
+          baseClassName,
+        );
+        const resultTokens = result!.split(/\s+/).filter(Boolean);
+        const baseTokens = baseClassName.split(/\s+/).filter(Boolean);
+        const activeTokens = activeClassName.split(/\s+/).filter(Boolean);
+
+        // Maximum position of a base token MUST be <= minimum position of a
+        // distinct active token (one not present in the base). Skip the test
+        // when every active token collides with the base — there's nothing
+        // unique to position-check.
+        const distinctActive = activeTokens.filter(
+          (t) => !baseTokens.includes(t),
+        );
+
+        fc.pre(distinctActive.length > 0);
+
+        const maxBasePos = Math.max(
+          ...baseTokens.map((t) => resultTokens.indexOf(t)),
+        );
+        const minDistinctActivePos = Math.min(
+          ...distinctActive.map((t) => resultTokens.indexOf(t)),
+        );
+
+        expect(maxBasePos).toBeLessThan(minDistinctActivePos);
+      },
+    );
+  });
 });
 
 // =============================================================================
@@ -584,6 +857,111 @@ describe("parseTokens — contract locks (via buildActiveClassName)", () => {
 
       expect(tokens).toHaveLength(10_000);
       expect(tokens.indexOf("t5000")).toBe(5000);
+    });
+  });
+});
+
+// =============================================================================
+// Audit 2026-05-16 §6.2 #10 (MED) — parseTokens unicode whitespace polymorphism
+// `parseTokens` uses `/\S+/g` which treats every Unicode whitespace character
+// as a separator. Pinning this lets us catch a future refactor to `value.split
+// (" ")` (which would only treat ASCII space as a separator).
+// =============================================================================
+describe("parseTokens — Unicode whitespace polymorphism (audit §6.2 #10)", () => {
+  // \S excludes the entire Unicode whitespace set — tab, newline, CR, FF, VT,
+  // NBSP, ogham space mark, en/em quads, em space, thin space, hair space,
+  // medium mathematical space, ideographic space, and ZERO-WIDTH-NO-BREAK
+  // (U+FEFF). Picking representative codepoints from each "interesting" band:
+  const arbUnicodeWhitespace = fc.constantFrom(
+    "\t", // tab
+    "\n", // LF
+    "\r", // CR
+    "\f", // FF
+    "\v", // VT
+    "\u00A0", // NBSP
+    "\u1680", // OGHAM SPACE MARK
+    "\u2000", // EN QUAD
+    "\u2003", // EM SPACE
+    "\u2009", // THIN SPACE
+    "\u200A", // HAIR SPACE
+    "\u2028", // LINE SEPARATOR
+    "\u2029", // PARAGRAPH SEPARATOR
+    "\u202F", // NARROW NO-BREAK SPACE
+    "\u205F", // MEDIUM MATHEMATICAL SPACE
+    "\u3000", // IDEOGRAPHIC SPACE
+    "\uFEFF", // ZERO WIDTH NO-BREAK SPACE
+  );
+
+  test.prop([arbUnicodeWhitespace, arbToken], { numRuns: NUM_RUNS.standard })(
+    "whitespace-only base (any Unicode WS class repeated) → active token replaces it verbatim",
+    (ws, token) => {
+      const wsOnly = ws.repeat(3);
+
+      // `parseTokens("")` returns `[]`, so `buildActiveClassName(true, token, wsOnly)`
+      // should produce exactly `token` (no padding from `wsOnly`).
+      expect(buildActiveClassName(true, token, wsOnly)).toBe(token);
+    },
+  );
+
+  test.prop([arbUnicodeWhitespace, arbToken], { numRuns: NUM_RUNS.standard })(
+    "any Unicode whitespace separates tokens inside base (no phantom contribution)",
+    (ws, token) => {
+      const base = `${token}${ws}${token}2`;
+
+      // base parses to two distinct tokens; the active "active" must append.
+      expect(buildActiveClassName(true, "active", base)).toBe(
+        `${token} ${token}2 active`,
+      );
+    },
+  );
+
+  test.prop([arbUnicodeWhitespace, arbToken], { numRuns: NUM_RUNS.standard })(
+    "active class containing Unicode whitespace is tokenised, not treated as a single token",
+    (ws, token) => {
+      const multiActive = `${token}${ws}other`;
+      const result = buildActiveClassName(true, multiActive, undefined);
+      const tokens = result?.split(/\s+/).filter(Boolean) ?? [];
+
+      expect(tokens).toStrictEqual([token, "other"]);
+    },
+  );
+
+  // Audit 2026-05-16 §5.2 Bug 5 (LOW) — pin: `\S` (non-whitespace) does NOT
+  // include zero-width characters (U+200B ZERO WIDTH SPACE, U+200C ZERO WIDTH
+  // NON-JOINER, U+200D ZERO WIDTH JOINER, U+FEFF ZERO WIDTH NO-BREAK SPACE).
+  // A token containing a zero-width char is treated as a SINGLE token, not
+  // split. The CLAUDE specification of CSS class names allows zero-width
+  // characters in identifiers (Unicode-aware), so this is correct behavior
+  // — but the pin documents the boundary for future readers.
+  //
+  // Note: U+FEFF (BOM / ZWNBSP) is excluded from `\S` per ECMA-262 § Whitespace
+  // table, so it IS treated as a separator. The other three zero-width
+  // characters are NOT in that table.
+  describe("parseTokens — zero-width characters are NOT separators (Bug 5 pin)", () => {
+    it("U+200B (ZWSP) inside a token keeps it as a single token", () => {
+      // U+200B is not in \s, so the token is preserved as-is.
+      const result = buildActiveClassName(true, "a\u200Bb", undefined);
+
+      expect(result).toBe("a\u200Bb");
+    });
+
+    it("U+200C (ZWNJ) inside a token keeps it as a single token", () => {
+      const result = buildActiveClassName(true, "a\u200Cb", undefined);
+
+      expect(result).toBe("a\u200Cb");
+    });
+
+    it("U+200D (ZWJ) inside a token keeps it as a single token", () => {
+      const result = buildActiveClassName(true, "a\u200Db", undefined);
+
+      expect(result).toBe("a\u200Db");
+    });
+
+    it("U+FEFF (BOM / ZWNBSP) IS a separator (in JS whitespace class)", () => {
+      const result = buildActiveClassName(true, "a\uFEFFb", undefined);
+      const tokens = result?.split(/\s+/).filter(Boolean) ?? [];
+
+      expect(tokens).toStrictEqual(["a", "b"]);
     });
   });
 });

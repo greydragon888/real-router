@@ -16,7 +16,12 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect, vi } from "vitest";
 
-import { NUM_RUNS, arbDottedNameExtended, arbHash } from "./helpers";
+import {
+  NUM_RUNS,
+  arbDottedNameExtended,
+  arbHash,
+  arbParamsExtended,
+} from "./helpers";
 import { buildHref } from "../../src/dom-utils";
 
 import type { Router } from "@real-router/core";
@@ -35,9 +40,15 @@ function makeFakeRouter(
 }
 
 describe("buildHref — Property Tests", () => {
+  // Closes review §6 MEDIUM #1: Inv1-4 are the most combinatorially rich
+  // properties (routeName × params × buildUrl × buildPath; idempotence over
+  // every input shape; error path coverage). 100 runs left under-sampled
+  // corners around the buildUrl-defined-but-returns-undefined boundary and
+  // the both-throw error path. `thorough` (200) doubles the coverage at
+  // minimal CI cost (~50ms extra per file).
   describe("Invariant 1: Falls back to buildPath when buildUrl returns undefined", () => {
     test.prop([fc.string({ minLength: 1, maxLength: 16 })], {
-      numRuns: NUM_RUNS.standard,
+      numRuns: NUM_RUNS.thorough,
     })("buildUrl=()=>undefined uses buildPath result", (path) => {
       const router = makeFakeRouter(
         () => undefined,
@@ -54,7 +65,7 @@ describe("buildHref — Property Tests", () => {
         fc.string({ minLength: 1, maxLength: 16 }),
         fc.string({ minLength: 1, maxLength: 16 }),
       ],
-      { numRuns: NUM_RUNS.standard },
+      { numRuns: NUM_RUNS.thorough },
     )("returns buildUrl result, not buildPath", (url, path) => {
       const router = makeFakeRouter(
         () => url,
@@ -75,7 +86,7 @@ describe("buildHref — Property Tests", () => {
         fc.string({ minLength: 1, maxLength: 12 }),
         fc.string({ minLength: 1, maxLength: 16 }),
       ],
-      { numRuns: NUM_RUNS.standard },
+      { numRuns: NUM_RUNS.thorough },
     )(
       "two consecutive calls with the same args yield the same href",
       (name, path) => {
@@ -93,7 +104,7 @@ describe("buildHref — Property Tests", () => {
         fc.string({ minLength: 1, maxLength: 16 }),
         arbHash,
       ],
-      { numRuns: NUM_RUNS.standard },
+      { numRuns: NUM_RUNS.thorough },
     )(
       "two consecutive calls with the same args + hash yield the same href",
       (name, path, hash) => {
@@ -108,7 +119,7 @@ describe("buildHref — Property Tests", () => {
 
   describe("Invariant 4: Returns undefined and logs error when buildUrl/buildPath throw", () => {
     test.prop([fc.string({ minLength: 1, maxLength: 12 })], {
-      numRuns: NUM_RUNS.standard,
+      numRuns: NUM_RUNS.thorough,
     })("invalid routeName → undefined + console.error", (name) => {
       const router = makeFakeRouter(
         () => {
@@ -128,6 +139,54 @@ describe("buildHref — Property Tests", () => {
       );
 
       errSpy.mockRestore();
+    });
+  });
+
+  // Closes review §6 LOW #4: explicit `test.each` pin-test for RFC 3986
+  // sub-delimiters. Inv5/Inv12 already exercise encodeURI behaviour
+  // probabilistically, but property tests rarely shrink to the canonical
+  // single-character sub-delim cases. The table here locks the exact
+  // expected-output for each sub-delim, so a regression that switched to a
+  // stricter encoder (e.g. `encodeURIComponent`, which DOES percent-encode
+  // `&=?:`) surfaces with a clear "expected '&' got '%26'" message.
+  describe("Invariant 5b: RFC 3986 sub-delimiters preserved verbatim by encodeURI", () => {
+    // encodeURI does NOT percent-encode: `;/?:@&=+$,#`
+    // Source: MDN encodeURI — "characters that are part of the URI syntax"
+    // The defensive `.replaceAll("#", "%23")` is layered on top to ensure the
+    // fragment cannot contain an unescaped `#` (which would split it).
+    const SUB_DELIM_CASES: readonly (readonly [string, string])[] = [
+      ["a&b", "a&b"], // ampersand — query-param separator
+      ["a=b", "a=b"], // equals — query-param assignment
+      ["a?b", "a?b"], // question mark — query string separator
+      ["a:b", "a:b"], // colon — scheme/auth/port separator
+      ["a;b", "a;b"], // semicolon — historical param separator
+      ["a@b", "a@b"], // at — userinfo separator
+      ["a,b", "a,b"], // comma — list separator
+      ["a$b", "a$b"], // dollar — RFC 3986 sub-delim
+      ["a+b", "a+b"], // plus — RFC 3986 sub-delim (NOT space, that's form-encoding)
+      ["a/b", "a/b"], // slash — path segment separator
+      ["tab=1&q=x", "tab=1&q=x"], // composite — multiple sub-delims unchanged
+      ["q=foo&sort=desc", "q=foo&sort=desc"], // realistic query-string fragment
+    ];
+
+    it.each(SUB_DELIM_CASES)(
+      "fragment '%s' → '%s' (sub-delim preserved by encodeURI)",
+      (input, expected) => {
+        const router = makeFakeRouter(undefined, () => "/p");
+        const href = buildHref(router, "any", {}, { hash: input });
+
+        expect(href).toBe(`/p#${expected}`);
+      },
+    );
+
+    it("composite sub-delims with `#` mixed in → `#` becomes %23, others preserved", () => {
+      // Defensive `%23` replacement fires after encodeURI, so a hash like
+      // "a&b#c=d" yields "a&b%23c=d" — `&` and `=` survive verbatim, only
+      // `#` is escaped.
+      const router = makeFakeRouter(undefined, () => "/p");
+      const href = buildHref(router, "any", {}, { hash: "a&b#c=d" });
+
+      expect(href).toBe("/p#a&b%23c=d");
     });
   });
 
@@ -239,6 +298,29 @@ describe("buildHref — Property Tests", () => {
         expect(calls[0].options).toStrictEqual({ hash: stripped });
       },
     );
+
+    // Pin-test the empty-string case explicitly. The property test above
+    // accepts `minLength: 0`, but fast-check rarely shrinks down to `""` —
+    // and a regression that conflated `hash === ""` with `hash === undefined`
+    // (e.g. by stripping falsy values from the options object) would let the
+    // property suite pass while breaking the tri-state contract: `""` MUST be
+    // forwarded as `{ hash: "" }`, NOT collapsed.
+    test("with-hash call where hash='' → buildUrl receives { hash: '' } (not collapsed to undefined)", () => {
+      const calls: { options: unknown }[] = [];
+      const router = makeFakeRouter(
+        (_n, _p, options) => {
+          calls.push({ options });
+
+          return "/url";
+        },
+        () => "/path",
+      );
+
+      buildHref(router, "home", {}, { hash: "" });
+
+      expect(calls).toHaveLength(1);
+      expect(calls[0].options).toStrictEqual({ hash: "" });
+    });
   });
 
   // Closes review §2.4: `arbDottedName` did not cover real-world route names
@@ -319,6 +401,65 @@ describe("buildHref — Property Tests", () => {
         );
 
         errSpy.mockRestore();
+      },
+    );
+  });
+
+  // Closes review §6 MEDIUM #2: `arbParamsExtended` extends the standard
+  // params generator with `null` / `undefined` values. The helper is
+  // content-agnostic about value types — it must NOT short-circuit on
+  // nullish values, must NOT JSON-coerce them, and the underlying
+  // `router.buildUrl` / `router.buildPath` must receive the literal `null`
+  // / `undefined` for downstream serialization. Pins this contract under
+  // arbitrary nullish-rich params shapes.
+  describe("Invariant 10b: arbParamsExtended (null / undefined values) forwarded verbatim", () => {
+    test.prop([arbParamsExtended], { numRuns: NUM_RUNS.standard })(
+      "buildUrl receives the exact params object (no nullish stripping)",
+      (params) => {
+        const calls: { params: unknown }[] = [];
+        const router = {
+          buildUrl: (_name: string, p: object) => {
+            calls.push({ params: p });
+
+            return "/url";
+          },
+          buildPath: () => "/path",
+        } as unknown as import("@real-router/core").Router;
+
+        buildHref(
+          router,
+          "test",
+          params as unknown as import("@real-router/core").Params,
+        );
+
+        expect(calls).toHaveLength(1);
+        // Same reference handed through verbatim — no defensive copy, no
+        // nullish coercion, no JSON round-trip.
+        expect(calls[0].params).toBe(params);
+      },
+    );
+
+    test.prop([arbParamsExtended], { numRuns: NUM_RUNS.standard })(
+      "buildPath receives the exact params object (no nullish stripping)",
+      (params) => {
+        const calls: { params: unknown }[] = [];
+        const router = {
+          buildUrl: undefined,
+          buildPath: (_name: string, p: object) => {
+            calls.push({ params: p });
+
+            return "/path";
+          },
+        } as unknown as import("@real-router/core").Router;
+
+        buildHref(
+          router,
+          "test",
+          params as unknown as import("@real-router/core").Params,
+        );
+
+        expect(calls).toHaveLength(1);
+        expect(calls[0].params).toBe(params);
       },
     );
   });

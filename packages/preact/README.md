@@ -10,9 +10,12 @@
 npm install @real-router/preact @real-router/core
 ```
 
-`@real-router/core` is the only hard dependency. Add `@real-router/browser-plugin`
-(or `hash-plugin` / `navigation-plugin` / `memory-plugin`) when you need History
-API integration — the Quick Start below uses it.
+`@real-router/core` is the entry-point dependency the API revolves around;
+`@real-router/route-utils` and `@real-router/sources` are pulled in automatically
+as transitive deps (used internally by `useRouteUtils` / hook subscriptions).
+Add `@real-router/browser-plugin` (or `hash-plugin` / `navigation-plugin` /
+`memory-plugin`) when you need History API integration — the Quick Start below
+uses it.
 
 **Peer dependency:** `preact` >= 10.0.0
 
@@ -69,7 +72,7 @@ function App() {
 | `useRouteUtils()`       | `RouteUtils`                                               | Never                                   |
 | `useRouterTransition()` | `{ isTransitioning, isLeaveApproved, toRoute, fromRoute }` | On transition start/end                 |
 | `useRouteExit(handler, options?)`  | `void` — wraps `router.subscribeLeave` with abort + same-route guards | Never (stable subscription) |
-| `useRouteEnter(handler, options?)` | `void` — fires on nav-driven mount via `useRoute()` snapshot          | Never (handler stays current) |
+| `useRouteEnter(handler, options?)` | `void` — fires on nav-driven mount via `useRoute()` snapshot          | Every navigation (host component reads `useRoute()`); handler ref + subscription are stable across renders |
 
 ```tsx
 // useRouteNode — re-renders only when "users.*" changes
@@ -178,11 +181,12 @@ Declarative route matching. Renders the first matching `<RouteView.Match>` child
 
 #### `RouteView.Match` props
 
-| Prop       | Type                | Description                                                                   |
-| ---------- | ------------------- | ----------------------------------------------------------------------------- |
-| `segment`  | `string`            | Route segment to match                                                        |
-| `exact`    | `boolean`           | When `true`, matches only the exact route (not descendants). Default: `false` |
-| `fallback` | `ComponentChildren` | Shown while children suspend. Wraps children in `<Suspense>` when provided.   |
+| Prop       | Type                | Required | Description                                                                   |
+| ---------- | ------------------- | -------- | ----------------------------------------------------------------------------- |
+| `segment`  | `string`            | Yes      | Route segment to match                                                        |
+| `exact`    | `boolean`           | No       | When `true`, matches only the exact route (not descendants). Default: `false` |
+| `fallback` | `ComponentChildren` | No       | Shown while children suspend. Wraps children in `<Suspense>` when provided.   |
+| `children` | `ComponentChildren` | Yes      | Content to render when the active route matches `segment`                     |
 
 #### `<RouteView.Self>` and `<RouteView.NotFound>`
 
@@ -198,8 +202,9 @@ Precedence:
 
 1. `<Match>` first-wins — duplicate segments short-circuit; subsequent `<Match>` with the same segment are not rendered.
 2. `<Self>` first-wins — only the first `<RouteView.Self>` contributes; subsequent ones are ignored.
-3. An activating `<Match>` suppresses both `<Self>` and `<NotFound>`.
-4. When no `<Match>` activates: `<Self>` wins over `<NotFound>` if both would fire (occurs only when `nodeName === UNKNOWN_ROUTE`, narrow edge case).
+3. `<NotFound>` **last-wins** — when multiple `<RouteView.NotFound>` siblings are declared (unusual but legal), only the *last* one renders. Asymmetric with the other two slots; prefer a single `<NotFound>` per RouteView.
+4. An activating `<Match>` suppresses both `<Self>` and `<NotFound>`.
+5. When no `<Match>` activates: `<Self>` wins over `<NotFound>` if both would fire (occurs only when `nodeName === UNKNOWN_ROUTE`, narrow edge case).
 
 ```tsx
 <RouteView nodeName="users">

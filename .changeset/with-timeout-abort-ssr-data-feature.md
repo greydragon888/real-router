@@ -1,6 +1,5 @@
 ---
 "@real-router/ssr-data-plugin": minor
-"@real-router/rsc-server-plugin": minor
 ---
 
 withTimeout passes AbortSignal to loader for cooperative cancellation (#598)

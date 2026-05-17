@@ -105,16 +105,11 @@ export function injectRouteEnter(
       return;
     }
     // `previousRoute` is guaranteed populated whenever `route.transition.from`
-    // is set — core writes them together. `lastHandledRoute === route` would
-    // imply the signal re-fired with the same reference, which Angular signals
-    // never do (signals dedup by Object.is). Both invariants hold structurally;
-    // they were kept here only for parity with the React adapter's defensive
-    // pre-effects-rewrite path. Removed in line with audit §8.1 (unreachable
-    // code with v8-ignore is a maintenance smell).
+    // is set — core writes them together. The dead-code throw-guard that used
+    // to live here (review §8a LOW) is removed; the narrowing below is the
+    // type-safe equivalent and avoids the no-non-null-assertion lint.
     if (!previousRoute) {
-      throw new Error(
-        "injectRouteEnter: transition.from set but previousRoute missing — core invariant violated",
-      );
+      return;
     }
 
     handler({ route, previousRoute });

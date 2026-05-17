@@ -308,6 +308,121 @@ describe("navigateWithHash — Property Tests", () => {
         expect(opts.hash).toBe(newHash);
       },
     );
+
+    // Audit 2026-05-16 §2.2: the single-`{id: string}` PBT only covers a
+    // 1-key shallow-diff. Real routes carry multi-key params (search
+    // params, filters, pagination) and numeric values that shallowEqual
+    // distinguishes by Object.is — NaN !== NaN (Object.is(NaN,NaN)=true),
+    // +0 vs -0 (Object.is(+0,-0)=false). Widen the surface so the
+    // shallowEqual integration is exercised across the realistic
+    // parameter shapes.
+    const arbParamValue: fc.Arbitrary<string | number | boolean> = fc.oneof(
+      fc.string({ maxLength: 6 }),
+      fc.integer({ min: -100, max: 100 }),
+      fc.boolean(),
+      fc.constantFrom(0, -0, Number.NaN, Infinity, -Infinity),
+    );
+    const arbMultiKeyParams: fc.Arbitrary<Record<string, unknown>> =
+      fc.dictionary(fc.stringMatching(/^[a-z]{1,4}$/), arbParamValue, {
+        minKeys: 1,
+        maxKeys: 5,
+      });
+
+    test.prop([arbRouteName, arbHash, arbHash, arbMultiKeyParams], {
+      numRuns: NUM_RUNS.thorough,
+    })(
+      "multi-key params + numeric/NaN/±0 — shallow-not-equal → no auto-bypass",
+      (routeName, currentHash, newHash, requestedParams) => {
+        fc.pre(currentHash !== newHash);
+
+        // Anchor the router's "current" params to a fixed sentinel so the
+        // generated params produce a real shallow-diff (no key collision
+        // by chance).
+        const currentParams = { __anchor: "fixed" };
+
+        const { router, calls } = makeRouter({
+          name: routeName,
+          params: currentParams as unknown as Params,
+          hash: currentHash,
+        });
+
+        // Compute the expected shallowEqual verdict the implementation will
+        // see — if the generator collapses to {} the anchor key wins and
+        // shallowEqual returns false anyway (key-count discriminator).
+        void navigateWithHash(
+          router,
+          routeName,
+          requestedParams as unknown as Params,
+          newHash,
+        );
+
+        expect(calls).toHaveLength(1);
+
+        const opts = calls[0].opts;
+
+        // Cross-params + different-hash should never trigger the same-route
+        // auto-bypass (the same-route path is gated by shallowEqual).
+        expect(opts.force).toBeUndefined();
+        expect(opts.hashChange).toBeUndefined();
+        expect(opts.hash).toBe(newHash);
+      },
+    );
+
+    test.prop([arbRouteName, arbHash, arbHash], { numRuns: NUM_RUNS.thorough })(
+      "NaN-valued params are stable under shallowEqual (Object.is(NaN,NaN)=true) — different-hash forces, different-param NaN-vs-NaN does NOT differentiate",
+      (routeName, currentHash, newHash) => {
+        fc.pre(currentHash !== newHash);
+
+        const { router, calls } = makeRouter({
+          name: routeName,
+          params: { score: Number.NaN },
+          hash: currentHash,
+        });
+
+        // Same NaN on both sides: shallowEqual(params, params) is true →
+        // the SAME-route + SAME-params + different-hash branch fires, so
+        // force + hashChange MUST be set (Inv 2).
+        void navigateWithHash(
+          router,
+          routeName,
+          { score: Number.NaN },
+          newHash,
+        );
+
+        expect(calls).toHaveLength(1);
+
+        const opts = calls[0].opts;
+
+        expect(opts.force).toBe(true);
+        expect(opts.hashChange).toBe(true);
+        expect(opts.hash).toBe(newHash);
+      },
+    );
+
+    test.prop([arbRouteName, arbHash, arbHash], { numRuns: NUM_RUNS.thorough })(
+      "±0 params are distinguished by shallowEqual (Object.is(+0,-0)=false) — params differ → NO auto-bypass even with hash change",
+      (routeName, currentHash, newHash) => {
+        fc.pre(currentHash !== newHash);
+
+        const { router, calls } = makeRouter({
+          name: routeName,
+          params: { delta: 0 },
+          hash: currentHash,
+        });
+
+        // +0 vs -0: shallowEqual returns false (Object.is distinguishes them).
+        // params differ → cross-params branch → no force / no hashChange.
+        void navigateWithHash(router, routeName, { delta: -0 }, newHash);
+
+        expect(calls).toHaveLength(1);
+
+        const opts = calls[0].opts;
+
+        expect(opts.force).toBeUndefined();
+        expect(opts.hashChange).toBeUndefined();
+        expect(opts.hash).toBe(newHash);
+      },
+    );
   });
 
   describe("Invariant 10: current.context.url absent → defensive '' fallback", () => {
@@ -670,6 +785,134 @@ describe("navigateWithHash — Property Tests", () => {
         expect(calls[i].opts.hashChange).toBe(true);
         expect(calls[i].opts.hash).toBe("billing");
       }
+    });
+  });
+
+  // ===========================================================================
+  // Audit 2026-05-16 §6.2 #9 (MED) — extraOptions immutability + full pass-through
+  // Locks two contracts at once:
+  //  - every user-provided field in `extraOptions` survives into the
+  //    router.navigate call (no field is dropped silently),
+  //  - the helper does not mutate the input `extraOptions` object.
+  // ===========================================================================
+  describe("Invariant 13: extraOptions full pass-through + non-mutation (audit §6.2 #9)", () => {
+    const arbExtraOptions: fc.Arbitrary<NavigationOptions> = fc
+      .dictionary(
+        fc.stringMatching(/^[a-z]{1,8}$/),
+        fc.oneof(
+          fc.string({ maxLength: 8 }),
+          fc.integer({ min: -100, max: 100 }),
+          fc.boolean(),
+        ),
+        { minKeys: 0, maxKeys: 5 },
+      )
+      .map((d) => d as unknown as NavigationOptions);
+
+    function snapshotEntries(o: object): [string, unknown][] {
+      return Object.keys(o as Record<string, unknown>)
+        .toSorted((a, b) => a.localeCompare(b))
+        .map(
+          (k) => [k, (o as Record<string, unknown>)[k]] as [string, unknown],
+        );
+    }
+
+    test.prop([arbRouteName, fc.option(arbHash), arbExtraOptions], {
+      numRuns: NUM_RUNS.thorough,
+    })(
+      "every user-provided field reaches router.navigate AND extraOptions is not mutated",
+      (routeName, hash, extras) => {
+        fc.pre(
+          !("hash" in (extras as Record<string, unknown>)) &&
+            !("force" in (extras as Record<string, unknown>)) &&
+            !("hashChange" in (extras as Record<string, unknown>)),
+        );
+
+        // structuredClone refuses null-prototype records (fast-check may
+        // shrink to `{__proto__: null}`); compare by own-entries snapshot.
+        const before = snapshotEntries(extras);
+        const { router, calls } = makeRouter(undefined);
+
+        void navigateWithHash(router, routeName, {}, hash ?? undefined, extras);
+
+        expect(snapshotEntries(extras)).toStrictEqual(before);
+
+        expect(calls).toHaveLength(1);
+
+        const opts = calls[0].opts as Record<string, unknown>;
+
+        for (const key of Object.keys(extras as Record<string, unknown>)) {
+          expect(opts[key]).toStrictEqual(
+            (extras as Record<string, unknown>)[key],
+          );
+        }
+      },
+    );
+
+    test.prop([arbRouteName, arbHash, arbExtraOptions], {
+      numRuns: NUM_RUNS.thorough,
+    })(
+      "extraOptions retains its shape even when same-route different-hash triggers force+hashChange overlay",
+      (routeName, newHash, extras) => {
+        fc.pre(
+          !("hash" in (extras as Record<string, unknown>)) &&
+            !("force" in (extras as Record<string, unknown>)) &&
+            !("hashChange" in (extras as Record<string, unknown>)) &&
+            newHash !== "",
+        );
+
+        const before = snapshotEntries(extras);
+        const { router } = makeRouter({
+          name: routeName,
+          params: {},
+          hash: `${newHash}-old`,
+        });
+
+        void navigateWithHash(router, routeName, {}, newHash, extras);
+
+        expect(snapshotEntries(extras)).toStrictEqual(before);
+      },
+    );
+  });
+
+  // ===========================================================================
+  // Audit 2026-05-16 §5.2 Bug 2 (LOW) — pin: `navigateWithHash` overwrites
+  // `extraOptions.force=false` with `force=true` on same-route different-hash
+  // (auto-bypass branch). This is intentional per jsdoc on the helper, but
+  // the asymmetry vs Inv 11 (`force=true` survives idempotently) is not
+  // covered. The pin below documents that consumer's explicit `force: false`
+  // is silently upgraded when the auto-bypass branch fires.
+  // ===========================================================================
+  describe("Invariant 14: extraOptions.force=false overwritten by auto-bypass overlay (Bug 2 pin)", () => {
+    test("same route + different hash + consumer extraOptions.force=false → opts.force=true (silent upgrade)", () => {
+      const { router, calls } = makeRouter({
+        name: "home",
+        params: {},
+        hash: "old",
+      });
+
+      void navigateWithHash(router, "home", {}, "new", {
+        force: false,
+      } as NavigationOptions);
+
+      expect(calls).toHaveLength(1);
+      expect(calls[0].opts.force).toBe(true);
+      expect(calls[0].opts.hashChange).toBe(true);
+    });
+
+    test("same route + same hash + consumer extraOptions.force=false → opts.force=false survives (no auto-bypass fired)", () => {
+      const { router, calls } = makeRouter({
+        name: "home",
+        params: {},
+        hash: "same",
+      });
+
+      void navigateWithHash(router, "home", {}, "same", {
+        force: false,
+      } as NavigationOptions);
+
+      expect(calls).toHaveLength(1);
+      expect(calls[0].opts.force).toBe(false);
+      expect(calls[0].opts.hashChange).toBeUndefined();
     });
   });
 });

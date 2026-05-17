@@ -188,6 +188,35 @@ describe("shouldNavigate — Property Tests (Svelte Link)", () => {
       expect(shouldNavigate(evt)).toBe(false);
     });
   });
+
+  // Closes review §6 MEDIUM #3: Inv1/Inv2/Inv5/Inv7 cover the 0-modifier,
+  // single-modifier, ≥2-modifier, and all-4-modifier cases as separate
+  // properties — but they don't lock the EXACT mutual-exclusivity contract
+  // as a single law: `shouldNavigate(evt) === !hasAnyModifier` when
+  // `button === 0`. A regression that flipped one branch (e.g. shouldNavigate
+  // returning true when EXACTLY one modifier is held but false otherwise)
+  // would fail Inv2 randomly but pass the other invariants — this single
+  // law expresses the full truth table in one assertion.
+  describe("Invariant 8: Mutual exclusivity — shouldNavigate ⇔ no modifier held (button=0)", () => {
+    test.prop(
+      [fc.tuple(fc.boolean(), fc.boolean(), fc.boolean(), fc.boolean())],
+      { numRuns: NUM_RUNS.thorough },
+    )(
+      "for button=0, shouldNavigate === !(any modifier held) across all 16 truth-table rows",
+      ([metaKey, altKey, ctrlKey, shiftKey]) => {
+        const hasAnyModifier = metaKey || altKey || ctrlKey || shiftKey;
+        const evt = {
+          button: 0,
+          metaKey,
+          altKey,
+          ctrlKey,
+          shiftKey,
+        } as unknown as MouseEvent;
+
+        expect(shouldNavigate(evt)).toBe(!hasAnyModifier);
+      },
+    );
+  });
 });
 
 // =============================================================================
@@ -564,6 +593,127 @@ describe("parseTokens — contract locks (via buildActiveClassName)", () => {
     });
 
     it("active=undefined, base=undefined → undefined", () => {
+      expect(buildActiveClassName(true, undefined, undefined)).toBeUndefined();
+    });
+  });
+
+  // Closes review §6 LOW #6: an explicit, table-driven contract block for
+  // parseTokens. The function is private (no public export), but its
+  // input→output contract is observable through buildActiveClassName. Each
+  // row below pins one boundary case with the exact expected token list,
+  // giving a refactor of the underlying regex (`/\S+/g`) a clear, message-
+  // first failure surface — "expected ['x','y'] got ['x\ty']" — instead of a
+  // probabilistic property hit.
+  //
+  // Why a table over more properties: parseTokens behaviour is fully
+  // characterised by a small finite set of categories (single-token,
+  // multi-token, ASCII whitespace, Unicode whitespace, empty). A table
+  // documents the contract textually; new contributors can extend it without
+  // needing fast-check intuition.
+  describe("parseTokens — explicit contract table (via buildActiveClassName)", () => {
+    // (input, expectedTokenList) — buildActiveClassName(true, "active", input)
+    // returns a string whose token-set (filtered with /\s+/) is exactly:
+    //   parseTokens(input) ++ (active not in parseTokens(input) ? ["active"] : []).
+    //
+    // We use a base that does NOT contain "active" so the active token is
+    // always appended once at the end — making the expected output unambiguous.
+    const ACTIVE = "active";
+    const CASES: readonly {
+      readonly label: string;
+      readonly input: string | undefined;
+      readonly expectedBaseTokens: readonly string[];
+    }[] = [
+      { label: "single token", input: "a", expectedBaseTokens: ["a"] },
+      {
+        label: "two tokens, single ASCII space",
+        input: "a b",
+        expectedBaseTokens: ["a", "b"],
+      },
+      {
+        label: "two tokens, double ASCII space",
+        input: "a  b",
+        expectedBaseTokens: ["a", "b"],
+      },
+      {
+        label: "leading + trailing whitespace stripped",
+        input: "  a  ",
+        expectedBaseTokens: ["a"],
+      },
+      {
+        label: "tab separator",
+        input: "a\tb",
+        expectedBaseTokens: ["a", "b"],
+      },
+      {
+        label: "newline separator",
+        input: "a\nb",
+        expectedBaseTokens: ["a", "b"],
+      },
+      {
+        label: "CR separator",
+        input: "a\rb",
+        expectedBaseTokens: ["a", "b"],
+      },
+      {
+        label: "mixed tab/newline/CR",
+        input: "a\t b\n c",
+        expectedBaseTokens: ["a", "b", "c"],
+      },
+      { label: "empty string", input: "", expectedBaseTokens: [] },
+      {
+        label: "whitespace-only (spaces)",
+        input: "   ",
+        expectedBaseTokens: [],
+      },
+      {
+        label: "whitespace-only (tabs/newlines)",
+        input: "\t\n\r",
+        expectedBaseTokens: [],
+      },
+      { label: "undefined input", input: undefined, expectedBaseTokens: [] },
+      {
+        label: "NBSP separator (U+00A0)",
+        input: "a b",
+        expectedBaseTokens: ["a", "b"],
+      },
+      {
+        label: "LINE SEPARATOR (U+2028)",
+        input: "a b",
+        expectedBaseTokens: ["a", "b"],
+      },
+      {
+        label: "PARAGRAPH SEPARATOR (U+2029)",
+        input: "a b",
+        expectedBaseTokens: ["a", "b"],
+      },
+      {
+        label: "OGHAM SPACE MARK (U+1680)",
+        input: "a b",
+        expectedBaseTokens: ["a", "b"],
+      },
+      {
+        label: "BEM-style hyphenated tokens",
+        input: "btn btn-primary",
+        expectedBaseTokens: ["btn", "btn-primary"],
+      },
+      {
+        label: "tokens with digits and underscores",
+        input: "tab_2 col-3",
+        expectedBaseTokens: ["tab_2", "col-3"],
+      },
+    ];
+
+    it.each(CASES)(
+      "input '$label' → base tokens $expectedBaseTokens, active appended",
+      ({ input, expectedBaseTokens }) => {
+        const result = buildActiveClassName(true, ACTIVE, input);
+        const tokens = result?.split(/\s+/).filter(Boolean) ?? [];
+
+        expect(tokens).toStrictEqual([...expectedBaseTokens, ACTIVE]);
+      },
+    );
+
+    it("undefined input + undefined active → undefined (parseTokens(undefined) → [], no tokens to join)", () => {
       expect(buildActiveClassName(true, undefined, undefined)).toBeUndefined();
     });
   });

@@ -26,7 +26,7 @@ describe("createHttpStatusSink — Property Tests", () => {
     // N calls must produce N distinct object identities so that mutations to
     // one sink (e.g. `sink.code = 404`) never affect another. A regression
     // that returned a singleton would cause cross-request status leakage.
-    test.prop([fc.integer({ min: 2, max: 10 })], {
+    test.prop([fc.integer({ min: 1, max: 10 })], {
       numRuns: NUM_RUNS.standard,
     })("N sinks are pairwise distinct references", (n) => {
       const sinks = Array.from({ length: n }, () => createHttpStatusSink());

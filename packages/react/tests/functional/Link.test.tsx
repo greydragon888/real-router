@@ -237,7 +237,7 @@ describe("Link component", () => {
       const link = screen.getByTestId("link");
 
       // No params → buildPath("items.item", undefined) fails (required :id missing) → no href.
-      expect(link).not.toHaveAttribute("href");
+      expect(link.getAttribute("href")).toBeNull();
 
       // undefined → defined: shallowEqual hits `!a || !b` branch → false → re-render.
       rerender(
@@ -266,7 +266,7 @@ describe("Link component", () => {
       );
 
       // Href gone again, proving Link re-rendered with undefined params.
-      expect(link).not.toHaveAttribute("href");
+      expect(link.getAttribute("href")).toBeNull();
     });
 
     it("should re-render when routeParams contain Symbol/Date/Map/nested-object values with different references", () => {
@@ -757,5 +757,67 @@ describe("Link component", () => {
     );
 
     consoleError.mockRestore();
+  });
+
+  describe("hash prop tri-state (#532)", () => {
+    it("hash={undefined} calls navigate without hash option (preserves current hash)", async () => {
+      vi.spyOn(router, "navigate");
+
+      render(
+        <Link routeName="one-more-test" data-testid="link">
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      await user.click(screen.getByTestId("link"));
+
+      expect(router.navigate).toHaveBeenCalledWith("one-more-test", {}, {});
+    });
+
+    it('hash="" calls navigate with hash: "" (clears hash)', async () => {
+      vi.spyOn(router, "navigate");
+
+      render(
+        <Link routeName="one-more-test" hash="" data-testid="link">
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      await user.click(screen.getByTestId("link"));
+
+      expect(router.navigate).toHaveBeenCalledWith(
+        "one-more-test",
+        {},
+        {
+          hash: "",
+        },
+      );
+    });
+
+    it('hash="section" on same route adds force + hashChange (bypasses SAME_STATES)', async () => {
+      vi.spyOn(router, "navigate");
+
+      // router already started at "/" = "test" route in beforeEach
+      render(
+        <Link routeName="test" hash="section" data-testid="link">
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      await user.click(screen.getByTestId("link"));
+
+      expect(router.navigate).toHaveBeenCalledWith(
+        "test",
+        {},
+        {
+          hash: "section",
+          force: true,
+          hashChange: true,
+        },
+      );
+    });
   });
 });

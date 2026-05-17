@@ -138,11 +138,7 @@ describe("InkLink", () => {
     await flushInk();
 
     // Navigate was attempted with the correct route; rejection was caught internally.
-    expect(navigateSpy).toHaveBeenCalledWith(
-      "about",
-      expect.any(Object),
-      expect.any(Object),
-    );
+    expect(navigateSpy).toHaveBeenCalledWith("about", {}, {});
   });
 
   it("does not navigate when not focused", async () => {

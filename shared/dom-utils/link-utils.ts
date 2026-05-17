@@ -68,7 +68,14 @@ export function buildHref(
         normHash === undefined ? undefined : { hash: normHash },
       );
 
-      if (url !== undefined) {
+      // Accept only non-empty strings. The BuildUrlFn type contract is
+      // `string | undefined`, but defensive against:
+      //   - `""` (empty string) → would render `<a href="">`, which resolves
+      //     to the current page URL → silent self-navigation on click.
+      //   - `null` (type-contract violation) → would render `<a href={null}>`,
+      //     stringified to `"null"` in some renderers.
+      // Either case falls through to the `router.buildPath` fallback below.
+      if (typeof url === "string" && url.length > 0) {
         return url;
       }
     }

@@ -337,10 +337,10 @@ describe("shallowEqual — Property Tests", () => {
         const p1 = reactive({ ...record });
         const p2 = reactive({ ...record });
 
-        // Sanity: the two proxies are distinct references — otherwise the
-        // Object.is fast-path would short-circuit and this test would tell us
-        // nothing about the per-key loop.
-        fc.pre(p1 !== p2);
+        // Two distinct reactive proxies — Vue always wraps in a new Proxy so
+        // this invariant is guaranteed; assert explicitly rather than using
+        // fc.pre() which would silently skip if the assumption broke.
+        expect(p1).not.toBe(p2);
 
         // Vue may have created proxies that hide non-primitive values (Date,
         // nested objects, Symbol slots). When that happens the per-key
@@ -422,5 +422,124 @@ describe("shallowEqual — Property Tests", () => {
       // contract because Object.keys returns [].
       expect(shallowEqual(a, b)).toBe(true);
     });
+  });
+
+  // Review §6 — NEW Inv 14: Function values compared by Object.is reference.
+  // `routeOptions` / `routeParams` may contain callback fields (event handlers,
+  // transition callbacks). Two literal arrow functions with identical bodies
+  // are distinct references — `shallowEqual` must report them as not-equal
+  // (Object.is per key). A regression that calls `.toString()` or tries
+  // structural equality would falsely collapse them. Locks the per-key
+  // Object.is contract for function values.
+  describe("Invariant 14: function values — Object.is by reference", () => {
+    test("same function reference on both sides → equal", () => {
+      const fn = () => undefined;
+
+      expect(shallowEqual({ cb: fn }, { cb: fn })).toBe(true);
+    });
+
+    test("distinct function references with identical bodies → not equal", () => {
+      const fn1 = () => undefined;
+      const fn2 = () => undefined;
+
+      expect(shallowEqual({ cb: fn1 }, { cb: fn2 })).toBe(false);
+    });
+
+    test.prop(
+      [fc.func(fc.constant(undefined)), fc.func(fc.constant(undefined))],
+      {
+        numRuns: NUM_RUNS.standard,
+      },
+    )(
+      "PBT: two distinct fast-check-generated functions are not equal",
+      (f1, f2) => {
+        // fc.func produces fresh closures per draw; two independent draws
+        // are guaranteed distinct references regardless of body shape.
+        expect(shallowEqual({ cb: f1 }, { cb: f2 })).toBe(false);
+        // Reflexivity on the same reference still holds.
+        expect(shallowEqual({ cb: f1 }, { cb: f1 })).toBe(true);
+      },
+    );
+  });
+
+  // Review §6 — NEW Inv 15: Getter side-effects (documented limitation).
+  // `shallowEqual` reads each key via plain bracket access (`prev[key]`,
+  // `next[key]`). When `key` is a getter, the getter fires once per call per
+  // side — there is no proxy bypass / Reflect.getOwnPropertyDescriptor short-
+  // circuit. This is a deliberate trade-off: PBT consumers may pass reactive-
+  // proxy params, and the comparator must operate at the same logical layer
+  // as user code. Locks the contract so a future "optimisation" that switches
+  // to property-descriptor reads is caught as a behaviour change.
+  describe("Invariant 15: getter side-effects are observable (no proxy bypass)", () => {
+    test("each getter is invoked exactly once per shallowEqual call (per side)", () => {
+      let aReads = 0;
+      let bReads = 0;
+      const a = Object.defineProperty({} as Record<string, number>, "x", {
+        get() {
+          aReads++;
+
+          return 42;
+        },
+        enumerable: true,
+        configurable: true,
+      });
+      const b = Object.defineProperty({} as Record<string, number>, "x", {
+        get() {
+          bReads++;
+
+          return 42;
+        },
+        enumerable: true,
+        configurable: true,
+      });
+
+      const result = shallowEqual(a, b);
+
+      // Both records have one own enumerable key (`x`); Object.keys captures
+      // it on both sides. The per-key loop reads `prev.x` and `next.x` once
+      // each. A regression that double-reads (e.g., a defensive fallback)
+      // would surface as aReads > 1 or bReads > 1.
+      expect(result).toBe(true);
+      expect(aReads).toBe(1);
+      expect(bReads).toBe(1);
+    });
+  });
+
+  // Review §6 — NEW Inv 16: `Object.seal` / `Object.preventExtensions` /
+  // `Object.freeze` produce records that compare identically to mutable ones
+  // when their key/value pairs match. The comparator uses `Object.keys` +
+  // `Object.is` — neither API discriminates by extensibility. Route snapshots
+  // emitted by `@real-router/core` are frozen; consumers may also seal their
+  // own params before passing them to `<Link>`. Locks the contract so all
+  // three integrity levels stay equivalence-preserving.
+  describe("Invariant 16: integrity levels (seal / preventExtensions / freeze)", () => {
+    test.prop([arbExtendedRecord], { numRuns: NUM_RUNS.standard })(
+      "shallowEqual(rec, Object.seal({ ...rec })) === true",
+      (rec) => {
+        expect(shallowEqual(rec, Object.seal({ ...rec }))).toBe(true);
+      },
+    );
+
+    test.prop([arbExtendedRecord], { numRuns: NUM_RUNS.standard })(
+      "shallowEqual(rec, Object.preventExtensions({ ...rec })) === true",
+      (rec) => {
+        expect(shallowEqual(rec, Object.preventExtensions({ ...rec }))).toBe(
+          true,
+        );
+      },
+    );
+
+    test.prop([arbExtendedRecord], { numRuns: NUM_RUNS.standard })(
+      "shallowEqual(Object.freeze({ ...rec }), Object.seal({ ...rec })) === true (mixed integrity levels)",
+      (rec) => {
+        // Cross-integrity comparison — frozen vs. sealed must still be equal
+        // when keys/values match. The comparator must not branch on any
+        // integrity flag.
+        const frozen = Object.freeze({ ...rec });
+        const sealed = Object.seal({ ...rec });
+
+        expect(shallowEqual(frozen, sealed)).toBe(true);
+      },
+    );
   });
 });

@@ -86,9 +86,10 @@ describe("RouterProvider — announceNavigation", () => {
     // Second navigation triggers the announcement
     await router.navigate("home");
 
-    expect(document.querySelector(ANNOUNCER_SEL)?.textContent).toBe(
-      "Navigated to home",
-    );
+    const announcer = document.querySelector(ANNOUNCER_SEL);
+
+    expect(announcer).not.toBeNull();
+    expect(announcer!.textContent).toBe("Navigated to home");
   });
 
   it("announcer textContent uses h1 text when present", async () => {
@@ -115,9 +116,10 @@ describe("RouterProvider — announceNavigation", () => {
     // Second navigation triggers the announcement — h1 is present
     await router.navigate("home");
 
-    expect(document.querySelector(ANNOUNCER_SEL)?.textContent).toBe(
-      "Navigated to About Page",
-    );
+    const announcer = document.querySelector(ANNOUNCER_SEL);
+
+    expect(announcer).not.toBeNull();
+    expect(announcer!.textContent).toBe("Navigated to About Page");
 
     h1.remove();
   });

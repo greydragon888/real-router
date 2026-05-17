@@ -314,7 +314,7 @@ tests/
 
 ## Stress Test Coverage
 
-~53 stress tests across 18 files in `tests/stress/` validate behavior under extreme conditions:
+77 stress tests across 24 files in `tests/stress/` validate behavior under extreme conditions:
 
 | Category                | Tests (file count) | Test count | What they verify                                                                                                                                                                                |
 | ----------------------- | ------------------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -329,13 +329,19 @@ tests/
 | Lazy loading            | 1 file             | 3 tests    | 30 Lazy components mount + immediate unmount before loader resolves — discarded results, no setState-after-unmount; 100 mount/unmount cycles — bounded heap; many concurrent loads all reach `ready` |
 | RouterErrorBoundary     | 1 file             | 3 tests    | 50 trigger→recover cycles with throwing onError — boundary stays alive, every throw caught and logged via console.error; 200 mount/unmount cycles — bounded heap; throwing onError doesn't break later reactivity |
 | Teardown race           | 1 file             | 2 tests    | Click 100 Links and immediately unmount — no unhandled promise rejections; 50 mount→click→unmount iterations — `.catch(noop)` keeps the loop clean                                              |
-| Long-run leak           | 1 file             | 1 test     | 5000 navigations across 5 routes with 20 mounted consumers — heap delta after warmup stays bounded                                                                                              |
+| Long-run leak           | 1 file             | 3 tests    | 5K navigations with 20 consumers — bounded heap after warmup; 10K-with-checkpoints (5K + 10K) — linear marginal growth (no super-linear accumulator); 10K createReactiveSource read cycles — listener count stays zero (lazy contract) |
 | Start/stop churn        | 1 file             | 3+ tests   | 1000 mount/unmount cycles for RouterProvider without leaks — covers leave-listener leak audit (#1)                                                                                              |
 | Memory mount/unmount    | 1 file             | 2 tests    | Dedicated heap-stability matrix — bounded heap after N cycles for each public composable                                                                                                        |
 | Concurrent guards race  | 1 file             | 5+ tests   | Async guards of varying durations fired concurrently — last-wins semantics, no orphan effects                                                                                                   |
 | Route removed mid-session | 1 file           | 2 tests    | Single + 100-cycle: removing the active route during a session does not leave dangling subscriptions                                                                                            |
 | replaceHistoryState during transition | 1 file | 3 tests    | `replaceHistoryState` called mid-transition — state coherent, no listener desync                                                                                                                |
 | Router switch           | 1 file             | 2 tests    | 200 router instance swaps via RouterProvider remount — context cache rebuilds correctly                                                                                                         |
+| Announce navigation     | 1 file             | 2+ tests   | aria-live route announcer under rapid navigation — single announcer DOM node, no orphaned attributes                                                                                            |
+| Concurrent force-clicks | 1 file             | 4 tests    | 100 same-Link force-clicks — last-wins; 50 mount/click/unmount cycles; 30 alternating between Links; **100 concurrent clicks to 100 different Links** — FSM cancels 99 pending, no stuck transitions |
+| Scroll restoration rapid | 1 file            | 3 tests    | 100 rapid navs with mode="restore" — bounded heap, history.scrollRestoration stable; 50 mount/unmount cycles; sessionStorage stays bounded under 100 distinct routes                            |
+| Scroll restoration history-nav | 1 file      | 2 tests    | **50 history.back/forward cycles** — bounded heap, history.scrollRestoration stays "manual" (popstate path); 20-burst back/forward bursts without settle — RouterProvider stays stable          |
+| useRouteEnter/useRouteExit | 1 file          | 2+ tests   | Unmount during guard execution — abort signal fires, no callback after unmount                                                                                                                  |
+| View transitions stop   | 1 file             | 2+ tests   | `createViewTransitions` cleanup on router stop — no leftover listeners, mode flips back to default                                                                                              |
 
 ## See Also
 

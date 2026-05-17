@@ -7,6 +7,7 @@ import {
 } from "@real-router/ssr-data-plugin";
 
 import {
+  arbRscAction,
   arbSimpleRouteName,
   arbParamValue,
   arbReactNode,
@@ -14,13 +15,21 @@ import {
   node,
   NUM_RUNS,
   ROUTES,
+  stateWith,
 } from "./helpers";
 import {
+  buildRscPayload,
   getSsrRscMode,
   invalidate,
   rscActionPluginFactory,
   rscServerPluginFactory,
 } from "../../src";
+import { ALLOWED_RSC_MODES } from "../../src/constants";
+import {
+  clearStale,
+  isStale,
+  markStale,
+} from "../../src/shared-ssr/staleRegistry";
 
 import type {
   RscActionResult,
@@ -353,6 +362,56 @@ describe("validation: non-function loader values rejected", () => {
 });
 
 // =============================================================================
+// Invariant 13 — Factory compilation error releases claim (PBT coverage)
+// =============================================================================
+//
+// The functional suite covers this with a single hand-crafted Error; PBT
+// generalises across arbitrary error shapes so a regression that only
+// releases the claim on certain message lengths or error subclasses
+// surfaces here. Property: for ANY throw inside the loader factory,
+// `usePlugin()` rethrows AND the `"rsc"` namespace is re-claimable after.
+
+describe("teardown: factory throw releases claim (Inv 13)", () => {
+  // Strings and Errors hit the two common throw shapes in JS code. The
+  // factory's try/catch is shape-blind — what matters is that the
+  // exception propagates and the claim is released regardless.
+  const arbThrowValue = fc.oneof(
+    fc.string({ minLength: 1, maxLength: 32 }).map((m) => new Error(m)),
+    fc.string({ minLength: 1, maxLength: 32 }).map((m) => new TypeError(m)),
+    fc.string({ minLength: 1, maxLength: 32 }),
+  );
+
+  test.prop([arbThrowValue], { numRuns: NUM_RUNS.standard })(
+    "factory that throws → usePlugin rethrows + namespace re-claimable",
+    (thrown) => {
+      const router = createRouter(ROUTES, { defaultRoute: "home" });
+      const factory = rscServerPluginFactory({
+        home: () => {
+          // The point of this test is to exercise the claim-release path
+          // for arbitrary thrown shapes — including plain strings, which
+          // are valid JS throws but flagged by `only-throw-error`. The
+          // factory's try/catch is shape-blind; refusing to test string
+          // throws would shrink the property's range without changing
+          // what the invariant guarantees.
+          // eslint-disable-next-line @typescript-eslint/only-throw-error
+          throw thrown;
+        },
+      });
+
+      // Rethrow is shape-preserving — fast-check shrinking would give us
+      // the minimal reproducer if a regression broke this.
+      expect(() => router.usePlugin(factory)).toThrow();
+
+      // Same-namespace re-claim must succeed AFTER the rethrow — proves
+      // the factory released the claim on its way out (Inv 13).
+      expect(() =>
+        getPluginApi(router).claimContextNamespace("rsc"),
+      ).not.toThrow();
+    },
+  );
+});
+
+// =============================================================================
 // Composition: rsc-server-plugin + ssr-data-plugin coexist on the same router
 // =============================================================================
 //
@@ -481,7 +540,11 @@ describe("invalidate: per-namespace orthogonality", () => {
     maxLength: 10,
   });
 
-  test.prop([arbMarkSequence], { numRuns: NUM_RUNS.standard })(
+  // Use `thorough` (100) rather than `standard` (50): with sequences up to
+  // length 10, 50 runs gives statistically reliable coverage only to
+  // sequence-length ~4 (per the audit's §1 numRuns analysis). 100 runs
+  // covers the full length range with margin.
+  test.prop([arbMarkSequence], { numRuns: NUM_RUNS.thorough })(
     "marking 'data' never triggers the rsc loader (and vice versa)",
     async (sequence) => {
       let rscCalls = 0;
@@ -545,6 +608,18 @@ describe("invalidate: per-namespace orthogonality", () => {
 
       expect(rscCalls - rscBaseline).toBe(expectedRscDelta);
       expect(dataCalls - dataBaseline).toBe(expectedDataDelta);
+
+      // Conservation cross-check: per the orthogonality contract each
+      // navigation triggers EXACTLY ONE plugin re-run (whichever was
+      // invalidated). Sum of post-baseline deltas must equal the number
+      // of navigations. Without this, a regression where both plugins
+      // re-fire on a single invalidate would pass the per-delta check
+      // (each rscDelta could "accidentally" equal expectedRscDelta if
+      // both plugins inflate together) — symmetric inflation is invisible
+      // to delta-vs-expected math at N=10 but caught here.
+      expect(rscCalls + dataCalls - rscBaseline - dataBaseline).toBe(
+        sequence.length,
+      );
 
       router.dispose();
     },
@@ -630,26 +705,19 @@ describe("ssr mode: function-form resolver runs once per start()", () => {
 });
 
 describe("ssr mode: getSsrRscMode is a pure read-side guard", () => {
-  // Helper: build a minimal `State` with arbitrary `ssrRscMode` in context.
-  // No router involvement — `getSsrRscMode` only reads `state.context`.
-  const stateWith = (ssrRscMode: unknown): State => ({
-    name: "any",
-    params: {},
-    path: "/",
-    transition: {
-      phase: "activating",
-      reason: "success",
-      segments: { deactivated: [], activated: [], intersection: "" },
-    },
-    context: { ssrRscMode } as Record<string, unknown>,
-  });
+  // Narrow wrapper around the shared `stateWith` helper — `getSsrRscMode`
+  // reads only `state.context.ssrRscMode`, so a single-field State is the
+  // minimal fixture. Keeping the wrapper local to this describe block
+  // lets the foreign-mode and idempotency tests share the same builder.
+  const stateWithMode = (ssrRscMode: unknown): State =>
+    stateWith({ ssrRscMode });
 
   test.prop([fc.constantFrom<RscSsrMode>("full", "client-only")], {
     numRuns: NUM_RUNS.standard,
   })(
     "transparency: for any allowed mode m, getSsrRscMode(state{ssrRscMode:m}) === m",
     (m) => {
-      expect(getSsrRscMode(stateWith(m))).toBe(m);
+      expect(getSsrRscMode(stateWithMode(m))).toBe(m);
     },
   );
 
@@ -670,10 +738,33 @@ describe("ssr mode: getSsrRscMode is a pure read-side guard", () => {
     fc.object(),
   );
 
-  test.prop([arbForeignMode], { numRuns: NUM_RUNS.thorough })(
+  // `arbForeignMode` has 10 branches via `fc.oneof` — `thorough` (100)
+  // gives each branch only ~10 expected hits, which is too few to reliably
+  // cover regressions limited to one specific branch shape. `exhaustive`
+  // (200) raises the per-branch expectation to ~20 — twice the prior
+  // coverage at twice the runtime, still well under the property suite's
+  // sub-second budget.
+  test.prop([arbForeignMode], { numRuns: NUM_RUNS.exhaustive })(
     "guard: any non-allowed value collapses to 'full'",
     (foreign) => {
-      expect(getSsrRscMode(stateWith(foreign))).toBe("full");
+      expect(getSsrRscMode(stateWithMode(foreign))).toBe("full");
+    },
+  );
+
+  // Inv (NEW) — Idempotency of getSsrRscMode. The function maps any input
+  // into ALLOWED_RSC_MODES, then returns it as-is on subsequent reads.
+  // Two consecutive reads of a state whose `ssrRscMode` is already the
+  // resolved mode must give the same result — protects against a
+  // regression that double-validates (e.g. wraps the read in a fallback
+  // chain that shifts state under read after a `set ssrRscMode` from a
+  // foreign writer).
+  test.prop([arbForeignMode], { numRuns: NUM_RUNS.exhaustive })(
+    "idempotency: getSsrRscMode(state{ssrRscMode: getSsrRscMode(s)}) === getSsrRscMode(s)",
+    (foreign) => {
+      const once = getSsrRscMode(stateWithMode(foreign));
+      const twice = getSsrRscMode(stateWithMode(once));
+
+      expect(twice).toBe(once);
     },
   );
 });
@@ -772,6 +863,343 @@ describe("ssr mode: short form === { loader }", () => {
 
       baseShort.stop();
       baseObject.stop();
+    },
+  );
+});
+
+// =============================================================================
+// buildRscPayload — wire-format helper invariants
+// =============================================================================
+//
+// The audit (§6) calls out six invariants of `buildRscPayload` that are
+// reachable from the function's signature but absent from INVARIANTS.md
+// and untested via PBT. Documenting + property-testing them is cheap and
+// catches refactor-time regressions that would otherwise only surface in
+// integration tests inside the SSR demo apps.
+//
+// The function reads `state.context.rsc` and `state.context.rscAction`
+// and is otherwise side-effect-free — no router, no claim machinery —
+// so the property tests work on hand-built State objects.
+
+describe("buildRscPayload: identity / override / null preservation", () => {
+  test.prop([arbReactNode], { numRuns: NUM_RUNS.thorough })(
+    "identity: buildRscPayload(state).root === state.context.rsc",
+    (rsc) => {
+      const payload = buildRscPayload(stateWith({ rsc }));
+
+      // toBe (===) — the contract is reference passthrough, not deep
+      // copy. A regression that wrapped rsc in a new object would still
+      // pass toStrictEqual but fail here.
+      expect(payload.root).toBe(rsc);
+    },
+  );
+
+  test.prop([arbReactNode, arbReactNode], { numRuns: NUM_RUNS.thorough })(
+    "override winning: any defined override replaces state.context.rsc",
+    (rsc, override) => {
+      // arbReactNode emits `null` as a valid ReactNode and `undefined` is
+      // NOT in the arbitrary's range — so `override` is always defined.
+      // The audit's separate `null preservation` property below covers
+      // the `null` override case.
+      const payload = buildRscPayload(stateWith({ rsc }), override);
+
+      expect(payload.root).toBe(override);
+    },
+  );
+
+  test.prop([arbReactNode], { numRuns: NUM_RUNS.standard })(
+    "null preservation: explicit null override is preserved, not collapsed to default",
+    (rsc) => {
+      // The function uses `=== undefined`, not `??`, to distinguish
+      // "render nothing" (null) from "use the default" (undefined).
+      // Loss of this distinction would silently fall back to rsc, which
+      // is the bug this invariant guards against.
+      const payload = buildRscPayload(stateWith({ rsc }), null);
+
+      expect(payload.root).toBeNull();
+    },
+  );
+});
+
+describe("buildRscPayload: rscAction passthrough + omit semantics", () => {
+  test.prop([arbReactNode], { numRuns: NUM_RUNS.standard })(
+    "absent action: returnValue and formState keys are OMITTED, not undefined",
+    (rsc) => {
+      const payload = buildRscPayload(stateWith({ rsc }));
+
+      // `in` distinguishes "key absent" from "key present with undefined"
+      // — `exactOptionalPropertyTypes: true` consumers rely on this.
+      expect("returnValue" in payload).toBe(false);
+      expect("formState" in payload).toBe(false);
+    },
+  );
+
+  test.prop([arbReactNode, arbRscAction], { numRuns: NUM_RUNS.thorough })(
+    "passthrough by reference: payload.returnValue/formState === action.<field>",
+    (rsc, action) => {
+      const payload = buildRscPayload(stateWith({ rsc, rscAction: action }));
+
+      // Reference identity (toBe) — the function publishes the existing
+      // object graph, not a copy. A regression that deep-cloned the
+      // action result would inflate Flight payload size and break
+      // identity-based memoization downstream.
+      if (action.returnValue === undefined) {
+        expect("returnValue" in payload).toBe(false);
+      } else {
+        expect(payload.returnValue).toBe(action.returnValue);
+      }
+
+      if (action.formState === undefined) {
+        expect("formState" in payload).toBe(false);
+      } else {
+        expect(payload.formState).toBe(action.formState);
+      }
+    },
+  );
+
+  test.prop([arbReactNode], { numRuns: NUM_RUNS.standard })(
+    "fixpoint: feeding the output's root back as override yields the same root",
+    (rsc) => {
+      // buildRscPayload(state, buildRscPayload(state).root) — applying
+      // the function to its own output. The expected post-condition is
+      // that .root tracks state.context.rsc (or the override, which
+      // here IS state.context.rsc by construction). Catches a regression
+      // where override handling diverges from default handling.
+      const inner = buildRscPayload(stateWith({ rsc }));
+      const outer = buildRscPayload(stateWith({ rsc }), inner.root);
+
+      expect(outer.root).toBe(rsc);
+    },
+  );
+});
+
+// =============================================================================
+// getSsrRscMode — closed-set membership (Inv 28)
+// =============================================================================
+//
+// §6.8: for ANY input, `getSsrRscMode` returns a value ∈ ALLOWED_RSC_MODES.
+// The defensive-read contract — never leak a value outside the allowed set
+// downstream, regardless of how the context got populated (typed write,
+// TS-cast bypass, foreign writer). Complements Inv 16 (reflects valid
+// input) and Inv 21 (idempotency under double-application).
+
+describe("getSsrRscMode: closed-set membership (Inv 28)", () => {
+  const stateWithMode = (ssrRscMode: unknown): State =>
+    stateWith({ ssrRscMode });
+
+  const arbAnyInput = fc.oneof(
+    fc.constant(undefined),
+    fc.constant(null),
+    fc.boolean(),
+    fc.integer(),
+    fc.double(),
+    fc.string(),
+    fc.constant("full"),
+    fc.constant("client-only"),
+    fc.constant("data-only"),
+    fc.array(fc.anything()),
+    fc.object(),
+  );
+
+  test.prop([arbAnyInput], { numRuns: NUM_RUNS.exhaustive })(
+    "result ∈ ALLOWED_RSC_MODES for any input",
+    (input) => {
+      const result = getSsrRscMode(stateWithMode(input));
+
+      // toContain on a readonly array — Inv 28 is "result is one of the
+      // documented set members". A regression that returned a foreign
+      // string (e.g. the raw value when validation slips) would fail
+      // here, even if downstream branches still functioned.
+      expect(ALLOWED_RSC_MODES).toContain(result);
+    },
+  );
+});
+
+// =============================================================================
+// rscActionPluginFactory — runtime guard invariants (Inv 29-30)
+// =============================================================================
+//
+// §6.9-6.11: the per-start guard at `actionFactory.ts:110-119` rejects
+// Promise/thenable, array, and null. PBT generalises the existing
+// functional coverage:
+//
+// - Inv 29: any plain object (typeof === "object", non-null, non-array,
+//   non-thenable) passes the guard and survives `claim.write`.
+// - Inv 30: any thenable result raises a "Promise/thenable …" TypeError
+//   with the documented prefix.
+//
+// §6.10 (determinism of `describeBadResult`) is trivially true in JS —
+// no PBT, but documented as Inv 29's pre-condition.
+
+describe("rscActionPluginFactory: guard accepts plain objects (Inv 29)", () => {
+  // arbPlainAcceptedResult — values that ALL of: typeof === "object",
+  // not null, not array, no own/inherited `.then === function`. The
+  // factory must accept these without throwing during start().
+  //
+  // We use `fc.dictionary(string, primitive)` to guarantee plain-object
+  // shape without ever generating a `.then` field — a thenable shape
+  // would land in Inv 30's territory, not here.
+  const arbPlainAcceptedResult = fc
+    .dictionary(
+      fc
+        .string({ minLength: 1, maxLength: 8 })
+        // Hard-exclude `then`/`Symbol.toStringTag`-class collisions —
+        // we only test the non-thenable branch here.
+        .filter((k) => k !== "then"),
+      fc.oneof(fc.string(), fc.integer(), fc.boolean(), fc.constant(null)),
+      { minKeys: 0, maxKeys: 4 },
+    )
+    .map((dict) => dict as unknown as RscActionResult);
+
+  test.prop([arbPlainAcceptedResult], { numRuns: NUM_RUNS.thorough })(
+    "any plain object payload flows through claim.write without throwing",
+    async (result) => {
+      const router = createRouter(ROUTES, { defaultRoute: "home" });
+
+      router.usePlugin(rscActionPluginFactory(() => result));
+
+      // The contract: if guard accepts (typeof === "object" && !null &&
+      // !Array && !.then), `claim.write` succeeds. A regression that
+      // tightened the guard (e.g. required exact `RscActionResult`
+      // shape) would fail here on random extras.
+      const state = await router.start("/");
+
+      expect(state.context.rscAction).toBe(result);
+
+      router.stop();
+    },
+  );
+});
+
+describe("rscActionPluginFactory: Promise/thenable detection (Inv 30)", () => {
+  // arbThenableResult — any object with `.then === function`. The
+  // guard at actionFactory.ts:114 must reject these with a
+  // "Promise/thenable" prefix. This catches the common consumer
+  // mistake of wiring an `async getResult`. We DELIBERATELY build
+  // thenable POJOs here — that's the regression class under test —
+  // so the unicorn lint rule is disabled inline.
+  const arbThenableResult = fc.oneof(
+    // Real Promises.
+    fc.anything().map((v) => Promise.resolve(v)),
+    // POJO thenable — `.then` returning various callables. Built via
+    // Object.defineProperty to avoid the literal-`then`-key linter
+    // trigger while still exposing the same own-property shape.
+    fc
+      .constantFrom<() => unknown>(
+        () => undefined,
+        () => null,
+        () => {
+          throw new Error("ignored");
+        },
+      )
+      .map((thenFn) => {
+        const obj: Record<string, unknown> = {};
+
+        // Deliberately constructs a thenable POJO to exercise the
+        // Promise-detection guard at actionFactory.ts:114.
+        // eslint-disable-next-line unicorn/no-thenable
+        Object.defineProperty(obj, "then", {
+          value: thenFn,
+          enumerable: true,
+          writable: true,
+          configurable: true,
+        });
+
+        return obj;
+      }),
+  );
+
+  test.prop([arbThenableResult], { numRuns: NUM_RUNS.thorough })(
+    "any thenable result raises TypeError with the Promise/thenable prefix",
+    async (result) => {
+      const router = createRouter(ROUTES, { defaultRoute: "home" });
+
+      router.usePlugin(rscActionPluginFactory(() => result as RscActionResult));
+
+      await expect(router.start("/")).rejects.toThrow(/Promise\/thenable/);
+
+      router.stop();
+    },
+  );
+});
+
+// =============================================================================
+// staleRegistry — Set-based registry invariants (Inv 31-33)
+// =============================================================================
+//
+// §6.12-6.14: the registry is a WeakMap<Router, Set<string>>, so the
+// expected algebra is:
+//
+// - Inv 31 (idempotent mark): markStale(r, ns); markStale(r, ns) leaves
+//   the registry in the same state as a single mark — verified by
+//   `isStale === true` after either count, and a single `clearStale`
+//   restoring `isStale === false` (no residual marks from the
+//   duplicated call).
+// - Inv 32 (inverse): mark/clear restores isStale to false.
+// - Inv 33 (per-router isolation): marking one router does not affect
+//   another. Verifies the WeakMap key isolation contract.
+//
+// All tests use fresh router instances per fast-check trial — the
+// module-level WeakMap survives across trials, so cross-talk would
+// quickly poison a shared router. Fresh-per-trial == clean baseline.
+
+describe("staleRegistry: markStale is idempotent (Inv 31)", () => {
+  test.prop([fc.string({ minLength: 1, maxLength: 16 })], {
+    numRuns: NUM_RUNS.standard,
+  })("double markStale collapses to a single Set entry", (namespace) => {
+    const router = createRouter(ROUTES, { defaultRoute: "home" });
+
+    markStale(router, namespace);
+    markStale(router, namespace);
+
+    // Both reads must observe the flag.
+    expect(isStale(router, namespace)).toBe(true);
+
+    // A single clearStale must restore the false state — if markStale
+    // were counting, two clears would be needed.
+    clearStale(router, namespace);
+
+    expect(isStale(router, namespace)).toBe(false);
+  });
+});
+
+describe("staleRegistry: markStale / clearStale is an inverse pair (Inv 32)", () => {
+  test.prop([fc.string({ minLength: 1, maxLength: 16 })], {
+    numRuns: NUM_RUNS.standard,
+  })("mark; clear; isStale === false", (namespace) => {
+    const router = createRouter(ROUTES, { defaultRoute: "home" });
+
+    expect(isStale(router, namespace)).toBe(false);
+
+    markStale(router, namespace);
+
+    expect(isStale(router, namespace)).toBe(true);
+
+    clearStale(router, namespace);
+
+    expect(isStale(router, namespace)).toBe(false);
+  });
+});
+
+describe("staleRegistry: per-router isolation (Inv 33)", () => {
+  test.prop([fc.string({ minLength: 1, maxLength: 16 })], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "markStale on one router leaves another router unaffected",
+    (namespace) => {
+      const r1 = createRouter(ROUTES, { defaultRoute: "home" });
+      const r2 = createRouter(ROUTES, { defaultRoute: "home" });
+
+      markStale(r1, namespace);
+
+      expect(isStale(r1, namespace)).toBe(true);
+      expect(isStale(r2, namespace)).toBe(false);
+
+      // Symmetric: marking r2 doesn't retroactively affect r1's flag.
+      markStale(r2, "another-namespace");
+
+      expect(isStale(r1, namespace)).toBe(true);
+      expect(isStale(r1, "another-namespace")).toBe(false);
     },
   );
 });

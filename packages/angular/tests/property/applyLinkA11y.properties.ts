@@ -191,4 +191,214 @@ describe("applyLinkA11y — Property Tests", () => {
       expect(svg.getAttribute("role")).toBe("img");
     });
   });
+
+  // ===========================================================================
+  // Audit 2026-05-16 §6.2 #7 (MED) — skip-or-fully-apply
+  // For every freshly-created element (no pre-existing role/tabindex), the
+  // function must either skip entirely (interactive native tag — anchor /
+  // button) or stamp BOTH `role` and `tabindex`. There is no partial state.
+  // The wider tag matrix here covers <details>/<summary>/<input>/<form>/<svg>,
+  // which are the realistic regression targets.
+  // ===========================================================================
+  describe("Invariant 7: skip-or-fully-apply — never partial (audit §6.2 #7)", () => {
+    const arbAnyTag = fc.constantFrom(
+      "a",
+      "button",
+      "div",
+      "span",
+      "section",
+      "li",
+      "p",
+      "article",
+      "aside",
+      "nav",
+      "header",
+      "footer",
+      "main",
+      "input",
+      "textarea",
+      "select",
+      "label",
+      "form",
+      "details",
+      "summary",
+    );
+
+    test.prop([arbAnyTag], { numRuns: NUM_RUNS.thorough })(
+      "fresh element: role-attribute presence === tabindex-attribute presence",
+      (tag) => {
+        const element = document.createElement(tag);
+
+        applyLinkA11y(element);
+
+        const hasRole = element.hasAttribute("role");
+        const hasTab = element.hasAttribute("tabindex");
+
+        // Either both are present (stamped path) or neither is (skip path).
+        // A partial state — say, only `role` without `tabindex` — would
+        // produce inaccessible UI (announced as a link but not keyboard
+        // reachable).
+        expect(hasRole).toBe(hasTab);
+      },
+    );
+
+    test.prop([arbAnyTag], { numRuns: NUM_RUNS.standard })(
+      "fresh element: when stamped, role==='link' and tabindex==='0'",
+      (tag) => {
+        const element = document.createElement(tag);
+
+        applyLinkA11y(element);
+
+        if (element.hasAttribute("role")) {
+          expect(element.getAttribute("role")).toBe("link");
+          expect(element.getAttribute("tabindex")).toBe("0");
+        }
+      },
+    );
+  });
+
+  // ===========================================================================
+  // Audit 2026-05-16 §6.1 — Composition: classification is deterministic and
+  // disjoint. Each tag falls strictly into ONE of two bins: skip-list (no
+  // attributes stamped) or injectable (role="link" + tabindex="0" stamped).
+  // The two bins must not overlap, and the bin assignment must be stable
+  // across repeated invocations on fresh elements with the same tag.
+  // ===========================================================================
+  describe("Invariant 9: skip-list ∩ injectable = ∅ — classification is deterministic and disjoint (audit §6.1)", () => {
+    const arbAnyTag = fc.constantFrom(
+      "a",
+      "button",
+      "div",
+      "span",
+      "section",
+      "li",
+      "p",
+      "article",
+      "aside",
+      "nav",
+      "header",
+      "footer",
+      "main",
+      "input",
+      "textarea",
+      "select",
+      "label",
+      "form",
+      "details",
+      "summary",
+    );
+
+    test.prop([arbAnyTag], { numRuns: NUM_RUNS.thorough })(
+      "classification is deterministic — five fresh elements of the same tag land in the same bin",
+      (tag) => {
+        const verdicts: boolean[] = [];
+
+        for (let i = 0; i < 5; i++) {
+          const element = document.createElement(tag);
+
+          applyLinkA11y(element);
+          verdicts.push(element.hasAttribute("role"));
+        }
+
+        // All five must agree — either all stamped or all skipped.
+        const unique = new Set(verdicts);
+
+        expect(unique.size).toBe(1);
+      },
+    );
+
+    test.prop([arbAnyTag], { numRuns: NUM_RUNS.standard })(
+      "classification is disjoint — every tag is in exactly one bin (skip-list XOR injectable)",
+      (tag) => {
+        const element = document.createElement(tag);
+
+        applyLinkA11y(element);
+
+        const isInjectable = element.hasAttribute("role");
+        // Skip-list = NOT injectable. Disjoint by definition because each tag
+        // produces a single boolean verdict — but pin it so a future refactor
+        // that introduced a third "partial" state (e.g. role without tabindex)
+        // would surface here.
+        const isSkipped = !element.hasAttribute("role");
+
+        // Boolean negation — exactly one of the two flags is true.
+        expect(isInjectable).not.toBe(isSkipped);
+
+        // And the stamped pattern is fully canonical when injectable.
+        if (isInjectable) {
+          expect(element.getAttribute("role")).toBe("link");
+          expect(element.getAttribute("tabindex")).toBe("0");
+        } else {
+          expect(element.hasAttribute("tabindex")).toBe(false);
+        }
+      },
+    );
+
+    // Audit 2026-05-16 §5.2 Bug 4 — documented known limitation:
+    // `applyLinkA11y` skip-list contains ONLY <a> and <button>; native
+    // interactive elements like <details>/<summary>/<input>/<textarea>/<form>
+    // still receive role="link" + tabindex="0" if used as a directive host
+    // (e.g. `<details realLink>`). This is an accessibility regression risk
+    // — screen readers see "link" instead of the element's native role
+    // (disclosure widget / form control). The fix (extending skip-list)
+    // requires a major release cycle since `shared/dom-utils/link-utils.ts`
+    // declares `applyLinkA11y` as frozen API consumed by 6 adapters
+    // (Preact, React, Solid, Vue, Svelte, Angular). The pin below documents
+    // the current behavior so any future regression that silently changes
+    // the classification surfaces here; the major-release fix should
+    // simultaneously update this expectation.
+    it("the documented skip-list contains <a> and <button>; everything else in the matrix is injectable (Bug 4: known a11y limitation)", () => {
+      const skipTags = ["a", "button"];
+      // Native interactive elements that SHOULD be in the skip-list but
+      // currently are not. Treated as injectable today (= role/tabindex
+      // stamped). When the major-release fix lands, move these into
+      // `skipTags` and re-run the test.
+      const nativeInteractiveCurrentlyInjectable = [
+        "input",
+        "textarea",
+        "select",
+        "label",
+        "form",
+        "details",
+        "summary",
+      ];
+      const injectableTags = [
+        "div",
+        "span",
+        "section",
+        "li",
+        "p",
+        "article",
+        "aside",
+        "nav",
+        "header",
+        "footer",
+        "main",
+        ...nativeInteractiveCurrentlyInjectable,
+      ];
+
+      for (const tag of skipTags) {
+        const element = document.createElement(tag);
+
+        applyLinkA11y(element);
+
+        expect(element.hasAttribute("role")).toBe(false);
+        expect(element.hasAttribute("tabindex")).toBe(false);
+      }
+
+      for (const tag of injectableTags) {
+        const element = document.createElement(tag);
+
+        applyLinkA11y(element);
+
+        expect(element.getAttribute("role")).toBe("link");
+        expect(element.getAttribute("tabindex")).toBe("0");
+      }
+
+      // Pin: the two sets are disjoint by construction.
+      const intersection = skipTags.filter((t) => injectableTags.includes(t));
+
+      expect(intersection).toStrictEqual([]);
+    });
+  });
 });

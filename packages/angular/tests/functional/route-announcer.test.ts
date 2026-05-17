@@ -1,5 +1,5 @@
 import { createRouter } from "@real-router/core";
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { createRouteAnnouncer } from "../../src/dom-utils";
 
@@ -526,6 +526,7 @@ describe("createRouteAnnouncer", () => {
         subscribe: () => () => {},
       } as unknown as ReturnType<typeof createRouter>;
 
+      const subscribeSpy = vi.spyOn(minimalRouter, "subscribe");
       let announcer: { destroy: () => void } | undefined;
 
       expect(() => {
@@ -534,6 +535,8 @@ describe("createRouteAnnouncer", () => {
 
       expect(announcer).toBeDefined();
       expect(announcer!.destroy).toBeTypeOf("function");
+      // NOOP_INSTANCE: no listener wired when document is unavailable.
+      expect(subscribeSpy).not.toHaveBeenCalled();
 
       // Idempotent destroy on NOOP_INSTANCE.
       expect(() => {

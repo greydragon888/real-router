@@ -150,6 +150,42 @@ adapters and for consumers who build their own custom Link surface.)
 | 4 | **Null / undefined element is a defensive no-op** — never throws | Framework refs can be `null` / `undefined` before mount; a throw here would crash the first user with a ref-callback on mount |
 | 5 | **Generic element gains `role="link"` + `tabindex="0"`** when neither attribute pre-exists | Canonical WAI-ARIA recipe for non-anchor link surfaces; the positive contract that justifies the helper's existence |
 
+## keyOf / canonicalJson (scroll-restore storage key)
+
+File: `tests/property/scrollRestoreKey.properties.ts`
+
+Private helpers in `shared/dom-utils/scroll-restore.ts` that derive the
+`sessionStorage` bucket key for saved scroll positions. CLAUDE.md L17 contract:
+*"Keyed by `(name, canonicalJson(params))` — duplicate history entries share
+one bucket."* Replicated inline (mirror of `scroll-restore.ts:264-288`); a
+change to that file must be mirrored here.
+
+| # | Invariant | Why it must hold |
+|---|-----------|-----------------|
+| 1 | **Determinism** — `keyOf(state) === keyOf(state)` across calls | scroll-restore calls `keyOf` at save time (subscribeLeave) and load time (mount restore). Drift between the two would cause silent UX loss — back-button never finds the saved position |
+| 2 | **Key-order insensitivity** — `keyOf({name, {a:1,b:2}}) === keyOf({name, {b:2,a:1}})` (symmetric, shuffled) | "Duplicate history entries share one bucket" — when the URL plugin parses `?b=2&a=1` it may emit keys in a different order than the JS literal `{a:1,b:2}`; both must hash to the same bucket |
+| 3 | **Name-injectivity** — different `name` → different key even with identical params | Without the `name:` prefix, navigating `/users` (scrolled) → `/posts` → back-to-`/users` could restore the wrong position; locks the prefix as the only injectivity guard |
+| 4 | **`canonicalJson` totality** — never throws on plain `{string: primitive}` params | scroll-restore subscribes to every leave event; a runtime throw would surface as an unhandled error on every navigation |
+| 5 | **Recursive sort + array preservation** — nested objects also get key-sorted; arrays preserve insertion order | The replacer recurses into objects but skips arrays (matches JSON semantics: object keys are unordered, array indices are ordered) |
+
+## encodeFragmentInline (private hash encoder)
+
+File: `tests/property/encodeFragmentInline.properties.ts`
+
+Private 1-line helper in `shared/dom-utils/link-utils.ts:25-27`:
+`encodeURI(decoded).replaceAll("#", "%23")`. Used by `buildHref`'s fallback
+path (when no `buildUrl` plugin is installed) to encode the fragment portion
+of the rendered href. Covered indirectly by `buildHref` Inv 4; this section
+locks the modular contract so regressions surface with a meaningful failure.
+
+| # | Invariant | Why it must hold |
+|---|-----------|-----------------|
+| 1 | **No literal `#` in output** — for any input (ASCII or full-Unicode), every `#` becomes `%23` | `encodeURI` does NOT escape `#` (reserved fragment delimiter in the source spec); the helper's defensive `.replaceAll` exists precisely to guarantee this. A regression dropping it would break the URL parser at the next hop |
+| 2 | **Totality** — never throws on any well-formed Unicode input (ASCII + grapheme units) | Called from buildHref's fallback on every Link render with `hash`; a runtime throw would surface as a misleading "Route … is not defined" error in the console (caught by `buildHref`'s try/catch) |
+| 3 | **Empty string round-trip** — `encodeFragmentInline("") === ""` | Defensive: `buildHref` skips the `#fragment` suffix on falsy `normHash`, so this should never actually be invoked with `""` — but the contract is locked for robustness |
+| 4 | **Sub-delims preserved verbatim** — `& = ? :` survive unchanged | RFC 3986 fragment grammar permits these; `encodeURI` already preserves them. Locking guards against a refactor that swaps in `encodeURIComponent` (which would percent-encode them and break query-style fragments like `#tab=1&q=x`) |
+| 5 | **NOT idempotent over already-encoded input** — `%E0…` becomes `%25E0…` (double-encoded); contract requires DECODED input | Locks the documented gotcha so a consumer who passes already-encoded input gets predictable (if wrong) output rather than silent "looks decoded" coincidence |
+
 ## createHttpStatusSink (SSR utility)
 
 File: `tests/property/httpStatusSink.properties.ts`

@@ -84,6 +84,7 @@ describe("useRefFromSource — gotchas and edge cases", () => {
 
     expect(fake.subscribeCount).toBe(1);
     expect(fake.unsubscribeCount).toBe(0);
+    expect(fake.listenerCount()).toBe(1);
 
     // Push a new snapshot — the ref must update inside the scope.
     fake.push({ value: "updated" });

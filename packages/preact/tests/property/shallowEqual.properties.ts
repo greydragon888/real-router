@@ -285,4 +285,60 @@ describe("shallowEqual — Property Tests", () => {
       expect(shallowEqual(owning, inheriting)).toBe(false);
     });
   });
+
+  describe("Edge cases (review §5.1): array length mismatch, null pairs, Symbol-keyed properties", () => {
+    // `shallowEqual` treats arrays as objects via `Object.keys`, so it
+    // operates on index strings ("0", "1", …) + `length`-style enumerable
+    // properties as they exist. Lock the three documented but previously
+    // not-tested edges that surfaced in the review's edge-case table.
+
+    test("arrays of different length → false (key-count short-circuit)", () => {
+      // `Object.keys([1,2,3])` → ["0","1","2"] (length 3); `[1,2]` → length 2.
+      // Inv 5 covers the abstract length mismatch on records; arrays are the
+      // concrete consumer-facing case worth locking explicitly.
+      expect(shallowEqual([1, 2, 3], [1, 2])).toBe(false);
+      expect(shallowEqual([1, 2], [1, 2, 3])).toBe(false);
+    });
+
+    test("arrays of equal length with identical primitives → true (same shape, same keys)", () => {
+      // Symmetric positive case: index keys "0", "1" exist on both, values
+      // compare via Object.is. Locks the array-as-record contract.
+      expect(shallowEqual([1, 2], [1, 2])).toBe(true);
+    });
+
+    test("(null, null) → true via Object.is fast-path", () => {
+      // `Object.is(null, null) === true` short-circuits the first guard. The
+      // documented practical context (CLAUDE.md) is that params are never
+      // null — but the comparator must remain safe over the full nullable
+      // input domain because it's called from areLinkPropsEqual on
+      // user-supplied props.
+      expect(
+        shallowEqual(null as unknown as object, null as unknown as object),
+      ).toBe(true);
+    });
+
+    test("(null, {}) and ({}, null) → false (no NPE in `!prev || !next` guard)", () => {
+      // Symmetric: the `if (!prev || !next)` guard catches null on either
+      // side after the Object.is fast-path missed; without the guard the
+      // for-loop would NPE on `Object.keys(null)`.
+      expect(shallowEqual(null as unknown as object, {})).toBe(false);
+      expect(shallowEqual({}, null as unknown as object)).toBe(false);
+    });
+
+    test("Symbol-keyed properties are IGNORED — only string keys participate", () => {
+      // `Object.keys` returns only string-keyed own properties (symbols are
+      // excluded). Two records that differ only in their Symbol-keyed
+      // properties compare as EQUAL — locks the comparator's "string-keys
+      // only" contract.
+      const symA = Symbol("a");
+      const a: Record<string, unknown> = { x: 1 };
+      const b: Record<string, unknown> = { x: 1 };
+
+      (a as Record<symbol, unknown>)[symA] = 1;
+      (b as Record<symbol, unknown>)[symA] = 2;
+
+      // Symbol values differ but Object.keys excludes them → still equal.
+      expect(shallowEqual(a, b)).toBe(true);
+    });
+  });
 });

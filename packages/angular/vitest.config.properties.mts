@@ -7,6 +7,10 @@ export default mergeConfig(
     test: {
       environment: "node",
       include: ["./tests/property/**/*.properties.ts"],
+      // sourceToSignal / scrollRestoration property tests use TestBed +
+      // jsdom (per-file `// @vitest-environment jsdom` override).
+      // setupTestBed wires the Angular test environment globally.
+      setupFiles: "./tests/setup.ts",
     },
   }),
 );

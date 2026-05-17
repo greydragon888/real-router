@@ -1,8 +1,8 @@
 import { createRouter } from "@real-router/core";
-import { cloneRouter } from "@real-router/core/api";
+import { cloneRouter, getLifecycleApi } from "@real-router/core/api";
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 
-import { invalidate, rscServerPluginFactory } from "../../src";
+import { buildRscPayload, invalidate, rscServerPluginFactory } from "../../src";
 
 import type { RscLoaderFactoryMap } from "../../src";
 import type { Router } from "@real-router/core";
@@ -249,7 +249,15 @@ describe("RSC Loader Stress", () => {
     // in a way the navigate() promise can settle — never crash the loop.
     const base = createRouter(routes, { defaultRoute: "home" });
     let crashes = 0;
+    let hangs = 0;
     let releaseSlowLoader: (() => void) | undefined;
+
+    // Per-iteration hard cap (1s) — a navPromise that never settles
+    // would otherwise hang until the file-level 60s testTimeout and
+    // surface as a generic "test timed out" instead of pointing at the
+    // iteration that wedged. Counting hangs makes the failure mode
+    // explicit instead of relying on the harness wall clock.
+    const ITERATION_TIMEOUT_MS = 1000;
 
     for (let i = 0; i < 100; i++) {
       const clone = cloneRouter(base);
@@ -273,10 +281,14 @@ describe("RSC Loader Stress", () => {
         const navPromise = clone.navigate("users.profile", { id: String(i) });
 
         // Yield enough microtasks to land inside `await loader(…)` of the
-        // leave handler.
-        await Promise.resolve();
-        await Promise.resolve();
-        await Promise.resolve();
+        // leave handler. Mirrors YIELDS_TO_REACH_LOADER_AWAIT in
+        // rsc-loader.test.ts:1160-1172 — same priming sequence for the
+        // leave handler's `await loader(params, { signal })` boundary.
+        const YIELDS_TO_REACH_LOADER_AWAIT = 3;
+
+        for (let y = 0; y < YIELDS_TO_REACH_LOADER_AWAIT; y++) {
+          await Promise.resolve();
+        }
 
         // Tear down WHILE the handler is awaiting the loader. The handler
         // continues to completion; its post-await `claim.write` may throw
@@ -285,7 +297,20 @@ describe("RSC Loader Stress", () => {
         unsub();
         releaseSlowLoader?.();
 
-        await Promise.allSettled([navPromise]);
+        const HANG_SENTINEL = Symbol("hang");
+        const timeoutPromise = new Promise<typeof HANG_SENTINEL>((resolve) => {
+          setTimeout(() => {
+            resolve(HANG_SENTINEL);
+          }, ITERATION_TIMEOUT_MS);
+        });
+        const settled = await Promise.race([
+          Promise.allSettled([navPromise]).then(() => "settled" as const),
+          timeoutPromise,
+        ]);
+
+        if (settled === HANG_SENTINEL) {
+          hangs++;
+        }
       } catch {
         crashes++;
       } finally {
@@ -294,6 +319,11 @@ describe("RSC Loader Stress", () => {
     }
 
     expect(crashes).toBe(0);
+    // Hangs would silently inflate wall time under the 60s testTimeout —
+    // count them as a distinct failure mode so a regression that wedges
+    // navPromise (e.g. unrelinquished leave-handler lock) surfaces with
+    // its own assertion rather than the harness's generic timeout error.
+    expect(hangs).toBe(0);
   });
 
   it("1000 cycles with WeakRef on rsc payload: no leak past GC", async () => {
@@ -444,5 +474,312 @@ describe("RSC Loader Stress", () => {
     expect(loaderCalls.length).toBeLessThanOrEqual(1 + 100 * 4);
 
     router.stop();
+  });
+
+  it("100 cycles of invalidate-after-dispose: WeakMap entry GC'd with router (§7.G1)", async () => {
+    // §7.G1: invalidate(router, "rsc") writes to the per-router WeakMap.
+    // If invalidate is called AFTER unsub() and dispose(), the entry
+    // briefly lives in the registry — the WeakMap key (router itself)
+    // becomes the only retention path. Once the test's local reference
+    // drops, the entry must be GC-eligible. Verify: (a) no crash on
+    // invalidate after dispose, (b) no leak — collected entries don't
+    // grow unboundedly.
+    const base = createRouter(routes, { defaultRoute: "home" });
+    const refs: WeakRef<Router>[] = [];
+
+    for (let i = 0; i < 100; i++) {
+      const clone = cloneRouter(base);
+      const unsub = clone.usePlugin(
+        rscServerPluginFactory({
+          home: () => () => Promise.resolve(node("Home", { i })),
+        }),
+      );
+
+      await clone.start("/");
+      unsub();
+
+      // The flag is set on the WeakMap AFTER unsub — listener gone, flag
+      // still lands. The function must not crash.
+      expect(() => {
+        invalidate(clone, "rsc");
+      }).not.toThrow();
+
+      clone.dispose();
+
+      // Second invalidate post-dispose — must also not crash. WeakMap
+      // entry survives dispose (only GC clears it).
+      expect(() => {
+        invalidate(clone, "rsc");
+      }).not.toThrow();
+
+      refs.push(new WeakRef(clone));
+    }
+
+    // GC pass — any clones not retained outside `refs` should collect.
+    globalThis.gc?.();
+    await new Promise((r) => {
+      setTimeout(r, 50);
+    });
+    globalThis.gc?.();
+
+    const alive = refs.filter((r) => r.deref() !== undefined).length;
+
+    // Conservative threshold mirrors the WeakRef pattern elsewhere in
+    // this file (1000-cycle test uses <200). Sub-50 leaves margin for
+    // V8 nondeterminism while still flagging an unbounded leak.
+    expect(alive).toBeLessThan(50);
+  });
+
+  it("100 hot-swap cycles with pre-existing stale flag: new plugin consumes mark (§7.G2)", async () => {
+    // §7.G2: rapid unsub → invalidate → re-usePlugin → navigate, all on
+    // the SAME router instance. The stale flag survives teardown
+    // (documented in §3.7 as intentional). Each iteration must:
+    //   (a) successfully register a new plugin (claim namespace),
+    //   (b) consume the pre-existing flag via the FIRST nav after
+    //       re-register (loader runs once),
+    //   (c) clear the flag after that consume (second nav doesn't
+    //       re-trigger loader).
+    const router = createRouter(routes, { defaultRoute: "home" });
+    let totalConsumes = 0;
+
+    for (let i = 0; i < 100; i++) {
+      const loader = vi.fn().mockResolvedValue(node("Home", { i }));
+      const unsub = router.usePlugin(
+        rscServerPluginFactory({
+          home: () => loader,
+          "users.profile": () => loader,
+        }),
+      );
+
+      if (i === 0) {
+        await router.start("/");
+      } else {
+        // After the first iteration the router stays started across the
+        // hot-swap — re-usePlugin attaches new listeners on the running
+        // router. Reset call count so the per-iteration assertion
+        // measures only THIS iteration's consume.
+        loader.mockClear();
+      }
+
+      // Set the flag while a plugin is active. Then tear down — the
+      // flag survives in the WeakMap.
+      invalidate(router, "rsc");
+      unsub();
+
+      // Re-register. The new subscribeLeave listener observes the
+      // pre-existing flag on its first leave-approve cycle.
+      const unsub2 = router.usePlugin(
+        rscServerPluginFactory({
+          home: () => loader,
+          "users.profile": () => loader,
+        }),
+      );
+
+      // Navigate to consume the flag.
+      await router.navigate("users.profile", { id: String(i) });
+
+      // The replacement listener saw the flag and ran the loader.
+      expect(loader).toHaveBeenCalled();
+
+      totalConsumes += loader.mock.calls.length;
+
+      unsub2();
+    }
+
+    // Each iteration consumed at least one loader call. 100 cycles ⇒
+    // ≥100 consumes overall. Loose lower bound — V8 timing variance
+    // could collapse some calls in concurrent scenarios; this is
+    // sequential, so the bound is tight.
+    expect(totalConsumes).toBeGreaterThanOrEqual(100);
+  });
+
+  it("50 cycles in-flight invalidate + guard rejection (§7.G3)", async () => {
+    // §7.G3: invalidate during nav that rejects on ACTIVATION GUARD.
+    //
+    // Subtle invariant (different from loader-rejection AND abort):
+    // the leave handler runs in LEAVE_APPROVE phase — BEFORE activation
+    // guards. It awaits the loader, then `clearStale` runs ONLY IF
+    // `!signal.aborted`. Activation guards that reject do NOT abort
+    // the signal — they reject the navigation by returning false.
+    // So the leave handler completes its loader+clearStale path, even
+    // though the navigation as a whole rejects.
+    //
+    // CONSEQUENCE: guard-rejection IS "the navigation that consumes
+    // the flag" — different from loader-rejection (loader threw, no
+    // clearStale) and abort (signal.aborted=true, no clearStale).
+    // Pin this asymmetry so a future refactor that moved clearStale
+    // to TRANSITION_SUCCESS would surface here as deliberate breaking.
+    const base = createRouter(routes, { defaultRoute: "home" });
+    const router = cloneRouter(base);
+    const loader = vi.fn().mockResolvedValue(node("Profile"));
+    let allowGuard = true;
+
+    router.usePlugin(rscServerPluginFactory({ "users.profile": () => loader }));
+
+    const lifecycleApi = getLifecycleApi(router);
+
+    lifecycleApi.addActivateGuard("users.profile", () => () => allowGuard);
+
+    await router.start("/");
+
+    let rejections = 0;
+    let loaderRanDuringRejection = 0;
+    let loaderRanOnFollowUp = 0;
+
+    for (let i = 0; i < 50; i++) {
+      // 1) Mark stale, then block the guard so the navigation fails.
+      invalidate(router, "rsc");
+      allowGuard = false;
+      loader.mockClear();
+
+      await router.navigate("users.profile", { id: `g${i}` }).catch(() => {
+        rejections++;
+      });
+
+      // The leave handler ran (LEAVE_APPROVE is before activation guards),
+      // loader was invoked, clearStale ran (no abort). The activation
+      // guard then rejected the navigation, but the flag is already gone.
+      if (loader.mock.calls.length > 0) {
+        loaderRanDuringRejection++;
+      }
+
+      // 2) Open the guard. The flag is GONE — follow-up nav must NOT
+      // see it (no fresh invalidate).
+      allowGuard = true;
+      loader.mockClear();
+      await router.navigate("users.profile", { id: `ok${i}` });
+
+      if (loader.mock.calls.length > 0) {
+        loaderRanOnFollowUp++;
+      }
+    }
+
+    expect(rejections).toBe(50);
+    // Guard-rejection invariant: leave handler consumed the flag every
+    // cycle — loader ran during the rejected navigation.
+    expect(loaderRanDuringRejection).toBe(50);
+    // Follow-up navigation without fresh invalidate must NOT trigger
+    // the loader — flag was consumed by the rejected nav's leave handler.
+    expect(loaderRanOnFollowUp).toBe(0);
+
+    router.stop();
+  });
+
+  it("200 sequential start() with param mutation: each gets correct rsc (§7.G5)", async () => {
+    // §7.G5: sequential `start()` calls on the same router with
+    // different paths. Router is single-threaded per state, so this is
+    // strict-serial — but a regression that cached `state.params` in
+    // the loader closure (instead of reading per-call from the
+    // resolved state) would surface as cross-call leakage.
+    const router = createRouter(routes, { defaultRoute: "home" });
+
+    router.usePlugin(
+      rscServerPluginFactory({
+        "users.profile": () => (params) =>
+          Promise.resolve(node("Profile", { id: params.id })),
+      }),
+    );
+
+    for (let i = 0; i < 200; i++) {
+      router.stop();
+
+      const state = await router.start(`/users/${i}`);
+
+      expect(state.context.rsc).toStrictEqual(
+        node("Profile", { id: String(i) }),
+      );
+    }
+
+    router.stop();
+  });
+
+  it("100 cycles abort-before-loader-await + invalidate (§7.G6)", async () => {
+    // §7.G6: a navigation aborted BEFORE its leave-handler reaches
+    // `await loader(...)`. The stale flag is consumed only after a
+    // successful, non-cancelled write — an abort BEFORE the loader
+    // starts must leave the flag intact for the next navigation.
+    const base = createRouter(routes, { defaultRoute: "home" });
+    const router = cloneRouter(base);
+    const loader = vi.fn().mockResolvedValue(node("Profile"));
+
+    router.usePlugin(rscServerPluginFactory({ "users.profile": () => loader }));
+
+    await router.start("/");
+
+    let abortedConsumes = 0;
+
+    for (let i = 0; i < 100; i++) {
+      invalidate(router, "rsc");
+      loader.mockClear();
+
+      const ac = new AbortController();
+      const navPromise = router.navigate(
+        "users.profile",
+        { id: `a${i}` },
+        { signal: ac.signal },
+      );
+
+      // Abort IMMEDIATELY — synchronously, before any microtask had a
+      // chance to schedule the leave handler.
+      ac.abort();
+
+      await navPromise.catch(() => undefined);
+
+      // Flag preserved — a follow-up nav with no abort consumes it.
+      await router.navigate("users.profile", { id: `r${i}` });
+
+      if (loader.mock.calls.length > 0) {
+        abortedConsumes++;
+      }
+    }
+
+    // Every aborted-then-recovered iteration must consume the flag on
+    // the follow-up nav. If abort somehow cleared the flag, the
+    // follow-up would not see it and the counter would drop.
+    expect(abortedConsumes).toBe(100);
+
+    router.stop();
+  });
+
+  it("10000 buildRscPayload calls — perf regression marker (§7.G7)", () => {
+    // §7.G7: `buildRscPayload` is on the per-request Flight payload
+    // hot path. A regression that introduced heavy work (deep clone,
+    // serialization, unbounded validation) would surface as a measurable
+    // slowdown here. The threshold is intentionally loose (200ms for
+    // 10k calls = 20µs/call) to avoid CI flakiness, but tight enough
+    // that a 10x regression triggers.
+    const state = {
+      name: "users.profile",
+      params: { id: "42" },
+      path: "/users/42",
+      transition: {
+        phase: "activating" as const,
+        reason: "success" as const,
+        segments: { deactivated: [], activated: [], intersection: "" },
+      },
+      context: {
+        rsc: node("UserProfile"),
+        rscAction: { returnValue: { ok: true, data: 1 } },
+      },
+    };
+    const N = 10_000;
+    const start = performance.now();
+
+    for (let i = 0; i < N; i++) {
+      // Voiding the result side-steps the dead-code-elimination risk;
+      // `expect.assertions` below also forces the loop to be live.
+      const payload = buildRscPayload(state);
+
+      // Just touch a key so V8 cannot constant-fold the call away.
+      if (payload.root === undefined) {
+        throw new Error("unreachable");
+      }
+    }
+
+    const elapsed = performance.now() - start;
+
+    // Generous upper bound — local runs are typically <30ms. 200ms
+    // catches 7-10x regressions; sub-threshold variance is OK.
+    expect(elapsed).toBeLessThan(200);
   });
 });

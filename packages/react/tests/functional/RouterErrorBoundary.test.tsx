@@ -223,6 +223,8 @@ describe("RouterErrorBoundary", () => {
       { wrapper },
     );
 
+    onError.mockClear();
+
     await act(async () => {
       await expect(router.navigate("dashboard")).rejects.toMatchObject({
         code: errorCodes.CANNOT_ACTIVATE,

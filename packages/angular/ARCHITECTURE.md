@@ -51,7 +51,7 @@ src/                            # Main entry — client API
 ├── providersFactory.ts         # provideRealRouterFactory (SSR/SSG per-request clones)
 ├── sourceToSignal.ts           # Signal bridge — converts RouterSource<T> to Signal<T>
 ├── types.ts                    # RouteSignals, ErrorContext interfaces
-├── functions/                  # 11 inject* functions
+├── functions/                  # 9 public inject* functions + 1 internal helper
 │   ├── injectRouter.ts         # Router instance from inject (never reactive)
 │   ├── injectNavigator.ts      # Navigator from inject (never reactive)
 │   ├── injectRoute.ts          # Full route context from ROUTE token (every navigation)
@@ -63,6 +63,10 @@ src/                            # Main entry — client API
 │   ├── injectRouteEnter.ts     # Fire on nav-driven mount via injectRoute() + effect() + transition.from
 │   ├── injectOrThrow.ts        # Internal helper — non-null inject() wrapper
 │   └── index.ts
+├── internal/                   # Internal helpers (not re-exported from src/index.ts)
+│   ├── install.ts              # installScrollRestoration + installViewTransitions — shared by providers + providersFactory
+│   ├── subscribeSourceToSignal.ts  # subscribe → setState → cleanup pattern used by RealLink/RealLinkActive/RouteView
+│   └── buildActiveRouteOptions.ts  # Builds ActiveRouteSourceOptions honoring exactOptionalPropertyTypes
 ├── directives/                 # Directives
 │   ├── RouteMatch.ts           # ng-template[routeMatch] — segment marker
 │   ├── RouteSelf.ts            # ng-template[routeSelf] — exact-match slot for the node itself
@@ -175,7 +179,7 @@ provideRealRouter (ROUTE)   — createRouteSource(router)                     �
 
 ### RouteView
 
-`RouteView` uses Angular's `contentChildren` query to collect `RouteMatch`, `RouteSelf`, and `RouteNotFound` directive instances. Each directive holds a `TemplateRef` injected from its host `ng-template`. The component creates a `createRouteNodeSource` in `ngOnInit` (not the constructor — signal inputs aren't available yet), stores snapshots in a local `signal<RouteSnapshot>`, and derives `activeTemplate` via `computed`:
+`RouteView` uses Angular's `contentChildren` query to collect `RouteMatch`, `RouteSelf`, and `RouteNotFound` directive instances. Each directive holds a `TemplateRef` injected from its host `ng-template`. The component creates a `createRouteNodeSource` inside an `effect(...)` scheduled from the **constructor** (#630 — signal inputs are readable inside `effect()` at first run), stores snapshots in a local `signal<RouteSnapshot>`, and derives `activeTemplate` via two split computeds:
 
 ```
 RouteView (@Component, selector: route-view)
@@ -184,12 +188,10 @@ RouteView (@Component, selector: route-view)
 ├── selfs = contentChildren(RouteSelf)                     # ng-template[routeSelf] directives (exact-match for the node itself)
 ├── notFounds = contentChildren(RouteNotFound)             # ng-template[routeNotFound] directives
 ├── routeState = signal<RouteSnapshot>(EMPTY_SNAPSHOT)     # local state, updated by source subscription
-├── ngOnInit → createRouteNodeSource + subscribe + destroyRef.onDestroy(unsub)
-└── activeTemplate = computed(() => {
-      for match of matches: startsWithSegment(routeName, fullSegmentName) → match.templateRef
-      if routeName === nodeName: first selfs.at(0).templateRef
-      if UNKNOWN_ROUTE: last notFound.templateRef
-    })
+├── effect((onCleanup) => createRouteNodeSource + subscribeSourceToSignal + onCleanup)  # reactive to nodeName()
+├── matchedTemplate = computed(() => /* Match priority loop */)
+├── fallbackTemplate = computed(() => /* Self → NotFound fallback chain */)
+└── activeTemplate = computed(() => matchedTemplate() ?? fallbackTemplate())
 ```
 
 **Template priority:** `Match` (segment prefix) → `Self` (exact-match for `nodeName`) → `NotFound` (UNKNOWN_ROUTE only). First-wins for matches/selfs, last-wins for notFounds — mirrors React/Preact/Solid/Vue contentChildren-resolution semantics adapted to Angular.
@@ -237,19 +239,21 @@ Opt-in via `provideRealRouter(router, { viewTransitions: true })`. Same wiring p
 
 ```
 RealLink (@Directive, selector: a[realLink])
-├── routeName, routeParams, routeOptions, activeClassName, activeStrict, ignoreQueryParams = input()
+├── routeName, routeParams, routeOptions, activeClassName, activeStrict, ignoreQueryParams, hash = input()
 ├── isActive = signal(false)                               # local active state
-├── ngOnInit → createActiveRouteSource + subscribe + destroyRef.onDestroy(unsub)
-├── updateDom() → buildHref(router, routeName, routeParams) → el.setAttribute("href", ...)
-│              → classList.add/remove(activeClassName) based on isActive state
-└── onClick(event) → shouldNavigate(event) ∧ target≠"_blank" → router.navigate(...).catch(() => {})
+├── href = computed(() => buildHref(...))                  # primitive-string output; Object.is dedup
+├── prevActive, prevHref, prevActiveClass                  # skip-same-value caches (audit §8b)
+├── effect((onCleanup) => createActiveRouteSource + subscribeSourceToSignal + skip-same-value branch)
+├── updateHref() → el.setAttribute("href", ...) iff href !== prevHref
+├── updateActiveClass() → classList.toggle(activeClass, isActive()) iff active flipped
+└── onClick(event) → shouldNavigate(event) ∧ target≠"_blank" → navigateWithHash(...).catch(NOOP_CATCH)
 ```
 
-Subscription setup is deferred to `ngOnInit` because signal inputs are not available in the constructor.
+Subscription setup runs inside `effect(...)` scheduled from the **constructor** (#630) — signal inputs are readable inside the effect's first execution, so reading `routeName()`/`routeParams()`/`hash()` makes the source creation reactive. The previous `ngOnInit` pattern captured inputs once at mount and silently drifted under AOT signal-input bindings.
 
 ### RealLinkActive
 
-Same subscription pattern as `RealLink`. Applies a CSS class to any element (not just `<a>`) via `classList.add/remove`. Calls `applyLinkA11y` in the constructor to set `role="link"` and `tabindex="0"` on non-interactive elements.
+Same subscription pattern as `RealLink` (constructor `effect()` + `subscribeSourceToSignal` helper + skip-same-value `prevActive`). Applies a CSS class to any element (not just `<a>`) via `classList.toggle`. Calls `applyLinkA11y` in the constructor to set `role="link"` and `tabindex="0"` on non-interactive elements (skip-list: `<a>`, `<button>` — see [audit §5.2 Bug 4](.claude/review-2026-05-16.md) for the known a11y limitation on `<details>` / `<summary>` / native interactive elements).
 
 ## Build Notes
 

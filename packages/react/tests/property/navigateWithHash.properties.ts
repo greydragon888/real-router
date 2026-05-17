@@ -23,7 +23,7 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect } from "vitest";
 
-import { arbHash, arbRouteName, NUM_RUNS } from "./helpers";
+import { arbHash, arbParams, arbRouteName, NUM_RUNS } from "./helpers";
 import { navigateWithHash } from "../../src/dom-utils";
 
 import type {
@@ -181,6 +181,108 @@ describe("navigateWithHash — Property Tests", () => {
 
         expect(calls).toHaveLength(1);
         expect(calls[0].opts.hash).toBe(hash);
+      },
+    );
+  });
+
+  describe("Invariant 6: force + hashChange tandem (XNOR) — both set OR both absent (review §6 HIGH)", () => {
+    // Stronger framing of Inv 2/3: across ALL parameter shapes the two
+    // flags are linked — a regression that sets one but not the other
+    // would slip past Inv 2 (which checks both as separate assertions
+    // under a same-route precondition). Here we sample the full surface
+    // and assert the XNOR explicitly: a future refactor that splits the
+    // flags into two code paths breaks this.
+    test.prop(
+      [
+        arbRouteName, // currentName
+        arbRouteName, // targetName
+        arbHash, // currentHash
+        arbHash, // newHash
+      ],
+      { numRuns: NUM_RUNS.thorough },
+    )(
+      "across all route/hash combinations: opts.force ↔ opts.hashChange",
+      (currentName, targetName, currentHash, newHash) => {
+        const { router, calls } = makeRouter({
+          name: currentName,
+          params: {},
+          hash: currentHash,
+        });
+
+        void navigateWithHash(router, targetName, {}, newHash);
+
+        expect(calls).toHaveLength(1);
+
+        const opts = calls[0].opts;
+        const hasForce = opts.force === true;
+        const hasHashChange = opts.hashChange === true;
+
+        // XNOR: both set OR both absent. Neither flag is allowed without
+        // the other under any input combination.
+        expect(hasForce).toBe(hasHashChange);
+      },
+    );
+  });
+
+  describe("Invariant 7: shallow params equality determinism — distinct refs with same shape detect same-route (review §6 MED)", () => {
+    // The same-route check uses `shallowEqual(current.params, routeParams)`,
+    // not reference equality. Two structurally-identical params objects with
+    // different identities must be treated as the same route for the
+    // hash-bypass logic. A regression to `current.params === routeParams`
+    // would silently skip the auto-force path for any consumer that
+    // allocates a fresh params object per render (the common React pattern).
+    test.prop([arbRouteName, arbParams, arbHash, arbHash], {
+      numRuns: NUM_RUNS.thorough,
+    })(
+      "same-route same-params different-hash sets force/hashChange across distinct param refs",
+      (routeName, params, currentHash, newHash) => {
+        fc.pre(currentHash !== newHash);
+        // arbHash never yields undefined, so newHash always overrides.
+
+        const currentParams = { ...params };
+        const navigationParams = { ...params };
+
+        // Distinct identities, structurally equal — both pass shallowEqual.
+        expect(currentParams).not.toBe(navigationParams);
+
+        const { router, calls } = makeRouter({
+          name: routeName,
+          params: currentParams,
+          hash: currentHash,
+        });
+
+        void navigateWithHash(router, routeName, navigationParams, newHash);
+
+        expect(calls).toHaveLength(1);
+        expect(calls[0].opts.force).toBe(true);
+        expect(calls[0].opts.hashChange).toBe(true);
+      },
+    );
+
+    test.prop([arbRouteName, arbParams, arbHash], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "same-route different-param-values bypass same-route detection (force NOT set)",
+      (routeName, params, hash) => {
+        // Pick a primitive value not present in params so the difference is
+        // observable through shallowEqual.
+        const extraKey = "____divergent_key____";
+        const currentParams = { ...params, [extraKey]: "a" };
+        const navigationParams = { ...params, [extraKey]: "b" };
+
+        const { router, calls } = makeRouter({
+          name: routeName,
+          params: currentParams,
+          hash,
+        });
+
+        void navigateWithHash(router, routeName, navigationParams, hash);
+
+        expect(calls).toHaveLength(1);
+        // params diverge → same-route check fails → no auto-force even
+        // though the hash matches.
+        expect(calls[0].opts.force).toBeUndefined();
+        expect(calls[0].opts.hashChange).toBeUndefined();
       },
     );
   });

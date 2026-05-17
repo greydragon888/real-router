@@ -104,6 +104,7 @@ describe("ClientOnly", () => {
           typeof msg === "string" && /hydrat/i.test(msg),
       );
 
+      expect(errSpy).toHaveBeenCalledTimes(0);
       expect(hydrationErrors).toHaveLength(0);
 
       root.unmount();

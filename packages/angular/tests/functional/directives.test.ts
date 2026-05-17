@@ -32,7 +32,7 @@ describe("RealLink directive", () => {
       router.stop();
     });
 
-    it("creates directive and runs ngOnInit with defaults", () => {
+    it("creates directive with default inputs — no href, no a11y attrs, buildHref error logged", () => {
       const spy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       @Component({
@@ -198,7 +198,7 @@ describe("RealLink directive", () => {
       spy.mockRestore();
     });
 
-    it("ngOnInit subscribe callback fires on navigation (covers isActive re-set)", async () => {
+    it("post-navigation: router state updates and href stays absent when routeName is empty", async () => {
       const spy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       @Component({
@@ -239,9 +239,9 @@ describe("RealLink directive", () => {
 
       globalThis.addEventListener("unhandledrejection", onUnhandled);
 
-      vi.spyOn(router, "navigate").mockRejectedValue(
-        new Error("rejected by guard"),
-      );
+      const navigateSpy = vi
+        .spyOn(router, "navigate")
+        .mockRejectedValue(new Error("rejected by guard"));
 
       @Component({
         template: `<a realLink>Link</a>`,
@@ -273,6 +273,8 @@ describe("RealLink directive", () => {
         setTimeout(resolve, 0);
       });
 
+      // Prove navigate WAS called (mock path exercised) AND rejection was caught.
+      expect(navigateSpy).toHaveBeenCalled();
       expect(unhandledRejections).toStrictEqual([]);
       expect(spy).toHaveBeenCalled();
 
@@ -303,6 +305,11 @@ describe("RealLink directive", () => {
       const classesBefore = [...anchor.classList];
       const hrefBefore = anchor.getAttribute("href");
 
+      // JIT-LIMITED: With default routeName="" the directive logs a console.error
+      // and leaves no href or class attributes on the anchor — both snapshots are
+      // empty/null before destroy. The post-destroy assertions (frozen attributes)
+      // are therefore trivially true in JIT. The behavioural contract (no DOM
+      // writes after destroy) is enforced at scale by stress/listener-leak.stress.ts.
       fixture.destroy();
 
       await router.navigate("users");
@@ -500,6 +507,9 @@ describe("RealLinkActive directive", () => {
       const div = fixture.nativeElement.querySelector("div") as HTMLDivElement;
       const classesBefore = [...div.classList];
 
+      // JIT-LIMITED: With empty realLinkActive input the directive never adds a
+      // class, so classesBefore = []. The post-destroy assertion is trivially true.
+      // Real post-destroy class stability is exercised by stress/listener-leak.stress.ts.
       fixture.destroy();
 
       await router.navigate("users");
@@ -790,14 +800,38 @@ describe("buildHref", () => {
     router.stop();
   });
 
-  it("returns empty string if buildUrl returns empty string (no fallback to buildPath)", async () => {
+  it("falls back to buildPath when buildUrl returns empty string (review §5.2 Bug 1)", async () => {
+    // Bug 1 fix: empty-string from `buildUrl` was previously accepted as a
+    // valid href, producing `<a href="">` which resolves to the current page
+    // URL — silent self-navigation. New contract: `typeof url === "string"
+    // && url.length > 0` — any falsy / non-string result delegates to
+    // `router.buildPath` instead. Adapter test mirrors the cross-adapter
+    // PBT coverage in `packages/preact/tests/property/linkUtils.properties.ts`
+    // Inv 7 and `packages/react/tests/property/linkUtils.properties.ts` Inv 12.
     const router = createRouter(routes);
 
     await router.start("/");
 
     (router as unknown as Record<string, unknown>).buildUrl = () => "";
 
-    expect(buildHref(router, "home", {})).toBe("");
+    // Now returns the buildPath result ("/"), NOT the empty string.
+    expect(buildHref(router, "home", {})).toBe("/");
+
+    delete (router as unknown as Record<string, unknown>).buildUrl;
+    router.stop();
+  });
+
+  it("falls back to buildPath when buildUrl returns null (review §5.2 Bug 1)", async () => {
+    // Defensive contract: BuildUrlFn type is `string | undefined`, but a
+    // misbehaving plugin returning `null` (type-contract violation) must NOT
+    // surface as `<a href={null}>` — fall back to buildPath instead.
+    const router = createRouter(routes);
+
+    await router.start("/");
+
+    (router as unknown as Record<string, unknown>).buildUrl = () => null;
+
+    expect(buildHref(router, "home", {})).toBe("/");
 
     delete (router as unknown as Record<string, unknown>).buildUrl;
     router.stop();

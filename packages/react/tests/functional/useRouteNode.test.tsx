@@ -33,8 +33,13 @@ describe("useRouteNode", () => {
 
     expect(result.current.navigator.navigate).toBe(router.navigate);
     expect(result.current.navigator.getState).toBe(router.getState);
-    expect(result.current.route).toStrictEqual(undefined);
-    expect(result.current.previousRoute).toStrictEqual(undefined);
+    expect(result.current.navigator.isActiveRoute).toBe(router.isActiveRoute);
+    expect(result.current.navigator.canNavigateTo).toBe(router.canNavigateTo);
+    expect(result.current.navigator.subscribe).toBe(router.subscribe);
+    expect(result.current.navigator.subscribeLeave).toBe(router.subscribeLeave);
+    expect(result.current.navigator.isLeaveApproved).toBe(
+      router.isLeaveApproved,
+    );
   });
 
   it("should not return a null route with a default route and the router started", async () => {

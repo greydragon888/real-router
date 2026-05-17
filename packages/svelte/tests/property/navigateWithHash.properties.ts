@@ -120,8 +120,10 @@ describe("navigateWithHash — Property Tests", () => {
 
         const opts = calls[0].opts;
 
-        expect(opts.force).toBe(true);
-        expect(opts.hashChange).toBe(true);
+        // Conjunction matters: a regression that sets only `force` (without
+        // `hashChange`) would still pass two separate `toBe(true)` checks if
+        // they were split — `toMatchObject` locks both flags as a unit.
+        expect(opts).toMatchObject({ force: true, hashChange: true });
         expect(opts.hash).toBe(newHash);
       },
     );

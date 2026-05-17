@@ -11,8 +11,12 @@ import { createActiveRouteSource } from "@real-router/sources";
 
 import { buildHref, navigateWithHash, shouldNavigate } from "../dom-utils";
 import { injectRouter } from "../functions/injectRouter";
+import { buildActiveRouteOptions } from "../internal/buildActiveRouteOptions";
+import { subscribeSourceToSignal } from "../internal/subscribeSourceToSignal";
 
 import type { Params, NavigationOptions } from "@real-router/core";
+
+const NOOP_CATCH = (): void => {};
 
 @Directive({
   selector: "a[realLink]",
@@ -39,6 +43,10 @@ export class RealLink {
   private readonly anchor = inject(ElementRef)
     .nativeElement as HTMLAnchorElement;
   private readonly isActive = signal(false);
+  // `href` is computed from signal inputs only — Angular's default Object.is
+  // equality already collapses repeated `string` results, so no custom
+  // comparator is required (review §8b note 3 — applies after verifying that
+  // `buildHref` returns a primitive).
   private readonly href = computed(() => {
     const hashValue = this.hash();
 
@@ -51,69 +59,47 @@ export class RealLink {
   });
   private prevActiveClass = "";
   private prevHref: string | undefined = undefined;
+  // Skip-same-value: only re-touch the DOM `class` list when the active state
+  // actually flipped. Without this, every navigation that re-fires the active
+  // source still issues a `classList.toggle` no-op (review §8b MEDIUM).
+  private prevActive: boolean | undefined = undefined;
 
   constructor() {
-    // Reactive source-creation effect (#630 fix).
-    //
-    // Previously this setup lived in `ngOnInit` with a one-time read of the
-    // signal inputs — meaning `createActiveRouteSource` captured the
-    // ROUTE-NAME / ROUTE-PARAMS / HASH values at mount and never recreated
-    // the source when those inputs changed. In AOT compilation (where signal
-    // inputs are template-bindable via `<a [realLink]="signal()">`), the
-    // active-class tracking would silently drift away from the bound values,
-    // even though `href` (a `computed`) updated correctly. Asymmetric
-    // reactivity → real AOT bug.
-    //
-    // The fix: read the inputs inside `effect(...)` so Angular's signal
-    // graph tracks them. When any input changes:
-    //   1. `onCleanup` of the previous run fires → unsubscribe + destroy
-    //      (destroy is a no-op for the cached source returned by
-    //      `createActiveRouteSource` — safe even on rapid input changes).
-    //   2. Effect re-runs → new source created with current input values →
-    //      new subscribe wires up.
-    //
-    // Effect cleanup is bound to the injection-context's DestroyRef
-    // automatically (the same way `inject(DestroyRef).onDestroy(...)`
-    // would have been wired in ngOnInit), so no manual destroyRef plumbing
-    // is needed.
-    //
-    // The `ngOnInit` rationale that previously sat here ("signal inputs not
-    // available during construction") is outdated for Angular 16+: signal
-    // inputs *are* readable inside `effect()` callbacks even from
-    // constructor scope, because the effect's first run is scheduled after
-    // the input bindings have been applied.
+    // Reactive source-creation effect (#630 fix) — see
+    // `packages/angular/CLAUDE.md` → "Directives use constructor + effect()".
+    // Reading signal inputs inside `effect()` re-creates the active-route
+    // source whenever any input changes; `onCleanup` tears the previous
+    // subscription down.
     effect((onCleanup) => {
-      // Hash-aware active state (#532): pass `hash` so that tab-style links
-      // (same routeName, different `hash` input) only mark the active variant.
-      const hashValue = this.hash();
       const source = createActiveRouteSource(
         this.router,
         this.routeName(),
         this.routeParams(),
-        hashValue === undefined
-          ? {
-              strict: this.activeStrict(),
-              ignoreQueryParams: this.ignoreQueryParams(),
-            }
-          : {
-              strict: this.activeStrict(),
-              ignoreQueryParams: this.ignoreQueryParams(),
-              hash: hashValue,
-            },
+        buildActiveRouteOptions(
+          this.activeStrict(),
+          this.ignoreQueryParams(),
+          this.hash(),
+        ),
       );
 
-      this.isActive.set(source.getSnapshot());
-      this.updateDom();
+      onCleanup(
+        subscribeSourceToSignal(source, (snap) => {
+          // Pure-href refresh: when the active flag did not change, only the
+          // href may have moved (e.g. param-only update on a parent route).
+          // Skip the classList work in that branch (review §8b MEDIUM).
+          if (snap === this.prevActive) {
+            this.isActive.set(snap);
+            this.updateHref();
 
-      const unsub = source.subscribe(() => {
-        this.isActive.set(source.getSnapshot());
-        this.updateDom();
-      });
+            return;
+          }
 
-      onCleanup(() => {
-        unsub();
-        source.destroy();
-      });
+          this.prevActive = snap;
+          this.isActive.set(snap);
+          this.updateHref();
+          this.updateActiveClass();
+        }),
+      );
     });
   }
 
@@ -129,24 +115,20 @@ export class RealLink {
       this.routeParams(),
       this.hash(),
       this.routeOptions(),
-    ).catch(() => {});
+    ).catch(NOOP_CATCH);
   }
 
-  private updateDom(): void {
+  private updateHref(): void {
     const href = this.href();
 
-    // Skip-same-value: `updateDom` fires on every active-source subscribe-fire
-    // (every navigation that affects this link), but href only changes when
-    // route inputs change (or hash changes via `[realLink hash]`). For a
-    // grid of N <a realLink> on a page, this eliminates N redundant
-    // `setAttribute("href")` DOM writes per navigation. Mirrors the
-    // `prevActiveClass` pattern below.
     if (href !== undefined && href !== this.prevHref) {
       this.anchor.setAttribute("href", href);
     }
 
     this.prevHref = href;
+  }
 
+  private updateActiveClass(): void {
     const activeClass = this.activeClassName();
 
     if (this.prevActiveClass && this.prevActiveClass !== activeClass) {

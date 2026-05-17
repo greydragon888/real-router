@@ -2,12 +2,15 @@ import { browserPluginFactory } from "@real-router/browser-plugin";
 import { createRouter } from "@real-router/core";
 import { getRoutesApi } from "@real-router/core/api";
 import { mount, flushPromises } from "@vue/test-utils";
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 import { Fragment, defineComponent, h } from "vue";
 
 import { RouteView } from "../../src/components/RouteView";
 import { Match, NotFound } from "../../src/components/RouteView/components";
-import { collectElements } from "../../src/components/RouteView/helpers";
+import {
+  collectElements,
+  isKeepAliveEnabled,
+} from "../../src/components/RouteView/helpers";
 import { RouterProvider } from "../../src/RouterProvider";
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
@@ -56,6 +59,7 @@ describe("RouteView", () => {
       );
 
       expect(wrapper.find("[data-testid='users']").exists()).toBe(true);
+      expect(wrapper.find("[data-testid='users']").text()).toBe("Users");
     });
 
     it("should return null if no match", async () => {
@@ -627,6 +631,32 @@ describe("RouteView", () => {
       expect(result).toHaveLength(0);
     });
 
+    // Review §5.3 — null children. Vue's slot functions may return `null`
+    // explicitly (e.g., conditional slots resolving to nothing). The helper
+    // must treat null identically to undefined — no throw, empty result.
+    it("should handle null children gracefully", () => {
+      const result: any[] = [];
+
+      collectElements(null, result);
+
+      expect(result).toHaveLength(0);
+    });
+
+    // Review §5.3 — Fragment whose `.children` is null. Vue normalises this
+    // shape when a Fragment receives an empty / nullish slot. The recursive
+    // `collectElements(child.children, result)` branch must tolerate it.
+    // Constructed manually because Vue's `h(Fragment, null, null)` is
+    // rejected by the typed overload signatures — runtime accepts it but
+    // TS does not.
+    it("should handle Fragment with null children gracefully", () => {
+      const fragVNode = { type: Fragment, children: null };
+      const result: any[] = [];
+
+      collectElements([fragVNode], result);
+
+      expect(result).toHaveLength(0);
+    });
+
     it("should support Match wrapped in Fragment", async () => {
       await router.start("/users/list");
 
@@ -812,6 +842,456 @@ describe("RouteView", () => {
       );
 
       expect(wrapper.html()).toBe("");
+    });
+
+    // Review §5.3 — `evaluateMatch` constructs `fullSegmentName` as
+    // `nodeName ? "${nodeName}.${segment}" : segment`. With `segment=""` and
+    // a non-empty `nodeName`, the result is the literal `"nodeName."`
+    // (trailing dot). `startsWithSegment` defensively rejects any segment
+    // ending in `.` because the next position after `.` must be `.` or
+    // end-of-string. Behaviour lock — pinning the documented gotcha:
+    // `<Match segment="">` inside `<RouteView nodeName="users">` never
+    // activates even when the route is `users.list`.
+    it("Match segment='' with non-empty nodeName never activates (trailing-dot guard)", async () => {
+      await router.start("/users/list");
+
+      const wrapper = mountRouteView(
+        router,
+        h(
+          RouteView,
+          { nodeName: "users" },
+          {
+            default: () => [
+              // `segment=""` + `nodeName="users"` → `fullSegmentName="users."`
+              // → startsWithSegment rejects → Match never activates.
+              h(
+                RouteView.Match,
+                { segment: "" },
+                {
+                  default: () =>
+                    h("div", { "data-testid": "trailing-dot" }, "Bad"),
+                },
+              ),
+              h(RouteView.NotFound, null, {
+                default: () => h("div", { "data-testid": "nf" }, "NF"),
+              }),
+            ],
+          },
+        ),
+      );
+
+      // Match did NOT activate. NotFound also doesn't fire (route is known,
+      // just not UNKNOWN_ROUTE), so the RouteView renders nothing.
+      expect(wrapper.find("[data-testid='trailing-dot']").exists()).toBe(false);
+      expect(wrapper.find("[data-testid='nf']").exists()).toBe(false);
+    });
+
+    // Review §5 isSegmentMatch sub-table: `undefined` segment (через
+    // `evaluateMatch` defaulting). Match without `segment` prop reads
+    // `props?.segment ?? ""` → empty segment → trailing-dot path (already
+    // locked above) OR empty fullSegmentName at root → both paths reject.
+    // Pin the "no segment prop at all" case explicitly so a future refactor
+    // that changes the default value (e.g. to `undefined` or throws) surfaces.
+    it("Match with NO `segment` prop never activates (segment defaults to '')", async () => {
+      await router.start("/users/list");
+
+      const wrapper = mountRouteView(
+        router,
+        h(
+          RouteView,
+          { nodeName: "" },
+          {
+            default: () => [
+              // No segment prop — evaluateMatch reads props?.segment ?? "".
+              h(RouteView.Match, null, {
+                default: () =>
+                  h(
+                    "div",
+                    { "data-testid": "no-segment-prop" },
+                    "Should not render",
+                  ),
+              }),
+              h(
+                RouteView.Match,
+                { segment: "users" },
+                {
+                  default: () =>
+                    h("div", { "data-testid": "users-content" }, "users"),
+                },
+              ),
+            ],
+          },
+        ),
+      );
+
+      // The no-segment Match must NOT activate; the segment="users" Match wins.
+      expect(wrapper.find("[data-testid='no-segment-prop']").exists()).toBe(
+        false,
+      );
+      expect(wrapper.find("[data-testid='users-content']").exists()).toBe(true);
+    });
+
+    // Review §5 isSegmentMatch sub-table: `segment="a.b.c"` (dotted).
+    // The segment string itself is a dotted route name. With nodeName=""
+    // and segment="users.list", `evaluateMatch` builds fullSegmentName =
+    // "users.list" (segment branch — empty nodeName). routeName "users.list"
+    // matches exactly. Tests the documented behavior that consumers can
+    // declare deep matches inline without nesting RouteViews.
+    it("Match with dotted `segment='users.list'` matches deep route name", async () => {
+      await router.start("/users/list");
+
+      const wrapper = mountRouteView(
+        router,
+        h(
+          RouteView,
+          { nodeName: "" },
+          {
+            default: () => [
+              h(
+                RouteView.Match,
+                { segment: "users.list" },
+                {
+                  default: () =>
+                    h("div", { "data-testid": "dotted-segment" }, "deep match"),
+                },
+              ),
+            ],
+          },
+        ),
+      );
+
+      expect(wrapper.find("[data-testid='dotted-segment']").exists()).toBe(
+        true,
+      );
+      expect(wrapper.find("[data-testid='dotted-segment']").text()).toBe(
+        "deep match",
+      );
+    });
+
+    // Review §5 isSegmentMatch sub-table: long-but-valid segment.
+    // route-utils' MAX_SEGMENT_LENGTH = 10_000. A 256-char ASCII segment is
+    // well within bounds. The cache path through `startsWithSegment`
+    // tolerates the length, and the comparison still runs in O(name length).
+    // Pin the upper-tested length so a regression that artificially clamps
+    // segments (e.g. to 128) surfaces here.
+    it("isSegmentMatch handles 256-char ASCII segments via startsWithSegment cache", async () => {
+      const longSegment = "a".repeat(256);
+      // Construct a router whose single route name IS the long segment so
+      // the match path lights up exactly.
+      const longRoute = createRouter([{ name: longSegment, path: "/long" }]);
+
+      longRoute.usePlugin(browserPluginFactory({}));
+      await longRoute.start("/long");
+
+      const wrapper = mountRouteView(
+        longRoute,
+        h(
+          RouteView,
+          { nodeName: "" },
+          {
+            default: () =>
+              h(
+                RouteView.Match,
+                { segment: longSegment },
+                {
+                  default: () =>
+                    h("div", { "data-testid": "long-segment" }, "matched"),
+                },
+              ),
+          },
+        ),
+      );
+
+      expect(wrapper.find("[data-testid='long-segment']").exists()).toBe(true);
+
+      longRoute.stop();
+    });
+
+    // Review §5 isSegmentMatch sub-table: Unicode segment — intentional
+    // skip. route-utils' SAFE_SEGMENT_PATTERN is `/^[\w.-]+$/` with no `u`
+    // flag, so `\w` is ASCII-only. Non-ASCII characters fail validation and
+    // `startsWithSegment` throws `TypeError`. The Vue adapter does not catch
+    // — the throw propagates from render synchronously. Lock the documented
+    // limitation as a behaviour test so the intentional-skip status is
+    // explicit (no longer "undocumented" per the review).
+    it("Unicode segment throws synchronously at render (intentional limitation)", async () => {
+      await router.start("/");
+
+      // Suppress Vue's "Unhandled error during execution" console.error —
+      // we expect the synchronous throw and assert on it directly.
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      const consoleWarn = vi
+        .spyOn(console, "warn")
+        .mockImplementation(() => {});
+
+      // Use a try/catch instead of `.toThrow()` because Vue's render error
+      // path wraps the original TypeError. We assert via inspection.
+      let caught: unknown;
+
+      try {
+        mountRouteView(
+          router,
+          h(
+            RouteView,
+            { nodeName: "" },
+            {
+              default: () =>
+                h(
+                  RouteView.Match,
+                  { segment: "пользователи" },
+                  {
+                    default: () => h("div", { "data-testid": "unicode" }, "ru"),
+                  },
+                ),
+            },
+          ),
+        );
+      } catch (error: unknown) {
+        caught = error;
+      }
+
+      // Vue may surface the error via console.error rather than rethrow —
+      // accept either path. The key invariant: a Unicode segment does NOT
+      // silently render, and the failure surfaces to the consumer somehow.
+      const surfaced =
+        caught !== undefined ||
+        consoleError.mock.calls.some((args) =>
+          args.some(
+            (arg) =>
+              typeof arg === "object" &&
+              arg !== null &&
+              "message" in arg &&
+              typeof (arg as { message: unknown }).message === "string" &&
+              (arg as { message: string }).message.includes(
+                "Segment contains invalid characters",
+              ),
+          ),
+        );
+
+      expect(surfaced).toBe(true);
+
+      consoleError.mockRestore();
+      consoleWarn.mockRestore();
+    });
+
+    // Review §5 isSegmentMatch sub-table: 6+ depth route names. The Inv 8
+    // PBT in routeView.properties.ts covers 1-6 segments; this functional
+    // test exercises 7-segment depth specifically — the regex-construction
+    // path in `startsWithSegment` (escape + dotOrEnd) at extreme depth.
+    it("RouteView matches 7-segment-deep route names (beyond PBT Inv 8 range)", async () => {
+      // Build a flat route whose name is a 7-segment dotted string.
+      const deepName = "a.b.c.d.e.f.g";
+      const deepRouter = createRouter([{ name: deepName, path: "/deep" }]);
+
+      deepRouter.usePlugin(browserPluginFactory({}));
+      await deepRouter.start("/deep");
+
+      const wrapper = mountRouteView(
+        deepRouter,
+        h(
+          RouteView,
+          { nodeName: "" },
+          {
+            default: () => [
+              // Non-exact ancestor prefix matches via startsWithSegment.
+              h(
+                RouteView.Match,
+                { segment: "a.b.c.d.e.f" },
+                {
+                  default: () =>
+                    h(
+                      "div",
+                      { "data-testid": "deep-ancestor" },
+                      "deep ancestor",
+                    ),
+                },
+              ),
+            ],
+          },
+        ),
+      );
+
+      expect(wrapper.find("[data-testid='deep-ancestor']").exists()).toBe(true);
+
+      deepRouter.stop();
+    });
+  });
+
+  // CLAUDE.md gotcha #12 — Async-Wrapped `Match` Is Not Detected.
+  // `collectElements` reads `slots.default?.()` and identifies markers by
+  // raw reference equality on `vnode.type`. Wrapping `RouteView.Match` in
+  // `defineAsyncComponent(...)` or a custom render function changes
+  // `vnode.type` to the wrapper — the identity check fails and the wrapped
+  // Match is silently skipped (no console warning).
+  //
+  // The route is still KNOWN_ROUTE so `<RouteView.NotFound>` will NOT
+  // activate either — the RouteView simply renders nothing.
+  describe("gotcha #12: marker identity check — wrapped Match is silently skipped", () => {
+    it("defineAsyncComponent(RouteView.Match) loses identity — Match never activates", async () => {
+      const { defineAsyncComponent } = await import("vue");
+
+      await router.start("/users/list");
+
+      // The async wrapper changes vnode.type from `Match` to the
+      // defineAsyncComponent-returned component, breaking the identity check.
+      const AsyncMatch = defineAsyncComponent(() =>
+        Promise.resolve(RouteView.Match),
+      );
+
+      const wrapper = mountRouteView(
+        router,
+        h(
+          RouteView,
+          { nodeName: "" },
+          {
+            default: () => [
+              h(
+                AsyncMatch,
+                { segment: "users" },
+                {
+                  default: () =>
+                    h(
+                      "div",
+                      { "data-testid": "async-wrapped-content" },
+                      "wrapped",
+                    ),
+                },
+              ),
+              h(RouteView.NotFound, null, {
+                default: () =>
+                  h("div", { "data-testid": "nf-fallback" }, "Not Found"),
+              }),
+            ],
+          },
+        ),
+      );
+
+      await flushPromises();
+
+      // The wrapped Match contents must NOT render — identity check failed.
+      expect(
+        wrapper.find("[data-testid='async-wrapped-content']").exists(),
+      ).toBe(false);
+      // NotFound also does NOT activate — route "users.list" is KNOWN_ROUTE,
+      // so the appendFallback NotFound branch is gated off.
+      expect(wrapper.find("[data-testid='nf-fallback']").exists()).toBe(false);
+    });
+
+    it("custom function component wrapping Match loses identity — same silent skip", async () => {
+      await router.start("/users/list");
+
+      // A consumer trying to factor out a "labelled match" via a custom
+      // function component is the canonical footgun. vnode.type points at
+      // CustomMatchWrapper, not at Match.
+      const CustomMatchWrapper = defineComponent({
+        props: { segment: { type: String, required: true } },
+        setup(props, { slots }) {
+          return () => h(RouteView.Match, { segment: props.segment }, slots);
+        },
+      });
+
+      const wrapper = mountRouteView(
+        router,
+        h(
+          RouteView,
+          { nodeName: "" },
+          {
+            default: () =>
+              h(
+                CustomMatchWrapper,
+                { segment: "users" },
+                {
+                  default: () =>
+                    h(
+                      "div",
+                      { "data-testid": "custom-wrapped-content" },
+                      "wrapped",
+                    ),
+                },
+              ),
+          },
+        ),
+      );
+
+      await flushPromises();
+
+      expect(
+        wrapper.find("[data-testid='custom-wrapped-content']").exists(),
+      ).toBe(false);
+    });
+
+    it("const alias preserves identity — Match still detected", async () => {
+      await router.start("/users/list");
+
+      // `const Alias = RouteView.Match;` does NOT change identity — Alias
+      // and RouteView.Match are the same component reference. The detection
+      // works exactly as if the original were used.
+      const Alias = RouteView.Match;
+
+      const wrapper = mountRouteView(
+        router,
+        h(
+          RouteView,
+          { nodeName: "" },
+          {
+            default: () =>
+              h(
+                Alias,
+                { segment: "users" },
+                {
+                  default: () =>
+                    h("div", { "data-testid": "alias-content" }, "aliased"),
+                },
+              ),
+          },
+        ),
+      );
+
+      await flushPromises();
+
+      // Alias === Match → identity check passes → content renders.
+      expect(wrapper.find("[data-testid='alias-content']").exists()).toBe(true);
+      expect(wrapper.find("[data-testid='alias-content']").text()).toBe(
+        "aliased",
+      );
+    });
+  });
+
+  // Review §5.7 — `isKeepAliveEnabled` accepts only the three Vue-shorthand
+  // truthy forms: `true`, `""` (boolean-attr shorthand), `"keep-alive"`
+  // (kebab-case attribute). Every other value — including truthy ones like
+  // `1`, `"true"`, `{}`, `[]` — must be rejected via strict `===`. Locks the
+  // narrow contract so a refactor to `Boolean(value)` doesn't silently widen
+  // acceptance.
+  describe("isKeepAliveEnabled — accepted vs rejected values", () => {
+    it("accepts the three documented truthy forms", () => {
+      expect(isKeepAliveEnabled(true)).toBe(true);
+      expect(isKeepAliveEnabled("")).toBe(true);
+      expect(isKeepAliveEnabled("keep-alive")).toBe(true);
+    });
+
+    it("rejects every other value (no truthy-coercion path)", () => {
+      const rejected: unknown[] = [
+        false,
+        undefined,
+        null,
+        0,
+        1,
+        "true",
+        "1",
+        "keepAlive",
+        " ", // single space is not the empty-string shorthand
+        {},
+        [],
+        () => true,
+        Symbol("ka"),
+      ];
+
+      for (const value of rejected) {
+        expect(isKeepAliveEnabled(value)).toBe(false);
+      }
     });
   });
 

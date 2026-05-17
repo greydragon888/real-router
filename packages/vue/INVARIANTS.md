@@ -17,6 +17,8 @@ File: `tests/property/routeView.properties.ts`
 | 7 | **Extended ASCII alphabet** (digits, `_`, `-`, mixed case) preserves Inv 1, 3, 5 | route-utils' `SAFE_SEGMENT_PATTERN` (`/^[\w.-]+$/`) accepts the full ASCII surface; real routes use `users-list`, `posts_2024` — invariants must hold beyond the default lowercase alpha-only generator |
 | 8 | **Wide-depth route names** (1–6 segments) preserve Inv 1, 3 | Deeply nested names exercise the regex-construction path of `startsWithSegment` (escape + dotOrEnd) at depths the default 1–4-segment generator misses |
 | 9 | **Strict monotonicity** — for non-empty `name`, `exact(name, seg)=true ⇒ non-exact(name, seg)=true` | Exact match is a specialisation of non-exact: if `name === seg` (and both non-empty), `startsWithSegment` must also return `true` (segment boundary at end-of-string). The empty-empty corner is the documented exception. |
+| 10 | **Transitivity of non-exact prefix** — name⊃parent ∧ parent⊃grand ⇒ name⊃grand (for `s1.s2.s3 / s1.s2 / s1`) | Fundamental ordering property of the segment-prefix relation; a regression in `dotOrEnd` regex that breaks multi-dot prefixes would surface here rather than in simpler self-match tests |
+| 11 | **`exact=undefined` ≡ `exact=false`** at the helper boundary — JS evaluates `if (exact)` as falsy for `undefined`, matching the `?? false` fallback at the `evaluateMatch` call site | Locks the runtime semantics that consumer templates (`<Match exact={undefined}>` / `<Match exact>` omitted) depend on; a refactor that adds explicit `=== true` would silently flip behaviour |
 
 ## shallowEqual (DOM-utils comparator — used by `useIsActiveRoute` and `navigateWithHash`)
 
@@ -37,6 +39,9 @@ File: `tests/property/shallowEqual.properties.ts`
 | 11 | **Frozen objects compare identically to mutable ones** — frozen record reflexivity + frozen↔mutable equivalence when keys/values match | Route snapshots emitted by `@real-router/core` are always frozen; `shallowRef` holds them as-is. `Object.keys` and `Object.is` work on frozen instances — the comparator must not branch on mutability |
 | 12 | **Vue reactive proxies — identity-based reflexivity, no deep compare across proxies** — `shallowEqual(p, p) === true`; two reactive proxies wrapping structurally-identical records compare via per-key `Object.is` (true when all values primitive, false when any nested non-primitive) | `useIsActiveRoute` may receive a `routeParams` proxy from setup-scope state. The comparator must treat each proxy as its own identity and must NOT deep-compare across proxies — that would silently break the documented "stabilize via `computed` if you want deep equality" contract |
 | 13 | **Prototype-pollution-resilient — `__proto__` / `constructor` / `hasOwnProperty` as own keys** — `{ [protoKey]: v }` reflexivity holds; symmetric records with the same proto-named own key compare via `Object.is(value, value)`; bare `{}` unaffected by inherited keys (zero own-keys short-circuit) | The loop uses `Object.keys` (own-properties only) + `Object.prototype.hasOwnProperty.call(next, key)` — both API entries skip inherited members. A regression to `for...in` or a missing `hasOwnProperty` guard would silently expose inherited prototype keys |
+| 14 | **Function values compared by `Object.is` reference** — same function ref → `true`; two distinct closures with identical bodies → `false` | `routeOptions` / `routeParams` may carry callbacks; the per-key loop must reject structural comparison and rely solely on identity. A regression that calls `.toString()` or tries `eval`-based equality would falsely collapse distinct callbacks |
+| 15 | **Getter side-effects observable (no proxy bypass)** — each getter invoked exactly once per side per `shallowEqual` call (via `prev[key]` / `next[key]`) | Documented trade-off: PBT consumers may pass reactive proxies, and the comparator must operate at the same logical layer as user code. A "performance optimisation" that switches to `Object.getOwnPropertyDescriptor` reads would silently break Vue reactivity dependency tracking |
+| 16 | **Integrity levels are equivalence-preserving** — `shallowEqual(rec, Object.seal({ ...rec }))`, `Object.preventExtensions`, `Object.freeze` all return `true` when keys/values match; cross-integrity comparison (frozen vs sealed) also `true` | Route snapshots emitted by `@real-router/core` are frozen; consumers may seal their own params. The comparator uses `Object.keys` + `Object.is` — neither discriminates by extensibility. Locking this prevents an "optimisation" that branches on `Object.isFrozen` from silently breaking the SSR-emitted snapshot path |
 
 ## buildActiveClassName (DOM-utils CSS-class composer)
 
@@ -81,6 +86,10 @@ File: `tests/property/routeView.pipeline.properties.ts`
 | 8 | **NotFound only on `UNKNOWN_ROUTE`** — non-UNKNOWN_ROUTE + no Match → NotFound NOT rendered; UNKNOWN_ROUTE + no Match → NotFound rendered | Locks the fallback semantic: NotFound is not a generic "no Match" catch-all, it is route-name-specific |
 | 9 | **Last NotFound wins** — two `<NotFound>` siblings under UNKNOWN_ROUTE → only the second is rendered | Vue's `appendFallback` uses `elements.filter(...NotFound).at(-1)`; this asymmetry vs first-wins-for-Self is intentional and locked here so a refactor does not silently flip it |
 | 10 | **`evaluateMatch.fullSegmentName` construction** — `nodeName ? "${nodeName}.${segment}" : segment` | Locks the join character (`.`) and the empty-nodeName branch; a regression to `/` or to mis-handling the empty branch would silently break root-level matching |
+| 11 | **`collectElements` is idempotent on flat input** — second pass over an already-flat result preserves identity per index | Locks the "no double-wrapping" contract: a regression that rebuilds wrapper VNodes on flat input would invalidate Vue's VNode-identity-based diffing and cause spurious unmount/mount cycles |
+| 12 | **`hasPerMatchKA` side-channel correctness** — equals `input.some(child => isKeepAliveEnabled(child.props.keepAlive))` across all Match children, regardless of which (if any) match activates | Single-pass derivation closing audit §8.1; a regression that short-circuits the scan after `activeMatchFound` would silently disable per-match keepAlive on segments declared after the active one |
+| 13 | **First-match-wins is independent of `exact` prop on losing candidates** — when two Matches share the same segment, the first wins regardless of any combination of `exact` values | `activeMatchFound` short-circuit at `helpers.ts:186-188` is the only guard. A regression that scans the whole list and picks an "exact" winner over the textually-first match would break documented slot-order semantics |
+| 14 | **`fallback` prop forwarded by identity** — VNode / function / undefined pass through unchanged (no wrapping, coercion, or shape conversion) | Consumers rely on identity to share fallback components across renders (e.g., `const Spinner = h(SpinnerComponent)`); a regression that normalises a VNode to a thunk (or vice versa) breaks the Suspense contract documented in CLAUDE.md / README |
 
 ## navigateWithHash (DOM-utils click handler for `<Link hash>`, #532)
 
@@ -94,6 +103,20 @@ File: `tests/property/navigateWithHash.properties.ts`
 | 4 | **`opts.hash` propagation** — `undefined` → key absent; defined → forwarded verbatim | Plugins distinguish "preserve current hash" from "explicit hash value" |
 | 5 | **Same route + `hash=undefined` → hash preserved, no force** | Passing `undefined` signals "don't change the fragment"; nothing to bypass in `SAME_STATES` |
 | 6 | **No current state → pass-through** (no `force` logic) | Initial navigation has no current state to compare against — the auto-bypass branch must short-circuit |
+| 7 | **Same name + DIFFERENT params → no auto-bypass** — when `current.name === routeName` but `shallowEqual(current.params, routeParams) === false`, neither `force` nor `hashChange` is auto-set | Closes the params-equality branch at `link-utils.ts:130-131`. Cross-params navigation is a legitimate state change in core's FSM — pre-emptively bypassing `SAME_STATES` would change the transition semantics in a way subscribers cannot disambiguate |
+
+## shouldNavigate (DOM-utils click predicate)
+
+File: `tests/property/shouldNavigate.properties.ts`
+
+Closes review-2026-05-16 §5/§6 — exhaustive truth-table coverage for the 5-axis predicate `button === 0 && !metaKey && !altKey && !ctrlKey && !shiftKey`. Total cartesian surface: 3 button states × 2⁴ modifier combinations = 48 cases.
+
+| # | Invariant | Why it must hold |
+|---|-----------|-----------------|
+| 1 | **5-axis truth-table equivalence** — `shouldNavigate(evt) === (button===0 && no modifier held)` for all 48 cases | Any divergence on any axis is a regression — losing alt/shift breaks download-link / new-window shortcuts; losing meta/ctrl breaks open-in-new-tab on every OS; losing the button check breaks middle-click new-tab and right-click context menu |
+| 2 | **Non-left button never navigates** — middle (1) / right (2) clicks short-circuit on the button check regardless of modifiers | Browsers' built-in middle-click / right-click behaviour must never be preempted by `<Link>` navigation. Adding modifier guards on top cannot rescue them |
+| 3 | **Any modifier on a left click suppresses navigation** — each of meta/alt/ctrl/shift maps to a documented browser shortcut | Losing any one would silently break hardware-keyboard accessibility patterns |
+| 4 | **Bare left click always navigates** — `(button=0, no modifiers) → true` | Sanity / completeness: the only happy path |
 
 ## createHttpStatusSink (SSR utility)
 

@@ -59,7 +59,7 @@ src/
 │   ├── route-announcer.ts      # createRouteAnnouncer — WCAG aria-live announcements
 │   ├── scroll-restore.ts       # createScrollRestoration — opt-in scroll capture + restore
 │   ├── view-transitions.ts     # createViewTransitions — opt-in View Transitions API integration
-│   └── direction-tracker.ts    # createDirectionTracker — back/forward annotation
+│   └── direction-tracker.ts    # createDirectionTracker — back/forward annotation. Available through the symlink barrel but NOT consumed by the Preact RouterProvider; consumers opt in manually (install before usePlugin(browserPlugin)).
 ├── utils/
 │   └── createHttpStatusSink.ts # /ssr — fresh { code: undefined } sink per request
 ├── hooks/
@@ -226,17 +226,26 @@ tests/
 
 ## Stress Test Coverage
 
-34 stress tests across 7 files in `tests/stress/` validate behavior under extreme conditions:
+20 stress files in `tests/stress/` validate behavior under extreme conditions across
+core hook fan-out, Link mass-rendering, deep trees, scope/cache isolation, transition
+lifecycle, SSR streaming, route deletion mid-session, view-transitions interruption,
+hash navigation, lazy-loaded RouteView, polyfill race conditions, and the announcer.
 
-| Category                | Tests (file count) | Test count | What they verify                                                                                                                                                                                        |
-| ----------------------- | ------------------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Mount/unmount lifecycle | 1 file             | 8 tests    | useRouteNode/useRoute/Link/useRouterTransition × 200 mount/unmount cycles — bounded heap; 50 components remount + re-subscribe; conditional toggle × 100; router stop/restart; dynamic nodeName changes |
-| Subscription fanout     | 1 file             | 5 tests    | 50 useRouteNode on different nodes — only relevant re-render; 20 useRoute + 30 useRouteNode('') — all update; 50 useRouteNode('users') — granular scoping; concurrent mount/unmount; cleanup on unmount |
-| Link mass rendering     | 1 file             | 6 tests    | 200 Links mount — no render loops; active class toggle; 50 round-robin navigations; deep routeParams; 50 rapid clicks — 0 unhandled rejections; dynamic routeName × 100                                 |
-| Deep tree context       | 1 file             | 4 tests    | 30-deep useRouteNode — only relevant nodes re-render; useRouter — 0 re-renders; wide tree 25 leaves — all re-render; nested RouterProviders — isolated                                                  |
-| shouldUpdateCache       | 1 file             | 4 tests    | 200 unique node names — cache scales; 100 same-node — cache hit; router stop + GC + new router; 2 routers × 50 nodes — isolated                                                                         |
-| Transition hook         | 1 file             | 4 tests    | 50 async guard cycles — isTransitioning true→false; 50 concurrent — last wins; 20 consumers — consistent; navigate + cancel × 50 — never stuck                                                          |
-| Combined SPA            | 1 file             | 3 tests    | Full app with RouteView + Links + useRouteNode + 200 navs; transition progress; tab layout; remount after unmount                                                                                       |
+| Category                      | File(s)                                                                  | What they verify                                                                                                                                                                                        |
+| ----------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mount/unmount lifecycle       | `mount-unmount-lifecycle.stress.tsx`, `memory-mount-unmount.stress.tsx`, `error-boundary-mount-unmount.stress.tsx` | useRouteNode/useRoute/Link/useRouterTransition × 200 mount/unmount cycles — bounded heap; conditional toggle × 100; router stop/restart; dynamic nodeName changes; RouterErrorBoundary remount cycles  |
+| Subscription fanout           | `subscription-fanout.stress.tsx`, `route-hooks-stress.stress.tsx`, `factory-reuse.stress.tsx` | 50 useRouteNode on different nodes — only relevant re-render; 20 useRoute + 30 useRouteNode('') — all update; granular scoping; cleanup on unmount; one factory → 100 router instances |
+| Link mass rendering           | `link-mass-rendering.stress.tsx`, `link-hash-stress.stress.tsx`          | 200 Links mount — no render loops; active class toggle; 50 round-robin navs; deep routeParams; 50 rapid clicks — 0 unhandled rejections; hash-aware active state under churn                            |
+| Deep tree context             | `deep-tree-context.stress.tsx`                                           | 30-deep useRouteNode — only relevant nodes re-render; useRouter — 0 re-renders; wide tree 25 leaves — all re-render; nested RouterProviders — isolated                                                  |
+| Cache isolation               | `should-update-cache.stress.tsx`                                         | 200 unique node names — cache scales; 100 same-node — cache hit; router stop + GC + new router; 2 routers × 50 nodes — isolated                                                                         |
+| Transition lifecycle          | `transition-hook-stress.stress.tsx`, `replace-history-during-transition.stress.tsx` | 50 async guard cycles — isTransitioning true→false; 50 concurrent — last wins; replaceHistoryState during active transition (single + burst of 10)                                                      |
+| Route deletion / traversal    | `route-deletion-midsession.stress.tsx`                                   | navigate() to a route removed mid-session, re-add of same route name, traversal patterns                                                                                                                |
+| View Transitions interruption | `view-transitions-stop.stress.tsx`                                       | stop() mid-VT, 30 rapid pairs, double-destroy, defensive try/catch around startViewTransition                                                                                                            |
+| SSR streaming                 | `http-status-streaming.stress.tsx`                                       | 50 concurrent renders, 100 sequential, last-write-wins on 20 sibling HttpStatusCode instances                                                                                                            |
+| Combined SPA                  | `combined-spa.stress.tsx`                                                | Full app with RouteView + Links + useRouteNode + 200 navs; transition progress; tab layout; remount after unmount                                                                                       |
+| Suspense + lazy RouteView     | `suspense-lazy-routeview.stress.tsx`                                     | RouteView.Match with `fallback` + `lazy()` under rapid navigation churn                                                                                                                                 |
+| useSyncExternalStore race     | `use-sync-external-store-race.stress.tsx`                                | Polyfill race between `useState(getSnapshot)` render and `useEffect` commit phase across 50+ concurrent mounts                                                                                          |
+| Route announcer rapid nav     | `announce-navigation-rapid.stress.tsx`                                   | 30 navs across Safari-ready window, repeat-dedup, double rAF + pendingText buffering                                                                                                                    |
 
 ## See Also
 

@@ -436,6 +436,234 @@ describe("RouteView pipeline — Property Tests", () => {
   // (cross-check; not in §626 list but tightens the fallback contract).
   // =============================================================================
 
+  // =============================================================================
+  // Invariant 9 — collectElements: recursion termination on deep Fragment nests
+  // (review §6 LOW). Defends against an accidental refactor that swaps
+  // Children.forEach for a custom iterator missing the termination case.
+  // =============================================================================
+
+  describe("Invariant 9: collectElements terminates on deeply nested Fragment trees (review §6 LOW)", () => {
+    test.prop([fc.integer({ min: 1, max: 10 })], {
+      numRuns: NUM_RUNS.thorough,
+    })(
+      "depth-N Fragment wrapping returns the inner Match — never infinite-recurses or throws",
+      (depth) => {
+        // Build N nested Fragments wrapping a single Match — depth-10 is the
+        // empirical ceiling for hand-written route shapes; the function
+        // must terminate within React's stack budget either way.
+        let tree: ReactNode = createElement(Match, {
+          segment: "leaf",
+          exact: false,
+          keepAlive: false,
+          children: null,
+        });
+
+        for (let i = 0; i < depth; i++) {
+          tree = createElement(Fragment, { key: `wrap-${i}`, children: tree });
+        }
+
+        const result: ReactElement[] = [];
+
+        collectElements(tree, result);
+
+        expect(result).toHaveLength(1);
+        expect(result[0].type).toBe(Match);
+      },
+    );
+  });
+
+  // =============================================================================
+  // Invariant 10 — buildRenderList: stability — same elements + routeName +
+  // empty hasBeenActivated produce identical rendered lists across calls
+  // (review §6 LOW). A regression to an internal cache that key-orders or
+  // hashes by reference would silently break this.
+  // =============================================================================
+
+  describe("Invariant 10: buildRenderList is stable across identical calls (review §6 LOW)", () => {
+    test.prop([arbRouteMatchTree, arbSegmentName], {
+      numRuns: NUM_RUNS.thorough,
+    })(
+      "calling twice with identical (elements, routeName, fresh hasBeenActivated) yields equal-shape outputs",
+      (elements, routeName) => {
+        const first = buildRenderList(elements, routeName, "", new Set());
+        const second = buildRenderList(elements, routeName, "", new Set());
+
+        // Shape equality: same length, same activeMatchFound, same per-index
+        // element type and key. ReactElement instances are freshly created
+        // per call (different references) so we deliberately don't compare
+        // by `toStrictEqual` on the whole object.
+        expect(second.rendered).toHaveLength(first.rendered.length);
+        expect(second.activeMatchFound).toBe(first.activeMatchFound);
+
+        for (let i = 0; i < first.rendered.length; i++) {
+          expect(second.rendered[i].type).toBe(first.rendered[i].type);
+          expect(second.rendered[i].key).toBe(first.rendered[i].key);
+        }
+      },
+    );
+  });
+
+  // =============================================================================
+  // Invariant 11 — processMatch: keepAlive set monotonicity (review §6 MED).
+  // After a sequence of buildRenderList passes, the cumulative hasBeenActivated
+  // set never loses an entry — each activated segment is sticky.
+  // =============================================================================
+
+  describe("Invariant 11: keepAlive hasBeenActivated set grows monotonically (review §6 MED)", () => {
+    test.prop([fc.array(arbSegmentName, { minLength: 2, maxLength: 10 })], {
+      numRuns: NUM_RUNS.thorough,
+    })(
+      "navigating through N distinct segments with keepAlive Match never removes a previously-activated segment",
+      (segments) => {
+        const uniqueSegments = [...new Set(segments)];
+
+        fc.pre(uniqueSegments.length >= 2);
+
+        // One <Match keepAlive> per unique segment. The render tree is
+        // fixed; the routeName changes between passes.
+        const elements = uniqueSegments.map((seg) =>
+          makeMatch(seg, { keepAlive: true }),
+        );
+
+        const hasBeenActivated = new Set<string>();
+        let previousSize = 0;
+
+        for (const seg of uniqueSegments) {
+          buildRenderList(elements, seg, "", hasBeenActivated);
+
+          // After visiting `seg`, every previously-visited segment must
+          // still be in the set.
+          expect(hasBeenActivated.size).toBeGreaterThanOrEqual(previousSize);
+          expect(hasBeenActivated.has(seg)).toBe(true);
+
+          previousSize = hasBeenActivated.size;
+        }
+
+        // Final state: every visited segment is in the activated set.
+        for (const seg of uniqueSegments) {
+          expect(hasBeenActivated.has(seg)).toBe(true);
+        }
+      },
+    );
+  });
+
+  // =============================================================================
+  // Edge-case: large Match arrays (review §5 LOW) — buildRenderList walks
+  // elements linearly. >20 Match was uncovered; this test stresses 50..120
+  // elements to guard against an accidental O(n²) refactor.
+  // =============================================================================
+
+  describe("edge-case: buildRenderList with 50..120 Match elements (review §5 LOW)", () => {
+    test.prop([fc.integer({ min: 50, max: 120 }), arbSegmentName], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "first-match wins across N copies; large N does not break activation semantics",
+      (n, activeSegment) => {
+        const elements: ReactElement[] = Array.from({ length: n }, (_, i) =>
+          makeMatch(`${activeSegment}-${i}`, { marker: `m-${i}` }),
+        );
+
+        // Insert one Match whose segment matches the active route at a
+        // random-ish position so the linear walk has to skip many entries
+        // before finding the activator.
+        const insertAt = Math.floor(n / 2);
+
+        elements.splice(insertAt, 0, makeMatch(activeSegment));
+
+        const { rendered, activeMatchFound } = buildRenderList(
+          elements,
+          activeSegment,
+          "",
+          new Set(),
+        );
+
+        expect(activeMatchFound).toBe(true);
+        expect(rendered).toHaveLength(1);
+      },
+    );
+
+    test.prop(
+      [fc.integer({ min: 50, max: 120 }), arbSegmentName, arbSegmentName],
+      { numRuns: NUM_RUNS.standard },
+    )(
+      "no-match across N elements + no Self → NotFound rendered iff routeName === UNKNOWN_ROUTE",
+      (n, segmentBase, routeName) => {
+        fc.pre(segmentBase !== routeName && routeName !== UNKNOWN_ROUTE);
+
+        const elements: ReactElement[] = Array.from({ length: n }, (_, i) =>
+          makeMatch(`${segmentBase}-${i}`),
+        );
+
+        // Append a single NotFound at the end.
+        elements.push(makeNotFound());
+
+        const { rendered, activeMatchFound } = buildRenderList(
+          elements,
+          routeName,
+          "",
+          new Set(),
+        );
+
+        // None of the N Match elements activates, NotFound only fires on
+        // UNKNOWN_ROUTE — for a regular routeName the render list is empty.
+        expect(activeMatchFound).toBe(false);
+        expect(rendered).toHaveLength(0);
+      },
+    );
+  });
+
+  // =============================================================================
+  // Edge-case: processMatch keepAlive with falsy routeName (review §5 LOW).
+  // `<Match keepAlive segment="x">` against `routeName=""` must NOT activate
+  // (route name is empty → no match against any non-empty segment) AND must
+  // NOT enter the keepAlive set. Guards against a regression where keepAlive
+  // is misinterpreted as "always render".
+  // =============================================================================
+
+  describe("edge-case: processMatch keepAlive + falsy routeName (review §5 LOW)", () => {
+    test.prop([arbSegmentName], { numRuns: NUM_RUNS.standard })(
+      'routeName="" against <Match keepAlive segment="x"> → no activation, no sticky entry',
+      (segment) => {
+        const elements = [makeMatch(segment, { keepAlive: true })];
+        const hasBeenActivated = new Set<string>();
+
+        const { rendered, activeMatchFound } = buildRenderList(
+          elements,
+          "",
+          "",
+          hasBeenActivated,
+        );
+
+        expect(activeMatchFound).toBe(false);
+        expect(rendered).toHaveLength(0);
+        // Never-activated segment must not enter the keepAlive registry.
+        expect(hasBeenActivated.size).toBe(0);
+      },
+    );
+
+    test.prop([arbSegmentName], { numRuns: NUM_RUNS.standard })(
+      "previously-activated keepAlive segment survives a transition through routeName='' (hidden render)",
+      (segment) => {
+        const elements = [makeMatch(segment, { keepAlive: true })];
+        const hasBeenActivated = new Set<string>();
+
+        // Pass 1: activate.
+        const first = buildRenderList(elements, segment, "", hasBeenActivated);
+
+        expect(first.activeMatchFound).toBe(true);
+        expect(hasBeenActivated.has(segment)).toBe(true);
+
+        // Pass 2: transition through empty route name. The segment stays
+        // in hasBeenActivated; renderSlotElement emits the hidden Activity.
+        const second = buildRenderList(elements, "", "", hasBeenActivated);
+
+        expect(second.activeMatchFound).toBe(false);
+        expect(second.rendered).toHaveLength(1);
+        expect(hasBeenActivated.has(segment)).toBe(true);
+      },
+    );
+  });
+
   describe("Cross-check: NotFound appended ONLY on UNKNOWN_ROUTE", () => {
     test.prop([arbSegmentName], { numRuns: NUM_RUNS.standard })(
       "non-UNKNOWN_ROUTE + no Match → NotFound is NOT in rendered",

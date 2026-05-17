@@ -175,14 +175,9 @@ The start interceptor calls the loader without a context — SSR boot path apps 
 
 Non-breaking via TypeScript contravariance — existing `(params) => …` loaders without the second arg continue to work; they just don't observe cancellation.
 
-## Post-hydration loader skip (#596)
+## Post-hydration loader skip
 
-When the application uses `hydrateRouter()` from `@real-router/core/utils`, the
-parsed server-serialized state is briefly deposited on a one-shot internal
-scratchpad before `start()` runs. The plugin reads this scratchpad and
-**reuses the server-resolved value** if `state.context.data` is already present
-for the same route name — skipping the redundant client-side loader call on
-first paint.
+When the application uses `hydrateRouter()` from `@real-router/core/utils`, the parsed server-serialized state is briefly deposited on a one-shot internal scratchpad before `start()` runs. The plugin reads this scratchpad and **reuses the server-resolved value** if `state.context.data` is already present for the same route name — skipping the redundant client-side loader call on first paint.
 
 ```typescript
 // Server: state.context.data populated by the loader, serialized into HTML
@@ -193,18 +188,9 @@ await hydrateRouter(router, window.__SSR_STATE__);
 // loader was NOT called — state.context.data === server's value
 ```
 
-The skip is single-shot — only the first `start()` triggered by `hydrateRouter`
-consumes the scratchpad. Subsequent navigations run the loader normally.
-Composes with per-route mode: `"client-only"` skips the loader regardless of
-scratchpad contents (mode wins).
+The skip is single-shot — only the first `start()` triggered by `hydrateRouter`consumes the scratchpad. Subsequent navigations run the loader normally. Composes with per-route mode: `"client-only"` skips the loader regardless of scratchpad contents (mode wins).
 
-**Mode marker is always written.** Even on a scratchpad-hit the plugin still
-calls `claim.write(state, mode)` for `state.context.ssrDataMode` before the
-loader-skip branch runs. So a route configured `ssr: "full"` keeps
-`getSsrDataMode(state) === "full"` on the client after hydration even when the
-loader was skipped — UI conditionals that branch on `ssrDataMode` don't need
-to special-case the post-hydration first paint. Symmetric on the rsc-server-plugin
-side (`state.context.ssrRscMode`).
+**Mode marker is always written.** Even on a scratchpad-hit the plugin still calls `claim.write(state, mode)` for `state.context.ssrDataMode` before the loader-skip branch runs. So a route configured `ssr: "full"` keeps `getSsrDataMode(state) === "full"` on the client after hydration even when the loader was skipped — UI conditionals that branch on `ssrDataMode` don't need to special-case the post-hydration first paint. Symmetric on the rsc-server-plugin side (`state.context.ssrRscMode`).
 
 ## Typed Loader Errors (`@real-router/ssr-data-plugin/errors`)
 

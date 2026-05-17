@@ -10,6 +10,8 @@ import { createActiveRouteSource } from "@real-router/sources";
 
 import { applyLinkA11y } from "../dom-utils";
 import { injectRouter } from "../functions/injectRouter";
+import { buildActiveRouteOptions } from "../internal/buildActiveRouteOptions";
+import { subscribeSourceToSignal } from "../internal/subscribeSourceToSignal";
 
 import type { Params } from "@real-router/core";
 
@@ -24,6 +26,10 @@ export class RealLinkActive {
   private readonly router = injectRouter();
   private readonly element = inject(ElementRef).nativeElement as HTMLElement;
   private readonly isActive = signal(false);
+  // Skip-same-value: only touch `classList.toggle` when the active flag
+  // actually flipped. Saves one DOM write per RealLinkActive per unrelated
+  // navigation (review §8b MEDIUM).
+  private prevActive: boolean | undefined = undefined;
 
   constructor() {
     // One-time a11y setup — doesn't depend on signal inputs, stays in
@@ -31,35 +37,31 @@ export class RealLinkActive {
     // be safe, but we only need it once per element.
     applyLinkA11y(this.element);
 
-    // Reactive source-creation effect (#630 fix). See RealLink.ts for the
-    // full rationale — same asymmetric-reactivity bug applied here:
-    // previous `ngOnInit` setup captured `(routeName, routeParams)` once,
-    // so changing those inputs reactively in AOT did not update the
-    // active-class tracking. Moving setup into `effect()` makes the source
-    // creation reactive to all bound signal inputs.
+    // Reactive source-creation effect (#630 fix) — see
+    // `packages/angular/CLAUDE.md` → "Directives use constructor + effect()".
     effect((onCleanup) => {
       const source = createActiveRouteSource(
         this.router,
         this.routeName(),
         this.routeParams(),
-        {
-          strict: this.activeStrict(),
-          ignoreQueryParams: this.ignoreQueryParams(),
-        },
+        buildActiveRouteOptions(
+          this.activeStrict(),
+          this.ignoreQueryParams(),
+          undefined,
+        ),
       );
 
-      this.isActive.set(source.getSnapshot());
-      this.updateClass();
+      onCleanup(
+        subscribeSourceToSignal(source, (snap) => {
+          if (snap === this.prevActive) {
+            return;
+          }
 
-      const unsub = source.subscribe(() => {
-        this.isActive.set(source.getSnapshot());
-        this.updateClass();
-      });
-
-      onCleanup(() => {
-        unsub();
-        source.destroy();
-      });
+          this.prevActive = snap;
+          this.isActive.set(snap);
+          this.updateClass();
+        }),
+      );
     });
   }
 

@@ -143,7 +143,7 @@ describe("buildHref — Property Tests", () => {
   // landing in the URL as a second fragment delimiter.
   describe("Invariant 5: Hash encoding (RFC 3986 + defensive %23 for #)", () => {
     test.prop([arbHash, fc.string({ minLength: 1, maxLength: 12 })], {
-      numRuns: NUM_RUNS.thorough,
+      numRuns: NUM_RUNS.extensive,
     })("fallback path → hash is encodeURI'd and # → %23", (rawHash, path) => {
       const router = makeFakeRouter(undefined, () => path);
       const href = buildHref(router, "any", {}, { hash: rawHash });
@@ -610,6 +610,293 @@ describe("buildHref — Property Tests", () => {
       const result = buildHref(router, "any", {}, { hash: "🎉" });
 
       expect(result).toBe("/p#%F0%9F%8E%89");
+    });
+  });
+
+  // ===========================================================================
+  // Audit 2026-05-16 §6.2 #1 (HIGH) — encodeFragmentInline non-idempotency
+  // ===========================================================================
+  describe("Invariant 13: encodeFragmentInline is NOT idempotent for inputs containing `%` or `#` (audit §6.2 #1)", () => {
+    // Fragment-side contract: callers MUST NOT feed an already-encoded fragment
+    // back through `buildHref`. The %-encoding round-trip would double-encode
+    // `%` into `%25`, breaking the rendered href.
+    //
+    // Drift sentinel (Invariant 12 above) checks the formula, but does not
+    // prove the function is non-idempotent on the wire — this test does.
+    test.prop(
+      [fc.constantFrom("a#b", "a%20b", "%FF", "%25foo", "a%xy", "ab#cd%ef")],
+      { numRuns: NUM_RUNS.standard },
+    )(
+      "buildHref called twice with the wire fragment from the first call changes the output (% gets re-encoded into %25)",
+      (rawHash) => {
+        const router = {
+          buildUrl: undefined,
+          buildPath: () => "/p",
+        } as unknown as Router;
+
+        const once = buildHref(router, "any", {}, { hash: rawHash });
+
+        fc.pre(once !== undefined);
+
+        const onceFragment = once.slice(once.indexOf("#") + 1);
+
+        fc.pre(onceFragment.includes("%") || onceFragment.includes("#"));
+
+        // Feed the WIRE fragment back in as a decoded hash — encodeURI now
+        // sees raw `%` characters and re-encodes them as `%25`. The output
+        // diverges from the first call.
+        const twice = buildHref(router, "any", {}, { hash: onceFragment });
+
+        expect(twice).not.toBe(once);
+        expect(twice!.slice(twice!.indexOf("#") + 1)).toContain("%25");
+      },
+    );
+  });
+
+  // ===========================================================================
+  // Audit 2026-05-16 §2.1 / §2.2 — path verbatim contract (Unicode + embedded
+  // chars). `buildHref` is content-agnostic for the path: it concatenates
+  // verbatim with `${path}#${encodedHash}`. Unicode codepoints, control
+  // characters, and already-embedded `#`/`?` in the path must pass through
+  // unchanged — the helper does not sanitize the router's output. A future
+  // refactor that "cleaned up" the path would silently break Unicode-routed
+  // pages and apps that already render fragments inside the path string.
+  // ===========================================================================
+  describe("Invariant 15: path is forwarded verbatim — Unicode + control chars + embedded `#`/`?` survive (audit §2.1/§2.2)", () => {
+    // fast-check v4 dropped the dedicated `fullUnicodeString` arbitrary; the
+    // `constantFrom` band is curated to cover every script class that matters
+    // for verbatim-passthrough verification (CJK, RTL, astral plane,
+    // zero-width controls, ASCII C0 controls).
+    const arbUnicodeyPath: fc.Arbitrary<string> = fc.oneof(
+      fc.string({ minLength: 1, maxLength: 16 }),
+      fc.constantFrom(
+        "/用户/42",
+        "/über",
+        "/한국어",
+        "/אבג",
+        "/مرحبا",
+        "/p\u0000q", // embedded NUL (C0 control)
+        "/p\u0001q", // SOH (C0 control)
+        "/p\u001Fq", // unit separator (C0 control)
+        "/p\u200Bq", // zero-width space
+        "/p\u202Eq", // RTL override
+        "/p\u{1F389}q", // astral plane (\ud83c\udf89)
+      ),
+    );
+
+    test.prop([arbUnicodeyPath], { numRuns: NUM_RUNS.standard })(
+      "buildPath result is concatenated verbatim into the href (no sanitization)",
+      (path) => {
+        const router = {
+          buildUrl: undefined,
+          buildPath: () => path,
+        } as unknown as Router;
+
+        // No hash → result is exactly the path the router returned.
+        expect(buildHref(router, "any", {})).toBe(path);
+      },
+    );
+
+    test.prop([arbUnicodeyPath, arbHash], { numRuns: NUM_RUNS.standard })(
+      "Unicode path + hash → `${path}#${encodedHash}`; path bytes are unchanged",
+      (path, rawHash) => {
+        const router = {
+          buildUrl: undefined,
+          buildPath: () => path,
+        } as unknown as Router;
+        const result = buildHref(router, "any", {}, { hash: rawHash });
+        const stripped = rawHash.startsWith("#") ? rawHash.slice(1) : rawHash;
+
+        if (!stripped) {
+          expect(result).toBe(path);
+
+          return;
+        }
+
+        // The path prefix is byte-equal to `path` regardless of Unicode content.
+        expect(result).toBeDefined();
+        expect(result!.startsWith(path)).toBe(true);
+        // After the path comes a SINGLE delimiter `#`, then the encoded hash.
+        expect(result![path.length]).toBe("#");
+      },
+    );
+
+    test.prop(
+      [
+        fc.string({ minLength: 1, maxLength: 8 }),
+        fc.string({ minLength: 1, maxLength: 8 }),
+      ],
+      { numRuns: NUM_RUNS.standard },
+    )(
+      "path with an already-embedded `#` is NOT sanitised; the resulting href contains two `#` (caller-owned hazard)",
+      (prefix, suffix) => {
+        fc.pre(!prefix.includes("#"));
+        fc.pre(!suffix.includes("#"));
+
+        const pathWithHash = `/${prefix}#${suffix}`;
+        const router = {
+          buildUrl: undefined,
+          buildPath: () => pathWithHash,
+        } as unknown as Router;
+        const result = buildHref(router, "any", {}, { hash: "extra" });
+
+        // The path's embedded `#` and the buildHref `#extra` delimiter both
+        // survive — buildHref appends, it does not parse the path.
+        expect(result).toBe(`${pathWithHash}#extra`);
+
+        // Two `#` characters in the final href: caller-owned hazard.
+        expect(result!.match(/#/g) ?? []).toHaveLength(2);
+      },
+    );
+
+    test("path with embedded `?` and `#` is forwarded verbatim with no escaping", () => {
+      const path = "/a?q=1#frag";
+      const router = {
+        buildUrl: undefined,
+        buildPath: () => path,
+      } as unknown as Router;
+
+      expect(buildHref(router, "any", {})).toBe(path);
+
+      const withHash = buildHref(router, "any", {}, { hash: "more" });
+
+      // Same as above: `#more` appended to a path that already contains `#frag`.
+      expect(withHash).toBe(`${path}#more`);
+    });
+  });
+
+  // ===========================================================================
+  // Audit 2026-05-16 §6.2 #8 (MED) — params non-mutation
+  // ===========================================================================
+  describe("Invariant 14: buildHref does not mutate the params argument (audit §6.2 #8)", () => {
+    function snapshotEntries(o: Record<string, unknown>): [string, unknown][] {
+      return Object.keys(o)
+        .toSorted((a, b) => a.localeCompare(b))
+        .map((k) => [k, o[k]] as [string, unknown]);
+    }
+
+    test.prop(
+      [
+        fc.dictionary(
+          fc.stringMatching(/^[a-z]{1,4}$/),
+          fc.oneof(
+            fc.string({ maxLength: 8 }),
+            fc.integer({ min: -100, max: 100 }),
+            fc.boolean(),
+          ),
+          { minKeys: 0, maxKeys: 4 },
+        ),
+      ],
+      { numRuns: NUM_RUNS.standard },
+    )(
+      "params snapshot before equals snapshot after for buildPath-only routers",
+      (params) => {
+        const router = {
+          buildUrl: undefined,
+          buildPath: () => "/p",
+        } as unknown as Router;
+        // structuredClone refuses null-prototype records (fast-check may shrink
+        // to `{__proto__: null}`); compare by own-entries snapshot instead.
+        const before = snapshotEntries(params as Record<string, unknown>);
+
+        buildHref(router, "any", params as Params);
+
+        expect(
+          snapshotEntries(params as Record<string, unknown>),
+        ).toStrictEqual(before);
+      },
+    );
+
+    test.prop(
+      [
+        fc.dictionary(
+          fc.stringMatching(/^[a-z]{1,4}$/),
+          fc.oneof(
+            fc.string({ maxLength: 8 }),
+            fc.integer({ min: -100, max: 100 }),
+            fc.boolean(),
+          ),
+          { minKeys: 0, maxKeys: 4 },
+        ),
+        arbHash,
+      ],
+      { numRuns: NUM_RUNS.standard },
+    )(
+      "params snapshot before equals snapshot after even when hash is provided",
+      (params, hash) => {
+        const router = {
+          buildUrl: undefined,
+          buildPath: () => "/p",
+        } as unknown as Router;
+        const before = snapshotEntries(params as Record<string, unknown>);
+
+        buildHref(router, "any", params as Params, { hash });
+
+        expect(
+          snapshotEntries(params as Record<string, unknown>),
+        ).toStrictEqual(before);
+      },
+    );
+  });
+
+  // ===========================================================================
+  // Audit 2026-05-16 §5.2 Bug 1 (LOW) — routeName containing `#` / `?` is
+  // forwarded verbatim into the href without encoding. In production the
+  // route-tree layer (route-utils `SAFE_SEGMENT_PATTERN`) rejects such
+  // routeNames before they reach buildHref. The pin below documents that
+  // buildHref itself is content-agnostic: it trusts router.buildPath /
+  // router.buildUrl to have already validated the name.
+  // ===========================================================================
+  describe("Invariant 16: routeName with `#`/`?` is forwarded verbatim (Bug 1 pin — defense lives in route-tree)", () => {
+    test("router.buildPath returning `/a#b` is concatenated verbatim into href", () => {
+      const router = {
+        buildUrl: undefined,
+        buildPath: (name: string) => `/${name}`,
+      } as unknown as Router;
+      // Caller passes a routeName that *would* normally be rejected by
+      // route-utils — buildHref does NOT re-validate.
+      const result = buildHref(router, "a#b", {});
+
+      expect(result).toBe("/a#b");
+    });
+
+    test("router.buildPath returning `/a?q=1` is concatenated verbatim into href", () => {
+      const router = {
+        buildUrl: undefined,
+        buildPath: (name: string) => `/${name}`,
+      } as unknown as Router;
+      const result = buildHref(router, "a?q=1", {});
+
+      expect(result).toBe("/a?q=1");
+    });
+  });
+
+  // ===========================================================================
+  // Audit 2026-05-16 §5.2 Bug 6 (LOW) — `encodeFragmentInline` double-encodes
+  // strings that already contain `%XX` sequences. This is by design: the
+  // `<Link hash>` API accepts a DECODED fragment string. The pin below
+  // documents the contract so a future "smart re-encoder" refactor surfaces
+  // as a regression.
+  // ===========================================================================
+  describe("Invariant 17: encodeFragmentInline double-encodes pre-encoded input (Bug 6 pin — DECODED contract)", () => {
+    test("hash='a%20b' produces wire fragment 'a%2520b' (% itself is encoded as %25)", () => {
+      const router = {
+        buildUrl: undefined,
+        buildPath: () => "/p",
+      } as unknown as Router;
+      const result = buildHref(router, "any", {}, { hash: "a%20b" });
+
+      expect(result).toBe("/p#a%2520b");
+    });
+
+    test("hash='%FF' produces wire fragment '%25FF' (raw % → %25, F/F unchanged)", () => {
+      const router = {
+        buildUrl: undefined,
+        buildPath: () => "/p",
+      } as unknown as Router;
+      const result = buildHref(router, "any", {}, { hash: "%FF" });
+
+      expect(result).toBe("/p#%25FF");
     });
   });
 });

@@ -47,16 +47,30 @@ describe("applyLinkA11y — Property Tests", () => {
   });
 
   describe("Invariant 1: null / undefined no-op (defensive guard)", () => {
-    test("applyLinkA11y(null) does not throw", () => {
+    // Stronger contract than `not.toThrow()`: the function MUST not mutate the
+    // surrounding document either. A regression that silently appended to
+    // `document.body` or stamped attributes on a default element would still
+    // pass a bare throw-check. Snapshot innerHTML before/after to catch it.
+    test("applyLinkA11y(null) does not throw and does not mutate the document", () => {
+      document.body.innerHTML = "<div id='sentinel' data-role='probe'></div>";
+      const before = document.body.innerHTML;
+
       expect(() => {
         applyLinkA11y(null);
       }).not.toThrow();
+
+      expect(document.body.innerHTML).toBe(before);
     });
 
-    test("applyLinkA11y(undefined) does not throw", () => {
+    test("applyLinkA11y(undefined) does not throw and does not mutate the document", () => {
+      document.body.innerHTML = "<div id='sentinel' data-role='probe'></div>";
+      const before = document.body.innerHTML;
+
       expect(() => {
         applyLinkA11y(undefined);
       }).not.toThrow();
+
+      expect(document.body.innerHTML).toBe(before);
     });
   });
 

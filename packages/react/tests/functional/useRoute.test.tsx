@@ -36,12 +36,16 @@ describe("useRoute hook", () => {
       a.localeCompare(b),
     );
 
+    expect(keys).toHaveLength(7);
     expect(keys).toStrictEqual(
       expect.arrayContaining([
-        "navigate",
+        "canNavigateTo",
         "getState",
         "isActiveRoute",
+        "isLeaveApproved",
+        "navigate",
         "subscribe",
+        "subscribeLeave",
       ]),
     );
     expect(result.current.navigator.navigate).toBe(router.navigate);

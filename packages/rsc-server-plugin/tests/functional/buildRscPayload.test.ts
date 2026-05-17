@@ -134,15 +134,15 @@ describe("buildRscPayload", () => {
   });
 
   describe("omit semantics (exactOptionalPropertyTypes safety)", () => {
-    it("omits the returnValue key entirely when state.context.rscAction is absent", () => {
+    it("omits both action keys entirely when state.context.rscAction is absent", () => {
+      // Merged from two separate single-key checks — they exercised the
+      // same code path twice. The `Object.keys === ["root"]` test below
+      // is the strictest form, but this `in`-operator pair documents the
+      // per-key absence intent explicitly (no `undefined` slot left
+      // behind, which `in` distinguishes from `=== undefined`).
       const payload = buildRscPayload(buildState({ rsc: node("Page") }));
 
       expect("returnValue" in payload).toBe(false);
-    });
-
-    it("omits the formState key entirely when state.context.rscAction is absent", () => {
-      const payload = buildRscPayload(buildState({ rsc: node("Page") }));
-
       expect("formState" in payload).toBe(false);
     });
 
@@ -181,6 +181,76 @@ describe("buildRscPayload", () => {
       );
 
       expect(Object.keys(payload)).toStrictEqual(["root"]);
+    });
+  });
+
+  describe("edge cases (gotchas §5.18-§5.21)", () => {
+    it("falsy override values (0, '', false) are preserved as root — NOT collapsed (gotcha §5.18)", () => {
+      // §5.18: implementation uses `rootOverride === undefined ? default
+      // : override`, NOT `rootOverride ?? default`. So falsy-non-undefined
+      // values survive intact. All three (`0`, `""`, `false`) are valid
+      // ReactNodes by React's render rules — 0 renders as text "0",
+      // "" as empty text node, false as a no-op. A regression that
+      // switched to `??` would silently fall back to state.context.rsc.
+      const rsc = node("Default");
+
+      const zero = buildRscPayload(buildState({ rsc }), 0 as unknown as null);
+
+      expect(zero.root).toBe(0);
+
+      const empty = buildRscPayload(buildState({ rsc }), "");
+
+      expect(empty.root).toBe("");
+
+      const falseOverride = buildRscPayload(
+        buildState({ rsc }),
+        false as unknown as null,
+      );
+
+      expect(falseOverride.root).toBe(false);
+    });
+
+    it("rscAction.returnValue === null is passed through as null (gotcha §5.20)", () => {
+      // §5.20: TS type says `returnValue?: { ok, data }` — null is NOT
+      // valid. But at runtime, the omit-check is `action?.returnValue
+      // !== undefined`, and `null !== undefined === true`, so a null
+      // returnValue would slip through onto the payload. Pin the
+      // current pass-through behaviour so a future tightening (e.g.
+      // require object type) becomes deliberate.
+      const action = {
+        returnValue: null,
+      } as unknown as RscActionResult;
+      const payload = buildRscPayload(
+        buildState({ rsc: node("Page"), rscAction: action }),
+      );
+
+      expect("returnValue" in payload).toBe(true);
+      expect(payload.returnValue).toBeNull();
+    });
+
+    it("ctx.rsc === undefined as OWN property differs from missing key (gotcha §5.21)", () => {
+      // §5.21: when `state.context.rsc` is explicitly set to undefined
+      // (own enumerable property), the result is `{ root: undefined }`
+      // — `"root" in payload` is true, but the value is undefined.
+      // When the key is absent (e.g. excludeContext or
+      // never-written-by-plugin), the result is also `{ root:
+      // undefined }`. From a downstream view they look identical via
+      // .root access, but the IN-operator distinguishes — pin both
+      // shapes so a future refactor that started omitting the root
+      // key on undefined would surface here.
+      const explicit = buildRscPayload(buildState({ rsc: undefined }));
+      const missing = buildRscPayload(buildState({}));
+
+      // .root access: both undefined — observationally equivalent at
+      // the consumer level.
+      expect(explicit.root).toBeUndefined();
+      expect(missing.root).toBeUndefined();
+
+      // BUT: payload always has a `root` key regardless of source —
+      // the helper always builds `{ root, ...optional }`, never
+      // omitting root even when the source value is undefined.
+      expect("root" in explicit).toBe(true);
+      expect("root" in missing).toBe(true);
     });
   });
 

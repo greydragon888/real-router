@@ -33,6 +33,11 @@ export function provideRealRouter(
 ): EnvironmentProviders {
   const navigator = getNavigator(router);
 
+  // `Parameters<typeof makeEnvironmentProviders>[0]` is the actual union
+  // `(Provider | EnvironmentProviders | EnvironmentProviders[])[]` —
+  // `provideEnvironmentInitializer()` returns `EnvironmentProviders`, so the
+  // narrower `Provider[]` would force a cast at every push (review §8a — the
+  // proposed Provider[] swap was retracted after discovering this).
   const providers: Parameters<typeof makeEnvironmentProviders>[0] = [
     { provide: ROUTER, useValue: router },
     { provide: NAVIGATOR, useValue: navigator },

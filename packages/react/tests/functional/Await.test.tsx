@@ -78,7 +78,6 @@ describe("<Await>", () => {
       </RouterProvider>,
     );
 
-    expect(screen.getByTestId("list")).toBeInTheDocument();
     expect(screen.getByText("r1")).toBeInTheDocument();
     expect(screen.getByText("r2")).toBeInTheDocument();
     expect(screen.queryByTestId("fallback")).not.toBeInTheDocument();

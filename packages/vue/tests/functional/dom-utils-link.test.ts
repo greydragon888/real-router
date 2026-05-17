@@ -66,6 +66,18 @@ describe("buildHref — params edge cases", () => {
 
     router.stop();
   });
+
+  it("ignores undefined extra alongside a required path param", () => {
+    const router = makeRouter();
+
+    // Required param `id` is provided; `extra: undefined` must be filtered out
+    // rather than serialised as a query param or poisoning the path template.
+    expect(
+      buildHref(router, "users.view", { id: "42", extra: undefined }),
+    ).toBe("/users/42");
+
+    router.stop();
+  });
 });
 
 describe("buildActiveClassName — token edge cases", () => {
@@ -204,10 +216,156 @@ describe("shouldNavigate — modifier keys", () => {
     expect(shouldNavigate(evt)).toBe(false);
   });
 
-  it("returns true for a bare left click (button=0, no modifiers)", () => {
-    const evt = new MouseEvent("click", { button: 0 });
+  // Review §5.4 — metaKey / ctrlKey are equally documented modifiers, both
+  // map to "open in new tab" on macOS and Windows/Linux respectively. The
+  // PBT in tests/property/shouldNavigate.properties.ts covers the full
+  // truth table; these two hand-written cases keep the contract visible in
+  // the per-modifier regression list alongside the older alt/shift ones.
+  it("returns false when metaKey is held (macOS open-in-new-tab shortcut)", () => {
+    const evt = new MouseEvent("click", { button: 0, metaKey: true });
 
-    expect(shouldNavigate(evt)).toBe(true);
+    expect(shouldNavigate(evt)).toBe(false);
+  });
+
+  it("returns false when ctrlKey is held (Windows/Linux open-in-new-tab shortcut)", () => {
+    const evt = new MouseEvent("click", { button: 0, ctrlKey: true });
+
+    expect(shouldNavigate(evt)).toBe(false);
+  });
+
+  // Review §5.4 — non-left mouse buttons. Browsers fire `click` events for
+  // middle/right buttons in some legacy paths; `shouldNavigate` must reject
+  // them so the browser's native behavior (new tab / context menu) wins.
+  it("returns false on middle-click (button=1) without modifiers", () => {
+    const evt = new MouseEvent("click", { button: 1 });
+
+    expect(shouldNavigate(evt)).toBe(false);
+  });
+
+  it("returns false on right-click (button=2) without modifiers", () => {
+    const evt = new MouseEvent("click", { button: 2 });
+
+    expect(shouldNavigate(evt)).toBe(false);
+  });
+});
+
+// Review §5.6 — `applyLinkA11y` edge cases beyond <a>/<button> early-return.
+describe("applyLinkA11y — attribute preservation and SVG handling", () => {
+  it("preserves an existing tabindex attribute even if non-zero (-1)", () => {
+    // `hasAttribute("tabindex")` returns true regardless of the value, so the
+    // helper short-circuits without overwriting. Consumers may set
+    // `tabindex="-1"` to mark a Link as intentionally not focusable
+    // (e.g., a disabled menu item).
+    const div = document.createElement("div");
+
+    div.setAttribute("tabindex", "-1");
+    applyLinkA11y(div);
+
+    expect(div.getAttribute("tabindex")).toBe("-1");
+    // role still applied — it was not set.
+    expect(div.getAttribute("role")).toBe("link");
+  });
+
+  it("does NOT inspect aria-disabled — role and tabindex are still applied", () => {
+    // `applyLinkA11y` has no aria-disabled branch — locks the current behavior
+    // as a regression. Consumers who want a non-focusable disabled link must
+    // pre-set tabindex="-1" themselves (the preservation test above).
+    const div = document.createElement("div");
+
+    div.setAttribute("aria-disabled", "true");
+    applyLinkA11y(div);
+
+    expect(div.getAttribute("role")).toBe("link");
+    expect(div.getAttribute("tabindex")).toBe("0");
+    expect(div.getAttribute("aria-disabled")).toBe("true");
+  });
+
+  it("applies role=link / tabindex=0 to an SVG element via `hasAttribute` (no early return)", () => {
+    // `SVGElement` is not `HTMLAnchorElement | HTMLButtonElement` → falls
+    // through to the default branch. `hasAttribute` works on SVG elements
+    // identically. The semantic correctness of `role="link"` on SVG is
+    // debatable but the helper's contract is "make non-a/button elements
+    // keyboard-focusable" — this locks the current behavior.
+    const svg = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "g",
+    ) as unknown as HTMLElement;
+
+    applyLinkA11y(svg);
+
+    expect(svg.getAttribute("role")).toBe("link");
+    expect(svg.getAttribute("tabindex")).toBe("0");
+  });
+});
+
+// Review §5.2 Bug 1 — `buildHref` return-value contract (post-fix). The
+// previous behaviour used `url !== undefined` and propagated any non-undefined
+// value (null, "", 0, false) as the href — silent self-navigation on `""` and
+// stringified `"null"` / `"0"` / `"false"` from misbehaving plugins.
+//
+// New contract: `typeof url === "string" && url.length > 0` — any falsy /
+// non-string return from `buildUrl` falls back to `router.buildPath`. The
+// "intentional break" anticipated by the previous lock is now done; this
+// block re-locks the corrected contract.
+describe("buildHref — buildUrl non-string return (behaviour lock, post-fix §5.2 Bug 1)", () => {
+  function makeRouterWithBuildUrl(returnValue: unknown): Router {
+    const router = createRouter([{ name: "users", path: "/users" }]);
+
+    void router.start("/users");
+    (router as unknown as { buildUrl: () => unknown }).buildUrl = () =>
+      returnValue;
+
+    return router;
+  }
+
+  it("falls back to buildPath when buildUrl returns null (type-contract violation)", () => {
+    const router = makeRouterWithBuildUrl(null);
+
+    expect(buildHref(router, "users", {})).toBe("/users");
+
+    router.stop();
+  });
+
+  it("falls back to buildPath when buildUrl returns the number 0", () => {
+    const router = makeRouterWithBuildUrl(0);
+
+    expect(buildHref(router, "users", {})).toBe("/users");
+
+    router.stop();
+  });
+
+  it("falls back to buildPath when buildUrl returns the boolean false", () => {
+    const router = makeRouterWithBuildUrl(false);
+
+    expect(buildHref(router, "users", {})).toBe("/users");
+
+    router.stop();
+  });
+
+  it("falls back to buildPath when buildUrl returns empty string '' (silent self-nav prevention)", () => {
+    const router = makeRouterWithBuildUrl("");
+
+    // The original bug: `<a href="">` resolves to the current page URL →
+    // clicking the Link silently navigates to self. Fix delegates to buildPath.
+    expect(buildHref(router, "users", {})).toBe("/users");
+
+    router.stop();
+  });
+
+  it("falls back to buildPath when buildUrl returns undefined (unchanged from pre-fix)", () => {
+    const router = makeRouterWithBuildUrl(undefined);
+
+    expect(buildHref(router, "users", {})).toBe("/users");
+
+    router.stop();
+  });
+
+  it("propagates a non-empty string verbatim (positive contract — only valid case)", () => {
+    const router = makeRouterWithBuildUrl("/custom/users");
+
+    expect(buildHref(router, "users", {})).toBe("/custom/users");
+
+    router.stop();
   });
 });
 

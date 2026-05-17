@@ -56,7 +56,11 @@ describe("ClientOnly component", () => {
     const debug = fixture.debugElement.query(By.directive(ClientOnly));
     const cmp = debug.componentInstance as ClientOnly;
 
-    expect(typeof cmp.mounted).toBe("function");
-    expect(typeof cmp.fallback).toBe("function");
+    // Signal getters are callable and return concrete values.
+    // In jsdom afterNextRender() fires synchronously during detectChanges,
+    // so mounted() is true here; fallback() is undefined (no [fallback]
+    // template bound — JIT does not propagate signal inputs).
+    expect(cmp.mounted()).toBe(true);
+    expect(cmp.fallback()).toBeUndefined();
   });
 });

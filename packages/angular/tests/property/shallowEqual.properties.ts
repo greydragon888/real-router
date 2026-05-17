@@ -149,7 +149,12 @@ describe("shallowEqual — Property Tests", () => {
   });
 
   describe("Invariant 6: key-order insensitivity", () => {
-    test.prop([arbExtendedRecord], { numRuns: NUM_RUNS.thorough })(
+    // Audit 2026-05-16 §2.3 — bumped from `thorough` (200) to `extensive`
+    // (500). With `arbExtendedRecord.maxKeys: 4`, the combinatorial surface
+    // is wide enough that 200 leaves edge values (Number.MIN_VALUE, BigInt
+    // 10^30, etc., added in §2.2) under-sampled — the larger Object.is
+    // surface deserves more iterations.
+    test.prop([arbExtendedRecord], { numRuns: NUM_RUNS.extensive })(
       "reversing key insertion order does not change equality",
       (o) => {
         const keys = Object.keys(o);
@@ -376,6 +381,105 @@ describe("shallowEqual — Property Tests", () => {
   // equal even if their prototype chains differ wildly. Locks the contract
   // against a future refactor to `for (const key in obj)` (which DOES walk
   // the chain) or `Reflect.ownKeys()` (different semantics).
+  // ===========================================================================
+  // Audit 2026-05-16 §6.2 #2 (HIGH) — substitution
+  // shallowEqual(a, b) === true ⟹ shallowEqual({k:a}, {k:b}) === true
+  // Critical for navigateWithHash auto-bypass through `shallowEqual(current.params, routeParams)`.
+  // ===========================================================================
+  describe("Invariant 15: substitution — equal primitives stay equal when wrapped in single-key record (audit §6.2 #2)", () => {
+    test.prop([arbExtendedPrimitive, fc.stringMatching(/^[a-z]{1,4}$/)], {
+      numRuns: NUM_RUNS.thorough,
+    })(
+      "shallowEqual(a, b) === true ⟹ shallowEqual({k:a}, {k:b}) === true",
+      (val, key) => {
+        const a = { [key]: val } as Record<string, unknown>;
+        const b = { [key]: val } as Record<string, unknown>;
+
+        expect(shallowEqual(a, b)).toBe(true);
+      },
+    );
+
+    test.prop(
+      [
+        arbExtendedPrimitive,
+        arbExtendedPrimitive,
+        fc.stringMatching(/^[a-z]{1,4}$/),
+      ],
+      { numRuns: NUM_RUNS.thorough },
+    )(
+      "Object.is(a, b) === false ⟹ shallowEqual({k:a}, {k:b}) === false",
+      (a, b, key) => {
+        fc.pre(!Object.is(a, b));
+
+        expect(
+          shallowEqual(
+            { [key]: a } as Record<string, unknown>,
+            {
+              [key]: b,
+            } as Record<string, unknown>,
+          ),
+        ).toBe(false);
+      },
+    );
+  });
+
+  // ===========================================================================
+  // Audit 2026-05-16 §6.2 #3 (HIGH) — transitivity for same-keys records
+  // shallowEqual(a, b) ∧ shallowEqual(b, c) ⟹ shallowEqual(a, c)
+  // Regressions break memoization in Angular signal-based CD.
+  // ===========================================================================
+  describe("Invariant 16: transitivity for same-keys records (audit §6.2 #3)", () => {
+    test.prop([arbExtendedRecord], { numRuns: NUM_RUNS.thorough })(
+      "a===b ∧ b===c ⟹ a===c (three independent copies of the same base)",
+      (base) => {
+        const a = { ...base };
+        const b = { ...base };
+        const c = { ...base };
+
+        fc.pre(shallowEqual(a, b));
+        fc.pre(shallowEqual(b, c));
+
+        expect(shallowEqual(a, c)).toBe(true);
+      },
+    );
+
+    // Transitivity over arbitrary triples is the obvious property, but it
+    // fails to find counter-examples in reasonable wall time: random tuples
+    // almost never satisfy `shallowEqual(a, b) && shallowEqual(b, c)`, so
+    // fast-check exhausts its pre-condition budget. The "three copies of the
+    // same base" variant above covers the real-world `useNavigate`-style
+    // signal-CD scenario, which is what `navigateWithHash` actually relies on.
+  });
+
+  // ===========================================================================
+  // Audit 2026-05-16 §6.2 #?  — no mutation of args
+  // ===========================================================================
+  describe("Invariant 17: shallowEqual does not mutate its arguments", () => {
+    function snapshot(o: Record<string, unknown>): [string, unknown][] {
+      return Object.keys(o)
+        .toSorted((a, b) => a.localeCompare(b))
+        .map((k) => [k, o[k]] as [string, unknown]);
+    }
+
+    test.prop([arbExtendedRecord, arbExtendedRecord], {
+      numRuns: NUM_RUNS.thorough,
+    })(
+      "both arguments retain identical key/value identities after the call (BigInt / Symbol safe)",
+      (a, b) => {
+        // Avoid `structuredClone` — `arbExtendedRecord` mixes BigInt / Symbol
+        // values which the built-in clone rejects. Reference-identity snapshot
+        // is the strongest "no mutation" oracle we can build here.
+        const beforeA = snapshot(a);
+        const beforeB = snapshot(b);
+
+        shallowEqual(a, b);
+
+        expect(snapshot(a)).toStrictEqual(beforeA);
+        expect(snapshot(b)).toStrictEqual(beforeB);
+      },
+    );
+  });
+
   describe("Invariant 14: inherited properties via prototype are NOT compared", () => {
     test("two records with same own-keys but DIFFERENT prototypes → still equal", () => {
       class WithProto {
@@ -433,6 +537,45 @@ describe("shallowEqual — Property Tests", () => {
       // The loop iterates "y" on both — both equal "2". Both have own "y".
       // The fact that a has inherited "x" doesn't affect the result.
       expect(shallowEqual(a, b)).toBe(true);
+    });
+  });
+
+  // ===========================================================================
+  // Audit 2026-05-16 §5.2 Bug 3 (MED — contract incompleteness) — passing
+  // Date / Map / Array instances DIRECTLY (not wrapped in a record) to
+  // shallowEqual returns `true` for any two empty-key-list objects with the
+  // same length-0. This is a consequence of `Object.keys()` semantics: own
+  // enumerable keys of `new Date(0)`, `new Map()`, `[]` all evaluate to `[]`.
+  //
+  // In practice, `shallowEqual` is called only with `Record<string, Primitive>`
+  // (Angular's `navigateWithHash` and signal-CD memoization paths). The pin
+  // below documents the surprising behavior so a future caller that passes
+  // a Date / Map / Array directly is aware of the contract limitation.
+  // ===========================================================================
+  describe("Invariant 18: shallowEqual called DIRECTLY on Date/Map/Array (Bug 3 pin — contract limitation)", () => {
+    test("two distinct Date instances with equal epoch → true (Object.keys is empty)", () => {
+      expect(shallowEqual(new Date(0), new Date(0))).toBe(true);
+    });
+
+    test("two distinct Map instances (both empty) → true", () => {
+      expect(shallowEqual(new Map(), new Map())).toBe(true);
+    });
+
+    test("Map vs plain {} (both empty) → true", () => {
+      expect(shallowEqual(new Map(), {})).toBe(true);
+    });
+
+    test("two distinct empty arrays → true (Object.keys([]) is [])", () => {
+      expect(shallowEqual([], [])).toBe(true);
+    });
+
+    test("array [1,2] vs [1,2] → true (numeric keys are enumerable)", () => {
+      // Object.keys([1, 2]) === ["0", "1"]; values match by Object.is.
+      expect(shallowEqual([1, 2], [1, 2])).toBe(true);
+    });
+
+    test("array [1,2] vs [3,4] → false (numeric values differ)", () => {
+      expect(shallowEqual([1, 2], [3, 4])).toBe(false);
     });
   });
 });

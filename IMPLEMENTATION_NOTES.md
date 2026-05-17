@@ -2759,6 +2759,7 @@ The `namespace` argument is typed as a literal (`"data"` for ssr-data-plugin, `"
 - **AbortSignal plumbed into the loader (#605, follow-up)** — `SsrLoaderFn<T>` now accepts an optional second argument `context?: { signal: AbortSignal }`. The leave handler passes the navigation's controller signal so cancellation-aware loaders can abort their in-flight work (fetch, DB query, …). Non-breaking via TypeScript contravariance — existing `(params) => ...` loaders ignore the second arg and still benefit from the post-await `signal.aborted` write-skip. Important pattern: a signal aborted *before* `addEventListener("abort", …)` does NOT auto-fire the listener, so cancellation-aware loaders must check `signal.aborted` upfront (see dogfooding `home` loader in each `ssr-mixed/` example for the canonical shape). The start interceptor does NOT pass a signal — SSR boot path apps that need request-scoped cancellation use the existing `getDep("abortSignal")` pattern from `createRequestScope` (#603) + `withTimeout({ upstreamSignal })` (#598).
 - **Cross-namespace not transactional** — calling `invalidate(router, "data")` and `invalidate(router, "rsc")` separately marks both flags, but they are consumed by their respective plugins' independent listeners on the same navigation. There is no "atomic group" — if one loader rejects, the other has already started. Acceptable for the small N of namespaces in practice (data + rsc + at most 1-2 application namespaces); a transactional group would warrant a separate API.
 - **Loader rejection leaves flag set** — if `entry.loader(...)` throws, the navigation rejects with that error and the flag is *not* cleared (clearStale runs after `await`). User retries → loader runs again. Matches the existing start-interceptor behavior (no caching of failures).
+- **Stale flag survives plugin teardown until the router is GC'd** — the per-router stale registry lives in a module-level `WeakMap<Router, Set<string>>`. `unsubscribe()` removes the **consumer** (the `subscribeLeave` listener) but **not the producer's mark** — a flag set by `invalidate(router, "data")` before `unsub()` remains in the WeakMap entry. Concretely: `invalidate(router, "data"); unsub(); router.usePlugin(ssrDataPluginFactory(loaders)); await router.navigate(...);` — the re-registered listener picks up the pre-existing flag and re-runs the loader. **Intentional for hot-swap scenarios** on long-lived router instances (plugin replacement without re-architecting cache busts). The flag becomes unreachable only when the router itself is GC'd; `cloneRouter()` clones get a fresh registry entry via WeakMap key isolation, so per-request SSR scopes are unaffected. To drop the flag without disposing the router, navigate once to a route with a registered loader and let the listener consume it, OR re-architect to avoid the hot-swap (typical apps don't need this). Documented as a gotcha in both plugins' `CLAUDE.md`.
 
 ### Test coverage
 
@@ -2784,3 +2785,531 @@ Two e2e scenarios per adapter (12 new tests total + 2 in `ssr-rsc/`):
 - **In-flight defer** — `page.evaluate(() => { btn.click(); btn.click(); })` fires two synchronous clicks. The second `navigate()` aborts the first via `#abortPreviousNavigation`; with cancel-safety, the first nav's late-resolving loader sees `signal.aborted` and skips the write, the flag stays set, the second nav's leave handler consumes it. End state has fresh `fetchedAt`.
 
 `ssr-rsc/` adds a parallel "Scenario 3b" exercising the same in-flight defer pattern through the `/__rsc` Flight refetch path, with `RevalidateButton` updated to call `invalidate(router, "rsc")` for API symmetry (no-op on the client router in this RSC architecture — server's per-request `cloneRouter` already creates a fresh router each Flight request).
+
+## `shared/ssr/` — third consumer category for the symlink pattern (#437 extension)
+
+### Problem
+
+After `ssr-data-plugin` (#594, plain JSON loader payloads) and `rsc-server-plugin` (#566, `ReactNode` Flight payloads) both shipped, the duplicated surface area between them was significant: identical `start()` interceptor mechanics, identical validation rules (`createLoadersValidator`), identical claim/teardown lifecycle, identical `subscribeLeave` listener for `invalidate()` (#605), identical `SsrMode` resolution, identical typed-error classes (`LoaderRedirect`/`LoaderNotFound`/`LoaderTimeout`), identical `withTimeout` deadline composer, identical `defer({ critical, deferred })` API, identical `__rrDefer__` settle wire format. The only meaningful differences were the namespace string (`"data"` vs `"rsc"`), the loader return type (`unknown` vs `ReactNode`), and the per-route mode subset (`rsc-server-plugin` rejects `"data-only"` because RSC has no "data without component" concept).
+
+Pre-`shared/ssr/`: every shared file would have lived twice — once in `packages/ssr-data-plugin/src/`, once in `packages/rsc-server-plugin/src/`. Drift between the two would have been near-guaranteed; the `rsc-server-plugin` audit (2026-05-10) had already caught two bugs that landed identically in both copies and required parallel fixes.
+
+### Solution
+
+Extend the #437 `shared/` symlink pattern with a third category, `shared/ssr/`. Both plugins consume it via `src/shared-ssr` symlinks (parity with `src/dom-utils` and `src/browser-env`). The barrel exports a **generic factory** `createSsrLoaderPlugin<T, D>` parameterised on the payload type and the dependency map; each plugin instantiates it once:
+
+```typescript
+// packages/ssr-data-plugin/src/factory.ts
+export const ssrDataPluginFactory = (loaders: SsrLoaderFactoryMap<unknown>) =>
+  createSsrLoaderPlugin<unknown>({
+    namespace: "data",
+    modeNamespace: "ssrDataMode",
+    allowedModes: ["full", "data-only", "client-only"],
+    validate: createLoadersValidator(ERROR_PREFIX_SSR_DATA),
+    loaders,
+  });
+
+// packages/rsc-server-plugin/src/factory.ts
+export const rscServerPluginFactory = (loaders: RscLoaderFactoryMap) =>
+  createSsrLoaderPlugin<ReactNode>({
+    namespace: "rsc",
+    modeNamespace: "ssrRscMode",
+    allowedModes: ["full", "client-only"], // no "data-only"
+    validate: createLoadersValidator(ERROR_PREFIX_RSC_SERVER),
+    loaders,
+  });
+```
+
+Symlink layout (parallels #437):
+
+```
+packages/ssr-data-plugin/src/shared-ssr   → ../../../shared/ssr           (symlink, git-tracked)
+packages/rsc-server-plugin/src/shared-ssr → ../../../shared/ssr           (symlink, git-tracked)
+```
+
+`shared/ssr/` contents (8 files):
+
+```
+shared/ssr/
+├── createSsrLoaderPlugin.ts  # generic factory: compile loop + start interceptor + subscribeLeave + 4-claim teardown
+├── createLoadersValidator.ts # generic shape validator (rejects unknown keys, allowed-mode strings only)
+├── defer.ts                  # defer({ critical, deferred }) API + DEFER_BRAND symbol + shallow-clone freeze
+├── deferRegistry.ts          # __rrDeferRegistry__ global Map + escapeForScript + formatSettleScript + getDeferBootstrapScript
+├── errors.ts                 # LoaderRedirect / LoaderNotFound / LoaderTimeout + withTimeout (AbortSignal.any composer)
+├── staleRegistry.ts          # markStale / isStale / clearStale — WeakMap<Router, Set<namespace>> for invalidate()
+├── types.ts                  # SsrLoaderFn<T> with optional { signal }, SsrLoaderFnFactory<T,D>, SsrMode, SsrLoaderPluginConfig
+└── index.ts                  # barrel
+```
+
+### Why this is correct as a #437 extension, not a separate mechanism
+
+The shape, tooling concerns, and trade-offs are **identical** to #437:
+
+- Same git-tracked symlink pattern, same Windows requirement (`git config --global core.symlinks true`)
+- Same minimal `shared/package.json` (one workspace entry covers all three sibling directories)
+- Same coverage trade-off (shared code excluded from per-package 100% — tests live in the consumer that exercises them)
+- Same propagation rule: an edit in `shared/ssr/createSsrLoaderPlugin.ts` reflects instantly in both plugins via their symlinks; `pnpm build` verifies both packages
+- Same `knip.json` / `.jscpd.json` ignores extended to `shared/ssr/**`
+
+The only #437 carry-over that does NOT apply: `shared/ssr/` consumers don't need `type-guards` resolution (no inlined workspace deps) — the existing `shared/package.json` workspace devDep on `@real-router/core` is sufficient.
+
+### Why a generic factory, not class inheritance or two copies
+
+- **Two-copy approach** rejected: drift is near-guaranteed at this surface area (12+ shared concerns each with non-trivial semantics — see `subscribeLeave` peek-then-clear-after-write logic in `createSsrLoaderPlugin.ts:303-335`, which has 5 distinct bail-out branches)
+- **Class inheritance** rejected: plugin factories return `PluginFactory<Deps>` functions, not classes. A `BaseLoaderPlugin` class would invert the natural API shape
+- **Generic factory** chosen: zero runtime cost, zero allocation per consumer (the factory closure is created once at module load), full type inference for both `T = unknown` and `T = ReactNode` via TypeScript generics. Both plugins are now ~10-line adapters that validate + delegate
+
+### Audit confirmation
+
+`rsc-server-plugin` audit (2026-05-10 + 2026-05-16) verified composition: both plugins coexist on the same router without cross-namespace mutation, teardown of one does not affect the other, and `invalidate("data")` re-runs only the ssr-data-plugin loader while `state.context.rsc` stays cached. Invariants 14-15 in `packages/rsc-server-plugin/INVARIANTS.md` formalise this contract.
+
+## Subpath isolation for SSR/RSC concerns: `/ssr` entry-point split × 6 adapters (#574 + #609 + #610 + #611)
+
+### Problem
+
+Once SSR primitives (`<ClientOnly>`, `<ServerOnly>`, `<Await>`, `<Streamed>`, `useDeferred`, `<HttpStatusCode>` + `<HttpStatusProvider>` + `createHttpStatusSink`) started shipping in framework adapters, three concerns surfaced:
+
+1. **Type pollution in client components.** A React component file authored for client-only use would get autocompletion for `<HttpStatusCode>` from `@real-router/react` even though the component does nothing meaningful on the client (it writes to a server-side sink that doesn't exist). Tree-shaking removes the dead code from the runtime bundle but TypeScript still suggests the symbol, producing genuine developer confusion ("why is this `<HttpStatusCode>` rendering as `null` in my SPA?").
+
+2. **RSC `react-server` export-condition composition.** React's RSC tooling uses a `react-server` Node export condition to swap the React runtime (different `react/jsx-runtime`, no `useState`/`useEffect`). Adapter packages that ship server-rendered components must either (a) split their entry-points by export condition or (b) pretend the components are isomorphic and break at runtime. Industry alignment: TanStack Router PR #7183 (April 2026) and `react-router@7.x` both adopted the `react-server` condition + thin server-only re-export. Mirroring this puts Real-Router on the same ground.
+
+3. **ESLint enforcement readiness.** Code review caught two cases of `import { HttpStatusCode } from "@real-router/react"` in client components during the `<HttpStatusCode>` Stage 3 rollout. With everything in one entry-point, there is no mechanical rule that catches this — only humans noticing.
+
+### Solution
+
+Every adapter (`react`, `preact`, `solid`, `vue`, `svelte`, `angular`) ships a distinct `@real-router/{adapter}/ssr` subpath alongside the main entry-point. SSR-only components and helpers live exclusively in `/ssr`; the main entry never re-exports them; the `/ssr` entry never depends on history-/navigation-plugin runtime.
+
+```jsonc
+// packages/react/package.json (excerpt)
+{
+  "exports": {
+    ".": { /* main: hooks, RouterProvider, Link, RouteView */ },
+    "./ssr": {
+      "@real-router/internal-source": "./src/ssr/index.ts",
+      "react-server": "./src/ssr/index.react-server.ts", // type-only re-export
+      "types": "./dist/ssr/index.d.ts",
+      "import": "./dist/esm/ssr/index.mjs",
+      "require": "./dist/cjs/ssr/index.cjs"
+    },
+    "./legacy": { /* React 18 fallback, no <Await> */ }
+  }
+}
+```
+
+Symmetric 8-export surface for React/Preact/Vue/Solid/Svelte: `<ClientOnly>`, `<ServerOnly>`, `<Await>`, `<Streamed>`, `useDeferred`, `<HttpStatusCode>`, `<HttpStatusProvider>`, `createHttpStatusSink`. Angular is asymmetric by language: `ClientOnly`, `ServerOnly`, `injectDeferred` (no `<Await>` — Angular has no `<Suspense>`/`use(promise)`), `<http-status-code>` component, `provideHttpStatusSink` env-providers, `HTTP_STATUS_SINK` injection token, `createHttpStatusSink`. Angular's `/ssr` is built as an ng-packagr **secondary entry-point** (`packages/angular/ssr/` with its own `ng-package.json`) because ng-packagr cannot emit a secondary bundle from a `src/ssr/` subdirectory of the primary entry-point.
+
+`@real-router/react/legacy` is preserved alongside `/ssr` for React 18 consumers: no `<Await>` (depends on React 19 `use()`), and the `react-server` condition on the main entry resolves into a type-only re-export so server components can `import type { Navigator, LinkProps }` without dragging client-only runtime in.
+
+### Why per-adapter subpath, not a centralised `@real-router/ssr` package
+
+- **Adapter-native idioms.** `<ClientOnly>` in React uses `useState(false) + useEffect`; in Vue it's `ref(false) + onMounted`; in Solid it's `createSignal(false) + onMount + <Show>`; in Svelte 5 it's `$state(false) + $effect`; in Angular it's `signal(false) + afterNextRender`. Each implementation reaches into framework internals that cannot be abstracted without losing the no-mismatch hydration contract. A central package would have to either (a) wrap all 6 implementations with adapter dispatch (huge surface, single point of failure) or (b) re-export from adapter subpaths anyway (no gain over a direct subpath).
+- **Bundle granularity.** Consumers using only the main entry never pay for SSR primitives; `/ssr` imports never pollute the SPA bundle. With a central package this would require careful tree-shaking that bundlers do not guarantee for cross-package boundaries.
+- **`react-server` export condition is per-package.** The condition resolves at the package boundary; centralising would force the condition into one package while half the consumers wouldn't use it.
+
+### Trade-offs
+
+- **Six packages, six `package.json` updates per new SSR primitive.** New SSR-side component additions now require coordinated updates across React, Preact, Vue, Solid, Svelte, Angular `package.json` `exports` maps, plus 6 `src/ssr/` directories, plus 6 tsdown/svelte-package/ng-packagr configurations. Mitigated by: (a) symmetric API surface enforced by parallel tests across adapters, (b) the audit cadence already catches drift, (c) common implementation logic lives in `shared/ssr/` (see preceding section).
+- **TypeScript `customConditions`.** The internal `@real-router/internal-source` export condition (see `Custom @real-router/internal-source Export Condition` section above) had to be added to every `/ssr` subpath as well, otherwise monorepo `tsc` would resolve `@real-router/react/ssr` to `dist/` artifacts during type-check — slower, and breaks the structural fix from #431.
+- **ESLint rule not yet authored.** The rule "no `*/ssr` import in client component file" is mechanically possible but not yet shipped. Tracked separately; the subpath structure makes it implementable as a 10-line `no-restricted-imports` config.
+
+### Composition with `<HttpStatusProvider>` client mount (Vue/Solid asymmetry)
+
+Render-scoped HTTP status sink requires that the client tree match the server tree structurally during hydration. React/Preact/Svelte tolerate `{#if}`-branch asymmetry; Vue (fragment markers `<!--[-->`/`<!--]-->`) and Solid (`data-hk` per-component DOM markers) do not — the client must mount a throwaway `<HttpStatusProvider>` to preserve structural symmetry. Documented in each `/ssr` adapter README; e2e-verified across all six adapters' `ssr/` examples.
+
+## `createRequestScope(req | request, baseRouter, deps?)` — correct-by-construction request-scoped DI (#603)
+
+### Problem
+
+The naive SSR pattern requires four steps per request, each easy to forget:
+
+```typescript
+app.use(async (req, res) => {
+  const controller = new AbortController(); //                ↓ 1. allocate controller
+  req.on("close", () => controller.abort()); //               ↓ 2. wire client-disconnect
+  const router = cloneRouter(baseRouter, { //                 ↓ 3. clone with request DI
+    abortSignal: controller.signal,
+    currentUser: parseCookies(req).user,
+  });
+  try {
+    const state = await router.start(req.url);
+    res.send(renderHtml(state));
+  } finally {
+    await router.dispose(); //                                ↓ 4. teardown
+  }
+});
+```
+
+Each example app re-implemented this. The four hazards are:
+
+1. **Forgetting `req.on("close")`** — long-running loaders continue after the client disconnects, wasting DB connections, upstream API quotas, and event-loop time. Production bug class: a streaming SSR pipeline that never aborts mid-flight `fetch` calls when the user closes their tab.
+2. **Forgetting `await router.dispose()`** — accumulating un-disposed routers per request leaks `WeakRef` entries, lifecycle subscriptions, and plugin claims. Detectable only via heap snapshots after thousands of requests.
+3. **Order-dependent allocation** — if `cloneRouter` happens before `req.on("close")`, an abort during the clone window leaks the half-initialised router. If `dispose` is not in `finally`, an exception in `start(url)` leaks the router.
+4. **Web `Request` vs Node `IncomingMessage` shape divergence** — Edge runtimes (Cloudflare Workers, Vercel Edge, Deno Deploy, Bun) expose Web `Request` with built-in `request.signal`; Node `http.IncomingMessage` does not have `.signal` and requires `.on("close")` + `.removeListener`. Hand-rolling both shapes per app is repetitive and error-prone.
+
+### Solution
+
+One helper from `@real-router/core/utils`:
+
+```typescript
+import { createRequestScope } from "@real-router/core/utils";
+
+app.use(async (req, res) => {
+  await using scope = createRequestScope(req, baseRouter, {
+    currentUser: parseCookies(req).user,
+  });
+  const state = await scope.router.start(req.url);
+  res.send(renderHtml(state));
+});
+```
+
+Under the hood the helper performs:
+
+1. **`AbortController` allocation** + binding to client-disconnect via `"signal" in req` type-guard: Web `Request` gets `request.signal` chained into the new controller (`AbortSignal.any([request.signal, controller.signal])` — Node 20.3+); Node `IncomingMessage` gets `req.on("close", ...)` plus a `req.removeListener` cleanup hook to satisfy lint and prevent listener leaks on long-running connections.
+2. **`cloneRouter(base, { ...deps, abortSignal: controller.signal })`** — the `abortSignal` is auto-injected under the fixed key `"abortSignal"`, so loaders read it via `getDep("abortSignal")` without per-app wiring.
+3. **Returns `{ router, dispose }`** plus `Symbol.asyncDispose` so callers on Node 24+ / Bun 1.0.23+ / Deno 1.37+ can use `await using`; on Node 22 LTS the same pattern works via explicit `try/finally + await scope.dispose()`.
+4. **Idempotent `dispose`** — calling twice is safe; subsequent calls no-op. Required because `await using` triggers `[Symbol.asyncDispose]` AND the explicit `dispose()` path may be exercised by tests.
+
+### Why a helper, not constructor sugar on `createRouter`
+
+- **`createRouter` is platform-agnostic.** It knows nothing about `req`/`Request`/`AbortController`/`req.on("close")`. Pushing per-request lifecycle into the constructor would force every consumer (Ink, React Native, NativeScript, custom runtimes) to either implement the per-request shape or branch around it.
+- **`cloneRouter` already exists** (#287). The natural decomposition is: `cloneRouter` for DI/isolation (used in SSG build scripts, tests, and the helper internals), `createRequestScope` for the request lifecycle wrapper. Keeps each primitive doing one thing.
+- **Tests already need the lower-level path.** Unit tests call `cloneRouter(base, deps)` directly with a synthetic `AbortController` — no `req` object exists. Folding everything into one helper would have forced tests to fake a `req` shape.
+
+### Why dual Node `IncomingMessage` / Web `Request` shape
+
+Real-Router targets all current serverless/edge runtimes simultaneously: Vercel Edge, Cloudflare Workers, Deno Deploy, Bun, AWS Lambda, plus traditional Node servers (Express, Fastify, Hono on Node). Forcing app authors to pick one shape would create a fork in example code; supporting both at the helper level keeps the SSR examples uniform across `ssr/`, `ssr-streaming/`, `ssr-mixed/`, `ssg/`, and `ssr-rsc/` directories.
+
+The `"signal" in req` discriminator was chosen over `instanceof Request` because (a) `Request` is not available in Node before v18, (b) testing harnesses inject mocked request objects that don't pass `instanceof`, (c) duck-typing is the canonical JavaScript pattern for cross-runtime shape detection.
+
+### Trade-offs
+
+- **Helper still SSR-only.** On CSR Real-Router uses one `createRouter(deps)` per app session — per-request scope has no meaning when navigation is not a new request. Tests still use `cloneRouter(base, deps)` directly because they don't have a `req`. `createRequestScope` lives in `@real-router/core/utils` (server-side import boundary), not in `@real-router/core/api`.
+- **`Symbol.asyncDispose` requires modern runtimes.** Examples document the `try/finally + dispose()` fallback for Node 22 LTS compatibility. Once Node 24 ships LTS (October 2027), the explicit fallback can be removed from example code; the helper continues to support both shapes.
+- **Helper does not own response shape.** Whether `start(url)` rejection maps to HTTP 404 / 504 / 302 is the application's concern — see the `LoaderRedirect` / `LoaderNotFound` / `LoaderTimeout` → HTTP mapping in `examples/web/{adapter}/ssr-examples/ssr/server.ts`. The helper composes naturally with these typed errors (via `withTimeout({ upstreamSignal: scope.router.getDep("abortSignal") })`) but doesn't enforce HTTP semantics.
+
+### Dogfooding
+
+Every `entry-server.{ts,tsx}` in `examples/web/{react,preact,vue,solid,svelte,angular}/ssr-examples/{ssr,ssr-streaming,ssr-mixed}/` uses `createRequestScope`. Per-request isolation is verified end-to-end via Playwright scenarios that issue 10 concurrent requests to `/users/:id` with different cookies and assert that each response carries its own `currentUser` — no cross-request leakage. Example anchors: `ssr/` × 10 concurrent (React), `ssr-streaming/` × 9 concurrent, `ssr-rsc/` Scenario 5 × 10 concurrent.
+
+## `defer({ critical, deferred })` formal API + `__rrDefer__` inline-script settle wire (#610)
+
+### Problem
+
+Streaming SSR consumers across the industry need a way to split a loader's payload into two halves: data that **must** be present in the initial HTML (page title, above-the-fold content, anything that affects layout shift or SEO) and data that **can** arrive asynchronously after the shell is delivered (below-the-fold lists, comments, recommendations). Three competing wire formats existed when this was specced:
+
+1. **Remix / React Router 7 framework mode** — `__remixContext.streamController.enqueue(...)` chunks emitted via React's `renderToReadableStream` integration; tightly coupled to RR7's stream renderer.
+2. **TanStack Start** — `defer(promise)` + `<Await>` consumer, server pushes serialised promise resolutions through a per-request buffer; tied to TanStack Start's RSC bundler.
+3. **Custom in-house wire formats** — each app rolls its own `<script>` tag convention, parser, registry.
+
+Real-Router needed a wire format that (a) is standalone (no framework-mode coupling), (b) survives `react-server-dom-*` bundler swaps, (c) works identically in React, Preact, Vue, Solid, and Svelte adapters (Angular asymmetric via `Signal<T | undefined>`), (d) does not require a client-side parser bundle that runs before the React/Vue/Solid/Svelte hydration entry-point.
+
+### Solution
+
+A formal `defer()` API and an inline-script settle wire that all stream consumers share.
+
+**API surface** (`@real-router/ssr-data-plugin`, also re-exported from `@real-router/rsc-server-plugin`):
+
+```typescript
+import { defer } from "@real-router/ssr-data-plugin";
+
+const loader = async (params, { signal }) => {
+  const product = await fetchProduct(params.id, { signal }); // critical
+  return defer({
+    critical: { product },
+    deferred: {
+      reviews: fetchReviews(params.id, { signal }),     // resolves later
+      related: fetchRelated(product.categoryId, { signal }), // resolves later
+    },
+  });
+};
+```
+
+The plugin:
+- Writes `critical` to `state.context.data` via the existing claim contract — same as a non-deferred loader return.
+- Writes the live `deferred` promise record to `state.context.ssrDataDeferred`.
+- Writes the keys array to `state.context.ssrDataDeferredKeys` for post-hydration registry reconstruction (so the client can pre-create awaiter slots before the inline scripts arrive).
+- Total of **four claims** per loader plugin: `data`, `ssrDataMode`, `ssrDataDeferred`, `ssrDataDeferredKeys` — all released atomically on teardown.
+
+**Wire format** (`shared/ssr/deferRegistry.ts` + `@real-router/ssr-data-plugin/server`):
+
+```html
+<!-- Server emits one inline script per deferred key, in resolution order -->
+<script>__rrDefer__("reviews", [{"id":1,"text":"…"}])</script>
+<script>__rrDefer__("related", [{"id":42,"name":"…"}])</script>
+```
+
+The `__rrDefer__` global is installed by `getDeferBootstrapScript()` before the deferred consumer hooks run; it looks up the promise stored in `__rrDeferRegistry__` (a global `Map<string, { promise, resolve, reject }>` populated lazily by `ensureRegistryPromise(key)`) and resolves it.
+
+Errors use a parallel `__rrDeferError__("key", "AbortError: …")` script that rejects the promise; the consumer's error boundary catches it.
+
+**Consumers** — `<Await name>`, `<Streamed fallback>`, `useDeferred()` from `@real-router/{react,preact,solid,vue,svelte}/ssr`. Each adapter implements its idiomatic awaiter: React via `use(promise)` inside `<Suspense>`, Vue via `<Suspense>` + `async setup()`, Solid via `createResource`, Svelte via `{#await}`. Angular asymmetric: `injectDeferred(key)` returns `Signal<T | undefined>` (no native `<Suspense>` / `use(promise)` in Angular's reactivity model).
+
+### Why inline `<script>__rrDefer__(...)</script>`, not Server-Sent Events / WebSocket / fetch streams
+
+- **Zero client parser.** Browsers execute inline `<script>` tags as they're parsed; the registry is populated **before** the client bundle's first instruction. No race between "script loaded enough to register awaiter" and "stream chunk arrived".
+- **Industry-aligned format.** Inline-script settle is the de facto standard adopted by Remix, RR7, TanStack Start, and Astro. Bytes on the wire are readable by tools (`curl https://app/page | grep __rrDefer__` shows resolution order).
+- **TransformStream-friendly.** `injectDeferredScripts(htmlStream, deferred, options?)` from `@real-router/ssr-data-plugin/server` wraps the framework's HTML stream and emits settle scripts as their promises resolve. Buffering only what `TextEncoder.encode` produces; no per-promise queue, no manual ordering buffer.
+- **CSP-aware.** Apps with strict CSP can either (a) use nonce-injected `<script>` (the `bootstrap` option in `InjectDeferredScriptsOptions` supports custom prelude), or (b) replace the entire bootstrap with a static `<script src="/rrDefer.js">` reference. The wire format remains stable.
+
+### Why a formal API in the plugin, not "just await promises in your loader"
+
+Before #610 the supported pattern was "loaders that return objects with `Promise` properties" — the plugin would JSON-serialise the wrapper, which throws because `JSON.stringify(Promise)` is `"{}"`. Each app had to know which keys were promises and route them through a custom serialiser. The formal `defer({ critical, deferred })` API:
+
+- **Brand-tags the return** with `Symbol.for("@real-router/defer")` so the plugin can detect deferred returns without instanceof checks across module boundaries (`Symbol.for` is cross-realm safe — required for tests running in vitest workers, RSC bundler sub-processes, and the SSG build script's separate Node process).
+- **Freezes the wrapper shallowly** (`Object.freeze({ critical, deferred, [DEFER_BRAND]: true })`) — a security invariant: `defer()` returns are passed through user code (lifecycle hooks, logger plugin) before the plugin sees them; freezing prevents accidental mutation that would invalidate `state.context.data` shape mid-transition.
+- **Rejects reserved keys** at runtime: `"__proto__"`, `"constructor"`, `"prototype"` in `deferred` would corrupt the `__rrDeferRegistry__` Map; rejected with `LoaderRedirect`-style typed error. Validated via PBT (`numRuns: 500`, security-critical).
+- **Attaches defensive `.catch(() => {})`** to each deferred promise inside `defer()` itself, before user code sees the wrapper. This prevents `unhandledRejection` from killing the Node process when a deferred promise rejects before its consumer (`<Await>`) attaches a handler. The rejection is still propagated to the consumer via `__rrDeferError__` settle script.
+
+### Trade-offs
+
+- **Wrappable but not transparent.** Loaders that return `defer({ critical, deferred })` cannot also return `null` for "no data" — the plugin treats `defer(...)` as opaque payload. App code that needs conditional defer wraps it as `defer({ critical: { value: null }, deferred: {} })`. Acceptable; conditional defer is rare.
+- **Registry is monotonic.** `__rrDeferRegistry__` (global `Map`) grows unbounded over the page's lifetime — each settled key stays in the map. **Leak-by-design**: there is no `releaseKey()` API. The Map is bounded by the number of distinct deferred keys ever resolved in this page session (typically <50 for a content site, <500 for a heavy dashboard). Single-page apps that navigate thousands of times do not see growth from `defer()` — the Map grows only on new keys, and key names are typically a small finite set. Documented in `packages/ssr-data-plugin/CLAUDE.md` gotcha and asserted in stress test `defer-registry-growth.stress.ts` (1000 unique keys → Map.size === 1000, absent `releaseKey` API asserted).
+- **`__rrDefer__` is a global.** Conflicts with any other library claiming the same name. Resolved by namespace prefix (`__rr`) and treated as a documented public API surface — renaming would be a breaking change.
+- **No retry semantics.** If a deferred promise rejects, the consumer sees the error; there is no plugin-level retry. App-level retry happens at the loader, not the wire. Aligns with the "loader = pure resolution; transport = stream layer" separation.
+
+### Audit confirmation
+
+`ssr-data-plugin` audit (2026-05-16) verified the security invariants: shallow-clone freeze (PBT, `numRuns: 500`), reserved-keys rejection (PBT), HTML-safety of `formatSettleScript` and `getDeferBootstrapScript` (`numRuns: 500`, `escapeForScript` chain), `__rrDefer__("key", isError=true)` routing to `__rrDeferError__`. Stress: 500 concurrent streams with random upstream HTML errors, `seenUnhandled === []` assertion across 2000 streams × 1 key; 100 parallel `withTimeout` late-rejections with sibling-handler `seenUnhandled === []`. See `packages/ssr-data-plugin/.claude/review-2026-05-16.md` sections 6 (PBT) and 7 (stress) for the full coverage matrix.
+
+## `<HttpStatusCode>` Stage 3 — render-time HTTP status as a component (#610 + #611)
+
+### Problem
+
+The existing loader-driven HTTP path covers cases where the server side knows the status before rendering: `throw new LoaderRedirect("/login", 302)` → 302, `throw new LoaderNotFound("user:42")` → 404, `throw new LoaderTimeout(name, ms)` → 504. But two real cases fall outside this:
+
+1. **Component-level NotFound.** A glob `*` catchall route resolves successfully (route matched, loader returned an empty result) — yet the rendered component decides "this URL doesn't represent a real resource". Forcing the loader to throw retroactively requires duplicating route-knowledge in the loader; using `LoaderNotFound` from inside a loader for `*` defeats the catchall purpose (you'd need to throw from every `*`-handler, including default routes that intentionally render a NotFound page).
+2. **Per-render status drift.** A blog post page resolves loader data successfully but the content was soft-deleted (`post.status === "removed"`). The component decides "render the removed-content placeholder + return HTTP 410 Gone". The status is a property of the **rendered output**, not the resolved data.
+
+Pre-Stage 3: applications worked around this by re-throwing `LoaderNotFound` from within layout components (caught by `<RouterErrorBoundary>`) or by manually inspecting state after `renderToString` and rewriting the response. Both leaked rendering concerns into framework-specific places and broke under streaming (where status is needed in headers **before** body content emits).
+
+### Solution
+
+A render-scoped sink + a component that writes to it:
+
+```typescript
+// Server entry:
+import { createHttpStatusSink, HttpStatusProvider } from "@real-router/react/ssr";
+
+const sink = createHttpStatusSink();
+const html = renderToString(
+  <HttpStatusProvider sink={sink}>
+    <App />
+  </HttpStatusProvider>,
+);
+
+res.status(sink.code ?? 200).send(html);
+```
+
+```tsx
+// Component:
+import { HttpStatusCode } from "@real-router/react/ssr";
+
+function NotFoundPage() {
+  return (
+    <>
+      <HttpStatusCode code={404} />
+      <h1>Not found</h1>
+    </>
+  );
+}
+```
+
+`createHttpStatusSink()` returns `{ code: number | undefined }` — a mutable holder. `<HttpStatusCode code={N}/>` writes through the provider on mount. After `renderToString*` completes, `entry-server` reads `sink.code ?? 200` and applies to the response. For streaming SSR pipelines, the status is captured during the synchronous render phase (which produces the shell, including the `<head>`) — the streaming body cannot retroactively change status, and `<Suspense>` boundaries that resolve later cannot change it either (status is locked when the first byte is flushed).
+
+On the client, the same `<HttpStatusCode code={N}/>` rendered without a provider is a silent no-op — same component tree hydrates without mismatch warnings.
+
+### Cross-adapter symmetry × 6
+
+Implementation is per-adapter idiomatic but contract-identical:
+
+- **React/Preact** — `useContext(HttpStatusContext)?.code = props.code` in a `useInsertionEffect` (writes before paint, no double-write under StrictMode)
+- **Vue** — `inject(HttpStatusKey)?.code = props.code` in `onMounted`
+- **Solid** — `useContext(HttpStatusContext)?.code = props.code` in `onMount`
+- **Svelte 5** — `getContext<HttpStatusSink>(HTTP_STATUS_KEY).code = code` in `$effect`
+- **Angular** — environment-providers shape: `provideHttpStatusSink()` registers `HTTP_STATUS_SINK` injection token; `<http-status-code [code]="404">` component reads via `inject(HTTP_STATUS_SINK, { optional: true })?.set(code)` in `afterNextRender`
+
+All six adapters expose the same three names: `<HttpStatusCode>`, `<HttpStatusProvider>` (or Angular's `provideHttpStatusSink` + `HTTP_STATUS_SINK`), `createHttpStatusSink()`.
+
+### Why a mutable sink, not a thrown signal
+
+- **Streaming-compatible.** `throw` interrupts rendering — incompatible with `<Suspense>` and any streaming pipeline that needs to deliver the shell while the deferred section is still rendering. The mutable sink captures status **synchronously during the shell render**, doesn't disrupt the React/Vue/Solid/Svelte render phase, and the status is read by the server **after** `renderToString*` returns.
+- **Last write wins, by design.** If two `<HttpStatusCode>` instances render in the same tree (e.g., layout sets `200`, inner page sets `404`), the last assignment wins — matches the component-composition mental model where inner content overrides outer defaults.
+- **No provider → silent no-op.** Client hydration runs the same component tree; on the client `<HttpStatusProvider>` is absent (status only matters server-side), so the write target is `undefined?.code = …` — TypeScript-safe via optional chaining, runtime no-op. **Zero hydration mismatches.**
+
+### Vue/Solid client-mount asymmetry
+
+Vue (fragment markers `<!--[-->`/`<!--]-->`) and Solid (`data-hk` per-component DOM markers) emit hydration anchors for **every** Suspense/component boundary, including `<HttpStatusProvider>`. If the server tree contains a provider but the client doesn't, hydration sees structural divergence and falls back to client re-render — defeats the SSR benefit.
+
+The fix is mechanical: `entry-client.{ts,tsx}` mounts a throwaway `<HttpStatusProvider sink={createHttpStatusSink()}>` wrapper around `<App />` to preserve structural symmetry. The throwaway sink is never read (client doesn't apply HTTP status); the provider exists purely to match server-side markers.
+
+Svelte 5 hydration is `{#if}`-branch-tolerant — the client provider mount is **not** needed. React/Preact tolerate the missing provider because `useContext` returns `undefined` and the component no-ops without DOM emission.
+
+Documented in each `/ssr` adapter README; e2e-verified by the `Stage 3 / <HttpStatusCode>` scenario across all six `ssr/` examples (1 scenario per adapter, asserts `response.status === 404` for catchall route + `response.text()` contains the NotFound markup).
+
+### Trade-offs
+
+- **Status is captured during shell render, not during deferred resolution.** A `<Suspense>` fallback that renders `<HttpStatusCode code={500}/>` after a deferred section rejects — the status is **not** written to the response (headers already flushed). Apps that need per-section status emit it through loader-driven path (`LoaderRedirect`/`LoaderTimeout`) before the deferred wire starts.
+- **Mutable sink is not React-strict-mode-safe by default.** React's StrictMode renders components twice; without `useInsertionEffect` (which runs once per commit, not once per render) two writes would race. The implementation uses `useInsertionEffect`; tested under StrictMode in `packages/react/tests/functional/HttpStatusCode.test.tsx`.
+- **Angular requires explicit env-providers registration.** Angular DI does not support "optional global default sink that no-ops if not provided" without an `InjectionToken` + factory. Apps must call `provideHttpStatusSink()` at bootstrap; forgetting it → silent no-op on server (the intended fallback), but discoverable via `inject(HTTP_STATUS_SINK, { optional: true })` warning in dev mode.
+
+## Post-hydration loader skip via hydration scratchpad (#596)
+
+### Problem
+
+In the classic SSR flow without coordination, the client re-fetches loader data immediately after hydration:
+
+1. Server: `router.start("/users/42")` → loader runs → `state.context.data = { user: ... }` → HTML rendered with data.
+2. Server: `serializeRouterState(state)` → JSON in `<script>window.__SSR_STATE__=...</script>`.
+3. Client: `router.start("/users/42")` → loader runs **again** → same data fetched **again** → React/Vue/Solid/Svelte re-renders with the new data.
+
+Step 3 wastes one full RTT per hydration. Worse, it creates a visible flicker if the loader takes >16ms (one frame): the hydrated UI shows server-rendered data, then briefly shows a stale state, then shows the re-fetched data. The competitive analysis showed this is the #1 SSR-correctness defect in standalone routers — `react-router` data mode solves it via `serverLoader` + `clientLoader` split (forces convention), TanStack via SWR cache (forces TTL config); standalone Vue/Solid/Svelte/Preact roughers leave it to the app.
+
+### Solution
+
+A one-shot **hydration scratchpad** at the core level. Before `router.start(state.path)` the client deserialises the server state and parks it in a per-router `RouterInternals.hydrationState` slot. The `ssr-data-plugin` `start()` interceptor reads the scratchpad and short-circuits — instead of calling the loader, it writes the server's `state.context.data` straight to the new state via `claim.write()`.
+
+```typescript
+// Client entry:
+import { hydrateRouter } from "@real-router/core/utils";
+
+const ssrJson = JSON.parse(document.getElementById("__SSR_STATE__")!.textContent!);
+const router = createRouter(routes, { /* deps */ });
+router.usePlugin(ssrDataPluginFactory(loaders), browserPluginFactory());
+
+await hydrateRouter(router, ssrJson); // parks ssrJson in scratchpad, calls router.start(ssrJson.path)
+// state.context.data === ssrJson.context.data — no loader call, no fetch
+```
+
+Mechanics:
+
+1. `hydrateRouter(router, ssrState)` parses `ssrState` (or accepts pre-parsed), writes `parsed` to `RouterInternals.hydrationState`, calls `router.start(parsed.path)`.
+2. `ssr-data-plugin`'s start interceptor checks `RouterInternals.hydrationState` synchronously inside `wrappedStart`. If the path matches and `"data" in scratchpad.context` (presence-wins, see below), it writes the scratchpad value via `claim.write()` instead of calling `entry.loader(...)`.
+3. After write, the scratchpad is **cleared** (`RouterInternals.hydrationState = null`). The next navigation runs the loader normally — scratchpad is **one-shot by design**, only the initial hydration benefits.
+
+Per-namespace: each loader plugin (ssr-data-plugin, rsc-server-plugin) reads its own namespace from the scratchpad independently. Side-by-side composition still works — both `"data"` and `"rsc"` skip their loaders on the same hydration.
+
+### Why `in` check, not `!== undefined`
+
+The scratchpad check is `namespace in scratchpad.context`, not `scratchpad.context[namespace] !== undefined`. The distinction matters for **explicit `null`** loader returns: a server-side loader that returns `null` for "user not found, render empty profile" must hydrate with `data === null`, not re-run the loader. With `!== undefined`, an explicit `null` would slip past and trigger a re-fetch. The `in` check matches the JavaScript truth "the server published this namespace; the value (whatever it is) is the authoritative result".
+
+The presence-wins contract is frozen by an anchor test in `packages/ssr-data-plugin/tests/functional/data-loader.test.ts:549-566` that asserts `data: undefined` in the scratchpad is treated as "missing" (loader runs) while `data: null` is treated as "present" (loader skipped). The contract is documented in `packages/ssr-data-plugin/CLAUDE.md` gotcha #5.
+
+### Why a scratchpad, not a state-merging API
+
+- **Synchronous read.** The start interceptor runs inside `wrappedStart`, before any `await`. A synchronous slot access on a `WeakMap<Router, ScratchpadShape>` is O(1) with zero allocation. A state-merging API ("start with this state as initial") would require deserialising into a `State` shape before `start()`, then merging — duplicating the FSM transitions for one edge case.
+- **One-shot, no cleanup.** The scratchpad clears itself on read. No reference retained, no opportunity for stale state to bleed into later navigations.
+- **Plugin-extensible.** `claimContextNamespace()` consumers naturally read their own namespace from the scratchpad. The mechanism scales to any number of loader plugins without core changes.
+
+### Angular asymmetry — TransferState bridge
+
+Angular's SSR pipeline (`@angular/ssr`) does not expose a way to inject a custom `<script>window.__SSR_STATE__=...</script>` block. Instead, Angular ships its own `TransferState` API + `<script id="ng-state" type="application/json">…</script>` convention. `provideRealRouterFactory` adapts to this:
+
+1. **Server side:** after `await router.start(path)`, write `serializeRouterState(state)` into `TransferState` under the internal key `@real-router/angular:ssrState`. Angular SSR pipeline emits the `ng-state` script automatically.
+2. **Client side:** `provideAppInitializer` callback reads the seed from `TransferState`, calls `hydrateRouter(router, ssrJson)` (instead of `router.start(path)`). Scratchpad is populated; ssr-data-plugin and rsc-server-plugin skip their loaders on first paint.
+
+Symmetry with the other five adapters is preserved at the **contract level** (post-hydration loader skip works the same way) while using Angular's idiomatic transport. Documented in `packages/angular/CLAUDE.md` and verified by 4 e2e scenarios (one per pipeline: `ssr/`, `ssr-streaming/`, `ssg/`, `ssr-mixed/`).
+
+### Trade-offs
+
+- **Scratchpad is internal API.** `RouterInternals.hydrationState` is exposed only to the loader plugin via `getPluginApi(router)`. Apps cannot pre-populate the scratchpad to bypass loaders for non-hydration navigations — that would defeat the "scratchpad is hydration-specific" contract. Apps that need to inject pre-fetched data on regular navigation use `state.context.data` directly via a custom plugin.
+- **Path mismatch falls through to loader.** If the hydration `ssrState.path` does not match the URL the router resolves (mid-navigation redirect on the server, URL rewrite), the scratchpad is **not consumed** and the loader runs normally on the client. The mismatched scratchpad is then discarded on the next clear. Documented as a non-issue: server-side `LoaderRedirect` causes the server to render the *destination* page, so `ssrState.path` already reflects the post-redirect URL.
+- **No retry on failure.** If the scratchpad write fails (claim was released, namespace re-claimed by a different plugin), the path falls through to the loader — degraded but not broken. The mismatched-claim case is structurally impossible if `usePlugin` registration order is identical between server and client (documented invariant).
+
+### Dogfooding
+
+Verified end-to-end across all six adapters via `post-hydration loader skip` Playwright scenario in each `ssr/`, `ssr-streaming/`, `ssr-rsc/`, and `ssr-mixed/` example. The test asserts that after hydration:
+
+- Zero `/__bench/loader-call` increments are observed (server-side counter exposed by the test fixture for each loader)
+- Browser network panel shows zero loader-driven `fetch` requests on first paint
+- DOM content matches the SSR HTML byte-for-byte (no flicker between hydrated and re-fetched states)
+
+Angular `provideRealRouterFactory` extends this to all 4 of its pipelines including `ssr-mixed/` "full" mode (shell modes naturally skip Angular bootstrap, so the bridge is structurally inactive for them).
+
+## Per-route SSR mode + function form: `(state) => SsrMode` (#581)
+
+### Problem
+
+Mixed-rendering applications need per-route control: marketing pages SSR'd for SEO, dashboards client-rendered to reduce server cost, document detail pages SSR'd when the format is HTML but client-rendered when the format is PDF (no point pre-rendering binary content). The competitive landscape offers three shapes:
+
+1. **Static path-based** (Angular `ServerRoute { renderMode: "Server" | "Client" | "Prerender" }`) — decision is part of the route configuration. Cannot vary by query string or resolved data.
+2. **Boolean app-wide** (`react-router` framework mode `ssr: true|false`) — single global toggle.
+3. **None** (`@solidjs/router` standalone, `vue-router` stable, `preact-iso`, `svelte-spa-router`) — all routes go through one SSR pipeline; opt-out requires application-level workaround.
+
+None of these support data-driven per-navigation decisions like "render `/docs/intro` as HTML for `?format=html`, ship empty shell for `?format=pdf`" without forking the route into two definitions.
+
+### Solution
+
+`ssr-data-plugin`'s per-route entry accepts a discriminated union:
+
+```typescript
+import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
+
+router.usePlugin(
+  ssrDataPluginFactory({
+    home: () => async () => ({ /* ... */ }),                       // short form → "full"
+    "admin.dashboard": { ssr: false },                              // false → "client-only"
+    "marketing.landing": { ssr: "data-only", loader: () => /* ... */ }, // JSON only, shell rendered client-side
+    "docs.detail": {
+      ssr: (state) => state.params.format === "pdf" ? "client-only" : "full",
+      loader: () => async (params) => fetchDoc(params.id),
+    },
+  }),
+);
+```
+
+The discriminated union: `SsrMode = "full" | "data-only" | "client-only"`, boolean aliases `true`/`false`, or function form `(state) => SsrMode` evaluated on every navigation.
+
+Semantics:
+
+- **`"full"`** — loader runs on server and client; SSR shell + JSON + post-hydration skip (#596).
+- **`"data-only"`** — loader runs on server; SSR emits empty shell (`<div id="app"></div>` + `<script>__SSR_STATE__</script>`); client picks up data from scratchpad on hydration. **No server-side render of the component tree.**
+- **`"client-only"`** — loader skipped on server **and client**; the route's `state.context.data` stays `undefined`; the application is expected to handle the client-side fetch (React Query, Suspense, `useEffect`).
+- **Boolean `true`** ≡ `"full"`; boolean `false` ≡ `"client-only"`.
+- **Function form** — invoked with the **already-resolved state** (after route matching, params/path/name available; before mode is written). Returns one of the three string modes. Re-evaluated per navigation.
+
+Mode resolution writes to `state.context.ssrDataMode`; read via public helper `getSsrDataMode(state)`. The `entry-server` reads it after `await router.start(url)` and branches between `renderToString(<App/>)` and HTML shell:
+
+```typescript
+const state = await scope.router.start(req.url);
+const mode = getSsrDataMode(state); // "full" | "data-only" | "client-only"
+const html = mode === "full" ? renderToString(<App router={scope.router}/>) : SHELL;
+res.send(htmlDoc(html, serializeRouterState(state)));
+```
+
+### Why function form receives resolved state
+
+Function-form `(state) => SsrMode` receives the **already-routed** state (params, path, name populated) but **before** mode is written to `state.context.ssrDataMode`. This is deliberate:
+
+- **Path/params/query are available** — apps can branch on `state.params.format === "pdf"`, `state.path.startsWith("/admin")`, or any combination of routed concerns.
+- **Mode is not yet readable** — function resolver must compute mode from inputs, not read it. Prevents recursive resolution (`mode -> mode` feedback loop).
+- **State is otherwise immutable from the resolver's perspective** — the function is pure data → mode; it cannot mutate state, register guards, or trigger navigation. Side-effects belong in lifecycle plugins, not in SSR mode resolution.
+
+The execution order is: route match → state freeze (shallow on `context`) → `ssr-data-plugin` start interceptor calls function resolver → mode written to `state.context.ssrDataMode` → loader either runs or skips → activation guards.
+
+### Why three modes, not two
+
+`"full"` vs `"client-only"` is the obvious boolean split. `"data-only"` is the non-obvious third mode and was a recurring competitive ask:
+
+- **App shell architecture.** Mobile-first apps that want fast TTFB (HTML shell + JSON in `<script>` tag = ~5 KB transferred before client bundle loads) ship `"data-only"` for everything except the landing page. The hydration entry mounts the app from JSON without server-side rendering of every component.
+- **Avoiding double-render cost.** Client-heavy apps where SSR adds latency (component tree with thousands of nodes) but apps still want SSR-loaded data on first paint use `"data-only"` to skip the rendering cost while preserving the no-fetch-after-hydration benefit (#596).
+- **Symmetric with TanStack Start.** TanStack Start ships `ssr: true | false | 'data-only'` (only in Start framework, not standalone). Mirroring the three-mode contract avoids competitive divergence for apps migrating to/from Start.
+
+`rsc-server-plugin` ships a **subset** of these modes: `"full" | "client-only"`. RSC has no semantically meaningful "data without component" — a Server Component is rendered as a ReactNode, so "data-only RSC" would mean "render ReactNode but don't include it in the Flight stream", which has no use case. Rejected at factory time with a typed error: `mode "data-only" is not allowed for route "X". Allowed: full, client-only`.
+
+### Trade-offs
+
+- **Function resolver runs every navigation.** Including SSR boot and CSR navigation. Cost is O(1) per call; the function body should be a synchronous read of state fields. Async resolvers are not supported (function returns the mode synchronously; the plugin awaits the resolver only via `Promise.resolve(fn(state))` for type compatibility, not for async). Apps that need async decisions (e.g., feature-flag lookup) should pre-bake the flag into `state.context.<ns>` via a different plugin and read it synchronously.
+- **Per-navigation mode is published, not memoised.** `state.context.ssrDataMode` is written on every navigation, even if the mode hasn't changed. Subscribers that care about mode transitions debounce themselves (`route.context.ssrDataMode !== previousRoute?.context.ssrDataMode`).
+- **`"client-only"` mode is symmetric.** Loader is skipped on both server and client — application code must read `getSsrDataMode(state) === "client-only"` to know it must fetch data itself. Documented in each `ssr-mixed/` example README.
+- **Mode marker takes priority over hydration scratchpad.** `"client-only"` skips loader unconditionally even if the scratchpad has data — preserves the "client-only means client handles fetching" contract. The scratchpad is wasted in this edge case (server published data, mode says ignore it); apps that mix `"client-only"` with pre-populated scratchpad data should re-think the architecture.
+
+### Dogfooding
+
+Six `ssr-mixed/` examples (React, Preact, Vue, Solid, Svelte, Angular) — each serves four routes × four configuration forms (short form, `{ ssr: false }`, `{ ssr: "data-only", loader }`, `{ ssr: (state) => …, loader }`). Per-adapter Playwright suite of 4 scenarios verifies:
+
+1. **`"full"` mode** — server emits rendered HTML + JSON; client hydrates without re-fetch.
+2. **`"data-only"` mode** — server emits empty shell + JSON; client mounts and reads `state.context.data` without fetch.
+3. **`"client-only"` mode** — server emits empty shell, no JSON for this route; client fetches via app-level code.
+4. **Function form** — same route with `?format=html` ↔ `?format=pdf` toggles the mode; assertion via `response.text()` body length and presence of `<script>__SSR_STATE__</script>`.
+
+Angular `ssr-mixed/` is uniquely structured: `AngularNodeAppEngine` takes control of the request immediately after invocation, so per-route mode branching happens in **Express middleware before Angular** (`server.ts` performs `cloneRouter` + `ssrDataPluginFactory` + `await router.start(url)` BEFORE `angularApp.handle(req)`, reads `getSsrDataMode(state)`, branches: `next()` → AngularNodeAppEngine for `"full"` mode, or `res.send(shell)` for shell modes). The TransferState bridge applies automatically only in the `"full"` mode path; the shell modes use `<script>__SSR_STATE__</script>` directly (no Angular bootstrap, so no `TransferState` involvement). Documented in `packages/angular/CLAUDE.md` SSR section.

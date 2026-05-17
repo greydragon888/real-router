@@ -75,7 +75,12 @@ describe("@real-router/rsc-server-plugin — rscActionPluginFactory", () => {
 
       const state = await router.start("/");
 
-      expect(state.context.rscAction?.formState).toBe(formState);
+      // toStrictEqual proves the tuple shape AND element order; reference
+      // equality is implicit (same array literal threaded through). The
+      // prior duplicate `toBe(formState)` was redundant — keep the
+      // structural check that pins the contract (a regression that
+      // re-wrapped the tuple would still hit `toBe` if the wrapper kept
+      // identity, but would fail toStrictEqual on shape changes).
       expect(state.context.rscAction?.formState).toStrictEqual([
         "form-key",
         "ok",
@@ -388,10 +393,100 @@ describe("@real-router/rsc-server-plugin — rscActionPluginFactory", () => {
         secret?: string;
       };
 
-      expect(action.returnValue).toStrictEqual({ ok: true, data: { id: 1 } });
-      expect(action.formState).toStrictEqual(["form", "ok"]);
-      expect(action.meta).toStrictEqual({ traceId: "abc-123" });
-      expect(action.secret).toBe("internal-token");
+      // Single toStrictEqual pins the EXACT key set — a regression that
+      // silently filters out `meta` or `secret` would have passed under
+      // the previous four-separate-expects pattern (missing keys give
+      // `undefined.toStrictEqual(...)` which is a fragile failure
+      // signature, plus there was no check that NO extra keys appeared).
+      expect(action).toStrictEqual({
+        returnValue: { ok: true, data: { id: 1 } },
+        formState: ["form", "ok"],
+        meta: { traceId: "abc-123" },
+        secret: "internal-token",
+      });
+    });
+
+    it("accepts an object with inherited non-function `then` getter (gotcha §5.12)", async () => {
+      // §5.12: guard at actionFactory.ts:114 reads `.then` from the result
+      // and checks `typeof === "function"`. An inherited getter that
+      // returns a NON-function is NOT a thenable in JS semantics (await
+      // wouldn't treat it as a Promise), so the guard correctly accepts
+      // the object. Pin the current behaviour: downstream consumers see
+      // an object with no own returnValue/formState — that's the caller's
+      // contract violation, not a guard failure. Deliberately installs
+      // a `.then` getter to verify the guard accepts non-function returns
+      // (NOT a real thenable).
+      // eslint-disable-next-line unicorn/no-thenable
+      const proto = Object.defineProperty({}, "then", {
+        get() {
+          // Returns a number — typeof !== "function", so NOT thenable
+          return 42;
+        },
+        enumerable: false,
+        configurable: true,
+      });
+      const result = Object.create(proto) as RscActionResult;
+
+      router.usePlugin(rscActionPluginFactory(() => result));
+
+      const state = await router.start("/");
+
+      // Reference identity: claim.write received the exact object.
+      expect(state.context.rscAction).toBe(result);
+      // No own data — caller passed an unconventional shape, plugin
+      // surfaces it as-is.
+      expect(state.context.rscAction?.returnValue).toBeUndefined();
+      expect(state.context.rscAction?.formState).toBeUndefined();
+    });
+
+    it("rejects Object.create(Promise.prototype) — inherited .then is function (gotcha §5.13)", async () => {
+      // §5.13: an object with Promise.prototype in its chain inherits
+      // `Promise.prototype.then` which IS a function. The guard correctly
+      // classifies this as thenable and rejects with the documented
+      // "Promise/thenable" message — even though `instanceof Promise`
+      // would also be true.
+      const fakePromise = Object.create(Promise.prototype) as RscActionResult;
+
+      router.usePlugin(rscActionPluginFactory(() => fakePromise));
+
+      await expect(router.start("/")).rejects.toThrow(/Promise\/thenable/);
+    });
+
+    it("accepts Object.create(null) — null-prototype with no `.then` (gotcha §5.14)", async () => {
+      // §5.14: null-prototype object — no inherited `.then` property,
+      // `typeof === "object"`, not Array, not null. Guard accepts.
+      const nullProto = Object.create(null) as Record<string, unknown>;
+
+      nullProto.returnValue = { ok: true, data: "via-null-proto" };
+
+      router.usePlugin(
+        rscActionPluginFactory(() => nullProto as RscActionResult),
+      );
+
+      const state = await router.start("/");
+
+      // The object writes through claim.write unchanged — including its
+      // null prototype. Strict-equal compares own enumerable structure.
+      expect(state.context.rscAction?.returnValue).toStrictEqual({
+        ok: true,
+        data: "via-null-proto",
+      });
+    });
+
+    it("accepts a frozen result object (gotcha §5.15)", async () => {
+      // §5.15: Object.freeze freezes property descriptors but doesn't
+      // change typeof or prototype shape. Guard accepts; claim.write
+      // stores the frozen reference on state.context.
+      const frozen = Object.freeze({
+        returnValue: Object.freeze({ ok: true, data: "frozen" }),
+      });
+
+      router.usePlugin(rscActionPluginFactory(() => frozen as RscActionResult));
+
+      const state = await router.start("/");
+
+      expect(state.context.rscAction).toBe(frozen);
+      expect(Object.isFrozen(state.context.rscAction)).toBe(true);
     });
 
     it("accepts a payload whose returnValue.data has a `then` field (string, not function)", async () => {

@@ -352,6 +352,8 @@ One import path change — all hooks and `Link` work identically:
 
 `RouteView` is not available from `/legacy`. Use `useRouteNode` with a switch/case pattern instead.
 
+`useRouteExit` and `useRouteEnter` are also not available from `/legacy` — they depend on React 19's concurrent-mode scheduling guarantees. Use `router.subscribeLeave()` directly for exit guards, and `useEffect` for mount-time analytics on React 18.
+
 ## Ink (Terminal UI)
 
 `@real-router/react/ink` lets you build terminal apps with the same hooks you use in the browser.
@@ -403,7 +405,7 @@ render(
 );
 ```
 
-**Navigation contract:** Tab moves focus between `InkLink`s, Enter calls `router.navigate(...)`. `RouteView` and the DOM `Link` are intentionally absent from this entry — compose routes with `useRouteNode("")` and a switch.
+**Navigation contract:** Tab moves focus between `InkLink`s, Enter calls `router.navigate(...)`. `RouteView` and the DOM `Link` are intentionally absent from this entry — compose routes with `useRouteNode("")` and a switch. `RouterErrorBoundary` is available for terminal error handling.
 
 **Install:**
 

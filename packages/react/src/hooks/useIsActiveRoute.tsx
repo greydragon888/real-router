@@ -28,17 +28,14 @@ export function useIsActiveRoute(
   // `params={{id:1}}` the dep changes per render and the lookup still
   // runs, but that path was already the slow path before this memo.
   // exactOptionalPropertyTypes forbids `{ hash: undefined }` literally, so
-  // we conditionally include the key only when the caller passed a value.
+  // we conditionally spread the key only when the caller passed a value.
   const store = useMemo(
     () =>
-      createActiveRouteSource(
-        router,
-        routeName,
-        params,
-        hash === undefined
-          ? { strict, ignoreQueryParams }
-          : { strict, ignoreQueryParams, hash },
-      ),
+      createActiveRouteSource(router, routeName, params, {
+        strict,
+        ignoreQueryParams,
+        ...(hash !== undefined && { hash }),
+      }),
     [router, routeName, params, strict, ignoreQueryParams, hash],
   );
 

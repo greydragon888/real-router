@@ -44,12 +44,15 @@ describe("createReactiveSource", () => {
 
   // Locks in the "lazy" contract from CLAUDE.md gotcha #3:
   // createSubscriber does NOT invoke source.subscribe() when .current is read
-  // outside of a reactive context. Only getSnapshot() runs.
+  // outside of a reactive context. Only getSnapshot() runs — and it MUST run,
+  // otherwise the read would return a stale/cached value and break Inv3
+  // (snapshot transitions observable).
   it("should not call source.subscribe() when .current is read outside reactive context", () => {
     const subscribeSpy = vi.fn(() => () => {});
+    const getSnapshotSpy = vi.fn(() => 0);
     const source: RouterSource<number> = {
       subscribe: subscribeSpy,
-      getSnapshot: () => 0,
+      getSnapshot: getSnapshotSpy,
       destroy: () => {},
     };
 
@@ -57,6 +60,7 @@ describe("createReactiveSource", () => {
 
     expect(reactive.current).toBe(0);
     expect(subscribeSpy).not.toHaveBeenCalled();
+    expect(getSnapshotSpy).toHaveBeenCalledTimes(1);
   });
 
   // Closes review §5.9 row 4: the dual of the lazy contract — when `.current`

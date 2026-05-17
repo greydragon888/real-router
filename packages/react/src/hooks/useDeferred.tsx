@@ -1,13 +1,9 @@
+import { NEVER_PROMISE } from "../constants";
 import { useRoute } from "./useRoute";
 
 interface DeferredContext {
   ssrDataDeferred?: Record<string, Promise<unknown>>;
 }
-
-const NEVER_PROMISE = new Promise<never>(() => {
-  // Intentionally never resolves — surfaces a forever-pending Suspense boundary
-  // when a key is requested that the loader never declared.
-});
 
 /**
  * Read a deferred promise published by `defer({ deferred: { <key>: Promise } })`

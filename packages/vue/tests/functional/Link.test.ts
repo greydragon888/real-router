@@ -79,6 +79,8 @@ describe("Link component", () => {
 
       const link = wrapper.find("a");
 
+      await flushPromises();
+
       expect(link.classes()).not.toContain("active");
 
       await link.trigger("click");
@@ -97,6 +99,52 @@ describe("Link component", () => {
       });
 
       expect(wrapper.find("a").classes()).toContain("active");
+    });
+
+    // CLAUDE.md gotcha #16: activeStrict meaning — explicit ancestor vs
+    // exact comparison. Current route = "items.item" (a descendant of
+    // "items"). A `<Link routeName="items">` with `activeStrict: false`
+    // (default) lights up because "items" is an ancestor of "items.item".
+    // The SAME Link with `activeStrict: true` does NOT light up, because
+    // the current route is not exactly "items".
+    //
+    // Locks the documented semantic asymmetry — closes review §4 gotcha
+    // #16 partial coverage finding.
+    it("CLAUDE.md gotcha #16: activeStrict — ancestor route vs exact route comparison", async () => {
+      // Current route = items.item (child of items).
+      await router.navigate("items.item", { id: 6 });
+
+      // activeStrict: false → ancestor "items" matches descendant "items.item".
+      const ancestorWrapper = mountLink(router, {
+        routeName: "items",
+        activeStrict: false,
+        activeClassName: "active",
+      });
+
+      expect(ancestorWrapper.find("a").classes()).toContain("active");
+
+      // activeStrict: true → "items" must be EXACTLY the current route to
+      // light up. Since the current route is "items.item" (a different,
+      // longer name), the strict match fails.
+      const strictAncestorWrapper = mountLink(router, {
+        routeName: "items",
+        activeStrict: true,
+        activeClassName: "active",
+      });
+
+      expect(strictAncestorWrapper.find("a").classes()).not.toContain("active");
+
+      // Sanity counter-case: when the Link's routeName matches the current
+      // route exactly, both modes light up. activeStrict only adds a rejection
+      // on top of the ancestor match, never blocks exact equality.
+      const exactWrapper = mountLink(router, {
+        routeName: "items.item",
+        routeParams: { id: 6 },
+        activeStrict: true,
+        activeClassName: "active",
+      });
+
+      expect(exactWrapper.find("a").classes()).toContain("active");
     });
 
     // CLAUDE.md gotcha #17 — `ignoreQueryParams` Default

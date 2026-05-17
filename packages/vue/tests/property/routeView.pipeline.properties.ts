@@ -472,4 +472,179 @@ describe("RouteView pipeline — Property Tests (Vue)", () => {
       },
     );
   });
+
+  // =============================================================================
+  // Invariant 11 — collectElements is idempotent on already-flat input
+  // =============================================================================
+
+  // Review §6 — NEW Inv (collectElements idempotency). After one `collectElements`
+  // pass the result is a flat array of Match/Self/NotFound VNodes; a SECOND pass
+  // over that flat array must produce a structurally identical result. Tests the
+  // "passes through already-normalised input untouched" contract — a regression
+  // that double-wraps or filters non-recursively on flat input would surface here.
+  describe("Invariant 11: collectElements is idempotent on flat input", () => {
+    test.prop([arbRouteMatchTree], { numRuns: NUM_RUNS.standard })(
+      "collectElements(collectElements(x)) === collectElements(x) (element-wise type equality)",
+      (input) => {
+        const flat: VNode[] = [];
+
+        collectElements(input, flat);
+
+        const flat2: VNode[] = [];
+
+        collectElements(flat, flat2);
+
+        expect(flat2).toHaveLength(flat.length);
+
+        for (const [i, element] of flat.entries()) {
+          // Same VNode identity, not just same type — re-collection must not
+          // rebuild wrapper VNodes.
+          expect(flat2[i]).toBe(element);
+        }
+      },
+    );
+  });
+
+  // =============================================================================
+  // Invariant 12 — buildRenderList: hasPerMatchKA side-channel correctness
+  // =============================================================================
+
+  // Review §6 — NEW Inv (hasPerMatchKA). The `hasPerMatchKA` boolean returned
+  // by `buildRenderList` must be `true` iff at least one `<Match>` child has its
+  // `keepAlive` prop set to a Vue-accepted truthy form (`true`, `""`, `"keep-alive"`).
+  // It is consumed by `RouteView` to decide whether the per-match KeepAlive
+  // wrapper branch should fire even when the parent `<RouteView>` has no
+  // `keepAlive` prop. A regression that misses a positive (e.g., short-circuits
+  // on the first non-keepAlive match) silently disables per-match keepAlive.
+  describe("Invariant 12: hasPerMatchKA reflects ANY Match child with truthy keepAlive", () => {
+    test.prop(
+      [
+        fc.array(
+          fc.record({
+            segment: arbSegmentName,
+            // Mix Vue-truthy and Vue-falsy shorthand forms — the side-channel
+            // must accept all truthy forms and reject all falsy ones.
+            keepAlive: fc.constantFrom<unknown>(
+              true,
+              "",
+              "keep-alive",
+              false,
+              undefined,
+              "false",
+              0,
+            ),
+          }),
+          { minLength: 0, maxLength: 6 },
+        ),
+      ],
+      { numRuns: NUM_RUNS.thorough },
+    )(
+      "hasPerMatchKA === input.some(e => isKeepAliveEnabled(e.keepAlive))",
+      (input) => {
+        const elements = input.map(({ segment, keepAlive }) => {
+          // Build a Match with `keepAlive` injected directly into props — the
+          // makeMatch helper does not expose this prop, so construct via h()
+          // directly. The marker-component identity check in collectElements
+          // relies on `vnode.type === Match`, which `h(Match, ...)` satisfies.
+          return h(
+            Match,
+            { segment, keepAlive } as unknown as { segment: string },
+            { default: () => h("div") },
+          );
+        });
+        // Use routeName "any" + empty nodeName — no match will activate (the
+        // segments are random strings), so the loop walks every element.
+        const { hasPerMatchKA } = buildRenderList(
+          elements,
+          "any-unmatchable",
+          "",
+        );
+        const expected = input.some(
+          (entry) =>
+            entry.keepAlive === true ||
+            entry.keepAlive === "" ||
+            entry.keepAlive === "keep-alive",
+        );
+
+        expect(hasPerMatchKA).toBe(expected);
+      },
+    );
+
+    test("hasPerMatchKA === false when no Match children exist (Self/NotFound only)", () => {
+      const elements = [makeSelf("a"), makeNotFound("nf")];
+      const { hasPerMatchKA } = buildRenderList(elements, UNKNOWN_ROUTE, "");
+
+      expect(hasPerMatchKA).toBe(false);
+    });
+  });
+
+  // =============================================================================
+  // Invariant 13 — First-match-wins is independent of `exact` prop on losers
+  // =============================================================================
+
+  // Review §6 — NEW Inv (first-match-wins independent of exact). When the first
+  // Match in slot order activates, ALL subsequent Matches are suppressed
+  // regardless of whether they have `exact: true` / `exact: false` / `exact`
+  // omitted. The `activeMatchFound` short-circuit at `helpers.ts:186-188` is
+  // the only guard; locking this invariant prevents a regression where the
+  // pipeline scans the whole list and picks an "exact" match over the
+  // textually-first one.
+  describe("Invariant 13: first-match-wins ignores `exact` prop on losing candidates", () => {
+    test.prop([arbSegmentName, fc.boolean(), fc.boolean()], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "two identical-segment Matches: first wins, second's `exact` value is irrelevant",
+      (segment, firstExact, secondExact) => {
+        const first = makeMatch(segment, {
+          exact: firstExact,
+          marker: "first",
+        });
+        const second = makeMatch(segment, {
+          exact: secondExact,
+          marker: "second",
+        });
+        // routeName === segment guarantees the first Match activates (Inv 1
+        // self-match) regardless of `exact` value.
+        const { rendered } = buildRenderList([first, second], segment, "");
+
+        expect(rendered).toHaveLength(1);
+        expect(rendered[0]).toBe(first);
+      },
+    );
+  });
+
+  // =============================================================================
+  // Invariant 14 — Fallback prop is forwarded by identity (VNode | function | undefined)
+  // =============================================================================
+
+  // Review §6 — NEW Inv (fallback type union). `Match.fallback` accepts the
+  // union `VNode | (() => VNode) | undefined`. The pipeline must forward the
+  // value verbatim (by identity) to the caller — no wrapping, no coercion, no
+  // shape conversion. A regression that normalises (e.g., wraps a VNode in a
+  // thunk) breaks the consumer-facing Suspense contract documented in
+  // CLAUDE.md / README.
+  describe("Invariant 14: fallback prop forwarded by identity", () => {
+    test("VNode fallback passes through by reference", () => {
+      const fb = h("div", { "data-marker": "spinner" });
+      const m = makeMatch("x", { fallback: fb });
+      const result = buildRenderList([m], "x", "");
+
+      expect(result.fallback).toBe(fb);
+    });
+
+    test("function fallback passes through by reference", () => {
+      const fb = () => h("div", { "data-marker": "spinner-fn" });
+      const m = makeMatch("x", { fallback: fb });
+      const result = buildRenderList([m], "x", "");
+
+      expect(result.fallback).toBe(fb);
+    });
+
+    test("undefined fallback stays undefined (no Suspense wrapping)", () => {
+      const m = makeMatch("x");
+      const result = buildRenderList([m], "x", "");
+
+      expect(result.fallback).toBeUndefined();
+    });
+  });
 });

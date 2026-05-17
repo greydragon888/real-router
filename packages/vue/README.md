@@ -246,7 +246,7 @@ In a template:
 <Link routeName="settings" hash="account">Account</Link>
 ```
 
-Tri-state: `undefined` preserves the current hash, `""` clears it, a value sets it. Active class is hash-aware — only the matching tab lights up. Live demo: [`examples/web/react/link-hash/`](../../examples/web/react/link-hash/) — behavior is identical across adapters, only template syntax differs. See the [Hash Fragment Support](https://github.com/greydragon888/real-router/wiki/Hash) wiki page for the full surface.
+Tri-state: `undefined` preserves the current hash, `""` clears it, a value sets it. Active class is hash-aware — only the matching tab lights up. Live demo (React adapter, same API): [`examples/web/react/link-hash/`](../../examples/web/react/link-hash/) — template syntax differs, behavior is identical. See the [Hash Fragment Support](https://github.com/greydragon888/real-router/wiki/Hash) wiki page for the full surface.
 
 ### `<RouteView>`
 
@@ -319,6 +319,37 @@ h(
   },
 );
 ```
+
+**Per-Match `keepAlive`:** `RouteView.Match` also accepts its own `keepAlive` prop for fine-grained control. This lets you keep only specific routes alive without enabling `keepAlive` on the parent `<RouteView>`.
+
+```typescript
+h(
+  RouteView,
+  { nodeName: "" },
+  {
+    default: () => [
+      // Only UsersPage is kept alive; SettingsPage always remounts
+      h(RouteView.Match, { segment: "users", keepAlive: true }, { default: () => h(UsersPage) }),
+      h(RouteView.Match, { segment: "settings" }, { default: () => h(SettingsPage) }),
+    ],
+  },
+);
+```
+
+In a template:
+
+```vue
+<RouteView nodeName="">
+  <RouteView.Match segment="users" keepAlive>
+    <UsersPage />
+  </RouteView.Match>
+  <RouteView.Match segment="settings">
+    <SettingsPage />
+  </RouteView.Match>
+</RouteView>
+```
+
+Per-Match `keepAlive` is checked first; if any `Match` child has `keepAlive: true`, the `<KeepAlive>` wrapper is created for that segment even if the parent `<RouteView>` prop is not set.
 
 **Lazy loading with `fallback`:** Pass a `fallback` prop (`VNode | (() => VNode)`) to wrap the matched content in Vue's `<Suspense>`. This lets you show a loading state while a `defineAsyncComponent` chunk is fetching. Works with both `keepAlive` and non-`keepAlive` modes.
 

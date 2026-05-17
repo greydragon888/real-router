@@ -53,7 +53,7 @@ describe("HttpStatusCode", () => {
       );
 
       expect(view).toContain("Hello");
-      expect(view).not.toMatch(/410/);
+      expect(view).not.toContain("410");
     });
 
     it("last write wins with multiple instances in render order", () => {

@@ -94,6 +94,7 @@ describe("RouterProvider — scrollRestoration", () => {
       }),
     );
 
+    // The "pagehide" handler runs synchronously inside dispatchEvent.
     globalThis.dispatchEvent(new Event("pagehide"));
 
     const raw = sessionStorage.getItem(STORAGE_KEY);

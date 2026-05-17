@@ -259,4 +259,54 @@ describe("RSC Action Stress", () => {
       expect(results[i].reqId).toBe(i);
     }
   });
+
+  it("200 concurrent throwing getResult: each rejects, no cross-clone contamination (§7.G4)", async () => {
+    // §7.G4: concurrent clones each with a throwing getResult. The
+    // existing sequential test (`100 starts where getResult throws`)
+    // covers the happy-error path but doesn't stress the concurrent
+    // closure-isolation contract — each clone must reject with its
+    // own captured error message, no cross-pollination.
+    const base = createRouter(routes, { defaultRoute: "home" });
+    const N = 200;
+
+    const results = await Promise.allSettled(
+      Array.from({ length: N }, async (_, i) => {
+        const clone = cloneRouter(base);
+
+        clone.usePlugin(
+          rscActionPluginFactory(() => {
+            throw new Error(`crash-${i}`);
+          }),
+        );
+
+        try {
+          await clone.start("/");
+
+          // start() should NOT resolve — the throwing getResult must
+          // surface as a rejection.
+          throw new Error("unreachable-resolve");
+        } finally {
+          clone.dispose();
+        }
+      }),
+    );
+
+    // Every clone must reject with ITS OWN error number. A regression
+    // that leaked a shared closure across clones would surface as
+    // mismatched indices (e.g. all rejecting with the same message).
+    expect(results).toHaveLength(N);
+
+    // Pre-narrow into rejected reasons so the inner expect has no
+    // conditional. A regression that produced any "fulfilled" entry
+    // (silent swallow of the throw) would shrink this array — caught
+    // by the toHaveLength guard below before message-by-message check.
+    const rejectedReasons = results
+      .filter((r): r is PromiseRejectedResult => r.status === "rejected")
+      .map((r) => (r.reason as Error).message);
+
+    expect(rejectedReasons).toHaveLength(N);
+    expect(rejectedReasons).toStrictEqual(
+      Array.from({ length: N }, (_, i) => `crash-${i}`),
+    );
+  });
 });

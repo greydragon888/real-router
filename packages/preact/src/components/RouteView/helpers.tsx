@@ -94,7 +94,12 @@ function processMatch(
   nodeName: string,
   alreadyActive: boolean,
 ): VNode | null {
-  const { segment, exact = false, fallback } = child.props as MatchProps;
+  const {
+    segment,
+    exact = false,
+    fallback,
+    children,
+  } = child.props as MatchProps;
   const fullSegmentName = nodeName ? `${nodeName}.${segment}` : segment;
   const isActive =
     !alreadyActive && isSegmentMatch(routeName, fullSegmentName, exact);
@@ -103,11 +108,7 @@ function processMatch(
     return null;
   }
 
-  return renderSlot(
-    (child.props as MatchProps).children,
-    fullSegmentName,
-    fallback,
-  );
+  return renderSlot(children, fullSegmentName, fallback);
 }
 
 function appendFallback(

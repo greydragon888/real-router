@@ -66,14 +66,33 @@ export const arbParams: fc.Arbitrary<
 /**
  * Hash fragment generator covering:
  * - ASCII strings (sub-delims preserved by encodeURI)
- * - Unicode (must be percent-encoded by encodeURI)
+ * - Unicode incl. CJK / Latin-with-diacritics
+ * - Emoji including ZWJ-composed sequences (must round-trip through encodeURI
+ *   without breaking surrogate pairs)
+ * - RTL text (Hebrew / Arabic) — encodeURI percent-encodes these, but a
+ *   bidi-aware regression could mangle the byte order
  * - Strings starting with "#" (must be stripped by buildHref)
  * - Strings containing "#" (must be defensively replaced with "%23")
  * - Empty string (falsy — buildHref returns path without `#…`)
  */
 export const arbHash: fc.Arbitrary<string> = fc.oneof(
   fc.string({ minLength: 0, maxLength: 24 }),
-  fc.constantFrom("section", "tab=1&q=x", "用户", "über", "a#b#c", "#leading"),
+  fc.constantFrom(
+    "section",
+    "tab=1&q=x",
+    "用户",
+    "über",
+    "a#b#c",
+    "#leading",
+    // Emoji: single codepoint + ZWJ-composed family + heart-variation-selector
+    "❤️",
+    "👨‍👩‍👧‍👦",
+    "🎉section",
+    // RTL: Hebrew + Arabic + mixed LTR/RTL
+    "שלום",
+    "مرحبا",
+    "section-עברית",
+  ),
 );
 
 /**

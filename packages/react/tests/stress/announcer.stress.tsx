@@ -114,6 +114,54 @@ describe("R9 — announceNavigation toggle stress", () => {
     routerB.stop();
   });
 
+  it("9.5: 100x (mount → 5 navs → unmount) — no orphan nodes, no stale timers (review-2026-05-16 §7 Top-5 #4)", async () => {
+    // 9.1 covers pure mount/unmount with NO navigation in between, 9.4
+    // covers 200 navigations inside a single mount. The audit calls out
+    // the combined surface: each provider lifecycle observes a handful of
+    // navigations before tearing down, *repeated* many times. Failure mode:
+    // the announcer's `pendingText` + double-rAF + Safari 100ms buffer
+    // could keep a timer alive across destroy(), causing the next mount to
+    // observe a stale write.
+    const router = createStressRouter(10);
+
+    await router.start("/route0");
+
+    for (let cycle = 0; cycle < 100; cycle++) {
+      const { unmount } = render(
+        <RouterProvider router={router} announceNavigation>
+          <div />
+        </RouterProvider>,
+      );
+
+      expect(document.querySelectorAll(ANNOUNCER_SEL)).toHaveLength(1);
+
+      for (let nav = 0; nav < 5; nav++) {
+        await act(async () => {
+          await router.navigate(`route${(cycle + nav) % 10}`).catch(() => {});
+        });
+      }
+
+      // Singleton invariant after every nav cycle.
+      expect(document.querySelectorAll(ANNOUNCER_SEL)).toHaveLength(1);
+
+      unmount();
+
+      // After every unmount the node must be gone. If a stale timer or rAF
+      // resurrects it, the next iteration's first assertion catches it.
+      expect(document.querySelectorAll(ANNOUNCER_SEL)).toHaveLength(0);
+    }
+
+    // Final sanity: post-burst navigations on the same router don't create
+    // an announcer (no provider is mounted).
+    await act(async () => {
+      await router.navigate("route1").catch(() => {});
+    });
+
+    expect(document.querySelectorAll(ANNOUNCER_SEL)).toHaveLength(0);
+
+    router.stop();
+  });
+
   it("9.4: 200 rapid navigations through the announcer state machine — single node, clean teardown (#14)", async () => {
     // The announcer is a four-state machine: `lastAnnouncedText` +
     // `pendingText` + `safariTimeoutId` + double rAF. Rapid navigations

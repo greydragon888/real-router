@@ -146,7 +146,7 @@ describe("useRoute composable", () => {
     const countAfterNavigation = effectCount;
     const currentSnapshot = routeRef!.value;
 
-    expect(countAfterNavigation).toBeGreaterThan(countAfterMount);
+    expect(countAfterNavigation).toBe(countAfterMount + 1);
     expect(currentSnapshot).toBeDefined();
 
     // CORE shallowRef invariant: writing the SAME reference back must NOT
@@ -192,5 +192,49 @@ describe("useRoute composable", () => {
     // Generic type params are erased at runtime — verify the params object shape.
     expect(typedParams).toBeTypeOf("object");
     expect(typedParams).not.toBeNull();
+  });
+
+  // CLAUDE.md gotcha #8: Typed route params via generic — runtime test.
+  // The generic argument `useRoute<P>()` is purely type-level (erased at
+  // runtime). This test pins the runtime contract: actual param values
+  // navigate through unchanged and `route.value.params` carries the
+  // runtime-typed primitives the router committed (string / number /
+  // boolean per the route definition). Closes the `partial — compile-time
+  // only` finding noted in review §4 gotcha #8.
+  it("CLAUDE.md gotcha #8: useRoute<P>() runtime values pass through generic unchanged", async () => {
+    type UserViewParams = { id: string } & Params;
+
+    let observed: UserViewParams | undefined;
+
+    const App = defineComponent({
+      setup() {
+        const { route } = useRoute<UserViewParams>();
+
+        // Read inside setup once — re-reads on render don't affect this test;
+        // we want the value at the moment after navigation settled.
+        observed = route.value.params;
+
+        return () => h("div");
+      },
+    });
+
+    // Navigate to users.view with an explicit `id` param before mounting.
+    await router.navigate("items.item", { id: "42" });
+    await flushPromises();
+
+    mount(
+      defineComponent({
+        setup: () => () =>
+          h(RouterProvider, { router }, { default: () => h(App) }),
+      }),
+    );
+
+    // The generic was erased; the runtime params object IS the one the
+    // router committed. `id: "42"` (string) round-trips through buildPath /
+    // matchUrl as a string (path-matcher does not coerce path segments to
+    // numbers by default).
+    expect(observed).toBeDefined();
+    expect(observed!.id).toBe("42");
+    expect(typeof observed!.id).toBe("string");
   });
 });

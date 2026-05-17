@@ -152,7 +152,7 @@ describe("RouterProvider component", () => {
     tick.value++;
     await wrapper.vm.$nextTick();
 
-    expect(wrapper.text()).toContain("tick=2");
+    expect(wrapper.text()).toBe("tick=2");
     expect(router.subscribe).toHaveBeenCalledTimes(1);
   });
 });

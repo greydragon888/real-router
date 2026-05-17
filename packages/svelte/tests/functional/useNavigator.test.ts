@@ -64,8 +64,7 @@ describe("useNavigator composable", () => {
 
     const state = result.getState();
 
-    expect(state).not.toBeNull();
-    expect(state!.name).toBe("test");
+    expect(state?.name).toBe("test");
   });
 
   it("should have working isActiveRoute method", () => {

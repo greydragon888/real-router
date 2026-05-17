@@ -40,6 +40,12 @@ export function collectElements(
   children: ReactNode,
   result: ReactElement[],
 ): void {
+  // Recurses into Fragment-like wrappers (anything that isn't Match / Self /
+  // NotFound) to flatten the slot tree. No explicit depth guard: typical
+  // RouteView shape is `<RouteView><Match/>...<NotFound/></RouteView>` —
+  // depth ≤ 3 in real apps. A pathological hand-written tree of N Fragments
+  // recurses N times; the call stack, not this function, is the bound.
+  //
   // `Children.forEach` iterates without `Children.toArray`'s array allocation
   // and per-child clone-with-synthetic-key step. We don't read child.key here
   // (Match/Self/NotFound carry their own segment-derived keys further down),

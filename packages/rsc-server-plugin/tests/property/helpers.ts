@@ -3,8 +3,8 @@ import { createRouter } from "@real-router/core";
 
 import { rscServerPluginFactory } from "../../src";
 
-import type { RscLoaderFactoryMap } from "../../src";
-import type { Route, Router } from "@real-router/core";
+import type { RscActionResult, RscLoaderFactoryMap } from "../../src";
+import type { Route, Router, State } from "@real-router/core";
 import type { ReactNode } from "react";
 
 // =============================================================================
@@ -31,6 +31,13 @@ export const ROUTES: Route[] = [
 export const NUM_RUNS = {
   standard: 50,
   thorough: 100,
+  // `exhaustive` is reserved for arbitraries whose branching factor is so
+  // wide that `thorough` (100) statistically under-samples some branches.
+  // `arbForeignMode` (10 fc.oneof branches) is the canonical example —
+  // the audit's `1.numRuns анализ` argues that 100 runs gives each branch
+  // only ~10 hits on average, which is too few to reliably catch a
+  // regression that fails on one specific branch shape.
+  exhaustive: 200,
 } as const;
 
 // =============================================================================
@@ -105,6 +112,52 @@ export const arbReactNode = fc.oneof(
       node(r.kind, { children: [node(r.childKind), node(r.childKind)] }),
     ),
 );
+
+/**
+ * RscActionResult arbitrary. Both fields independently optional — matches
+ * the public type which declares both as optional. `returnValue.ok` and
+ * `returnValue.data` are kept open (boolean × anything) because the
+ * plugin treats the payload structurally and does NOT enforce semantics
+ * inside `data`. `formState` is `fc.anything()` for the same reason —
+ * we test the value-pipe, not React-DOM's form state shape.
+ */
+export const arbRscAction = fc.record(
+  {
+    returnValue: fc.record(
+      {
+        ok: fc.boolean(),
+        data: fc.anything(),
+      },
+      { requiredKeys: ["ok", "data"] },
+    ),
+    formState: fc.anything(),
+  },
+  { requiredKeys: [] },
+) as fc.Arbitrary<RscActionResult>;
+
+/**
+ * Build a minimal `State` with arbitrary `context`. The `buildRscPayload`
+ * and `getSsrRscMode` property tests don't need a router — they read
+ * `state.context` directly. Centralising the factory here avoids re-
+ * declaring the boilerplate State shape in every test block.
+ */
+export function stateWith(
+  context: Record<string, unknown>,
+  overrides: Partial<State> = {},
+): State {
+  return {
+    name: "users.profile",
+    params: { id: "42" },
+    path: "/users/42",
+    transition: {
+      phase: "activating",
+      reason: "success",
+      segments: { deactivated: [], activated: [], intersection: "" },
+    },
+    ...overrides,
+    context,
+  };
+}
 
 // =============================================================================
 // Router Factory Helpers

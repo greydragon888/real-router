@@ -21,6 +21,7 @@
 | 4   | Nullable short-circuit                 | `shallowEqual(undefined, record) === false` and `shallowEqual(record, undefined) === false` (no NPE). `shallowEqual(undefined, undefined) === true` via the Object.is fast-path.                          |
 | 5   | Key-count short-circuit                | Different `Object.keys.length` returns `false` without iterating values. Adding a single key to one side breaks equality (verified symmetrically).                                                          |
 | 6   | Key-order insensitivity                | `{a:1, b:2}` ≡ `{b:2, a:1}` regardless of internal insertion order. Documented public contract in CLAUDE.md L376.                                                                                          |
+| 7   | Determinism                            | Two consecutive calls with the same `(a, b)` arguments produce the same boolean. Locks the function against accidental introduction of hidden state (identity-keyed cache, mutable closure).                |
 
 ## Class Name Helper (buildActiveClassName)
 
@@ -32,6 +33,9 @@
 | 4   | `isActive=false` returns base verbatim | When `isActive=false`, the function returns `baseClassName` unchanged.                                                                                                                                     |
 | 5   | Whitespace-only active → base verbatim | When `activeClassName` is empty/whitespace-only (no `\S+` tokens after `parseTokens`), the function returns `baseClassName` as-is via `?? undefined` (not `?:`, so empty strings are preserved).            |
 | 6   | Idempotency                            | `buildActiveClassName(true, a, buildActiveClassName(true, a, base))` yields the same token set as one application (no duplicates accumulate over repeated apply).                                            |
+| 7   | Whitespace normalization               | Output never contains tab / newline / CR or any consecutive whitespace runs. Stronger than #1: catches a regression to character iteration that would emit non-space whitespace mid-result.                |
+| 8   | Double-apply different active accumulates | `buildActiveClassName(true, B, buildActiveClassName(true, A, base))` contains both `A` and `B`. Chaining different active tokens performs union over base, not replacement.                              |
+| 9   | Very long base className                  | A base with 256..1024 unique tokens + `isActive=true` yields exactly `K + 1` tokens (where K is the base token count) and the active token appears exactly once. Catches O(n²) regressions in dedup.    |
 
 ## Href Builder (buildHref)
 
@@ -43,6 +47,7 @@
 | 4   | Hash encoding (RFC 3986 + defensive `%23`)         | On the `buildPath` fallback path, the appended fragment is `encodeURI`'d with `#` defensively replaced by `%23`. No literal `#` remains in the rendered fragment.                                          |
 | 5   | Leading `#` is stripped before encoding/forwarding | `<Link hash="#section">` and `<Link hash="section">` produce identical hrefs — the leading `#` is a convenience for callers and is not part of the fragment.                                                |
 | 6   | `buildUrl` receives `{ hash }` only when defined   | No-hash call → `buildUrl(name, params, undefined)`; with-hash call → `buildUrl(name, params, { hash: <stripped> })`. The helper must NOT pass `{ hash: undefined }` — plugins distinguish absent from empty. |
+| 7   | No literal `#` in fragment                         | Generalizes the implicit assertion in #4: across all input shapes (incl. emoji / RTL / ZWJ-composed text) the fragment portion of the rendered href never contains a literal `#` — only `%23`.            |
 
 ## Navigate Helper (navigateWithHash, #532)
 
@@ -53,6 +58,8 @@
 | 3   | Different route → no hash bypass                  | The auto-force logic is exclusively the same-route hash-change signal. Cross-route navigation never sets `force`/`hashChange` even if hashes differ.                                                       |
 | 4   | `opts.hash` propagation                           | `hash === undefined` → `opts.hash` is not set (preserve current). `hash` defined → `opts.hash` is forwarded verbatim to `router.navigate`.                                                                  |
 | 5   | No current state → straight navigate              | When `router.getState()` returns `undefined` (router not started), the helper skips the same-route force logic and forwards opts as-is.                                                                    |
+| 6   | Force + hashChange tandem (XNOR)                   | Across every (currentName, targetName, currentHash, newHash) combination, `opts.force` and `opts.hashChange` are either both set OR both absent. Stronger than #2: prevents a future refactor from splitting the flags into independent code paths.                                                       |
+| 7   | Shallow params equality determinism                | Same-route detection uses `shallowEqual(current.params, routeParams)`, not reference equality. Distinct param objects with identical shape trigger the hash-bypass path; structurally different params skip it even when the route name matches.                                                       |
 
 ## HTTP Status Sink (createHttpStatusSink)
 
@@ -78,6 +85,11 @@ trees of `<Match>` / `<Self>` / `<NotFound>` leaves (optionally
 | 6   | `buildRenderList` activeMatchFound precludes fallback | Any activating `<Match>` suppresses both `<Self>` and `<NotFound>` from the render list. `appendFallback` is gated by `!activeMatchFound`.                                                                  |
 | 7   | `processMatch` keepAlive sticky activation         | Once a `keepAlive=true` segment becomes visible, it stays in `hasBeenActivated` for the RouteView's lifetime. Subsequent navigations to a different route still render it (in hidden mode).                  |
 | 8   | `processMatch` alreadyActive short-circuit         | After the first `<Match>` activates within a `buildRenderList` pass, subsequent matches with overlapping segments are short-circuited via the `alreadyActive` flag — exactly one entry rendered per pass.    |
+| 9   | `collectElements` recursion termination            | Depth-N Fragment wrapping (N up to 10) terminates and returns the inner Match element. Defends against an iterator regression that loses the terminating case.                                              |
+| 10  | `buildRenderList` stability                        | Two consecutive calls with identical `(elements, routeName, freshSet)` produce render lists of equal length, identical `activeMatchFound`, and identical per-index `type` + `key`. No hidden state.         |
+| 11  | `processMatch` keepAlive monotonicity              | Across a sequence of `buildRenderList` passes with distinct route names targeting different `<Match keepAlive>` segments, `hasBeenActivated` grows monotonically — no entry is ever removed.                |
+| 12  | Large element arrays                               | `buildRenderList` correctly resolves first-match-wins and NotFound conditional across 50..120 Match elements. Guards against an O(n²) regression in the linear walk.                                       |
+| 13  | keepAlive with falsy routeName                     | `<Match keepAlive segment="x">` against `routeName=""` does NOT activate and does NOT enter the keepAlive set. A segment previously activated stays in `hasBeenActivated` and renders hidden during a `routeName=""` transition. |
 
 Cross-check (not in #626, tightens fallback contract): `<NotFound>` is
 appended to the render list **only** when `routeName === UNKNOWN_ROUTE`
@@ -92,15 +104,18 @@ AND no `<Match>` activated AND no `<Self>` consumed the slot.
 | 3   | Self-match                 | `isSegmentMatch(name, name, false) === true` for any valid route name. Every name is a prefix of itself at a dot boundary.                                                     |
 | 4   | Dot boundary               | `"users"` does not match `"users2"` non-exactly. Prefix matching respects dot separators and does not match partial segment names (e.g., `users` vs `users2`).                 |
 | 5   | Empty segment → false      | An empty `segment` argument never matches a non-empty route name (root case handled by structural callers, not by `isSegmentMatch`).                                            |
+| 6   | Dot-boundary multi-segment | For a deep route name `a.b.c.d` (up to 5 segments): every ancestor prefix matches non-exactly; only the full path matches exactly; a segment longer than the route never matches either way. |
+| 7   | Empty routeName (root)     | `isSegmentMatch("", segment, *)` returns `false` for every non-empty segment (exact + non-exact). `isSegmentMatch("", "", *)` returns `false` (early-return on empty `fullSegmentName`). Locks root-vs-segment behavior — root self-matching is `processMatch`'s job via `nodeName`, not this function's. |
+| 8   | Deep route names           | Self-match and prefix-ladder behavior holds for 20..64-segment route names. Defends against an accidental O(n²) regression in the dot-boundary regex. |
 
 ## Test Files
 
 | File                                            | Invariants | Category                                                                                       |
 | ----------------------------------------------- | ---------- | ---------------------------------------------------------------------------------------------- |
 | `tests/property/link.properties.ts`             | 4          | `areLinkPropsEqual` — reflexivity, symmetry, sensitivity, deep-equal                            |
-| `tests/property/shallowEqual.properties.ts`     | 6          | `shallowEqual` — reflexivity, symmetry, NaN-aware, nullable, key-count, key-order               |
-| `tests/property/linkUtils.properties.ts`        | 6 + 6      | `buildActiveClassName` (6) + `buildHref` incl. hash encoding/strip/forwarding (6)              |
-| `tests/property/navigateWithHash.properties.ts` | 5          | `navigateWithHash` (#532) — same-route same/different hash, cross-route, propagation, no-state |
+| `tests/property/shallowEqual.properties.ts`     | 7          | `shallowEqual` — reflexivity, symmetry, NaN-aware, nullable, key-count, key-order, determinism  |
+| `tests/property/linkUtils.properties.ts`        | 9 + 7      | `buildActiveClassName` (9 — incl. very-long base) + `buildHref` (7)                            |
+| `tests/property/navigateWithHash.properties.ts` | 7          | `navigateWithHash` (#532) — same-route same/different hash, cross-route, propagation, no-state, tandem, params determinism |
 | `tests/property/httpStatusSink.properties.ts`   | 2          | `createHttpStatusSink` — fresh code, distinct identity per call                                |
-| `tests/property/routeView.properties.ts`        | 5          | `isSegmentMatch` — exact, monotonicity, self-match, dot boundary, empty segment                |
-| `tests/property/routeView.pipeline.properties.ts` | 8 + 1    | RouteView pipeline (#626) — `collectElements` (2), `buildRenderList` (4), `processMatch` (2) + cross-check |
+| `tests/property/routeView.properties.ts`        | 8          | `isSegmentMatch` — exact, monotonicity, self-match, dot boundary, empty segment, multi-segment depth, empty routeName, deep names |
+| `tests/property/routeView.pipeline.properties.ts` | 13 + 1   | RouteView pipeline (#626) — `collectElements` (3: order, flatness, termination), `buildRenderList` (6: first-match, first-Self, Self priority, activeMatchFound, stability, large arrays), `processMatch` (4: sticky, alreadyActive, monotonicity, falsy routeName) + cross-check |

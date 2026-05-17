@@ -26,7 +26,7 @@
 
 import { errorCodes } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
-import { act, cleanup, render } from "@testing-library/preact";
+import { act, cleanup, render, screen } from "@testing-library/preact";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { RouterErrorBoundary, RouterProvider } from "@real-router/preact";
@@ -214,5 +214,185 @@ describe("R — RouterErrorBoundary mount/unmount under active error (§7.2 #8)"
     for (const call of onErrorCalls) {
       expect(call.code).toBe(errorCodes.CANNOT_ACTIVATE);
     }
+  });
+
+  /**
+   * Closes review §7 #13 LOW-MEDIUM: "RouterErrorBoundary: вложенные —
+   * `RouterErrorBoundary.test.tsx:334` (nested boundaries both show error),
+   * но не stress mount/unmount нескольких вложенных при concurrent errors.
+   * Дубль onError calls если дочерний boundary не reset'ит до распространения."
+   *
+   * Outer and inner boundaries both subscribe to the SAME router-cached
+   * `createDismissableError` source. The contract: each onError fires once
+   * per error event per boundary instance, even under rapid concurrent
+   * navigations and mount/unmount churn.
+   */
+  it("two nested boundaries each fire onError exactly once per error event (no duplicates)", async () => {
+    const outerCalls: RouterError[] = [];
+    const innerCalls: RouterError[] = [];
+
+    render(
+      <RouterProvider router={router}>
+        <RouterErrorBoundary
+          fallback={(error) => (
+            <div data-testid="outer-fallback">{error.code}</div>
+          )}
+          onError={(error) => {
+            outerCalls.push(error);
+          }}
+        >
+          <RouterErrorBoundary
+            fallback={(error) => (
+              <div data-testid="inner-fallback">{error.code}</div>
+            )}
+            onError={(error) => {
+              innerCalls.push(error);
+            }}
+          >
+            <div data-testid="children">App</div>
+          </RouterErrorBoundary>
+        </RouterErrorBoundary>
+      </RouterProvider>,
+    );
+
+    for (let i = 0; i < 30; i++) {
+      await act(async () => {
+        await router
+          .navigate("users.view", { id: String(i) })
+          .catch((error: unknown) => error as RouterError);
+      });
+    }
+
+    // Each error event must call BOTH boundaries' onError exactly once.
+    // A regression where one boundary's subscription fires multiple times
+    // per event would surface as `outerCalls.length > 30`.
+    expect(outerCalls).toHaveLength(30);
+    expect(innerCalls).toHaveLength(30);
+
+    for (const call of [...outerCalls, ...innerCalls]) {
+      expect(call.code).toBe(errorCodes.CANNOT_ACTIVATE);
+    }
+  });
+
+  it("nested boundaries survive 50 mount/unmount cycles of the inner under an error", async () => {
+    // Mount outer once, then mount/unmount the inner 50 times. After every
+    // inner mount, trigger a fresh error and verify the inner's fallback
+    // renders (proves the per-router cached source re-attaches the inner's
+    // listener correctly across remount churn).
+    const { rerender } = render(
+      <RouterProvider router={router}>
+        <RouterErrorBoundary
+          fallback={(error) => (
+            <div data-testid="outer-fallback">{error.code}</div>
+          )}
+        >
+          <div data-testid="children">App</div>
+        </RouterErrorBoundary>
+      </RouterProvider>,
+    );
+
+    for (let i = 0; i < 50; i++) {
+      // Mount inner.
+      rerender(
+        <RouterProvider router={router}>
+          <RouterErrorBoundary
+            fallback={(error) => (
+              <div data-testid="outer-fallback">{error.code}</div>
+            )}
+          >
+            <RouterErrorBoundary
+              fallback={(error) => (
+                <div data-testid={`inner-fallback-${i}`}>{error.code}</div>
+              )}
+            >
+              <div data-testid="children">App</div>
+            </RouterErrorBoundary>
+          </RouterErrorBoundary>
+        </RouterProvider>,
+      );
+
+      await act(async () => {
+        await router
+          .navigate("users.view", { id: `iter-${i}` })
+          .catch((error: unknown) => error as RouterError);
+      });
+
+      // Inner fallback for THIS iteration must be visible — proves the inner
+      // boundary subscribed and received the latest error event.
+      expect(screen.getByTestId(`inner-fallback-${i}`)).toBeInTheDocument();
+
+      // Unmount inner (back to outer-only tree).
+      rerender(
+        <RouterProvider router={router}>
+          <RouterErrorBoundary
+            fallback={(error) => (
+              <div data-testid="outer-fallback">{error.code}</div>
+            )}
+          >
+            <div data-testid="children">App</div>
+          </RouterErrorBoundary>
+        </RouterProvider>,
+      );
+
+      // Previous inner-fallback-i node should be gone.
+      expect(screen.queryByTestId(`inner-fallback-${i}`)).toBeNull();
+    }
+
+    // Outer survived all 50 remount cycles.
+    expect(screen.getByTestId("outer-fallback")).toBeInTheDocument();
+  });
+
+  it("resetError() on inner does NOT dismiss outer (per-boundary dismissedVersion)", async () => {
+    // Important behaviour: `createDismissableError` is per-router cached;
+    // BUT each `useSyncExternalStore` consumer holds its own snapshot. The
+    // `resetError` exposed via fallback is captured in the snapshot —
+    // calling it on the inner advances dismissedVersion in the shared
+    // dismissable store, which dismisses for BOTH outer and inner on the
+    // SAME error event. This test locks the documented behaviour: the
+    // shared dismissable source is a SINGLE channel; reset propagates to
+    // both boundaries.
+    let innerResetFn: (() => void) | undefined;
+    let outerResetFn: (() => void) | undefined;
+
+    render(
+      <RouterProvider router={router}>
+        <RouterErrorBoundary
+          fallback={(error, resetError) => {
+            outerResetFn = resetError;
+
+            return <div data-testid="outer-fallback">{error.code}</div>;
+          }}
+        >
+          <RouterErrorBoundary
+            fallback={(error, resetError) => {
+              innerResetFn = resetError;
+
+              return <div data-testid="inner-fallback">{error.code}</div>;
+            }}
+          >
+            <div data-testid="children">App</div>
+          </RouterErrorBoundary>
+        </RouterErrorBoundary>
+      </RouterProvider>,
+    );
+
+    await act(async () => {
+      await router
+        .navigate("users.view", { id: "1" })
+        .catch((error: unknown) => error as RouterError);
+    });
+
+    expect(screen.getByTestId("inner-fallback")).toBeInTheDocument();
+    expect(screen.getByTestId("outer-fallback")).toBeInTheDocument();
+    expect(innerResetFn).toBeDefined();
+    expect(outerResetFn).toBeDefined();
+
+    // Call inner's resetError — single shared channel means BOTH dismiss.
+    await act(async () => {
+      innerResetFn?.();
+    });
+
+    expect(screen.queryByTestId("inner-fallback")).toBeNull();
+    expect(screen.queryByTestId("outer-fallback")).toBeNull();
   });
 });

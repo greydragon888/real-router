@@ -53,7 +53,7 @@ describe("RouteView", () => {
         </RouterProvider>,
       );
 
-      expect(screen.queryByTestId("users")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("users")).toBeNull();
       expect(container).toBeEmptyDOMElement();
     });
 
@@ -86,7 +86,7 @@ describe("RouteView", () => {
         </RouterProvider>,
       );
 
-      expect(screen.queryByTestId("users-exact")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("users-exact")).toBeNull();
       expect(container).toBeEmptyDOMElement();
     });
 
@@ -265,7 +265,6 @@ describe("RouteView", () => {
       );
 
       expect(screen.queryByTestId("users")).not.toBeInTheDocument();
-      expect(screen.queryByTestId("not-found")).not.toBeInTheDocument();
       expect(container).toBeEmptyDOMElement();
     });
 

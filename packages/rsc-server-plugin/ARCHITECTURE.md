@@ -111,23 +111,27 @@ Same closure-based factory as `ssr-data-plugin` — no class, no mutable state b
 ```
 rscServerPluginFactory(loaders)              ← factory.ts (~25 LOC incl. JSDoc)
         │
-        │  1. validateLoaders(loaders)         ← validation.ts → createLoadersValidator(ERROR_PREFIX)
-        │  2. createSsrLoaderPlugin<ReactNode, Dependencies>(loaders, { namespace: "rsc", errorPrefix })
+        │  1. validateLoaders(loaders)         ← inlined binding of createLoadersValidator(ERROR_PREFIX, ALLOWED_RSC_MODES) (the previous standalone validation.ts was deleted; single 7-line consumer, no other importer)
+        │  2. createSsrLoaderPlugin<ReactNode, Dependencies>(loaders, { namespace: "rsc", modeNamespace: "ssrRscMode", errorPrefix, allowedModes })
         │
         └── createSsrLoaderPlugin returns PluginFactory (closure)
                 │
                 │  Called by router.usePlugin():
                 │
                 ├── api = getPluginApi(router)
-                ├── claim = api.claimContextNamespace("rsc")
-                ├── try: compile factories → compiledLoaders Map
-                │       └── factory(router, getDependency) per entry
-                │       └── typeof check on each returned loader
-                │   catch: claim.release() + rethrow
+                ├── acquired: ContextNamespaceClaim[] = []
+                ├── try:
+                │       ├── claim       = api.claimContextNamespace("rsc")          → acquired.push(claim)
+                │       ├── modeClaim   = api.claimContextNamespace("ssrRscMode")   → acquired.push(modeClaim)
+                │       └── compile factories → compiledLoaders Map
+                │               └── factory(router, getDependency) per entry
+                │               └── typeof check on each returned loader
+                │   catch: rollback(acquired) — release ALL acquired claims in reverse order + rethrow
                 ├── api.addInterceptor("start", ...)
-                │       └── claim.write(state, await loader(state.params))
+                │       └── claim.write(state, await loader(state.params)) + modeClaim.write(state, resolveMode(...))
+                ├── api.subscribeLeave(consumesStaleFlag)
                 └── return { teardown }
-                        └── removeStartInterceptor() + claim.release()
+                        └── removeStartInterceptor() + removeLeaveListener() + claim.release() + modeClaim.release()
 ```
 
 ## Sibling: `rscActionPluginFactory` (Server Actions)
@@ -322,14 +326,19 @@ All operations are synchronous and infallible. The stale flag in the per-router 
 
 ## Validation
 
-`validateLoaders(loaders)` runs at factory call time (before `PluginFactory` is returned):
+`validateLoaders(loaders)` runs at factory call time (before `PluginFactory` is returned). Implementation lives in `shared-ssr/createLoadersValidator.ts`; `factory.ts:11` binds it with `ERROR_PREFIX` + `ALLOWED_RSC_MODES`.
 
-| Check          | Rule                          |
-| -------------- | ----------------------------- |
-| Top-level type | Must be non-null object       |
-| Values         | Each value must be a function |
+| Check                                | Rule                                                                                                                |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| Top-level type                       | `loaders` must be a non-null object AND not an array — `Array.isArray` rejection is explicit                        |
+| Per-route value: function form       | `typeof entry === "function"` → accepted as shorthand factory                                                       |
+| Per-route value: object form         | `entry` must be a non-null object, not an array, not a function returning non-object — else `entry for route "X" must be a function or { ssr?, loader? } object` |
+| Object-form keys                     | Only `"ssr"` and `"loader"` allowed — any other own key throws `unexpected key "X" in route "Y" config`             |
+| Object-form `loader` (if present)    | Must be a function                                                                                                  |
+| Object-form `ssr` (if present)       | One of: `function`, `boolean`, or a string in `ALLOWED_RSC_MODES` (`"full"` \| `"client-only"`). Anything else — including `"data-only"`, `null`, `number` — throws |
+| `ssr` string outside allowed set     | Specific error: `mode "X" is not allowed for route "Y". Allowed: full, client-only` (uses the bound `allowedModes` list) |
 
-Throws `TypeError` with `[@real-router/rsc-server-plugin]` prefix on violation.
+Throws `TypeError` with `[@real-router/rsc-server-plugin]` prefix on violation. The validator is shared with `ssr-data-plugin` (same source file in `shared-ssr/`), bound with `ALL_SSR_MODES` there instead of `ALLOWED_RSC_MODES`.
 
 Factory-time validation checks the `loaders` object. Plugin-registration-time validation (in the compilation loop) checks that each factory returns a function. Loader return values (any `ReactNode` — element, fragment, null, string, etc.) are written as-is to `state.context.rsc` via `claim.write()`.
 
@@ -351,15 +360,20 @@ Factory-time validation checks the `loaders` object. Plugin-registration-time va
 
 Same as `ssr-data-plugin`: `Object.entries(loaders)` at compilation time only iterates own enumerable properties. `compiledLoaders.get(state.name)` at runtime looks up only compiled entries. Inherited prototype keys (e.g. `toString`) cannot be triggered as loaders.
 
-### Error-safe compilation
+### Error-safe compilation (all-or-nothing claim rollback)
 
-The compilation loop is wrapped in `try/catch`. If any loader factory throws, or if the returned value is not a function:
+The compilation loop in `shared-ssr/createSsrLoaderPlugin.ts:153-187` is wrapped in `try/catch` with an `acquired: ContextNamespaceClaim[]` array. Claims are pushed onto `acquired` as they're successfully obtained from `api.claimContextNamespace(...)` — `"rsc"` first, then `"ssrRscMode"` (and, in the `ssr-data-plugin` build of the same shared factory, additional `value`/`keys` claims under a configured `deferredNamespace`).
 
-- `claim.release()` is called to free the `"rsc"` namespace
+If any factory throws or returns a non-function:
+
+- `rollback(acquired)` calls `claim.release()` on EVERY successfully-claimed namespace in reverse order — atomic all-or-nothing semantics
 - The error is re-thrown to the `usePlugin()` caller
 - No interceptor is registered (it runs after the loop)
+- No leave listener is registered (it runs after the loop)
 
-This prevents permanently blocking the namespace when a factory has a bug.
+This prevents permanently blocking ANY of the plugin's namespaces when a factory has a bug. The change from "single-claim rollback" to "acquired-array rollback" was driven by adding the `ssrRscMode` claim — a single `claim.release()` would have leaked the partner namespace on factory failure.
+
+For `rsc-server-plugin` specifically, `acquired.length` is always 2 (no `deferredNamespace` configured). The `ssr-data-plugin` path can grow it to 4 — see `shared-ssr/createSsrLoaderPlugin.ts:165-180` for the deferred-namespace branch obligations.
 
 ### No bundler dependency
 

@@ -122,11 +122,11 @@ describe("useRouteExit", () => {
       navigated = true;
     });
 
-    // Wait microtask — handler should be called but navigation pending.
-    await Promise.resolve();
-    await Promise.resolve();
+    // Wait until subscribeLeave handler fires (before exitPromise resolves).
+    await vi.waitFor(() => {
+      expect(handler).toHaveBeenCalledTimes(1);
+    });
 
-    expect(handler).toHaveBeenCalledTimes(1);
     expect(navigated).toBe(false);
 
     resolveExit();

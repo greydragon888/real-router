@@ -308,6 +308,148 @@ describe("§7.2 #16 — useRouteEnter / useRouteExit stress (Vue)", () => {
     expect(enters.at(-1)!.name).toBe("route0");
   });
 
+  // Closes review-2026-05-16 §7.E — useRouteExit + useRouteEnter in the
+  // same component + same-route `force: true`. Locks the documented
+  // asymmetry between the two hooks:
+  //
+  //   - `useRouteExit` rides `router.subscribeLeave` (FSM-level event) and
+  //     observes force-same-route navs (controlled by `skipSameRoute`).
+  //   - `useRouteEnter` rides `watch(route)` (Vue shallowRef-level) and
+  //     does NOT observe force-same-route navs at all, because the route
+  //     source emits the same State reference and shallowRef short-circuits
+  //     on identity. The `skipSameRoute` option is therefore inert in this
+  //     pathway.
+  //
+  // The asymmetry surfaces as a real consumer-side risk: a component with
+  // `useRouteExit({skipSameRoute:false})` + `useRouteEnter()` will observe
+  // exit cleanup but never the matching enter setup on force-same-route
+  // refreshes — state can desynchronise. Test pins this contract.
+  it("16.7: §7.E exit+enter in one component + same-route force — documented exit-fires/enter-skips asymmetry", async () => {
+    const counts = {
+      bothDefault: { exit: 0, enter: 0 },
+      exitOptOut: { exit: 0, enter: 0 },
+      enterOptOut: { exit: 0, enter: 0 },
+      bothOptOut: { exit: 0, enter: 0 },
+    };
+
+    const HostBothDefault = defineComponent({
+      setup() {
+        useRouteExit(() => {
+          counts.bothDefault.exit++;
+        });
+        useRouteEnter(() => {
+          counts.bothDefault.enter++;
+        });
+
+        return () => h("div", { "data-testid": "both-default" });
+      },
+    });
+    const HostExitOptOut = defineComponent({
+      setup() {
+        useRouteExit(
+          () => {
+            counts.exitOptOut.exit++;
+          },
+          { skipSameRoute: false },
+        );
+        useRouteEnter(() => {
+          counts.exitOptOut.enter++;
+        });
+
+        return () => h("div", { "data-testid": "exit-opt-out" });
+      },
+    });
+    const HostEnterOptOut = defineComponent({
+      setup() {
+        useRouteExit(() => {
+          counts.enterOptOut.exit++;
+        });
+        useRouteEnter(
+          () => {
+            counts.enterOptOut.enter++;
+          },
+          { skipSameRoute: false },
+        );
+
+        return () => h("div", { "data-testid": "enter-opt-out" });
+      },
+    });
+    const HostBothOptOut = defineComponent({
+      setup() {
+        useRouteExit(
+          () => {
+            counts.bothOptOut.exit++;
+          },
+          { skipSameRoute: false },
+        );
+        useRouteEnter(
+          () => {
+            counts.bothOptOut.enter++;
+          },
+          { skipSameRoute: false },
+        );
+
+        return () => h("div", { "data-testid": "both-opt-out" });
+      },
+    });
+
+    mountWithProvider(router, () => [
+      h(HostBothDefault),
+      h(HostExitOptOut),
+      h(HostEnterOptOut),
+      h(HostBothOptOut),
+    ]);
+    await flushPromises();
+
+    for (let i = 0; i < 20; i++) {
+      await router.navigate("route0", {}, { force: true });
+      await nextTick();
+      await flushPromises();
+    }
+
+    // Default exit (skipSameRoute=true) never fires on same-route.
+    expect(counts.bothDefault.exit).toBe(0);
+    // Default enter cannot fire either — same reason.
+    expect(counts.bothDefault.enter).toBe(0);
+
+    // Exit opt-out → fires 20 times via subscribeLeave (FSM level).
+    expect(counts.exitOptOut.exit).toBe(20);
+    // Companion enter never fires — watch(route) doesn't see same-ref updates.
+    // This is the consumer-side state-inconsistency risk noted in §7.E.
+    expect(counts.exitOptOut.enter).toBe(0);
+
+    // Enter opt-out has no effect because the watch never fires on
+    // same-route force navs (shallowRef short-circuits on identity).
+    // Documented inert-option behaviour locked here.
+    expect(counts.enterOptOut.exit).toBe(0);
+    expect(counts.enterOptOut.enter).toBe(0);
+
+    // Both opt-out → exit still fires 20×, enter still 0× — the option pair
+    // CANNOT recover from the shallowRef identity short-circuit. The only
+    // way to observe an enter callback on force-same-route is to break the
+    // identity (e.g., navigate to a different route in between).
+    expect(counts.bothOptOut.exit).toBe(20);
+    expect(counts.bothOptOut.enter).toBe(0);
+
+    // Sanity: a single cross-route navigation followed by return DOES fire
+    // both hooks under their respective opt-outs — proves the subscriptions
+    // are still alive after the 20 force-same-route storm.
+    await router.navigate("route1");
+    await nextTick();
+    await flushPromises();
+    await router.navigate("route0");
+    await nextTick();
+    await flushPromises();
+
+    // Two cross-route transitions fired both subscriptions twice each on
+    // the bothOptOut host (skipSameRoute false on both); the default host's
+    // exit/enter also fire twice each because route names differ.
+    expect(counts.bothDefault.exit).toBe(2);
+    expect(counts.bothDefault.enter).toBe(2);
+    expect(counts.bothOptOut.exit).toBe(22);
+    expect(counts.bothOptOut.enter).toBe(2);
+  });
+
   it("16.6: force-true same-route navigation default — useRouteExit skips, opt-out fires", async () => {
     // Default skipSameRoute=true: force-navigate to same route does NOT
     // fire the handler. Counts must match documented semantics.

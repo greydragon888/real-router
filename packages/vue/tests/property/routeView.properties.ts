@@ -192,15 +192,18 @@ describe("isSegmentMatch — Property Tests (Vue RouteView)", () => {
       },
     );
 
-    test.prop([arbRouteNameWide], { numRuns: NUM_RUNS.standard })(
+    test.prop(
+      [
+        fc
+          .array(arbSegmentName, { minLength: 2, maxLength: 6 })
+          .map((segs) => segs.join(".")),
+      ],
+      { numRuns: NUM_RUNS.standard },
+    )(
       "Inv 3 wide: any non-final segment prefix matches the full name",
       (name) => {
         const segments = name.split(".");
-
-        fc.pre(segments.length >= 2);
-
-        // Use the parent (everything up to but not including the last segment)
-        // as the test segment. Non-exact match must accept it.
+        // Generator guarantees minLength:2 — every name has at least one prefix.
         const parent = segments.slice(0, -1).join(".");
 
         expect(isSegmentMatch(name, parent, false)).toBe(true);
@@ -243,6 +246,68 @@ describe("isSegmentMatch — Property Tests (Vue RouteView)", () => {
         if (exact) {
           expect(nonExact).toBe(true);
         }
+      },
+    );
+  });
+
+  // Review §6 — NEW Inv 10: Transitivity of non-exact prefix matching.
+  // If `name` matches `parent` non-exactly AND `parent` matches `grand`
+  // non-exactly, then `name` must also match `grand` non-exactly. This is
+  // a fundamental property of the segment-prefix relation — any regression
+  // (e.g., a bug in `dotOrEnd` regex that breaks multi-dot prefixes) would
+  // surface here. The three-segment chain s1.s2.s3 / s1.s2 / s1 is the
+  // minimal test case that requires real transitivity rather than just
+  // self-match.
+  describe("Invariant 10: Transitivity of non-exact prefix (s1.s2.s3 ⊃ s1.s2 ⊃ s1)", () => {
+    test.prop([arbSegmentName, arbSegmentName, arbSegmentName], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "name matches parent && parent matches grand ⇒ name matches grand",
+      (s1, s2, s3) => {
+        const grand = s1;
+        const parent = `${s1}.${s2}`;
+        const name = `${s1}.${s2}.${s3}`;
+        const nameMatchesParent = isSegmentMatch(name, parent, false);
+        const parentMatchesGrand = isSegmentMatch(parent, grand, false);
+
+        if (nameMatchesParent && parentMatchesGrand) {
+          expect(isSegmentMatch(name, grand, false)).toBe(true);
+        }
+      },
+    );
+  });
+
+  // Review §6 — NEW Inv 12: Default-exact semantics. `evaluateMatch` reads
+  // `props?.exact ?? false` — when a consumer writes
+  // `<RouteView.Match segment="users" exact={undefined}>`, the nullish-
+  // coalescing falls back to `false`. The `isSegmentMatch` helper itself
+  // takes `exact: boolean` (no undefined accepted at the type level), but a
+  // future refactor that changes the call site to pass through `undefined`
+  // must observe that JS's strict `===` would treat `undefined` as falsy
+  // for the exact branch. Locks the contract at the helper boundary by
+  // calling it with both `false` and (cast) `undefined`, expecting identical
+  // results.
+  describe("Invariant 12: exact=false ≡ exact=undefined (via ?? fallback at call site)", () => {
+    test.prop([arbDottedName, arbDottedName], { numRuns: NUM_RUNS.standard })(
+      "isSegmentMatch(name, seg, false) === isSegmentMatch(name, seg, undefined as any)",
+      (name, seg) => {
+        // The runtime contract — both call shapes must produce the same
+        // verdict because the `evaluateMatch` indirection collapses
+        // `undefined` to `false` before calling here. We test the helper's
+        // observable behaviour: any future widening of the `exact` param's
+        // accepted domain must preserve the current "undefined acts like false"
+        // semantics that consumers' templates depend on.
+        const withFalse = isSegmentMatch(name, seg, false);
+        // Cast through unknown to reach the runtime path — the TS overload
+        // refuses `undefined` for `exact`, but JS evaluates the branch
+        // `if (exact)` as falsy → identical to `false`.
+        const withUndefined = isSegmentMatch(
+          name,
+          seg,
+          undefined as unknown as boolean,
+        );
+
+        expect(withUndefined).toBe(withFalse);
       },
     );
   });

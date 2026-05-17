@@ -46,7 +46,9 @@ describe("shallowEqual — Property Tests", () => {
   describe("Invariant 3: NaN-aware (Object.is, not ===)", () => {
     // Object.is(NaN, NaN) === true, while NaN === NaN is false.
     // Strict equality would treat two records with NaN values as not equal.
-    test.prop([arbExtendedRecord], { numRuns: NUM_RUNS.standard })(
+    // numRuns=thorough: NaN/±0 are rare in random generation — more runs
+    // increase the chance of catching edge-case interactions with other keys.
+    test.prop([arbExtendedRecord], { numRuns: NUM_RUNS.thorough })(
       "NaN values compare equal across distinct objects",
       (base) => {
         const a = { ...base, n: Number.NaN };
@@ -56,7 +58,7 @@ describe("shallowEqual — Property Tests", () => {
       },
     );
 
-    test.prop([arbExtendedRecord], { numRuns: NUM_RUNS.standard })(
+    test.prop([arbExtendedRecord], { numRuns: NUM_RUNS.thorough })(
       "+0 and -0 are NOT equal (Object.is semantics)",
       (base) => {
         const a = { ...base, z: 0 };
@@ -111,6 +113,22 @@ describe("shallowEqual — Property Tests", () => {
         expect(shallowEqual(b, a)).toBe(false);
       },
     );
+  });
+
+  describe("Invariant 7: determinism — same inputs always yield same output (review §6 MED)", () => {
+    // shallowEqual is pure: no closures, no Date, no random. A future
+    // change that introduces hidden state (e.g., a cache keyed by object
+    // identity that updates on read) would silently violate this. Running
+    // the comparison twice and asserting strict equality of the verdict
+    // makes such a regression visible.
+    test.prop([arbExtendedRecord, arbExtendedRecord], {
+      numRuns: NUM_RUNS.thorough,
+    })("two calls with the same arguments return the same boolean", (a, b) => {
+      const first = shallowEqual(a, b);
+      const second = shallowEqual(a, b);
+
+      expect(second).toBe(first);
+    });
   });
 
   describe("Invariant 6: key-order insensitivity (CLAUDE.md L376)", () => {

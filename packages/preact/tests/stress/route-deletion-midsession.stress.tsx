@@ -202,4 +202,98 @@ describe("preact — route deleted mid-session", () => {
 
     expect(getByTestId("route2-match").textContent).toBe("route2");
   });
+
+  /**
+   * Closes review §7 #4 MEDIUM: "traverseToLast к route, удалённому
+   * mid-session" — back-button navigation (popstate) to a route that was
+   * removed mid-session must NOT hang the router. The reviewed gap stated:
+   * "На частую операцию back-button после deploy с удалением route".
+   *
+   * Real-Router has no `traverseToLast` method — back-button navigation goes
+   * through the browser-plugin's popstate handler. To simulate without
+   * pulling in the full browser-plugin (jsdom popstate plumbing is brittle),
+   * we use the equivalent semantic: a transition target that was active
+   * in-session but is now ROUTE_NOT_FOUND. The router must reject cleanly
+   * (TRANSITION_ERROR with `ROUTE_NOT_FOUND`-style code), not hang in
+   * pending state.
+   */
+  it("navigate to a previously-active route AFTER its removal rejects cleanly (no hang)", async () => {
+    const api = getRoutesApi(router);
+
+    // Visit route1, then route2, then come back to "users.list" — establishes
+    // a real navigation history within the router.
+    await act(async () => {
+      await router.navigate("route1");
+    });
+    await act(async () => {
+      await router.navigate("route2");
+    });
+    await act(async () => {
+      await router.navigate("users.list");
+    });
+
+    expect(router.getState()?.name).toBe("users.list");
+
+    // Remove route1 — the route the user might press "back" to in a real
+    // browser session.
+    api.remove("route1");
+
+    expect(api.has("route1")).toBe(false);
+
+    // Simulate the "back to deleted route" attempt. Router must surface the
+    // error synchronously (Promise rejects); MUST NOT leave isTransitioning
+    // === true forever.
+    let rejection: RouterError | undefined;
+
+    await act(async () => {
+      await router.navigate("route1").catch((error: unknown) => {
+        rejection = error as RouterError;
+      });
+    });
+
+    expect(rejection).toBeDefined();
+    // Either ROUTE_NOT_FOUND or TRANSITION_ERR — both are acceptable
+    // outcomes; the lock here is that SOMETHING rejects, deterministically.
+    expect([errorCodes.ROUTE_NOT_FOUND, errorCodes.TRANSITION_ERR]).toContain(
+      rejection!.code,
+    );
+
+    // Router stays on the prior state — not stuck mid-transition.
+    expect(router.getState()?.name).toBe("users.list");
+
+    // The router is still usable — a subsequent navigation to a valid route
+    // succeeds without the previous failure poisoning the pipeline.
+    await act(async () => {
+      await router.navigate("route2");
+    });
+
+    expect(router.getState()?.name).toBe("route2");
+  });
+
+  it("rapid back-and-forth between live and removed routes: pipeline does not deadlock", async () => {
+    // Stress variant: 30 alternating navigations between a live route and a
+    // route that was just removed. The pending-transition state machine must
+    // not accumulate stale state under churn.
+    const api = getRoutesApi(router);
+
+    await act(async () => {
+      await router.navigate("route1");
+    });
+
+    api.remove("route1");
+
+    for (let i = 0; i < 30; i++) {
+      const target = i % 2 === 0 ? "route1" : "route2";
+
+      await act(async () => {
+        await router.navigate(target).catch(() => {
+          // route1 navigations reject silently (deleted); route2 succeed.
+        });
+      });
+    }
+
+    // After 30 alternating attempts, router lands on the last successful
+    // navigation target.
+    expect(router.getState()?.name).toBe("route2");
+  });
 });

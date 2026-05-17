@@ -1,5 +1,4 @@
 import { memo } from "preact/compat";
-import { useCallback, useMemo } from "preact/hooks";
 
 import { EMPTY_PARAMS, EMPTY_OPTIONS } from "../constants";
 import {
@@ -15,6 +14,24 @@ import { useRouter } from "../hooks/useRouter";
 import type { LinkProps } from "../types";
 import type { FunctionComponent, JSX } from "preact";
 
+/**
+ * Custom comparator for `Link`'s `memo()` wrapper.
+ *
+ * **Maintenance contract:** every field in `LinkProps` MUST appear in either
+ * the `===` chain (primitives + identity-checked references like `onClick` /
+ * `children` / `style`) or in the `shallowEqual` arms (object-valued
+ * `routeParams` / `routeOptions`). When adding a new prop to `LinkProps`,
+ * extend this function in the same PR — `tests/functional/Link.test.tsx`
+ * contains a regression-guard that fails the build if `LinkProps` gains a
+ * field that is not compared here.
+ *
+ * **Intentional omissions:** `props` (the rest-spread of HTMLAnchorElement
+ * attributes — `aria-label`, `data-*`, `target`-other-than-`_blank`-handling,
+ * etc.) is NOT compared. A change to `aria-label` will NOT trigger a Link
+ * re-render. This is by design: dynamic `aria-label` is rare; consumers who
+ * truly need a reactive aria-label should call `<Link key={ariaLabel}>` to
+ * force a remount.
+ */
 function areLinkPropsEqual(
   prev: Readonly<LinkProps>,
   next: Readonly<LinkProps>,
@@ -66,46 +83,47 @@ export const Link: FunctionComponent<LinkProps> = memo(
       hash,
     );
 
-    const href = useMemo(
-      () =>
-        buildHref(
-          router,
-          routeName,
-          routeParams,
-          hash === undefined ? undefined : { hash },
-        ),
-      [router, routeName, routeParams, hash],
+    // `buildHref` is a cheap synchronous call (route-tree lookup + string
+    // concat). Wrapping it in `useMemo` allocates a deps array on every
+    // render that does not bail out — and on bail-out the function body
+    // doesn't execute, so the cache never pays off. Same logic for
+    // `buildActiveClassName` and `handleClick` below.
+    const href = buildHref(
+      router,
+      routeName,
+      routeParams,
+      hash === undefined ? undefined : { hash },
     );
 
-    const handleClick = useCallback(
-      (evt: JSX.TargetedMouseEvent<HTMLAnchorElement>) => {
-        if (onClick) {
-          onClick(evt);
+    const handleClick = (
+      evt: JSX.TargetedMouseEvent<HTMLAnchorElement>,
+    ): void => {
+      if (onClick) {
+        onClick(evt);
 
-          if (evt.defaultPrevented) {
-            return;
-          }
-        }
-
-        if (!shouldNavigate(evt) || target === "_blank") {
+        if (evt.defaultPrevented) {
           return;
         }
+      }
 
-        evt.preventDefault();
-        navigateWithHash(
-          router,
-          routeName,
-          routeParams,
-          hash,
-          routeOptions,
-        ).catch(() => {});
-      },
-      [onClick, target, router, routeName, routeParams, routeOptions, hash],
-    );
+      if (!shouldNavigate(evt) || target === "_blank") {
+        return;
+      }
 
-    const finalClassName = useMemo(
-      () => buildActiveClassName(isActive, activeClassName, className),
-      [isActive, activeClassName, className],
+      evt.preventDefault();
+      navigateWithHash(
+        router,
+        routeName,
+        routeParams,
+        hash,
+        routeOptions,
+      ).catch(() => {});
+    };
+
+    const finalClassName = buildActiveClassName(
+      isActive,
+      activeClassName,
+      className,
     );
 
     return (

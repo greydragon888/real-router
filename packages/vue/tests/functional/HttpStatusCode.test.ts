@@ -93,7 +93,10 @@ describe("HttpStatusCode", () => {
       const html = await renderToString(createSSRApp(buildHost(sink)));
 
       expect(sink.code).toBe(404);
-      expect(html).toMatch(/^<!--/);
+      // HttpStatusCode renders null → "<!---->"; provider slot wraps in a
+      // Fragment → "<!--[--><!----><!--]-->". No real HTML elements emitted.
+      expect(html).toContain("<!---->");
+      expect(html).not.toMatch(/<[a-z]/i);
     });
 
     it("renders nothing — siblings still emit", async () => {

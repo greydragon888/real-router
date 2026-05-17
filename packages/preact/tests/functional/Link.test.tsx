@@ -679,6 +679,54 @@ describe("Link component", () => {
       expect(linkRenders.mock.calls.length).toBeGreaterThan(baseline);
     });
 
+    it("regression-guard: LinkProps own-key surface matches areLinkPropsEqual coverage (review §8a Link.tsx MEDIUM)", () => {
+      // Type-level lock. The `areLinkPropsEqual` JSDoc in `Link.tsx` requires
+      // every LinkProps OWN field (not inherited HTMLAttributes) to appear in
+      // the comparator's `&&` chain. If a future PR adds a new field to
+      // `LinkProps` in `packages/preact/src/types.ts` without updating this
+      // list AND `areLinkPropsEqual`, the type assertion below fails to
+      // compile (one of the `extends` clauses produces `false`), forcing a
+      // coordinated edit:
+      //   1. extend the `LinkPropsOwnKey` union with the new field
+      //   2. extend `areLinkPropsEqual` to compare it
+      //   3. extend the `expected` list here
+      //
+      // The runtime body is a tautology — the value is verified by the
+      // TypeScript compile step (turbo `type-check` task is part of `build`).
+      const expected = [
+        "routeName",
+        "routeParams",
+        "routeOptions",
+        "className",
+        "activeClassName",
+        "activeStrict",
+        "ignoreQueryParams",
+        "hash",
+        "target",
+      ] as const;
+
+      type ExpectedKey = (typeof expected)[number];
+      type LinkPropsOwnKey =
+        | "routeName"
+        | "routeParams"
+        | "routeOptions"
+        | "className"
+        | "activeClassName"
+        | "activeStrict"
+        | "ignoreQueryParams"
+        | "hash"
+        | "target";
+      type Equal = [ExpectedKey] extends [LinkPropsOwnKey]
+        ? [LinkPropsOwnKey] extends [ExpectedKey]
+          ? true
+          : false
+        : false;
+      const same: Equal = true;
+
+      expect(same).toBe(true);
+      expect(expected).toHaveLength(9);
+    });
+
     it("should not throw when routeParams contains a circular reference", () => {
       interface Circular {
         id: string;

@@ -240,4 +240,76 @@ describe("navigateWithHash — feature #532 auto-bypass", () => {
     expect(extraOptions).toStrictEqual({ replace: true });
     expect(calls[0].opts).not.toBe(extraOptions);
   });
+
+  // Review §5.3 — behaviour lock for the documented OVERWRITE RISK on
+  // extraOptions.{hash, force, hashChange}. The helper deliberately
+  // overwrites these three keys to enforce its same-route auto-bypass
+  // contract. Callers cannot opt out by pre-setting them.
+  describe("extraOptions overwrite — behaviour lock (review §5.3)", () => {
+    it("`hash` positional arg overrides `extraOptions.hash` (positional wins)", async () => {
+      const { router, calls } = makeFakeRouter({
+        name: "settings",
+        params: {},
+        hash: "profile",
+      });
+      const extraOptions = { hash: "from-extra" } as NavigationOptions;
+
+      await navigateWithHash(router, "settings", {}, "from-arg", extraOptions);
+
+      expect(calls).toHaveLength(1);
+      // Positional `hash` arg ("from-arg") overwrites `extraOptions.hash`.
+      expect(calls[0].opts.hash).toBe("from-arg");
+    });
+
+    it("auto-bypass overwrites `extraOptions.force=false` with `true` on same-route different-hash", async () => {
+      const { router, calls } = makeFakeRouter({
+        name: "settings",
+        params: {},
+        hash: "profile",
+      });
+      // Caller explicitly opts out of force; helper still flips it back to true.
+      const extraOptions = { force: false } as NavigationOptions;
+
+      await navigateWithHash(router, "settings", {}, "account", extraOptions);
+
+      expect(calls).toHaveLength(1);
+      // Helper's auto-bypass takes precedence over the caller's `force: false`.
+      expect(calls[0].opts.force).toBe(true);
+      expect(calls[0].opts.hashChange).toBe(true);
+    });
+
+    it("auto-bypass overwrites `extraOptions.hashChange=false` with `true`", async () => {
+      const { router, calls } = makeFakeRouter({
+        name: "settings",
+        params: {},
+        hash: "profile",
+      });
+      const extraOptions = { hashChange: false } as HashAwareOpts;
+
+      await navigateWithHash(router, "settings", {}, "account", extraOptions);
+
+      expect(calls).toHaveLength(1);
+      // Same overwrite contract — caller's `hashChange: false` is silently flipped.
+      expect(calls[0].opts.hashChange).toBe(true);
+    });
+
+    it("non-bypass path preserves `extraOptions.force` (only auto-bypass writes the key)", async () => {
+      // When the bypass branch does NOT fire (same hash, OR different route),
+      // the helper never writes `opts.force` — so a caller-supplied value
+      // survives. Locks the conditional-write contract.
+      const { router, calls } = makeFakeRouter({
+        name: "settings",
+        params: {},
+        hash: "profile",
+      });
+      const extraOptions = { force: false } as NavigationOptions;
+
+      // Same hash → no bypass → no overwrite of `force`.
+      await navigateWithHash(router, "settings", {}, "profile", extraOptions);
+
+      expect(calls).toHaveLength(1);
+      expect(calls[0].opts.force).toBe(false);
+      expect(calls[0].opts.hashChange).toBeUndefined();
+    });
+  });
 });

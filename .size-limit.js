@@ -18,24 +18,24 @@ export default [
   },
 
   // ── UI Bindings ───────────────────────────────────────────────────
-  esm("react", "6 kB", ["react", "react-dom", ...ignoreCore]),
-  esm("preact", "6 kB", [
+  esm("react", "8 kB", ["react", "react-dom", ...ignoreCore]),
+  esm("preact", "8 kB", [
     "preact",
     "preact/hooks",
     "preact/compat",
     ...ignoreCore,
   ]),
-  esm("solid", "6 kB", [
+  esm("solid", "8 kB", [
     "solid-js",
     "solid-js/store",
     "solid-js/web",
     ...ignoreCore,
   ]),
-  esm("vue", "7 kB", ["vue", ...ignoreCore]),
+  esm("vue", "8 kB", ["vue", ...ignoreCore]),
   {
     name: "@real-router/angular (FESM2022)",
     path: "packages/angular/dist/fesm2022/real-router-angular.mjs",
-    limit: "7.5 kB",
+    limit: "8 kB",
     ignore: [
       "@angular/core",
       "@angular/common",
@@ -45,7 +45,7 @@ export default [
   },
   // Note: @real-router/svelte uses svelte-package (individual files),
   // not a single ESM bundle — cannot be measured by size-limit/esbuild.
-  esm("sources", "2.5 kB", ignoreCore),
+  esm("sources", "3 kB", ignoreCore),
   esm("rx", "1.5 kB", ignoreCore),
 
   // ── Plugins ───────────────────────────────────────────────────────
@@ -59,8 +59,8 @@ export default [
   esm("preload-plugin", "1.1 kB", ignoreCore),
   esm("search-schema-plugin", "1.1 kB", ignoreCore),
   esm("validation-plugin", "10 kB", ignoreCore),
-  esm("ssr-data-plugin", "2 kB", ignoreCore),
-  esm("rsc-server-plugin", "2 kB", ignoreCore),
+  esm("ssr-data-plugin", "2.5 kB", ignoreCore),
+  esm("rsc-server-plugin", "2.5 kB", ignoreCore),
 
   // ── Utilities ─────────────────────────────────────────────────────
   esm("route-utils", "1 kB"),

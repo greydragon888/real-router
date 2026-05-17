@@ -194,10 +194,28 @@ Swap the platform plugin, reuse everything else.
 
 Runs in **browser, terminal (Ink), and desktop (Electron, Tauri)** — same router, different plugins. See [Desktop Integration Guide](https://github.com/greydragon888/real-router/wiki/Desktop-Integration).
 
-SSR works naturally: `cloneRouter()` per request, `start(url)` to resolve, `dispose()` to clean up.
-Data loading plugs in via interceptors without touching the transition pipeline.
-SSG is the same loop at build time — `getStaticPaths()` enumerates routes, `cloneRouter()` + `renderToString()` per URL.
-See the [SSR example](examples/web/react/ssr-examples/ssr) and [SSG example](examples/web/react/ssr-examples/ssg).
+### First-Class SSR · Streaming · SSG
+
+The only standalone router that ships the **same SSR contract** across React 19, Vue 3, Solid, Svelte 5, and Angular 21+ — without locking you into Next.js, Nuxt, SolidStart, or SvelteKit. ~200+ e2e scenarios covering classical SSR, streaming, SSG, and RSC pipelines.
+
+| Adapter  | SSR | Streaming SSR                | SSG | e2e scenarios |
+| -------- | --- | ---------------------------- | --- | ------------- |
+| React 19 | ✓   | OOO `<Suspense>` + `use()`   | ✓   | 36+           |
+| Vue 3    | ✓   | chunked + blocking Suspense  | ✓   | 55            |
+| Solid    | ✓   | OOO + selective hydration    | ✓   | 59            |
+| Svelte 5 | ✓   | deferred-data via `{#await}` | ✓   | 52            |
+| Angular  | ✓   | TransferState bridge         | ✓   | 4 pipelines   |
+
+**Unique primitives at the routing layer:**
+
+- **Per-route SSR mode** — `full` / `data-only` / `client-only` + function form `(state) => SsrMode` (data-driven, not path-based)
+- **Cross-adapter SSR components** — `<ClientOnly>`, `<ServerOnly>`, `<Await>`, `<Streamed>`, `<HttpStatusCode>` shipped symmetric across 5 adapters via `/ssr` subpath
+- **Typed loader errors → HTTP** — `LoaderRedirect` / `LoaderNotFound` / `LoaderTimeout` mapped to 301/302/404/504 in both SSR and RSC pipelines
+- **`createRequestScope(req, baseRouter, deps)`** — correct-by-construction request DI: clone + AbortController + `req.on("close")` + dispose in one call
+- **Network-level cancellation** — `withTimeout()` composes deadline + client-disconnect into one `AbortSignal`; in-flight `fetch` aborts at TCP level when deadline fires
+- **Post-hydration loader skip** — zero fetch on first paint after hydration, automatic in all 6 adapters
+
+[SSR](examples/web/react/ssr-examples/ssr) · [Streaming SSR](examples/web/react/ssr-examples/ssr-streaming) · [SSG](examples/web/react/ssr-examples/ssg) · [RSC](examples/web/react/ssr-examples/ssr-rsc) · [Wiki: SSR](https://github.com/greydragon888/real-router/wiki/ssr) · [Streaming SSR](https://github.com/greydragon888/real-router/wiki/Streaming-SSR) · [SSR Hydration](https://github.com/greydragon888/real-router/wiki/SSR-Hydration)
 
 ### Performance
 
@@ -256,7 +274,7 @@ The Segment Trie matcher traverses in O(segments), not O(routes).
 ### Key Features
 
 - **Framework-agnostic** — React, Preact, Solid, Vue, Svelte, Angular, or vanilla JS
-- **Universal** — client-side, server-side rendering ([SSR example](examples/web/react/ssr-examples/ssr)), and static site generation ([SSG example](examples/web/react/ssr-examples/ssg))
+- **First-class SSR / Streaming / SSG / RSC** — same primitives across React 19, Vue 3, Solid, Svelte 5, Angular 21+ — no meta-framework lock-in. [See above](#first-class-ssr--streaming--ssg)
 - **Named nested routes** — dot-notation hierarchy (`users.profile`)
 - **Lifecycle guards** — `canActivate` / `canDeactivate` per route or globally
 - **AbortController** — cancel navigations via standard `AbortSignal`
@@ -461,7 +479,17 @@ Many runnable examples across the most popular frameworks — each is a standalo
 | Combined (all features) | [combined](examples/web/react/combined)                                                                           | [combined](examples/web/preact/combined)                   | [combined](examples/web/solid/combined)                                                                                                                                   | [combined](examples/web/vue/combined)                                                                                                                 | [combined](examples/web/svelte/combined)                                                                                                                                                                             |
 | **Framework-specific**  | [keepAlive](examples/web/react/keepAlive), [legacy-entry](examples/web/react/legacy-entry), [hmr](examples/web/react/hmr), [ink-demo](examples/console/react-ink) | —                                                      | [store-based-state](examples/web/solid/store-based-state), [use-link-directive](examples/web/solid/use-link-directive), [signal-primitives](examples/web/solid/signal-primitives) | [plugin-installation](examples/web/vue/plugin-installation), [v-link-directive](examples/web/vue/v-link-directive), [keep-alive](examples/web/vue/keep-alive) | [link-action](examples/web/svelte/link-action), [lazy-loading-svelte](examples/web/svelte/lazy-loading-svelte), [snippets-routing](examples/web/svelte/snippets-routing), [reactive-source](examples/web/svelte/reactive-source) |
 
-| **Server rendering** ([examples/web/react/ssr-examples/](examples/web/react/ssr-examples)) | [ssr](examples/web/react/ssr-examples/ssr) — Express + Vite SSR, [ssr-streaming](examples/web/react/ssr-examples/ssr-streaming) — React 19 `renderToReadableStream` + `<Suspense>` + `use(promise)` (no router-specific API), [ssr-rsc](examples/web/react/ssr-examples/ssr-rsc) — RSC + Flight streaming via [@vitejs/plugin-rsc](https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-rsc) + [@real-router/rsc-server-plugin](packages/rsc-server-plugin), [ssg](examples/web/react/ssr-examples/ssg) — Static site generation |
+### Server rendering — cross-framework symmetry
+
+Every pipeline below ships as a standalone Vite app per adapter — `pnpm dev` from any folder. All 6 web adapters cover the same 4 SSR pipelines through one `ssr-data-plugin` contract; React additionally has RSC + Flight via `@real-router/rsc-server-plugin`.
+
+| Pipeline       | [React](examples/web/react/ssr-examples)                       | [Preact](examples/web/preact/ssr-examples)                       | [Vue](examples/web/vue/ssr-examples)                       | [Solid](examples/web/solid/ssr-examples)                       | [Svelte](examples/web/svelte/ssr-examples)                       | [Angular](examples/web/angular/ssr-examples)                       |
+| -------------- | -------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Classical SSR  | [ssr](examples/web/react/ssr-examples/ssr)                     | [ssr](examples/web/preact/ssr-examples/ssr)                      | [ssr](examples/web/vue/ssr-examples/ssr)                   | [ssr](examples/web/solid/ssr-examples/ssr)                     | [ssr](examples/web/svelte/ssr-examples/ssr)                      | [ssr](examples/web/angular/ssr-examples/ssr)                       |
+| Streaming SSR  | [ssr-streaming](examples/web/react/ssr-examples/ssr-streaming) | [ssr-streaming](examples/web/preact/ssr-examples/ssr-streaming)  | [ssr-streaming](examples/web/vue/ssr-examples/ssr-streaming) | [ssr-streaming](examples/web/solid/ssr-examples/ssr-streaming) | [ssr-streaming](examples/web/svelte/ssr-examples/ssr-streaming)  | [ssr-streaming](examples/web/angular/ssr-examples/ssr-streaming)   |
+| Mixed SSR modes| [ssr-mixed](examples/web/react/ssr-examples/ssr-mixed)         | [ssr-mixed](examples/web/preact/ssr-examples/ssr-mixed)          | [ssr-mixed](examples/web/vue/ssr-examples/ssr-mixed)       | [ssr-mixed](examples/web/solid/ssr-examples/ssr-mixed)         | [ssr-mixed](examples/web/svelte/ssr-examples/ssr-mixed)          | [ssr-mixed](examples/web/angular/ssr-examples/ssr-mixed)           |
+| SSG            | [ssg](examples/web/react/ssr-examples/ssg)                     | [ssg](examples/web/preact/ssr-examples/ssg)                      | [ssg](examples/web/vue/ssr-examples/ssg)                   | [ssg](examples/web/solid/ssr-examples/ssg)                     | [ssg](examples/web/svelte/ssr-examples/ssg)                      | [ssg](examples/web/angular/ssr-examples/ssg)                       |
+| RSC + Flight   | [ssr-rsc](examples/web/react/ssr-examples/ssr-rsc)             | —                                                                | —                                                          | —                                                              | —                                                                | —                                                                  |
 
 | **Terminal UI (Ink)** | [ink-demo](examples/console/react-ink) — CLI app via [@real-router/react/ink](packages/react/README.md#ink-terminal-ui) + memory-plugin |
 

@@ -8,8 +8,8 @@ import { createTestRouterWithADefaultRouter } from "../helpers";
 
 import type { Router } from "@real-router/core";
 
-function mountWithRouter(router: Router, composable: () => unknown) {
-  let result: any;
+function mountWithRouter<T>(router: Router, composable: () => T) {
+  let result: T | undefined;
   const App = defineComponent({
     setup() {
       result = composable();
@@ -25,7 +25,7 @@ function mountWithRouter(router: Router, composable: () => unknown) {
     }),
   );
 
-  return { result };
+  return { result: result as T };
 }
 
 describe("useNavigator composable", () => {
@@ -116,15 +116,13 @@ describe("useNavigator composable", () => {
 
     await result.navigate("about");
 
-    const callCount = callback.mock.calls.length;
-
-    expect(callCount).toBeGreaterThan(0);
+    expect(callback).toHaveBeenCalledTimes(1);
 
     unsubscribe();
 
     await result.navigate("home");
 
-    expect(callback).toHaveBeenCalledTimes(callCount);
+    expect(callback).toHaveBeenCalledTimes(1);
   });
 
   it("should throw error if used outside RouterProvider", () => {

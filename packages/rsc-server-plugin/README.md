@@ -197,24 +197,13 @@ The start interceptor calls the loader without a context. **Robust loaders check
 
 Non-breaking via TypeScript contravariance — existing `(params) => …` loaders continue to compile and work unchanged.
 
-## Post-hydration loader skip (#596)
+## Post-hydration loader skip
 
-When the application uses `hydrateRouter()` from `@real-router/core/utils`, the
-parsed server-serialized state is briefly deposited on a one-shot internal
-scratchpad before `start()` runs. The plugin reads this scratchpad and
-**reuses the server-resolved value** if `state.context.rsc` is already present
-for the same route name — skipping the redundant client-side `ReactNode`
-resolution on first paint.
+When the application uses `hydrateRouter()` from `@real-router/core/utils`, the parsed server-serialized state is briefly deposited on a one-shot internal scratchpad before `start()` runs. The plugin reads this scratchpad and **reuses the server-resolved value** if `state.context.rsc` is already present for the same route name — skipping the redundant client-side `ReactNode` resolution on first paint.
 
-In practice, RSC apps usually `excludeContext: ["rsc"]` from the JSON payload
-(a `ReactNode` tree contains functions/symbols and isn't JSON-serializable).
-In that case the scratchpad has no `rsc` namespace and the loader runs as
-today. The skip path matters when the bundler-specific Flight pipeline
-arranges to thread an already-resolved `ReactNode` through hydration.
+In practice, RSC apps usually `excludeContext: ["rsc"]` from the JSON payload (a `ReactNode` tree contains functions/symbols and isn't JSON-serializable). In that case the scratchpad has no `rsc` namespace and the loader runs as today. The skip path matters when the bundler-specific Flight pipeline arranges to thread an already-resolved `ReactNode` through hydration.
 
-The skip is single-shot — only the first `start()` triggered by `hydrateRouter`
-consumes the scratchpad. Composes with per-route mode: `"client-only"` skips
-the loader regardless of scratchpad contents (mode wins).
+The skip is single-shot — only the first `start()` triggered by `hydrateRouter` consumes the scratchpad. Composes with per-route mode: `"client-only"` skips the loader regardless of scratchpad contents (mode wins).
 
 ## Typed Loader Errors (`@real-router/rsc-server-plugin/errors`)
 
@@ -328,7 +317,7 @@ For the full integration recipe (HTML + `/__rsc` endpoints, dev/prod bundler con
 
 ## Example
 
-- [examples/web/react/ssr-examples/ssr-rsc](../../examples/web/react/ssr-examples/ssr-rsc) — End-to-end dogfooding example: Express + `@vitejs/plugin-rsc` + this plugin, with Flight injection, client navigation via `/__rsc?route=…`, revalidation, and **Server Actions** wired through `rscActionPluginFactory` (see `entry.rsc.tsx` + `NotificationBanner.tsx`). The Playwright suite covers initial HTML load, client nav, revalidation **happy path + in-flight defer** (Scenarios 3 + 3b), 404, per-request isolation under concurrent load, and the Server Action GET-pass-through case. `RevalidateButton` calls `invalidate(router, "rsc")` for API symmetry — see [`src/client-components/RevalidateButton.tsx`](../../examples/web/react/ssr-examples/ssr-rsc/src/client-components/RevalidateButton.tsx).
+- [examples/web/react/ssr-examples/ssr-rsc](../../examples/web/react/ssr-examples/ssr-rsc) — End-to-end dogfooding example: Express + `@vitejs/plugin-rsc` + this plugin, with Flight injection, client navigation via `/__rsc?route=…`, revalidation, and **Server Actions** wired through `rscActionPluginFactory` (see `entry.rsc.tsx` + `NotificationBanner.tsx`). The Playwright suite covers **27 scenarios** including initial HTML load, client nav, revalidation **happy path + in-flight defer** (Scenarios 3 + 3b), 404 routing, per-request isolation under concurrent load, `/__rsc` content-type assertions, loader-driven HTTP status (404/500), search-param flow, browser back/forward, interleaved-click abort, per-route Cache-Control, ETag absence on streamed responses, and the full Server Action lifecycle (form rendering, mutation, `useActionState` validation errors, `NotificationBanner` cross-component reflection via `state.context.rscAction`). `RevalidateButton` calls `invalidate(router, "rsc")` for API symmetry — see [`src/client-components/RevalidateButton.tsx`](../../examples/web/react/ssr-examples/ssr-rsc/src/client-components/RevalidateButton.tsx).
 
 ## Documentation
 

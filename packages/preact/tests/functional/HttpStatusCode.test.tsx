@@ -177,4 +177,86 @@ describe("HttpStatusCode", () => {
       expect(outer.code).toBeUndefined();
     });
   });
+
+  describe("dev-only validation (review §5 Bug 3)", () => {
+    // Lock the development-only console.error emitted when `code` is not a
+    // valid HTTP status integer in [100, 999]. Node's res.end() rejects bad
+    // values with "Invalid status code"; the dev warning surfaces the bad
+    // value at the React/Preact source rather than at the response boundary.
+    // The warning is stripped from production bundles via the
+    // `process.env.NODE_ENV !== "production"` guard.
+    it.each([
+      [Number.NaN, "NaN"],
+      [0, "0"],
+      [-1, "-1"],
+      [99, "99"],
+      [1000, "1000"],
+      [9999, "9999"],
+      [200.5, "200.5"],
+      [Infinity, "Infinity"],
+      [-Infinity, "-Infinity"],
+    ])(
+      "dev-warns when code === %s (still writes to sink for downstream observability)",
+      (invalidCode) => {
+        const sink = createHttpStatusSink();
+        const consoleError = vi
+          .spyOn(console, "error")
+          .mockImplementation(() => {});
+
+        renderToString(
+          <HttpStatusProvider sink={sink}>
+            <HttpStatusCode code={invalidCode} />
+          </HttpStatusProvider>,
+        );
+
+        expect(consoleError).toHaveBeenCalledTimes(1);
+        expect(consoleError).toHaveBeenCalledWith(
+          expect.stringMatching(
+            /^\[real-router\] <HttpStatusCode code=\{.+\} \/> received an invalid HTTP status code\./,
+          ),
+        );
+
+        // The value is still propagated — the warning is informational, not
+        // a hard block. Consumers can detect the bad value in the sink and
+        // fall back to a known-good default before sending the response.
+        expect(sink.code).toBe(invalidCode);
+
+        consoleError.mockRestore();
+      },
+    );
+
+    it("does NOT warn for valid integer codes in [100, 999]", () => {
+      const sink = createHttpStatusSink();
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
+      renderToString(
+        <HttpStatusProvider sink={sink}>
+          <HttpStatusCode code={100} />
+          <HttpStatusCode code={404} />
+          <HttpStatusCode code={503} />
+          <HttpStatusCode code={999} />
+        </HttpStatusProvider>,
+      );
+
+      expect(consoleError).not.toHaveBeenCalled();
+
+      consoleError.mockRestore();
+    });
+
+    it("does NOT warn when no provider is mounted (validation only fires on the write path)", () => {
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
+      // Without a provider the component is a silent no-op; the validation
+      // branch is guarded by `if (sink)` and must not fire either.
+      renderToString(<HttpStatusCode code={Number.NaN} />);
+
+      expect(consoleError).not.toHaveBeenCalled();
+
+      consoleError.mockRestore();
+    });
+  });
 });

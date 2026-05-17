@@ -342,6 +342,127 @@ describe("shallowEqual — Property Tests", () => {
     });
   });
 
+  // Closes review §6 LOW #5: large records (100+ keys) with mixed
+  // Symbol/BigInt/Date/NaN values. shallowEqual is the comparator behind
+  // every Link memoization layer; pathological-size records appear when
+  // consumers stuff a large query-params object through `<Link routeParams>`.
+  // The loop iterates `Object.keys(prev).length` times and does an
+  // `Object.is` lookup per key — O(n). A regression that slipped a
+  // quadratic step (e.g. nested `Object.keys(next).includes(key)`) would
+  // still produce correct results but blow up time; this test catches both
+  // correctness AND a stack/heap blowup.
+  //
+  // Why standalone rather than parameterised by arbExtendedRecord: we want
+  // a deterministic large fixture where we control which keys differ, so
+  // we can assert specific equality/inequality outcomes. Property tests
+  // above already cover random small records.
+  describe("Invariant 12b: Large records (100+ keys, mixed Symbol/BigInt/Date) — O(n) correctness", () => {
+    function buildLargeRecord(
+      n: number,
+      seed: { date: Date; sym: symbol },
+    ): Record<string, unknown> {
+      const record: Record<string, unknown> = {};
+
+      for (let i = 0; i < n; i++) {
+        const key = `k${i}`;
+
+        // Round-robin across 5 value-type categories to exercise every
+        // Object.is branch under load.
+        switch (i % 5) {
+          case 0: {
+            record[key] = seed.sym;
+
+            break;
+          }
+          case 1: {
+            record[key] = BigInt(100 + i);
+
+            break;
+          }
+          case 2: {
+            record[key] = seed.date;
+
+            break;
+          }
+          case 3: {
+            record[key] = i % 7 === 0 ? Number.NaN : i;
+
+            break;
+          }
+          default: {
+            record[key] = `value_${i}`;
+
+            break;
+          }
+        }
+      }
+
+      return record;
+    }
+
+    it("two 200-key identical records (Symbol/BigInt/Date refs shared) compare equal", () => {
+      const seed = { date: new Date(0), sym: Symbol.for("svelte-pbt-large") };
+      const a = buildLargeRecord(200, seed);
+      // Re-build with the SAME seed so Symbol refs are identical and the
+      // Date ref is shared (Symbol.for returns the registered symbol; we
+      // pass the same Date instance).
+      const b = buildLargeRecord(200, seed);
+
+      expect(shallowEqual(a, b)).toBe(true);
+      expect(shallowEqual(b, a)).toBe(true); // symmetry holds at scale
+    });
+
+    it("two 200-key records differing on ONE BigInt value compare unequal", () => {
+      const seed = { date: new Date(0), sym: Symbol.for("svelte-pbt-large") };
+      const a = buildLargeRecord(200, seed);
+      const b = buildLargeRecord(200, seed);
+
+      // k101 is at index 101, 101 % 5 === 1 → BigInt category. Mutate.
+      b.k101 = 999_999n;
+
+      expect(shallowEqual(a, b)).toBe(false);
+      expect(shallowEqual(b, a)).toBe(false);
+    });
+
+    it("two 200-key records differing on ONE Date ref (same epoch) compare unequal", () => {
+      const epoch = 1_700_000_000_000;
+      const sym = Symbol.for("svelte-pbt-large-date");
+      const a = buildLargeRecord(200, { date: new Date(epoch), sym });
+      const b = buildLargeRecord(200, { date: new Date(epoch), sym });
+
+      // Every k where i % 5 === 2 is the shared Date — but each call to
+      // buildLargeRecord receives a freshly-built Date so a and b have
+      // distinct Date refs throughout. Object.is identifies the difference
+      // on the FIRST Date-category key (k2).
+      expect(shallowEqual(a, b)).toBe(false);
+    });
+
+    it("two 500-key records — no stack overflow, O(n) iteration completes", () => {
+      const seed = { date: new Date(0), sym: Symbol.for("svelte-pbt-500") };
+      const a = buildLargeRecord(500, seed);
+      const b = buildLargeRecord(500, seed);
+
+      // Plain assertion — completion under default timeout is itself the
+      // perf check. A regression to O(n²) on 500 keys would push runtime
+      // into seconds; vitest would surface it as a slow-test warning.
+      expect(shallowEqual(a, b)).toBe(true);
+    });
+
+    it("symbol-keyed extras on a 200-key record are ignored (Object.keys excludes Symbols)", () => {
+      const seed = { date: new Date(0), sym: Symbol.for("svelte-pbt-large") };
+      const a = buildLargeRecord(200, seed);
+      const b = buildLargeRecord(200, seed);
+
+      // Add a Symbol-keyed property to ONE side — Object.keys ignores it,
+      // so the records still compare equal (locks Inv12 at scale).
+      const tagSym = Symbol("hidden-tag");
+
+      (b as Record<string | symbol, unknown>)[tagSym] = "extra-meta";
+
+      expect(shallowEqual(a, b)).toBe(true);
+    });
+  });
+
   // Closes review §5.5 row 7 (MED, theoretical): Symbol-keyed properties are
   // excluded by `Object.keys()`. shallowEqual iterates Object.keys(prev) —
   // so any Symbol-keyed property on prev OR next is silently ignored. Two

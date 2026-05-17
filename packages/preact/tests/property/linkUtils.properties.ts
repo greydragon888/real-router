@@ -258,6 +258,44 @@ describe("parseTokens — contract locks (via buildActiveClassName)", () => {
     );
   });
 
+  describe("Edge cases (review §5.1): inactive-empty-base verbatim, Unicode tokens", () => {
+    // `buildActiveClassName(false, *, *)` returns `baseClassName ?? undefined`
+    // verbatim — `??`, not `?:`. Empty string is preserved as-is and NOT
+    // coerced to `undefined`. Locks the documented edge that consumers
+    // relying on `undefined` for class-removal must explicitly opt into
+    // (e.g. `base || undefined`).
+    test("buildActiveClassName(false, 'a', '') returns '' verbatim (not undefined)", () => {
+      expect(buildActiveClassName(false, "a", "")).toBe("");
+    });
+
+    test("buildActiveClassName(false, 'a', undefined) returns undefined", () => {
+      expect(buildActiveClassName(false, "a", undefined)).toBeUndefined();
+    });
+
+    // `parseTokens` uses `/\S+/g`, which matches any non-whitespace including
+    // Unicode codepoints. A regression to `/[^ ]+/g` would still pass — but
+    // a switch to `/[a-zA-Z0-9-]+/g` (or stricter) would drop Unicode tokens.
+    // Lock the wide-character contract with reified examples covering
+    // combining-mark, surrogate-pair, and CJK alphabets.
+    test("preserves Unicode tokens (combining marks, surrogate pairs, CJK)", () => {
+      // U+00E9 (é, precomposed), U+0301 (combining acute) on `e`, surrogate
+      // pair (emoji), CJK ideograph.
+      expect(buildActiveClassName(true, "café", "")).toBe("café");
+      expect(buildActiveClassName(true, "用户", "")).toBe("用户");
+      expect(buildActiveClassName(true, "★star", "")).toBe("★star");
+      // Mixed: ASCII base + Unicode active token, dedup still works.
+      expect(buildActiveClassName(true, "用户", "list 用户")).toBe("list 用户");
+    });
+
+    test("Unicode token in BOTH base and active — dedup applies (single occurrence)", () => {
+      // Inv 3 generalisation: dedup uses Set membership keyed on the token
+      // string; Unicode normalisation is NOT performed (Object equality of
+      // strings is codepoint-by-codepoint). Two visually-equal-but-different
+      // normalisations would NOT dedup — but identical codepoint sequences do.
+      expect(buildActiveClassName(true, "用户", "用户 list")).toBe("用户 list");
+    });
+  });
+
   describe("Roundtrip: tokens joined and re-parsed yield the same set", () => {
     // parseTokens(parseTokens(s).join(" ")) must equal parseTokens(s) —
     // re-parsing a normalized (single-spaced) token string must be a no-op.
@@ -461,5 +499,70 @@ describe("buildHref — Property Tests", () => {
         expect(calls[0].options).toStrictEqual({ hash: stripped });
       },
     );
+  });
+
+  describe("Invariant 7: empty-string from buildUrl falls back to buildPath (review §5.2 Bug 1)", () => {
+    // Bug 1 was: `if (url !== undefined) return url` accepted `""` as valid,
+    // producing `<a href="">` which resolves to the current page URL (silent
+    // self-navigation). The fix: `typeof url === "string" && url.length > 0`
+    // — any falsy / non-string result delegates to `buildPath` instead.
+    test.prop([fc.string({ minLength: 1, maxLength: 16 })], {
+      numRuns: NUM_RUNS.standard,
+    })("buildUrl=()=>'' uses buildPath result, not ''", (path) => {
+      const router = makeFakeRouter(
+        () => "",
+        () => path,
+      );
+
+      expect(buildHref(router, "any", {})).toBe(path);
+    });
+
+    test.prop(
+      [
+        fc.string({ minLength: 1, maxLength: 8 }),
+        fc.string({ minLength: 1, maxLength: 16 }),
+      ],
+      { numRuns: NUM_RUNS.standard },
+    )(
+      "buildUrl=()=>'' + hash → falls back to buildPath + appended fragment",
+      (hash, path) => {
+        // Mirror buildHref's leading-`#` strip behaviour; if the stripped
+        // hash is empty (e.g. raw input was just `"#"`), the fallback path
+        // appends no fragment per documented contract.
+        const stripped = hash.startsWith("#") ? hash.slice(1) : hash;
+
+        const router = makeFakeRouter(
+          () => "",
+          () => path,
+        );
+
+        const href = buildHref(router, "any", {}, { hash });
+
+        if (stripped.length === 0) {
+          expect(href).toBe(path);
+        } else {
+          expect(href).toBe(
+            `${path}#${encodeURI(stripped).replaceAll("#", "%23")}`,
+          );
+        }
+      },
+    );
+  });
+
+  describe("Invariant 8: null from buildUrl falls back to buildPath (review §5.2 Bug 1)", () => {
+    // Defensive contract: BuildUrlFn type is `string | undefined`, but a
+    // misbehaving plugin returning `null` (type-contract violation) must NOT
+    // surface as `<a href={null}>` — fall back to buildPath instead.
+    test.prop([fc.string({ minLength: 1, maxLength: 16 })], {
+      numRuns: NUM_RUNS.standard,
+    })("buildUrl=()=>null uses buildPath result", (path) => {
+      const router = makeFakeRouter(
+        // Deliberate type-contract violation — adapter must defend against it.
+        (() => null) as unknown as Parameters<typeof makeFakeRouter>[0],
+        () => path,
+      );
+
+      expect(buildHref(router, "any", {})).toBe(path);
+    });
   });
 });

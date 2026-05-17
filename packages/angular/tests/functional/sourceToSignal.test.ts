@@ -47,7 +47,7 @@ describe("sourceToSignal", () => {
   it("throws when called outside injection context", () => {
     const source = createMockSource(42);
 
-    expect(() => sourceToSignal(source)).toThrow(/injection context/i);
+    expect(() => sourceToSignal(source)).toThrow(/injection context/);
   });
 
   it("reads initial snapshot", () => {

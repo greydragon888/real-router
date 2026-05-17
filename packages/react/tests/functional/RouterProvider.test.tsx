@@ -46,6 +46,7 @@ describe("RouterProvider component", () => {
       wrapper,
     });
 
+    expect(result.current).toBeDefined();
     expect(result.current).toStrictEqual(router);
   });
 

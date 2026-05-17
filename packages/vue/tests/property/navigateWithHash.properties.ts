@@ -25,8 +25,8 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect } from "vitest";
 
-import { arbHash, arbRouteName, NUM_RUNS } from "./helpers";
-import { navigateWithHash } from "../../src/dom-utils";
+import { arbHash, arbParams, arbRouteName, NUM_RUNS } from "./helpers";
+import { navigateWithHash, shallowEqual } from "../../src/dom-utils";
 
 import type {
   NavigationOptions,
@@ -231,6 +231,48 @@ describe("navigateWithHash — Property Tests", () => {
         expect(opts.force).toBeUndefined();
         expect(opts.hashChange).toBeUndefined();
         expect(opts.hash).toBe(hash);
+      },
+    );
+  });
+
+  // Review §6 — NEW Inv 7: Params disagree → no same-route auto-bypass.
+  // The helper's same-route check is `current.name === routeName &&
+  // shallowEqual(current.params, routeParams)`. When the route name matches
+  // but params differ (shallowEqual=false), the navigation must NOT receive
+  // `force:true / hashChange:true` even if the hash changed — the navigation
+  // is to a different logical route from core's perspective. Locks the
+  // params-equality branch at `link-utils.ts:130-131`.
+  describe("Invariant 7: same name + DIFFERENT params → no auto-bypass", () => {
+    test.prop([arbRouteName, arbParams, arbParams, arbHash, arbHash], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "name matches but params shallowEqual=false → opts.force/hashChange undefined",
+      (routeName, p1, p2, currentHash, newHash) => {
+        // Precondition: the two param sets must NOT be shallow-equal —
+        // otherwise the same-route path activates and the test asserts the
+        // wrong branch. arbParams generates dicts with 0-5 keys, so the
+        // probability of distinct draws is high; fc.pre filters the rare
+        // identical case rather than reshaping the generator.
+        fc.pre(!shallowEqual(p1, p2));
+
+        const { router, calls } = makeRouter({
+          name: routeName,
+          params: p1,
+          hash: currentHash,
+        });
+
+        void navigateWithHash(router, routeName, p2, newHash);
+
+        expect(calls).toHaveLength(1);
+
+        const opts = calls[0].opts;
+
+        // Cross-params navigation: SAME_STATES doesn't fire in core anyway,
+        // so the helper must not pre-emptively bypass it.
+        expect(opts.force).toBeUndefined();
+        expect(opts.hashChange).toBeUndefined();
+        // The hash is still forwarded verbatim.
+        expect(opts.hash).toBe(newHash);
       },
     );
   });

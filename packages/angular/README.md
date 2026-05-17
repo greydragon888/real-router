@@ -684,9 +684,9 @@ Subscriptions created by `sourceToSignal` and the directives clean up automatica
 
 The adapter is signal-first and does not depend on Zone.js. It works with `provideExperimentalZonelessChangeDetection()` out of the box.
 
-### ngOnInit for Input-Dependent Setup
+### Reactive Source Setup via `effect()` (#630)
 
-`RealLink`, `RealLinkActive`, and `RouteView` create their subscription sources in `ngOnInit`, not the constructor. Signal inputs (`input()`) are not available during construction, so setup that reads inputs must be deferred to `ngOnInit`.
+`RealLink`, `RealLinkActive`, and `RouteView` create their subscription sources inside `effect(...)` blocks scheduled from the **constructor** (not `ngOnInit`). Reading signal inputs inside `effect()` makes the source-creation REACTIVE — when `[realLink]`, `[routeParams]`, `[hash]`, `[realLinkActive]`, or `[routeNode]` change in AOT, the effect tears down the previous source via `onCleanup` and creates a new one with the current input values. The legacy `ngOnInit` setup captured inputs once at mount and produced a real AOT bug (#630). Effect cleanup is bound automatically to the host directive's injection-context `DestroyRef`.
 
 ## Signal Bridge
 

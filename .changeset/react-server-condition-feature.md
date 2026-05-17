@@ -1,5 +1,5 @@
 ---
-"@real-router/react": patch
+"@real-router/react": minor
 ---
 
 Add `react-server` export condition for RSC bundler compatibility (#574)

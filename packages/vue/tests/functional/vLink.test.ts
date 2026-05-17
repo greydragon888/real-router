@@ -79,7 +79,7 @@ describe("v-link directive", () => {
 
       vLinkHooks.beforeUnmount(element);
 
-      expect(removeEventListenerSpy).toHaveBeenCalled();
+      expect(removeEventListenerSpy).toHaveBeenCalledTimes(2);
     });
 
     it("should return router when router is set", () => {

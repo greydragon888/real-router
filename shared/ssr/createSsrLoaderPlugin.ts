@@ -23,7 +23,22 @@ import type {
 } from "@real-router/types";
 
 interface CompiledEntry<T> {
-  mode: SsrModeConfig | undefined;
+  /**
+   * Pre-resolved mode for static `ssr` configs (undefined / boolean /
+   * string). `null` marker means "function-form resolver — must call
+   * `resolveMode(modeFn, state, …)` at navigation time". Pre-computing
+   * skips the `resolveMode` walk on every `start()` + every stale-flag
+   * leave handler invocation for the common static-config case.
+   */
+  staticMode: SsrMode | null;
+  /**
+   * Function-form mode resolver. Defined ONLY when `obj.ssr` is a
+   * function; `undefined` for static forms (where `staticMode` is
+   * authoritative). Kept as a typed field rather than reusing the
+   * raw `obj.ssr` so the prepareEntry call site avoids a `typeof`
+   * branch per navigation.
+   */
+  modeFn: ((state: State) => SsrMode) | undefined;
   loader: SsrLoaderFn<T> | undefined;
 }
 
@@ -40,6 +55,13 @@ interface CompiledEntry<T> {
  * caller-provided `router` + `getDependency` arguments, and it only walks
  * own-enumerable entries (`Object.entries`) so prototype pollution stays
  * structurally impossible.
+ *
+ * Mode pre-resolution: static `ssr` forms (`undefined` / boolean / string)
+ * are resolved here at compile time and cached as `staticMode`. The
+ * runtime path in `prepareEntry` then reuses the cached value on every
+ * `start()` + stale-flag leave handler invocation, skipping the
+ * `resolveMode` if/else chain. Function-form `ssr` keeps a typed
+ * `modeFn` for per-navigation evaluation.
  */
 function compile<
   T,
@@ -49,6 +71,7 @@ function compile<
   router: Router<Dependencies>,
   getDependency: <K extends keyof Dependencies>(key: K) => Dependencies[K],
   errorPrefix: string,
+  allowed: readonly SsrMode[],
 ): Map<string, CompiledEntry<T>> {
   const compiled = new Map<string, CompiledEntry<T>>();
 
@@ -69,11 +92,48 @@ function compile<
       loader = fn;
     }
 
-    compiled.set(name, { mode: obj.ssr, loader });
+    // Pre-resolve static modes; defer function-form to navigation-time.
+    // The `resolveMode` runtime helper still validates function-form
+    // returns AND any forms that the validator passed but createSsrLoaderPlugin's
+    // narrower `allowedModes` rejects (consumer-specific allow-list).
+    let staticMode: SsrMode | null = null;
+    let modeFn: ((state: State) => SsrMode) | undefined;
+
+    if (typeof obj.ssr === "function") {
+      modeFn = obj.ssr;
+    } else {
+      // Static — undefined/true/false/string. Pass a synthetic state;
+      // resolveMode ignores `state` for non-function forms.
+      staticMode = resolveMode(
+        obj.ssr,
+        SYNTHETIC_STATE,
+        allowed,
+        errorPrefix,
+        name,
+      );
+    }
+
+    compiled.set(name, { staticMode, modeFn, loader });
   }
 
   return compiled;
 }
+
+// Placeholder state for compile-time static-mode resolution. The
+// resolveMode function reads `state` only for the function-form branch,
+// so any non-null reference works for the static branches. Kept module-
+// level so all compile() calls share one allocation.
+const SYNTHETIC_STATE = {
+  name: "",
+  params: {},
+  path: "",
+  transition: {
+    phase: "activating",
+    reason: "success",
+    segments: { deactivated: [], activated: [], intersection: "" },
+  },
+  context: {},
+} as unknown as State;
 
 function rejectMode(
   value: unknown,
@@ -179,7 +239,13 @@ export function createSsrLoaderPlugin<
         };
       }
 
-      compiled = compile(loaders, router, getDependency, config.errorPrefix);
+      compiled = compile(
+        loaders,
+        router,
+        getDependency,
+        config.errorPrefix,
+        allowed,
+      );
     } catch (error) {
       rollback();
 
@@ -264,13 +330,21 @@ export function createSsrLoaderPlugin<
 
       if (!entry) return null;
 
-      const mode = resolveMode(
-        entry.mode,
-        state,
-        allowed,
-        config.errorPrefix,
-        state.name,
-      );
+      // Static forms (the common case) — staticMode was pre-resolved at
+      // compile time, skip the resolveMode if/else walk per navigation.
+      // Function-form path: invoke modeFn with the resolved state and
+      // re-validate via resolveMode (catches a resolver returning a
+      // foreign string at runtime).
+      const mode =
+        entry.staticMode !== null
+          ? entry.staticMode
+          : resolveMode(
+              entry.modeFn,
+              state,
+              allowed,
+              config.errorPrefix,
+              state.name,
+            );
 
       modeClaim.write(state, mode);
 

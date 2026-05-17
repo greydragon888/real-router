@@ -253,6 +253,27 @@ export const arbParams: fc.Arbitrary<Record<string, Primitive>> = fc.dictionary(
 );
 
 /**
+ * Extended params dictionary that ALSO emits `null` and `undefined` values
+ * alongside the standard primitives. Closes review §6 MEDIUM #2: `arbParams`
+ * only covered string/number/boolean — but real consumers can construct
+ * `{ id: null }` or `{ tab: undefined }` via runtime escape hatches
+ * (`as unknown as Params`), and `buildHref` / `navigateWithHash` must
+ * forward those verbatim without coercion.
+ *
+ * The function-under-test must NOT short-circuit on `value == null`, and the
+ * downstream `router.buildUrl` / `router.navigate` is expected to receive the
+ * literal `null` / `undefined`. Use this generator anywhere the helper is
+ * meant to be content-agnostic about param value types.
+ */
+export const arbParamsExtended: fc.Arbitrary<
+  Record<string, Primitive | null | undefined>
+> = fc.dictionary(
+  fc.stringMatching(/^[a-z]{1,8}$/),
+  fc.oneof(arbPrimitive, fc.constant(null), fc.constant(undefined)),
+  { minKeys: 0, maxKeys: 5 },
+);
+
+/**
  * Hash fragment generator covering:
  * - ASCII strings (sub-delims preserved by encodeURI)
  * - Unicode (must be percent-encoded by encodeURI)

@@ -73,6 +73,7 @@ describe("useRouteExit", () => {
     expect(ctx.route.name).toBe("test");
     expect(ctx.nextRoute.name).toBe("about");
     expect(ctx.signal).toBeInstanceOf(AbortSignal);
+    expect(ctx.signal.aborted).toBe(false);
   });
 
   it("skips the handler on same-route navigation by default", async () => {

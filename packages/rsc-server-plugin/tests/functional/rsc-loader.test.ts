@@ -303,8 +303,19 @@ describe("@real-router/rsc-server-plugin", () => {
 
       const state = await router.start("/");
 
+      // Reference identity proves the inner ReactNode survived — neither
+      // wrapper Promise leaked through. `.not.toBeInstanceOf(Promise)` alone
+      // would still pass for a stray thenable POJO with own `.then`, so
+      // assert both the absence of `.then` AND the exact element shape.
       expect(state.context.rsc).toBe(inner);
       expect(state.context.rsc).not.toBeInstanceOf(Promise);
+      expect((state.context.rsc as { then?: unknown }).then).toBeUndefined();
+      expect(state.context.rsc).toStrictEqual({
+        type: "Inner",
+        props: { v: 42 },
+        key: null,
+        $$typeof: Symbol.for("react.element"),
+      });
     });
 
     it("should handle async element return", async () => {
@@ -372,6 +383,11 @@ describe("@real-router/rsc-server-plugin", () => {
 
       const state = await router.start("/");
 
+      // The sentinel must have been overwritten by the subscribe callback —
+      // otherwise the subscription never fired and `toBeUndefined()` below
+      // would pass for the wrong reason (callback unreached, not callback
+      // observing undefined `rsc`).
+      expect(subscribeRsc).not.toBe("sentinel");
       expect(subscribeRsc).toBeUndefined();
       expect(state.context.rsc).toStrictEqual(node("Home"));
     });
@@ -423,6 +439,82 @@ describe("@real-router/rsc-server-plugin", () => {
       ).toThrow(
         "[@real-router/rsc-server-plugin] loaders must be a non-null object",
       );
+    });
+  });
+
+  describe("Validation — edge cases (gotchas §5.2-§5.6)", () => {
+    it("accepts empty-string route name '' (validator passes, plugin compiles entry)", () => {
+      // §5.2: core's route-tree filters empty names so this entry is
+      // unreachable at runtime — but validateLoaders treats keys as
+      // opaque strings and accepts. Pin current accept-and-ignore
+      // semantics so a future tightening (reject empty names at
+      // validation time) is a deliberate breaking change.
+      expect(() =>
+        rscServerPluginFactory({
+          "": () => () => node("Unreachable"),
+        }),
+      ).not.toThrow();
+    });
+
+    it("ignores entries inherited via prototype with __proto__ as own key would (§5.4)", () => {
+      // §5.4: writing `__proto__: badEntry` in a literal sets the
+      // PROTOTYPE, not an own property — validator's Object.entries
+      // walks own enumerable keys only, so the prototype chain is
+      // invisible. Define `__proto__` as an OWN property via
+      // defineProperty to confirm it's then treated as a regular
+      // string key (rejected: not function, not { ssr?, loader? }).
+      const loaders: Record<string, unknown> = {};
+
+      Object.defineProperty(loaders, "__proto__", {
+        value: "not-a-function",
+        enumerable: true,
+        configurable: true,
+        writable: true,
+      });
+
+      expect(() =>
+        rscServerPluginFactory(loaders as RscLoaderFactoryMap),
+      ).toThrow(
+        '[@real-router/rsc-server-plugin] entry for route "__proto__" must be a function or { ssr?, loader? } object',
+      );
+    });
+
+    it("ignores entry's symbolic keys (gotcha §5.5)", () => {
+      // §5.5: Object.keys() and Object.entries() skip symbols, so the
+      // validator's key-restriction check (allow only "ssr"/"loader")
+      // never sees them. Symbols are inert at runtime — Map lookup
+      // uses state.name (string), so no symbolic loader is ever called.
+      const symbolKey = Symbol("hidden");
+      const entry: Record<string | symbol, unknown> = {
+        loader: () => () => node("Visible"),
+        [symbolKey]: "ignored-by-validator",
+      };
+
+      expect(() =>
+        rscServerPluginFactory({
+          home: entry as unknown as RscLoaderFactoryMap[string],
+        }),
+      ).not.toThrow();
+    });
+
+    it("rejects numeric ssr (NaN/0/Infinity) with the typed error (gotcha §5.6)", () => {
+      // §5.6: validator branches on `typeof ssr === "function" | "boolean"
+      // | "string"`. Numbers (including NaN, 0, Infinity) hit none of
+      // these branches and fall through to the catch-all TypeError. The
+      // existing test suite covers strings/booleans/objects but not
+      // numbers — pin the explicit numeric branch.
+      for (const ssrValue of [Number.NaN, 0, Number.POSITIVE_INFINITY]) {
+        expect(() =>
+          rscServerPluginFactory({
+            home: {
+              ssr: ssrValue,
+              loader: () => () => node("Home"),
+            } as unknown as RscLoaderFactoryMap[string],
+          }),
+        ).toThrow(
+          '[@real-router/rsc-server-plugin] ssr for route "home" must be SsrMode string, boolean, or (state) => SsrMode',
+        );
+      }
     });
   });
 
@@ -577,6 +669,84 @@ describe("@real-router/rsc-server-plugin", () => {
       expect(loader).toHaveBeenCalledTimes(1);
       expect(loader).toHaveBeenCalledWith({ id: "99" });
       expect(next.context.rsc).toStrictEqual(node("Loaded"));
+    });
+  });
+
+  describe("Serialization: strip 'rsc' before transport (gotcha §4.2)", () => {
+    // `state.context.rsc` is a ReactNode — an object tree carrying functions
+    // and Symbol-keyed brands ($$typeof). JSON-serializing it via the default
+    // `serializeRouterState(state)` silently drops those non-JSON values,
+    // producing a payload that LOOKS valid but cannot be rehydrated as a
+    // ReactNode. The contract is "strip rsc via excludeContext"; these tests
+    // pin both the failure mode (lossy default) and the success mode
+    // (excludeContext omits the namespace entirely).
+    it("default serialization silently drops the React element's $$typeof Symbol", async () => {
+      const rscNode = node("HomePage", { greeting: "hi" });
+
+      router.usePlugin(rscServerPluginFactory({ home: () => () => rscNode }));
+
+      const state = await router.start("/");
+
+      const json = serializeRouterState(state);
+      const parsed = JSON.parse(json) as {
+        context: { rsc?: { $$typeof?: unknown; type?: string } };
+      };
+
+      // The rsc key IS present in the JSON (no exclusion), but the React
+      // element's `$$typeof: Symbol.for("react.element")` is silently
+      // dropped — JSON has no Symbol representation. Other own properties
+      // survive, so the payload looks plausible to inattentive eyes.
+      expect(parsed.context.rsc).toBeDefined();
+      expect(parsed.context.rsc?.type).toBe("HomePage");
+      // ← the destructive loss: the brand that React uses to validate
+      // elements at render time is gone.
+      expect(parsed.context.rsc?.$$typeof).toBeUndefined();
+    });
+
+    it("excludeContext: ['rsc'] omits the namespace entirely (recommended SSR config)", async () => {
+      const rscNode = node("HomePage");
+
+      router.usePlugin(rscServerPluginFactory({ home: () => () => rscNode }));
+
+      const state = await router.start("/");
+
+      const json = serializeRouterState(state, { excludeContext: ["rsc"] });
+      const parsed = JSON.parse(json) as { context: Record<string, unknown> };
+
+      // The key is GONE — not present, not undefined. This is what apps
+      // ship over the wire; the Flight payload travels via the bundler's
+      // stream renderer alongside the JSON state. `in` (own-property
+      // check) distinguishes "key absent" from "key present with
+      // undefined" so a regression that re-introduced the key would fail.
+      expect("rsc" in parsed.context).toBe(false);
+    });
+
+    it("excludeContext only strips listed namespaces — other context survives", async () => {
+      const rscNode = node("HomePage");
+
+      router.usePlugin(rscServerPluginFactory({ home: () => () => rscNode }));
+
+      const state = await router.start("/");
+      // Inject a sibling namespace synthetically so this test stays
+      // independent of ssr-data-plugin's claim mechanics.
+      const augmented = {
+        ...state,
+        context: { ...state.context, data: { preferences: { theme: "dark" } } },
+      };
+
+      const json = serializeRouterState(augmented, {
+        excludeContext: ["rsc"],
+      });
+      const parsed = JSON.parse(json) as {
+        context: { rsc?: unknown; data?: { preferences: { theme: string } } };
+      };
+
+      expect("rsc" in parsed.context).toBe(false);
+      // Surgical: the data namespace rides through untouched, proving
+      // excludeContext is a narrow filter (not "strip all non-JSON").
+      expect(parsed.context.data).toStrictEqual({
+        preferences: { theme: "dark" },
+      });
     });
   });
 
@@ -930,6 +1100,53 @@ describe("@real-router/rsc-server-plugin", () => {
     it("preserves the value for ssrRscMode === 'client-only'", () => {
       expect(getSsrRscMode(stateWith("client-only"))).toBe("client-only");
     });
+
+    it("returns 'full' when ssrRscMode getter throws (gotcha §5.7)", () => {
+      // Confirmed bug-risk from the audit: a foreign writer that installs
+      // a throwing getter on state.context.ssrRscMode previously caused
+      // getSsrRscMode to propagate the exception. The defensive read is
+      // now wrapped in try/catch — any throw collapses to "full".
+      const context: Record<string, unknown> = {};
+
+      Object.defineProperty(context, "ssrRscMode", {
+        get() {
+          throw new Error("foreign-getter boom");
+        },
+        enumerable: true,
+        configurable: true,
+      });
+
+      const state: State = {
+        name: "users.profile",
+        params: { id: "42" },
+        path: "/users/42",
+        transition: {
+          phase: "activating",
+          reason: "success",
+          segments: { deactivated: [], activated: [], intersection: "" },
+        },
+        context,
+      };
+
+      expect(() => getSsrRscMode(state)).not.toThrow();
+      expect(getSsrRscMode(state)).toBe("full");
+    });
+
+    it("returns 'full' for ssrRscMode === Symbol(...) (gotcha §5.9)", () => {
+      // Symbols bypass the `typeof === "string"` guard naturally; pinning
+      // explicit coverage so a refactor that switched to e.g. duck-typing
+      // would surface here.
+      expect(getSsrRscMode(stateWith(Symbol("foreign-mode")))).toBe("full");
+    });
+
+    it("returns 'full' for ssrRscMode === Object.create(String.prototype) (gotcha §5.10)", () => {
+      // Object that looks string-shaped via inherited prototype but
+      // `typeof !== "string"`. The first-condition typeof check is the
+      // canonical defense; this pins the proxy-like attack surface.
+      const fakeString = Object.create(String.prototype) as unknown;
+
+      expect(getSsrRscMode(stateWith(fakeString))).toBe("full");
+    });
   });
 
   describe("invalidate(router, 'rsc') — CSR revalidation", () => {
@@ -1008,6 +1225,14 @@ describe("@real-router/rsc-server-plugin", () => {
       invalidate(router, "rsc");
       invalidate(router, "rsc");
 
+      await router.navigate("users.profile", { id: "42" }, { reload: true });
+
+      expect(loader).toHaveBeenCalledTimes(1);
+
+      // Flag consumed by the first nav — a second nav without a fresh
+      // invalidate() MUST NOT re-trigger the loader. Catches a regression
+      // where stacked invalidates would each survive one extra navigation
+      // instead of collapsing into a single one.
       await router.navigate("users.profile", { id: "42" }, { reload: true });
 
       expect(loader).toHaveBeenCalledTimes(1);
@@ -1108,6 +1333,116 @@ describe("@real-router/rsc-server-plugin", () => {
       expect(loader).toHaveBeenCalledTimes(1);
     });
 
+    it("in-flight transition is unchanged; following navigation consumes the flag (gotcha §4.10)", async () => {
+      // Documented contract (CLAUDE.md:188): "Behaviour during an in-flight
+      // transition is deferred — the current transition completes unchanged;
+      // the *following* navigation consumes the flag."
+      //
+      // Construct a slow navigation that's awaiting its loader. While that
+      // navigation is mid-flight, call invalidate(). The current navigation
+      // must complete with the FIRST loader's result (no extra runs), and
+      // a fresh follow-up navigation must trigger a refresh.
+      const firstNode = node("First");
+      const secondNode = node("Second");
+      const thirdNode = node("Third");
+
+      let releaseFirst: () => void = () => {};
+      const firstPromise = new Promise<ReactNode>((resolve) => {
+        releaseFirst = () => {
+          resolve(firstNode);
+        };
+      });
+
+      const loader = vi
+        .fn()
+        .mockImplementationOnce(() => firstPromise) // in-flight start()
+        .mockResolvedValueOnce(secondNode) // post-invalidate follow-up nav
+        .mockResolvedValueOnce(thirdNode); // sanity: no further loader calls beyond two
+
+      router.usePlugin(
+        rscServerPluginFactory({ "users.profile": () => loader }),
+      );
+
+      const startPromise = router.start("/users/42");
+
+      // Yield for the start interceptor to reach `await loader(…)`. Mirrors
+      // the priming cadence used in `cancelled mid-loader` test above.
+      const YIELDS_TO_REACH_LOADER_AWAIT = 3;
+
+      for (let i = 0; i < YIELDS_TO_REACH_LOADER_AWAIT; i++) {
+        await Promise.resolve();
+      }
+
+      // Fire invalidate WHILE the start interceptor is awaiting its loader.
+      // Contract says: this should NOT cause the in-flight start to re-run
+      // the loader, AND the flag should survive until the next navigation.
+      invalidate(router, "rsc");
+
+      releaseFirst();
+      const state = await startPromise;
+
+      // Current transition: exactly one loader call, exactly the first
+      // payload. The invalidate did NOT inject a duplicate run mid-flight.
+      expect(loader).toHaveBeenCalledTimes(1);
+      expect(state.context.rsc).toBe(firstNode);
+
+      // Following navigation: the flag is consumed in LEAVE_APPROVE phase,
+      // loader runs a second time, fresh payload lands on nextRoute.
+      await router.navigate("users.profile", { id: "42" }, { reload: true });
+
+      expect(loader).toHaveBeenCalledTimes(2);
+      expect(router.getState()!.context.rsc).toBe(secondNode);
+
+      // Sanity: the flag is single-shot — a third navigation without a
+      // fresh invalidate must NOT touch the loader.
+      await router.navigate("users.profile", { id: "42" }, { reload: true });
+
+      expect(loader).toHaveBeenCalledTimes(2);
+    });
+
+    it("invalidate after unsub + re-usePlugin re-uses the pre-existing flag (gotcha §3.7)", async () => {
+      // CLAUDE.md "Stale flag survives plugin teardown until router is GC'd":
+      // the per-router WeakMap is NOT cleared on teardown, so a hot-swap
+      // (unsub → re-usePlugin) on the SAME router instance picks up any
+      // mark that was set before teardown. This test pins that intentional
+      // behaviour so a future refactor that "fixes" it by clearing on
+      // teardown would surface here as a deliberate breaking change.
+      const firstNode = node("First");
+      const secondNode = node("Second");
+      const loader = vi
+        .fn()
+        .mockResolvedValueOnce(firstNode)
+        .mockResolvedValueOnce(secondNode);
+
+      const unsubscribe = router.usePlugin(
+        rscServerPluginFactory({ "users.profile": () => loader }),
+      );
+
+      await router.start("/users/42");
+
+      expect(loader).toHaveBeenCalledTimes(1);
+      expect(router.getState()!.context.rsc).toBe(firstNode);
+
+      // Set the flag BEFORE teardown. The WeakMap entry persists.
+      invalidate(router, "rsc");
+
+      // Teardown removes the leave listener but leaves the flag in place.
+      unsubscribe();
+
+      // Re-register a fresh plugin on the SAME router. The new
+      // subscribeLeave listener observes the pre-existing flag.
+      router.usePlugin(
+        rscServerPluginFactory({ "users.profile": () => loader }),
+      );
+
+      await router.navigate("users.profile", { id: "42" }, { reload: true });
+
+      // The pre-existing flag was consumed by the new listener — second
+      // loader call, fresh payload.
+      expect(loader).toHaveBeenCalledTimes(2);
+      expect(router.getState()!.context.rsc).toBe(secondNode);
+    });
+
     it("teardown removes the leave listener — invalidate() after unsubscribe is a no-op", async () => {
       const loader = vi.fn().mockResolvedValue(node("X"));
       const unsubscribe = router.usePlugin(
@@ -1157,10 +1492,20 @@ describe("@real-router/rsc-server-plugin", () => {
         { signal: ac.signal },
       );
 
-      // Let the leave handler reach `await loader(…)`.
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
+      // Yield enough microtasks for the leave handler to reach
+      // `await loader(…)`. The empirically-required count is 3 yields:
+      //   tick 1 — navigate() schedules LEAVE_APPROVE
+      //   tick 2 — leave handler's `await router…` resolves
+      //   tick 3 — handler enters `await loader(params, { signal })`
+      // The number is brittle to additions of `await` upstream in
+      // `createSsrLoaderPlugin.ts`; tighten the count only after
+      // re-verifying empirically. Looping rather than three open-coded
+      // statements makes the count self-documenting.
+      const YIELDS_TO_REACH_LOADER_AWAIT = 3;
+
+      for (let i = 0; i < YIELDS_TO_REACH_LOADER_AWAIT; i++) {
+        await Promise.resolve();
+      }
 
       ac.abort();
       releaseSlowLoader();
@@ -1364,6 +1709,10 @@ describe("@real-router/rsc-server-plugin", () => {
       // `toHaveBeenCalledWith(params, undefined)` would NOT work here —
       // vitest treats `f(x)` and `f(x, undefined)` as distinct call
       // shapes by arity, and the start path passes a single argument.
+      // Guard the indexed access — without it, a regression that skips
+      // the loader entirely would surface as `undefined.toStrictEqual(…)`
+      // rather than a meaningful "expected 1 call, got 0".
+      expect(loader).toHaveBeenCalledTimes(1);
       expect(loader.mock.calls[0]).toStrictEqual([{ id: "42" }]);
 
       invalidate(router, "rsc");

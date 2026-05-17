@@ -250,6 +250,13 @@ describe("RouteView component", () => {
 
     const captured = view.activeTemplate();
 
+    // JIT-LIMITED: In JIT mode contentChildren stays empty so activeTemplate()
+    // is always null — the assertion `null === null` is trivially true. The
+    // actual post-destroy no-mutation contract is enforced by:
+    //   • stress/mount-unmount-lifecycle.stress.ts (500 mount/unmount cycles)
+    //   • stress/listener-leak.stress.ts
+    // If subscription cleanup breaks, heap growth surfaces in stress runs, not
+    // here.
     fixture.destroy();
 
     await router.navigate("users");
@@ -287,7 +294,7 @@ describe("RouteView component", () => {
   // structural directives on ng-template with signal inputs aren't
   // registered. We instead drive RouteView programmatically: verify that
   // activeTemplate() reads selfs() correctly given a known route state.
-  it("Self has priority over NotFound when active === nodeName", async () => {
+  it("JIT: RouteSelf not registered as contentChild — selfs() is empty, priority logic untested", async () => {
     @Component({
       template: `
         <route-view>

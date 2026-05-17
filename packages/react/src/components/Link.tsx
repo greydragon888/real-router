@@ -66,18 +66,12 @@ const LinkImpl: FC<LinkProps> = ({
     hash,
   );
 
-  // useMemo on buildHref was a footgun: deps include `routeParams` by
-  // reference. `<Link routeParams={{id:1}} />` allocates a fresh object every
-  // render, so the cache never hit; the outer memo()+shallowEqual is what
-  // actually shortens the path — when it bails out, Link doesn't re-render
-  // and buildHref is not called either. Inline call is simpler and removes
-  // the useMemo bookkeeping.
-  // useMemo avoids allocating a new `{ hash }` object literal on every render
-  // when the hash prop is unchanged — one alloc per distinct hash value.
-  const hashOption = useMemo(
-    () => (hash === undefined ? undefined : { hash }),
-    [hash],
-  );
+  // No useMemo: outer memo()+shallowEqual prevents Link re-render unless a
+  // prop actually changed. When this body runs, either `hash` differs from
+  // last render or another prop changed — in both cases the `{ hash }` alloc
+  // is unavoidable. The useMemo wrapper added one closure + deps slot per
+  // render without saving an allocation.
+  const hashOption = hash === undefined ? undefined : { hash };
   const href = buildHref(router, routeName, routeParams, hashOption);
 
   // useCallback was wasteful: 7 deps recreated the closure on every meaningful

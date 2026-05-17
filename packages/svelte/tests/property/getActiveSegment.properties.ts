@@ -108,6 +108,12 @@ describe("getActiveSegment — Property Tests", () => {
         const routeName = `${reservedName}.${suffix}`;
         const result = getActiveSegment(routeName, "", snippets);
 
+        // Tightened from a pair of `.not.toBe(reserved)` assertions: the
+        // function is typed `string` and must never return `undefined` /
+        // `null` / a non-string value, regardless of input shape. Without
+        // the type check, a regression that returned `undefined` for
+        // reserved names would pass both negative assertions silently.
+        expect(typeof result).toBe("string");
         expect(result).not.toBe("notFound");
         expect(result).not.toBe("self");
       },
