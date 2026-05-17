@@ -6,7 +6,7 @@ import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import { Link, RouterErrorBoundary, RouterProvider } from "@real-router/solid";
 
-import type { Router } from "@real-router/core";
+import type { Router, RouterError } from "@real-router/core";
 import type { JSX } from "solid-js";
 
 describe("RouterErrorBoundary - Integration Tests", () => {
@@ -127,7 +127,15 @@ describe("RouterErrorBoundary - Integration Tests", () => {
 
     expect(screen.queryByTestId("fallback")).not.toBeInTheDocument();
 
-    await router.navigate("home").catch(() => {});
+    // Shape-aware catch: this test specifically exercises SAME_STATES.
+    // A bare `.catch(() => {})` would silently absorb any regression
+    // (e.g. CANNOT_ACTIVATE) and the SAME_STATES expectation below would
+    // appear to fail on a different code, masking the real cause.
+    await router.navigate("home").catch((error: unknown) => {
+      if ((error as RouterError).code !== errorCodes.SAME_STATES) {
+        throw error;
+      }
+    });
 
     await waitFor(() => {
       expect(screen.getByTestId("fallback")).toBeInTheDocument();

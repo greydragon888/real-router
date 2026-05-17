@@ -77,8 +77,15 @@ describe("link directive", () => {
       );
 
       expect(screen.getByTestId("link")).not.toHaveAttribute("href");
+      // audit-2026-05-17 §1 MEDIUM #11 — pin exact "is not defined" wording
+      // and lock single emission; a regression that double-logs or changes
+      // the message shape (e.g. "invalid route" vs "not defined") would slip
+      // past the previous loose `containing` matcher.
+      expect(consoleError).toHaveBeenCalledTimes(1);
       expect(consoleError).toHaveBeenCalledWith(
-        expect.stringContaining("@@nonexistent-route"),
+        expect.stringMatching(
+          /^\[real-router\] Route "@@nonexistent-route" is not defined\./,
+        ),
       );
 
       consoleError.mockRestore();
@@ -298,7 +305,11 @@ describe("link directive", () => {
 
       await user.click(screen.getByTestId("link"));
 
-      expect(preventDefaultSpy).toHaveBeenCalled();
+      // audit-2026-05-17 §1 MEDIUM #12 — strict call count. A single click
+      // on `<a>` should fire preventDefault exactly once; a regression
+      // that double-attaches the click handler would inflate this past 1
+      // without changing observable nav behaviour.
+      expect(preventDefaultSpy).toHaveBeenCalledTimes(1);
 
       preventDefaultSpy.mockRestore();
     });
@@ -318,6 +329,35 @@ describe("link directive", () => {
       await user.click(screen.getByTestId("link"));
 
       expect(preventDefaultSpy).not.toHaveBeenCalled();
+
+      preventDefaultSpy.mockRestore();
+    });
+
+    it('should not intercept clicks on <a target="_blank"> (browser handles new tab natively) — #P0.6 audit', async () => {
+      const preventDefaultSpy = vi.spyOn(Event.prototype, "preventDefault");
+      const navigateSpy = vi.spyOn(router, "navigate");
+
+      render(
+        () => (
+          <a
+            use:link={{ routeName: "one-more-test" }}
+            target="_blank"
+            data-testid="link"
+          >
+            Test
+          </a>
+        ),
+        { wrapper },
+      );
+
+      await user.click(screen.getByTestId("link"));
+
+      // Browser must be allowed to open the new tab natively. The
+      // directive must neither swallow the click via preventDefault nor
+      // perform a programmatic router navigation (which would silently
+      // keep the user on the current page in the current tab).
+      expect(preventDefaultSpy).not.toHaveBeenCalled();
+      expect(navigateSpy).not.toHaveBeenCalled();
 
       preventDefaultSpy.mockRestore();
     });

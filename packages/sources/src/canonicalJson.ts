@@ -6,6 +6,16 @@
  * Used as a cache key for `createActiveRouteSource` so that equivalent params
  * objects share the same cached source regardless of key order.
  *
+ * **Divergence from `shared/dom-utils/scroll-restore.canonicalJson` — by
+ * design.** That sibling implementation is the cheap navigation-hot-path
+ * variant (uses `localeCompare`, plain-object accumulator, native cycle
+ * detector) and pairs with `safeKeyOf` for crash-tolerance. This one is the
+ * strict cache-key variant: byte-order compare, prototype-less accumulator,
+ * bespoke cycle detection — eagerly throws on inputs that would cause
+ * collisions or pollution, so callers can fall back to non-cached sources.
+ * They are NOT interchangeable; cross-package equivalence is explicitly not
+ * a goal (audit-2 / audit-2026-05-17 §2).
+ *
  * Edge cases:
  * - Arrays preserve order (canonical: index-ordered already).
  * - `undefined` values are dropped (standard JSON behaviour).

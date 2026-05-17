@@ -59,7 +59,8 @@ src/
 │   ├── direction-tracker.ts    # createDirectionTracker (back/forward annotation)
 │   └── index.ts                # barrel
 ├── utils/
-│   └── createHttpStatusSink.ts # /ssr — fresh { code: undefined } sink per request
+│   ├── createHttpStatusSink.ts # /ssr — fresh { code: undefined } sink per request
+│   └── createMountedSignal.ts  # createSignal(false) + onMount(true) — drives ClientOnly/ServerOnly
 ├── createSignalFromSource.ts   # Signal bridge — converts RouterSource to Solid Accessor
 ├── createStoreFromSource.ts    # Store bridge — converts RouterSource to Solid store (reconcile)
 ├── directives/
@@ -168,6 +169,8 @@ All caches live inside `@real-router/sources` — no local WeakMaps in this adap
 
 | Hook / Component          | Source factory                                         | Cache key                                                        |
 | ------------------------- | ------------------------------------------------------ | ---------------------------------------------------------------- |
+| `useRoute()`              | `createRouteSource(router)`                            | `(router)` — shared root snapshot                                |
+| `useRouteStore()`         | `createRouteSource(router)`                            | `(router)` — same shared root, wrapped via store bridge          |
 | `useRouteNode(name)`      | `createRouteNodeSource(router, nodeName)`              | `(router, nodeName)`                                             |
 | `useRouteNodeStore(name)` | `createRouteNodeSource(router, nodeName)`              | `(router, nodeName)`                                             |
 | `useRouterTransition()`   | `getTransitionSource(router)`                          | `(router)`                                                       |

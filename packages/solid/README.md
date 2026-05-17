@@ -29,7 +29,7 @@ const router = createRouter([
 ]);
 
 router.usePlugin(browserPluginFactory());
-router.start();
+await router.start();
 
 function App() {
   return (
@@ -334,7 +334,13 @@ import { RouterErrorBoundary } from "@real-router/solid";
       {error.code} <button onClick={resetError}>Dismiss</button>
     </div>
   )}
-  onError={(error) => analytics.track("nav_error", { code: error.code })}
+  onError={(error, toRoute, fromRoute) =>
+    analytics.track("nav_error", {
+      code: error.code,
+      to: toRoute?.name,
+      from: fromRoute?.name,
+    })
+  }
 >
   <Link routeName="protected">Go to Protected</Link>
 </RouterErrorBoundary>;
@@ -431,16 +437,18 @@ import { link } from "@real-router/solid";
 
 **Options:**
 
-| Option              | Type      | Default | Description                             |
-| ------------------- | --------- | ------- | --------------------------------------- |
-| `routeName`         | `string`  | —       | Target route name                       |
-| `routeParams`       | `Params`  | `{}`    | Route parameters                        |
-| `routeOptions`      | `object`  | `{}`    | Navigation options (replace, etc.)      |
-| `activeClassName`   | `string`  | —       | Class added when route is active        |
-| `activeStrict`      | `boolean` | `false` | Exact match only (no ancestor matching) |
-| `ignoreQueryParams` | `boolean` | `true`  | Query params don't affect active state  |
+| Option              | Type      | Required | Default | Description                             |
+| ------------------- | --------- | -------- | ------- | --------------------------------------- |
+| `routeName`         | `string`  | ★ yes    | —       | Target route name                       |
+| `routeParams`       | `Params`  | no       | `{}`    | Route parameters                        |
+| `routeOptions`      | `object`  | no       | `{}`    | Navigation options (replace, etc.)      |
+| `activeClassName`   | `string`  | no       | —       | Class added when route is active        |
+| `activeStrict`      | `boolean` | no       | `false` | Exact match only (no ancestor matching) |
+| `ignoreQueryParams` | `boolean` | no       | `true`  | Query params don't affect active state  |
 
 The directive automatically sets `href` on `<a>` elements and adds `role="link"` + `tabindex="0"` to non-interactive elements for accessibility.
+
+> **Must be used inside `<RouterProvider>`.** The directive calls `useRouter()` internally and will throw if the host element is mounted outside the provider tree. See CLAUDE.md gotcha *"use:link Requires useRouter Context"* for the failure mode and the canonical wrapping pattern.
 
 **Accessor or object literal — both work.** The directive expects an accessor (`() => options`), and that's the form that gives you static-analysis friendliness across editors. Solid's `babel-preset-solid` also auto-wraps an object literal at compile time, so `use:link={{ routeName: "home" }}` is accepted too:
 

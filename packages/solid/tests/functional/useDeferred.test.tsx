@@ -90,4 +90,61 @@ describe("useDeferred", () => {
 
     expect(winner).toBe("microtask");
   });
+
+  it("NEVER_PROMISE is a shared sentinel — distinct missing keys return SAME ref (audit-2026-05-17 §6 P3 #3.9)", () => {
+    // The module-top `NEVER_PROMISE` is allocated ONCE per module load.
+    // Two `useDeferred("missing-A")` and `useDeferred("missing-B")` calls
+    // must return the same promise reference — a regression that
+    // allocated a fresh forever-pending promise per call (e.g.
+    // `?? new Promise<never>(() => {})`) would balloon memory under
+    // mass-mount and prevent `<Suspense>` from coalescing identical
+    // pending states.
+    let firstRef: Promise<unknown> | undefined;
+    let secondRef: Promise<unknown> | undefined;
+
+    renderInRouter(router, () => {
+      firstRef = useDeferred("missing-A")();
+      secondRef = useDeferred("missing-B")();
+
+      return <span>x</span>;
+    });
+
+    expect(firstRef).toBeDefined();
+    expect(secondRef).toBeDefined();
+    expect(firstRef).toBe(secondRef);
+  });
+
+  it("found-key passthrough — no wrap, no double-Promise (audit-2026-05-17 §6 P3 #3.9)", () => {
+    // When the key exists in `ssrDataDeferred`, useDeferred returns the
+    // exact promise reference stored in state.context — not a wrapping
+    // promise. Pin-test the verbatim passthrough so a defensive
+    // `Promise.resolve(deferred[key])` refactor doesn't slip in
+    // (that would double-wrap and break `<Await>` reference identity
+    // expectations).
+    const trackedPromise = Promise.resolve("payload");
+    const state = router.getState()!;
+    const mutated = {
+      ...state,
+      context: {
+        ...state.context,
+        ssrDataDeferred: { found: trackedPromise },
+      },
+    };
+
+    Object.defineProperty(router, "getState", {
+      value: () => mutated,
+      configurable: true,
+    });
+
+    let captured: Promise<unknown> | undefined;
+
+    renderInRouter(router, () => {
+      captured = useDeferred("found")();
+
+      return <span>x</span>;
+    });
+
+    // Strict ref equality — the helper does NOT wrap the input.
+    expect(captured).toBe(trackedPromise);
+  });
 });

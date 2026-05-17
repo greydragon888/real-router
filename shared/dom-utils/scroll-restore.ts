@@ -189,6 +189,30 @@ export function createScrollRestoration(
   };
 
   let destroyed = false;
+  let unserializableWarned = false;
+
+  // `keyOf` defers to `canonicalJson` which calls `JSON.stringify`. Two
+  // realistic inputs blow up the serializer and would otherwise crash the
+  // subscribe callback (taking scroll-restore offline for the whole session):
+  //   - `BigInt` params → `TypeError: Do not know how to serialize a BigInt`
+  //   - cyclic params (reactive proxies, DOM-ref back-pointers) → stack
+  //     overflow.
+  // The defensive wrapper drops capture/restore for that specific navigation
+  // and warns once per provider — the rest of the cache stays usable.
+  const safeKeyOf = (state: State): string | null => {
+    try {
+      return keyOf(state);
+    } catch {
+      if (!unserializableWarned) {
+        unserializableWarned = true;
+        console.error(
+          `[real-router] scroll-restore: route "${state.name}" has params that cannot be canonicalized (e.g. BigInt or cyclic structure). Scroll position will not be captured or restored for this route.`,
+        );
+      }
+
+      return null;
+    }
+  };
 
   const unsubscribe = router.subscribe(({ route, previousRoute }) => {
     const nav = (route.context as { navigation?: NavigationContext })
@@ -198,7 +222,11 @@ export function createScrollRestoration(
     // previousRoute is undefined and capture is naturally skipped. The
     // pre-refresh position was already persisted via pagehide.
     if (previousRoute) {
-      putPos(keyOf(previousRoute), readPos());
+      const prevKey = safeKeyOf(previousRoute);
+
+      if (prevKey !== null) {
+        putPos(prevKey, readPos());
+      }
     }
 
     // Single rAF so DOM is committed before we read anchors / write scroll.
@@ -223,7 +251,9 @@ export function createScrollRestoration(
         nav.navigationType === "traverse" ||
         nav.navigationType === "reload"
       ) {
-        writePos(loadStore()[keyOf(route)] ?? 0);
+        const key = safeKeyOf(route);
+
+        writePos(key === null ? 0 : (loadStore()[key] ?? 0));
 
         return;
       }
@@ -236,7 +266,11 @@ export function createScrollRestoration(
     const current = router.getState();
 
     if (current) {
-      putPos(keyOf(current), readPos());
+      const key = safeKeyOf(current);
+
+      if (key !== null) {
+        putPos(key, readPos());
+      }
     }
   };
 
@@ -270,9 +304,34 @@ export function createScrollRestoration(
  * as a regression guard (§8b H20 / audit-2026-05-16 #S3). A change to
  * key format would silently lose scroll positions across an upgrade —
  * the test set is the contract.
+ *
+ * ## Identity-based memoization (audit-2026-05-17 §8b #2)
+ *
+ * `State` objects emitted by core are frozen per-navigation: their
+ * `name` / `params` are immutable for the lifetime of the snapshot, and
+ * any change produces a new `State` reference. A `WeakMap<State, string>`
+ * therefore safely caches the canonicalised key by identity — repeat
+ * `keyOf(state)` calls on the same snapshot (typical on
+ * back/forward/traverse where the same prior `State` is re-emitted)
+ * skip the recursive `canonicalJson` pass entirely.
+ *
+ * The cache key is the `State` reference, so entries auto-release when
+ * the snapshot is GC'd — no eviction needed.
  */
+const KEY_CACHE = new WeakMap<State, string>();
+
 export function keyOf(state: State): string {
-  return `${state.name}:${canonicalJson(state.params)}`;
+  const cached = KEY_CACHE.get(state);
+
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const key = `${state.name}:${canonicalJson(state.params)}`;
+
+  KEY_CACHE.set(state, key);
+
+  return key;
 }
 
 /**
@@ -282,6 +341,33 @@ export function keyOf(state: State): string {
  * excluded from `index.ts` barrel). Adapter property tests import it via
  * the direct path to lock the key-order-insensitive property
  * (`canonicalJson({a:1,b:2}) === canonicalJson({b:2,a:1})`).
+ *
+ * ## Divergence from `@real-router/sources/canonicalJson` — by design
+ *
+ * Two independent implementations live in the monorepo:
+ *
+ * - **`shared/dom-utils/scroll-restore.canonicalJson`** (this file) — scroll
+ *   cache key builder. Uses `localeCompare` and a plain-object accumulator;
+ *   tolerates `__proto__`-keyed inputs only insofar as `JSON.stringify`'s
+ *   replacer happens to sort them; relies on `JSON.stringify`'s native cycle
+ *   detector. Designed to be cheap on the navigation hot path. The
+ *   surrounding [[safeKeyOf]] wrapper catches the two crash inputs (`BigInt`,
+ *   cyclic) and skips the offending capture/restore.
+ *
+ * - **`@real-router/sources/canonicalJson`** — sources cache key builder.
+ *   Uses byte-order compare (`< / >`) for locale-independence, a
+ *   `Object.create(null)` accumulator to prevent prototype pollution, and a
+ *   bespoke path-based cycle detector (the native one cannot see the cloned
+ *   graph). Throws eagerly on `Map`/`Set`/`RegExp`/cycles — the caller falls
+ *   back to a non-cached source.
+ *
+ * **They are intentionally NOT interchangeable.** Aligning them would either
+ * regress scroll-restore performance (byte-order + recursive clone is heavier
+ * per call) or weaken the sources cache (locale dependence breaks
+ * deterministic cache keys across machines). No cross-package equivalence
+ * test exists or should be added; the relationship is "different invariants,
+ * different costs, different consumers." Audit-2 / audit-2026-05-17 §2
+ * documents the choice.
  */
 export function canonicalJson(value: unknown): string {
   return JSON.stringify(value, canonicalReplacer);
@@ -289,7 +375,14 @@ export function canonicalJson(value: unknown): string {
 
 function canonicalReplacer(_key: string, val: unknown): unknown {
   if (val !== null && typeof val === "object" && !Array.isArray(val)) {
-    const sorted: Record<string, unknown> = {};
+    // Null-prototype accumulator: a plain `{}` would interpret
+    // `sorted["__proto__"] = x` as a prototype assignment (silently dropped
+    // from JSON.stringify output AND a prototype-pollution vector). Mirrors
+    // the same guard in `@real-router/sources/canonicalJson`. The two
+    // implementations are still intentionally divergent (see the doc-block
+    // on [[canonicalJson]] above), but prototype-safety is non-negotiable
+    // on both. Lock-test: scrollRestoreKey.properties.ts Invariant 11.
+    const sorted = Object.create(null) as Record<string, unknown>;
     // eslint-disable-next-line unicorn/no-array-sort -- ng-packagr uses pre-ES2023 lib; toSorted unavailable
     const keys = Object.keys(val as Record<string, unknown>).sort(
       (left: string, right: string) => left.localeCompare(right),

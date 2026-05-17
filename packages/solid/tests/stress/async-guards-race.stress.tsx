@@ -164,4 +164,74 @@ describe("S10 — async-guards race stress (Solid)", () => {
 
     router.stop();
   });
+
+  // audit-2026-05-17 §7 P1 #5 — real wall-clock async guards. 10.1/10.2
+  // use manually-resolved promises (microtask semantics). Production
+  // guards use `setTimeout`/`fetch` (macrotask semantics) — different
+  // scheduling. A FSM bug that only manifests under macrotask ordering
+  // would slip past microtask-only tests. Lock "last navigate wins"
+  // under real timers.
+  it("10.3 — real-timed concurrent guards (1ms/100ms/500ms) — last navigate wins, stale slow resolve is discarded", async () => {
+    const router = createRouter([
+      { name: "home", path: "/" },
+      { name: "fast", path: "/fast" },
+      { name: "mid", path: "/mid" },
+      { name: "slow", path: "/slow" },
+    ]);
+
+    await router.start("/");
+
+    const lifecycle = getLifecycleApi(router);
+
+    lifecycle.addActivateGuard(
+      "fast",
+      () => () =>
+        new Promise<boolean>((resolve) => {
+          setTimeout(() => {
+            resolve(true);
+          }, 1);
+        }),
+    );
+    lifecycle.addActivateGuard(
+      "mid",
+      () => () =>
+        new Promise<boolean>((resolve) => {
+          setTimeout(() => {
+            resolve(true);
+          }, 100);
+        }),
+    );
+    lifecycle.addActivateGuard(
+      "slow",
+      () => () =>
+        new Promise<boolean>((resolve) => {
+          setTimeout(() => {
+            resolve(true);
+          }, 500);
+        }),
+    );
+
+    // Fire all three in request-order slow → mid → fast. The FSM
+    // cancels the prior in-flight on every new navigate; under
+    // wall-clock timers, the "fast" navigation (issued last) is the
+    // one that wins. The "slow" 500ms timer resolves LAST in wall-clock
+    // time but its navigation was already cancelled — its result is
+    // discarded.
+    const slowP = router.navigate("slow").catch(() => null);
+    const midP = router.navigate("mid").catch(() => null);
+    const fastP = router.navigate("fast").catch(() => null);
+
+    await Promise.all([slowP, midP, fastP]);
+
+    // Wall-clock wait so the slow timer has had time to fire and be
+    // discarded (its 500ms timeout completes after the fast guard
+    // resolves; exercises the "stale resolve after cancel" path).
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 600);
+    });
+
+    expect(router.getState()?.name).toBe("fast");
+
+    router.stop();
+  }, 30_000);
 });

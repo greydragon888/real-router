@@ -24,18 +24,23 @@ export function link<P extends Params = Params>(
   const router = useRouter();
   const options = accessor();
 
+  // audit-2026-05-17 §8a cleanup — single instanceof probe, single EMPTY_PARAMS
+  // default. Previously evaluated three times for the <a>-only branches and
+  // twice for routeParams. The directive accessor is read once at init
+  // (documented "use:link Options Are Captured Once"), so both lookups are
+  // stable and worth hoisting.
+  const anchor = element instanceof HTMLAnchorElement ? element : null;
+  const resolvedRouteParams = (options.routeParams ?? EMPTY_PARAMS) as P;
+  const resolvedRouteOptions = options.routeOptions ?? EMPTY_OPTIONS;
+
   // Set href on <a> elements
-  if (element instanceof HTMLAnchorElement) {
-    const href = buildHref(
-      router,
-      options.routeName,
-      options.routeParams ?? (EMPTY_PARAMS as P),
-    );
+  if (anchor) {
+    const href = buildHref(router, options.routeName, resolvedRouteParams);
 
     if (href === undefined) {
-      element.removeAttribute("href");
+      anchor.removeAttribute("href");
     } else {
-      element.href = href;
+      anchor.href = href;
     }
   }
 
@@ -50,7 +55,7 @@ export function link<P extends Params = Params>(
     const activeSource = createActiveRouteSource(
       router,
       options.routeName,
-      options.routeParams ?? (EMPTY_PARAMS as P),
+      resolvedRouteParams,
       {
         strict: options.activeStrict ?? false,
         ignoreQueryParams: options.ignoreQueryParams ?? true,
@@ -63,20 +68,21 @@ export function link<P extends Params = Params>(
     });
   }
 
-  // §8.1 audit fix (LOW #11) — hoist `routeParams`/`routeOptions` `??`
-  // resolution out of the click handler. The directive accessor is read once
-  // at init (documented "use:link Options Are Captured Once"), so these
-  // defaults can be resolved here and reused across every click without
-  // re-evaluating the `??` chain.
-  const resolvedRouteParams = (options.routeParams ?? EMPTY_PARAMS) as P;
-  const resolvedRouteOptions = options.routeOptions ?? EMPTY_OPTIONS;
-
   // Click handler
   function handleClick(evt: MouseEvent) {
     if (!shouldNavigate(evt)) {
       return;
     }
-    if (element instanceof HTMLAnchorElement) {
+
+    // Symmetric with <Link> (#P0.6 audit): on an <a target="_blank"> the
+    // browser opens the URL in a new tab/window natively. Intercepting the
+    // click via preventDefault + router.navigate would suppress the new
+    // tab and silently keep the user on the current page.
+    if (anchor?.target === "_blank") {
+      return;
+    }
+
+    if (anchor) {
       evt.preventDefault();
     }
 

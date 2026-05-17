@@ -211,7 +211,9 @@ describe("Link component", () => {
 
       fireEvent.click(screen.getByTestId("link"), { button: 1 });
 
-      expect(onClickMock).toHaveBeenCalled();
+      // audit-2026-05-17 §1 MEDIUM #1 — strict call count + MouseEvent arg
+      expect(onClickMock).toHaveBeenCalledTimes(1);
+      expect(onClickMock).toHaveBeenCalledWith(expect.any(MouseEvent));
 
       expect(router.navigate).not.toHaveBeenCalled();
       expect(router.getState()?.name).toStrictEqual(currentRouteName);
@@ -239,7 +241,9 @@ describe("Link component", () => {
 
       await user.click(screen.getByTestId("link"));
 
-      expect(onClickMock).toHaveBeenCalled();
+      // audit-2026-05-17 §1 MEDIUM #2 — strict call count + MouseEvent arg
+      expect(onClickMock).toHaveBeenCalledTimes(1);
+      expect(onClickMock).toHaveBeenCalledWith(expect.any(MouseEvent));
 
       expect(router.navigate).not.toHaveBeenCalled();
       expect(router.getState()?.name).toStrictEqual(currentRouteName);
@@ -441,11 +445,8 @@ describe("Link component", () => {
     fireEvent.keyDown(link, { key: "Enter" });
     fireEvent.click(link, { bubbles: true, cancelable: true });
 
-    expect(router.navigate).toHaveBeenCalledWith(
-      "one-more-test",
-      expect.any(Object),
-      expect.any(Object),
-    );
+    // audit-2026-05-17 §1 MEDIUM #4 — pin exact arg shape, not just any-Object
+    expect(router.navigate).toHaveBeenCalledWith("one-more-test", {}, {});
   });
 
   it("should render without href and log error for invalid routeName", () => {
@@ -463,8 +464,14 @@ describe("Link component", () => {
     );
 
     expect(screen.getByTestId("link")).not.toHaveAttribute("href");
+    // audit-2026-05-17 §1 MEDIUM #3 — pin the exact "is not defined" message
+    // and lock that only ONE error was emitted (a regression that double-logs
+    // would silently inflate noise).
+    expect(consoleError).toHaveBeenCalledTimes(1);
     expect(consoleError).toHaveBeenCalledWith(
-      expect.stringContaining("@@nonexistent-route"),
+      expect.stringMatching(
+        /^\[real-router\] Route "@@nonexistent-route" is not defined\./,
+      ),
     );
 
     consoleError.mockRestore();
@@ -898,10 +905,18 @@ describe("Link component", () => {
 
         expect(href).not.toBeNull();
         expect(decodeURIComponent(href!)).toContain("/items/");
-        // Some serialization of the date must end up in the URL — exact
-        // representation depends on buildPath's encoder; the contract is
-        // "non-empty string after the slug", not a specific format.
-        expect(href!.length).toBeGreaterThan("/items/".length);
+
+        // audit-2026-05-17 §1 MEDIUM #7 — assert the post-slug payload is
+        // non-empty AND looks like a date serialisation. `String(date)`
+        // (Date.prototype.toString — `Mon Jan 01 2024 ...`), `date.toISOString()`
+        // (`2024-01-01T00:00:00.000Z`), and `date.valueOf()` (epoch ms) all
+        // contain a 4-digit year — that's the cross-format invariant.
+        // The previous `length > "/items/".length` would have accepted any
+        // single char appended (including `"/"` → empty slug).
+        const slug = decodeURIComponent(href!).slice("/items/".length);
+
+        expect(slug.length).toBeGreaterThan(0);
+        expect(slug).toMatch(/\d{4}/);
       });
 
       it("Map → empty-object JSON ('{}'), no crash", () => {

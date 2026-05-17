@@ -55,8 +55,15 @@ describe("RouterProvider — announceNavigation", () => {
     await router.navigate("about");
     await router.navigate("home");
 
-    expect(document.querySelector(ANNOUNCER_SEL)?.textContent).toMatch(
-      /^Navigated to\s+/,
+    // audit-2026-05-17 §1 MEDIUM #4 — pin the EXACT announced text rather
+    // than just the prefix. The previous `/^Navigated to\s+/` would pass
+    // even on a regression that emitted "Navigated to <empty>" or
+    // "Navigated to undefined". Resolver chain (route-announcer.ts
+    // `resolveText`): h1.textContent → document.title → route.name.
+    // No h1 / fresh document title in this test → routeName wins, so
+    // the expected announcement is verbatim "Navigated to home".
+    expect(document.querySelector(ANNOUNCER_SEL)?.textContent).toBe(
+      "Navigated to home",
     );
   });
 
@@ -323,7 +330,13 @@ describe("RouterProvider — announceNavigation", () => {
     }
 
     // Announcer element was removed in destroy(); textContent never written.
+    // `isConnected === false` alone is a property of unmount(), not proof
+    // that the isDestroyed guard blocked the inner-rAF write. The
+    // textContent assertion is the actual contract: the announcer's
+    // text MUST remain empty because the rAF callback bailed out on the
+    // destroyed flag (#P0.5 audit).
     expect(announcer!.isConnected).toBe(false);
+    expect(announcer!.textContent).toBe("");
   });
 
   it("§5.7 — custom getAnnouncementText throw is swallowed; falls back to default resolution", async () => {

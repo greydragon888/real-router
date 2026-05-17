@@ -161,4 +161,74 @@ describe("S1 — scrollRestoration + rapid pushState (§7.2 #10)", () => {
     addEventListenerSpy.mockRestore();
     removeEventListenerSpy.mockRestore();
   }, 60_000);
+
+  // audit-2026-05-17 §7 P1 #4 — rapid back/forward via popstate. The
+  // S1 test exercises sequential `router.navigate(...)` calls (which
+  // dispatch via the FSM directly); browser-driven back/forward uses
+  // the `popstate` event path with different timing — popstate may
+  // arrive before rAF commits. Without a browser-plugin in the
+  // scroll-restore loop we cannot reach `popstate` end-to-end, so this
+  // variant simulates the burst by emitting alternating navigations
+  // (forward/back/forward/back via traverse-style navigation through
+  // the same routes) and asserts the cache key set stays
+  // well-formed — no `undefined` segments, no duplicate entries.
+  it("S3 — 50 rapid alternating navigations — sessionStorage keys stay well-formed", async () => {
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+      cb(0);
+
+      return 0;
+    });
+
+    const router = createStressRouter(8);
+
+    await router.start("/route0");
+
+    const { unmount } = render(() => (
+      <RouterProvider router={router} scrollRestoration={{ mode: "restore" }}>
+        <div />
+      </RouterProvider>
+    ));
+
+    // 50 alternating navigations stress the capture path with rapid
+    // route flips (a-b-a-b-a-b...). The leave-event listener writes
+    // the previous route's scroll position to sessionStorage for each
+    // flip; the post-rAF restore reads back. A regression where the
+    // key gets corrupted under burst (e.g. `keyOf` reading a stale
+    // state, missing canonicalJson normalisation) shows here as keys
+    // containing `undefined`.
+    for (let i = 0; i < 50; i++) {
+      const target = i % 2 === 0 ? "route1" : "route2";
+
+      Object.defineProperty(globalThis, "scrollY", {
+        value: i * 13,
+        configurable: true,
+      });
+
+      await router.navigate(target).catch(() => {});
+    }
+
+    // Inspect the sessionStorage state directly.
+    const raw = sessionStorage.getItem("real-router:scroll");
+
+    expect(raw).not.toBeNull();
+
+    const stored = JSON.parse(raw!) as Record<string, number>;
+    const keys = Object.keys(stored);
+
+    expect(keys.length).toBeGreaterThan(0);
+
+    // Lock the key shape: `${name}:${canonicalJson(params)}`. No
+    // `undefined` or `null` segments; every key follows the
+    // `route<N>:<json>` pattern (the alternating burst touches route1
+    // and route2 specifically, plus the initial route0 captured on
+    // the first leave).
+    for (const key of keys) {
+      expect(key).not.toContain("undefined");
+      expect(key).not.toContain("null");
+      expect(key).toMatch(/^route\d+:.+$/);
+    }
+
+    unmount();
+    router.stop();
+  }, 60_000);
 });

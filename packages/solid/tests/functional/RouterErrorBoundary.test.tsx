@@ -303,6 +303,11 @@ describe("RouterErrorBoundary", () => {
       expect(firstOnError).toHaveBeenCalled();
     });
 
+    // audit-2026-05-17 §1 MEDIUM #9 — lock that exactly one nav error
+    // fired before the handler swap (a regression that double-emits
+    // would silently inflate this and pass the post-swap check below).
+    expect(firstOnError).toHaveBeenCalledTimes(1);
+
     const firstOnErrorCallsBeforeSwap = firstOnError.mock.calls.length;
 
     setHandler(() => secondOnError);
@@ -314,6 +319,14 @@ describe("RouterErrorBoundary", () => {
     await waitFor(() => {
       expect(secondOnError).toHaveBeenCalled();
     });
+
+    // audit-2026-05-17 §1 MEDIUM #10 — secondOnError fires at least once
+    // for the post-swap navigation. The reactive effect re-runs whenever
+    // the snapshot accessor flips, so the handler may pick up BOTH the
+    // pre-swap snapshot (still error-flagged) and the new error — total
+    // ≥ 1 calls. The `.at(-1)` check below verifies the LAST call carries
+    // the post-swap error code; here we only lock the lower bound.
+    expect(secondOnError.mock.calls.length).toBeGreaterThanOrEqual(1);
 
     // After reassignment, new navigation errors land on secondOnError — the
     // latest one must be SAME_STATES-free and carry the CANNOT_ACTIVATE code

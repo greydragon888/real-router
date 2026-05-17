@@ -348,4 +348,54 @@ describe("shallowEqual — Property Tests (Solid)", () => {
       expect(shallowEqual(a, b)).toBe(true);
     });
   });
+
+  describe("Invariant 12: empty objects and asymmetric null (audit-2026-05-17 §6 Stage-2)", () => {
+    // Empty objects must be equal — boundary case that's reachable through
+    // `routeParams={}` on `<Link>` and identical default-empty `params` on
+    // navigations. A regression that short-circuited the loop with `if
+    // (!prevKeys.length) return false` would silently break Link
+    // memoisation. Locks the answer.
+    test("shallowEqual({}, {}) === true", () => {
+      expect(shallowEqual({}, {})).toBe(true);
+    });
+
+    test("shallowEqual({}, {}) is symmetric (independent branch lock)", () => {
+      // Both directions must answer true. Captures the case where the
+      // empty-objects branch is asymmetrically optimised in only one
+      // call-order.
+      const a = {};
+      const b = {};
+
+      expect(shallowEqual(a, b)).toBe(true);
+      expect(shallowEqual(b, a)).toBe(true);
+    });
+
+    test("shallowEqual(null, {}) === false (asymmetric null guard, direction A→B)", () => {
+      // `if (!prev || !next) return false` covers null on either side.
+      // Pin both directions so a refactor that drops one of the truthy
+      // checks fails immediately.
+      expect(shallowEqual(null as unknown as object, {})).toBe(false);
+    });
+
+    test("shallowEqual({}, null) === false (asymmetric null guard, direction B→A)", () => {
+      expect(shallowEqual({}, null as unknown as object)).toBe(false);
+    });
+
+    test("shallowEqual(undefined, {}) === false", () => {
+      expect(shallowEqual(undefined, {})).toBe(false);
+    });
+
+    test("shallowEqual({}, undefined) === false", () => {
+      expect(shallowEqual({}, undefined)).toBe(false);
+    });
+
+    test("shallowEqual(null, undefined) === false (Object.is short-circuit does NOT collapse)", () => {
+      // Object.is(null, undefined) === false → falls to `!prev || !next`
+      // branch → false. Lock against a refactor that uses `==` and
+      // collapses null/undefined to "same".
+      expect(
+        shallowEqual(null as unknown as object, undefined as unknown as object),
+      ).toBe(false);
+    });
+  });
 });

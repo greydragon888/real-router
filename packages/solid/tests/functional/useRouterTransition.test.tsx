@@ -35,14 +35,16 @@ describe("useRouterTransition", () => {
       wrapper: wrapper(router),
     });
 
-    expect(result()).toStrictEqual(
-      expect.objectContaining({
-        isTransitioning: false,
-        toRoute: null,
-        fromRoute: null,
-        isLeaveApproved: false,
-      }),
-    );
+    // audit-2026-05-17 §1 MEDIUM #14 — strict shape (toStrictEqual without
+    // objectContaining) locks the snapshot shape exactly. A regression that
+    // added a stray field to IDLE_SNAPSHOT (e.g. `phase: "idle"`) would slip
+    // past `objectContaining` because it ignores extra keys.
+    expect(result()).toStrictEqual({
+      isTransitioning: false,
+      toRoute: null,
+      fromRoute: null,
+      isLeaveApproved: false,
+    });
   });
 
   it("isTransitioning === true upon TRANSITION_START", async () => {

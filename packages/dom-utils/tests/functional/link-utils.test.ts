@@ -243,6 +243,51 @@ describe("buildHref", () => {
       undefined,
     );
   });
+
+  it("12 — returns undefined + logs error when buildPath returns empty string (#P0.1 audit)", () => {
+    // Symmetric to the buildUrl="" defense (Invariant 12 in property tests).
+    // A custom path-matcher that returns "" for a registered route would
+    // otherwise render `<a href="">` → silent self-navigation on click.
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    const router = {
+      buildPath: vi.fn().mockReturnValue(""),
+    } as unknown as Router;
+
+    const result = buildHref(router, "weird-route", {});
+
+    expect(result).toBeUndefined();
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining("weird-route"),
+    );
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining("empty path"),
+    );
+
+    consoleError.mockRestore();
+  });
+
+  it("13 — returns undefined + logs error when buildUrl returns '' AND buildPath returns '' (#P0.1 audit)", () => {
+    // Both layers degrade to empty — must not concatenate `${""}#${hash}`
+    // into a bare `<a href="#hash">`. Treat as no-href.
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    const router = {
+      buildUrl: vi.fn().mockReturnValue(""),
+      buildPath: vi.fn().mockReturnValue(""),
+    } as unknown as Router;
+
+    const result = buildHref(router, "weird-route", {}, { hash: "tab" });
+
+    expect(result).toBeUndefined();
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining("weird-route"),
+    );
+
+    consoleError.mockRestore();
+  });
 });
 
 describe("buildActiveClassName", () => {

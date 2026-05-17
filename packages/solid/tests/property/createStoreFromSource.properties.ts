@@ -245,4 +245,87 @@ describe("createStoreFromSource — Property Tests (Solid)", () => {
       expect(Object.keys(store!)).toHaveLength(0);
     });
   });
+
+  describe("Invariant 7: same-snapshot-ref emit skips reconcile (audit-2026-05-17 §6 P3 #3.10)", () => {
+    // The `lastSnapshot` reference check (lines 38-49 of
+    // createStoreFromSource.ts) short-circuits when the source emits a
+    // change-event but returns the SAME snapshot ref via getSnapshot()
+    // (cached lazy sources stabilise the snapshot — same ref through
+    // multiple emits when nothing in the node's slice changed). A
+    // regression that always calls reconcile would do redundant work on
+    // every emit × N store consumers — invisible in functional tests
+    // but expensive at scale.
+    //
+    // We probe the skip indirectly: the store's `state.route` proxy
+    // maintains *its own* identity stability across same-ref emits (the
+    // proxy wraps the underlying snapshot object). After N same-ref
+    // emits, `store.route` must remain ref-equal to its FIRST observed
+    // value — the proxy is not recreated. A regression that ran
+    // reconcile on every same-ref emit would still preserve the proxy
+    // identity (reconcile is a no-op on structurally-equal trees), so
+    // we additionally pin "no exception thrown" + "store still readable"
+    // as the safety contract.
+    test.prop([arbSnapshot], { numRuns: NUM_RUNS.standard })(
+      "re-emitting the SAME snapshot ref keeps store.route proxy ref equal",
+      (initial) => {
+        fc.pre(initial.route !== undefined);
+
+        const { source, emit } = createMockSource(initial);
+
+        createRoot((dispose) => {
+          const store = createStoreFromSource(source);
+
+          // Read the proxy identity AFTER the bridge has stabilised
+          // (initial spread + first re-read inside the bridge).
+          const proxyBefore = store.route;
+
+          // Emit WITHOUT changing the snapshot value — `current` in the
+          // mock stays the same `initial` reference, so `getSnapshot()`
+          // returns the identical object.
+          expect(() => {
+            emit(initial);
+            emit(initial);
+            emit(initial);
+          }).not.toThrow();
+
+          const proxyAfter = store.route;
+
+          // Proxy identity preserved across same-ref emits.
+          expect(proxyAfter).toBe(proxyBefore);
+
+          dispose();
+        });
+      },
+    );
+
+    // A second probe: under the same-ref skip, `source.getSnapshot()` is
+    // called once per emit notification, but `reconcile` (the expensive
+    // path) is bypassed. We can't directly count reconcile calls without
+    // monkey-patching solid/store, but we CAN observe the structural
+    // effect — `store.route` deeply equals the original after N
+    // same-ref emits. (Without the skip, reconcile would still produce
+    // a deeply-equal result, so this is a defensive sibling probe rather
+    // than a direct skip detector; the first test above is the real
+    // ref-equality lock.)
+    test("N same-ref emits leave store structurally equal to initial", () => {
+      const initial: RouteSnapshotLike = {
+        route: { name: "home", params: { id: "1" } },
+        previousRoute: undefined,
+      };
+      const { source, emit } = createMockSource(initial);
+
+      createRoot((dispose) => {
+        const store = createStoreFromSource(source);
+
+        for (let i = 0; i < 5; i++) {
+          emit(initial);
+        }
+
+        expect(store.route).toStrictEqual(initial.route);
+        expect(store.previousRoute).toStrictEqual(initial.previousRoute);
+
+        dispose();
+      });
+    });
+  });
 });

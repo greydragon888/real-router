@@ -82,6 +82,20 @@ export function buildHref(
 
     const path = router.buildPath(routeName, routeParams);
 
+    // Symmetric to the buildUrl guard above (#S1 audit, Invariant 12).
+    // `router.buildPath` is typed `string`, but defends against:
+    //   - `""` (empty string) — would render `<a href="">`, which resolves
+    //     to the current page URL → silent self-navigation on click.
+    //   - non-string type-contract violations from custom path-matchers.
+    // Both yield `undefined` (renderer drops the attribute) with a warning.
+    if (typeof path !== "string" || path.length === 0) {
+      console.error(
+        `[real-router] Route "${routeName}" yielded an empty path. The element will render without an href attribute.`,
+      );
+
+      return undefined;
+    }
+
     return normHash ? `${path}#${encodeFragmentInline(normHash)}` : path;
   } catch {
     console.error(
@@ -151,8 +165,28 @@ export function navigateWithHash(
   return router.navigate(routeName, routeParams, opts);
 }
 
+// Match-any-whitespace regex shared across calls. RegExp literals at
+// call-site recompile in some engines; lifting it avoids that microcost
+// for the slow-path branch.
+const WHITESPACE_PROBE = /\s/;
+const WHITESPACE_SPLIT = /\S+/g;
+
 function parseTokens(value: string | undefined): string[] {
-  return value ? (value.match(/\S+/g) ?? []) : [];
+  if (!value) {
+    return [];
+  }
+
+  // Hot-path fast-path (audit-2026-05-17 §8b #1): >99% of active-class
+  // inputs at `<Link>` emit are single-token strings like `"active"` or
+  // `"is-current"` — no whitespace, no leading/trailing pad. Skip the
+  // regex match and Array result allocation: a literal `[value]` works
+  // because the slow-path `match(/\S+/g)` would return exactly `[value]`
+  // for the same input. PBT lock: linkUtils.properties.ts Invariant 13.
+  if (!WHITESPACE_PROBE.test(value)) {
+    return [value];
+  }
+
+  return value.match(WHITESPACE_SPLIT) ?? [];
 }
 
 export function buildActiveClassName(

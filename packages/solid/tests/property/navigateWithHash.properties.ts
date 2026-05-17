@@ -271,4 +271,46 @@ describe("navigateWithHash — Property Tests (Solid)", () => {
       },
     );
   });
+
+  describe("Invariant 7: `hash` parameter overrides extraOptions.hash (audit-2026-05-17 §6 Stage-1)", () => {
+    // The helper builds `opts = { ...extraOptions }` then conditionally
+    // assigns `opts.hash = hash` when the `hash` arg is defined. The arg
+    // therefore wins over any pre-existing `hash` in extraOptions. Locking
+    // this prevents a refactor that swaps to `if (opts.hash === undefined)
+    // opts.hash = hash` (the inverse) from sliding past silently — the
+    // inverse would let `extraOptions.hash` silently shadow the explicit
+    // `<Link hash="...">` prop.
+    test.prop([arbRouteName, arbHash, arbHash], {
+      numRuns: NUM_RUNS.thorough,
+    })(
+      "navigateWithHash(..., hash, { hash: other }) → opts.hash === hash (arg wins)",
+      (routeName, argHash, optsHash) => {
+        fc.pre(argHash !== optsHash);
+
+        const { router, calls } = makeRouter(undefined);
+
+        void navigateWithHash(router, routeName, {}, argHash, {
+          hash: optsHash,
+        } as NavigationOptions & { hash?: string });
+
+        expect(calls).toHaveLength(1);
+        expect(calls[0].opts.hash).toBe(argHash);
+      },
+    );
+
+    test.prop([arbRouteName, arbHash], { numRuns: NUM_RUNS.standard })(
+      "hash === undefined → extraOptions.hash survives (no override path)",
+      (routeName, optsHash) => {
+        const { router, calls } = makeRouter(undefined);
+
+        void navigateWithHash(router, routeName, {}, undefined, {
+          hash: optsHash,
+        } as NavigationOptions & { hash?: string });
+
+        expect(calls).toHaveLength(1);
+        // No `hash` arg → the spread-from-extraOptions value remains.
+        expect(calls[0].opts.hash).toBe(optsHash);
+      },
+    );
+  });
 });

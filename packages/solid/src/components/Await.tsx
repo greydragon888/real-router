@@ -36,6 +36,14 @@ export function Await<T = unknown>(props: AwaitProps<T>): JSX.Element {
   const promiseAccessor = useDeferred<T>(props.name);
   const [resource] = createResource(promiseAccessor, (promise) => promise);
 
+  // The double cast `as unknown as JSX.Element` (audit-2026-05-17 §8a) is
+  // load-bearing: this returns a Solid accessor *function*, not an element
+  // node. `JSX.Element` in Solid is a union that includes function-as-child
+  // for reactive bindings, but the type machinery can't narrow the bare
+  // arrow's signature to that union — going through `unknown` is the
+  // standard escape hatch used elsewhere in solid-router-style adapters.
+  // Removing either cast yields a "Type '() => unknown' is not assignable
+  // to type 'JSX.Element'" error.
   return (() => {
     const value = resource();
 

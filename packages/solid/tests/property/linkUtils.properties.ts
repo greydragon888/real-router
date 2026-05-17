@@ -241,6 +241,73 @@ describe("buildActiveClassName — Property Tests (Solid)", () => {
     );
   });
 
+  describe("Invariant 7a: Conservation — |outputTokens| ≤ |baseTokens| + |activeTokens| (audit-2026-05-17 §6 Stage-2)", () => {
+    // The dedup logic in buildActiveClassName guarantees no token-count
+    // amplification: the result token set is a subset of `base ∪ active`,
+    // never adds anything else. A regression that double-appended a token
+    // (forgotten `if (!seen.has(token))` guard) or injected a phantom
+    // marker would inflate this count.
+    test.prop([arbActiveClassName, arbBaseClassName], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "result token count never exceeds the union of base + active token sets",
+      (active, base) => {
+        const result = buildActiveClassName(true, active, base) ?? "";
+        const resultCount = result.split(/\s+/).filter(Boolean).length;
+        const baseTokens = new Set(base.split(/\s+/).filter(Boolean));
+        const activeTokens = new Set(active.split(/\s+/).filter(Boolean));
+        const unionSize = new Set([...baseTokens, ...activeTokens]).size;
+
+        expect(resultCount).toBeLessThanOrEqual(unionSize);
+      },
+    );
+  });
+
+  describe("Invariant 7b: multi-token active className adds ALL tokens (audit-2026-05-17 §6 Stage-1)", () => {
+    // The helper splits `activeClassName` via parseTokens and concatenates
+    // each unique token. A regression that read only `activeClassName.split(' ')[0]`
+    // or stopped after the first token would still pass Invariant 2 (single
+    // token present), but would silently drop the rest. Lock the multi-token
+    // contract over fc.array of 2-4 tokens against any base.
+    const arbMultiActive = fc
+      .array(arbToken, { minLength: 2, maxLength: 4 })
+      .map((tokens) => [...new Set(tokens)] as string[])
+      .filter((tokens) => tokens.length >= 2)
+      .map((tokens) => tokens.join(" "));
+
+    test.prop([arbMultiActive, arbBaseClassName], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "all distinct active tokens appear in the result exactly once",
+      (active, base) => {
+        const result = buildActiveClassName(true, active, base);
+
+        expect(result).toBeDefined();
+
+        const activeTokens = active.split(/\s+/).filter(Boolean);
+        const resultTokens = result!.split(/\s+/).filter(Boolean);
+
+        for (const token of activeTokens) {
+          expect(resultTokens.filter((t) => t === token)).toHaveLength(1);
+        }
+      },
+    );
+
+    test("`'a b'` active + empty base → result is 'a b' verbatim (order from active)", () => {
+      expect(buildActiveClassName(true, "a b", "")).toBe("a b");
+    });
+
+    test("`'a b'` active + `'c'` base → result contains a, b, AND c", () => {
+      const result = buildActiveClassName(true, "a b", "c");
+      const tokens = result!
+        .split(/\s+/)
+        .filter(Boolean)
+        .toSorted((a, b) => a.localeCompare(b));
+
+      expect(tokens).toStrictEqual(["a", "b", "c"]);
+    });
+  });
+
   describe("Invariant 8: base=undefined edge cases (§5.6 audit)", () => {
     // arbBaseClassName always produces a string, so the `undefined` base
     // path is reachable only via raw helper invocation (e.g. `<Link>` with
@@ -604,6 +671,35 @@ describe("buildHref — Property Tests (Solid)", () => {
         const href = buildHref(router, "any", {});
 
         expect(href).toBe(relativePath);
+      },
+    );
+  });
+
+  describe("Invariant 11b: encodeFragmentInline — multiple `#` all escape to `%23` (audit-2026-05-17 §6 Stage-2)", () => {
+    // `encodeFragmentInline` (in shared/dom-utils/link-utils.ts) calls
+    // `replaceAll("#", "%23")`. A refactor to `replace("#", "%23")` (single
+    // replacement) would corrupt fragments with multiple `#` characters
+    // into `tab%23section#trailing` — looks safe in single-# cases, fails
+    // silently on multi-#. Exercise through buildHref's fallback path so
+    // we don't need to export the private helper.
+    test.prop([fc.integer({ min: 2, max: 6 })], { numRuns: NUM_RUNS.standard })(
+      "hash with N `#` characters → result fragment contains zero `#`, exactly N `%23`",
+      (count) => {
+        const router = makeFakeRouter(undefined, () => "/x");
+        // Build a hash like "a#a#a" (count - 1 internal `#`s) — strip the
+        // leading position so the helper's leading-`#` strip doesn't eat
+        // the first one.
+        const hash = Array.from({ length: count }, () => "a").join("#");
+        const href = buildHref(router, "any", {}, { hash });
+        const fragment = href!.slice("/x#".length);
+
+        // No bare `#` survives encoding.
+        expect(fragment).not.toContain("#");
+
+        // The N-1 `#`s between "a"s all became `%23`.
+        const escapeCount = (fragment.match(/%23/g) ?? []).length;
+
+        expect(escapeCount).toBe(count - 1);
       },
     );
   });

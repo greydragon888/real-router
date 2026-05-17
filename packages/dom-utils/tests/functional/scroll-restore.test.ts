@@ -1135,4 +1135,145 @@ describe("createScrollRestoration", () => {
 
     expect(sessionStorage.getItem(STORAGE_KEY)).toBeNull();
   });
+
+  describe("unserializable params (#P0.2 audit)", () => {
+    // `keyOf` defers to `canonicalJson` → `JSON.stringify`. Two realistic
+    // inputs blow it up: BigInt values (TypeError) and cyclic structures
+    // (stack overflow). Without the defensive wrapper, the subscribe
+    // callback throws and scroll-restore goes silently offline for the
+    // whole session. The wrapper drops capture/restore for the offending
+    // route, warns once, and keeps the rest of the cache usable.
+
+    it("BigInt params do NOT throw — capture is skipped, warning logged once", () => {
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
+      Object.defineProperty(globalThis, "scrollY", {
+        value: 250,
+        configurable: true,
+      });
+
+      const fake = makeFakeRouter(makeState("home"));
+      const sr = track(createScrollRestoration(fake.router));
+
+      const bad = makeState("bad", { id: 9_007_199_254_740_993n });
+      const next = makeState("next", { id: "ok" });
+
+      // Capture: previousRoute is `bad` (unserializable) — must NOT throw.
+      expect(() => {
+        fake.emit(next, bad);
+      }).not.toThrow();
+
+      // Nothing persisted for the unserializable key. Storage is either
+      // null (never written) or an empty object — both prove the capture
+      // was skipped. Read deterministically (no conditional expect).
+      const raw = sessionStorage.getItem(STORAGE_KEY);
+      const stored =
+        raw === null ? {} : (JSON.parse(raw) as Record<string, number>);
+
+      expect(Object.keys(stored).some((k) => k.startsWith("bad:"))).toBe(false);
+
+      // Warning was emitted; second hit must NOT spam.
+      expect(consoleError).toHaveBeenCalledTimes(1);
+      expect(consoleError).toHaveBeenCalledWith(expect.stringContaining("bad"));
+
+      const bad2 = makeState("bad", { id: 1n });
+
+      fake.emit(makeState("again"), bad2);
+
+      expect(consoleError).toHaveBeenCalledTimes(1);
+
+      sr.destroy();
+      consoleError.mockRestore();
+    });
+
+    it("cyclic params do NOT throw — capture is skipped, warning logged once", () => {
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
+      const cyclic: Record<string, unknown> = { id: "x" };
+
+      cyclic.self = cyclic;
+
+      Object.defineProperty(globalThis, "scrollY", {
+        value: 400,
+        configurable: true,
+      });
+
+      const fake = makeFakeRouter(makeState("home"));
+      const sr = track(createScrollRestoration(fake.router));
+
+      const bad = makeState("loop", cyclic);
+      const next = makeState("home");
+
+      expect(() => {
+        fake.emit(next, bad);
+      }).not.toThrow();
+
+      expect(consoleError).toHaveBeenCalledTimes(1);
+
+      sr.destroy();
+      consoleError.mockRestore();
+    });
+
+    it("pagehide with unserializable current state does NOT throw", () => {
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
+      const fake = makeFakeRouter(makeState("bad", { id: 42n }));
+
+      Object.defineProperty(globalThis, "scrollY", {
+        value: 150,
+        configurable: true,
+      });
+
+      const sr = track(createScrollRestoration(fake.router));
+
+      expect(() => {
+        globalThis.dispatchEvent(new Event("pagehide"));
+      }).not.toThrow();
+
+      // Nothing persisted for the bad key, but the dispatch itself was safe.
+      expect(sessionStorage.getItem(STORAGE_KEY)).toBeNull();
+
+      sr.destroy();
+      consoleError.mockRestore();
+    });
+
+    it("restore (back/traverse) with unserializable params writes 0 instead of throwing", () => {
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
+      const scrollSpy = vi.fn();
+
+      globalThis.scrollTo = scrollSpy as unknown as typeof globalThis.scrollTo;
+
+      const fake = makeFakeRouter(makeState("home"));
+      const sr = track(createScrollRestoration(fake.router));
+
+      const target = makeState(
+        "bad",
+        { id: 7n },
+        { navigation: { direction: "back", navigationType: "traverse" } },
+      );
+
+      expect(() => {
+        fake.emit(target, makeState("prev"));
+      }).not.toThrow();
+
+      // Default-to-zero behavior: cannot look up a key we cannot compute.
+      expect(scrollSpy).toHaveBeenCalledWith({
+        top: 0,
+        left: 0,
+        behavior: "auto",
+      });
+
+      sr.destroy();
+      consoleError.mockRestore();
+    });
+  });
 });

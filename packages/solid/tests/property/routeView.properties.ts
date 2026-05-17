@@ -424,6 +424,58 @@ describe("buildRenderList — Property Tests (Solid RouteView, §6.2 Inv 8)", ()
       },
     );
   });
+
+  describe("Invariant 12: NotFound vs Self at UNKNOWN_ROUTE parent (audit-2026-05-17 §6 Stage-1)", () => {
+    // CLAUDE.md documents this rare edge: when `nodeName === UNKNOWN_ROUTE`
+    // AND the active route is also `UNKNOWN_ROUTE`, both `<Self>` and
+    // `<NotFound>` *could* fire — Self because `routeName === nodeName`,
+    // NotFound because `routeName === UNKNOWN_ROUTE`. The implementation
+    // gives Self precedence (see `helpers.tsx` `buildRenderList` —
+    // `selfMarker !== null && routeName === nodeName` is the FIRST
+    // branch of the !activeMatchFound conditional).
+    //
+    // Pin-test the precedence so a refactor that re-orders the branches
+    // (or adds a guard like `nodeName !== UNKNOWN_ROUTE` to Self) becomes
+    // visible. NotFound-only at UNKNOWN_ROUTE parent is covered by Inv 10
+    // (`UNKNOWN_ROUTE + NotFound marker → exactly one rendered`).
+    test("Self wins over NotFound when both could fire at nodeName === UNKNOWN_ROUTE", () => {
+      const selfMarker: RouteViewMarker = {
+        $$type: SELF_MARKER,
+        children: "SELF-AT-UNKNOWN" as never,
+        fallback: undefined,
+      };
+      const notFoundMarker: RouteViewMarker = {
+        $$type: NOT_FOUND_MARKER,
+        children: "NOTFOUND" as never,
+      };
+
+      const rendered = buildRenderList(
+        [selfMarker, notFoundMarker],
+        UNKNOWN_ROUTE,
+        UNKNOWN_ROUTE,
+      );
+
+      // Both markers would qualify individually; the impl picks Self first.
+      expect(rendered).toHaveLength(1);
+      expect(rendered[0]).toBe("SELF-AT-UNKNOWN");
+    });
+
+    test("NotFound fires when no Self present at nodeName === UNKNOWN_ROUTE", () => {
+      const notFoundMarker: RouteViewMarker = {
+        $$type: NOT_FOUND_MARKER,
+        children: "NOTFOUND-ONLY" as never,
+      };
+
+      const rendered = buildRenderList(
+        [notFoundMarker],
+        UNKNOWN_ROUTE,
+        UNKNOWN_ROUTE,
+      );
+
+      expect(rendered).toHaveLength(1);
+      expect(rendered[0]).toBe("NOTFOUND-ONLY");
+    });
+  });
 });
 
 // =============================================================================
@@ -558,5 +610,81 @@ describe("collectElements — Property Tests (§6.4 №6, §6.5 №5)", () => {
 
       expect(result).toStrictEqual([m1, m2, m3]);
     });
+  });
+
+  describe("idempotency: two collect passes produce identical-ref outputs (audit-2026-05-17 §6 Stage-2)", () => {
+    // The collector is pure — given the same input it must produce the same
+    // (marker-ref-preserving) sequence on every run. A regression that
+    // mutated the markers in-place or introduced a hidden counter would fail
+    // here. Identity preservation matters because consumers compare marker
+    // refs upstream in `buildRenderList`.
+    test.prop(
+      [fc.array(fc.string({ minLength: 1, maxLength: 4 }), { maxLength: 6 })],
+      { numRuns: NUM_RUNS.standard },
+    )(
+      "collect twice over the same markers yields ref-equal sequences",
+      (ids) => {
+        const markers = ids.map((id) => sampleMatch(id));
+
+        const a: RouteViewMarker[] = [];
+        const b: RouteViewMarker[] = [];
+
+        collectElements(markers, a);
+        collectElements(markers, b);
+
+        expect(a).toHaveLength(b.length);
+
+        a.forEach((marker, i) => {
+          // Stronger than `toStrictEqual` — the SAME object reference must
+          // appear in both passes (no per-pass clone).
+          expect(marker).toBe(b[i]);
+        });
+      },
+    );
+  });
+
+  describe("type preservation: every result element has a known $$type (audit-2026-05-17 §6 Stage-2)", () => {
+    // Locks the marker filter: only Match/Self/NotFound shapes pass through,
+    // everything else is silently dropped. A regression that opens the
+    // gate (e.g. `if (typeof child === 'object')` instead of the symbol
+    // check) would fail because non-marker objects would leak into the
+    // result with `$$type === undefined`.
+    test.prop(
+      [
+        fc.array(
+          fc.oneof(
+            fc.constant(undefined).map((_) => sampleMatch("m")),
+            fc.constant(undefined).map(
+              (_): RouteViewMarker => ({
+                $$type: SELF_MARKER,
+                children: "S" as never,
+                fallback: undefined,
+              }),
+            ),
+            fc.constant(undefined).map(
+              (_): RouteViewMarker => ({
+                $$type: NOT_FOUND_MARKER,
+                children: "NF" as never,
+              }),
+            ),
+          ),
+          { minLength: 1, maxLength: 6 },
+        ),
+      ],
+      { numRuns: NUM_RUNS.standard },
+    )(
+      "every collected marker has $$type ∈ {MATCH, SELF, NOT_FOUND}",
+      (markers) => {
+        const result: RouteViewMarker[] = [];
+
+        collectElements(markers, result);
+
+        const allowed = new Set([MATCH_MARKER, SELF_MARKER, NOT_FOUND_MARKER]);
+
+        for (const m of result) {
+          expect(allowed.has(m.$$type)).toBe(true);
+        }
+      },
+    );
   });
 });

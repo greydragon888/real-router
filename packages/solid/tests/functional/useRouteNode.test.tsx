@@ -404,20 +404,21 @@ describe("useRouteNode", () => {
 
       // RouterProvider itself calls router.subscribe ONCE (via createRouteSource).
       // The 5 useRouteNode("users") consumers must NOT add 5 more — they all
-      // multiplex through the cached createRouteNodeSource. Tolerate ≤ 2 to
-      // allow for an internal helper subscription if added; > 2 indicates the
-      // cache silently broke and per-component subscriptions are leaking.
-      expect(subscribeSpy.mock.calls.length).toBeLessThanOrEqual(2);
+      // multiplex through the cached createRouteNodeSource. Strict equality:
+      // 1 (provider) + 1 (cached node source) = 2 total. A loose `≤ 2` would
+      // pass on the regression "cache silently broke" up to 5 calls; the
+      // strict check fails on the first extra subscription (#P0.4 audit).
+      expect(subscribeSpy).toHaveBeenCalledTimes(2);
     });
 
     it("different node names produce separate cache entries but share router subscription", async () => {
       const subscribeSpy = vi.spyOn(router, "subscribe");
 
       // 3 distinct nodes × 2 consumers each → cache produces 3 sources,
-      // each backed by a router subscription. Tolerate up to 4 calls
-      // (RouterProvider's own subscribe + per-source registrations) to keep
-      // the assertion robust against internal refactors, while still
-      // catching the worst case of 6 (one per useRouteNode call).
+      // each backed by a router subscription. Strict equality: 1 (provider)
+      // + 3 (one cached source per distinct node name) = 4 total. The
+      // previous `≤ 4` would silently absorb a regression up to 6
+      // (one subscribe per useRouteNode call) (#P0.4 audit).
       render(() => (
         <RouterProvider router={router}>
           <RouteNodeProbe name="users" />
@@ -429,7 +430,7 @@ describe("useRouteNode", () => {
         </RouterProvider>
       ));
 
-      expect(subscribeSpy.mock.calls.length).toBeLessThanOrEqual(4);
+      expect(subscribeSpy).toHaveBeenCalledTimes(4);
     });
   });
 

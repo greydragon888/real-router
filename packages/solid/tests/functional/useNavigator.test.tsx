@@ -40,7 +40,15 @@ describe("useNavigator hook", () => {
 
     await result.navigate("about");
 
+    // audit-2026-05-17 §1 MEDIUM #13 — subscribe callback must receive the
+    // standard `{ route, ... }` payload. Loose count-only assertion would
+    // pass even if the FSM stopped passing data to subscribers.
     expect(subscribeCallback).toHaveBeenCalledTimes(1);
+    expect(subscribeCallback).toHaveBeenCalledWith(
+      expect.objectContaining({
+        route: expect.objectContaining({ name: "about" }),
+      }),
+    );
 
     unsubscribe();
 
@@ -54,7 +62,13 @@ describe("useNavigator hook", () => {
 
     await result.navigate("about");
 
+    // audit-2026-05-17 §1 MEDIUM #13 — same shape lock on subscribeLeave.
+    // The leave payload includes `signal` for guard-style cancellation
+    // (RFC TRANSITION_LEAVE_APPROVE).
     expect(leaveCallback).toHaveBeenCalledTimes(1);
+    expect(leaveCallback).toHaveBeenCalledWith(
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
 
     unsubscribeLeave();
 

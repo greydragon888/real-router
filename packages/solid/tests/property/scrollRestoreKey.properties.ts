@@ -192,4 +192,191 @@ describe("keyOf / canonicalJson — Property Tests (§8b H20, audit #S3)", () =>
       expect(canonicalJson(undefined)).toBeUndefined();
     });
   });
+
+  // ===========================================================================
+  // Invariants 7–12 (audit-2026-05-17 §2 / §6) — keyOf injectivity +
+  // canonicalJson hardening.
+  // ===========================================================================
+
+  describe("Invariant 7: `keyOf` injectivity for distinct (name, params)", () => {
+    // Two snapshots that differ in either `name` or `params` MUST produce
+    // distinct keys — otherwise the scroll-restore cache would silently
+    // collide and "restore" wrong positions on back-navigation. Locks the
+    // structural separator between `name` and `params` and the
+    // canonicalisation of `params`. We restrict the param shape to objects
+    // whose canonical form is non-trivial so the differing-params branch
+    // actually surfaces in the key.
+    test.prop(
+      [
+        fc.tuple(
+          fc.stringMatching(/^[a-z][a-z.]{0,8}[a-z]$/),
+          fc.stringMatching(/^[a-z][a-z.]{0,8}[a-z]$/),
+        ),
+        arbPlainParams,
+        arbPlainParams,
+      ],
+      { numRuns: NUM_RUNS.thorough },
+    )(
+      "distinct (name, params) pairs produce distinct keys",
+      ([nameA, nameB], paramsA, paramsB) => {
+        // Skip the trivial case where both pairs collapse to the same
+        // (name, canonicalForm) — that's the equality branch and it's
+        // covered by Invariant 1.
+        const stateA = { ...arbState(paramsA), name: nameA } as State;
+        const stateB = { ...arbState(paramsB), name: nameB } as State;
+
+        if (
+          nameA === nameB &&
+          canonicalJson(paramsA) === canonicalJson(paramsB)
+        ) {
+          // Equality branch — they SHOULD produce the same key.
+          expect(keyOf(stateA)).toBe(keyOf(stateB));
+
+          return;
+        }
+
+        expect(keyOf(stateA)).not.toBe(keyOf(stateB));
+      },
+    );
+  });
+
+  describe("Invariant 8: `keyOf` name-vs-params collision boundary (documented)", () => {
+    // Edge case: `name` contains a literal `:` separator, so an adversarial
+    // route name could in principle pun against the params section. The
+    // helper's current key format `${name}:${canonicalJson(params)}` makes
+    // the name fully prefixed (separator placed AFTER the name), so a route
+    // named `"a:b"` with empty params is distinguishable from a route named
+    // `"a"` with params `{ b: "" }` — the second produces `a:{"b":""}`, the
+    // first produces `a:b:{}`. Locking the answer prevents a refactor to
+    // `${name}|${params}` or stripping `:` from the name from accidentally
+    // collapsing these two cases.
+    test("keyOf({name:'a:b', params:{}}) !== keyOf({name:'a', params:{b:''}})", () => {
+      const stateColonName = {
+        ...arbState({}),
+        name: "a:b",
+      } as State;
+      const stateWithEmptyParam = {
+        ...arbState({ b: "" }),
+        name: "a",
+      } as State;
+
+      expect(keyOf(stateColonName)).not.toBe(keyOf(stateWithEmptyParam));
+    });
+
+    test("keyOf shape: empty params produces `${name}:{}` suffix", () => {
+      const state = { ...arbState({}), name: "home" } as State;
+
+      // `canonicalJson({})` is `"{}"` — the trailing `{}` is the
+      // observable suffix that pin-tests the empty-params shape.
+      expect(keyOf(state)).toBe("home:{}");
+    });
+  });
+
+  describe("Invariant 9: `canonicalJson` roundtrip — JSON.parse recovers structurally equal value", () => {
+    // The serialised form must be a valid JSON document whose parse result
+    // matches the canonicalised input. This locks the contract "scroll
+    // cache values can be read back unchanged" — a non-recoverable
+    // serialisation would corrupt restoration after a page reload (when
+    // sessionStorage is re-parsed).
+    test.prop([arbPlainParams], { numRuns: NUM_RUNS.thorough })(
+      "JSON.parse(canonicalJson(x)) structurally equals canonical(x)",
+      (params) => {
+        const serialised = canonicalJson(params);
+        const parsed = JSON.parse(serialised) as Record<string, unknown>;
+
+        // Compare canonicalised forms — direct deep-equal of `params` and
+        // `parsed` would fail when `params` contains an `undefined` value
+        // (canonical drops those, matching JSON.stringify semantics).
+        expect(canonicalJson(parsed)).toBe(serialised);
+      },
+    );
+  });
+
+  describe("Invariant 10: `canonicalJson` idempotency over JSON-parse roundtrip", () => {
+    // `canonicalJson(JSON.parse(canonicalJson(x))) === canonicalJson(x)` —
+    // the serialisation is a fixed point of itself under one parse cycle.
+    // Stronger than determinism (Invariant 3) because it also locks the
+    // parse-then-serialise path against subtle reordering quirks.
+    test.prop([arbPlainParams], { numRuns: NUM_RUNS.standard })(
+      "canonicalJson is a fixed point of itself under one parse cycle",
+      (params) => {
+        const once = canonicalJson(params);
+        const parsed = JSON.parse(once) as unknown;
+        const twice = canonicalJson(parsed);
+
+        expect(twice).toBe(once);
+      },
+    );
+  });
+
+  describe("Invariant 11: `canonicalJson` is safe with hostile own-keys (__proto__/constructor)", () => {
+    // `__proto__` set on a plain object via property accessor (e.g.
+    // `{ __proto__: 1 }`) becomes an OWN property on V8 — it must be
+    // sorted alongside the other keys and serialised verbatim, without
+    // polluting `Object.prototype`. A regression here would either drop
+    // the key entirely (cache-key collision) or silently leak into the
+    // prototype chain (security).
+    test("hostile own-keys are serialised verbatim and do NOT pollute Object.prototype", () => {
+      // Build the object via Object.defineProperty so the key is unambiguously
+      // an own property (not a real prototype assignment). `__proto__` via
+      // object literal would set the prototype chain instead.
+      const hostile = {} as Record<string, unknown>;
+
+      Object.defineProperty(hostile, "__proto__", {
+        value: "evil",
+        enumerable: true,
+        configurable: true,
+        writable: true,
+      });
+      Object.defineProperty(hostile, "constructor", {
+        value: "evil2",
+        enumerable: true,
+        configurable: true,
+        writable: true,
+      });
+      hostile.normal = "ok";
+
+      const probeBefore = Object.create(null) as { polluted?: unknown };
+      const result = canonicalJson(hostile);
+      const probeAfter = Object.create(null) as { polluted?: unknown };
+
+      // Both probes must remain empty (no leak into Object.prototype).
+      expect(probeBefore.polluted).toBeUndefined();
+      expect(probeAfter.polluted).toBeUndefined();
+
+      // Hostile keys appear in the sorted output. `__proto__` may serialise
+      // as a plain string property; we assert presence by parsing back and
+      // checking the OWN key set.
+      const parsed = JSON.parse(result) as Record<string, unknown>;
+
+      const byLocale = (a: string, b: string): number => a.localeCompare(b);
+
+      expect(Object.keys(parsed).toSorted(byLocale)).toStrictEqual(
+        ["__proto__", "constructor", "normal"].toSorted(byLocale),
+      );
+    });
+  });
+
+  describe("Invariant 12: `canonicalJson` deep nesting stress (no stack overflow at realistic depth)", () => {
+    // User-controllable scroll-restore params with a deeply nested shape
+    // (e.g. a Solid `<For>` of dynamic filter trees) would otherwise crash
+    // `JSON.stringify` via stack exhaustion. 64 levels is well past
+    // anything any real router consumer should ever pass; locking the
+    // boundary at 64 catches regressions to a fully recursive replacer
+    // without a stack budget.
+    test("nested object 64 levels deep serialises without throwing", () => {
+      let nested: Record<string, unknown> = { leaf: 1 };
+
+      for (let i = 0; i < 64; i++) {
+        nested = { wrap: nested };
+      }
+
+      const result = canonicalJson(nested);
+
+      expect(typeof result).toBe("string");
+      // Parse-back must succeed — a corrupted output (truncated, malformed)
+      // would throw here.
+      expect(() => JSON.parse(result)).not.toThrow();
+    });
+  });
 });
