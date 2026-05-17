@@ -222,7 +222,10 @@ describe("parseTokens — contract locks (via buildActiveClassName)", () => {
       'base="" → result is exactly the active class',
       (active) => {
         const result = buildActiveClassName(true, active, "");
-        const tokens = result?.split(/\s+/).filter(Boolean) ?? [];
+
+        expect(result).toBeDefined();
+
+        const tokens = result!.split(/\s+/).filter(Boolean);
 
         expect(tokens).toStrictEqual([active]);
       },
@@ -245,7 +248,10 @@ describe("parseTokens — contract locks (via buildActiveClassName)", () => {
       "whitespace-only base (tab/newline) → result is exactly the active class",
       (active, wsBase) => {
         const result = buildActiveClassName(true, active, wsBase);
-        const tokens = result?.split(/\s+/).filter(Boolean) ?? [];
+
+        expect(result).toBeDefined();
+
+        const tokens = result!.split(/\s+/).filter(Boolean);
 
         expect(tokens).toStrictEqual([active]);
       },

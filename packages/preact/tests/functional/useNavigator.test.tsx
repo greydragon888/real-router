@@ -26,19 +26,22 @@ describe("useNavigator hook", () => {
     router.stop();
   });
 
-  it("should return navigator with 4 methods", () => {
+  it("should return navigator with full method surface", () => {
     const { result } = renderHook(() => useNavigator(), {
       wrapper: wrapper(router),
     });
 
-    expect(result.current).toStrictEqual(
-      expect.objectContaining({
-        navigate: expect.any(Function),
-        getState: expect.any(Function),
-        isActiveRoute: expect.any(Function),
-        subscribe: expect.any(Function),
-      }),
-    );
+    expect(
+      Object.keys(result.current).toSorted((a, b) => a.localeCompare(b)),
+    ).toStrictEqual([
+      "canNavigateTo",
+      "getState",
+      "isActiveRoute",
+      "isLeaveApproved",
+      "navigate",
+      "subscribe",
+      "subscribeLeave",
+    ]);
   });
 
   it("should have working navigate method", async () => {

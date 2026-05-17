@@ -322,9 +322,12 @@ describe("RouterErrorBoundary", () => {
 
     fireEvent.click(screen.getByTestId("link"));
 
-    await waitFor(() => {
-      expect(screen.getByTestId("fallback")).toBeInTheDocument();
-    });
+    await waitFor(
+      () => {
+        expect(screen.getByTestId("fallback")).toBeInTheDocument();
+      },
+      { timeout: 100 },
+    );
 
     expect(screen.getByTestId("fallback").textContent).toBe(
       errorCodes.CANNOT_ACTIVATE,

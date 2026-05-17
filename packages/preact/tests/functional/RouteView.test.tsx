@@ -135,6 +135,10 @@ describe("RouteView", () => {
           ),
         ).toThrow(/Segment contains invalid characters/);
 
+        // The error throws synchronously from render() before Preact's error
+        // boundary logging fires — console.error must not have been called.
+        expect(consoleError).not.toHaveBeenCalled();
+
         consoleError.mockRestore();
       },
     );

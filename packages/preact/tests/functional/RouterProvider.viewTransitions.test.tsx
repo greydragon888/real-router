@@ -73,6 +73,7 @@ describe("RouterProvider — viewTransitions", () => {
     });
 
     expect(startSpy).toHaveBeenCalledTimes(1);
+    expect(startSpy).toHaveBeenCalledWith(expect.any(Function));
   });
 
   it("viewTransitions: false — utility not wired", async () => {

@@ -82,8 +82,12 @@ const arbLinkProps = fc.record({
   hash: fc.option(arbHash, { nil: undefined }),
   onClick: fc.constant(undefined),
   target: fc.option(fc.constantFrom("_blank", "_self"), { nil: undefined }),
-  style: fc.constant(undefined),
-  children: fc.constant(undefined),
+  style: fc.option(fc.string({ minLength: 1, maxLength: 10 }), {
+    nil: undefined,
+  }),
+  children: fc.option(fc.string({ minLength: 1, maxLength: 10 }), {
+    nil: undefined,
+  }),
   routeParams: fc.option(arbParams, { nil: undefined }),
   routeOptions: fc.option(arbParams, { nil: undefined }),
 });
@@ -255,6 +259,27 @@ describe("areLinkPropsEqual — Property Tests", () => {
         ),
       ).toBe(false);
     });
+
+    test.prop([arbLinkProps], { numRuns: NUM_RUNS.standard })(
+      'different style ("a" vs "b") → false',
+      (base) => {
+        expect(
+          areLinkPropsEqual({ ...base, style: "a" }, { ...base, style: "b" }),
+        ).toBe(false);
+      },
+    );
+
+    test.prop([arbLinkProps], { numRuns: NUM_RUNS.standard })(
+      'different children ("a" vs "b") → false',
+      (base) => {
+        expect(
+          areLinkPropsEqual(
+            { ...base, children: "a" },
+            { ...base, children: "b" },
+          ),
+        ).toBe(false);
+      },
+    );
   });
 
   describe("Invariant 5: `hash` prop sensitivity (#532)", () => {

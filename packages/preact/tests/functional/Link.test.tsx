@@ -824,6 +824,7 @@ describe("Link component", () => {
     fireEvent.click(screen.getByTestId("link"));
     await Promise.resolve();
 
+    expect(router.getState()).toBeDefined();
     expect(router.getState()?.name).toBe("test");
 
     consoleError.mockRestore();
@@ -849,6 +850,7 @@ describe("Link component", () => {
     fireEvent.click(screen.getByTestId("link"));
     await Promise.resolve();
 
+    expect(router.getState()).toBeDefined();
     expect(router.getState()?.name).toBe("test");
 
     consoleError.mockRestore();

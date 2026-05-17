@@ -40,28 +40,23 @@ describe("createHttpStatusSink", () => {
     expect(sink.code).toBe(200);
   });
 
-  it("survives consumer-applied Object.freeze without crashing HttpStatusCode render", () => {
-    // A defensive consumer might freeze the sink before render. In strict mode
-    // the write inside HttpStatusCode would normally throw a TypeError. The
-    // module's behaviour here is: write-through-context succeeds when the sink
-    // is mutable; if the consumer freezes it, the failed write is the
-    // consumer's responsibility — but the render itself must not surface the
-    // TypeError as an unhandled rejection that kills the SSR pipeline.
+  it("throws TypeError when consumer-frozen sink is written to", () => {
+    // A defensive consumer might freeze the sink before render. In strict-mode
+    // ESM, assigning to a frozen object property throws a TypeError — that is
+    // the expected behaviour here. The render will throw; the consumer is
+    // responsible for not freezing the sink in production.
     const sink = Object.freeze(createHttpStatusSink());
 
-    // Pre-freeze code is undefined; renderToString runs through normally and
-    // returns the HTML — the frozen sink simply doesn't receive the write.
-    // We assert the render does not throw (try/catch elevates a thrown error
-    // to a test failure with the actual message).
     expect(() => {
       renderToString(
         <HttpStatusProvider sink={sink}>
           <HttpStatusCode code={404} />
         </HttpStatusProvider>,
       );
-    }).toThrow();
+    }).toThrow(TypeError);
 
-    // Sink stays at its pre-freeze value — write was rejected by the freeze.
+    // The write was rejected before it could complete — code stays at its
+    // initial undefined value.
     expect(sink.code).toBeUndefined();
   });
 });
@@ -115,7 +110,9 @@ describe("HttpStatusCode", () => {
     });
 
     it("no-op without provider (safe to render anywhere)", () => {
-      expect(() => renderToString(<HttpStatusCode code={404} />)).not.toThrow();
+      const html = renderToString(<HttpStatusCode code={404} />);
+
+      expect(html).toBe("");
     });
 
     it("non-404 codes (410 Gone, 451 Unavailable for Legal Reasons) round-trip", () => {

@@ -27,19 +27,24 @@ describe("useRoute hook", () => {
     router.stop();
   });
 
-  it("should return navigator", () => {
+  it("should return navigator with full method surface", () => {
     const { result } = renderHook(() => useRoute(), {
       wrapper: wrapper(router),
     });
 
-    expect(result.current.navigator).toStrictEqual(
-      expect.objectContaining({
-        navigate: expect.any(Function),
-        getState: expect.any(Function),
-        isActiveRoute: expect.any(Function),
-        subscribe: expect.any(Function),
-      }),
-    );
+    expect(
+      Object.keys(result.current.navigator).toSorted((a, b) =>
+        a.localeCompare(b),
+      ),
+    ).toStrictEqual([
+      "canNavigateTo",
+      "getState",
+      "isActiveRoute",
+      "isLeaveApproved",
+      "navigate",
+      "subscribe",
+      "subscribeLeave",
+    ]);
   });
 
   it("should return current route", async () => {

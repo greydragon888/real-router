@@ -31,6 +31,7 @@ File: `tests/property/routeView.properties.ts`
 | 6 | **Empty `fullSegmentName` always returns false** — early return guard | Empty-segment match is undefined behaviour; the guard protects callers from ambiguous results |
 | 7 | **Extended ASCII alphabet** (digits, `_`, `-`, mixed case) preserves Inv 1, 3, 5 | route-utils' `SAFE_SEGMENT_PATTERN` (`/^[\w.-]+$/`) accepts the full ASCII surface; real routes use `users-list`, `posts_2024` — invariants must hold beyond the default lowercase alpha-only generator |
 | 8 | **Wide-depth route names** (1–6 segments) preserve Inv 1, 3 | Deeply nested names exercise the regex-construction path of `startsWithSegment` (escape + dotOrEnd) at depths the default 1–4-segment generator misses |
+| 9 | **Strict monotonicity** — `isSegmentMatch(a, b, true) === true` ⇒ `isSegmentMatch(a, b, false) === true` | Exact match is a specialisation of non-exact (a route that matches `name === segment` always satisfies `startsWithSegment(name, segment)`). A regression that broke this would mean a route exactly matches a segment but is rejected by the prefix check — impossible by the segment-boundary regex construction; the invariant locks the relationship |
 
 ## shallowEqual (DOM-utils comparator for `routeParams` / `routeOptions`)
 
@@ -47,6 +48,8 @@ File: `tests/property/shallowEqual.properties.ts`
 | 7 | **Symbol values (Object.is by reference)** — same Symbol ref → `true`; distinct Symbol refs → `false` | Symbols are identity-only; `===` and `Object.is` agree on them, but coverage must explicitly exercise the path |
 | 8 | **Date values (Object.is by reference, not by epoch)** — same Date ref → `true`; distinct Date with identical `valueOf()` → `false` | Locks the no-value-equality contract for objects passed as params; consumers stabilize Date refs themselves if they want memo reuse |
 | 9 | **Nested objects compared by reference (no deep compare)** — structurally-identical nested objects with distinct refs → `false`; shared nested ref → `true` | Documented gotcha (CLAUDE.md "Object Params and Memoization"); a deep-compare regression would silently change Link re-render behaviour |
+| 10 | **Explicit-undefined value counts as a present key** — `shallowEqual({a:1, b:undefined}, {a:1}) === false` (symmetric) | `Object.keys` includes own-properties whose value is `undefined`, so the length short-circuit fires. A "fix" that filtered undefined values would break the contract on consumers who toggle an optional field between absent and explicitly-`undefined` (e.g. controlled vs. uncontrolled form binding) |
+| 11 | **Prototype-pollution lock — inherited keys do not count as own** — `shallowEqual(Object.create({shared:1}), {own:1, shared:1}) === false` | Implementation uses `Object.prototype.hasOwnProperty.call(next, key)` for each `prev` key. A regression to plain `key in next` would accept inherited properties; the generator alphabet (`[a-z]{1,4}`) never exercises this path, so the lock is a reified example covering the prototype chain |
 
 ## buildActiveClassName (DOM-utils CSS-class composer)
 
@@ -61,6 +64,14 @@ File: `tests/property/linkUtils.properties.ts`
 | 5 | **Whitespace-only `activeClassName` falls back to base verbatim** — `??`, not `?:` | Empty-string `base` is preserved verbatim and not coerced to `undefined` |
 | 6 | **Strict idempotency** — `f(true, a, f(true, a, base)) === f(true, a, base)` | The first apply normalizes whitespace; the second over the normalized output reproduces the exact same string (not just the same token set) — catches token reordering or re-padding regressions |
 | Behaviour lock | Dedup applies to the active token only, NOT to pre-existing duplicates in `base` | The helper uses `Set` for membership but pushes onto the original `baseTokens` array; locking this behaviour prevents a silent contract change during refactoring |
+
+> **`parseTokens` (private helper) contract.** `parseTokens(s)` uses `/\S+/g`,
+> so empty / whitespace-only input produces zero tokens, and tabs / newlines /
+> CR collapse to single-space joins. The contract is locked through
+> `buildActiveClassName` ("parseTokens — contract locks" describe block in
+> `linkUtils.properties.ts`): a regression to `/[^ ]+/g` would leave `\t`/`\n`
+> as tokens and surface as a meaningful failure rather than a generic Inv 1
+> hit on double-space output.
 
 ## buildHref (DOM-utils href builder)
 
@@ -101,3 +112,53 @@ File: `tests/property/navigateWithHash.properties.ts`
 | 3 | **Different route → no auto-bypass** even if hash differs | `force`/`hashChange` are exclusively the same-route hash-change signal |
 | 4 | **`opts.hash` propagation** — `undefined` → key absent; defined → forwarded verbatim | Plugins distinguish "preserve current hash" from "explicit hash value" |
 | 5 | **No current state → pass-through** (no `force` logic) | Initial navigation has no current state to compare against — the auto-bypass branch must short-circuit |
+| 6 | **Same route + `hash === undefined` → preserve current hash, no force** | `hash ?? currentHash` makes `newHash === currentHash`, so the `currentHash !== newHash` branch never fires; passing `undefined` is the documented "don't change the fragment" signal and must not trigger the bypass flags |
+
+## shouldNavigate (DOM-utils click-gate)
+
+File: `tests/property/shouldNavigate.properties.ts`
+
+`shouldNavigate(evt)` decides whether a `<Link>` click should call
+`preventDefault()` and route programmatically vs. let the browser follow the
+href natively (new-tab middle-click, modifier-click, secondary-click). The
+decision matrix is `evt.button === 0 && !meta && !alt && !ctrl && !shift`.
+
+| # | Invariant | Why it must hold |
+|---|-----------|-----------------|
+| 1 | **`button !== 0` always returns `false`** for every modifier combination | Middle-click (button=1) opens a new tab; right-click (button=2) shows the context menu. A regression that returned `true` here would hijack both UX gestures |
+| 2 | **Any modifier set on `button=0` returns `false`** — result equals `(button === 0 && no modifiers set)` | meta/ctrl-click opens a new tab, shift-click opens a new window, alt-click triggers download in some browsers. None should route programmatically — those are browser-native gestures the consumer expects to keep working |
+| 3 | **Plain primary click (`button=0`, no modifiers) → `true`** | The default-navigate path must always succeed; otherwise no Link in the app would respond to a plain click |
+| 4 | **Totality** — never throws on any `(button, modifiers)` input | Called inside every adapter's click handler; a runtime throw surfaces as an unhandled error in the consumer's app |
+| 5 | **Purity** — same input yields same output across calls | No hidden state; a memoization regression keyed on event identity could flake on re-fired synthetic events |
+
+## applyLinkA11y (DOM-utils a11y helper)
+
+File: `tests/property/applyLinkA11y.properties.ts`
+
+`applyLinkA11y(el)` adds `role="link"` + `tabindex="0"` to non-anchor /
+non-button elements that act as Links (e.g. `<div>`, `<span>`). Frozen API in
+`shared/dom-utils/`; consumed by every framework adapter's `Link` /
+directive. (Preact's `Link.tsx` currently renders `<a>` natively so does not
+call the helper, but the function must still hold its contract for other
+adapters and for consumers who build their own custom Link surface.)
+
+| # | Invariant | Why it must hold |
+|---|-----------|-----------------|
+| 1 | **Idempotency** — calling twice yields the same attribute state on the element | Re-mounts and parent re-renders must not duplicate or thrash attributes; a regression that dropped the `!element.hasAttribute(...)` guard would surface as attribute writes on every effect re-run |
+| 2 | **Pre-existing `role` / `tabindex` is preserved** — values set by the consumer (including empty string) are never overwritten | Consumers may declare `role="menuitem"` / `tabindex="-1"` on the wrapper. Uses `hasAttribute` (not `getAttribute`), so any present value counts as "consumer-owned" |
+| 3 | **Anchor / button are no-op** — `<a>` and `<button>` never gain `role` or `tabindex` | `<a>` is natively focusable and announces as a link; adding `role="link"` causes screen readers to double-announce. `<button>` is similarly self-describing — `instanceof HTMLAnchorElement` / `HTMLButtonElement` short-circuits both |
+| 4 | **Null / undefined element is a defensive no-op** — never throws | Framework refs can be `null` / `undefined` before mount; a throw here would crash the first user with a ref-callback on mount |
+| 5 | **Generic element gains `role="link"` + `tabindex="0"`** when neither attribute pre-exists | Canonical WAI-ARIA recipe for non-anchor link surfaces; the positive contract that justifies the helper's existence |
+
+## createHttpStatusSink (SSR utility)
+
+File: `tests/property/httpStatusSink.properties.ts`
+
+`createHttpStatusSink()` returns a mutable `{ code: number | undefined }`
+object per call — one sink per request, written by `<HttpStatusCode>` during
+render, read by the server after `renderToString`.
+
+| # | Invariant | Why it must hold |
+|---|-----------|-----------------|
+| 1 | **Each call returns a fresh object** — N invocations produce N distinct references; writing `sink.code` on one never affects another | A regression returning a singleton (or module-level cached object) would cause cross-request status code leakage on a multi-tenant SSR server |
+| 2 | **Initial `code === undefined`** | The server interprets `undefined` as "no `<HttpStatusCode>` rendered" → default to 200. A non-undefined default would silently override the server's status decision |

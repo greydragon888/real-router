@@ -31,9 +31,19 @@ describe("useRouteNode", () => {
       wrapper: (props) => wrapper({ ...props, router }),
     });
 
-    expect(result.current.navigator).toStrictEqual(
-      expect.objectContaining({ navigate: expect.any(Function) }),
-    );
+    expect(
+      Object.keys(result.current.navigator).toSorted((a, b) =>
+        a.localeCompare(b),
+      ),
+    ).toStrictEqual([
+      "canNavigateTo",
+      "getState",
+      "isActiveRoute",
+      "isLeaveApproved",
+      "navigate",
+      "subscribe",
+      "subscribeLeave",
+    ]);
     expect(result.current.route).toBeUndefined();
     expect(result.current.previousRoute).toBeUndefined();
   });
@@ -257,9 +267,19 @@ describe("useRouteNode", () => {
 
       expect(result.current.route).toBeUndefined();
       expect(result.current.previousRoute).toBeUndefined();
-      expect(result.current.navigator).toStrictEqual(
-        expect.objectContaining({ navigate: expect.any(Function) }),
-      );
+      expect(
+        Object.keys(result.current.navigator).toSorted((a, b) =>
+          a.localeCompare(b),
+        ),
+      ).toStrictEqual([
+        "canNavigateTo",
+        "getState",
+        "isActiveRoute",
+        "isLeaveApproved",
+        "navigate",
+        "subscribe",
+        "subscribeLeave",
+      ]);
     });
 
     it("should handle root node when navigating to non-existent route", async () => {

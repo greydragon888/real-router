@@ -58,6 +58,10 @@ describe("useDeferred", () => {
       settled = true;
     });
 
+    // Three microtask flushes: the NEVER_PROMISE singleton never resolves, so
+    // `settled` must stay false across all of them.
+    await Promise.resolve();
+    await Promise.resolve();
     await Promise.resolve();
 
     expect(settled).toBe(false);
@@ -74,6 +78,10 @@ describe("useDeferred", () => {
       settled = true;
     });
 
+    // Three microtask flushes: the NEVER_PROMISE singleton never resolves, so
+    // `settled` must stay false across all of them.
+    await Promise.resolve();
+    await Promise.resolve();
     await Promise.resolve();
 
     expect(settled).toBe(false);

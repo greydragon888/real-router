@@ -265,4 +265,24 @@ describe("shallowEqual — Property Tests", () => {
       expect(shallowEqual({ a: 1 }, { a: 1, b: undefined })).toBe(false);
     });
   });
+
+  describe("Invariant 11: prototype-pollution lock — inherited keys do not count as own", () => {
+    // The implementation uses `Object.prototype.hasOwnProperty.call(next, key)`
+    // for each key from `prev`. A regression to plain `key in next` would
+    // accept inherited properties — so an object with `own=1` would falsely
+    // match a record that inherits `own` from a prototype rather than owning
+    // it directly. `arbParams`/`arbExtendedRecord` only generate
+    // `[a-z]{1,4}` keys, so they never exercise this path — the lock is
+    // intentionally a reified example covering the prototype chain.
+    test("inherited key on one side does NOT match own key on the other", () => {
+      const inheriting: Record<string, unknown> = Object.create({ shared: 1 });
+
+      inheriting.own = 1;
+
+      const owning = { own: 1, shared: 1 };
+
+      expect(shallowEqual(inheriting, owning)).toBe(false);
+      expect(shallowEqual(owning, inheriting)).toBe(false);
+    });
+  });
 });

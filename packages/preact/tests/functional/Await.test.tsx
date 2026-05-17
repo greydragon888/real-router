@@ -61,6 +61,8 @@ describe("<Await>", () => {
 
     expect(screen.getByText("r1")).toBeInTheDocument();
     expect(screen.getByText("r2")).toBeInTheDocument();
+    // Once resolved, the Suspense fallback must no longer be visible.
+    expect(screen.queryByTestId("fallback")).not.toBeInTheDocument();
   });
 
   it("shows Streamed fallback while pending", () => {
@@ -153,12 +155,17 @@ describe("<Await>", () => {
 
   it("re-throws the rejection reason when the promise is pre-tracked as rejected (caught by ErrorBoundary)", async () => {
     const reason = new Error("boom");
-    const rejected = Object.assign(Promise.reject(reason), {
+    const base = Promise.reject(reason);
+
+    // Attach a no-op catch to prevent an unhandled-rejection warning.
+    // The rejection is intentional — we expose it to <Await> via the
+    // pre-tagged object so that <Await>'s Suspense-throw path is exercised.
+    base.catch(() => undefined);
+
+    const rejected = Object.assign(base, {
       status: "rejected" as const,
       reason,
     });
-
-    const capturedError = await rejected.catch((error: unknown) => error);
 
     injectDeferred(router, { broken: rejected });
 
@@ -173,8 +180,6 @@ describe("<Await>", () => {
         </RouterProvider>,
       ),
     ).toThrow("boom");
-
-    expect(capturedError).toBe(reason);
   });
 
   it("suspends forever (renders fallback) when the deferred key is missing", async () => {

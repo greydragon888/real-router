@@ -76,7 +76,7 @@ describe("useIsActiveRoute", () => {
 
     await act(async () => {
       await router.navigate("home");
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      await Promise.resolve();
     });
 
     expect(checkCount).toBe(checksAfterInitialRender);

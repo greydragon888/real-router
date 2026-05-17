@@ -85,7 +85,9 @@ describe("RouterProvider — scrollRestoration", () => {
       sessionStorage.getItem(STORAGE_KEY) ?? "{}",
     ) as Record<string, number>;
 
-    expect(Object.values(saved)).toContain(180);
+    // Key is "<routeName>:<canonicalJson(params)>". The router starts at "test"
+    // with empty params, so the bucket key is "test:{}".
+    expect(saved).toMatchObject({ "test:{}": 180 });
 
     unmount();
   });

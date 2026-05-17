@@ -119,6 +119,9 @@ describe("useRouteExit", () => {
       navigated = true;
     });
 
+    // Two microtask flushes: first settles the subscribeLeave notification
+    // Promise (which fires the handler), second lets Preact's deferred effect
+    // queue drain so that the handler call-count is stable before asserting.
     await Promise.resolve();
     await Promise.resolve();
 

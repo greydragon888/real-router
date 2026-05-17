@@ -45,7 +45,9 @@ describe("createHttpStatusSink — Property Tests", () => {
     )("writing code to one sink does not affect any other sink", (code, n) => {
       const sinks = Array.from({ length: n }, () => createHttpStatusSink());
 
-      // Write to the first sink only.
+      // n >= 2 (fc constraint), so sinks[0] is always defined.
+      expect(sinks[0]).toBeDefined();
+
       sinks[0].code = code;
 
       // Every other sink must still have code === undefined.

@@ -13,7 +13,7 @@ import type { ComponentChildren } from "preact";
 
 describe("useSyncExternalStore polyfill", () => {
   describe("Object.is(prev, next) bailout", () => {
-    it("does not re-render when getSnapshot returns the same reference between notifications", () => {
+    it("does not re-render when getSnapshot returns the same reference between notifications", async () => {
       const snapshot = { value: 1 };
       const listeners = new Set<() => void>();
 
@@ -39,9 +39,9 @@ describe("useSyncExternalStore polyfill", () => {
 
       // Fire the listener several times — `getSnapshot` returns the same
       // object ref, so the updater short-circuits via Object.is and Preact
-      // skips the re-render.
-
-      void act(() => {
+      // skips the re-render. Awaiting the async act ensures all microtasks
+      // and Preact batched updates have flushed before the assertion.
+      await act(async () => {
         for (let i = 0; i < 3; i++) {
           listeners.forEach((cb) => {
             cb();
@@ -69,17 +69,23 @@ describe("useSyncExternalStore polyfill", () => {
       let call = 0;
       const values = ["v1", "v2"] as const;
 
-      const getSnapshot = (): string => values[Math.min(call++, 1)] ?? "v2";
+      const getSnapshotImpl = (): string => values[Math.min(call++, 1)] ?? "v2";
+      const getSnapshotSpy = vi.fn(getSnapshotImpl);
       const subscribe = (): (() => void) => () => {};
 
       function Consumer(): ComponentChildren {
-        const v = useSyncExternalStore(subscribe, getSnapshot);
+        const v = useSyncExternalStore(subscribe, getSnapshotSpy);
 
         return <span data-testid="v">{v}</span>;
       }
 
       render(<Consumer />);
 
+      // Polyfill calls getSnapshot twice: once during useState(initialFn) for
+      // the initial render value ("v1"), and once inside the sync() effect
+      // to catch the fresher snapshot ("v2"). Exactly 2 calls confirms the
+      // race-fix mechanism fired rather than relying on the ?? fallback.
+      expect(getSnapshotSpy).toHaveBeenCalledTimes(2);
       expect(screen.getByTestId("v")).toHaveTextContent("v2");
     });
   });
