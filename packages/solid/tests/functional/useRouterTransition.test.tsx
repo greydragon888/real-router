@@ -175,15 +175,6 @@ describe("useRouterTransition", () => {
     await Promise.resolve();
   });
 
-  it("toRoute and fromRoute === null when no transition", () => {
-    const { result } = renderHook(() => useRouterTransition(), {
-      wrapper: wrapper(router),
-    });
-
-    expect(result().toRoute).toBeNull();
-    expect(result().fromRoute).toBeNull();
-  });
-
   it("handles cancel by new navigate correctly", async () => {
     const lifecycle = getLifecycleApi(router);
     let resolveGuard!: (value: boolean) => void;

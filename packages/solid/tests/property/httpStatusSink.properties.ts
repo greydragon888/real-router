@@ -20,7 +20,7 @@ import { createHttpStatusSink } from "../../src/utils/createHttpStatusSink";
 
 describe("createHttpStatusSink — Property Tests (Solid)", () => {
   describe("Invariant 1: fresh sink — code === undefined", () => {
-    test.prop([fc.nat({ max: 32 })], { numRuns: NUM_RUNS.standard })(
+    test.prop([fc.nat({ max: 32 })], { numRuns: NUM_RUNS.elevated })(
       "after N back-to-back calls, every sink starts with code: undefined",
       (n) => {
         for (let i = 0; i < n; i++) {
@@ -30,7 +30,7 @@ describe("createHttpStatusSink — Property Tests (Solid)", () => {
     );
 
     test.prop([fc.integer({ min: 100, max: 599 })], {
-      numRuns: NUM_RUNS.standard,
+      numRuns: NUM_RUNS.elevated,
     })("writing to a sink does not affect subsequent fresh sinks", (code) => {
       const first = createHttpStatusSink();
 
@@ -44,7 +44,7 @@ describe("createHttpStatusSink — Property Tests (Solid)", () => {
 
   describe("Invariant 2: distinct identity per call", () => {
     test.prop([fc.integer({ min: 1, max: 16 })], {
-      numRuns: NUM_RUNS.standard,
+      numRuns: NUM_RUNS.elevated,
     })("N calls produce N distinct object references", (n) => {
       const sinks = Array.from({ length: n }, createHttpStatusSink);
 
@@ -125,5 +125,35 @@ describe("createHttpStatusSink — Property Tests (Solid)", () => {
 
       expect(sink.code).toBeUndefined();
     });
+  });
+
+  describe("Invariant 4: shape stability — sink has exactly one own key (`code`)", () => {
+    // The public contract advertised in CLAUDE.md: `HttpStatusSink` is
+    // `{ code: number | undefined }`. A regression that adds bookkeeping
+    // fields (timestamp, version, etc.) would silently break consumers
+    // that snapshot the sink via `{ ...sink }` or serialize it as JSON.
+    // Lock the strict shape so any expansion requires an explicit API change.
+    test.prop([fc.nat({ max: 16 })], { numRuns: NUM_RUNS.standard })(
+      "fresh sink owns only the `code` key — no metadata leakage",
+      (_n) => {
+        const sink = createHttpStatusSink();
+        const keys = Object.keys(sink);
+
+        expect(keys).toStrictEqual(["code"]);
+      },
+    );
+
+    test.prop([fc.integer({ min: 100, max: 599 })], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "after writing a code, key set still equals exactly [`code`]",
+      (code) => {
+        const sink = createHttpStatusSink();
+
+        sink.code = code;
+
+        expect(Object.keys(sink)).toStrictEqual(["code"]);
+      },
+    );
   });
 });

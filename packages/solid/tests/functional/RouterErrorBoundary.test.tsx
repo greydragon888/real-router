@@ -392,8 +392,14 @@ describe("RouterErrorBoundary", () => {
       expect(screen.getByTestId("inner-fallback")).toBeInTheDocument();
     });
 
+    // Pin the exact code (not just equality between two boundaries) — a
+    // regression that renders empty fallbacks would still satisfy
+    // .toBe(other.textContent) but fail these explicit checks.
     expect(screen.getByTestId("outer-fallback").textContent).toBe(
-      screen.getByTestId("inner-fallback").textContent,
+      errorCodes.CANNOT_ACTIVATE,
+    );
+    expect(screen.getByTestId("inner-fallback").textContent).toBe(
+      errorCodes.CANNOT_ACTIVATE,
     );
   });
 

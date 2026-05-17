@@ -1,4 +1,6 @@
-import { createSignal, onMount, Show } from "solid-js";
+import { Show } from "solid-js";
+
+import { createMountedSignal } from "../utils/createMountedSignal";
 
 import type { JSX } from "solid-js";
 
@@ -8,11 +10,7 @@ export interface ServerOnlyProps {
 }
 
 export function ServerOnly(props: ServerOnlyProps): JSX.Element {
-  const [mounted, setMounted] = createSignal(false);
-
-  onMount(() => {
-    setMounted(true);
-  });
+  const mounted = createMountedSignal();
 
   return (
     <Show when={mounted()} fallback={props.children}>

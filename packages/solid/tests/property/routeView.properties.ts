@@ -28,8 +28,10 @@ import {
 } from "../../src/components/RouteView/components";
 import {
   buildRenderList,
+  collectElements,
   isSegmentMatch,
 } from "../../src/components/RouteView/helpers";
+import { isRouteActive } from "../../src/RouterProvider";
 
 import type { RouteViewMarker } from "../../src/components/RouteView/components";
 
@@ -137,6 +139,42 @@ describe("isSegmentMatch — Property Tests (Solid RouteView)", () => {
         fc.pre(name.length > 0);
 
         expect(isSegmentMatch(name, "", exact)).toBe(false);
+      },
+    );
+  });
+
+  describe("Invariant 8: Monotonicity exact→non-exact (§6.4 №4)", () => {
+    // Mathematical claim: if `exact=true` matches, then `exact=false` also
+    // matches — relaxing the predicate cannot reject what strict accepts.
+    // Regression guard against a refactor that inverts the `exact` branch
+    // or short-circuits the non-exact path.
+    test.prop([arbDottedName, arbDottedName], { numRuns: NUM_RUNS.standard })(
+      "isSegmentMatch(a, b, true) === true ⇒ isSegmentMatch(a, b, false) === true",
+      (a, b) => {
+        if (isSegmentMatch(a, b, true)) {
+          expect(isSegmentMatch(a, b, false)).toBe(true);
+        }
+      },
+    );
+  });
+
+  describe("Invariant 9: Cross-function consistency with isRouteActive (§6.4 №5, §6.5 №1)", () => {
+    // Two production functions decide "is this segment/link active in the
+    // current route" in different code paths:
+    //   - `isRouteActive(linkRouteName, currentRouteName)` in RouterProvider
+    //     drives the Link fast-path createSelector.
+    //   - `isSegmentMatch(routeName, fullSegmentName, false)` in RouteView
+    //     decides whether a `<Match segment>` child should render.
+    // If they diverge, a Link can show "active" while the corresponding
+    // RouteView block fails to render (or vice-versa). One of the worst-
+    // diagnosable classes of bug in the adapter — this property locks the
+    // equivalence and removes the entire class.
+    test.prop([arbDottedName, arbDottedName], { numRuns: NUM_RUNS.standard })(
+      "isSegmentMatch(routeName, segment, false) ⇔ isRouteActive(segment, routeName)",
+      (routeName, segment) => {
+        expect(isSegmentMatch(routeName, segment, false)).toBe(
+          isRouteActive(segment, routeName),
+        );
       },
     );
   });
@@ -295,5 +333,230 @@ describe("buildRenderList — Property Tests (Solid RouteView, §6.2 Inv 8)", ()
         expect(rendered).toHaveLength(1);
       },
     );
+  });
+
+  describe("Invariant 9: first-Match-wins among multiple activating Match (§6.4 №7, §6.5 №3)", () => {
+    // Documented in helpers.tsx (122-146) but only verified indirectly via
+    // "at most one" (Invariant 8). If a refactor switches to last-wins (e.g.
+    // a reduce over the marker list), consumers relying on JSX declaration
+    // order silently see a different child. Use identifiable `children`
+    // payloads ("FIRST" / "SECOND") to prove which Match actually wins.
+    test.prop(
+      [
+        arbAlphaSegmentName,
+        arbAlphaSegmentName,
+        fc.array(arbMatchMarker, { minLength: 0, maxLength: 4 }),
+      ],
+      { numRuns: NUM_RUNS.thorough },
+    )(
+      "two Match markers with the same segment — only the first contributes",
+      (segment, child, otherMatches) => {
+        // `otherMatches` must NOT contain the same segment (would shadow
+        // FIRST). The shape of arbMatchMarker uses arbAlphaSegmentName for
+        // segment which has no other constraints — filter manually.
+        fc.pre(segment !== child);
+        fc.pre(
+          otherMatches.every((m) => "segment" in m && m.segment !== segment),
+        );
+
+        const first: RouteViewMarker = {
+          $$type: MATCH_MARKER,
+          segment,
+          exact: false,
+          children: "FIRST" as never,
+          fallback: undefined,
+        };
+        const second: RouteViewMarker = {
+          $$type: MATCH_MARKER,
+          segment,
+          exact: false,
+          children: "SECOND" as never,
+          fallback: undefined,
+        };
+
+        const rendered = buildRenderList(
+          [first, ...otherMatches, second],
+          `${segment}.${child}`,
+          "",
+        );
+
+        expect(rendered).toHaveLength(1);
+        expect(rendered[0]).toBe("FIRST");
+      },
+    );
+  });
+
+  describe("Invariant 10: first-Self-wins (§6.4 №7)", () => {
+    // Documented through `selfMarker ??= child` in helpers.tsx — later
+    // Self markers are silently ignored. Property locks the behavior
+    // (and protects against a refactor that switches to last-wins).
+    test("two Self markers in same RouteView — only the first contributes", () => {
+      // Active route name equals nodeName ("users") so Self fires.
+      const first: RouteViewMarker = {
+        $$type: SELF_MARKER,
+        children: "FIRST" as never,
+        fallback: undefined,
+      };
+      const second: RouteViewMarker = {
+        $$type: SELF_MARKER,
+        children: "SECOND" as never,
+        fallback: undefined,
+      };
+
+      const rendered = buildRenderList([first, second], "users", "users");
+
+      expect(rendered).toHaveLength(1);
+      expect(rendered[0]).toBe("FIRST");
+    });
+  });
+
+  describe("Invariant 11: empty markers → empty result", () => {
+    // Defensive baseline — locks that `buildRenderList([], any, any)`
+    // never spawns a phantom element.
+    test.prop([arbDottedName, arbAlphaSegmentName], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "buildRenderList([], routeName, nodeName) === []",
+      (routeName, nodeName) => {
+        const rendered = buildRenderList([], routeName, nodeName);
+
+        expect(rendered).toStrictEqual([]);
+      },
+    );
+  });
+});
+
+// =============================================================================
+// collectElements — flatten + marker-filter (§6.4 №6, §6.5 №5)
+// =============================================================================
+
+// `collectElements` is recursive over arbitrarily-nested JSX children with a
+// mutable result accumulator. It MUST: ignore non-marker values silently,
+// flatten any depth, preserve traversal order, and treat null/undefined as
+// no-op. None of these properties was covered before — they are exactly
+// what Solid's JSX runtime delivers in real usage (string children, nested
+// fragments, conditional `&&` branches, etc.).
+describe("collectElements — Property Tests (§6.4 №6, §6.5 №5)", () => {
+  const sampleMatch = (id: string): RouteViewMarker => ({
+    $$type: MATCH_MARKER,
+    segment: id,
+    exact: false,
+    children: id as never,
+    fallback: undefined,
+  });
+
+  describe("null-safe: null/undefined input is a no-op", () => {
+    test("collectElements(null, []) does not throw and leaves result empty", () => {
+      const result: RouteViewMarker[] = [];
+
+      collectElements(null, result);
+
+      expect(result).toStrictEqual([]);
+    });
+
+    test("collectElements(undefined, []) does not throw and leaves result empty", () => {
+      const result: RouteViewMarker[] = [];
+
+      collectElements(undefined, result);
+
+      expect(result).toStrictEqual([]);
+    });
+  });
+
+  describe("non-marker tolerance: primitives/strings/random objects are silently ignored", () => {
+    // Solid's JSX runtime may pass strings, numbers, booleans, or arbitrary
+    // objects through children when consumers mix marker-children with
+    // plain JSX. The collector must filter without crashing.
+    test.prop(
+      [
+        fc.array(
+          fc.oneof(
+            fc.string({ maxLength: 8 }),
+            fc.integer(),
+            fc.boolean(),
+            fc.constantFrom(null, undefined),
+            fc.record({ random: fc.constant(true) }),
+          ),
+          { maxLength: 6 },
+        ),
+      ],
+      { numRuns: NUM_RUNS.standard },
+    )("non-marker inputs are dropped, result stays empty", (junk) => {
+      const result: RouteViewMarker[] = [];
+
+      collectElements(junk, result);
+
+      expect(result).toStrictEqual([]);
+    });
+  });
+
+  describe("order preservation: result mirrors traversal order", () => {
+    // collectElements pushes markers in the order it encounters them via
+    // for-of over arrays. Property: shuffling the input produces a result
+    // in the same shuffled order.
+    test.prop(
+      [fc.array(fc.string({ minLength: 1, maxLength: 4 }), { maxLength: 6 })],
+      {
+        numRuns: NUM_RUNS.standard,
+      },
+    )("markers appear in result in the same order as in input", (ids) => {
+      const markers = ids.map((id) => sampleMatch(id));
+      const result: RouteViewMarker[] = [];
+
+      collectElements(markers, result);
+
+      expect(result).toHaveLength(markers.length);
+
+      result.forEach((m, i) => {
+        expect(m).toBe(markers[i]);
+      });
+    });
+  });
+
+  describe("concat homomorphism: collect(left ∥ right) ≡ collect(left) ∥ collect(right)", () => {
+    // Fundamental flatten-collect property. If a refactor changes the
+    // traversal (e.g. switches to a non-depth-first walk or pushes
+    // sub-arrays in reverse), this invariant fails immediately.
+    test.prop(
+      [
+        fc.array(fc.string({ minLength: 1, maxLength: 4 }), { maxLength: 4 }),
+        fc.array(fc.string({ minLength: 1, maxLength: 4 }), { maxLength: 4 }),
+      ],
+      { numRuns: NUM_RUNS.thorough },
+    )("concatenated input yields concatenated output", (leftIds, rightIds) => {
+      const left = leftIds.map((id) => sampleMatch(id));
+      const right = rightIds.map((id) => sampleMatch(id));
+
+      const both: RouteViewMarker[] = [];
+
+      collectElements([...left, ...right], both);
+
+      const onlyLeft: RouteViewMarker[] = [];
+
+      collectElements(left, onlyLeft);
+      const onlyRight: RouteViewMarker[] = [];
+
+      collectElements(right, onlyRight);
+
+      expect(both).toStrictEqual([...onlyLeft, ...onlyRight]);
+    });
+  });
+
+  describe("arbitrary nesting: nested arrays of any depth flatten correctly", () => {
+    // Solid's JSX can produce children like `[[m1, [m2]], m3]` via
+    // <For>/conditional rendering nesting. The recursive `Array.isArray`
+    // walk must flatten any depth without changing order.
+    test("triple-nested arrays flatten to the same flat list", () => {
+      const m1 = sampleMatch("a");
+      const m2 = sampleMatch("b");
+      const m3 = sampleMatch("c");
+
+      const nested = [[m1, [m2, [m3]]]];
+      const result: RouteViewMarker[] = [];
+
+      collectElements(nested, result);
+
+      expect(result).toStrictEqual([m1, m2, m3]);
+    });
   });
 });

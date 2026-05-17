@@ -147,3 +147,115 @@ describe("LSP2 — createSelector O(1) under 200 Links × 1000 navs (§7.3 #22)"
     router.stop();
   }, 120_000);
 });
+
+// §7.2 audit scenario G16 — createSelector under concurrent navigate
+// via Promise.all. Sequential navs are covered by LSP2; this section
+// stress-tests the "Promise.all(N navs)" pattern where earlier navs
+// get cancelled by later ones (TRANSITION_CANCELLED). Locks: only the
+// FINAL winner's Link carries the active class, no stale active state
+// on an intermediate route.
+describe("LSP3 — concurrent navigate via Promise.all (§7.2 G16)", () => {
+  it("LSP3.1: Promise.all of 10 navs → only the LAST winner has the active class", async () => {
+    const router = createStressRouter(20);
+
+    await router.start("/route0");
+
+    render(() => (
+      <RouterProvider router={router}>
+        {Array.from({ length: 20 }, (_, i) => (
+          <Link
+            routeName={`route${i}`}
+            activeClassName="active"
+            data-testid={`link-${i}`}
+          >
+            Link {i}
+          </Link>
+        ))}
+      </RouterProvider>
+    ));
+
+    // Fire 10 navs concurrently. Core processes them serially — earlier
+    // navs that are superseded by later ones reject with
+    // TRANSITION_CANCELLED; the LAST nav wins. Suppress rejections from
+    // cancelled navs since they are EXPECTED here.
+    const navs = Array.from({ length: 10 }, (_, i) =>
+      router.navigate(`route${i + 1}`).catch(() => undefined),
+    );
+
+    await Promise.all(navs);
+
+    // The final committed route should be one of route1..route10 — the
+    // last successful (uncancelled) nav. Core's serialization usually
+    // commits route10 (the last one fired), but timing can vary; the
+    // critical invariant is that the active class is on the SAME route
+    // as router.getState(), not on a stale intermediate.
+    const finalRouteName = router.getState()?.name;
+
+    expect(finalRouteName).toMatch(/^route\d+$/);
+
+    // Active class follows the actual final state.
+    const finalIndex = Number(finalRouteName!.replace("route", ""));
+
+    expect(screen.getByTestId(`link-${finalIndex}`)).toHaveClass("active");
+
+    // Spot-check 4 other Links — none should have it.
+    const otherIndices = [0, 5, 11, 19].filter((i) => i !== finalIndex);
+
+    for (const i of otherIndices) {
+      expect(screen.getByTestId(`link-${i}`)).not.toHaveClass("active");
+    }
+
+    router.stop();
+  }, 60_000);
+
+  it("LSP3.2: 30 burst Promise.all rounds — selector always settles on the final state", async () => {
+    const router = createStressRouter(15);
+
+    await router.start("/route0");
+
+    render(() => (
+      <RouterProvider router={router}>
+        {Array.from({ length: 15 }, (_, i) => (
+          <Link
+            routeName={`route${i}`}
+            activeClassName="active"
+            data-testid={`link-${i}`}
+          >
+            Link {i}
+          </Link>
+        ))}
+      </RouterProvider>
+    ));
+
+    const ROUNDS = 30;
+
+    for (let round = 0; round < ROUNDS; round++) {
+      // Each round fires 5 concurrent navs to different routes.
+      // Suppress cancellation rejections.
+      const navs = Array.from({ length: 5 }, (_, i) => {
+        const target = (i + round + 1) % 14; // skip 0; cross-route
+
+        return router.navigate(`route${target}`).catch(() => undefined);
+      });
+
+      await Promise.all(navs);
+
+      const finalName = router.getState()?.name;
+
+      expect(finalName).toBeDefined();
+
+      // The active class must be exactly on the route reflected by
+      // getState() — no stale leftovers from intermediate cancelled
+      // navs. This is the invariant from G16.
+      const finalIndex = Number(finalName!.replace("route", ""));
+      const activeLinks = Array.from({ length: 15 })
+        .map((_, i) => screen.getByTestId(`link-${i}`))
+        .filter((element) => element.classList.contains("active"));
+
+      expect(activeLinks).toHaveLength(1);
+      expect(activeLinks[0].dataset.testid).toBe(`link-${finalIndex}`);
+    }
+
+    router.stop();
+  }, 120_000);
+});

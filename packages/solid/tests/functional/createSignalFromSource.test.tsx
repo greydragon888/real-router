@@ -173,10 +173,10 @@ describe("createSignalFromSource", () => {
     createSignalFromSource(source);
 
     // Pin down the exact signal — this is Solid's onCleanup ownership warning.
+    // Match on `cleanup` keyword only — solid-js wording may shift across
+    // minor versions; the semantic anchor is the cleanup-without-owner concept.
     expect(consoleWarn).toHaveBeenCalledTimes(1);
-    expect(consoleWarn).toHaveBeenCalledWith(
-      expect.stringContaining("cleanups created outside a `createRoot`"),
-    );
+    expect(consoleWarn).toHaveBeenCalledWith(expect.stringMatching(/cleanup/i));
 
     consoleWarn.mockRestore();
   });

@@ -11,6 +11,10 @@ import type { RouterSource } from "@real-router/sources";
 
 export const NUM_RUNS = {
   standard: 50,
+  // §2.2 audit follow-up: 100+ for invariants over wide arbitrary domains
+  // where shrinkage matters (anti-symmetry, transitivity, NaN/±0 edges).
+  // 50 leaves too narrow a margin for low-frequency corner cases.
+  elevated: 100,
   thorough: 200,
 } as const;
 
@@ -44,6 +48,28 @@ export const arbAlphaSegmentName: fc.Arbitrary<string> =
 export const arbDottedName: fc.Arbitrary<string> = fc
   .array(arbSegmentName, { minLength: 1, maxLength: 4 })
   .map((segments) => segments.join("."));
+
+/**
+ * §2.3 audit follow-up — invalid / hostile route names.
+ *
+ * `arbDottedName` only emits well-formed names. Real implementations of
+ * `isRouteActive` / `isSegmentMatch` must not crash on malformed input —
+ * leading/trailing dots, doubled dots, empty strings, dot-only — even
+ * though such names never reach production (validation rejects them).
+ * This covers the negative domain so a refactor that adds `.split(".")`
+ * indexing or similar fragile parsing is caught.
+ */
+export const arbInvalidDottedName: fc.Arbitrary<string> = fc.constantFrom(
+  "",
+  ".",
+  "..",
+  ".leading",
+  "trailing.",
+  "a..b",
+  "..a..",
+  ".a.b.",
+  "a...b...c",
+);
 
 /**
  * Known route names for testing with realistic values.
@@ -129,6 +155,20 @@ export const arbHash: fc.Arbitrary<string> = fc.oneof(
   fc.string({ minLength: 0, maxLength: 24 }),
   fc.constantFrom("section", "tab=1&q=x", "用户", "über", "a#b#c", "#leading"),
 );
+
+/**
+ * §2.3 audit follow-up — long-string stress. Most arbitraries cap at
+ * `maxLength: 24` which keeps shrinkage manageable but never exercises
+ * the "user pastes a 1KB query string into a hash" case. Use for
+ * `buildHref` / `buildActiveClassName` / route-name length-stress.
+ *
+ * Min 256 to guarantee non-trivial length; max 1024 to keep test runtime
+ * reasonable across hundreds of fc runs.
+ */
+export const arbLongString: fc.Arbitrary<string> = fc.string({
+  minLength: 256,
+  maxLength: 1024,
+});
 
 /**
  * Extended primitive that also includes Object.is / `===` edge-cases:
@@ -236,8 +276,11 @@ export const arbSnapshot: fc.Arbitrary<RouteSnapshotLike> = fc.record({
   route: fc.option(
     fc.record({
       name: fc.constantFrom("home", "users", "users.view", "admin"),
+      // §2.3 audit follow-up — mix in hostile keys so reconcile/sources are
+      // exercised against `__proto__` / dotted / unicode params, not only
+      // the safe `[a-z]{1,4}` alphabet that production plugins generate.
       params: fc.dictionary(
-        fc.stringMatching(/^[a-z]{1,4}$/),
+        fc.oneof(arbHostileParamKey, fc.stringMatching(/^[a-z]{1,4}$/)),
         fc.string({ minLength: 0, maxLength: 8 }),
         { minKeys: 0, maxKeys: 3 },
       ),

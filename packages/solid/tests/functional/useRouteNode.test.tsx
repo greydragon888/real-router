@@ -1,7 +1,7 @@
 import { createRouter } from "@real-router/core";
 import { getRoutesApi } from "@real-router/core/api";
-import { renderHook } from "@solidjs/testing-library";
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { renderHook, render } from "@solidjs/testing-library";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { RouterProvider, useRouteNode } from "@real-router/solid";
 
@@ -13,6 +13,15 @@ import type { JSX } from "solid-js";
 const wrapper = (router: Router) => (props: { children: JSX.Element }) => (
   <RouterProvider router={router}>{props.children}</RouterProvider>
 );
+
+// Probe component for source-caching tests (gotcha #22). Drives a single
+// useRouteNode(name) call so we can mount N copies and watch how many
+// underlying router.subscribe registrations they produce.
+function RouteNodeProbe(props: Readonly<{ name: string }>): JSX.Element {
+  const node = useRouteNode(props.name);
+
+  return <span data-name={props.name}>{node().route?.name ?? "—"}</span>;
+}
 
 describe("useRouteNode", () => {
   let router: Router;
@@ -365,6 +374,62 @@ describe("useRouteNode", () => {
 
       expect(result().route?.name).toBe("users.view");
       expect(result().previousRoute?.name).toBe("items");
+    });
+  });
+
+  // Gotcha #22 from CLAUDE.md "Hook Caching via @real-router/sources":
+  // N components calling useRouteNode("users") against the same router share
+  // ONE source — one router.subscribe, one shouldUpdate per navigation.
+  // Without this caching, 50 sidebar links would each add a subscriber and
+  // the per-nav callback fanout would be N × work. This test pins the
+  // contract by spying on router.subscribe and asserting it's invoked at
+  // most once for repeat useRouteNode(name) calls on the same name.
+  describe("Source caching (gotcha #22 — N consumers → ONE router subscription)", () => {
+    it("multiple components reading the same node share one router subscription", async () => {
+      const subscribeSpy = vi.spyOn(router, "subscribe");
+
+      // Mount 5 separate hook consumers of useRouteNode("users") inside the
+      // SAME RouterProvider. The cached createRouteNodeSource(router, "users")
+      // must yield 5 listeners on its shared internal Set, not 5 separate
+      // router.subscribe registrations.
+      render(() => (
+        <RouterProvider router={router}>
+          <RouteNodeProbe name="users" />
+          <RouteNodeProbe name="users" />
+          <RouteNodeProbe name="users" />
+          <RouteNodeProbe name="users" />
+          <RouteNodeProbe name="users" />
+        </RouterProvider>
+      ));
+
+      // RouterProvider itself calls router.subscribe ONCE (via createRouteSource).
+      // The 5 useRouteNode("users") consumers must NOT add 5 more — they all
+      // multiplex through the cached createRouteNodeSource. Tolerate ≤ 2 to
+      // allow for an internal helper subscription if added; > 2 indicates the
+      // cache silently broke and per-component subscriptions are leaking.
+      expect(subscribeSpy.mock.calls.length).toBeLessThanOrEqual(2);
+    });
+
+    it("different node names produce separate cache entries but share router subscription", async () => {
+      const subscribeSpy = vi.spyOn(router, "subscribe");
+
+      // 3 distinct nodes × 2 consumers each → cache produces 3 sources,
+      // each backed by a router subscription. Tolerate up to 4 calls
+      // (RouterProvider's own subscribe + per-source registrations) to keep
+      // the assertion robust against internal refactors, while still
+      // catching the worst case of 6 (one per useRouteNode call).
+      render(() => (
+        <RouterProvider router={router}>
+          <RouteNodeProbe name="users" />
+          <RouteNodeProbe name="users" />
+          <RouteNodeProbe name="items" />
+          <RouteNodeProbe name="items" />
+          <RouteNodeProbe name="" />
+          <RouteNodeProbe name="" />
+        </RouterProvider>
+      ));
+
+      expect(subscribeSpy.mock.calls.length).toBeLessThanOrEqual(4);
     });
   });
 

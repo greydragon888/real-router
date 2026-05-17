@@ -23,7 +23,7 @@
  */
 
 import { fc, test } from "@fast-check/vitest";
-import { createRoot } from "solid-js";
+import { createRenderEffect, createRoot } from "solid-js";
 import { describe, expect } from "vitest";
 
 import { arbExtendedPrimitive, createMockSource, NUM_RUNS } from "./helpers";
@@ -138,9 +138,13 @@ describe("createSignalFromSource — Property Tests (Solid)", () => {
     // Solid `createSignal` default equality is `===`, not Object.is. The
     // bridge does not override it, so re-emitting the same reference is a
     // no-op at the signal level. A regression flipping to `{ equals: false }`
-    // would notify on every set — this test pins the default behavior.
+    // would notify on every set — this test pins the default behavior via a
+    // createRenderEffect-driven run counter (synchronous in Solid; an
+    // accessor()-only check would NOT catch the regression because under
+    // `{ equals: false }` accessor() still returns the same value, only the
+    // notification frequency changes).
     test.prop([arbExtendedPrimitive], { numRuns: NUM_RUNS.standard })(
-      "same-reference emit does not spuriously change the accessor",
+      "same-reference emit does not trigger reactive notifications",
       (value) => {
         // NaN !== NaN under `===` (Solid's default) — would propagate, so
         // exclude it from the "same-reference is a no-op" invariant.
@@ -151,13 +155,23 @@ describe("createSignalFromSource — Property Tests (Solid)", () => {
         createRoot((dispose) => {
           const accessor = createSignalFromSource(source);
 
-          const before = accessor();
+          let runs = 0;
+
+          createRenderEffect(() => {
+            accessor();
+            runs += 1;
+          });
+
+          // Baseline: createRenderEffect runs once synchronously on creation.
+          expect(runs).toBe(1);
 
           emit(value);
+          emit(value);
+          emit(value);
 
-          const after = accessor();
-
-          expect(after).toBe(before);
+          // Three same-reference emits must NOT add any reactive runs.
+          // Under `{ equals: false }` this would be 4.
+          expect(runs).toBe(1);
 
           dispose();
         });
@@ -196,5 +210,80 @@ describe("createSignalFromSource — Property Tests (Solid)", () => {
         expect(accessor()).toBe(initial);
       },
     );
+  });
+
+  describe("Invariant 6: error propagation from source (§5.7 edge-cases)", () => {
+    // The bridge does NOT defensively wrap getSnapshot/subscribe in try/catch
+    // — exceptions must bubble to the reactive owner unchanged. This is
+    // intentional: a thrown source error is a contract violation, not a
+    // recoverable runtime state, so swallowing it would hide bugs. Lock the
+    // throw-through behaviour so a future defensive `try { … } catch { }`
+    // refactor surfaces here.
+    test("getSnapshot() throw at init bubbles up to createRoot owner", () => {
+      const boom = new Error("snapshot boom");
+      const source: RouterSource<unknown> = {
+        subscribe: () => () => {},
+        getSnapshot: () => {
+          throw boom;
+        },
+        destroy: () => {},
+      };
+
+      expect(() => {
+        createRoot((dispose) => {
+          createSignalFromSource(source);
+          dispose();
+        });
+      }).toThrow(boom);
+    });
+
+    test("subscribe() throw after createSignal is constructed bubbles up", () => {
+      // The order in createSignalFromSource is: createSignal(getSnapshot())
+      // FIRST, then source.subscribe(). A throw inside subscribe lands
+      // mid-init — must propagate (not leak a partially-wired signal).
+      const boom = new Error("subscribe boom");
+      const source: RouterSource<unknown> = {
+        subscribe: () => {
+          throw boom;
+        },
+        getSnapshot: () => 0,
+        destroy: () => {},
+      };
+
+      expect(() => {
+        createRoot((dispose) => {
+          createSignalFromSource(source);
+          dispose();
+        });
+      }).toThrow(boom);
+    });
+  });
+
+  describe("Invariant 7: double subscribe in one owner (§5.7 documented behaviour)", () => {
+    // Calling createSignalFromSource(source) twice on the SAME source in the
+    // SAME reactive owner is allowed and produces TWO independent listeners.
+    // Sources contract guarantees fan-out support (Set/Map of callbacks in
+    // BaseSource), so this is not a leak — just a per-call subscription.
+    // Pin the answer so a future "dedupe by source identity" refactor does
+    // NOT silently collapse two subscriptions into one (which would break
+    // independent accessor lifetimes if one is disposed early).
+    test("two calls on same source produce two independent listeners", () => {
+      const { source, listeners } = createMockSource<number>(0);
+
+      createRoot((dispose) => {
+        const accessorA = createSignalFromSource(source);
+        const accessorB = createSignalFromSource(source);
+
+        expect(accessorA()).toBe(0);
+        expect(accessorB()).toBe(0);
+        // Both subscriptions live on the source's listener set.
+        expect(listeners()).toBe(2);
+
+        dispose();
+
+        // Both cleaned up together when the shared owner disposes.
+        expect(listeners()).toBe(0);
+      });
+    });
   });
 });

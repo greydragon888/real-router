@@ -51,7 +51,18 @@ describe("HttpStatusCode", () => {
         </HttpStatusProvider>
       ));
 
+      // Sibling renders normally — confirms the test wired up correctly.
       expect(screen.getByText("Hello")).toBeInTheDocument();
+
+      // HttpStatusCode contributes no element children — only the sibling
+      // <p>Hello</p> exists. (Solid may emit placeholder text nodes for
+      // reactive slots, so we check Element children, not all child nodes.)
+      const content = screen.getByTestId("content");
+
+      expect(content.children).toHaveLength(1);
+      expect(content.children[0].tagName).toBe("P");
+      // No text leaks from HttpStatusCode — text content equals the sibling's.
+      expect(content.textContent).toBe("Hello");
     });
 
     it("last write wins with multiple instances in render order", () => {

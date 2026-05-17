@@ -8,7 +8,7 @@
 @real-router/solid
 ├── @real-router/core         # Router instance, Navigator, State types
 ├── @real-router/sources      # Subscription layer (createRouteSource, createRouteNodeSource, createActiveRouteSource, getTransitionSource, createDismissableError)
-└── @real-router/route-utils  # Route tree queries (getRouteUtils, getChain, getSiblings)
+└── @real-router/route-utils  # Route tree queries: `getRouteUtils(router)` returns a `RouteUtils` instance whose methods (`getChain`, `getSiblings`, …) walk the route tree
 ```
 
 ## Entry Points
@@ -287,7 +287,7 @@ tests/
 
 ## Stress Test Coverage
 
-46 stress tests across 13 files in `tests/stress/` validate behavior under extreme conditions:
+30 stress-test files in `tests/stress/` (excluding `helpers.tsx`) validate behavior under extreme conditions. The 13 categories below describe the original coverage; subsequent audits added single-purpose files (e.g. `link-hash-rapid`, `link-modifier-keys`, `link-slow-path`, `lazy-switching`, `route-enter-exit`, `view-transitions-stop`, `should-update-cache`, `remove-route-mid-session`, `replace-history-during-transition`, `error-boundary-auto-reset`, `create-root-ownership`, `announcer-double-raf`, `announcer-rapid`, `async-guards-race`, `destroy-during-callback`, `use-route-throws`, `memory-mount-unmount`) — see `ls packages/solid/tests/stress/` for the current set.
 
 | Category                 | Tests (file count) | Test count | What they verify                                                                                                                                                                                                                                                                        |
 | ------------------------ | ------------------ | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

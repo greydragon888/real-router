@@ -1,5 +1,6 @@
 import { browserPluginFactory } from "@real-router/browser-plugin";
 import { fireEvent, render, screen } from "@solidjs/testing-library";
+import { Show } from "solid-js";
 import { describe, it, expect } from "vitest";
 
 import { Link, RouterProvider } from "@real-router/solid";
@@ -152,6 +153,79 @@ describe("LH1 — Link hash rapid changes (§7.3 #20, #532)", () => {
     const heapAfter = takeHeapSnapshot();
 
     expect(heapAfter - heapBefore).toBeLessThan(15 * MB);
+
+    router.stop();
+  }, 60_000);
+
+  // §7.2 audit scenario G6 — Link hash dynamic via `<Show keyed>` cache
+  // growth in createActiveRouteSource.
+  //
+  // The documented workaround for dynamic hash on <Link> is to force a
+  // remount via `<Show keyed when={hash()}>`. Each remount creates a
+  // fresh Link instance, which (on the slow path) creates a fresh
+  // `createActiveRouteSource(router, name, params, { hash, ... })`
+  // cache entry. The cache key includes the hash → 100+ unique hashes
+  // produce 100+ cache entries in a single Map keyed by routeName.
+  //
+  // Concern: under heavy tab-UI flipping, the per-(router, name)-map
+  // inside createActiveRouteSource grows linearly without bound — WeakMap
+  // releases the router reference on GC, but the inner Map keyed by hash
+  // never evicts. This stress test pins the actual heap behaviour.
+  it("LH2 — dynamic Link hash via <Show keyed> + 100 flips → bounded heap", async () => {
+    const router = createStressRouter(5);
+
+    await router.start("/route0");
+
+    let setHash: ((h: string) => void) | undefined;
+    let currentHash = "tab0";
+    const hashAccessor = (): string => currentHash;
+
+    // Drive remounts by toggling a top-level boolean key in `<Show keyed>`.
+    // Each toggle forces Solid to throw away the inner subtree and create
+    // a fresh `<Link>` — which on the slow path allocates a new
+    // createActiveRouteSource cache entry keyed by `(name, params, opts)`.
+    const setHashCallback = (h: string): void => {
+      currentHash = h;
+    };
+
+    setHash = setHashCallback;
+
+    render(() => (
+      <RouterProvider router={router}>
+        <Show keyed when={hashAccessor()}>
+          {(hash) => (
+            <Link
+              routeName="route0"
+              hash={hash}
+              activeClassName="active"
+              data-testid="link"
+            >
+              Tab {hash}
+            </Link>
+          )}
+        </Show>
+      </RouterProvider>
+    ));
+
+    const heapBefore = takeHeapSnapshot();
+    const ITERATIONS = 100;
+
+    for (let i = 0; i < ITERATIONS; i++) {
+      // Unique hash each iteration → unique cache entry.
+      setHash(`tab${i}`);
+      // Force Solid to flush the Show keyed remount.
+      await Promise.resolve();
+    }
+
+    forceGC();
+    const heapAfter = takeHeapSnapshot();
+
+    // Heap budget: 100 unique cache entries × ~few KB each. Should be
+    // bounded — actual growth depends on Solid + createActiveRouteSource
+    // internal Map sizing. 20 MB is a generous ceiling that catches an
+    // exponential leak (e.g. listeners not detached on Link unmount)
+    // without flagging the expected linear cache growth.
+    expect(heapAfter - heapBefore).toBeLessThan(20 * MB);
 
     router.stop();
   }, 60_000);

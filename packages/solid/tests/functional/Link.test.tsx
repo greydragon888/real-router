@@ -616,11 +616,11 @@ describe("Link component", () => {
 
     // Flip strict to true. If the fast→slow switch happened, strict=true
     // would suppress ancestor activation and the class would be removed.
-    // The signal fires (strict() === true), but the path decision is
-    // frozen — Link stays on fast path, ancestor stays active.
+    // The signal fires, but the path decision is frozen — Link stays on
+    // fast path, ancestor stays active. (No tautological strict()===true
+    // check — solid-js setSignal contract is not under test here.)
     setStrict(true);
 
-    expect(strict()).toBe(true);
     expect(screen.getByTestId("link")).toHaveClass("active");
   });
 
@@ -699,7 +699,11 @@ describe("Link component", () => {
 
         expect(spy).toHaveBeenCalledTimes(1);
 
-        const opts = spy.mock.calls[0][2] ?? {};
+        // opts must be defined — Link always forwards a third argument so the
+        // routing layer sees an explicit options object (no implicit defaults).
+        expect(spy.mock.calls[0][2]).toBeDefined();
+
+        const opts = spy.mock.calls[0][2]!;
 
         // Undefined hash MUST stay undefined — no `hash` key in opts.
         expect("hash" in opts).toBe(false);
@@ -722,7 +726,9 @@ describe("Link component", () => {
 
         expect(spy).toHaveBeenCalledTimes(1);
 
-        const opts = spy.mock.calls[0][2] ?? {};
+        expect(spy.mock.calls[0][2]).toBeDefined();
+
+        const opts = spy.mock.calls[0][2]!;
 
         expect(opts.hash).toBe("");
         // Cross-route navigation → no force/hashChange auto-bypass.
@@ -746,7 +752,9 @@ describe("Link component", () => {
 
         expect(spy).toHaveBeenCalledTimes(1);
 
-        const opts = spy.mock.calls[0][2] ?? {};
+        expect(spy.mock.calls[0][2]).toBeDefined();
+
+        const opts = spy.mock.calls[0][2]!;
 
         expect(opts.hash).toBe("section");
         // Cross-route — same-route hash logic must NOT fire.
@@ -776,7 +784,9 @@ describe("Link component", () => {
 
         expect(spy).toHaveBeenCalledTimes(1);
 
-        const opts = spy.mock.calls[0][2] ?? {};
+        expect(spy.mock.calls[0][2]).toBeDefined();
+
+        const opts = spy.mock.calls[0][2]!;
 
         expect(opts.hash).toBe("second");
         expect((opts as { force?: boolean }).force).toBe(true);
@@ -808,7 +818,9 @@ describe("Link component", () => {
 
         expect(spy).toHaveBeenCalledTimes(1);
 
-        const opts = spy.mock.calls[0][2] ?? {};
+        expect(spy.mock.calls[0][2]).toBeDefined();
+
+        const opts = spy.mock.calls[0][2]!;
 
         expect(opts.hash).toBe("same");
         expect((opts as { force?: boolean }).force).toBeUndefined();

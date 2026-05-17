@@ -280,7 +280,11 @@ describe("RouteView", () => {
       expect(container.innerHTML).toBe("");
     });
 
-    it("Self with fallback wraps children in Suspense", async () => {
+    it("Self with fallback + synchronous children renders children, fallback never visible", async () => {
+      // Companion to the lazy-suspends test below — Self's fallback wraps
+      // children in <Suspense>, but with synchronous children Solid never
+      // shows the fallback. Pins the contract that adding `fallback` is
+      // backward-compatible for sync children.
       await router.start("/users");
 
       render(() => (
@@ -295,9 +299,8 @@ describe("RouteView", () => {
         </RouterProvider>
       ));
 
-      // Synchronous children resolve immediately — fallback path covered
-      // structurally even when no async boundary triggers visibly.
       expect(screen.getByTestId("users-self")).toBeInTheDocument();
+      expect(screen.queryByTestId("self-fallback")).not.toBeInTheDocument();
     });
 
     it("Self with fallback shows fallback while lazy child suspends", async () => {
@@ -698,15 +701,12 @@ describe("RouteView", () => {
       expect(screen.getByTestId("items")).toBeInTheDocument();
       expect(screen.queryByTestId("users")).not.toBeInTheDocument();
 
-      // Top-level NotFound still wins on UNKNOWN_ROUTE.
-      await router.navigate("@@router/UNKNOWN_ROUTE").catch(() => {});
-      // UNKNOWN_ROUTE isn't real — but the previous failed navigate may
-      // have left us on items; rather than fight the router's internal
-      // state, just assert collectElements DID see the NotFound marker
-      // by checking the render-list pipeline through a separate render
-      // pass. The behavioral claim here is "deeply-nested NotFound is
-      // collected", which the mounting itself proves (no console errors,
-      // no crash).
+      // (The UNKNOWN_ROUTE NotFound-fallback for nested markers is exercised
+      // by the dedicated <RouteView.NotFound> tests below — driving it
+      // through `router.navigate("@@router/UNKNOWN_ROUTE")` here is not
+      // reliable: the router rejects the navigation and the state stays on
+      // "items", which yields a false-positive NotFound assertion. Two
+      // resolution checks above are enough to prove deep-nesting walk.)
     });
   });
 

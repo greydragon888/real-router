@@ -25,18 +25,39 @@ import type { RouterSource } from "@real-router/sources";
 export function createStoreFromSource<T extends object>(
   source: RouterSource<T>,
 ): T {
-  const [state, setState] = createStore<T>({ ...source.getSnapshot() });
+  const initialSnapshot = source.getSnapshot();
+  const [state, setState] = createStore<T>({ ...initialSnapshot });
+
+  // Track the last reconciled snapshot reference to short-circuit redundant
+  // `reconcile` calls. Cached lazy sources (e.g. `createRouteNodeSource`)
+  // stabilize their snapshot — the same reference flows through multiple
+  // emits when nothing in the node's slice changed. `reconcile` itself
+  // handles identity (no-ops on structurally-equal input), but a reference
+  // check is cheaper than the structural walk and avoids the function call
+  // entirely on every navigation × N store consumers (§8b H10 audit fix).
+  let lastSnapshot: T = initialSnapshot;
 
   const unsubscribe = source.subscribe(() => {
-    setState(reconcile(source.getSnapshot()));
+    const nextSnapshot = source.getSnapshot();
+
+    if (nextSnapshot === lastSnapshot) {
+      return;
+    }
+
+    lastSnapshot = nextSnapshot;
+    setState(reconcile(nextSnapshot));
   });
 
   // Re-read after subscribe: lazy sources reconcile their snapshot in
   // onFirstSubscribe (when reused after disconnect via cache). The listener
   // is not notified for that internal update, so we must reconcile manually.
-  // No-op when snapshot is structurally unchanged (reconcile preserves identity).
-  // Mirrors the same pattern in `createSignalFromSource.ts`.
-  setState(reconcile(source.getSnapshot()));
+  // Guarded by the same reference check so a no-op stays free.
+  const afterSubscribe = source.getSnapshot();
+
+  if (afterSubscribe !== lastSnapshot) {
+    lastSnapshot = afterSubscribe;
+    setState(reconcile(afterSubscribe));
+  }
 
   onCleanup(unsubscribe);
 

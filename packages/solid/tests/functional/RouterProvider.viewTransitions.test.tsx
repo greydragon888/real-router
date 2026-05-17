@@ -42,11 +42,20 @@ describe("RouterProvider — viewTransitions", () => {
     vi.unstubAllGlobals();
   });
 
-  it("no viewTransitions prop — utility not wired", async () => {
+  // Both falsy forms (omitted prop OR explicit `false`) must skip wiring —
+  // mountFeature() treats `enabled` as boolean-truthy, so undefined and false
+  // share the same code path. Parameterized to lock both cases.
+  it.each([
+    { label: "no viewTransitions prop", props: {} as const },
+    {
+      label: "viewTransitions: false",
+      props: { viewTransitions: false } as const,
+    },
+  ])("$label — utility not wired", async ({ props }) => {
     const startSpy = stubStartViewTransition();
 
     render(() => (
-      <RouterProvider router={router}>
+      <RouterProvider router={router} {...props}>
         <div />
       </RouterProvider>
     ));
@@ -68,20 +77,6 @@ describe("RouterProvider — viewTransitions", () => {
     await router.navigate("about");
 
     expect(startSpy).toHaveBeenCalledTimes(1);
-  });
-
-  it("viewTransitions: false — utility not wired", async () => {
-    const startSpy = stubStartViewTransition();
-
-    render(() => (
-      <RouterProvider router={router} viewTransitions={false}>
-        <div />
-      </RouterProvider>
-    ));
-
-    await router.navigate("about");
-
-    expect(startSpy).not.toHaveBeenCalled();
   });
 
   it("unmount tears down the utility", async () => {

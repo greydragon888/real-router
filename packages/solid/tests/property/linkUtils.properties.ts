@@ -19,7 +19,7 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it, vi } from "vitest";
 
-import { arbHash, NUM_RUNS } from "./helpers";
+import { arbHash, arbLongString, NUM_RUNS } from "./helpers";
 import {
   applyLinkA11y,
   buildActiveClassName,
@@ -216,6 +216,67 @@ describe("buildActiveClassName — Property Tests (Solid)", () => {
         expect(twice).toBe(once);
       },
     );
+  });
+
+  describe("Invariant 7: long-string length stress (§2.3 audit)", () => {
+    // Real consumers may load class lists from `clsx(...arbitraryArgs)` or
+    // CSS-Module bag-of-classes — easily 256+ chars. The token parser
+    // (parseTokens, `/\S+/g`) is linear in length; lock the behaviour
+    // (no truncation, no thrash) at ≥256 chars.
+    test.prop([arbActiveClassName, arbLongString], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "active class still present exactly once after ≥256-char base",
+      (activeClassName, longBase) => {
+        const result = buildActiveClassName(true, activeClassName, longBase);
+
+        expect(result).toBeDefined();
+
+        const occurrences = result!
+          .split(/\s+/)
+          .filter((t) => t === activeClassName).length;
+
+        expect(occurrences).toBe(1);
+      },
+    );
+  });
+
+  describe("Invariant 8: base=undefined edge cases (§5.6 audit)", () => {
+    // arbBaseClassName always produces a string, so the `undefined` base
+    // path is reachable only via raw helper invocation (e.g. `<Link>` with
+    // no `class` prop). Lock the answers explicitly so a regression that
+    // changes the `??` operator inside buildActiveClassName surfaces here.
+    test("base=undefined + isActive=true + active='x' → just 'x'", () => {
+      // No base to concatenate — result is the active token alone.
+      const result = buildActiveClassName(true, "x", undefined);
+
+      expect(result).toBe("x");
+    });
+
+    test("base=undefined + isActive=false + active='x' → undefined (preserved via ??)", () => {
+      // Inactive + undefined base → nothing to return. The helper uses
+      // `??` (not `||`) so this path returns `undefined`, not `""`.
+      // Locked behaviour — a switch to `||` would coerce to "" silently.
+      const result = buildActiveClassName(false, "x", undefined);
+
+      expect(result).toBeUndefined();
+    });
+
+    test("base=undefined + isActive=true + active='' (empty) → undefined", () => {
+      // parseTokens on "" yields zero tokens → active-concat branch is
+      // skipped → fall through to `baseClassName ?? undefined`.
+      const result = buildActiveClassName(true, "", undefined);
+
+      expect(result).toBeUndefined();
+    });
+
+    test("base=undefined + isActive=true + active='a b c' (multi-token) → 'a b c' verbatim", () => {
+      // No base means no dedup work — multi-token active is preserved
+      // exactly as parseTokens normalizes it (single-space join).
+      const result = buildActiveClassName(true, "a b c", undefined);
+
+      expect(result).toBe("a b c");
+    });
   });
 });
 
@@ -425,6 +486,124 @@ describe("buildHref — Property Tests (Solid)", () => {
         const stripped = rawHash.startsWith("#") ? rawHash.slice(1) : rawHash;
 
         expect(calls[0].options).toStrictEqual({ hash: stripped });
+      },
+    );
+  });
+
+  describe("Invariant 9: buildHref hash idempotency — calling twice on same input returns same href", () => {
+    // buildHref is a pure read over (router, name, params, hashOpts). Two
+    // back-to-back invocations with identical args must produce identical
+    // strings — verifies the fallback chain (buildUrl → buildPath → inline
+    // encode) is deterministic with no hidden state mutation.
+    test.prop(
+      [
+        arbHash,
+        fc.string({ minLength: 1, maxLength: 12 }),
+        fc.constantFrom("route", "users", "users.profile"),
+      ],
+      { numRuns: NUM_RUNS.thorough },
+    )(
+      "buildHref(...) === buildHref(...) on identical inputs",
+      (rawHash, path, name) => {
+        const router = makeFakeRouter(undefined, () => path);
+
+        const first = buildHref(router, name, {}, { hash: rawHash });
+        const second = buildHref(router, name, {}, { hash: rawHash });
+
+        expect(first).toBe(second);
+      },
+    );
+
+    // Stronger property — encoding stability: re-feeding the OUTPUT's
+    // fragment back through buildHref as the hash input still produces an
+    // encoded output where `#` → `%23` is reapplied (encoding step is
+    // idempotent for the stripped/encoded portion).
+    test.prop([fc.string({ minLength: 1, maxLength: 12 })], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "buildHref output stripped → fed back yields identical fragment encoding",
+      (path) => {
+        const router = makeFakeRouter(undefined, () => path);
+
+        // Use a hash with a `#` to exercise the defensive %23 replacement on
+        // both rounds (the dangerous case for a non-idempotent encoder).
+        const rawHash = "tab#section";
+        const href1 = buildHref(router, "any", {}, { hash: rawHash });
+
+        // Extract fragment from first call, feed it back.
+        const fragment1 = href1!.slice(`${path}#`.length);
+        const decoded = decodeURI(fragment1.replaceAll("%23", "#"));
+        const href2 = buildHref(router, "any", {}, { hash: decoded });
+
+        expect(href2).toBe(href1);
+      },
+    );
+  });
+
+  describe("Invariant 10: path with query string + hash combo (§5.3 edge-case)", () => {
+    // Production routers regularly emit paths like `/users?q=1&sort=asc`.
+    // The buildPath fallback concatenates `?<query>` BEFORE `#<hash>` —
+    // never the other way around — so the final href shape is always
+    // `<path><?query><#hash>` per WHATWG URL. Locking this prevents a
+    // future refactor that swaps the concat order from producing
+    // `users#tab?q=1` (which most browsers would parse as path "users",
+    // fragment "tab?q=1", losing the query entirely).
+    test.prop(
+      [
+        fc.stringMatching(/^[a-z]{1,8}$/),
+        fc.stringMatching(/^[a-z]{1,8}$/),
+        fc.stringMatching(/^[a-z]{1,8}$/),
+      ],
+      { numRuns: NUM_RUNS.standard },
+    )(
+      "path-with-query + hash yields `<path>?<query>#<hash>` (query before hash)",
+      (pathSegment, queryValue, hash) => {
+        const pathWithQuery = `/${pathSegment}?q=${queryValue}`;
+        const router = makeFakeRouter(undefined, () => pathWithQuery);
+        const href = buildHref(router, "any", {}, { hash });
+
+        // Hash MUST appear after the query, not inside it.
+        expect(href).toBe(`${pathWithQuery}#${encodeURI(hash)}`);
+        // Sanity: query string survives intact (no `#` injected before `?`).
+        expect(href).toContain(`?q=${queryValue}#`);
+      },
+    );
+  });
+
+  describe("Invariant 11: path without leading slash (§5.3 edge-case — relative URLs)", () => {
+    // Some custom plugins (memory-plugin without URL plugin, history-less
+    // adapters, route-as-key approaches) emit relative paths like
+    // `users/list`. WHATWG URL accepts these — buildHref must not add a
+    // leading `/` or reject. Locking this preserves the relative-path
+    // contract so a refactor that prepends `/` doesn't silently break
+    // memory-plugin-only setups.
+    test.prop(
+      [
+        fc.stringMatching(/^[a-z]{1,8}\/[a-z]{1,8}$/),
+        fc.stringMatching(/^[a-z]{1,8}$/),
+      ],
+      { numRuns: NUM_RUNS.standard },
+    )(
+      "relative path (no leading `/`) + hash yields `<path>#<hash>` verbatim",
+      (relativePath, hash) => {
+        const router = makeFakeRouter(undefined, () => relativePath);
+        const href = buildHref(router, "any", {}, { hash });
+
+        // Path stays relative — no leading `/` injected.
+        expect(href).toBe(`${relativePath}#${encodeURI(hash)}`);
+        expect(href!.startsWith("/")).toBe(false);
+      },
+    );
+
+    test.prop([fc.stringMatching(/^[a-z]{1,8}\/[a-z]{1,8}$/)], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "relative path without hash stays as-is (no trailing `#`)",
+      (relativePath) => {
+        const router = makeFakeRouter(undefined, () => relativePath);
+        const href = buildHref(router, "any", {});
+
+        expect(href).toBe(relativePath);
       },
     );
   });

@@ -61,15 +61,37 @@ All hooks that subscribe to route state return `Accessor<T>` — call the access
 | Hook                      | Returns                              | Reactive?                            |
 | ------------------------- | ------------------------------------ | ------------------------------------ |
 | `useRouter()`             | `Router`                             | Never                                |
-| `useNavigator()`          | `Navigator`                          | Never                                |
+| `useNavigator()`          | `Navigator` — `{ navigate, subscribe, subscribeLeave, isLeaveApproved, … }` | Never                                |
 | `useRoute()`              | `Accessor<RouteState>`               | Every navigation                     |
-| `useRouteNode(name)`      | `Accessor<RouteState>`               | Only when node activates/deactivates |
+| `useRouteNode(name)`      | `Accessor<RouteState>`               | When the node's slice of state changes (activation, deactivation, params change inside the subtree) |
 | `useRouteUtils()`         | `RouteUtils`                         | Never                                |
 | `useRouterTransition()`   | `Accessor<RouterTransitionSnapshot>` | On transition start/end              |
 | `useRouteStore()`         | `RouteState` (store)                 | Granular — per-property              |
 | `useRouteNodeStore(name)` | `RouteState` (store)                 | Granular — per-property, node-scoped |
 | `useRouteExit(handler, options?)`  | `void` — wraps `subscribeLeave` with abort + same-route guards            | Never (handler captured at hook call) |
 | `useRouteEnter(handler, options?)` | `void` — fires once on nav-driven mount via `useRoute()` + `transition.from` | Never (handler captured at hook call) |
+
+### Typed Route Params (`useRoute<P>`)
+
+`useRoute<P>()` accepts an optional generic so `route.params` is typed without an `as` cast at the call site (the cast happens once inside the hook — no runtime overhead):
+
+```tsx
+import { useRoute } from "@real-router/solid";
+import type { Params } from "@real-router/core";
+
+type SearchParams = { q: string; sort: "asc" | "desc" } & Params;
+
+function SearchView() {
+  const routeState = useRoute<SearchParams>();
+  return <p>Query: {routeState().route.params.q}</p>; // typed as string
+}
+```
+
+`Link<P>` and `LinkDirectiveOptions<P>` accept the same generic for type-safe `routeParams`.
+
+### `useRoute()` throws when no route is active
+
+`useRoute()` returns `Accessor<{ route: State<P>; previousRoute?: State }>` where `route` is **non-nullable**. The hook throws if the router has no active state (unstarted, stopped, disposed) at the point of subscription. Use `useRouteNode(name)` or `useRouteStore()` if node inactivity is a legitimate state in your code path — those stay nullable. See `Gotchas` in the CLAUDE.md for the migration pattern.
 
 ### Store-Based Hooks (Granular Reactivity)
 
@@ -338,6 +360,42 @@ import { ClientOnly, ServerOnly } from "@real-router/solid/ssr";
 
 All SSR-aware exports (`ClientOnly`, `ServerOnly`, `Streamed`, `Await`, `useDeferred`, `HttpStatusCode`, `HttpStatusProvider`, `createHttpStatusSink`) live at the `/ssr` subpath — the main entry stays client-only.
 
+### Render-Time HTTP Status (`<HttpStatusCode />`)
+
+For SSR responses that need a non-200 status (404, 410, 503, redirects), declare the code inline during render. `<HttpStatusCode code={N} />` writes through a `<HttpStatusProvider>` sink and returns `null` — no DOM, no hydration mismatch. Last write wins; a no-op without a provider so the same code paths work in CSR.
+
+```tsx
+import { renderToString } from "solid-js/web";
+import {
+  HttpStatusCode,
+  HttpStatusProvider,
+  createHttpStatusSink,
+} from "@real-router/solid/ssr";
+
+// In a "page not found" view:
+function NotFound() {
+  return (
+    <>
+      <HttpStatusCode code={404} />
+      <h1>Page not found</h1>
+    </>
+  );
+}
+
+// entry-server.tsx
+const sink = createHttpStatusSink();
+const html = renderToString(() => (
+  <HttpStatusProvider sink={sink}>
+    <App />
+  </HttpStatusProvider>
+));
+response.status(sink.code ?? 200).send(html);
+```
+
+> **Streaming SSR caveat:** with `renderToStream`, the response status MUST be sent before the first body byte flushes. If `<HttpStatusCode />` is mounted **inside a late-resolving `<Suspense>`**, the sink write happens AFTER the headers are already on the wire — the override is lost. Mount the component in the shell (above every `<Suspense>` that could delay it), or use `renderToStringAsync` (awaits all Suspense before returning HTML).
+
+> **Valid `code` range:** Node's `res.end()` throws `Invalid status code` on `NaN`, `0`, negative values, or `> 999` — surfaces as a 5xx / dropped connection. Pass a real HTTP status integer (100-999; commonly 4xx/5xx).
+
 Implementation: `createSignal(false)` + `onMount(() => setMounted(true))` + `<Show>`. `onMount` is SSR-safe per Solid's runtime contract — it never fires during `renderToString`/`renderToStream`. End-to-end dogfooding lives in [`examples/web/solid/ssr-examples/ssr/`](../../examples/web/solid/ssr-examples/ssr/) (see `e2e/ssr-boundaries.spec.ts`).
 
 ## Directives
@@ -482,11 +540,11 @@ Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 
 ## Examples
 
-17 runnable examples — each is a standalone Vite app. Run: `cd examples/web/solid/basic && pnpm dev`
+20 runnable examples — each is a standalone Vite app. Run: `cd examples/web/solid/basic && pnpm dev`
 
 [basic](../../examples/web/solid/basic) · [nested-routes](../../examples/web/solid/nested-routes) · [auth-guards](../../examples/web/solid/auth-guards) · [data-loading](../../examples/web/solid/data-loading) · [lazy-loading](../../examples/web/solid/lazy-loading) · [async-guards](../../examples/web/solid/async-guards) · [hash-routing](../../examples/web/solid/hash-routing) · [persistent-params](../../examples/web/solid/persistent-params) · [error-handling](../../examples/web/solid/error-handling) · [dynamic-routes](../../examples/web/solid/dynamic-routes) · [store-based-state](../../examples/web/solid/store-based-state) · [use-link-directive](../../examples/web/solid/use-link-directive) · [signal-primitives](../../examples/web/solid/signal-primitives) · [combined](../../examples/web/solid/combined) · [animation-examples](../../examples/web/solid/animation-examples) · [search-schema](../../examples/web/solid/search-schema)
 
-Server-side rendering: [ssr](../../examples/web/solid/ssr-examples/ssr) · [ssr-streaming](../../examples/web/solid/ssr-examples/ssr-streaming) · [ssg](../../examples/web/solid/ssr-examples/ssg)
+Server-side rendering: [ssr](../../examples/web/solid/ssr-examples/ssr) · [ssr-streaming](../../examples/web/solid/ssr-examples/ssr-streaming) · [ssr-mixed](../../examples/web/solid/ssr-examples/ssr-mixed) · [ssg](../../examples/web/solid/ssr-examples/ssg)
 
 ## Related Packages
 

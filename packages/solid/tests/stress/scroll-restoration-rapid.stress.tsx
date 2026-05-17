@@ -82,4 +82,83 @@ describe("S1 — scrollRestoration + rapid pushState (§7.2 #10)", () => {
     unmount();
     router.stop();
   }, 60_000);
+
+  // §7.2 audit scenario G4 — pagehide listener leak when router.stop()
+  // is called WITHOUT unmounting the RouterProvider first.
+  //
+  // `createScrollRestoration` registers `addEventListener("pagehide", …)`
+  // on `globalThis`. Destroy unregisters it, but the helper's destroy
+  // path is only invoked via the provider's `onCleanup` (component
+  // unmount). If a consumer calls `router.stop()` without unmount,
+  // the pagehide listener is orphaned on window for the rest of the
+  // page lifetime — invisible to users but compounding in micro-frontend
+  // shells that swap routers without tearing down the React/Solid tree.
+  it("S2 — N router.stop() without unmount → pagehide listeners growth (documented leak)", async () => {
+    vi.stubGlobal("requestAnimationFrame", ((cb: FrameRequestCallback) => {
+      cb(0);
+
+      return 0;
+    }) as typeof globalThis.requestAnimationFrame);
+
+    const addEventListenerSpy = vi.spyOn(globalThis, "addEventListener");
+    const removeEventListenerSpy = vi.spyOn(globalThis, "removeEventListener");
+
+    const ITERATIONS = 20;
+    const cleanupHandles: (() => void)[] = [];
+
+    for (let i = 0; i < ITERATIONS; i++) {
+      const router = createStressRouter(5);
+
+      await router.start("/route0");
+
+      const { unmount } = render(() => (
+        <RouterProvider router={router} scrollRestoration={{}}>
+          <div />
+        </RouterProvider>
+      ));
+
+      // ANTI-PATTERN: stop router without unmounting the provider.
+      // pagehide listener stays attached to globalThis until either
+      // the unmount fires (which we delay) OR the test cleanup runs.
+      router.stop();
+      cleanupHandles.push(unmount);
+    }
+
+    // Count "pagehide" registrations across all iterations.
+    const pagehideAdds = addEventListenerSpy.mock.calls.filter(
+      ([type]) => type === "pagehide",
+    ).length;
+    const pagehideRemoves = removeEventListenerSpy.mock.calls.filter(
+      ([type]) => type === "pagehide",
+    ).length;
+
+    // Document the leak: adds outpace removes when stop() is called
+    // without unmount. This is the captured behaviour — a future fix
+    // that ties listener cleanup to router lifecycle (instead of only
+    // provider unmount) would close the gap and flip this assertion.
+    expect(pagehideAdds).toBeGreaterThanOrEqual(ITERATIONS);
+    // Removes happen only on `unmount`; since none have been called yet,
+    // we expect 0 removes at this point.
+    expect(pagehideRemoves).toBe(0);
+
+    // Now cleanup all providers — listeners should drain.
+    for (const unmount of cleanupHandles) {
+      unmount();
+    }
+
+    forceGC();
+
+    const pagehideRemovesAfterCleanup =
+      removeEventListenerSpy.mock.calls.filter(
+        ([type]) => type === "pagehide",
+      ).length;
+
+    // After unmount, every pagehide listener must be released. If the
+    // unmount path leaks (component disposed but listener stuck), this
+    // assertion catches it.
+    expect(pagehideRemovesAfterCleanup).toBeGreaterThanOrEqual(ITERATIONS);
+
+    addEventListenerSpy.mockRestore();
+    removeEventListenerSpy.mockRestore();
+  }, 60_000);
 });

@@ -1,3 +1,4 @@
+import { errorCodes } from "@real-router/core";
 import { render } from "@solidjs/testing-library";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
@@ -131,7 +132,19 @@ describe("RouterProvider — announceNavigation", () => {
   // fire must navigate twice (or once after the warm-up).
   async function warmUpAnnouncer(): Promise<void> {
     vi.advanceTimersByTime(100);
-    await router.navigate("home").catch(() => {});
+    // The router is already at "home" after beforeEach, so navigate("home")
+    // rejects with SAME_STATES — that's the EXPECTED rejection here, used to
+    // burn the initial-skip guard. Any other error code is a real bug and
+    // must propagate (a blanket `.catch(() => {})` would mask it).
+    await router.navigate("home").catch((error: unknown) => {
+      if (
+        typeof error !== "object" ||
+        error === null ||
+        (error as { code?: string }).code !== errorCodes.SAME_STATES
+      ) {
+        throw error;
+      }
+    });
   }
 
   it("§5.7 — second navigation to the same text is skipped (lastAnnouncedText guard)", async () => {
@@ -280,6 +293,11 @@ describe("RouterProvider — announceNavigation", () => {
 
     const announcer = document.querySelector(ANNOUNCER_SEL);
 
+    // Lock the precondition: the announcer must exist before we test
+    // destroy semantics. Without this assertion, `announcer?.isConnected`
+    // below would coerce `null` to `undefined !== false`, hiding a setup bug.
+    expect(announcer).not.toBeNull();
+
     vi.advanceTimersByTime(100);
     // Warm-up nav — still produces queued rAF callbacks; flush them so the
     // initial-skip transition fires cleanly.
@@ -305,7 +323,7 @@ describe("RouterProvider — announceNavigation", () => {
     }
 
     // Announcer element was removed in destroy(); textContent never written.
-    expect(announcer?.isConnected).toBe(false);
+    expect(announcer!.isConnected).toBe(false);
   });
 
   it("§5.7 — custom getAnnouncementText throw is swallowed; falls back to default resolution", async () => {

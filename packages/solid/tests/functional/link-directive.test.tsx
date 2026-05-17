@@ -584,6 +584,29 @@ describe("link directive", () => {
       // href still reflects the initial value
       expect(screen.getByTestId("link")).toHaveAttribute("href", "/test");
     });
+
+    // Gotcha #19 (realistic case — accessor reading a Solid signal) and
+    // Gotcha #21 (accessor-form ≡ object-literal-form equivalence):
+    //
+    // The realistic gotcha pattern is `<a use:link={() => ({ routeName: signal() })}>`,
+    // where babel-preset-solid auto-wraps the object literal OR the explicit
+    // arrow into a directive accessor at compile time. The directive then
+    // calls accessor() exactly once → reactivity dropped.
+    //
+    // A unit test that hand-rolls the accessor (cast a function to the
+    // expected object type) cannot exercise this: Solid's directive runtime
+    // treats whatever it receives as an already-resolved options object, so
+    // a raw function does NOT get called — href stays null, click navigates
+    // to nothing. The contract only holds when the JSX is compiled by
+    // babel-preset-solid in the host project, which is exactly the
+    // production use case.
+    //
+    // Therefore: the closure-mutation tests above (gotcha #19, plain `let`)
+    // are the strongest in-process guarantee we can pin without an actual
+    // JSX compilation pipeline. Signal-reactivity and accessor↔literal
+    // equivalence remain documented in CLAUDE.md / Wiki under "use:link
+    // Options Are Captured Once" and are exercised end-to-end in the
+    // `examples/web/solid/use-link-directive` example app.
   });
 
   describe("cleanup", () => {

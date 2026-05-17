@@ -1,7 +1,14 @@
 import { errorCodes } from "@real-router/core";
 import { renderHook } from "@solidjs/testing-library";
 import { createEffect } from "solid-js";
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import {
+  describe,
+  beforeEach,
+  afterEach,
+  it,
+  expect,
+  expectTypeOf,
+} from "vitest";
 
 import { RouterProvider, useRoute } from "@real-router/solid";
 
@@ -133,5 +140,54 @@ describe("useRoute hook", () => {
     expect(result().route.name).toStrictEqual("test");
     // Route "test" has no declared params — generic is purely a compile-time cast.
     expect(params).toStrictEqual({});
+
+    // Compile-time type validation — locks that the generic actually narrows
+    // `route.params` to the user-supplied shape (otherwise the runtime
+    // `params = {}` check above would be a tautology — see §1.1 audit note).
+    // expectTypeOf is a no-op at runtime; if the type narrowing breaks
+    // (e.g. someone removes the `as` cast inside useRoute), the test fails
+    // at type-check time.
+    expectTypeOf(result().route.params).toEqualTypeOf<TypedParams>();
+    expectTypeOf(result().route.params.id).toEqualTypeOf<string>();
+    expectTypeOf(result().route.params.tab).toEqualTypeOf<string>();
+  });
+
+  // Gotcha #3 from CLAUDE.md "Hooks Return Accessors, Not Values":
+  // Destructuring a Solid accessor's result inside a component body captures
+  // the value at mount time and breaks reactivity — subsequent navigations
+  // will NOT update the destructured locals. Lock the contract via a
+  // positive/negative pair so a regression that turns useRoute into a
+  // store/object (e.g. via createMutable) fails this test.
+  it("destructuring useRoute() result at mount breaks reactivity (gotcha #3)", async () => {
+    let destructuredName: string | undefined;
+    let accessorName: string | undefined;
+
+    renderHook(
+      () => {
+        const routeState = useRoute();
+        // WRONG pattern — captures `route.name` at hook-call time. Subsequent
+        // navigations don't re-run this line because the component body runs
+        // exactly once in Solid.
+        const { route } = routeState();
+
+        destructuredName = route.name;
+
+        // CORRECT pattern — reads via accessor inside a reactive owner.
+        createEffect(() => {
+          accessorName = routeState().route.name;
+        });
+      },
+      { wrapper: wrapper(router) },
+    );
+
+    expect(destructuredName).toBe("test");
+    expect(accessorName).toBe("test");
+
+    await router.navigate("about");
+
+    // Negative half: destructured value DID NOT update.
+    expect(destructuredName).toBe("test");
+    // Positive half: reactive accessor read DID update.
+    expect(accessorName).toBe("about");
   });
 });

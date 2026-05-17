@@ -1,8 +1,8 @@
 import { createActiveRouteSource } from "@real-router/sources";
-import { createMemo, mergeProps, splitProps, useContext } from "solid-js";
+import { createMemo, mergeProps, splitProps } from "solid-js";
 
 import { EMPTY_PARAMS, EMPTY_OPTIONS } from "../constants";
-import { RouterContext } from "../context";
+import { useRequiredRouterContext } from "../context";
 import { createSignalFromSource } from "../createSignalFromSource";
 import {
   shouldNavigate,
@@ -43,12 +43,7 @@ export function Link<P extends Params = Params>(
     "children",
   ]);
 
-  const ctx = useContext(RouterContext);
-
-  if (!ctx) {
-    throw new Error("Link must be used within a RouterProvider");
-  }
-
+  const ctx = useRequiredRouterContext("Link");
   const router = ctx.router;
 
   // Hash-aware active state (#532). `routeSelector` (the O(1) shared selector)
@@ -91,13 +86,18 @@ export function Link<P extends Params = Params>(
         ),
       );
 
+  // Separate memo for the hash-options object so the `{ hash }` literal
+  // is allocated only when `local.hash` actually changes (instead of on
+  // every `href` memo evaluation). For static `<Link hash="foo">` this
+  // produces ONE allocation total; for dynamic hash through `<Show keyed>`
+  // workaround the allocation cost scales with hash changes, not with
+  // routeName/routeParams changes (§8c A4 audit fix).
+  const hashOpts = createMemo(() =>
+    local.hash === undefined ? undefined : { hash: local.hash },
+  );
+
   const href = createMemo(() =>
-    buildHref(
-      router,
-      local.routeName,
-      local.routeParams,
-      local.hash === undefined ? undefined : { hash: local.hash },
-    ),
+    buildHref(router, local.routeName, local.routeParams, hashOpts()),
   );
 
   const handleClick = (evt: MouseEvent) => {

@@ -41,7 +41,10 @@ export function link<P extends Params = Params>(
 
   applyLinkA11y(element);
 
-  // Active class tracking (reactive)
+  // Active class tracking: only `isActive` is reactive (createEffect toggles
+  // the class on each emit). The `options` object itself is captured ONCE at
+  // init (see gotcha "use:link Options Are Captured Once") — changing
+  // `activeClassName` / `routeName` / `routeParams` later has no effect.
   if (options.activeClassName) {
     const activeClassName = options.activeClassName;
     const activeSource = createActiveRouteSource(
