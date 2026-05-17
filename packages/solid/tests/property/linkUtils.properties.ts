@@ -607,6 +607,73 @@ describe("buildHref — Property Tests (Solid)", () => {
       },
     );
   });
+
+  describe("Invariant 12: buildUrl returning null / empty string falls through to buildPath (§S1 audit)", () => {
+    // The `BuildUrlFn` type contract is `string | undefined`, but the
+    // implementation defends against two contract violations:
+    //   - `""` (empty string) — would render `<a href="">`, which resolves
+    //     to the current page URL → silent self-navigation on click.
+    //   - `null` (type-cast escape) — would render as `"null"` in some
+    //     stringifying renderers, or break a11y on focus.
+    // Both must fall through to `router.buildPath()` instead of being
+    // returned verbatim. The defensive check is
+    // `typeof url === "string" && url.length > 0` (see
+    // `shared/dom-utils/link-utils.ts:78`).
+    test.prop([fc.string({ minLength: 1, maxLength: 12 })], {
+      numRuns: NUM_RUNS.standard,
+    })("buildUrl returning '' → falls through to buildPath", (path) => {
+      // buildUrl returns the empty string — a contract violation that
+      // would silently self-navigate if not caught.
+      const router = makeFakeRouter(
+        () => "",
+        () => path,
+      );
+      const href = buildHref(router, "any", {});
+
+      // Must NOT be "", must be the buildPath fallback.
+      expect(href).toBe(path);
+    });
+
+    test.prop([fc.string({ minLength: 1, maxLength: 12 })], {
+      numRuns: NUM_RUNS.standard,
+    })("buildUrl returning null → falls through to buildPath", (path) => {
+      // buildUrl returns null — escapes the `string | undefined`
+      // type contract via a cast.
+      const router = makeFakeRouter(
+        () => null as unknown as string,
+        () => path,
+      );
+      const href = buildHref(router, "any", {});
+
+      // Must NOT be null/"null", must be the buildPath fallback.
+      expect(href).toBe(path);
+    });
+
+    test.prop(
+      [
+        fc.string({ minLength: 1, maxLength: 12 }),
+        // Hash without leading '#' or embedded '#' — keeps the expected
+        // encoding simple (just encodeURI). The leading-strip + %23 defense
+        // is covered by Invariants 5 and 6 separately.
+        fc.stringMatching(/^[A-Za-z0-9_-]{1,8}$/),
+      ],
+      { numRuns: NUM_RUNS.standard },
+    )(
+      "buildUrl returning '' + hash → fallback applies hash via buildPath path",
+      (path, hash) => {
+        const router = makeFakeRouter(
+          () => "",
+          () => path,
+        );
+        const href = buildHref(router, "any", {}, { hash });
+
+        // The fallback path appends the encoded hash; the empty buildUrl
+        // result is correctly skipped, so the final href reflects the
+        // buildPath + hash composition (not the empty url + hash).
+        expect(href).toBe(`${path}#${hash}`);
+      },
+    );
+  });
 });
 
 // =============================================================================

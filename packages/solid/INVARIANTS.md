@@ -1,6 +1,6 @@
 # @real-router/solid — Invariants
 
-Invariants verified by property-based tests in `tests/property/`. Test count: **139 PBT** across 10 files (as of audit follow-up rounds 4-20 in `2026-05-17`).
+Invariants verified by property-based tests in `tests/property/`. Test count: **142 PBT** across 10 files (as of audit follow-up rounds 4-21 in `2026-05-17`).
 
 ## isRouteActive (RouterProvider selector)
 
@@ -95,6 +95,7 @@ Invariants verified by property-based tests in `tests/property/`. Test count: **
 | 9 | **Hash idempotency** — `buildHref(...) === buildHref(...)` on identical inputs; feeding output's fragment back yields identical encoding | Pure-read determinism; no hidden state mutation across calls |
 | 10 | **Path with query string + hash combo** — `/users?q=1#tab` → `<path>?<query>#<hash>` order preserved | Query string must come BEFORE hash per WHATWG URL; a swap would parse path as `users`, fragment as `tab?q=1`, losing query |
 | 11 | **Relative path (no leading `/`)** — `users/list#tab` is preserved verbatim, no leading `/` injected | Custom plugins (memory-plugin, history-less adapters) emit relative paths; must not break |
+| 12 | **`buildUrl` returning `null` / empty string falls through to `buildPath`** (3 explicit pin-tests) — `buildUrl=() => ""` → fallback; `buildUrl=() => null` (cast escape) → fallback; `buildUrl=() => "" + hash` → buildPath + hash | `BuildUrlFn` type contract is `string \| undefined`, but defensive `typeof url === "string" && url.length > 0` guards against `""` (would render `<a href="">` → silent self-navigation) and `null` (would render as `"null"` in stringifying renderers). |
 
 ## shallowEqual (`shared/dom-utils/link-utils.ts`)
 
