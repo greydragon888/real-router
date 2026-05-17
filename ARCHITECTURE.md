@@ -55,15 +55,19 @@ real-router/
 │   ├── browser-env/               # Shared browser abstractions for URL plugins: history API, popstate, SSR fallback
 │   └── ssr/                       # Shared SSR plugin scaffolding: createSsrLoaderPlugin generic factory + createLoadersValidator
 ├── examples/
-│   ├── shared/                    # Shared store, API, abilities, styles
-│   ├── react/    (18 examples)    # React 19.2+ examples (incl. ink-demo for @real-router/react/ink) + 9 e2e suites
-│   ├── preact/   (12 examples)    # Preact examples + 9 e2e suites
-│   ├── solid/    (18 examples)    # Solid.js examples (incl. ssr-examples/ × 3 subgroup) + 9 e2e suites
-│   ├── vue/      (22 examples)    # Vue 3 SFC examples (incl. animation-examples/ × 4 + ssr-examples/ × 3 subgroups) + 9 e2e suites
-│   ├── svelte/   (19 examples)    # Svelte 5 examples (incl. ssr-examples/ × 3 subgroup) + 9 e2e suites
-│   ├── angular/  (11 examples)    # Angular 21+ examples (incl. ssr-examples/ × 3 subgroup using provideRealRouterFactory) + 8 e2e suites
-│   ├── electron/ (3 examples)     # Electron desktop: browser-plugin (app://), hash-plugin (file://), navigation-plugin
-│   └── tauri/    (2 examples)     # Tauri v2 desktop: browser-plugin, navigation-plugin
+│   ├── shared/                            # Shared store, API, abilities, styles
+│   ├── web/
+│   │   ├── react/      (28 vite apps)     # React 19.2+ (incl. animation-examples × 4 + ssr-examples × 5 [ssr, ssr-streaming, ssr-mixed, ssg, ssr-rsc]); 59 e2e specs
+│   │   ├── preact/     (21 vite apps)     # Preact 10 (incl. animation-examples × 4 + ssr-examples × 4); 54 e2e specs
+│   │   ├── solid/      (24 vite apps)     # Solid.js (incl. animation-examples × 4 + ssr-examples × 4); 54 e2e specs
+│   │   ├── vue/        (24 vite apps)     # Vue 3 SFC (incl. animation-examples × 4 + ssr-examples × 4); 55 e2e specs
+│   │   ├── svelte/     (25 vite apps)     # Svelte 5 (incl. animation-examples × 4 + ssr-examples × 4); 54 e2e specs
+│   │   └── angular/    (16 vite apps)     # Angular 21+ (incl. animation-examples × 4 + ssr-examples × 4 using provideRealRouterFactory); 49 e2e specs
+│   ├── console/
+│   │   └── react-ink/  (1 app)            # CLI demo via @real-router/react/ink + memory-plugin
+│   └── desktop/
+│       ├── electron/   (3 apps)           # Electron: browser-plugin (app://), hash-plugin (file://), navigation-plugin
+│       └── tauri/      (2 apps)           # Tauri v2: browser-plugin, navigation-plugin
 ```
 
 **Public packages** (published to npm): `core`, `core-types`, `react`, `preact`, `solid`, `vue`, `svelte`, `angular`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `rsc-server-plugin`, `lifecycle-plugin`, `preload-plugin`, `memory-plugin`, `navigation-plugin`, `validation-plugin`, `search-schema-plugin`, `route-utils`, `logger`
@@ -278,15 +282,20 @@ stateDiagram-v2
 | `LEAVE_APPROVED`     | Deactivation guards passed, activation guards pending |
 | `DISPOSED`           | Terminal state, no transitions out                    |
 
-FSM events trigger observable emissions via `fsm.on(from, event, action)`:
+FSM events trigger observable emissions through two paths:
+
+**Via `fsm.on(from, event, action)`** — events that go through the FSM's `send()` dispatch:
 
 - `STARTED` → `emitRouterStart()`
-- `NAVIGATE` → `emitTransitionStart()`
-- `LEAVE_APPROVE` → `emitTransitionLeaveApprove()`
-- `COMPLETE` → `emitTransitionSuccess()`
-- `CANCEL` → `emitTransitionCancel()`
-- `FAIL` → `emitTransitionError()`
 - `STOP` → `emitRouterStop()`
+- `CANCEL` (from `TRANSITION_STARTED` or `LEAVE_APPROVED`) → `emitTransitionCancel()`
+- `FAIL` (from any state) → `emitTransitionError()`
+
+**Via direct `forceState()` + emit** — hot-path navigation transitions bypass FSM dispatch for performance (no Map lookup, no action call); the emit follows the state transition in `EventBusNamespace.send*()` helpers:
+
+- `NAVIGATE` (`sendNavigate`) → `forceState(TRANSITION_STARTED)` + `emitTransitionStart()`
+- `LEAVE_APPROVE` (`sendLeaveApprove`) → `forceState(LEAVE_APPROVED)` + `emitTransitionLeaveApprove()`
+- `COMPLETE` (`sendComplete`) → `forceState(READY)` + `emitTransitionSuccess()`
 
 ## Navigation Pipeline
 
@@ -343,13 +352,14 @@ On error at any step: `emitTransitionError()`, Promise rejects with `RouterError
 
 ### Plugin Interception
 
-Plugins intercept router methods via `addInterceptor()` on `PluginApi`:
+Plugins intercept router methods via `addInterceptor()` on `PluginApi`. `InterceptableMethodMap` is fixed at compile time (`core-types/src/api.ts`):
 
-| Method         | Signature                                                 | Used by                         |
-| -------------- | --------------------------------------------------------- | ------------------------------- |
-| `start`        | `(path?: string) => Promise<State>`                       | browser-plugin, ssr-data-plugin, rsc-server-plugin |
-| `buildPath`    | `(route: string, params?: Params) => string`              | persistent-params-plugin        |
-| `forwardState` | `(routeName: string, routeParams: Params) => SimpleState` | persistent-params-plugin        |
+| Method         | Signature                                                                | Used by                                                                                          |
+| -------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| `start`        | `(path?: string) => Promise<State>`                                      | browser-plugin, hash-plugin, navigation-plugin (via `createStartInterceptor` from `shared/browser-env`); ssr-data-plugin, rsc-server-plugin (via `createSsrLoaderPlugin` from `shared/ssr`) |
+| `buildPath`    | `(route: string, params?: Params) => string`                             | persistent-params-plugin                                                                         |
+| `forwardState` | `(routeName: string, routeParams: Params) => SimpleState`                | persistent-params-plugin, search-schema-plugin                                                   |
+| `add`          | `(routes: Route[], options?: { parent?: string }) => void`               | search-schema-plugin                                                                             |
 
 Multiple interceptors per method execute in **LIFO** order (last-registered wraps first). Each receives `next` (original or previously-wrapped function) plus the method's arguments. Applied via `createInterceptable()` in `RouterInternals`.
 
@@ -359,7 +369,16 @@ Plugins extend the router instance with new properties via `extendRouter()` on `
 
 ### Context Namespace Claims
 
-Plugins publish per-route data via `claimContextNamespace()` on `PluginApi`. Each plugin claims a unique namespace key at registration time (O(1) collision detection via `Set<string>`), receives a `{ write, release }` object, and publishes data to `state.context.<namespace>` from lifecycle hooks. Mirrors the `extendRouter()` ownership model: closure-based tracking, manual `release()` in `teardown()`, dispose safety net for orphaned claims. Six plugins use this: navigation (`direction`, `sourceElement`), ssr-data (`data`), rsc-server (`rsc`), persistent-params (`persistentParams`), browser (`source`), memory (`direction`, `historyIndex`).
+Plugins publish per-route data via `claimContextNamespace()` on `PluginApi`. Each plugin claims a unique namespace key at registration time (O(1) collision detection via `Set<string>`), receives a `{ write, release }` object, and publishes data to `state.context.<namespace>` from lifecycle hooks. Mirrors the `extendRouter()` ownership model: closure-based tracking, manual `release()` in `teardown()`, dispose safety net for orphaned claims. Six plugins use this — 8 claims in total:
+
+| Plugin                   | Namespace key(s)       | Published fields (examples)                                |
+| ------------------------ | ---------------------- | ---------------------------------------------------------- |
+| browser-plugin           | `browser` + `url`      | source, fullUrl                                            |
+| navigation-plugin        | `navigation`           | direction, sourceElement                                   |
+| memory-plugin            | `memory`               | direction, historyIndex                                    |
+| persistent-params-plugin | `persistentParams`     | persisted query param snapshot                             |
+| ssr-data-plugin          | `data`                 | per-route loader result (via `createSsrLoaderPlugin`)      |
+| rsc-server-plugin        | `rsc` + `rscAction`    | per-route ReactNode (via `createSsrLoaderPlugin`) + server-action results |
 
 ### Validator Slot
 
@@ -455,9 +474,9 @@ All navigation errors are `RouterError` instances with typed `code` from `errorC
 ### Testing Strategy
 
 - **100% code coverage** enforced in CI across all packages
-- **Property-based testing** (fast-check) for URL encoding, parameter serialization, route tree operations
-- **310 stress tests** — concurrent navigations, guard removal mid-execution, route CRUD under load, heap snapshots confirming zero memory leaks, SPA simulations for Vue and Svelte adapters
-- **Playwright e2e testing** — 522 test cases across 41 suites covering all 5 framework adapters. Tests verify real browser behavior: navigation, guards, data loading, error handling, hash routing, nested routes, dynamic routes, async guards. Turbo-cached via `test:e2e` task.
+- **Property-based testing** — 2000+ property test cases via fast-check across 31 packages: URL encoding, parameter serialization, route tree operations, reactive subscription ordering, canonical params, link helpers
+- **Stress testing** — 700+ stress test cases across 183 `.stress.ts` files in 14 packages (core, plugins, all 6 framework adapters): concurrent navigations, guard removal mid-execution, route CRUD under load, heap snapshots confirming zero memory leaks, mount/unmount lifecycle, subscription fanout granularity, full SPA simulations
+- **Playwright e2e testing** — 1800+ test cases across 330+ spec files (100+ playwright projects) covering all 6 framework adapters (React, Preact, Solid, Vue, Svelte, Angular). Tests verify real browser behavior: navigation, guards, data loading, error handling, hash routing, nested routes, dynamic routes, async guards, SSR/streaming/SSG/RSC pipelines, animations. Turbo-cached via `test:e2e` task.
 - **Mutation testing** (Stryker) validates test suite quality beyond line coverage
 - **`lint:e2e`** pre-commit check — verifies every example with `playwright.config.ts` has at least one spec file
 

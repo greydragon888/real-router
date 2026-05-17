@@ -113,7 +113,7 @@ Root `CHANGELOG.md` is auto-populated from package changelogs:
 - First publish must be manual (`npm publish`) - can't configure Trusted Publisher before package exists
 - Trusted Publisher configured with workflow: `changesets.yml`
 
-**Build optimization:** Release workflow uses `pnpm turbo run build:dist-only --filter='!./examples/**'` and `pnpm turbo run test --filter='!./examples/**'` — packages only, skipping ~90 example apps. Previously used bare `pnpm build` / `pnpm test` which ran the full 218-task pipeline including all examples, adding ~10 minutes to release time.
+**Build optimization:** Release workflow uses `pnpm turbo run build:dist-only --filter='!./examples/**'` and `pnpm turbo run test --filter='!./examples/**'` — packages only, skipping ~130 example apps. Previously used bare `pnpm build` / `pnpm test` which ran the full ~1200-task pipeline including all examples, adding ~10 minutes to release time.
 
 ### Critical: Use `pnpm publish` NOT `npm publish`
 
@@ -198,10 +198,19 @@ Per-package releases — each published package gets its own GitHub release via 
 
 ### SonarCloud Version
 
-`.github/workflows/sonarcloud.yml` gets version dynamically:
+The `sonarcloud` job inside `.github/workflows/ci.yml` (consolidated from the former standalone `sonarcloud.yml`) gets version dynamically:
 
 ```yaml
-VERSION=$(node -p "require('./packages/core/package.json').version")
+- id: version
+  run: |
+    VERSION=$(node -p 'require("./packages/core/package.json").version')
+    echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+- name: SonarCloud Scan
+  uses: SonarSource/sonarqube-scan-action@... # v7
+  with:
+    args: >
+      -Dsonar.projectVersion=${{ steps.version.outputs.version }}
 ```
 
 This ensures SonarCloud shows correct version without manual updates.
@@ -287,7 +296,7 @@ Pipeline runs two turbo invocations in one VM:
 
 ### Package Smoke Test
 
-CI job `smoke` (added after #413 and #418): packs all 22 public packages into tarballs, installs them into an isolated temp project via `npm install`, and verifies every export resolves with `import()`.
+CI job `smoke` (added after #413 and #418): packs all 24 public packages into tarballs, installs them into an isolated temp project via `npm install`, and verifies every export resolves with `import()`.
 
 **Script:** `scripts/smoke-test-packages.sh`
 
@@ -337,9 +346,9 @@ concurrency:
 
 Cancels in-progress runs when new commit pushed.
 
-### pnpm/action-setup v5
+### pnpm/action-setup v6
 
-All CI workflows migrated from `pnpm/action-setup@v4` to `pnpm/action-setup@v5` (`ci.yml`, `changesets.yml`, `danger.yml`). v5 auto-detects pnpm version from `packageManager` field in root `package.json` — no explicit `version` input needed.
+All CI workflows use `pnpm/action-setup@v6` (`ci.yml`, `changesets.yml`, `danger.yml`, `post-merge.yml`, `examples.yml`, `codeql.yml`). v5 introduced auto-detection of pnpm version from the `packageManager` field in root `package.json` — no explicit `version` input needed; v6 preserved this behavior.
 
 ### Workflows
 
@@ -516,7 +525,7 @@ Uses syncpack v14 (Rust rewrite). `syncpack.config.mjs` enforces:
 
 ## Turbo Configuration
 
-Uses turbo v2.9.5.
+Uses turbo v2.9.6.
 
 **v2.9 migration:** Adopted `futureFlags` for the new global configuration schema:
 
@@ -896,7 +905,7 @@ uses: actions/checkout@v6
 
 Previously used `minimum-release-age=1440` in `.npmrc` to block packages published less than 24 hours ago. Removed due to high maintenance overhead — every dependency update required temporary exclusions in `pnpm-workspace.yaml` with manual cleanup. The `strict-dep-builds=true` setting (pnpm 10) and `pnpm.onlyBuiltDependencies` allowlist now provide the primary supply-chain protection for lifecycle scripts.
 
-**`onlyBuiltDependencies` allowlist:** `core-js`, `esbuild`, `fsevents`, `unrs-resolver`, `vue-demi`. Only these packages are permitted to run post-install scripts. `vue-demi` was added after it started failing in CI with `ERR_PNPM_IGNORED_BUILDS` (pnpm 10 blocks unapproved build scripts by default).
+**`onlyBuiltDependencies` allowlist:** `@parcel/watcher`, `core-js`, `electron`, `esbuild`, `fsevents`, `lmdb`, `msgpackr-extract`, `unrs-resolver`, `vue-demi`. Only these packages are permitted to run post-install scripts. `vue-demi` was added after it started failing in CI with `ERR_PNPM_IGNORED_BUILDS` (pnpm 10 blocks unapproved build scripts by default); `electron` and its transitive native deps (`@parcel/watcher`, `lmdb`, `msgpackr-extract`) were added when the Electron desktop examples landed.
 
 ### Security Overrides
 
@@ -928,7 +937,7 @@ Each override addresses a known vulnerability in older versions. Version-scoped 
 
 ### Overview
 
-Migrated from ESLint 9.39 to ESLint 10.1. Tracking issue: [#237](https://github.com/greydragon888/real-router/issues/237).
+Migrated from ESLint 9.39 to ESLint 10.x (currently 10.2.1). Tracking issue: [#237](https://github.com/greydragon888/real-router/issues/237).
 
 ### Package Changes
 
@@ -1013,7 +1022,7 @@ Evaluated `eslint-plugin-solid@0.14.5` for the Solid adapter. Decision: not adde
 
 `typescript-eslint@8.57.2` introduced a fixer crash in `no-unnecessary-type-arguments`. The rule's `fix()` function accesses `typeArguments.params[-1]` → `undefined` → crash on `.range`. Occurs on both ESLint 9 and 10, even without `--fix`.
 
-**Bisected:** 8.57.1 OK → 8.57.2 CRASH. The main `typescript-eslint` package is now at `8.58.0`, but pnpm overrides still pin the transitive `@typescript-eslint/eslint-plugin` and `@typescript-eslint/parser` to `8.57.1` to avoid the crashing code path in the plugin package.
+**Bisected:** 8.57.1 OK → 8.57.2 CRASH. The main `typescript-eslint` package is now at `8.59.0`, but pnpm overrides still pin the transitive `@typescript-eslint/eslint-plugin` and `@typescript-eslint/parser` to `8.57.1` to avoid the crashing code path in the plugin package.
 
 **TODO:** Remove overrides when typescript-eslint ships a fix for the `no-unnecessary-type-arguments` crash.
 
@@ -1097,7 +1106,7 @@ After `pnpm add -Dw typescript@6.0.2`, packages with `rollup-plugin-dts` as a de
 
 ### Peer Dependency Warnings
 
-typescript-eslint, tsconfck (via vite-tsconfig-paths), and svelte2tsx declare `typescript <6.0.0` or `^5.0.0` as peer deps. All work correctly with TS 6.0, but pnpm's strict peer checking fails on install.
+Originally three packages declared `typescript <6.0.0` or `^5.0.0` as peer deps: typescript-eslint, tsconfck (via vite-tsconfig-paths), and svelte2tsx. All work correctly with TS 6.0, but pnpm's strict peer checking fails on install.
 
 **Fix:** `peerDependencyRules.allowedVersions` in root package.json:
 
@@ -1111,7 +1120,9 @@ typescript-eslint, tsconfck (via vite-tsconfig-paths), and svelte2tsx declare `t
 }
 ```
 
-**TODO:** Remove after these packages update their peer dep ranges to include TS 6.
+**Progress:** `typescript-eslint` (now `>=4.8.4 <6.1.0`) and `svelte2tsx` (now `^4.9.4 || ^5.0.0 || ^6.0.0`) have updated their peer ranges to include TS 6. The override remains needed solely because of `tsconfck` (still `^5.0.0`, reached transitively through `vite-tsconfig-paths`).
+
+**TODO:** Remove the override once `tsconfck` widens its `typescript` peer range to include 6.x.
 
 ### What Did NOT Need Changing
 
@@ -1441,22 +1452,25 @@ Removed `clearMocks: true` from `vitest.config.common.mts`. `restoreMocks: true`
 
 ### Examples Workspace
 
-80 example applications across 5 framework adapters (React, Preact, Solid, Vue, Svelte) plus standalone SSR/SSG examples. Organized by framework:
+~130 example applications across 6 framework adapters (React, Preact, Solid, Vue, Svelte, Angular) plus terminal and desktop runtimes. Organized by runtime:
 
 ```
 examples/
-├── preact/{app-name}/
-├── react/{app-name}/
-├── solid/{app-name}/
-├── svelte/{app-name}/
-├── vue/{app-name}/
-└── react/
-    ├── ...               # 14 SPA examples
-    ├── ssr/              # Server-side rendering with Express + Vite
-    └── ssg/              # Static site generation with Vite
+├── web/
+│   ├── react/{app-name}/         # incl. animation-examples × 4 + ssr-examples × 5 (RSC adds 1)
+│   ├── preact/{app-name}/        # incl. animation-examples × 4 + ssr-examples × 4
+│   ├── solid/{app-name}/         # incl. animation-examples × 4 + ssr-examples × 4
+│   ├── vue/{app-name}/           # incl. animation-examples × 4 + ssr-examples × 4
+│   ├── svelte/{app-name}/        # incl. animation-examples × 4 + ssr-examples × 4
+│   └── angular/{app-name}/       # incl. animation-examples × 4 + ssr-examples × 4
+├── console/
+│   └── react-ink/                # CLI demo via @real-router/react/ink + memory-plugin
+└── desktop/
+    ├── electron/{react,react-hash,react-navigation}/
+    └── tauri/{react,react-navigation}/
 ```
 
-`pnpm-workspace.yaml` includes both `examples/*` and `examples/*/*` as workspace globs. Examples are private packages (`"private": true`) that use workspace packages via `workspace:^`.
+`pnpm-workspace.yaml` includes nested globs (`examples/*/*`, `examples/*/*/*`, `examples/*/*/*/*`) to pick up the deepest sub-app directories (`animation-examples/*`, `ssr-examples/*`). Examples are private packages (`"private": true`) that use workspace packages via `workspace:^`.
 
 **Turbo exclusion:** Examples use `build:app` instead of `build` in their scripts to avoid triggering turbo's `build` pipeline. `turbo run build` only matches packages with a `build` script — examples are excluded.
 
@@ -1670,7 +1684,7 @@ cleanup-unused-catalogs=true # Auto-cleanup unused catalog entries
 script-shell=bash            # Use bash for script execution
 ```
 
-`pnpm.onlyBuiltDependencies` in root `package.json` allowlists packages that may run lifecycle scripts: `core-js`, `esbuild`, `fsevents`, `unrs-resolver`.
+`pnpm.onlyBuiltDependencies` in root `package.json` allowlists packages that may run lifecycle scripts: `@parcel/watcher`, `core-js`, `electron`, `esbuild`, `fsevents`, `lmdb`, `msgpackr-extract`, `unrs-resolver`, `vue-demi`. See "Supply-Chain Security › Minimum Release Age (Removed)" above for the rationale.
 
 ### Strict Peer Dependencies
 
@@ -2157,7 +2171,7 @@ canDeactivate: ((toState, fromState) => showDialog(), // pure decision
 
 `pnpm turbo run test --filter='!./examples/**'` still executes `test` tasks for example packages. Turbo `--filter` controls the initial scope but does not prevent downstream dependents from being included in the execution graph. This is a known turbo limitation ([vercel/turborepo#6505](https://github.com/vercel/turborepo/discussions/7453)) with no planned fix.
 
-Pre-push hook and CI were running ~30 example `test` tasks and ~68 example `build` tasks on every run — adding minutes to both local and CI pipelines.
+Pre-push hook and CI were running dozens of example `test` and `build` tasks on every run (today the example set alone is ~1000 turbo tasks) — adding minutes to both local and CI pipelines.
 
 ### Solution
 
@@ -2200,6 +2214,10 @@ Adding `github.event_name == 'pull_request'` to each job makes the file harder t
 ### Why no coverage on push
 
 Coverage and SonarCloud depend on test job artifacts. Without test, there are no coverage files to upload. Codecov updates baseline from PR merge commits — no separate push upload needed.
+
+### Release pipeline coupling
+
+`changesets.yml` uses a `workflow_run` trigger and must reference the workflow that runs on master push. After the split, this trigger was updated from `workflows: [CI]` to `workflows: [Post-Merge Build]`. Missing this update breaks the release pipeline — changesets never triggers after merge, no Version PR is created.
 
 ## State Context — Plugin-Extensible Route Data via Claim-Based API
 
@@ -2261,13 +2279,14 @@ const direction = route.context.navigation.direction;
 
 ### Migrated plugins
 
-| Plugin                     | Context namespace  | Data                                    |
-| -------------------------- | ------------------ | --------------------------------------- |
-| `navigation-plugin`        | `navigation`       | direction, sourceElement, userInitiated |
-| `ssr-data-plugin`          | `ssr`              | loader data                             |
-| `persistent-params-plugin` | `persistentParams` | persistent params snapshot              |
-| `browser-plugin`           | `browser`          | popstate/navigate source                |
-| `memory-plugin`            | `memory`           | direction, historyIndex                 |
+| Plugin                     | Context namespace(s)    | Data                                            |
+| -------------------------- | ----------------------- | ----------------------------------------------- |
+| `navigation-plugin`        | `navigation`            | direction, sourceElement, userInitiated         |
+| `ssr-data-plugin`          | `data` (+ `ssrDataMode`, `ssrDataDeferred`, `ssrDataDeferredKeys`) | per-route loader result + mode marker + deferred-promise registry (#610) |
+| `rsc-server-plugin`        | `rsc` + `rscAction`     | per-route ReactNode + server-action results     |
+| `persistent-params-plugin` | `persistentParams`      | persistent params snapshot                      |
+| `browser-plugin`           | `browser` + `url`       | popstate/navigate source + URL fragment (#532)  |
+| `memory-plugin`            | `memory`                | direction, historyIndex                         |
 
 ### Not migrated
 
@@ -2355,23 +2374,6 @@ router.usePlugin(() => ({
 - Closes #471 case 3 from the opposite direction — `{ allowNotFound: false, defaultRoute: "" }` is no longer a dead-end configuration.
 - Single purpose for `defaultRoute`: only the explicit `router.navigateToDefault()` target.
 - All error surfaces go through one channel (`onTransitionError`) — uniform observability for logs, analytics, and recovery UIs.
-
-## CI/CD: Split CI into PR-only and Post-Merge Workflows
-
-### Problem
-
-Full CI pipeline (lint, type-check, test, build, coverage, bundle size, SonarCloud) ran on every push to master — redundant since the same commit was already validated on the PR. ~12 min wasted per merge.
-
-### Solution
-
-Split into two workflows:
-
-- **`ci.yml`** (`on: pull_request`) — single Pipeline job (test + bundle), then downstream: smoke, coverage, bundle size
-- **`post-merge.yml`** (`on: push` to master) — bundle-only verification (~30s)
-
-### Why this matters
-
-`changesets.yml` uses `workflow_run` trigger and must reference the workflow that runs on master push. After the split, this trigger was updated from `workflows: [CI]` to `workflows: [Post-Merge Build]`. Missing this update breaks the release pipeline — changesets never triggers after merge, no Version PR is created.
 
 ## Scroll Restoration as Utility, Not Plugin
 
