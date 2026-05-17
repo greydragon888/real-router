@@ -1,6 +1,6 @@
 # @real-router/solid — Invariants
 
-Invariants verified by property-based tests in `tests/property/`. Test count: **142 PBT** across 10 files (as of audit follow-up rounds 4-21 in `2026-05-17`).
+Invariants verified by property-based tests in `tests/property/`. Test count: **152 PBT** across 11 files (as of audit follow-up rounds 4-22 in `2026-05-17`).
 
 ## isRouteActive (RouterProvider selector)
 
@@ -189,3 +189,16 @@ Invariants verified by property-based tests in `tests/property/`. Test count: **
 | 2 | **Idempotency** — `applyLinkA11y(el)` followed by `applyLinkA11y(el)` yields the same attribute state as a single call (role="link", tabindex="0") | `hasAttribute` guard ensures second application reads the attributes set by the first and short-circuits |
 | 3 | **HTMLAnchorElement / HTMLButtonElement skip** — `<a>` and `<button>` get NEITHER `role` NOR `tabindex` injected; non-focusable elements (div, span, li, section, article, p, header, nav, …) DO get role="link" + tabindex="0" | Anchors and buttons are natively accessible; injecting `role="link"` would break native a11y semantics |
 | 4 | **Existing `role` / `tabindex` preserved** — pre-set role (e.g. `"button"`, `"menuitem"`, `"tab"`, `"switch"`, `"checkbox"`) or tabindex (e.g. `"-1"`, `"0"`, `"1"`, `"5"`) survives `applyLinkA11y` call; only the unset attribute is filled with the default | Consumer-supplied a11y attributes must not be silently overwritten — defensive `hasAttribute` guard is the contract |
+
+## keyOf / canonicalJson (`shared/dom-utils/scroll-restore.ts` — test-only export)
+
+`tests/property/scrollRestoreKey.properties.ts`. **`keyOf`/`canonicalJson`** are internal helpers behind `createScrollRestoration`'s sessionStorage cache. **Not exported from the `shared/dom-utils/index.ts` barrel** — exposed only via direct file path for test access (audit-2026-05-16 #S3).
+
+| # | Invariant | Why it must hold |
+|---|-----------|-----------------|
+| 1 | **`keyOf` shape** — `keyOf(state) === `${state.name}:${canonicalJson(state.params)}`` for any state. Locked also via a separator check ("colon comes right after name, no embedded colons in the prefix"). | The persisted sessionStorage key format. A change to the separator or composition silently invalidates every saved scroll position across an upgrade |
+| 2 | **`canonicalJson` key-order-insensitive** — `canonicalJson({a:1, b:2}) === canonicalJson({b:2, a:1})` for any record | Defines the same-route same-params scroll-cache entry sharing. `<Link routeParams={...}>` with semantically-equal params must hit the same key |
+| 3 | **`canonicalJson` deterministic** — `canonicalJson(x) === canonicalJson(x)` across N calls on the same value | Locks against accidental randomized iteration order |
+| 4 | **`canonicalJson` recursive sort** — nested object keys are also sorted at every depth (`canonicalReplacer` applies recursively) | A top-only sort would silently desync cache keys for deep params |
+| 5 | **`canonicalJson` arrays preserve positional order** — arrays are not sorted (only object keys); `canonicalJson(arr) === JSON.stringify(arr)` for primitive arrays | Arrays are positional data; sorting them would corrupt semantic meaning |
+| 6 | **Primitive / null / undefined pass-through** — matches `JSON.stringify` semantics; null → `"null"`; undefined → `undefined` (the value, not the string) | `canonicalReplacer` short-circuits non-object values, preserving JSON.stringify behaviour |

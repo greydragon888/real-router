@@ -174,4 +174,174 @@ describe("EBR1 — RouterErrorBoundary auto-reset stress (§7.3 #25)", () => {
     consoleError.mockRestore();
     router.stop();
   }, 60_000);
+
+  // §7.2 audit scenario G8 — RouterErrorBoundary zombie-effect protection.
+  //
+  // Concern: `createEffect` inside RouterErrorBoundary reads the
+  // dismissable error source and calls `props.onError?.(...)` whenever
+  // an error fires. If a TRANSITION_ERROR lands AFTER the boundary
+  // component unmounts (race between error emission and Solid cleanup),
+  // `onError` must NOT be invoked — the effect must already be disposed.
+  //
+  // Solid runtime guarantees `onCleanup` runs before further effect
+  // triggers, but a regression in the createSignalFromSource bridge
+  // (setValue after dispose silently no-ops, but the effect tick still
+  // reads stale subscription state) could leak a single "zombie"
+  // onError call.
+  it("EBR1.3: error fires → unmount → late nav → onError NOT invoked (zombie effect protection)", async () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    const routes: Route[] = [
+      { name: "home", path: "/home" },
+      {
+        name: "guarded",
+        path: "/guarded",
+        canActivate: () => () => Promise.resolve(false),
+      },
+    ];
+    const router = createRouter(routes, { defaultRoute: "home" });
+
+    await router.start("/home");
+
+    const onErrorSpy = vi.fn();
+
+    const { unmount } = render(() => (
+      <RouterProvider router={router}>
+        <RouterErrorBoundary
+          onError={onErrorSpy}
+          fallback={(err) => <div data-testid="fallback">{err.code}</div>}
+        >
+          <div data-testid="children">app</div>
+        </RouterErrorBoundary>
+      </RouterProvider>
+    ));
+
+    // Round 1: trigger an error to confirm onError WAS invoked while mounted.
+    const navError = await router
+      .navigate("guarded")
+      .catch((error: unknown) => error);
+
+    expect((navError as { code?: string } | undefined)?.code).toBe(
+      errorCodes.CANNOT_ACTIVATE,
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("fallback")).toBeInTheDocument();
+    });
+
+    const callsBeforeUnmount = onErrorSpy.mock.calls.length;
+
+    expect(callsBeforeUnmount).toBeGreaterThanOrEqual(1);
+
+    // Unmount BEFORE another error fires. Effect is disposed.
+    unmount();
+
+    // Fire another error AFTER unmount. The onCleanup chain MUST have
+    // released the subscription — onError must not be called for the
+    // post-unmount error.
+    await router.navigate("guarded").catch(() => undefined);
+
+    // Allow microtasks to drain.
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(onErrorSpy).toHaveBeenCalledTimes(callsBeforeUnmount);
+
+    consoleError.mockRestore();
+    router.stop();
+  });
+
+  it("EBR1.4: 50 mount/error/unmount cycles — no onError leak per cycle", async () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    const routes: Route[] = [
+      { name: "home", path: "/home" },
+      { name: "other", path: "/other" },
+      {
+        name: "guarded",
+        path: "/guarded",
+        canActivate: () => () => Promise.resolve(false),
+      },
+    ];
+    const router = createRouter(routes, { defaultRoute: "home" });
+
+    await router.start("/home");
+
+    const onErrorSpy = vi.fn();
+    const heapBefore = takeHeapSnapshot();
+    const ITERATIONS = 50;
+
+    // Per-cycle invariant: zero onError calls happen BETWEEN unmount and
+    // the next mount. Late errors fired against a disposed boundary must
+    // not bump onErrorSpy — even if the error remains "latent" in the
+    // dismissable source. (We don't assert the TOTAL call count because
+    // a fresh mount may legitimately see and fire on a pre-existing
+    // latent error — that's not a zombie, it's a re-mount handler.)
+    let zombieDetected = false;
+
+    for (let i = 0; i < ITERATIONS; i++) {
+      // Alternate between home and other to guarantee cross-route nav.
+      const safe = i % 2 === 0 ? "other" : "home";
+
+      const { unmount } = render(() => (
+        <RouterProvider router={router}>
+          <RouterErrorBoundary
+            onError={onErrorSpy}
+            fallback={(err) => <div data-testid="fallback">{err.code}</div>}
+          >
+            <div data-testid="children">app</div>
+          </RouterErrorBoundary>
+        </RouterProvider>
+      ));
+
+      // Mid-cycle error.
+      await router.navigate("guarded").catch(() => undefined);
+
+      // Snapshot call count BEFORE unmount.
+      const callsBeforeUnmount = onErrorSpy.mock.calls.length;
+
+      unmount();
+
+      // Late error AFTER unmount — Solid's onCleanup MUST have released
+      // the subscription. If a zombie effect fires onError now, the call
+      // count bumps.
+      await router.navigate("guarded").catch(() => undefined);
+      // Allow microtasks to drain in case a late callback queued.
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const callsAfterLateError = onErrorSpy.mock.calls.length;
+
+      if (callsAfterLateError !== callsBeforeUnmount) {
+        zombieDetected = true;
+
+        break;
+      }
+
+      // Successful navigation to clear state for next iteration.
+      await router.navigate(safe).catch(() => undefined);
+    }
+
+    forceGC();
+    const heapAfter = takeHeapSnapshot();
+
+    // The key zombie-effect invariant: no late-error invocations across
+    // 50 cycles. Each cycle's late nav (post-unmount) MUST NOT bump the
+    // spy.
+    expect(zombieDetected).toBe(false);
+
+    // Sanity: spy fired SOMEWHERE across the cycles (otherwise the test
+    // would trivially pass even if onError was wired to null).
+    expect(onErrorSpy.mock.calls.length).toBeGreaterThan(0);
+
+    // Heap bounded: 50 mount/unmount cycles → < 20 MB growth.
+    expect(heapAfter - heapBefore).toBeLessThan(20 * MB);
+
+    consoleError.mockRestore();
+    router.stop();
+  }, 60_000);
 });

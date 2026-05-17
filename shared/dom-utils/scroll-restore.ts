@@ -261,11 +261,29 @@ export function createScrollRestoration(
   };
 }
 
-function keyOf(state: State): string {
+/**
+ * Internal cache-key builder for scroll-position storage.
+ *
+ * **Exported for testing only — not part of the public API** (intentionally
+ * excluded from `index.ts` barrel). Adapter property tests import it via
+ * the direct path to lock the `(name, canonicalJson(params))` key shape
+ * as a regression guard (§8b H20 / audit-2026-05-16 #S3). A change to
+ * key format would silently lose scroll positions across an upgrade —
+ * the test set is the contract.
+ */
+export function keyOf(state: State): string {
   return `${state.name}:${canonicalJson(state.params)}`;
 }
 
-function canonicalJson(value: unknown): string {
+/**
+ * Stable JSON serializer with sorted object keys.
+ *
+ * **Exported for testing only — not part of the public API** (intentionally
+ * excluded from `index.ts` barrel). Adapter property tests import it via
+ * the direct path to lock the key-order-insensitive property
+ * (`canonicalJson({a:1,b:2}) === canonicalJson({b:2,a:1})`).
+ */
+export function canonicalJson(value: unknown): string {
   return JSON.stringify(value, canonicalReplacer);
 }
 
