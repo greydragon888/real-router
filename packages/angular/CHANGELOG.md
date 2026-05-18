@@ -1,5 +1,202 @@
 # @real-router/angular
 
+## 0.9.0
+
+### Minor Changes
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Angular post-hydration loader skip via TransferState bridge ([#599](https://github.com/greydragon888/real-router/issues/599))
+
+  `provideRealRouterFactory` now bridges Angular's `TransferState` to the
+  hydration scratchpad established by [#596](https://github.com/greydragon888/real-router/issues/596):
+  - **Server pass** — after `await router.start(path)` resolves, the
+    resulting state is serialized via `serializeRouterState(state)` and
+    written to `TransferState` under `@real-router/angular:ssrState`.
+    Angular's standard SSR pipeline (`provideClientHydration()` +
+    `provideServerRendering()`) embeds the entry as `<script id="ng-state"
+type="application/json">…</script>` in the response body.
+  - **Client pass** — the same `provideAppInitializer` callback reads
+    `TransferState`, finds the seeded JSON, and calls
+    `hydrateRouter(router, ssrJson)` instead of `router.start(path)`.
+    `hydrateRouter` deposits the parsed state into the one-shot
+    scratchpad on `RouterInternals.hydrationState`, and `ssr-data-plugin`'s
+    start interceptor reuses the server-resolved `state.context.data`
+    without invoking the loader on first paint — parity with the other 5
+    adapters that consume `<script>window.__SSR_STATE__</script>` in their
+    `entry-client.tsx`.
+  - **Pure CSR** — no TransferState seed and `inject(REQUEST, { optional:
+true })` returns null; falls back to `router.start(path)` with no write.
+
+  The TransferState key is internal — no public API surface change. Existing
+  8 Angular examples (basic, combined, dynamic-routes, hash-routing,
+  lazy-loading, nested-routes, persistent-params, animation-examples/\*)
+  continue to use `provideRealRouter` for SPA scenarios; the bridge applies
+  only to apps using `provideRealRouterFactory` together with
+  `provideClientHydration()`.
+
+  Verified end-to-end by `post-hydration loader skip ([#599](https://github.com/greydragon888/real-router/issues/599))` e2e in both
+  `examples/web/angular/ssr-examples/ssr/` and
+  `examples/web/angular/ssr-examples/ssr-streaming/` — counter on
+  `window.__LOADER_CALLS__` stays empty after deep-link navigation, parity
+  with the 5 cross-adapter baselines.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `provideRealRouterFactory` for SSR support ([#582](https://github.com/greydragon888/real-router/issues/582))
+
+  New `provideRealRouterFactory({ baseRouter, plugins, deps })` API enables per-request router scope for Angular SSR (`@angular/ssr` + `outputMode: "server"`) and SSG build-time render via `renderApplication` + `platformProviders` `REQUEST` mock.
+
+  The factory uses `useFactory` to clone the base router per request via Angular's `REQUEST: InjectionToken<Request | null>` token, runs `router.start(url)` through `provideAppInitializer`, and disposes the per-request router via `DestroyRef.onDestroy`. Conditional `plugins` function form supports browser-plugin server/client separation.
+
+  Existing `provideRealRouter(router)` is unchanged — backward compatible. Both APIs ship in parallel; pick one for the entire application.
+
+  See `packages/angular/CLAUDE.md` SSR Support section and RFC `.claude/rfc-angular-ssr-factory-ru.md`. Related parent issue: [#581](https://github.com/greydragon888/real-router/issues/581).
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `<client-only>` and `<server-only>` SSR-aware components ([#604](https://github.com/greydragon888/real-router/issues/604))
+
+  Two paired components for opt-in client/server rendering boundaries.
+  Built on `signal()` + `afterNextRender` — `afterNextRender` is a no-op on
+  the server, so SSR emits the SSR-side branch (fallback for `<client-only>`,
+  projected children for `<server-only>`). After the first browser render the
+  signal flips and the `@if` branch swaps. `fallback` is a `TemplateRef`
+  input rendered through `<ng-container [ngTemplateOutlet]>`.
+
+  Imported from the new `/ssr` subpath (`@real-router/angular/ssr`, ng-packagr
+  secondary entry-point) — see the Stage 2 `defer()` changeset for the
+  cross-adapter `/ssr` migration.
+
+  ```ts
+  import { ClientOnly, ServerOnly } from "@real-router/angular/ssr";
+  ```
+
+  ```html
+  <ng-template #loadingTpl>
+    <span>Loading…</span>
+  </ng-template>
+
+  <client-only [fallback]="loadingTpl">
+    <browser-api-widget />
+  </client-only>
+
+  <server-only>
+    <seo-help-strip />
+  </server-only>
+  ```
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `<http-status-code [code]="N"/>` + `provideHttpStatusSink()` + `createHttpStatusSink()` to `/ssr` ([#611](https://github.com/greydragon888/real-router/issues/611))
+
+  Render-time HTTP status declaration for SSR. Angular 21 idioms — DI token `HTTP_STATUS_SINK` provided via `provideHttpStatusSink(sink)` env-providers helper, optional `inject(HTTP_STATUS_SINK, { optional: true })` in the component. The sink write happens in `ngOnInit` (after the input binding is bound), template renders nothing.
+
+  ```ts
+  // entry-server.ts
+  import { bootstrapApplication } from "@angular/platform-browser";
+  import {
+    createHttpStatusSink,
+    provideHttpStatusSink,
+  } from "@real-router/angular/ssr";
+
+  const sink = createHttpStatusSink();
+  await bootstrapApplication(AppRoot, {
+    providers: [
+      provideRealRouterFactory({ ... }),
+      provideHttpStatusSink(sink),
+    ],
+  });
+  response.status(sink.code ?? 200).send(html);
+  ```
+
+  ```html
+  <!-- inside not-found.component.ts template -->
+  <http-status-code [code]="404" />
+  ```
+
+  `code` is declared as optional `input<number>()` rather than `input.required<number>()` to keep the JIT/TestBed test path safe (`NG0950` would fire otherwise) — the `ngOnInit` body skips the write when the value is `undefined`.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - `defer()` consumers + `/ssr` subpath split ([#611](https://github.com/greydragon888/real-router/issues/611))
+
+  Mirrors the React Stage 1 + Stage 0a roll-out ([#609](https://github.com/greydragon888/real-router/issues/609) / [#610](https://github.com/greydragon888/real-router/issues/610)). Angular ships
+  via ng-packagr secondary entry-point at `packages/angular/ssr/`:
+  - `injectDeferred(key)` — returns `Signal<T | undefined>` reading the
+    promise published by the loader at `state.context.ssrDataDeferred[key]`.
+
+  No `<Await>` / `<Streamed>` — Angular uses different control flow
+  (`@if` / `async` pipe + signals).
+
+  Idiom: Signals + `effect()` + `@if` / `async` pipe.
+
+  **`<ClientOnly>` / `<ServerOnly>` migrated to `/ssr`**:
+
+  ```diff
+  - import { ClientOnly, ServerOnly } from "@real-router/angular";
+  + import { ClientOnly, ServerOnly } from "@real-router/angular/ssr";
+  ```
+
+  The 3-SSR-feature-export threshold (per `.claude/SSR_FEATURE_GAPS_RU.md`
+  §8) is reached with `injectDeferred` + `ClientOnly` + `ServerOnly` —
+  triggers the subpath split for Angular.
+
+  **Wire-format**: consumes the NDJSON-shaped `<script>__rrDefer__("key",
+json)</script>` settle scripts emitted by `@real-router/ssr-data-plugin/server`'s
+  `injectDeferredScripts` — server-side loaders return `defer({ critical,
+deferred })` once.
+
+  **Streaming behaviour**: no server-streaming, incremental hydration on
+  the client — 🟡 DX-only — `injectDeferred` ready for future framework
+  streaming.
+
+  **Breaking change** (pre-1.0, allowed in `minor`): `ClientOnly`/`ServerOnly`
+  removed from main entry; `injectDeferred` lives at `/ssr` only.
+
+### Patch Changes
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `<a [realLink]="signal()">` active state not reacting to signal input changes in AOT ([#630](https://github.com/greydragon888/real-router/issues/630))
+
+  `RealLink`, `RealLinkActive`, and `RouteView` previously captured signal-input values once in `ngOnInit` — `createActiveRouteSource` / `createRouteNodeSource` was bound to the initial `routeName` / `routeParams` / `hash` / `routeNode` values and never recreated when those inputs changed reactively. In AOT (where signal-input template bindings work), `href` updated correctly (it's a `computed`), but `.active` class kept tracking the original values — asymmetric reactivity, real bug.
+
+  **Fix**: source-creation setup moved from `ngOnInit` into `effect((onCleanup) => …)` from the constructor. Reading signal inputs inside the effect makes the setup reactive to Angular's signal graph — any input change re-runs the effect, `onCleanup` tears down the previous source (no-op for cached sources from `@real-router/sources`), and a new source is created with the current input values. Effect cleanup auto-registers with the injection-context `DestroyRef`.
+
+  **Behavioral parity with React/Preact**: `<Link>` in those adapters re-renders on every prop change and re-evaluates `useIsActiveRoute(routeName, params)` each time. Angular now matches that behavior in AOT.
+
+  **JIT note**: full reactive-input verification requires AOT compilation — JIT rejects signal-input template bindings with `NG0303`. The fix is structurally correct in JIT (existing JIT tests continue to pass) but the asymmetric-reactivity scenario itself can only be reproduced under AOT. CLAUDE.md gotcha updated with the new pattern and testing limitation.
+
+  **No public API change** — the `OnInit` interface and `ngOnInit` method were internal implementation details. Consumers' templates continue to work unchanged.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Guard against throwing `getAnnouncementText` in `createRouteAnnouncer` ([#628](https://github.com/greydragon888/real-router/issues/628))
+
+  A user-provided `getAnnouncementText` callback that throws was propagating
+  the exception up through `router.subscribe`'s listener loop, tearing down
+  sibling listeners and breaking navigation tracking elsewhere. The shared
+  `resolveText` helper now wraps the callback in try/catch, logs the error
+  via `console.error` with a `[real-router]` prefix, and falls through to
+  the built-in resolution chain (`<h1>` textContent → `document.title` →
+  route name → pathname).
+
+  User-visible effect: a buggy custom announcer resolver no longer breaks
+  router subscriptions — the announcer announces the fallback text and
+  logs the underlying error so the bug surfaces in dev tools.
+
+  Discovered during the React audit (`review-2026-05-10` §5.7, MED
+  severity). Applied to `shared/dom-utils/route-announcer.ts` and the
+  git-tracked Angular copy.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `shallowEqual` asymmetry on disjoint-key records ([#627](https://github.com/greydragon888/real-router/issues/627))
+
+  `shallowEqual({ a: undefined }, { b: "" })` returned `true` while
+  `shallowEqual({ b: "" }, { a: undefined })` returned `false`. The inner loop
+  read missing keys via bracket access as `undefined` and falsely matched
+  `prev[key] === undefined`. Added a `hasOwnProperty` guard mirroring React's
+  own `shallowEqual` (`packages/shared/shallowEqual.js`).
+
+  Angular consumes a git-tracked copy of `dom-utils` (ng-packagr does not
+  follow symlinks); the fix was applied to both `shared/dom-utils/link-utils.ts`
+  and `packages/angular/src/dom-utils/link-utils.ts` and verified identical.
+
+  User-visible effect: `<a realLink [routeParams]="{ a: undefined }">` no
+  longer compares equal to `[routeParams]="{ b: undefined }"` in directive
+  memoization paths — re-render now matches the documented `shallowEqual`
+  contract (key-order-insensitive, `Object.is` per key).
+
+- Updated dependencies [[`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c)]:
+  - @real-router/core@0.53.0
+  - @real-router/sources@0.8.2
+
 ## 0.8.1
 
 ### Patch Changes

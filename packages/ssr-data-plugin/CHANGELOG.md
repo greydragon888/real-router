@@ -1,5 +1,174 @@
 # ssr-data-plugin
 
+## 0.4.0
+
+### Minor Changes
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - `defer()` formal API for critical/deferred split ([#610](https://github.com/greydragon888/real-router/issues/610))
+
+  Loaders may now return `defer({ critical, deferred })` to split per-route data
+  into a critical bundle (resolved before the shell renders) and a record of
+  deferred promises (streamed after as they resolve). This is the standard
+  pattern shipped by SvelteKit `streamed`, Remix / RR7 `defer()`, and TanStack
+  Start `defer()`.
+
+  ```ts
+  import { defer } from "@real-router/ssr-data-plugin";
+  import { LoaderNotFound } from "@real-router/ssr-data-plugin/errors";
+
+  export const loaders = {
+    "products.detail": () => (params) => {
+      const product = getProduct(params.id);
+      if (!product) throw new LoaderNotFound(`product:${params.id}`);
+
+      return defer({
+        critical: { product },
+        deferred: {
+          reviews: fetchReviews(params.id),
+          related: fetchRelated(params.id),
+        },
+      });
+    },
+  };
+  ```
+
+  Plugin output:
+  - `state.context.data` — critical payload (existing contract).
+  - `state.context.ssrDataDeferred` — `Record<string, Promise<unknown>>` of the
+    deferred promises (server) or registry-backed promises reconstructed from
+    the inline settle scripts (client post-hydration).
+  - `state.context.ssrDataDeferredKeys` — `string[]` of declared keys, included
+    in the SSR state so the client-side plugin can reconstruct the deferred map.
+
+  New server-side subpath `@real-router/ssr-data-plugin/server` exports:
+  - `injectDeferredScripts(reactStream, deferredMap, options?)` — wraps an HTML
+    `ReadableStream` (e.g. from React 19's `renderToReadableStream`) with inline
+    `<script>__rrDefer__("key", json)</script>` chunks emitted as each deferred
+    promise resolves. Order is by resolution time.
+  - `getDeferBootstrapScript()` — returns the inline JS (no `<script>` wrapper)
+    that installs the global `__rrDeferRegistry__` + `__rrDefer__` /
+    `__rrDeferError__` functions. Embed once in `<head>` so React's hydration
+    walks the pristine `#root` subtree it expects.
+
+  `devalue` / `superjson` integration: pass `{ serialize: devalue.stringify }`
+  to `injectDeferredScripts` for non-JSON deferred payloads (Date / Map / Set /
+  RegExp / BigInt). The wire-format remains a JSON string the client
+  `JSON.parse`s — combine with `hydrateRouter(router, json, { deserialize })`
+  from `@real-router/core/utils` for matching critical-data shapes.
+
+  Non-breaking — loaders that return plain values continue to work unchanged
+  and never touch the new namespaces. The plugin's `subscribeLeave` revalidation
+  channel (`invalidate(router, "data")`, [#605](https://github.com/greydragon888/real-router/issues/605)) also handles deferred returns:
+  `router.navigate({ reload: true })` after `invalidate(...)` re-runs the loader
+  and overwrites both critical data and the deferred map.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Skip loader call on hydration when `data` namespace is pre-resolved ([#596](https://github.com/greydragon888/real-router/issues/596))
+
+  When `hydrateRouter()` is invoked, the plugin's `start` interceptor consults
+  the one-shot hydration scratchpad and reuses the server-resolved value at
+  `state.context.data` instead of running the loader a second time. Pure CSR
+  `start()` calls and subsequent post-hydration starts continue to run loaders
+  as today.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `invalidate(router, "data")` helper for client-side revalidation ([#605](https://github.com/greydragon888/real-router/issues/605))
+
+  Marks the `"data"` namespace as stale on the given router. The next
+  navigation (including a same-route reload) re-runs the loader for the
+  destination route and overwrites `state.context.data` (and the mode
+  marker) via the plugin's `subscribeLeave` listener — fresh data lands
+  on the state snapshot **before** `TRANSITION_SUCCESS` fires, so
+  subscribers see the new payload.
+
+  `void` (fire-and-forget) return — honest semantics. Compose with the
+  existing core API for an explicit synchronous round-trip:
+
+  ```ts
+  import { invalidate } from "@real-router/ssr-data-plugin";
+
+  // Fire-and-forget — stale until any next navigation
+  invalidate(router, "data");
+
+  // Explicit await — pair with a same-route reload
+  invalidate(router, "data");
+  await router.navigate(state.name, state.params, { reload: true });
+  ```
+
+  Closes the parity gap with Nuxt `useAsyncData(...).refresh()` and
+  SolidStart `redirect("/path", { revalidate })`. Surgical alternative
+  to `router.navigate({ reload: true })`: only `"data"` re-runs;
+  companion plugins (e.g. `rsc-server-plugin`) keep their cached
+  `state.context.<ns>` unless their own `invalidate()` was also called.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add per-route SSR mode ([#597](https://github.com/greydragon888/real-router/issues/597))
+
+  `ssrDataPluginFactory` now accepts a per-route object form `{ ssr?, loader? }`
+  where `ssr` is `"full" | "data-only" | "client-only" | boolean | (state) => SsrMode`.
+  The resolved mode is published to `state.context.ssrDataMode`. New helper
+  `getSsrDataMode(state)` returns the mode (fallback `"full"`).
+
+  When mode is `"client-only"` the loader is **skipped on every `start()` call**
+  (server and client). The application reads the mode marker and triggers its own
+  client-side fetching strategy. Short-form (loader factory directly) remains valid.
+
+  Breaking on the type level: `DataLoaderFactoryMap` now accepts a union of
+  factory or `{ ssr?, loader? }` per entry. Existing consumers passing a factory
+  directly continue to work; consumers iterating the map (`Object.entries`) need
+  a narrow / cast (e.g. `(Object.entries(loaders) as [string, DataLoaderFnFactory][])`).
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `@real-router/ssr-data-plugin/errors` subpath with typed loader errors ([#594](https://github.com/greydragon888/real-router/issues/594))
+
+  Exports `LoaderRedirect`, `LoaderNotFound`, `LoaderTimeout`, and `withTimeout` from a new `errors` subpath. Replaces the per-example `_loader-errors.ts` files that were duplicated across 12 examples (`react/vue/solid/svelte/angular` × `ssr/ssr-streaming/ssg/ssr-rsc`).
+
+  Loaders bridge to HTTP semantics by throwing typed errors; handlers match by the structural `code` field (`"LOADER_NOT_FOUND"`, `"LOADER_REDIRECT"`, `"LOADER_TIMEOUT"`) without `instanceof`:
+
+  ```ts
+  import {
+    LoaderNotFound,
+    LoaderRedirect,
+    withTimeout,
+  } from "@real-router/ssr-data-plugin/errors";
+
+  const loaders: DataLoaderFactoryMap = {
+    "users.profile": () => (params) =>
+      withTimeout("users.profile", 250, async () => {
+        const user = await fetchUser(params.id);
+        if (!user) throw new LoaderNotFound(`user:${params.id}`);
+        return { user };
+      }),
+  };
+  ```
+
+  Errors live in `shared/ssr/errors.ts` and are mirror-exported by `@real-router/rsc-server-plugin/errors` — RSC apps can throw the same shapes without depending on `ssr-data-plugin`.
+
+  Zero runtime impact on the main entry — `errors` is a separate dist file (`dist/{esm,cjs}/errors.{mjs,js}`), tree-shaken when unused.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - withTimeout passes AbortSignal to loader for cooperative cancellation ([#598](https://github.com/greydragon888/real-router/issues/598))
+
+  The `loader` argument signature changes from `() => Promise<T>` to
+  `({ signal }) => Promise<T>`. The signal aborts synchronously when the
+  deadline elapses (before the race rejects with `LoaderTimeout`), so loader
+  I/O honoring the signal — e.g. `fetch(url, { signal })` — is actually
+  cancelled at the network layer. Optional `options.upstreamSignal` composes
+  via `AbortSignal.any`, so the loader's signal aborts on whichever happens
+  first: the deadline OR an upstream client-disconnect.
+
+  If `options.upstreamSignal` is already aborted at call time, the loader
+  is _not_ invoked and the timer is _not_ started — `withTimeout` rejects
+  immediately with the upstream's reason.
+
+  Breaking on the type level — TS permits passing a parameter-less function
+  to a callback expecting `{ signal }`, so existing call sites that ignore
+  the new arg keep working. Cancellation is cooperative — loaders that
+  don't pass `signal` into their I/O still run to completion (current
+  behavior preserved).
+
+  Requires Node 20.3+ for `AbortSignal.any`.
+
+### Patch Changes
+
+- Updated dependencies [[`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c)]:
+  - @real-router/core@0.53.0
+
 ## 0.3.4
 
 ### Patch Changes
