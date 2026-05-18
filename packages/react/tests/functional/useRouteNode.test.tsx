@@ -31,10 +31,15 @@ describe("useRouteNode", () => {
       wrapper: (props) => wrapper({ ...props, router }),
     });
 
-    expect(result.current.navigator.navigate).toBeTypeOf("function");
-    expect(result.current.navigator.getState).toBeTypeOf("function");
-    expect(result.current.route).toStrictEqual(undefined);
-    expect(result.current.previousRoute).toStrictEqual(undefined);
+    expect(result.current.navigator.navigate).toBe(router.navigate);
+    expect(result.current.navigator.getState).toBe(router.getState);
+    expect(result.current.navigator.isActiveRoute).toBe(router.isActiveRoute);
+    expect(result.current.navigator.canNavigateTo).toBe(router.canNavigateTo);
+    expect(result.current.navigator.subscribe).toBe(router.subscribe);
+    expect(result.current.navigator.subscribeLeave).toBe(router.subscribeLeave);
+    expect(result.current.navigator.isLeaveApproved).toBe(
+      router.isLeaveApproved,
+    );
   });
 
   it("should not return a null route with a default route and the router started", async () => {
@@ -228,7 +233,7 @@ describe("useRouteNode", () => {
       expect(result.current.previousRoute?.params).toStrictEqual({ id: "1" });
     });
 
-    it("should handle reload option correctly", async () => {
+    it("should fire a fresh snapshot on reload (#605, transition.reload bypasses dedupe)", async () => {
       const { result } = renderHook(() => useRouteNode("users"), {
         wrapper: (props) => wrapper({ ...props, router }),
       });
@@ -241,13 +246,15 @@ describe("useRouteNode", () => {
 
       const initialRoute = result.current.route;
 
-      // Navigate to same route with reload: true
+      // Navigate to same route with reload: true.
       await act(() => router.navigate("users.list", {}, { reload: true }));
 
-      // Node should update even though it's the same route
+      // Reload is the user's explicit non-idempotent signal — observers
+      // see fresh refs so they react to context changes (e.g. data
+      // refreshed by `invalidate(router, "data")` + reload).
       expect(result.current.route?.name).toBe("users.list");
-      // Route ref stabilized by stabilizeState (same path → same ref)
-      expect(result.current.route).toBe(initialRoute);
+      expect(result.current.route).not.toBe(initialRoute);
+      expect(result.current.route?.path).toBe(initialRoute?.path);
     });
   });
 
@@ -260,7 +267,7 @@ describe("useRouteNode", () => {
 
       expect(result.current.route).toBeUndefined();
       expect(result.current.previousRoute).toBeUndefined();
-      expect(result.current.navigator.navigate).toBeTypeOf("function");
+      expect(result.current.navigator.navigate).toBe(router.navigate);
     });
 
     it("should handle root node when navigating to non-existent route", async () => {
@@ -301,11 +308,11 @@ describe("useRouteNode", () => {
       );
 
       await act(async () => {
-        await router.start();
+        await router.start("/");
       });
 
       await act(async () => {
-        await router.navigate("users.list").catch(() => {});
+        await router.navigate("users.list");
       });
 
       // Root node should show users.list
@@ -363,12 +370,12 @@ describe("useRouteNode", () => {
       });
 
       await act(async () => {
-        await router.start();
+        await router.start("/");
       });
 
       // Navigate to users
       await act(async () => {
-        await router.navigate("users.list").catch(() => {});
+        await router.navigate("users.list");
       });
 
       expect(usersResult.current.route?.name).toBe("users.list");
@@ -543,13 +550,13 @@ describe("useRouteNode", () => {
   });
 
   describe("previousRoute edge cases", () => {
-    it("should have correct previousRoute on first navigation", async () => {
+    it("should have undefined previousRoute on start and global prior route on first node navigation", async () => {
       const { result } = renderHook(() => useRouteNode("users"), {
         wrapper: (props) => wrapper({ ...props, router }),
       });
 
       await act(async () => {
-        await router.start();
+        await router.start("/"); // Pin to "/" → defaultRoute "test" for determinism
       });
 
       expect(result.current.previousRoute).toBeUndefined();
@@ -557,10 +564,9 @@ describe("useRouteNode", () => {
       // First navigation to users node
       await act(() => router.navigate("users.list"));
 
-      // previousRoute might be undefined since users node was never active before
-      // or it could be the global previousRoute
       expect(result.current.route?.name).toBe("users.list");
-      // We don't make strict assumptions about previousRoute on first entry to a node
+      // previousRoute is global: the state before users.list was the start state ("test")
+      expect(result.current.previousRoute?.name).toBe("test");
     });
 
     it("should preserve previousRoute when leaving node", async () => {
@@ -706,7 +712,8 @@ describe("useRouteNode", () => {
       const serverSnapshot = source.getSnapshot();
 
       expect(serverSnapshot).toBe(clientSnapshot);
-      expect(serverSnapshot.route).toBeDefined();
+      // Route name matches whatever the browser URL resolved to on start.
+      expect(serverSnapshot.route?.name).toStrictEqual(router.getState()?.name);
 
       source.destroy();
     });

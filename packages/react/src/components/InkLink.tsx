@@ -1,5 +1,5 @@
 import { Text, useFocus, useInput } from "ink";
-import { memo, useCallback } from "react";
+import { memo } from "react";
 
 import { EMPTY_OPTIONS, EMPTY_PARAMS } from "../constants";
 import { shallowEqual } from "../dom-utils";
@@ -8,6 +8,30 @@ import { useRouter } from "../hooks/useRouter";
 
 import type { InkLinkProps } from "../ink-types";
 import type { FC } from "react";
+
+/**
+ * Pick the most specific value across focus / active / base priority.
+ * Focus wins over active; active wins over base. Each layer falls through
+ * to the next when its value is undefined, matching the original explicit
+ * if/else cascade for both `color` and `inverse`.
+ */
+function pickPriority<T>(
+  isFocused: boolean,
+  isRouteActive: boolean,
+  focusValue: T | undefined,
+  activeValue: T | undefined,
+  baseValue: T | undefined,
+): T | undefined {
+  if (isFocused) {
+    return focusValue ?? activeValue ?? baseValue;
+  }
+
+  if (isRouteActive) {
+    return activeValue ?? baseValue;
+  }
+
+  return baseValue;
+}
 
 function areInkLinkPropsEqual(
   prev: Readonly<InkLinkProps>,
@@ -61,35 +85,33 @@ const InkLinkImpl: FC<InkLinkProps> = ({
     ignoreQueryParams,
   );
 
-  const activate = useCallback(() => {
-    onSelect?.();
-    router.navigate(routeName, routeParams, routeOptions).catch(() => {});
-  }, [onSelect, router, routeName, routeParams, routeOptions]);
-
+  // No useCallback: `useInput` consumes the handler via its own internal
+  // ref; a stable identity provides no cache-bail-out benefit here. Same
+  // reasoning as Link's handleClick.
   useInput(
     (_input, key) => {
       if (key.return) {
-        activate();
+        onSelect?.();
+        router.navigate(routeName, routeParams, routeOptions).catch(() => {});
       }
     },
     { isActive: isFocused },
   );
 
-  let finalColor = color;
-
-  if (isFocused) {
-    finalColor = focusColor ?? activeColor ?? color;
-  } else if (isRouteActive) {
-    finalColor = activeColor ?? color;
-  }
-
-  let finalInverse = inverse;
-
-  if (isFocused) {
-    finalInverse = focusInverse ?? activeInverse ?? inverse;
-  } else if (isRouteActive) {
-    finalInverse = activeInverse ?? inverse;
-  }
+  const finalColor = pickPriority(
+    isFocused,
+    isRouteActive,
+    focusColor,
+    activeColor,
+    color,
+  );
+  const finalInverse = pickPriority(
+    isFocused,
+    isRouteActive,
+    focusInverse,
+    activeInverse,
+    inverse,
+  );
 
   const textProps: { color?: string; inverse?: boolean } = {};
 

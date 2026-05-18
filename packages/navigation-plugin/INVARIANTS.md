@@ -60,20 +60,24 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 
 ---
 
-### A4. Hash Preservation on Same-Path Navigation
-**Category:** Bidirectional Sync  
-**Testable:** Example-based  
-**Description:** When navigating to the same path, the hash fragment is preserved.
+### A4. Hash Preservation — Tri-State Contract (#532)
+**Category:** Bidirectional Sync
+**Testable:** Example-based
+**Description:** `opts.hash` on `router.navigate` / `router.buildUrl` / `router.replaceHistoryState` follows tri-state semantics. The previous "preserve on same path, clear on cross path" heuristic was removed in plugin v0.7.0.
 
 **Precondition:**
 - Current URL is `/users#section`
-- Call `router.navigate("users.list")` (same path)
 
-**Postcondition:**
-- Final URL is `/users#section` (hash preserved)
-- If navigating to a different path, hash is cleared
+**Postcondition (by `opts.hash` value):**
+- `opts.hash === undefined` (or omitted) → **preserve** the current fragment, regardless of whether the target path equals the source path. `router.navigate("home")` from `/users#section` lands on `/home#section`.
+- `opts.hash === ""` → **clear** the fragment. `router.navigate("home", {}, { hash: "" })` lands on `/home`.
+- `opts.hash === "value"` (non-empty string) → **set** the fragment. `router.navigate("home", {}, { hash: "footer" })` lands on `/home#footer`. Decoded form (no leading `#`); the plugin encodes per RFC 3986 (`encodeHashFragment`).
 
-**Why it matters:** Preserves user scroll position and anchor links.
+`state.context.url.hashChanged` is `true` only when the resolved hash differs from the previous transition's published hash (`fromState.context.url.hash`), or when the browser fires `event.hashChange === true` for a hash-only navigation. Subscribers should branch on `hashChanged`, not on the overloaded `force` flag.
+
+**Initial transition (no `fromState`):** the plugin reads `location.hash` lazily via `getDecodedHash(browser)` in `onTransitionSuccess`, so F5 on `/page#anchor` preserves the fragment without explicit priming.
+
+**Why it matters:** Preserves user scroll position and anchor links across **any** programmatic navigation by default. Tri-state replaces the legacy `shouldPreserveHash` heuristic — there is no longer a "hash dropped on cross-path navigation" case.
 
 ---
 

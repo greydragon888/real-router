@@ -42,7 +42,11 @@ export function pushDirectiveRouter(router: Router): () => void {
 /**
  * Backwards-compatible alias. Replaces the active router unconditionally and
  * does NOT participate in the stack — use {@link pushDirectiveRouter} from
- * provider code instead. Kept for tests and direct callers.
+ * provider code instead. Not exported from the package entry; retained for
+ * unit tests and rare standalone-directive setups (where v-link is mounted
+ * outside any RouterProvider).
+ *
+ * @internal
  */
 export function setDirectiveRouter(router: Router | null): void {
   if (router === null) {
@@ -174,6 +178,19 @@ export const vLink: Directive<HTMLElement, LinkDirectiveValue> = {
   },
 
   updated(element, binding) {
+    // Hot-path guard: Vue invokes `updated` on every parent re-render even
+    // when the directive's binding value reference has not changed. Without
+    // this short-circuit, every parent rerender (which is the common case on
+    // Link-heavy pages — any unrelated state change triggers the parent's
+    // render fn) would detach + reattach the click/keydown listeners.
+    // Comparing references is enough: when consumers pass a stable
+    // `LinkDirectiveValue` object (the recommended pattern, since Vue's
+    // template compiler hoists `v-link="{ name: 'home' }"` to a stable
+    // literal), this guard collapses the work to zero.
+    if (binding.value === binding.oldValue) {
+      return;
+    }
+
     const router = getDirectiveRouter();
 
     detachHandlers(element);

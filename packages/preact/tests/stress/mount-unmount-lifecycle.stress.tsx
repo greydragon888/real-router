@@ -247,6 +247,40 @@ describe("R3 — mount/unmount subscription lifecycle", () => {
     expect(totalAfter).toBeGreaterThan(totalBefore);
   });
 
+  it("3.6b: rapid stop/start cycles with mounted consumers — listeners track current router instance only", async () => {
+    const renderCounts: number[] = Array.from<number>({ length: 20 }).fill(0);
+
+    const consumers = Array.from({ length: 20 }, (_, i) =>
+      makeRenderCountingConsumer(renderCounts, i, `OverlapConsumer${i}`),
+    );
+
+    render(
+      <RouterProvider router={router}>
+        {consumers.map((Consumer, i) => (
+          <Consumer key={i} />
+        ))}
+      </RouterProvider>,
+    );
+
+    for (let cycle = 0; cycle < 50; cycle++) {
+      router.stop();
+      await act(async () => {
+        await router.start("/route0");
+      });
+    }
+
+    renderCounts.fill(0);
+
+    await act(async () => {
+      await router.navigate("route1");
+    });
+
+    const totalAfterFinalNav = renderCounts.reduce((a, b) => a + b, 0);
+
+    expect(totalAfterFinalNav).toBeGreaterThan(0);
+    expect(router.getState()?.name).toBe("route1");
+  });
+
   it("3.7: dynamic nodeName rapid switch x 100 on 20 components — no errors, final state correct", async () => {
     const nodeNameRef: { current: (name: string) => void } = {
       current: () => {},

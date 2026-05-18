@@ -6,6 +6,8 @@ import {
   createTestRouterWithADefaultRouter,
   renderWithRouter,
 } from "../helpers";
+import CreateLinkActionInEffect from "../helpers/CreateLinkActionInEffect.svelte";
+import CreateLinkActionInTimeout from "../helpers/CreateLinkActionInTimeout.svelte";
 import LinkActionAnchorTest from "../helpers/LinkActionAnchorTest.svelte";
 import LinkActionDoubleTest from "../helpers/LinkActionDoubleTest.svelte";
 import LinkActionTest from "../helpers/LinkActionTest.svelte";
@@ -330,6 +332,50 @@ describe("createLinkAction", () => {
     }).toThrow("createLinkAction must be used within a RouterProvider");
   });
 
+  // Locks Svelte 5 context-inheritance for `$effect`: `createLinkAction` is a
+  // factory that captures router context via `getContext()`, and `$effect`
+  // callbacks run within the same context that was active at init. The
+  // factory therefore RESOLVES successfully inside `$effect` when provider
+  // is mounted. Closes CLAUDE.md gotcha #20 audit gap.
+  it("should resolve when called inside $effect (Svelte 5 context inheritance)", async () => {
+    let capturedAction: unknown = "not-called";
+    let capturedError: unknown = "not-called";
+
+    renderWithRouter(router, CreateLinkActionInEffect, {
+      onCapture: (action: unknown, err: unknown) => {
+        capturedAction = action;
+        capturedError = err;
+      },
+    });
+
+    await Promise.resolve();
+
+    expect(capturedError).toBeNull();
+    expect(typeof capturedAction).toBe("function");
+  });
+
+  // Locks the actual misuse contract: calling `createLinkAction` from an
+  // async callback (setTimeout, fetch) runs OUTSIDE `current_component_context`
+  // and Svelte 5 raises `lifecycle_outside_component`. This is the
+  // user-visible signal that the factory must be called during init —
+  // CLAUDE.md gotcha #20 ("createLinkAction Is a Factory — Call During Init").
+  it("should throw 'lifecycle_outside_component' when called from setTimeout (outside component context)", async () => {
+    let capturedError: unknown = "not-called";
+
+    renderWithRouter(router, CreateLinkActionInTimeout, {
+      onCapture: (_action: unknown, err: unknown) => {
+        capturedError = err;
+      },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 16));
+
+    expect(capturedError).toBeInstanceOf(Error);
+    expect((capturedError as Error).message).toMatch(
+      /lifecycle_outside_component|getContext/,
+    );
+  });
+
   it("should support multiple link actions in one component", async () => {
     vi.spyOn(router, "navigate");
 
@@ -374,6 +420,194 @@ describe("createLinkAction", () => {
     // Default not prevented — browser handles it (opens new tab).
     expect(event.defaultPrevented).toBe(false);
     expect(router.navigate).not.toHaveBeenCalled();
+  });
+
+  // Closes review §5.11 row 4: the `target="_blank"` skip ONLY applies to
+  // `<a>` elements (the implementation checks `node instanceof HTMLAnchorElement`).
+  // On `<button>` and `<div>`, the target attribute is meaningless to the
+  // browser (target is anchor-specific HTML), so the action still navigates.
+  // Locks this asymmetry so a future refactor that generalizes the check
+  // wouldn't silently break button/div use cases.
+  it("non-anchor element with target='_blank' attribute → still navigates (anchor-specific skip)", async () => {
+    vi.spyOn(router, "navigate");
+
+    renderWithRouter(router, LinkActionTest, {
+      params: { name: "home" },
+      element: "button",
+    });
+
+    const button = document.querySelector("button")!;
+
+    // Manually set target attribute (Svelte doesn't pass arbitrary attrs to
+    // the test helper, but the runtime check inspects `getAttribute("target")`).
+    button.setAttribute("target", "_blank");
+
+    await userEvent.click(button);
+
+    // <button target="_blank"> is not an anchor → instanceof check fails → navigate fires.
+    expect(router.navigate).toHaveBeenCalledWith("home", {}, {});
+  });
+
+  it("div with target='_blank' attribute → still navigates", async () => {
+    vi.spyOn(router, "navigate");
+
+    renderWithRouter(router, LinkActionTest, {
+      params: { name: "home" },
+      element: "div",
+    });
+
+    const element = document.querySelector("div[role='link']")!;
+
+    element.setAttribute("target", "_blank");
+
+    // Use a real click event to avoid jsdom navigation warnings.
+    const event = new MouseEvent("click", { bubbles: true, cancelable: true });
+
+    element.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(router.navigate).toHaveBeenCalledWith("home", {}, {});
+  });
+
+  // Closes review §5.11 row 12: mount → destroy → mount again must work.
+  // The factory captures router at init, but each `use:` invocation creates
+  // a fresh closure (with its own listeners + currentParams). Remounting
+  // gives a clean state.
+  it("re-mount after destroy: each mount is an independent action lifecycle", async () => {
+    vi.spyOn(router, "navigate");
+
+    const { unmount } = renderWithRouter(router, LinkActionTest, {
+      params: { name: "home" },
+    });
+
+    const firstButton = document.querySelector("button")!;
+
+    await userEvent.click(firstButton);
+
+    expect(router.navigate).toHaveBeenCalledTimes(1);
+
+    // Tear down.
+    unmount();
+
+    expect(document.querySelector("button")).toBeNull();
+
+    // Fresh mount in same test — router context is the same, but the action
+    // creates a new closure + listeners.
+    renderWithRouter(router, LinkActionTest, {
+      params: { name: "about" },
+    });
+
+    const secondButton = document.querySelector("button")!;
+
+    await userEvent.click(secondButton);
+
+    expect(router.navigate).toHaveBeenCalledTimes(2);
+    expect(router.navigate).toHaveBeenLastCalledWith("about", {}, {});
+  });
+
+  // Closes review §5.11 row 15: `currentParams` is captured by closure and
+  // reassigned by `update()`. A click reads `currentParams.*` at click time
+  // — so an `update()` BEFORE the click switches the navigation target.
+  // This complements existing "should call update method when action params
+  // change" test (which validates update→click) by adding the in-flight
+  // closure-snapshot semantics: a click in flight uses the params snapshot
+  // at the moment `router.navigate(...)` was invoked.
+  it("closure snapshot: navigate args bound at click time, in-flight nav unaffected by later update()", async () => {
+    const navigateSpy = vi.spyOn(router, "navigate");
+
+    const { component } = renderWithRouter(router, LinkActionUpdateTest, {
+      initialParams: { name: "home" },
+    });
+
+    const button = document.querySelector("button")!;
+
+    // Click → navigate("home", ...) is invoked synchronously inside
+    // handleClick. The Promise from router.navigate is now pending.
+    await userEvent.click(button);
+
+    expect(navigateSpy).toHaveBeenCalledTimes(1);
+    expect(navigateSpy).toHaveBeenLastCalledWith("home", {}, {});
+
+    // Now update params. Since router.navigate was already called with the
+    // OLD params, the in-flight call is unaffected. Pin: NO second call.
+    component.updateParams({ name: "about" });
+
+    expect(navigateSpy).toHaveBeenCalledTimes(1);
+
+    // Subsequent click uses the new params.
+    await userEvent.click(button);
+
+    expect(navigateSpy).toHaveBeenCalledTimes(2);
+    expect(navigateSpy).toHaveBeenLastCalledWith("about", {}, {});
+  });
+
+  // Closes review §5.11 row 16: when the element is removed from the DOM
+  // while the action's listeners are still bound, click events naturally
+  // don't fire (no element to receive them). Svelte's `use:` lifecycle
+  // calls `destroy()` on unmount, so the standard path is element removal
+  // BY unmount. Manual `element.remove()` without unmount would leave the
+  // listeners bound — but since the element is detached, no further user
+  // interaction can fire them. Pin this defensive contract.
+  it("element manually removed from DOM → no navigation, no error", async () => {
+    vi.spyOn(router, "navigate");
+
+    renderWithRouter(router, LinkActionTest, {
+      params: { name: "home" },
+    });
+
+    const button = document.querySelector("button")!;
+
+    // Detach the element manually (NOT via Svelte unmount).
+    button.remove();
+
+    expect(document.body.contains(button)).toBe(false);
+
+    // Dispatching a click on a detached element fires the listener (the
+    // listener was attached directly to the node). The action navigates.
+    // This is documented behavior — Svelte's unmount path is what stops
+    // navigation, not DOM detachment. Locks the contract.
+    const event = new MouseEvent("click", { bubbles: true, cancelable: true });
+
+    button.dispatchEvent(event);
+
+    expect(router.navigate).toHaveBeenCalledWith("home", {}, {});
+  });
+
+  // Closes review §5.11 row 17: hash asymmetry pin-test. The action's
+  // `LinkActionParams` shape does NOT include `hash`. If a consumer
+  // attempts to pass `hash` via the params bag at runtime (TypeScript
+  // would reject, but `as` casts could bypass it), the property is
+  // silently ignored — the action calls `router.navigate(name, params, options)`
+  // without ever consulting a `hash` field. Documented as a known asymmetry
+  // with `<Link hash>` in README/CLAUDE.md; locked here against accidental
+  // future "we should support hash here too" refactors that would diverge
+  // from `<Link>` semantics.
+  it("hash field on params bag → ignored (action does NOT call navigateWithHash)", async () => {
+    vi.spyOn(router, "navigate");
+
+    renderWithRouter(router, LinkActionTest, {
+      // Smuggle a `hash` field through the runtime — TypeScript would
+      // reject this; testing the runtime guard.
+      params: {
+        name: "home",
+
+        hash: "section",
+      } as any,
+    });
+
+    const button = document.querySelector("button")!;
+
+    await userEvent.click(button);
+
+    // The hash is NOT in the call arguments — confirms action uses
+    // navigate directly, not navigateWithHash, and the unknown `hash`
+    // field is ignored.
+    expect(router.navigate).toHaveBeenCalledWith("home", {}, {});
+    expect(router.navigate).not.toHaveBeenCalledWith(
+      "home",
+      expect.anything(),
+      expect.objectContaining({ hash: "section" }),
+    );
   });
 
   it("should still navigate when anchor has no target", async () => {

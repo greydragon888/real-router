@@ -2,7 +2,7 @@ import { browserPluginFactory } from "@real-router/browser-plugin";
 import { createRouter } from "@real-router/core";
 import { getRoutesApi } from "@real-router/core/api";
 import { render, screen, waitFor } from "@solidjs/testing-library";
-import { onCleanup } from "solid-js";
+import { lazy, onCleanup } from "solid-js";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import { RouteView, RouterProvider } from "@real-router/solid";
@@ -10,6 +10,7 @@ import { RouteView, RouterProvider } from "@real-router/solid";
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
 import type { Router } from "@real-router/core";
+import type { JSX } from "solid-js";
 
 describe("RouteView", () => {
   let router: Router;
@@ -53,6 +54,31 @@ describe("RouteView", () => {
       ));
 
       expect(screen.queryByTestId("users")).not.toBeInTheDocument();
+      expect(container.innerHTML).toBe("");
+    });
+
+    // audit-2026-05-17 Sprint A.2 — empty-segment Match guard.
+    // Without the early-return in processMatchChild, `<Match segment="">`
+    // under a non-empty parent nodeName produces fullSegmentName
+    // `"nodeName."` which crashes startsWithSegment in @real-router/route-utils
+    // with TypeError ("segment must not end with a dot"). This test locks
+    // the guard: empty-segment Match silently never matches.
+    it("`<Match segment=''>` does NOT crash and never matches (Sprint A.2)", async () => {
+      await router.start("/users/list");
+
+      const { container } = render(() => (
+        <RouterProvider router={router}>
+          <RouteView nodeName="users">
+            <RouteView.Match segment="">
+              <div data-testid="empty-segment">Should not render</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>
+      ));
+
+      // No exception thrown during render — render() returns normally.
+      // No match: container is empty.
+      expect(screen.queryByTestId("empty-segment")).not.toBeInTheDocument();
       expect(container.innerHTML).toBe("");
     });
 
@@ -279,7 +305,11 @@ describe("RouteView", () => {
       expect(container.innerHTML).toBe("");
     });
 
-    it("Self with fallback wraps children in Suspense", async () => {
+    it("Self with fallback + synchronous children renders children, fallback never visible", async () => {
+      // Companion to the lazy-suspends test below — Self's fallback wraps
+      // children in <Suspense>, but with synchronous children Solid never
+      // shows the fallback. Pins the contract that adding `fallback` is
+      // backward-compatible for sync children.
       await router.start("/users");
 
       render(() => (
@@ -294,9 +324,46 @@ describe("RouteView", () => {
         </RouterProvider>
       ));
 
-      // Synchronous children resolve immediately — fallback path covered
-      // structurally even when no async boundary triggers visibly.
       expect(screen.getByTestId("users-self")).toBeInTheDocument();
+      expect(screen.queryByTestId("self-fallback")).not.toBeInTheDocument();
+    });
+
+    it("Self with fallback shows fallback while lazy child suspends", async () => {
+      await router.start("/users");
+
+      let resolveComponent!: (module_: { default: () => JSX.Element }) => void;
+      const componentPromise = new Promise<{ default: () => JSX.Element }>(
+        (r) => {
+          resolveComponent = r;
+        },
+      );
+      const LazyChild = lazy(() => componentPromise);
+
+      render(() => (
+        <RouterProvider router={router}>
+          <RouteView nodeName="users">
+            <RouteView.Self
+              fallback={<div data-testid="self-fallback">Loading…</div>}
+            >
+              <LazyChild />
+            </RouteView.Self>
+          </RouteView>
+        </RouterProvider>
+      ));
+
+      // Suspense boundary is active — fallback visible, content not yet.
+      expect(screen.getByTestId("self-fallback")).toBeInTheDocument();
+      expect(screen.queryByTestId("lazy-content")).not.toBeInTheDocument();
+
+      resolveComponent({
+        default: () => <div data-testid="lazy-content">Loaded</div>,
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("lazy-content")).toBeInTheDocument();
+      });
+
+      expect(screen.queryByTestId("self-fallback")).not.toBeInTheDocument();
     });
 
     it("transitions: descendant Match → Self when navigating up", async () => {
@@ -475,8 +542,9 @@ describe("RouteView", () => {
       expect(container.innerHTML).toBe("");
     });
 
-    it("Match and NotFound have displayName", () => {
+    it("Match, Self, and NotFound have displayName", () => {
       expect(RouteView.Match.displayName).toBe("RouteView.Match");
+      expect(RouteView.Self.displayName).toBe("RouteView.Self");
       expect(RouteView.NotFound.displayName).toBe("RouteView.NotFound");
     });
 
@@ -496,7 +564,9 @@ describe("RouteView", () => {
 
       const { container } = render(() => (
         <RouterProvider router={router}>
-          <RouteView nodeName="">{spoofedMatch as unknown as null}</RouteView>
+          <RouteView nodeName="">
+            {spoofedMatch as unknown as JSX.Element}
+          </RouteView>
         </RouterProvider>
       ));
 
@@ -515,7 +585,7 @@ describe("RouteView", () => {
       const { container } = render(() => (
         <RouterProvider router={router}>
           <RouteView nodeName="">
-            {spoofedNotFound as unknown as null}
+            {spoofedNotFound as unknown as JSX.Element}
           </RouteView>
         </RouterProvider>
       ));
@@ -566,7 +636,7 @@ describe("RouteView", () => {
 
       const { container } = render(() => (
         <RouterProvider router={router}>
-          <RouteView nodeName="">{null as unknown as any}</RouteView>
+          <RouteView nodeName="">{null}</RouteView>
         </RouterProvider>
       ));
 
@@ -609,6 +679,59 @@ describe("RouteView", () => {
 
       expect(screen.getByTestId("items")).toBeInTheDocument();
       expect(screen.queryByTestId("users")).not.toBeInTheDocument();
+    });
+
+    // §5.8 audit edge case: collectElements is recursive but the previous
+    // test only exercised 1 level of nested arrays. This case probes 3+
+    // levels — markers wrapped in array-of-array-of-array, simulating
+    // composed factories (e.g. plugin-supplied route groups that themselves
+    // call .map() and embed their result into another .map()).
+    it("§5.8 — collectElements recurses through 3+ levels of nested arrays", async () => {
+      await router.start("/");
+
+      const deeplyNestedMarkers = [
+        [
+          [
+            // Level 3: array > array > array > marker
+            <RouteView.Match segment="users">
+              <div data-testid="users">UsersDeep</div>
+            </RouteView.Match>,
+          ],
+          // Mixed with a level-2 marker at the same nesting depth.
+          <RouteView.Match segment="items">
+            <div data-testid="items">ItemsMid</div>
+          </RouteView.Match>,
+        ],
+        // And a top-level NotFound to prove the helper still picks it up.
+        <RouteView.NotFound>
+          <div data-testid="not-found">NotFoundTop</div>
+        </RouteView.NotFound>,
+      ];
+
+      render(() => (
+        <RouterProvider router={router}>
+          <RouteView nodeName="">{deeplyNestedMarkers}</RouteView>
+        </RouterProvider>
+      ));
+
+      // Level-3 marker resolves on navigation.
+      await router.navigate("users.list");
+
+      expect(screen.getByTestId("users")).toBeInTheDocument();
+      expect(screen.queryByTestId("items")).not.toBeInTheDocument();
+
+      // Level-2 marker resolves on navigation.
+      await router.navigate("items");
+
+      expect(screen.getByTestId("items")).toBeInTheDocument();
+      expect(screen.queryByTestId("users")).not.toBeInTheDocument();
+
+      // (The UNKNOWN_ROUTE NotFound-fallback for nested markers is exercised
+      // by the dedicated <RouteView.NotFound> tests below — driving it
+      // through `router.navigate("@@router/UNKNOWN_ROUTE")` here is not
+      // reliable: the router rejects the navigation and the state stays on
+      // "items", which yields a false-positive NotFound assertion. Two
+      // resolution checks above are enough to prove deep-nesting walk.)
     });
   });
 
@@ -764,7 +887,7 @@ describe("RouteView", () => {
   });
 
   describe("Suspense fallback", () => {
-    it("should render fallback when provided", async () => {
+    it("should render fallback when provided (synchronous — content visible immediately)", async () => {
       await router.start("/users/list");
 
       render(() => (
@@ -781,6 +904,45 @@ describe("RouteView", () => {
       ));
 
       expect(screen.getByTestId("users")).toBeInTheDocument();
+    });
+
+    it("Match with fallback shows fallback while lazy child suspends", async () => {
+      await router.start("/users/list");
+
+      let resolveComponent!: (module_: { default: () => JSX.Element }) => void;
+      const componentPromise = new Promise<{ default: () => JSX.Element }>(
+        (r) => {
+          resolveComponent = r;
+        },
+      );
+      const LazyUsers = lazy(() => componentPromise);
+
+      render(() => (
+        <RouterProvider router={router}>
+          <RouteView nodeName="">
+            <RouteView.Match
+              segment="users"
+              fallback={<div data-testid="match-fallback">Loading…</div>}
+            >
+              <LazyUsers />
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>
+      ));
+
+      // Suspense boundary active — fallback shows, content not yet.
+      expect(screen.getByTestId("match-fallback")).toBeInTheDocument();
+      expect(screen.queryByTestId("lazy-users")).not.toBeInTheDocument();
+
+      resolveComponent({
+        default: () => <div data-testid="lazy-users">Users</div>,
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("lazy-users")).toBeInTheDocument();
+      });
+
+      expect(screen.queryByTestId("match-fallback")).not.toBeInTheDocument();
     });
 
     it("should not render fallback when no fallback prop", async () => {

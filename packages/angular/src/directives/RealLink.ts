@@ -2,18 +2,21 @@ import {
   Directive,
   ElementRef,
   computed,
+  effect,
   inject,
   input,
   signal,
-  DestroyRef,
-  type OnInit,
 } from "@angular/core";
 import { createActiveRouteSource } from "@real-router/sources";
 
 import { buildHref, navigateWithHash, shouldNavigate } from "../dom-utils";
 import { injectRouter } from "../functions/injectRouter";
+import { buildActiveRouteOptions } from "../internal/buildActiveRouteOptions";
+import { subscribeSourceToSignal } from "../internal/subscribeSourceToSignal";
 
 import type { Params, NavigationOptions } from "@real-router/core";
+
+const NOOP_CATCH = (): void => {};
 
 @Directive({
   selector: "a[realLink]",
@@ -21,7 +24,7 @@ import type { Params, NavigationOptions } from "@real-router/core";
     "(click)": "onClick($event)",
   },
 })
-export class RealLink implements OnInit {
+export class RealLink {
   readonly routeName = input<string>("");
   readonly routeParams = input<Params>({});
   readonly routeOptions = input<NavigationOptions>({});
@@ -37,10 +40,13 @@ export class RealLink implements OnInit {
   readonly hash = input<string | undefined>(undefined);
 
   private readonly router = injectRouter();
-  private readonly destroyRef = inject(DestroyRef);
   private readonly anchor = inject(ElementRef)
     .nativeElement as HTMLAnchorElement;
   private readonly isActive = signal(false);
+  // `href` is computed from signal inputs only — Angular's default Object.is
+  // equality already collapses repeated `string` results, so no custom
+  // comparator is required (review §8b note 3 — applies after verifying that
+  // `buildHref` returns a primitive).
   private readonly href = computed(() => {
     const hashValue = this.hash();
 
@@ -52,38 +58,48 @@ export class RealLink implements OnInit {
     );
   });
   private prevActiveClass = "";
+  private prevHref: string | undefined = undefined;
+  // Skip-same-value: only re-touch the DOM `class` list when the active state
+  // actually flipped. Without this, every navigation that re-fires the active
+  // source still issues a `classList.toggle` no-op (review §8b MEDIUM).
+  private prevActive: boolean | undefined = undefined;
 
-  ngOnInit(): void {
-    // Hash-aware active state (#532): pass `hash` so that tab-style links
-    // (same routeName, different `hash` input) only mark the active variant.
-    const hashValue = this.hash();
-    const source = createActiveRouteSource(
-      this.router,
-      this.routeName(),
-      this.routeParams(),
-      hashValue === undefined
-        ? {
-            strict: this.activeStrict(),
-            ignoreQueryParams: this.ignoreQueryParams(),
+  constructor() {
+    // Reactive source-creation effect (#630 fix) — see
+    // `packages/angular/CLAUDE.md` → "Directives use constructor + effect()".
+    // Reading signal inputs inside `effect()` re-creates the active-route
+    // source whenever any input changes; `onCleanup` tears the previous
+    // subscription down.
+    effect((onCleanup) => {
+      const source = createActiveRouteSource(
+        this.router,
+        this.routeName(),
+        this.routeParams(),
+        buildActiveRouteOptions(
+          this.activeStrict(),
+          this.ignoreQueryParams(),
+          this.hash(),
+        ),
+      );
+
+      onCleanup(
+        subscribeSourceToSignal(source, (snap) => {
+          // Pure-href refresh: when the active flag did not change, only the
+          // href may have moved (e.g. param-only update on a parent route).
+          // Skip the classList work in that branch (review §8b MEDIUM).
+          if (snap === this.prevActive) {
+            this.isActive.set(snap);
+            this.updateHref();
+
+            return;
           }
-        : {
-            strict: this.activeStrict(),
-            ignoreQueryParams: this.ignoreQueryParams(),
-            hash: hashValue,
-          },
-    );
 
-    this.isActive.set(source.getSnapshot());
-    this.updateDom();
-
-    const unsub = source.subscribe(() => {
-      this.isActive.set(source.getSnapshot());
-      this.updateDom();
-    });
-
-    this.destroyRef.onDestroy(() => {
-      unsub();
-      source.destroy();
+          this.prevActive = snap;
+          this.isActive.set(snap);
+          this.updateHref();
+          this.updateActiveClass();
+        }),
+      );
     });
   }
 
@@ -99,16 +115,20 @@ export class RealLink implements OnInit {
       this.routeParams(),
       this.hash(),
       this.routeOptions(),
-    ).catch(() => {});
+    ).catch(NOOP_CATCH);
   }
 
-  private updateDom(): void {
+  private updateHref(): void {
     const href = this.href();
 
-    if (href !== undefined) {
+    if (href !== undefined && href !== this.prevHref) {
       this.anchor.setAttribute("href", href);
     }
 
+    this.prevHref = href;
+  }
+
+  private updateActiveClass(): void {
     const activeClass = this.activeClassName();
 
     if (this.prevActiveClass && this.prevActiveClass !== activeClass) {

@@ -4,6 +4,6 @@
   "private": true,
   "dependencies": {
     "@real-router/svelte": "workspace:^",
-    "svelte": "5.54.0"
+    "svelte": "5.55.7"
   }
 }

@@ -66,9 +66,21 @@ export class BaseSource<T> {
     }
 
     this.#currentSnapshot = snapshot;
-    this.#listeners.forEach((listener) => {
-      listener();
-    });
+    // Isolate listener exceptions so a single throwing subscriber (e.g. React
+    // error-boundary fallback throwing inside `onStoreChange`) does not block
+    // the remaining subscribers — the invariant "after updateSnapshot all
+    // listeners see the new snapshot" must hold. Re-throw asynchronously via
+    // queueMicrotask so global error handlers / test harnesses still surface
+    // the bug without breaking the synchronous notification fan-out.
+    for (const listener of this.#listeners) {
+      try {
+        listener();
+      } catch (error) {
+        queueMicrotask(() => {
+          throw error;
+        });
+      }
+    }
   }
 
   destroy(): void {

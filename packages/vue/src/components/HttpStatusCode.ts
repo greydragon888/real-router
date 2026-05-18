@@ -1,0 +1,74 @@
+import { defineComponent, inject } from "vue";
+
+import { HTTP_STATUS_KEY } from "../context";
+
+// Module-scope render function — returns null since the component emits no DOM.
+// Hoisted to satisfy `unicorn/consistent-function-scoping` and to avoid
+// re-creating the closure on every component instantiation.
+const renderNull = (): null => null;
+
+/**
+ * Render-time HTTP status declaration. Mount inside a route component (typical
+ * use case: a glob `*` route's NotFound page) when the status is decided by
+ * the rendered tree rather than a loader.
+ *
+ * Writes `code` to the nearest `<HttpStatusProvider>`'s sink during `setup()`
+ * and renders nothing. With no provider mounted (the standard client-side
+ * case) the component is a silent no-op — same component tree hydrates
+ * without touching the DOM or warning about mismatches.
+ *
+ * Loader-driven errors (`LoaderNotFound` → 404, `LoaderRedirect` → 30x) keep
+ * working as before; this component covers render-time decisions only.
+ *
+ * Last write wins when several `<HttpStatusCode />` instances mount in the
+ * same render pass — sink reflects the last component that ran.
+ *
+ * ```vue-html
+ * <HttpStatusProvider :sink="sink">
+ *   <RouterProvider :router="router">
+ *     <App />
+ *   </RouterProvider>
+ * </HttpStatusProvider>
+ *
+ * <!-- inside NotFound.vue -->
+ * <HttpStatusCode :code="404" />
+ * ```
+ *
+ * **`renderToWebStream` (streaming SSR):** Vue 3 `<Suspense>` is
+ * chunked-blocking — Vue waits for every `async setup()` inside a boundary
+ * before emitting the chunks past it. So in practice `<HttpStatusCode />`
+ * inside a `<Suspense>` boundary still writes to the sink before the
+ * response headers flush. Still, prefer mounting in the shell to avoid
+ * coupling the contract to that particular Vue 3 streaming behaviour. With
+ * `renderToString` there is no ordering concern at all.
+ *
+ * **Hydration symmetry:** `<HttpStatusProvider>` wraps a render slot, so
+ * Vue emits a fragment marker pair (`<!--[-->` / `<!--]-->`) around its
+ * children server-side. Mount the same `<HttpStatusProvider>` on the
+ * client (with a throwaway sink) to keep the marker count balanced — see
+ * the `ssr/` example's `entry-client.ts`. Otherwise hydration logs
+ * "Hydration completed but contains mismatches".
+ *
+ * **Valid `code` range:** Node's `res.end()` throws `Invalid status code`
+ * on `NaN`, `0`, negative values, or values `> 999` — this surfaces as a
+ * 5xx / dropped connection, not silent corruption. Pass a real HTTP status
+ * integer (commonly 4xx/5xx; 100-999 is what Node accepts).
+ */
+export const HttpStatusCode = defineComponent({
+  name: "HttpStatusCode",
+  props: {
+    /** HTTP status to apply to the response. Common values: 404, 410, 451, 503. */
+    code: { type: Number, required: true },
+  },
+  setup(props) {
+    const sink = inject(HTTP_STATUS_KEY, null);
+
+    if (sink) {
+      sink.code = props.code;
+    }
+
+    return renderNull;
+  },
+});
+
+export type HttpStatusCodeProps = InstanceType<typeof HttpStatusCode>["$props"];

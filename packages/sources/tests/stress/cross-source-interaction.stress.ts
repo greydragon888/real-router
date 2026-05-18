@@ -264,9 +264,12 @@ describe("S5: Cross-source interaction", () => {
     // receive events.
     expect(transCounters.every((c) => c.count > 0)).toBe(true);
 
-    // activeSources are cached — destroy was no-op, updates still flow. But
-    // "about" may not be reached in the 10 nav loop; relax to `>= 0`.
-    expect(activeCounters.every((c) => c.count >= 0)).toBe(true);
+    // activeSources are cached — destroy was no-op, updates still flow.
+    // Loop hits "about" 3 times in a cycle [users.list, about, admin.dashboard,
+    // home]; the source flips on every entry/exit → 5 listener calls per
+    // subscriber. (All 10 createActiveRouteSource(router, "about") calls return
+    // the SAME cached source, so each of the 10 counters sees the same 5.)
+    expect(activeCounters.every((c) => c.count === 5)).toBe(true);
 
     // createRouteSource still supports destroy() — it's lazy; after destroy
     // the subscription is gone and counters stop incrementing.

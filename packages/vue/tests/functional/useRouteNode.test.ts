@@ -50,8 +50,8 @@ describe("useRouteNode", () => {
     const { result } = mountWithRouter(router, () => useRouteNode(""));
 
     expect(result.navigator).toBeDefined();
-    expect(result.route.value).toStrictEqual(undefined);
-    expect(result.previousRoute.value).toStrictEqual(undefined);
+    expect(result.route.value).toBeUndefined();
+    expect(result.previousRoute.value).toBeUndefined();
   });
 
   it("should not return a null route with a default route and the router started", async () => {
@@ -60,7 +60,7 @@ describe("useRouteNode", () => {
     await router.start();
     await flushPromises();
 
-    expect(result.route.value?.name).toStrictEqual("test");
+    expect(result.route.value?.name).toBe("test");
   });
 
   it("should change route if composable was subscribed to root node", async () => {
@@ -69,12 +69,12 @@ describe("useRouteNode", () => {
     await router.start();
     await flushPromises();
 
-    expect(result.route.value?.name).toStrictEqual("test");
+    expect(result.route.value?.name).toBe("test");
 
     await router.navigate("one-more-test");
     await flushPromises();
 
-    expect(result.route.value?.name).toStrictEqual("one-more-test");
+    expect(result.route.value?.name).toBe("one-more-test");
   });
 
   it("should change route if composable was subscribed to changed node", async () => {
@@ -83,23 +83,23 @@ describe("useRouteNode", () => {
     await router.start();
     await flushPromises();
 
-    expect(result.route.value?.name).toStrictEqual(undefined);
+    expect(result.route.value?.name).toBeUndefined();
 
     await router.navigate("items");
     await flushPromises();
 
-    expect(result.route.value?.name).toStrictEqual("items");
+    expect(result.route.value?.name).toBe("items");
 
     await router.navigate("items.item", { id: 6 });
     await flushPromises();
 
-    expect(result.route.value?.name).toStrictEqual("items.item");
+    expect(result.route.value?.name).toBe("items.item");
     expect(result.route.value?.params).toStrictEqual({ id: 6 });
 
     await router.navigate("items");
     await flushPromises();
 
-    expect(result.route.value?.name).toStrictEqual("items");
+    expect(result.route.value?.name).toBe("items");
     expect(result.route.value?.params).toStrictEqual({});
   });
 
@@ -143,7 +143,7 @@ describe("useRouteNode", () => {
           },
         }),
       ),
-    ).toThrow();
+    ).toThrow("useRouter must be used within a RouterProvider");
   });
 
   it("should handle node becoming inactive and active again", async () => {

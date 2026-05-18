@@ -1,4 +1,4 @@
-import { createRouter } from "@real-router/core";
+import { createRouter, errorCodes } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
 import {
   act,
@@ -96,7 +96,9 @@ describe("useRouterTransition", () => {
     });
 
     await act(async () => {
-      await router.navigate("dashboard").catch(() => {});
+      await expect(router.navigate("dashboard")).rejects.toMatchObject({
+        code: errorCodes.CANNOT_ACTIVATE,
+      });
     });
 
     expect(result.current.isTransitioning).toBe(false);
@@ -125,7 +127,10 @@ describe("useRouterTransition", () => {
 
       resolveGuard(true);
       await p2;
-      await p1.catch(() => {});
+
+      await expect(p1).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
     });
 
     expect(result.current.isTransitioning).toBe(false);
@@ -226,7 +231,10 @@ describe("useRouterTransition", () => {
 
       resolveGuard(true);
       await p2;
-      await p1.catch(() => {});
+
+      await expect(p1).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
     });
 
     expect(result.current.isTransitioning).toBe(false);

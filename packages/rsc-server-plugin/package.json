@@ -6,6 +6,13 @@
   "main": "./dist/cjs/index.js",
   "module": "./dist/esm/index.mjs",
   "types": "./dist/esm/index.d.mts",
+  "typesVersions": {
+    "*": {
+      "errors": [
+        "./dist/cjs/errors.d.ts"
+      ]
+    }
+  },
   "exports": {
     ".": {
       "@real-router/internal-source": "./src/index.ts",
@@ -15,6 +22,15 @@
       },
       "import": "./dist/esm/index.mjs",
       "require": "./dist/cjs/index.js"
+    },
+    "./errors": {
+      "@real-router/internal-source": "./src/errors.ts",
+      "types": {
+        "import": "./dist/esm/errors.d.mts",
+        "require": "./dist/cjs/errors.d.ts"
+      },
+      "import": "./dist/esm/errors.mjs",
+      "require": "./dist/cjs/errors.js"
     }
   },
   "files": [

@@ -35,32 +35,51 @@ dist/
 
 ```
 src/
-├── index.ts                    # Single entry point
+├── index.ts                    # Main entry — client API
+├── ssr.ts                      # /ssr — SSR-feature subpath (8 exports)
 ├── RouterProvider.ts           # Context provider — wires router to Vue tree
-├── context.ts                  # Three InjectionKeys (RouterKey, NavigatorKey, RouteKey)
-├── types.ts                    # RouteState, RouteContext, LinkProps
+├── context.ts                  # Triple Injection Key Pattern (public: RouterKey/NavigatorKey/RouteKey) + @internal HTTP_STATUS_KEY for /ssr
+├── types.ts                    # RouteState, RouteContext, LinkProps (with hash for #532)
 ├── constants.ts                # EMPTY_PARAMS, EMPTY_OPTIONS (frozen singletons)
 ├── createRouterPlugin.ts       # Vue Plugin factory (for app.use())
 ├── useRefFromSource.ts         # Ref bridge — converts RouterSource to ShallowRef
+├── setupRouteProvision.ts      # Internal — shared route subscription setup (RouterProvider + createRouterPlugin)
 ├── composables/
 │   ├── useRouter.ts            # Router instance from inject (never reactive)
 │   ├── useNavigator.ts         # Navigator from inject (never reactive)
-│   ├── useRoute.ts             # Full route context from inject (every navigation)
-│   ├── useRouteNode.ts         # Node-scoped subscription via useRefFromSource
+│   ├── useRoute.ts             # Full route context from inject (every navigation) — Readonly<Ref<State>>
+│   ├── useRouteNode.ts         # Node-scoped subscription via useRefFromSource (computed over shallowRef snapshot)
 │   ├── useIsActiveRoute.ts     # Active state subscription (internal — used by Link)
 │   ├── useRouteUtils.ts        # RouteUtils from route tree (never reactive)
 │   ├── useRouterTransition.ts  # Transition lifecycle ShallowRef (isTransitioning, toRoute, fromRoute)
 │   ├── useRouteExit.ts         # Wrap subscribeLeave with abort + same-route guards (handler captured in setup())
-│   └── useRouteEnter.ts        # Fire on nav-driven mount via watch(route) + route.transition.from
-└── components/
-    ├── Link.ts                 # defineComponent + h('a'), computed href/class, active state
-    ├── RouterErrorBoundary.ts   # Declarative navigation error handling
-    └── RouteView/              # Declarative route matching with native keepAlive support
-        ├── index.ts            # Barrel re-exports
-        ├── RouteView.ts        # RouteViewComponent + compound export (RouteView.Match, RouteView.NotFound)
-        ├── types.ts            # RouteViewProps, MatchProps, NotFoundProps
-        ├── components.ts       # Match, NotFound marker components (render: null)
-        └── helpers.ts          # collectElements, buildRenderList, isSegmentMatch
+│   ├── useRouteEnter.ts        # Fire on nav-driven mount via watch(route) + route.transition.from
+│   └── useDeferred.ts          # /ssr — reads state.context.ssrDataDeferred[key]
+├── components/
+│   ├── Link.ts                 # defineComponent + h('a'), computed href/class, hash-aware active state
+│   ├── RouterErrorBoundary.ts  # Declarative navigation error handling (uses createDismissableError)
+│   ├── ClientOnly.ts           # /ssr — ref(false) + onMounted swap (slots: default/fallback)
+│   ├── ServerOnly.ts           # /ssr — symmetric inverse of ClientOnly
+│   ├── Streamed.ts             # /ssr — cross-adapter <Suspense> alias
+│   ├── Await.ts                # /ssr — async setup() over deferred[key], scoped slot delivery
+│   ├── HttpStatusCode.ts       # /ssr — writes sink.code via inject(HTTP_STATUS_KEY)
+│   ├── HttpStatusProvider.ts   # /ssr — provides HttpStatusSink via InjectionKey
+│   └── RouteView/              # Declarative route matching with native keepAlive support
+│       ├── index.ts            # Barrel re-exports (RouteView + props types incl. RouteViewSelfProps)
+│       ├── RouteView.ts        # RouteViewComponent + compound export (RouteView.Match, RouteView.Self, RouteView.NotFound)
+│       ├── types.ts            # RouteViewProps, RouteViewMatchProps, RouteViewSelfProps, RouteViewNotFoundProps
+│       ├── components.ts       # Match, Self, NotFound marker components (render: null)
+│       └── helpers.ts          # collectElements, buildRenderList, evaluateMatch, isSegmentMatch (exported for PBT)
+├── directives/
+│   └── vLink.ts                # v-link directive (router stack for nested providers; LIFO push/pop)
+├── dom-utils/                  # Symlink → shared/dom-utils/ (cross-adapter DOM helpers)
+│   ├── index.ts                # Barrel
+│   ├── link-utils.ts           # shouldNavigate, buildHref, navigateWithHash (#532), buildActiveClassName, shallowEqual, applyLinkA11y
+│   ├── route-announcer.ts      # createRouteAnnouncer — WCAG aria-live announcements
+│   ├── scroll-restore.ts       # createScrollRestoration — opt-in scroll capture + restore
+│   └── view-transitions.ts     # createViewTransitions — subscribeLeave-based VT integration
+└── utils/
+    └── createHttpStatusSink.ts # /ssr — fresh { code: undefined } sink per request
 ```
 
 ## Key Differences from React, Preact, and Solid Adapters
@@ -159,6 +178,8 @@ RouterErrorBoundary (defineComponent)
 
 **`class` string concat for active state:** Vue's `class` binding accepts a string. The `finalClassName` computed concatenates `props.class` and `props.activeClassName` when `isActive.value` is true.
 
+**`RouteView.Match.exact` prop:** When `exact={true}`, the segment matches only when `routeName === fullSegmentName` (passed as `exact=true` to `isSegmentMatch`). Default (`exact=false` / omitted) uses prefix matching — `"users"` matches both `"users"` and `"users.profile"`. Use `exact` when sibling Matches have overlapping prefixes and you want to isolate one level.
+
 **RouteView.Match with `fallback`:** When `fallback` prop is provided, `Match` wraps its children in Vue's `<Suspense>` boundary with that fallback. Use this with `defineAsyncComponent` to code-split route components. Works with both `keepAlive` and non-`keepAlive` modes — the `<Suspense>` boundary is preserved inside the `<KeepAlive>` wrapper.
 
 **RouteView marker components:** `Match` and `NotFound` are real `defineComponent` instances with `render: null`. `RouteView` reads `slots.default?.()` to get VNodes, then `collectElements` walks them checking `vnode.type === Match` or `vnode.type === NotFound`. This is standard Vue VNode type checking.
@@ -253,18 +274,20 @@ tests/
 
 ## Stress Test Coverage
 
-43 stress tests across 9 files in `tests/stress/` validate behavior under extreme conditions:
+54 stress tests across 11 files in `tests/stress/` validate behavior under extreme conditions:
 
 | Category                | Tests (file count) | Test count | What they verify                                                                                                                                                                        |
 | ----------------------- | ------------------ | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Mount/unmount lifecycle | 1 file             | 9 tests    | useRouteNode/useRoute/Link/useRouterTransition × 200 mount/unmount cycles — bounded heap; 50 components remount + re-subscribe; conditional toggle × 100 + post-toggle navigation works; router stop/restart; navigate during teardown; 10 000 navigate cycles — bounded heap |
+| Mount/unmount lifecycle | 1 file             | 10 tests   | useRouteNode/useRoute/Link/useRouterTransition × 200 mount/unmount cycles — bounded heap; 50 components remount + re-subscribe; conditional toggle × 100 + post-toggle navigation works; router stop/restart; navigate during teardown; 10 000 navigate cycles — bounded heap; rapid `start/stop` × 100 with no navigations between — no FSM/event-bus leak |
+| Memory mount/unmount    | 1 file             | 3 tests    | Steady-state heap baselines for `useRouterTransition`/`useRouteNode`/`RouterErrorBoundary` (delta-per-iter reported)                                                                    |
 | Subscription fanout     | 1 file             | 4 tests    | 50 useRouteNode on different nodes — only relevant re-render; 20 useRoute + 30 useRouteNode('') — all update; 30 useRouteNode('users') — granular scoping; concurrent mount/unmount     |
 | Link mass rendering     | 1 file             | 6 tests    | 200 Links mount — correct DOM; active class toggle; 50 round-robin navigations; deep routeParams; 50 rapid clicks; 100 dynamic routeName updates                                        |
-| keepAlive cycling       | 1 file             | 4 tests    | 10 keepAlive segments × 100 round-robin navs — state preserved via Vue `<KeepAlive>`; wrapper cache bounded (markRaw reuse); mixed keepAlive/non-keepAlive — both modes count > 0; DOM element count stability |
+| keepAlive cycling       | 1 file             | 5 tests    | 10 keepAlive segments × 100 round-robin navs — state preserved via Vue `<KeepAlive>`; wrapper cache bounded (markRaw reuse); mixed keepAlive/non-keepAlive — both modes count > 0; DOM element count stability |
 | v-link directive        | 1 file             | 4 tests    | 200 v-link elements — cursor:pointer + role + tabindex; mount/unmount × 100 cycles — bounded heap (WeakMap cleanup); v-link update × 100 — final-route navigation still works; click navigation after mass mount |
 | Deep tree context       | 1 file             | 4 tests    | 30-deep useRouteNode — only relevant nodes re-render; useRouter — 0 re-renders; wide tree 25 leaves — all re-render; nested RouterProviders — isolated                                  |
-| Transition hook         | 1 file             | 4 tests    | 50 async guard cycles — isTransitioning true→false; 50 concurrent — last wins; 20 consumers — consistent; navigate + cancel × 50 — never stuck                                          |
-| shouldUpdateCache       | 1 file             | 4 tests    | 200 unique node names — cache scales; 100 same-node — cache hit; router stop + GC + new router; 2 routers × 50 nodes — isolated                                                         |
+| Transition hook         | 1 file             | 6 tests    | 50 async guard cycles — isTransitioning true→false; 50 concurrent — last wins; 20 consumers — consistent; navigate + cancel × 50 — never stuck; mid-transition `router.stop()` — no unhandled rejections; mixed-duration concurrent guards (10/40/80 ms) — no zombie isTransitioning, last navigate wins |
+| shouldUpdateCache       | 1 file             | 5 tests    | 200 unique node names — cache scales; 100 same-node — cache hit; router stop + GC + new router; 2 routers × 50 nodes — isolated                                                         |
+| Suspense + lazy         | 1 file             | 3 tests    | 50 navs across two lazy `<RouteView.Match fallback>` segments — fallbacks never stuck after resolve; 100 mount/unmount cycles of a lazy Match — bounded heap; 50 fallback→content cycles per segment — bounded heap |
 | Combined SPA            | 1 file             | 4 tests    | Full app with RouteView + Links + useRouteNode + 200 navs; transition progress; keepAlive tabs + 30 Links; remount after unmount                                                        |
 
 ## See Also

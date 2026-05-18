@@ -17,7 +17,7 @@ const COVERS: Partial<Record<string, { name: string; color: string }>> = {
 export function ProductDetail(): JSX.Element {
   const routeState = useRoute<{ id: string }>();
 
-  const id = (): string => routeState().route?.params.id ?? "1";
+  const id = (): string => routeState().route.params.id;
   const product = (): { name: string; color: string } | undefined =>
     COVERS[id()];
 

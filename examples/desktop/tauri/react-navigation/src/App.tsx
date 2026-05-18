@@ -13,6 +13,7 @@ import type { JSX } from "react";
 
 export function App(): JSX.Element {
   const router = useRouter();
+
   // Subscribe to route changes so visited-marks re-render on navigation.
   useRoute();
 

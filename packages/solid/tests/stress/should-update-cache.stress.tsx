@@ -7,7 +7,7 @@ import { RouterProvider, useRouteNode } from "@real-router/solid";
 import { createStressRouter, forceGC } from "./helpers";
 
 describe("S6 — shouldUpdateCache growth (Solid)", () => {
-  it("6.1: 200 unique useRouteNode(name) — all fire effects, no crash on navigation", async () => {
+  it("S6.1: 200 unique useRouteNode(name) — all fire effects, no crash on navigation", async () => {
     const router = createStressRouter(200);
 
     await router.start("/route0");
@@ -45,7 +45,7 @@ describe("S6 — shouldUpdateCache growth (Solid)", () => {
     router.stop();
   });
 
-  it("6.2: same nodeName × 100 components — cache hit, consistent signal state", async () => {
+  it("S6.2: same nodeName × 100 components — cache hit, consistent signal state", async () => {
     const router = createStressRouter(10);
 
     await router.start("/route0");
@@ -87,7 +87,7 @@ describe("S6 — shouldUpdateCache growth (Solid)", () => {
     router.stop();
   });
 
-  it("6.3: router stop + GC → new router works independently", async () => {
+  it("S6.3: router stop + GC → new router works independently", async () => {
     const router = createStressRouter(50);
 
     await router.start("/route0");
@@ -145,7 +145,7 @@ describe("S6 — shouldUpdateCache growth (Solid)", () => {
     router2.stop();
   });
 
-  it("6.4: 2 routers × 50 nodeNames — isolated signal caches, no cross-talk", async () => {
+  it("S6.4: 2 routers × 50 nodeNames — isolated signal caches, no cross-talk", async () => {
     const router1 = createStressRouter(50);
     const router2 = createStressRouter(50);
 

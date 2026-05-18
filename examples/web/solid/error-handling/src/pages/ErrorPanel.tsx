@@ -31,7 +31,7 @@ export function ErrorPanel(): JSX.Element {
         }
       >
         <ul style={{ "padding-left": "16px", "margin-top": "8px" }}>
-          <For each={[...errors()].reverse()}>
+          <For each={errors().toReversed()}>
             {(entry) => (
               <li style={{ "margin-bottom": "4px", "font-size": "13px" }}>
                 <strong style={{ color: "#c62828" }}>{entry.code}</strong>

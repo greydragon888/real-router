@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo } from "react";
+import { memo, useMemo } from "react";
 
 import { EMPTY_PARAMS, EMPTY_OPTIONS } from "../constants";
 import {
@@ -66,47 +66,43 @@ const LinkImpl: FC<LinkProps> = ({
     hash,
   );
 
-  const href = useMemo(
-    () =>
-      buildHref(
-        router,
-        routeName,
-        routeParams,
-        hash === undefined ? undefined : { hash },
-      ),
-    [router, routeName, routeParams, hash],
-  );
+  // No useMemo: outer memo()+shallowEqual prevents Link re-render unless a
+  // prop actually changed. When this body runs, either `hash` differs from
+  // last render or another prop changed — in both cases the `{ hash }` alloc
+  // is unavoidable. The useMemo wrapper added one closure + deps slot per
+  // render without saving an allocation.
+  const hashOption = hash === undefined ? undefined : { hash };
+  const href = buildHref(router, routeName, routeParams, hashOption);
 
-  const handleClick = useCallback(
-    (evt: MouseEvent<HTMLAnchorElement>) => {
-      if (onClick) {
-        onClick(evt);
+  // useCallback was wasteful: 7 deps recreated the closure on every meaningful
+  // render anyway, and `<a onClick>` does not benefit from a stable function
+  // identity (no child-memo-bail-out chain past it). Inline arrow function is
+  // what React Compiler emits automatically for this shape.
+  const handleClick = (evt: MouseEvent<HTMLAnchorElement>) => {
+    if (onClick) {
+      onClick(evt);
 
-        if (evt.defaultPrevented) {
-          return;
-        }
-      }
-
-      if (!shouldNavigate(evt.nativeEvent) || target === "_blank") {
+      if (evt.defaultPrevented) {
         return;
       }
+    }
 
-      evt.preventDefault();
-      navigateWithHash(
-        router,
-        routeName,
-        routeParams,
-        hash,
-        routeOptions,
-      ).catch(() => {});
-    },
-    [onClick, target, router, routeName, routeParams, routeOptions, hash],
-  );
+    if (!shouldNavigate(evt.nativeEvent) || target === "_blank") {
+      return;
+    }
 
-  const finalClassName = buildActiveClassName(
-    isActive,
-    activeClassName,
-    className,
+    evt.preventDefault();
+    navigateWithHash(router, routeName, routeParams, hash, routeOptions).catch(
+      () => {},
+    );
+  };
+
+  // Memoize the joined class string. parseTokens + Set + join on every render
+  // adds up on pages with N Links navigating frequently; deps cover every
+  // input the function reads so cache invalidation is exact.
+  const finalClassName = useMemo(
+    () => buildActiveClassName(isActive, activeClassName, className),
+    [isActive, activeClassName, className],
   );
 
   return (

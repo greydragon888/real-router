@@ -5,7 +5,7 @@
 [![bundle size](https://deno.bundlejs.com/?q=@real-router/rsc-server-plugin&treeshake=[*]&badge=detailed)](https://bundlejs.com/?q=@real-router/rsc-server-plugin&treeshake=[*])
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](../../LICENSE)
 
-> Per-route `ReactNode` (RSC payload) loading for [Real-Router](https://github.com/greydragon888/real-router). Intercepts `start()` to load Server Components before Flight rendering. **Bundler-agnostic** — works with `@vitejs/plugin-rsc`, `react-server-dom-webpack`, `react-server-dom-turbopack`, `react-server-dom-parcel`.
+> Per-route `ReactNode` (RSC payload) loading for [Real-Router](https://github.com/greydragon888/real-router). Intercepts `start()` to load Server Components before Flight rendering. **Bundler-agnostic** — the plugin **never imports** a Flight renderer; the caller picks one of `@vitejs/plugin-rsc`, `react-server-dom-webpack`, `react-server-dom-turbopack`, or `react-server-dom-parcel`. Examples in this README and in the [wiki](https://github.com/greydragon888/real-router/wiki/RSC-Integration) use the Vite import path (`@vitejs/plugin-rsc/rsc`); other bundlers expose the same `renderToReadableStream` shape under their own paths (`react-server-dom-webpack/server.edge`, `react-server-dom-turbopack/server`, `react-server-dom-parcel/server`) — swap the import, keep the call site.
 
 ```typescript
 // Without plugin: manual per-route Server Component dispatch
@@ -85,7 +85,42 @@ const loaders: RscLoaderFactoryMap = {
 };
 ```
 
-Routes without a matching loader leave `state.context.rsc` as `undefined`.
+Routes without a matching entry leave `state.context.rsc` as `undefined` and `getSsrRscMode(state)` falls back to `"full"`.
+
+## Per-route SSR mode
+
+`rsc-server-plugin` accepts the same `{ ssr?, loader? }` shape as `ssr-data-plugin`, but with a strict subset of `SsrMode`: only `"full"` and `"client-only"` are allowed. Passing `"data-only"` (RSC has no semantically meaningful "data without component") throws at factory time.
+
+```typescript
+const loaders: RscLoaderFactoryMap = {
+  home: () => () => <HomePage />,                                 // short form, defaults to "full"
+  "admin.dashboard": { ssr: false },                              // false → "client-only"
+  "docs.detail": {
+    ssr: (state) => state.params.format === "pdf" ? "client-only" : "full",
+    loader: () => () => <Doc />,
+  },
+};
+```
+
+| `ssr` value                  | mode marker       | loader behaviour          |
+| ---------------------------- | ----------------- | ------------------------- |
+| omitted / `true` / `"full"`  | `"full"`          | runs (composes with #596) |
+| `false` / `"client-only"`    | `"client-only"`   | **skipped** unconditionally |
+| `(state) => RscSsrMode`      | resolver result   | resolved per-navigation   |
+
+Read the resolved mode via `getSsrRscMode(state)` (returns `"full"` for routes without an entry):
+
+```typescript
+import { getSsrRscMode } from "@real-router/rsc-server-plugin";
+
+const mode = getSsrRscMode(state); // RscSsrMode = "full" | "client-only"
+
+if (mode === "full") {
+  const flight = renderToReadableStream(buildRscPayload(state));
+  // … pipe Flight + SSR HTML
+}
+// mode === "client-only" → no Server Component was rendered server-side
+```
 
 ## Why `ReactNode`, not Flight bytes?
 
@@ -112,7 +147,7 @@ const ssrJson = serializeRouterState(state, { excludeContext: ["rsc"] });
 // JSON contains state.context.data and other namespaces, but not state.context.rsc
 ```
 
-## SSR-Only by Design
+## SSR-Only by Design (with explicit CSR revalidation channel)
 
 This plugin intercepts `start()` only — not `navigate()`. In SSR, the flow is:
 
@@ -124,7 +159,83 @@ cloneRouter → usePlugin → start(url) → ReactNode resolved → state.contex
                                                           Flight stream → HTTP
 ```
 
-Client-side data fetching is the application's responsibility (React Query, Suspense, RSC `/__rsc` endpoint).
+Client-side navigation does **not** re-run the RSC loader by default — application-layer fetching (React Query, Suspense, RSC `/__rsc` endpoint) owns CSR data. The one explicit exception is the `invalidate()` revalidation channel below.
+
+## Client-side revalidation (`invalidate`)
+
+After a mutation, mark the `"rsc"` namespace stale on the router. The next navigation (including a same-route reload) re-runs the RSC loader for the destination route and overwrites `state.context.rsc` before `TRANSITION_SUCCESS` fires — so subscribers see the fresh `ReactNode`.
+
+```typescript
+import { invalidate } from "@real-router/rsc-server-plugin";
+
+// Fire-and-forget — stale until the user navigates somewhere.
+invalidate(router, "rsc");
+
+// Explicit await — pair with a same-route reload.
+invalidate(router, "rsc");
+await router.navigate(state.name, state.params, { reload: true });
+```
+
+The flag is **preserved** until a successful, non-cancelled loader write. So a navigation that lands on a route without an entry, a `client-only` route, a mode-only entry, or one that gets cancelled mid-loader (newer `navigate()` aborts the older controller) all leave the flag set for the next attempt. A loader rejection also leaves the flag set — retry re-runs the loader.
+
+Idempotent — multiple `invalidate()` calls between refreshes collapse to one re-run. Surgical for multi-namespace routes — only `"rsc"` re-runs; a side-by-side [`@real-router/ssr-data-plugin`](https://www.npmjs.com/package/@real-router/ssr-data-plugin) keeps its cached `state.context.data` unless its own `invalidate()` was also called.
+
+### Cancellation-aware loaders
+
+The leave handler passes the navigation's `AbortController.signal` as the second loader argument so loaders can abort their in-flight work (DB query, RSC stream, …) when a newer navigation supersedes:
+
+```typescript
+"users.profile": (_router, getDep) => async (params, ctx) => {
+  const db = getDep("db");
+  const user = await db.users.findById(params.id, { signal: ctx?.signal });
+
+  return <UserProfile user={user} />;
+},
+```
+
+The start interceptor calls the loader without a context. **Robust loaders check `signal.aborted` upfront** — a signal aborted before `addEventListener("abort", …)` does NOT auto-fire the listener.
+
+Non-breaking via TypeScript contravariance — existing `(params) => …` loaders continue to compile and work unchanged.
+
+## Post-hydration loader skip
+
+When the application uses `hydrateRouter()` from `@real-router/core/utils`, the parsed server-serialized state is briefly deposited on a one-shot internal scratchpad before `start()` runs. The plugin reads this scratchpad and **reuses the server-resolved value** if `state.context.rsc` is already present for the same route name — skipping the redundant client-side `ReactNode` resolution on first paint.
+
+In practice, RSC apps usually `excludeContext: ["rsc"]` from the JSON payload (a `ReactNode` tree contains functions/symbols and isn't JSON-serializable). In that case the scratchpad has no `rsc` namespace and the loader runs as today. The skip path matters when the bundler-specific Flight pipeline arranges to thread an already-resolved `ReactNode` through hydration.
+
+The skip is single-shot — only the first `start()` triggered by `hydrateRouter` consumes the scratchpad. Composes with per-route mode: `"client-only"` skips the loader regardless of scratchpad contents (mode wins).
+
+## Typed Loader Errors (`@real-router/rsc-server-plugin/errors`)
+
+Mirror of [`@real-router/ssr-data-plugin/errors`](../ssr-data-plugin/README.md#typed-loader-errors-real-routerssr-data-pluginerrors) — same shared source under `shared/ssr/errors.ts`. RSC apps can import error classes without adding `ssr-data-plugin` as a dependency:
+
+```typescript
+import {
+  LoaderNotFound,
+  LoaderRedirect,
+} from "@real-router/rsc-server-plugin/errors";
+
+const loaders: RscLoaderFactoryMap = {
+  "users.profile": (_router, getDep) => async (params) => {
+    const user = await getDep("db").users.findById(params.id);
+    if (!user) throw new LoaderNotFound(`user:${params.id}`);
+    return <UserProfile user={user} />;
+  },
+};
+
+// In the RSC fetch handler:
+try {
+  const state = await router.start(pathname);
+  return new Response(renderToReadableStream(buildRscPayload(state)));
+} catch (error) {
+  if (error?.code === "LOADER_NOT_FOUND") {
+    return new Response("Not Found", { status: 404 });
+  }
+  throw error;
+}
+```
+
+`LoaderNotFound`, `LoaderRedirect`, `LoaderTimeout`, `withTimeout` — same shape and structural `code` discriminator as the data-plugin counterparts.
 
 ## Cleanup
 
@@ -137,9 +248,76 @@ unsubscribe();
 
 In SSR, `router.dispose()` handles cleanup automatically.
 
+## Server Actions (`rscActionPluginFactory`)
+
+For RSC apps that ship Server Actions, this package also exports a **second factory** — `rscActionPluginFactory(getResult)` — that publishes the action result (`returnValue` / `formState`) to `state.context.rscAction`. It claims a separate `"rscAction"` namespace, so it composes with `rscServerPluginFactory` and `ssr-data-plugin` on the same router. Action results are produced *outside* the loader pipeline (typically in the request fetch handler, before the router exists for that request), so they're surfaced via a closure-captured resolver rather than a per-route map.
+
+```typescript
+import {
+  buildRscPayload,
+  rscActionPluginFactory,
+  rscServerPluginFactory,
+  type RscActionResult,
+} from "@real-router/rsc-server-plugin";
+// Vite path — swap for `react-server-dom-{webpack,turbopack,parcel}/server.*`
+// when you use a different bundler. The plugin itself imports nothing here.
+import {
+  decodeAction,
+  decodeFormState,
+  decodeReply,
+  loadServerAction,
+  renderToReadableStream,
+} from "@vitejs/plugin-rsc/rsc";
+
+let actionResult: RscActionResult | undefined;
+
+if (request.method === "POST") {
+  const isFormPost = request.headers
+    .get("content-type")
+    ?.includes("multipart/form-data");
+
+  if (isFormPost) {
+    // Progressive enhancement path — POST without JS.
+    const formData = await request.formData();
+    const decoded = await decodeAction(formData);
+    const result = await decoded();
+    const formState = await decodeFormState(result, formData);
+
+    actionResult = formState ? { formState } : undefined;
+  } else {
+    // Hydrated client path — setServerCallback dispatched the call.
+    const actionId = request.headers.get("rsc-action") ?? "";
+    const fn = await loadServerAction(actionId);
+    const args = await decodeReply(await request.text());
+
+    actionResult = { returnValue: { ok: true, data: await fn(...args) } };
+  }
+}
+
+const router = cloneRouter(baseRouter, requestDeps);
+
+router.usePlugin(
+  rscServerPluginFactory(loaders),
+  rscActionPluginFactory(() => actionResult), // closure captures live mutation
+);
+
+const state = await router.start(new URL(request.url).pathname);
+const flight = renderToReadableStream(buildRscPayload(state));
+```
+
+Rules:
+
+- `getResult` is **validated at factory time** as a function — a TS-cast bypass that smuggles `null`/`async` through throws `TypeError` synchronously, **before** the `"rscAction"` namespace is claimed.
+- The return value is **validated per `start()`** — must be `undefined` (skip the write) or a plain object. Arrays, primitives, and `Promise`/thenables are rejected with a typed message pointing back at the call site. The most common consumer mistake is wiring an `async` getResult; the runtime guard surfaces that explicitly.
+- `state.context.rscAction` is **JSON-friendly** — `serializeRouterState(state)` works without `excludeContext`. Pass `excludeContext: ["rsc", "rscAction"]` only if the result carries server-only secrets you don't want to ship to the client.
+- The two plugins coexist regardless of registration order; both namespaces are exclusive (double-registration throws `RouterError(CONTEXT_NAMESPACE_ALREADY_CLAIMED)`).
+- `buildRscPayload(state, rootOverride?)` reads `state.context.rsc` + `state.context.rscAction` and returns the canonical `RscPayload<TReturn, TFormState>` Flight shape. `returnValue` / `formState` are **omitted** (not set to `undefined`) when their source is missing — type-safe under `exactOptionalPropertyTypes: true`.
+
+For the full integration recipe (HTML + `/__rsc` endpoints, dev/prod bundler config, Flight injection), see the [Wiki: RSC Integration](https://github.com/greydragon888/real-router/wiki/RSC-Integration) guide.
+
 ## Example
 
-- [examples/web/react/ssr-rsc](../../examples/web/react/ssr-rsc) — End-to-end dogfooding example: Express + `@vitejs/plugin-rsc` + this plugin, with Flight injection, client navigation via `/__rsc?route=…`, and revalidation. 5-scenario Playwright suite covering initial HTML load, client nav, revalidation, 404, and per-request isolation under concurrent load.
+- [examples/web/react/ssr-examples/ssr-rsc](../../examples/web/react/ssr-examples/ssr-rsc) — End-to-end dogfooding example: Express + `@vitejs/plugin-rsc` + this plugin, with Flight injection, client navigation via `/__rsc?route=…`, revalidation, and **Server Actions** wired through `rscActionPluginFactory` (see `entry.rsc.tsx` + `NotificationBanner.tsx`). The Playwright suite covers **27 scenarios** including initial HTML load, client nav, revalidation **happy path + in-flight defer** (Scenarios 3 + 3b), 404 routing, per-request isolation under concurrent load, `/__rsc` content-type assertions, loader-driven HTTP status (404/500), search-param flow, browser back/forward, interleaved-click abort, per-route Cache-Control, ETag absence on streamed responses, and the full Server Action lifecycle (form rendering, mutation, `useActionState` validation errors, `NotificationBanner` cross-component reflection via `state.context.rscAction`). `RevalidateButton` calls `invalidate(router, "rsc")` for API symmetry — see [`src/client-components/RevalidateButton.tsx`](../../examples/web/react/ssr-examples/ssr-rsc/src/client-components/RevalidateButton.tsx).
 
 ## Documentation
 

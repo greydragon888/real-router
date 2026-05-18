@@ -7,6 +7,7 @@ import {
   arbNavigationSeq,
   arbRouteName,
   createStartedRouter,
+  IDLE_TRANSITION,
   NUM_RUNS,
   paramsForRoute,
 } from "./helpers";
@@ -24,12 +25,7 @@ describe("createTransitionSource — state machine", () => {
 
       const source = createTransitionSource(router);
 
-      expect(source.getSnapshot()).toStrictEqual({
-        isTransitioning: false,
-        isLeaveApproved: false,
-        toRoute: null,
-        fromRoute: null,
-      });
+      expect(source.getSnapshot()).toStrictEqual(IDLE_TRANSITION);
 
       router.stop();
       source.destroy();
@@ -108,12 +104,7 @@ describe("createTransitionSource — state machine", () => {
         .navigate(routeName, paramsForRoute(routeName))
         .catch(() => {});
 
-      expect(source.getSnapshot()).toStrictEqual({
-        isTransitioning: false,
-        isLeaveApproved: false,
-        toRoute: null,
-        fromRoute: null,
-      });
+      expect(source.getSnapshot()).toStrictEqual(IDLE_TRANSITION);
 
       router.stop();
       source.destroy();
@@ -150,12 +141,7 @@ describe("createTransitionSource — state machine", () => {
       await p2;
       await p1.catch(() => {});
 
-      expect(source.getSnapshot()).toStrictEqual({
-        isTransitioning: false,
-        isLeaveApproved: false,
-        toRoute: null,
-        fromRoute: null,
-      });
+      expect(source.getSnapshot()).toStrictEqual(IDLE_TRANSITION);
 
       router.stop();
       source.destroy();
@@ -207,7 +193,7 @@ describe("createTransitionSource — state machine", () => {
       for (const nav of navSeq) {
         await router.navigate(nav.name, nav.params).catch(() => {});
 
-        expect(Object.is(source.getSnapshot(), initialIdle)).toBe(true);
+        expect(source.getSnapshot()).toBe(initialIdle);
       }
 
       router.stop();
@@ -238,15 +224,119 @@ describe("createTransitionSource — state machine", () => {
       void router.navigate(routeName, paramsForRoute(routeName));
       await Promise.resolve();
 
-      // TRANSITION_START + TRANSITION_LEAVE_APPROVE should have notified
-      expect(listener.mock.calls.length).toBeGreaterThanOrEqual(1);
+      // Async-guarded nav: TRANSITION_START + TRANSITION_LEAVE_APPROVE fire
+      // before the activate guard is awaited → exactly 2 notifications.
+      expect(listener).toHaveBeenCalledTimes(2);
 
       resolveGuard(true);
       await Promise.resolve();
       await Promise.resolve();
       await Promise.resolve();
 
-      expect(listener.mock.calls.length).toBeGreaterThanOrEqual(2);
+      // + TRANSITION_SUCCESS once the guard resolves → exactly 3 total.
+      expect(listener).toHaveBeenCalledTimes(3);
+
+      router.stop();
+      source.destroy();
+    },
+  );
+});
+
+describe("createTransitionSource — isLeaveApproved monotonicity", () => {
+  test.prop([arbRouteName], { numRuns: NUM_RUNS.async })(
+    "isLeaveApproved goes true on TRANSITION_LEAVE_APPROVE, resets false on SUCCESS",
+    async (routeName) => {
+      fc.pre(routeName !== "home");
+
+      const router = await createStartedRouter();
+      const lifecycle = getLifecycleApi(router);
+      let resolveGuard!: (value: boolean) => void;
+
+      lifecycle.addActivateGuard(routeName, () => () => {
+        return new Promise<boolean>((resolve) => {
+          resolveGuard = resolve;
+        });
+      });
+
+      const source = createTransitionSource(router);
+
+      void router.navigate(routeName, paramsForRoute(routeName));
+      await Promise.resolve();
+
+      // After LEAVE_APPROVE (deactivate guards passed) the flag is true.
+      expect(source.getSnapshot().isLeaveApproved).toBe(true);
+
+      resolveGuard(true);
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // After SUCCESS the IDLE snapshot is restored — isLeaveApproved=false.
+      expect(source.getSnapshot().isLeaveApproved).toBe(false);
+
+      router.stop();
+      source.destroy();
+    },
+  );
+
+  test.prop([arbRouteName], { numRuns: NUM_RUNS.async })(
+    "isLeaveApproved resets to false on TRANSITION_ERROR (activate-guard reject)",
+    async (routeName) => {
+      fc.pre(routeName !== "home");
+
+      const router = await createStartedRouter();
+      const lifecycle = getLifecycleApi(router);
+
+      lifecycle.addActivateGuard(routeName, () => () => false);
+
+      const source = createTransitionSource(router);
+
+      await router
+        .navigate(routeName, paramsForRoute(routeName))
+        .catch(() => {});
+
+      expect(source.getSnapshot().isLeaveApproved).toBe(false);
+
+      router.stop();
+      source.destroy();
+    },
+  );
+
+  test.prop([arbRouteName], { numRuns: NUM_RUNS.async })(
+    "isLeaveApproved resets to false on TRANSITION_CANCEL",
+    async (routeName) => {
+      fc.pre(routeName !== "home");
+
+      const router = await createStartedRouter();
+      const lifecycle = getLifecycleApi(router);
+      let resolveGuard!: (value: boolean) => void;
+
+      lifecycle.addActivateGuard(routeName, () => () => {
+        return new Promise<boolean>((resolve) => {
+          resolveGuard = resolve;
+        });
+      });
+
+      const source = createTransitionSource(router);
+
+      const cancelTarget =
+        routeName === "admin.settings" ? "users.list" : "admin.settings";
+
+      const p1 = router.navigate(routeName, paramsForRoute(routeName));
+
+      await Promise.resolve();
+
+      // We're past LEAVE_APPROVE, so flag is true here.
+      expect(source.getSnapshot().isLeaveApproved).toBe(true);
+
+      const p2 = router.navigate(cancelTarget);
+
+      resolveGuard(true);
+      await p2;
+      await p1.catch(() => {});
+
+      // After CANCEL → IDLE → isLeaveApproved=false.
+      expect(source.getSnapshot().isLeaveApproved).toBe(false);
 
       router.stop();
       source.destroy();
@@ -296,12 +386,7 @@ describe("createTransitionSource — concurrent navigation", () => {
       await p2;
       await p1.catch(() => {});
 
-      expect(source.getSnapshot()).toStrictEqual({
-        isTransitioning: false,
-        isLeaveApproved: false,
-        toRoute: null,
-        fromRoute: null,
-      });
+      expect(source.getSnapshot()).toStrictEqual(IDLE_TRANSITION);
 
       router.stop();
       source.destroy();
@@ -320,12 +405,64 @@ describe("createTransitionSource — concurrent navigation", () => {
 
       await Promise.all(promises);
 
-      expect(source.getSnapshot()).toStrictEqual({
-        isTransitioning: false,
-        isLeaveApproved: false,
-        toRoute: null,
-        fromRoute: null,
-      });
+      expect(source.getSnapshot()).toStrictEqual(IDLE_TRANSITION);
+
+      router.stop();
+      source.destroy();
+    },
+  );
+
+  test.prop([arbRouteName, arbRouteName, arbRouteName], {
+    numRuns: NUM_RUNS.async,
+  })(
+    "N concurrent async-guarded navs + 1 unguarded finisher → final IDLE",
+    async (first, second, finisher) => {
+      fc.pre(first !== "home" && second !== "home" && finisher !== "home");
+      // `finisher` runs unguarded; it must NOT collide with the two guarded
+      // routes, otherwise it inherits their pending async guard and hangs.
+      fc.pre(finisher !== first && finisher !== second);
+
+      const router = await createStartedRouter();
+      const lifecycle = getLifecycleApi(router);
+
+      const abortableGuard =
+        () =>
+        (_toState: unknown, _fromState: unknown, signal?: AbortSignal) => {
+          return new Promise<boolean>((resolve) => {
+            if (signal?.aborted) {
+              resolve(true);
+
+              return;
+            }
+
+            signal?.addEventListener("abort", () => {
+              resolve(true);
+            });
+          });
+        };
+
+      for (const target of new Set([first, second])) {
+        lifecycle.addActivateGuard(target, abortableGuard);
+      }
+
+      const source = createTransitionSource(router);
+
+      const p1 = router.navigate(first, paramsForRoute(first));
+
+      await Promise.resolve();
+
+      const p2 = router.navigate(second, paramsForRoute(second));
+
+      await Promise.resolve();
+
+      // `finisher` is unguarded, so it resolves promptly and cancels both
+      // pending guards via the router's abort signal.
+      const p3 = router.navigate(finisher, paramsForRoute(finisher));
+
+      await p3.catch(() => {});
+      await Promise.all([p1, p2].map((p) => p.catch(() => {})));
+
+      expect(source.getSnapshot()).toStrictEqual(IDLE_TRANSITION);
 
       router.stop();
       source.destroy();
@@ -453,12 +590,7 @@ describe("createTransitionSource — destroy", () => {
         await router.navigate(nav.name, nav.params).catch(() => {});
       }
 
-      expect(source.getSnapshot()).toStrictEqual({
-        isTransitioning: false,
-        isLeaveApproved: false,
-        toRoute: null,
-        fromRoute: null,
-      });
+      expect(source.getSnapshot()).toStrictEqual(IDLE_TRANSITION);
 
       router.stop();
     },

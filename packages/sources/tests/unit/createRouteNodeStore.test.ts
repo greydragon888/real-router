@@ -181,14 +181,20 @@ describe("createRouteNodeSources", () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
-  it("destroy: idempotent", () => {
+  it("destroy: idempotent — snapshot ref stable across N destroys (cached source no-op)", () => {
     const source = createRouteNodeSource(router, "users");
+    const beforeDestroy = source.getSnapshot();
 
     source.destroy();
 
+    expect(source.getSnapshot()).toBe(beforeDestroy);
+
     expect(() => {
       source.destroy();
+      source.destroy();
     }).not.toThrow();
+
+    expect(source.getSnapshot()).toBe(beforeDestroy);
   });
 
   it("post-destroy: getSnapshot still returns up-to-date snapshot", async () => {
@@ -222,7 +228,7 @@ describe("createRouteNodeSources", () => {
     unsubscribe();
   });
 
-  it("stabilizeState: snapshot ref preserved on second reload to same path within node", async () => {
+  it("stabilizeState: each reload to same path produces a fresh snapshot ref (#605, transition.reload bypasses dedupe)", async () => {
     const source = createRouteNodeSource(router, "users");
 
     source.subscribe(() => {});
@@ -234,7 +240,35 @@ describe("createRouteNodeSources", () => {
 
     await router.navigate("users.view", { id: "42" }, { reload: true });
 
-    expect(source.getSnapshot()).toBe(snapshotAfterFirstReload);
+    // Reload is the user's explicit non-idempotent signal — every reload
+    // emits a fresh snapshot so observers can see refreshed
+    // `state.context` (written by SSR loader plugins via `invalidate()`).
+    expect(source.getSnapshot()).not.toBe(snapshotAfterFirstReload);
+    expect(source.getSnapshot().route?.path).toBe(
+      snapshotAfterFirstReload.route?.path,
+    );
+  });
+
+  it("stabilizeState: non-reload same-path force nav keeps snapshot ref (false branch on Object.is check)", async () => {
+    const source = createRouteNodeSource(router, "users");
+
+    source.subscribe(() => {});
+
+    await router.navigate("users.view", { id: "42" });
+    await router.navigate("users.view", { id: "42" }, {
+      force: true,
+    } as Parameters<typeof router.navigate>[2]);
+
+    const snapshotAfterFirstForce = source.getSnapshot();
+
+    await router.navigate("users.view", { id: "42" }, {
+      force: true,
+    } as Parameters<typeof router.navigate>[2]);
+
+    // `force: true` bypasses SAME_STATES so the navigation pipeline runs,
+    // but `transition.reload` is unset → stabilization keeps prev refs →
+    // Object.is sees the same snapshot → updateSnapshot skipped.
+    expect(source.getSnapshot()).toBe(snapshotAfterFirstForce);
   });
 
   it("onFirstSubscribe reconciles snapshot when router state changed since creation", async () => {
@@ -244,8 +278,18 @@ describe("createRouteNodeSources", () => {
 
     await router.navigate("users");
 
-    source.subscribe(() => {});
+    // Snapshot is still stale — onFirstSubscribe hasn't run yet.
+    expect(source.getSnapshot().route).toBeUndefined();
 
+    // Capture snapshot before AND inside the listener: the listener fires
+    // synchronously within subscribe() iff onFirstSubscribe's reconciliation
+    // calls updateSnapshot. Without that flush, this listener would never
+    // fire here (no router event between subscribe and assertion).
+    const listener = vi.fn();
+
+    source.subscribe(listener);
+
+    expect(listener).toHaveBeenCalledTimes(1);
     expect(source.getSnapshot().route?.name).toBe("users");
   });
 

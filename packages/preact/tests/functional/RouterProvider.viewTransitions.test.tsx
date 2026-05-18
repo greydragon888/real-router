@@ -14,10 +14,11 @@ function stubStartViewTransition(): ReturnType<typeof vi.fn> {
     return { skipTransition: vi.fn() };
   });
 
-  (
-    document as Document & { startViewTransition?: unknown }
-  ).startViewTransition =
-    startSpy as unknown as Document["startViewTransition"];
+  Object.defineProperty(document, "startViewTransition", {
+    value: startSpy,
+    writable: true,
+    configurable: true,
+  });
 
   return startSpy;
 }
@@ -38,7 +39,7 @@ describe("RouterProvider — viewTransitions", () => {
   afterEach(() => {
     router.stop();
 
-    delete (document as any).startViewTransition;
+    Reflect.deleteProperty(document, "startViewTransition");
     vi.unstubAllGlobals();
   });
 
@@ -72,6 +73,7 @@ describe("RouterProvider — viewTransitions", () => {
     });
 
     expect(startSpy).toHaveBeenCalledTimes(1);
+    expect(startSpy).toHaveBeenCalledWith(expect.any(Function));
   });
 
   it("viewTransitions: false — utility not wired", async () => {

@@ -4,7 +4,13 @@ import { describe, it, expect, afterEach } from "vitest";
 import ManyConsumers from "./components/ManyConsumers.svelte";
 import SameNodeConsumers from "./components/SameNodeConsumers.svelte";
 import StressConsumer from "./components/StressConsumer.svelte";
-import { createStressRouter, renderWithRouter, forceGC } from "./helpers";
+import {
+  createStressRouter,
+  renderWithRouter,
+  forceGC,
+  MB,
+  takeHeapSnapshot,
+} from "./helpers";
 
 describe("SV6 — shouldUpdateCache growth (Svelte)", () => {
   afterEach(() => {
@@ -177,5 +183,46 @@ describe("SV6 — shouldUpdateCache growth (Svelte)", () => {
     comp2.unmount();
     router1.stop();
     router2.stop();
+  });
+
+  // Audit follow-up #2.5 — extends 6.3/6.4 to 100 routers. The
+  // @real-router/sources package keys its source factories
+  // (createRouteSource, createRouteNodeSource, createActiveRouteSource,
+  // getTransitionSource) on `WeakMap<Router, ...>`. After each router is
+  // unmounted + stopped + dropped, a forced GC should reclaim the cache
+  // entry. 100 short-lived router instances must not balloon the heap.
+  it("6.5: 100 router instances mounted+unmounted in sequence — bounded heap, isolated caches", async () => {
+    forceGC();
+    const heapBefore = takeHeapSnapshot();
+
+    for (let i = 0; i < 100; i++) {
+      const router = createStressRouter(5);
+
+      await router.start("/route0");
+
+      const { unmount } = renderWithRouter(router, StressConsumer, {
+        nodeName: "route0",
+      });
+
+      await tick();
+
+      // One real navigation so the WeakMap-keyed source caches have
+      // recorded a snapshot pair; if the cache leaked across routers the
+      // heap delta after 100 instances would be obvious.
+      await router.navigate("route1");
+      await tick();
+
+      unmount();
+      router.stop();
+    }
+
+    forceGC();
+    const heapAfter = takeHeapSnapshot();
+
+    // 100 router instances each holding a tiny route tree should not
+    // exceed 50 MB residual. A leaked WeakMap entry (e.g. accidental
+    // strong reference in @real-router/sources) would push this far
+    // higher.
+    expect(heapAfter - heapBefore).toBeLessThan(50 * MB);
   });
 });

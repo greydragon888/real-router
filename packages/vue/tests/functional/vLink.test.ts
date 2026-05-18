@@ -9,7 +9,38 @@ import {
 } from "../../src/directives/vLink";
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
+import type { LinkDirectiveValue } from "../../src/directives/vLink";
 import type { Router } from "@real-router/core";
+import type { DirectiveBinding, ObjectDirective } from "vue";
+
+// `vLink` is declared as `Directive<HTMLElement, LinkDirectiveValue>`, a
+// type that admits either the function-form or the object-form. The tests
+// drive the object-form hooks directly without mounting a component, so we
+// widen the reference once and reuse it. Avoids `as any` at every call site.
+const vLinkAsObject = vLink as ObjectDirective<
+  HTMLElement,
+  LinkDirectiveValue | null | undefined
+>;
+
+// Tests construct `binding` as a minimal `{ value, oldValue? }` literal —
+// the directive only reads those two fields. Casting through this alias
+// keeps the inline literals concise while staying `any`-free at call sites.
+type Binding = DirectiveBinding<LinkDirectiveValue | null | undefined>;
+
+// Vue's `ObjectDirective` hook signatures require four parameters
+// (`el, binding, vnode, prevVNode`) — the directive only reads `el` and
+// `binding`, but type-checking still demands a 4-arity signature. Narrow the
+// hooks to test-friendly 2-arity shapes (1-arity for `beforeUnmount`) so the
+// call sites stay terse and stay `as any`-free.
+const vLinkHooks: {
+  mounted: (element: HTMLElement, binding: Binding) => void;
+  updated: (element: HTMLElement, binding: Binding) => void;
+  beforeUnmount: (element: HTMLElement) => void;
+} = {
+  mounted: vLinkAsObject.mounted as (element: HTMLElement, b: Binding) => void,
+  updated: vLinkAsObject.updated as (element: HTMLElement, b: Binding) => void,
+  beforeUnmount: vLinkAsObject.beforeUnmount as (element: HTMLElement) => void,
+};
 
 describe("v-link directive", () => {
   let router: Router;
@@ -27,9 +58,9 @@ describe("v-link directive", () => {
   describe("directive registration", () => {
     it("should export vLink directive", () => {
       expect(vLink).toBeDefined();
-      expect((vLink as any).mounted).toBeDefined();
-      expect((vLink as any).updated).toBeDefined();
-      expect((vLink as any).beforeUnmount).toBeDefined();
+      expect(vLinkHooks.mounted).toBeDefined();
+      expect(vLinkHooks.updated).toBeDefined();
+      expect(vLinkHooks.beforeUnmount).toBeDefined();
     });
 
     it("should set and get directive router", () => {
@@ -42,13 +73,13 @@ describe("v-link directive", () => {
       const element = document.createElement("div");
       const binding = { value: { name: "test" } };
 
-      (vLink as any).mounted!(element, binding as any);
+      vLinkHooks.mounted(element, binding as unknown as Binding);
 
       const removeEventListenerSpy = vi.spyOn(element, "removeEventListener");
 
-      (vLink as any).beforeUnmount!(element);
+      vLinkHooks.beforeUnmount(element);
 
-      expect(removeEventListenerSpy).toHaveBeenCalled();
+      expect(removeEventListenerSpy).toHaveBeenCalledTimes(2);
     });
 
     it("should return router when router is set", () => {
@@ -70,7 +101,7 @@ describe("v-link directive", () => {
       const binding = { value: { name: "home" } };
 
       expect(() => {
-        (vLink as any).mounted!(element, binding as any);
+        vLinkHooks.mounted(element, binding as unknown as Binding);
       }).toThrow(
         "v-link directive requires a RouterProvider ancestor. Make sure RouterProvider is mounted.",
       );
@@ -85,13 +116,13 @@ describe("v-link directive", () => {
       const binding = { value: { name: "home" } };
 
       setDirectiveRouter(router);
-      (vLink as any).mounted!(element, binding as any);
+      vLinkHooks.mounted(element, binding as unknown as Binding);
 
       // Then simulate RouterProvider removal
       setDirectiveRouter(null as unknown as Router);
 
       expect(() => {
-        (vLink as any).updated!(element, binding as any);
+        vLinkHooks.updated(element, binding as unknown as Binding);
       }).toThrow(
         "v-link directive requires a RouterProvider ancestor. Make sure RouterProvider is mounted.",
       );
@@ -198,14 +229,14 @@ describe("v-link directive", () => {
       setDirectiveRouter(router);
 
       expect(() => {
-        (vLink as any).mounted!(element, { value: null } as any);
+        vLinkHooks.mounted(element, { value: null } as unknown as Binding);
       }).not.toThrow();
 
       // Element still receives a11y + cursor (mount-time setup before validation).
       expect(element.style.cursor).toBe("pointer");
       expect(element.getAttribute("role")).toBe("link");
       expect(consoleError).toHaveBeenCalledWith(
-        expect.stringContaining("v-link directive received null/undefined"),
+        "[real-router] v-link directive received null/undefined value. The element will not be wired for navigation.",
       );
 
       consoleError.mockRestore();
@@ -220,7 +251,7 @@ describe("v-link directive", () => {
       setDirectiveRouter(router);
 
       expect(() => {
-        (vLink as any).mounted!(element, { value: undefined } as any);
+        vLinkHooks.mounted(element, { value: undefined } as unknown as Binding);
       }).not.toThrow();
       expect(consoleError).toHaveBeenCalled();
 
@@ -236,10 +267,10 @@ describe("v-link directive", () => {
       setDirectiveRouter(router);
 
       expect(() => {
-        (vLink as any).mounted!(element, { value: {} } as any);
+        vLinkHooks.mounted(element, { value: {} } as unknown as Binding);
       }).not.toThrow();
       expect(consoleError).toHaveBeenCalledWith(
-        expect.stringContaining("missing a string `name` field"),
+        "[real-router] v-link directive value is missing a string `name` field. The element will not be wired for navigation.",
       );
 
       consoleError.mockRestore();
@@ -255,7 +286,7 @@ describe("v-link directive", () => {
       const element = document.createElement("div");
 
       setDirectiveRouter(router);
-      (vLink as any).mounted!(element, { value: null } as any);
+      vLinkHooks.mounted(element, { value: null } as unknown as Binding);
 
       element.dispatchEvent(
         new MouseEvent("click", { bubbles: true, button: 0 }),
@@ -273,12 +304,12 @@ describe("v-link directive", () => {
       const element = document.createElement("div");
 
       setDirectiveRouter(router);
-      (vLink as any).mounted!(element, {
+      vLinkHooks.mounted(element, {
         value: { name: "one-more-test" },
-      } as any);
+      } as unknown as Binding);
 
       expect(() => {
-        (vLink as any).updated!(element, { value: null } as any);
+        vLinkHooks.updated(element, { value: null } as unknown as Binding);
       }).not.toThrow();
 
       expect(consoleError).toHaveBeenCalled();
@@ -293,7 +324,7 @@ describe("v-link directive", () => {
       const binding = { value: { name: "test" } };
 
       setDirectiveRouter(router);
-      (vLink as any).mounted!(element, binding as any);
+      vLinkHooks.mounted(element, binding as unknown as Binding);
 
       expect(element.getAttribute("role")).toBe("link");
       expect(element.getAttribute("tabindex")).toBe("0");
@@ -305,7 +336,7 @@ describe("v-link directive", () => {
       const binding = { value: { name: "test" } };
 
       setDirectiveRouter(router);
-      (vLink as any).mounted!(element, binding as any);
+      vLinkHooks.mounted(element, binding as unknown as Binding);
 
       expect(element.getAttribute("role")).toBeNull();
     });
@@ -315,7 +346,7 @@ describe("v-link directive", () => {
       const binding = { value: { name: "test" } };
 
       setDirectiveRouter(router);
-      (vLink as any).mounted!(element, binding as any);
+      vLinkHooks.mounted(element, binding as unknown as Binding);
 
       expect(element.getAttribute("role")).toBeNull();
     });
@@ -327,7 +358,7 @@ describe("v-link directive", () => {
       const binding = { value: { name: "one-more-test" } };
 
       setDirectiveRouter(router);
-      (vLink as any).mounted!(element, binding as any);
+      vLinkHooks.mounted(element, binding as unknown as Binding);
 
       const clickEvent = new MouseEvent("click", {
         bubbles: true,
@@ -346,7 +377,7 @@ describe("v-link directive", () => {
       const binding = { value: { name: "one-more-test" } };
 
       setDirectiveRouter(router);
-      (vLink as any).mounted!(element, binding as any);
+      vLinkHooks.mounted(element, binding as unknown as Binding);
 
       const clickEvent = new MouseEvent("click", {
         bubbles: true,
@@ -365,7 +396,7 @@ describe("v-link directive", () => {
       const binding = { value: { name: "one-more-test" } };
 
       setDirectiveRouter(router);
-      (vLink as any).mounted!(element, binding as any);
+      vLinkHooks.mounted(element, binding as unknown as Binding);
 
       const keyEvent = new KeyboardEvent("keydown", {
         key: "Enter",
@@ -384,7 +415,7 @@ describe("v-link directive", () => {
       const binding = { value: { name: "one-more-test" } };
 
       setDirectiveRouter(router);
-      (vLink as any).mounted!(element, binding as any);
+      vLinkHooks.mounted(element, binding as unknown as Binding);
 
       const keyEvent = new KeyboardEvent("keydown", {
         key: "Enter",
@@ -403,7 +434,7 @@ describe("v-link directive", () => {
       const binding = { value: { name: "test-route", params: { id: "1" } } };
 
       setDirectiveRouter(router);
-      (vLink as any).mounted!(element, binding as any);
+      vLinkHooks.mounted(element, binding as unknown as Binding);
 
       const keyEvent = new KeyboardEvent("keydown", {
         key: "Enter",
@@ -431,7 +462,7 @@ describe("v-link directive", () => {
       };
 
       setDirectiveRouter(router);
-      (vLink as any).mounted!(element, binding as any);
+      vLinkHooks.mounted(element, binding as unknown as Binding);
 
       const keyEvent = new KeyboardEvent("keydown", {
         key: "Enter",
@@ -450,7 +481,7 @@ describe("v-link directive", () => {
       const binding = { value: { name: "test-route" } };
 
       setDirectiveRouter(router);
-      (vLink as any).mounted!(element, binding as any);
+      vLinkHooks.mounted(element, binding as unknown as Binding);
 
       expect(element.getAttribute("role")).toBeNull();
 
@@ -471,7 +502,7 @@ describe("v-link directive", () => {
       const binding = { value: { name: "test-route" } };
 
       setDirectiveRouter(router);
-      (vLink as any).mounted!(element, binding as any);
+      vLinkHooks.mounted(element, binding as unknown as Binding);
 
       expect(element.getAttribute("role")).toBeNull();
 
@@ -492,7 +523,7 @@ describe("v-link directive", () => {
       const binding = { value: { name: "test" } };
 
       setDirectiveRouter(router);
-      (vLink as any).mounted!(element, binding as any);
+      vLinkHooks.mounted(element, binding as unknown as Binding);
 
       expect(element.getAttribute("role")).toBe("button");
     });
@@ -504,7 +535,7 @@ describe("v-link directive", () => {
       const binding = { value: { name: "test" } };
 
       setDirectiveRouter(router);
-      (vLink as any).mounted!(element, binding as any);
+      vLinkHooks.mounted(element, binding as unknown as Binding);
 
       expect(element.getAttribute("tabindex")).toBe("1");
     });
@@ -516,7 +547,7 @@ describe("v-link directive", () => {
       const binding = { value: { name: "test-route" } };
 
       setDirectiveRouter(router);
-      (vLink as any).mounted!(element, binding as any);
+      vLinkHooks.mounted(element, binding as unknown as Binding);
 
       const clickEvent = new MouseEvent("click", {
         bubbles: true,
@@ -535,7 +566,7 @@ describe("v-link directive", () => {
       const binding = { value: { name: "test-route" } };
 
       setDirectiveRouter(router);
-      (vLink as any).mounted!(element, binding as any);
+      vLinkHooks.mounted(element, binding as unknown as Binding);
 
       const keyEvent = new KeyboardEvent("keydown", {
         key: "Space",
@@ -554,7 +585,7 @@ describe("v-link directive", () => {
       const binding = { value: { name: "one-more-test" } };
 
       setDirectiveRouter(router);
-      (vLink as any).mounted!(element, binding as any);
+      vLinkHooks.mounted(element, binding as unknown as Binding);
 
       const clickEvent = new MouseEvent("click", {
         bubbles: true,
@@ -574,7 +605,7 @@ describe("v-link directive", () => {
       const binding = { value: { name: "one-more-test" } };
 
       setDirectiveRouter(router);
-      (vLink as any).mounted!(element, binding as any);
+      vLinkHooks.mounted(element, binding as unknown as Binding);
 
       const clickEvent = new MouseEvent("click", {
         bubbles: true,
@@ -594,7 +625,7 @@ describe("v-link directive", () => {
       const binding = { value: { name: "one-more-test" } };
 
       setDirectiveRouter(router);
-      (vLink as any).mounted!(element, binding as any);
+      vLinkHooks.mounted(element, binding as unknown as Binding);
 
       const keyEvent = new KeyboardEvent("keydown", {
         key: " ",
@@ -610,10 +641,14 @@ describe("v-link directive", () => {
       vi.spyOn(router, "navigate");
 
       const element = document.createElement("div");
-      let binding = { value: { name: "route-one" } };
+      // Widen the initial value type so the reassignment below (with `params`)
+      // type-checks without contracting `binding` to the narrow `name`-only shape.
+      let binding: { value: { name: string; params?: { id: string } } } = {
+        value: { name: "route-one" },
+      };
 
       setDirectiveRouter(router);
-      (vLink as any).mounted!(element, binding as any);
+      vLinkHooks.mounted(element, binding as unknown as Binding);
 
       const clickEvent1 = new MouseEvent("click", {
         bubbles: true,
@@ -627,9 +662,9 @@ describe("v-link directive", () => {
       vi.clearAllMocks();
 
       binding = {
-        value: { name: "route-two", params: { id: "42" } } as any,
+        value: { name: "route-two", params: { id: "42" } },
       };
-      (vLink as any).updated!(element, binding as any);
+      vLinkHooks.updated(element, binding as unknown as Binding);
 
       const clickEvent2 = new MouseEvent("click", {
         bubbles: true,
@@ -650,9 +685,38 @@ describe("v-link directive", () => {
 
       const removeEventListenerSpy = vi.spyOn(element, "removeEventListener");
 
-      (vLink as any).beforeUnmount!(element);
+      vLinkHooks.beforeUnmount(element);
 
       expect(removeEventListenerSpy).not.toHaveBeenCalled();
+    });
+
+    // Hot-path guard (audit §8.2 H6): `updated()` short-circuits when
+    // `binding.value === binding.oldValue`. Without this, every parent
+    // rerender (common case on Link-heavy pages — any unrelated state
+    // change re-runs the render fn) would detach + reattach listeners
+    // even though the binding is identical.
+    it("CLAUDE.md §8.2 H6: updated() short-circuits when binding.value === binding.oldValue", () => {
+      const element = document.createElement("div");
+      const stableValue = { name: "stable-route" };
+      const binding = { value: stableValue };
+
+      setDirectiveRouter(router);
+      vLinkHooks.mounted(element, binding as unknown as Binding);
+
+      const removeEventListenerSpy = vi.spyOn(element, "removeEventListener");
+      const addEventListenerSpy = vi.spyOn(element, "addEventListener");
+
+      // Simulate a parent re-render that re-invokes the directive's
+      // `updated` hook with the SAME binding value reference. Vue invokes
+      // `updated` on every parent rerender regardless of binding identity.
+      vLinkHooks.updated(element, {
+        value: stableValue,
+        oldValue: stableValue,
+      } as unknown as Binding);
+
+      // No detach / no attach — the guard collapsed the work to zero.
+      expect(removeEventListenerSpy).not.toHaveBeenCalled();
+      expect(addEventListenerSpy).not.toHaveBeenCalled();
     });
   });
 });

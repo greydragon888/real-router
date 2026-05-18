@@ -143,7 +143,7 @@ describe("inject functions", () => {
         const params: TypedParams = route.routeState().route.params;
 
         expect(route.routeState().route.name).toBe("home");
-        expect(params).toBeDefined();
+        expect(typeof params).toBe("object");
       });
     });
   });

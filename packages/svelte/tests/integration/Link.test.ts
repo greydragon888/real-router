@@ -140,4 +140,106 @@ describe("Link - Integration Tests", () => {
       expect(href).toContain("filter=active");
     });
   });
+
+  // Locks gotcha #16 / CLAUDE.md `<Link hash>` Prop (#532) tri-state contract:
+  // - undefined (omitted) → preserve current state.context.url.hash on click
+  //   (no `hash` key forwarded to navigate so plugins see "no hash intent")
+  // - "" (explicit empty) → clear the fragment on click
+  // - "value" → set the fragment (and trigger force/hashChange auto-bypass
+  //   when same route+params, different hash — see navigateWithHash tests)
+  describe("Hash Tri-State Contract (#532)", () => {
+    it("hash=undefined → click forwards opts without `hash` key (preserve current)", async () => {
+      const navigateSpy = vi.spyOn(router, "navigate");
+
+      renderWithRouter(router, Link, {
+        routeName: "one-more-test",
+      });
+
+      const link = document.querySelector("a")!;
+
+      await userEvent.click(link);
+
+      expect(navigateSpy).toHaveBeenCalledTimes(1);
+
+      const opts = navigateSpy.mock.calls[0][2] as
+        | { hash?: string }
+        | undefined;
+
+      // Critical: the `hash` key must be ABSENT (not `undefined`) so plugins
+      // can distinguish "no hash intent" from "explicit clear".
+      expect(opts).toBeDefined();
+      expect(Object.prototype.hasOwnProperty.call(opts, "hash")).toBe(false);
+    });
+
+    it("hash='' → click forwards `opts.hash = \"\"` (explicit clear)", async () => {
+      const navigateSpy = vi.spyOn(router, "navigate");
+
+      renderWithRouter(router, Link, {
+        routeName: "one-more-test",
+        hash: "",
+      });
+
+      const link = document.querySelector("a")!;
+
+      await userEvent.click(link);
+
+      expect(navigateSpy).toHaveBeenCalledTimes(1);
+
+      const opts = navigateSpy.mock.calls[0][2] as { hash?: string };
+
+      // Explicit empty hash: present in opts with empty-string value.
+      expect(Object.prototype.hasOwnProperty.call(opts, "hash")).toBe(true);
+      expect(opts.hash).toBe("");
+    });
+
+    it("hash='value' → click forwards `opts.hash = \"value\"` (set)", async () => {
+      const navigateSpy = vi.spyOn(router, "navigate");
+
+      renderWithRouter(router, Link, {
+        routeName: "one-more-test",
+        hash: "section",
+      });
+
+      const link = document.querySelector("a")!;
+
+      await userEvent.click(link);
+
+      expect(navigateSpy).toHaveBeenCalledTimes(1);
+
+      const opts = navigateSpy.mock.calls[0][2] as { hash?: string };
+
+      expect(opts.hash).toBe("section");
+    });
+
+    it("hash='value' on same route + same params → auto-adds force + hashChange", async () => {
+      // Navigate to the target so the link is "same route + same params"
+      // when clicked. Without force/hashChange, core's SAME_STATES check
+      // would correctly reject the hash-only navigation — the link would
+      // silently no-op. The auto-bypass is the #532 UX feature.
+      await router.navigate("one-more-test");
+
+      const navigateSpy = vi.spyOn(router, "navigate");
+
+      renderWithRouter(router, Link, {
+        routeName: "one-more-test",
+        hash: "tab-2",
+      });
+
+      const link = document.querySelector("a")!;
+
+      await userEvent.click(link);
+
+      expect(navigateSpy).toHaveBeenCalledTimes(1);
+
+      const opts = navigateSpy.mock.calls[0][2] as {
+        force?: boolean;
+        hashChange?: boolean;
+        hash?: string;
+      };
+
+      expect(opts.hash).toBe("tab-2");
+      expect(opts.force).toBe(true);
+      expect(opts.hashChange).toBe(true);
+    });
+  });
 });

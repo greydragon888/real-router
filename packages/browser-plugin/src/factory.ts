@@ -2,6 +2,7 @@ import { getPluginApi } from "@real-router/core/api";
 
 import {
   buildUrl,
+  createPluginBuildUrl,
   createPopstateHandler,
   createPopstateLifecycle,
   createReplaceHistoryState,
@@ -29,7 +30,6 @@ import type {
 import type { BrowserContext, BrowserPluginOptions } from "./types";
 import type {
   NavigationOptions,
-  Params,
   Plugin,
   PluginFactory,
   Router,
@@ -128,22 +128,7 @@ function createBrowserPlugin(
   const updateState = createUpdateBrowserState();
   const removeStartInterceptor = createStartInterceptor(api, browser);
 
-  const pluginBuildUrl = (
-    route: string,
-    params?: Params,
-    opts?: { hash?: string },
-  ) => {
-    const path = router.buildPath(route, params);
-    const url = buildUrl(path, options.base);
-
-    if (opts?.hash === undefined) {
-      return url;
-    }
-
-    const norm = normalizeHashInput(opts.hash);
-
-    return norm ? `${url}#${encodeHashFragment(norm)}` : url;
-  };
+  const pluginBuildUrl = createPluginBuildUrl(router, options.base);
 
   const removeExtensions = api.extendRouter({
     buildUrl: pluginBuildUrl,

@@ -1,8 +1,5 @@
 import {
-  ApplicationRef,
-  DestroyRef,
   InjectionToken,
-  inject,
   makeEnvironmentProviders,
   provideEnvironmentInitializer,
   type EnvironmentProviders,
@@ -10,7 +7,10 @@ import {
 import { getNavigator, type Router, type Navigator } from "@real-router/core";
 import { createRouteSource } from "@real-router/sources";
 
-import { createScrollRestoration, createViewTransitions } from "./dom-utils";
+import {
+  installScrollRestoration,
+  installViewTransitions,
+} from "./internal/install";
 import { sourceToSignal } from "./sourceToSignal";
 
 import type { ScrollRestorationOptions } from "./dom-utils";
@@ -33,6 +33,11 @@ export function provideRealRouter(
 ): EnvironmentProviders {
   const navigator = getNavigator(router);
 
+  // `Parameters<typeof makeEnvironmentProviders>[0]` is the actual union
+  // `(Provider | EnvironmentProviders | EnvironmentProviders[])[]` —
+  // `provideEnvironmentInitializer()` returns `EnvironmentProviders`, so the
+  // narrower `Provider[]` would force a cast at every push (review §8a — the
+  // proposed Provider[] swap was retracted after discovering this).
   const providers: Parameters<typeof makeEnvironmentProviders>[0] = [
     { provide: ROUTER, useValue: router },
     { provide: NAVIGATOR, useValue: navigator },
@@ -50,45 +55,13 @@ export function provideRealRouter(
 
     providers.push(
       provideEnvironmentInitializer(() => {
-        const sr = createScrollRestoration(router, scrollOpts);
-
-        inject(DestroyRef).onDestroy(() => {
-          sr.destroy();
-        });
+        installScrollRestoration(scrollOpts);
       }),
     );
   }
 
   if (options?.viewTransitions === true) {
-    providers.push(
-      provideEnvironmentInitializer(() => {
-        const appRef = inject(ApplicationRef);
-
-        // Force synchronous change detection on every transition success
-        // BEFORE the VT utility resolves its deferred. The utility uses
-        // `setTimeout(0)` to release the new-snapshot capture, which is
-        // load-bearing because Chromium blocks rAF callbacks while VT sits
-        // in the `update-callback-called` phase. Angular's zoneless CD is
-        // rAF-driven by default — without this synchronous tick the new
-        // DOM is not committed when the browser captures the new snapshot,
-        // so old and new snapshots end up identical and animations finish
-        // in ~0 ms with no visible work (the inner-route `products.list ↔
-        // products.detail` morph in the example example was the canary).
-        // Subscribers fire in registration order; this one runs BEFORE
-        // `createViewTransitions` registers its own subscriber,
-        // guaranteeing CD completes first.
-        const offTick = router.subscribe(() => {
-          appRef.tick();
-        });
-
-        const vt = createViewTransitions(router);
-
-        inject(DestroyRef).onDestroy(() => {
-          offTick();
-          vt.destroy();
-        });
-      }),
-    );
+    providers.push(provideEnvironmentInitializer(installViewTransitions));
   }
 
   return makeEnvironmentProviders(providers);

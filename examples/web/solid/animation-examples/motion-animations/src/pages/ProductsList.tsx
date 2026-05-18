@@ -31,7 +31,7 @@ export function ProductsList(): JSX.Element {
   const routeState = useRoute<{ sort?: SortDirection }>();
 
   const sort = createMemo<SortDirection>(() =>
-    routeState().route?.params.sort === "desc" ? "desc" : "asc",
+    routeState().route.params.sort === "desc" ? "desc" : "asc",
   );
 
   const items = createMemo(() => {
@@ -46,13 +46,12 @@ export function ProductsList(): JSX.Element {
     <>
       <h1>Products</h1>
       <p>
-        Click a product card to see the page-level transition: the list
-        slides out, the detail page slides in. There is no library
-        layoutId hero morph in this Solid example — Motion One's
-        layout-animation primitives (<code>layoutId</code>,{" "}
-        <code>layout</code>) are React-only. For cross-component hero
-        morphs in Solid, see <code>route-animations/</code> →{" "}
-        <code>useHeroMorph</code>.
+        Click a product card to see the page-level transition: the list slides
+        out, the detail page slides in. There is no library layoutId hero morph
+        in this Solid example — Motion One's layout-animation primitives (
+        <code>layoutId</code>, <code>layout</code>) are React-only. For
+        cross-component hero morphs in Solid, see <code>route-animations/</code>{" "}
+        → <code>useHeroMorph</code>.
       </p>
 
       <div class="products-toolbar">

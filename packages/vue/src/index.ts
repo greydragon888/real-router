@@ -34,7 +34,7 @@ export { RouterProvider } from "./RouterProvider";
 export { RouterKey, NavigatorKey, RouteKey } from "./context";
 
 // Types
-export type { LinkProps } from "./types";
+export type { RouteContext, LinkProps } from "./types";
 
 export type { RouterErrorBoundaryProps } from "./components/RouterErrorBoundary";
 
@@ -43,6 +43,7 @@ export type { LinkDirectiveValue } from "./directives/vLink";
 export type {
   RouteViewProps,
   RouteViewMatchProps,
+  RouteViewSelfProps,
   RouteViewNotFoundProps,
 } from "./components/RouteView";
 

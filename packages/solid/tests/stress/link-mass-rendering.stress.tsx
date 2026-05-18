@@ -99,7 +99,7 @@ describe("link-mass-rendering stress tests", () => {
     expect(document.querySelectorAll(".active")).toHaveLength(1);
   });
 
-  it("2.5: 200 Links with deep routeParams + navigation — correct active state", async () => {
+  it("2.4: 200 Links with deep routeParams + navigation — correct active state", async () => {
     render(() => (
       <RouterProvider router={router}>
         {Array.from({ length: 200 }, (_, i) => (
@@ -128,7 +128,7 @@ describe("link-mass-rendering stress tests", () => {
     expect(document.querySelectorAll(".active")).toHaveLength(1);
   });
 
-  it("2.7: 20 Links with dynamic routeName changing 100 times — correct final active state, no crashes", () => {
+  it("2.5: 20 Links with dynamic routeName changing 100 times — correct final active state, no crashes", () => {
     let errorThrown: unknown = null;
     const [routeIndex, setRouteIndex] = createSignal(0);
 

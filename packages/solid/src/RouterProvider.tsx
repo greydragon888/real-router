@@ -31,52 +31,58 @@ export function isRouteActive(
   );
 }
 
+// §8.1 audit fix (LOW) — collapse three identical onMount lifecycle blocks
+// into a single helper. Each opt-in feature has the same shape:
+//   `if (!enabled) return; const handle = create(...); onCleanup(handle.destroy)`.
+// Routing setup through this helper keeps the props.<feature> check + mount
+// side-effect + cleanup wiring in one place.
+function mountFeature(
+  enabled: unknown,
+  factory: () => { destroy: () => void },
+): void {
+  onMount(() => {
+    if (!enabled) {
+      return;
+    }
+
+    const handle = factory();
+
+    onCleanup(() => {
+      handle.destroy();
+    });
+  });
+}
+
 export function RouterProvider(
   props: ParentProps<RouteProviderProps>,
 ): JSX.Element {
-  onMount(() => {
-    if (!props.announceNavigation) {
-      return;
-    }
-
-    const announcer = createRouteAnnouncer(props.router);
-
-    onCleanup(() => {
-      announcer.destroy();
-    });
-  });
-
-  onMount(() => {
-    if (!props.scrollRestoration) {
-      return;
-    }
-
-    const sr = createScrollRestoration(props.router, props.scrollRestoration);
-
-    onCleanup(() => {
-      sr.destroy();
-    });
-  });
-
-  onMount(() => {
-    if (!props.viewTransitions) {
-      return;
-    }
-
-    const vt = createViewTransitions(props.router);
-
-    onCleanup(() => {
-      vt.destroy();
-    });
-  });
-
+  // Setup vars FIRST (§8.1 audit fix LOW #2 — semantic ordering): the router
+  // subscription wiring is the core of the provider, the opt-in features
+  // below ride on top of it.
   const navigator = getNavigator(props.router);
   const routeSource = createRouteSource(props.router);
   const routeSignal = createSignalFromSource(routeSource);
 
   const routeSelector = createSelector(
+    // The empty-string sentinel guarantees no Link is "active" while the
+    // router has no route (unstarted / stopped) — `isRouteActive` short-
+    // circuits because no real route name equals or starts with `""` +
+    // dot boundary. Without the sentinel, `routeSignal().route?.name`
+    // would be `undefined` and the selector would compare against
+    // `undefined`, defeating Solid's identity-based change detection.
     () => routeSignal().route?.name ?? "",
     isRouteActive,
+  );
+
+  // Opt-in features wired through the shared mountFeature helper.
+  mountFeature(props.announceNavigation, () =>
+    createRouteAnnouncer(props.router),
+  );
+  mountFeature(props.scrollRestoration, () =>
+    createScrollRestoration(props.router, props.scrollRestoration),
+  );
+  mountFeature(props.viewTransitions, () =>
+    createViewTransitions(props.router),
   );
 
   return (

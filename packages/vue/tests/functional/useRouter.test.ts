@@ -42,7 +42,7 @@ describe("useRouter composable", () => {
   it("should return router", () => {
     const { result } = mountWithRouter(router, () => useRouter());
 
-    expect(result).toStrictEqual(router);
+    expect(result).toBe(router);
   });
 
   it("should throw error if router instance was not passed to provider", () => {
@@ -56,6 +56,6 @@ describe("useRouter composable", () => {
           },
         }),
       );
-    }).toThrow();
+    }).toThrow("useRouter must be used within a RouterProvider");
   });
 });

@@ -11,7 +11,8 @@
 //
 // All other tests mirror the React suite 1:1.
 
-import { renderHook } from "@solidjs/testing-library";
+import { render, renderHook } from "@solidjs/testing-library";
+import { createSignal } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RouterProvider, useRouteEnter } from "@real-router/solid";
@@ -19,8 +20,23 @@ import { RouterProvider, useRouteEnter } from "@real-router/solid";
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
 import type { Router } from "@real-router/core";
-import type { UseRouteEnterOptions } from "@real-router/solid";
+import type {
+  RouteEnterContext,
+  RouteEnterHandler,
+  UseRouteEnterOptions,
+} from "@real-router/solid";
 import type { JSX } from "solid-js";
+
+function ProbeEnter(
+  props: Readonly<{
+    handler: RouteEnterHandler;
+    options?: UseRouteEnterOptions;
+  }>,
+): JSX.Element {
+  useRouteEnter(props.handler, props.options);
+
+  return <div data-testid="probe" />;
+}
 
 const wrapper = (router: Router) => (props: { children: JSX.Element }) => (
   <RouterProvider router={router}>{props.children}</RouterProvider>
@@ -65,7 +81,7 @@ describe("useRouteEnter", () => {
 
     expect(handler).toHaveBeenCalledTimes(1);
 
-    const ctx = handler.mock.calls[0][0];
+    const ctx: RouteEnterContext = handler.mock.calls[0][0];
 
     expect(ctx.route.name).toBe("about");
     expect(ctx.previousRoute.name).toBe("test");
@@ -154,6 +170,35 @@ describe("useRouteEnter", () => {
     expect(handler).toHaveBeenCalledTimes(1);
   });
 
+  it("handler is captured at init — replacing the handler reference has no effect (gotcha #1)", async () => {
+    // Solid components run **once** at mount; `useRouteEnter(handler)` reads
+    // its argument synchronously during init and stores it in a closure on
+    // the createEffect listener. Swapping the prop/signal that produced the
+    // handler later must NOT reach the live effect.
+    //
+    // Mirrors the React "uses the latest handler reference without resubscribing"
+    // test inverted — React DOES swap via handlerRef; Solid does NOT.
+    const initialHandler = vi.fn();
+    const swappedHandler = vi.fn();
+    const [handler, setHandler] =
+      createSignal<typeof initialHandler>(initialHandler);
+
+    render(() => (
+      <RouterProvider router={router}>
+        <ProbeEnter handler={handler()} />
+      </RouterProvider>
+    ));
+
+    // Swap the signal BEFORE navigating — useRouteEnter already captured
+    // `initialHandler` at component init, so this update is invisible.
+    setHandler(() => swappedHandler);
+
+    await router.navigate("about");
+
+    expect(initialHandler).toHaveBeenCalledTimes(1);
+    expect(swappedHandler).not.toHaveBeenCalled();
+  });
+
   it("does not fire on unmount", async () => {
     const handler = vi.fn();
 
@@ -171,5 +216,52 @@ describe("useRouteEnter", () => {
     await router.navigate("about");
 
     expect(handler).not.toHaveBeenCalled();
+  });
+
+  // Mini-sprint F.4 (audit-6 Stage-2 #22) — lastHandledRoute dedup.
+  // The hook keeps a closed-over `lastHandledRoute: State | null` and
+  // checks `if (lastHandledRoute === route) return;` before invoking
+  // the handler. This guards against the (theoretically unreachable
+  // on Solid, kept for parity with React) case where the same route
+  // ref drives a second effect activation. The contract: even if the
+  // same `route` reference appears twice in the effect's run sequence,
+  // the handler fires AT MOST ONCE per unique route ref.
+  it("dedups by route reference — same route ref never triggers handler twice (Mini-sprint F.4)", async () => {
+    const handler = vi.fn();
+
+    renderHook(
+      () => {
+        useRouteEnter(handler, { skipSameRoute: false });
+      },
+      { wrapper: wrapper(router) },
+    );
+
+    // First real navigation — handler fires once.
+    await router.navigate("about");
+
+    expect(handler).toHaveBeenCalledTimes(1);
+
+    // Capture the route ref the handler just received.
+    const firstCallRoute = (handler.mock.calls[0]?.[0] as RouteEnterContext)
+      .route;
+
+    expect(firstCallRoute.name).toBe("about");
+
+    // Now navigate to a NEW route and back. Each navigation gives a
+    // FRESH route object (router emits new State per navigation), so
+    // dedup never blocks legitimate flow.
+    await router.navigate("test");
+    await router.navigate("about");
+
+    expect(handler).toHaveBeenCalledTimes(3);
+
+    // The "about" route the handler received on the third call is a
+    // DIFFERENT reference than the first call — confirms the dedup
+    // guard never accidentally suppresses a real re-entry.
+    const thirdCallRoute = (handler.mock.calls[2]?.[0] as RouteEnterContext)
+      .route;
+
+    expect(thirdCallRoute.name).toBe("about");
+    expect(thirdCallRoute).not.toBe(firstCallRoute);
   });
 });

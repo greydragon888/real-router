@@ -257,3 +257,126 @@ describe("link-mass-rendering stress tests (Vue)", () => {
     );
   });
 });
+
+// Closes the §7.2 #13 review item: "Concurrent <Link> clicks с {force: true}
+// — link-mass-rendering.stress.ts:170-196 covers 50 rapid clicks WITHOUT
+// force. force:true is not exercised." Patched here to lock the SAME_STATES
+// bypass: every click on a same-route Link with `routeOptions: {force: true}`
+// must invoke router.navigate so the FSM observes 50 successful transitions.
+//
+// Counterpart: `packages/preact/tests/stress/link-hash-stress.stress.tsx`
+// — Preact uses navigateWithHash to exercise auto-force; Vue's Link
+// surfaces force via `routeOptions`.
+describe("§7.2 #13 — Mass concurrent clicks with force=true (Vue)", () => {
+  let router: Router;
+
+  beforeEach(async () => {
+    router = createStressRouter(20);
+    await router.start("/route5");
+  });
+
+  afterEach(() => {
+    router.stop();
+  });
+
+  it("13.1: 50 rapid same-route clicks with force=true — every click invokes router.navigate", async () => {
+    // Spy on router.navigate so we can count the actual calls. Core's
+    // SAME_STATES guard would normally short-circuit duplicate same-route
+    // navigations, but `force: true` bypasses it.
+    const calls: { name: string; options: unknown }[] = [];
+    const original = router.navigate.bind(router);
+
+    router.navigate = ((name, params, options) => {
+      calls.push({ name, options: options ?? {} });
+
+      return original(name, params, options);
+    }) as Router["navigate"];
+
+    const wrapper = mountWithProvider(router, () =>
+      h(
+        Link,
+        {
+          routeName: "route5",
+          routeOptions: { force: true },
+          activeClassName: "active",
+          "data-testid": "force-link",
+        },
+        { default: () => "Force Link" },
+      ),
+    );
+
+    await nextTick();
+    await flushPromises();
+
+    const link = wrapper.find("[data-testid='force-link']");
+
+    for (let i = 0; i < 50; i++) {
+      await link.trigger("click");
+    }
+
+    await nextTick();
+    await flushPromises();
+
+    // Each click must produce one navigate call — the `force` flag
+    // bypasses the same-state short-circuit so all 50 commits run.
+    expect(calls).toHaveLength(50);
+
+    for (const call of calls) {
+      expect(call.name).toBe("route5");
+      expect((call.options as { force?: boolean }).force).toBe(true);
+    }
+
+    expect(link.classes()).toContain("active");
+
+    wrapper.unmount();
+  });
+
+  it("13.2: 30 force-clicks across multiple Links — every click commits, no coalescing", async () => {
+    // Different Links pointing at different routes, each with `force: true`.
+    // We click each one once in round-robin × 6 cycles = 30 clicks. The
+    // expectation is 30 distinct navigate calls, in order.
+    const calls: { name: string; options: unknown }[] = [];
+    const original = router.navigate.bind(router);
+
+    router.navigate = ((name, params, options) => {
+      calls.push({ name, options: options ?? {} });
+
+      return original(name, params, options);
+    }) as Router["navigate"];
+
+    const wrapper = mountWithProvider(router, () =>
+      Array.from({ length: 5 }, (_, i) =>
+        h(
+          Link,
+          {
+            key: i,
+            routeName: `route${i}`,
+            routeOptions: { force: true },
+            "data-testid": `force-link-${i}`,
+          },
+          { default: () => `Link ${i}` },
+        ),
+      ),
+    );
+
+    await nextTick();
+    await flushPromises();
+
+    for (let cycle = 0; cycle < 6; cycle++) {
+      for (let i = 0; i < 5; i++) {
+        await wrapper.find(`[data-testid='force-link-${i}']`).trigger("click");
+      }
+    }
+
+    await nextTick();
+    await flushPromises();
+
+    expect(calls).toHaveLength(30);
+
+    for (const call of calls) {
+      expect((call.options as { force?: boolean }).force).toBe(true);
+    }
+
+    wrapper.unmount();
+  });
+});

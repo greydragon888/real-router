@@ -80,9 +80,11 @@ describe("RouterProvider — scrollRestoration", () => {
 
     globalThis.dispatchEvent(new Event("pagehide"));
 
-    const saved = JSON.parse(
-      sessionStorage.getItem(STORAGE_KEY) ?? "{}",
-    ) as Record<string, number>;
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+
+    expect(raw).not.toBeNull(); // scroll position must have been saved
+
+    const saved = JSON.parse(raw!) as Record<string, number>;
 
     expect(Object.values(saved)).toContain(250);
 

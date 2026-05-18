@@ -47,9 +47,18 @@
 
   $effect(() => {
     if (!srEnabled) return;
-    // Read scrollRestoration object props via `untrack` for non-primitive
-    // refs that naturally change each render. Primitive $derived memos
-    // (mode/anchor/behavior/storageKey) drive re-runs.
+    // Pin primitive $derived deps as explicit dependencies of this effect
+    // BEFORE constructing the utility. The four `void srX` reads make
+    // intent unambiguous: even if `createScrollRestoration` throws after
+    // partial argument evaluation (e.g. invalid `mode` rejected), every
+    // srMode/srAnchor/srBehavior/srStorageKey is already in this effect's
+    // dependency set — the next change to any of them re-runs the effect
+    // and the utility gets rebuilt. Without these reads, the dependency
+    // tracking would depend on Svelte's argument-evaluation order inside
+    // the factory call, which is brittle. Non-primitive refs (like
+    // `scrollContainer` — a DOM element that changes ref every render but
+    // is identity-equal in practice) are deliberately read via `untrack`
+    // to keep this effect from re-running on every parent re-render.
     void srMode;
     void srAnchor;
     void srBehavior;

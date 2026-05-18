@@ -17,7 +17,7 @@
 </script>
 
 {#if loading}
-  <div><h1>Products</h1><span class="spinner"></span> <span style="margin-left: 12px">Loading…</span></div>
+  <div><h1>Products</h1><span class="spinner"></span> <span style="margin-left: 12px">Loading products…</span></div>
 {:else if error}
   <div><h1>Products</h1><p>Error: {error}</p></div>
 {:else if !products}

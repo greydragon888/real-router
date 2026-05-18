@@ -14,11 +14,11 @@ export function Home(): JSX.Element {
       <h1>Page Animations</h1>
       <p>
         Distributed per-page recipe: each page calls{" "}
-        <code>useRouteAnimation(ref, …)</code> in its own component. The hook
-        is built on <code>useRouteExit</code> + <code>useRouteEnter</code>{" "}
-        from <code>@real-router/react</code>, both of which subscribe to
-        the router for the page&apos;s lifetime. No centralised policy
-        module — animation logic lives next to the page that owns it.
+        <code>useRouteAnimation(ref, …)</code> in its own component. The hook is
+        built on <code>useRouteExit</code> + <code>useRouteEnter</code> from{" "}
+        <code>@real-router/react</code>, both of which subscribe to the router
+        for the page&apos;s lifetime. No centralised policy module — animation
+        logic lives next to the page that owns it.
       </p>
 
       <h2>Scenarios to try</h2>
@@ -45,23 +45,22 @@ export function Home(): JSX.Element {
           <strong>Skip same-route</strong>: open <em>Query demo</em> and switch
           filter. <code>useRouteExit</code>&apos;s default{" "}
           <code>skipSameRoute: true</code> short-circuits when{" "}
-          <code>route.name === nextRoute.name</code> — no leave / entry flash
-          on each filter click.
+          <code>route.name === nextRoute.name</code> — no leave / entry flash on
+          each filter click.
         </li>
         <li>
-          <strong>Skip-initial entry</strong>: reload this page — the
-          fade-in does not play. <code>useRouteEnter</code> requires a{" "}
-          <code>previousRoute</code> in its context, so initial-load mounts
-          do not trigger entry animations. Click <em>About</em> and back to{" "}
+          <strong>Skip-initial entry</strong>: reload this page — the fade-in
+          does not play. <code>useRouteEnter</code> requires a{" "}
+          <code>previousRoute</code> in its context, so initial-load mounts do
+          not trigger entry animations. Click <em>About</em> and back to{" "}
           <em>Home</em>: now the fade-in plays.
         </li>
         <li>
           <strong>Reduced motion</strong>: with{" "}
           <code>prefers-reduced-motion: reduce</code> the keyframes collapse to{" "}
-          <code>animation: none</code>.{" "}
-          <code>Element.getAnimations()</code> returns <code>[]</code>, so{" "}
-          <code>Promise.allSettled([])</code> in the exit handler resolves
-          synchronously — the router never blocks.
+          <code>animation: none</code>. <code>Element.getAnimations()</code>{" "}
+          returns <code>[]</code>, so <code>Promise.allSettled([])</code> in the
+          exit handler resolves synchronously — the router never blocks.
         </li>
       </ol>
 

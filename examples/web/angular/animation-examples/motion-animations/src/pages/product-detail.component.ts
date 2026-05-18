@@ -23,12 +23,12 @@ const COVERS: Partial<Record<string, { name: string; color: string }>> = {
       ></div>
       <p>
         Note: no library-driven hero morph here. The
-        <code>page</code> wrapper's CSS keyframes are per-element
-        entry/exit only — they do not pair elements across the route
-        boundary. For an inverse-FLIP hero morph in Angular, see
-        <code>route-animations/</code> → <code>installHeroMorph</code>:
-        capture rect on <code>injectRouteExit</code>, animate via
-        WAAPI on <code>navigator.subscribe</code>.
+        <code>page</code> wrapper's CSS keyframes are per-element entry/exit
+        only — they do not pair elements across the route boundary. For an
+        inverse-FLIP hero morph in Angular, see <code>route-animations/</code> →
+        <code>installHeroMorph</code>: capture rect on
+        <code>injectRouteExit</code>, animate via WAAPI on
+        <code>navigator.subscribe</code>.
       </p>
       <p>
         <a realLink routeName="products" [activeStrict]="true">
@@ -46,6 +46,6 @@ const COVERS: Partial<Record<string, { name: string; color: string }>> = {
 export class ProductDetailComponent {
   private readonly state = injectRoute<{ id: string }>();
 
-  readonly id = computed(() => this.state.routeState().route.params["id"] ?? "1");
+  readonly id = computed(() => this.state.routeState().route.params.id ?? "1");
   readonly product = computed(() => COVERS[this.id()]);
 }

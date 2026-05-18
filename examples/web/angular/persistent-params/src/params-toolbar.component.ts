@@ -54,6 +54,7 @@ export class ParamsToolbarComponent {
 
   setParam(key: string, value: string): void {
     const current = this.route.routeState().route;
+
     void this.navigator.navigate(
       current.name,
       { ...current.params, [key]: value },

@@ -64,8 +64,7 @@ describe("useNavigator composable", () => {
 
     const state = result.getState();
 
-    expect(state).not.toBeNull();
-    expect(state!.name).toBe("test");
+    expect(state?.name).toBe("test");
   });
 
   it("should have working isActiveRoute method", () => {
@@ -111,6 +110,6 @@ describe("useNavigator composable", () => {
       render(NavigatorCapture, {
         props: { onCapture: () => {} },
       }),
-    ).toThrow();
+    ).toThrow("useNavigator must be used within a RouterProvider");
   });
 });

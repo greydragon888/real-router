@@ -40,6 +40,8 @@ bootstrapApplication(AppComponent, {
 });
 ```
 
+> **Lifecycle:** `provideRealRouter(router)` expects a router that has already been started — `await router.start()` MUST run before `bootstrapApplication`. For SSR / SSG, use [`provideRealRouterFactory`](#server-side-rendering) instead — it accepts a non-started `baseRouter` and runs `router.start(url)` itself via `provideAppInitializer`, deriving the URL from Angular's `REQUEST` token.
+
 Then use `injectRoute` and `RouteView` in your root component:
 
 ```typescript
@@ -288,6 +290,103 @@ WCAG-compliant screen reader announcements for route changes. Add it once near t
 
 See the [Accessibility](#accessibility) section for details.
 
+### `<client-only>` / `<server-only>` (`@real-router/angular/ssr`)
+
+Paired SSR-aware boundaries. `<client-only>` renders the bound `fallback` `TemplateRef` on the server (and on the client first paint, to match SSR HTML), then swaps in the projected children after mount. `<server-only>` is the symmetric inverse.
+
+Imported from the `/ssr` subpath (ng-packagr secondary entry-point). The same `/ssr` entry also exposes `injectDeferred()` — see [packages/angular/CLAUDE.md](./CLAUDE.md) — for cross-adapter parity with `@real-router/{react,preact,solid,vue,svelte}/ssr`.
+
+```typescript
+import { Component } from "@angular/core";
+import { ClientOnly, ServerOnly } from "@real-router/angular/ssr";
+
+@Component({
+  selector: "app-home",
+  template: `
+    <ng-template #loadingTpl>
+      <span>Loading…</span>
+    </ng-template>
+    <client-only [fallback]="loadingTpl">
+      <browser-api-widget />
+    </client-only>
+
+    <server-only>
+      <seo-meta-strip />
+    </server-only>
+  `,
+  imports: [ClientOnly, ServerOnly],
+})
+export class HomeComponent {}
+```
+
+Implementation: `signal(false)` + `afterNextRender(() => mounted.set(true))`. `afterNextRender` is a no-op on the server (Angular runtime guarantees), so SSR naturally lands on the SSR-side branch. End-to-end dogfooding lives in [`examples/web/angular/ssr-examples/ssr/`](../../examples/web/angular/ssr-examples/ssr/) (see `e2e/ssr-boundaries.spec.ts`).
+
+### `<http-status-code>` (`@real-router/angular/ssr`)
+
+Render-time HTTP status declaration. Writes `code` to the optional `HttpStatusSink` provided via `provideHttpStatusSink`, then renders nothing. Last write wins. No-op when no sink is provided.
+
+```typescript
+// not-found.component.ts
+import { Component } from "@angular/core";
+import { HttpStatusCode } from "@real-router/angular/ssr";
+
+@Component({
+  selector: "app-not-found",
+  imports: [HttpStatusCode],
+  template: `
+    <http-status-code [code]="404" />
+    <h1>Page not found</h1>
+  `,
+})
+export class NotFoundComponent {}
+```
+
+```typescript
+// entry-server.ts
+import { bootstrapApplication } from "@angular/platform-browser";
+import {
+  createHttpStatusSink,
+  provideHttpStatusSink,
+} from "@real-router/angular/ssr";
+
+const sink = createHttpStatusSink();
+
+await bootstrapApplication(AppRoot, {
+  providers: [
+    provideRealRouterFactory({ baseRouter }),
+    provideHttpStatusSink(sink),
+  ],
+});
+
+response.status(sink.code ?? 200).send(html);
+```
+
+`HTTP_STATUS_SINK` is the underlying `InjectionToken` — inject it directly with `{ optional: true }` if you need to read the sink in your own components. `createHttpStatusSink()` constructs a fresh `{ code: number | undefined }` per request — read `sink.code` after the SSR render pass to set the response status. Loader-driven errors (`LoaderNotFound` → 404, `LoaderRedirect` → 30x) keep working as before; `<http-status-code>` covers render-time decisions only.
+
+### `injectDeferred()` (`@real-router/angular/ssr`)
+
+Reads `state.context.ssrDataDeferred[key]` (populated by `defer()` in `@real-router/ssr-data-plugin`). Returns `Signal<T | undefined>` — `undefined` before the promise settles, the resolved value once it does. Compose with `@if` or the `async` pipe for pending UI:
+
+```typescript
+import { Component } from "@angular/core";
+import { injectDeferred } from "@real-router/angular/ssr";
+
+@Component({
+  template: `
+    @if (reviews(); as r) {
+      @for (review of r; track review.id) { <li>{{ review.author }}</li> }
+    } @else {
+      <p>Loading reviews…</p>
+    }
+  `,
+})
+export class ReviewsComponent {
+  readonly reviews = injectDeferred<Review[]>("reviews");
+}
+```
+
+**Full `/ssr` surface** (8 exports): `ClientOnly`, `ServerOnly`, `HttpStatusCode`, `injectDeferred`, `provideHttpStatusSink`, `HTTP_STATUS_SINK`, `createHttpStatusSink`, plus the `HttpStatusSink` type. See [`packages/angular/CLAUDE.md`](./CLAUDE.md#ssr-feature-surface--real-routerangularssr) for the implementation notes.
+
 ## Directives
 
 ### `realLink`
@@ -359,6 +458,25 @@ Structural directive used inside `<route-view>`. Marks an `ng-template` as the c
 </ng-template>
 ```
 
+### `routeSelf`
+
+Structural directive used inside `<route-view>`. Marks an `ng-template` as the exact-match slot for the parent `<route-view>`'s `routeNode` — it renders only when `state.name === routeNode()`. Useful for nodes that have both an "index" view and child routes:
+
+```html
+<route-view [routeNode]="'users'">
+  <ng-template routeSelf>
+    <!-- shown when route is exactly "users" -->
+    <app-users-list />
+  </ng-template>
+  <ng-template routeMatch="profile">
+    <!-- shown when route is "users.profile" -->
+    <app-user-profile />
+  </ng-template>
+</route-view>
+```
+
+**Template priority** inside `<route-view>`: `routeMatch` (segment prefix) → `routeSelf` (exact-match for `routeNode`) → `routeNotFound` (`UNKNOWN_ROUTE` only). First-wins for `routeMatch` and `routeSelf`, last-wins for `routeNotFound`.
+
 ### `routeNotFound`
 
 Structural directive used inside `<route-view>`. Marks an `ng-template` as the fallback when no segment matches and the route is `UNKNOWN_ROUTE`.
@@ -415,6 +533,65 @@ interface RealRouterOptions {
 ```
 
 Restores scroll on back/forward, scrolls to top (or `#hash`) on push. Three modes: `"restore"` (default), `"top"`, `"native"`. Custom containers via `scrollContainer: () => HTMLElement | null`. The utility is created by `provideEnvironmentInitializer` and torn down via `inject(DestroyRef)`. Options are a snapshot at bootstrap — not reactive to runtime changes. See [Scroll Restoration guide](https://github.com/greydragon888/real-router/wiki/Scroll-Restoration) for details.
+
+## Server-Side Rendering
+
+For Angular SSR (`@angular/ssr` with `outputMode: "server"`) and SSG build-time render via `renderApplication`, use `provideRealRouterFactory` instead of `provideRealRouter`. The factory creates a per-request router clone via Angular's `REQUEST: InjectionToken<Request | null>`, runs `router.start(url)` through `provideAppInitializer`, and disposes the router on `DestroyRef`:
+
+```typescript
+import { provideRealRouterFactory } from "@real-router/angular";
+import { browserPluginFactory } from "@real-router/browser-plugin";
+import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
+
+const baseRouter = createRouter(routes);
+
+export const appConfig: ApplicationConfig = {
+  providers: [
+    provideRealRouterFactory({
+      baseRouter,
+      plugins: (request) =>
+        request
+          ? [ssrDataPluginFactory(loaders)]
+          : [browserPluginFactory(), ssrDataPluginFactory(loaders)],
+      deps: (request) => ({
+        currentUser: request
+          ? parseCookies(request.headers.get("cookie"))
+          : parseCookies(document.cookie),
+      }),
+    }),
+  ],
+};
+```
+
+Existing `provideRealRouter(router)` is unchanged — keep using it for SPA / post-hydrate scenarios. Both APIs ship in parallel; pick one for the whole application.
+
+### Working examples
+
+**SPA examples** — `provideRealRouter(router)` after `await router.start()`:
+
+| Example | Demonstrates |
+|---------|--------------|
+| [`examples/web/angular/basic/`](../../examples/web/angular/basic) | Minimal setup with `RouteView` + `RealLink` + `injectRoute` |
+| [`examples/web/angular/combined/`](../../examples/web/angular/combined) | All features combined: nested routes, dynamic params, lazy loading, persistent params |
+| [`examples/web/angular/dynamic-routes/`](../../examples/web/angular/dynamic-routes) | `:id` params, programmatic navigation |
+| [`examples/web/angular/hash-routing/`](../../examples/web/angular/hash-routing) | `hash-plugin` with `<a realLink hash="…">` tab-style UIs (#532) |
+| [`examples/web/angular/lazy-loading/`](../../examples/web/angular/lazy-loading) | Route-level code-splitting via `import()` |
+| [`examples/web/angular/nested-routes/`](../../examples/web/angular/nested-routes) | Multi-level `<route-view>` composition |
+| [`examples/web/angular/persistent-params/`](../../examples/web/angular/persistent-params) | `persistent-params-plugin` integration |
+| [`examples/web/angular/animation-examples/`](../../examples/web/angular/animation-examples) | View Transitions API + scroll restoration + direction-tracker patterns |
+
+**SSR / SSG examples** — `provideRealRouterFactory({ baseRouter, plugins, deps })`:
+
+| Example | Demonstrates |
+|---------|--------------|
+| [`examples/web/angular/ssr-examples/ssr/`](../../examples/web/angular/ssr-examples/ssr) | Classical SSR with cookie-based DI, auth guards, nested loaders |
+| [`examples/web/angular/ssr-examples/ssr-mixed/`](../../examples/web/angular/ssr-examples/ssr-mixed) | Mixed SSR/CSR routes — some routes server-rendered, others CSR-only |
+| [`examples/web/angular/ssr-examples/ssr-streaming/`](../../examples/web/angular/ssr-examples/ssr-streaming) | Streaming SSR with `@defer (on viewport)` + `@defer (on hover)` + `withIncrementalHydration()` |
+| [`examples/web/angular/ssr-examples/ssg/`](../../examples/web/angular/ssr-examples/ssg) | Static site generation via in-process AngularNodeAppEngine + `getStaticPaths()` |
+
+**Post-hydration loader skip (#599)** — `provideRealRouterFactory` automatically bridges Angular's `TransferState` to the cross-adapter hydration scratchpad. On the server pass, the resolved router state is written to `TransferState`; on the client, the bootstrap consumes the seed via `hydrateRouter(...)` and `ssr-data-plugin` reuses the server-resolved `state.context.data` without re-invoking the loader on first paint. Requires `provideServerRendering()` (server) + `provideClientHydration()` (client) — both standard for Angular SSR apps. Verified end-to-end in `ssr/` and `ssr-streaming/` examples via `window.__LOADER_CALLS__` counter assertion.
+
+See [CLAUDE.md → SSR Support](./CLAUDE.md#ssr-support) for the full decision matrix, lifecycle diagram, plugin separation guidance, decision matrix, and known constraints.
 
 ## View Transitions
 
@@ -507,9 +684,9 @@ Subscriptions created by `sourceToSignal` and the directives clean up automatica
 
 The adapter is signal-first and does not depend on Zone.js. It works with `provideExperimentalZonelessChangeDetection()` out of the box.
 
-### ngOnInit for Input-Dependent Setup
+### Reactive Source Setup via `effect()` (#630)
 
-`RealLink`, `RealLinkActive`, and `RouteView` create their subscription sources in `ngOnInit`, not the constructor. Signal inputs (`input()`) are not available during construction, so setup that reads inputs must be deferred to `ngOnInit`.
+`RealLink`, `RealLinkActive`, and `RouteView` create their subscription sources inside `effect(...)` blocks scheduled from the **constructor** (not `ngOnInit`). Reading signal inputs inside `effect()` makes the source-creation REACTIVE — when `[realLink]`, `[routeParams]`, `[hash]`, `[realLinkActive]`, or `[routeNode]` change in AOT, the effect tears down the previous source via `onCleanup` and creates a new one with the current input values. The legacy `ngOnInit` setup captured inputs once at mount and produced a real AOT bug (#630). Effect cleanup is bound automatically to the host directive's injection-context `DestroyRef`.
 
 ## Signal Bridge
 
@@ -526,10 +703,12 @@ const transitionSignal = sourceToSignal(createTransitionSource(router));
 
 ## Documentation
 
-Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
+Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki) — start with the [Angular Integration guide](https://github.com/greydragon888/real-router/wiki/Angular-Integration) for Angular-specific examples and gotchas.
+
+The shared (cross-framework) wiki pages use the `use*` naming convention — they cover every adapter (React, Preact, Solid, Vue, Svelte, Angular) and each page has an explicit Angular section showing the `inject*` form:
 
 - [RouterProvider](https://github.com/greydragon888/real-router/wiki/RouterProvider) · [RouteView](https://github.com/greydragon888/real-router/wiki/RouteView) · [RouterErrorBoundary](https://github.com/greydragon888/real-router/wiki/RouterErrorBoundary) · [Scroll Restoration](https://github.com/greydragon888/real-router/wiki/Scroll-Restoration)
-- [injectRouter](https://github.com/greydragon888/real-router/wiki/injectRouter) · [injectRoute](https://github.com/greydragon888/real-router/wiki/injectRoute) · [injectRouteNode](https://github.com/greydragon888/real-router/wiki/injectRouteNode) · [injectNavigator](https://github.com/greydragon888/real-router/wiki/injectNavigator) · [injectRouteUtils](https://github.com/greydragon888/real-router/wiki/injectRouteUtils) · [injectRouterTransition](https://github.com/greydragon888/real-router/wiki/injectRouterTransition) · [injectRouteExit](https://github.com/greydragon888/real-router/wiki/injectRouteExit) · [injectRouteEnter](https://github.com/greydragon888/real-router/wiki/injectRouteEnter)
+- [useRouter → `injectRouter`](https://github.com/greydragon888/real-router/wiki/useRouter) · [useRoute → `injectRoute`](https://github.com/greydragon888/real-router/wiki/useRoute) · [useRouteNode → `injectRouteNode`](https://github.com/greydragon888/real-router/wiki/useRouteNode) · [useNavigator → `injectNavigator`](https://github.com/greydragon888/real-router/wiki/useNavigator) · [useRouteUtils → `injectRouteUtils`](https://github.com/greydragon888/real-router/wiki/useRouteUtils) · [useRouterTransition → `injectRouterTransition`](https://github.com/greydragon888/real-router/wiki/useRouterTransition) · [useRouteExit → `injectRouteExit`](https://github.com/greydragon888/real-router/wiki/useRouteExit) · [useRouteEnter → `injectRouteEnter`](https://github.com/greydragon888/real-router/wiki/useRouteEnter)
 
 ## Related Packages
 

@@ -6,6 +6,8 @@ export const NAVIGATOR_KEY = "real-router:navigator";
 
 export const ROUTE_KEY = "real-router:route";
 
+export const HTTP_STATUS_KEY = "real-router:http-status-sink";
+
 // The type parameter is used by the caller to narrow the return type.
 // ESLint's no-unnecessary-type-parameters sees only a single textual use of T
 // (the return type) — but each call site supplies a different T, so it is not

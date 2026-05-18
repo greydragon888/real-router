@@ -21,139 +21,144 @@ import type { Router } from "@real-router/core";
 
 let testRouter: Router<AppDependencies>;
 
-afterEach(() => {
-  cleanup();
-  testRouter.stop();
-});
-
-describe("Login → sidebar swap", () => {
-  it("swaps sidebar from public to private links after login", async () => {
-    const user = userEvent.setup();
-
-    testRouter = createRouter<AppDependencies>(publicRoutes, {
-      defaultRoute: "home",
-      allowNotFound: true,
-    });
-    await testRouter.start("/");
-
-    render(App, { props: { router: testRouter } });
-
-    const sidebar = screen.getByRole("complementary");
-
-    expect(within(sidebar).getByText("Home")).toBeInTheDocument();
-    expect(within(sidebar).getByText("Services")).toBeInTheDocument();
-    expect(within(sidebar).getByText("Contacts")).toBeInTheDocument();
-    expect(within(sidebar).getByText("Login")).toBeInTheDocument();
-
-    await user.click(within(sidebar).getByText("Login"));
-
-    await user.type(
-      screen.getByPlaceholderText("alice@example.com"),
-      "alice@example.com",
-    );
-    await user.type(screen.getByPlaceholderText("any password"), "password");
-    await user.click(screen.getByRole("button", { name: "Login" }));
-
-    await waitFor(() => {
-      expect(within(sidebar).getByText("Dashboard")).toBeInTheDocument();
-    });
-
-    expect(within(sidebar).getByText("Settings")).toBeInTheDocument();
-    expect(within(sidebar).getByText("Admin")).toBeInTheDocument();
-    expect(within(sidebar).queryByText("Login")).not.toBeInTheDocument();
-    expect(within(sidebar).queryByText("Services")).not.toBeInTheDocument();
+describe("svelte/auth-guards — components", () => {
+  afterEach(() => {
+    cleanup();
+    testRouter.stop();
   });
-});
 
-describe("Logout → sidebar swap back to public", () => {
-  it("restores public links after logout", async () => {
-    const user = userEvent.setup();
+  describe("Login → sidebar swap", () => {
+    it("swaps sidebar from public to private links after login", async () => {
+      const user = userEvent.setup();
 
-    store.set("user", {
-      id: "1",
-      name: "Alice",
-      role: "admin" as const,
-      email: "alice@example.com",
-    });
+      testRouter = createRouter<AppDependencies>(publicRoutes, {
+        defaultRoute: "home",
+        allowNotFound: true,
+      });
+      await testRouter.start("/");
 
-    testRouter = createRouter<AppDependencies>(privateRoutes, {
-      defaultRoute: "home",
-      allowNotFound: true,
-    });
-    getDependenciesApi(testRouter).set("abilities", defineAbilities("admin"));
-    await testRouter.start("/dashboard");
+      render(App, { props: { router: testRouter } });
 
-    render(App, { props: { router: testRouter } });
+      const sidebar = screen.getByRole("complementary");
 
-    const sidebar = screen.getByRole("complementary");
-
-    expect(within(sidebar).getByText("Dashboard")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Logout" }));
-
-    await waitFor(() => {
       expect(within(sidebar).getByText("Home")).toBeInTheDocument();
+      expect(within(sidebar).getByText("Services")).toBeInTheDocument();
+      expect(within(sidebar).getByText("Contacts")).toBeInTheDocument();
+      expect(within(sidebar).getByText("Login")).toBeInTheDocument();
+
+      await user.click(within(sidebar).getByText("Login"));
+
+      await user.type(
+        screen.getByPlaceholderText("alice@example.com"),
+        "alice@example.com",
+      );
+      await user.type(screen.getByPlaceholderText("any password"), "password");
+      await user.click(screen.getByRole("button", { name: "Login" }));
+
+      await waitFor(() => {
+        expect(within(sidebar).getByText("Dashboard")).toBeInTheDocument();
+      });
+
+      expect(within(sidebar).getByText("Settings")).toBeInTheDocument();
+      expect(within(sidebar).getByText("Admin")).toBeInTheDocument();
+      expect(within(sidebar).queryByText("Login")).not.toBeInTheDocument();
+      expect(within(sidebar).queryByText("Services")).not.toBeInTheDocument();
     });
-
-    expect(within(sidebar).getByText("Services")).toBeInTheDocument();
-    expect(within(sidebar).getByText("Login")).toBeInTheDocument();
-    expect(within(sidebar).queryByText("Dashboard")).not.toBeInTheDocument();
-  });
-});
-
-describe("RBAC — admin guard in UI", () => {
-  it("admin can see Admin page", async () => {
-    store.set("user", {
-      id: "1",
-      name: "Alice",
-      role: "admin" as const,
-      email: "alice@example.com",
-    });
-
-    testRouter = createRouter<AppDependencies>(privateRoutes, {
-      defaultRoute: "home",
-      allowNotFound: true,
-    });
-    getDependenciesApi(testRouter).set("abilities", defineAbilities("admin"));
-    await testRouter.start("/admin");
-
-    render(App, { props: { router: testRouter } });
-
-    expect(
-      screen.getByRole("heading", { name: "Admin Panel" }),
-    ).toBeInTheDocument();
   });
 
-  it("editor stays on dashboard when admin guard rejects", async () => {
-    store.set("user", {
-      id: "2",
-      name: "Bob",
-      role: "editor" as const,
-      email: "bob@example.com",
+  describe("Logout → sidebar swap back to public", () => {
+    it("restores public links after logout", async () => {
+      const user = userEvent.setup();
+
+      store.set("user", {
+        id: "1",
+        name: "Alice",
+        role: "admin" as const,
+        email: "alice@example.com",
+      });
+
+      testRouter = createRouter<AppDependencies>(privateRoutes, {
+        defaultRoute: "home",
+        allowNotFound: true,
+      });
+      getDependenciesApi(testRouter).set("abilities", defineAbilities("admin"));
+      await testRouter.start("/dashboard");
+
+      render(App, { props: { router: testRouter } });
+
+      const sidebar = screen.getByRole("complementary");
+
+      expect(within(sidebar).getByText("Dashboard")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Logout" }));
+
+      await waitFor(() => {
+        expect(within(sidebar).getByText("Home")).toBeInTheDocument();
+      });
+
+      expect(within(sidebar).getByText("Services")).toBeInTheDocument();
+      expect(within(sidebar).getByText("Login")).toBeInTheDocument();
+      expect(within(sidebar).queryByText("Dashboard")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("RBAC — admin guard in UI", () => {
+    it("admin can see Admin page", async () => {
+      store.set("user", {
+        id: "1",
+        name: "Alice",
+        role: "admin" as const,
+        email: "alice@example.com",
+      });
+
+      testRouter = createRouter<AppDependencies>(privateRoutes, {
+        defaultRoute: "home",
+        allowNotFound: true,
+      });
+      getDependenciesApi(testRouter).set("abilities", defineAbilities("admin"));
+      await testRouter.start("/admin");
+
+      render(App, { props: { router: testRouter } });
+
+      expect(
+        screen.getByRole("heading", { name: "Admin Panel" }),
+      ).toBeInTheDocument();
     });
 
-    testRouter = createRouter<AppDependencies>(privateRoutes, {
-      defaultRoute: "home",
-      allowNotFound: true,
+    it("editor stays on dashboard when admin guard rejects", async () => {
+      store.set("user", {
+        id: "2",
+        name: "Bob",
+        role: "editor" as const,
+        email: "bob@example.com",
+      });
+
+      testRouter = createRouter<AppDependencies>(privateRoutes, {
+        defaultRoute: "home",
+        allowNotFound: true,
+      });
+      getDependenciesApi(testRouter).set(
+        "abilities",
+        defineAbilities("editor"),
+      );
+      await testRouter.start("/dashboard");
+
+      render(App, { props: { router: testRouter } });
+
+      expect(
+        screen.getByRole("heading", { name: "Dashboard" }),
+      ).toBeInTheDocument();
+
+      await act(async () => {
+        await testRouter.navigate("admin").catch(() => {});
+      });
+
+      expect(
+        screen.getByRole("heading", { name: "Dashboard" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("heading", { name: "Admin Panel" }),
+      ).not.toBeInTheDocument();
     });
-    getDependenciesApi(testRouter).set("abilities", defineAbilities("editor"));
-    await testRouter.start("/dashboard");
-
-    render(App, { props: { router: testRouter } });
-
-    expect(
-      screen.getByRole("heading", { name: "Dashboard" }),
-    ).toBeInTheDocument();
-
-    await act(async () => {
-      await testRouter.navigate("admin").catch(() => {});
-    });
-
-    expect(
-      screen.getByRole("heading", { name: "Dashboard" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("heading", { name: "Admin Panel" }),
-    ).not.toBeInTheDocument();
   });
 });

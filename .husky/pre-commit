@@ -19,15 +19,10 @@ fi
 echo "🧪 Running tests (includes type-check and lint via turbo)..."
 pnpm turbo run test --filter='!./examples/**'
 
-# Check for unused code
-echo "🧹 Checking for unused code..."
-pnpm lint:unused
-
-# Check for code duplication
-echo "📋 Checking for code duplication..."
-pnpm lint:duplicates
-
 # Check that e2e directories have specs
+# Cheap static check (find + wc) — catches forgotten e2e/ during scaffolding.
+# lint:duplicates (jscpd) and lint:unused (knip) live in pre-push only —
+# their analysis depends on the full tree, not on the current commit's diff.
 echo "🎭 Checking e2e specs..."
 pnpm lint:e2e
 

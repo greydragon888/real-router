@@ -1,5 +1,6 @@
-import type { ElementRef } from "@angular/core";
 import { injectRouteEnter, injectRouteExit } from "@real-router/angular";
+
+import type { ElementRef } from "@angular/core";
 
 export interface RouteAnimationOptions {
   /** Class added during entry, removed on `animationend`. */
@@ -68,6 +69,7 @@ export function installRouteAnimation(
 
       const element = hostRef.nativeElement;
 
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- defensive guard: nativeElement is typed non-null but can be missing on destroyed views
       if (!element) {
         return;
       }
@@ -106,6 +108,7 @@ export function installRouteAnimation(
 
       const element = hostRef.nativeElement;
 
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- defensive guard: nativeElement is typed non-null but can be missing on destroyed views
       if (!element) {
         return;
       }

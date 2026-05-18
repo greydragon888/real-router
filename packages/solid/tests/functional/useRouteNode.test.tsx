@@ -1,6 +1,7 @@
+import { createRouter } from "@real-router/core";
 import { getRoutesApi } from "@real-router/core/api";
-import { renderHook } from "@solidjs/testing-library";
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { renderHook, render } from "@solidjs/testing-library";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { RouterProvider, useRouteNode } from "@real-router/solid";
 
@@ -12,6 +13,15 @@ import type { JSX } from "solid-js";
 const wrapper = (router: Router) => (props: { children: JSX.Element }) => (
   <RouterProvider router={router}>{props.children}</RouterProvider>
 );
+
+// Probe component for source-caching tests (gotcha #22). Drives a single
+// useRouteNode(name) call so we can mount N copies and watch how many
+// underlying router.subscribe registrations they produce.
+function RouteNodeProbe(props: Readonly<{ name: string }>): JSX.Element {
+  const node = useRouteNode(props.name);
+
+  return <span data-name={props.name}>{node().route?.name ?? "—"}</span>;
+}
 
 describe("useRouteNode", () => {
   let router: Router;
@@ -29,8 +39,8 @@ describe("useRouteNode", () => {
       wrapper: wrapper(router),
     });
 
-    expect(result().route).toStrictEqual(undefined);
-    expect(result().previousRoute).toStrictEqual(undefined);
+    expect(result().route).toBeUndefined();
+    expect(result().previousRoute).toBeUndefined();
   });
 
   it("should not return a null route with a default route and the router started", async () => {
@@ -64,7 +74,7 @@ describe("useRouteNode", () => {
 
     await router.start();
 
-    expect(result().route?.name).toStrictEqual(undefined);
+    expect(result().route?.name).toBeUndefined();
 
     await router.navigate("items");
 
@@ -153,7 +163,7 @@ describe("useRouteNode", () => {
       expect(result().previousRoute?.params).toStrictEqual({ id: "1" });
     });
 
-    it("should handle reload option correctly", async () => {
+    it("should fire a fresh snapshot on reload (#605, transition.reload bypasses dedupe)", async () => {
       const { result } = renderHook(() => useRouteNode("users"), {
         wrapper: wrapper(router),
       });
@@ -165,8 +175,12 @@ describe("useRouteNode", () => {
 
       await router.navigate("users.list", {}, { reload: true });
 
+      // Reload is the user's explicit non-idempotent signal — observers
+      // see fresh refs so they react to context changes (e.g. data
+      // refreshed by `invalidate(router, "data")` + reload).
       expect(result().route?.name).toBe("users.list");
-      expect(result().route).toBe(initialRoute);
+      expect(result().route).not.toBe(initialRoute);
+      expect(result().route?.path).toBe(initialRoute?.path);
     });
   });
 
@@ -200,8 +214,9 @@ describe("useRouteNode", () => {
         wrapper: wrapper(router),
       });
 
-      await router.start();
-      await router.navigate("users.list").catch(() => {});
+      // Explicit path prevents JSDOM from carrying URL state from prior tests.
+      await router.start("/");
+      await router.navigate("users.list");
 
       expect(usersResult().route?.name).toBe("users.list");
       expect(itemsResult().route).toBeUndefined();
@@ -359,6 +374,86 @@ describe("useRouteNode", () => {
 
       expect(result().route?.name).toBe("users.view");
       expect(result().previousRoute?.name).toBe("items");
+    });
+  });
+
+  // Gotcha #22 from CLAUDE.md "Hook Caching via @real-router/sources":
+  // N components calling useRouteNode("users") against the same router share
+  // ONE source — one router.subscribe, one shouldUpdate per navigation.
+  // Without this caching, 50 sidebar links would each add a subscriber and
+  // the per-nav callback fanout would be N × work. This test pins the
+  // contract by spying on router.subscribe and asserting it's invoked at
+  // most once for repeat useRouteNode(name) calls on the same name.
+  describe("Source caching (gotcha #22 — N consumers → ONE router subscription)", () => {
+    it("multiple components reading the same node share one router subscription", async () => {
+      const subscribeSpy = vi.spyOn(router, "subscribe");
+
+      // Mount 5 separate hook consumers of useRouteNode("users") inside the
+      // SAME RouterProvider. The cached createRouteNodeSource(router, "users")
+      // must yield 5 listeners on its shared internal Set, not 5 separate
+      // router.subscribe registrations.
+      render(() => (
+        <RouterProvider router={router}>
+          <RouteNodeProbe name="users" />
+          <RouteNodeProbe name="users" />
+          <RouteNodeProbe name="users" />
+          <RouteNodeProbe name="users" />
+          <RouteNodeProbe name="users" />
+        </RouterProvider>
+      ));
+
+      // RouterProvider itself calls router.subscribe ONCE (via createRouteSource).
+      // The 5 useRouteNode("users") consumers must NOT add 5 more — they all
+      // multiplex through the cached createRouteNodeSource. Strict equality:
+      // 1 (provider) + 1 (cached node source) = 2 total. A loose `≤ 2` would
+      // pass on the regression "cache silently broke" up to 5 calls; the
+      // strict check fails on the first extra subscription (#P0.4 audit).
+      expect(subscribeSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it("different node names produce separate cache entries but share router subscription", async () => {
+      const subscribeSpy = vi.spyOn(router, "subscribe");
+
+      // 3 distinct nodes × 2 consumers each → cache produces 3 sources,
+      // each backed by a router subscription. Strict equality: 1 (provider)
+      // + 3 (one cached source per distinct node name) = 4 total. The
+      // previous `≤ 4` would silently absorb a regression up to 6
+      // (one subscribe per useRouteNode call) (#P0.4 audit).
+      render(() => (
+        <RouterProvider router={router}>
+          <RouteNodeProbe name="users" />
+          <RouteNodeProbe name="users" />
+          <RouteNodeProbe name="items" />
+          <RouteNodeProbe name="items" />
+          <RouteNodeProbe name="" />
+          <RouteNodeProbe name="" />
+        </RouterProvider>
+      ));
+
+      expect(subscribeSpy).toHaveBeenCalledTimes(4);
+    });
+  });
+
+  describe("Empty route tree (#3.4 defensive)", () => {
+    it("does not throw when subscribing to root node on a router with no routes", () => {
+      const emptyRouter = createRouter([]);
+
+      const wrapEmpty = (props: { children: JSX.Element }) => (
+        <RouterProvider router={emptyRouter}>{props.children}</RouterProvider>
+      );
+
+      // The hook is the public surface for createRouteNodeSource(router, "")
+      // — must produce an undefined route + undefined previousRoute snapshot
+      // without throwing, even when the route tree is empty (e.g. a router
+      // that's been replaced via getRoutesApi().replace([])).
+      expect(() => {
+        const { result } = renderHook(() => useRouteNode(""), {
+          wrapper: wrapEmpty,
+        });
+
+        expect(result().route).toBeUndefined();
+        expect(result().previousRoute).toBeUndefined();
+      }).not.toThrow();
     });
   });
 });

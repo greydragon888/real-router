@@ -2,7 +2,7 @@
 
 > Simple, powerful, view-agnostic, modular and extensible router
 
-pnpm monorepo with 32 packages + `benchmarks/` + bare `shared/` sources (symlinked into consumers' `src/dom-utils`, `src/browser-env`, and `src/shared-ssr`, except `packages/angular` which uses a git-tracked copy of `dom-utils`) + 81 example applications (incl. `examples/electron/*` and `examples/tauri/*` — see [Desktop Integration](https://github.com/greydragon888/real-router/wiki/Desktop-Integration)). Run `pnpm install` after cloning.
+pnpm monorepo with 32 packages + `benchmarks/` + bare `shared/` sources (symlinked into consumers' `src/dom-utils`, `src/browser-env`, and `src/shared-ssr`, except `packages/angular` which uses a git-tracked copy of `dom-utils`) + 91 example applications (incl. `examples/electron/*` and `examples/tauri/*` — see [Desktop Integration](https://github.com/greydragon888/real-router/wiki/Desktop-Integration)). Run `pnpm install` after cloning.
 
 `shared/` is a minimal workspace entry (name, type, devDeps) with no `src/` of its own — it owns sibling directories `shared/browser-env/`, `shared/dom-utils/`, and `shared/ssr/` that are git-tracked symlink targets. This entry is required for `type-guards` resolution during bundling via symlinks. See IMPLEMENTATION_NOTES.md section "Shared Sources via Symlinks" for details.
 
@@ -30,9 +30,13 @@ shared/
 │   ├── scroll-restore.ts   # createScrollRestoration (opt-in scroll capture + restore)
 │   └── index.ts          # barrel
 └── ssr/                  # SSR plugin scaffolding — for server-side per-route loader plugins
-    ├── createSsrLoaderPlugin.ts  # generic factory: validate compile loop + start interceptor + claim/teardown
-    ├── createLoadersValidator.ts # generic shape validator (non-null object → function values)
-    ├── types.ts          # SsrLoaderFn<T>, SsrLoaderFnFactory<T,D>, SsrLoaderFactoryMap<T,D>, SsrLoaderPluginConfig
+    ├── createSsrLoaderPlugin.ts  # generic factory: validate compile loop + start interceptor + subscribeLeave + claim/teardown (4 claims)
+    ├── createLoadersValidator.ts # generic shape validator (non-null object → function values; rejects unknown keys, allowed-mode strings only)
+    ├── defer.ts          # defer({ critical, deferred }) API + DEFER_BRAND symbol + shallow-clone freeze (security invariant)
+    ├── deferRegistry.ts  # __rrDeferRegistry__ global Map + escapeForScript + formatSettleScript + getDeferBootstrapScript
+    ├── errors.ts         # LoaderRedirect / LoaderNotFound / LoaderTimeout + withTimeout (AbortSignal.any composer, Node 20.3+)
+    ├── staleRegistry.ts  # markStale / isStale / clearStale — WeakMap<Router, Set<namespace>> for invalidate() CSR channel
+    ├── types.ts          # SsrLoaderFn<T> with optional context, SsrLoaderFnFactory<T,D>, SsrLoaderFactoryMap<T,D>, SsrMode, SsrLoaderPluginConfig
     └── index.ts          # barrel
 ```
 
@@ -44,7 +48,7 @@ shared/
 | `shared/dom-utils/`   | `src/dom-utils`           | `preact`, `react`, `solid`, `svelte`, `vue`          |
 | `shared/ssr/`         | `src/shared-ssr`          | `ssr-data-plugin`, `rsc-server-plugin`               |
 
-**Any edit to `shared/browser-env/utils.ts` or `shared/dom-utils/link-utils.ts` propagates instantly to every consumer via its symlink** — verify with `pnpm build` across all affected packages.
+**Any edit to `shared/browser-env/utils.ts`, `shared/dom-utils/link-utils.ts`, or `shared/ssr/createSsrLoaderPlugin.ts` propagates instantly to every consumer via its symlink** — verify with `pnpm build` across all affected packages. For `shared/ssr/` specifically, both `ssr-data-plugin` and `rsc-server-plugin` consume the same generic factory `createSsrLoaderPlugin<T>` with different type parameters (`unknown` vs `ReactNode`) and namespaces (`"data"` vs `"rsc"`) — one source of truth, two plugins; an edit that breaks one breaks the other.
 
 `packages/angular/src/dom-utils` is **not** a symlink — it is a git-tracked copy, re-materialized from `shared/dom-utils/` by the `prebundle` npm script before every build (ng-packagr does not follow symlinks the same way tsdown does). **When editing `shared/dom-utils/*.ts`, also update `packages/angular/src/dom-utils/*.ts`** — or run `pnpm -F @real-router/angular bundle` to sync the copy. Verify with `readlink packages/angular/src/dom-utils`; returns empty.
 
@@ -54,6 +58,7 @@ shared/
 - After completing a task, run: `pnpm build` (turbo runs the full graph: type-check → lint → test → build)
 - Prefer editing existing files over creating new ones
 - Keep changes minimal and focused
+- **Update `IMPLEMENTATION_NOTES.md` after any infrastructure change** — new scripts/hooks (`.husky/*`, `scripts/*.sh`), CI workflow edits (`.github/workflows/*.yml`), build pipeline changes (turbo.json, tsdown configs, custom export conditions), dependency-audit tooling, or anything that changes "how the repo builds/ships/audits itself." Use the Problem → Solution → Why format established there. This is what makes the file useful as the "why is it this way?" reference
 
 ## Key Commands
 

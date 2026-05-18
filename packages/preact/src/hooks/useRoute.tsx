@@ -1,19 +1,18 @@
-import { useContext } from "preact/hooks";
-
-import { RouteContext } from "../context";
+import { createUseContextOrThrow, RouteContext } from "../context";
 
 import type { RouteContext as RouteContextType } from "../types";
 import type { Params, State } from "@real-router/core";
+
+const useRouteContextOrThrow = createUseContextOrThrow(
+  RouteContext,
+  "useRoute",
+);
 
 export const useRoute = <P extends Params = Params>(): Omit<
   RouteContextType<P>,
   "route"
 > & { route: State<P> } => {
-  const routeContext = useContext(RouteContext);
-
-  if (!routeContext) {
-    throw new Error("useRoute must be used within a RouterProvider");
-  }
+  const routeContext = useRouteContextOrThrow();
 
   if (!routeContext.route) {
     throw new Error(

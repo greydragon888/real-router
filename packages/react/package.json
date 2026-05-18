@@ -13,11 +13,26 @@
       ],
       "ink": [
         "./dist/cjs/ink.d.ts"
+      ],
+      "ssr": [
+        "./dist/cjs/ssr.d.ts"
+      ],
+      "legacy/ssr": [
+        "./dist/cjs/legacy.ssr.d.ts"
       ]
     }
   },
   "exports": {
     ".": {
+      "react-server": {
+        "@real-router/internal-source": "./src/index.react-server.ts",
+        "types": {
+          "import": "./dist/esm/index.react-server.d.mts",
+          "require": "./dist/cjs/index.react-server.d.ts"
+        },
+        "import": "./dist/esm/index.react-server.mjs",
+        "require": "./dist/cjs/index.react-server.js"
+      },
       "@real-router/internal-source": "./src/index.ts",
       "types": {
         "import": "./dist/esm/index.d.mts",
@@ -43,6 +58,33 @@
       },
       "import": "./dist/esm/ink.mjs",
       "require": "./dist/cjs/ink.js"
+    },
+    "./ssr": {
+      "react-server": {
+        "@real-router/internal-source": "./src/ssr.react-server.ts",
+        "types": {
+          "import": "./dist/esm/ssr.react-server.d.mts",
+          "require": "./dist/cjs/ssr.react-server.d.ts"
+        },
+        "import": "./dist/esm/ssr.react-server.mjs",
+        "require": "./dist/cjs/ssr.react-server.js"
+      },
+      "@real-router/internal-source": "./src/ssr.ts",
+      "types": {
+        "import": "./dist/esm/ssr.d.mts",
+        "require": "./dist/cjs/ssr.d.ts"
+      },
+      "import": "./dist/esm/ssr.mjs",
+      "require": "./dist/cjs/ssr.js"
+    },
+    "./legacy/ssr": {
+      "@real-router/internal-source": "./src/legacy.ssr.ts",
+      "types": {
+        "import": "./dist/esm/legacy.ssr.d.mts",
+        "require": "./dist/cjs/legacy.ssr.d.ts"
+      },
+      "import": "./dist/esm/legacy.ssr.mjs",
+      "require": "./dist/cjs/legacy.ssr.js"
     }
   },
   "files": [

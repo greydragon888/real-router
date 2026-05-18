@@ -20,23 +20,28 @@ export function resolveEntryToMatchedState(
   routeName: string,
   api: PluginApi,
   base: string,
-): { entry: NavigationHistoryEntry; matchedState: State } {
+): { entry: NavigationHistoryEntry; entryUrl: string; matchedState: State } {
   if (!entry) {
     throw new Error(`No history entry for route "${routeName}"`);
   }
 
-  if (!entry.url) {
-    throw new Error(`No matching route for entry URL "${entry.url}"`);
+  const entryUrl = entry.url;
+
+  if (!entryUrl) {
+    throw new Error(`No matching route for entry URL "${entryUrl}"`);
   }
 
-  const path = extractPathFromAbsoluteUrl(entry.url, base);
+  const path = extractPathFromAbsoluteUrl(entryUrl, base);
   const matchedState = api.matchPath(path);
 
   if (!matchedState) {
-    throw new Error(`No matching route for entry URL "${entry.url}"`);
+    throw new Error(`No matching route for entry URL "${entryUrl}"`);
   }
 
-  return { entry, matchedState };
+  // entryUrl is returned alongside `entry` so callers can read the validated
+  // URL without re-doing the null check — TypeScript cannot narrow a property
+  // access through a control-flow guard on `entry.url`.
+  return { entry, entryUrl, matchedState };
 }
 
 /**

@@ -215,12 +215,10 @@ describe("useRouteNodeStore hook", () => {
 
     await router.navigate("users.list");
 
-    const initialRouteName = result.route?.name;
-
     await router.navigate("users.list", {}, { reload: true });
 
+    // reload keeps the active route unchanged
     expect(result.route?.name).toBe("users.list");
-    expect(result.route?.name).toBe(initialRouteName);
   });
 
   it("should throw error if router instance was not passed to provider", () => {

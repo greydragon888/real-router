@@ -62,8 +62,14 @@ describe("RouterErrorBoundary", () => {
         },
       });
 
-      await router.navigate("dashboard").catch(() => {});
+      let rejection: RouterError | undefined;
+
+      await router.navigate("dashboard").catch((error: unknown) => {
+        rejection = error as RouterError;
+      });
       flushSync();
+
+      expect(rejection?.code).toBe(errorCodes.CANNOT_ACTIVATE);
 
       const err = result.current.error;
 
@@ -98,11 +104,11 @@ describe("RouterErrorBoundary", () => {
 
     it("SSR: returns initial snapshot", () => {
       const freshRouter = createRouter([{ name: "home", path: "/" }]);
-      let result: any;
+      let result!: ErrorState;
 
       renderWithRouter(freshRouter, ErrorCapture, {
         onCapture: (r: unknown) => {
-          result = r;
+          result = r as ErrorState;
         },
       });
 

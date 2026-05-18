@@ -1,6 +1,7 @@
-import { app, BrowserWindow, net, protocol } from "electron";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+
+import { app, BrowserWindow, net, protocol } from "electron";
 
 protocol.registerSchemesAsPrivileged([
   {

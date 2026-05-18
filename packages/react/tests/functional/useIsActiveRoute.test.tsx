@@ -1,3 +1,4 @@
+import { errorCodes } from "@real-router/core";
 import { getRoutesApi } from "@real-router/core/api";
 import { act, renderHook } from "@testing-library/react";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
@@ -53,31 +54,24 @@ describe("useIsActiveRoute", () => {
   });
 
   it("should skip unrelated route updates", async () => {
-    let checkCount = 0;
-
-    // Mock isActive to count calls
-    const originalIsActive = router.isActiveRoute.bind(router);
-
-    vi.spyOn(router, "isActiveRoute").mockImplementation((...args) => {
-      checkCount++;
-
-      return originalIsActive(...args);
-    });
+    // Call-count coupling here is intentional: isActiveRoute NOT being called
+    // for unrelated route changes IS the optimization invariant under test.
+    const isActiveRouteSpy = vi.spyOn(router, "isActiveRoute");
 
     const { result } = renderHook(
       () => useIsActiveRoute("users.view", { id: "123" }),
       { wrapper: (props) => wrapper({ ...props, router }) },
     );
 
-    const initialCheckCount = checkCount;
+    const callsBefore = isActiveRouteSpy.mock.calls.length;
 
     await act(async () => {
       await router.navigate("home");
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
-    // Should skip check for unrelated route
-    expect(checkCount).toBe(initialCheckCount);
+    // No additional isActiveRoute calls after navigating to an unrelated route.
+    expect(isActiveRouteSpy).toHaveBeenCalledTimes(callsBefore);
     expect(result.current).toBe(false);
   });
 
@@ -246,7 +240,9 @@ describe("useIsActiveRoute", () => {
 
       // Navigate to ensure we have a fresh state, then check with string again
       await act(async () => {
-        await router.navigate("users.view", { id: "123" }).catch(() => {});
+        await expect(
+          router.navigate("users.view", { id: "123" }),
+        ).rejects.toMatchObject({ code: errorCodes.SAME_STATES });
       });
 
       expect(stringParam.current).toBe(true);
@@ -260,6 +256,14 @@ describe("useIsActiveRoute", () => {
         { wrapper: (props) => wrapper({ ...props, router }) },
       );
 
+      // Sample at start, two intermediate points, and the end so a mid-loop
+      // flip-flop in the active source can't slip through with only the final
+      // assertion catching it.
+      const intermediateCheckpoints = [0, 250, 500, 750];
+      // For each checkpoint i, after navigate(i % 2 === 0 ? "home" : "users.view"),
+      // the hook value should be (i % 2 === 1).
+      const observedSamples: { index: number; active: boolean }[] = [];
+
       // Perform 1000 navigations (last one will be to users.view since 999 is odd)
       for (let i = 0; i < 1000; i++) {
         await act(() =>
@@ -267,7 +271,18 @@ describe("useIsActiveRoute", () => {
             id: "123",
           }),
         );
+
+        if (intermediateCheckpoints.includes(i)) {
+          observedSamples.push({ index: i, active: result.current });
+        }
       }
+
+      expect(observedSamples).toStrictEqual(
+        intermediateCheckpoints.map((index) => ({
+          index,
+          active: index % 2 === 1,
+        })),
+      );
 
       // Final check should be correct (i=999 is odd, so last navigation is users.view)
       expect(result.current).toBe(true);
@@ -311,11 +326,23 @@ describe("useIsActiveRoute", () => {
         },
       );
 
-      // Change routeName multiple times
+      // Sample mid-loop so a regression that returns a non-boolean (NaN,
+      // undefined, null) at any intermediate iteration doesn't silently pass.
+      const intermediateCheckpoints = [0, 25, 50, 75];
+      const observedTypes: { index: number; type: string }[] = [];
+
       for (let i = 0; i < 100; i++) {
         currentIndex = (currentIndex + 1) % routes.length;
         rerender({ routeName: routes[currentIndex] });
+
+        if (intermediateCheckpoints.includes(i)) {
+          observedTypes.push({ index: i, type: typeof result.current });
+        }
       }
+
+      expect(observedTypes).toStrictEqual(
+        intermediateCheckpoints.map((index) => ({ index, type: "boolean" })),
+      );
 
       // Anchor on a known-inactive name to verify no memory corruption:
       // the hook must still return false (boolean) for a non-matching route.
@@ -342,7 +369,8 @@ describe("useIsActiveRoute", () => {
         { wrapper: (props) => wrapper({ ...props, router }) },
       );
 
-      expect(result.current).toBeTypeOf("boolean");
+      // Route name matches (users.view active) but params differ (circular ≠ {id:"123"}) → false.
+      expect(result.current).toBe(false);
     });
 
     it("should keep stable reference across re-renders when same non-serializable value is passed", () => {
@@ -370,14 +398,15 @@ describe("useIsActiveRoute", () => {
         { wrapper: (props) => wrapper({ ...props, router }) },
       );
 
-      // First render establishes initial stableRef for BigInt params.
-      expect(result.current).toBeTypeOf("boolean");
+      // First render: route name matches but 1n ≠ "123" (string) → false.
+      expect(result.current).toBe(false);
 
       // New object, still non-serializable → catch branch must update stableRef.current.
       params = { id: 2n };
       rerender();
 
-      expect(result.current).toBeTypeOf("boolean");
+      // 2n ≠ "123" → still false; stableRef updated to new object identity.
+      expect(result.current).toBe(false);
     });
   });
 
@@ -432,7 +461,9 @@ describe("useIsActiveRoute", () => {
       ]);
 
       await act(async () => {
-        await router.navigate("users.view", { id: "123" }).catch(() => {});
+        await expect(
+          router.navigate("users.view", { id: "123" }),
+        ).rejects.toMatchObject({ code: errorCodes.SAME_STATES });
       });
 
       // Check "user" is not active when "users.view" is

@@ -29,7 +29,7 @@ const router = createRouter([
 ]);
 
 router.usePlugin(browserPluginFactory());
-router.start();
+await router.start();
 
 function App() {
   return (
@@ -61,15 +61,37 @@ All hooks that subscribe to route state return `Accessor<T>` — call the access
 | Hook                      | Returns                              | Reactive?                            |
 | ------------------------- | ------------------------------------ | ------------------------------------ |
 | `useRouter()`             | `Router`                             | Never                                |
-| `useNavigator()`          | `Navigator`                          | Never                                |
+| `useNavigator()`          | `Navigator` — `{ navigate, subscribe, subscribeLeave, isLeaveApproved, … }` | Never                                |
 | `useRoute()`              | `Accessor<RouteState>`               | Every navigation                     |
-| `useRouteNode(name)`      | `Accessor<RouteState>`               | Only when node activates/deactivates |
+| `useRouteNode(name)`      | `Accessor<RouteState>`               | When the node's slice of state changes (activation, deactivation, params change inside the subtree) |
 | `useRouteUtils()`         | `RouteUtils`                         | Never                                |
 | `useRouterTransition()`   | `Accessor<RouterTransitionSnapshot>` | On transition start/end              |
 | `useRouteStore()`         | `RouteState` (store)                 | Granular — per-property              |
 | `useRouteNodeStore(name)` | `RouteState` (store)                 | Granular — per-property, node-scoped |
 | `useRouteExit(handler, options?)`  | `void` — wraps `subscribeLeave` with abort + same-route guards            | Never (handler captured at hook call) |
 | `useRouteEnter(handler, options?)` | `void` — fires once on nav-driven mount via `useRoute()` + `transition.from` | Never (handler captured at hook call) |
+
+### Typed Route Params (`useRoute<P>`)
+
+`useRoute<P>()` accepts an optional generic so `route.params` is typed without an `as` cast at the call site (the cast happens once inside the hook — no runtime overhead):
+
+```tsx
+import { useRoute } from "@real-router/solid";
+import type { Params } from "@real-router/core";
+
+type SearchParams = { q: string; sort: "asc" | "desc" } & Params;
+
+function SearchView() {
+  const routeState = useRoute<SearchParams>();
+  return <p>Query: {routeState().route.params.q}</p>; // typed as string
+}
+```
+
+`Link<P>` and `LinkDirectiveOptions<P>` accept the same generic for type-safe `routeParams`.
+
+### `useRoute()` throws when no route is active
+
+`useRoute()` returns `Accessor<{ route: State<P>; previousRoute?: State }>` where `route` is **non-nullable**. The hook throws if the router has no active state (unstarted, stopped, disposed) at the point of subscription. Use `useRouteNode(name)` or `useRouteStore()` if node inactivity is a legitimate state in your code path — those stay nullable. See `Gotchas` in the CLAUDE.md for the migration pattern.
 
 ### Store-Based Hooks (Granular Reactivity)
 
@@ -102,6 +124,28 @@ Two low-level bridges convert `@real-router/sources` `RouterSource<T>` instances
 | `createStoreFromSource`  | `T` (Solid store)  | Bridges a source to a Solid store via `createStore + reconcile`. |
 
 Both must be called inside a reactive owner (component body or `createRoot`).
+
+### Contexts (Advanced)
+
+Two Solid contexts are exported for building custom hooks or deeply nested integrations that need direct access to router internals without prop drilling:
+
+| Context        | Value type                                                       | Description                                                              |
+| -------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `RouterContext` | `RouterContextValue \| null` — `{ router, navigator, routeSelector }` | Stable references. `routeSelector(name)` is the O(1) `createSelector`-backed active check used by `<Link>`. |
+| `RouteContext`  | `Accessor<RouteState> \| null`                                   | Reactive signal. Updates on every navigation. Consumed by `useRoute()`. |
+
+```tsx
+import { RouterContext, RouteContext } from "@real-router/solid";
+import { useContext } from "solid-js";
+
+function MyCustomHook() {
+  const ctx = useContext(RouterContext);
+  if (!ctx) throw new Error("Must be used inside <RouterProvider>");
+  return ctx.router;
+}
+```
+
+For most use cases the existing hooks (`useRouter`, `useRoute`, `useNavigator`) are sufficient — reach for raw contexts only when building custom primitives.
 
 ```tsx
 // useRouteNode — updates only when "users.*" changes
@@ -243,6 +287,38 @@ const LazyDashboard = lazy(() => import("./Dashboard"));
 
 Without `fallback`, no `<Suspense>` boundary is added. The prop is optional.
 
+#### `<RouteView.Self>` — render the parent node itself
+
+`RouteView` shows `<Match>` children when a **descendant** route is active. To render content when the active route's name equals the parent's `nodeName` **exactly**, use `<RouteView.Self>`:
+
+```tsx
+<RouteView nodeName="users">
+  <RouteView.Self>
+    <UsersIndex /> {/* active route === "users" exactly */}
+  </RouteView.Self>
+  <RouteView.Match segment="profile">
+    <UserProfile /> {/* active route is "users.profile" or a descendant */}
+  </RouteView.Match>
+  <RouteView.NotFound>
+    <NotFoundPage />
+  </RouteView.NotFound>
+</RouteView>
+```
+
+`<RouteView.Self>` accepts an optional `fallback` prop (`JSX.Element`) — when provided, the children are wrapped in `<Suspense>` with that fallback, parallel to `<Match fallback>`.
+
+**Precedence rules:**
+
+1. `<Match>` first-wins — if any `<Match>` activates, `<Self>` and `<NotFound>` are suppressed.
+2. `<Self>` first-wins — only the first `<RouteView.Self>` contributes; later instances are ignored.
+3. `<Self>` wins over `<NotFound>` if no `<Match>` activates (rare — applies only when `nodeName === UNKNOWN_ROUTE`).
+
+| Element | Fires when | Render position |
+|---|---|---|
+| `<RouteView.Match>` | Active route segment matches `segment` (or descendant if `exact={false}`) | Inline at source position |
+| `<RouteView.Self>` | Active route name **exactly equals** parent's `nodeName` | Appended after Match elements |
+| `<RouteView.NotFound>` | Active route is `UNKNOWN_ROUTE` AND no Match activated | Appended after Match elements |
+
 > **Note:** `keepAlive` is not supported. Solid has no equivalent of React's `<Activity>` API. Components dispose completely when navigating away.
 
 ### `<RouterErrorBoundary>`
@@ -258,13 +334,75 @@ import { RouterErrorBoundary } from "@real-router/solid";
       {error.code} <button onClick={resetError}>Dismiss</button>
     </div>
   )}
-  onError={(error) => analytics.track("nav_error", { code: error.code })}
+  onError={(error, toRoute, fromRoute) =>
+    analytics.track("nav_error", {
+      code: error.code,
+      to: toRoute?.name,
+      from: fromRoute?.name,
+    })
+  }
 >
   <Link routeName="protected">Go to Protected</Link>
 </RouterErrorBoundary>;
 ```
 
 Auto-resets on next successful navigation. Works with both `<Link>` and imperative `router.navigate()`.
+
+### `<ClientOnly>` / `<ServerOnly>`
+
+Paired SSR-aware boundaries. `<ClientOnly>` renders `fallback` on the server (and on the client first paint, to match SSR HTML), then swaps in `children` after mount. `<ServerOnly>` is the symmetric inverse.
+
+```tsx
+import { ClientOnly, ServerOnly } from "@real-router/solid/ssr";
+
+<ClientOnly fallback={<Skeleton />}>
+  <BrowserApiWidget />
+</ClientOnly>
+
+<ServerOnly>
+  <SeoMetaStrip />
+</ServerOnly>;
+```
+
+All SSR-aware exports (`ClientOnly`, `ServerOnly`, `Streamed`, `Await`, `useDeferred`, `HttpStatusCode`, `HttpStatusProvider`, `createHttpStatusSink`) live at the `/ssr` subpath — the main entry stays client-only.
+
+### Render-Time HTTP Status (`<HttpStatusCode />`)
+
+For SSR responses that need a non-200 status (404, 410, 503, redirects), declare the code inline during render. `<HttpStatusCode code={N} />` writes through a `<HttpStatusProvider>` sink and returns `null` — no DOM, no hydration mismatch. Last write wins; a no-op without a provider so the same code paths work in CSR.
+
+```tsx
+import { renderToString } from "solid-js/web";
+import {
+  HttpStatusCode,
+  HttpStatusProvider,
+  createHttpStatusSink,
+} from "@real-router/solid/ssr";
+
+// In a "page not found" view:
+function NotFound() {
+  return (
+    <>
+      <HttpStatusCode code={404} />
+      <h1>Page not found</h1>
+    </>
+  );
+}
+
+// entry-server.tsx
+const sink = createHttpStatusSink();
+const html = renderToString(() => (
+  <HttpStatusProvider sink={sink}>
+    <App />
+  </HttpStatusProvider>
+));
+response.status(sink.code ?? 200).send(html);
+```
+
+> **Streaming SSR caveat:** with `renderToStream`, the response status MUST be sent before the first body byte flushes. If `<HttpStatusCode />` is mounted **inside a late-resolving `<Suspense>`**, the sink write happens AFTER the headers are already on the wire — the override is lost. Mount the component in the shell (above every `<Suspense>` that could delay it), or use `renderToStringAsync` (awaits all Suspense before returning HTML).
+
+> **Valid `code` range:** Node's `res.end()` throws `Invalid status code` on `NaN`, `0`, negative values, or `> 999` — surfaces as a 5xx / dropped connection. Pass a real HTTP status integer (100-999; commonly 4xx/5xx).
+
+Implementation: `createSignal(false)` + `onMount(() => setMounted(true))` + `<Show>`. `onMount` is SSR-safe per Solid's runtime contract — it never fires during `renderToString`/`renderToStream`. End-to-end dogfooding lives in [`examples/web/solid/ssr-examples/ssr/`](../../examples/web/solid/ssr-examples/ssr/) (see `e2e/ssr-boundaries.spec.ts`).
 
 ## Directives
 
@@ -299,16 +437,30 @@ import { link } from "@real-router/solid";
 
 **Options:**
 
-| Option              | Type      | Default | Description                             |
-| ------------------- | --------- | ------- | --------------------------------------- |
-| `routeName`         | `string`  | —       | Target route name                       |
-| `routeParams`       | `Params`  | `{}`    | Route parameters                        |
-| `routeOptions`      | `object`  | `{}`    | Navigation options (replace, etc.)      |
-| `activeClassName`   | `string`  | —       | Class added when route is active        |
-| `activeStrict`      | `boolean` | `false` | Exact match only (no ancestor matching) |
-| `ignoreQueryParams` | `boolean` | `true`  | Query params don't affect active state  |
+| Option              | Type      | Required | Default | Description                             |
+| ------------------- | --------- | -------- | ------- | --------------------------------------- |
+| `routeName`         | `string`  | ★ yes    | —       | Target route name                       |
+| `routeParams`       | `Params`  | no       | `{}`    | Route parameters                        |
+| `routeOptions`      | `object`  | no       | `{}`    | Navigation options (replace, etc.)      |
+| `activeClassName`   | `string`  | no       | —       | Class added when route is active        |
+| `activeStrict`      | `boolean` | no       | `false` | Exact match only (no ancestor matching) |
+| `ignoreQueryParams` | `boolean` | no       | `true`  | Query params don't affect active state  |
 
 The directive automatically sets `href` on `<a>` elements and adds `role="link"` + `tabindex="0"` to non-interactive elements for accessibility.
+
+> **Must be used inside `<RouterProvider>`.** The directive calls `useRouter()` internally and will throw if the host element is mounted outside the provider tree. See CLAUDE.md gotcha *"use:link Requires useRouter Context"* for the failure mode and the canonical wrapping pattern.
+
+**Accessor or object literal — both work.** The directive expects an accessor (`() => options`), and that's the form that gives you static-analysis friendliness across editors. Solid's `babel-preset-solid` also auto-wraps an object literal at compile time, so `use:link={{ routeName: "home" }}` is accepted too:
+
+```tsx
+// Accessor form (recommended — explicit, plays well with reactive values)
+<a use:link={() => ({ routeName: "home" })}>Home</a>
+
+// Object-literal form (accepted — babel-preset-solid wraps it for you)
+<a use:link={{ routeName: "home" }}>Home</a>
+```
+
+Either way the directive captures the options **once** at init (see CLAUDE.md "use:link Options Are Captured Once"). For reactive route switching, use the `<Link>` component instead.
 
 ## Solid-Specific Patterns
 
@@ -392,12 +544,15 @@ Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 
 - [RouterProvider](https://github.com/greydragon888/real-router/wiki/RouterProvider) · [RouteView](https://github.com/greydragon888/real-router/wiki/RouteView) · [RouterErrorBoundary](https://github.com/greydragon888/real-router/wiki/RouterErrorBoundary) · [Link](https://github.com/greydragon888/real-router/wiki/Link) · [Scroll Restoration](https://github.com/greydragon888/real-router/wiki/Scroll-Restoration) · [View Transitions](https://github.com/greydragon888/real-router/wiki/View-Transitions)
 - [useRouter](https://github.com/greydragon888/real-router/wiki/useRouter) · [useRoute](https://github.com/greydragon888/real-router/wiki/useRoute) · [useRouteNode](https://github.com/greydragon888/real-router/wiki/useRouteNode) · [useNavigator](https://github.com/greydragon888/real-router/wiki/useNavigator) · [useRouteUtils](https://github.com/greydragon888/real-router/wiki/useRouteUtils) · [useRouterTransition](https://github.com/greydragon888/real-router/wiki/useRouterTransition) · [useRouteExit](https://github.com/greydragon888/real-router/wiki/useRouteExit) · [useRouteEnter](https://github.com/greydragon888/real-router/wiki/useRouteEnter)
+- Solid-specific store variants: [useRouteStore / useRouteNodeStore](https://github.com/greydragon888/real-router/wiki/Solid-Integration#store-based-granular-route-state) — `createStore` + `reconcile`, property-level reactivity
 
 ## Examples
 
-14 runnable examples — each is a standalone Vite app. Run: `cd examples/web/solid/basic && pnpm dev`
+20 runnable examples — each is a standalone Vite app. Run: `cd examples/web/solid/basic && pnpm dev`
 
-[basic](../../examples/web/solid/basic) · [nested-routes](../../examples/web/solid/nested-routes) · [auth-guards](../../examples/web/solid/auth-guards) · [data-loading](../../examples/web/solid/data-loading) · [lazy-loading](../../examples/web/solid/lazy-loading) · [async-guards](../../examples/web/solid/async-guards) · [hash-routing](../../examples/web/solid/hash-routing) · [persistent-params](../../examples/web/solid/persistent-params) · [error-handling](../../examples/web/solid/error-handling) · [dynamic-routes](../../examples/web/solid/dynamic-routes) · [store-based-state](../../examples/web/solid/store-based-state) · [use-link-directive](../../examples/web/solid/use-link-directive) · [signal-primitives](../../examples/web/solid/signal-primitives) · [combined](../../examples/web/solid/combined)
+[basic](../../examples/web/solid/basic) · [nested-routes](../../examples/web/solid/nested-routes) · [auth-guards](../../examples/web/solid/auth-guards) · [data-loading](../../examples/web/solid/data-loading) · [lazy-loading](../../examples/web/solid/lazy-loading) · [async-guards](../../examples/web/solid/async-guards) · [hash-routing](../../examples/web/solid/hash-routing) · [persistent-params](../../examples/web/solid/persistent-params) · [error-handling](../../examples/web/solid/error-handling) · [dynamic-routes](../../examples/web/solid/dynamic-routes) · [store-based-state](../../examples/web/solid/store-based-state) · [use-link-directive](../../examples/web/solid/use-link-directive) · [signal-primitives](../../examples/web/solid/signal-primitives) · [combined](../../examples/web/solid/combined) · [animation-examples](../../examples/web/solid/animation-examples) · [search-schema](../../examples/web/solid/search-schema)
+
+Server-side rendering: [ssr](../../examples/web/solid/ssr-examples/ssr) · [ssr-streaming](../../examples/web/solid/ssr-examples/ssr-streaming) · [ssr-mixed](../../examples/web/solid/ssr-examples/ssr-mixed) · [ssg](../../examples/web/solid/ssr-examples/ssg)
 
 ## Related Packages
 

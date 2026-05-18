@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Real-Router Streaming SSR Example</title>
+    <!--defer-bootstrap-->
+  </head>
+  <body>
+    <div id="root"><!--ssr-outlet--></div>
+    <!-- createPortal target: ProductSpecsModal mounts its dialog
+         here, outside the #root subtree. Empty div on initial load. -->
+    <div id="modal-target" data-testid="modal-target"></div>
+    <!--ssr-state-->
+    <script type="module" src="/src/entry-client.tsx"></script>
+  </body>
+</html>

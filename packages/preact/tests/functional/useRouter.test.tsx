@@ -30,10 +30,12 @@ describe("useRouter hook", () => {
       wrapper: wrapper(router),
     });
 
-    expect(result.current).toStrictEqual(router);
+    expect(result.current).toBe(router);
   });
 
   it("should throw error if router instance was not passed to provider", () => {
-    expect(() => renderHook(() => useRouter())).toThrow();
+    expect(() => renderHook(() => useRouter())).toThrow(
+      "useRouter must be used within a RouterProvider",
+    );
   });
 });

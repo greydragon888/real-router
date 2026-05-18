@@ -1,4 +1,4 @@
-import { createActiveRouteSource } from "@real-router/sources";
+import { canonicalJson, createActiveRouteSource } from "@real-router/sources";
 import { defineComponent, h, computed, shallowRef, watch } from "vue";
 
 import { useRouter } from "../composables/useRouter";
@@ -18,6 +18,13 @@ type OnClickHandler = (evt: MouseEvent) => void;
 /**
  * Vue's compiled template binds multiple `@click` handlers as an array.
  * Single render-function `onClick` is a function. Both must be invoked.
+ *
+ * The function-branch deliberately omits a `defaultPrevented` check: the
+ * single call short-circuits naturally and control returns to the caller
+ * (`handleClick`), which then re-reads `evt.defaultPrevented` on the same
+ * MouseEvent. The array-branch needs the per-iteration check because the
+ * caller cannot observe intermediate handlers — without it, later handlers
+ * would still run after an earlier one called `preventDefault()`.
  */
 function invokeAttributesOnClick(value: unknown, evt: MouseEvent): void {
   if (typeof value === "function") {
@@ -96,24 +103,37 @@ export const Link = defineComponent({
 
     const isActive = shallowRef(false);
 
-    // watch with an explicit dep getter recreates the source ONLY when
-    // routeName/routeParams/strict/ignoreQueryParams change — not on every
-    // reactive read inside the source factory (the watchEffect alternative
-    // would also re-subscribe whenever isActive itself changed).
+    // watch with an explicit dep getter recreates the source ONLY when the
+    // structural identity of routeName/routeParams/strict/ignoreQueryParams/
+    // hash changes — not on every parent rerender that hands a fresh
+    // `routeParams` literal with the same shape.
+    //
+    // Hot-path note: inline `:routeParams="{ id: 1 }"` in a parent template
+    // allocates a new object each render. Comparing by reference would
+    // tear down + recreate the ActiveRouteSource subscription on every
+    // unrelated parent state change. `canonicalJson(routeParams)` collapses
+    // structurally-equal objects to the same key-order-stable string, so the
+    // subscription persists across re-renders that don't change shape.
+    // (The source's own per-router cache uses the same canonical key under
+    // the hood — this watch dep just mirrors it at the consumer layer.)
     watch(
       () =>
         [
           props.routeName,
-          props.routeParams,
+          canonicalJson(props.routeParams),
           props.activeStrict,
           props.ignoreQueryParams,
           props.hash,
         ] as const,
       (
-        [routeName, routeParams, activeStrict, ignoreQueryParams, hash],
+        [routeName, _paramsKey, activeStrict, ignoreQueryParams, hash],
         _prev,
         onCleanup,
       ) => {
+        // Re-read the raw `routeParams` ref when constructing the source —
+        // canonicalJson was only used for change-detection above, the source
+        // factory still wants the live object.
+        const routeParams = props.routeParams;
         // Hash-aware active (#532): pass hash through so tab links with the
         // same routeName but different `hash` props don't all light up.
         const source = createActiveRouteSource(
@@ -182,13 +202,13 @@ export const Link = defineComponent({
       // double-invoke user handlers when combined with our explicit `onClick`.
       // We invoke the original attrs.onClick manually inside handleClick so the
       // preventDefault contract is preserved.
-      const restAttributes: Record<string, unknown> = {};
+      //
+      // Spread + delete avoids the per-key copy loop on every render — one
+      // allocation + one property deletion instead of N iterations across
+      // data-*, aria-*, role, etc. Hot-path optimisation for Link-heavy pages.
+      const restAttributes = { ...attrs } as Record<string, unknown>;
 
-      for (const key of Object.keys(attrs)) {
-        if (key !== "onClick") {
-          restAttributes[key] = (attrs as Record<string, unknown>)[key];
-        }
-      }
+      delete restAttributes.onClick;
 
       return h(
         "a",

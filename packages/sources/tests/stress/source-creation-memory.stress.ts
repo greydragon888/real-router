@@ -5,6 +5,7 @@ import {
   createRouteNodeSource,
   createActiveRouteSource,
   createTransitionSource,
+  createErrorSource,
 } from "@real-router/sources";
 
 import {
@@ -50,6 +51,26 @@ describe("S2: Source creation storm + memory", () => {
       () => createActiveRouteSource(router, "home"),
       500,
     );
+
+    const routes = ["users.list", "about", "admin.dashboard", "home"];
+
+    for (let i = 0; i < 50; i++) {
+      await router.navigate(routes[i % routes.length]);
+    }
+
+    sources.forEach((s) => {
+      s.destroy();
+    });
+
+    const after = takeHeapSnapshot();
+
+    expect(after - baseline).toBeLessThan(MB);
+  });
+
+  it("S2.3: Create 200 ErrorSource → navigate × 50 → destroy all → heap returns to baseline", async () => {
+    const baseline = takeHeapSnapshot();
+
+    const sources = createManySources(() => createErrorSource(router), 200);
 
     const routes = ["users.list", "about", "admin.dashboard", "home"];
 

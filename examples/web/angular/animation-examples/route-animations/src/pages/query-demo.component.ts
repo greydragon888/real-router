@@ -20,14 +20,14 @@ const FILTERS: Filter[] = ["all", "letter", "number", "color"];
     <div data-route-root data-route-anim="fade">
       <h1>Query-only navigation</h1>
       <p>
-        Changing the filter via query params is a same-route navigation
-        (<code>route.name === nextRoute.name</code>).
-        <code>injectRouteExit</code> detects this via its default
-        <code>skipSameRoute: true</code> and skips the page-level fade
-        entirely — the page does not animate. <code>installListFlip</code>
-        opts in via <code>skipSameRoute: false</code> to own the
-        same-route window: items glide between positions, newcomers fade
-        in, removed items fade out via ghost clones.
+        Changing the filter via query params is a same-route navigation (<code
+          >route.name === nextRoute.name</code
+        >). <code>injectRouteExit</code> detects this via its default
+        <code>skipSameRoute: true</code> and skips the page-level fade entirely
+        — the page does not animate. <code>installListFlip</code> opts in via
+        <code>skipSameRoute: false</code> to own the same-route window: items
+        glide between positions, newcomers fade in, removed items fade out via
+        ghost clones.
       </p>
 
       <div class="qd-toolbar">
@@ -60,11 +60,12 @@ export class QueryDemoComponent {
   readonly filters = FILTERS;
 
   readonly filter = computed<Filter>(
-    () => (this.state.routeState().route.params["filter"] as Filter | undefined) ?? "all",
+    () => this.state.routeState().route.params.filter ?? "all",
   );
 
   readonly visible = computed(() => {
     const f = this.filter();
+
     return f === "all" ? ITEMS : ITEMS.filter((item) => item.category === f);
   });
 }

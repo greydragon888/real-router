@@ -13,7 +13,7 @@ const COVERS: Partial<Record<string, { name: string; color: string }>> = {
 
 export function ProductDetail(): JSX.Element {
   const { route } = useRoute<{ id: string }>();
-  const id = route.params.id ?? "1";
+  const id = route.params.id;
   const product = COVERS[id];
 
   if (!product) {
@@ -48,11 +48,11 @@ export function ProductDetail(): JSX.Element {
         animation: source rect captured on leave (inside the{" "}
         <code>useRouteExit</code> handler in <code>useHeroMorph</code>),
         destination rect measured after commit (in{" "}
-        <code>navigator.subscribe</code> + <code>setTimeout(0)</code>), then
-        the delta plays via <code>element.animate()</code>. The parallel{" "}
-        <code>view-transitions/</code> example does this with two CSS rules
-        and matching <code>view-transition-name</code> — the recipe pays in
-        JS for cross-browser support.
+        <code>navigator.subscribe</code> + <code>setTimeout(0)</code>), then the
+        delta plays via <code>element.animate()</code>. The parallel{" "}
+        <code>view-transitions/</code> example does this with two CSS rules and
+        matching <code>view-transition-name</code> — the recipe pays in JS for
+        cross-browser support.
       </p>
       <p>
         <Link routeName="products" activeStrict>

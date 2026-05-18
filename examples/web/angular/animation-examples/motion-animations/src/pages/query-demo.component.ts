@@ -19,12 +19,12 @@ const FILTERS: Filter[] = ["all", "letter", "number", "color"];
   template: `
     <h1>Query-only navigation</h1>
     <p>
-      Changing the filter via query params is a same-route navigation
-      (<code>route.name === nextRoute.name</code>).
-      <code>injectRouteExit</code> detects this via its default
+      Changing the filter via query params is a same-route navigation (<code
+        >route.name === nextRoute.name</code
+      >). <code>injectRouteExit</code> detects this via its default
       <code>skipSameRoute: true</code> and does not fire — the
-      <code>page</code> wrapper does not animate. For per-list
-      reorder animations, see <code>installListFlip</code> in
+      <code>page</code> wrapper does not animate. For per-list reorder
+      animations, see <code>installListFlip</code> in
       <code>route-animations/</code> or <code>page-animations/</code>.
     </p>
 
@@ -57,11 +57,12 @@ export class QueryDemoComponent {
   readonly filters = FILTERS;
 
   readonly filter = computed<Filter>(
-    () => (this.state.routeState().route.params["filter"] as Filter | undefined) ?? "all",
+    () => this.state.routeState().route.params.filter ?? "all",
   );
 
   readonly visible = computed(() => {
     const f = this.filter();
+
     return f === "all" ? ITEMS : ITEMS.filter((item) => item.category === f);
   });
 }

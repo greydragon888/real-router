@@ -1,8 +1,8 @@
 import { createActiveRouteSource } from "@real-router/sources";
-import { createMemo, mergeProps, splitProps, useContext } from "solid-js";
+import { createMemo, mergeProps, splitProps } from "solid-js";
 
 import { EMPTY_PARAMS, EMPTY_OPTIONS } from "../constants";
-import { RouterContext } from "../context";
+import { useRequiredRouterContext } from "../context";
 import { createSignalFromSource } from "../createSignalFromSource";
 import {
   shouldNavigate,
@@ -43,23 +43,24 @@ export function Link<P extends Params = Params>(
     "children",
   ]);
 
-  const ctx = useContext(RouterContext);
-
-  if (!ctx) {
-    throw new Error("Link must be used within a RouterProvider");
-  }
-
+  const ctx = useRequiredRouterContext("Link");
   const router = ctx.router;
 
   // Hash-aware active state (#532). `routeSelector` (the O(1) shared selector)
   // doesn't know about hash — when `hash` prop is set, fall back to the slow
   // path so the source's hash comparison kicks in. Tab-style UI is opt-in via
   // the prop, so the fast path stays open for the typical Link case.
+  //
+  // §8.1 audit fix: read `props.routeParams === undefined` directly instead of
+  // `local.routeParams === EMPTY_PARAMS`. The latter went through `mergeProps`
+  // proxy and relied on a hidden contract (mergeProps preserves the default
+  // sentinel identity when consumer omits the field). The new check is
+  // explicit: "fast path kicks in when consumer did not supply routeParams".
   const useFastPath =
     local.hash === undefined &&
     !local.activeStrict &&
     local.ignoreQueryParams &&
-    local.routeParams === EMPTY_PARAMS;
+    props.routeParams === undefined;
 
   const buildActiveOptions = () => {
     const base = {
@@ -85,13 +86,18 @@ export function Link<P extends Params = Params>(
         ),
       );
 
+  // Separate memo for the hash-options object so the `{ hash }` literal
+  // is allocated only when `local.hash` actually changes (instead of on
+  // every `href` memo evaluation). For static `<Link hash="foo">` this
+  // produces ONE allocation total; for dynamic hash through `<Show keyed>`
+  // workaround the allocation cost scales with hash changes, not with
+  // routeName/routeParams changes (§8c A4 audit fix).
+  const hashOpts = createMemo(() =>
+    local.hash === undefined ? undefined : { hash: local.hash },
+  );
+
   const href = createMemo(() =>
-    buildHref(
-      router,
-      local.routeName,
-      local.routeParams,
-      local.hash === undefined ? undefined : { hash: local.hash },
-    ),
+    buildHref(router, local.routeName, local.routeParams, hashOpts()),
   );
 
   const handleClick = (evt: MouseEvent) => {

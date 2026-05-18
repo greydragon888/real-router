@@ -30,50 +30,56 @@ export interface NotFoundMarker {
 
 export type RouteViewMarker = MatchMarker | SelfMarker | NotFoundMarker;
 
-export function Match(props: MatchProps): JSX.Element {
-  const result: MatchMarker = {
-    $$type: MATCH_MARKER,
-    segment: props.segment,
-    exact: props.exact ?? false,
-    fallback: props.fallback,
+// §8.1 audit fix (LOW #8) — three marker factories share the
+// `$$type + children getter` skeleton plus a small per-marker payload.
+// `createMarker` keeps the shared shape in one place; each public factory
+// (Match/Self/NotFound) only provides what differs.
+//
+// The `children` getter (not a plain field) is intentional: it lets the
+// marker capture Solid's reactive `props.children` lazily, so swapping the
+// marker content in a parent component re-evaluates at render time without
+// pulling stale references.
+//
+// Marker objects are identified by `$$type` Symbol in RouteView/helpers.tsx,
+// not rendered as JSX. The `as unknown as JSX.Element` cast is required at
+// the call site because `JSX.Element` does not include arbitrary marker
+// shapes.
+function createMarker<M extends RouteViewMarker>(
+  type: M["$$type"],
+  getChildren: () => JSX.Element,
+  extras?: Omit<M, "$$type" | "children">,
+): JSX.Element {
+  const result = {
+    $$type: type,
+    ...extras,
     get children(): JSX.Element {
-      return props.children;
+      return getChildren();
     },
   };
 
-  // Marker object is identified by $$type Symbol in RouteView/helpers.tsx,
-  // not rendered as JSX. Cast required because JSX.Element does not include
-  // arbitrary marker shapes.
   return result as unknown as JSX.Element;
+}
+
+export function Match(props: MatchProps): JSX.Element {
+  return createMarker<MatchMarker>(MATCH_MARKER, () => props.children, {
+    segment: props.segment,
+    exact: props.exact ?? false,
+    fallback: props.fallback,
+  });
 }
 
 Match.displayName = "RouteView.Match";
 
 export function Self(props: SelfProps): JSX.Element {
-  const result: SelfMarker = {
-    $$type: SELF_MARKER,
+  return createMarker<SelfMarker>(SELF_MARKER, () => props.children, {
     fallback: props.fallback,
-    get children(): JSX.Element {
-      return props.children;
-    },
-  };
-
-  // See Match for the marker-pattern rationale.
-  return result as unknown as JSX.Element;
+  });
 }
 
 Self.displayName = "RouteView.Self";
 
 export function NotFound(props: NotFoundProps): JSX.Element {
-  const result: NotFoundMarker = {
-    $$type: NOT_FOUND_MARKER,
-    get children(): JSX.Element {
-      return props.children;
-    },
-  };
-
-  // See Match for the marker-pattern rationale.
-  return result as unknown as JSX.Element;
+  return createMarker<NotFoundMarker>(NOT_FOUND_MARKER, () => props.children);
 }
 
 NotFound.displayName = "RouteView.NotFound";

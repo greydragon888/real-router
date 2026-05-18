@@ -1,6 +1,6 @@
 import { RouteView } from "@real-router/solid";
-import { Motion, Presence } from "solid-motionone";
 import { Show } from "solid-js";
+import { Motion, Presence } from "solid-motionone";
 
 import { About } from "./pages/About";
 import { Home } from "./pages/Home";

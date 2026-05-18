@@ -27,4 +27,14 @@ export interface LinkProps<P extends Params = Params> {
   activeStrict?: boolean;
   ignoreQueryParams?: boolean;
   target?: string;
+  /**
+   * URL fragment (#532). Decoded, no leading `#`. Tri-state:
+   * - `undefined` (default) — preserves current `state.context.url.hash` on click.
+   * - `""` — clears the hash.
+   * - `"value"` — sets the hash; click routes through `navigateWithHash`,
+   *   which auto-adds `force: true, hashChange: true` for same-route hash
+   *   transitions (bypasses core's SAME_STATES check).
+   * Active state is hash-aware when `hash` is set.
+   */
+  hash?: string;
 }

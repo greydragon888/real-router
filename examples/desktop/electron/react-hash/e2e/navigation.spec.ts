@@ -4,6 +4,9 @@ import {
   _electron as electron,
 } from "@playwright/test";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const MAIN = path.join(__dirname, "../dist-electron/main.js");
 

@@ -72,6 +72,8 @@ describe("N20 — traverseTo to an evicted or invalid key", () => {
     await router.traverseToLast("users.list").catch(noop);
 
     expect(traverseToSpy).toHaveBeenCalled();
+    // Router must still be in a defined state after the failed traverse
+    expect(router.getState()).toBeDefined();
 
     traverseToSpy.mockRestore();
 

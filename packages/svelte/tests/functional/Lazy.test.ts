@@ -169,8 +169,12 @@ describe("Lazy component", () => {
     await Promise.resolve();
     flushSync();
 
-    // Still showing second loader's component, not first
+    // Still showing second loader's component, not first. The explicit
+    // fallback-absent check guards against a regression where the stale
+    // resolution swaps the rendered component back to the fallback
+    // (whose default export was the first loader's payload here).
     expect(screen.getByTestId("loaded")).toBeInTheDocument();
+    expect(screen.queryByTestId("fallback")).not.toBeInTheDocument();
   });
 
   it("should not render loaded component after unmount", async () => {

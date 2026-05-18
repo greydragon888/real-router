@@ -94,13 +94,18 @@ describe("RouterProvider — scrollRestoration", () => {
       }),
     );
 
+    // The "pagehide" handler runs synchronously inside dispatchEvent.
     globalThis.dispatchEvent(new Event("pagehide"));
 
-    const saved = JSON.parse(
-      sessionStorage.getItem(STORAGE_KEY) ?? "{}",
-    ) as Record<string, number>;
+    const raw = sessionStorage.getItem(STORAGE_KEY);
 
-    expect(Object.values(saved)).toContain(275);
+    expect(raw).not.toBeNull();
+
+    const saved = JSON.parse(raw!) as Record<string, number>;
+    // The key is "<routeName>:<canonicalJson(params)>" — for the "test" route with no params: "test:{}"
+    const testRouteKey = "test:{}";
+
+    expect(saved[testRouteKey]).toBe(275);
 
     wrapper.unmount();
   });

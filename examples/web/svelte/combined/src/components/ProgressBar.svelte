@@ -5,5 +5,9 @@
 </script>
 
 {#if transition.current.isTransitioning}
-  <div class="progress-bar" style="width: 100%"></div>
+  <div
+    class="progress-bar"
+    data-testid="progress-bar"
+    style="width: 100%"
+  ></div>
 {/if}

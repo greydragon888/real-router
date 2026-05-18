@@ -121,7 +121,7 @@ describe("R8 — combined SPA simulation", () => {
     router.stop();
   });
 
-  it("8.4: mount -> 50 nav -> unmount -> remount -> 50 nav — correct after remount", async () => {
+  it("8.3: mount -> 50 nav -> unmount -> remount -> 50 nav — correct after remount", async () => {
     const router = createStressRouter(50);
 
     await router.start("/route0");
@@ -174,7 +174,7 @@ describe("R8 — combined SPA simulation", () => {
     router.stop();
   });
 
-  it("8.5: RouteView active match correctness through 100 navigations", async () => {
+  it("8.4: RouteView active match correctness through 100 navigations", async () => {
     const routes = Array.from({ length: 5 }, (_, i) => ({
       name: `section${i}`,
       path: `/section${i}`,

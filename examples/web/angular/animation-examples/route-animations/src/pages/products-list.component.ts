@@ -25,13 +25,12 @@ type SortDirection = "asc" | "desc";
     <div data-route-root data-route-anim="slide">
       <h1>Products</h1>
       <p>
-        Click a product card to see the manual hero-morph: the
-        thumbnail's bounding rect is captured before leave, an
-        inverse-FLIP transform on the destination cover after the new
-        page mounts. Compare with the parallel
+        Click a product card to see the manual hero-morph: the thumbnail's
+        bounding rect is captured before leave, an inverse-FLIP transform on the
+        destination cover after the new page mounts. Compare with the parallel
         <code>view-transitions/</code> example, where the browser pairs
-        <code>view-transition-name</code> values and animates for you in
-        two CSS rules.
+        <code>view-transition-name</code> values and animates for you in two CSS
+        rules.
       </p>
 
       <div class="products-toolbar">
@@ -44,7 +43,7 @@ type SortDirection = "asc" | "desc";
         >
           A → Z
         </a>
-        {{ ' · ' }}
+        {{ " · " }}
         <a
           realLink
           routeName="products"
@@ -53,8 +52,8 @@ type SortDirection = "asc" | "desc";
         >
           Z → A
         </a>
-        {{ ' · ' }}
-        <strong>current: {{ sort() }}</strong>
+        {{ " · " }}
+        <strong>current: {{ sortDirection() }}</strong>
       </div>
 
       <ul class="product-list">
@@ -82,16 +81,17 @@ type SortDirection = "asc" | "desc";
 export class ProductsListComponent {
   private readonly state = injectRoute<{ sort?: SortDirection }>();
 
-  readonly sort = computed<SortDirection>(() => {
+  readonly sortDirection = computed<SortDirection>(() => {
     const params = this.state.routeState().route.params;
-    return params?.["sort"] === "desc" ? "desc" : "asc";
+
+    return params?.sort === "desc" ? "desc" : "asc";
   });
 
   readonly items = computed(() => {
-    const sorted = [...PRODUCTS].sort((left, right) =>
+    const sorted = PRODUCTS.toSorted((left, right) =>
       left.name.localeCompare(right.name),
     );
 
-    return this.sort() === "desc" ? sorted.reverse() : sorted;
+    return this.sortDirection() === "desc" ? sorted.toReversed() : sorted;
   });
 }

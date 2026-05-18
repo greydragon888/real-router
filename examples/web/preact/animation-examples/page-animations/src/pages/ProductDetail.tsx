@@ -18,7 +18,7 @@ export function ProductDetail() {
   useRouteAnimation(ref, { entryClass: "fade-in", exitClass: "fade-out" });
 
   const { route } = useRoute<{ id: string }>();
-  const id = route.params.id ?? "1";
+  const id = route.params.id;
   const product = COVERS[id];
 
   if (!product) {
@@ -41,9 +41,9 @@ export function ProductDetail() {
         aria-hidden="true"
       />
       <p>
-        Note: no hero morph here. The thumbnail on the products page slides
-        away with that page; this cover fades in independently. Bridging the
-        two requires shared state across components — out of scope for the
+        Note: no hero morph here. The thumbnail on the products page slides away
+        with that page; this cover fades in independently. Bridging the two
+        requires shared state across components — out of scope for the
         distributed pattern.
       </p>
       <p>

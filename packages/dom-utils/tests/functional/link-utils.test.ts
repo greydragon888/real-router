@@ -243,6 +243,51 @@ describe("buildHref", () => {
       undefined,
     );
   });
+
+  it("12 — returns undefined + logs error when buildPath returns empty string (#P0.1 audit)", () => {
+    // Symmetric to the buildUrl="" defense (Invariant 12 in property tests).
+    // A custom path-matcher that returns "" for a registered route would
+    // otherwise render `<a href="">` → silent self-navigation on click.
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    const router = {
+      buildPath: vi.fn().mockReturnValue(""),
+    } as unknown as Router;
+
+    const result = buildHref(router, "weird-route", {});
+
+    expect(result).toBeUndefined();
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining("weird-route"),
+    );
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining("empty path"),
+    );
+
+    consoleError.mockRestore();
+  });
+
+  it("13 — returns undefined + logs error when buildUrl returns '' AND buildPath returns '' (#P0.1 audit)", () => {
+    // Both layers degrade to empty — must not concatenate `${""}#${hash}`
+    // into a bare `<a href="#hash">`. Treat as no-href.
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    const router = {
+      buildUrl: vi.fn().mockReturnValue(""),
+      buildPath: vi.fn().mockReturnValue(""),
+    } as unknown as Router;
+
+    const result = buildHref(router, "weird-route", {}, { hash: "tab" });
+
+    expect(result).toBeUndefined();
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining("weird-route"),
+    );
+
+    consoleError.mockRestore();
+  });
 });
 
 describe("buildActiveClassName", () => {
@@ -387,5 +432,62 @@ describe("applyLinkA11y", () => {
     expect(() => {
       applyLinkA11y(undefined);
     }).not.toThrow();
+  });
+
+  // audit-2026-05-17 §5 HIGH #4 (Sprint A.1) — cross-realm safety. The
+  // helper now compares `tagName` rather than `instanceof`, so an
+  // anchor-like element from a foreign realm (iframe contentDocument,
+  // micro-frontend) is correctly skipped even though its prototype
+  // chain does NOT lead to *this* realm's `HTMLAnchorElement`.
+  // Simulate by handing the helper an object whose `tagName === "A"`
+  // but is NOT a real HTMLAnchorElement subclass.
+  it("10 — cross-realm: foreign anchor (tagName='A', not instanceof HTMLAnchorElement) is skipped", () => {
+    const setAttribute = vi.fn();
+    const hasAttribute = vi.fn().mockReturnValue(false);
+    const foreignAnchor = {
+      tagName: "A",
+      setAttribute,
+      hasAttribute,
+    } as unknown as HTMLElement;
+
+    applyLinkA11y(foreignAnchor);
+
+    // Must NOT have set role/tabindex — recognised as an anchor by
+    // tagName despite failing the instanceof check.
+    expect(setAttribute).not.toHaveBeenCalled();
+  });
+
+  it("11 — cross-realm: foreign button (tagName='BUTTON', not instanceof HTMLButtonElement) is skipped", () => {
+    const setAttribute = vi.fn();
+    const hasAttribute = vi.fn().mockReturnValue(false);
+    const foreignButton = {
+      tagName: "BUTTON",
+      setAttribute,
+      hasAttribute,
+    } as unknown as HTMLElement;
+
+    applyLinkA11y(foreignButton);
+
+    expect(setAttribute).not.toHaveBeenCalled();
+  });
+
+  it("12 — case-sensitivity: lowercase 'a' (SVG anchor namespace) is NOT skipped", () => {
+    // SVG `<a>` has lowercase tagName because it's in the SVG
+    // namespace. Solid/React do not produce SVG anchors via <Link>,
+    // but if a consumer manually passes one to applyLinkA11y, it
+    // gets a11y treatment — SVG anchors don't have native keyboard
+    // activation. Locks the uppercase-only contract.
+    const setAttribute = vi.fn();
+    const hasAttribute = vi.fn().mockReturnValue(false);
+    const svgAnchor = {
+      tagName: "a",
+      setAttribute,
+      hasAttribute,
+    } as unknown as HTMLElement;
+
+    applyLinkA11y(svgAnchor);
+
+    expect(setAttribute).toHaveBeenCalledWith("role", "link");
+    expect(setAttribute).toHaveBeenCalledWith("tabindex", "0");
   });
 });

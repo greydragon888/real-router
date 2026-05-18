@@ -1,5 +1,6 @@
-import { app, BrowserWindow } from "electron";
 import path from "node:path";
+
+import { app, BrowserWindow } from "electron";
 
 app.whenReady().then(() => {
   const win = new BrowserWindow({

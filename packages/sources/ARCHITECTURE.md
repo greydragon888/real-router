@@ -17,7 +17,7 @@ src/
 ├── canonicalJson.ts             — Key-order-stable JSON serialization (cache keys for active-route)
 ├── normalizeActiveOptions.ts    — DEFAULT_ACTIVE_OPTIONS + normalizeActiveOptions helper
 ├── computeSnapshot.ts           — Same-reference snapshot optimization for route nodes
-├── stabilizeState.ts            — Path-based State ref stabilization (not exported)
+├── stabilizeState.ts            — State ref stabilization keyed on path + url.hash + transition.reload (not exported)
 ├── types.ts                     — Public type definitions
 └── index.ts                     — Public exports
 ```
@@ -39,7 +39,7 @@ Most factories return a cached instance keyed by router and, where applicable, b
 
 **Composite key for `createActiveRouteSource`:** `` `${routeName}|${canonicalJson(params)}|${strict}|${ignoreQueryParams}` ``. Key-order-insensitive via `canonicalJson` — `{a:1, b:2}` and `{b:2, a:1}` hit the same entry.
 
-**`Symbol`/`BigInt` fallback:** if `canonicalJson(params)` throws (non-serializable), `createActiveRouteSource` bypasses the cache and returns a fresh non-cached source for that specific call.
+**Non-serializable fallback:** if `canonicalJson(params)` throws, `createActiveRouteSource` bypasses the cache and returns a fresh non-cached source for that specific call. Throw-triggers include `BigInt` (native `JSON.stringify`), `Map`, `Set`, `WeakMap`, `WeakSet`, `RegExp` (eager `TypeError` — these would otherwise collapse to `"{}"` and cause cache-key collisions), and circular references (path-based detector in `canonicalize()`). `Symbol`-valued fields are silently dropped (standard JSON semantics) — they do not bypass the cache.
 
 **`destroy()` on cached wrappers is a no-op** — the shared source lives until the router is garbage-collected, releasing the WeakMap entry automatically. Required so that adapter code like Angular `sourceToSignal` can call `destroy()` in `DestroyRef.onDestroy` without tearing down a shared instance.
 
@@ -115,11 +115,11 @@ Determines whether a node is active for a given route and builds the `{ route, p
 
 ### `stabilizeState`
 
-Path-based State reference stabilization. Compares `prev.path` with `next.path`. When paths match, returns `prev`; otherwise returns `next`. O(1) string comparison. Used by `computeSnapshot`, `createRouteSource`, and `createTransitionSource`.
+State reference stabilization keyed on `path` **+** `state.context.url.hash` (#532) **+** `state.transition.reload` (#605). When all three match, returns `prev`; otherwise returns `next`. Reload navigations always bypass dedup (`next.transition.reload === true` returns `next` even on path-equal navs). Hash differences also surface as a fresh render so tab-style UIs (`/settings#profile` → `/settings#billing`) re-render. O(1) comparisons. Used by `computeSnapshot`, `createRouteSource`, and `createTransitionSource`.
 
 ### `canonicalJson`
 
-`JSON.stringify` with a replacer that sorts object keys via `toSorted((a, b) => a.localeCompare(b))` before serialization. Used by `createActiveRouteSource` to build a stable cache key from the `params` argument. Throws on `BigInt` (standard `JSON.stringify` behaviour) — the caller falls back to a non-cached source.
+Explicit `canonicalize()` clone that sorts object keys via byte-order comparison (`<` / `>`, locale-independent) before `JSON.stringify`. Used by `createActiveRouteSource` to build a stable cache key from the `params` argument. Throws `TypeError` on `BigInt` (standard `JSON.stringify` behaviour), `Map` / `Set` / `WeakMap` / `WeakSet` / `RegExp` (would otherwise collapse to `"{}"` and collide on cache keys), and circular references (path-based detector via `Set<object>` with `try/finally` cleanup — DAGs with shared refs serialise normally). `__proto__` is preserved as an own property (null-prototype sorted record). The caller falls back to a non-cached source on any throw.
 
 ### `normalizeActiveOptions`
 
@@ -148,11 +148,10 @@ Framework-agnostic port of the `routeSelector` pattern from `@real-router/solid`
 
 ## Dependencies
 
-| Dependency                 | Type    | Purpose                                                        |
-| -------------------------- | ------- | -------------------------------------------------------------- |
-| `@real-router/route-utils` | runtime | `areRoutesRelated` for active-route filtering                  |
-| `@real-router/types`       | runtime | `Router`, `State`, `Params`, `SubscribeState` type definitions |
-| `@real-router/core`        | dev     | `createRouter` for tests                                       |
+| Dependency                 | Type    | Purpose                                                                                                          |
+| -------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------- |
+| `@real-router/route-utils` | runtime | `areRoutesRelated` for active-route filtering                                                                    |
+| `@real-router/core`        | runtime | `events` constants, `getPluginApi` for `createTransitionSource` / `createErrorSource` event subscriptions, plus type re-exports (`Router`, `State`, `Params`, `SubscribeState` — there is no standalone `@real-router/types` package) |
 
 ## Performance Characteristics
 

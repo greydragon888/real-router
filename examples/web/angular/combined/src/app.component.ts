@@ -1,5 +1,4 @@
 import { Component, computed, effect, inject, signal } from "@angular/core";
-import { getDependenciesApi, getRoutesApi } from "@real-router/core/api";
 import {
   injectNavigator,
   NavigationAnnouncer,
@@ -10,6 +9,7 @@ import {
   RouteSelf,
   RouteView,
 } from "@real-router/angular";
+import { getDependenciesApi, getRoutesApi } from "@real-router/core/api";
 
 import { ProgressBarComponent } from "./components/progress-bar.component";
 import { AdminComponent } from "./pages/admin.component";
@@ -22,12 +22,11 @@ import { ProductsListComponent } from "./pages/products-list.component";
 import { SettingsComponent } from "./pages/settings.component";
 import { UsersLayoutComponent } from "./pages/users-layout.component";
 import { privateRoutes, publicRoutes } from "./routes";
-
 import { defineAbilities } from "../../../../shared/abilities";
 import { store } from "../../../../shared/store";
 
-import type { User } from "../../../../shared/api";
 import type { AppDependencies } from "./types";
+import type { User } from "../../../../shared/api";
 import type { Router } from "@real-router/core";
 
 const PRIVATE_LINKS = [
@@ -125,7 +124,9 @@ export class AppComponent {
     });
 
     effect((onCleanup) => {
-      onCleanup(() => unsub());
+      onCleanup(() => {
+        unsub();
+      });
     });
   }
 

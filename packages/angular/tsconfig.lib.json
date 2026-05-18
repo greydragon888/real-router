@@ -15,6 +15,6 @@
   "angularCompilerOptions": {
     "compilationMode": "partial"
   },
-  "include": ["src"],
-  "exclude": ["src/**/*.test.ts", "tests"]
+  "include": ["src", "ssr"],
+  "exclude": ["src/**/*.test.ts", "ssr/**/*.test.ts", "tests"]
 }

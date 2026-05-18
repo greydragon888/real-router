@@ -87,7 +87,6 @@ export function injectRouteEnter(
 
   const { routeState } = injectRoute();
   const skipSameRoute = options?.skipSameRoute ?? true;
-  let lastHandledRoute: State | null = null;
 
   effect(() => {
     const { route, previousRoute } = routeState();
@@ -99,24 +98,20 @@ export function injectRouteEnter(
     //   - **Skip-same-route**: query-only navigations have
     //     `transition.from === route.name`. Opt-out via
     //     `skipSameRoute: false`.
-    //   - **Defensive dedupe + missing `previousRoute`**: same `route`
-    //     ref between effect re-runs is unexpected on Angular (the
-    //     signal only fires on real reference changes); `!previousRoute`
-    //     is unreachable once `transition.from` is set (core populates
-    //     them together). Both kept for parity with React; v8-ignored.
     if (!route.transition.from) {
       return;
     }
     if (skipSameRoute && route.transition.from === route.name) {
       return;
     }
-    /* v8 ignore start */
-    if (lastHandledRoute === route || !previousRoute) {
+    // `previousRoute` is guaranteed populated whenever `route.transition.from`
+    // is set — core writes them together. The dead-code throw-guard that used
+    // to live here (review §8a LOW) is removed; the narrowing below is the
+    // type-safe equivalent and avoids the no-non-null-assertion lint.
+    if (!previousRoute) {
       return;
     }
-    /* v8 ignore stop */
 
-    lastHandledRoute = route;
     handler({ route, previousRoute });
   });
 }

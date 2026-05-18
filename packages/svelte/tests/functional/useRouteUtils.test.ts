@@ -94,18 +94,18 @@ describe("useRouteUtils composable", () => {
 
     await router2.start();
 
-    let result1: any;
-    let result2: any;
+    let result1!: RouteUtils;
+    let result2!: RouteUtils;
 
     renderWithRouter(router, RouteUtilsCapture, {
       onCapture: (r: unknown) => {
-        result1 = r;
+        result1 = r as RouteUtils;
       },
     });
 
     renderWithRouter(router2, RouteUtilsCapture, {
       onCapture: (r: unknown) => {
-        result2 = r;
+        result2 = r as RouteUtils;
       },
     });
 

@@ -162,7 +162,7 @@ describe("stabilizeState", () => {
       expect(afterNav).toBe(initialSnapshot);
     });
 
-    it("reload to same route: stabilizeState preserves prev (same path)", async () => {
+    it("reload to same route: stabilizeState returns next (transition.reload === true bypasses dedupe, #605)", async () => {
       await router.navigate("users.view", { id: "42" });
 
       const prevRoute = router.getState()!;
@@ -173,7 +173,11 @@ describe("stabilizeState", () => {
 
       expect(prevRoute.path).toBe(nextRoute.path);
       expect(prevRoute).not.toBe(nextRoute);
-      expect(stabilizeState(prevRoute, nextRoute)).toBe(prevRoute);
+      // Reload is the user's explicit non-idempotent signal — observers
+      // should see fresh context (data refreshed by `invalidate()`-driven
+      // loader re-runs in SSR plugins).
+      expect(nextRoute.transition.reload).toBe(true);
+      expect(stabilizeState(prevRoute, nextRoute)).toBe(nextRoute);
     });
 
     it("navigate to different route: path changed → returns next", async () => {
@@ -245,6 +249,101 @@ describe("stabilizeState", () => {
       const next = makeStateWithHash(base, undefined);
 
       expect(stabilizeState(prev, next)).toBe(prev);
+    });
+  });
+
+  // ===
+  // Reload-aware stabilization (#605)
+  // ===
+
+  describe("reload-aware stabilization (#605)", () => {
+    function withReload(state: State, reload: boolean): State {
+      return {
+        ...state,
+        transition: {
+          phase: "activating" as const,
+          reason: "success" as const,
+          segments: { deactivated: [], activated: [], intersection: "" },
+          ...(reload ? { reload: true } : {}),
+        },
+      };
+    }
+
+    it("same path, next.transition.reload === true → returns next (bypass dedupe)", () => {
+      const api = getPluginApi(router);
+      const base = api.makeState("home", {}, "/");
+      const prev = withReload(base, false);
+      const next = withReload(base, true);
+
+      expect(prev.path).toBe(next.path);
+      expect(stabilizeState(prev, next)).toBe(next);
+    });
+
+    it("same path, neither has reload → returns prev (legacy behavior)", () => {
+      const api = getPluginApi(router);
+      const base = api.makeState("home", {}, "/");
+      const prev = withReload(base, false);
+      const next = withReload(base, false);
+
+      expect(stabilizeState(prev, next)).toBe(prev);
+    });
+
+    it("same path, prev has reload (next does not) → returns prev", () => {
+      // Only `next.transition.reload` is consulted — the predecessor's
+      // reload flag is irrelevant; what matters is whether the current
+      // navigation was an explicit reload request.
+      const api = getPluginApi(router);
+      const base = api.makeState("home", {}, "/");
+      const prev = withReload(base, true);
+      const next = withReload(base, false);
+
+      expect(stabilizeState(prev, next)).toBe(prev);
+    });
+  });
+
+  describe("defensive reload-flag read (audit §5.G)", () => {
+    it("state with missing `.transition` does not throw (dedups normally)", () => {
+      // Type-erased input simulating a malformed state from a plugin or
+      // future fork. The dedup path must NOT throw TypeError when
+      // `state.transition` is undefined.
+      const malformed = {
+        name: "home",
+        params: {},
+        path: "/",
+        context: {},
+        // transition: missing
+      } as unknown as State;
+
+      // path-equal → dedup branch reads transition.reload. With the defensive
+      // optional chain, the read returns false (not-a-reload) and we dedup.
+      expect(() => stabilizeState(malformed, malformed)).not.toThrow();
+
+      // Different references, same path, no transition → still dedups to prev.
+      const malformed2 = {
+        name: "home",
+        params: {},
+        path: "/",
+        context: {},
+      } as unknown as State;
+
+      expect(stabilizeState(malformed, malformed2)).toBe(malformed);
+    });
+
+    it("state with missing `.transition` and different path returns next", () => {
+      const malformedA = {
+        name: "home",
+        params: {},
+        path: "/",
+        context: {},
+      } as unknown as State;
+      const malformedB = {
+        name: "users",
+        params: {},
+        path: "/users",
+        context: {},
+      } as unknown as State;
+
+      expect(stabilizeState(malformedA, malformedB)).toBe(malformedB);
     });
   });
 });

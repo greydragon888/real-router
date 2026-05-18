@@ -22,6 +22,7 @@
     "lint:unused": "knip",
     "lint:duplicates": "jscpd packages/*/src/",
     "lint:e2e": "bash scripts/check-e2e-specs.sh",
+    "lint:audit": "bash scripts/check-deps-audit.sh",
     "lint:deps": "syncpack lint",
     "lint:deps:fix": "syncpack fix && pnpm dedupe && pnpm install",
     "lint:dedupe": "pnpm dedupe --check",
@@ -137,6 +138,7 @@
     },
     "overrides": {
       "@types/node": "$@types/node",
+      "@angular/router": "21.2.9",
       "@isaacs/brace-expansion": "5.0.1",
       "axios": ">=1.15.0",
       "follow-redirects": ">=1.16.0",
@@ -163,7 +165,11 @@
       "@typescript-eslint/eslint-plugin": "8.57.1",
       "@typescript-eslint/parser": "8.57.1",
       "smol-toml": ">=1.6.1",
-      "defu": ">=6.1.5"
+      "defu": ">=6.1.5",
+      "devalue": ">=5.8.1",
+      "fast-uri": ">=3.1.2",
+      "hono": ">=4.12.18",
+      "ip-address": ">=10.1.1"
     }
   },
   "packageManager": "pnpm@10.33.0+sha512.10568bb4a6afb58c9eb3630da90cc9516417abebd3fabbe6739f0ae795728da1491e9db5a544c76ad8eb7570f5c4bb3d6c637b2cb41bfdcdb47fa823c8649319"

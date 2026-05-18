@@ -12,10 +12,29 @@ export interface RouteAnnouncerOptions {
   getAnnouncementText?: (route: State) => string;
 }
 
+const NOOP_INSTANCE: { destroy: () => void } = Object.freeze({
+  destroy: () => {
+    /* no-op */
+  },
+});
+
 export function createRouteAnnouncer(
   router: Router,
   options?: RouteAnnouncerOptions,
 ): { destroy: () => void } {
+  // Defensive SSR / non-browser guard: in SSR (Node.js) or non-DOM
+  // environments, `document` is undefined and the announcer cannot
+  // attach its aria-live region. Return a frozen NOOP_INSTANCE — same
+  // pattern as `createDirectionTracker`, `createScrollRestoration`, and
+  // `createViewTransitions`. Without this guard, `NavigationAnnouncer`
+  // component construction would throw `ReferenceError: document is not
+  // defined` under `@angular/ssr` rendering, tearing down the whole SSR
+  // bootstrap. Closes review-2026-05-10 §5.10 ⛔ "NavigationAnnouncer
+  // SSR mode" MED.
+  if (typeof document === "undefined") {
+    return NOOP_INSTANCE;
+  }
+
   const prefix = options?.prefix ?? "Navigated to ";
   const getCustomText = options?.getAnnouncementText;
 
@@ -117,7 +136,21 @@ function getOrCreateAnnouncer(): HTMLElement {
   element.setAttribute("aria-atomic", "true");
   element.setAttribute(ANNOUNCER_ATTR, "");
 
-  document.body.prepend(element);
+  // Defensive SSR / pre-`<body>` guard: in some environments (early
+  // injection, deferred-body documents, certain SSR rehydration paths)
+  // `document.body` can be null when the announcer is constructed.
+  // `document.body.prepend(...)` would throw `TypeError: Cannot read
+  // properties of null`, tearing down the consumer's RouterProvider /
+  // NavigationAnnouncer mount. Fallback to `documentElement` keeps the
+  // announcer working for SR users; visual-hidden styling means there is
+  // no visible artifact regardless of mount point.
+  //
+  // TS dom lib types `document.body` as `HTMLElement` (non-null), but
+  // runtime can return null per spec. The `as` cast narrows the type to
+  // include null so the `??` short-circuit is type-safe.
+  ((document.body as HTMLElement | null) ?? document.documentElement).prepend(
+    element,
+  );
 
   return element;
 }
@@ -133,7 +166,30 @@ function resolveText(
   h1: HTMLElement | null,
 ): string {
   if (getCustomText) {
-    return getCustomText(route);
+    try {
+      const customText = getCustomText(route);
+
+      // Mini-sprint E.4 (audit-5 §4.2 #4) — empty-string fallback.
+      // A consumer pattern like
+      //   getAnnouncementText: (route) => myMap[route.name] ?? ""
+      // returns `""` for routes outside the map. The subscribe loop
+      // then sees an empty text and silently no-announces — screen
+      // readers stay quiet without any signal to the developer. Treat
+      // a falsy custom result (`""` / `null` / `undefined`) as
+      // "consumer doesn't have a name for this route" and fall through
+      // to the default resolution chain (h1 → title → route name).
+      if (customText) {
+        return customText;
+      }
+    } catch (error) {
+      // A throwing consumer callback inside the router's subscribe loop
+      // would tear down sibling listeners — log and fall through to the
+      // built-in resolution chain so the announcer keeps working.
+      console.error(
+        "[real-router] getAnnouncementText threw; falling back to default resolution.",
+        error,
+      );
+    }
   }
 
   const h1Text = (h1?.textContent ?? "").trim();

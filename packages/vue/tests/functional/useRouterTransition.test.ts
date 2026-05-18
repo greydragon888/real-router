@@ -108,8 +108,33 @@ describe("useRouterTransition", () => {
   it("toRoute and fromRoute === null when no transition", () => {
     const { result } = mountWithRouter(router, () => useRouterTransition());
 
+    // Full IDLE shape: both route fields are null and transition is not active
+    expect(result.value).toMatchObject({
+      toRoute: null,
+      fromRoute: null,
+      isTransitioning: false,
+    });
+  });
+
+  it("snapshot returns to IDLE shape after a successful transition (not just idle on mount)", async () => {
+    const { result } = mountWithRouter(router, () => useRouterTransition());
+
+    // Capture the initial idle snapshot so we can prove the post-success
+    // snapshot is the same canonical shape (full idle reset, not stale fields).
+    const idleOnMount = result.value;
+
+    expect(idleOnMount.isTransitioning).toBe(false);
+    expect(idleOnMount.toRoute).toBeNull();
+    expect(idleOnMount.fromRoute).toBeNull();
+    expect(idleOnMount.isLeaveApproved).toBe(false);
+
+    await router.navigate("dashboard");
+    await flushPromises();
+
+    expect(result.value.isTransitioning).toBe(false);
     expect(result.value.toRoute).toBeNull();
     expect(result.value.fromRoute).toBeNull();
+    expect(result.value.isLeaveApproved).toBe(false);
   });
 
   it("should set isLeaveApproved to true after deactivation guards pass", async () => {

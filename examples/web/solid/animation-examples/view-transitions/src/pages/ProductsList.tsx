@@ -24,7 +24,7 @@ export function ProductsList(): JSX.Element {
   const routeState = useRoute<{ sort?: SortDirection }>();
 
   const sort = createMemo<SortDirection>(() =>
-    routeState().route?.params.sort === "desc" ? "desc" : "asc",
+    routeState().route.params.sort === "desc" ? "desc" : "asc",
   );
 
   const items = createMemo(() => {

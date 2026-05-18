@@ -8,11 +8,17 @@
       "@real-router/internal-source": "./src/index.ts",
       "types": "./dist/types/real-router-angular.d.ts",
       "default": "./dist/fesm2022/real-router-angular.mjs"
+    },
+    "./ssr": {
+      "@real-router/internal-source": "./ssr/public_api.ts",
+      "types": "./dist/types/real-router-angular-ssr.d.ts",
+      "default": "./dist/fesm2022/real-router-angular-ssr.mjs"
     }
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "ssr"
   ],
   "homepage": "https://github.com/greydragon888/real-router",
   "repository": {
@@ -21,9 +27,10 @@
   },
   "scripts": {
     "test": "vitest",
+    "test:properties": "vitest run --config vitest.config.properties.mts",
     "test:stress": "vitest -c vitest.config.stress.mts",
     "type-check": "tsc --noEmit",
-    "lint": "eslint --cache src/ tests/ --fix --max-warnings 0",
+    "lint": "eslint --cache src/ ssr/ tests/ --fix --max-warnings 0",
     "prebundle": "node scripts/sync-dom-utils.mjs",
     "bundle": "ng-packagr -p ng-package.json -c tsconfig.lib.json"
   },
@@ -49,11 +56,11 @@
   },
   "devDependencies": {
     "@analogjs/vitest-angular": "2.4.7",
-    "@angular/common": "21.2.8",
-    "@angular/compiler": "21.2.8",
-    "@angular/compiler-cli": "21.2.8",
-    "@angular/core": "21.2.8",
-    "@angular/platform-browser": "21.2.8",
+    "@angular/common": "21.2.9",
+    "@angular/compiler": "21.2.9",
+    "@angular/compiler-cli": "21.2.9",
+    "@angular/core": "21.2.9",
+    "@angular/platform-browser": "21.2.9",
     "ng-packagr": "21.2.2",
     "typescript": "6.0.3"
   },

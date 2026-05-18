@@ -29,7 +29,8 @@ export function defineAbilities(role: string): Rule[] {
 
 export function can(rules: Rule[], action: Action, subject: Subject): boolean {
   return rules.some(
-    (r) =>
-      (r.action === action || r.action === "manage") && r.subject === subject,
+    (rule) =>
+      (rule.action === action || rule.action === "manage") &&
+      rule.subject === subject,
   );
 }

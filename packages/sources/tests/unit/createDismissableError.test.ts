@@ -48,14 +48,17 @@ describe("createDismissableError", () => {
     expect(snap.toRoute).toBeNull();
     expect(snap.fromRoute).toBeNull();
     expect(snap.version).toBe(0);
-    expect(typeof snap.resetError).toBe("function");
+    // resetError is the same stable function across snapshots (not re-allocated).
+    expect(snap.resetError).toBe(source.getSnapshot().resetError);
   });
 
   it("snapshot.error becomes non-null on navigation error", async () => {
     const source = createDismissableError(router);
     const unsub = source.subscribe(() => {});
 
-    await expect(router.navigate("nonexistent")).rejects.toThrow();
+    await expect(router.navigate("nonexistent")).rejects.toThrow(
+      /ROUTE_NOT_FOUND/,
+    );
 
     const snap = source.getSnapshot();
 
@@ -70,7 +73,9 @@ describe("createDismissableError", () => {
     const source = createDismissableError(router);
     const unsub = source.subscribe(() => {});
 
-    await expect(router.navigate("nonexistent")).rejects.toThrow();
+    await expect(router.navigate("nonexistent")).rejects.toThrow(
+      /ROUTE_NOT_FOUND/,
+    );
     expect(source.getSnapshot().error).not.toBeNull();
 
     source.getSnapshot().resetError();
@@ -86,7 +91,9 @@ describe("createDismissableError", () => {
     const source = createDismissableError(router);
     const unsub = source.subscribe(() => {});
 
-    await expect(router.navigate("first-missing")).rejects.toThrow();
+    await expect(router.navigate("first-missing")).rejects.toThrow(
+      /ROUTE_NOT_FOUND/,
+    );
 
     const firstVersion = source.getSnapshot().version;
 
@@ -94,7 +101,9 @@ describe("createDismissableError", () => {
 
     expect(source.getSnapshot().error).toBeNull();
 
-    await expect(router.navigate("second-missing")).rejects.toThrow();
+    await expect(router.navigate("second-missing")).rejects.toThrow(
+      /ROUTE_NOT_FOUND/,
+    );
 
     const snap = source.getSnapshot();
 
@@ -108,19 +117,19 @@ describe("createDismissableError", () => {
     const source = createDismissableError(router);
     const unsub = source.subscribe(() => {});
 
-    await expect(router.navigate("missing")).rejects.toThrow();
+    await expect(router.navigate("missing")).rejects.toThrow(/ROUTE_NOT_FOUND/);
 
     const firstSnap = source.getSnapshot();
     const firstError = firstSnap.error;
 
-    await expect(router.navigate("missing")).rejects.toThrow();
+    await expect(router.navigate("missing")).rejects.toThrow(/ROUTE_NOT_FOUND/);
 
     const secondSnap = source.getSnapshot();
 
-    expect(secondSnap.error).not.toBeNull();
     expect(secondSnap.version).toBeGreaterThan(firstSnap.version);
-    // Same error code (same behaviour — core may reuse the error instance)
-    expect(secondSnap.error!.code).toBe(firstError!.code);
+    // Core reuses the RouterError instance for repeated identical failures
+    // (ROUTE_NOT_FOUND on the same target) — assert reference identity.
+    expect(secondSnap.error).toBe(firstError);
 
     unsub();
   });
@@ -133,25 +142,65 @@ describe("createDismissableError", () => {
       notifications.push(source.getSnapshot().error?.code ?? null);
     });
 
-    await expect(router.navigate("nonexistent")).rejects.toThrow();
+    await expect(router.navigate("nonexistent")).rejects.toThrow(
+      /ROUTE_NOT_FOUND/,
+    );
 
     source.getSnapshot().resetError();
 
-    expect(notifications.length).toBeGreaterThanOrEqual(2);
-    expect(notifications[0]).toBe("ROUTE_NOT_FOUND");
-    expect(notifications.at(-1)).toBeNull();
+    // Exactly two notifications: ROUTE_NOT_FOUND emitted by the error event,
+    // then null emitted by resetError() advancing dismissedVersion.
+    expect(notifications).toStrictEqual(["ROUTE_NOT_FOUND", null]);
 
     unsub();
   });
 
-  it("destroy() is a no-op — snapshot still works", () => {
+  it("resetError() is a no-op when already dismissed at the current version (audit §8.3)", async () => {
+    const source = createDismissableError(router);
+    const notifications: (string | null)[] = [];
+
+    const unsub = source.subscribe(() => {
+      notifications.push(source.getSnapshot().error?.code ?? null);
+    });
+
+    await expect(router.navigate("nonexistent")).rejects.toThrow(
+      /ROUTE_NOT_FOUND/,
+    );
+
+    // First resetError advances dismissedVersion → emits one notification.
+    source.getSnapshot().resetError();
+
+    const snapshotAfterFirstReset = source.getSnapshot();
+    const notificationsAfterFirstReset = notifications.length;
+
+    // Three additional resetError() calls — all no-ops because dismissedVersion
+    // is already at or above the live error-source version. No extra snapshot
+    // allocations, no extra listener calls.
+    source.getSnapshot().resetError();
+    source.getSnapshot().resetError();
+    source.getSnapshot().resetError();
+
+    expect(source.getSnapshot()).toBe(snapshotAfterFirstReset);
+    expect(notifications).toHaveLength(notificationsAfterFirstReset);
+
+    unsub();
+  });
+
+  it("destroy() is a no-op — snapshot still works and resetError is callable", () => {
     const source = createDismissableError(router);
 
     source.destroy();
     source.destroy();
 
+    const snap = source.getSnapshot();
+
+    expect(snap.error).toBeNull();
+    // resetError must be callable after destroy — it is a no-op on the shared
+    // cached source, which survives individual consumer teardowns.
+    expect(() => {
+      snap.resetError();
+    }).not.toThrow();
     expect(source.getSnapshot().error).toBeNull();
-    expect(typeof source.getSnapshot().resetError).toBe("function");
   });
 
   it("N consumers share one subscription — reset from one applies to all", async () => {
@@ -164,7 +213,7 @@ describe("createDismissableError", () => {
       }),
     );
 
-    await expect(router.navigate("missing")).rejects.toThrow();
+    await expect(router.navigate("missing")).rejects.toThrow(/ROUTE_NOT_FOUND/);
 
     // All 5 consumers see the error.
     expect(snaps.every((s) => s === "ROUTE_NOT_FOUND")).toBe(true);

@@ -4,12 +4,13 @@ import { UserSettings } from "./UserSettings";
 
 import type { JSX } from "preact";
 
-const userData: Record<string, { name: string; role: string; email: string }> =
-  {
-    "1": { name: "Alice", role: "Admin", email: "alice@example.com" },
-    "2": { name: "Bob", role: "Editor", email: "bob@example.com" },
-    "3": { name: "Carol", role: "Viewer", email: "carol@example.com" },
-  };
+const userData: Partial<
+  Record<string, { name: string; role: string; email: string }>
+> = {
+  "1": { name: "Alice", role: "Admin", email: "alice@example.com" },
+  "2": { name: "Bob", role: "Editor", email: "bob@example.com" },
+  "3": { name: "Carol", role: "Viewer", email: "carol@example.com" },
+};
 
 function ProfileDetails({ id }: { id: string }): JSX.Element {
   const user = userData[id];

@@ -5,10 +5,10 @@ export default defineConfig({
   retries: 1,
   webServer: {
     command: "pnpm preview",
-    port: 4173,
+    port: 4208,
     reuseExistingServer: !process.env.CI,
   },
   use: {
-    baseURL: "http://localhost:4173",
+    baseURL: "http://localhost:4208",
   },
 });

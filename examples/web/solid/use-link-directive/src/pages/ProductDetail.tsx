@@ -3,6 +3,7 @@ import { link, useRouteNode } from "@real-router/solid";
 import type { JSX } from "solid-js";
 
 // Keep reference to prevent tree-shaking (Solid directive pattern)
+// eslint-disable-next-line @typescript-eslint/no-unused-expressions -- Solid directive use:link is detected at compile time but reads as unused at runtime
 link;
 
 export function ProductDetail(): JSX.Element {

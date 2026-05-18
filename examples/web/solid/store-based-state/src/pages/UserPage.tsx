@@ -8,18 +8,18 @@ function HeaderStore(): JSX.Element {
   const [count, setCount] = createSignal(0);
 
   createEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- subscribe to params.id changes
     state.route?.params.id;
     setCount((c) => c + 1);
     console.log(
-      `[Header Store] effect ran — id=${state.route?.params.id as string}, count=${count()}`,
+      `[Header Store] effect ran — id=${state.route?.params.id as string | undefined}, count=${count()}`,
     );
   });
 
   return (
     <div class="card">
       <strong>Header (useRouteStore → params.id)</strong>
-      <p>User ID: {(state.route?.params.id as string) ?? "—"}</p>
+      <p>User ID: {state.route?.params.id as string | undefined}</p>
       <p style={{ "font-size": "13px", color: "#888" }}>
         Effect count: {count()}
       </p>
@@ -32,11 +32,11 @@ function SidebarStore(): JSX.Element {
   const [count, setCount] = createSignal(0);
 
   createEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- subscribe to params.page changes
     state.route?.params.page;
     setCount((c) => c + 1);
     console.log(
-      `[Sidebar Store] effect ran — page=${state.route?.params.page as string}, count=${count()}`,
+      `[Sidebar Store] effect ran — page=${state.route?.params.page as string | undefined}, count=${count()}`,
     );
   });
 
@@ -58,7 +58,7 @@ function SignalComparison(): JSX.Element {
   const [count, setCount] = createSignal(0);
 
   createEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- subscribe to params.id changes
     routeState().route.params.id;
     setCount((c) => c + 1);
     console.log(`[Signal] effect ran — count=${count()}`);
@@ -67,7 +67,7 @@ function SignalComparison(): JSX.Element {
   return (
     <div class="card">
       <strong>Signal comparison (useRoute → params.id)</strong>
-      <p>User ID: {(routeState().route.params.id as string) ?? "—"}</p>
+      <p>User ID: {routeState().route.params.id as string}</p>
       <p style={{ "font-size": "13px", color: "#888" }}>
         Effect count: {count()} — re-runs on ANY param change
       </p>

@@ -14,6 +14,12 @@ interface FallbackSlots {
   notFoundChildren: ReactNode;
 }
 
+// Fixed keys used by appendFallback to distinguish the Self / NotFound
+// render slots from user-supplied <Match> children. Match render slots key
+// off `fullSegmentName` instead — these two are the only synthetic keys.
+const SELF_KEY = "__route-view-self__";
+const NOT_FOUND_KEY = "__route-view-not-found__";
+
 function isSegmentMatch(
   routeName: string,
   fullSegmentName: string,
@@ -34,10 +40,20 @@ export function collectElements(
   children: ReactNode,
   result: ReactElement[],
 ): void {
-  // eslint-disable-next-line @eslint-react/no-children-to-array
-  for (const child of Children.toArray(children)) {
+  // Recurses into Fragment-like wrappers (anything that isn't Match / Self /
+  // NotFound) to flatten the slot tree. No explicit depth guard: typical
+  // RouteView shape is `<RouteView><Match/>...<NotFound/></RouteView>` —
+  // depth ≤ 3 in real apps. A pathological hand-written tree of N Fragments
+  // recurses N times; the call stack, not this function, is the bound.
+  //
+  // `Children.forEach` iterates without `Children.toArray`'s array allocation
+  // and per-child clone-with-synthetic-key step. We don't read child.key here
+  // (Match/Self/NotFound carry their own segment-derived keys further down),
+  // so the cheaper iterator is functionally equivalent.
+  // eslint-disable-next-line @eslint-react/no-children-for-each -- intentional: collectElements is a render-hot pipeline; toArray's array+key clone is wasteful here
+  Children.forEach(children, (child) => {
     if (!isValidElement(child)) {
-      continue;
+      return;
     }
 
     if (
@@ -52,7 +68,7 @@ export function collectElements(
         result,
       );
     }
-  }
+  });
 }
 
 function renderSlotElement(
@@ -108,12 +124,8 @@ function processMatch(
   hasBeenActivated: Set<string>,
   alreadyActive: boolean,
 ): { rendered: ReactElement | null; matched: boolean } {
-  const {
-    segment,
-    exact = false,
-    keepAlive = false,
-    fallback,
-  } = child.props as MatchProps;
+  const matchProps = child.props as MatchProps;
+  const { segment, exact = false, keepAlive = false, fallback } = matchProps;
   const fullSegmentName = nodeName ? `${nodeName}.${segment}` : segment;
   const isActive =
     !alreadyActive && isSegmentMatch(routeName, fullSegmentName, exact);
@@ -123,7 +135,7 @@ function processMatch(
 
     return {
       rendered: renderSlotElement(
-        (child.props as MatchProps).children,
+        matchProps.children,
         fullSegmentName,
         keepAlive,
         "visible",
@@ -136,7 +148,7 @@ function processMatch(
   if (keepAlive && hasBeenActivated.has(fullSegmentName)) {
     return {
       rendered: renderSlotElement(
-        (child.props as MatchProps).children,
+        matchProps.children,
         fullSegmentName,
         keepAlive,
         "hidden",
@@ -159,7 +171,7 @@ function appendFallback(
     rendered.push(
       renderSlotElement(
         slots.selfChildren,
-        "__route-view-self__",
+        SELF_KEY,
         false,
         "visible",
         slots.selfFallback,
@@ -171,9 +183,7 @@ function appendFallback(
 
   if (routeName === UNKNOWN_ROUTE && slots.notFoundChildren !== null) {
     rendered.push(
-      <Fragment key="__route-view-not-found__">
-        {slots.notFoundChildren}
-      </Fragment>,
+      <Fragment key={NOT_FOUND_KEY}>{slots.notFoundChildren}</Fragment>,
     );
   }
 }

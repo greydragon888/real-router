@@ -10,7 +10,7 @@ import { createStressRouter, takeHeapSnapshot, MB, forceGC } from "./helpers";
 // Link slow path, useRouterError). Each router should be GC-collectable
 // once all references to it are dropped — WeakMap keys auto-release.
 describe("F1 — factory reuse (100 router instances)", () => {
-  it("F1 — 100 router instances via factory — all disposed, heap stable", async () => {
+  it("F1.1 — 100 router instances via factory — all disposed, heap stable", async () => {
     const heapBefore = takeHeapSnapshot();
 
     for (let i = 0; i < 100; i++) {
@@ -34,6 +34,27 @@ describe("F1 — factory reuse (100 router instances)", () => {
 
     const heapAfter = takeHeapSnapshot();
 
+    expect(heapAfter - heapBefore).toBeLessThan(50 * MB);
+  }, 120_000);
+
+  // F1.2: 1000 lightweight router cycles — no UI render — detects slow WeakMap
+  // key accumulation or source-cache leaks that 100 iterations may miss.
+  it("F1.2 — 1000 router instances (cache-only, no render) — heap stable", async () => {
+    const heapBefore = takeHeapSnapshot();
+
+    for (let i = 0; i < 1000; i++) {
+      const router = createStressRouter(3);
+
+      await router.start("/route0");
+      await router.navigate("users.list");
+      router.stop();
+    }
+
+    forceGC();
+
+    const heapAfter = takeHeapSnapshot();
+
+    // 1000 cache-only cycles: steady-state delta should be well under 50 MB.
     expect(heapAfter - heapBefore).toBeLessThan(50 * MB);
   }, 120_000);
 });

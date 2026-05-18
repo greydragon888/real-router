@@ -1,5 +1,3 @@
-// packages/react/src/hooks/useNavigator.tsx
-
 import { useContext } from "react";
 
 import { NavigatorContext } from "../context";

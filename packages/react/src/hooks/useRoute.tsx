@@ -1,5 +1,3 @@
-// packages/react/src/hooks/useRoute.tsx
-
 import { useContext } from "react";
 
 import { RouteContext } from "../context";
@@ -7,10 +5,17 @@ import { RouteContext } from "../context";
 import type { RouteContext as RouteContextType } from "../types";
 import type { Params, State } from "@real-router/core";
 
-export const useRoute = <P extends Params = Params>(): Omit<
+/**
+ * Return shape of `useRoute<P>()` — the context with `route` narrowed to
+ * `State<P>` (non-nullable). Promoting the intersection to a named alias
+ * keeps the function signature and the cast site in sync.
+ */
+type RouteHookResult<P extends Params = Params> = Omit<
   RouteContextType<P>,
   "route"
-> & { route: State<P> } => {
+> & { route: State<P> };
+
+export const useRoute = <P extends Params = Params>(): RouteHookResult<P> => {
   const routeContext = useContext(RouteContext);
 
   if (!routeContext) {
@@ -23,7 +28,5 @@ export const useRoute = <P extends Params = Params>(): Omit<
     );
   }
 
-  return routeContext as Omit<RouteContextType<P>, "route"> & {
-    route: State<P>;
-  };
+  return routeContext as RouteHookResult<P>;
 };

@@ -112,16 +112,16 @@ All composables (`useRouter`, `useRoute`, etc.) and the `v-link` directive work 
 
 ## Composables
 
-Route state composables return `ShallowRef` values. Read `.value` in script, or use them directly in templates where Vue auto-unwraps refs.
+Route state composables return `Readonly<Ref>` values — `useRoute` mirrors a `shallowRef`, `useRouteNode` derives a `computed`, and `useRouterTransition` returns a `ShallowRef` directly. Consumers only need `.value` read access; in templates Vue auto-unwraps refs.
 
-| Composable              | Returns                                                       | Reactive?                                |
-| ----------------------- | ------------------------------------------------------------- | ---------------------------------------- |
-| `useRouter()`           | `Router`                                                      | Never                                    |
-| `useNavigator()`        | `Navigator`                                                   | Never (stable ref, safe to use directly) |
-| `useRoute()`            | `{ navigator, route: ShallowRef, previousRoute: ShallowRef }` | route/previousRoute on every navigation  |
-| `useRouteNode(name)`    | `{ navigator, route: ShallowRef, previousRoute: ShallowRef }` | Only when node activates/deactivates     |
-| `useRouteUtils()`       | `RouteUtils`                                                  | Never                                    |
-| `useRouterTransition()` | `ShallowRef<RouterTransitionSnapshot>`                        | On transition start/end                  |
+| Composable              | Returns                                                                      | Reactive?                                |
+| ----------------------- | ---------------------------------------------------------------------------- | ---------------------------------------- |
+| `useRouter()`           | `Router`                                                                     | Never                                    |
+| `useNavigator()`        | `Navigator`                                                                  | Never (stable ref, safe to use directly) |
+| `useRoute()`            | `{ navigator, route: Readonly<Ref<State>>, previousRoute: Readonly<Ref<State \| undefined>> }` | route/previousRoute on every navigation  |
+| `useRouteNode(name)`    | `{ navigator, route: Readonly<Ref<State \| undefined>>, previousRoute: Readonly<Ref<State \| undefined>> }` (computed under the hood) | Only when node activates/deactivates     |
+| `useRouteUtils()`       | `RouteUtils`                                                                 | Never                                    |
+| `useRouterTransition()` | `ShallowRef<RouterTransitionSnapshot>`                                       | On transition start/end                  |
 | `useRouteExit(handler, options?)`  | `void` — wraps `subscribeLeave` with abort + same-route guards            | Never (handler captured in `setup()`)    |
 | `useRouteEnter(handler, options?)` | `void` — fires once on nav-driven mount via `watch(route)` + `transition.from` | Never (handler captured in `setup()`) |
 
@@ -246,7 +246,7 @@ In a template:
 <Link routeName="settings" hash="account">Account</Link>
 ```
 
-Tri-state: `undefined` preserves the current hash, `""` clears it, a value sets it. Active class is hash-aware — only the matching tab lights up. Live demo: [`examples/web/react/link-hash/`](../../examples/web/react/link-hash/) — behavior is identical across adapters, only template syntax differs. See the [Hash Fragment Support](https://github.com/greydragon888/real-router/wiki/Hash) wiki page for the full surface.
+Tri-state: `undefined` preserves the current hash, `""` clears it, a value sets it. Active class is hash-aware — only the matching tab lights up. Live demo (React adapter, same API): [`examples/web/react/link-hash/`](../../examples/web/react/link-hash/) — template syntax differs, behavior is identical. See the [Hash Fragment Support](https://github.com/greydragon888/real-router/wiki/Hash) wiki page for the full surface.
 
 ### `<RouteView>`
 
@@ -281,6 +281,30 @@ h(
 // Only matches "users" exactly, not "users.profile"
 ```
 
+**`<RouteView.Self>`** — renders when the active route name **exactly equals** the parent `<RouteView>`'s `nodeName`. Use for leaf pages where the parent route itself is the destination. Self outranks `<NotFound>` and yields to any activating `<Match>`. First-`<Self>`-wins if multiple are provided.
+
+```typescript
+h(
+  RouteView,
+  { nodeName: "users" },
+  {
+    default: () => [
+      // Active when route.name === "users" — the "directory index" of the node
+      h(RouteView.Self, null, { default: () => h(UsersIndex) }),
+      // Active when route.name === "users.profile"
+      h(
+        RouteView.Match,
+        { segment: "users.profile" },
+        { default: () => h(UserProfile) },
+      ),
+      h(RouteView.NotFound, null, { default: () => h(NotFoundPage) }),
+    ],
+  },
+);
+```
+
+`RouteView.Self` also accepts an optional `fallback` prop (same semantics as `RouteView.Match.fallback`) for Suspense integration with `defineAsyncComponent`.
+
 **`keepAlive` prop:** Vue's native `<KeepAlive>` preserves component state across navigations. Each segment gets a dedicated wrapper component so `<KeepAlive>` can track them independently.
 
 ```typescript
@@ -295,6 +319,37 @@ h(
   },
 );
 ```
+
+**Per-Match `keepAlive`:** `RouteView.Match` also accepts its own `keepAlive` prop for fine-grained control. This lets you keep only specific routes alive without enabling `keepAlive` on the parent `<RouteView>`.
+
+```typescript
+h(
+  RouteView,
+  { nodeName: "" },
+  {
+    default: () => [
+      // Only UsersPage is kept alive; SettingsPage always remounts
+      h(RouteView.Match, { segment: "users", keepAlive: true }, { default: () => h(UsersPage) }),
+      h(RouteView.Match, { segment: "settings" }, { default: () => h(SettingsPage) }),
+    ],
+  },
+);
+```
+
+In a template:
+
+```vue
+<RouteView nodeName="">
+  <RouteView.Match segment="users" keepAlive>
+    <UsersPage />
+  </RouteView.Match>
+  <RouteView.Match segment="settings">
+    <SettingsPage />
+  </RouteView.Match>
+</RouteView>
+```
+
+Per-Match `keepAlive` is checked first; if any `Match` child has `keepAlive: true`, the `<KeepAlive>` wrapper is created for that segment even if the parent `<RouteView>` prop is not set.
 
 **Lazy loading with `fallback`:** Pass a `fallback` prop (`VNode | (() => VNode)`) to wrap the matched content in Vue's `<Suspense>`. This lets you show a loading state while a `defineAsyncComponent` chunk is fetching. Works with both `keepAlive` and non-`keepAlive` modes.
 
@@ -377,6 +432,31 @@ In a template:
 ```
 
 Auto-resets on next successful navigation. Works with both `<Link>` and imperative `router.navigate()`.
+
+### `<ClientOnly>` / `<ServerOnly>`
+
+Paired SSR-aware boundaries. `<ClientOnly>` renders the `fallback` slot on the server (and on the client first paint, to match SSR HTML), then swaps in the `default` slot after mount. `<ServerOnly>` is the symmetric inverse.
+
+```vue
+<script setup lang="ts">
+import { ClientOnly, ServerOnly } from "@real-router/vue";
+</script>
+
+<template>
+  <ClientOnly>
+    <BrowserApiWidget />
+    <template #fallback>
+      <Skeleton />
+    </template>
+  </ClientOnly>
+
+  <ServerOnly>
+    <SeoMetaStrip />
+  </ServerOnly>
+</template>
+```
+
+Implementation: `ref(false)` + `onMounted(() => mounted.value = true)`. Slots `default` (children) and `fallback`. End-to-end dogfooding lives in [`examples/web/vue/ssr-examples/ssr/`](../../examples/web/vue/ssr-examples/ssr/) (see `e2e/ssr-boundaries.spec.ts`).
 
 ## Directives
 
@@ -560,9 +640,13 @@ Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 
 ## Examples
 
-14 runnable examples — each is a standalone Vite app. Run: `cd examples/web/vue/basic && pnpm dev`
+23 runnable examples — each is a standalone Vite app. Run: `cd examples/web/vue/basic && pnpm dev`
 
-[basic](../../examples/web/vue/basic) · [nested-routes](../../examples/web/vue/nested-routes) · [auth-guards](../../examples/web/vue/auth-guards) · [data-loading](../../examples/web/vue/data-loading) · [lazy-loading](../../examples/web/vue/lazy-loading) · [async-guards](../../examples/web/vue/async-guards) · [hash-routing](../../examples/web/vue/hash-routing) · [persistent-params](../../examples/web/vue/persistent-params) · [error-handling](../../examples/web/vue/error-handling) · [dynamic-routes](../../examples/web/vue/dynamic-routes) · [plugin-installation](../../examples/web/vue/plugin-installation) · [v-link-directive](../../examples/web/vue/v-link-directive) · [keep-alive](../../examples/web/vue/keep-alive) · [combined](../../examples/web/vue/combined)
+**Routing patterns:** [basic](../../examples/web/vue/basic) · [nested-routes](../../examples/web/vue/nested-routes) · [auth-guards](../../examples/web/vue/auth-guards) · [data-loading](../../examples/web/vue/data-loading) · [lazy-loading](../../examples/web/vue/lazy-loading) · [async-guards](../../examples/web/vue/async-guards) · [hash-routing](../../examples/web/vue/hash-routing) · [persistent-params](../../examples/web/vue/persistent-params) · [error-handling](../../examples/web/vue/error-handling) · [dynamic-routes](../../examples/web/vue/dynamic-routes) · [plugin-installation](../../examples/web/vue/plugin-installation) · [v-link-directive](../../examples/web/vue/v-link-directive) · [keep-alive](../../examples/web/vue/keep-alive) · [search-schema](../../examples/web/vue/search-schema) · [combined](../../examples/web/vue/combined)
+
+**Animations:** [view-transitions](../../examples/web/vue/animation-examples/view-transitions) · [route-animations](../../examples/web/vue/animation-examples/route-animations) · [page-animations](../../examples/web/vue/animation-examples/page-animations) · [motion-animations](../../examples/web/vue/animation-examples/motion-animations)
+
+**Server-side rendering:** [ssr](../../examples/web/vue/ssr-examples/ssr) · [ssr-streaming](../../examples/web/vue/ssr-examples/ssr-streaming) · [ssr-mixed](../../examples/web/vue/ssr-examples/ssr-mixed) · [ssg](../../examples/web/vue/ssr-examples/ssg)
 
 ## Related Packages
 

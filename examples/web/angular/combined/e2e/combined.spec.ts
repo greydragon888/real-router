@@ -225,7 +225,13 @@ test.describe("Combined Example", () => {
 
     test("invalid query params recovered to defaults", async ({ page }) => {
       await login(page);
-      await page.goto("/products?page=-1&sort=invalid");
+      // Simulate user landing on bad URL via SPA navigation. page.goto would
+      // hard-reload and lose the in-memory auth state, demoting /products to
+      // an unknown route (allowNotFound keeps the URL untouched).
+      await page.evaluate(() => {
+        history.pushState(null, "", "/products?page=-1&sort=invalid");
+        dispatchEvent(new PopStateEvent("popstate", { state: null }));
+      });
       await expect(page).toHaveURL(/page=1/);
       await expect(page).toHaveURL(/sort=name/);
     });

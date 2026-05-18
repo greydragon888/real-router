@@ -3,7 +3,12 @@ import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import { createTransitionSource } from "../../src";
+import {
+  nextLeaveApproveSnapshot,
+  nextTransitionStartSnapshot,
+} from "../../src/createTransitionSource";
 
+import type { RouterTransitionSnapshot } from "../../src";
 import type { Router, State } from "@real-router/core";
 
 describe("createTransitionSource", () => {
@@ -156,6 +161,7 @@ describe("createTransitionSource", () => {
     const snapshot = source.getSnapshot();
 
     expect(snapshot.isTransitioning).toBe(false);
+    expect(snapshot.isLeaveApproved).toBe(false);
     expect(snapshot.toRoute).toBeNull();
     expect(snapshot.fromRoute).toBeNull();
   });
@@ -209,19 +215,24 @@ describe("createTransitionSource", () => {
 
     source.subscribe(listener);
 
-    void router.navigate("dashboard");
+    const navPromise = router.navigate("dashboard");
+
+    await Promise.resolve();
     await Promise.resolve();
 
-    // TRANSITION_START + TRANSITION_LEAVE_APPROVE should have notified
-    expect(listener.mock.calls.length).toBeGreaterThanOrEqual(1);
+    // After START + LEAVE_APPROVE land but the activate guard is blocked,
+    // the listener has been notified exactly twice. This is deterministic:
+    // both events call updateSnapshot which always notifies.
+    const callsBeforeResolve = listener.mock.calls.length;
+
+    expect(callsBeforeResolve).toBe(2);
 
     resolveGuard(true);
-    await Promise.resolve();
-    await Promise.resolve();
-    await Promise.resolve();
+    await navPromise;
 
-    // TRANSITION_SUCCESS should have notified again
-    expect(listener.mock.calls.length).toBeGreaterThanOrEqual(2);
+    // TRANSITION_SUCCESS resets to IDLE_SNAPSHOT (singleton ref). Total
+    // notifications: START + LEAVE_APPROVE + SUCCESS = 3.
+    expect(listener).toHaveBeenCalledTimes(3);
   });
 
   it("does not notify subscribers after unsubscribe", async () => {
@@ -286,11 +297,24 @@ describe("createTransitionSource", () => {
     });
 
     const source = createTransitionSource(router);
+    const api = getPluginApi(router);
+    const captures: { target: string; observed: string | undefined }[] = [];
+
+    // Capture toRoute at the moment each TRANSITION_START fires, AFTER the
+    // source's own listener has updated the snapshot (the source registers
+    // first, so this listener observes the post-update state).
+    api.addEventListener(events.TRANSITION_START, (toState) => {
+      captures.push({
+        target: toState.name,
+        observed: source.getSnapshot().toRoute?.name,
+      });
+    });
 
     const p1 = router.navigate("dashboard");
 
     await Promise.resolve();
 
+    expect(source.getSnapshot().toRoute).not.toBeNull();
     expect(source.getSnapshot().toRoute!.name).toBe("dashboard");
 
     // New navigation cancels previous
@@ -305,9 +329,22 @@ describe("createTransitionSource", () => {
 
     // After second navigation completes, should be IDLE
     expect(source.getSnapshot().isTransitioning).toBe(false);
+
+    // Verify toRoute was actually flipped to "settings" mid-flight, not just
+    // observed at the IDLE endpoint. Both TRANSITION_START events captured
+    // the source's snapshot post-update — confirms the source tracks the
+    // current target through cancel/replace.
+    expect(captures.map((c) => c.target)).toStrictEqual([
+      "dashboard",
+      "settings",
+    ]);
+    expect(captures.map((c) => c.observed)).toStrictEqual([
+      "dashboard",
+      "settings",
+    ]);
   });
 
-  it("skip update when reentrant navigation produces TRANSITION_START with same paths", async () => {
+  it("reentrant TRANSITION_START produces fresh snapshots each call (post-#605 dedup is unreachable, but every snapshot must be a new reference)", async () => {
     const lifecycle = getLifecycleApi(router);
     const resolvers: ((value: boolean) => void)[] = [];
 
@@ -329,8 +366,25 @@ describe("createTransitionSource", () => {
     }));
 
     const source = createTransitionSource(router);
+    // Capture the IDLE_SNAPSHOT singleton before any nav — used below as the
+    // reference for the post-settle assertion. The singleton is module-private
+    // (`createTransitionSource.ts:15`), so we observe it through the public
+    // initial snapshot rather than importing it directly.
+    const idleSnapshot = source.getSnapshot();
+    const startEvents = vi.fn();
+    const api = getPluginApi(router);
 
-    source.subscribe(() => {});
+    api.addEventListener(events.TRANSITION_START, startEvents);
+
+    // Capture the snapshot the listener observes at each notification — this
+    // turns the listener into a reference-by-reference trace we can assert
+    // against, instead of just counting calls.
+    const snapshotTrace: RouterTransitionSnapshot[] = [];
+    const listener = vi.fn(() => {
+      snapshotTrace.push(source.getSnapshot());
+    });
+
+    source.subscribe(listener);
 
     void router.navigate("dashboard").catch(() => {});
 
@@ -342,42 +396,242 @@ describe("createTransitionSource", () => {
     await Promise.resolve();
     await Promise.resolve();
 
+    // 1. Reentrancy actually happened — the plugin fired the second nav, so
+    //    the router emitted at least two TRANSITION_START events.
+    expect(startEvents).toHaveBeenCalledTimes(2);
+
+    // 2. The source settled back to IDLE after all transitions resolved.
+    expect(source.getSnapshot()).toBe(idleSnapshot);
     expect(source.getSnapshot().isTransitioning).toBe(false);
+    expect(source.getSnapshot().isLeaveApproved).toBe(false);
+
+    // 3. The listener observed every state-changing snapshot — at minimum the
+    //    initial entry into a transitioning state plus the final reset to IDLE.
+    expect(listener.mock.calls.length).toBeGreaterThanOrEqual(2);
+
+    // 4. **Snapshot identity invariant (covers the dedup contract via its
+    //    observable consequence):** no two adjacent notifications produced
+    //    the same snapshot reference. If `nextTransitionStartSnapshot`
+    //    returned `null` from the dedup guard, `source.updateSnapshot` would
+    //    be skipped and the listener would not fire — so a duplicate-ref
+    //    notification can never appear in this trace. Conversely, a
+    //    regression that made the guard always return the previous snapshot
+    //    (instead of `null`) would surface here as two identical refs in
+    //    a row.
+    expect(snapshotTrace.length).toBeGreaterThan(0);
+
+    for (let i = 1; i < snapshotTrace.length; i++) {
+      expect(snapshotTrace[i]).not.toBe(snapshotTrace[i - 1]);
+    }
+
+    // 5. The trace passed through a transitioning state at some point — the
+    //    initial TRANSITION_START (or the post-reentrant one) flipped the
+    //    source to `isTransitioning: true` before the final settle.
+    expect(snapshotTrace.some((s) => s.isTransitioning)).toBe(true);
+    // 6. The final emitted snapshot is the singleton IDLE — proves the
+    //    SUCCESS/CANCEL collapse path ran and the source converged cleanly
+    //    via the shared `IDLE_SNAPSHOT` constant (captured at construction).
+    expect(snapshotTrace.at(-1)).toBe(idleSnapshot);
 
     source.destroy();
   });
 
-  it("repeated IDLE_SNAPSHOT (success after success) is idempotent", async () => {
+  function fakeState(path: string, name = "x"): State {
+    return {
+      name,
+      params: {},
+      path,
+      transition: { phase: "activating", segments: [], reload: false },
+      context: {},
+    } as unknown as State;
+  }
+
+  describe("nextTransitionStartSnapshot (dedup guard, direct unit)", () => {
+    it("returns next snapshot from IDLE (initial transition entry)", () => {
+      const idle: RouterTransitionSnapshot = {
+        isTransitioning: false,
+        isLeaveApproved: false,
+        toRoute: null,
+        fromRoute: null,
+      };
+      const toState = fakeState("/a", "a");
+      const fromState = fakeState("/", "home");
+
+      const next = nextTransitionStartSnapshot(idle, toState, fromState);
+
+      expect(next).toStrictEqual({
+        isTransitioning: true,
+        isLeaveApproved: false,
+        toRoute: toState,
+        fromRoute: fromState,
+      });
+    });
+
+    it("returns null (dedup skip) when re-entered with path-equal States", () => {
+      const toState = fakeState("/a", "a");
+      const fromState = fakeState("/", "home");
+      const prev: RouterTransitionSnapshot = {
+        isTransitioning: true,
+        isLeaveApproved: false,
+        toRoute: toState,
+        fromRoute: fromState,
+      };
+
+      // Fresh State refs with the same paths — stabilizeState collapses them
+      // back to prev.toRoute/prev.fromRoute → guard fires.
+      const toStateAgain = fakeState("/a", "a");
+      const fromStateAgain = fakeState("/", "home");
+
+      expect(
+        nextTransitionStartSnapshot(prev, toStateAgain, fromStateAgain),
+      ).toBeNull();
+    });
+
+    it("returns next snapshot when paths differ even while transitioning", () => {
+      const stateA = fakeState("/a", "a");
+      const prev: RouterTransitionSnapshot = {
+        isTransitioning: true,
+        isLeaveApproved: false,
+        toRoute: stateA,
+        fromRoute: null,
+      };
+      const stateB = fakeState("/b", "b");
+
+      const next = nextTransitionStartSnapshot(prev, stateB, undefined);
+
+      expect(next).not.toBeNull();
+      expect(next?.toRoute).toBe(stateB);
+      expect(next?.fromRoute).toBeNull();
+    });
+
+    it("returns next snapshot when prev is not transitioning (precondition unmet)", () => {
+      const stateA = fakeState("/a", "a");
+      const prev: RouterTransitionSnapshot = {
+        isTransitioning: false,
+        isLeaveApproved: false,
+        toRoute: stateA,
+        fromRoute: null,
+      };
+      const stateAClone = fakeState("/a", "a");
+
+      // Even though path-equal, guard requires prev.isTransitioning=true.
+      const next = nextTransitionStartSnapshot(prev, stateAClone, undefined);
+
+      expect(next).not.toBeNull();
+      expect(next?.isTransitioning).toBe(true);
+    });
+  });
+
+  describe("nextLeaveApproveSnapshot (dedup guard, direct unit)", () => {
+    it("returns next snapshot with isLeaveApproved=true on first call", () => {
+      const toState = fakeState("/a", "a");
+      const fromState = fakeState("/", "home");
+      const prev: RouterTransitionSnapshot = {
+        isTransitioning: true,
+        isLeaveApproved: false,
+        toRoute: toState,
+        fromRoute: fromState,
+      };
+
+      const next = nextLeaveApproveSnapshot(prev, toState, fromState);
+
+      expect(next).toStrictEqual({
+        isTransitioning: true,
+        isLeaveApproved: true,
+        toRoute: toState,
+        fromRoute: fromState,
+      });
+    });
+
+    it("returns null (dedup skip) when called twice with path-equal States after LEAVE_APPROVE", () => {
+      const toState = fakeState("/a", "a");
+      const fromState = fakeState("/", "home");
+      const prev: RouterTransitionSnapshot = {
+        isTransitioning: true,
+        isLeaveApproved: true,
+        toRoute: toState,
+        fromRoute: fromState,
+      };
+
+      expect(
+        nextLeaveApproveSnapshot(
+          prev,
+          fakeState("/a", "a"),
+          fakeState("/", "home"),
+        ),
+      ).toBeNull();
+    });
+
+    it("returns next snapshot when prev.isLeaveApproved=false (precondition unmet)", () => {
+      const toState = fakeState("/a", "a");
+      const prev: RouterTransitionSnapshot = {
+        isTransitioning: true,
+        isLeaveApproved: false,
+        toRoute: toState,
+        fromRoute: null,
+      };
+
+      const next = nextLeaveApproveSnapshot(prev, toState, undefined);
+
+      expect(next).not.toBeNull();
+      expect(next?.isLeaveApproved).toBe(true);
+    });
+  });
+
+  it("repeated IDLE_SNAPSHOT (success after success) shares the same singleton ref", async () => {
     const source = createTransitionSource(router);
+    const initialIdle = source.getSnapshot();
     const listener = vi.fn();
 
     source.subscribe(listener);
 
     await router.navigate("dashboard");
 
-    const callsAfterFirst = listener.mock.calls.length;
+    // Sync nav with no async guards: START → LEAVE_APPROVE → SUCCESS = 3
+    // notifications. After SUCCESS, snapshot is the IDLE singleton again.
+    expect(listener).toHaveBeenCalledTimes(3);
+    expect(source.getSnapshot()).toBe(initialIdle);
 
     await router.navigate("settings");
 
-    // Both navigations are sync (no guards), so each emits START+SUCCESS
-    // The key point: no extra notifications from duplicate IDLE states
-    const totalCalls = listener.mock.calls.length;
-
-    // Verify final state is IDLE
-    expect(source.getSnapshot().isTransitioning).toBe(false);
-
-    // Exact count depends on batching, but should be reasonable
-    expect(totalCalls).toBeGreaterThanOrEqual(callsAfterFirst);
+    // Second navigation emits the same 3 events, no spurious "IDLE → IDLE"
+    // notification in between → total stays at 6.
+    expect(listener).toHaveBeenCalledTimes(6);
+    expect(source.getSnapshot()).toBe(initialIdle);
   });
 
-  it("post-destroy: getSnapshot still returns last value", () => {
+  it("post-destroy: getSnapshot returns the captured snapshot, not default IDLE", async () => {
+    // Capture a non-IDLE snapshot so post-destroy preservation is observable
+    // distinct from "destroy resets to default" — verifies the snapshot is
+    // truly frozen at destroy time.
+    const lifecycle = getLifecycleApi(router);
+    let resolveGuard!: (value: boolean) => void;
+
+    lifecycle.addActivateGuard("dashboard", () => () => {
+      return new Promise<boolean>((resolve) => {
+        resolveGuard = resolve;
+      });
+    });
+
     const source = createTransitionSource(router);
 
-    expect(source.getSnapshot().isTransitioning).toBe(false);
+    void router.navigate("dashboard");
+    await Promise.resolve();
+
+    const snapshotAtDestroy = source.getSnapshot();
+
+    expect(snapshotAtDestroy.isTransitioning).toBe(true);
+    expect(snapshotAtDestroy.toRoute?.name).toBe("dashboard");
 
     source.destroy();
 
-    expect(source.getSnapshot().isTransitioning).toBe(false);
+    // Same reference (frozen mid-transition), not the IDLE singleton.
+    expect(source.getSnapshot()).toBe(snapshotAtDestroy);
+    expect(source.getSnapshot().isTransitioning).toBe(true);
+
+    resolveGuard(true);
+    await Promise.resolve();
+    await Promise.resolve();
   });
 
   it("post-destroy: subscribe returns no-op unsubscribe", () => {
@@ -394,14 +648,24 @@ describe("createTransitionSource", () => {
     }).not.toThrow();
   });
 
-  it("destroy is idempotent", () => {
+  it("destroy is idempotent — snapshot ref stable after N destroys", () => {
     const source = createTransitionSource(router);
+    const beforeDestroy = source.getSnapshot();
 
     source.destroy();
 
+    const afterFirstDestroy = source.getSnapshot();
+
+    expect(afterFirstDestroy).toBe(beforeDestroy);
+
     expect(() => {
       source.destroy();
+      source.destroy();
+      source.destroy();
     }).not.toThrow();
+
+    // Second/third destroys must not corrupt the snapshot — same reference.
+    expect(source.getSnapshot()).toBe(afterFirstDestroy);
   });
 
   it("isLeaveApproved === false initially", () => {
@@ -479,10 +743,14 @@ describe("createTransitionSource", () => {
   it("isLeaveApproved === true upon TRANSITION_LEAVE_APPROVE event", async () => {
     const api = getPluginApi(router);
     const source = createTransitionSource(router);
+    const leaveApproveAssert = vi.fn();
+    const startAssert = vi.fn();
 
     api.addEventListener(
       events.TRANSITION_LEAVE_APPROVE,
       (toState, fromState) => {
+        leaveApproveAssert();
+
         expect(source.getSnapshot().isLeaveApproved).toBe(true);
         expect(source.getSnapshot().isTransitioning).toBe(true);
         expect(source.getSnapshot().toRoute).toBe(toState);
@@ -491,10 +759,57 @@ describe("createTransitionSource", () => {
     );
 
     api.addEventListener(events.TRANSITION_START, () => {
+      startAssert();
+
       expect(source.getSnapshot().isLeaveApproved).toBe(false);
     });
 
-    void router.navigate("dashboard");
-    await Promise.resolve();
+    await router.navigate("dashboard");
+
+    // Without these the inner expect()s in listeners can silently no-op if
+    // the events never fire (false negative). Sync nav fires both events.
+    expect(startAssert).toHaveBeenCalledTimes(1);
+    expect(leaveApproveAssert).toHaveBeenCalledTimes(1);
+  });
+
+  describe("IDLE_SNAPSHOT immutability (audit §5.K)", () => {
+    it("initial getSnapshot() returns a frozen object", () => {
+      const source = createTransitionSource(router);
+      const idle = source.getSnapshot();
+
+      expect(Object.isFrozen(idle)).toBe(true);
+
+      source.destroy();
+    });
+
+    it("attempting to mutate a property throws in strict mode", () => {
+      const source = createTransitionSource(router);
+      const idle = source.getSnapshot();
+
+      expect(() => {
+        (idle as unknown as { toRoute: unknown }).toRoute = { hijacked: true };
+      }).toThrow(TypeError);
+      // Snapshot reference is unchanged.
+      expect(source.getSnapshot().toRoute).toBeNull();
+
+      source.destroy();
+    });
+
+    it("IDLE singleton across navigations stays frozen (every IDLE return is the same frozen ref)", async () => {
+      const source = createTransitionSource(router);
+      const initialIdle = source.getSnapshot();
+
+      await router.navigate("dashboard");
+
+      expect(source.getSnapshot()).toBe(initialIdle);
+      expect(Object.isFrozen(source.getSnapshot())).toBe(true);
+
+      await router.navigate("settings");
+
+      expect(source.getSnapshot()).toBe(initialIdle);
+      expect(Object.isFrozen(source.getSnapshot())).toBe(true);
+
+      source.destroy();
+    });
   });
 });

@@ -9,7 +9,7 @@ import { Link, RouterProvider } from "@real-router/solid";
 
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Router, State } from "@real-router/core";
 import type { JSX } from "solid-js";
 
 describe("Link component", () => {
@@ -61,7 +61,7 @@ describe("Link component", () => {
   });
 
   describe("activeClassName", () => {
-    it("should set active class if name current router state is same with link's route name", async () => {
+    it("should set active class when the current router state matches the link route name", async () => {
       const linkRouteName = "one-more-test";
 
       render(
@@ -77,7 +77,7 @@ describe("Link component", () => {
         { wrapper },
       );
 
-      expect(router.getState()?.name).not.toStrictEqual(linkRouteName);
+      expect(router.getState()?.name).toBe("test");
       expect(screen.getByTestId("link")).not.toHaveClass("active");
 
       await user.click(screen.getByTestId("link"));
@@ -104,7 +104,7 @@ describe("Link component", () => {
         { wrapper },
       );
 
-      expect(router.getState()?.name).not.toStrictEqual(linkRouteName);
+      expect(router.getState()?.name).toBe("test");
       expect(screen.getByTestId("link")).not.toHaveClass("active");
 
       await user.click(screen.getByTestId("link"));
@@ -211,7 +211,9 @@ describe("Link component", () => {
 
       fireEvent.click(screen.getByTestId("link"), { button: 1 });
 
-      expect(onClickMock).toHaveBeenCalled();
+      // audit-2026-05-17 §1 MEDIUM #1 — strict call count + MouseEvent arg
+      expect(onClickMock).toHaveBeenCalledTimes(1);
+      expect(onClickMock).toHaveBeenCalledWith(expect.any(MouseEvent));
 
       expect(router.navigate).not.toHaveBeenCalled();
       expect(router.getState()?.name).toStrictEqual(currentRouteName);
@@ -239,7 +241,9 @@ describe("Link component", () => {
 
       await user.click(screen.getByTestId("link"));
 
-      expect(onClickMock).toHaveBeenCalled();
+      // audit-2026-05-17 §1 MEDIUM #2 — strict call count + MouseEvent arg
+      expect(onClickMock).toHaveBeenCalledTimes(1);
+      expect(onClickMock).toHaveBeenCalledWith(expect.any(MouseEvent));
 
       expect(router.navigate).not.toHaveBeenCalled();
       expect(router.getState()?.name).toStrictEqual(currentRouteName);
@@ -424,7 +428,7 @@ describe("Link component", () => {
   });
 
   it("should navigate on keyboard Enter key", async () => {
-    vi.spyOn(router, "navigate").mockResolvedValue({} as never);
+    vi.spyOn(router, "navigate").mockResolvedValue({} as unknown as State);
 
     render(
       () => (
@@ -441,11 +445,8 @@ describe("Link component", () => {
     fireEvent.keyDown(link, { key: "Enter" });
     fireEvent.click(link, { bubbles: true, cancelable: true });
 
-    expect(router.navigate).toHaveBeenCalledWith(
-      "one-more-test",
-      expect.any(Object),
-      expect.any(Object),
-    );
+    // audit-2026-05-17 §1 MEDIUM #4 — pin exact arg shape, not just any-Object
+    expect(router.navigate).toHaveBeenCalledWith("one-more-test", {}, {});
   });
 
   it("should render without href and log error for invalid routeName", () => {
@@ -463,8 +464,14 @@ describe("Link component", () => {
     );
 
     expect(screen.getByTestId("link")).not.toHaveAttribute("href");
+    // audit-2026-05-17 §1 MEDIUM #3 — pin the exact "is not defined" message
+    // and lock that only ONE error was emitted (a regression that double-logs
+    // would silently inflate noise).
+    expect(consoleError).toHaveBeenCalledTimes(1);
     expect(consoleError).toHaveBeenCalledWith(
-      expect.stringContaining("@@nonexistent-route"),
+      expect.stringMatching(
+        /^\[real-router\] Route "@@nonexistent-route" is not defined\./,
+      ),
     );
 
     consoleError.mockRestore();
@@ -614,11 +621,380 @@ describe("Link component", () => {
     // Fast path chose at init: ancestor "items" is active.
     expect(screen.getByTestId("link")).toHaveClass("active");
 
-    // Flip strict — if path-switching worked, the ancestor would now be
-    // inactive. If the decision is captured at init (expected), fast-path
-    // behavior persists and the ancestor stays active.
+    // Flip strict to true. If the fast→slow switch happened, strict=true
+    // would suppress ancestor activation and the class would be removed.
+    // The signal fires, but the path decision is frozen — Link stays on
+    // fast path, ancestor stays active. (No tautological strict()===true
+    // check — solid-js setSignal contract is not under test here.)
     setStrict(true);
 
     expect(screen.getByTestId("link")).toHaveClass("active");
+  });
+
+  describe("buildHref edge cases", () => {
+    it("combines hash and query params in href (#3.1 defensive)", () => {
+      render(
+        () => (
+          <Link
+            routeName="items.item"
+            routeParams={{ id: "42", q: "search" }}
+            hash="section-2"
+            data-testid="link"
+          >
+            Combined
+          </Link>
+        ),
+        { wrapper },
+      );
+
+      const href = screen.getByTestId("link").getAttribute("href");
+
+      expect(href).not.toBeNull();
+      // Both query and fragment must end up in the rendered href.
+      expect(href).toContain("/items/42");
+      expect(href).toContain("?q=search"); // explicit `?` lead — substring
+      // "q=search" alone could match e.g. ".q=search" without the marker.
+      expect(href).toContain("#section-2");
+      // Sprint C.1 — pre-conditions for the ordering check: indexOf
+      // returns -1 for missing characters, and `-1 > -1` is false, so
+      // the assertion below works ONLY because both characters exist.
+      // Explicit pin removes the silent failure mode.
+      expect(href).toMatch(/\?/);
+      expect(href).toMatch(/#/);
+      // Query precedes fragment per RFC 3986.
+      expect(href!.indexOf("#")).toBeGreaterThan(href!.indexOf("?"));
+    });
+
+    it("encodes Unicode params via percent-encoding (#3.2 defensive)", () => {
+      render(
+        () => (
+          <Link
+            routeName="items.item"
+            routeParams={{ id: "café-🚀-Привет" }}
+            data-testid="link"
+          >
+            Unicode
+          </Link>
+        ),
+        { wrapper },
+      );
+
+      const href = screen.getByTestId("link").getAttribute("href");
+
+      expect(href).not.toBeNull();
+      // Decoded round-trip must equal the original — verifies the encoder
+      // produced valid UTF-8 percent-encoding (multi-byte chars + surrogate
+      // pairs for emoji + non-Latin Cyrillic). startsWith() in the matcher
+      // is UTF-16-safe but the URL-side encoding has to round-trip.
+      expect(decodeURIComponent(href!)).toContain("café-🚀-Привет");
+    });
+
+    // Locks the tristate contract from CLAUDE.md "<Link hash> Prop (#532)":
+    //   undefined → preserves current state.context.url.hash on click
+    //   ""        → clears the hash (opts.hash === "")
+    //   "value"   → sets the hash; same-route + diff hash → force + hashChange
+    //
+    // The spy on router.navigate is the source of truth — navigateWithHash
+    // (shared/dom-utils) flows opts through router.navigate verbatim.
+    describe("`hash` prop tristate (#532, gotcha #16)", () => {
+      it("hash={undefined} → click does not add `hash` key to opts", async () => {
+        const spy = vi.spyOn(router, "navigate");
+
+        render(
+          () => (
+            <Link routeName="about" data-testid="link">
+              About
+            </Link>
+          ),
+          { wrapper },
+        );
+
+        await user.click(screen.getByTestId("link"));
+
+        expect(spy).toHaveBeenCalledTimes(1);
+
+        // opts must be defined — Link always forwards a third argument so the
+        // routing layer sees an explicit options object (no implicit defaults).
+        expect(spy.mock.calls[0][2]).toBeDefined();
+
+        const opts = spy.mock.calls[0][2]!;
+
+        // Undefined hash MUST stay undefined — no `hash` key in opts.
+        expect("hash" in opts).toBe(false);
+        expect((opts as { force?: boolean }).force).toBeUndefined();
+      });
+
+      it("hash='' → click forwards opts.hash === '' verbatim", async () => {
+        const spy = vi.spyOn(router, "navigate");
+
+        render(
+          () => (
+            <Link routeName="about" hash="" data-testid="link">
+              About
+            </Link>
+          ),
+          { wrapper },
+        );
+
+        await user.click(screen.getByTestId("link"));
+
+        expect(spy).toHaveBeenCalledTimes(1);
+
+        expect(spy.mock.calls[0][2]).toBeDefined();
+
+        const opts = spy.mock.calls[0][2]!;
+
+        expect(opts.hash).toBe("");
+        // Cross-route navigation → no force/hashChange auto-bypass.
+        expect((opts as { force?: boolean }).force).toBeUndefined();
+        expect((opts as { hashChange?: boolean }).hashChange).toBeUndefined();
+      });
+
+      it("hash='value' on a different route → opts.hash forwarded, no force/hashChange", async () => {
+        const spy = vi.spyOn(router, "navigate");
+
+        render(
+          () => (
+            <Link routeName="about" hash="section" data-testid="link">
+              About
+            </Link>
+          ),
+          { wrapper },
+        );
+
+        await user.click(screen.getByTestId("link"));
+
+        expect(spy).toHaveBeenCalledTimes(1);
+
+        expect(spy.mock.calls[0][2]).toBeDefined();
+
+        const opts = spy.mock.calls[0][2]!;
+
+        expect(opts.hash).toBe("section");
+        // Cross-route — same-route hash logic must NOT fire.
+        expect((opts as { force?: boolean }).force).toBeUndefined();
+        expect((opts as { hashChange?: boolean }).hashChange).toBeUndefined();
+      });
+
+      it("hash='value' on same route + different current hash → auto-adds force + hashChange (SAME_STATES bypass)", async () => {
+        // Navigate first to a route with hash A so state.context.url.hash
+        // is populated. Then click a Link targeting the same route + same
+        // params but with hash B — navigateWithHash must auto-bypass core's
+        // SAME_STATES rejection by setting `force: true, hashChange: true`.
+        await router.navigate("about", {}, { hash: "first" });
+
+        const spy = vi.spyOn(router, "navigate");
+
+        render(
+          () => (
+            <Link routeName="about" hash="second" data-testid="link">
+              About
+            </Link>
+          ),
+          { wrapper },
+        );
+
+        await user.click(screen.getByTestId("link"));
+
+        expect(spy).toHaveBeenCalledTimes(1);
+
+        expect(spy.mock.calls[0][2]).toBeDefined();
+
+        const opts = spy.mock.calls[0][2]!;
+
+        expect(opts.hash).toBe("second");
+        expect((opts as { force?: boolean }).force).toBe(true);
+        expect((opts as { hashChange?: boolean }).hashChange).toBe(true);
+      });
+
+      it("hash='value' on same route + same current hash → no force/hashChange (no spurious SAME_STATES bypass)", async () => {
+        // Symmetric to the previous test — when the requested hash equals
+        // the current hash, navigateWithHash must NOT add force/hashChange.
+        // Adding them would force a redundant transition where SAME_STATES
+        // correctly rejects.
+        await router.navigate("about", {}, { hash: "same" });
+
+        const spy = vi.spyOn(router, "navigate");
+
+        render(
+          () => (
+            <Link routeName="about" hash="same" data-testid="link">
+              About
+            </Link>
+          ),
+          { wrapper },
+        );
+
+        // Click is expected to be rejected by core's SAME_STATES — Link
+        // swallows the rejection with .catch(() => {}). Use fireEvent
+        // (sync) to avoid awaiting the rejection.
+        fireEvent.click(screen.getByTestId("link"));
+
+        expect(spy).toHaveBeenCalledTimes(1);
+
+        expect(spy.mock.calls[0][2]).toBeDefined();
+
+        const opts = spy.mock.calls[0][2]!;
+
+        expect(opts.hash).toBe("same");
+        expect((opts as { force?: boolean }).force).toBeUndefined();
+        expect((opts as { hashChange?: boolean }).hashChange).toBeUndefined();
+      });
+    });
+
+    // Probes how real-router stringifies exotic JS value types when they
+    // sneak into `routeParams`. These types are NOT supported as first-class
+    // route param values — but property-test fuzzing or stale state can
+    // produce them, and `buildHref` MUST not throw. Lock the observed
+    // behavior here so a future buildPath refactor doesn't silently break
+    // the no-crash contract.
+    describe("exotic param types — defensive (§5.2)", () => {
+      it("BigInt → stringified via toString (1n → '1'), no crash", () => {
+        render(
+          () => (
+            <Link
+              routeName="items.item"
+              routeParams={{ id: 1n as unknown as string }}
+              data-testid="link"
+            >
+              BigInt
+            </Link>
+          ),
+          { wrapper },
+        );
+
+        const href = screen.getByTestId("link").getAttribute("href");
+
+        expect(href).not.toBeNull();
+        expect(href).toContain("/items/1");
+      });
+
+      it("Symbol → stringified via toString ('Symbol(x)'), no crash", () => {
+        render(
+          () => (
+            <Link
+              routeName="items.item"
+              routeParams={{
+                id: Symbol("x") as unknown as string,
+              }}
+              data-testid="link"
+            >
+              Symbol
+            </Link>
+          ),
+          { wrapper },
+        );
+
+        const href = screen.getByTestId("link").getAttribute("href");
+
+        expect(href).not.toBeNull();
+        // Symbol's toString is "Symbol(x)" — URL-encoded for the path slot.
+        expect(decodeURIComponent(href!)).toContain("/items/Symbol(x)");
+      });
+
+      it("Date → JSON-stringified ISO + URL-encoded, no crash", () => {
+        const date = new Date("2026-05-13T00:00:00.000Z");
+
+        render(
+          () => (
+            <Link
+              routeName="items.item"
+              routeParams={{ id: date as unknown as string }}
+              data-testid="link"
+            >
+              Date
+            </Link>
+          ),
+          { wrapper },
+        );
+
+        const href = screen.getByTestId("link").getAttribute("href");
+
+        expect(href).not.toBeNull();
+        expect(decodeURIComponent(href!)).toContain("/items/");
+
+        // audit-2026-05-17 §1 MEDIUM #7 — assert the post-slug payload is
+        // non-empty AND looks like a date serialisation. `String(date)`
+        // (Date.prototype.toString — `Mon Jan 01 2024 ...`), `date.toISOString()`
+        // (`2024-01-01T00:00:00.000Z`), and `date.valueOf()` (epoch ms) all
+        // contain a 4-digit year — that's the cross-format invariant.
+        // The previous `length > "/items/".length` would have accepted any
+        // single char appended (including `"/"` → empty slug).
+        const slug = decodeURIComponent(href!).slice("/items/".length);
+
+        expect(slug.length).toBeGreaterThan(0);
+        expect(slug).toMatch(/\d{4}/);
+      });
+
+      it("Map → empty-object JSON ('{}'), no crash", () => {
+        render(
+          () => (
+            <Link
+              routeName="items.item"
+              routeParams={{ id: new Map() as unknown as string }}
+              data-testid="link"
+            >
+              Map
+            </Link>
+          ),
+          { wrapper },
+        );
+
+        const href = screen.getByTestId("link").getAttribute("href");
+
+        expect(href).not.toBeNull();
+        // `JSON.stringify(new Map()) === "{}"` — Map has no enumerable
+        // own keys for the JSON serializer.
+        expect(decodeURIComponent(href!)).toContain("/items/{}");
+      });
+
+      it("Set → empty-object JSON ('{}'), no crash", () => {
+        render(
+          () => (
+            <Link
+              routeName="items.item"
+              routeParams={{ id: new Set([1, 2]) as unknown as string }}
+              data-testid="link"
+            >
+              Set
+            </Link>
+          ),
+          { wrapper },
+        );
+
+        const href = screen.getByTestId("link").getAttribute("href");
+
+        expect(href).not.toBeNull();
+        // `JSON.stringify(new Set([1,2])) === "{}"` — same as Map.
+        expect(decodeURIComponent(href!)).toContain("/items/{}");
+      });
+    });
+
+    it("serializes numeric params correctly (#3.3 defensive)", async () => {
+      render(
+        () => (
+          <Link
+            routeName="items.item"
+            routeParams={{ id: 6 }}
+            data-testid="link"
+          >
+            Numeric
+          </Link>
+        ),
+        { wrapper },
+      );
+
+      const href = screen.getByTestId("link").getAttribute("href");
+
+      expect(href).not.toBeNull();
+      // Number must end up as a percent-safe ASCII string in the URL.
+      expect(href).toContain("/items/6");
+
+      // And the navigation must round-trip (number is stored as such in
+      // params, but URL serialization is the string "6").
+      await router.navigate("items.item", { id: 6 });
+
+      expect(router.getState()?.params).toStrictEqual({ id: 6 });
+    });
   });
 });

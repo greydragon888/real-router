@@ -28,17 +28,15 @@ const FILTERS: Filter[] = ["all", "letter", "number", "color"];
   template: `
     <h1>Query-only navigation</h1>
     <p>
-      Click a filter — the page itself does not fade because the
-      factory's default <code>skipSameRoute: true</code> short-circuits
-      when <code>route.name === nextRoute.name</code>. Three coordinated
-      WAAPI animations play instead, all driven by
-      <code>installListFlip</code>: survivors translate from old to new
-      positions (inverse-FLIP from a
-      <code>getBoundingClientRect</code> diff in
-      <code>effect()</code>); newly-visible items fade in; items
-      removed by a narrowing filter fade out via cloned ghosts
-      reconstructed from <code>outerHTML</code> and pinned at their
-      last-known rect. View-local — no router events, no shared state
+      Click a filter — the page itself does not fade because the factory's
+      default <code>skipSameRoute: true</code> short-circuits when
+      <code>route.name === nextRoute.name</code>. Three coordinated WAAPI
+      animations play instead, all driven by <code>installListFlip</code>:
+      survivors translate from old to new positions (inverse-FLIP from a
+      <code>getBoundingClientRect</code> diff in <code>effect()</code>);
+      newly-visible items fade in; items removed by a narrowing filter fade out
+      via cloned ghosts reconstructed from <code>outerHTML</code> and pinned at
+      their last-known rect. View-local — no router events, no shared state
       between components.
     </p>
 
@@ -73,16 +71,18 @@ export class QueryDemoComponent {
   readonly list = viewChild<ElementRef<HTMLUListElement>>("list");
 
   readonly filter = computed<Filter>(
-    () => (this.state.routeState().route.params["filter"] as Filter | undefined) ?? "all",
+    () => this.state.routeState().route.params.filter ?? "all",
   );
 
   readonly visible = computed(() => {
     const f = this.filter();
+
     return f === "all" ? ITEMS : ITEMS.filter((item) => item.category === f);
   });
 
   constructor() {
     const hostRef = inject(ElementRef<HTMLElement>);
+
     installRouteAnimation(hostRef, {
       entryClass: "fade-in",
       exitClass: "fade-out",

@@ -19,23 +19,29 @@ describe("useNavigator hook", () => {
 
   beforeEach(async () => {
     router = createTestRouterWithADefaultRouter();
-    await router.start();
+    await router.start("/");
   });
 
   afterEach(() => {
     router.stop();
   });
 
-  it("should return navigator with 4 methods", () => {
+  it("should return navigator with full method surface", () => {
     const { result } = renderHook(() => useNavigator(), {
       wrapper: wrapper(router),
     });
 
-    expect(result.current).toBeTypeOf("object");
-    expect(result.current.navigate).toBeTypeOf("function");
-    expect(result.current.getState).toBeTypeOf("function");
-    expect(result.current.isActiveRoute).toBeTypeOf("function");
-    expect(result.current.subscribe).toBeTypeOf("function");
+    expect(
+      Object.keys(result.current).toSorted((a, b) => a.localeCompare(b)),
+    ).toStrictEqual([
+      "canNavigateTo",
+      "getState",
+      "isActiveRoute",
+      "isLeaveApproved",
+      "navigate",
+      "subscribe",
+      "subscribeLeave",
+    ]);
   });
 
   it("should have working navigate method", async () => {
@@ -54,18 +60,17 @@ describe("useNavigator hook", () => {
     });
     const state = result.current.getState();
 
-    expect(state).not.toBeNull();
-    expect(state!.name).toBeTypeOf("string");
+    expect(state?.name).toBe("test");
   });
 
   it("should have working isActiveRoute method", () => {
     const { result } = renderHook(() => useNavigator(), {
       wrapper: wrapper(router),
     });
-    const state = result.current.getState();
 
-    expect(state).not.toBeNull();
-    expect(result.current.isActiveRoute(state!.name)).toBe(true);
+    expect(result.current.getState()?.name).toBe("test");
+    expect(result.current.isActiveRoute("test")).toBe(true);
+    expect(result.current.isActiveRoute("home")).toBe(false);
   });
 
   it("should have working subscribe method", async () => {

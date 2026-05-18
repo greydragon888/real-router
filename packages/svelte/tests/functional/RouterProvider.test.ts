@@ -106,7 +106,11 @@ describe("RouterProvider component", () => {
     await rerender({ onCapture: () => {} });
     flushSync();
 
+    // Two assertions: keep the count at 1, AND explicitly reject 2. The latter
+    // surfaces the failure mode in plain text ("resubscribed on rerender") if
+    // a regression introduces a redundant subscribe call on prop-change.
     expect(subscribeSpy).toHaveBeenCalledTimes(1);
+    expect(subscribeSpy).not.toHaveBeenCalledTimes(2);
   });
 
   it("should provide previousRoute.current through real RouterProvider", async () => {

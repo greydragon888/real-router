@@ -11,12 +11,16 @@
 └── @real-router/route-utils  # Route tree queries (startsWithSegment)
 ```
 
-## Single Entry Point
+## Entry Points
 
-One entry point. No modern/legacy split.
+Two entry points (main + SSR-feature surface). The main entry stays
+client-safe; the `/ssr` secondary entry holds components and functions that
+depend on Angular SSR plumbing (`afterNextRender`, `TransferState`,
+`HttpStatusSink`).
 
 ```
-@real-router/angular  →  src/index.ts  →  Full API (Angular 21+)
+@real-router/angular        →  src/index.ts          →  Client API (Angular 21+)
+@real-router/angular/ssr    →  ssr/public_api.ts     →  SSR-feature surface
 ```
 
 **Build output** (ng-packagr, partial compilation):
@@ -24,23 +28,30 @@ One entry point. No modern/legacy split.
 ```
 dist/
 ├── fesm2022/
-│   └── real-router-angular.mjs
+│   ├── real-router-angular.mjs
+│   └── real-router-angular-ssr.mjs
 ├── esm2022/
 │   └── (individual compiled files)
-└── index.d.ts
+├── types/
+│   ├── real-router-angular.d.ts
+│   └── real-router-angular-ssr.d.ts
+└── ssr/                       # ng-packagr secondary entry
 ```
 
 ng-packagr produces FESM2022 bundles (ESM-only, no CJS). The `dom-utils` directory is an independent in-package copy of `shared/dom-utils/` — not a symlink (unlike the other framework adapters). The `prebundle` script copies `shared/dom-utils/` into `src/dom-utils/` before ng-packagr runs, because ng-packagr does not follow symlinks the same way tsdown does.
 
+The `/ssr` subpath is built as a ng-packagr secondary entry point with its own `ssr/ng-package.json`. Importing from `@real-router/angular/ssr` does not pull SSR-only dependencies into client bundles.
+
 ## Source Structure
 
 ```
-src/
-├── index.ts                    # Single entry point
+src/                            # Main entry — client API
+├── index.ts                    # Public exports
 ├── providers.ts                # ROUTER, NAVIGATOR, ROUTE tokens + provideRealRouter
+├── providersFactory.ts         # provideRealRouterFactory (SSR/SSG per-request clones)
 ├── sourceToSignal.ts           # Signal bridge — converts RouterSource<T> to Signal<T>
-├── types.ts                    # RouteSignals interface
-├── functions/                  # All inject* functions
+├── types.ts                    # RouteSignals, ErrorContext interfaces
+├── functions/                  # 9 public inject* functions + 1 internal helper
 │   ├── injectRouter.ts         # Router instance from inject (never reactive)
 │   ├── injectNavigator.ts      # Navigator from inject (never reactive)
 │   ├── injectRoute.ts          # Full route context from ROUTE token (every navigation)
@@ -50,9 +61,15 @@ src/
 │   ├── injectIsActiveRoute.ts  # Active state Signal
 │   ├── injectRouteExit.ts      # Wrap subscribeLeave with abort + same-route guards (cleanup via DestroyRef)
 │   ├── injectRouteEnter.ts     # Fire on nav-driven mount via injectRoute() + effect() + transition.from
+│   ├── injectOrThrow.ts        # Internal helper — non-null inject() wrapper
 │   └── index.ts
+├── internal/                   # Internal helpers (not re-exported from src/index.ts)
+│   ├── install.ts              # installScrollRestoration + installViewTransitions — shared by providers + providersFactory
+│   ├── subscribeSourceToSignal.ts  # subscribe → setState → cleanup pattern used by RealLink/RealLinkActive/RouteView
+│   └── buildActiveRouteOptions.ts  # Builds ActiveRouteSourceOptions honoring exactOptionalPropertyTypes
 ├── directives/                 # Directives
 │   ├── RouteMatch.ts           # ng-template[routeMatch] — segment marker
+│   ├── RouteSelf.ts            # ng-template[routeSelf] — exact-match slot for the node itself
 │   ├── RouteNotFound.ts        # ng-template[routeNotFound] — not-found marker
 │   ├── RealLink.ts             # a[realLink] — navigation + active class
 │   ├── RealLinkActive.ts       # [realLinkActive] — active class on any element
@@ -63,11 +80,25 @@ src/
 │   ├── NavigationAnnouncer.ts  # WCAG aria-live announcer
 │   └── index.ts
 └── dom-utils/                  # Shared DOM utilities (prebuild copy of shared/)
-    ├── link-utils.ts           # buildHref, buildActiveClassName, applyLinkA11y, shouldNavigate
+    ├── link-utils.ts           # buildHref, buildActiveClassName, applyLinkA11y, shouldNavigate, navigateWithHash, shallowEqual
     ├── route-announcer.ts      # createRouteAnnouncer
     ├── scroll-restore.ts       # createScrollRestoration (opt-in scroll capture + restore)
     ├── view-transitions.ts     # createViewTransitions (opt-in View Transitions API integration)
+    ├── direction-tracker.ts    # createDirectionTracker — optional public utility (not re-exported from src/index.ts)
     └── index.ts
+
+ssr/                            # SSR-feature entry — @real-router/angular/ssr
+├── public_api.ts               # Public exports (8 names + 1 type)
+├── ng-package.json             # ng-packagr secondary entry-point config
+├── components/
+│   ├── ClientOnly.ts           # <client-only [fallback]="tpl"> — server emits fallback, client swaps after afterNextRender
+│   ├── ServerOnly.ts           # <server-only> — symmetric inverse of ClientOnly
+│   └── HttpStatusCode.ts       # <http-status-code [code]="N"> — writes to optional HttpStatusSink
+├── functions/
+│   ├── injectDeferred.ts       # Reads state.context.ssrDataDeferred[key] from ssr-data-plugin
+│   └── provideHttpStatusSink.ts  # Environment providers helper for HTTP_STATUS_SINK
+└── utils/
+    └── createHttpStatusSink.ts # HTTP_STATUS_SINK + createHttpStatusSink — request-scoped sink
 ```
 
 ## Key Differences from React, Preact, Solid, and Vue Adapters
@@ -148,20 +179,22 @@ provideRealRouter (ROUTE)   — createRouteSource(router)                     �
 
 ### RouteView
 
-`RouteView` uses Angular's `contentChildren` query to collect `RouteMatch` and `RouteNotFound` directive instances. Each directive holds a `TemplateRef` injected from its host `ng-template`. The component creates a `createRouteNodeSource` in `ngOnInit` (not the constructor — signal inputs aren't available yet), stores snapshots in a local `signal<RouteSnapshot>`, and derives `activeTemplate` via `computed`:
+`RouteView` uses Angular's `contentChildren` query to collect `RouteMatch`, `RouteSelf`, and `RouteNotFound` directive instances. Each directive holds a `TemplateRef` injected from its host `ng-template`. The component creates a `createRouteNodeSource` inside an `effect(...)` scheduled from the **constructor** (#630 — signal inputs are readable inside `effect()` at first run), stores snapshots in a local `signal<RouteSnapshot>`, and derives `activeTemplate` via two split computeds:
 
 ```
 RouteView (@Component, selector: route-view)
 ├── nodeName = input<string>("", { alias: "routeNode" })   # aliased to avoid HTMLElement.nodeName collision
 ├── matches = contentChildren(RouteMatch)                  # ng-template[routeMatch] directives
+├── selfs = contentChildren(RouteSelf)                     # ng-template[routeSelf] directives (exact-match for the node itself)
 ├── notFounds = contentChildren(RouteNotFound)             # ng-template[routeNotFound] directives
 ├── routeState = signal<RouteSnapshot>(EMPTY_SNAPSHOT)     # local state, updated by source subscription
-├── ngOnInit → createRouteNodeSource + subscribe + destroyRef.onDestroy(unsub)
-└── activeTemplate = computed(() => {
-      for match of matches: startsWithSegment(routeName, fullSegmentName) → match.templateRef
-      if UNKNOWN_ROUTE: last notFound.templateRef
-    })
+├── effect((onCleanup) => createRouteNodeSource + subscribeSourceToSignal + onCleanup)  # reactive to nodeName()
+├── matchedTemplate = computed(() => /* Match priority loop */)
+├── fallbackTemplate = computed(() => /* Self → NotFound fallback chain */)
+└── activeTemplate = computed(() => matchedTemplate() ?? fallbackTemplate())
 ```
+
+**Template priority:** `Match` (segment prefix) → `Self` (exact-match for `nodeName`) → `NotFound` (UNKNOWN_ROUTE only). First-wins for matches/selfs, last-wins for notFounds — mirrors React/Preact/Solid/Vue contentChildren-resolution semantics adapted to Angular.
 
 Template renders `<ng-container [ngTemplateOutlet]="activeTemplate()">` — only the matched template is instantiated.
 
@@ -206,19 +239,21 @@ Opt-in via `provideRealRouter(router, { viewTransitions: true })`. Same wiring p
 
 ```
 RealLink (@Directive, selector: a[realLink])
-├── routeName, routeParams, routeOptions, activeClassName, activeStrict, ignoreQueryParams = input()
+├── routeName, routeParams, routeOptions, activeClassName, activeStrict, ignoreQueryParams, hash = input()
 ├── isActive = signal(false)                               # local active state
-├── ngOnInit → createActiveRouteSource + subscribe + destroyRef.onDestroy(unsub)
-├── updateDom() → buildHref(router, routeName, routeParams) → el.setAttribute("href", ...)
-│              → classList.add/remove(activeClassName) based on isActive state
-└── onClick(event) → shouldNavigate(event) ∧ target≠"_blank" → router.navigate(...).catch(() => {})
+├── href = computed(() => buildHref(...))                  # primitive-string output; Object.is dedup
+├── prevActive, prevHref, prevActiveClass                  # skip-same-value caches (audit §8b)
+├── effect((onCleanup) => createActiveRouteSource + subscribeSourceToSignal + skip-same-value branch)
+├── updateHref() → el.setAttribute("href", ...) iff href !== prevHref
+├── updateActiveClass() → classList.toggle(activeClass, isActive()) iff active flipped
+└── onClick(event) → shouldNavigate(event) ∧ target≠"_blank" → navigateWithHash(...).catch(NOOP_CATCH)
 ```
 
-Subscription setup is deferred to `ngOnInit` because signal inputs are not available in the constructor.
+Subscription setup runs inside `effect(...)` scheduled from the **constructor** (#630) — signal inputs are readable inside the effect's first execution, so reading `routeName()`/`routeParams()`/`hash()` makes the source creation reactive. The previous `ngOnInit` pattern captured inputs once at mount and silently drifted under AOT signal-input bindings.
 
 ### RealLinkActive
 
-Same subscription pattern as `RealLink`. Applies a CSS class to any element (not just `<a>`) via `classList.add/remove`. Calls `applyLinkA11y` in the constructor to set `role="link"` and `tabindex="0"` on non-interactive elements.
+Same subscription pattern as `RealLink` (constructor `effect()` + `subscribeSourceToSignal` helper + skip-same-value `prevActive`). Applies a CSS class to any element (not just `<a>`) via `classList.toggle`. Calls `applyLinkA11y` in the constructor to set `role="link"` and `tabindex="0"` on non-interactive elements (skip-list: `<a>`, `<button>` — see [audit §5.2 Bug 4](.claude/review-2026-05-16.md) for the known a11y limitation on `<details>` / `<summary>` / native interactive elements).
 
 ## Build Notes
 
@@ -263,7 +298,7 @@ tests/
 └── setup.ts              # Angular TestBed + JSDOM environment setup
 ```
 
-**Coverage thresholds:** 95% statements, 86% branches, 95% functions, 95% lines (enforced in vitest.config.mts).
+**Coverage thresholds:** 94% statements, 84% branches, 94% functions, 94% lines (enforced in `vitest.config.mts`). `src/dom-utils/direction-tracker.ts` is excluded from coverage — coverage for the shared source lives in `packages/dom-utils/`.
 
 **Why not 100%:** Angular 21 JIT mode (TestBed without `@analogjs/vite-plugin-angular`) does not compile signal-based `input()` template bindings. This makes ~15 lines across `RouteView`, `RealLink`, `RealLinkActive` unreachable from tests — specifically the subscription callbacks, DOM update branches, and `contentChildren`-driven template matching. These paths execute correctly at runtime with AOT compilation in real apps, but cannot be triggered in JIT-based unit tests without installing the AOT vite plugin (~30 packages of tooling) or refactoring directives to expose internals. See CLAUDE.md "Coverage Ceiling" section for the full analysis.
 

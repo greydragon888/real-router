@@ -19,6 +19,7 @@ type Filter = "all" | "letter" | "number" | "color";
 const FILTERS: Filter[] = ["all", "letter", "number", "color"];
 
 export function QueryDemo(): JSX.Element {
+  // eslint-disable-next-line no-unassigned-vars -- assigned by Solid ref={ref} JSX binding
   let ref: HTMLDivElement | undefined;
   const setListRef = useListFlip<HTMLUListElement>();
 
@@ -29,7 +30,7 @@ export function QueryDemo(): JSX.Element {
 
   const routeState = useRoute<{ filter?: Filter }>();
   const filter = createMemo<Filter>(
-    () => (routeState().route?.params.filter as Filter | undefined) ?? "all",
+    () => routeState().route.params.filter ?? "all",
   );
 
   const visible = createMemo(() => {
@@ -44,17 +45,16 @@ export function QueryDemo(): JSX.Element {
     <div ref={ref}>
       <h1>Query-only navigation</h1>
       <p>
-        Click a filter — the page itself does not fade because the
-        hook's default <code>skipSameRoute: true</code> short-circuits
-        when <code>route.name === nextRoute.name</code>. Three coordinated
-        WAAPI animations play instead, all driven by{" "}
-        <code>useListFlip</code>: survivors translate from old to new
-        positions (inverse-FLIP from a <code>getBoundingClientRect</code>{" "}
-        diff in <code>createEffect</code>); newly-visible items fade in;
-        items removed by a narrowing filter fade out via cloned ghosts
-        reconstructed from <code>outerHTML</code> and pinned at their
-        last-known rect. View-local — no router events, no shared state
-        between components.
+        Click a filter — the page itself does not fade because the hook's
+        default <code>skipSameRoute: true</code> short-circuits when{" "}
+        <code>route.name === nextRoute.name</code>. Three coordinated WAAPI
+        animations play instead, all driven by <code>useListFlip</code>:
+        survivors translate from old to new positions (inverse-FLIP from a{" "}
+        <code>getBoundingClientRect</code> diff in <code>createEffect</code>);
+        newly-visible items fade in; items removed by a narrowing filter fade
+        out via cloned ghosts reconstructed from <code>outerHTML</code> and
+        pinned at their last-known rect. View-local — no router events, no
+        shared state between components.
       </p>
 
       <div class="qd-toolbar">

@@ -33,10 +33,10 @@ type SortDirection = "asc" | "desc";
   template: `
     <h1>Products</h1>
     <p>
-      Click a product to see the detail. Each page (this list and the
-      detail) registers its own <code>installRouteAnimation</code>
-      factory on its host — slide-out for the list's exit, fade-in for
-      the detail's entry, no shared shell, no centralised policy.
+      Click a product to see the detail. Each page (this list and the detail)
+      registers its own <code>installRouteAnimation</code>
+      factory on its host — slide-out for the list's exit, fade-in for the
+      detail's entry, no shared shell, no centralised policy.
     </p>
 
     <div class="products-toolbar">
@@ -49,7 +49,7 @@ type SortDirection = "asc" | "desc";
       >
         A → Z
       </a>
-      {{ ' · ' }}
+      {{ " · " }}
       <a
         realLink
         routeName="products"
@@ -58,8 +58,8 @@ type SortDirection = "asc" | "desc";
       >
         Z → A
       </a>
-      {{ ' · ' }}
-      <strong>current: {{ sort() }}</strong>
+      {{ " · " }}
+      <strong>current: {{ sortDirection() }}</strong>
     </div>
 
     <ul #list class="product-list">
@@ -87,21 +87,23 @@ export class ProductsListComponent {
 
   readonly list = viewChild<ElementRef<HTMLUListElement>>("list");
 
-  readonly sort = computed<SortDirection>(() => {
+  readonly sortDirection = computed<SortDirection>(() => {
     const params = this.state.routeState().route.params;
-    return params?.["sort"] === "desc" ? "desc" : "asc";
+
+    return params?.sort === "desc" ? "desc" : "asc";
   });
 
   readonly items = computed(() => {
-    const sorted = [...PRODUCTS].sort((left, right) =>
+    const sorted = PRODUCTS.toSorted((left, right) =>
       left.name.localeCompare(right.name),
     );
 
-    return this.sort() === "desc" ? sorted.reverse() : sorted;
+    return this.sortDirection() === "desc" ? sorted.toReversed() : sorted;
   });
 
   constructor() {
     const hostRef = inject(ElementRef<HTMLElement>);
+
     installRouteAnimation(hostRef, {
       entryClass: "slide-in",
       exitClass: "slide-out",

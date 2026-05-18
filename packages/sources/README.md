@@ -38,27 +38,35 @@ const unsubscribe = source.subscribe(() => {
 
 ## Source Factories
 
-| Factory                                                 | Snapshot                                           | Cache                                         |
-| ------------------------------------------------------- | -------------------------------------------------- | --------------------------------------------- |
-| `createRouteSource(router)`                             | `{ route, previousRoute }`                         | not cached                                    |
-| `createRouteNodeSource(router, node)`                   | `{ route, previousRoute }`                         | per-router + per-nodeName                     |
-| `createActiveRouteSource(router, name, params?, opts?)` | `boolean`                                          | per-router + canonical-args                   |
-| `createTransitionSource(router)`                        | `{ isTransitioning, toRoute, fromRoute }`          | not cached (advanced)                         |
-| `getTransitionSource(router)`                           | same as above                                      | **per-router** — recommended for integrations |
-| `createErrorSource(router)`                             | `{ error, toRoute, fromRoute, version }`           | not cached (advanced)                         |
-| `getErrorSource(router)`                                | same as above                                      | **per-router** — recommended for integrations |
-| `createDismissableError(router)`                        | `{ error, toRoute, fromRoute, version, resetError }` | **per-router** — dismissal-aware error source for RouterErrorBoundary-style UIs |
-| `createActiveNameSelector(router)`                      | `{ subscribe(name, listener), isActive(name), destroy }` | **per-router** — O(1) active-name checker for Link fast-path |
+| Factory                                                 | Returns                                                  | Cache                                         |
+| ------------------------------------------------------- | -------------------------------------------------------- | --------------------------------------------- |
+| `createRouteSource(router)`                             | `RouterSource<{ route, previousRoute }>`                 | not cached                                    |
+| `createRouteNodeSource(router, node)`                   | `RouterSource<{ route, previousRoute }>`                 | per-router + per-nodeName                     |
+| `createActiveRouteSource(router, name, params?, opts?)` | `RouterSource<boolean>`                                  | per-router + canonical-args                   |
+| `createTransitionSource(router)`                        | `RouterSource<{ isTransitioning, isLeaveApproved, toRoute, fromRoute }>` | not cached (advanced)         |
+| `getTransitionSource(router)`                           | same as above                                            | **per-router** — recommended for integrations |
+| `createErrorSource(router)`                             | `RouterSource<{ error, toRoute, fromRoute, version }>`   | not cached (advanced)                         |
+| `getErrorSource(router)`                                | same as above                                            | **per-router** — recommended for integrations |
+| `createDismissableError(router)`                        | `RouterSource<{ error, toRoute, fromRoute, version, resetError }>` | **per-router** — dismissal-aware error source for RouterErrorBoundary-style UIs |
+| `createActiveNameSelector(router)`                      | `ActiveNameSelector` (selector API — `subscribe(name, listener)` / `isActive(name)` / `destroy`; **not** a `RouterSource<T>` — no `getSnapshot()`) | **per-router** — O(1) active-name checker for Link fast-path |
 
-Plus utilities: `DEFAULT_ACTIVE_OPTIONS`, `normalizeActiveOptions(opts?)`, `canonicalJson(value)`.
+Plus utilities: `DEFAULT_ACTIVE_OPTIONS`, `normalizeActiveOptions(opts?)`, `canonicalJson(value)`, and the `ActiveNameSelector` type.
 
-All factories return a `RouterSource<T>`:
+All factories return a `RouterSource<T>` **except `createActiveNameSelector`**, which returns an `ActiveNameSelector` (see Source Factories table above):
 
 ```typescript
 interface RouterSource<T> {
   subscribe(listener: () => void): () => void; // useSyncExternalStore-compatible
   getSnapshot(): T; // current value, synchronous
   destroy(): void; // no-op for cached wrappers; real teardown for create*
+}
+
+// createActiveNameSelector is the exception — its `subscribe` accepts a route-name
+// argument and the active-state check lives on `isActive(name)` (no `getSnapshot()`).
+interface ActiveNameSelector {
+  subscribe(routeName: string, listener: () => void): () => void;
+  isActive(routeName: string): boolean;
+  destroy(): void;
 }
 ```
 
@@ -67,6 +75,8 @@ interface RouterSource<T> {
 Cached factories (`createRouteNodeSource`, `createActiveRouteSource`, `getTransitionSource`, `getErrorSource`) share a single source across all consumers of the same router. Multiple `subscribe`/`unsubscribe` pairs on the same instance share one router subscription. `destroy()` on the returned wrapper is a **no-op** — the underlying source lives as long as the router (the `WeakMap` entry releases on router GC).
 
 Non-cached factories (`createRouteSource`, `createTransitionSource`, `createErrorSource`) return a fresh instance every call with real teardown on `destroy()` — use when you need an isolated source.
+
+All route-state sources (`createRouteSource`, `createRouteNodeSource`, `createActiveRouteSource`) deduplicate via `stabilizeState`: same-path non-reload transitions preserve the snapshot reference and skip listener notifications. Reload navigations bypass dedup. See [INVARIANTS.md](./INVARIANTS.md) #6.
 
 ### Lazy vs Eager Subscription
 
@@ -80,10 +90,18 @@ Non-cached factories (`createRouteSource`, `createTransitionSource`, `createErro
 const source = createActiveRouteSource(router, "users", undefined, {
   strict: false, // default: false — match descendants too
   ignoreQueryParams: true, // default: true
+  hash: undefined, // default: undefined — ignore URL fragment.
+  //                 string → match iff state.context.url.hash equals it (#532).
 });
 ```
 
-Params are hashed with `canonicalJson()`, so `{a: 1, b: 2}` and `{b: 2, a: 1}` hit the same cache entry. `BigInt`/`Symbol`/circular refs fall back to a fresh non-cached source.
+| Option              | Type        | Default       | Effect                                                                                                                                                                                                                                                       |
+| ------------------- | ----------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `strict`            | `boolean`   | `false`       | When `false`, parent route is active when the current route is a descendant; when `true`, only an exact name match is active.                                                                                                                                  |
+| `ignoreQueryParams` | `boolean`   | `true`        | Whether to drop query-string params before comparing.                                                                                                                                                                                                          |
+| `hash`              | `string`    | `undefined`   | When set, source is active iff route matches **and** `state.context.url.hash` equals this value. Requires a URL-publishing plugin (browser/navigation); under hash-plugin or memory-plugin (no `context.url` namespace), a non-`undefined` hash is always `false`. |
+
+Params are hashed with `canonicalJson()`, so `{a: 1, b: 2}` and `{b: 2, a: 1}` hit the same cache entry. `BigInt`/circular refs fall back to a fresh non-cached source with a working `destroy()` — call it to release the router subscription.
 
 ## Usage Examples
 
@@ -127,7 +145,8 @@ import { getTransitionSource } from "@real-router/sources";
 const source = getTransitionSource(router);
 
 source.subscribe(() => {
-  const { isTransitioning, toRoute, fromRoute } = source.getSnapshot();
+  const { isTransitioning, isLeaveApproved, toRoute, fromRoute } =
+    source.getSnapshot();
   if (isTransitioning) {
     showSpinner();
   } else {
@@ -153,7 +172,8 @@ source.subscribe(() => {
 
 ## Documentation
 
-Full documentation: [Wiki — sources](https://github.com/greydragon888/real-router/wiki/sources-package)
+- API reference and usage: [Wiki — sources-package](https://github.com/greydragon888/real-router/wiki/sources-package)
+- Adapter integration guide (Link fast-path migration recipe, snapshot bridging patterns): [Wiki — sources-adapter-guide](https://github.com/greydragon888/real-router/wiki/sources-adapter-guide)
 
 ## Related Packages
 

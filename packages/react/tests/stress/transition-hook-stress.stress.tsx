@@ -328,4 +328,78 @@ describe("R7 — useRouterTransition stress", () => {
 
     router.stop();
   });
+
+  it("7.7: 20 concurrent navigations with mixed-duration guards — last-wins, no zombie state", async () => {
+    // 7.6 covers a 3-target interleave. This stresses a wider fanout: 20
+    // targets with deterministic-but-mixed delays in [5..100]ms so several
+    // pairs collide on the resolve-order timeline. The invariant is the same:
+    // last navigate wins, isTransitioning settles to false, no orphan promise.
+    const targets = Array.from({ length: 20 }, (_, i) => `t${i}`);
+    const router = createRouter(
+      [
+        { name: "home", path: "/" },
+        ...targets.map((name) => ({ name, path: `/${name}` })),
+      ],
+      { defaultRoute: "home" },
+    );
+
+    await router.start("/");
+
+    const lifecycle = getLifecycleApi(router);
+
+    targets.forEach((name, i) => {
+      // Delays span 5..100ms in non-monotonic order so some later-issued
+      // navigations resolve BEFORE earlier ones (real interleaving).
+      const delayMs = 5 + ((i * 13) % 96);
+
+      lifecycle.addActivateGuard(
+        name,
+        () => () =>
+          new Promise<boolean>((resolve) => {
+            setTimeout(() => {
+              resolve(true);
+            }, delayMs);
+          }),
+      );
+    });
+
+    let snapshot = { isTransitioning: false };
+
+    const Consumer = makeTransitionConsumer((t) => {
+      snapshot = t;
+    });
+
+    let unhandledRejection = false;
+    const rejectionHandler = (): void => {
+      unhandledRejection = true;
+    };
+
+    globalThis.addEventListener("unhandledrejection", rejectionHandler);
+
+    render(
+      <RouterProvider router={router}>
+        <Consumer />
+      </RouterProvider>,
+    );
+
+    await act(async () => {
+      // Fire all 20 in order — last navigate (t19) wins regardless of timing.
+      for (const name of targets) {
+        void router.navigate(name).catch(() => {});
+      }
+
+      // Drain past the longest guard (max delay ~ 5+13*19 mod 96 = ~5+19 = 24,
+      // but spread to 100ms ceiling for safety) plus react flush.
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 200);
+      });
+    });
+
+    expect(snapshot.isTransitioning).toBe(false);
+    expect(router.getState()?.name).toBe(targets.at(-1));
+    expect(unhandledRejection).toBe(false);
+
+    globalThis.removeEventListener("unhandledrejection", rejectionHandler);
+    router.stop();
+  });
 });

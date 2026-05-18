@@ -1,4 +1,5 @@
 import { encodeHashFragment, normalizeHashInput } from "./url-context.js";
+import { buildUrl } from "./url-utils.js";
 
 import type {
   NavigationOptions,
@@ -43,11 +44,32 @@ export function createStartInterceptor(
   );
 }
 
+// Shared `buildUrl` extension for browser-plugin and navigation-plugin.
+// Composes router.buildPath + base prefixing + tri-state hash (#532) into the
+// single function the plugins register via `api.extendRouter({ buildUrl })`.
+export function createPluginBuildUrl(
+  router: Router,
+  base: string,
+): (route: string, params?: Params, opts?: { hash?: string }) => string {
+  return (route, params, opts) => {
+    const path = router.buildPath(route, params);
+    const url = buildUrl(path, base);
+
+    if (opts?.hash === undefined) {
+      return url;
+    }
+
+    const norm = normalizeHashInput(opts.hash);
+
+    return norm ? `${url}#${encodeHashFragment(norm)}` : url;
+  };
+}
+
 export function createReplaceHistoryState(
   api: PluginApi,
   router: Router,
   browser: ReplaceStateBrowser,
-  buildUrl: (
+  buildUrlFn: (
     name: string,
     params?: Params,
     options?: ReplaceHistoryStateOptions,
@@ -111,7 +133,7 @@ export function createReplaceHistoryState(
     // double-append). Hash-plugin's buildUrl ignores the option and warns,
     // so call without options here for semantic clarity — but the result is
     // identical because hashSegment is "" in that branch (preserveHash=false).
-    const url = buildUrl(name, params) + hashSegment;
+    const url = buildUrlFn(name, params) + hashSegment;
 
     buffer.name = builtState.name;
     buffer.params = builtState.params;

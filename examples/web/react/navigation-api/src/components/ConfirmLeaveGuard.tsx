@@ -3,7 +3,8 @@ import { getLifecycleApi } from "@real-router/core/api";
 import type { Router, State } from "@real-router/core";
 
 function hasUnsavedDraft(fromState: State | null | undefined): boolean {
-  const id = String(fromState?.params.id ?? "");
+  const rawId = fromState?.params.id;
+  const id = typeof rawId === "string" ? rawId : "";
 
   if (!id) {
     return false;

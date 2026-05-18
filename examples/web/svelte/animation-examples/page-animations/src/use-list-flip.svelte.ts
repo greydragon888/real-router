@@ -54,16 +54,15 @@ interface Snapshot {
  * implicitly. No `useRouteExit` / `subscribeLeave` involvement —
  * everything is post-update DOM work.
  */
-export function useListFlip<T extends HTMLElement>(
-  getEl: () => T | undefined,
-): void {
+export function useListFlip(getElement: () => HTMLElement | undefined): void {
   const { route } = useRoute();
   const previousMap = new Map<string, Snapshot>();
 
   $effect(() => {
-    void route.current; // track route changes
+    // Read route.current to register dependency on route changes.
+    route.current; // eslint-disable-line @typescript-eslint/no-unused-expressions -- Svelte $effect dependency hook
 
-    const container = getEl();
+    const container = getElement();
 
     if (!container) {
       return;

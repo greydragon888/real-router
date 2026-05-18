@@ -224,4 +224,63 @@ describe("createActiveNameSelector", () => {
 
     expect(selector.isActive("home")).toBe(false);
   });
+
+  describe("root semantics (audit §5.F — symmetry with createRouteNodeSource(''))", () => {
+    it("isActive('') returns true when a route is current (root is always-active)", () => {
+      const selector = createActiveNameSelector(router);
+
+      // Router started at "/" → "home" is current.
+      expect(selector.isActive("")).toBe(true);
+    });
+
+    it("isActive('') tracks router state — true after navigation, true after another", async () => {
+      const selector = createActiveNameSelector(router);
+
+      expect(selector.isActive("")).toBe(true);
+
+      await router.navigate("users.list");
+
+      expect(selector.isActive("")).toBe(true);
+
+      await router.navigate("admin");
+
+      expect(selector.isActive("")).toBe(true);
+    });
+
+    it("isActive('') is false only when router has no state", () => {
+      const freshRouter = createRouter([{ name: "home", path: "/" }]);
+      const selector = createActiveNameSelector(freshRouter);
+
+      expect(selector.isActive("")).toBe(false);
+    });
+
+    it("subscribe('') listener fires on first nav (false → true flip), never again", async () => {
+      const freshRouter = createRouter([
+        { name: "home", path: "/" },
+        { name: "users", path: "/users" },
+      ]);
+      const selector = createActiveNameSelector(freshRouter);
+      const listener = vi.fn();
+
+      // selector.subscribe seeds active state immediately via isActiveNonStrict.
+      // Before start: isActive('') = false.
+      const unsub = selector.subscribe("", listener);
+
+      expect(selector.isActive("")).toBe(false);
+
+      await freshRouter.start("/");
+
+      // After start, isActive('') flips true → listener fires once.
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(selector.isActive("")).toBe(true);
+
+      // Subsequent in-tree navigation doesn't flip root active — no further fires.
+      await freshRouter.navigate("users");
+
+      expect(listener).toHaveBeenCalledTimes(1);
+
+      unsub();
+      freshRouter.stop();
+    });
+  });
 });

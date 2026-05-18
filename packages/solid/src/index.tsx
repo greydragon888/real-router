@@ -30,6 +30,8 @@ export { RouterProvider } from "./RouterProvider";
 
 export { RouterContext, RouteContext } from "./context";
 
+export type { RouterContextValue } from "./context";
+
 export { createSignalFromSource } from "./createSignalFromSource";
 
 export { createStoreFromSource } from "./createStoreFromSource";

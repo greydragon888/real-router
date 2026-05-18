@@ -53,6 +53,23 @@ const encodeValue = (value: unknown): string => {
   return encodeURIComponent(value as string | number | boolean);
 };
 
+// Repeats `${name}${suffix}=${value}` joined by `&`. Shared between
+// `none` (suffix `""`) and `brackets` (suffix `"[]"`) strategies.
+const repeatKey = (name: string, values: unknown[], suffix: string): string => {
+  if (values.length === 0) {
+    return "";
+  }
+
+  const key = `${name}${suffix}`;
+  let result = `${key}=${encodeValue(values[0])}`;
+
+  for (let i = 1; i < values.length; i++) {
+    result += `&${key}=${encodeValue(values[i])}`;
+  }
+
+  return result;
+};
+
 // =============================================================================
 // Strategy Implementations
 // =============================================================================
@@ -62,19 +79,7 @@ const encodeValue = (value: unknown): string => {
  * Example: items=a&items=b
  */
 export const noneArrayStrategy: ArrayStrategy = {
-  encodeArray: (name, values) => {
-    if (values.length === 0) {
-      return "";
-    }
-
-    let result = `${name}=${encodeValue(values[0])}`;
-
-    for (let i = 1; i < values.length; i++) {
-      result += `&${name}=${encodeValue(values[i])}`;
-    }
-
-    return result;
-  },
+  encodeArray: (name, values) => repeatKey(name, values, ""),
 };
 
 /**
@@ -82,19 +87,7 @@ export const noneArrayStrategy: ArrayStrategy = {
  * Example: items[]=a&items[]=b
  */
 export const bracketsArrayStrategy: ArrayStrategy = {
-  encodeArray: (name, values) => {
-    if (values.length === 0) {
-      return "";
-    }
-
-    let result = `${name}[]=${encodeValue(values[0])}`;
-
-    for (let i = 1; i < values.length; i++) {
-      result += `&${name}[]=${encodeValue(values[i])}`;
-    }
-
-    return result;
-  },
+  encodeArray: (name, values) => repeatKey(name, values, "[]"),
 };
 
 /**

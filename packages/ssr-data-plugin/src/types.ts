@@ -1,6 +1,12 @@
-import type { DefaultDependencies, Params, Router } from "@real-router/types";
+import type {
+  SsrLoaderFn,
+  SsrLoaderFnFactory,
+  SsrMode,
+  SsrRouteEntry,
+} from "./shared-ssr";
+import type { DefaultDependencies } from "@real-router/types";
 
-export type DataLoaderFn = (params: Params) => Promise<unknown>;
+export type DataLoaderFn = SsrLoaderFn<unknown>;
 
 /**
  * Factory function for creating data loaders.
@@ -13,11 +19,24 @@ export type DataLoaderFn = (params: Params) => Promise<unknown>;
  */
 export type DataLoaderFnFactory<
   Dependencies extends DefaultDependencies = DefaultDependencies,
-> = (
-  router: Router<Dependencies>,
-  getDependency: <K extends keyof Dependencies>(key: K) => Dependencies[K],
-) => DataLoaderFn;
+> = SsrLoaderFnFactory<unknown, Dependencies>;
+
+/**
+ * Per-route entry: either a loader factory (short form) or
+ * `{ ssr?, loader? }` object form. Mode defaults to "full".
+ *
+ * - `ssr: "full"` (default) — server runs the loader, mode marker `state.context.ssrDataMode = "full"`.
+ * - `ssr: "data-only"` — server runs the loader, mode marker `"data-only"`. App may render shell-only HTML.
+ * - `ssr: "client-only"` (or `false`) — loader is skipped on every `start()`. App handles client-side fetching.
+ * - `ssr: true` — alias for "full".
+ * - `ssr: (state) => SsrMode` — resolved per-navigation, **before** the mode is written to context.
+ */
+export type DataRouteEntry<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+> = SsrRouteEntry<unknown, SsrMode, Dependencies>;
 
 export type DataLoaderFactoryMap<
   Dependencies extends DefaultDependencies = DefaultDependencies,
-> = Record<string, DataLoaderFnFactory<Dependencies>>;
+> = Record<string, DataRouteEntry<Dependencies>>;
+
+export { type SsrLoaderContext, type SsrMode } from "./shared-ssr";

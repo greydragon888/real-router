@@ -1,3 +1,4 @@
+import { errorCodes } from "@real-router/core";
 import { renderHook } from "@solidjs/testing-library";
 import { createEffect } from "solid-js";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
@@ -6,7 +7,7 @@ import { RouterProvider, useRouteStore } from "@real-router/solid";
 
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Router, RouterError } from "@real-router/core";
 import type { JSX } from "solid-js";
 
 const wrapper = (router: Router) => (props: { children: JSX.Element }) => (
@@ -43,7 +44,7 @@ describe("useRouteStore hook", () => {
 
     expect(result.route?.name).toStrictEqual("test");
 
-    await router.navigate("items").catch(() => {});
+    await router.navigate("items");
 
     expect(result.route?.name).toStrictEqual("items");
   });
@@ -71,11 +72,11 @@ describe("useRouteStore hook", () => {
     // Initial run: no id (router started on "test").
     expect(observedIds).toStrictEqual([undefined]);
 
-    await router.navigate("items.item", { id: "123" }).catch(() => {});
+    await router.navigate("items.item", { id: "123" });
 
     expect(observedIds).toStrictEqual([undefined, "123"]);
 
-    await router.navigate("items.item", { id: "456" }).catch(() => {});
+    await router.navigate("items.item", { id: "456" });
 
     expect(observedIds).toStrictEqual([undefined, "123", "456"]);
   });
@@ -96,16 +97,16 @@ describe("useRouteStore hook", () => {
 
     expect(observedNames).toStrictEqual(["test"]);
 
-    await router.navigate("items").catch(() => {});
+    await router.navigate("items");
 
     expect(observedNames).toStrictEqual(["test", "items"]);
 
-    await router.navigate("items.item", { id: "123" }).catch(() => {});
+    await router.navigate("items.item", { id: "123" });
 
     expect(observedNames).toStrictEqual(["test", "items", "items.item"]);
 
     // Only params change — effect reads state.route?.name, so it must NOT run.
-    await router.navigate("items.item", { id: "456" }).catch(() => {});
+    await router.navigate("items.item", { id: "456" });
 
     expect(observedNames).toStrictEqual(["test", "items", "items.item"]);
   });
@@ -115,7 +116,7 @@ describe("useRouteStore hook", () => {
       wrapper: wrapper(router),
     });
 
-    await router.navigate("items.item", { id: "789" }).catch(() => {});
+    await router.navigate("items.item", { id: "789" });
 
     expect(result.route?.name).toBe("items.item");
     expect(result.route?.params.id).toBe("789");
@@ -124,8 +125,12 @@ describe("useRouteStore hook", () => {
   it("should have reactive previousRoute after navigation", async () => {
     let effectRunCount = 0;
 
-    // Ensure known starting route
-    await router.navigate("test").catch(() => {});
+    // Ensure known starting route (router may start elsewhere if JSDOM carries state)
+    await router.navigate("test").catch((error: unknown) => {
+      if ((error as RouterError).code !== errorCodes.SAME_STATES) {
+        throw error;
+      }
+    });
 
     renderHook(
       () => {
@@ -146,13 +151,13 @@ describe("useRouteStore hook", () => {
 
     expect(effectRunCount).toBe(1);
 
-    await router.navigate("home").catch(() => {});
+    await router.navigate("home");
 
     expect(result.route?.name).toBe("home");
     expect(result.previousRoute?.name).toBe("test");
     expect(effectRunCount).toBe(2);
 
-    await router.navigate("about").catch(() => {});
+    await router.navigate("about");
 
     expect(result.previousRoute?.name).toBe("home");
     expect(effectRunCount).toBe(3);

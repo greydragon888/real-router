@@ -14,7 +14,7 @@ interface FallbackSlots {
   notFoundChildren: unknown;
 }
 
-function isSegmentMatch(
+export function isSegmentMatch(
   routeName: string,
   fullSegmentName: string,
   exact: boolean,
@@ -24,6 +24,17 @@ function isSegmentMatch(
   }
 
   return startsWithSegment(routeName, fullSegmentName);
+}
+
+// Vue compiles boolean-shorthand template attributes (`<Match keepAlive>`) to
+// an empty string instead of `true`, and converts them to `true` only when the
+// receiving component's prop is declared with `type: Boolean`. `Match` is a
+// marker component (`render: null`) — its props are inspected on the VNode
+// without ever going through Vue's prop-casting pipeline, so the raw `""` (or
+// the hyphenated attribute name) reaches us here. Accept the same trio Vue's
+// runtime does.
+export function isKeepAliveEnabled(value: unknown): boolean {
+  return value === true || value === "" || value === "keep-alive";
 }
 
 function normalizeChildren(children: unknown): VNode[] {
@@ -137,6 +148,14 @@ export function buildRenderList(
   rendered: VNode[];
   activeMatchFound: boolean;
   fallback?: FallbackType;
+  /**
+   * True iff any `<Match>` child in the input has its `keepAlive` prop set
+   * to one of Vue's accepted boolean-shorthand forms. Surfaced as a
+   * side-channel from the single pipeline pass so the caller doesn't have
+   * to re-iterate `elements` after `buildRenderList` returns — closes a MED
+   * code-quality finding (audit §8.1).
+   */
+  hasPerMatchKA: boolean;
 } {
   const slots: FallbackSlots = {
     selfVNode: null,
@@ -145,9 +164,21 @@ export function buildRenderList(
   };
   let activeMatchFound = false;
   let fallback: FallbackType = undefined;
+  let hasPerMatchKA = false;
   const rendered: VNode[] = [];
 
   for (const child of elements) {
+    // Match-only side-channel: scan for the keepAlive shorthand in the same
+    // pass that already inspects every child. Short-circuits once a positive
+    // is found to avoid redundant prop reads in big slot trees.
+    if (!hasPerMatchKA && child.type === Match) {
+      const matchProps = child.props as { keepAlive?: unknown } | null;
+
+      if (isKeepAliveEnabled(matchProps?.keepAlive)) {
+        hasPerMatchKA = true;
+      }
+    }
+
     if (recordFallback(child, slots)) {
       continue;
     }
@@ -169,5 +200,5 @@ export function buildRenderList(
     fallback = appendFallback(rendered, routeName, nodeName, slots, elements);
   }
 
-  return { rendered, activeMatchFound, fallback };
+  return { rendered, activeMatchFound, fallback, hasPerMatchKA };
 }

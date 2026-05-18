@@ -1,5 +1,7 @@
 import { areRoutesRelated } from "@real-router/route-utils";
 
+import { noopDestroy } from "./internal/noopDestroy.js";
+
 import type { Router } from "@real-router/core";
 
 export interface ActiveNameSelector {
@@ -64,6 +66,15 @@ export function createActiveNameSelector(router: Router): ActiveNameSelector {
       return false;
     }
 
+    // Empty string represents the root of the name hierarchy — every named
+    // route is its descendant. Without this short-circuit, `current.name`
+    // would have to equal `""` or start with `"."` (both impossible for
+    // valid route names), breaking symmetry with `createRouteNodeSource("")`
+    // which is always-active when a route is current.
+    if (routeName === "") {
+      return true;
+    }
+
     return (
       current.name === routeName || current.name.startsWith(`${routeName}.`)
     );
@@ -73,14 +84,19 @@ export function createActiveNameSelector(router: Router): ActiveNameSelector {
     routerUnsubscribe = router.subscribe((next) => {
       for (const [routeName, listeners] of listenersByName) {
         // Cheap pre-filter: if neither new nor previous route is related
-        // to this name, its active state cannot have changed.
-        const isNewRelated = areRoutesRelated(routeName, next.route.name);
-        const isPrevRelated =
-          next.previousRoute &&
-          areRoutesRelated(routeName, next.previousRoute.name);
+        // to this name, its active state cannot have changed. Empty
+        // routeName is the implicit root — every route is its descendant,
+        // so the filter would falsely exclude it (`areRoutesRelated`
+        // doesn't treat `""` specially). Skip the filter for the root.
+        if (routeName !== "") {
+          const isNewRelated = areRoutesRelated(routeName, next.route.name);
+          const isPrevRelated =
+            next.previousRoute &&
+            areRoutesRelated(routeName, next.previousRoute.name);
 
-        if (!isNewRelated && !isPrevRelated) {
-          continue;
+          if (!isNewRelated && !isPrevRelated) {
+            continue;
+          }
         }
 
         // activeByName always has an entry for names present in listenersByName —
@@ -163,8 +179,4 @@ export function createActiveNameSelector(router: Router): ActiveNameSelector {
   selectorCache.set(router, selector);
 
   return selector;
-}
-
-function noopDestroy(): void {
-  // Shared cached selector — external destroy() is a no-op.
 }

@@ -32,7 +32,7 @@ type SortDirection = "asc" | "desc";
       >
         A → Z
       </a>
-      {{ ' · ' }}
+      {{ " · " }}
       <a
         realLink
         routeName="products"
@@ -41,8 +41,8 @@ type SortDirection = "asc" | "desc";
       >
         Z → A
       </a>
-      {{ ' · ' }}
-      <strong>current: {{ sort() }}</strong>
+      {{ " · " }}
+      <strong>current: {{ sortDirection() }}</strong>
     </div>
 
     <ul class="vt-product-list" data-vt-scope="product-list">
@@ -72,16 +72,17 @@ type SortDirection = "asc" | "desc";
 export class ProductsListComponent {
   private readonly state = injectRoute<{ sort?: SortDirection }>();
 
-  readonly sort = computed<SortDirection>(() => {
+  readonly sortDirection = computed<SortDirection>(() => {
     const params = this.state.routeState().route.params;
+
     return params?.sort === "desc" ? "desc" : "asc";
   });
 
   readonly items = computed(() => {
-    const sorted = [...PRODUCTS].sort((left, right) =>
+    const sorted = PRODUCTS.toSorted((left, right) =>
       left.name.localeCompare(right.name),
     );
 
-    return this.sort() === "desc" ? sorted.reverse() : sorted;
+    return this.sortDirection() === "desc" ? sorted.toReversed() : sorted;
   });
 }

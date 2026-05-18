@@ -27,33 +27,47 @@
 ```
 rsc-server-plugin/
 ├── src/
-│   ├── index.ts        — Public API (exports factory + types) + module augmentation StateContext.rsc
-│   ├── factory.ts      — rscServerPluginFactory: thin adapter over createSsrLoaderPlugin
-│   ├── validation.ts   — validateLoaders = createLoadersValidator(ERROR_PREFIX)
-│   ├── types.ts        — RscLoaderFn, RscLoaderFnFactory, RscLoaderFactoryMap
-│   ├── constants.ts    — ERROR_PREFIX, LOGGER_CONTEXT
-│   └── shared-ssr/     — symlink → shared/ssr/ (contains the generic factory & validator)
+│   ├── index.ts            — Public API + StateContext module augmentation (rsc, rscAction, ssrRscMode)
+│   ├── factory.ts          — rscServerPluginFactory: thin adapter over createSsrLoaderPlugin (validateLoaders inlined)
+│   ├── actionFactory.ts    — rscActionPluginFactory: claims "rscAction" namespace, publishes Server Action result
+│   ├── buildRscPayload.ts  — buildRscPayload(state, rootOverride?): wire-format helper for { root, returnValue, formState }
+│   ├── invalidate.ts       — invalidate(router, "rsc"): typed wrapper over markStale
+│   ├── getSsrRscMode.ts    — getSsrRscMode(state): runtime-guarded reader of state.context.ssrRscMode
+│   ├── types.ts            — RscLoaderFn, RscLoaderFnFactory, RscLoaderFactoryMap, RscActionResult, RscPayload
+│   ├── errors.ts           — Re-export of LoaderRedirect / LoaderNotFound / LoaderTimeout / withTimeout (subpath: /errors)
+│   ├── constants.ts        — ERROR_PREFIX, ALLOWED_RSC_MODES (single source of truth shared by factory/validation/getter)
+│   └── shared-ssr/         — symlink → shared/ssr/ (factory, validator, stale registry, errors)
 ```
 
 ## Module Dependency Graph
 
 ```
 index.ts
-    └── factory.ts
-            ├── validation.ts
-            │       ├── shared-ssr/createLoadersValidator.ts
-            │       └── constants.ts
-            ├── shared-ssr/createSsrLoaderPlugin.ts
-            └── types.ts
+    ├── factory.ts
+    │       ├── constants.ts (ERROR_PREFIX, ALLOWED_RSC_MODES)
+    │       ├── shared-ssr/createLoadersValidator.ts (inlined validateLoaders binding)
+    │       ├── shared-ssr/createSsrLoaderPlugin.ts
+    │       │       ├── shared-ssr/staleRegistry.ts (isStale + clearStale)
+    │       │       └── shared-ssr/defer.ts (isDeferred — ssr-data-only path; no-op for rsc)
+    │       └── types.ts
+    ├── actionFactory.ts
+    │       ├── constants.ts (ERROR_PREFIX)
+    │       └── @real-router/core/api (getPluginApi)
+    ├── buildRscPayload.ts → types.ts (RscActionResult, RscPayload)
+    ├── invalidate.ts → shared-ssr/staleRegistry.ts (markStale)
+    └── getSsrRscMode.ts → constants.ts (ALLOWED_RSC_MODES) + types.ts (RscSsrMode)
+
+errors.ts → shared-ssr/errors.ts (LoaderRedirect, LoaderNotFound, LoaderTimeout, withTimeout)
 ```
 
 External dependencies:
 
-| Dependency           | What it provides                                  | Used in                                |
-| -------------------- | ------------------------------------------------- | -------------------------------------- |
-| `@real-router/core`  | `getPluginApi`, types (`PluginFactory`, `Plugin`) | `shared-ssr/createSsrLoaderPlugin.ts`  |
-| `@real-router/types` | `StateContext` (module augmentation target)      | `index.ts`                             |
-| `react`              | `ReactNode` type only (peer dep)                  | `types.ts`, `index.ts`                 |
+| Dependency                        | What it provides                                                              | Used in                                |
+| --------------------------------- | ----------------------------------------------------------------------------- | -------------------------------------- |
+| `@real-router/core/api`           | `getPluginApi`                                                                | `actionFactory.ts`, `shared-ssr/createSsrLoaderPlugin.ts` |
+| `@real-router/core/validation`    | `getInternals` (read-only access to internals.hydrationState scratchpad)      | `shared-ssr/createSsrLoaderPlugin.ts`  |
+| `@real-router/types`              | `StateContext` (module augmentation target), `Plugin`, `PluginFactory`, `State` | `index.ts`, all factories              |
+| `react`                           | `ReactNode` type only (peer dep)                                              | `types.ts`, `index.ts`, `buildRscPayload.ts` |
 
 **No** `react-server-dom-*`, **no** `@vitejs/plugin-rsc`, **no** `react-dom`.
 
@@ -97,24 +111,89 @@ Same closure-based factory as `ssr-data-plugin` — no class, no mutable state b
 ```
 rscServerPluginFactory(loaders)              ← factory.ts (~25 LOC incl. JSDoc)
         │
-        │  1. validateLoaders(loaders)         ← validation.ts → createLoadersValidator(ERROR_PREFIX)
-        │  2. createSsrLoaderPlugin<ReactNode, Dependencies>(loaders, { namespace: "rsc", errorPrefix })
+        │  1. validateLoaders(loaders)         ← inlined binding of createLoadersValidator(ERROR_PREFIX, ALLOWED_RSC_MODES) (the previous standalone validation.ts was deleted; single 7-line consumer, no other importer)
+        │  2. createSsrLoaderPlugin<ReactNode, Dependencies>(loaders, { namespace: "rsc", modeNamespace: "ssrRscMode", errorPrefix, allowedModes })
         │
         └── createSsrLoaderPlugin returns PluginFactory (closure)
                 │
                 │  Called by router.usePlugin():
                 │
                 ├── api = getPluginApi(router)
-                ├── claim = api.claimContextNamespace("rsc")
-                ├── try: compile factories → compiledLoaders Map
-                │       └── factory(router, getDependency) per entry
-                │       └── typeof check on each returned loader
-                │   catch: claim.release() + rethrow
+                ├── acquired: ContextNamespaceClaim[] = []
+                ├── try:
+                │       ├── claim       = api.claimContextNamespace("rsc")          → acquired.push(claim)
+                │       ├── modeClaim   = api.claimContextNamespace("ssrRscMode")   → acquired.push(modeClaim)
+                │       └── compile factories → compiledLoaders Map
+                │               └── factory(router, getDependency) per entry
+                │               └── typeof check on each returned loader
+                │   catch: rollback(acquired) — release ALL acquired claims in reverse order + rethrow
                 ├── api.addInterceptor("start", ...)
-                │       └── claim.write(state, await loader(state.params))
+                │       └── claim.write(state, await loader(state.params)) + modeClaim.write(state, resolveMode(...))
+                ├── api.subscribeLeave(consumesStaleFlag)
                 └── return { teardown }
-                        └── removeStartInterceptor() + claim.release()
+                        └── removeStartInterceptor() + removeLeaveListener() + claim.release() + modeClaim.release()
 ```
+
+## Sibling: `rscActionPluginFactory` (Server Actions)
+
+For RSC apps that ship Server Actions, a second plugin in this package
+publishes the action result to `state.context.rscAction` using the same
+claim-based pattern. It coexists with `rscServerPluginFactory` on the
+same router (distinct namespaces — `"rsc"` vs `"rscAction"`).
+
+```
+rscActionPluginFactory(getResult)             ← actionFactory.ts (~80 LOC incl. JSDoc)
+        │
+        │  factory-time:
+        │    1. typeof getResult === "function"  → else throw TypeError
+        │
+        └── PluginFactory closure
+                │
+                │  Called by router.usePlugin():
+                │
+                ├── api = getPluginApi(router)
+                ├── claim = api.claimContextNamespace("rscAction")
+                ├── api.addInterceptor("start", async (next, path) => {
+                │       state = await next(path);
+                │       result = getResult();
+                │
+                │       per-start runtime guard:
+                │         result === undefined          → return state (skip-write)
+                │         typeof result !== "object" |
+                │           result === null |
+                │           Array.isArray(result) |
+                │           result.then === function    → throw TypeError
+                │
+                │       claim.write(state, result);
+                │       return state;
+                │   })
+                └── return { teardown: removeStartInterceptor + claim.release }
+```
+
+**Why a separate factory?** Server Action results are produced *outside*
+the loader pipeline (typically in the request fetch handler, before the
+router exists for that request). They have no per-route mapping, so they
+don't fit `RscLoaderFactoryMap`. Closing over a `let actionResult` in
+the request handler is the natural API.
+
+**Two layers of validation, mirroring `rscServerPluginFactory(loaders)`:**
+
+- Factory-time: `getResult` is a function (eager fail before the namespace
+  is claimed).
+- Per-start runtime: the *return value* must be `undefined` or a
+  plain object (not Promise/thenable, not array, not primitive). The
+  most common consumer mistake is wiring an `async getResult` — the
+  guard surfaces that as a typed error pointing back at the call site.
+
+### `buildRscPayload(state, rootOverride?)` — wire-format helper
+
+`buildRscPayload` reads `state.context.rsc` and `state.context.rscAction`
+and returns a `RscPayload<TReturn, TFormState>` ready for the bundler's
+Flight renderer. `returnValue` and `formState` are **omitted** (not set
+to `undefined`) when their source is missing — the result type-checks
+under `exactOptionalPropertyTypes: true` consumers without ceremony.
+A strict `=== undefined` `rootOverride` check preserves an explicit
+`null` override as "render nothing" instead of collapsing to the default.
 
 ## Data Flow
 
@@ -147,6 +226,45 @@ router.start(url)
 ```
 
 The interceptor runs **after** route resolution. If guards block the navigation, `next()` rejects and the loader never runs.
+
+### subscribeLeave handler — CSR revalidation
+
+A second listener registered alongside the start interceptor consumes the per-router stale flag set by `invalidate(router, "rsc")`. Runs in the awaited LEAVE_APPROVE phase, so a fresh `ReactNode` lands on `nextRoute.context` *before* `TRANSITION_SUCCESS` fires.
+
+```
+router.navigate(...) (any CSR navigation)
+        │
+        ▼
+  deactivation guards
+        │
+        ▼
+  sendLeaveApprove → awaitLeaveListeners
+        │
+        ▼
+  subscribeLeave handler
+        │
+        ├── isStale(router, "rsc")? no  → return (cheap WeakMap.get + Set.has)
+        │
+        ├── compiledLoaders.get(nextRoute.name)? none → return (flag preserved)
+        │
+        ├── modeClaim.write(nextRoute, mode)
+        │
+        ├── client-only / no-loader entry → return (flag preserved)
+        │
+        ├── rsc = await loader(nextRoute.params)
+        │
+        ├── signal.aborted? yes → return (flag preserved for the new nav)
+        │
+        ├── clearStale(router, "rsc")
+        └── claim.write(nextRoute, rsc)   ← writes ReactNode to nextRoute.context.rsc
+        │
+        ▼
+  activation guards → completeTransition → TRANSITION_SUCCESS
+```
+
+**Peek-then-clear-after-write**: the flag is cleared only on a successful, non-cancelled loader write. Every "non-refresh" outcome — no-entry hops, client-only mode, mode-only entries, cancellation by a newer navigation, loader rejections — leaves the flag set for the next attempt.
+
+The flag itself lives in `shared/ssr/staleRegistry.ts` — a module-level `WeakMap<Router, Set<string>>` shared with `ssr-data-plugin`. Per-router and per-namespace isolation comes free from the WeakMap key + Set value pairing: `invalidate(router, "data")` and `invalidate(router, "rsc")` are independent, and `cloneRouter()` clones get their own flag set.
 
 ### Accessing the RSC payload
 
@@ -194,22 +312,33 @@ unsubscribe() or router.dispose()
         ├── removeStartInterceptor()
         │     └── array.splice — cannot throw
         │
-        └── claim.release()
-              └── releases "rsc" namespace, allowing other plugins to claim it
+        ├── removeLeaveListener()
+        │     └── array.splice on #leaveListeners — cannot throw
+        │
+        ├── dataClaim.release()
+        │     └── releases "rsc" namespace
+        │
+        └── modeClaim.release()
+              └── releases "ssrRscMode" namespace
 ```
 
-Both operations are synchronous and infallible.
+All operations are synchronous and infallible. The stale flag in the per-router `WeakMap` is **not** cleared on teardown — markStale entries are GC'd along with the router.
 
 ## Validation
 
-`validateLoaders(loaders)` runs at factory call time (before `PluginFactory` is returned):
+`validateLoaders(loaders)` runs at factory call time (before `PluginFactory` is returned). Implementation lives in `shared-ssr/createLoadersValidator.ts`; `factory.ts:11` binds it with `ERROR_PREFIX` + `ALLOWED_RSC_MODES`.
 
-| Check          | Rule                          |
-| -------------- | ----------------------------- |
-| Top-level type | Must be non-null object       |
-| Values         | Each value must be a function |
+| Check                                | Rule                                                                                                                |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| Top-level type                       | `loaders` must be a non-null object AND not an array — `Array.isArray` rejection is explicit                        |
+| Per-route value: function form       | `typeof entry === "function"` → accepted as shorthand factory                                                       |
+| Per-route value: object form         | `entry` must be a non-null object, not an array, not a function returning non-object — else `entry for route "X" must be a function or { ssr?, loader? } object` |
+| Object-form keys                     | Only `"ssr"` and `"loader"` allowed — any other own key throws `unexpected key "X" in route "Y" config`             |
+| Object-form `loader` (if present)    | Must be a function                                                                                                  |
+| Object-form `ssr` (if present)       | One of: `function`, `boolean`, or a string in `ALLOWED_RSC_MODES` (`"full"` \| `"client-only"`). Anything else — including `"data-only"`, `null`, `number` — throws |
+| `ssr` string outside allowed set     | Specific error: `mode "X" is not allowed for route "Y". Allowed: full, client-only` (uses the bound `allowedModes` list) |
 
-Throws `TypeError` with `[@real-router/rsc-server-plugin]` prefix on violation.
+Throws `TypeError` with `[@real-router/rsc-server-plugin]` prefix on violation. The validator is shared with `ssr-data-plugin` (same source file in `shared-ssr/`), bound with `ALL_SSR_MODES` there instead of `ALLOWED_RSC_MODES`.
 
 Factory-time validation checks the `loaders` object. Plugin-registration-time validation (in the compilation loop) checks that each factory returns a function. Loader return values (any `ReactNode` — element, fragment, null, string, etc.) are written as-is to `state.context.rsc` via `claim.write()`.
 
@@ -231,15 +360,20 @@ Factory-time validation checks the `loaders` object. Plugin-registration-time va
 
 Same as `ssr-data-plugin`: `Object.entries(loaders)` at compilation time only iterates own enumerable properties. `compiledLoaders.get(state.name)` at runtime looks up only compiled entries. Inherited prototype keys (e.g. `toString`) cannot be triggered as loaders.
 
-### Error-safe compilation
+### Error-safe compilation (all-or-nothing claim rollback)
 
-The compilation loop is wrapped in `try/catch`. If any loader factory throws, or if the returned value is not a function:
+The compilation loop in `shared-ssr/createSsrLoaderPlugin.ts:153-187` is wrapped in `try/catch` with an `acquired: ContextNamespaceClaim[]` array. Claims are pushed onto `acquired` as they're successfully obtained from `api.claimContextNamespace(...)` — `"rsc"` first, then `"ssrRscMode"` (and, in the `ssr-data-plugin` build of the same shared factory, additional `value`/`keys` claims under a configured `deferredNamespace`).
 
-- `claim.release()` is called to free the `"rsc"` namespace
+If any factory throws or returns a non-function:
+
+- `rollback(acquired)` calls `claim.release()` on EVERY successfully-claimed namespace in reverse order — atomic all-or-nothing semantics
 - The error is re-thrown to the `usePlugin()` caller
 - No interceptor is registered (it runs after the loop)
+- No leave listener is registered (it runs after the loop)
 
-This prevents permanently blocking the namespace when a factory has a bug.
+This prevents permanently blocking ANY of the plugin's namespaces when a factory has a bug. The change from "single-claim rollback" to "acquired-array rollback" was driven by adding the `ssrRscMode` claim — a single `claim.release()` would have leaked the partner namespace on factory failure.
+
+For `rsc-server-plugin` specifically, `acquired.length` is always 2 (no `deferredNamespace` configured). The `ssr-data-plugin` path can grow it to 4 — see `shared-ssr/createSsrLoaderPlugin.ts:165-180` for the deferred-namespace branch obligations.
 
 ### No bundler dependency
 

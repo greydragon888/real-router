@@ -5,14 +5,10 @@ import { createDismissableError } from "@real-router/sources";
 import { injectRouter } from "../functions/injectRouter";
 import { sourceToSignal } from "../sourceToSignal";
 
+import type { ErrorContext } from "../types";
 import type { TemplateRef } from "@angular/core";
 import type { RouterError, State } from "@real-router/core";
 import type { DismissableErrorSnapshot } from "@real-router/sources";
-
-export interface ErrorContext {
-  $implicit: RouterError;
-  resetError: () => void;
-}
 
 @Component({
   selector: "router-error-boundary",
@@ -55,6 +51,12 @@ export class RouterErrorBoundary {
   );
 
   constructor() {
+    // `effect()` registers itself with the current injection context's
+    // `DestroyRef` and tears down automatically when the component is
+    // destroyed. The earlier manual `effectRef.destroy()` wired through
+    // `inject(DestroyRef).onDestroy(...)` duplicated that built-in cleanup
+    // (audit §8.1 LOW — confirmed: no behavior change without the manual
+    // path).
     effect(() => {
       const snap = this.snapshot();
 

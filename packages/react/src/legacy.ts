@@ -1,4 +1,8 @@
 // Legacy entry point — React 18+
+//
+// SSR-aware components/hooks live at `@real-router/react/legacy/ssr`
+// (subset of the React 19+ `/ssr` surface — `<Await>` is excluded since
+// it depends on `use(promise)`).
 
 // Components
 export { Link } from "./components/Link";

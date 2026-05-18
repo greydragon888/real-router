@@ -37,7 +37,7 @@ const adminGuard: GuardFnFactory<AppDependencies> = (_router, getDep) => {
   };
 };
 
-// Always succeeds after 600ms delay — demonstrates progress bar only. See async-guards example for denial demo.
+// Always succeeds after 600ms delay — demonstrates progress bar only.
 function checkoutGuardFn(
   _toState: unknown,
   _fromState: unknown,
@@ -73,6 +73,36 @@ function settingsDeactivateGuardFn(): Promise<boolean> {
 
 const settingsDeactivateGuard: GuardFnFactory = () => settingsDeactivateGuardFn;
 
+async function preloadProducts(): Promise<void> {
+  const data = await api.getProducts();
+
+  store.set("products", data);
+}
+
+function fetchProducts(): Promise<unknown> {
+  return api.getProducts();
+}
+
+function onEnterProducts(): void {
+  loadRoute("products", fetchProducts);
+}
+
+async function preloadProductDetail(params: Params): Promise<void> {
+  const data = await api.getProduct(getParamId(params));
+
+  store.set("products.detail", data);
+}
+
+function getParamId(params: Params): string {
+  return typeof params.id === "string" ? params.id : "";
+}
+
+function onEnterProductDetail(toState: { params: Params }): void {
+  const id = getParamId(toState.params);
+
+  loadRoute("products.detail", () => api.getProduct(id));
+}
+
 export const publicRoutes: Route[] = [
   { name: "home", path: "/" },
   { name: "login", path: "/login" },
@@ -86,29 +116,14 @@ export const privateRoutes: Route<AppDependencies>[] = [
     path: "/products?page&sort",
     defaultParams: { page: 1, sort: "name" },
     searchSchema: productsListSchema,
-    preload: () => async () => {
-      const data = await api.getProducts();
-
-      store.set("products", data);
-    },
-    onEnter: () => () => {
-      loadRoute("products", () => api.getProducts());
-    },
+    preload: () => preloadProducts,
+    onEnter: () => onEnterProducts,
     children: [
       {
         name: "detail",
         path: "/:id",
-        preload: () => async (params: Params) => {
-          const data = await api.getProduct(String(params.id));
-
-          store.set("products.detail", data);
-        },
-        onEnter: () => (toState) => {
-          const id =
-            typeof toState.params.id === "string" ? toState.params.id : "";
-
-          loadRoute("products.detail", () => api.getProduct(id));
-        },
+        preload: () => preloadProductDetail,
+        onEnter: () => onEnterProductDetail,
       },
     ],
   },

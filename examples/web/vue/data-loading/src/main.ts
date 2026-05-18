@@ -1,11 +1,11 @@
 import { browserPluginFactory } from "@real-router/browser-plugin";
 import { createRouter } from "@real-router/core";
+import { lifecyclePluginFactory } from "@real-router/lifecycle-plugin";
+import { preloadPluginFactory } from "@real-router/preload-plugin";
 import { RouterProvider } from "@real-router/vue";
 import { createApp, h } from "vue";
 
 import App from "./App.vue";
-import { lifecyclePluginFactory } from "@real-router/lifecycle-plugin";
-import { preloadPluginFactory } from "@real-router/preload-plugin";
 import { routes } from "./routes";
 
 import "../../../../shared/styles.css";

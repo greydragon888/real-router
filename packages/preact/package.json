@@ -6,6 +6,13 @@
   "main": "./dist/cjs/index.js",
   "module": "./dist/esm/index.mjs",
   "types": "./dist/esm/index.d.mts",
+  "typesVersions": {
+    "*": {
+      "ssr": [
+        "./dist/cjs/ssr.d.ts"
+      ]
+    }
+  },
   "exports": {
     ".": {
       "@real-router/internal-source": "./src/index.ts",
@@ -15,6 +22,15 @@
       },
       "import": "./dist/esm/index.mjs",
       "require": "./dist/cjs/index.js"
+    },
+    "./ssr": {
+      "@real-router/internal-source": "./src/ssr.ts",
+      "types": {
+        "import": "./dist/esm/ssr.d.mts",
+        "require": "./dist/cjs/ssr.d.ts"
+      },
+      "import": "./dist/esm/ssr.mjs",
+      "require": "./dist/cjs/ssr.js"
     }
   },
   "files": [
@@ -68,7 +84,8 @@
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/preact": "3.2.4",
     "@testing-library/user-event": "14.6.1",
-    "preact": "10.25.4"
+    "preact": "10.25.4",
+    "preact-render-to-string": "6.6.7"
   },
   "peerDependencies": {
     "preact": ">=10.0.0"

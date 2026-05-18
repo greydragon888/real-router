@@ -1,4 +1,4 @@
-import { createRouter } from "@real-router/core";
+import { createRouter, errorCodes } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
 import { render, screen, renderHook } from "@solidjs/testing-library";
 import { fireEvent } from "@testing-library/dom";
@@ -35,14 +35,16 @@ describe("useRouterTransition", () => {
       wrapper: wrapper(router),
     });
 
-    expect(result()).toStrictEqual(
-      expect.objectContaining({
-        isTransitioning: false,
-        toRoute: null,
-        fromRoute: null,
-        isLeaveApproved: false,
-      }),
-    );
+    // audit-2026-05-17 §1 MEDIUM #14 — strict shape (toStrictEqual without
+    // objectContaining) locks the snapshot shape exactly. A regression that
+    // added a stray field to IDLE_SNAPSHOT (e.g. `phase: "idle"`) would slip
+    // past `objectContaining` because it ignores extra keys.
+    expect(result()).toStrictEqual({
+      isTransitioning: false,
+      toRoute: null,
+      fromRoute: null,
+      isLeaveApproved: false,
+    });
   });
 
   it("isTransitioning === true upon TRANSITION_START", async () => {
@@ -88,7 +90,9 @@ describe("useRouterTransition", () => {
       wrapper: wrapper(router),
     });
 
-    await router.navigate("dashboard").catch(() => {});
+    await expect(router.navigate("dashboard")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_ACTIVATE,
+    });
 
     expect(result().isTransitioning).toBe(false);
   });
@@ -115,7 +119,10 @@ describe("useRouterTransition", () => {
 
     resolveGuard(true);
     await p2;
-    await p1.catch(() => {});
+
+    await expect(p1).rejects.toMatchObject({
+      code: errorCodes.TRANSITION_CANCELLED,
+    });
 
     expect(result().isTransitioning).toBe(false);
   });
@@ -170,15 +177,6 @@ describe("useRouterTransition", () => {
     await Promise.resolve();
   });
 
-  it("toRoute and fromRoute === null when no transition", () => {
-    const { result } = renderHook(() => useRouterTransition(), {
-      wrapper: wrapper(router),
-    });
-
-    expect(result().toRoute).toBeNull();
-    expect(result().fromRoute).toBeNull();
-  });
-
   it("handles cancel by new navigate correctly", async () => {
     const lifecycle = getLifecycleApi(router);
     let resolveGuard!: (value: boolean) => void;
@@ -207,11 +205,26 @@ describe("useRouterTransition", () => {
 
     resolveGuard(true);
     await p2;
-    await p1.catch(() => {});
+
+    await expect(p1).rejects.toMatchObject({
+      code: errorCodes.TRANSITION_CANCELLED,
+    });
 
     expect(result().isTransitioning).toBe(false);
     expect(result().toRoute).toBeNull();
   });
+
+  // KNOWN LIMITATION (pinning current behavior, not endorsing it):
+  // The transition source replays only the LATEST snapshot to new
+  // subscribers. A consumer that mounts AFTER `TRANSITION_START` (but
+  // before TRANSITION_SUCCESS/CANCEL) sees the IDLE snapshot — there is
+  // no replay of the in-flight TRANSITION_START frame. Ideally the
+  // source would surface the live transition immediately on subscribe.
+  // See `useRouteEnter`-style abort+revisit pattern for the symmetric
+  // shape on the route side. Until the source is reworked, this test
+  // pins existing behavior so a regression to "captures mid-transition"
+  // would surface as a deliberate test update, not silent breakage.
+  it.todo("ideally captures mid-transition state on subscribe");
 
   it("reports IDLE when mounted mid-transition (known limitation)", async () => {
     const lifecycle = getLifecycleApi(router);

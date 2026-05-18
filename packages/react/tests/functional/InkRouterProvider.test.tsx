@@ -54,11 +54,9 @@ describe("InkRouterProvider", () => {
       </InkRouterProvider>,
     );
 
-    const announcerCalls = querySelectorSpy.mock.calls.filter((call) =>
-      String(call[0]).includes("real-router-announcer"),
+    expect(querySelectorSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining("real-router-announcer"),
     );
-
-    expect(announcerCalls).toHaveLength(0);
   });
 
   it("provides router context to descendants", () => {

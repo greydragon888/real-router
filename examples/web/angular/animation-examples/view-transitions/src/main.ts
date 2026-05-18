@@ -23,7 +23,7 @@ void router.start().then(() => {
       provideZonelessChangeDetection(),
       provideRealRouter(router, { viewTransitions: true }),
     ],
-  }).catch((err: unknown) => {
-    console.error(err);
+  }).catch((error: unknown) => {
+    console.error(error);
   });
 });

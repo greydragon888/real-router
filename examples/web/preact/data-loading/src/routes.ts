@@ -43,35 +43,50 @@ function loadData(
   })();
 }
 
+async function preloadProducts(): Promise<void> {
+  const data = await api.getProducts();
+
+  store.set("products", data);
+}
+
+function fetchProductsWithSignal(signal: AbortSignal): Promise<unknown> {
+  return api.getProducts(signal);
+}
+
+function onEnterProducts(): void {
+  loadData("products", fetchProductsWithSignal);
+}
+
+function getParamId(params: Params): string {
+  return typeof params.id === "string" ? params.id : "";
+}
+
+async function preloadProductDetail(params: Params): Promise<void> {
+  const data = await api.getProduct(getParamId(params));
+
+  store.set("products.detail", data);
+}
+
+function onEnterProductDetail(toState: { params: Params }): void {
+  const id = getParamId(toState.params);
+
+  loadData("products.detail", (signal) => api.getProduct(id, signal));
+}
+
 export const routes: Route[] = [
   { name: "home", path: "/" },
   {
     name: "products",
     path: "/products",
-    preload: () => async () => {
-      const data = await api.getProducts();
-
-      store.set("products", data);
-    },
-    onEnter: () => () => {
-      loadData("products", (signal) => api.getProducts(signal));
-    },
+    preload: () => preloadProducts,
+    onEnter: () => onEnterProducts,
     onLeave: () => abortPending,
     children: [
       {
         name: "detail",
         path: "/:id",
-        preload: () => async (params: Params) => {
-          const data = await api.getProduct(String(params.id));
-
-          store.set("products.detail", data);
-        },
-        onEnter: () => (toState) => {
-          const id =
-            typeof toState.params.id === "string" ? toState.params.id : "";
-
-          loadData("products.detail", (signal) => api.getProduct(id, signal));
-        },
+        preload: () => preloadProductDetail,
+        onEnter: () => onEnterProductDetail,
         onLeave: () => abortPending,
       },
     ],

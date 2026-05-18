@@ -12,9 +12,8 @@ export function Home(): JSX.Element {
         keyed by an <code>exitToken</code> counter bumped inside{" "}
         <code>useRouteExit</code> (from <code>@real-router/react</code>);
         AnimatePresence detects the key change and starts exit. The router
-        blocks on a Promise that resolves on <code>onExitComplete</code> —
-        URL and UI stay in lock-step, same semantics as the other three
-        examples.
+        blocks on a Promise that resolves on <code>onExitComplete</code> — URL
+        and UI stay in lock-step, same semantics as the other three examples.
       </p>
 
       <h2>Scenarios to try</h2>

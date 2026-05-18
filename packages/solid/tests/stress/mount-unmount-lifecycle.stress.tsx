@@ -11,7 +11,7 @@ import {
   Link,
 } from "@real-router/solid";
 
-import { createStressRouter, takeHeapSnapshot, MB } from "./helpers";
+import { createStressRouter, takeHeapSnapshot, MB, forceGC } from "./helpers";
 
 import type { Router } from "@real-router/core";
 import type { JSX } from "solid-js";
@@ -270,6 +270,57 @@ describe("R3 — mount/unmount subscription lifecycle", () => {
 
     expect(router.getState()?.name).toBe("route1");
   });
+
+  // audit-2026-05-17 §7 P1 #1 — extended start/stop with a higher
+  // iteration count and a per-half drift baseline. R10 caps at 50 cycles
+  // and asserts only a total heap budget; this variant runs 200 cycles
+  // and compares first-half vs second-half deltas — that's the actual
+  // signature of "subscribers leak per cycle".
+  it("R10b — 200 start/stop cycles — per-half heap drift bounded", async () => {
+    router.stop();
+
+    // Warm-up to stabilise JIT + initial GC.
+    for (let i = 0; i < 10; i++) {
+      await router.start("/route0");
+      router.stop();
+    }
+
+    forceGC();
+
+    const heapStart = takeHeapSnapshot();
+
+    for (let i = 0; i < 100; i++) {
+      await router.start("/route0");
+      router.stop();
+    }
+
+    const heapMid = takeHeapSnapshot();
+
+    for (let i = 0; i < 100; i++) {
+      await router.start("/route0");
+      router.stop();
+    }
+
+    forceGC();
+    const heapEnd = takeHeapSnapshot();
+
+    const firstHalfDelta = heapMid - heapStart;
+    const secondHalfDelta = heapEnd - heapMid;
+
+    // Steady-state contract: second half should not retain dramatically
+    // more memory than the first. Without a per-cycle subscriber leak,
+    // the deltas track each other (jitter ~few MB on jsdom GC). With a
+    // leak (e.g. internal listener array grows on start without drain on
+    // stop), the second-half delta runs away.
+    expect(secondHalfDelta - firstHalfDelta).toBeLessThan(20 * MB);
+    expect(heapEnd - heapStart).toBeLessThan(40 * MB);
+
+    // Sanity: the router still works after the burst.
+    await router.start("/route0");
+    await router.navigate("route1");
+
+    expect(router.getState()?.name).toBe("route1");
+  }, 120_000);
 });
 
 function NodeConsumer(): JSX.Element {

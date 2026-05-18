@@ -17,7 +17,7 @@ router.usePlugin(hashPluginFactory({ hashPrefix: "!" }));
 void router.start().then(() => {
   void bootstrapApplication(AppComponent, {
     providers: [provideZonelessChangeDetection(), provideRealRouter(router)],
-  }).catch((err: unknown) => {
-    console.error(err);
+  }).catch((error: unknown) => {
+    console.error(error);
   });
 });

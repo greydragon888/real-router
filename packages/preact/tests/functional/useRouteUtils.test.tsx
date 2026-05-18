@@ -21,22 +21,29 @@ describe("useRouteUtils hook", () => {
 
   beforeEach(async () => {
     router = createTestRouterWithADefaultRouter();
-    await router.start();
+    await router.start("/");
   });
 
   afterEach(() => {
     router.stop();
   });
 
-  it("should return a RouteUtils instance", () => {
+  it("should return a RouteUtils instance bound to the provider's router", () => {
+    // Locks both the type (`instanceof RouteUtils`) AND the binding: the
+    // returned utils must know about routes registered in *this* router, not
+    // a default / empty / wrong-router tree. Without the `getChain` check, a
+    // regression that returned `getRouteUtils(emptyTree)` would still pass.
     const { result } = renderHook(() => useRouteUtils(), {
       wrapper: wrapper(router),
     });
 
     expect(result.current).toBeInstanceOf(RouteUtils);
-    expect(result.current.getChain).toBeTypeOf("function");
-    expect(result.current.getSiblings).toBeTypeOf("function");
-    expect(result.current.isDescendantOf).toBeTypeOf("function");
+    // `createTestRouterWithADefaultRouter` declares `users.list` as a child
+    // of `users`; a properly-bound RouteUtils returns the ancestor chain.
+    expect(result.current.getChain("users.list")).toStrictEqual([
+      "users",
+      "users.list",
+    ]);
   });
 
   it("should return same instance on re-render (WeakMap cache)", () => {
@@ -69,6 +76,7 @@ describe("useRouteUtils hook", () => {
 
     const siblings = result.current.getSiblings("users.list");
 
+    expect(siblings).toHaveLength(2);
     expect(siblings).toContain("users.view");
     expect(siblings).toContain("users.edit");
     expect(siblings).not.toContain("users.list");

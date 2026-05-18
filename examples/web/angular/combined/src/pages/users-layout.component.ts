@@ -22,7 +22,7 @@ function getLabel(name: string, params: Params): string {
   }
 
   if (name === "users.profile") {
-    const id = typeof params["id"] === "string" ? params["id"] : "?";
+    const id = typeof params.id === "string" ? params.id : "?";
 
     return `User #${id}`;
   }
@@ -74,7 +74,8 @@ export class UserProfileInnerComponent {
 
   readonly id = computed(() => {
     const params = this.node.routeState().route?.params;
-    const raw = params?.["id"];
+    const raw = params?.id;
+
     return typeof raw === "string" ? raw : "?";
   });
 }
@@ -121,6 +122,7 @@ export class UsersLayoutComponent {
     const current = this.route.routeState().route;
     const chain = this.utils.getChain(current.name) ?? [current.name];
     const names = ["home", ...chain];
+
     return names.map((name, i) => ({
       name,
       label: getLabel(name, current.params),

@@ -88,7 +88,14 @@ describe("Navigation Plugin — Navigate", () => {
         "http://localhost/nonexistent-path",
       );
 
-      await finished.catch(() => undefined);
+      let finishedRejection: unknown;
+
+      await finished.catch((error: unknown) => {
+        finishedRejection = error;
+      });
+
+      // finished must reject because the intercept handler throws for ROUTE_NOT_FOUND (#483)
+      expect(finishedRejection).toBeDefined();
 
       // No silent fallback
       expect(navigateDefaultSpy).not.toHaveBeenCalled();
@@ -132,7 +139,7 @@ describe("Navigation Plugin — Navigate", () => {
       expect(navigateSpy).not.toHaveBeenCalled();
     });
 
-    it("skips events when isSyncingFromRouter is true (no infinite loops)", async () => {
+    it("router.navigate() calls router exactly once (onTransitionSuccess navigate event short-circuits via isSyncingFromRouter)", async () => {
       const navigateSpy = vi.spyOn(router, "navigate");
 
       await router.navigate("users.list");
@@ -235,6 +242,8 @@ describe("Navigation Plugin — Navigate", () => {
 
       expect(mockNav.crossDocumentReloadCount).toBe(0);
       expect(router.getState()?.name).toBe("users.view");
+      expect(router.getState()?.params).toStrictEqual({ id: "42" });
+      expect(mockNav.currentUrl).toBe("http://localhost/users/view/42");
     });
 
     it("browser-initiated navigate event does not trigger cross-document reload", async () => {
@@ -244,6 +253,7 @@ describe("Navigation Plugin — Navigate", () => {
 
       expect(mockNav.crossDocumentReloadCount).toBe(0);
       expect(router.getState()?.name).toBe("users.list");
+      expect(mockNav.currentUrl).toBe("http://localhost/users/list");
     });
   });
 
@@ -460,7 +470,7 @@ describe("createNavigateHandler — direct", () => {
     expect(setCapturedMeta).not.toHaveBeenCalled();
   });
 
-  it("intercepts with noop handler when isSyncingFromRouter() returns true — #518", () => {
+  it("intercepts with noop handler when isSyncingFromRouter() returns true — #518", async () => {
     // Regression test for #518: when the plugin itself triggers a navigate
     // event (via browser.navigate in onTransitionSuccess), the handler MUST
     // still call event.intercept(). Per Navigation API spec, a bare `return`
@@ -468,8 +478,15 @@ describe("createNavigateHandler — direct", () => {
     // falls back to a cross-document (full-reload) navigation — which
     // re-runs the bootstrap and triggers an infinite loop.
     const setCapturedMeta = vi.fn();
+    const routerNavigateMock = vi.fn();
     const handler = createNavigateHandler(
       makeHandlerDeps({
+        router: {
+          isActive: () => true,
+          navigate: routerNavigateMock,
+          navigateToNotFound: vi.fn(),
+          navigateToDefault: vi.fn(),
+        } as unknown as Router,
         isSyncingFromRouter: () => true,
         setCapturedMeta,
       }),
@@ -484,12 +501,15 @@ describe("createNavigateHandler — direct", () => {
     // Must intercept to cancel the cross-document fallback.
     expect(interceptSpy).toHaveBeenCalledTimes(1);
 
-    // But the handler must be a noop — router state is already committed.
+    // Call the noop handler — must not invoke router.navigate (syncing path is a pure noop)
     const interceptCall = interceptSpy.mock.calls[0][0] as {
       handler: () => Promise<unknown>;
     };
 
-    expect(typeof interceptCall.handler).toBe("function");
+    await interceptCall.handler();
+
+    expect(routerNavigateMock).not.toHaveBeenCalled();
+
     // Must NOT capture meta — the plugin-initiated navigation already has it.
     expect(setCapturedMeta).not.toHaveBeenCalled();
   });
@@ -554,7 +574,7 @@ describe("Error Recovery", () => {
   // Obsolete after #483: strict-mode path no longer invokes navigateToDefault,
   // so there is no "navigateToDefault crash" code path to recover from.
 
-  it("does NOT recover on RouterError (expected behavior) and manually syncs URL via replace", async () => {
+  it("RouterError triggers manual URL sync (syncUrlToRouterState) without critical-error logging", async () => {
     unsub = router.usePlugin(
       navigationPluginFactory({ forceDeactivate: false }, browser),
     );

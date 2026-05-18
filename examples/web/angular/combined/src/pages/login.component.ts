@@ -66,6 +66,7 @@ export class LoginComponent {
         this.error.set(
           "Invalid credentials. Try alice@example.com or bob@example.com",
         );
+
         return;
       }
 

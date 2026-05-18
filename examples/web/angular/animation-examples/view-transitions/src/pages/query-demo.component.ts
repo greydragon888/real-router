@@ -32,8 +32,8 @@ const FILTERS: Filter[] = ["all", "letter", "number", "color"];
     <div>
       <h1>Query-only navigation</h1>
       <p>
-        Changing the filter via query params is still a navigation, so VT
-        runs. The <strong>inner list container</strong> has its own
+        Changing the filter via query params is still a navigation, so VT runs.
+        The <strong>inner list container</strong> has its own
         <code>view-transition-name: query-demo-list</code> — only this area
         animates, while the page header and buttons stay fixed.
       </p>
@@ -53,10 +53,7 @@ const FILTERS: Filter[] = ["all", "letter", "number", "color"];
 
       <ul class="vt-qd-list" data-vt-scope="query-demo-list">
         @for (item of visible(); track item.id) {
-          <li
-            class="vt-qd-item"
-            [style.--vt-qd-name]="'vt-qd-' + item.id"
-          >
+          <li class="vt-qd-item" [style.--vt-qd-name]="'vt-qd-' + item.id">
             <strong>{{ item.label }}</strong>
             <span> — {{ item.category }}</span>
           </li>
@@ -73,11 +70,13 @@ export class QueryDemoComponent {
   readonly filter = computed<Filter>(() => {
     const params = this.state.routeState().route.params;
     const raw = params?.filter;
+
     return raw && FILTERS.includes(raw) ? raw : "all";
   });
 
   readonly visible = computed(() => {
     const f = this.filter();
+
     return f === "all" ? ITEMS : ITEMS.filter((item) => item.category === f);
   });
 }

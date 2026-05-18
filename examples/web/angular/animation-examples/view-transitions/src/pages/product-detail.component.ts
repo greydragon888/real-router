@@ -35,11 +35,15 @@ const COVERS: Partial<Record<string, { name: string; color: string }>> = {
         both elements → browser pairs them → automatic FLIP-style animation.
       </p>
       <p>
-        <a realLink routeName="products" [activeStrict]="true">← Back to products</a>
+        <a realLink routeName="products" [activeStrict]="true"
+          >← Back to products</a
+        >
       </p>
     } @else {
       <h2>Unknown product</h2>
-      <a realLink routeName="products" [activeStrict]="true">Back to products</a>
+      <a realLink routeName="products" [activeStrict]="true"
+        >Back to products</a
+      >
     }
   `,
 })
@@ -48,6 +52,7 @@ export class ProductDetailComponent {
 
   readonly id = computed(() => {
     const params = this.state.routeState().route.params;
+
     return typeof params?.id === "string" ? params.id : "1";
   });
 

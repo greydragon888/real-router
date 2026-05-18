@@ -88,7 +88,7 @@ describe("Navigation Plugin — Lifecycle", () => {
   });
 
   describe("onStart Listener Management", () => {
-    it("removes existing navigate listener when onStart called twice (factory reuse with same router)", async () => {
+    it("removes existing navigate listener on stop and re-registers on restart (lifecycle restart)", async () => {
       const removeEventSpy = vi.spyOn(mockNav, "removeEventListener");
 
       unsubscribe = router.usePlugin(navigationPluginFactory({}, browser));
@@ -135,17 +135,11 @@ describe("Navigation Plugin — Lifecycle", () => {
   });
 
   describe("Configuration Validation", () => {
-    it("does not warn for valid configuration", () => {
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
-
-      router.usePlugin(navigationPluginFactory({}, browser));
-
-      expect(consoleSpy).not.toHaveBeenCalledWith(
-        expect.stringContaining("ignored"),
-      );
-
-      consoleSpy.mockRestore();
-    });
+    // Note: "does not warn for valid configuration" / "for correct option types"
+    // removed — the shared validator (`createOptionsValidator`) throws on
+    // invalid types and has no warn paths, so those assertions could never
+    // catch a regression. The pinned-message throw tests below cover the
+    // entire validator surface.
 
     it("validates option types throw on invalid types", () => {
       expect(() =>
@@ -157,26 +151,6 @@ describe("Navigation Plugin — Lifecycle", () => {
           browser,
         ),
       ).toThrow();
-    });
-
-    it("does not warn for correct option types", () => {
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
-
-      router.usePlugin(
-        navigationPluginFactory(
-          {
-            base: "/app",
-            forceDeactivate: false,
-          },
-          browser,
-        ),
-      );
-
-      expect(consoleSpy).not.toHaveBeenCalledWith(
-        expect.stringContaining("Invalid type"),
-      );
-
-      consoleSpy.mockRestore();
     });
 
     it("throws Error with message for invalid base type", () => {
@@ -243,6 +217,28 @@ describe("Navigation Plugin — Lifecycle", () => {
 
       await router.navigate("users.list");
 
+      expect(browser.navigate).toHaveBeenCalledWith(
+        "/users/list",
+        expect.objectContaining({
+          state: expect.objectContaining({ name: "users.list" }),
+          history: "push",
+        }),
+      );
+    });
+
+    it("explicit `replace: false` on the first programmatic navigate after start → push entry + meta.navigationType 'push'", async () => {
+      // Pins the documented gotcha "Explicit `replace: false` on first
+      // navigation → push" end-to-end. `pure-functions.properties.ts:148-154`
+      // covers the `shouldReplaceHistory` pure function partition; this test
+      // closes the e2e gap by asserting both meta and browser-level history
+      // action stay "push" — a regression that defaulted to replace on the
+      // first navigate() call (e.g., misreading the `??` operator as `||`)
+      // would surface here, not in the partition PBT.
+      vi.spyOn(browser, "navigate");
+
+      const state = await router.navigate("users.list", {}, { replace: false });
+
+      expect(state.context.navigation?.navigationType).toBe("push");
       expect(browser.navigate).toHaveBeenCalledWith(
         "/users/list",
         expect.objectContaining({
@@ -321,6 +317,7 @@ describe("Navigation Plugin — Lifecycle", () => {
       // Guard blocks navigation — router state stays at users.list
       // (In real Navigation API, URL also auto-rolls back via event.intercept() rejection)
       expect(router.getState()!.name).toBe("users.list");
+      expect(mockNav.currentUrl).toBe("http://localhost/users/list");
     });
   });
 
@@ -450,7 +447,7 @@ describe("Navigation Plugin — Lifecycle", () => {
 
       await router.navigate("users.list");
 
-      expect(mockNav.currentUrl).toContain("#section");
+      expect(mockNav.currentUrl).toBe("http://localhost/users/list#section");
     });
 
     it("clears hash when navigation explicitly passes opts.hash = '' (#532)", async () => {
@@ -459,7 +456,7 @@ describe("Navigation Plugin — Lifecycle", () => {
 
       await router.navigate("users.list", {}, { hash: "" });
 
-      expect(mockNav.currentUrl).not.toContain("#section");
+      expect(mockNav.currentUrl).toBe("http://localhost/users/list");
     });
 
     it("sets hash when navigation explicitly passes opts.hash = 'value' (#532)", async () => {
@@ -500,8 +497,7 @@ describe("Navigation Plugin — Lifecycle", () => {
         }
       ).url;
 
-      expect(url?.hash).toBe("x");
-      expect(url?.hashChanged).toBe(false);
+      expect(url).toStrictEqual({ hash: "x", hashChanged: false });
     });
 
     it("publishes state.context.url even when hash is empty (#532)", async () => {
@@ -515,8 +511,7 @@ describe("Navigation Plugin — Lifecycle", () => {
         }
       ).url;
 
-      expect(url).toBeDefined();
-      expect(url?.hash).toBe("");
+      expect(url).toStrictEqual({ hash: "", hashChanged: false });
     });
 
     it("G-1: preserves hash on initial navigation (fromState === undefined)", async () => {

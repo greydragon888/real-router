@@ -134,7 +134,139 @@ describe("R8 — dynamic route tree mutations mid-session", () => {
     forceGC();
   });
 
-  it("8.4: add → navigate → remove same route concurrently — no UB", async () => {
+  it("8.4: useRouteNode reflects zombie state cleanly after removeRoute", async () => {
+    const routesApi = getRoutesApi(router);
+
+    routesApi.add({ name: "ephemeral", path: "/ephemeral" });
+
+    let snapshot: { name: string | undefined } = { name: undefined };
+    const ZombieConsumer: FC = () => {
+      const { route } = useRouteNode("ephemeral");
+
+      snapshot = { name: route?.name };
+
+      return <div data-testid="zombie">{route?.name ?? "inactive"}</div>;
+    };
+
+    ZombieConsumer.displayName = "ZombieConsumer";
+
+    render(
+      <RouterProvider router={router}>
+        <ZombieConsumer />
+      </RouterProvider>,
+    );
+
+    await act(async () => {
+      await router.navigate("ephemeral");
+    });
+
+    expect(snapshot.name).toBe("ephemeral");
+
+    // Move off the doomed route, then drop it from the route table.
+    await act(async () => {
+      await router.navigate("route0");
+    });
+    routesApi.remove("ephemeral");
+
+    // useRouteNode("ephemeral") must report inactive — no zombie reference
+    // to a route that no longer exists in the tree, no thrown errors.
+    expect(snapshot.name).toBeUndefined();
+
+    // Re-mounting a fresh consumer for the dropped route also reports inactive.
+    let secondSnapshot: { name: string | undefined } = { name: undefined };
+    const FreshConsumer: FC = () => {
+      const { route } = useRouteNode("ephemeral");
+
+      secondSnapshot = { name: route?.name };
+
+      return null;
+    };
+
+    FreshConsumer.displayName = "FreshConsumer";
+
+    render(
+      <RouterProvider router={router}>
+        <FreshConsumer />
+      </RouterProvider>,
+    );
+
+    expect(secondSnapshot.name).toBeUndefined();
+  });
+
+  it("8.6: 50 useRouteNode subscribers on a route that is removed mid-subscription — no crashes, clean inactive state (CRITICAL)", async () => {
+    // Closes review-2026-05-16 §7 Top-5 #3 (CRITICAL). Existing 8.1/8.3
+    // exercise add → navigate → remove with consumers OUTSIDE the route
+    // being removed. This test mounts 50 components watching the doomed
+    // node, navigates ONTO it, then removes the route while every snapshot
+    // subscriber is live. Failure mode: some subscribers retain a stale
+    // Route reference and their next snapshot read returns it after the
+    // route table no longer recognises the name.
+    const routesApi = getRoutesApi(router);
+
+    routesApi.add({ name: "doomed", path: "/doomed" });
+
+    const snapshots: { name: string | undefined }[] = Array.from(
+      { length: 50 },
+      () => ({ name: undefined }),
+    );
+
+    const DoomedConsumer: FC<{ index: number }> = ({ index }) => {
+      const { route } = useRouteNode("doomed");
+
+      snapshots[index] = { name: route?.name };
+
+      return <div data-testid={`doomed-${index}`}>{route?.name ?? "off"}</div>;
+    };
+
+    DoomedConsumer.displayName = "DoomedConsumer";
+
+    const { unmount } = render(
+      <RouterProvider router={router}>
+        {Array.from({ length: 50 }, (_, i) => (
+          <DoomedConsumer key={i} index={i} />
+        ))}
+      </RouterProvider>,
+    );
+
+    // Activate the doomed route so every subscriber holds a non-null
+    // snapshot pointing at it.
+    await act(async () => {
+      await router.navigate("doomed");
+    });
+
+    for (const snap of snapshots) {
+      expect(snap.name).toBe("doomed");
+    }
+
+    // Move OFF the doomed route, then remove it while every subscriber is
+    // still mounted and active. The snapshot stream must converge to
+    // `undefined` for the now-inactive node — no zombie Route refs.
+    await act(async () => {
+      await router.navigate("route0");
+    });
+
+    routesApi.remove("doomed");
+
+    for (const snap of snapshots) {
+      expect(snap.name).toBeUndefined();
+    }
+
+    // Further navigations don't resurrect the removed route — each remains
+    // inactive across navigations to other nodes.
+    for (let i = 0; i < 5; i++) {
+      await act(async () => {
+        await router.navigate(`route${i % 5}`).catch(() => {});
+      });
+
+      for (const snap of snapshots) {
+        expect(snap.name).toBeUndefined();
+      }
+    }
+
+    unmount();
+  });
+
+  it("8.5: add → navigate → remove same route concurrently — no UB", async () => {
     const routesApi = getRoutesApi(router);
     const nav = getNavigator(router);
 

@@ -616,4 +616,116 @@ describe("createViewTransitions (Angular copy)", () => {
       expect(startSpy).toHaveBeenCalledTimes(2);
     });
   });
+
+  // =========================================================================
+  // Closes review-2026-05-10 §5.4 ⛔ edge-cases (2 LOW).
+  // =========================================================================
+
+  describe("defensive optional chaining (review §5.4)", () => {
+    // LOW: `currentVT.skipTransition` undefined — the utility uses
+    // `currentVT?.skipTransition?.()` at lines 77 (abort branch) and 137
+    // (destroy branch). If a browser returns a `ViewTransition`-like object
+    // without `skipTransition` (older Chromium betas, future API drift,
+    // custom polyfills), the optional chain must short-circuit silently
+    // instead of throwing `TypeError: skipTransition is not a function`.
+    it("startViewTransition returns object without skipTransition → destroy + abort do NOT throw", async () => {
+      // Custom stub returning an instance WITHOUT skipTransition.
+      const capturedCallbacks: (() => void | Promise<void>)[] = [];
+      const startSpy = vi.fn((cb: () => void | Promise<void>) => {
+        capturedCallbacks.push(cb);
+
+        // Return a ViewTransition-like object WITHOUT skipTransition.
+        // The utility's `currentVT?.skipTransition?.()` must not crash.
+        return {};
+      });
+
+      (
+        document as Document & { startViewTransition?: unknown }
+      ).startViewTransition =
+        startSpy as unknown as Document["startViewTransition"];
+
+      const fake = makeFakeRouter();
+      const vt = track(createViewTransitions(fake.router));
+
+      // Trigger leave → utility calls startViewTransition → currentVT set
+      // to an object without skipTransition.
+      void fake.emitLeave(makeState("home"), makeState("about"));
+
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(startSpy).toHaveBeenCalledTimes(1);
+
+      // Destroy path: line 137 calls `currentVT?.skipTransition?.()` —
+      // optional chain short-circuits because skipTransition is undefined.
+      // No throw.
+      expect(() => {
+        vt.destroy();
+      }).not.toThrow();
+    });
+
+    // LOW: `currentVT.skipTransition` undefined in ABORT path (line 77).
+    // Same defensive contract, exercised via the abort branch instead of
+    // destroy. Uses async stub (callback NOT auto-invoked) + explicit
+    // AbortController to trigger the abort handler while currentVT === {}
+    // (no skipTransition property).
+    it("abort during pending VT with undefined skipTransition → no throw, leave resolves", async () => {
+      // Custom async stub returning instance WITHOUT skipTransition.
+      const capturedCallbacks: (() => void | Promise<void>)[] = [];
+      const startSpy = vi.fn((cb: () => void | Promise<void>) => {
+        capturedCallbacks.push(cb);
+
+        return {};
+      });
+
+      (
+        document as Document & { startViewTransition?: unknown }
+      ).startViewTransition =
+        startSpy as unknown as Document["startViewTransition"];
+
+      const fake = makeFakeRouter();
+      const controller = new AbortController();
+
+      track(createViewTransitions(fake.router));
+
+      const leave = fake.emitLeave(
+        makeState("home"),
+        makeState("about"),
+        controller.signal,
+      );
+
+      expect(startSpy).toHaveBeenCalledTimes(1);
+
+      // Abort while currentVT is the {}-instance — line 77 calls
+      // `currentVT?.skipTransition?.()`; optional chain short-circuits
+      // because skipTransition is undefined. No throw. resolveLeave()
+      // fires (line 78), unblocking the leave Promise.
+      expect(() => {
+        controller.abort();
+      }).not.toThrow();
+
+      await expect(leave).resolves.toBeUndefined();
+    });
+  });
+
+  // LOW: Real Chromium rAF suppression (timeout > 4s) — out of scope for
+  // JSDOM. The utility's defensive design uses `setTimeout(0)` (line
+  // 126-129 in view-transitions.ts) instead of `requestAnimationFrame`
+  // specifically because Chromium blocks rAF callbacks while VT sits in
+  // the `update-callback-called` phase (rendering suppression). rAF
+  // callbacks would never fire → deferred never resolves → browser aborts
+  // `vt.ready` with `TimeoutError` after 4 s.
+  //
+  // This protection is structurally verified by the existing "subscribe
+  // resolves AFTER updateCallback (async)" test (which stubs setTimeout
+  // synchronously) — the path is exercised. Real-browser rAF suppression
+  // is impossible to reproduce in JSDOM because JSDOM has no view-
+  // transition rendering pipeline. This `it.skip` block documents the
+  // gap explicitly for future maintainers; an e2e Playwright test against
+  // a real Chromium build is the right verification venue.
+  describe("Chromium rAF suppression scenarios (out-of-scope for JSDOM)", () => {
+    it.todo(
+      "real Chromium 4s timeout — rAF suppressed during update-callback-called; setTimeout(0) is load-bearing defense (see view-transitions.ts:114-128 NOTE)",
+    );
+  });
 });

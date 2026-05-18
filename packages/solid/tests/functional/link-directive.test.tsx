@@ -77,8 +77,15 @@ describe("link directive", () => {
       );
 
       expect(screen.getByTestId("link")).not.toHaveAttribute("href");
+      // audit-2026-05-17 §1 MEDIUM #11 — pin exact "is not defined" wording
+      // and lock single emission; a regression that double-logs or changes
+      // the message shape (e.g. "invalid route" vs "not defined") would slip
+      // past the previous loose `containing` matcher.
+      expect(consoleError).toHaveBeenCalledTimes(1);
       expect(consoleError).toHaveBeenCalledWith(
-        expect.stringContaining("@@nonexistent-route"),
+        expect.stringMatching(
+          /^\[real-router\] Route "@@nonexistent-route" is not defined\./,
+        ),
       );
 
       consoleError.mockRestore();
@@ -164,6 +171,49 @@ describe("link directive", () => {
       const element = screen.getByTestId("link");
 
       expect(element).not.toHaveAttribute("role");
+    });
+
+    // §5.5 anti-pattern lock: `applyLinkA11y` only short-circuits on
+    // `HTMLAnchorElement` and `HTMLButtonElement`. Anything else — including
+    // `<input>`, `<select>`, `<textarea>`, `<label>` — gets `role="link"` and
+    // `tabindex="0"` slapped on, which is semantically WRONG for form
+    // controls but a documented consequence of the helper's narrow skip-list.
+    //
+    // These tests lock the current behavior so an accidental "fix" that
+    // adds role/tabindex skipping for form controls (or, worse, removes
+    // them from the skip list) doesn't slip through silently. The fix path,
+    // if anyone needs it, is to widen `applyLinkA11y`'s short-circuit to
+    // cover form controls — but no realistic use case has surfaced yet.
+    it("§5.5 anti-pattern — <input> gets role=link + tabindex (documented gotcha)", () => {
+      render(
+        () => (
+          <input use:link={{ routeName: "one-more-test" }} data-testid="link" />
+        ),
+        { wrapper },
+      );
+
+      const element = screen.getByTestId("link");
+
+      // The helper does NOT short-circuit on <input>: role/tabindex are set.
+      expect(element).toHaveAttribute("role", "link");
+      expect(element).toHaveAttribute("tabindex", "0");
+    });
+
+    it("§5.5 anti-pattern — <textarea> gets role=link + tabindex (documented gotcha)", () => {
+      render(
+        () => (
+          <textarea
+            use:link={{ routeName: "one-more-test" }}
+            data-testid="link"
+          />
+        ),
+        { wrapper },
+      );
+
+      const element = screen.getByTestId("link");
+
+      expect(element).toHaveAttribute("role", "link");
+      expect(element).toHaveAttribute("tabindex", "0");
     });
   });
 
@@ -255,7 +305,11 @@ describe("link directive", () => {
 
       await user.click(screen.getByTestId("link"));
 
-      expect(preventDefaultSpy).toHaveBeenCalled();
+      // audit-2026-05-17 §1 MEDIUM #12 — strict call count. A single click
+      // on `<a>` should fire preventDefault exactly once; a regression
+      // that double-attaches the click handler would inflate this past 1
+      // without changing observable nav behaviour.
+      expect(preventDefaultSpy).toHaveBeenCalledTimes(1);
 
       preventDefaultSpy.mockRestore();
     });
@@ -278,10 +332,93 @@ describe("link directive", () => {
 
       preventDefaultSpy.mockRestore();
     });
+
+    it('should not intercept clicks on <a target="_blank"> (browser handles new tab natively) — #P0.6 audit', async () => {
+      const preventDefaultSpy = vi.spyOn(Event.prototype, "preventDefault");
+      const navigateSpy = vi.spyOn(router, "navigate");
+
+      render(
+        () => (
+          <a
+            use:link={{ routeName: "one-more-test" }}
+            target="_blank"
+            data-testid="link"
+          >
+            Test
+          </a>
+        ),
+        { wrapper },
+      );
+
+      await user.click(screen.getByTestId("link"));
+
+      // Browser must be allowed to open the new tab natively. The
+      // directive must neither swallow the click via preventDefault nor
+      // perform a programmatic router navigation (which would silently
+      // keep the user on the current page in the current tab).
+      expect(preventDefaultSpy).not.toHaveBeenCalled();
+      expect(navigateSpy).not.toHaveBeenCalled();
+
+      preventDefaultSpy.mockRestore();
+    });
+
+    it("should respect upstream preventDefault — does NOT navigate when an earlier listener cancelled the event (Mini-sprint E.2)", async () => {
+      // The directive attaches its click listener via addEventListener,
+      // so consumer-registered listeners on the SAME element fire in
+      // registration order. If the consumer's listener calls
+      // preventDefault to opt out of navigation, the directive must
+      // honour that — symmetric with <Link>'s onClick + defaultPrevented
+      // check.
+      const navigateSpy = vi.spyOn(router, "navigate");
+
+      let element: HTMLAnchorElement | null = null;
+
+      render(
+        () => (
+          <a
+            ref={(element_) => {
+              element = element_;
+            }}
+            use:link={{ routeName: "one-more-test" }}
+            data-testid="link"
+          >
+            Test
+          </a>
+        ),
+        { wrapper },
+      );
+
+      // Register a listener BEFORE the directive's listener would
+      // process the event. In Solid, the directive's addEventListener
+      // fires after the JSX render commit; calling addEventListener
+      // here registers AFTER it in DOM order... so we use the JSX
+      // `onClick` prop, which uses addEventListener internally and is
+      // registered before the directive's call.
+      // BUT — actually the directive runs use:link during render,
+      // attaching the listener immediately. Solid JSX onClick props
+      // are attached via addEventListener too, in JSX-attribute
+      // evaluation order. To deterministically register a listener
+      // BEFORE the directive's, we add it manually to the captured
+      // ref via `useCapture: true` (capture phase fires first).
+      const earlyListener = vi.fn((event: Event) => {
+        event.preventDefault();
+      });
+
+      element!.addEventListener("click", earlyListener, { capture: true });
+
+      await user.click(screen.getByTestId("link"));
+
+      expect(earlyListener).toHaveBeenCalledTimes(1);
+      // Navigation suppressed — directive saw defaultPrevented=true
+      // and returned early.
+      expect(navigateSpy).not.toHaveBeenCalled();
+    });
   });
 
-  describe("keyboard handler", () => {
-    it("should not navigate on other keys", () => {
+  // The link directive attaches only a click handler — it has no keydown listener.
+  // These tests document that keyboard events are not intercepted.
+  describe("click-only — no keyboard handler", () => {
+    it("does not intercept keyboard events (Space and Enter do not navigate)", () => {
       vi.spyOn(router, "navigate");
 
       render(
@@ -293,7 +430,10 @@ describe("link directive", () => {
         { wrapper },
       );
 
-      fireEvent.keyDown(screen.getByTestId("link"), { key: "Space" });
+      const element = screen.getByTestId("link");
+
+      fireEvent.keyDown(element, { key: "Space" });
+      fireEvent.keyDown(element, { key: "Enter" });
 
       expect(router.navigate).not.toHaveBeenCalled();
     });
@@ -450,7 +590,12 @@ describe("link directive", () => {
 
       await user.click(screen.getByTestId("link"));
 
-      expect(screen.getByTestId("link")).not.toHaveClass("active");
+      const linkElement = screen.getByTestId("link");
+
+      expect(linkElement).not.toHaveClass("active");
+      // Stronger: directive must not set ANY class attribute when
+      // activeClassName is omitted (catches accidental `class="other"`).
+      expect(linkElement.getAttribute("class")).toBeNull();
     });
   });
 
@@ -531,6 +676,29 @@ describe("link directive", () => {
       // href still reflects the initial value
       expect(screen.getByTestId("link")).toHaveAttribute("href", "/test");
     });
+
+    // Gotcha #19 (realistic case — accessor reading a Solid signal) and
+    // Gotcha #21 (accessor-form ≡ object-literal-form equivalence):
+    //
+    // The realistic gotcha pattern is `<a use:link={() => ({ routeName: signal() })}>`,
+    // where babel-preset-solid auto-wraps the object literal OR the explicit
+    // arrow into a directive accessor at compile time. The directive then
+    // calls accessor() exactly once → reactivity dropped.
+    //
+    // A unit test that hand-rolls the accessor (cast a function to the
+    // expected object type) cannot exercise this: Solid's directive runtime
+    // treats whatever it receives as an already-resolved options object, so
+    // a raw function does NOT get called — href stays null, click navigates
+    // to nothing. The contract only holds when the JSX is compiled by
+    // babel-preset-solid in the host project, which is exactly the
+    // production use case.
+    //
+    // Therefore: the closure-mutation tests above (gotcha #19, plain `let`)
+    // are the strongest in-process guarantee we can pin without an actual
+    // JSX compilation pipeline. Signal-reactivity and accessor↔literal
+    // equivalence remain documented in CLAUDE.md / Wiki under "use:link
+    // Options Are Captured Once" and are exercised end-to-end in the
+    // `examples/web/solid/use-link-directive` example app.
   });
 
   describe("cleanup", () => {
@@ -556,6 +724,129 @@ describe("link directive", () => {
         "click",
         expect.any(Function),
       );
+    });
+  });
+
+  // §5.12 audit edge case — directive idempotency / coexistence with a
+  // pre-existing consumer click listener on the same element.
+  //
+  // The directive attaches its handler via `addEventListener("click", ...)`,
+  // which is ADDITIVE — it does NOT replace an existing JSX `onClick` (which
+  // Solid translates to a property assignment, distinct from the addEventListener
+  // queue). So both listeners must fire on click, AND cleanup must only
+  // remove the directive's handler, leaving the JSX listener intact.
+  describe("idempotency — coexistence with pre-existing click listener (§5.12)", () => {
+    it("directive click + JSX onClick on same <a> — both fire, directive navigates", async () => {
+      const consumerSpy = vi.fn();
+      const navigateSpy = vi.spyOn(router, "navigate");
+
+      render(
+        () => (
+          <a
+            use:link={{ routeName: "one-more-test" }}
+            onClick={consumerSpy}
+            data-testid="link"
+          >
+            Test
+          </a>
+        ),
+        { wrapper },
+      );
+
+      await user.click(screen.getByTestId("link"));
+
+      // Both the JSX-provided onClick AND the directive's click handler fire.
+      // Order is JSX-property handler first (DOM-property handler runs before
+      // addEventListener queue), but the assertion below just locks that
+      // BOTH ran on a single click.
+      // Sprint C.1 — strict args: directive uses EMPTY_PARAMS / EMPTY_OPTIONS
+      // sentinels (frozen module singletons), so params/options are exactly
+      // `{}` references. expect.any(Object) accepted any shape including a
+      // regression where the directive forwarded foreign objects.
+      expect(consumerSpy).toHaveBeenCalledTimes(1);
+      expect(consumerSpy).toHaveBeenCalledWith(expect.any(MouseEvent));
+      expect(navigateSpy).toHaveBeenCalledTimes(1);
+      expect(navigateSpy).toHaveBeenCalledWith("one-more-test", {}, {});
+    });
+
+    it("after unmount, JSX onClick remains on element while directive listener is removed", async () => {
+      const consumerSpy = vi.fn();
+      const navigateSpy = vi.spyOn(router, "navigate");
+
+      const { unmount } = render(
+        () => (
+          <a
+            use:link={{ routeName: "one-more-test" }}
+            onClick={consumerSpy}
+            data-testid="link"
+          >
+            Test
+          </a>
+        ),
+        { wrapper },
+      );
+
+      const linkElement = screen.getByTestId("link");
+
+      // Sanity: directive's handler is currently bound — click triggers nav.
+      await user.click(linkElement);
+
+      expect(navigateSpy).toHaveBeenCalledTimes(1);
+      expect(consumerSpy).toHaveBeenCalledTimes(1);
+
+      navigateSpy.mockClear();
+      consumerSpy.mockClear();
+
+      // The directive's onCleanup runs at unmount. Solid will also unmount
+      // the JSX `onClick` because the element itself is removed from the DOM.
+      // What the test locks: cleanup did not throw, did not double-call,
+      // and the directive's `removeEventListener` ran in isolation from the
+      // consumer-supplied handler.
+      const removeEventListenerSpy = vi.spyOn(
+        linkElement,
+        "removeEventListener",
+      );
+
+      unmount();
+
+      // Exactly one removeEventListener("click", ...) from the directive —
+      // not double-called, not racing with consumer cleanup.
+      const clickRemovals = removeEventListenerSpy.mock.calls.filter(
+        ([type]) => type === "click",
+      );
+
+      expect(clickRemovals).toHaveLength(1);
+    });
+
+    it("directive on <div> + consumer onClick — both fire, no preventDefault on consumer event", async () => {
+      // For non-<a> targets the directive does NOT call evt.preventDefault.
+      // A consumer's onClick that inspects evt.defaultPrevented must see
+      // false — the directive's handler must coexist cleanly without
+      // mutating the event for the consumer's view.
+      const consumerSpy = vi.fn((evt: MouseEvent) => evt.defaultPrevented);
+      const navigateSpy = vi.spyOn(router, "navigate");
+
+      render(
+        () => (
+          <div
+            use:link={{ routeName: "one-more-test" }}
+            onClick={consumerSpy}
+            data-testid="link"
+          >
+            Test
+          </div>
+        ),
+        { wrapper },
+      );
+
+      await user.click(screen.getByTestId("link"));
+
+      expect(consumerSpy).toHaveBeenCalledTimes(1);
+      // Consumer's snapshot of defaultPrevented at observation time === false.
+      // (Solid DOM-property handler runs before the addEventListener queue,
+      // and the directive does not preventDefault on <div> anyway.)
+      expect(consumerSpy.mock.results[0]?.value).toBe(false);
+      expect(navigateSpy).toHaveBeenCalledTimes(1);
     });
   });
 

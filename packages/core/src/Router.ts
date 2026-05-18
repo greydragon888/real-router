@@ -214,7 +214,7 @@ export class Router<
             this.#options.get(),
           ),
         interceptorsMap,
-      ) as unknown as RouterInternals["buildPath"],
+      ),
       emitTransitionError: (error) => {
         this.#eventBus.sendFailSafe(undefined, this.#state.get(), error);
       },
@@ -257,11 +257,7 @@ export class Router<
       dependenciesGetStore: () => this.#dependenciesStore,
       // Clone support (issue #173)
       cloneOptions: () => ({ ...this.#options.get() }),
-      cloneDependencies: () =>
-        ({ ...this.#dependenciesStore.dependencies }) as Record<
-          string,
-          unknown
-        >,
+      cloneDependencies: () => ({ ...this.#dependenciesStore.dependencies }),
       getLifecycleFactories: () => this.#routeLifecycle.getFactories(),
       getPluginFactories: () => this.#plugins.getAll(),
       routeGetStore: () => this.#routes.getStore(),
@@ -276,6 +272,7 @@ export class Router<
       },
       routerExtensions: [],
       contextClaimRecords: new Set(),
+      hydrationState: null,
     });
 
     // =========================================================================
@@ -677,16 +674,16 @@ export class Router<
   }
 
   #markDisposed(): void {
-    this.navigate = throwDisposed as never;
-    this.navigateToDefault = throwDisposed as never;
-    this.navigateToNotFound = throwDisposed as never;
-    this.start = throwDisposed as never;
-    this.stop = throwDisposed as never;
-    this.usePlugin = throwDisposed as never;
+    this.navigate = throwDisposed;
+    this.navigateToDefault = throwDisposed;
+    this.navigateToNotFound = throwDisposed;
+    this.start = throwDisposed;
+    this.stop = throwDisposed;
+    this.usePlugin = throwDisposed;
 
-    this.subscribe = throwDisposed as never;
-    this.subscribeLeave = throwDisposed as never;
-    this.canNavigateTo = throwDisposed as never;
+    this.subscribe = throwDisposed;
+    this.subscribeLeave = throwDisposed;
+    this.canNavigateTo = throwDisposed;
   }
 }
 

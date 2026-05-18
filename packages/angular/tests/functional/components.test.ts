@@ -250,6 +250,13 @@ describe("RouteView component", () => {
 
     const captured = view.activeTemplate();
 
+    // JIT-LIMITED: In JIT mode contentChildren stays empty so activeTemplate()
+    // is always null — the assertion `null === null` is trivially true. The
+    // actual post-destroy no-mutation contract is enforced by:
+    //   • stress/mount-unmount-lifecycle.stress.ts (500 mount/unmount cycles)
+    //   • stress/listener-leak.stress.ts
+    // If subscription cleanup breaks, heap growth surfaces in stress runs, not
+    // here.
     fixture.destroy();
 
     await router.navigate("users");
@@ -287,7 +294,7 @@ describe("RouteView component", () => {
   // structural directives on ng-template with signal inputs aren't
   // registered. We instead drive RouteView programmatically: verify that
   // activeTemplate() reads selfs() correctly given a known route state.
-  it("Self has priority over NotFound when active === nodeName", async () => {
+  it("JIT: RouteSelf not registered as contentChild — selfs() is empty, priority logic untested", async () => {
     @Component({
       template: `
         <route-view>
@@ -364,6 +371,53 @@ describe("RouteView component", () => {
 
     expect(view.activeTemplate()).toBeNull();
     expect(fixture.nativeElement.querySelector(".home")).toBeNull();
+  });
+
+  // The nested RouteView (`routeNode="users"` + `<ng-template routeMatch="profile">`)
+  // selects the matching template via `matchEntries`, which composes
+  // `fullSegmentName = nodeName ? ${nodeName}.${segment} : segment`. JIT
+  // mode prevents directly driving this computed from a TestBed component:
+  //   (1) `contentChildren` query stays empty — structural directives on
+  //       ng-template with signal inputs are not registered without AOT;
+  //   (2) `setInput("routeNode", "users")` does not propagate to the
+  //       signal-based input — Angular issues NG0303 and the value stays at
+  //       the default;
+  //   (3) Reactive dependency graph captured by `computed(...)` at
+  //       construction does not re-attach when the underlying class fields
+  //       are replaced via `Object.defineProperty`.
+  // All three are documented in CLAUDE.md "Coverage Ceiling (~95%)". The
+  // production `matchEntries` logic IS exercised end-to-end by the AOT-
+  // compiled examples in `examples/web/angular/nested-routes` and the SSR
+  // examples. The smoke check below verifies that the `RouteView` class
+  // ships with the public surface required by nested rendering — anything
+  // breaking the structural contract would surface here before AOT.
+  it("RouteView ships with nodeName signal + matches/notFounds/selfs queries (structural contract)", async () => {
+    const nestedRouter = createRouter(routes);
+
+    await nestedRouter.start("/users/123");
+
+    TestBed.configureTestingModule({
+      imports: [RouteView],
+      providers: [provideRealRouter(nestedRouter)],
+    });
+    const fixture = TestBed.createComponent(RouteView);
+
+    fixture.detectChanges();
+
+    const view = fixture.componentInstance;
+
+    expect(typeof view.nodeName).toBe("function");
+    expect(view.nodeName()).toBe("");
+    expect(typeof view.matches).toBe("function");
+    expect(view.matches()).toStrictEqual([]);
+    expect(typeof view.notFounds).toBe("function");
+    expect(view.notFounds()).toStrictEqual([]);
+    expect(typeof view.selfs).toBe("function");
+    expect(view.selfs()).toStrictEqual([]);
+    expect(typeof view.activeTemplate).toBe("function");
+    expect(view.activeTemplate()).toBeNull();
+
+    nestedRouter.stop();
   });
 });
 
@@ -740,5 +794,17 @@ describe("NavigationAnnouncer component", () => {
     const element = fixture.nativeElement.querySelector("navigation-announcer");
 
     expect(element.textContent.trim()).toBe("");
+  });
+});
+
+// Closes [#630] — RouteView source-creation also captured at ngOnInit;
+// same architectural fix applied to recreate `createRouteNodeSource` when
+// `nodeName()` input changes. JIT-mode tests pin structural change only;
+// full reactive-input verification requires AOT.
+describe("RouteView — #630 architectural fix (constructor + effect)", () => {
+  it("does NOT implement OnInit (ngOnInit removed in favor of constructor + effect)", () => {
+    expect(
+      (RouteView.prototype as unknown as { ngOnInit?: () => void }).ngOnInit,
+    ).toBeUndefined();
   });
 });

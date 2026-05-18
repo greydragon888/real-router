@@ -62,7 +62,9 @@ describe("RouterErrorBoundary", () => {
       { wrapper },
     );
 
-    await router.navigate("dashboard").catch(() => {});
+    await expect(router.navigate("dashboard")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_ACTIVATE,
+    });
 
     await waitFor(() => {
       expect(screen.getByTestId("fallback")).toBeInTheDocument();
@@ -87,7 +89,9 @@ describe("RouterErrorBoundary", () => {
       { wrapper },
     );
 
-    await router.navigate("dashboard").catch(() => {});
+    await expect(router.navigate("dashboard")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_ACTIVATE,
+    });
 
     await waitFor(() => {
       expect(screen.getByTestId("fallback")).toBeInTheDocument();
@@ -114,7 +118,9 @@ describe("RouterErrorBoundary", () => {
       { wrapper },
     );
 
-    await router.navigate("dashboard").catch(() => {});
+    await expect(router.navigate("dashboard")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_ACTIVATE,
+    });
 
     await waitFor(() => {
       expect(screen.getByTestId("fallback")).toBeInTheDocument();
@@ -152,7 +158,9 @@ describe("RouterErrorBoundary", () => {
       { wrapper },
     );
 
-    await router.navigate("dashboard").catch(() => {});
+    await expect(router.navigate("dashboard")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_ACTIVATE,
+    });
 
     await waitFor(() => {
       expect(screen.getByTestId("fallback")).toBeInTheDocument();
@@ -188,7 +196,9 @@ describe("RouterErrorBoundary", () => {
       { wrapper },
     );
 
-    await router.navigate("dashboard").catch(() => {});
+    await expect(router.navigate("dashboard")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_ACTIVATE,
+    });
 
     await waitFor(() => {
       expect(screen.getByTestId("fallback")).toBeInTheDocument();
@@ -198,7 +208,9 @@ describe("RouterErrorBoundary", () => {
 
     expect(screen.queryByTestId("fallback")).not.toBeInTheDocument();
 
-    await router.navigate("settings").catch(() => {});
+    await expect(router.navigate("settings")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_ACTIVATE,
+    });
 
     await waitFor(() => {
       expect(screen.getByTestId("fallback")).toBeInTheDocument();
@@ -224,7 +236,9 @@ describe("RouterErrorBoundary", () => {
       { wrapper },
     );
 
-    await router.navigate("dashboard").catch(() => {});
+    await expect(router.navigate("dashboard")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_ACTIVATE,
+    });
 
     await waitFor(() => {
       expect(onError).toHaveBeenCalledTimes(1);
@@ -281,21 +295,38 @@ describe("RouterErrorBoundary", () => {
       { wrapper },
     );
 
-    await router.navigate("dashboard").catch(() => {});
+    await expect(router.navigate("dashboard")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_ACTIVATE,
+    });
 
     await waitFor(() => {
       expect(firstOnError).toHaveBeenCalled();
     });
 
+    // audit-2026-05-17 §1 MEDIUM #9 — lock that exactly one nav error
+    // fired before the handler swap (a regression that double-emits
+    // would silently inflate this and pass the post-swap check below).
+    expect(firstOnError).toHaveBeenCalledTimes(1);
+
     const firstOnErrorCallsBeforeSwap = firstOnError.mock.calls.length;
 
     setHandler(() => secondOnError);
 
-    await router.navigate("settings").catch(() => {});
+    await expect(router.navigate("settings")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_ACTIVATE,
+    });
 
     await waitFor(() => {
       expect(secondOnError).toHaveBeenCalled();
     });
+
+    // audit-2026-05-17 §1 MEDIUM #10 — secondOnError fires at least once
+    // for the post-swap navigation. The reactive effect re-runs whenever
+    // the snapshot accessor flips, so the handler may pick up BOTH the
+    // pre-swap snapshot (still error-flagged) and the new error — total
+    // ≥ 1 calls. The `.at(-1)` check below verifies the LAST call carries
+    // the post-swap error code; here we only lock the lower bound.
+    expect(secondOnError.mock.calls.length).toBeGreaterThanOrEqual(1);
 
     // After reassignment, new navigation errors land on secondOnError — the
     // latest one must be SAME_STATES-free and carry the CANNOT_ACTIVATE code
@@ -365,15 +396,23 @@ describe("RouterErrorBoundary", () => {
       { wrapper },
     );
 
-    await router.navigate("dashboard").catch(() => {});
+    await expect(router.navigate("dashboard")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_ACTIVATE,
+    });
 
     await waitFor(() => {
       expect(screen.getByTestId("outer-fallback")).toBeInTheDocument();
       expect(screen.getByTestId("inner-fallback")).toBeInTheDocument();
     });
 
+    // Pin the exact code (not just equality between two boundaries) — a
+    // regression that renders empty fallbacks would still satisfy
+    // .toBe(other.textContent) but fail these explicit checks.
     expect(screen.getByTestId("outer-fallback").textContent).toBe(
-      screen.getByTestId("inner-fallback").textContent,
+      errorCodes.CANNOT_ACTIVATE,
+    );
+    expect(screen.getByTestId("inner-fallback").textContent).toBe(
+      errorCodes.CANNOT_ACTIVATE,
     );
   });
 
@@ -398,23 +437,31 @@ describe("RouterErrorBoundary", () => {
 
     unmount();
 
-    await router.navigate("dashboard").catch(() => {});
+    await expect(router.navigate("dashboard")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_ACTIVATE,
+    });
 
     expect(onError).not.toHaveBeenCalled();
   });
 
   it("resetError then same cached error", async () => {
+    const observedErrors: RouterError[] = [];
+
     render(
       () => (
         <RouterErrorBoundary
-          fallback={(error, resetError) => (
-            <div data-testid="fallback">
-              {error.code}
-              <button data-testid="dismiss" onClick={resetError}>
-                Dismiss
-              </button>
-            </div>
-          )}
+          fallback={(error, resetError) => {
+            observedErrors.push(error);
+
+            return (
+              <div data-testid="fallback">
+                {error.code}
+                <button data-testid="dismiss" onClick={resetError}>
+                  Dismiss
+                </button>
+              </div>
+            );
+          }}
         >
           <div data-testid="children">App</div>
         </RouterErrorBoundary>
@@ -422,7 +469,11 @@ describe("RouterErrorBoundary", () => {
       { wrapper },
     );
 
-    await router.navigate("home").catch(() => {});
+    await router.navigate("home").catch((error: unknown) => {
+      if ((error as RouterError).code !== errorCodes.SAME_STATES) {
+        throw error;
+      }
+    });
 
     await waitFor(() => {
       expect(screen.getByTestId("fallback")).toBeInTheDocument();
@@ -436,7 +487,11 @@ describe("RouterErrorBoundary", () => {
 
     expect(screen.queryByTestId("fallback")).not.toBeInTheDocument();
 
-    await router.navigate("home").catch(() => {});
+    await router.navigate("home").catch((error: unknown) => {
+      if ((error as RouterError).code !== errorCodes.SAME_STATES) {
+        throw error;
+      }
+    });
 
     await waitFor(() => {
       expect(screen.getByTestId("fallback")).toBeInTheDocument();
@@ -445,5 +500,12 @@ describe("RouterErrorBoundary", () => {
     expect(screen.getByTestId("fallback").textContent).toContain(
       errorCodes.SAME_STATES,
     );
+
+    // Identity check — the dedup invariant requires that the error object
+    // surfaced after reset is the SAME reference as the one cached before
+    // dismissal (createDismissableError shares a single error source). If
+    // the implementation ever clones the error, this assertion fails.
+    expect(observedErrors.length).toBeGreaterThanOrEqual(2);
+    expect(observedErrors.at(-1)).toBe(observedErrors[0]);
   });
 });

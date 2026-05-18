@@ -2,7 +2,7 @@ import { browserPluginFactory } from "@real-router/browser-plugin";
 import { createRouter } from "@real-router/core";
 import { getRoutesApi } from "@real-router/core/api";
 import { render, screen, act } from "@testing-library/react";
-import { lazy, useEffect, useRef } from "react";
+import { lazy, memo, useEffect, useRef } from "react";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { RouteView, RouterProvider } from "@real-router/react";
@@ -53,8 +53,8 @@ describe("RouteView", () => {
         </RouterProvider>,
       );
 
-      expect(screen.queryByTestId("users")).not.toBeInTheDocument();
-      expect(container.innerHTML).toBe("");
+      expect(screen.queryByTestId("users")).toBeNull();
+      expect(container).toBeEmptyDOMElement();
     });
 
     it("should support exact matching — matches exact route only", async () => {
@@ -86,8 +86,8 @@ describe("RouteView", () => {
         </RouterProvider>,
       );
 
-      expect(screen.queryByTestId("users-exact")).not.toBeInTheDocument();
-      expect(container.innerHTML).toBe("");
+      expect(screen.queryByTestId("users-exact")).toBeNull();
+      expect(container).toBeEmptyDOMElement();
     });
 
     it("should support startsWith matching by default", async () => {
@@ -181,7 +181,7 @@ describe("RouteView", () => {
       );
 
       expect(screen.queryByTestId("users")).not.toBeInTheDocument();
-      expect(container.innerHTML).toBe("");
+      expect(container).toBeEmptyDOMElement();
     });
 
     it("should never match a Match with empty segment string (safety: early return)", async () => {
@@ -198,7 +198,7 @@ describe("RouteView", () => {
       );
 
       expect(screen.queryByTestId("empty-match")).not.toBeInTheDocument();
-      expect(container.innerHTML).toBe("");
+      expect(container).toBeEmptyDOMElement();
     });
   });
 
@@ -265,8 +265,7 @@ describe("RouteView", () => {
       );
 
       expect(screen.queryByTestId("users")).not.toBeInTheDocument();
-      expect(screen.queryByTestId("not-found")).not.toBeInTheDocument();
-      expect(container.innerHTML).toBe("");
+      expect(container).toBeEmptyDOMElement();
     });
 
     it("should use last NotFound when multiple are present", async () => {
@@ -322,7 +321,7 @@ describe("RouteView", () => {
       );
 
       expect(screen.queryByTestId("users")).not.toBeInTheDocument();
-      expect(container.innerHTML).toBe("");
+      expect(container).toBeEmptyDOMElement();
     });
   });
 
@@ -381,7 +380,7 @@ describe("RouteView", () => {
         </RouterProvider>,
       );
 
-      expect(container.innerHTML).toBe("");
+      expect(container).toBeEmptyDOMElement();
     });
 
     it("position-independent: Self before Match is still ignored when descendant is active", async () => {
@@ -464,7 +463,9 @@ describe("RouteView", () => {
 
       // Sanity: routesApi is reachable on the rebuilt router (we don't
       // mutate, but the cast keeps the lint rule out of the way).
-      expect(routesApi).toBeDefined();
+      expect(routesApi).toStrictEqual(
+        expect.objectContaining({ add: expect.any(Function) }),
+      );
 
       await router.start("/nonexistent");
 
@@ -624,7 +625,7 @@ describe("RouteView", () => {
         </RouterProvider>,
       );
 
-      expect(container.innerHTML).toBe("");
+      expect(container).toBeEmptyDOMElement();
     });
   });
 
@@ -634,13 +635,13 @@ describe("RouteView", () => {
         <RouteView.Match segment="x">content</RouteView.Match>,
       );
 
-      expect(container.innerHTML).toBe("");
+      expect(container).toBeEmptyDOMElement();
     });
 
     it("Self renders null when used standalone", () => {
       const { container } = render(<RouteView.Self>content</RouteView.Self>);
 
-      expect(container.innerHTML).toBe("");
+      expect(container).toBeEmptyDOMElement();
     });
 
     it("NotFound renders null when used standalone", () => {
@@ -648,7 +649,77 @@ describe("RouteView", () => {
         <RouteView.NotFound>content</RouteView.NotFound>,
       );
 
-      expect(container.innerHTML).toBe("");
+      expect(container).toBeEmptyDOMElement();
+    });
+
+    // review-2026-05-10 §5.9 MED-HIGH — known limitation: collectElements
+    // uses reference equality (`child.type === Match`) to detect marker
+    // components. React.memo() / React.forwardRef() wrap the underlying
+    // function, so a `memo(RouteView.Match)` produces an element whose
+    // `child.type` is a MemoExoticComponent, NOT the Match function.
+    // collectElements then descends into `child.props.children` instead of
+    // treating it as a Match — the result is a SILENTLY DROPPED match.
+    //
+    // This test documents the limitation so a future regression that
+    // accidentally "fixes" detection (e.g. by unwrapping memo) is caught.
+    // Consumers should NOT wrap RouteView markers in memo() — the markers
+    // already render `null`, so memoization adds nothing.
+    it("known limitation: memo(RouteView.Match) is silently dropped (review §5.9)", async () => {
+      await router.start("/users/list");
+
+      const MemoizedMatch = memo(RouteView.Match);
+
+      render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="">
+            <MemoizedMatch segment="users">
+              <div data-testid="users-memo">Should NOT render</div>
+            </MemoizedMatch>
+            <RouteView.Match segment="users">
+              <div data-testid="users-plain">Renders correctly</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      // The plain (non-memoized) Match renders correctly.
+      expect(screen.getByTestId("users-plain")).toBeInTheDocument();
+      // The memo'd Match is dropped — its children never reach the DOM.
+      expect(screen.queryByTestId("users-memo")).not.toBeInTheDocument();
+    });
+
+    it("known limitation: memo(RouteView.NotFound) is silently dropped (review §5.9 M16)", async () => {
+      const nfRouter = createRouter([{ name: "home", path: "/" }], {
+        defaultRoute: "home",
+        allowNotFound: true,
+      });
+
+      nfRouter.usePlugin(browserPluginFactory({}));
+      await nfRouter.start("/non-existent");
+
+      // eslint-disable-next-line @eslint-react/static-components
+      const MemoizedNotFound = memo(RouteView.NotFound);
+
+      render(
+        <RouterProvider router={nfRouter}>
+          <RouteView nodeName="">
+            {/* eslint-disable-next-line @eslint-react/static-components */}
+            <MemoizedNotFound>
+              <div data-testid="not-found-memo">Should NOT render</div>
+            </MemoizedNotFound>
+            <RouteView.NotFound>
+              <div data-testid="not-found-plain">Renders correctly</div>
+            </RouteView.NotFound>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      // The plain (non-memoized) NotFound renders correctly.
+      expect(screen.getByTestId("not-found-plain")).toBeInTheDocument();
+      // The memo'd NotFound is dropped — its children never reach the DOM.
+      expect(screen.queryByTestId("not-found-memo")).not.toBeInTheDocument();
+
+      nfRouter.stop();
     });
   });
 
@@ -665,7 +736,7 @@ describe("RouteView", () => {
       );
 
       expect(screen.queryByTestId("users")).not.toBeInTheDocument();
-      expect(container.innerHTML).toBe("");
+      expect(container).toBeEmptyDOMElement();
     });
   });
 
@@ -696,7 +767,7 @@ describe("RouteView", () => {
       expect(screen.getByTestId("view")).toBeInTheDocument();
     });
 
-    it("should not re-render when navigating outside nodeName", async () => {
+    it("should unmount the matched Match when navigating outside nodeName", async () => {
       await router.start("/users/list");
 
       render(
@@ -759,8 +830,14 @@ describe("RouteView", () => {
         await router.navigate("users.view", { id: "1" });
       });
 
-      expect(screen.getByTestId("list")).toBeInTheDocument();
-      expect(screen.getByTestId("list")).not.toBeVisible();
+      // Use queryByTestId for the presence check: if keepAlive ever unmounts the
+      // element instead of hiding it via Activity, the failure should read
+      // "expected element in document" rather than the misleading
+      // "Unable to find element" thrown by getByTestId.
+      const hiddenList = screen.queryByTestId("list");
+
+      expect(hiddenList).toBeInTheDocument();
+      expect(hiddenList).not.toBeVisible();
       expect(screen.getByTestId("view")).toBeVisible();
     });
 
@@ -833,8 +910,10 @@ describe("RouteView", () => {
         await router.navigate("users.view", { id: "1" });
       });
 
-      expect(screen.getByTestId("list")).toBeInTheDocument();
-      expect(screen.getByTestId("list")).not.toBeVisible();
+      const hiddenListMulti = screen.queryByTestId("list");
+
+      expect(hiddenListMulti).toBeInTheDocument();
+      expect(hiddenListMulti).not.toBeVisible();
       expect(screen.getByTestId("view")).toBeVisible();
     });
 
@@ -904,9 +983,9 @@ describe("RouteView", () => {
       const setupAfterMount = setup.mock.calls.length;
       const cleanupAfterMount = cleanup.mock.calls.length;
 
-      // StrictMode may double-invoke effects: expect 1 (no StrictMode) or 2 (with StrictMode).
-      expect(setupAfterMount).toBeGreaterThanOrEqual(1);
-      expect(setupAfterMount).toBeLessThanOrEqual(2);
+      // reactStrictMode: true in tests/setup.ts — effects double-invoke: 2 setups, 1 cleanup.
+      expect(setupAfterMount).toStrictEqual(2);
+      expect(cleanupAfterMount).toStrictEqual(1);
 
       await act(async () => {
         await router.navigate("users.view", { id: "1" });
@@ -1423,7 +1502,7 @@ describe("RouteView", () => {
       );
 
       expect(screen.queryByTestId("list")).not.toBeInTheDocument();
-      expect(container.innerHTML).toBe("");
+      expect(container).toBeEmptyDOMElement();
     });
 
     it("scoped RouteView (nodeName='users') renders when route enters its subtree", async () => {

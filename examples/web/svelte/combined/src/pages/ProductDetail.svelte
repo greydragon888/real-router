@@ -17,7 +17,7 @@
 </script>
 
 {#if loading}
-  <div><h1>Product</h1><span class="spinner"></span></div>
+  <div><h1>Product</h1><span class="spinner"></span> <span style="margin-left: 12px">Loading…</span></div>
 {:else if error}
   <div><h1>Product</h1><p>Error: {error}</p><Link routeName="products">← Back</Link></div>
 {:else if !product}

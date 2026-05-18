@@ -3,37 +3,35 @@
 /**
  * Property-based smoke tests for isSegmentMatch logic in Vue RouteView.
  *
- * isSegmentMatch is NOT exported — we replicate the logic here.
+ * isSegmentMatch is imported directly from helpers.ts (exported for testing).
  * It delegates to startsWithSegment from @real-router/route-utils for non-exact.
  *
- * Invariants:
- * 1. Exact match: isSegmentMatch(name, name, true) === true
- * 2. Exact mismatch: isSegmentMatch(a, b, true) === false (when a !== b)
- * 3. Prefix match: isSegmentMatch("parent.child", "parent", false) === true
- * 4. Non-prefix: isSegmentMatch("parent", "parent.child", false) === false
+ * Unlike Preact's adapter, Vue's `isSegmentMatch` does NOT short-circuit on
+ * empty `fullSegmentName` — it only branches on `exact`. The non-exact path
+ * passes through to `startsWithSegment`, which itself returns `false` for any
+ * empty input (route name or segment). Exact comparison is bare `===`, so the
+ * `("", "", true)` corner-case returns `true` (both equal) — captured below.
+ *
+ * Closes §2.2 review items:
+ * - Inv 5 Shared-prefix-without-boundary
+ * - Inv 6 Empty-string edge cases (Vue semantics, not Preact's)
+ * - Inv 7 Extended ASCII alphabet (digits, `_`, `-`, mixed case)
+ * - Inv 8 Wide-depth route names (1–6 segments)
+ * - Inv 9 Strict monotonicity (exact ⇒ non-exact)
  */
 
 import { fc, test } from "@fast-check/vitest";
-import { startsWithSegment } from "@real-router/route-utils";
 import { describe, expect } from "vitest";
 
-import { NUM_RUNS, arbSegmentName, arbDottedName } from "./helpers";
-
-// =============================================================================
-// Inline replica of isSegmentMatch (not exported)
-// =============================================================================
-
-function isSegmentMatch(
-  routeName: string,
-  fullSegmentName: string,
-  exact: boolean,
-): boolean {
-  if (exact) {
-    return routeName === fullSegmentName;
-  }
-
-  return startsWithSegment(routeName, fullSegmentName);
-}
+import {
+  NUM_RUNS,
+  arbDottedName,
+  arbDottedNameExtended,
+  arbRouteNameWide,
+  arbSegmentName,
+  arbSegmentNameExtended,
+} from "./helpers";
+import { isSegmentMatch } from "../../src/components/RouteView/helpers";
 
 // =============================================================================
 // Tests
@@ -50,7 +48,11 @@ describe("isSegmentMatch — Property Tests (Vue RouteView)", () => {
   });
 
   describe("Invariant 2: Exact mismatch", () => {
-    test.prop([arbDottedName, arbDottedName.filter((n) => n.length > 0)], {
+    // arbDottedName is built from arbSegmentName (`/^[a-z]{1,10}$/`) joined
+    // with ".", with `minLength: 1` on the segment array — every draw has
+    // length ≥ 1. The previous `.filter((n) => n.length > 0)` was tautological;
+    // dropped in favour of relying on the generator contract directly.
+    test.prop([arbDottedName, arbDottedName], {
       numRuns: NUM_RUNS.standard,
     })("isSegmentMatch(a, b, true) === false when a !== b", (a, b) => {
       fc.pre(a !== b);
@@ -77,6 +79,235 @@ describe("isSegmentMatch — Property Tests (Vue RouteView)", () => {
         const fullSegmentName = `${parent}.${child}`;
 
         expect(isSegmentMatch(parent, fullSegmentName, false)).toBe(false);
+      },
+    );
+  });
+
+  describe("Invariant 5: Shared prefix without segment boundary does not match", () => {
+    test.prop([arbSegmentName, arbSegmentName], { numRuns: NUM_RUNS.standard })(
+      "isSegmentMatch('usersAdmin', 'users', false) === false",
+      (a, b) => {
+        fc.pre(a !== b);
+
+        const routeName = `${a}${b}`;
+
+        // Guard: suffix must not accidentally make it a boundary match.
+        fc.pre(!routeName.startsWith(`${a}.`));
+
+        expect(isSegmentMatch(routeName, a, false)).toBe(false);
+      },
+    );
+  });
+
+  describe("Invariant 6: Empty-string edge cases (Vue semantics)", () => {
+    // Vue's `isSegmentMatch` does NOT have Preact's early-return-on-empty
+    // guard — the exact branch is bare `===`, so the `("", "", true)` pair
+    // matches reflexively. The non-exact branch defers to `startsWithSegment`,
+    // which returns `false` for ANY empty input (route name OR segment).
+    test("isSegmentMatch('', '', true) === true (exact branch — bare ===)", () => {
+      // Bare string equality returns true; this differs from Preact's adapter,
+      // which has an early-return that would yield false. Vue ships this
+      // behaviour because the surrounding pipeline (`evaluateMatch`) is the
+      // safeguard — `segment=""` is documented in CLAUDE.md as "never matches"
+      // because non-exact mode is the default and `startsWithSegment` returns
+      // false for empty segments.
+      expect(isSegmentMatch("", "", true)).toBe(true);
+    });
+
+    test("isSegmentMatch('users', '', true) === false (non-empty name vs empty)", () => {
+      expect(isSegmentMatch("users", "", true)).toBe(false);
+    });
+
+    test("isSegmentMatch('', 'users', true) === false (empty name vs non-empty)", () => {
+      expect(isSegmentMatch("", "users", true)).toBe(false);
+    });
+
+    test("isSegmentMatch('', '', false) === false (startsWithSegment rejects empty)", () => {
+      // `startsWithSegment` returns false for any empty input — both empty
+      // route name and empty segment short-circuit there. This is the path
+      // the documented `segment=""` gotcha (CLAUDE.md L301-314) relies on.
+      expect(isSegmentMatch("", "", false)).toBe(false);
+    });
+
+    test("isSegmentMatch('users', '', false) === false (empty segment rejected)", () => {
+      expect(isSegmentMatch("users", "", false)).toBe(false);
+    });
+
+    test("isSegmentMatch('', 'users', false) === false (empty route name rejected)", () => {
+      expect(isSegmentMatch("", "users", false)).toBe(false);
+    });
+  });
+
+  describe("Invariant 7: Extended ASCII alphabet (digits, `_`, `-`, mixed case)", () => {
+    // route-utils' SAFE_SEGMENT_PATTERN is `/^[\w.-]+$/` — letters, digits,
+    // `_`, `-`. Real-world routes use `users-list`, `posts_2024`, mixed case.
+    // The default `arbSegmentName` (`/^[a-z]{1,10}$/`) leaves the full ASCII
+    // surface untested; this block verifies invariants 1, 3, 5 hold across it.
+    test.prop([arbDottedNameExtended], { numRuns: NUM_RUNS.standard })(
+      "Inv 1 ext: exact self-match holds for any safe-pattern name",
+      (name) => {
+        expect(isSegmentMatch(name, name, true)).toBe(true);
+      },
+    );
+
+    test.prop([arbSegmentNameExtended, arbSegmentNameExtended], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "Inv 3 ext: parent prefix matches child (non-exact) with digits/`_`/`-`",
+      (parent, child) => {
+        const routeName = `${parent}.${child}`;
+
+        expect(isSegmentMatch(routeName, parent, false)).toBe(true);
+      },
+    );
+
+    test.prop([arbSegmentNameExtended, arbSegmentNameExtended], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "Inv 5 ext: shared prefix without segment boundary still rejects",
+      (a, b) => {
+        fc.pre(a !== b);
+
+        const routeName = `${a}${b}`;
+
+        // Same boundary guard as the base invariant 5 — only that `a`/`b`
+        // now span the extended alphabet (digit-prefix permutations included).
+        fc.pre(!routeName.startsWith(`${a}.`));
+
+        expect(isSegmentMatch(routeName, a, false)).toBe(false);
+      },
+    );
+  });
+
+  describe("Invariant 8: Wide-depth route names (1–6 segments)", () => {
+    // `arbRouteName` only emits 1–2-deep names; `arbDottedName` caps at 4.
+    // Deeply nested route names ("a.b.c.d.e.f") exercise the regex
+    // construction path of `startsWithSegment` (escape + dotOrEnd) at depths
+    // where a regression in escape ordering would surface only on cumulative
+    // segment-boundary matches.
+    test.prop([arbRouteNameWide], { numRuns: NUM_RUNS.standard })(
+      "Inv 1 wide: exact self-match holds for any depth",
+      (name) => {
+        expect(isSegmentMatch(name, name, true)).toBe(true);
+      },
+    );
+
+    test.prop(
+      [
+        fc
+          .array(arbSegmentName, { minLength: 2, maxLength: 6 })
+          .map((segs) => segs.join(".")),
+      ],
+      { numRuns: NUM_RUNS.standard },
+    )(
+      "Inv 3 wide: any non-final segment prefix matches the full name",
+      (name) => {
+        const segments = name.split(".");
+        // Generator guarantees minLength:2 — every name has at least one prefix.
+        const parent = segments.slice(0, -1).join(".");
+
+        expect(isSegmentMatch(name, parent, false)).toBe(true);
+      },
+    );
+  });
+
+  describe("Invariant 9: Strict monotonicity — exact match implies non-exact match", () => {
+    // If isSegmentMatch(a, b, true) then isSegmentMatch(a, b, false).
+    // Exact match (a === b) is a specialisation of non-exact: since a = b,
+    // startsWithSegment(a, b) must return true (a starts with itself at a
+    // segment boundary). Violating monotonicity would mean a route exactly
+    // matches a segment but is rejected by the prefix check — impossible by
+    // the segment-boundary regex construction (Vue's `dotOrEnd`).
+    //
+    // Vue caveat: the ("", "", true) pair is the one exception — exact `===`
+    // returns true but `startsWithSegment("", "")` returns false. The arbitrary
+    // `arbDottedName` filters minLength=1 so this case is never drawn; the
+    // generic property below uses `arbDottedName` for both sides for the
+    // same reason.
+    test.prop([arbDottedName], { numRuns: NUM_RUNS.standard })(
+      "exact match ⇒ non-exact match (non-empty name)",
+      (name) => {
+        // exact=true self-match is always true (Inv 1).
+        expect(isSegmentMatch(name, name, true)).toBe(true);
+        // The same pair under non-exact must also be true.
+        expect(isSegmentMatch(name, name, false)).toBe(true);
+      },
+    );
+
+    // Generic: for any (name, segment) pair where exact returns true,
+    // non-exact must also return true — except for the ("", "") corner case
+    // (excluded by the minLength: 1 floor in `arbDottedName`).
+    test.prop([arbDottedName, arbDottedName], { numRuns: NUM_RUNS.standard })(
+      "for any non-empty (name, seg): exact(name, seg)=true ⇒ non-exact(name, seg)=true",
+      (name, seg) => {
+        const exact = isSegmentMatch(name, seg, true);
+        const nonExact = isSegmentMatch(name, seg, false);
+
+        if (exact) {
+          expect(nonExact).toBe(true);
+        }
+      },
+    );
+  });
+
+  // Review §6 — NEW Inv 10: Transitivity of non-exact prefix matching.
+  // If `name` matches `parent` non-exactly AND `parent` matches `grand`
+  // non-exactly, then `name` must also match `grand` non-exactly. This is
+  // a fundamental property of the segment-prefix relation — any regression
+  // (e.g., a bug in `dotOrEnd` regex that breaks multi-dot prefixes) would
+  // surface here. The three-segment chain s1.s2.s3 / s1.s2 / s1 is the
+  // minimal test case that requires real transitivity rather than just
+  // self-match.
+  describe("Invariant 10: Transitivity of non-exact prefix (s1.s2.s3 ⊃ s1.s2 ⊃ s1)", () => {
+    test.prop([arbSegmentName, arbSegmentName, arbSegmentName], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "name matches parent && parent matches grand ⇒ name matches grand",
+      (s1, s2, s3) => {
+        const grand = s1;
+        const parent = `${s1}.${s2}`;
+        const name = `${s1}.${s2}.${s3}`;
+        const nameMatchesParent = isSegmentMatch(name, parent, false);
+        const parentMatchesGrand = isSegmentMatch(parent, grand, false);
+
+        if (nameMatchesParent && parentMatchesGrand) {
+          expect(isSegmentMatch(name, grand, false)).toBe(true);
+        }
+      },
+    );
+  });
+
+  // Review §6 — NEW Inv 12: Default-exact semantics. `evaluateMatch` reads
+  // `props?.exact ?? false` — when a consumer writes
+  // `<RouteView.Match segment="users" exact={undefined}>`, the nullish-
+  // coalescing falls back to `false`. The `isSegmentMatch` helper itself
+  // takes `exact: boolean` (no undefined accepted at the type level), but a
+  // future refactor that changes the call site to pass through `undefined`
+  // must observe that JS's strict `===` would treat `undefined` as falsy
+  // for the exact branch. Locks the contract at the helper boundary by
+  // calling it with both `false` and (cast) `undefined`, expecting identical
+  // results.
+  describe("Invariant 12: exact=false ≡ exact=undefined (via ?? fallback at call site)", () => {
+    test.prop([arbDottedName, arbDottedName], { numRuns: NUM_RUNS.standard })(
+      "isSegmentMatch(name, seg, false) === isSegmentMatch(name, seg, undefined as any)",
+      (name, seg) => {
+        // The runtime contract — both call shapes must produce the same
+        // verdict because the `evaluateMatch` indirection collapses
+        // `undefined` to `false` before calling here. We test the helper's
+        // observable behaviour: any future widening of the `exact` param's
+        // accepted domain must preserve the current "undefined acts like false"
+        // semantics that consumers' templates depend on.
+        const withFalse = isSegmentMatch(name, seg, false);
+        // Cast through unknown to reach the runtime path — the TS overload
+        // refuses `undefined` for `exact`, but JS evaluates the branch
+        // `if (exact)` as falsy → identical to `false`.
+        const withUndefined = isSegmentMatch(
+          name,
+          seg,
+          undefined as unknown as boolean,
+        );
+
+        expect(withUndefined).toBe(withFalse);
       },
     );
   });

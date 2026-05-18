@@ -20,23 +20,31 @@ describe("useRoute hook", () => {
   beforeEach(async () => {
     router = createTestRouterWithADefaultRouter();
 
-    await router.start();
+    await router.start("/");
   });
 
   afterEach(() => {
     router.stop();
   });
 
-  it("should return navigator", () => {
+  it("should return navigator with full method surface", () => {
     const { result } = renderHook(() => useRoute(), {
       wrapper: wrapper(router),
     });
 
-    expect(result.current.navigator).toBeTypeOf("object");
-    expect(result.current.navigator.navigate).toBeTypeOf("function");
-    expect(result.current.navigator.getState).toBeTypeOf("function");
-    expect(result.current.navigator.isActiveRoute).toBeTypeOf("function");
-    expect(result.current.navigator.subscribe).toBeTypeOf("function");
+    expect(
+      Object.keys(result.current.navigator).toSorted((a, b) =>
+        a.localeCompare(b),
+      ),
+    ).toStrictEqual([
+      "canNavigateTo",
+      "getState",
+      "isActiveRoute",
+      "isLeaveApproved",
+      "navigate",
+      "subscribe",
+      "subscribeLeave",
+    ]);
   });
 
   it("should return current route", async () => {
@@ -54,9 +62,6 @@ describe("useRoute hook", () => {
   });
 
   it("should return previousRoute after navigation", async () => {
-    // Ensure we start on a known route
-    await router.navigate("test");
-
     const { result } = renderHook(() => useRoute(), {
       wrapper: wrapper(router),
     });
@@ -90,8 +95,6 @@ describe("useRoute hook", () => {
   it("should propagate generic params type without runtime change", async () => {
     type TypedParams = { id: string; tab: string } & Params;
 
-    await router.navigate("test");
-
     const { result } = renderHook(() => useRoute<TypedParams>(), {
       wrapper: wrapper(router),
     });
@@ -99,6 +102,6 @@ describe("useRoute hook", () => {
     const params: TypedParams = result.current.route.params;
 
     expect(result.current.route.name).toStrictEqual("test");
-    expect(params).toBeDefined();
+    expect(params).toStrictEqual({});
   });
 });

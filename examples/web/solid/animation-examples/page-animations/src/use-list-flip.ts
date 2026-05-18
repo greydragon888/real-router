@@ -54,8 +54,9 @@ interface Snapshot {
  * implicitly. No `useRouteExit` / `subscribeLeave` involvement —
  * everything is post-update DOM work.
  */
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- T propagates to the returned ref-setter so callers can pin the element type
 export function useListFlip<T extends HTMLElement>(): (
-  el: T | undefined,
+  element: T | undefined,
 ) => void {
   const routeState = useRoute();
   let container: T | undefined;
@@ -166,7 +167,7 @@ export function useListFlip<T extends HTMLElement>(): (
     }
   });
 
-  return (el) => {
-    container = el;
+  return (element) => {
+    container = element;
   };
 }

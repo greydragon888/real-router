@@ -11,7 +11,7 @@ export function useIsActiveRoute(
   strict: boolean,
   ignoreQueryParams: boolean,
   hash?: string,
-): { readonly current: boolean } {
+) {
   const router = useRouter();
 
   // The `hash` argument (#532) participates in the cache key when defined.

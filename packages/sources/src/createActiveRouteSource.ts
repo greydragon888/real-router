@@ -2,6 +2,8 @@ import { areRoutesRelated } from "@real-router/route-utils";
 
 import { BaseSource } from "./BaseSource";
 import { canonicalJson } from "./canonicalJson.js";
+import { noopDestroy } from "./internal/noopDestroy.js";
+import { readContextHash } from "./internal/readContextHash.js";
 import { normalizeActiveOptions } from "./normalizeActiveOptions.js";
 
 import type { ActiveRouteSourceOptions, RouterSource } from "./types.js";
@@ -20,14 +22,12 @@ const activeSourceCache = new WeakMap<
  * (`{ a:1, b:2 }` and `{ b:2, a:1 }` hit the same cache entry via
  * `canonicalJson`).
  *
- * `destroy()` is a no-op — shared sources live with the router. The router
- * subscription stays active while any consumer subscribes; when the router
- * is garbage-collected, the WeakMap entry releases automatically.
+ * For cached entries `destroy()` is a no-op — shared sources live with the
+ * router and release automatically on router GC (WeakMap entry).
  *
- * Edge cases: `Symbol`/`BigInt` in params bypass `canonicalJson` and produce
- * an unstable cache key — these will simply miss the cache and create a new
- * source on each call. Practical params are primitives, so this is not a
- * concern in real usage.
+ * `BigInt`/circular params can't be serialized → the source bypasses the cache
+ * and `destroy()` becomes a real teardown that detaches the underlying
+ * `router.subscribe` handle.
  */
 export function createActiveRouteSource(
   router: Router,
@@ -49,13 +49,30 @@ export function createActiveRouteSource(
     // if unusual, fragment).
     const hashKey = hash === undefined ? "" : `#${hash}`;
 
-    key = `${routeName}|${canonicalJson(params)}|${String(strict)}|${String(ignoreQueryParams)}|${hashKey}`;
+    // `params === undefined` is the common Link case (`<Link to="users">`
+    // with no params). Skip canonicalJson(undefined) — it returns the literal
+    // string "undefined" and template interpolation would just embed it. An
+    // explicit empty sentinel avoids the call and shaves the cache-key by 9
+    // characters per Link.
+    const paramsKey = params === undefined ? "" : canonicalJson(params);
+
+    // Delimiter `|` is safe because route names use `.` as the segment
+    // separator (`users.list`, not `users|list`) and canonicalJson-encoded
+    // params escape `"` (so any literal `|` inside params lives inside a
+    // quoted JSON string and can't be confused with our delimiter). If route
+    // names ever grow a `|` character, this composite key would become
+    // ambiguous — change the separator to a control char or hash-encode each
+    // field.
+    key = `${routeName}|${paramsKey}|${String(strict)}|${String(ignoreQueryParams)}|${hashKey}`;
   } catch {
     key = undefined;
   }
 
   if (key === undefined) {
-    const source = buildActiveRouteSource(
+    // Non-cached fallback (canonicalJson threw on BigInt / circular / etc.).
+    // Return the real source — `destroy()` must unwind the router subscription;
+    // otherwise the wrapper leaks for the lifetime of the router.
+    return buildActiveRouteSource(
       router,
       routeName,
       params,
@@ -63,12 +80,6 @@ export function createActiveRouteSource(
       ignoreQueryParams,
       hash,
     );
-
-    return {
-      subscribe: source.subscribe,
-      getSnapshot: source.getSnapshot,
-      destroy: noopDestroy,
-    };
   }
 
   let perRouter = activeSourceCache.get(router);
@@ -102,20 +113,6 @@ export function createActiveRouteSource(
 }
 
 /**
- * Reads the URL fragment published by browser/navigation plugins on the given
- * router state. Returns `""` when no plugin claims the `"url"` namespace
- * (hash-plugin runtime, memory-plugin, SSR) — `undefined` is reserved for
- * "no published fragment yet" and not visible at the source layer.
- */
-function readContextHash(router: Router): string {
-  const ctx = router.getState()?.context as
-    | { url?: { hash?: string } }
-    | undefined;
-
-  return ctx?.url?.hash ?? "";
-}
-
-/**
  * Combines route-name match with optional hash match (#532).
  *
  * - Route-name match: `router.isActiveRoute(name, params, strict, ignoreQueryParams)`.
@@ -145,7 +142,11 @@ function computeActive(
     return true;
   }
 
-  return readContextHash(router) === hash;
+  // `readContextHash` returns `undefined` when no URL plugin claimed the
+  // namespace (hash-plugin runtime, memory-plugin, SSR). For hash-equality
+  // matching we collapse that to `""` — a hash-aware Link with no URL plugin
+  // can only match when the consumer also asked for `hash: ""`.
+  return (readContextHash(router.getState()) ?? "") === hash;
 }
 
 function buildActiveRouteSource(
@@ -165,13 +166,20 @@ function buildActiveRouteSource(
     hash,
   );
 
-  const source = new BaseSource(initialValue);
+  let routerUnsubscribe: (() => void) | undefined;
 
-  // Eager connection: subscribe to router immediately. This source is only
-  // ever reached through the cached public `createActiveRouteSource`, whose
-  // returned wrapper has a no-op destroy. The source lives with the router;
-  // the router.subscribe handle is released on router GC.
-  router.subscribe((next) => {
+  const source = new BaseSource(initialValue, {
+    onDestroy: () => {
+      routerUnsubscribe?.();
+      routerUnsubscribe = undefined;
+    },
+  });
+
+  // Eager connection: subscribe to router immediately. For the cached path,
+  // the returned wrapper has a no-op destroy and the handle lives with the
+  // router (released on router GC). For the non-cached fallback (BigInt /
+  // circular params), the handle is unwound through `onDestroy` above.
+  routerUnsubscribe = router.subscribe((next) => {
     const isNewRelated = areRoutesRelated(routeName, next.route.name);
     const isPrevRelated =
       next.previousRoute &&
@@ -212,8 +220,4 @@ function buildActiveRouteSource(
   });
 
   return source;
-}
-
-function noopDestroy(): void {
-  // Shared cached source — external destroy() is a no-op.
 }

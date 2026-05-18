@@ -1,5 +1,6 @@
 import { BaseSource } from "./BaseSource";
 import { computeSnapshot } from "./computeSnapshot.js";
+import { noopDestroy } from "./internal/noopDestroy.js";
 
 import type { RouteNodeSnapshot, RouterSource } from "./types.js";
 import type { Router } from "@real-router/core";
@@ -106,9 +107,19 @@ function buildRouteNodeSource(
             next,
           );
 
-          if (!Object.is(source.getSnapshot(), newSnapshot)) {
-            source.updateSnapshot(newSnapshot);
+          // computeSnapshot returns the SAME currentSnapshot reference when
+          // both route and previousRoute stabilize to prev — guard against
+          // emitting redundant updates to listeners (matters for signal-
+          // based adapters that re-run effects on every set).
+          /* v8 ignore next 3 -- @preserve: structurally unreachable after #605
+             — reload navs always return fresh refs via stabilizeState, and
+             within-node non-reload navs short-circuit at shouldUpdate. Guard
+             kept for defensive correctness against future stabilizer changes. */
+          if (Object.is(source.getSnapshot(), newSnapshot)) {
+            return;
           }
+
+          source.updateSnapshot(newSnapshot);
         });
       },
       onLastUnsubscribe: disconnect,
@@ -116,8 +127,4 @@ function buildRouteNodeSource(
   );
 
   return source;
-}
-
-function noopDestroy(): void {
-  // Shared cached source — external destroy() is a no-op.
 }

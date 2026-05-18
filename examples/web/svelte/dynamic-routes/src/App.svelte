@@ -43,7 +43,7 @@
             checked={analyticsEnabled}
             onchange={async () => {
               if (analyticsEnabled) {
-                if (route.current.name.startsWith("analytics")) {
+                if (navigator.getState()?.name.startsWith("analytics")) {
                   await navigator.navigate("home");
                 }
                 routesApi.remove("analytics");
@@ -63,7 +63,7 @@
             checked={adminEnabled}
             onchange={async () => {
               if (adminEnabled) {
-                if (route.current.name.startsWith("admin")) {
+                if (navigator.getState()?.name.startsWith("admin")) {
                   await navigator.navigate("home");
                 }
                 routesApi.remove("admin");
@@ -96,16 +96,12 @@
         {#snippet about()}
           <About />
         {/snippet}
-        {#if analyticsEnabled}
-          {#snippet analytics()}
-            <Analytics />
-          {/snippet}
-        {/if}
-        {#if adminEnabled}
-          {#snippet admin()}
-            <Admin />
-          {/snippet}
-        {/if}
+        {#snippet analytics()}
+          <Analytics />
+        {/snippet}
+        {#snippet admin()}
+          <Admin />
+        {/snippet}
         {#snippet notFound()}
           <h1>404 — Page Not Found</h1>
         {/snippet}

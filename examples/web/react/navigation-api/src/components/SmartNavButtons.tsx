@@ -12,10 +12,10 @@ function labelFor(state: State): string {
       return "Products";
     }
     case "products.product": {
-      return `Product #${String(state.params.id)}`;
+      return `Product #${state.params.id as string}`;
     }
     case "products.product.edit": {
-      return `Edit #${String(state.params.id)}`;
+      return `Edit #${state.params.id as string}`;
     }
     case "categories": {
       return "Categories";

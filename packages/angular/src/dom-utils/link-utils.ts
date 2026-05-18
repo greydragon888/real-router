@@ -15,14 +15,41 @@ export function shouldNavigate(evt: MouseEvent): boolean {
   );
 }
 
+// Matches a single percent-escape triple (`%` + two hex digits). Used as
+// the "already-encoded" probe in `encodeFragmentInline` below — see the
+// idempotency rationale there.
+const PERCENT_ESCAPE_PROBE = /%[\dA-Fa-f]{2}/;
+
 /**
  * RFC 3986 fragment encoding: preserve sub-delims (`&`, `=`, `?`, `:`),
  * encode space, `%`, control chars, non-ASCII via encodeURI; defensively
  * escape `#` (encodeURI does not). Mirrors `encodeHashFragment` in
  * `shared/browser-env/url-context.ts` — duplicated here because the
  * shared/dom-utils symlink graph does not reach shared/browser-env.
+ *
+ * **Idempotency for pre-encoded input (audit-2026-05-17 §5 MEDIUM E.1).**
+ * The doc-comment on `<Link hash>` says the value is a "decoded fragment
+ * without leading #". But realistic consumers copy hashes out of
+ * `location.hash` (which is percent-encoded) and pass them back, so the
+ * naive `encodeURI("%20")` would double-encode into `"%2520"` and break
+ * anchor lookup. We detect a percent-escape triple in the input and, if
+ * present, decode + re-encode for idempotency. Malformed `%XX` (e.g.
+ * `"%2"` or `"%ZZ"`) makes `decodeURIComponent` throw — in that case we
+ * fall through to plain `encodeURI`, which never throws.
  */
 function encodeFragmentInline(decoded: string): string {
+  if (PERCENT_ESCAPE_PROBE.test(decoded)) {
+    try {
+      const roundtrip = decodeURIComponent(decoded);
+
+      return encodeURI(roundtrip).replaceAll("#", "%23");
+    } catch {
+      // Malformed `%XX` — fall through to the plain encoding path.
+      // encodeURI does not throw on malformed escapes; it treats the
+      // `%` as a literal and percent-encodes it (`%2` → `%252`).
+    }
+  }
+
   return encodeURI(decoded).replaceAll("#", "%23");
 }
 
@@ -68,12 +95,33 @@ export function buildHref(
         normHash === undefined ? undefined : { hash: normHash },
       );
 
-      if (url !== undefined) {
+      // Accept only non-empty strings. The BuildUrlFn type contract is
+      // `string | undefined`, but defensive against:
+      //   - `""` (empty string) → would render `<a href="">`, which resolves
+      //     to the current page URL → silent self-navigation on click.
+      //   - `null` (type-contract violation) → would render `<a href={null}>`,
+      //     stringified to `"null"` in some renderers.
+      // Either case falls through to the `router.buildPath` fallback below.
+      if (typeof url === "string" && url.length > 0) {
         return url;
       }
     }
 
     const path = router.buildPath(routeName, routeParams);
+
+    // Symmetric to the buildUrl guard above (#S1 audit, Invariant 12).
+    // `router.buildPath` is typed `string`, but defends against:
+    //   - `""` (empty string) — would render `<a href="">`, which resolves
+    //     to the current page URL → silent self-navigation on click.
+    //   - non-string type-contract violations from custom path-matchers.
+    // Both yield `undefined` (renderer drops the attribute) with a warning.
+    if (typeof path !== "string" || path.length === 0) {
+      console.error(
+        `[real-router] Route "${routeName}" yielded an empty path. The element will render without an href attribute.`,
+      );
+
+      return undefined;
+    }
 
     return normHash ? `${path}#${encodeFragmentInline(normHash)}` : path;
   } catch {
@@ -144,8 +192,28 @@ export function navigateWithHash(
   return router.navigate(routeName, routeParams, opts);
 }
 
+// Match-any-whitespace regex shared across calls. RegExp literals at
+// call-site recompile in some engines; lifting it avoids that microcost
+// for the slow-path branch.
+const WHITESPACE_PROBE = /\s/;
+const WHITESPACE_SPLIT = /\S+/g;
+
 function parseTokens(value: string | undefined): string[] {
-  return value ? (value.match(/\S+/g) ?? []) : [];
+  if (!value) {
+    return [];
+  }
+
+  // Hot-path fast-path (audit-2026-05-17 §8b #1): >99% of active-class
+  // inputs at `<Link>` emit are single-token strings like `"active"` or
+  // `"is-current"` — no whitespace, no leading/trailing pad. Skip the
+  // regex match and Array result allocation: a literal `[value]` works
+  // because the slow-path `match(/\S+/g)` would return exactly `[value]`
+  // for the same input. PBT lock: linkUtils.properties.ts Invariant 13.
+  if (!WHITESPACE_PROBE.test(value)) {
+    return [value];
+  }
+
+  return value.match(WHITESPACE_SPLIT) ?? [];
 }
 
 export function buildActiveClassName(
@@ -179,6 +247,29 @@ export function buildActiveClassName(
   return baseClassName ?? undefined;
 }
 
+/**
+ * One-level structural equality using `Object.is` per key.
+ *
+ * **String-keyed properties only (Mini-sprint E.3 — audit-5 §4.2 #3).**
+ * Implementation walks `Object.keys()` which by spec returns only
+ * enumerable own STRING keys. Symbol-keyed properties — created via
+ * `obj[Symbol("brand")] = value` or `{ [Symbol(...)]: value }` — are
+ * NOT compared. Two records that differ only in a Symbol-keyed value
+ * will compare as equal.
+ *
+ * This is intentional: route params and Link options are documented as
+ * string-keyed primitives (string | number | boolean) — Symbol-keyed
+ * metadata (e.g. brand markers, private state) doesn't belong in a
+ * cache-key comparison. Switching to `Reflect.ownKeys()` would extend
+ * the contract to symbols at the cost of one extra allocation per call
+ * (Reflect.ownKeys composes string-keys + symbol-keys arrays). If a
+ * consumer relies on symbol-keyed metadata for navigation
+ * disambiguation, they should encode it into a string key instead.
+ *
+ * Mirrors React's `shallowEqual` (packages/shared/shallowEqual.js) in
+ * both the string-keys-only semantics and the `hasOwnProperty` guard
+ * below.
+ */
 export function shallowEqual(
   prev: object | undefined,
   next: object | undefined,
@@ -200,7 +291,13 @@ export function shallowEqual(
   const nextRecord = next as Record<string, unknown>;
 
   for (const key of prevKeys) {
-    if (!Object.is(prevRecord[key], nextRecord[key])) {
+    // hasOwnProperty guard: without it, a key missing in `next` reads as
+    // `undefined` and falsely matches `prev[key] === undefined`. Same shape
+    // as React's shallowEqual (packages/shared/shallowEqual.js).
+    if (
+      !Object.prototype.hasOwnProperty.call(next, key) ||
+      !Object.is(prevRecord[key], nextRecord[key])
+    ) {
       return false;
     }
   }
@@ -212,10 +309,25 @@ export function applyLinkA11y(element: HTMLElement | null | undefined): void {
   if (!element) {
     return;
   }
-  if (
-    element instanceof HTMLAnchorElement ||
-    element instanceof HTMLButtonElement
-  ) {
+
+  // Cross-realm safety (audit-2026-05-17 §5 HIGH #4):
+  // `instanceof HTMLAnchorElement` compares against the constructor from
+  // the CURRENT realm. An element created in a different window (iframe
+  // contentDocument, micro-frontend, embedded widget) fails the check
+  // even when it IS a real anchor — the helper would then inject
+  // role="link" + tabindex="0" on top of native anchor semantics,
+  // breaking screen reader output ("link link") and focus order.
+  //
+  // tagName is realm-agnostic and is uppercase for HTML-namespaced
+  // elements in any document. SVG `<a>` has lowercase tagName plus a
+  // different prototype (SVGAElement) — skipping it here is wrong by
+  // accident: SVG anchors don't have keyboard activation semantics the
+  // helper would add. But they also don't reach this helper in
+  // practice (router Link components emit HTML anchors). Lock the
+  // uppercase compare to keep the contract narrow.
+  const tag = element.tagName;
+
+  if (tag === "A" || tag === "BUTTON") {
     return;
   }
   if (!element.hasAttribute("role")) {

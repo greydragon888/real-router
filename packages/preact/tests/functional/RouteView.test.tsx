@@ -9,7 +9,6 @@ import { RouteView, RouterProvider } from "@real-router/preact";
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
 import type { Router } from "@real-router/core";
-import type { ComponentChildren } from "preact";
 
 describe("RouteView", () => {
   let router: Router;
@@ -105,6 +104,44 @@ describe("RouteView", () => {
       expect(screen.queryByTestId("empty-match")).not.toBeInTheDocument();
       expect(container.innerHTML).toBe("");
     });
+
+    it.each([
+      ["users/", "trailing slash"],
+      ["users?id=1", "query separator"],
+      ["users#section", "hash separator"],
+      ["/users", "leading slash"],
+    ])(
+      "should reject segments containing URL special characters: %s (%s)",
+      async (segment) => {
+        await router.start("/users/list");
+
+        // `startsWithSegment` from `@real-router/route-utils` throws on chars
+        // outside [a-zA-Z0-9._-]. The throw propagates through render — the
+        // documented user contract is that `segment` is a dot-delimited route
+        // name, never a URL path. Capture this as a regression-locked error.
+        const consoleError = vi
+          .spyOn(console, "error")
+          .mockImplementation(() => {});
+
+        expect(() =>
+          render(
+            <RouterProvider router={router}>
+              <RouteView nodeName="">
+                <RouteView.Match segment={segment}>
+                  <div data-testid="bad-segment">Bad</div>
+                </RouteView.Match>
+              </RouteView>
+            </RouterProvider>,
+          ),
+        ).toThrow(/Segment contains invalid characters/);
+
+        // The error throws synchronously from render() before Preact's error
+        // boundary logging fires — console.error must not have been called.
+        expect(consoleError).not.toHaveBeenCalled();
+
+        consoleError.mockRestore();
+      },
+    );
 
     it("should support startsWith matching by default", async () => {
       await router.start("/users/list");
@@ -489,6 +526,37 @@ describe("RouteView", () => {
       expect(screen.getByTestId("users")).toBeInTheDocument();
     });
 
+    it("should support Match wrapped in deeply-nested non-marker DOM elements (collectElements recurses)", async () => {
+      // collectElements traverses everything that isn't a Match/Self/NotFound
+      // marker — when it sees a `<div>` it recurses into `child.props.children`.
+      // This test locks the deep-recursion path: three levels of unrelated
+      // wrappers still surface the Match for activation. Shallow nesting is
+      // already covered by the Fragment test below; this complements it.
+      await router.start("/users/list");
+
+      render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="">
+            <div className="layer-1">
+              <div className="layer-2">
+                <div className="layer-3">
+                  <RouteView.Match segment="users">
+                    <div data-testid="deep-users">Deep Users</div>
+                  </RouteView.Match>
+                </div>
+              </div>
+            </div>
+            <RouteView.NotFound>
+              <div data-testid="deep-nf">Not Found</div>
+            </RouteView.NotFound>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      expect(screen.getByTestId("deep-users")).toBeInTheDocument();
+      expect(screen.queryByTestId("deep-nf")).not.toBeInTheDocument();
+    });
+
     it("should support Match and NotFound wrapped in Fragment", async () => {
       await router.start("/users/list");
 
@@ -538,9 +606,7 @@ describe("RouteView", () => {
 
       const { container } = render(
         <RouterProvider router={router}>
-          <RouteView nodeName="">
-            {null as unknown as ComponentChildren}
-          </RouteView>
+          <RouteView nodeName="">{null}</RouteView>
         </RouterProvider>,
       );
 
@@ -790,6 +856,100 @@ describe("RouteView", () => {
 
       expect(screen.getByTestId("content")).toBeInTheDocument();
       expect(screen.queryByTestId("fallback")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("consumer footgun: RouteView.Match wrapped in memo()", () => {
+    // `collectElements` matches children by `child.type === Match`. Wrapping
+    // `<RouteView.Match>` in `memo()` or `forwardRef()` changes `child.type`
+    // to the memo wrapper — the reference check fails and the wrapped element
+    // is silently skipped (no match, no render). This test locks the behaviour
+    // so accidental "helpful" memo-wrapping is immediately visible in CI.
+    it("memo-wrapped Match is NOT recognised — silently skipped, NotFound shown instead", async () => {
+      const { memo } = await import("preact/compat");
+      const MemoMatch = memo(RouteView.Match);
+
+      await router.start("/users/list");
+
+      render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="">
+            {/* MemoMatch.type !== Match → collectElements skips it */}
+            <MemoMatch segment="users">
+              <div data-testid="users-content">Users</div>
+            </MemoMatch>
+            <RouteView.NotFound>
+              <div data-testid="not-found">Not Found</div>
+            </RouteView.NotFound>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      // Wrapped Match is invisible to collectElements — content never renders.
+      expect(screen.queryByTestId("users-content")).not.toBeInTheDocument();
+      // NotFound does NOT activate either: it only renders for UNKNOWN_ROUTE,
+      // not for a valid route that simply has no recognised Match slot.
+      expect(screen.queryByTestId("not-found")).not.toBeInTheDocument();
+    });
+
+    it("wrapper-function rename of Match is NOT recognised — silently skipped (same gotcha)", async () => {
+      // A consumer-defined wrapper component that *renders* RouteView.Match
+      // has a different `type` identity, so collectElements can't see it.
+      // Aliasing via `const MyMatch = RouteView.Match` preserves identity and
+      // works — *wrapping* via a new function component does not.
+      function MyMatch(
+        props: Readonly<{
+          segment: string;
+          children: import("preact").ComponentChildren;
+        }>,
+      ) {
+        return (
+          <RouteView.Match segment={props.segment}>
+            {props.children}
+          </RouteView.Match>
+        );
+      }
+
+      await router.start("/users/list");
+
+      render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="">
+            {/* MyMatch.type !== Match → invisible to collectElements */}
+            <MyMatch segment="users">
+              <div data-testid="users-content">Users</div>
+            </MyMatch>
+            <RouteView.NotFound>
+              <div data-testid="not-found">Not Found</div>
+            </RouteView.NotFound>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      expect(screen.queryByTestId("users-content")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("not-found")).not.toBeInTheDocument();
+    });
+
+    it("identity-preserving rename of Match (const alias) IS recognised", async () => {
+      // Sanity check the symmetric positive case: aliasing without wrapping
+      // preserves identity (`Alias === RouteView.Match`), so the Match is
+      // detected normally. Confirms that the prior negative test isolates
+      // the *wrapper*, not the *rename*.
+      const Alias = RouteView.Match;
+
+      await router.start("/users/list");
+
+      render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="">
+            <Alias segment="users">
+              <div data-testid="aliased-content">Users (aliased)</div>
+            </Alias>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      expect(screen.getByTestId("aliased-content")).toBeInTheDocument();
     });
   });
 });

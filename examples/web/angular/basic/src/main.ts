@@ -22,7 +22,7 @@ void router.start().then(() => {
         scrollRestoration: { mode: "restore" },
       }),
     ],
-  }).catch((err: unknown) => {
-    console.error(err);
+  }).catch((error: unknown) => {
+    console.error(error);
   });
 });

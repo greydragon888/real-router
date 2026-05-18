@@ -84,17 +84,30 @@ export const RouterProvider: FunctionComponent<RouteProviderProps> = ({
     };
   }, [router, viewTransitions]);
 
-  const navigator = useMemo(() => getNavigator(router), [router]);
+  // `getNavigator` is cached per-router in `@real-router/core` (WeakMap) —
+  // same router always returns the same Navigator ref. No `useMemo` needed.
+  const navigator = getNavigator(router);
+
+  // `createRouteSource` is NOT cached (per packages/sources/CLAUDE.md table).
+  // It must be stable across renders so `useSyncExternalStore`'s deps don't
+  // change identity and trigger an unsubscribe/resubscribe loop on every
+  // render. `useMemo([router])` gives one source per router-instance lifetime.
+  const store = useMemo(() => createRouteSource(router), [router]);
 
   // useSyncExternalStore manages the router subscription lifecycle:
   // subscribe connects to router on first listener, unsubscribes on last.
-  const store = useMemo(() => createRouteSource(router), [router]);
   const { route, previousRoute } = useSyncExternalStore(
     store.subscribe,
     store.getSnapshot,
     store.getSnapshot, // SSR: router returns same state on server and client
   );
 
+  // Stable-ref against parent re-renders: when parent re-renders RouterProvider
+  // without a route change (e.g. consumer re-renders the root), navigator /
+  // route / previousRoute references stay identical (useSyncExternalStore +
+  // Object.is bail-out). Without `useMemo` the object literal is fresh every
+  // render, propagating spurious re-renders to every `useRoute()` consumer.
+  // The memo bails out whenever the three deps are referentially equal.
   const routeContextValue = useMemo(
     () => ({ navigator, route, previousRoute }),
     [navigator, route, previousRoute],

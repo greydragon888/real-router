@@ -1,9 +1,12 @@
+import { getLifecycleApi } from "@real-router/core/api";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import {
   createRouteSource,
+  createRouteNodeSource,
   createActiveRouteSource,
   createTransitionSource,
+  createErrorSource,
 } from "@real-router/sources";
 
 import { createStressRouter } from "./helpers";
@@ -95,5 +98,84 @@ describe("S6: destroy() during notification", () => {
     }
 
     expect(callCount).toBe(1);
+  });
+
+  it("S6.5: RouteNodeSource: listener unsubscribes during notification (cached source survives)", async () => {
+    const source = createRouteNodeSource(router, "users");
+
+    let aCount = 0;
+    let bCount = 0;
+    let unsubB: () => void = () => {};
+
+    source.subscribe(() => {
+      aCount++;
+      unsubB();
+    });
+
+    unsubB = source.subscribe(() => {
+      bCount++;
+    });
+
+    for (let i = 0; i < 50; i++) {
+      await router.navigate(i % 2 === 0 ? "users.list" : "users.view", {
+        id: String(i),
+      });
+    }
+
+    // Listener A receives every notification; B is unsubscribed mid-call
+    // and sees at most one before its slot is removed from the Set.
+    expect(aCount).toBe(50);
+    expect(bCount).toBeLessThanOrEqual(1);
+  });
+
+  it("S6.6: ErrorSource: listener calls destroy() during TRANSITION_ERROR", async () => {
+    const lifecycle = getLifecycleApi(router);
+
+    lifecycle.addActivateGuard("admin.settings", () => () => false);
+
+    const source = createErrorSource(router);
+    let callCount = 0;
+
+    source.subscribe(() => {
+      callCount++;
+      source.destroy();
+    });
+
+    for (let i = 0; i < 50; i++) {
+      await router.navigate("admin.settings").catch(() => {});
+    }
+
+    // After the first error fires, listener calls destroy() → unsubs are
+    // torn down → subsequent errors don't notify. Exactly one call.
+    expect(callCount).toBe(1);
+  });
+
+  it("S6.7: ErrorSource: listener unsubscribes another during notification", async () => {
+    const lifecycle = getLifecycleApi(router);
+
+    lifecycle.addActivateGuard("admin.settings", () => () => false);
+
+    const source = createErrorSource(router);
+    let aCount = 0;
+    let bCount = 0;
+    let unsubB: () => void = () => {};
+
+    source.subscribe(() => {
+      aCount++;
+      unsubB();
+    });
+
+    unsubB = source.subscribe(() => {
+      bCount++;
+    });
+
+    for (let i = 0; i < 30; i++) {
+      await router.navigate("admin.settings").catch(() => {});
+    }
+
+    expect(aCount).toBe(30);
+    expect(bCount).toBeLessThanOrEqual(1);
+
+    source.destroy();
   });
 });

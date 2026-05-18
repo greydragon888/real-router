@@ -18,13 +18,7 @@ const USER_DATA: Record<string, { name: string; role: string; email: string }> =
 
 @Component({
   selector: "user-profile",
-  imports: [
-    RealLink,
-    RouteMatch,
-    RouteSelf,
-    RouteView,
-    UserSettingsComponent,
-  ],
+  imports: [RealLink, RouteMatch, RouteSelf, RouteView, UserSettingsComponent],
   // `users.profile` IS the profile-info page — no synthetic child for it.
   // routeSelf template renders profile details when active is exactly
   // `users.profile`; routeMatch "settings" wins for /users/:id/settings.
@@ -86,12 +80,14 @@ export class UserProfileComponent {
 
   readonly id = computed(() => {
     const params = this.node.routeState().route?.params;
-    const raw = params?.["id"];
+    const raw = params?.id;
+
     return typeof raw === "string" ? raw : "";
   });
 
   readonly user = computed(() => {
     const id = this.id();
+
     return id ? USER_DATA[id] : undefined;
   });
 

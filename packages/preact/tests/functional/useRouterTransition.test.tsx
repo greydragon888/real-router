@@ -1,4 +1,4 @@
-import { createRouter } from "@real-router/core";
+import { createRouter, errorCodes } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
 import {
   act,
@@ -96,7 +96,9 @@ describe("useRouterTransition", () => {
     });
 
     await act(async () => {
-      await router.navigate("dashboard").catch(() => {});
+      await expect(router.navigate("dashboard")).rejects.toMatchObject({
+        code: errorCodes.CANNOT_ACTIVATE,
+      });
     });
 
     expect(result.current.isTransitioning).toBe(false);
@@ -150,8 +152,7 @@ describe("useRouterTransition", () => {
       await Promise.resolve();
     });
 
-    expect(result.current.toRoute).not.toBeNull();
-    expect(result.current.toRoute!.name).toBe("dashboard");
+    expect(result.current.toRoute?.name).toBe("dashboard");
 
     await act(async () => {
       resolveGuard(true);
@@ -179,8 +180,7 @@ describe("useRouterTransition", () => {
       await Promise.resolve();
     });
 
-    expect(result.current.fromRoute).not.toBeNull();
-    expect(result.current.fromRoute!.name).toBe("home");
+    expect(result.current.fromRoute?.name).toBe("home");
 
     await act(async () => {
       resolveGuard(true);
@@ -219,7 +219,8 @@ describe("useRouterTransition", () => {
       await Promise.resolve();
     });
 
-    expect(result.current.toRoute!.name).toBe("dashboard");
+    expect(result.current.toRoute).not.toBeNull();
+    expect(result.current.toRoute?.name).toBe("dashboard");
 
     await act(async () => {
       const p2 = router.navigate("settings");

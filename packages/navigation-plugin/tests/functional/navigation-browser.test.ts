@@ -179,6 +179,42 @@ describe("createNavigationBrowser", () => {
       // Pre-Chrome-123 browsers expose `navigation` without `activation`.
       expect(browser.getActivationType()).toBeUndefined();
     });
+
+    it("returns 'push' for push activation type", () => {
+      (mockNav as unknown as { activation: NavigationActivation }).activation =
+        {
+          entry: { url: "http://localhost/users" } as NavigationHistoryEntry,
+          from: { url: "http://localhost/" } as NavigationHistoryEntry,
+          navigationType: "push",
+        };
+      browser = createNavigationBrowser("");
+
+      expect(browser.getActivationType()).toBe("push");
+    });
+
+    it("returns 'replace' for replace activation type", () => {
+      (mockNav as unknown as { activation: NavigationActivation }).activation =
+        {
+          entry: { url: "http://localhost/" } as NavigationHistoryEntry,
+          from: { url: "http://localhost/" } as NavigationHistoryEntry,
+          navigationType: "replace",
+        };
+      browser = createNavigationBrowser("");
+
+      expect(browser.getActivationType()).toBe("replace");
+    });
+
+    it("returns 'traverse' for traverse activation type", () => {
+      (mockNav as unknown as { activation: NavigationActivation }).activation =
+        {
+          entry: { url: "http://localhost/" } as NavigationHistoryEntry,
+          from: { url: "http://localhost/users" } as NavigationHistoryEntry,
+          navigationType: "traverse",
+        };
+      browser = createNavigationBrowser("");
+
+      expect(browser.getActivationType()).toBe("traverse");
+    });
   });
 
   describe("addNavigateListener", () => {

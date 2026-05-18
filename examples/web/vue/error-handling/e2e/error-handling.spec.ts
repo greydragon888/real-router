@@ -9,7 +9,7 @@ test.describe("Error Handling Example", () => {
   test("1. Go to Unknown shows ROUTE_NOT_FOUND toast", async ({ page }) => {
     await page.click('button:has-text("Go to Unknown")');
 
-    await expect(page.locator(".toast")).toContainText("ROUTE_NOT_FOUND", {
+    await expect(page.locator(".toast:not(:has(button))")).toContainText("ROUTE_NOT_FOUND", {
       timeout: 3000,
     });
   });
@@ -17,7 +17,7 @@ test.describe("Error Handling Example", () => {
   test("2. Go to Protected shows CANNOT_ACTIVATE toast", async ({ page }) => {
     await page.click('button:has-text("Go to Protected")');
 
-    await expect(page.locator(".toast")).toContainText("CANNOT_ACTIVATE", {
+    await expect(page.locator(".toast:not(:has(button))")).toContainText("CANNOT_ACTIVATE", {
       timeout: 3000,
     });
   });

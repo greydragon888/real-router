@@ -27,13 +27,12 @@ export function QueryDemo() {
       <h1>Query-only navigation</h1>
       <p>
         Changing the filter via query params is a same-route navigation (
-        <code>route.name === nextRoute.name</code>).{" "}
-        <code>useRouteExit</code> detects this via its default{" "}
-        <code>skipSameRoute: true</code> and skips the page-level fade
-        entirely — the page does not animate. <code>useListFlip</code>{" "}
-        opts in via <code>skipSameRoute: false</code> to own the same-route
-        window: items glide between positions, newcomers fade in, removed
-        items fade out via ghost clones.
+        <code>route.name === nextRoute.name</code>). <code>useRouteExit</code>{" "}
+        detects this via its default <code>skipSameRoute: true</code> and skips
+        the page-level fade entirely — the page does not animate.{" "}
+        <code>useListFlip</code> opts in via <code>skipSameRoute: false</code>{" "}
+        to own the same-route window: items glide between positions, newcomers
+        fade in, removed items fade out via ghost clones.
       </p>
 
       <div className="qd-toolbar">

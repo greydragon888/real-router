@@ -12,8 +12,16 @@ export function sourceToSignal<T>(source: RouterSource<T>): Signal<T> {
   });
 
   destroyRef.onDestroy(() => {
-    unsubscribe();
-    source.destroy();
+    // `try/finally` guarantees `source.destroy()` runs even if `unsubscribe`
+    // throws. Cached sources from `@real-router/sources` keep `destroy()` as
+    // a no-op (so they survive multi-consumer teardown), but non-cached
+    // sources rely on this call to release their router subscription —
+    // skipping it on an unsubscribe throw would leak the listener.
+    try {
+      unsubscribe();
+    } finally {
+      source.destroy();
+    }
   });
 
   return sig.asReadonly();

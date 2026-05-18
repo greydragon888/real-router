@@ -106,7 +106,11 @@ describe("Issue #270: RouteNodeSource no longer leaks router subscriptions", () 
     });
 
     const source = createRouteNodeSource(router, "users");
-    const unsub = source.subscribe(() => {});
+    // Subscribe a real source-level listener too, so the zombie scenario
+    // (router callback fires after source unsub) would observably leak via
+    // `sourceListener` if BaseSource forgot to remove the router subscription.
+    const sourceListener = vi.fn();
+    const unsub = source.subscribe(sourceListener);
 
     unsub();
     callbackCount = 0;
@@ -114,6 +118,7 @@ describe("Issue #270: RouteNodeSource no longer leaks router subscriptions", () 
     await router.navigate("users.list");
 
     expect(callbackCount).toBe(0);
+    expect(sourceListener).not.toHaveBeenCalled();
   });
 
   it("matches createRouteSource lazy pattern", () => {

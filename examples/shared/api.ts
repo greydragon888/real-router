@@ -42,7 +42,16 @@ function delay<T>(data: T, signal?: AbortSignal): Promise<T> {
       "abort",
       () => {
         clearTimeout(timer);
-        reject(signal.reason);
+
+        const reason: unknown = signal.reason;
+
+        if (reason instanceof Error) {
+          reject(reason);
+
+          return;
+        }
+
+        reject(new Error(typeof reason === "string" ? reason : "aborted"));
       },
       { once: true },
     );
@@ -50,24 +59,35 @@ function delay<T>(data: T, signal?: AbortSignal): Promise<T> {
 }
 
 export const api = {
-  getUsers: (signal?: AbortSignal) => delay(users, signal),
-  getUser: (id: string, signal?: AbortSignal) =>
+  getUsers: (signal?: AbortSignal): Promise<User[]> => delay(users, signal),
+  getUser: (id: string, signal?: AbortSignal): Promise<User | undefined> =>
     delay(
-      users.find((u) => u.id === id),
+      users.find((user) => user.id === id),
       signal,
     ),
-  getProducts: (signal?: AbortSignal) => delay(products, signal),
-  getProduct: (id: string, signal?: AbortSignal) =>
+  getProducts: (signal?: AbortSignal): Promise<Product[]> =>
+    delay(products, signal),
+  getProduct: (
+    id: string,
+    signal?: AbortSignal,
+  ): Promise<Product | undefined> =>
     delay(
-      products.find((p) => p.id === id),
+      products.find((product) => product.id === id),
       signal,
     ),
-  checkCartNotEmpty: (signal?: AbortSignal) =>
-    delay(Math.random() > 0.5, signal),
-  checkPermission: (_userId: string, signal?: AbortSignal) =>
+  checkCartNotEmpty: (signal?: AbortSignal): Promise<boolean> => {
+    const isNotEmpty = Math.random() > 0.5;
+
+    return delay(isNotEmpty, signal);
+  },
+  checkPermission: (_userId: string, signal?: AbortSignal): Promise<boolean> =>
     delay(true, signal),
-  login: (email: string, _password: string, signal?: AbortSignal) => {
-    const user = users.find((u) => u.email === email);
+  login: (
+    email: string,
+    _password: string,
+    signal?: AbortSignal,
+  ): Promise<User | null> => {
+    const user = users.find((candidate) => candidate.email === email);
 
     return delay(user ?? null, signal);
   },

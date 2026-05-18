@@ -214,6 +214,6 @@ describe("useRoute composable", () => {
     const params: TypedParams | undefined = typed!.route.current?.params;
 
     expect(typed!.route.current?.name).toStrictEqual("test");
-    expect(params).toBeDefined();
+    expect(params).toStrictEqual({});
   });
 });

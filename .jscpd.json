@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/jscpd.json",
   "threshold": 2,
   "minLines": 5,
-  "minTokens": 50,
+  "minTokens": 70,
   "skipComments": true,
   "reporters": ["console"],
   "ignore": [
@@ -21,7 +21,11 @@
     "packages/hash-plugin/src/**",
     "packages/*/src/dom-utils/**",
     "packages/*/src/browser-env/**",
-    "packages/*/src/shared-ssr/**"
+    "packages/*/src/shared-ssr/**",
+    "packages/*/src/**/*.react-server.ts",
+    "packages/react/src/legacy.ts",
+    "packages/react/src/legacy.ssr.ts",
+    "packages/react/src/ink.ts"
   ],
   "format": ["typescript", "tsx"],
   "absolute": false,

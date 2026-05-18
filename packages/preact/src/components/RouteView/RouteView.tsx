@@ -24,17 +24,21 @@ function RouteViewRoot({
     return collected;
   }, [children]);
 
-  if (!route) {
-    return null;
-  }
+  const routeName = route?.name;
 
-  const { rendered } = buildRenderList(elements, route.name, nodeName);
+  // buildRenderList is O(N) over Match/Self/NotFound children. Memo on
+  // (elements, routeName, nodeName) skips the re-walk on parent re-renders
+  // that don't change the active route; navigations always invalidate via
+  // routeName.
+  const rendered = useMemo(() => {
+    if (routeName === undefined) {
+      return [];
+    }
 
-  if (rendered.length > 0) {
-    return <>{rendered}</>;
-  }
+    return buildRenderList(elements, routeName, nodeName).rendered;
+  }, [elements, routeName, nodeName]);
 
-  return null;
+  return rendered.length > 0 ? <>{rendered}</> : null;
 }
 
 RouteViewRoot.displayName = "RouteView";

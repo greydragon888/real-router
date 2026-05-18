@@ -9,7 +9,7 @@ import {
   renderWithRouter,
 } from "../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Router, State } from "@real-router/core";
 
 describe("Link component", () => {
   let router: Router;
@@ -89,6 +89,65 @@ describe("Link component", () => {
         true,
       );
     });
+
+    // Closes CLAUDE.md gotcha #10 audit gap: Link's `ignoreQueryParams`
+    // default is `true` (Link.svelte:22). Without an explicit functional
+    // test, an unobservant refactor (e.g. flipping the default to `false`
+    // for "safer" param matching) would silently break every consumer that
+    // relies on tab-style query-param links staying active across page
+    // changes. This test pins the default value behaviorally — `Link`
+    // mounted WITHOUT the prop must stay active when only query params
+    // change on the same route.
+    it("ignoreQueryParams defaults to true — same route + different query params still active", async () => {
+      // Navigate first so the link's params match the active state.
+      await router.navigate("items.item", { id: "6", page: "1" });
+      flushSync();
+
+      renderWithRouter(router, Link, {
+        routeName: "items.item",
+        routeParams: { id: "6" },
+        activeClassName: "active",
+        // NOTE: ignoreQueryParams intentionally omitted — drives the default.
+      });
+
+      const link = document.querySelector("a")!;
+
+      expect(link.classList.contains("active")).toBe(true);
+
+      // Same route name + same path params, ONLY the query param differs.
+      // Default behavior must keep the link active.
+      await router.navigate("items.item", { id: "6", page: "2" });
+      flushSync();
+
+      expect(link.classList.contains("active")).toBe(true);
+    });
+
+    // Symmetry pin: when consumers explicitly opt out via
+    // `ignoreQueryParams={false}`, the link MUST drop active on query-param
+    // change. Catches a hypothetical regression that ignored the prop value
+    // entirely and always treated query params as "ignore".
+    it("ignoreQueryParams={false} — same route + different query params drops active", async () => {
+      await router.navigate("items.item", { id: "6", page: "1" });
+      flushSync();
+
+      renderWithRouter(router, Link, {
+        routeName: "items.item",
+        routeParams: { id: "6", page: "1" },
+        activeStrict: true,
+        ignoreQueryParams: false,
+        activeClassName: "active",
+      });
+
+      const link = document.querySelector("a")!;
+
+      expect(link.classList.contains("active")).toBe(true);
+
+      await router.navigate("items.item", { id: "6", page: "2" });
+      flushSync();
+
+      // ignoreQueryParams=false → different query params → NOT active.
+      expect(link.classList.contains("active")).toBe(false);
+    });
   });
 
   describe("clickHandler", () => {
@@ -127,7 +186,7 @@ describe("Link component", () => {
     });
 
     it("should navigate when custom onclick does not prevent default", () => {
-      vi.spyOn(router, "navigate").mockResolvedValue({} as never);
+      vi.spyOn(router, "navigate").mockResolvedValue({} as State);
 
       renderWithRouter(router, Link, {
         routeName: "one-more-test",

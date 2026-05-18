@@ -18,6 +18,21 @@ allow-licenses:
   - LGPL-3.0-only
   - GPL-3.0-only
   - GPL-3.0-or-later
+  # Permissive licenses surfaced by Tauri 2.x → GTK/WebKit / Servo / ICU /
+  # LLVM transitive crates in `examples/desktop/tauri/*/src-tauri/Cargo.lock`.
+  # None of these crates are shipped in any published @real-router/* package —
+  # they live exclusively in desktop-example src-tauri trees.
+  - MPL-2.0           # cssparser, cssparser-macros, dtoa-short, option-ext,
+                      # selectors (Mozilla Servo crates pulled by webkit2gtk
+                      # stack). Weak file-level copyleft; permissive for use
+                      # without modification of the source files themselves.
+  - Zlib              # foldhash (hashing). Simple permissive, GPL-compatible.
+  - Unicode-3.0       # icu_* + tinystr + writeable + yoke + zerofrom +
+                      # zerotrie + zerovec + litemap + potential_utf
+                      # (Unicode Consortium ICU4X crates). Replaces the
+                      # earlier Unicode-DFS-2016; remains permissive.
+  - Apache-2.0 WITH LLVM-exception  # target-lexicon. Apache-2.0 + extra
+                      # patent grant for LLVM-derived projects.
 
 # Transitive devDeps with SPDX strings the allow-list doesn't disambiguate but
 # that are de-facto permissive. All four are vendored by jsdom / Playwright /
@@ -49,3 +64,14 @@ allow-dependencies-licenses:
   # for macOS .dmg packaging in example apps. devDependency only,
   # never bundled into the published @real-router/* packages.
   - pkg:npm/truncate-utf8-bytes
+  # "LicenseRef-bad-apache-2.0mit" — non-standard SPDX string from a
+  # malformed Cargo.toml; the underlying intent is "Apache-2.0 OR MIT".
+  # libdbus-sys is a transitive Linux-only dep of Tauri 2.x for D-Bus
+  # bindings; desktop examples only.
+  - pkg:cargo/libdbus-sys
+  # "(MIT OR Apache-2.0) AND Unicode-3.0" — the AND combinator with
+  # Unicode-3.0 isn't matched by the allow-list parser even though both
+  # halves are individually permitted. unicode-ident is a Rust transitive
+  # dep of every proc-macro crate, pulled in via Tauri build deps;
+  # desktop examples only.
+  - pkg:cargo/unicode-ident

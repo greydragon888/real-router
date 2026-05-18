@@ -6,13 +6,13 @@
     "predev": "pnpm turbo run bundle --filter=...angular-route-animations-example",
     "dev": "ng serve",
     "build": "ng build",
-    "preview": "sirv dist/angular-route-animations-example/browser --port 4173 --single --quiet",
+    "preview": "sirv dist/angular-route-animations-example/browser --port 4204 --single --quiet",
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@angular/common": "21.2.8",
-    "@angular/core": "21.2.8",
-    "@angular/platform-browser": "21.2.8",
+    "@angular/common": "21.2.9",
+    "@angular/core": "21.2.9",
+    "@angular/platform-browser": "21.2.9",
     "@real-router/angular": "workspace:^",
     "@real-router/browser-plugin": "workspace:^",
     "@real-router/core": "workspace:^",
@@ -22,10 +22,10 @@
   "devDependencies": {
     "@angular-devkit/architect": "0.2102.7",
     "@angular-devkit/schematics": "21.2.7",
-    "@angular/build": "21.2.7",
-    "@angular/cli": "21.2.7",
-    "@angular/compiler": "21.2.8",
-    "@angular/compiler-cli": "21.2.8",
+    "@angular/build": "21.2.9",
+    "@angular/cli": "21.2.9",
+    "@angular/compiler": "21.2.9",
+    "@angular/compiler-cli": "21.2.9",
     "@playwright/test": "1.58.2",
     "sirv-cli": "3.0.1",
     "typescript": "6.0.3"

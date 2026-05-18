@@ -6,7 +6,7 @@ export interface NavigationPluginOptions {
   /**
    * Bypass canDeactivate guards on browser back/forward.
    *
-   * @default true
+   * @default false
    */
   forceDeactivate?: boolean;
 

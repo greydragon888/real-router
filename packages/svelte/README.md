@@ -61,11 +61,13 @@ npm install @real-router/svelte @real-router/core @real-router/browser-plugin
 
 All composables must be called during component initialization (not inside `$effect` or event handlers). Reactive composables return `{ current: T }` getter objects — read `.current` inside a template or `$derived` to register a reactive dependency.
 
+`useRoute()` returns a **non-nullable** `route.current` (typed as `State<P>`) and throws when the router has no active state (unstarted, stopped, disposed). `useRouteNode(name)` keeps its nullable `current` — node inactivity is a legitimate business state, not a lifecycle error.
+
 | Composable              | Returns                                                         | Reactive?                                  |
 | ----------------------- | --------------------------------------------------------------- | ------------------------------------------ |
 | `useRouter()`           | `Router`                                                        | Never                                      |
 | `useNavigator()`        | `Navigator`                                                     | Never (stable ref, safe to use directly)   |
-| `useRoute()`            | `{ navigator, route: { current }, previousRoute: { current } }` | `.current` on every navigation             |
+| `useRoute()`            | `{ navigator, route: { current: State<P> }, previousRoute: { current } }` — throws if no active state | `.current` on every navigation             |
 | `useRouteNode(name)`    | `{ navigator, route: { current }, previousRoute: { current } }` | `.current` when node activates/deactivates |
 | `useRouteUtils()`       | `RouteUtils`                                                    | Never                                      |
 | `useRouterTransition()` | `{ current: RouterTransitionSnapshot }`                         | `.current` on transition start/end         |
@@ -118,7 +120,9 @@ All composables must be called during component initialization (not inside `$eff
 <script lang="ts">
   import { useRouteExit } from "@real-router/svelte";
 
-  let el: HTMLDivElement;
+  // `let el = $state<HTMLDivElement | null>(null)` under Svelte 5 strict mode —
+  // the `bind:this` target must be reactive for binding to land.
+  let el = $state<HTMLDivElement | null>(null);
 
   useRouteExit(async ({ signal }) => {
     if (!el) return;
@@ -239,13 +243,25 @@ Declarative route matching. Renders the snippet whose name matches the active ro
 
 **Props:**
 
-| Prop        | Type      | Description                                 |
-| ----------- | --------- | ------------------------------------------- |
-| `nodeName`  | `string`  | Route node to match against. `""` for root. |
-| `notFound`  | `Snippet` | Rendered when route is `UNKNOWN_ROUTE`      |
-| `[segment]` | `Snippet` | Named snippet matching a route segment      |
+| Prop        | Type      | Description                                                                                  |
+| ----------- | --------- | -------------------------------------------------------------------------------------------- |
+| `nodeName`  | `string`  | Route node to match against. `""` for root.                                                  |
+| `self`      | `Snippet` | Rendered when the active route is exactly `nodeName` (no descendant segments)                |
+| `notFound`  | `Snippet` | Rendered when route is `UNKNOWN_ROUTE`                                                       |
+| `[segment]` | `Snippet` | Named snippet matching a route segment                                                       |
 
 Snippet names must be valid JavaScript identifiers and match the first segment of the active route after `nodeName`. For a route `users.profile` with `nodeName=""`, the snippet named `users` matches.
+
+**`self` snippet:** distinguishes the exact-match case from any descendant. With `nodeName="users"`, the `users` segment snippet matches `users`, `users.list`, `users.profile`, etc. — but `{#snippet self()}` only renders when the active route is `"users"` exactly. Both `self` and `notFound` are **reserved** snippet names: a literal route named `notFound` or `self` is never matched as a regular segment.
+
+```svelte
+<!-- nested: render UsersIndex on /users, list on /users/list -->
+<RouteView nodeName="users">
+  {#snippet self()}<UsersIndex /> {/snippet}
+  {#snippet list()}<UsersList /> {/snippet}
+  {#snippet profile()}<UserProfile /> {/snippet}
+</RouteView>
+```
 
 > **Note:** `keepAlive` is not supported. Svelte has no equivalent of React's `<Activity>` API or Vue's `<KeepAlive>`. Components are destroyed when navigating away.
 
@@ -281,6 +297,33 @@ Auto-resets on next successful navigation. Works with both `<Link>` and imperati
 
 **`onError` signature:** `(error, toRoute, fromRoute) => void`. Receives the `RouterError`, the attempted destination (`State | null`), and the previously active route (`State | null`). A throwing `onError` is caught by the boundary, logged via `console.error`, and never breaks reactivity.
 
+### `<ClientOnly>` / `<ServerOnly>`
+
+Paired SSR-aware boundaries. `<ClientOnly>` renders the `fallback` snippet on the server (and on the client first paint, to match SSR HTML), then swaps in the `children` snippet after mount. `<ServerOnly>` is the symmetric inverse.
+
+```svelte
+<script lang="ts">
+  import { ClientOnly, ServerOnly } from "@real-router/svelte";
+</script>
+
+<ClientOnly>
+  {#snippet children()}
+    <BrowserApiWidget />
+  {/snippet}
+  {#snippet fallback()}
+    <Skeleton />
+  {/snippet}
+</ClientOnly>
+
+<ServerOnly>
+  {#snippet children()}
+    <SeoMetaStrip />
+  {/snippet}
+</ServerOnly>
+```
+
+Implementation: `$state(false)` + `$effect(() => mounted = true)`. The Svelte compiler emits the rune as a no-op on the server, so server-side rendering naturally lands on the SSR-side branch. End-to-end dogfooding lives in [`examples/web/svelte/ssr-examples/ssr/`](../../examples/web/svelte/ssr-examples/ssr/) (see `e2e/ssr-boundaries.spec.ts`).
+
 ## Actions
 
 ### `createLinkAction`
@@ -302,7 +345,10 @@ Factory function that creates a low-level action for adding navigation to any el
   Go Home
 </button>
 
-<div use:link={{ name: "settings", params: {}, options: { replace: true } }} role="link" tabindex="0">
+<!-- For non-anchor / non-button elements you can omit role="link" + tabindex="0":
+     applyLinkA11y adds them automatically. Explicit attrs in the example below are
+     redundant but harmless. -->
+<div use:link={{ name: "settings", params: {}, options: { replace: true } }}>
   Settings
 </div>
 ```
@@ -315,7 +361,9 @@ Factory function that creates a low-level action for adding navigation to any el
 | `params`  | `Params` | `{}`    | Route parameters                   |
 | `options` | `object` | `{}`    | Navigation options (replace, etc.) |
 
-The action automatically adds `role="link"` + `tabindex="0"` to non-interactive elements for accessibility. It handles click events and Enter key navigation.
+The action automatically adds `role="link"` + `tabindex="0"` to non-interactive elements for accessibility (skipping `<a>` / `<button>` which already convey link semantics). It handles click events and Enter key navigation.
+
+> **Hash asymmetry vs `<Link hash>`:** `createLinkAction` does **not** accept a `hash` parameter; `<Link hash="x">` does (#532). Use `<Link>` when a hash-aware variant is needed (tab-style UIs, same-route different-fragment navigation through `navigateWithHash`). For pure `use:link` callers, attach a click handler that calls `router.navigate(name, params, { force: true, hash: "x" })` manually if hash control is required.
 
 ## Reactive Primitives
 
@@ -448,9 +496,13 @@ Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 
 ## Examples
 
-16 runnable examples — each is a standalone Vite app. Run: `cd examples/web/svelte/basic && pnpm dev`
+24 runnable examples — each is a standalone Vite app. Run: `cd examples/web/svelte/basic && pnpm dev`
 
-[basic](../../examples/web/svelte/basic) · [nested-routes](../../examples/web/svelte/nested-routes) · [auth-guards](../../examples/web/svelte/auth-guards) · [data-loading](../../examples/web/svelte/data-loading) · [lazy-loading](../../examples/web/svelte/lazy-loading) · [async-guards](../../examples/web/svelte/async-guards) · [hash-routing](../../examples/web/svelte/hash-routing) · [persistent-params](../../examples/web/svelte/persistent-params) · [error-handling](../../examples/web/svelte/error-handling) · [dynamic-routes](../../examples/web/svelte/dynamic-routes) · [link-action](../../examples/web/svelte/link-action) · [lazy-loading-svelte](../../examples/web/svelte/lazy-loading-svelte) · [snippets-routing](../../examples/web/svelte/snippets-routing) · [reactive-source](../../examples/web/svelte/reactive-source) · [search-schema](../../examples/web/svelte/search-schema) · [combined](../../examples/web/svelte/combined)
+**Core:** [basic](../../examples/web/svelte/basic) · [nested-routes](../../examples/web/svelte/nested-routes) · [auth-guards](../../examples/web/svelte/auth-guards) · [data-loading](../../examples/web/svelte/data-loading) · [lazy-loading](../../examples/web/svelte/lazy-loading) · [async-guards](../../examples/web/svelte/async-guards) · [hash-routing](../../examples/web/svelte/hash-routing) · [persistent-params](../../examples/web/svelte/persistent-params) · [error-handling](../../examples/web/svelte/error-handling) · [dynamic-routes](../../examples/web/svelte/dynamic-routes) · [link-action](../../examples/web/svelte/link-action) · [lazy-loading-svelte](../../examples/web/svelte/lazy-loading-svelte) · [snippets-routing](../../examples/web/svelte/snippets-routing) · [reactive-source](../../examples/web/svelte/reactive-source) · [search-schema](../../examples/web/svelte/search-schema) · [combined](../../examples/web/svelte/combined)
+
+**Animations:** [motion-animations](../../examples/web/svelte/animation-examples/motion-animations) · [page-animations](../../examples/web/svelte/animation-examples/page-animations) · [route-animations](../../examples/web/svelte/animation-examples/route-animations) · [view-transitions](../../examples/web/svelte/animation-examples/view-transitions)
+
+**Server-side rendering:** [ssr](../../examples/web/svelte/ssr-examples/ssr) · [ssr-streaming](../../examples/web/svelte/ssr-examples/ssr-streaming) · [ssr-mixed](../../examples/web/svelte/ssr-examples/ssr-mixed) · [ssg](../../examples/web/svelte/ssr-examples/ssg)
 
 ## Related Packages
 

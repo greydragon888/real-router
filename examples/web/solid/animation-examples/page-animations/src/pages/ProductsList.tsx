@@ -28,6 +28,7 @@ type SortDirection = "asc" | "desc";
 // list its own slide entry / exit; on navigation to the detail page,
 // this whole component unmounts and ProductDetail mounts in its place.
 export function ProductsList(): JSX.Element {
+  // eslint-disable-next-line no-unassigned-vars -- assigned by Solid ref={ref} JSX binding
   let ref: HTMLDivElement | undefined;
   const setListRef = useListFlip<HTMLUListElement>();
 
@@ -39,7 +40,7 @@ export function ProductsList(): JSX.Element {
   const routeState = useRoute<{ sort?: SortDirection }>();
 
   const sort = createMemo<SortDirection>(() =>
-    routeState().route?.params.sort === "desc" ? "desc" : "asc",
+    routeState().route.params.sort === "desc" ? "desc" : "asc",
   );
 
   const items = createMemo(() => {
@@ -54,10 +55,10 @@ export function ProductsList(): JSX.Element {
     <div ref={ref}>
       <h1>Products</h1>
       <p>
-        Click a product to see the detail. Each page (this list and the
-        detail) registers its own <code>useRouteAnimation</code> hook on
-        its wrapper — slide-out for the list's exit, fade-in for the
-        detail's entry, no shared shell, no centralised policy.
+        Click a product to see the detail. Each page (this list and the detail)
+        registers its own <code>useRouteAnimation</code> hook on its wrapper —
+        slide-out for the list's exit, fade-in for the detail's entry, no shared
+        shell, no centralised policy.
       </p>
 
       <div class="products-toolbar">

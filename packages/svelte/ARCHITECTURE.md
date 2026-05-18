@@ -11,25 +11,34 @@
 └── @real-router/route-utils  # Route tree queries (getRouteUtils, getChain, getSiblings)
 ```
 
-## Single Entry Point
+## Two Entry Points
 
-One entry point. Svelte has no equivalent of React's `<Activity>` API, so no modern/legacy split is needed.
+Two entry points via `package.json` `exports` — main + `/ssr` subpath (mirrors `@real-router/react/ssr`). Svelte has no equivalent of React's `<Activity>` API, so no modern/legacy split is needed.
 
 ```
-@real-router/svelte  →  src/index.ts  →  Full API (Svelte 5.7+)
+@real-router/svelte        →  src/index.ts  →  Client API (Svelte 5.7+)
+@real-router/svelte/ssr    →  src/ssr.ts    →  SSR-feature surface (8 exports)
 ```
 
 **Build output** (`svelte-package` via `@sveltejs/package`):
 
 ```
 dist/
-├── index.js          # ESM (consumer bundles)
+├── index.js          # ESM (client API barrel)
 ├── index.d.ts        # Type declarations
+├── ssr.js            # ESM (/ssr subpath barrel)
+├── ssr.d.ts
 ├── components/
 │   ├── Link.svelte
 │   ├── RouteView.svelte
 │   ├── Lazy.svelte
-│   └── RouterErrorBoundary.svelte
+│   ├── RouterErrorBoundary.svelte
+│   ├── ClientOnly.svelte          # /ssr
+│   ├── ServerOnly.svelte          # /ssr
+│   ├── Streamed.svelte            # /ssr
+│   ├── Await.svelte               # /ssr
+│   ├── HttpStatusCode.svelte      # /ssr
+│   └── HttpStatusProvider.svelte  # /ssr
 ├── composables/
 │   ├── useRouter.svelte.js
 │   ├── useNavigator.svelte.js
@@ -39,7 +48,10 @@ dist/
 │   ├── useRouterTransition.svelte.js
 │   ├── useIsActiveRoute.svelte.js
 │   ├── useRouteExit.svelte.js
-│   └── useRouteEnter.svelte.js
+│   ├── useRouteEnter.svelte.js
+│   └── useDeferred.svelte.js      # /ssr
+├── utils/
+│   └── createHttpStatusSink.js    # /ssr
 └── RouterProvider.svelte
 ```
 
@@ -49,33 +61,44 @@ Unlike tsdown (which bundles into a single file), `svelte-package` outputs indiv
 
 ```
 src/
-├── index.ts                              # Single entry point
+├── index.ts                              # Main entry — client API
+├── ssr.ts                                # /ssr subpath — 8 SSR-feature exports
 ├── RouterProvider.svelte                 # Context provider — wires router to Svelte tree
-├── context.ts                            # Three string context keys (ROUTER_KEY, NAVIGATOR_KEY, ROUTE_KEY)
-├── constants.ts                          # EMPTY_PARAMS, EMPTY_OPTIONS (frozen singletons)
+├── context.ts                            # Four string context keys (ROUTER_KEY, NAVIGATOR_KEY, ROUTE_KEY, HTTP_STATUS_KEY — last is internal)
+├── constants.ts                          # EMPTY_PARAMS, EMPTY_OPTIONS, EMPTY_ACTIVE_OPTIONS, NOOP (frozen singletons)
 ├── createReactiveSource.svelte.ts        # Reactive bridge — createSubscriber from svelte/reactivity
 ├── createRouteContext.svelte.ts          # Helper — builds RouteContext from a reactive source (RouterProvider + useRouteNode)
-├── types.ts                              # RouteContext, LinkProps
+├── types.ts                              # RouteContext, LinkProps + 6 useRouteExit/Enter types
 ├── dom-utils/                            # Symlink → ../../shared/dom-utils
-│                                         # shouldNavigate, buildHref, buildActiveClassName, applyLinkA11y,
-│                                         # createRouteAnnouncer, createScrollRestoration, createViewTransitions
+│                                         # shouldNavigate, buildHref, navigateWithHash, buildActiveClassName,
+│                                         # applyLinkA11y, shallowEqual, createRouteAnnouncer,
+│                                         # createScrollRestoration, createViewTransitions, createDirectionTracker
+├── utils/
+│   └── createHttpStatusSink.ts           # /ssr — fresh { code: undefined } sink per request
 ├── composables/
 │   ├── useRouter.svelte.ts               # Router instance from getContext (never reactive)
 │   ├── useNavigator.svelte.ts            # Navigator from getContext (never reactive)
-│   ├── useRoute.svelte.ts                # Full route context from getContext (every navigation)
+│   ├── useRoute.svelte.ts                # Full route context from getContext (every navigation, throws if no active state)
 │   ├── useRouteNode.svelte.ts            # Node-scoped subscription via createReactiveSource
 │   ├── useIsActiveRoute.svelte.ts        # Active state subscription (internal — used by Link)
 │   ├── useRouteUtils.svelte.ts
 │   ├── useRouterTransition.svelte.ts
 │   ├── useRouteExit.svelte.ts            # Wrap subscribeLeave with abort + same-route guards (handler captured at init)
-│   └── useRouteEnter.svelte.ts           # Fire on nav-driven mount via $effect + route.transition.from
+│   ├── useRouteEnter.svelte.ts           # Fire on nav-driven mount via $effect + route.transition.from
+│   └── useDeferred.svelte.ts             # /ssr — reads state.context.ssrDataDeferred[key]
 ├── actions/
 │   └── link.svelte.ts                    # createLinkAction factory (use:link directive)
-└── components/
+└── components/                           # 10 total (4 client + 6 SSR)
     ├── Link.svelte                       # Navigation link with $derived href/class, active state
     ├── RouteView.svelte                  # Declarative route matching via named snippets
     ├── Lazy.svelte                       # Lazy-loaded route content with fallback
-    └── RouterErrorBoundary.svelte        # Declarative navigation error handling
+    ├── RouterErrorBoundary.svelte        # Declarative navigation error handling
+    ├── ClientOnly.svelte                 # /ssr — server fallback → client children swap
+    ├── ServerOnly.svelte                 # /ssr — symmetric inverse of ClientOnly
+    ├── Streamed.svelte                   # /ssr — alias for {#await} block
+    ├── Await.svelte                      # /ssr — reads useDeferred(name) via {#await}
+    ├── HttpStatusCode.svelte             # /ssr — writes sink.code at component init
+    └── HttpStatusProvider.svelte         # /ssr — provides HttpStatusSink via setContext
 ```
 
 **File extension conventions:**
@@ -291,7 +314,7 @@ tests/
 
 ## Stress Test Coverage
 
-38 stress tests across 12 files in `tests/stress/` validate behavior under extreme conditions:
+77 stress tests across 24 files in `tests/stress/` validate behavior under extreme conditions:
 
 | Category                | Tests (file count) | Test count | What they verify                                                                                                                                                                                |
 | ----------------------- | ------------------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -306,7 +329,19 @@ tests/
 | Lazy loading            | 1 file             | 3 tests    | 30 Lazy components mount + immediate unmount before loader resolves — discarded results, no setState-after-unmount; 100 mount/unmount cycles — bounded heap; many concurrent loads all reach `ready` |
 | RouterErrorBoundary     | 1 file             | 3 tests    | 50 trigger→recover cycles with throwing onError — boundary stays alive, every throw caught and logged via console.error; 200 mount/unmount cycles — bounded heap; throwing onError doesn't break later reactivity |
 | Teardown race           | 1 file             | 2 tests    | Click 100 Links and immediately unmount — no unhandled promise rejections; 50 mount→click→unmount iterations — `.catch(noop)` keeps the loop clean                                              |
-| Long-run leak           | 1 file             | 1 test     | 5000 navigations across 5 routes with 20 mounted consumers — heap delta after warmup stays bounded                                                                                              |
+| Long-run leak           | 1 file             | 3 tests    | 5K navigations with 20 consumers — bounded heap after warmup; 10K-with-checkpoints (5K + 10K) — linear marginal growth (no super-linear accumulator); 10K createReactiveSource read cycles — listener count stays zero (lazy contract) |
+| Start/stop churn        | 1 file             | 3+ tests   | 1000 mount/unmount cycles for RouterProvider without leaks — covers leave-listener leak audit (#1)                                                                                              |
+| Memory mount/unmount    | 1 file             | 2 tests    | Dedicated heap-stability matrix — bounded heap after N cycles for each public composable                                                                                                        |
+| Concurrent guards race  | 1 file             | 5+ tests   | Async guards of varying durations fired concurrently — last-wins semantics, no orphan effects                                                                                                   |
+| Route removed mid-session | 1 file           | 2 tests    | Single + 100-cycle: removing the active route during a session does not leave dangling subscriptions                                                                                            |
+| replaceHistoryState during transition | 1 file | 3 tests    | `replaceHistoryState` called mid-transition — state coherent, no listener desync                                                                                                                |
+| Router switch           | 1 file             | 2 tests    | 200 router instance swaps via RouterProvider remount — context cache rebuilds correctly                                                                                                         |
+| Announce navigation     | 1 file             | 2+ tests   | aria-live route announcer under rapid navigation — single announcer DOM node, no orphaned attributes                                                                                            |
+| Concurrent force-clicks | 1 file             | 4 tests    | 100 same-Link force-clicks — last-wins; 50 mount/click/unmount cycles; 30 alternating between Links; **100 concurrent clicks to 100 different Links** — FSM cancels 99 pending, no stuck transitions |
+| Scroll restoration rapid | 1 file            | 3 tests    | 100 rapid navs with mode="restore" — bounded heap, history.scrollRestoration stable; 50 mount/unmount cycles; sessionStorage stays bounded under 100 distinct routes                            |
+| Scroll restoration history-nav | 1 file      | 2 tests    | **50 history.back/forward cycles** — bounded heap, history.scrollRestoration stays "manual" (popstate path); 20-burst back/forward bursts without settle — RouterProvider stays stable          |
+| useRouteEnter/useRouteExit | 1 file          | 2+ tests   | Unmount during guard execution — abort signal fires, no callback after unmount                                                                                                                  |
+| View transitions stop   | 1 file             | 2+ tests   | `createViewTransitions` cleanup on router stop — no leftover listeners, mode flips back to default                                                                                              |
 
 ## See Also
 

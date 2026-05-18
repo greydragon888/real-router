@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/svelte";
 import { flushSync } from "svelte";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { getActiveSegment } from "../../src/components/RouteView.svelte";
+import { getActiveSegment } from "../../src/components/RouteView.helpers";
 import { createTestRouterWithADefaultRouter } from "../helpers";
 import RouteViewBasicTest from "../helpers/RouteViewBasicTest.svelte";
 import RouteViewNestedTest from "../helpers/RouteViewNestedTest.svelte";

@@ -94,9 +94,45 @@ export function roundRobinRoutes(
   );
 }
 
+/**
+ * Audit 2026-05-16 §7.3: a silent `forceGC()` is worse than no GC at all — if
+ * `--expose-gc` is missing from `execArgv` (vitest.config.stress.mts) every
+ * `takeHeapSnapshot()` then measures uncollected debris and the heap-delta
+ * thresholds pass for the wrong reason. Warn LOUDLY on the first call so a
+ * misconfigured run shows up immediately in stress output.
+ */
+// eslint-disable-next-line vitest/require-hook -- module-level flag intentionally lives outside any hook; it gates a one-time console.warn across the whole stress run, not per-test
+let warnedAboutMissingGC = false;
+
 export function forceGC(): void {
   if (typeof globalThis.gc === "function") {
     globalThis.gc();
+
+    return;
+  }
+
+  if (!warnedAboutMissingGC) {
+    warnedAboutMissingGC = true;
+
+    console.warn(
+      "[stress] forceGC() is a no-op — globalThis.gc is undefined. " +
+        "Heap-delta thresholds will measure uncollected garbage. " +
+        "Run with `--expose-gc` (vitest.config.stress.mts → execArgv).",
+    );
+  }
+}
+
+/**
+ * Use in `beforeAll` of stress tests whose passing/failing decision depends on
+ * `process.memoryUsage().heapUsed` deltas. Throws if `globalThis.gc` is missing
+ * — converts the silent-no-op into an explicit configuration error.
+ */
+export function assertGcExposed(): void {
+  if (typeof globalThis.gc !== "function") {
+    throw new TypeError(
+      "[stress] This test relies on heap measurements and requires " +
+        "`--expose-gc`. Add it to execArgv in vitest.config.stress.mts.",
+    );
   }
 }
 

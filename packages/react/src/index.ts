@@ -1,4 +1,9 @@
 // Main entry point — React 19.2+
+//
+// Client-side hooks + components. SSR-aware components and hooks
+// (`<ClientOnly>`, `<ServerOnly>`, `<Await>`, `<Streamed>`, `useDeferred`)
+// have moved to the `/ssr` subpath — import them from
+// `@real-router/react/ssr` to opt into the SSR-feature surface.
 
 // Components
 export { RouteView } from "./components/modern/RouteView";

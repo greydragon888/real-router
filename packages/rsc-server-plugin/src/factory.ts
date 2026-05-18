@@ -1,10 +1,14 @@
-import { ERROR_PREFIX } from "./constants";
-import { createSsrLoaderPlugin } from "./shared-ssr";
-import { validateLoaders } from "./validation";
+import { ALLOWED_RSC_MODES, ERROR_PREFIX } from "./constants";
+import { createLoadersValidator, createSsrLoaderPlugin } from "./shared-ssr";
 
 import type { RscLoaderFactoryMap } from "./types";
 import type { DefaultDependencies, PluginFactory } from "@real-router/types";
 import type { ReactNode } from "react";
+
+// Inlined from the deleted validation.ts — single 7-line consumer was
+// here, no other importer in src/ or tests/, so the indirection was
+// pure ceremony.
+const validateLoaders = createLoadersValidator(ERROR_PREFIX, ALLOWED_RSC_MODES);
 
 /**
  * Plugin factory that loads per-route `ReactNode` (RSC payload) by intercepting
@@ -45,6 +49,8 @@ export function rscServerPluginFactory<
 
   return createSsrLoaderPlugin<ReactNode, Dependencies>(loaders, {
     namespace: "rsc",
+    modeNamespace: "ssrRscMode",
     errorPrefix: ERROR_PREFIX,
+    allowedModes: ALLOWED_RSC_MODES,
   });
 }

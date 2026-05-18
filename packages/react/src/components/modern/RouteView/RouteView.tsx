@@ -17,9 +17,15 @@ function RouteViewRoot({
   // eslint-disable-next-line @eslint-react/refs -- lazy init: assign once when null to avoid `new Set()` allocation on every render
   hasBeenActivatedRef.current ??= new Set();
 
-  // Skip the Children.toArray + collectElements traversal when children
-  // reference is unchanged. children only changes when the parent re-renders
-  // with a new ReactNode, so this caches the steady-state.
+  // Skip the Children.forEach + collectElements traversal when the children
+  // reference is unchanged. The common SPA case is a stable JSX tree across
+  // re-renders, so the cache hits on every render except the first.
+  //
+  // Streaming SSR caveat: with `renderToReadableStream`, React may invoke
+  // RouteView multiple times across chunks with a fresh `children` reference
+  // each time. The useMemo misses on each new render and the traversal runs
+  // again — this is the expected SSR cost; the alternative would be build-
+  // time codegen of the static route tree, which is out of scope here.
   const elements = useMemo(() => {
     const collected: ReactElement[] = [];
 

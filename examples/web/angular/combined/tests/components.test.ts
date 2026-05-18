@@ -15,109 +15,113 @@ import type { Router } from "@real-router/core";
 
 let testRouter: Router<AppDependencies>;
 
-beforeEach(() => {
-  store.set("user", null);
-  store.set("settings:unsaved", false);
-  store.set("products", null);
-  store.set("products:loading", undefined);
-  store.set("products:error", null);
-});
+describe("angular/combined — components", () => {
+  beforeEach(() => {
+    store.set("user", null);
+    store.set("settings:unsaved", false);
+    store.set("products", null);
+    store.set("products:loading", undefined);
+    store.set("products:error", null);
+  });
 
-afterEach(() => {
-  testRouter.stop();
-});
+  afterEach(() => {
+    testRouter.stop();
+  });
 
-async function setupApp(url: string, asAdmin = false) {
-  testRouter = createRouter<AppDependencies>(
-    asAdmin ? privateRoutes : publicRoutes,
-    {
-      defaultRoute: "home",
-      allowNotFound: true,
-      queryParams: { numberFormat: "auto" },
-    },
-  );
-  testRouter.usePlugin(lifecyclePluginFactory());
+  async function setupApp(url: string, asAdmin = false) {
+    testRouter = createRouter<AppDependencies>(
+      asAdmin ? privateRoutes : publicRoutes,
+      {
+        defaultRoute: "home",
+        allowNotFound: true,
+        queryParams: { numberFormat: "auto" },
+      },
+    );
+    testRouter.usePlugin(lifecyclePluginFactory());
 
-  if (asAdmin) {
-    getDependenciesApi(testRouter).set("abilities", defineAbilities("admin"));
-    store.set("user", { id: "1", name: "Alice", role: "admin", email: "" });
+    if (asAdmin) {
+      getDependenciesApi(testRouter).set("abilities", defineAbilities("admin"));
+      store.set("user", { id: "1", name: "Alice", role: "admin", email: "" });
+    }
+
+    await testRouter.start(url);
+
+    TestBed.configureTestingModule({
+      imports: [AppComponent],
+      providers: [provideRealRouter(testRouter)],
+    });
+
+    const fixture = TestBed.createComponent(AppComponent);
+
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    return fixture;
   }
 
-  await testRouter.start(url);
+  describe("Public routes — logged out state", () => {
+    it("renders Home on /", async () => {
+      const fixture = await setupApp("/");
+      const host = fixture.nativeElement as HTMLElement;
 
-  TestBed.configureTestingModule({
-    imports: [AppComponent],
-    providers: [provideRealRouter(testRouter)],
+      expect(host.textContent).toMatch(/Welcome to the Real-Router combined/);
+      expect(host.querySelector("aside.sidebar")?.textContent).toMatch(/Home/);
+      expect(host.querySelector("aside.sidebar")?.textContent).toMatch(/Login/);
+      expect(host.querySelector("aside.sidebar")?.textContent).not.toMatch(
+        /Dashboard/,
+      );
+    });
+
+    it("renders Login on /login", async () => {
+      const fixture = await setupApp("/login");
+      const host = fixture.nativeElement as HTMLElement;
+
+      expect(host.querySelector("h1")?.textContent).toBe("Login");
+    });
+
+    it("shows 404 on unknown URL", async () => {
+      const fixture = await setupApp("/unknown");
+      const host = fixture.nativeElement as HTMLElement;
+
+      expect(host.textContent).toMatch(/404/);
+    });
   });
 
-  const fixture = TestBed.createComponent(AppComponent);
-  fixture.detectChanges();
-  await fixture.whenStable();
-  return fixture;
-}
+  describe("Private routes — logged in state", () => {
+    it("renders Dashboard on /dashboard", async () => {
+      const fixture = await setupApp("/dashboard", true);
+      const host = fixture.nativeElement as HTMLElement;
 
-describe("Public routes — logged out state", () => {
-  it("renders Home on /", async () => {
-    const fixture = await setupApp("/");
-    const host = fixture.nativeElement as HTMLElement;
+      expect(host.querySelector("h1")?.textContent).toBe("Dashboard");
+      expect(host.textContent).toMatch(/Logged in as:/);
+    });
 
-    expect(host.textContent).toMatch(/Welcome to the Real-Router combined/);
-    expect(host.querySelector("aside.sidebar")?.textContent).toMatch(/Home/);
-    expect(host.querySelector("aside.sidebar")?.textContent).toMatch(/Login/);
-    expect(host.querySelector("aside.sidebar")?.textContent).not.toMatch(
-      /Dashboard/,
-    );
-  });
+    it("private sidebar is shown when user is set", async () => {
+      const fixture = await setupApp("/dashboard", true);
+      const sidebar = (fixture.nativeElement as HTMLElement).querySelector(
+        "aside.sidebar",
+      );
 
-  it("renders Login on /login", async () => {
-    const fixture = await setupApp("/login");
-    const host = fixture.nativeElement as HTMLElement;
+      expect(sidebar?.textContent).toMatch(/Dashboard/);
+      expect(sidebar?.textContent).toMatch(/Products/);
+      expect(sidebar?.textContent).toMatch(/Users/);
+      expect(sidebar?.textContent).toMatch(/Admin/);
+      expect(sidebar?.textContent).not.toMatch(/Login/);
+    });
 
-    expect(host.querySelector("h1")?.textContent).toBe("Login");
-  });
+    it("renders users list on /users (parent IS the list)", async () => {
+      const fixture = await setupApp("/users", true);
+      const host = fixture.nativeElement as HTMLElement;
 
-  it("shows 404 on unknown URL", async () => {
-    const fixture = await setupApp("/unknown");
-    const host = fixture.nativeElement as HTMLElement;
+      expect(host.querySelector("h1")?.textContent).toBe("Users");
+      expect(host.textContent).toMatch(/Alice/);
+    });
 
-    expect(host.textContent).toMatch(/404/);
-  });
-});
+    it("renders user profile on /users/2", async () => {
+      const fixture = await setupApp("/users/2", true);
+      const host = fixture.nativeElement as HTMLElement;
 
-describe("Private routes — logged in state", () => {
-  it("renders Dashboard on /dashboard", async () => {
-    const fixture = await setupApp("/dashboard", true);
-    const host = fixture.nativeElement as HTMLElement;
-
-    expect(host.querySelector("h1")?.textContent).toBe("Dashboard");
-    expect(host.textContent).toMatch(/Logged in as:/);
-  });
-
-  it("private sidebar is shown when user is set", async () => {
-    const fixture = await setupApp("/dashboard", true);
-    const sidebar = (fixture.nativeElement as HTMLElement).querySelector(
-      "aside.sidebar",
-    );
-
-    expect(sidebar?.textContent).toMatch(/Dashboard/);
-    expect(sidebar?.textContent).toMatch(/Products/);
-    expect(sidebar?.textContent).toMatch(/Users/);
-    expect(sidebar?.textContent).toMatch(/Admin/);
-    expect(sidebar?.textContent).not.toMatch(/Login/);
-  });
-
-  it("renders users list on /users (parent IS the list)", async () => {
-    const fixture = await setupApp("/users", true);
-    const host = fixture.nativeElement as HTMLElement;
-
-    expect(host.querySelector("h1")?.textContent).toBe("Users");
-    expect(host.textContent).toMatch(/Alice/);
-  });
-
-  it("renders user profile on /users/2", async () => {
-    const fixture = await setupApp("/users/2", true);
-    const host = fixture.nativeElement as HTMLElement;
-
-    expect(host.querySelector("h1")?.textContent).toBe("User #2");
+      expect(host.querySelector("h1")?.textContent).toBe("User #2");
+    });
   });
 });

@@ -1,8 +1,9 @@
-import type { DependenciesStore } from "./namespaces/DependenciesNamespace";
+import type { DependenciesStore } from "./namespaces";
 import type { RoutesStore } from "./namespaces/RoutesNamespace";
 import type { Router as RouterClass } from "./Router";
 import type { EventMethodMap, GuardFnFactory, PluginFactory } from "./types";
 import type { RouterValidator } from "./types/RouterValidator";
+import type { SerializedRouterState } from "./utils";
 import type {
   DefaultDependencies,
   EventName,
@@ -105,6 +106,17 @@ export interface RouterInternals<
   readonly setState: (state: State) => void;
   readonly routerExtensions: { keys: string[] }[];
   readonly contextClaimRecords: Set<string>;
+
+  /**
+   * One-shot hydration scratchpad populated by `hydrateRouter` immediately
+   * before delegating to `router.start(parsed.path)` and cleared in the
+   * matching `finally`. SSR loader plugins read this slot directly via
+   * `getInternals(router).hydrationState` to short-circuit their own loader
+   * call when the server-resolved namespace value is already present in the
+   * parsed state (#596). `null` outside of an active `hydrateRouter`
+   * invocation.
+   */
+  hydrationState: SerializedRouterState | null;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- existential type: stores RouterInternals for all Dependencies types

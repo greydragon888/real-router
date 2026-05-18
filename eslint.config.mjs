@@ -879,6 +879,66 @@ export default tsEslint.config(
   },
 
   // ============================================
+  // 13.1 EXAMPLES (demo apps — relaxed library-grade rules)
+  // ============================================
+  // Examples are demonstration apps, not library code.
+  // Many library-grade rules (default exports for framework boilerplate,
+  // explicit module boundary types on demo helpers, etc.) add noise without value.
+  {
+    files: ["examples/**/*.ts", "examples/**/*.tsx"],
+    rules: {
+      // Default exports are idiomatic for framework entry components.
+      "import-x/no-default-export": "off",
+      // Demo-grade signatures — return-type inference is fine.
+      "@typescript-eslint/explicit-module-boundary-types": "off",
+      "@typescript-eslint/explicit-function-return-type": "off",
+      // Demo data uses simple loops/conditions; cognitive complexity bumps are fine.
+      "sonarjs/cognitive-complexity": "off",
+      // Demo IDs (e.g. `id`) are fine.
+      "id-length": "off",
+      // Demos use Math.random for data generation — not security-sensitive.
+      "sonarjs/pseudo-random": "off",
+      // Loader factories `() => (params) => ...` and similar nested
+      // arrow patterns are idiomatic for the router API.
+      "unicorn/consistent-function-scoping": "off",
+      // Demo Promise chains in click handlers / hooks frequently pattern as
+      // `void promise` — the explicit `void` is intentional, the rule
+      // misreads it.
+      "@typescript-eslint/no-floating-promises": "off",
+      // React/Vue event handlers naturally take async callbacks.
+      "@typescript-eslint/no-misused-promises": "off",
+      // `params.id as string` is a frequent demo idiom for nested params
+      // typed as Params (Record<string, unknown>).
+      "@typescript-eslint/no-unsafe-argument": "off",
+      "@typescript-eslint/no-unsafe-assignment": "off",
+      // Demo data structures use mutable arrays/objects — readonly mods
+      // would clutter the examples without illustrating router behavior.
+      "sonarjs/prefer-read-only-props": "off",
+      // Demo abbreviations (id, e, ev) are fine in component bodies.
+      "unicorn/prevent-abbreviations": "off",
+    },
+  },
+
+  // ============================================
+  // 13.2 ANGULAR COMPONENT FILES (decorator-only classes)
+  // ============================================
+  // Angular components are decorator-driven; the class itself is a metadata
+  // anchor for @Component(). Many lint rules trip false positives here.
+  {
+    files: ["examples/web/angular/**/*.component.ts"],
+    rules: {
+      // @Component metadata classes legitimately have no instance members.
+      "@typescript-eslint/no-extraneous-class": "off",
+      // Field decorators (signal(), computed(), input()) define members in
+      // declaration order — re-ordering them obscures the component shape.
+      "@typescript-eslint/member-ordering": "off",
+      // Angular signal types (Signal<T>, InputSignal<T>) read as
+      // "always-truthy" to TS, but the framework wraps them in callable values.
+      "@typescript-eslint/no-unnecessary-condition": "off",
+    },
+  },
+
+  // ============================================
   // 14. TEST HELPERS AND MOCKS (relaxed JSDoc)
   // ============================================
   {

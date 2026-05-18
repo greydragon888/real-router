@@ -15,6 +15,7 @@ const COVERS: Partial<Record<string, { name: string; color: string }>> = {
 };
 
 export function ProductDetail(): JSX.Element {
+  // eslint-disable-next-line no-unassigned-vars -- assigned by Solid ref={ref} JSX binding
   let ref: HTMLDivElement | undefined;
 
   useRouteAnimation(() => ref, {
@@ -23,7 +24,7 @@ export function ProductDetail(): JSX.Element {
   });
 
   const routeState = useRoute<{ id: string }>();
-  const id = createMemo(() => routeState().route?.params.id ?? "1");
+  const id = createMemo(() => routeState().route.params.id);
   const product = createMemo(() => COVERS[id()]);
 
   return (
@@ -47,10 +48,10 @@ export function ProductDetail(): JSX.Element {
             aria-hidden="true"
           />
           <p>
-            Note: no hero morph here. The thumbnail on the products page
-            slides away with that page; this cover fades in independently.
-            Bridging the two requires shared state across components — out
-            of scope for the distributed pattern.
+            Note: no hero morph here. The thumbnail on the products page slides
+            away with that page; this cover fades in independently. Bridging the
+            two requires shared state across components — out of scope for the
+            distributed pattern.
           </p>
           <p>
             <Link routeName="products" activeStrict>

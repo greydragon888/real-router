@@ -48,25 +48,25 @@ export function App(): JSX.Element {
         ];
 
   const onLogin = async (loggedInUser: User) => {
-    store.set("user", loggedInUser);
-    getDependenciesApi(router).set(
-      "abilities",
-      defineAbilities(loggedInUser.role),
-    );
     const routesApi = getRoutesApi(router);
 
     routesApi.clear();
     routesApi.add(privateRoutes);
+    getDependenciesApi(router).set(
+      "abilities",
+      defineAbilities(loggedInUser.role),
+    );
+    store.set("user", loggedInUser);
     await navigator.navigate("dashboard");
   };
 
   const onLogout = async () => {
-    store.set("user", null);
-    getDependenciesApi(router).set("abilities", []);
     const routesApi = getRoutesApi(router);
 
     routesApi.clear();
     routesApi.add(publicRoutes);
+    getDependenciesApi(router).set("abilities", []);
+    store.set("user", null);
     await navigator.navigate("home");
   };
 

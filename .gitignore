@@ -50,6 +50,7 @@ stryker.temp.config.mjs
 .playwright-mcp/
 playwright-report/
 test-results/
+recordings/
 
 # ESLint cache
 .eslintcache

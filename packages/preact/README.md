@@ -10,9 +10,12 @@
 npm install @real-router/preact @real-router/core
 ```
 
-`@real-router/core` is the only hard dependency. Add `@real-router/browser-plugin`
-(or `hash-plugin` / `navigation-plugin` / `memory-plugin`) when you need History
-API integration — the Quick Start below uses it.
+`@real-router/core` is the entry-point dependency the API revolves around;
+`@real-router/route-utils` and `@real-router/sources` are pulled in automatically
+as transitive deps (used internally by `useRouteUtils` / hook subscriptions).
+Add `@real-router/browser-plugin` (or `hash-plugin` / `navigation-plugin` /
+`memory-plugin`) when you need History API integration — the Quick Start below
+uses it.
 
 **Peer dependency:** `preact` >= 10.0.0
 
@@ -69,7 +72,7 @@ function App() {
 | `useRouteUtils()`       | `RouteUtils`                                               | Never                                   |
 | `useRouterTransition()` | `{ isTransitioning, isLeaveApproved, toRoute, fromRoute }` | On transition start/end                 |
 | `useRouteExit(handler, options?)`  | `void` — wraps `router.subscribeLeave` with abort + same-route guards | Never (stable subscription) |
-| `useRouteEnter(handler, options?)` | `void` — fires on nav-driven mount via `useRoute()` snapshot          | Never (handler stays current) |
+| `useRouteEnter(handler, options?)` | `void` — fires on nav-driven mount via `useRoute()` snapshot          | Every navigation (host component reads `useRoute()`); handler ref + subscription are stable across renders |
 
 ```tsx
 // useRouteNode — re-renders only when "users.*" changes
@@ -158,7 +161,7 @@ Tri-state: `undefined` preserves the current hash, `""` clears it, a value sets 
 
 ### `<RouteView>`
 
-Declarative route matching. Renders the first matching `<RouteView.Match>` child.
+Declarative route matching. Renders the first matching `<RouteView.Match>` child; falls back to `<RouteView.Self>` when the active route name equals `nodeName`, or `<RouteView.NotFound>` for `UNKNOWN_ROUTE`.
 
 ```tsx
 <RouteView nodeName="">
@@ -178,11 +181,44 @@ Declarative route matching. Renders the first matching `<RouteView.Match>` child
 
 #### `RouteView.Match` props
 
-| Prop       | Type                | Description                                                                   |
-| ---------- | ------------------- | ----------------------------------------------------------------------------- |
-| `segment`  | `string`            | Route segment to match                                                        |
-| `exact`    | `boolean`           | When `true`, matches only the exact route (not descendants). Default: `false` |
-| `fallback` | `ComponentChildren` | Shown while children suspend. Wraps children in `<Suspense>` when provided.   |
+| Prop       | Type                | Required | Description                                                                   |
+| ---------- | ------------------- | -------- | ----------------------------------------------------------------------------- |
+| `segment`  | `string`            | Yes      | Route segment to match                                                        |
+| `exact`    | `boolean`           | No       | When `true`, matches only the exact route (not descendants). Default: `false` |
+| `fallback` | `ComponentChildren` | No       | Shown while children suspend. Wraps children in `<Suspense>` when provided.   |
+| `children` | `ComponentChildren` | Yes      | Content to render when the active route matches `segment`                     |
+
+#### `<RouteView.Self>` and `<RouteView.NotFound>`
+
+Three fallback slots compose inside a `<RouteView nodeName="…">`:
+
+| Element                  | Fires when                                              | Props                              | Render position                 |
+|--------------------------|---------------------------------------------------------|------------------------------------|---------------------------------|
+| `<RouteView.Match>`      | Active route segment matches `segment` (or descendant when `exact={false}`) | `segment` / `exact` / `fallback` / `children` | Inline at source position       |
+| `<RouteView.Self>`       | Active route name **exactly equals** parent's `nodeName` | `fallback` / `children`           | Appended after Match elements   |
+| `<RouteView.NotFound>`   | Active route name is `UNKNOWN_ROUTE` AND no Match activated | `children`                       | Appended after Match elements   |
+
+Precedence:
+
+1. `<Match>` first-wins — duplicate segments short-circuit; subsequent `<Match>` with the same segment are not rendered.
+2. `<Self>` first-wins — only the first `<RouteView.Self>` contributes; subsequent ones are ignored.
+3. `<NotFound>` **last-wins** — when multiple `<RouteView.NotFound>` siblings are declared (unusual but legal), only the *last* one renders. Asymmetric with the other two slots; prefer a single `<NotFound>` per RouteView.
+4. An activating `<Match>` suppresses both `<Self>` and `<NotFound>`.
+5. When no `<Match>` activates: `<Self>` wins over `<NotFound>` if both would fire (occurs only when `nodeName === UNKNOWN_ROUTE`, narrow edge case).
+
+```tsx
+<RouteView nodeName="users">
+  <RouteView.Self>
+    <UsersIndex />            {/* route name === "users" → renders */}
+  </RouteView.Self>
+  <RouteView.Match segment="profile">
+    <UserProfile />           {/* "users.profile" and descendants → renders */}
+  </RouteView.Match>
+  <RouteView.NotFound>
+    <NotFoundPage />          {/* UNKNOWN_ROUTE → renders */}
+  </RouteView.NotFound>
+</RouteView>
+```
 
 #### Lazy loading with `fallback` (experimental)
 
@@ -212,6 +248,7 @@ import {
   RouteContext, // { navigator, route, previousRoute }
   type RouteViewProps,
   type RouteViewMatchProps,
+  type RouteViewSelfProps,
   type RouteViewNotFoundProps,
 } from "@real-router/preact";
 ```
@@ -245,6 +282,87 @@ import { RouterErrorBoundary } from "@real-router/preact";
 
 Auto-resets on next successful navigation. Works with both `<Link>` and imperative `router.navigate()`.
 
+## SSR-feature surface — `@real-router/preact/ssr`
+
+All SSR-aware components, hooks, and utilities live at the `/ssr` subpath — mirror of `@real-router/react/ssr` (same exports, same API). Eight exports total: `<ClientOnly>`, `<ServerOnly>`, `<Streamed>`, `<Await>`, `<HttpStatusCode>`, `<HttpStatusProvider>`, `useDeferred`, `createHttpStatusSink`.
+
+### `<ClientOnly>` / `<ServerOnly>`
+
+Paired SSR-aware boundaries. `<ClientOnly>` renders `fallback` on the server (and on the client first paint, to match SSR HTML), then swaps in `children` after mount. `<ServerOnly>` is the symmetric inverse.
+
+```tsx
+import { ClientOnly, ServerOnly } from "@real-router/preact/ssr";
+
+<ClientOnly fallback={<Skeleton />}>
+  <BrowserApiWidget />
+</ClientOnly>
+
+<ServerOnly>
+  <SeoMetaStrip />
+</ServerOnly>;
+```
+
+Implementation: `useState(false)` + `useEffect(() => setMounted(true), [])` from `preact/hooks`. End-to-end dogfooding lives in [`examples/web/preact/ssr-examples/ssr/`](../../examples/web/preact/ssr-examples/ssr/) (see `e2e/ssr-boundaries.spec.ts`).
+
+### `<Streamed>` / `<Await>` / `useDeferred`
+
+Three pieces of the deferred-data pipeline (paired with [`@real-router/ssr-data-plugin`](https://www.npmjs.com/package/@real-router/ssr-data-plugin)'s `defer()` API). `<Streamed>` is a cross-adapter alias for Preact's `<Suspense>` (from `preact/compat`). `<Await<T> name="key">` reads the deferred promise the loader published under that key and hands the resolved value to a render-prop via Preact's Suspense-throwing convention. `useDeferred<T>(key)` returns the same promise for callers composing with a third-party Suspense-aware lib.
+
+```tsx
+import { Streamed, Await, useDeferred } from "@real-router/preact/ssr";
+
+<Streamed fallback={<Spinner />}>
+  <Await<Review[]> name="reviews">
+    {(reviews) => <ReviewList items={reviews} />}
+  </Await>
+</Streamed>;
+```
+
+End-to-end example: [`examples/web/preact/ssr-examples/ssr-streaming/`](../../examples/web/preact/ssr-examples/ssr-streaming/).
+
+### `<HttpStatusCode>` / `<HttpStatusProvider>` / `createHttpStatusSink`
+
+Render-time HTTP status declaration for SSR responses. Mount `<HttpStatusCode code={N} />` inside a route component (typical use: a `<RouteView.NotFound>` glob page) — it writes `N` to the nearest `<HttpStatusProvider>`'s sink during render and returns `null`. After `renderToString`, read `sink.code` and pass it to your response.
+
+```tsx
+// app.tsx
+import { HttpStatusCode } from "@real-router/preact/ssr";
+
+function NotFound() {
+  return (
+    <>
+      <HttpStatusCode code={404} />
+      <h1>Page not found</h1>
+    </>
+  );
+}
+
+// entry-server.tsx
+import { renderToString } from "preact-render-to-string";
+import {
+  HttpStatusProvider,
+  createHttpStatusSink,
+} from "@real-router/preact/ssr";
+
+const sink = createHttpStatusSink();
+const html = renderToString(
+  <HttpStatusProvider sink={sink}>
+    <RouterProvider router={router}>
+      <App />
+    </RouterProvider>
+  </HttpStatusProvider>,
+);
+response.status(sink.code ?? 200).send(html);
+```
+
+| Export                          | Kind      | Purpose                                                                                                                                                  |
+| ------------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<HttpStatusCode code={N}/>`    | component | Writes `code` to the optional context sink during render. Last write wins across multiple instances. No-op without a provider.                            |
+| `<HttpStatusProvider sink={…}>` | component | Supplies an `HttpStatusSink` to descendant `<HttpStatusCode />` via Preact context.                                                                       |
+| `createHttpStatusSink()`        | utility   | Returns a fresh `{ code: number \| undefined }` sink — construct one per request on the server, read `sink.code` after rendering.                         |
+
+Loader-driven errors (`LoaderNotFound` → 404, `LoaderRedirect` → 30x) keep working as before; this component covers render-time decisions only.
+
 ## Accessibility
 
 Enable screen reader announcements for route changes:
@@ -267,7 +385,7 @@ Opt-in preservation of scroll position across navigations:
 </RouterProvider>
 ```
 
-Restores scroll on back/forward, scrolls to top (or `#hash`) on push. Three modes: `"restore"` (default), `"top"`, `"native"`. Custom containers via `scrollContainer: () => HTMLElement | null`. Lifecycle tied to the provider — created on mount, destroyed on unmount. See [Scroll Restoration guide](https://github.com/greydragon888/real-router/wiki/Scroll-Restoration) for details.
+Restores scroll on back/forward, scrolls to top (or `#hash`) on push. Three modes: `"restore"` (default), `"top"`, `"native"`. Custom containers via `scrollContainer: () => HTMLElement | null`. Override the `sessionStorage` key via `storageKey` (default `"real-router:scroll"`) when isolating multiple routers on one origin. Lifecycle tied to the provider — created on mount, destroyed on unmount. See [Scroll Restoration guide](https://github.com/greydragon888/real-router/wiki/Scroll-Restoration) for details.
 
 ## View Transitions
 
@@ -290,9 +408,17 @@ Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 
 ## Examples
 
-11 runnable examples — each is a standalone Vite app. Run: `cd examples/web/preact/basic && pnpm dev`
+20 runnable examples — each is a standalone Vite app. Run: `cd examples/web/preact/basic && pnpm dev`
 
-[basic](../../examples/web/preact/basic) · [nested-routes](../../examples/web/preact/nested-routes) · [auth-guards](../../examples/web/preact/auth-guards) · [data-loading](../../examples/web/preact/data-loading) · [lazy-loading](../../examples/web/preact/lazy-loading) · [async-guards](../../examples/web/preact/async-guards) · [hash-routing](../../examples/web/preact/hash-routing) · [persistent-params](../../examples/web/preact/persistent-params) · [error-handling](../../examples/web/preact/error-handling) · [dynamic-routes](../../examples/web/preact/dynamic-routes) · [combined](../../examples/web/preact/combined)
+**Routing fundamentals:** [basic](../../examples/web/preact/basic) · [nested-routes](../../examples/web/preact/nested-routes) · [dynamic-routes](../../examples/web/preact/dynamic-routes) · [combined](../../examples/web/preact/combined)
+
+**Data & guards:** [auth-guards](../../examples/web/preact/auth-guards) · [async-guards](../../examples/web/preact/async-guards) · [data-loading](../../examples/web/preact/data-loading) · [lazy-loading](../../examples/web/preact/lazy-loading) · [error-handling](../../examples/web/preact/error-handling)
+
+**URL features:** [hash-routing](../../examples/web/preact/hash-routing) · [persistent-params](../../examples/web/preact/persistent-params) · [search-schema](../../examples/web/preact/search-schema)
+
+**Animations:** [motion-animations](../../examples/web/preact/animation-examples/motion-animations) · [page-animations](../../examples/web/preact/animation-examples/page-animations) · [route-animations](../../examples/web/preact/animation-examples/route-animations) · [view-transitions](../../examples/web/preact/animation-examples/view-transitions)
+
+**SSR:** [ssg](../../examples/web/preact/ssr-examples/ssg) · [ssr](../../examples/web/preact/ssr-examples/ssr) · [ssr-mixed](../../examples/web/preact/ssr-examples/ssr-mixed) · [ssr-streaming](../../examples/web/preact/ssr-examples/ssr-streaming)
 
 ## Related Packages
 

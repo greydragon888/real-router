@@ -159,4 +159,71 @@ describe("S11 — replaceHistoryState during active transition (Solid)", () => {
 
     router.stop();
   });
+
+  // audit-2026-05-17 §7 P1 #7 — 100-replace burst. The 11.2 case caps
+  // at 10 replaces; this variant pushes to 100 to surface any quadratic
+  // behaviour (e.g. each replace re-scanning the full event listener
+  // list) or rare-race URL desync that requires a deeper queue.
+  it("11.3 — 100 replaceHistoryState during pending transition — final state still equals transition target", async () => {
+    const router = createRouter(
+      [
+        { name: "home", path: "/" },
+        { name: "target", path: "/target" },
+        ...Array.from({ length: 100 }, (_, i) => ({
+          name: `r${i}`,
+          path: `/r${i}`,
+        })),
+      ],
+      { defaultRoute: "home" },
+    );
+
+    router.usePlugin(browserPluginFactory());
+
+    await router.start("/");
+
+    const lifecycle = getLifecycleApi(router);
+    let resolveGuard!: (v: boolean) => void;
+
+    lifecycle.addActivateGuard("target", () => () => {
+      return new Promise<boolean>((resolve) => {
+        resolveGuard = resolve;
+      });
+    });
+
+    render(() => <RouterProvider router={router}>{null}</RouterProvider>);
+
+    const pending = router.navigate("target").catch(() => null);
+
+    await Promise.resolve();
+
+    const t0 = performance.now();
+
+    for (let i = 0; i < 100; i++) {
+      router.replaceHistoryState(`r${i}`);
+    }
+
+    const elapsed = performance.now() - t0;
+
+    // 100 replaces complete in well under 1 second — locks the "no
+    // accidental O(n²) regression" baseline. (Realistic execution is
+    // ~5-20ms on jsdom.)
+    expect(elapsed).toBeLessThan(1000);
+
+    // URL reflects the LAST replace right now (the transition is
+    // still pending). r99 is the last in the burst.
+    expect(globalThis.location.pathname).toBe("/r99");
+
+    // Release the guard. Once the transition completes,
+    // `onTransitionSuccess` overwrites both URL and history.state to
+    // the transition target — the burst of intermediate replaces is
+    // discarded as documented.
+    resolveGuard(true);
+    await pending;
+
+    expect(router.getState()?.name).toBe("target");
+    expect(globalThis.location.pathname).toBe("/target");
+    expect(history.state).toMatchObject({ name: "target" });
+
+    router.stop();
+  }, 60_000);
 });

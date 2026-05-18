@@ -119,6 +119,9 @@ describe("useRouteExit", () => {
       navigated = true;
     });
 
+    // Two microtask flushes: first settles the subscribeLeave notification
+    // Promise (which fires the handler), second lets Preact's deferred effect
+    // queue drain so that the handler call-count is stable before asserting.
     await Promise.resolve();
     await Promise.resolve();
 
@@ -189,9 +192,8 @@ describe("useRouteExit", () => {
       await router.navigate("about");
     });
 
-    expect(receivedSignal).toBeDefined();
     expect(receivedSignal).toBeInstanceOf(AbortSignal);
-    expect(receivedSignal?.aborted).toBe(false);
+    expect(receivedSignal!.aborted).toBe(false);
   });
 
   it("skips the handler when signal is already aborted (reentrant abort)", async () => {
@@ -199,36 +201,22 @@ describe("useRouteExit", () => {
     // a pre-aborted signal — exercises the early-return branch that's
     // hard to reproduce via real navigation timing.
     const handler = vi.fn();
-    const leaveListeners: ((payload: {
-      route: { name: string };
-      nextRoute: { name: string };
-      signal: AbortSignal;
-    }) => void)[] = [];
+    const leaveListeners: Parameters<Router["subscribeLeave"]>[0][] = [];
 
-    const fakeRouter = Object.create(router) as Router;
+    vi.spyOn(router, "subscribeLeave").mockImplementation((listener) => {
+      leaveListeners.push(listener);
 
-    Object.assign(fakeRouter, {
-      subscribeLeave(
-        listener: (payload: {
-          route: { name: string };
-          nextRoute: { name: string };
-          signal: AbortSignal;
-        }) => void,
-      ) {
-        leaveListeners.push(listener);
+      return () => {
+        const index = leaveListeners.indexOf(listener);
 
-        return () => {
-          const index = leaveListeners.indexOf(listener);
-
-          if (index !== -1) {
-            leaveListeners.splice(index, 1);
-          }
-        };
-      },
+        if (index !== -1) {
+          leaveListeners.splice(index, 1);
+        }
+      };
     });
 
     render(
-      <RouterProvider router={fakeRouter}>
+      <RouterProvider router={router}>
         <Probe handler={handler} />
       </RouterProvider>,
     );
@@ -238,8 +226,10 @@ describe("useRouteExit", () => {
     controller.abort();
 
     for (const listener of leaveListeners) {
-      listener({
+      void listener({
+        // @ts-expect-error -- simplified stub: LeaveState requires full State<Params>; only signal.aborted matters here
         route: { name: "test" },
+        // @ts-expect-error -- simplified stub: LeaveState requires full State<Params>
         nextRoute: { name: "about" },
         signal: controller.signal,
       });

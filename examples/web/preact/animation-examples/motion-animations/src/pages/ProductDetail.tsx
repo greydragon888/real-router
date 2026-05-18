@@ -12,7 +12,7 @@ const COVERS: Partial<Record<string, { name: string; color: string }>> = {
 
 export function ProductDetail() {
   const { route } = useRoute<{ id: string }>();
-  const id = route.params.id ?? "1";
+  const id = route.params.id;
   const product = COVERS[id];
 
   if (!product) {
@@ -46,9 +46,9 @@ export function ProductDetail() {
       />
       <p>
         The square morphed from the Products list into this cover via{" "}
-        <code>layoutId</code>. No manual measurement, no policy module —
-        the library reads the previous element&apos;s rect on unmount and
-        animates this element from there.
+        <code>layoutId</code>. No manual measurement, no policy module — the
+        library reads the previous element&apos;s rect on unmount and animates
+        this element from there.
       </p>
       <p>
         <Link routeName="products" activeStrict>
