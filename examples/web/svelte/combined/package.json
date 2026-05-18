@@ -15,12 +15,12 @@
     "@real-router/browser-plugin": "workspace:^",
     "@real-router/core": "workspace:^",
     "@real-router/lifecycle-plugin": "workspace:^",
-    "@real-router/preload-plugin": "workspace:^",
     "@real-router/logger-plugin": "workspace:^",
     "@real-router/persistent-params-plugin": "workspace:^",
+    "@real-router/preload-plugin": "workspace:^",
     "@real-router/search-schema-plugin": "workspace:^",
     "@real-router/svelte": "workspace:^",
-    "svelte": "5.54.0",
+    "svelte": "5.55.7",
     "zod": "3.24.4"
   },
   "devDependencies": {
