@@ -49,7 +49,7 @@
     "@real-router/memory-plugin": "workspace:^",
     "@real-router/search-schema-plugin": "workspace:^",
     "@real-router/lifecycle-plugin": "workspace:^",
-    "@tanstack/react-router": "1.168.10",
+    "@tanstack/react-router": "1.170.4",
     "@tanstack/vue-router": "1.168.9",
     "@tanstack/solid-router": "1.168.9",
     "nanostores": "0.11.4",
