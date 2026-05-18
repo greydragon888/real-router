@@ -1,4 +1,5 @@
 import { createRouter } from "@real-router/core";
+import { getLifecycleApi } from "@real-router/core/api";
 import { render, act, cleanup } from "@testing-library/preact";
 import { describe, it, expect, afterEach } from "vitest";
 
@@ -93,7 +94,34 @@ describe("R8 — combined SPA simulation", () => {
     }));
     const router = createRouter(routes, { defaultRoute: "item0" });
 
-    await router.start("/item0");
+    // Manually-resolved activate guards split each navigation into two
+    // observable phases. Without this split, Preact 10.28+ batches the
+    // TRANSITION_START and TRANSITION_SUCCESS setState calls into a single
+    // commit; since IDLE_SNAPSHOT is a frozen singleton, the polyfill's
+    // `Object.is(prev, next)` bail-out collapses the round trip to zero
+    // renders. Real apps always interleave a microtask (guards, lazy
+    // loads, data fetching) between start and success — we model that
+    // explicitly so the stress test continues to exercise both edges of
+    // the transition.
+    const lifecycle = getLifecycleApi(router);
+    const pendingResolvers: ((value: boolean) => void)[] = [];
+
+    for (const route of routes) {
+      lifecycle.addActivateGuard(
+        route.name,
+        () => () =>
+          new Promise<boolean>((resolve) => {
+            pendingResolvers.push(resolve);
+          }),
+      );
+    }
+
+    // Bypass guards for the initial mount.
+    pendingResolvers.length = 0;
+    const startPromise = router.start("/item0");
+
+    pendingResolvers.shift()?.(true);
+    await startPromise;
 
     let progressRenders = 0;
 
@@ -121,7 +149,14 @@ describe("R8 — combined SPA simulation", () => {
 
     for (let nav = 0; nav < 100; nav++) {
       await act(async () => {
-        await router.navigate(`item${(nav % 49) + 1}`);
+        void router.navigate(`item${(nav % 49) + 1}`);
+        await Promise.resolve();
+      });
+
+      await act(async () => {
+        pendingResolvers.shift()?.(true);
+        await Promise.resolve();
+        await Promise.resolve();
       });
     }
 

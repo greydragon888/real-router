@@ -17,7 +17,7 @@ Add `@real-router/browser-plugin` (or `hash-plugin` / `navigation-plugin` /
 `memory-plugin`) when you need History API integration — the Quick Start below
 uses it.
 
-**Peer dependency:** `preact` >= 10.0.0
+**Peer dependency:** `preact` >= 10.28.0 (Preact 10) or ^11.0.0-0 (Preact 11 beta and later). The adapter imports DOM types (`HTMLAttributes`, `TargetedMouseEvent`) from the top-level `preact` namespace introduced in 10.28; Preact 11's JSX-namespace restructure preserves the same imports.
 
 ## Quick Start
 
