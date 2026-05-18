@@ -58,6 +58,7 @@ shared/
 - After completing a task, run: `pnpm build` (turbo runs the full graph: type-check → lint → test → build)
 - Prefer editing existing files over creating new ones
 - Keep changes minimal and focused
+- **Update `IMPLEMENTATION_NOTES.md` after any infrastructure change** — new scripts/hooks (`.husky/*`, `scripts/*.sh`), CI workflow edits (`.github/workflows/*.yml`), build pipeline changes (turbo.json, tsdown configs, custom export conditions), dependency-audit tooling, or anything that changes "how the repo builds/ships/audits itself." Use the Problem → Solution → Why format established there. This is what makes the file useful as the "why is it this way?" reference
 
 ## Key Commands
 

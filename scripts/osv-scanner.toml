@@ -1,0 +1,86 @@
+# Allowlist for osv-scanner — mirrors `allow-ghsas:` in
+# .github/workflows/codeql.yml so local pre-push checks match CI.
+# When adding a new entry here, also add it to the workflow (and
+# vice versa) — they must stay in sync.
+
+[[IgnoredVulns]]
+id = "GHSA-7mvr-c777-76hp"
+reason = "Historical exemption — kept in sync with codeql.yml allowlist."
+
+[[IgnoredVulns]]
+id = "GHSA-wrw7-89jp-8q8g"
+reason = "glib 0.18.5 VariantStrIter unsoundness (RUSTSEC-2024-0429). Transitive via Tauri 2.x → GTK/WebKit on Linux only, pulled by examples/desktop/tauri/*/src-tauri/. Not in any published @real-router/* package. Tauri 2.x pins glib < 0.20, so the fix can only land via an upstream Tauri bump that re-bases its GTK stack."
+
+# RUSTSEC unmaintained-crate advisories without CVSS scores — GitHub
+# Dependency Review does not flag these (Unknown severity), but
+# osv-scanner reports them. They sit in Tauri 2.x's transitive
+# dependency graph for desktop examples only. Drop these entries
+# when Tauri 2.x ships a new GTK stack.
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0411"  # gdkwayland-sys unmaintained
+reason = "Transitive via Tauri 2.x, desktop examples only."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0412"  # gdk unmaintained
+reason = "Transitive via Tauri 2.x, desktop examples only."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0413"  # atk unmaintained
+reason = "Transitive via Tauri 2.x, desktop examples only."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0414"  # gdkx11-sys unmaintained
+reason = "Transitive via Tauri 2.x, desktop examples only."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0415"  # gtk unmaintained
+reason = "Transitive via Tauri 2.x, desktop examples only."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0416"  # atk-sys unmaintained
+reason = "Transitive via Tauri 2.x, desktop examples only."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0417"  # gdkx11 unmaintained
+reason = "Transitive via Tauri 2.x, desktop examples only."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0418"  # gdk-sys unmaintained
+reason = "Transitive via Tauri 2.x, desktop examples only."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0419"  # gtk3-macros unmaintained
+reason = "Transitive via Tauri 2.x, desktop examples only."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0420"  # gtk-sys unmaintained
+reason = "Transitive via Tauri 2.x, desktop examples only."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0370"  # proc-macro-error unmaintained
+reason = "Transitive via Tauri 2.x build deps, desktop examples only."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0429"  # glib unsoundness — alias of GHSA-wrw7-89jp-8q8g above
+reason = "Alias of GHSA-wrw7-89jp-8q8g, see that entry."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2025-0075"  # unic-char-range unmaintained
+reason = "Transitive via Tauri 2.x, desktop examples only."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2025-0080"  # unic-common unmaintained
+reason = "Transitive via Tauri 2.x, desktop examples only."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2025-0081"  # unic-char-property unmaintained
+reason = "Transitive via Tauri 2.x, desktop examples only."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2025-0098"  # unic-ucd-version unmaintained
+reason = "Transitive via Tauri 2.x, desktop examples only."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2025-0100"  # unic-ucd-ident unmaintained
+reason = "Transitive via Tauri 2.x, desktop examples only."

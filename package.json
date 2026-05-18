@@ -22,6 +22,7 @@
     "lint:unused": "knip",
     "lint:duplicates": "jscpd packages/*/src/",
     "lint:e2e": "bash scripts/check-e2e-specs.sh",
+    "lint:audit": "bash scripts/check-deps-audit.sh",
     "lint:deps": "syncpack lint",
     "lint:deps:fix": "syncpack fix && pnpm dedupe && pnpm install",
     "lint:dedupe": "pnpm dedupe --check",

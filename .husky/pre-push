@@ -8,6 +8,9 @@
 # - lint:package: Validate package.json exports (publint)
 # - lint:unused: Dead code detection (knip)
 # - lint:deps: Dependency version consistency (syncpack)
+# - lint:audit: Vulnerability scan (osv-scanner, mirrors GHSA database
+#               used by GitHub Dependency Review; non-blocking if
+#               osv-scanner is not installed locally)
 
 set -e
 
@@ -28,5 +31,9 @@ pnpm lint:unused
 # Check dependency version consistency
 echo "🔗 Checking dependency versions..."
 pnpm lint:deps
+
+# Vulnerability scan against GHSA database
+echo "🔒 Auditing dependencies for known vulnerabilities..."
+pnpm lint:audit
 
 echo "✅ All pre-push checks passed! Pushing to remote..."

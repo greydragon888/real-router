@@ -245,8 +245,9 @@ Enforces conventional commits. Types and scopes defined in `commitlint.config.mj
 - `pnpm turbo run build:dist-only lint:package lint:types --filter='!./examples/**'` (build + validate .d.ts + validate package.json exports)
 - `pnpm lint:unused` (knip - dead code detection)
 - `pnpm lint:deps` (syncpack - dependency version consistency)
+- `pnpm lint:audit` (osv-scanner - vulnerability scan, non-blocking if not installed)
 
-**Rationale:** Pre-commit validates correctness (auto-dedupe + tests + linting). Pre-push validates artifacts (build + type declarations + package exports + dep consistency). `lint:deps` was added after #413 — syncpack errors were previously only caught in CI, allowing version mismatches (solid-js 1.9.5 vs 1.9.12) to slip through.
+**Rationale:** Pre-commit validates correctness (auto-dedupe + tests + linting). Pre-push validates artifacts (build + type declarations + package exports + dep consistency + GHSA audit). `lint:deps` was added after #413 — syncpack errors were previously only caught in CI, allowing version mismatches (solid-js 1.9.5 vs 1.9.12) to slip through. `lint:audit` was added after PR #643 (see "Local Dependency Audit" below) so contributors can catch CVEs locally before CI Dependency Review flags them.
 
 ## Commit Conventions
 
@@ -382,7 +383,23 @@ Bundle Size job (in `ci.yml`) compares bundle sizes between PR and base branch:
 - Runs CodeQL analysis on push/PR to master
 - Weekly scheduled scan (cron: `0 3 * * 1`)
 - Uses config file `.github/codeql/codeql-config.yml` for query configuration
-- Dependency review on PRs (fails on moderate+ severity, uses `.github/dependency-review-config.yml` for license allow-list)
+- Dependency review on PRs (fails on moderate+ severity, uses `.github/dependency-review-config.yml` for license allow-list and inline `allow-ghsas:` for individual GHSA exemptions)
+
+#### Local Dependency Audit (PR #643)
+
+**Problem:** `actions/dependency-review-action` only runs on PRs in CI — contributors discover GHSAs after pushing, and the action only flags vulns *newly introduced* by the PR relative to base, so pre-existing CVEs in the lockfile stay invisible until something changes them.
+
+**Solution:** `scripts/check-deps-audit.sh` wraps `osv-scanner` (`brew install osv-scanner`) to scan `pnpm-lock.yaml` + every `Cargo.lock` against the same GHSA database GitHub uses. Wired as `pnpm lint:audit` and runs in pre-push.
+
+**Behavior:**
+- Skips gracefully with a hint if `osv-scanner` is not installed (fresh clones / non-security contributors can still push).
+- `scripts/osv-scanner.toml` is the single source of truth for ignored advisories — mirrors `allow-ghsas:` in `codeql.yml` AND lists RUSTSEC unmaintained advisories without CVSS that GitHub Dependency Review ignores but osv-scanner reports (gtk/atk/gdk/glib/unic-\*/proc-macro-error — all transitive via Tauri 2.x in desktop examples only).
+
+**Sync rule:** when adding a new exemption, update **both** files (`scripts/osv-scanner.toml` + `.github/workflows/codeql.yml`) — they must stay aligned.
+
+**Coverage difference vs CI Dependency Review:**
+- CI: only flags vulns introduced by the PR (delta vs base).
+- Local: full state of current lockfiles (catches pre-existing CVEs too).
 
 ### Dependabot
 
