@@ -221,7 +221,7 @@ export class MockNavigation implements Navigation {
     });
   }
 
-  traverseTo(key: string): NavigationResult {
+  traverseTo(key: string, options?: { info?: unknown }): NavigationResult {
     const targetIndex = this._entries.findIndex((entry) => entry.key === key);
 
     if (targetIndex === -1) {
@@ -231,7 +231,7 @@ export class MockNavigation implements Navigation {
       );
     }
 
-    return this._performTraversal(targetIndex, false);
+    return this._performTraversal(targetIndex, false, options?.info);
   }
 
   back(): NavigationResult {
@@ -342,6 +342,7 @@ export class MockNavigation implements Navigation {
   private _performTraversal(
     targetIndex: number,
     userInitiated: boolean,
+    info?: unknown,
   ): NavigationResult {
     const target = this._entries[targetIndex];
 
@@ -354,7 +355,7 @@ export class MockNavigation implements Navigation {
       destinationIndex: target.index,
       canIntercept: true,
       userInitiated,
-      info: undefined,
+      info,
       hashChange: isHashChange(this.currentUrl, target.url),
     });
   }
@@ -406,8 +407,24 @@ export class MockNavigation implements Navigation {
     const listeners = this._listeners.get("navigate");
 
     if (listeners) {
-      for (const fn of listeners) {
-        fn(event);
+      if (this._asyncDispatch) {
+        // Mirror Safari 26.2 WKWebView behaviour observed in #580: navigate
+        // events fire on a subsequent microtask, not synchronously inside
+        // `nav.navigate(...)`. Tests that opt into this mode prove the
+        // plugin's detection path does not depend on synchronous dispatch.
+        // Snapshot listeners to avoid races if the set mutates between now
+        // and the microtask running.
+        const snapshot = [...listeners];
+
+        queueMicrotask(() => {
+          for (const fn of snapshot) {
+            fn(event);
+          }
+        });
+      } else {
+        for (const fn of listeners) {
+          fn(event);
+        }
       }
     }
 
@@ -512,6 +529,7 @@ export class MockNavigation implements Navigation {
 
   private _strictIntercept = false;
   private _crossDocumentReloads = 0;
+  private _asyncDispatch = false;
 
   /**
    * Opt in to strict cross-document fallback emulation. When enabled, any
@@ -522,6 +540,20 @@ export class MockNavigation implements Navigation {
    */
   enableStrictIntercept(): void {
     this._strictIntercept = true;
+  }
+
+  /**
+   * Opt in to asynchronous navigate-event dispatch — the listener fires on
+   * the next microtask after `nav.navigate(...)` returns, mirroring Safari
+   * 26.2 WKWebView behaviour observed in #580. Used to verify the plugin's
+   * detection of plugin-originated events is identity-based on `event.info`
+   * and does NOT depend on synchronous-fire timing (the previous
+   * `SyncingFlag` mechanism implicitly required sync dispatch and broke
+   * under WKWebView). Not compatible with `enableStrictIntercept()`: the
+   * sync intercept check would run before the async listener fires.
+   */
+  enableAsyncDispatch(): void {
+    this._asyncDispatch = true;
   }
 
   get crossDocumentReloadCount(): number {

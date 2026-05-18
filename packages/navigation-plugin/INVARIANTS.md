@@ -590,6 +590,98 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 
 ---
 
+## K. Same-URL Guard Invariants (#580)
+
+The same-URL guard in `NavigationPlugin.onTransitionSuccess` routes state-only mutations through `navigation.updateCurrentEntry()` instead of `navigation.navigate({history:"replace"})` whenever the destination URL is canonically equal to the current browser URL. This avoids the cross-document reload loop observed in Safari 26.2 WKWebView under custom protocols (`tauri://`, `app://`).
+
+The guard is implemented by the pure helper `isSameHref(target, currentHref)` in `src/href-utils.ts`. The properties below cover its behaviour as a total, deterministic function.
+
+### K1. Reflexivity
+**Category:** Same-URL Guard
+**Testable:** PBT
+**Description:** For any canonicalised valid href `h`, `isSameHref(h, h) === true`.
+
+**Why it matters:** A href must always be considered equal to itself — otherwise the guard would never short-circuit and `nav.navigate` would always run.
+
+---
+
+### K2. Empty / null / undefined currentHref → false
+**Category:** Same-URL Guard
+**Testable:** PBT
+**Description:** When `currentHref` is `null`, `undefined`, or the empty string, the function returns `false` regardless of `target`.
+
+**Why it matters:** SSR fallback / pre-start state has no current entry. Returning `false` falls back to the `nav.navigate` path, which is the safe choice (the navigate handler short-circuits via `event.info === PLUGIN_SYNC_INFO`).
+
+---
+
+### K3. Component-wise canonical equivalence
+**Category:** Same-URL Guard
+**Testable:** PBT
+**Description:** `isSameHref(target, base) === true` iff resolving `target` against `base` yields component-wise equality on protocol, host, pathname (with `""` normalised to `"/"`), search and hash. Concrete sub-properties:
+
+- **K3a**: `isSameHref("", base) === true` for fragment-free `base` — empty target resolves to base.
+- **K3b**: For special schemes (`http`/`https`/`ws`/`wss`), `isSameHref("scheme://host", "scheme://host/") === true` — authority-only URLs canonicalise to the trailing-slash form via raw `.href` equality.
+- **K3c**: For fragment-bearing `base`, `isSameHref("", base) === false` — empty target drops the fragment per WHATWG URL spec, so the comparison is asymmetric and the plugin must take the navigate path to clear the hash.
+- **K3d**: For **non-special** schemes (`tauri://`, `app://`, custom protocols), `isSameHref("/", "scheme://host") === true` and `isSameHref("scheme://host", "scheme://host/") === true` — non-special schemes preserve `pathname === ""` for authority-only URLs (raw `.href` would compare unequal). **This is the actual first-iteration case of #580**: the diagnostic dump showed `currentEntry.url === "tauri://localhost"` (no slash) at reboot 1, with `finalUrl === "/"`; without K3d's pathname normalisation the guard returned `false` on the first transition, the plugin called `nav.navigate`, and WKWebView triggered exactly one cross-document reload before the URL stabilised in the trailing-slash form.
+
+**Why it matters:** Safari 26.2 WKWebView under custom protocols converts a same-URL `nav.navigate({history:"replace"})` into a cross-document reload that destroys the JS context. Closing K3d eliminates the cosmetic trailing-slash difference that would otherwise force one such reload on every cold start of a Tauri/Electron app.
+
+---
+
+### K4. Path discrimination
+**Category:** Same-URL Guard
+**Testable:** PBT
+**Description:** `isSameHref(target, base) === false` whenever target and base share origin and query/hash but differ in path.
+
+**Why it matters:** A genuine cross-route navigation must go through `nav.navigate` so the URL bar updates and a back-stack entry is created.
+
+---
+
+### K5. Hash discrimination
+**Category:** Same-URL Guard
+**Testable:** PBT
+**Description:** Different `#fragment` under same origin/path/query → `false`.
+
+**Why it matters:** Hash-only navigations must still fire navigate events so subscribers branching on `state.context.url.hashChanged` see the change.
+
+---
+
+### K6. Query discrimination
+**Category:** Same-URL Guard
+**Testable:** PBT
+**Description:** Different `?query` under same origin/path/hash → `false`.
+
+**Why it matters:** Query-only changes (e.g., search-param updates) need a real navigate so the new URL is committed to history.
+
+---
+
+### K7. Origin discrimination
+**Category:** Same-URL Guard
+**Testable:** PBT
+**Description:** Different `host` under same scheme/path → `false`.
+
+**Why it matters:** Cross-origin (or cross-host within the same scheme) URLs are not the same document; a real navigate is mandatory.
+
+---
+
+### K8. Totality
+**Category:** Same-URL Guard
+**Testable:** PBT
+**Description:** For any pair of inputs `(target, currentHref)` where `target: string` and `currentHref: string | null | undefined`, `isSameHref` returns a boolean and never throws.
+
+**Why it matters:** The function is on the hot path of every transition. A throw here would crash `onTransitionSuccess` and leave the plugin in a partially-applied state. The `try/catch` around the `URL` constructor is the implementation's promise; this property locks it in.
+
+---
+
+### K9. Determinism / idempotence
+**Category:** Same-URL Guard
+**Testable:** PBT
+**Description:** Repeated calls with identical arguments return identical results.
+
+**Why it matters:** `isSameHref` is a pure helper — accidental introduction of `Date.now()` / `Math.random()` / mutable cache would silently break the guard's stability. A regression that adds non-determinism here would manifest as intermittent loops.
+
+---
+
 ## E. Lifecycle Invariants
 
 ### E1. onStart Listener Registration
@@ -1088,6 +1180,15 @@ agnostic parsing; validation is the matcher's job, not the parser's. See
 | J2. Null currentEntry | Edge Cases | Example | High |
 | J3. Unmatchable Entry | Edge Cases | Example | Medium |
 | J4. Inactive Router | Edge Cases | Example | High |
+| K1. isSameHref Reflexivity | Same-URL Guard | PBT | High |
+| K2. isSameHref Empty/null currentHref → false | Same-URL Guard | PBT | High |
+| K3. isSameHref Canonical Equivalence (#580) | Same-URL Guard | PBT | Critical |
+| K4. isSameHref Path Discrimination | Same-URL Guard | PBT | High |
+| K5. isSameHref Hash Discrimination | Same-URL Guard | PBT | High |
+| K6. isSameHref Query Discrimination | Same-URL Guard | PBT | High |
+| K7. isSameHref Origin Discrimination | Same-URL Guard | PBT | High |
+| K8. isSameHref Totality | Same-URL Guard | PBT | High |
+| K9. isSameHref Determinism | Same-URL Guard | PBT | Medium |
 
 ---
 

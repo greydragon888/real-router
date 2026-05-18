@@ -1,3 +1,5 @@
+import { PLUGIN_SYNC_INFO } from "../../src/navigation-browser";
+
 import type { MockNavigation } from "./mockNavigation";
 import type { NavigationBrowser } from "../../src/types";
 import type { State } from "@real-router/core";
@@ -38,10 +40,15 @@ export function createMockNavigationBrowser(
       mock.navigate(url, {
         state: options.state,
         history: options.history,
+        info: PLUGIN_SYNC_INFO,
       });
     },
     replaceState: (state: unknown, url: string) => {
-      mock.navigate(url, { state, history: "replace" });
+      mock.navigate(url, {
+        state,
+        history: "replace",
+        info: PLUGIN_SYNC_INFO,
+      });
     },
     updateCurrentEntry: (options: { state: unknown }) => {
       const entry = mock.currentEntry;
@@ -51,7 +58,7 @@ export function createMockNavigationBrowser(
       }
     },
     traverseTo: (key: string) => {
-      mock.traverseTo(key);
+      mock.traverseTo(key, { info: PLUGIN_SYNC_INFO });
     },
     addNavigateListener: (fn: (evt: NavigateEvent) => void) => {
       mock.addEventListener("navigate", fn);
