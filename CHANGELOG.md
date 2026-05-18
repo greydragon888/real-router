@@ -5,6 +5,1381 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-05-18]
+
+### @real-router/angular@0.9.0
+
+### Minor Changes
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Angular post-hydration loader skip via TransferState bridge ([#599](https://github.com/greydragon888/real-router/issues/599))
+
+  `provideRealRouterFactory` now bridges Angular's `TransferState` to the
+  hydration scratchpad established by [#596](https://github.com/greydragon888/real-router/issues/596):
+  - **Server pass** — after `await router.start(path)` resolves, the
+    resulting state is serialized via `serializeRouterState(state)` and
+    written to `TransferState` under `@real-router/angular:ssrState`.
+    Angular's standard SSR pipeline (`provideClientHydration()` +
+    `provideServerRendering()`) embeds the entry as `<script id="ng-state"
+type="application/json">…</script>` in the response body.
+  - **Client pass** — the same `provideAppInitializer` callback reads
+    `TransferState`, finds the seeded JSON, and calls
+    `hydrateRouter(router, ssrJson)` instead of `router.start(path)`.
+    `hydrateRouter` deposits the parsed state into the one-shot
+    scratchpad on `RouterInternals.hydrationState`, and `ssr-data-plugin`'s
+    start interceptor reuses the server-resolved `state.context.data`
+    without invoking the loader on first paint — parity with the other 5
+    adapters that consume `<script>window.__SSR_STATE__</script>` in their
+    `entry-client.tsx`.
+  - **Pure CSR** — no TransferState seed and `inject(REQUEST, { optional:
+true })` returns null; falls back to `router.start(path)` with no write.
+
+  The TransferState key is internal — no public API surface change. Existing
+  8 Angular examples (basic, combined, dynamic-routes, hash-routing,
+  lazy-loading, nested-routes, persistent-params, animation-examples/\*)
+  continue to use `provideRealRouter` for SPA scenarios; the bridge applies
+  only to apps using `provideRealRouterFactory` together with
+  `provideClientHydration()`.
+
+  Verified end-to-end by `post-hydration loader skip ([#599](https://github.com/greydragon888/real-router/issues/599))` e2e in both
+  `examples/web/angular/ssr-examples/ssr/` and
+  `examples/web/angular/ssr-examples/ssr-streaming/` — counter on
+  `window.__LOADER_CALLS__` stays empty after deep-link navigation, parity
+  with the 5 cross-adapter baselines.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `provideRealRouterFactory` for SSR support ([#582](https://github.com/greydragon888/real-router/issues/582))
+
+  New `provideRealRouterFactory({ baseRouter, plugins, deps })` API enables per-request router scope for Angular SSR (`@angular/ssr` + `outputMode: "server"`) and SSG build-time render via `renderApplication` + `platformProviders` `REQUEST` mock.
+
+  The factory uses `useFactory` to clone the base router per request via Angular's `REQUEST: InjectionToken<Request | null>` token, runs `router.start(url)` through `provideAppInitializer`, and disposes the per-request router via `DestroyRef.onDestroy`. Conditional `plugins` function form supports browser-plugin server/client separation.
+
+  Existing `provideRealRouter(router)` is unchanged — backward compatible. Both APIs ship in parallel; pick one for the entire application.
+
+  See `packages/angular/CLAUDE.md` SSR Support section and RFC `.claude/rfc-angular-ssr-factory-ru.md`. Related parent issue: [#581](https://github.com/greydragon888/real-router/issues/581).
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `<client-only>` and `<server-only>` SSR-aware components ([#604](https://github.com/greydragon888/real-router/issues/604))
+
+  Two paired components for opt-in client/server rendering boundaries.
+  Built on `signal()` + `afterNextRender` — `afterNextRender` is a no-op on
+  the server, so SSR emits the SSR-side branch (fallback for `<client-only>`,
+  projected children for `<server-only>`). After the first browser render the
+  signal flips and the `@if` branch swaps. `fallback` is a `TemplateRef`
+  input rendered through `<ng-container [ngTemplateOutlet]>`.
+
+  Imported from the new `/ssr` subpath (`@real-router/angular/ssr`, ng-packagr
+  secondary entry-point) — see the Stage 2 `defer()` changeset for the
+  cross-adapter `/ssr` migration.
+
+  ```ts
+  import { ClientOnly, ServerOnly } from "@real-router/angular/ssr";
+  ```
+
+  ```html
+  <ng-template #loadingTpl>
+    <span>Loading…</span>
+  </ng-template>
+
+  <client-only [fallback]="loadingTpl">
+    <browser-api-widget />
+  </client-only>
+
+  <server-only>
+    <seo-help-strip />
+  </server-only>
+  ```
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `<http-status-code [code]="N"/>` + `provideHttpStatusSink()` + `createHttpStatusSink()` to `/ssr` ([#611](https://github.com/greydragon888/real-router/issues/611))
+
+  Render-time HTTP status declaration for SSR. Angular 21 idioms — DI token `HTTP_STATUS_SINK` provided via `provideHttpStatusSink(sink)` env-providers helper, optional `inject(HTTP_STATUS_SINK, { optional: true })` in the component. The sink write happens in `ngOnInit` (after the input binding is bound), template renders nothing.
+
+  ```ts
+  // entry-server.ts
+  import { bootstrapApplication } from "@angular/platform-browser";
+  import {
+    createHttpStatusSink,
+    provideHttpStatusSink,
+  } from "@real-router/angular/ssr";
+
+  const sink = createHttpStatusSink();
+  await bootstrapApplication(AppRoot, {
+    providers: [
+      provideRealRouterFactory({ ... }),
+      provideHttpStatusSink(sink),
+    ],
+  });
+  response.status(sink.code ?? 200).send(html);
+  ```
+
+  ```html
+  <!-- inside not-found.component.ts template -->
+  <http-status-code [code]="404" />
+  ```
+
+  `code` is declared as optional `input<number>()` rather than `input.required<number>()` to keep the JIT/TestBed test path safe (`NG0950` would fire otherwise) — the `ngOnInit` body skips the write when the value is `undefined`.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - `defer()` consumers + `/ssr` subpath split ([#611](https://github.com/greydragon888/real-router/issues/611))
+
+  Mirrors the React Stage 1 + Stage 0a roll-out ([#609](https://github.com/greydragon888/real-router/issues/609) / [#610](https://github.com/greydragon888/real-router/issues/610)). Angular ships
+  via ng-packagr secondary entry-point at `packages/angular/ssr/`:
+  - `injectDeferred(key)` — returns `Signal<T | undefined>` reading the
+    promise published by the loader at `state.context.ssrDataDeferred[key]`.
+
+  No `<Await>` / `<Streamed>` — Angular uses different control flow
+  (`@if` / `async` pipe + signals).
+
+  Idiom: Signals + `effect()` + `@if` / `async` pipe.
+
+  **`<ClientOnly>` / `<ServerOnly>` migrated to `/ssr`**:
+
+  ```diff
+  - import { ClientOnly, ServerOnly } from "@real-router/angular";
+  + import { ClientOnly, ServerOnly } from "@real-router/angular/ssr";
+  ```
+
+  The 3-SSR-feature-export threshold (per `.claude/SSR_FEATURE_GAPS_RU.md`
+  §8) is reached with `injectDeferred` + `ClientOnly` + `ServerOnly` —
+  triggers the subpath split for Angular.
+
+  **Wire-format**: consumes the NDJSON-shaped `<script>__rrDefer__("key",
+json)</script>` settle scripts emitted by `@real-router/ssr-data-plugin/server`'s
+  `injectDeferredScripts` — server-side loaders return `defer({ critical,
+deferred })` once.
+
+  **Streaming behaviour**: no server-streaming, incremental hydration on
+  the client — 🟡 DX-only — `injectDeferred` ready for future framework
+  streaming.
+
+  **Breaking change** (pre-1.0, allowed in `minor`): `ClientOnly`/`ServerOnly`
+  removed from main entry; `injectDeferred` lives at `/ssr` only.
+
+### Patch Changes
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `<a [realLink]="signal()">` active state not reacting to signal input changes in AOT ([#630](https://github.com/greydragon888/real-router/issues/630))
+
+  `RealLink`, `RealLinkActive`, and `RouteView` previously captured signal-input values once in `ngOnInit` — `createActiveRouteSource` / `createRouteNodeSource` was bound to the initial `routeName` / `routeParams` / `hash` / `routeNode` values and never recreated when those inputs changed reactively. In AOT (where signal-input template bindings work), `href` updated correctly (it's a `computed`), but `.active` class kept tracking the original values — asymmetric reactivity, real bug.
+
+  **Fix**: source-creation setup moved from `ngOnInit` into `effect((onCleanup) => …)` from the constructor. Reading signal inputs inside the effect makes the setup reactive to Angular's signal graph — any input change re-runs the effect, `onCleanup` tears down the previous source (no-op for cached sources from `@real-router/sources`), and a new source is created with the current input values. Effect cleanup auto-registers with the injection-context `DestroyRef`.
+
+  **Behavioral parity with React/Preact**: `<Link>` in those adapters re-renders on every prop change and re-evaluates `useIsActiveRoute(routeName, params)` each time. Angular now matches that behavior in AOT.
+
+  **JIT note**: full reactive-input verification requires AOT compilation — JIT rejects signal-input template bindings with `NG0303`. The fix is structurally correct in JIT (existing JIT tests continue to pass) but the asymmetric-reactivity scenario itself can only be reproduced under AOT. CLAUDE.md gotcha updated with the new pattern and testing limitation.
+
+  **No public API change** — the `OnInit` interface and `ngOnInit` method were internal implementation details. Consumers' templates continue to work unchanged.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Guard against throwing `getAnnouncementText` in `createRouteAnnouncer` ([#628](https://github.com/greydragon888/real-router/issues/628))
+
+  A user-provided `getAnnouncementText` callback that throws was propagating
+  the exception up through `router.subscribe`'s listener loop, tearing down
+  sibling listeners and breaking navigation tracking elsewhere. The shared
+  `resolveText` helper now wraps the callback in try/catch, logs the error
+  via `console.error` with a `[real-router]` prefix, and falls through to
+  the built-in resolution chain (`<h1>` textContent → `document.title` →
+  route name → pathname).
+
+  User-visible effect: a buggy custom announcer resolver no longer breaks
+  router subscriptions — the announcer announces the fallback text and
+  logs the underlying error so the bug surfaces in dev tools.
+
+  Discovered during the React audit (`review-2026-05-10` §5.7, MED
+  severity). Applied to `shared/dom-utils/route-announcer.ts` and the
+  git-tracked Angular copy.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `shallowEqual` asymmetry on disjoint-key records ([#627](https://github.com/greydragon888/real-router/issues/627))
+
+  `shallowEqual({ a: undefined }, { b: "" })` returned `true` while
+  `shallowEqual({ b: "" }, { a: undefined })` returned `false`. The inner loop
+  read missing keys via bracket access as `undefined` and falsely matched
+  `prev[key] === undefined`. Added a `hasOwnProperty` guard mirroring React's
+  own `shallowEqual` (`packages/shared/shallowEqual.js`).
+
+  Angular consumes a git-tracked copy of `dom-utils` (ng-packagr does not
+  follow symlinks); the fix was applied to both `shared/dom-utils/link-utils.ts`
+  and `packages/angular/src/dom-utils/link-utils.ts` and verified identical.
+
+  User-visible effect: `<a realLink [routeParams]="{ a: undefined }">` no
+  longer compares equal to `[routeParams]="{ b: undefined }"` in directive
+  memoization paths — re-render now matches the documented `shallowEqual`
+  contract (key-order-insensitive, `Object.is` per key).
+
+- Updated dependencies [[`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c)]:
+  - @real-router/core@0.53.0
+  - @real-router/sources@0.8.2
+
+### @real-router/core@0.53.0
+
+### Minor Changes
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `createRequestScope(req, base, deps)` SSR helper ([#603](https://github.com/greydragon888/real-router/issues/603))
+
+  New utility export from `@real-router/core/utils` that bundles the four-step
+  per-request boilerplate every server entry repeats:
+  1. `new AbortController()` per request
+  2. `req.on("close", () => controller.abort())`
+  3. `cloneRouter(base, { ...deps, abortSignal: signal })`
+  4. `try { ... } finally { router.dispose() }`
+
+  ```typescript
+  import { createRequestScope } from "@real-router/core/utils";
+
+  export async function render(url: string, req: IncomingMessage) {
+    const scope = createRequestScope(req, baseRouter, { currentUser });
+    try {
+      scope.router.usePlugin(ssrDataPluginFactory(loaders));
+      return await renderShell(scope.router, url);
+    } finally {
+      await scope.dispose();
+    }
+  }
+  ```
+
+  Accepts both Node `IncomingMessage` (subscribes to its `"close"` event) and
+  Web `Request` shapes (uses `request.signal` directly). The injected
+  `abortSignal` is available to loaders via `getDep("abortSignal")` for
+  cooperative cancellation.
+
+  The scope also implements `Symbol.asyncDispose`, so `await using scope = …`
+  is supported on Node 24+, Bun, Deno, and modern browsers (Chrome/Edge 127+,
+  Firefox 141+). On Node 22 LTS the well-known symbol is unavailable, so the
+  bundled SSR examples use the explicit `try/finally` form shown above for
+  maximum compatibility — see JSDoc for the full runtime matrix.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `serialize` / `deserialize` options to SSR helpers for non-JSON types ([#606](https://github.com/greydragon888/real-router/issues/606))
+
+  `serializeState`, `serializeRouterState`, and `hydrateRouter` now accept an
+  optional user-supplied serializer pair. The defaults remain `JSON.stringify`
+  and `JSON.parse` — pass `devalue.stringify` / `devalue.parse` (or
+  `superjson.stringify` / `superjson.parse`) to round-trip non-JSON types
+  (`Date` / `Map` / `Set` / `RegExp` / `BigInt`) through SSR transport.
+
+  The custom serializer's output is still XSS-escaped (`<` / `>` / `&` →
+  `<` / `>` / `&`) before embedding into the inline `<script>`
+  tag — XSS safety remains a property of `serializeState`, independent of
+  which serializer produced the JSON.
+
+  `devalue` and `superjson` are not bundled — install whichever you prefer as
+  a peer dependency.
+
+  ```typescript
+  // Server
+  import * as devalue from "devalue";
+  import { serializeRouterState } from "@real-router/core/utils";
+
+  const json = serializeRouterState(state, { serialize: devalue.stringify });
+  const html = `<script>window.__SSR_STATE__=${json}</script>`;
+
+  // Client
+  import { hydrateRouter } from "@real-router/core/utils";
+
+  await hydrateRouter(router, window.__SSR_STATE__, {
+    deserialize: devalue.parse,
+  });
+  ```
+
+  New types exported from `@real-router/core/utils`:
+  - `Serialize` — `(data: unknown) => string`
+  - `Deserialize` — `(json: string) => unknown`
+  - `SerializeStateOptions` — `{ serialize?: Serialize }`
+  - `HydrateRouterOptions` — `{ deserialize?: Deserialize }`
+
+  `SerializeRouterStateOptions` gains an optional `serialize` field alongside
+  the existing `excludeContext`. Both are non-breaking — existing call sites
+  without options continue to use `JSON.stringify` / `JSON.parse` unchanged.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Eliminate post-hydration loader re-run via one-shot hydration scratchpad ([#596](https://github.com/greydragon888/real-router/issues/596))
+
+  `hydrateRouter()` now deposits the parsed `SerializedRouterState` (incl. plugin
+  context namespaces) onto a one-shot internal scratchpad before delegating to
+  `router.start(parsed.path)`, then clears it in `finally`. SSR loader plugins
+  read the scratchpad via a monorepo-internal helper to skip their loader call
+  when the server-resolved value is already present — avoiding the duplicate
+  loader fire on first paint.
+
+  The new `SerializedRouterState` type is exported from `@real-router/core/utils`
+  to give consumers a stable name for the parsed-state shape produced by
+  `serializeRouterState()`.
+
+### @real-router/preact@0.12.0
+
+### Minor Changes
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `<ClientOnly>` and `<ServerOnly>` SSR-aware components ([#604](https://github.com/greydragon888/real-router/issues/604))
+
+  Two paired components for opt-in client/server rendering boundaries.
+  Server emits the SSR-side branch (fallback for `<ClientOnly>`, children
+  for `<ServerOnly>`), client matches it on first paint, then a single
+  post-mount effect swaps the rendered branch.
+
+  ```tsx
+  import { ClientOnly, ServerOnly } from "@real-router/preact";
+
+  <ClientOnly fallback={<Skeleton />}>
+    <BrowserApiWidget />
+  </ClientOnly>;
+  ```
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `<HttpStatusCode code={N}/>` + `<HttpStatusProvider>` + `createHttpStatusSink()` to `/ssr` ([#611](https://github.com/greydragon888/real-router/issues/611))
+
+  Render-time HTTP status declaration for SSR. Mirror of `@real-router/react/ssr`. Mount inside a route component (typical use case: a glob `*` route's NotFound page) when the status is decided by the rendered tree rather than a loader.
+
+  ```tsx
+  import { renderToString } from "preact-render-to-string";
+  import {
+    createHttpStatusSink,
+    HttpStatusProvider,
+  } from "@real-router/preact/ssr";
+
+  const sink = createHttpStatusSink();
+  const html = renderToString(
+    <HttpStatusProvider sink={sink}>
+      <App />
+    </HttpStatusProvider>,
+  );
+  response.status(sink.code ?? 200).send(html);
+  ```
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - `defer()` consumers + `/ssr` subpath split ([#611](https://github.com/greydragon888/real-router/issues/611))
+
+  Mirrors the React Stage 1 + Stage 0a roll-out ([#609](https://github.com/greydragon888/real-router/issues/609) / [#610](https://github.com/greydragon888/real-router/issues/610)). Preact ships
+  three new SSR-feature exports under `@real-router/preact/ssr`:
+  - `useDeferred<T>(key)` — reads the promise published by the loader at
+    `state.context.ssrDataDeferred[key]`. Stable promise reference across
+    renders within one navigation.
+  - `<Await name="key">{(value) => …}</Await>` — thenable-throwing wrapper
+    that integrates with `preact/compat` `<Suspense>` (Preact has no
+    `use(promise)` analogue, so the implementation throws the pending
+    promise directly).
+  - `<Streamed fallback={…}>{children}</Streamed>` — alias for `<Suspense>`
+    matching cross-adapter naming.
+
+  Idiom: `useState`/`useEffect` + `preact/compat` `<Suspense>` + thenable-
+  throwing `<Await>`.
+
+  **`<ClientOnly>` / `<ServerOnly>` migrated to `/ssr`**:
+
+  ```diff
+  - import { ClientOnly, ServerOnly } from "@real-router/preact";
+  + import { ClientOnly, ServerOnly } from "@real-router/preact/ssr";
+  ```
+
+  **Wire-format**: consumes the NDJSON-shaped `<script>__rrDefer__("key",
+json)</script>` settle scripts emitted by `@real-router/ssr-data-plugin/server`'s
+  `injectDeferredScripts` — server-side loaders return `defer({ critical,
+deferred })` once.
+
+  **Streaming behaviour**: `<preact-island>` swap on `lazy()` boundaries —
+  🟡 DX + limited capability.
+
+  **Breaking change** (pre-1.0, allowed in `minor`): `ClientOnly`/`ServerOnly`
+  removed from main entry.
+
+### Patch Changes
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Guard against throwing `getAnnouncementText` in `createRouteAnnouncer` ([#628](https://github.com/greydragon888/real-router/issues/628))
+
+  A user-provided `getAnnouncementText` callback that throws was propagating
+  the exception up through `router.subscribe`'s listener loop, tearing down
+  sibling listeners and breaking navigation tracking elsewhere. The shared
+  `resolveText` helper now wraps the callback in try/catch, logs the error
+  via `console.error` with a `[real-router]` prefix, and falls through to
+  the built-in resolution chain (`<h1>` textContent → `document.title` →
+  route name → pathname).
+
+  User-visible effect: a buggy custom announcer resolver no longer breaks
+  router subscriptions — the announcer announces the fallback text and
+  logs the underlying error so the bug surfaces in dev tools.
+
+  Discovered during the React audit (`review-2026-05-10` §5.7, MED
+  severity). Applied to `shared/dom-utils/route-announcer.ts` and the
+  git-tracked Angular copy.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `shallowEqual` asymmetry on disjoint-key records ([#627](https://github.com/greydragon888/real-router/issues/627))
+
+  `shallowEqual({ a: undefined }, { b: "" })` returned `true` while
+  `shallowEqual({ b: "" }, { a: undefined })` returned `false`. The inner loop
+  read missing keys via bracket access as `undefined` and falsely matched
+  `prev[key] === undefined`. Added a `hasOwnProperty` guard mirroring React's
+  own `shallowEqual` (`packages/shared/shallowEqual.js`).
+
+  The helper is inlined from `shared/dom-utils/link-utils.ts` via the symlink
+  graph, so this adapter receives the fix in lockstep with React/Solid/Svelte/
+  Vue/Angular.
+
+  User-visible effect: `<Link routeParams={{ a: undefined }} />` no longer
+  compares equal to `<Link routeParams={{ b: undefined }} />` — re-render now
+  matches the documented `shallowEqual` contract (key-order-insensitive,
+  `Object.is` per key).
+
+- Updated dependencies [[`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c)]:
+  - @real-router/core@0.53.0
+  - @real-router/sources@0.8.2
+
+### @real-router/react@0.25.0
+
+### Minor Changes
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `<ClientOnly>` and `<ServerOnly>` SSR-aware components ([#604](https://github.com/greydragon888/real-router/issues/604))
+
+  Two paired components for opt-in client/server rendering boundaries that
+  formalize the `useState`/`useEffect` "isMounted" idiom every SSR app
+  re-implements:
+  - `<ClientOnly fallback={…}>{children}</ClientOnly>` — server emits
+    `fallback` (or nothing), client matches it on first paint, then a single
+    post-mount effect swaps in `children`. Use for browser-API consumers
+    (window/document/intersection observers), ad slots, or third-party widgets
+    that hydrate to the right shape without a hydration mismatch.
+  - `<ServerOnly fallback={…}>{children}</ServerOnly>` — server emits
+    `children`, client matches them on first paint, then swaps to `fallback`
+    (or hides). Use for SEO-only meta strips, zero-JS sections inside an
+    otherwise-hydrated page.
+
+  Both components are exported from `@real-router/react`, `@real-router/react/legacy`,
+  and re-exported as types under the `react-server` condition.
+
+  ```tsx
+  import { ClientOnly, ServerOnly } from "@real-router/react";
+
+  <ClientOnly fallback={<Skeleton />}>
+    <BrowserApiWidget />
+  </ClientOnly>
+
+  <ServerOnly>
+    <SeoHelpStrip />
+  </ServerOnly>
+  ```
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `<HttpStatusCode code={N}/>` + `<HttpStatusProvider>` + `createHttpStatusSink()` to `/ssr` ([#610](https://github.com/greydragon888/real-router/issues/610))
+
+  Render-time HTTP status declaration for SSR. Mount inside a route component (typical use case: a glob `*` route's NotFound page) when the status is decided by the rendered tree rather than a loader. Server reads `sink.code` after `renderToString` / `renderToReadableStream` and applies it to the HTTP response.
+
+  Exports from `@real-router/react/ssr` (and `@real-router/react/legacy/ssr`):
+  - `<HttpStatusCode code={404}/>` — writes `code` to the nearest sink during render, returns `null`. Last write wins.
+  - `<HttpStatusProvider sink={...}>` — provides the sink via context.
+  - `createHttpStatusSink(): HttpStatusSink` — factory; sink is `{ code: number | undefined }`.
+  - Type-only exports under the `react-server` condition.
+
+  ```tsx
+  // entry-server.tsx
+  import { renderToString } from "react-dom/server";
+  import {
+    createHttpStatusSink,
+    HttpStatusProvider,
+  } from "@real-router/react/ssr";
+
+  const sink = createHttpStatusSink();
+  const html = renderToString(
+    <HttpStatusProvider sink={sink}>
+      <RouterProvider router={router}>
+        <App />
+      </RouterProvider>
+    </HttpStatusProvider>,
+  );
+  response.status(sink.code ?? 200).send(html);
+  ```
+
+  No-op on the client when no provider is mounted — the same component tree hydrates without touching the DOM. Loader-driven errors (`LoaderNotFound` → 404, `LoaderRedirect` → 30x) keep working as before; this component covers render-time decisions only.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - `useDeferred()` hook + `<Await>` and `<Streamed>` components for consuming `defer()` payloads ([#610](https://github.com/greydragon888/real-router/issues/610))
+
+  Three new exports paired with `defer()` in `@real-router/ssr-data-plugin`:
+  - `useDeferred<T>(key)` — reads the promise published by the loader at
+    `state.context.ssrDataDeferred[key]`. Stable promise reference across
+    renders within one navigation; integrates with React 19's `use(promise)`
+    for native Suspense streaming. Returns a never-resolving promise (forever
+    fallback) when the key is missing — surfaces consumer/loader key drift
+    as a visible loading state.
+  - `<Await name="key">{(value) => …}</Await>` — ergonomic wrapper around
+    `useDeferred(name)` + `use(promise)`, mirrors the SvelteKit `{#await}` /
+    Solid `<Await/>` pair for cross-framework naming consistency. Main entry
+    only — `use()` requires React 19.
+  - `<Streamed fallback={…}>{children}</Streamed>` — alias for
+    `<Suspense fallback>` matching the cross-adapter "Streamed" naming.
+    Available in both main and `/legacy` entries (legacy only ships
+    `<Streamed>` + `useDeferred`, not `<Await>`).
+
+  `useDeferred` and `<Streamed>` ship in both the main entry and `/legacy`
+  (React 18+) entries. `<Await>` ships in the main entry only. The
+  `react-server` condition entry exposes the prop / option types only
+  (no client runtime).
+
+  ```tsx
+  import { Streamed, Await, useDeferred } from "@real-router/react";
+
+  // High-level — cross-adapter naming
+  <Streamed fallback={<Spinner />}>
+    <Await<Review[]> name="reviews">
+      {(reviews) => <ReviewList items={reviews} />}
+    </Await>
+  </Streamed>
+
+  // Low-level — React-native primitives
+  <Suspense fallback={<Spinner />}>
+    <Reviews />
+  </Suspense>
+
+  function Reviews() {
+    const reviews = use(useDeferred<Review[]>("reviews"));
+    return <ReviewList items={reviews} />;
+  }
+  ```
+
+  Pairs with `injectDeferredScripts` from `@real-router/ssr-data-plugin/server`
+  for the server-side wire format. Non-breaking addition — existing
+  `<Suspense>` + `use(promise)` patterns continue to work unchanged.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `react-server` export condition for RSC bundler compatibility ([#574](https://github.com/greydragon888/real-router/issues/574))
+
+  Adds a thin type-only re-export entry resolved under the `react-server` export condition. RSC bundlers (`@vitejs/plugin-rsc`, `react-server-dom-{webpack,turbopack,parcel}`) now resolve `@real-router/react` imports to a server-safe subset when bundling Server Component code, preventing accidental inclusion of client-only hooks/components/`RouterProvider` in server bundles.
+
+  The exposed surface is intentionally type-only — all hooks, components, and `RouterProvider` remain client-exclusive. Future server-safe utilities (pure functions without React state) can be added without breaking the contract.
+
+  Per-request RSC data loading is handled by [`@real-router/rsc-server-plugin`](https://www.npmjs.com/package/@real-router/rsc-server-plugin), not this entry. Mirrors the thin re-export pattern from [TanStack Router PR #7183](https://github.com/TanStack/router/pull/7183) and `react-router@7.x`.
+
+  ```tsx
+  // In a Server Component file (resolved under `react-server` condition):
+  import type { Navigator, LinkProps } from "@real-router/react";
+  // → resolves to server-safe types only, no runtime client code
+  ```
+
+  Additive change, no breaking. See [RSC Integration wiki guide](https://github.com/greydragon888/real-router/wiki/RSC-Integration).
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - `/ssr` and `/legacy/ssr` subpath split for SSR-feature exports ([#609](https://github.com/greydragon888/real-router/issues/609))
+
+  All SSR-aware components and hooks have moved out of the main entry into a
+  dedicated `/ssr` subpath:
+
+  | Was                                                | Now                                                    |
+  | -------------------------------------------------- | ------------------------------------------------------ |
+  | `import { ClientOnly } from "@real-router/react"`  | `import { ClientOnly } from "@real-router/react/ssr"`  |
+  | `import { ServerOnly } from "@real-router/react"`  | `import { ServerOnly } from "@real-router/react/ssr"`  |
+  | `import { Await } from "@real-router/react"`       | `import { Await } from "@real-router/react/ssr"`       |
+  | `import { Streamed } from "@real-router/react"`    | `import { Streamed } from "@real-router/react/ssr"`    |
+  | `import { useDeferred } from "@real-router/react"` | `import { useDeferred } from "@real-router/react/ssr"` |
+
+  For React 18 (`/legacy`) consumers, the corresponding subset lives at
+  `@real-router/react/legacy/ssr` (omits `<Await>` since it depends on React
+  19's `use(promise)`).
+
+  **Why split now**: the `<ClientOnly>`/`<ServerOnly>` pair ([#604](https://github.com/greydragon888/real-router/issues/604)) plus the
+  `defer()` consumer trio (`<Await>`, `<Streamed>`, `useDeferred`) reaches the
+  ≥3 SSR-feature-component threshold defined in `.claude/SSR_FEATURE_GAPS_RU.md`
+  §8. Splitting in this PR avoids a future double migration when the same
+  work lands across the remaining 5 adapters ([#611](https://github.com/greydragon888/real-router/issues/611), Stage 2).
+
+  **Why this matters**:
+  - **Type isolation** — server-only prop types (`AwaitProps`, `StreamedProps`,
+    etc.) no longer leak into the client TypeScript context for app code that
+    doesn't touch SSR.
+  - **DX clarity** — `import {…} from '@real-router/react/ssr'` self-documents
+    the SSR-pipeline intent.
+  - **`react-server` condition** — the `/ssr` subpath has its own type-only
+    RSC entry, so Server Components can import the prop types without pulling
+    client-only runtime into their bundle.
+  - **Future-proofing** — server-render utilities (`<HttpStatusCode>`, etc.)
+    slot into `/ssr` without re-shaping the main entry.
+
+  **Breaking change** (pre-1.0, allowed in `minor` per `.changeset/README.md`):
+  re-import the five exports from `/ssr` (or `/legacy/ssr` for React 18).
+  Bundle cost is ≈ 0 thanks to `"sideEffects": false` + tree-shaking — the
+  split is about API surface design, not bytes.
+
+### Patch Changes
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Guard against throwing `getAnnouncementText` in `createRouteAnnouncer` ([#628](https://github.com/greydragon888/real-router/issues/628))
+
+  A user-provided `getAnnouncementText` callback that throws was propagating
+  the exception up through `router.subscribe`'s listener loop, tearing down
+  sibling listeners and breaking navigation tracking elsewhere. The shared
+  `resolveText` helper now wraps the callback in try/catch, logs the error
+  via `console.error` with a `[real-router]` prefix, and falls through to
+  the built-in resolution chain (`<h1>` textContent → `document.title` →
+  route name → pathname).
+
+  User-visible effect: a buggy custom announcer resolver no longer breaks
+  router subscriptions — the announcer announces the fallback text and
+  logs the underlying error so the bug surfaces in dev tools.
+
+  Discovered during the React audit (`review-2026-05-10` §5.7, MED
+  severity). Applied to `shared/dom-utils/route-announcer.ts` and the
+  git-tracked Angular copy.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `shallowEqual` asymmetry on disjoint-key records ([#627](https://github.com/greydragon888/real-router/issues/627))
+
+  `shallowEqual({ a: undefined }, { b: "" })` returned `true` while
+  `shallowEqual({ b: "" }, { a: undefined })` returned `false`. The inner loop
+  read missing keys via bracket access as `undefined` and falsely matched
+  `prev[key] === undefined`. Added a `hasOwnProperty` guard mirroring React's
+  own `shallowEqual` (`packages/shared/shallowEqual.js`).
+
+  Discovered by a new property-based symmetry test in
+  `tests/property/shallowEqual.properties.ts` after fast-check shrunk the
+  counterexample to `[{"a":undefined},{"b":""}]` over 200 runs.
+
+  User-visible effect: `<Link routeParams={{ a: undefined }} />` no longer
+  compares equal to `<Link routeParams={{ b: undefined }} />` — re-render now
+  matches the documented `shallowEqual` contract (key-order-insensitive,
+  `Object.is` per key).
+
+- Updated dependencies [[`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c)]:
+  - @real-router/core@0.53.0
+  - @real-router/sources@0.8.2
+
+### @real-router/rsc-server-plugin@0.2.0
+
+### Minor Changes
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Skip loader call on hydration when `rsc` namespace is pre-resolved ([#596](https://github.com/greydragon888/real-router/issues/596))
+
+  When `hydrateRouter()` is invoked and the parsed state contains the `rsc`
+  namespace (uncommon — `serializeRouterState({ excludeContext: ["rsc"] })` is
+  the typical SSR config), the plugin's `start` interceptor reuses the value
+  instead of re-running the loader. Stripped-rsc payloads continue to fall
+  through to the loader as today.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `invalidate(router, "rsc")` helper for client-side revalidation ([#605](https://github.com/greydragon888/real-router/issues/605))
+
+  Marks the `"rsc"` namespace as stale on the given router. The next
+  navigation (including a same-route reload) re-runs the RSC loader for
+  the destination route and overwrites `state.context.rsc` (and the mode
+  marker) via the plugin's `subscribeLeave` listener — fresh `ReactNode`
+  lands on the state snapshot **before** `TRANSITION_SUCCESS` fires, so
+  subscribers see the new payload.
+
+  `void` (fire-and-forget) return. Compose with the existing core API
+  for an explicit synchronous round-trip:
+
+  ```ts
+  import { invalidate } from "@real-router/rsc-server-plugin";
+
+  // Fire-and-forget — stale until any next navigation
+  invalidate(router, "rsc");
+
+  // Explicit await — pair with a same-route reload
+  invalidate(router, "rsc");
+  await router.navigate(state.name, state.params, { reload: true });
+  ```
+
+  Surgical alternative to `router.navigate({ reload: true })` for
+  multi-namespace routes: only `"rsc"` re-runs; a side-by-side
+  `ssr-data-plugin` keeps its cached `state.context.data` on this same
+  transition unless its own `invalidate()` was also called. Behaviour
+  during an in-flight transition is deferred — the current transition
+  completes unchanged; the _following_ navigation consumes the flag,
+  preserving the invariant "one transition = one `state.context`
+  snapshot".
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `@real-router/rsc-server-plugin/errors` subpath with typed loader errors ([#594](https://github.com/greydragon888/real-router/issues/594))
+
+  Mirror of `@real-router/ssr-data-plugin/errors` — exports `LoaderRedirect`, `LoaderNotFound`, `LoaderTimeout`, and `withTimeout` from a new `errors` subpath. Same shared source under `shared/ssr/errors.ts`.
+
+  RSC apps throw the same error shapes as classical SSR apps and discriminate via the structural `code` field — without taking a dependency on `ssr-data-plugin`:
+
+  ```ts
+  import { LoaderNotFound } from "@real-router/rsc-server-plugin/errors";
+
+  const loaders: RscLoaderFactoryMap = {
+    "users.profile": (_router, getDep) => async (params) => {
+      const user = await getDep("db").users.findById(params.id);
+      if (!user) throw new LoaderNotFound(`user:${params.id}`);
+      return <UserProfile user={user} />;
+    },
+  };
+  ```
+
+  Zero runtime impact on the main entry — `errors` is a separate dist file, tree-shaken when unused.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `RscPayload<TReturn, TFormState>` type + `rscActionPluginFactory` for Server Action integration ([#593](https://github.com/greydragon888/real-router/issues/593))
+
+  The plugin gains two complementary pieces:
+  - **`RscPayload<TReturn, TFormState>`** — canonical Flight payload shape (`{ root: ReactNode } & RscActionResult`). Single source of truth used by both producer (rsc entry) and consumers (ssr + browser entries) — eliminates ad-hoc duplication of the same interface in multiple files.
+  - **`rscActionPluginFactory(getResult)`** — sibling plugin that claims the `"rscAction"` namespace. Publishes `{ returnValue?, formState? }` to `state.context.rscAction` via the `start` interceptor; coexists with `rscServerPluginFactory` (`"rsc"`) and `ssrDataPluginFactory` (`"data"`) on the same router.
+
+  Use case: Server Action results computed in the RSC fetch handler (via `decodeAction` / `loadServerAction` / `decodeReply`) become part of router state and can be read by any Server Component during the post-action render — eliminates prop-drilling for cross-page action result UI.
+
+  ```ts
+  let actionResult: RscActionResult | undefined;
+  if (request.method === "POST") {
+    // ... execute action ...
+    actionResult = { returnValue: { ok: true, data: ... } };
+  }
+
+  router.usePlugin(
+    rscServerPluginFactory(loaders),
+    rscActionPluginFactory(() => actionResult),
+  );
+
+  const state = await router.start(pathname);
+  // state.context.rsc       — ReactNode tree
+  // state.context.rscAction — { returnValue?, formState? }
+  ```
+
+  Verified by 12 new functional tests covering write semantics, composition with `rscServerPluginFactory`, namespace collision detection, and teardown.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add per-route SSR mode ([#597](https://github.com/greydragon888/real-router/issues/597))
+
+  Mirror of `ssr-data-plugin`: `rscServerPluginFactory` now accepts the
+  `{ ssr?, loader? }` shape per route. `RscSsrMode = "full" | "client-only"` —
+  `"data-only"` is rejected at factory time (RSC has no semantically meaningful
+  "data without component"). Mode is published to `state.context.ssrRscMode`;
+  read via `getSsrRscMode(state)` (fallback `"full"`).
+
+  When mode is `"client-only"` the loader is skipped unconditionally; the
+  application is responsible for fetching the Server Component tree via a
+  separate mechanism.
+
+  Breaking on the type level: `RscLoaderFactoryMap` now accepts a union of
+  factory or `{ ssr?, loader? }` per entry. Existing consumers passing a factory
+  directly continue to work without changes.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - withTimeout passes AbortSignal to loader for cooperative cancellation ([#598](https://github.com/greydragon888/real-router/issues/598))
+
+  The `loader` argument signature changes from `() => Promise<T>` to
+  `({ signal }) => Promise<T>`. The signal aborts synchronously when the
+  deadline elapses (before the race rejects with `LoaderTimeout`), so loader
+  I/O honoring the signal — e.g. `fetch(url, { signal })` — is actually
+  cancelled at the network layer. Optional `options.upstreamSignal` composes
+  via `AbortSignal.any`, so the loader's signal aborts on whichever happens
+  first: the deadline OR an upstream client-disconnect.
+
+  If `options.upstreamSignal` is already aborted at call time, the loader
+  is _not_ invoked and the timer is _not_ started — `withTimeout` rejects
+  immediately with the upstream's reason.
+
+  Breaking on the type level — TS permits passing a parameter-less function
+  to a callback expecting `{ signal }`, so existing call sites that ignore
+  the new arg keep working. Cancellation is cooperative — loaders that
+  don't pass `signal` into their I/O still run to completion (current
+  behavior preserved).
+
+  Requires Node 20.3+ for `AbortSignal.any`.
+
+### Patch Changes
+
+- Updated dependencies [[`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c)]:
+  - @real-router/core@0.53.0
+
+### @real-router/solid@0.12.0
+
+### Minor Changes
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `<ClientOnly>` and `<ServerOnly>` SSR-aware components ([#604](https://github.com/greydragon888/real-router/issues/604))
+
+  Two paired components for opt-in client/server rendering boundaries.
+  Built on `createSignal` + `onMount` — `onMount` is SSR-safe and never
+  fires on the server, so the initial render emits the SSR-side branch.
+  After hydration, the signal flips and `<Show>` swaps the branch.
+
+  ```tsx
+  import { ClientOnly, ServerOnly } from "@real-router/solid";
+
+  <ClientOnly fallback={<Skeleton />}>
+    <BrowserApiWidget />
+  </ClientOnly>;
+  ```
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `<HttpStatusCode code={N}/>` + `<HttpStatusProvider>` + `createHttpStatusSink()` to `/ssr` ([#611](https://github.com/greydragon888/real-router/issues/611))
+
+  Render-time HTTP status declaration for SSR. Mirror of `@real-router/react/ssr`, Solid-native idioms (`createContext` + `useContext`).
+
+  ```tsx
+  import { renderToString } from "solid-js/web";
+  import {
+    createHttpStatusSink,
+    HttpStatusProvider,
+  } from "@real-router/solid/ssr";
+
+  const sink = createHttpStatusSink();
+  const html = renderToString(() => (
+    <HttpStatusProvider sink={sink}>
+      <App />
+    </HttpStatusProvider>
+  ));
+  response.status(sink.code ?? 200).send(html);
+  ```
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - `defer()` consumers + `/ssr` subpath split ([#611](https://github.com/greydragon888/real-router/issues/611))
+
+  Mirrors the React Stage 1 + Stage 0a roll-out ([#609](https://github.com/greydragon888/real-router/issues/609) / [#610](https://github.com/greydragon888/real-router/issues/610)). Solid ships
+  three new SSR-feature exports under `@real-router/solid/ssr`:
+  - `useDeferred<T>(key)` — returns `Accessor<Promise<T>>` reading the
+    promise published by the loader at `state.context.ssrDataDeferred[key]`.
+  - `<Await name="key">{(value) => …}</Await>` — wraps `createResource` for
+    ergonomic deferred-payload rendering.
+  - `<Streamed fallback={…}>{children}</Streamed>` — alias for native
+    `<Suspense>` matching cross-adapter naming.
+
+  Idiom: `createResource` + native `<Suspense>`.
+
+  **`<ClientOnly>` / `<ServerOnly>` migrated to `/ssr`**:
+
+  ```diff
+  - import { ClientOnly, ServerOnly } from "@real-router/solid";
+  + import { ClientOnly, ServerOnly } from "@real-router/solid/ssr";
+  ```
+
+  **Wire-format**: consumes the NDJSON-shaped `<script>__rrDefer__("key",
+json)</script>` settle scripts emitted by `@real-router/ssr-data-plugin/server`'s
+  `injectDeferredScripts` — server-side loaders return `defer({ critical,
+deferred })` once.
+
+  **Streaming behaviour**: true OOO via splice scripts — 🟢 capability + DX.
+
+  **Breaking change** (pre-1.0, allowed in `minor`): `ClientOnly`/`ServerOnly`
+  removed from main entry.
+
+### Patch Changes
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Guard against throwing `getAnnouncementText` in `createRouteAnnouncer` ([#628](https://github.com/greydragon888/real-router/issues/628))
+
+  A user-provided `getAnnouncementText` callback that throws was propagating
+  the exception up through `router.subscribe`'s listener loop, tearing down
+  sibling listeners and breaking navigation tracking elsewhere. The shared
+  `resolveText` helper now wraps the callback in try/catch, logs the error
+  via `console.error` with a `[real-router]` prefix, and falls through to
+  the built-in resolution chain (`<h1>` textContent → `document.title` →
+  route name → pathname).
+
+  User-visible effect: a buggy custom announcer resolver no longer breaks
+  router subscriptions — the announcer announces the fallback text and
+  logs the underlying error so the bug surfaces in dev tools.
+
+  Discovered during the React audit (`review-2026-05-10` §5.7, MED
+  severity). Applied to `shared/dom-utils/route-announcer.ts` and the
+  git-tracked Angular copy.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `shallowEqual` asymmetry on disjoint-key records ([#627](https://github.com/greydragon888/real-router/issues/627))
+
+  `shallowEqual({ a: undefined }, { b: "" })` returned `true` while
+  `shallowEqual({ b: "" }, { a: undefined })` returned `false`. The inner loop
+  read missing keys via bracket access as `undefined` and falsely matched
+  `prev[key] === undefined`. Added a `hasOwnProperty` guard mirroring React's
+  own `shallowEqual` (`packages/shared/shallowEqual.js`).
+
+  The helper is inlined from `shared/dom-utils/link-utils.ts` via the symlink
+  graph, so this adapter receives the fix in lockstep with the other 5
+  adapters.
+
+  User-visible effect: `<Link routeParams={{ a: undefined }} />` no longer
+  compares equal to `<Link routeParams={{ b: undefined }} />` — re-render now
+  matches the documented `shallowEqual` contract (key-order-insensitive,
+  `Object.is` per key).
+
+- Updated dependencies [[`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c)]:
+  - @real-router/core@0.53.0
+  - @real-router/sources@0.8.2
+
+### @real-router/ssr-data-plugin@0.4.0
+
+### Minor Changes
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - `defer()` formal API for critical/deferred split ([#610](https://github.com/greydragon888/real-router/issues/610))
+
+  Loaders may now return `defer({ critical, deferred })` to split per-route data
+  into a critical bundle (resolved before the shell renders) and a record of
+  deferred promises (streamed after as they resolve). This is the standard
+  pattern shipped by SvelteKit `streamed`, Remix / RR7 `defer()`, and TanStack
+  Start `defer()`.
+
+  ```ts
+  import { defer } from "@real-router/ssr-data-plugin";
+  import { LoaderNotFound } from "@real-router/ssr-data-plugin/errors";
+
+  export const loaders = {
+    "products.detail": () => (params) => {
+      const product = getProduct(params.id);
+      if (!product) throw new LoaderNotFound(`product:${params.id}`);
+
+      return defer({
+        critical: { product },
+        deferred: {
+          reviews: fetchReviews(params.id),
+          related: fetchRelated(params.id),
+        },
+      });
+    },
+  };
+  ```
+
+  Plugin output:
+  - `state.context.data` — critical payload (existing contract).
+  - `state.context.ssrDataDeferred` — `Record<string, Promise<unknown>>` of the
+    deferred promises (server) or registry-backed promises reconstructed from
+    the inline settle scripts (client post-hydration).
+  - `state.context.ssrDataDeferredKeys` — `string[]` of declared keys, included
+    in the SSR state so the client-side plugin can reconstruct the deferred map.
+
+  New server-side subpath `@real-router/ssr-data-plugin/server` exports:
+  - `injectDeferredScripts(reactStream, deferredMap, options?)` — wraps an HTML
+    `ReadableStream` (e.g. from React 19's `renderToReadableStream`) with inline
+    `<script>__rrDefer__("key", json)</script>` chunks emitted as each deferred
+    promise resolves. Order is by resolution time.
+  - `getDeferBootstrapScript()` — returns the inline JS (no `<script>` wrapper)
+    that installs the global `__rrDeferRegistry__` + `__rrDefer__` /
+    `__rrDeferError__` functions. Embed once in `<head>` so React's hydration
+    walks the pristine `#root` subtree it expects.
+
+  `devalue` / `superjson` integration: pass `{ serialize: devalue.stringify }`
+  to `injectDeferredScripts` for non-JSON deferred payloads (Date / Map / Set /
+  RegExp / BigInt). The wire-format remains a JSON string the client
+  `JSON.parse`s — combine with `hydrateRouter(router, json, { deserialize })`
+  from `@real-router/core/utils` for matching critical-data shapes.
+
+  Non-breaking — loaders that return plain values continue to work unchanged
+  and never touch the new namespaces. The plugin's `subscribeLeave` revalidation
+  channel (`invalidate(router, "data")`, [#605](https://github.com/greydragon888/real-router/issues/605)) also handles deferred returns:
+  `router.navigate({ reload: true })` after `invalidate(...)` re-runs the loader
+  and overwrites both critical data and the deferred map.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Skip loader call on hydration when `data` namespace is pre-resolved ([#596](https://github.com/greydragon888/real-router/issues/596))
+
+  When `hydrateRouter()` is invoked, the plugin's `start` interceptor consults
+  the one-shot hydration scratchpad and reuses the server-resolved value at
+  `state.context.data` instead of running the loader a second time. Pure CSR
+  `start()` calls and subsequent post-hydration starts continue to run loaders
+  as today.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `invalidate(router, "data")` helper for client-side revalidation ([#605](https://github.com/greydragon888/real-router/issues/605))
+
+  Marks the `"data"` namespace as stale on the given router. The next
+  navigation (including a same-route reload) re-runs the loader for the
+  destination route and overwrites `state.context.data` (and the mode
+  marker) via the plugin's `subscribeLeave` listener — fresh data lands
+  on the state snapshot **before** `TRANSITION_SUCCESS` fires, so
+  subscribers see the new payload.
+
+  `void` (fire-and-forget) return — honest semantics. Compose with the
+  existing core API for an explicit synchronous round-trip:
+
+  ```ts
+  import { invalidate } from "@real-router/ssr-data-plugin";
+
+  // Fire-and-forget — stale until any next navigation
+  invalidate(router, "data");
+
+  // Explicit await — pair with a same-route reload
+  invalidate(router, "data");
+  await router.navigate(state.name, state.params, { reload: true });
+  ```
+
+  Closes the parity gap with Nuxt `useAsyncData(...).refresh()` and
+  SolidStart `redirect("/path", { revalidate })`. Surgical alternative
+  to `router.navigate({ reload: true })`: only `"data"` re-runs;
+  companion plugins (e.g. `rsc-server-plugin`) keep their cached
+  `state.context.<ns>` unless their own `invalidate()` was also called.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add per-route SSR mode ([#597](https://github.com/greydragon888/real-router/issues/597))
+
+  `ssrDataPluginFactory` now accepts a per-route object form `{ ssr?, loader? }`
+  where `ssr` is `"full" | "data-only" | "client-only" | boolean | (state) => SsrMode`.
+  The resolved mode is published to `state.context.ssrDataMode`. New helper
+  `getSsrDataMode(state)` returns the mode (fallback `"full"`).
+
+  When mode is `"client-only"` the loader is **skipped on every `start()` call**
+  (server and client). The application reads the mode marker and triggers its own
+  client-side fetching strategy. Short-form (loader factory directly) remains valid.
+
+  Breaking on the type level: `DataLoaderFactoryMap` now accepts a union of
+  factory or `{ ssr?, loader? }` per entry. Existing consumers passing a factory
+  directly continue to work; consumers iterating the map (`Object.entries`) need
+  a narrow / cast (e.g. `(Object.entries(loaders) as [string, DataLoaderFnFactory][])`).
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `@real-router/ssr-data-plugin/errors` subpath with typed loader errors ([#594](https://github.com/greydragon888/real-router/issues/594))
+
+  Exports `LoaderRedirect`, `LoaderNotFound`, `LoaderTimeout`, and `withTimeout` from a new `errors` subpath. Replaces the per-example `_loader-errors.ts` files that were duplicated across 12 examples (`react/vue/solid/svelte/angular` × `ssr/ssr-streaming/ssg/ssr-rsc`).
+
+  Loaders bridge to HTTP semantics by throwing typed errors; handlers match by the structural `code` field (`"LOADER_NOT_FOUND"`, `"LOADER_REDIRECT"`, `"LOADER_TIMEOUT"`) without `instanceof`:
+
+  ```ts
+  import {
+    LoaderNotFound,
+    LoaderRedirect,
+    withTimeout,
+  } from "@real-router/ssr-data-plugin/errors";
+
+  const loaders: DataLoaderFactoryMap = {
+    "users.profile": () => (params) =>
+      withTimeout("users.profile", 250, async () => {
+        const user = await fetchUser(params.id);
+        if (!user) throw new LoaderNotFound(`user:${params.id}`);
+        return { user };
+      }),
+  };
+  ```
+
+  Errors live in `shared/ssr/errors.ts` and are mirror-exported by `@real-router/rsc-server-plugin/errors` — RSC apps can throw the same shapes without depending on `ssr-data-plugin`.
+
+  Zero runtime impact on the main entry — `errors` is a separate dist file (`dist/{esm,cjs}/errors.{mjs,js}`), tree-shaken when unused.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - withTimeout passes AbortSignal to loader for cooperative cancellation ([#598](https://github.com/greydragon888/real-router/issues/598))
+
+  The `loader` argument signature changes from `() => Promise<T>` to
+  `({ signal }) => Promise<T>`. The signal aborts synchronously when the
+  deadline elapses (before the race rejects with `LoaderTimeout`), so loader
+  I/O honoring the signal — e.g. `fetch(url, { signal })` — is actually
+  cancelled at the network layer. Optional `options.upstreamSignal` composes
+  via `AbortSignal.any`, so the loader's signal aborts on whichever happens
+  first: the deadline OR an upstream client-disconnect.
+
+  If `options.upstreamSignal` is already aborted at call time, the loader
+  is _not_ invoked and the timer is _not_ started — `withTimeout` rejects
+  immediately with the upstream's reason.
+
+  Breaking on the type level — TS permits passing a parameter-less function
+  to a callback expecting `{ signal }`, so existing call sites that ignore
+  the new arg keep working. Cancellation is cooperative — loaders that
+  don't pass `signal` into their I/O still run to completion (current
+  behavior preserved).
+
+  Requires Node 20.3+ for `AbortSignal.any`.
+
+### Patch Changes
+
+- Updated dependencies [[`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c)]:
+  - @real-router/core@0.53.0
+
+### @real-router/svelte@0.11.0
+
+### Minor Changes
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `<ClientOnly>` and `<ServerOnly>` SSR-aware components ([#604](https://github.com/greydragon888/real-router/issues/604))
+
+  Two paired components for opt-in client/server rendering boundaries.
+  Both use `$state` + `$effect` — `$effect` is browser-only, so the
+  server emits the SSR-side branch (fallback for `<ClientOnly>`, children
+  for `<ServerOnly>`). After hydration the rune flips and the `{#if}` /
+  `{#else if}` branch swaps.
+
+  ```svelte
+  <script lang="ts">
+    import { ClientOnly, ServerOnly } from "@real-router/svelte";
+  </script>
+
+  <ClientOnly>
+    {#snippet children()}
+      <BrowserApiWidget />
+    {/snippet}
+    {#snippet fallback()}
+      <Skeleton />
+    {/snippet}
+  </ClientOnly>
+  ```
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `<HttpStatusCode code={N}/>` + `<HttpStatusProvider>` + `createHttpStatusSink()` to `/ssr` ([#611](https://github.com/greydragon888/real-router/issues/611))
+
+  Render-time HTTP status declaration for SSR. Svelte 5-native idioms (`setContext` / `getContext`). The sink write happens at component init via `getContext`, no DOM is rendered.
+
+  ```svelte
+  <script lang="ts">
+    import {
+      HttpStatusProvider,
+      createHttpStatusSink,
+    } from "@real-router/svelte/ssr";
+
+    const sink = createHttpStatusSink();
+  </script>
+
+  <HttpStatusProvider {sink}>
+    {#snippet children()}
+      <App />
+    {/snippet}
+  </HttpStatusProvider>
+
+  <!-- inside NotFound.svelte -->
+  <HttpStatusCode code={404} />
+  ```
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - `defer()` consumers + `/ssr` subpath split ([#611](https://github.com/greydragon888/real-router/issues/611))
+
+  Mirrors the React Stage 1 + Stage 0a roll-out ([#609](https://github.com/greydragon888/real-router/issues/609) / [#610](https://github.com/greydragon888/real-router/issues/610)). Svelte ships
+  three new SSR-feature exports under `@real-router/svelte/ssr`:
+  - `useDeferred<T>(key)` — reads the promise published by the loader at
+    `state.context.ssrDataDeferred[key]`.
+  - `<Await>` — `.svelte` component wrapping the native `{#await}` block
+    for ergonomic deferred-payload rendering.
+  - `<Streamed>` — `.svelte` component matching cross-adapter naming.
+
+  Idiom: Native `{#await}` block + Svelte 5 runes.
+
+  **`<ClientOnly>` / `<ServerOnly>` migrated to `/ssr`**:
+
+  ```diff
+  - import { ClientOnly, ServerOnly } from "@real-router/svelte";
+  + import { ClientOnly, ServerOnly } from "@real-router/svelte/ssr";
+  ```
+
+  **Wire-format**: consumes the NDJSON-shaped `<script>__rrDefer__("key",
+json)</script>` settle scripts emitted by `@real-router/ssr-data-plugin/server`'s
+  `injectDeferredScripts` — server-side loaders return `defer({ critical,
+deferred })` once.
+
+  **Streaming behaviour**: no progressive HTTP-flush — 🟡 DX-only — formal
+  API ready for Svelte 6+ streaming.
+
+  **Breaking change** (pre-1.0, allowed in `minor`): `ClientOnly`/`ServerOnly`
+  removed from main entry.
+
+### Patch Changes
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Guard against throwing `getAnnouncementText` in `createRouteAnnouncer` ([#628](https://github.com/greydragon888/real-router/issues/628))
+
+  A user-provided `getAnnouncementText` callback that throws was propagating
+  the exception up through `router.subscribe`'s listener loop, tearing down
+  sibling listeners and breaking navigation tracking elsewhere. The shared
+  `resolveText` helper now wraps the callback in try/catch, logs the error
+  via `console.error` with a `[real-router]` prefix, and falls through to
+  the built-in resolution chain (`<h1>` textContent → `document.title` →
+  route name → pathname).
+
+  User-visible effect: a buggy custom announcer resolver no longer breaks
+  router subscriptions — the announcer announces the fallback text and
+  logs the underlying error so the bug surfaces in dev tools.
+
+  Discovered during the React audit (`review-2026-05-10` §5.7, MED
+  severity). Applied to `shared/dom-utils/route-announcer.ts` and the
+  git-tracked Angular copy.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `shallowEqual` asymmetry on disjoint-key records ([#627](https://github.com/greydragon888/real-router/issues/627))
+
+  `shallowEqual({ a: undefined }, { b: "" })` returned `true` while
+  `shallowEqual({ b: "" }, { a: undefined })` returned `false`. The inner loop
+  read missing keys via bracket access as `undefined` and falsely matched
+  `prev[key] === undefined`. Added a `hasOwnProperty` guard mirroring React's
+  own `shallowEqual` (`packages/shared/shallowEqual.js`).
+
+  The helper is inlined from `shared/dom-utils/link-utils.ts` via the symlink
+  graph, so this adapter receives the fix in lockstep with the other 5
+  adapters.
+
+  User-visible effect: `<Link routeParams={{ a: undefined }} />` no longer
+  compares equal to `<Link routeParams={{ b: undefined }} />` — re-render now
+  matches the documented `shallowEqual` contract (key-order-insensitive,
+  `Object.is` per key).
+
+- Updated dependencies [[`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c)]:
+  - @real-router/core@0.53.0
+  - @real-router/sources@0.8.2
+
+### @real-router/vue@0.13.0
+
+### Minor Changes
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `<ClientOnly>` and `<ServerOnly>` SSR-aware components ([#604](https://github.com/greydragon888/real-router/issues/604))
+
+  Two paired components for opt-in client/server rendering boundaries.
+  Built on `ref` + `onMounted` — slots `default` and `fallback` switch
+  based on the mount state. Server emits the SSR-side branch, client
+  matches it on first paint, then `onMounted` flips the rendered slot.
+
+  ```vue
+  <ClientOnly>
+    <BrowserApiWidget />
+    <template #fallback>
+      <Skeleton />
+    </template>
+  </ClientOnly>
+  ```
+
+  Or with the render function:
+
+  ```ts
+  import { h } from "vue";
+  import { ClientOnly } from "@real-router/vue";
+
+  h(
+    ClientOnly,
+    {},
+    {
+      default: () => h(BrowserApiWidget),
+      fallback: () => h(Skeleton),
+    },
+  );
+  ```
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `<HttpStatusCode :code="N"/>` + `<HttpStatusProvider>` + `createHttpStatusSink()` to `/ssr` ([#611](https://github.com/greydragon888/real-router/issues/611))
+
+  Render-time HTTP status declaration for SSR. Vue-native idioms (`provide` / `inject` via `InjectionKey`). Sink writer fires in `setup()`, component renders nothing.
+
+  ```vue-html
+  <HttpStatusProvider :sink="sink">
+    <RouterProvider :router="router">
+      <App />
+    </RouterProvider>
+  </HttpStatusProvider>
+
+  <!-- inside NotFound.vue -->
+  <HttpStatusCode :code="404" />
+  ```
+
+  ```ts
+  const sink = createHttpStatusSink();
+  const html = await renderToString(createSSRApp(App));
+  response.status(sink.code ?? 200).send(html);
+  ```
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - `defer()` consumers + `/ssr` subpath split ([#611](https://github.com/greydragon888/real-router/issues/611))
+
+  Mirrors the React Stage 1 + Stage 0a roll-out ([#609](https://github.com/greydragon888/real-router/issues/609) / [#610](https://github.com/greydragon888/real-router/issues/610)). Vue ships
+  three new SSR-feature exports under `@real-router/vue/ssr`:
+  - `useDeferred<T>(key)` — reads the promise published by the loader at
+    `state.context.ssrDataDeferred[key]`.
+  - `<Await name="key">` — `defineComponent` with `async setup()` and a
+    scoped slot exposing the resolved value.
+  - `<Streamed fallback>` — alias for native `<Suspense>` matching
+    cross-adapter naming.
+
+  Idiom: `defineComponent` + `async setup()` + native `<Suspense>`.
+
+  **`<ClientOnly>` / `<ServerOnly>` migrated to `/ssr`**:
+
+  ```diff
+  - import { ClientOnly, ServerOnly } from "@real-router/vue";
+  + import { ClientOnly, ServerOnly } from "@real-router/vue/ssr";
+  ```
+
+  **Wire-format**: consumes the NDJSON-shaped `<script>__rrDefer__("key",
+json)</script>` settle scripts emitted by `@real-router/ssr-data-plugin/server`'s
+  `injectDeferredScripts` — server-side loaders return `defer({ critical,
+deferred })` once.
+
+  **Streaming behaviour**: chunked HTTP, `<Suspense>` blocking (no OOO
+  placeholders) — 🟡 DX-only — formal API.
+
+  **Breaking change** (pre-1.0, allowed in `minor`): `ClientOnly`/`ServerOnly`
+  removed from main entry.
+
+### Patch Changes
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Guard against throwing `getAnnouncementText` in `createRouteAnnouncer` ([#628](https://github.com/greydragon888/real-router/issues/628))
+
+  A user-provided `getAnnouncementText` callback that throws was propagating
+  the exception up through `router.subscribe`'s listener loop, tearing down
+  sibling listeners and breaking navigation tracking elsewhere. The shared
+  `resolveText` helper now wraps the callback in try/catch, logs the error
+  via `console.error` with a `[real-router]` prefix, and falls through to
+  the built-in resolution chain (`<h1>` textContent → `document.title` →
+  route name → pathname).
+
+  User-visible effect: a buggy custom announcer resolver no longer breaks
+  router subscriptions — the announcer announces the fallback text and
+  logs the underlying error so the bug surfaces in dev tools.
+
+  Discovered during the React audit (`review-2026-05-10` §5.7, MED
+  severity). Applied to `shared/dom-utils/route-announcer.ts` and the
+  git-tracked Angular copy.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `shallowEqual` asymmetry on disjoint-key records ([#627](https://github.com/greydragon888/real-router/issues/627))
+
+  `shallowEqual({ a: undefined }, { b: "" })` returned `true` while
+  `shallowEqual({ b: "" }, { a: undefined })` returned `false`. The inner loop
+  read missing keys via bracket access as `undefined` and falsely matched
+  `prev[key] === undefined`. Added a `hasOwnProperty` guard mirroring React's
+  own `shallowEqual` (`packages/shared/shallowEqual.js`).
+
+  The helper is inlined from `shared/dom-utils/link-utils.ts` via the symlink
+  graph, so this adapter receives the fix in lockstep with the other 5
+  adapters.
+
+  User-visible effect: `<Link routeParams={{ a: undefined }} />` no longer
+  compares equal to `<Link routeParams={{ b: undefined }} />` — re-render now
+  matches the documented `shallowEqual` contract (key-order-insensitive,
+  `Object.is` per key).
+
+- Updated dependencies [[`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c)]:
+  - @real-router/core@0.53.0
+  - @real-router/sources@0.8.2
+
+### @real-router/browser-plugin@0.17.2
+
+### Patch Changes
+
+- Updated dependencies [[`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c)]:
+  - @real-router/core@0.53.0
+
+### @real-router/hash-plugin@0.7.2
+
+### Patch Changes
+
+- Updated dependencies [[`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c)]:
+  - @real-router/core@0.53.0
+
+### @real-router/lifecycle-plugin@0.4.5
+
+### Patch Changes
+
+- Updated dependencies [[`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c)]:
+  - @real-router/core@0.53.0
+
+### @real-router/logger-plugin@0.5.6
+
+### Patch Changes
+
+- Updated dependencies [[`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c)]:
+  - @real-router/core@0.53.0
+
+### @real-router/memory-plugin@0.4.2
+
+### Patch Changes
+
+- Updated dependencies [[`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c)]:
+  - @real-router/core@0.53.0
+
+### @real-router/navigation-plugin@0.7.2
+
+### Patch Changes
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix duplicate history entry on initial transition ([#642](https://github.com/greydragon888/real-router/issues/642))
+
+  After `router.start()` resolved a cross-document load (URL bar entry, page reload, Playwright `goto`), the plugin pushed a second `navigation.entries()` row for the URL the browser had **already** committed. Result: stack length 2 for a perceived-fresh tab, `canGoBack()` returned `true`, and `peekBack()` resolved to the current route — violating the documented `canGoBack()` contract and breaking smart back-button UIs (`examples/web/react/navigation-api` Scenario 1; `examples/desktop/tauri/react-navigation` canGoBack/canGoForward toggle).
+
+  **Root cause**: the constructor's "Cross-document Activation Priming" ([#531](https://github.com/greydragon888/real-router/issues/531)) sets `#capturedMeta.navigationType` from `navigation.activation.navigationType` — typically `"push"`. In `onTransitionSuccess` the `navigationType !== "push"` check then evaluated to `false`, so the plugin physically pushed instead of replacing.
+
+  **Fix**: when `fromState === undefined` (first transition after start), the plugin now physically `replace`s the entry — the browser's own entry stays as the single stack row. `state.context.navigation.navigationType` metadata is **unchanged** (`"push"` / `"reload"` / `"replace"` continue to flow to consumers) — scroll restoration ([#497](https://github.com/greydragon888/real-router/issues/497)) and direction tracker logic are not affected.
+
+  **Verified**: 236 unit tests + 37/37 react-navigation-api e2e + 8/8 tauri-react-navigation e2e pass.
+
+- Updated dependencies [[`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c)]:
+  - @real-router/core@0.53.0
+
+### @real-router/persistent-params-plugin@0.2.6
+
+### Patch Changes
+
+- Updated dependencies [[`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c)]:
+  - @real-router/core@0.53.0
+
+### @real-router/preload-plugin@0.4.2
+
+### Patch Changes
+
+- Updated dependencies [[`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c)]:
+  - @real-router/core@0.53.0
+
+### @real-router/rx@0.3.6
+
+### Patch Changes
+
+- Updated dependencies [[`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c)]:
+  - @real-router/core@0.53.0
+
+### @real-router/search-schema-plugin@0.2.7
+
+### Patch Changes
+
+- Updated dependencies [[`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c)]:
+  - @real-router/core@0.53.0
+
+### @real-router/sources@0.8.2
+
+### Patch Changes
+
+- Updated dependencies [[`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c)]:
+  - @real-router/core@0.53.0
+
+### @real-router/validation-plugin@0.7.2
+
+### Patch Changes
+
+- Updated dependencies [[`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c)]:
+  - @real-router/core@0.53.0
+
 ## [2026-05-02]
 
 ### @real-router/core@0.52.0
