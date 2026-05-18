@@ -70,6 +70,16 @@ export default {
       isIgnored: true,
     },
     {
+      // Preact adapter spans Preact 10.28+ and Preact 11 beta — the
+      // compound peer range `>=10.28.0 || ^11.0.0-0` can't be compared
+      // with `sameRange` policy against the pinned example versions.
+      label: "Ignore preact peer dependency range",
+      packages: ["@real-router/preact"],
+      dependencies: ["preact"],
+      dependencyTypes: ["peer"],
+      isIgnored: true,
+    },
+    {
       label: "Workspace packages use workspace:^ protocol",
       dependencies: [
         "@real-router/*",

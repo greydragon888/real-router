@@ -1,5 +1,215 @@
 # @real-router/react
 
+## 0.25.0
+
+### Minor Changes
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `<ClientOnly>` and `<ServerOnly>` SSR-aware components ([#604](https://github.com/greydragon888/real-router/issues/604))
+
+  Two paired components for opt-in client/server rendering boundaries that
+  formalize the `useState`/`useEffect` "isMounted" idiom every SSR app
+  re-implements:
+  - `<ClientOnly fallback={…}>{children}</ClientOnly>` — server emits
+    `fallback` (or nothing), client matches it on first paint, then a single
+    post-mount effect swaps in `children`. Use for browser-API consumers
+    (window/document/intersection observers), ad slots, or third-party widgets
+    that hydrate to the right shape without a hydration mismatch.
+  - `<ServerOnly fallback={…}>{children}</ServerOnly>` — server emits
+    `children`, client matches them on first paint, then swaps to `fallback`
+    (or hides). Use for SEO-only meta strips, zero-JS sections inside an
+    otherwise-hydrated page.
+
+  Both components are exported from `@real-router/react`, `@real-router/react/legacy`,
+  and re-exported as types under the `react-server` condition.
+
+  ```tsx
+  import { ClientOnly, ServerOnly } from "@real-router/react";
+
+  <ClientOnly fallback={<Skeleton />}>
+    <BrowserApiWidget />
+  </ClientOnly>
+
+  <ServerOnly>
+    <SeoHelpStrip />
+  </ServerOnly>
+  ```
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `<HttpStatusCode code={N}/>` + `<HttpStatusProvider>` + `createHttpStatusSink()` to `/ssr` ([#610](https://github.com/greydragon888/real-router/issues/610))
+
+  Render-time HTTP status declaration for SSR. Mount inside a route component (typical use case: a glob `*` route's NotFound page) when the status is decided by the rendered tree rather than a loader. Server reads `sink.code` after `renderToString` / `renderToReadableStream` and applies it to the HTTP response.
+
+  Exports from `@real-router/react/ssr` (and `@real-router/react/legacy/ssr`):
+  - `<HttpStatusCode code={404}/>` — writes `code` to the nearest sink during render, returns `null`. Last write wins.
+  - `<HttpStatusProvider sink={...}>` — provides the sink via context.
+  - `createHttpStatusSink(): HttpStatusSink` — factory; sink is `{ code: number | undefined }`.
+  - Type-only exports under the `react-server` condition.
+
+  ```tsx
+  // entry-server.tsx
+  import { renderToString } from "react-dom/server";
+  import {
+    createHttpStatusSink,
+    HttpStatusProvider,
+  } from "@real-router/react/ssr";
+
+  const sink = createHttpStatusSink();
+  const html = renderToString(
+    <HttpStatusProvider sink={sink}>
+      <RouterProvider router={router}>
+        <App />
+      </RouterProvider>
+    </HttpStatusProvider>,
+  );
+  response.status(sink.code ?? 200).send(html);
+  ```
+
+  No-op on the client when no provider is mounted — the same component tree hydrates without touching the DOM. Loader-driven errors (`LoaderNotFound` → 404, `LoaderRedirect` → 30x) keep working as before; this component covers render-time decisions only.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - `useDeferred()` hook + `<Await>` and `<Streamed>` components for consuming `defer()` payloads ([#610](https://github.com/greydragon888/real-router/issues/610))
+
+  Three new exports paired with `defer()` in `@real-router/ssr-data-plugin`:
+  - `useDeferred<T>(key)` — reads the promise published by the loader at
+    `state.context.ssrDataDeferred[key]`. Stable promise reference across
+    renders within one navigation; integrates with React 19's `use(promise)`
+    for native Suspense streaming. Returns a never-resolving promise (forever
+    fallback) when the key is missing — surfaces consumer/loader key drift
+    as a visible loading state.
+  - `<Await name="key">{(value) => …}</Await>` — ergonomic wrapper around
+    `useDeferred(name)` + `use(promise)`, mirrors the SvelteKit `{#await}` /
+    Solid `<Await/>` pair for cross-framework naming consistency. Main entry
+    only — `use()` requires React 19.
+  - `<Streamed fallback={…}>{children}</Streamed>` — alias for
+    `<Suspense fallback>` matching the cross-adapter "Streamed" naming.
+    Available in both main and `/legacy` entries (legacy only ships
+    `<Streamed>` + `useDeferred`, not `<Await>`).
+
+  `useDeferred` and `<Streamed>` ship in both the main entry and `/legacy`
+  (React 18+) entries. `<Await>` ships in the main entry only. The
+  `react-server` condition entry exposes the prop / option types only
+  (no client runtime).
+
+  ```tsx
+  import { Streamed, Await, useDeferred } from "@real-router/react";
+
+  // High-level — cross-adapter naming
+  <Streamed fallback={<Spinner />}>
+    <Await<Review[]> name="reviews">
+      {(reviews) => <ReviewList items={reviews} />}
+    </Await>
+  </Streamed>
+
+  // Low-level — React-native primitives
+  <Suspense fallback={<Spinner />}>
+    <Reviews />
+  </Suspense>
+
+  function Reviews() {
+    const reviews = use(useDeferred<Review[]>("reviews"));
+    return <ReviewList items={reviews} />;
+  }
+  ```
+
+  Pairs with `injectDeferredScripts` from `@real-router/ssr-data-plugin/server`
+  for the server-side wire format. Non-breaking addition — existing
+  `<Suspense>` + `use(promise)` patterns continue to work unchanged.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `react-server` export condition for RSC bundler compatibility ([#574](https://github.com/greydragon888/real-router/issues/574))
+
+  Adds a thin type-only re-export entry resolved under the `react-server` export condition. RSC bundlers (`@vitejs/plugin-rsc`, `react-server-dom-{webpack,turbopack,parcel}`) now resolve `@real-router/react` imports to a server-safe subset when bundling Server Component code, preventing accidental inclusion of client-only hooks/components/`RouterProvider` in server bundles.
+
+  The exposed surface is intentionally type-only — all hooks, components, and `RouterProvider` remain client-exclusive. Future server-safe utilities (pure functions without React state) can be added without breaking the contract.
+
+  Per-request RSC data loading is handled by [`@real-router/rsc-server-plugin`](https://www.npmjs.com/package/@real-router/rsc-server-plugin), not this entry. Mirrors the thin re-export pattern from [TanStack Router PR #7183](https://github.com/TanStack/router/pull/7183) and `react-router@7.x`.
+
+  ```tsx
+  // In a Server Component file (resolved under `react-server` condition):
+  import type { Navigator, LinkProps } from "@real-router/react";
+  // → resolves to server-safe types only, no runtime client code
+  ```
+
+  Additive change, no breaking. See [RSC Integration wiki guide](https://github.com/greydragon888/real-router/wiki/RSC-Integration).
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - `/ssr` and `/legacy/ssr` subpath split for SSR-feature exports ([#609](https://github.com/greydragon888/real-router/issues/609))
+
+  All SSR-aware components and hooks have moved out of the main entry into a
+  dedicated `/ssr` subpath:
+
+  | Was                                                | Now                                                    |
+  | -------------------------------------------------- | ------------------------------------------------------ |
+  | `import { ClientOnly } from "@real-router/react"`  | `import { ClientOnly } from "@real-router/react/ssr"`  |
+  | `import { ServerOnly } from "@real-router/react"`  | `import { ServerOnly } from "@real-router/react/ssr"`  |
+  | `import { Await } from "@real-router/react"`       | `import { Await } from "@real-router/react/ssr"`       |
+  | `import { Streamed } from "@real-router/react"`    | `import { Streamed } from "@real-router/react/ssr"`    |
+  | `import { useDeferred } from "@real-router/react"` | `import { useDeferred } from "@real-router/react/ssr"` |
+
+  For React 18 (`/legacy`) consumers, the corresponding subset lives at
+  `@real-router/react/legacy/ssr` (omits `<Await>` since it depends on React
+  19's `use(promise)`).
+
+  **Why split now**: the `<ClientOnly>`/`<ServerOnly>` pair ([#604](https://github.com/greydragon888/real-router/issues/604)) plus the
+  `defer()` consumer trio (`<Await>`, `<Streamed>`, `useDeferred`) reaches the
+  ≥3 SSR-feature-component threshold defined in `.claude/SSR_FEATURE_GAPS_RU.md`
+  §8. Splitting in this PR avoids a future double migration when the same
+  work lands across the remaining 5 adapters ([#611](https://github.com/greydragon888/real-router/issues/611), Stage 2).
+
+  **Why this matters**:
+  - **Type isolation** — server-only prop types (`AwaitProps`, `StreamedProps`,
+    etc.) no longer leak into the client TypeScript context for app code that
+    doesn't touch SSR.
+  - **DX clarity** — `import {…} from '@real-router/react/ssr'` self-documents
+    the SSR-pipeline intent.
+  - **`react-server` condition** — the `/ssr` subpath has its own type-only
+    RSC entry, so Server Components can import the prop types without pulling
+    client-only runtime into their bundle.
+  - **Future-proofing** — server-render utilities (`<HttpStatusCode>`, etc.)
+    slot into `/ssr` without re-shaping the main entry.
+
+  **Breaking change** (pre-1.0, allowed in `minor` per `.changeset/README.md`):
+  re-import the five exports from `/ssr` (or `/legacy/ssr` for React 18).
+  Bundle cost is ≈ 0 thanks to `"sideEffects": false` + tree-shaking — the
+  split is about API surface design, not bytes.
+
+### Patch Changes
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Guard against throwing `getAnnouncementText` in `createRouteAnnouncer` ([#628](https://github.com/greydragon888/real-router/issues/628))
+
+  A user-provided `getAnnouncementText` callback that throws was propagating
+  the exception up through `router.subscribe`'s listener loop, tearing down
+  sibling listeners and breaking navigation tracking elsewhere. The shared
+  `resolveText` helper now wraps the callback in try/catch, logs the error
+  via `console.error` with a `[real-router]` prefix, and falls through to
+  the built-in resolution chain (`<h1>` textContent → `document.title` →
+  route name → pathname).
+
+  User-visible effect: a buggy custom announcer resolver no longer breaks
+  router subscriptions — the announcer announces the fallback text and
+  logs the underlying error so the bug surfaces in dev tools.
+
+  Discovered during the React audit (`review-2026-05-10` §5.7, MED
+  severity). Applied to `shared/dom-utils/route-announcer.ts` and the
+  git-tracked Angular copy.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `shallowEqual` asymmetry on disjoint-key records ([#627](https://github.com/greydragon888/real-router/issues/627))
+
+  `shallowEqual({ a: undefined }, { b: "" })` returned `true` while
+  `shallowEqual({ b: "" }, { a: undefined })` returned `false`. The inner loop
+  read missing keys via bracket access as `undefined` and falsely matched
+  `prev[key] === undefined`. Added a `hasOwnProperty` guard mirroring React's
+  own `shallowEqual` (`packages/shared/shallowEqual.js`).
+
+  Discovered by a new property-based symmetry test in
+  `tests/property/shallowEqual.properties.ts` after fast-check shrunk the
+  counterexample to `[{"a":undefined},{"b":""}]` over 200 runs.
+
+  User-visible effect: `<Link routeParams={{ a: undefined }} />` no longer
+  compares equal to `<Link routeParams={{ b: undefined }} />` — re-render now
+  matches the documented `shallowEqual` contract (key-order-insensitive,
+  `Object.is` per key).
+
+- Updated dependencies [[`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c)]:
+  - @real-router/core@0.53.0
+  - @real-router/sources@0.8.2
+
 ## 0.24.1
 
 ### Patch Changes

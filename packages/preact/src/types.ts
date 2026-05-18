@@ -4,7 +4,7 @@ import type {
   Navigator,
   State,
 } from "@real-router/core";
-import type { JSX } from "preact";
+import type { HTMLAttributes } from "preact";
 
 export interface RouteState<P extends Params = Params> {
   route: State<P> | undefined;
@@ -16,7 +16,7 @@ export type RouteContext<P extends Params = Params> = {
 } & RouteState<P>;
 
 export interface LinkProps<P extends Params = Params> extends Omit<
-  JSX.HTMLAttributes<HTMLAnchorElement>,
+  HTMLAttributes<HTMLAnchorElement>,
   "className"
 > {
   routeName: string;

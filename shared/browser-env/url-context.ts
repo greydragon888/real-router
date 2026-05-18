@@ -42,12 +42,21 @@ export function decodeHashFragment(encoded: string): string {
 }
 
 /**
- * Normalize user-provided hash input: strip a leading "#" if present, then
+ * Normalize user-provided hash input: strip ALL leading "#" characters, then
  * decode. Defensive against `<Link hash="#section">` — the prop is documented
  * to accept the fragment name without "#", but we accept both gracefully.
+ *
+ * Stripping a single "#" would leave the function non-idempotent on
+ * pathological inputs like `"##section"` (caller's accidental double-hash,
+ * concatenation bugs). Property test G9 in `hash-encoding.properties.ts`
+ * locks in idempotence — `normalize(normalize(x)) === normalize(x)`.
  */
 export function normalizeHashInput(input: string): string {
-  const stripped = input.startsWith("#") ? input.slice(1) : input;
+  let stripped = input;
+
+  while (stripped.startsWith("#")) {
+    stripped = stripped.slice(1);
+  }
 
   return decodeHashFragment(stripped);
 }
