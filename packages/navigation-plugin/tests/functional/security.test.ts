@@ -96,10 +96,10 @@ describe("replaceHistoryState Validation", () => {
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     // The router state must be unchanged — replaceHistoryState only rewrites
-    // browser history. If `isSyncingFromRouter` were not set during the
-    // internal `browser.navigate({ history: "replace" })`, the navigate event
-    // would fire, the handler would re-enter router.navigate, and the state
-    // would change.
+    // browser history. The internal `browser.navigate({ history: "replace" })`
+    // is tagged with PLUGIN_SYNC_INFO so the navigate-event handler
+    // short-circuits the event it fires; without that, the handler would
+    // re-enter router.navigate and the state would change.
     expect(navigateSpy).not.toHaveBeenCalled();
     expect(withoutMeta(router.getState()!)).toStrictEqual(stateBefore);
   });

@@ -1,6 +1,7 @@
 import { errorCodes, RouterError } from "@real-router/core";
 
 import { urlToPathAndHash } from "./browser-env";
+import { PLUGIN_SYNC_INFO } from "./navigation-browser";
 
 import type {
   NavigationBrowser,
@@ -10,11 +11,17 @@ import type {
 import type { Router } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
 
+// Hoisted noop intercept options — reused on every plugin-originated
+// navigate event (the hot path). `event.intercept` reads `handler` once per
+// call per Navigation API spec, so a shared object/function is safe and
+// saves two allocations per intercepted event.
+const NOOP_ASYNC = async (): Promise<void> => {};
+const NOOP_INTERCEPT: NavigationInterceptOptions = { handler: NOOP_ASYNC };
+
 interface NavigateHandlerDeps {
   router: Router;
   api: PluginApi;
   browser: NavigationBrowser;
-  isSyncingFromRouter: () => boolean;
   setCapturedMeta: (meta: NavigationMeta) => void;
   base: string;
   transitionOptions: {
@@ -41,8 +48,7 @@ export function computeDirection(
 }
 
 export function createNavigateHandler(deps: NavigateHandlerDeps) {
-  const { router, api, browser, isSyncingFromRouter, base, transitionOptions } =
-    deps;
+  const { router, api, browser, base, transitionOptions } = deps;
   const { allowNotFound } = api.getOptions();
 
   return function handleNavigateEvent(event: NavigateEvent): void {
@@ -50,16 +56,22 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
       return;
     }
 
-    if (isSyncingFromRouter()) {
+    if (event.info === PLUGIN_SYNC_INFO) {
       // Plugin-originated navigate event after its own successful transition
       // (onTransitionSuccess calls browser.navigate to sync URL). We must still
       // intercept — a bare `return` leaves the event un-intercepted, and
       // Chromium falls back to a cross-document navigation (full page reload).
       // The noop handler cancels the fallback without running router logic;
       // state is already committed.
-      event.intercept({
-        handler: async () => {},
-      });
+      //
+      // Detection by `event.info` (identity) instead of a synchronous flag
+      // (timing) so this works under Safari 26.2 WKWebView, which delivers
+      // navigate events on a subsequent task — by then a `finally`-cleared
+      // flag would already be false and the handler would loop (#580).
+      //
+      // NOOP_INTERCEPT is module-level so the intercept options + handler
+      // are not re-allocated per navigation (hot path).
+      event.intercept(NOOP_INTERCEPT);
 
       return;
     }
@@ -213,9 +225,9 @@ function syncUrlToRouterState(
         ctxHash ? { hash: ctxHash } : undefined,
       );
 
-      // The syncing flag is raised/lowered inside NavigationBrowser around
-      // browser.navigate, including the throw path — no manual try/finally
-      // needed here.
+      // browser.navigate inside `createNavigationBrowser` tags `info` with
+      // PLUGIN_SYNC_INFO so the navigate event this fires is recognised by
+      // the handler and short-circuited — no manual flag management here.
       browser.navigate(url, {
         state: {
           name: currentState.name,

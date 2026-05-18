@@ -4,6 +4,8 @@ import type { Params, State } from "@real-router/core";
 
 export { navigationPluginFactory } from "./factory";
 
+export { PLUGIN_SYNC_INFO } from "./navigation-browser";
+
 export type {
   NavigationPluginOptions,
   NavigationBrowser,

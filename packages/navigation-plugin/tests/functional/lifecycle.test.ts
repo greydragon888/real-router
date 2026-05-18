@@ -1,6 +1,6 @@
 import { createRouter, errorCodes } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { navigationPluginFactory } from "../../src";
 import { MockNavigation } from "../helpers/mockNavigation";
@@ -39,22 +39,63 @@ describe("Navigation Plugin — Lifecycle", () => {
       unsubscribe = router.usePlugin(navigationPluginFactory({}, browser));
     });
 
-    it("updates history on start (replaceState on first navigation)", async () => {
+    it("updates history on start via updateCurrentEntry when URL unchanged (#580)", async () => {
       vi.spyOn(browser, "navigate");
+      vi.spyOn(browser, "updateCurrentEntry");
 
       await router.start();
 
+      // Initial URL is already `/` (MockNavigation default) and the resolved
+      // route is also `/`. The same-URL guard (#580) writes router state via
+      // updateCurrentEntry instead of nav.navigate({history:"replace"}) —
+      // avoids firing an unnecessary navigate event under Chromium and the
+      // cross-document reload loop on Safari 26.2 WKWebView.
+      expect(browser.navigate).not.toHaveBeenCalled();
+      expect(browser.updateCurrentEntry).toHaveBeenCalledWith({
+        state: expect.objectContaining({
+          name: "index",
+          params: {},
+          path: "/",
+        }),
+      });
+
+      // Orthogonal invariants must survive the optimization — the same-URL
+      // branch must still publish NavigationMeta (state.context.navigation)
+      // and UrlContext (state.context.url). A regression that skipped either
+      // claim.write in the updateCurrentEntry branch would otherwise pass.
+      const state = router.getState();
+      const ctx = state?.context as
+        | {
+            navigation?: { navigationType: string; userInitiated: boolean };
+            url?: { hash: string };
+          }
+        | undefined;
+
+      expect(ctx?.navigation?.navigationType).toBe("replace");
+      expect(ctx?.navigation?.userInitiated).toBe(false);
+      expect(ctx?.url?.hash).toBe("");
+    });
+
+    it("updates history on start via navigate when URL differs", async () => {
+      vi.spyOn(browser, "navigate");
+      vi.spyOn(browser, "updateCurrentEntry");
+
+      await router.start("/users/list");
+
+      // Target URL `/users/list` differs from initial `/` — same-URL guard
+      // does not apply, plugin issues a real `replace` navigation.
       expect(browser.navigate).toHaveBeenCalledWith(
-        "/",
+        "/users/list",
         expect.objectContaining({
           state: expect.objectContaining({
-            name: "index",
+            name: "users.list",
             params: {},
-            path: "/",
+            path: "/users/list",
           }),
           history: "replace",
         }),
       );
+      expect(browser.updateCurrentEntry).not.toHaveBeenCalled();
     });
 
     it("updates history on navigation (pushState after start)", async () => {
@@ -181,15 +222,67 @@ describe("Navigation Plugin — Lifecycle", () => {
       await router.start();
     });
 
-    it("supports reload option to force same-state navigation", async () => {
+    it("supports reload option to force same-state navigation (state-only update via updateCurrentEntry, #580)", async () => {
       vi.spyOn(browser, "navigate");
+      vi.spyOn(browser, "updateCurrentEntry");
 
       await router.navigate("index", {}, { reload: true });
 
-      expect(browser.navigate).toHaveBeenCalledWith(
-        "/",
-        expect.objectContaining({ history: "replace" }),
-      );
+      // Same-URL reload: the URL `/` stays unchanged so the plugin writes
+      // state via updateCurrentEntry rather than re-issuing a same-URL
+      // nav.navigate({history:"replace"}).
+      expect(browser.navigate).not.toHaveBeenCalled();
+      expect(browser.updateCurrentEntry).toHaveBeenCalledWith({
+        state: expect.objectContaining({ name: "index" }),
+      });
+
+      // The user-facing semantics of `reload: true` — navigationType reported
+      // as "reload" in state.context.navigation — must survive the
+      // updateCurrentEntry optimization. Without this, downstream consumers
+      // (scroll restoration, direction tracker, …) cannot distinguish a
+      // genuine reload from a replace.
+      const ctx = router.getState()?.context as
+        | { navigation?: { navigationType: string } }
+        | undefined;
+
+      expect(ctx?.navigation?.navigationType).toBe("reload");
+    });
+
+    it("same-URL transition does NOT dispatch a navigate event — subscribers must use router.subscribe (#580 documented limitation)", async () => {
+      // Documents the behavioural consequence declared in
+      // packages/navigation-plugin/CLAUDE.md — "Same-URL guard in
+      // onTransitionSuccess (#580)":
+      //
+      //   > same-URL transitions no longer fire navigate events.
+      //   > Consumers that subscribed to navigate events for state-only
+      //   > changes must use `router.subscribe` instead
+      //
+      // Without an explicit assertion here, a regression that re-routed
+      // same-URL transitions back through `nav.navigate({history:"replace"})`
+      // — re-introducing the WKWebView cross-document reload loop — would
+      // pass all existing tests (they only check `browser.navigate` was not
+      // called; they do not observe the underlying mockNav event channel).
+      //
+      // The companion `subscribeSpy` assertion is mandatory: without it the
+      // negative `navigateEventSpy` check could silently pass if the whole
+      // subscription pipeline broke, and the limitation would be
+      // documentation-only.
+      const navigateEventSpy = vi.fn();
+
+      mockNav.addEventListener("navigate", navigateEventSpy);
+
+      const subscribeSpy = vi.fn();
+
+      router.subscribe(subscribeSpy);
+
+      await router.navigate("index", {}, { reload: true });
+
+      // Limitation: no navigate event fires for the same-URL reload.
+      expect(navigateEventSpy).not.toHaveBeenCalled();
+
+      // Migration path: router.subscribe still receives the transition
+      // signal so consumers have an event channel for state-only changes.
+      expect(subscribeSpy).toHaveBeenCalledTimes(1);
     });
 
     it("uses replace for first navigation (fromState is null)", async () => {
@@ -642,6 +735,116 @@ describe("Navigation Plugin — Lifecycle", () => {
 
       expect(mockNav.currentUrl).toContain("#anchor");
       expect(mockNav.currentUrl).toContain("/home");
+    });
+  });
+
+  describe("Same-URL guard (#580) — fallback branches", () => {
+    it("falls back to nav.navigate when browser.currentEntry is null", async () => {
+      // Custom browser whose currentEntry getter returns null. Plugin's
+      // same-URL guard cannot compute currentHref → returns false → navigate
+      // path is taken (not updateCurrentEntry).
+      const customBrowser = {
+        ...browser,
+        // override the getter
+      };
+
+      Object.defineProperty(customBrowser, "currentEntry", {
+        get: () => null,
+      });
+
+      const customRouter = createRouter(routerConfig, {
+        defaultRoute: "home",
+      });
+
+      const navSpy = vi.fn();
+      const updateSpy = vi.fn();
+
+      customBrowser.navigate = (
+        url: string,
+        opts: { state: unknown; history: "push" | "replace" },
+      ) => {
+        navSpy(url, opts);
+        // Delegate to MockNavigation so router state matches.
+        mockNav.navigate(url, { state: opts.state, history: opts.history });
+      };
+      customBrowser.updateCurrentEntry = (opts: { state: unknown }) => {
+        updateSpy(opts);
+      };
+
+      const unsub = customRouter.usePlugin(
+        navigationPluginFactory({}, customBrowser),
+      );
+
+      await customRouter.start();
+
+      // Concrete args — a bare `toHaveBeenCalled()` would pass even if the
+      // plugin issued `navigate("garbage", {...})`, masking a regression.
+      expect(navSpy).toHaveBeenCalledWith(
+        "/",
+        expect.objectContaining({
+          state: expect.objectContaining({
+            name: "index",
+            params: {},
+            path: "/",
+          }),
+          history: "replace",
+        }),
+      );
+      expect(updateSpy).not.toHaveBeenCalled();
+
+      customRouter.stop();
+      unsub();
+    });
+
+    it("falls back to nav.navigate when currentEntry.url is malformed", async () => {
+      // Custom browser whose currentEntry.url is a non-empty but malformed
+      // string — passes the truthy guard but the URL constructor throws,
+      // the same-URL guard catches and returns false, navigate path is taken.
+      const customBrowser = { ...browser };
+
+      Object.defineProperty(customBrowser, "currentEntry", {
+        get: () => ({ url: "not a valid url" }) as NavigationHistoryEntry,
+      });
+
+      const customRouter = createRouter(routerConfig, {
+        defaultRoute: "home",
+      });
+
+      const navSpy = vi.fn();
+      const updateSpy = vi.fn();
+
+      customBrowser.navigate = (
+        url: string,
+        opts: { state: unknown; history: "push" | "replace" },
+      ) => {
+        navSpy(url, opts);
+        mockNav.navigate(url, { state: opts.state, history: opts.history });
+      };
+      customBrowser.updateCurrentEntry = (opts: { state: unknown }) => {
+        updateSpy(opts);
+      };
+
+      const unsub = customRouter.usePlugin(
+        navigationPluginFactory({}, customBrowser),
+      );
+
+      await customRouter.start();
+
+      expect(navSpy).toHaveBeenCalledWith(
+        "/",
+        expect.objectContaining({
+          state: expect.objectContaining({
+            name: "index",
+            params: {},
+            path: "/",
+          }),
+          history: "replace",
+        }),
+      );
+      expect(updateSpy).not.toHaveBeenCalled();
+
+      customRouter.stop();
+      unsub();
     });
   });
 
