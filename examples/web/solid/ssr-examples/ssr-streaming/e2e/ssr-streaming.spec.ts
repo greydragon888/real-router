@@ -476,6 +476,21 @@ test.describe("Streaming SSR Example (Solid)", () => {
   // `RouteView.NotFound` workaround in App.tsx and the `<SuspenseList>` note
   // in ProductDetail.tsx. Track upstream and re-enable when the plugin's
   // hydration-key generator stabilises.
+  //
+  // PR #643 workaround attempts (all failed identically):
+  //   1. Wrap `<ProductActions />` in its own `<Suspense>` (isolated
+  //      hydration island)
+  //   2. Move `<ProductActions />` AFTER the streaming siblings (so its
+  //      keys allocate post-stream)
+  //   3. Inline `CrashOnDemand` into `ProductActions` (kill the reactive
+  //      prop boundary, read `crashed()` directly)
+  // All three reproduce the same symptom: `PAGEERROR: e is not a function`
+  // fires on initial page load, click handler attaches (Playwright finds
+  // and clicks the button), but `setCrashed(true)` never propagates to
+  // the message accessor — the effect graph for the ProductActions
+  // subtree never properly hydrates. The bug is deeper than DOM layout
+  // or prop scope; only an upstream fix or removing the streaming
+  // siblings (which defeats the example) can unblock these scenarios.
   test.fixme("Scenario 19: <ErrorBoundary> reset — clicking 'Try again' restores the original tree without remount", async ({
     page,
   }) => {
@@ -539,7 +554,9 @@ test.describe("Streaming SSR Example (Solid)", () => {
 
   // FIXME(vite-plugin-solid 2.11.x): same hydration-key drift as Scenario 19
   // — ProductActions' `onMount` callback never fires post-hydration. SSR
-  // HTML scrub guarantee (server side) is preserved by Scenario 24.
+  // HTML scrub guarantee (server side) is preserved by Scenario 24. See
+  // Scenario 19's FIXME for the PR #643 workaround attempts that did not
+  // help (same root cause).
   test.fixme("Scenario 20: onMount + isServer — populates window.__MOUNT_LOG__ on hydration; SSR HTML never references it", async ({
     page,
     request,
@@ -586,7 +603,8 @@ test.describe("Streaming SSR Example (Solid)", () => {
   // 19/20 — `use:trackView` directive on the `<article>` never executes
   // because the runtime fails to claim its DOM node during selective
   // hydration. SSR HTML scrub guarantee (server side) is preserved by
-  // Scenario 24.
+  // Scenario 24. See Scenario 19's FIXME for the PR #643 workaround
+  // attempts that did not help (same root cause).
   test.fixme("Scenario 23: use:trackView directive — IntersectionObserver fires on hydration, populates window.__VIEW_LOG__", async ({
     page,
   }) => {

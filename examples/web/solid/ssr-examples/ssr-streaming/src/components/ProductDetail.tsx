@@ -26,6 +26,15 @@ const _ensureTrackViewBinding = trackView;
 // current vite plugin is brittle. Track upstream + revisit once the
 // plugin's hydration-key generator stabilises. Same root cause as the
 // `RouteView.NotFound` workaround in App.tsx (top-level <Show> guard).
+//
+// PR #643 attempted three layout-level workarounds to unblock the
+// `test.fixme` Scenarios 19/20/23 in `e2e/ssr-streaming.spec.ts`:
+// wrapping `<ProductActions />` in its own `<Suspense>`, moving it
+// AFTER the streaming siblings, and inlining `CrashOnDemand` to drop
+// the reactive-prop boundary. All three reproduced the same `e is not
+// a function` page error on initial load — the effect graph for the
+// ProductActions subtree never hydrates correctly regardless of DOM
+// shape. Component-level workarounds will not unblock those scenarios.
 export function ProductDetail(): JSX.Element {
   const routeState = useRoute();
   const data = (): ProductDetailData | undefined =>
