@@ -1,5 +1,56 @@
 # @real-router/navigation-plugin
 
+## 0.7.3
+
+### Patch Changes
+
+- [#646](https://github.com/greydragon888/real-router/pull/646) [`4d5ef9a`](https://github.com/greydragon888/real-router/commit/4d5ef9a6deaba291a0e791cd0dc2fcca047961dd) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix render-loop in Tauri release build on macOS 26.2 (Safari 26.2 WKWebView) ([#580](https://github.com/greydragon888/real-router/issues/580))
+
+  Root cause was a Safari WKWebView quirk under custom protocols (`tauri://`, `app://`): `navigation.navigate(url, { history: "replace" })` against an effectively-same URL is treated as a **cross-document navigation** that discards the JS context. The plugin's `onTransitionSuccess` issues exactly this call on the initial transition to mark the current history entry with router state — the bootstrap script then re-runs, the plugin re-issues the same call, and the cycle becomes a render-loop the user perceives as flicker (the JS context is born and dies every ~50ms).
+
+  Captured trace from a Tauri release run on macOS 26.2:
+
+  ```
+  13ms [#1](https://github.com/greydragon888/real-router/issues/1) init {reinitCount:1, href:"tauri://localhost",  activationType:"push"}
+  16ms [#2](https://github.com/greydragon888/real-router/issues/2) router:transitionStart  {to:"/"}
+  16ms [#3](https://github.com/greydragon888/real-router/issues/3) router:transitionSuccess {to:"/"}
+  16ms [#4](https://github.com/greydragon888/real-router/issues/4) call:nav.navigate {url:"/", history:"replace", info:"…:syncing"}
+  70ms [#5](https://github.com/greydragon888/real-router/issues/5) init {reinitCount:2, href:"tauri://localhost/", activationType:"replace"}
+  …  // same pattern repeats
+  ```
+
+  Between `[#4](https://github.com/greydragon888/real-router/issues/4)` and `[#5](https://github.com/greydragon888/real-router/issues/5)` there is no `event:navigate` — WKWebView did a cross-document reload directly instead of dispatching the event same-document. The previous `SyncingFlag` mechanism (and the `event.info === PLUGIN_SYNC_INFO` short-circuit added in the same PR) cannot help because the handler never runs — the JS context is gone.
+
+  **Fix**: detect "same-URL transition" in `onTransitionSuccess` and write router state via `navigation.updateCurrentEntry({state})` instead of `navigation.navigate(url, {history:"replace"})`. Both leave a single history entry carrying the new state, but `updateCurrentEntry` does not fire a navigate event and (critically for [#580](https://github.com/greydragon888/real-router/issues/580)) does not trigger WKWebView's cross-document fallback.
+
+  The comparison (`isSameHref` in `src/href-utils.ts`) is component-wise — protocol, host, pathname (with empty pathname normalised to `"/"`), search, hash — rather than raw `.href` string equality. This matters for non-special schemes (`tauri://`, `app://`) where the URL parser preserves `pathname === ""` for authority-only URLs: `new URL("tauri://localhost").href === "tauri://localhost"` while `new URL("/", "tauri://localhost").href === "tauri://localhost/"`. A raw `.href` check would have called `nav.navigate` on the first iteration after a cold start, surviving exactly one cross-document reload before the URL stabilised in the trailing-slash form. Component-wise comparison closes that first-iteration hole.
+
+  **Companion change**: replaced the synchronous `SyncingFlag` mechanism (timing-dependent) with an identity-based `event.info === PLUGIN_SYNC_INFO` sentinel. This was the originally hypothesised fix; in practice WKWebView never delivered the event to the handler (cross-document reload, see above), but the sentinel approach is still strictly better than the flag for any future async-delivery edge case on Chromium and removes the implicit dependency on synchronous event dispatch.
+
+  **Internal API removed** (never exported from the package barrel):
+  - `SyncingFlag` interface
+  - `wrapNavigationBrowserWithSyncing` helper
+  - `isSyncingFromRouter` field on `createNavigateHandler` deps
+
+  **Newly exported**: `PLUGIN_SYNC_INFO` constant. Consumers supplying a custom `NavigationBrowser` should pass this value as `info` in their `nav.navigate` / `nav.traverseTo` calls so the handler can recognise plugin-originated events. The built-in factory path does this automatically. See `packages/navigation-plugin/CLAUDE.md` for the full rationale.
+
+  **Behaviour change to be aware of**: a transition that resolves to the same URL (initial transition into a same-path route, `router.navigate(name, params, {reload: true})` to current state, redirects via `forwardTo` that don't change the path) no longer fires a navigate event — the plugin updates state in-place. Consumers branching on navigate events for state-only changes should subscribe to `router.subscribe` instead; `state.context.navigation.navigationType` still reflects the logical type (`reload` / `replace` / etc.).
+
+- [#646](https://github.com/greydragon888/real-router/pull/646) [`4d5ef9a`](https://github.com/greydragon888/real-router/commit/4d5ef9a6deaba291a0e791cd0dc2fcca047961dd) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `normalizeHashInput` non-idempotence on multi-`#` input ([#647](https://github.com/greydragon888/real-router/issues/647))
+
+  `normalizeHashInput` in `shared/browser-env/url-context.ts` previously stripped only the FIRST leading `#`, so `normalize("##") === "#"` while `normalize("#") === ""` — calling it twice on `"##"` produced a different result. Property test G9 (`normalize(normalize(x)) === normalize(x)`) caught this under fast-check seed `-746842783` with counterexample `"##"`. Pre-existing since [#532](https://github.com/greydragon888/real-router/issues/532)/[#567](https://github.com/greydragon888/real-router/issues/567); only surfaced now because the seed had not generated the corner case before.
+
+  `normalizeHashInput` now strips ALL leading `#` characters in a loop. Idempotence holds for every input.
+
+  **Behavioural change for navigation-plugin consumers**:
+  - `router.navigate(name, params, { hash: "##foo" })` previously produced fragment `"#foo"`; now produces `"foo"`.
+  - `router.buildUrl(name, params, { hash: "##foo" })` and `router.replaceHistoryState(name, params, { hash: "##foo" })` follow the same change.
+  - `<Link hash="##foo">` (via React/Preact/Vue/Solid/Svelte/Angular adapters) now resolves to fragment `"foo"`.
+
+  A monorepo grep confirmed zero production or example call sites pass `"##..."` as a hash value, so the behavioural change is empirically inert.
+
+  Updated G10 property test in `tests/property/hash-encoding.properties.ts` — previously documented the old single-strip behaviour, now asserts the new invariant ("ALL leading '#' chars are stripped — the result never starts with '#'"). G9 idempotence passes for all inputs.
+
 ## 0.7.2
 
 ### Patch Changes
