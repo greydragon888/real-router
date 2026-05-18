@@ -301,7 +301,7 @@ test.describe("Streaming SSR Example (Svelte)", () => {
 
     await new Promise<void>((resolve, reject) => {
       const req = nodeRequest(
-        "http://localhost:3000/products/1",
+        "http://localhost:3012/products/1",
         (res) => {
           res.on("data", (buf: Buffer) => {
             chunks.push({ ts: Date.now() - startedAt, size: buf.length });

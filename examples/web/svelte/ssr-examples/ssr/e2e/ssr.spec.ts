@@ -88,7 +88,7 @@ test.describe("SSR (Svelte)", () => {
 
     await page
       .context()
-      .addCookies([{ name: "auth", value: "1", url: "http://localhost:3000" }]);
+      .addCookies([{ name: "auth", value: "1", url: "http://localhost:3013" }]);
     await page.goto("/dashboard");
     await expect(page).toHaveURL("/dashboard");
     await expect(page.locator("main")).toContainText("Dashboard");
@@ -519,7 +519,7 @@ test.describe("SSR (Svelte)", () => {
     await page
       .context()
       .addCookies([
-        { name: "userId", value: "1", url: "http://localhost:3000" },
+        { name: "userId", value: "1", url: "http://localhost:3013" },
       ]);
 
     await page.goto("/admin");
@@ -533,7 +533,7 @@ test.describe("SSR (Svelte)", () => {
     await page
       .context()
       .addCookies([
-        { name: "userId", value: "2", url: "http://localhost:3000" },
+        { name: "userId", value: "2", url: "http://localhost:3013" },
       ]);
 
     await page.goto("/admin");
@@ -546,7 +546,7 @@ test.describe("SSR (Svelte)", () => {
     await page
       .context()
       .addCookies([
-        { name: "userId", value: "2", url: "http://localhost:3000" },
+        { name: "userId", value: "2", url: "http://localhost:3013" },
       ]);
 
     await page.goto("/dashboard");
@@ -627,7 +627,7 @@ test.describe("SSR (Svelte)", () => {
     page,
   }) => {
     await page.context().addCookies([
-      { name: "userId", value: "1", url: "http://localhost:3000" },
+      { name: "userId", value: "1", url: "http://localhost:3013" },
     ]);
 
     await page.goto("/");
@@ -803,7 +803,7 @@ test.describe("SSR (Svelte)", () => {
     // Spin up three independent contexts (admin / regular user / anon) and
     // fire five different routes in parallel. Each request must see only its
     // own currentUser dependency; no cross-context bleed.
-    const BASE = "http://localhost:3000";
+    const BASE = "http://localhost:3013";
 
     const [adminCtx, userCtx, anonCtx] = await Promise.all([
       browser.newContext({

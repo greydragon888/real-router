@@ -24,7 +24,7 @@ test.describe("Checkout async guard", () => {
     page,
   }) => {
     await page.goto("/");
-    await page.getByRole("link", { name: "Checkout" }).click();
+    await page.getByRole("link", { name: "Checkout", exact: true }).click();
     await expect(page.locator(".progress-bar")).toBeVisible({ timeout: 2000 });
     await page.waitForURL(/\/checkout/);
     await expect(page.locator(".progress-bar")).not.toBeVisible();

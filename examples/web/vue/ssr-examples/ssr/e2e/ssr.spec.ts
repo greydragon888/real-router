@@ -93,7 +93,7 @@ test.describe("SSR (Vue)", () => {
 
     await page
       .context()
-      .addCookies([{ name: "auth", value: "1", url: "http://localhost:3000" }]);
+      .addCookies([{ name: "auth", value: "1", url: "http://localhost:3016" }]);
     await page.goto("/dashboard");
     await expect(page).toHaveURL("/dashboard");
     await expect(page.locator("main")).toContainText("Dashboard");
@@ -517,7 +517,7 @@ test.describe("SSR (Vue)", () => {
     await page
       .context()
       .addCookies([
-        { name: "userId", value: "1", url: "http://localhost:3000" },
+        { name: "userId", value: "1", url: "http://localhost:3016" },
       ]);
 
     await page.goto("/admin");
@@ -531,7 +531,7 @@ test.describe("SSR (Vue)", () => {
     await page
       .context()
       .addCookies([
-        { name: "userId", value: "2", url: "http://localhost:3000" },
+        { name: "userId", value: "2", url: "http://localhost:3016" },
       ]);
 
     await page.goto("/admin");
@@ -544,7 +544,7 @@ test.describe("SSR (Vue)", () => {
     await page
       .context()
       .addCookies([
-        { name: "userId", value: "2", url: "http://localhost:3000" },
+        { name: "userId", value: "2", url: "http://localhost:3016" },
       ]);
 
     await page.goto("/dashboard");
@@ -629,7 +629,7 @@ test.describe("SSR (Vue)", () => {
     // Cookie injected before goto so entry-client.ts picks it up at boot
     // (lookupUserFromCookies(parseCookieHeader(document.cookie)) before usePlugin).
     await page.context().addCookies([
-      { name: "userId", value: "1", url: "http://localhost:3000" },
+      { name: "userId", value: "1", url: "http://localhost:3016" },
     ]);
 
     await page.goto("/");

@@ -392,7 +392,7 @@ test.describe("Streaming SSR Example (Solid)", () => {
     const chunks: { ts: number; size: number }[] = [];
 
     await new Promise<void>((resolve, reject) => {
-      const req = nodeRequest("http://localhost:3000/products/1", (res) => {
+      const req = nodeRequest("http://localhost:3009/products/1", (res) => {
         res.on("data", (buf: Buffer) => {
           chunks.push({ ts: Date.now() - startedAt, size: buf.length });
         });
@@ -430,7 +430,7 @@ test.describe("Streaming SSR Example (Solid)", () => {
     const chunkBodies: string[] = [];
 
     await new Promise<void>((resolve, reject) => {
-      const req = nodeRequest("http://localhost:3000/products/1", (res) => {
+      const req = nodeRequest("http://localhost:3009/products/1", (res) => {
         res.on("data", (buf: Buffer) => {
           chunkBodies.push(buf.toString("utf8"));
         });

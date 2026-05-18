@@ -26,7 +26,11 @@
     </div>
   {/if}
   <div style="display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap">
-    <button onclick={() => void navigator.navigate(route.current.name, { ...route.current.params, lang: lang === "en" ? "ru" : "en" }, { reload: true })}>
+    <button onclick={() => {
+      const current = navigator.getState();
+      if (!current) return;
+      void navigator.navigate(current.name, { ...current.params, lang: lang === "en" ? "ru" : "en" }, { reload: true });
+    }}>
       Toggle lang ({lang === "en" ? "→ RU" : "→ EN"})
     </button>
     <button class="danger" onclick={() => void onLogout()}>Logout</button>

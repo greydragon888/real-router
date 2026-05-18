@@ -29,8 +29,7 @@ export interface SlowData {
 
 const PROFILE_TIMEOUT_MS = 1500;
 const SLOW_LOADER_TIMEOUT_MS = 250;
-// Angular SSR preview runs on port 4173 (sirv default + server-runner.mjs).
-const SLOW_FETCH_URL = "http://localhost:4173/__bench/slow-fetch";
+const SLOW_FETCH_URL = "http://localhost:4211/__bench/slow-fetch";
 
 export const loaders: DataLoaderFactoryMap = {
   users: () => (params) => {

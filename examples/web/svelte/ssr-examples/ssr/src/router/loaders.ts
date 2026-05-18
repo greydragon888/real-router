@@ -29,7 +29,7 @@ export interface SlowData {
 
 const PROFILE_TIMEOUT_MS = 1500;
 const SLOW_LOADER_TIMEOUT_MS = 250;
-const SLOW_FETCH_URL = "http://localhost:3000/__bench/slow-fetch";
+const SLOW_FETCH_URL = "http://localhost:3013/__bench/slow-fetch";
 
 export const loaders: DataLoaderFactoryMap = {
   users: () => (params) => {

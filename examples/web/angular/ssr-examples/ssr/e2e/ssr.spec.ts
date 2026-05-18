@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-const BASE = "http://localhost:4173";
+const BASE = "http://localhost:4211";
 
 test.describe("SSR (Angular)", () => {
   test("server-rendered HTML contains expected content", async ({

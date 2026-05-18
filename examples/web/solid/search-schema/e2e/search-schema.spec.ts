@@ -4,7 +4,7 @@ test.describe("Search schema plugin", () => {
   test.describe("Navigation", () => {
     test("home page loads", async ({ page }) => {
       await page.goto("/");
-      await expect(page.getByRole("heading", { name: "Home" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Search Schema Plugin" })).toBeVisible();
     });
 
     test("products link navigates with default params", async ({ page }) => {

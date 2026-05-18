@@ -112,7 +112,7 @@ test.describe("SSR (Solid)", () => {
 
     await page
       .context()
-      .addCookies([{ name: "auth", value: "1", url: "http://localhost:3000" }]);
+      .addCookies([{ name: "auth", value: "1", url: "http://localhost:3010" }]);
     await page.goto("/dashboard");
     await expect(page).toHaveURL("/dashboard");
     await expect(page.locator("main")).toContainText("Dashboard");
@@ -540,7 +540,7 @@ test.describe("SSR (Solid)", () => {
     await page
       .context()
       .addCookies([
-        { name: "userId", value: "1", url: "http://localhost:3000" },
+        { name: "userId", value: "1", url: "http://localhost:3010" },
       ]);
 
     await page.goto("/admin");
@@ -554,7 +554,7 @@ test.describe("SSR (Solid)", () => {
     await page
       .context()
       .addCookies([
-        { name: "userId", value: "2", url: "http://localhost:3000" },
+        { name: "userId", value: "2", url: "http://localhost:3010" },
       ]);
 
     await page.goto("/admin");
@@ -567,7 +567,7 @@ test.describe("SSR (Solid)", () => {
     await page
       .context()
       .addCookies([
-        { name: "userId", value: "2", url: "http://localhost:3000" },
+        { name: "userId", value: "2", url: "http://localhost:3010" },
       ]);
 
     await page.goto("/dashboard");
@@ -651,7 +651,7 @@ test.describe("SSR (Solid)", () => {
     // Cookie injected before goto so entry-client.tsx picks it up at boot
     // (lookupUserFromCookies(parseCookieHeader(document.cookie)) before usePlugin).
     await page.context().addCookies([
-      { name: "userId", value: "1", url: "http://localhost:3000" },
+      { name: "userId", value: "1", url: "http://localhost:3010" },
     ]);
 
     await page.goto("/");
@@ -808,7 +808,7 @@ test.describe("SSR (Solid)", () => {
     // Spin up three independent contexts (admin / regular user / anon) and
     // fire five different routes in parallel. Each request must see only
     // its own currentUser dependency; no cross-context bleed.
-    const BASE = "http://localhost:3000";
+    const BASE = "http://localhost:3010";
 
     const [adminCtx, userCtx, anonCtx] = await Promise.all([
       browser.newContext({

@@ -89,7 +89,7 @@ test.describe("SSR", () => {
 
     await page
       .context()
-      .addCookies([{ name: "auth", value: "1", url: "http://localhost:3000" }]);
+      .addCookies([{ name: "auth", value: "1", url: "http://localhost:3007" }]);
     await page.goto("/dashboard");
     await expect(page).toHaveURL("/dashboard");
     await expect(page.locator("main")).toContainText("Dashboard");
@@ -559,7 +559,7 @@ test.describe("SSR", () => {
     await page
       .context()
       .addCookies([
-        { name: "userId", value: "1", url: "http://localhost:3000" },
+        { name: "userId", value: "1", url: "http://localhost:3007" },
       ]);
 
     await page.goto("/admin");
@@ -573,7 +573,7 @@ test.describe("SSR", () => {
     await page
       .context()
       .addCookies([
-        { name: "userId", value: "2", url: "http://localhost:3000" },
+        { name: "userId", value: "2", url: "http://localhost:3007" },
       ]);
 
     await page.goto("/admin");
@@ -586,7 +586,7 @@ test.describe("SSR", () => {
     await page
       .context()
       .addCookies([
-        { name: "userId", value: "2", url: "http://localhost:3000" },
+        { name: "userId", value: "2", url: "http://localhost:3007" },
       ]);
 
     await page.goto("/dashboard");

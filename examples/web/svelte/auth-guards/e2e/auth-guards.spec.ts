@@ -212,6 +212,7 @@ test.describe("404 and route tree behavior", () => {
 
 test.describe("subscribeLeave — draft save", () => {
   test.beforeEach(async ({ page }) => {
+    await page.goto("/");
     await page.evaluate(() => {
       localStorage.removeItem("settings:draft");
     });
