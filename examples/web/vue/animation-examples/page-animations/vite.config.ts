@@ -8,6 +8,6 @@ export default defineConfig({
     dedupe: ["vue"],
   },
   preview: {
-    port: 4173,
+    port: 4275,
   },
 });

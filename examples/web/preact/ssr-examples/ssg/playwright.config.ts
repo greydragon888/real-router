@@ -3,11 +3,11 @@ import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: "./e2e",
   webServer: {
-    command: "pnpm build:app && pnpm preview --port 4173",
-    url: "http://localhost:4173/",
+    command: "pnpm build:app && pnpm preview --port 4227",
+    url: "http://localhost:4227/",
     reuseExistingServer: !process.env.CI,
   },
   use: {
-    baseURL: "http://localhost:4173",
+    baseURL: "http://localhost:4227",
   },
 });

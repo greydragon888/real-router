@@ -6,7 +6,7 @@
     "predev": "pnpm turbo run bundle --filter=...angular-route-animations-example",
     "dev": "ng serve",
     "build": "ng build",
-    "preview": "sirv dist/angular-route-animations-example/browser --port 4173 --single --quiet",
+    "preview": "sirv dist/angular-route-animations-example/browser --port 4204 --single --quiet",
     "test:e2e": "playwright test"
   },
   "dependencies": {

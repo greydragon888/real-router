@@ -7,7 +7,7 @@
     "predev": "pnpm turbo run bundle --filter=...ssg-angular-example",
     "dev": "ng serve",
     "build:app": "ng build && tsx scripts/ssg-build.ts",
-    "preview": "sirv dist/ssg-angular-example/browser --port 4173 --quiet",
+    "preview": "sirv dist/ssg-angular-example/browser --port 4210 --quiet",
     "test:e2e": "playwright test"
   },
   "dependencies": {

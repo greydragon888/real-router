@@ -3,12 +3,12 @@ import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: "./e2e",
   webServer: {
-    command: "pnpm build:app && pnpm preview",
-    port: 3000,
+    command: "pnpm build:app && PORT=3009 pnpm preview",
+    port: 3009,
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
   },
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL: "http://localhost:3009",
   },
 });

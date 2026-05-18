@@ -8,6 +8,6 @@ export default defineConfig({
     dedupe: ["solid-js"],
   },
   preview: {
-    port: 4173,
+    port: 4247,
   },
 });

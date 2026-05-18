@@ -6,7 +6,7 @@
     "predev": "pnpm turbo run bundle --filter=...angular-nested-routes-example",
     "dev": "ng serve",
     "build": "ng build",
-    "preview": "sirv dist/angular-nested-routes-example/browser --port 4173 --single --quiet",
+    "preview": "sirv dist/angular-nested-routes-example/browser --port 4209 --single --quiet",
     "test:unit": "vitest run",
     "test:e2e": "playwright test"
   },

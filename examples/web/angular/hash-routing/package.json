@@ -6,7 +6,7 @@
     "predev": "pnpm turbo run bundle --filter=...angular-hash-routing-example",
     "dev": "ng serve",
     "build": "ng build",
-    "preview": "sirv dist/angular-hash-routing-example/browser --port 4173 --single --quiet",
+    "preview": "sirv dist/angular-hash-routing-example/browser --port 4208 --single --quiet",
     "test:e2e": "playwright test"
   },
   "dependencies": {

@@ -7,6 +7,6 @@ export default defineConfig({
     conditions: ["development"],
   },
   preview: {
-    port: 4173,
+    port: 4234,
   },
 });

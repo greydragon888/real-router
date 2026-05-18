@@ -4,11 +4,11 @@ export default defineConfig({
   testDir: "./e2e",
   retries: 1,
   webServer: {
-    command: "pnpm build:app && pnpm preview",
-    port: 4173,
+    command: "pnpm build:app && pnpm preview --port 4259",
+    port: 4259,
     reuseExistingServer: !process.env.CI,
   },
   use: {
-    baseURL: "http://localhost:4173",
+    baseURL: "http://localhost:4259",
   },
 });

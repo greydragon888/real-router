@@ -5,11 +5,11 @@ export default defineConfig({
   retries: 1,
   webServer: {
     command: "pnpm build:app && pnpm preview",
-    port: 4173,
+    port: 4210,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },
   use: {
-    baseURL: "http://localhost:4173",
+    baseURL: "http://localhost:4210",
   },
 });

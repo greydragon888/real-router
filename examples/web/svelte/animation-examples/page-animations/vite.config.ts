@@ -8,6 +8,6 @@ export default defineConfig({
     dedupe: ["svelte"],
   },
   preview: {
-    port: 4173,
+    port: 4261,
   },
 });
