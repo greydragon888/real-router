@@ -1,5 +1,17 @@
 # @real-router/preact
 
+## 0.13.0
+
+### Minor Changes
+
+- [#649](https://github.com/greydragon888/real-router/pull/649) [`c2a2d56`](https://github.com/greydragon888/real-router/commit/c2a2d5637c035a8a923084f2dac3d6267ebc28e1) Thanks [@greydragon888](https://github.com/greydragon888)! - Add Preact 11 support; widen peer dependency range ([#592](https://github.com/greydragon888/real-router/issues/592))
+
+  The adapter now compiles against both Preact 10 (≥ 10.28) and Preact 11 by importing `HTMLAttributes` / `TargetedMouseEvent` from the top-level `preact` namespace instead of the `JSX` namespace. Preact 11 restructures `JSX.*` and only keeps `Element` / `IntrinsicElements`; everything else moves to `preact`. The top-level exports landed in Preact 10.28, so the peer-dep floor moves up to that version.
+
+  **Migration:** if you use the adapter you only need to upgrade Preact to 10.28 or newer. No source-code changes are required in consumer apps.
+
+  **Peer dependency:** `"preact": ">=10.28.0 || ^11.0.0-0"`. The `-0` suffix lets `npm`/`pnpm` accept Preact 11 pre-release tags during the beta window.
+
 ## 0.12.0
 
 ### Minor Changes
