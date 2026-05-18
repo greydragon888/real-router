@@ -298,16 +298,18 @@ describe("parseTokens — contract locks (via buildActiveClassName)", () => {
   });
 
   describe("Roundtrip: tokens joined and re-parsed yield the same set", () => {
-    // parseTokens(parseTokens(s).join(" ")) must equal parseTokens(s) —
-    // re-parsing a normalized (single-spaced) token string must be a no-op.
-    // This is observable through buildActiveClassName: after the first call
-    // normalizes the base string, a second call with the normalized output
-    // must produce the identical result (no new tokens appear, none disappear).
+    // parseTokens(parseTokens(s).join(" ")) must equal parseTokens(s) as a
+    // SET — re-parsing a normalized (single-spaced) token string adds and
+    // removes no tokens. Order is NOT guaranteed: `buildActiveClassName`
+    // appends `active` at the end iff it wasn't already in `base`; if it
+    // was, it stays in `base`'s original position. So the roundtrip
+    // {once → strip active → re-add} relocates the token from its
+    // original position to the end. The set membership is the invariant
+    // that holds; raw-string equality is not.
     test.prop([arbToken, arbBaseClassName], { numRuns: NUM_RUNS.standard })(
-      "re-applying to already-normalized output is a no-op",
+      "re-applying to already-normalized output preserves the token set",
       (active, base) => {
         const once = buildActiveClassName(true, active, base);
-        // Strip the active class from the first result to get the normalized base.
         const normalizedBase = once
           ?.split(/\s+/)
           .filter(Boolean)
@@ -315,7 +317,10 @@ describe("parseTokens — contract locks (via buildActiveClassName)", () => {
           .join(" ");
         const twice = buildActiveClassName(true, active, normalizedBase ?? "");
 
-        expect(twice).toBe(once);
+        const tokensOnce = new Set(once?.split(/\s+/).filter(Boolean));
+        const tokensTwice = new Set(twice?.split(/\s+/).filter(Boolean));
+
+        expect(tokensTwice).toStrictEqual(tokensOnce);
       },
     );
   });
@@ -542,9 +547,7 @@ describe("buildHref — Property Tests", () => {
         if (stripped.length === 0) {
           expect(href).toBe(path);
         } else {
-          expect(href).toBe(
-            `${path}#${encodeURI(stripped).replaceAll("#", "%23")}`,
-          );
+          expect(href).toBe(`${path}#${computeExpectedFragment(stripped)}`);
         }
       },
     );

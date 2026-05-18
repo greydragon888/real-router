@@ -628,14 +628,12 @@ describe("buildHref — Property Tests", () => {
   // asserting buildHref (which calls encodeFragmentInline) matches it.
   // Any drift in either implementation surfaces here as a buildHref bug.
   describe("Invariant 12: encodeFragmentInline matches the documented RFC 3986 + %23 formula", () => {
-    // The reference spec — MUST stay identical to the one-liners in both
-    // `shared/dom-utils/link-utils.ts:encodeFragmentInline` and
-    // `shared/browser-env/url-context.ts:encodeHashFragment`. If you change
-    // any of the three locations, change all three.
-    function referenceEncodeFragment(decoded: string): string {
-      return encodeURI(decoded).replaceAll("#", "%23");
-    }
-
+    // Reference is the shared `computeExpectedFragment` mirror from
+    // `shared/dom-utils/__test-helpers/expected-fragment.ts` — it
+    // independently re-derives the encoder including the idempotency
+    // layer for pre-encoded `%XX` input (audit 2026-05-17 §5 MEDIUM
+    // E.1). Drift between this mirror and `encodeFragmentInline` is
+    // exactly what this property test is supposed to surface.
     test.prop([arbHash, fc.string({ minLength: 1, maxLength: 16 })], {
       numRuns: NUM_RUNS.thorough,
     })(
@@ -655,7 +653,7 @@ describe("buildHref — Property Tests", () => {
           return;
         }
 
-        const reference = referenceEncodeFragment(stripped);
+        const reference = computeExpectedFragment(stripped);
 
         expect(result).toBe(`${path}#${reference}`);
       },

@@ -623,9 +623,7 @@ describe("buildHref — Property Tests", () => {
         if (stripped.length === 0) {
           expect(href).toBe(path);
         } else {
-          expect(href).toBe(
-            `${path}#${encodeURI(stripped).replaceAll("#", "%23")}`,
-          );
+          expect(href).toBe(`${path}#${computeExpectedFragment(stripped)}`);
         }
       },
     );
