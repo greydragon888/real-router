@@ -1,5 +1,134 @@
 # @real-router/vue
 
+## 0.13.0
+
+### Minor Changes
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `<ClientOnly>` and `<ServerOnly>` SSR-aware components ([#604](https://github.com/greydragon888/real-router/issues/604))
+
+  Two paired components for opt-in client/server rendering boundaries.
+  Built on `ref` + `onMounted` — slots `default` and `fallback` switch
+  based on the mount state. Server emits the SSR-side branch, client
+  matches it on first paint, then `onMounted` flips the rendered slot.
+
+  ```vue
+  <ClientOnly>
+    <BrowserApiWidget />
+    <template #fallback>
+      <Skeleton />
+    </template>
+  </ClientOnly>
+  ```
+
+  Or with the render function:
+
+  ```ts
+  import { h } from "vue";
+  import { ClientOnly } from "@real-router/vue";
+
+  h(
+    ClientOnly,
+    {},
+    {
+      default: () => h(BrowserApiWidget),
+      fallback: () => h(Skeleton),
+    },
+  );
+  ```
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `<HttpStatusCode :code="N"/>` + `<HttpStatusProvider>` + `createHttpStatusSink()` to `/ssr` ([#611](https://github.com/greydragon888/real-router/issues/611))
+
+  Render-time HTTP status declaration for SSR. Vue-native idioms (`provide` / `inject` via `InjectionKey`). Sink writer fires in `setup()`, component renders nothing.
+
+  ```vue-html
+  <HttpStatusProvider :sink="sink">
+    <RouterProvider :router="router">
+      <App />
+    </RouterProvider>
+  </HttpStatusProvider>
+
+  <!-- inside NotFound.vue -->
+  <HttpStatusCode :code="404" />
+  ```
+
+  ```ts
+  const sink = createHttpStatusSink();
+  const html = await renderToString(createSSRApp(App));
+  response.status(sink.code ?? 200).send(html);
+  ```
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - `defer()` consumers + `/ssr` subpath split ([#611](https://github.com/greydragon888/real-router/issues/611))
+
+  Mirrors the React Stage 1 + Stage 0a roll-out ([#609](https://github.com/greydragon888/real-router/issues/609) / [#610](https://github.com/greydragon888/real-router/issues/610)). Vue ships
+  three new SSR-feature exports under `@real-router/vue/ssr`:
+  - `useDeferred<T>(key)` — reads the promise published by the loader at
+    `state.context.ssrDataDeferred[key]`.
+  - `<Await name="key">` — `defineComponent` with `async setup()` and a
+    scoped slot exposing the resolved value.
+  - `<Streamed fallback>` — alias for native `<Suspense>` matching
+    cross-adapter naming.
+
+  Idiom: `defineComponent` + `async setup()` + native `<Suspense>`.
+
+  **`<ClientOnly>` / `<ServerOnly>` migrated to `/ssr`**:
+
+  ```diff
+  - import { ClientOnly, ServerOnly } from "@real-router/vue";
+  + import { ClientOnly, ServerOnly } from "@real-router/vue/ssr";
+  ```
+
+  **Wire-format**: consumes the NDJSON-shaped `<script>__rrDefer__("key",
+json)</script>` settle scripts emitted by `@real-router/ssr-data-plugin/server`'s
+  `injectDeferredScripts` — server-side loaders return `defer({ critical,
+deferred })` once.
+
+  **Streaming behaviour**: chunked HTTP, `<Suspense>` blocking (no OOO
+  placeholders) — 🟡 DX-only — formal API.
+
+  **Breaking change** (pre-1.0, allowed in `minor`): `ClientOnly`/`ServerOnly`
+  removed from main entry.
+
+### Patch Changes
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Guard against throwing `getAnnouncementText` in `createRouteAnnouncer` ([#628](https://github.com/greydragon888/real-router/issues/628))
+
+  A user-provided `getAnnouncementText` callback that throws was propagating
+  the exception up through `router.subscribe`'s listener loop, tearing down
+  sibling listeners and breaking navigation tracking elsewhere. The shared
+  `resolveText` helper now wraps the callback in try/catch, logs the error
+  via `console.error` with a `[real-router]` prefix, and falls through to
+  the built-in resolution chain (`<h1>` textContent → `document.title` →
+  route name → pathname).
+
+  User-visible effect: a buggy custom announcer resolver no longer breaks
+  router subscriptions — the announcer announces the fallback text and
+  logs the underlying error so the bug surfaces in dev tools.
+
+  Discovered during the React audit (`review-2026-05-10` §5.7, MED
+  severity). Applied to `shared/dom-utils/route-announcer.ts` and the
+  git-tracked Angular copy.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `shallowEqual` asymmetry on disjoint-key records ([#627](https://github.com/greydragon888/real-router/issues/627))
+
+  `shallowEqual({ a: undefined }, { b: "" })` returned `true` while
+  `shallowEqual({ b: "" }, { a: undefined })` returned `false`. The inner loop
+  read missing keys via bracket access as `undefined` and falsely matched
+  `prev[key] === undefined`. Added a `hasOwnProperty` guard mirroring React's
+  own `shallowEqual` (`packages/shared/shallowEqual.js`).
+
+  The helper is inlined from `shared/dom-utils/link-utils.ts` via the symlink
+  graph, so this adapter receives the fix in lockstep with the other 5
+  adapters.
+
+  User-visible effect: `<Link routeParams={{ a: undefined }} />` no longer
+  compares equal to `<Link routeParams={{ b: undefined }} />` — re-render now
+  matches the documented `shallowEqual` contract (key-order-insensitive,
+  `Object.is` per key).
+
+- Updated dependencies [[`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c)]:
+  - @real-router/core@0.53.0
+  - @real-router/sources@0.8.2
+
 ## 0.12.1
 
 ### Patch Changes

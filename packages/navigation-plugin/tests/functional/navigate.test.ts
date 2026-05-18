@@ -4,6 +4,7 @@ import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { navigationPluginFactory } from "../../src";
 import { createNavigateHandler } from "../../src/navigate-handler";
+import { PLUGIN_SYNC_INFO } from "../../src/navigation-browser";
 import { MockNavigation } from "../helpers/mockNavigation";
 import {
   createMockNavigationBrowser,
@@ -139,14 +140,14 @@ describe("Navigation Plugin — Navigate", () => {
       expect(navigateSpy).not.toHaveBeenCalled();
     });
 
-    it("router.navigate() calls router exactly once (onTransitionSuccess navigate event short-circuits via isSyncingFromRouter)", async () => {
+    it("router.navigate() calls router exactly once (onTransitionSuccess navigate event short-circuited via event.info === PLUGIN_SYNC_INFO)", async () => {
       const navigateSpy = vi.spyOn(router, "navigate");
 
       await router.navigate("users.list");
 
       // Exactly one user-initiated navigation — the navigate-event loop
-      // fired by onTransitionSuccess is short-circuited by isSyncingFromRouter=true,
-      // so router.navigate is not re-entered.
+      // fired by onTransitionSuccess carries info=PLUGIN_SYNC_INFO and is
+      // short-circuited by the handler before re-entering router.navigate.
       expect(navigateSpy).toHaveBeenCalledTimes(1);
       expect(navigateSpy.mock.calls[0][0]).toBe("users.list");
     });
@@ -197,7 +198,7 @@ describe("Navigation Plugin — Navigate", () => {
       expect(router.getState()?.name).toBe("users.list");
     });
 
-    it("no infinite loop: router → browser navigate → handler skipped (isSyncingFromRouter)", async () => {
+    it("no infinite loop: router → browser navigate → handler skipped (event.info === PLUGIN_SYNC_INFO)", async () => {
       const navigateSpy = vi.spyOn(router, "navigate");
       const subscribeSpy = vi.fn();
 
@@ -306,8 +307,8 @@ describe("Navigation Plugin — Navigate", () => {
 
       await finished;
 
-      // Explicit sync via browser.navigate({history:"replace"}) in the
-      // syncing branch keeps URL and router state consistent. No desync.
+      // Explicit sync via browser.navigate({history:"replace"}) tagged with
+      // PLUGIN_SYNC_INFO keeps URL and router state consistent. No desync.
       expect(mockNav.currentUrl).toBe(urlBefore);
       expect(router.getState()?.name).toBe("index");
     });
@@ -431,7 +432,6 @@ describe("createNavigateHandler — direct", () => {
       matchPath: vi.fn(),
     } as unknown as Parameters<typeof createNavigateHandler>[0]["api"],
     browser: {} as NavigationBrowser,
-    isSyncingFromRouter: () => false,
     setCapturedMeta: vi.fn(),
     base: "",
     transitionOptions: { source: "navigate", replace: true as const },
@@ -470,13 +470,18 @@ describe("createNavigateHandler — direct", () => {
     expect(setCapturedMeta).not.toHaveBeenCalled();
   });
 
-  it("intercepts with noop handler when isSyncingFromRouter() returns true — #518", async () => {
-    // Regression test for #518: when the plugin itself triggers a navigate
-    // event (via browser.navigate in onTransitionSuccess), the handler MUST
-    // still call event.intercept(). Per Navigation API spec, a bare `return`
-    // leaves a same-origin canIntercept event un-intercepted, and Chromium
-    // falls back to a cross-document (full-reload) navigation — which
-    // re-runs the bootstrap and triggers an infinite loop.
+  it("intercepts with noop handler when event.info === PLUGIN_SYNC_INFO — #518, #580", async () => {
+    // Regression test for #518 + #580: when the plugin itself triggers a
+    // navigate event (via browser.navigate in onTransitionSuccess), the
+    // handler MUST still call event.intercept(). Per Navigation API spec, a
+    // bare `return` leaves a same-origin canIntercept event un-intercepted,
+    // and Chromium falls back to a cross-document (full-reload) navigation —
+    // which re-runs the bootstrap and triggers an infinite loop.
+    //
+    // Detection is identity-based on `event.info` (PLUGIN_SYNC_INFO sentinel
+    // tagged at the createNavigationBrowser layer), so it works regardless
+    // of whether the navigate event is delivered synchronously (Chromium) or
+    // asynchronously on a subsequent task (Safari 26.2 WKWebView — #580).
     const setCapturedMeta = vi.fn();
     const routerNavigateMock = vi.fn();
     const handler = createNavigateHandler(
@@ -487,13 +492,13 @@ describe("createNavigateHandler — direct", () => {
           navigateToNotFound: vi.fn(),
           navigateToDefault: vi.fn(),
         } as unknown as Router,
-        isSyncingFromRouter: () => true,
         setCapturedMeta,
       }),
     );
     const interceptSpy = vi.fn();
     const event = makeEvent({
       intercept: interceptSpy,
+      info: PLUGIN_SYNC_INFO,
     } as unknown as Partial<NavigateEvent>);
 
     handler(event);
@@ -512,6 +517,76 @@ describe("createNavigateHandler — direct", () => {
 
     // Must NOT capture meta — the plugin-initiated navigation already has it.
     expect(setCapturedMeta).not.toHaveBeenCalled();
+  });
+});
+
+describe("Async navigate-event delivery (#580)", () => {
+  // Safari 26.2 WKWebView delivers navigate events on a subsequent microtask,
+  // not synchronously inside `nav.navigate(...)`. The previous `SyncingFlag`
+  // mechanism set a boolean inside a `try/finally` around the call, so by
+  // the time the event arrived the flag was already `false` and the handler
+  // treated the plugin's own write as a user-initiated navigation,
+  // re-issuing `router.navigate(...)` and triggering a render-loop on
+  // macOS 26.2 Tauri releases. The identity-based `event.info ===
+  // PLUGIN_SYNC_INFO` detection does not depend on dispatch timing and
+  // survives the WKWebView quirk.
+
+  let router: Router;
+  let mockNav: MockNavigation;
+  let browser: NavigationBrowser;
+  let unsub: Unsubscribe | undefined;
+
+  beforeEach(() => {
+    mockNav = new MockNavigation("http://localhost/");
+    mockNav.enableAsyncDispatch();
+    browser = createMockNavigationBrowser(mockNav);
+    router = createRouter(routerConfig, {
+      defaultRoute: "home",
+      queryParamsMode: "default",
+    });
+    unsub = router.usePlugin(navigationPluginFactory({}, browser));
+  });
+
+  afterEach(() => {
+    router.stop();
+    unsub?.();
+    vi.clearAllMocks();
+  });
+
+  it("does not loop when navigate events arrive on a subsequent microtask", async () => {
+    await router.start();
+    const navigateSpy = vi.spyOn(router, "navigate");
+
+    // Trigger an actual nav.navigate call (different URL bypasses the
+    // same-URL guard so we exercise the navigate event dispatch path).
+    await router.navigate("users.list");
+
+    // Drain microtasks twice — `enableAsyncDispatch` queues each navigate
+    // event via queueMicrotask; if the plugin's handler missed the info
+    // check it would call api.navigateToState which triggers another
+    // browser.navigate, which queues another event, ad infinitum.
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(navigateSpy).toHaveBeenCalledTimes(1);
+    expect(navigateSpy.mock.calls[0][0]).toBe("users.list");
+    expect(router.getState()?.name).toBe("users.list");
+  });
+
+  it("subscribers fire exactly once per navigation under async dispatch", async () => {
+    await router.start();
+    const subscribeSpy = vi.fn();
+
+    router.subscribe(subscribeSpy);
+
+    await router.navigate("users.list");
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Exactly one user-driven transition → exactly one subscriber fire.
+    // A loop would manifest as repeated subscribe calls.
+    expect(subscribeSpy).toHaveBeenCalledTimes(1);
+    expect(router.getState()?.name).toBe("users.list");
   });
 });
 
@@ -702,10 +777,10 @@ describe("Error Recovery", () => {
   });
 
   it("recovery calls browser.navigate with replace history", async () => {
-    // Recovery delegates URL→state sync to browser.navigate; the syncing flag
-    // is now raised/lowered inside NavigationBrowser around that call (verified
-    // separately in navigation-browser.test.ts → "syncing wrapper"), not by the
-    // navigate handler.
+    // Recovery delegates URL→state sync to browser.navigate; the built-in
+    // createNavigationBrowser tags that call with `info: PLUGIN_SYNC_INFO` so
+    // the navigate-event handler short-circuits it (verified separately in
+    // navigation-browser.test.ts → "navigate"/"replaceState"/"traverseTo").
     const mockRouter = {
       isActive: () => true,
       navigate: vi.fn().mockRejectedValue(new TypeError("crash")),
@@ -731,7 +806,6 @@ describe("Error Recovery", () => {
         }),
       } as unknown as Parameters<typeof createNavigateHandler>[0]["api"],
       browser: mockBrowser,
-      isSyncingFromRouter: () => false,
       setCapturedMeta: vi.fn(),
       base: "",
       transitionOptions: { source: "navigate", replace: true as const },

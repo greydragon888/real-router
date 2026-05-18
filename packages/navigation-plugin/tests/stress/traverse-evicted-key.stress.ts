@@ -174,10 +174,12 @@ describe("N20 — traverseTo to an evicted or invalid key", () => {
     expect(state.name).toBe("home");
   });
 
-  it("N20.4: after traverseTo failure, isSyncingFromRouter flag is released (subsequent navigate events are not skipped)", async () => {
-    // Invariant D1/D2/D4: the syncing flag is reset even when traverseTo
-    // throws mid-onTransitionSuccess. If it weren't, browser-initiated
-    // navigate events would be silently skipped forever.
+  it("N20.4: after traverseTo failure, subsequent browser-initiated navigate events are not skipped", async () => {
+    // Invariant D1/D2/D4: when traverseTo throws mid-onTransitionSuccess, no
+    // navigate event is dispatched for the failed call (the throw happens
+    // before any event would fire), so there is no stale plugin-sync state to
+    // leak. Subsequent user-initiated events carry their own `info` (none of
+    // them equal PLUGIN_SYNC_INFO) and the handler processes them normally.
     const result = createStressRouter();
 
     router = result.router;
@@ -197,9 +199,9 @@ describe("N20 — traverseTo to an evicted or invalid key", () => {
 
     spy.mockRestore();
 
-    // Browser-initiated navigate must not be ignored — if isSyncingFromRouter
-    // were stuck in `true`, the handler would early-return and router would
-    // never transition.
+    // Browser-initiated navigate must not be ignored — the handler checks
+    // event.info === PLUGIN_SYNC_INFO, and this user-initiated event carries
+    // no info, so it must transition through.
     const { finished } = mockNav.navigate("http://localhost/users/view/42");
 
     await finished;

@@ -25,11 +25,10 @@ import {
   canGoForward,
   canGoBackTo,
 } from "./history-extensions";
+import { isSameHref } from "./href-utils";
 import { createNavigateHandler } from "./navigate-handler";
-import { wrapNavigationBrowserWithSyncing } from "./navigation-browser";
 
 import type { UrlContext } from "./browser-env";
-import type { SyncingFlag } from "./navigation-browser";
 import type {
   NavigationBrowser,
   NavigationMeta,
@@ -76,7 +75,6 @@ export class NavigationPlugin {
     release: () => void;
   };
   readonly #lifecycle: Pick<Plugin, "onStart" | "onStop" | "teardown">;
-  readonly #syncing: SyncingFlag = { current: false };
 
   #capturedMeta: NavigationMeta | undefined;
   #pendingTraverseKey: string | undefined;
@@ -111,13 +109,12 @@ export class NavigationPlugin {
     this.#router = router;
     this.#api = api;
     this.#options = options;
-    // Wrap mutations with the syncing flag so the navigate handler can
-    // short-circuit re-entrant events fired by the plugin's own writes
-    // (`nav.navigate` and `nav.navigate({history:"replace"})` fire navigate
-    // events synchronously). The flag is per-instance — never shared across
-    // plugins — so multiple routers running concurrent transitions don't
-    // bleed syncing state into each other.
-    this.#browser = wrapNavigationBrowserWithSyncing(browser, this.#syncing);
+    // The navigate handler short-circuits re-entrant events from plugin-
+    // initiated writes by checking `event.info === PLUGIN_SYNC_INFO`. The
+    // built-in `createNavigationBrowser` tags every mutation with that
+    // sentinel; consumer-supplied browsers must do the same — see CLAUDE.md
+    // "Router-driven mutations re-enter the navigate handler".
+    this.#browser = browser;
 
     this.#claim = api.claimContextNamespace("navigation");
     this.#urlClaim = api.claimContextNamespace("url");
@@ -182,7 +179,6 @@ export class NavigationPlugin {
       router,
       api,
       browser: this.#browser,
-      isSyncingFromRouter: () => this.#syncing.current,
       setCapturedMeta: (meta) => {
         this.#capturedMeta = meta;
       },
@@ -293,8 +289,6 @@ export class NavigationPlugin {
         // under memory pressure), we must not leave the stale key behind —
         // otherwise the NEXT transition's onTransitionSuccess would see it
         // and replay the traverse against the same already-broken key.
-        // The syncing flag is raised/lowered inside NavigationBrowser around
-        // each mutation, so we do not need to manage it here.
         const traverseKey = this.#pendingTraverseKey;
         const traverseHash = this.#pendingTraverseHash;
 
@@ -355,7 +349,26 @@ export class NavigationPlugin {
           this.#historyStateBuffer.params = toState.params;
           this.#historyStateBuffer.path = toState.path;
 
-          if (toState.name === UNKNOWN_ROUTE) {
+          // Two cases route through `updateCurrentEntry` (state-only mutation
+          // of the current history entry, no navigate event):
+          //
+          // 1. UNKNOWN_ROUTE — URL stays as the browser had it; we only need
+          //    to tag the entry's state with the router's `name/params/path`.
+          // 2. Same-URL transition (#580) — the target URL is what the
+          //    browser already shows, so a `nav.navigate(url,
+          //    {history:"replace"})` would either be a no-op (Chromium fires
+          //    a navigate event we short-circuit via `event.info ===
+          //    PLUGIN_SYNC_INFO`) or — on Safari 26.2 WKWebView under custom
+          //    protocols (`tauri://`, `app://`) — a *cross-document*
+          //    navigation that discards the JS context. The bootstrap then
+          //    re-runs the plugin which re-issues the same call, and the
+          //    cycle becomes a render loop the user perceives as flicker.
+          //    `updateCurrentEntry` is the spec-correct primitive for a
+          //    state-only mutation and avoids both behaviours.
+          if (
+            toState.name === UNKNOWN_ROUTE ||
+            isSameHref(finalUrl, this.#browser.currentEntry?.url)
+          ) {
             this.#browser.updateCurrentEntry({
               state: this.#historyStateBuffer,
             });

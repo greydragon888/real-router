@@ -185,14 +185,16 @@ describe("normalizeHashInput Properties", () => {
   test.prop([fc.string().filter((s) => s.startsWith("##"))], {
     numRuns: NUM_RUNS.fast,
   })(
-    "G10: only the FIRST leading '#' is stripped — second one is preserved (decoded)",
-    (doubleHash) => {
-      // doubleHash starts with "##...": the first "#" is stripped, the
-      // second is decoded as-is (decodeURIComponent("#") === "#"). The
-      // result must still start with "#".
-      const result = normalizeHashInput(doubleHash);
+    "G10: ALL leading '#' chars are stripped — the result never starts with '#'",
+    (multiHash) => {
+      // Updated from earlier behaviour where only the FIRST "#" was stripped
+      // (which broke idempotence — G9 caught it on counterexample "##").
+      // `normalizeHashInput` now strips every leading "#" so the result never
+      // starts with one. Subsequent characters (including a literal "#" not
+      // at the start) are passed through `decodeHashFragment` unchanged.
+      const result = normalizeHashInput(multiHash);
 
-      expect(result.startsWith("#")).toBe(true);
+      expect(result.startsWith("#")).toBe(false);
     },
   );
 

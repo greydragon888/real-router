@@ -23,13 +23,14 @@ Contains no navigation business logic — only URL synchronization and navigate 
 ```
 navigation-plugin/
 ├── src/
-│   ├── index.ts               — Public API + module augmentation
+│   ├── index.ts               — Public API + module augmentation; exports PLUGIN_SYNC_INFO sentinel
 │   ├── factory.ts             — navigationPluginFactory (validation, normalization, instance creation)
-│   ├── plugin.ts              — NavigationPlugin class (runtime behavior)
-│   ├── types.ts               — Types (NavigationPluginOptions, NavigationBrowser, NavigationMeta, NavigationDirection, NavigationSharedState, SyncingFlag)
+│   ├── plugin.ts              — NavigationPlugin class (runtime behavior); same-URL guard in onTransitionSuccess (#580)
+│   ├── types.ts               — Types (NavigationPluginOptions, NavigationBrowser, NavigationMeta, NavigationDirection, NavigationSharedState)
 │   ├── history-extensions.ts  — Navigation API history extensions (peekBack, peekForward, hasVisited, etc.)
-│   ├── navigate-handler.ts    — Navigate event handler (createNavigateHandler, recoverFromNavigateError, withRecovery)
-│   ├── navigation-browser.ts  — NavigationBrowser implementation (createNavigationBrowser + wrapNavigationBrowserWithSyncing)
+│   ├── navigate-handler.ts    — Navigate event handler (createNavigateHandler, recoverFromNavigateError, withRecovery); plugin-event detection via `event.info === PLUGIN_SYNC_INFO`
+│   ├── navigation-browser.ts  — NavigationBrowser implementation (createNavigationBrowser tags every router-driven nav.navigate / nav.traverseTo call with `info: PLUGIN_SYNC_INFO`); exports the sentinel constant
+│   ├── href-utils.ts          — isSameHref(target, currentHref) pure helper for the same-URL guard (#580); URL-canonical equality predicate
 │   ├── ssr-fallback.ts        — createNavigationFallbackBrowser (no-op fallback for SSR)
 │   ├── validation.ts          — Options validation (delegates to browser-env)
 │   ├── constants.ts           — Constants (defaultOptions, source, LOGGER_CONTEXT)
@@ -265,7 +266,6 @@ this.#removeExtensions = api.extendRouter({
     router,
     browser,
     pluginBuildUrl,
-    setSyncing,
   ),
   peekBack: () => peekBack(browser, api, options.base),
   peekForward: () => peekForward(browser, api, options.base),
@@ -371,18 +371,20 @@ router.navigate(name, params, opts)
         │
         ├── historyState = { name, params, path }
         │
-        ├── #isSyncingFromRouter = true
-        │
         ├── #pendingTraverseKey set?
         │     YES: browser.traverseTo(key)
+        │          (createNavigationBrowser tags the call with info: PLUGIN_SYNC_INFO)
         │
-        ├── toState.name === UNKNOWN_ROUTE?
+        ├── toState.name === UNKNOWN_ROUTE
+        │   ── OR ── isSameHref(finalUrl, browser.currentEntry?.url) === true (#580)
         │     YES: browser.updateCurrentEntry({ state: historyState })
+        │          (no navigate event fires; URL stays as-is)
         │
         └── otherwise:
-              shouldReplace = shouldReplaceHistory(navOptions, toState, fromState)
+              replace = frozenMeta.navigationType !== "push" || isInitialTransition
               browser.navigate(finalUrl, { state: historyState, history: replace ? "replace" : "push" })
-              #isSyncingFromRouter = false
+              (createNavigationBrowser tags the call with info: PLUGIN_SYNC_INFO so the
+               re-entrant navigate event is short-circuited by the handler)
 ```
 
 ## Data Flow: Navigate Event
@@ -395,9 +397,11 @@ User clicks back/forward/link, or navigation.navigate() fires
         │
         ├── event.canIntercept === false? → return (cross-origin, download, etc.)
         │
-        ├── isSyncingFromRouter() === true? → return (plugin-initiated, skip)
-        │
         ├── router.isActive() === false? → return
+        │
+        ├── event.info === PLUGIN_SYNC_INFO?
+        │     YES: event.intercept({ handler: async () => {} }) — noop, no router call
+        │          (plugin-initiated event; identity-based check, timing-independent — #580)
         │
         ├── Parse destination URL → path
         │
@@ -559,32 +563,62 @@ The factory may be called again — for example, during HMR or when reusing the 
 
 `shared` is intentionally mutable. It's the only shared state between instances of the same factory.
 
-## replaceHistoryState and the Syncing Flag
+## Plugin-event detection (PLUGIN_SYNC_INFO sentinel, #518 + #580)
 
-`navigation.navigate({ history: "replace" })` fires a navigate event — unlike `history.replaceState()` which does not fire popstate. The plugin must suppress this event to prevent a full navigation cycle:
+`navigation.navigate({ history: "replace" })` fires a navigate event — unlike `history.replaceState()` which does not fire popstate. The plugin must mark its own events so the handler short-circuits them, otherwise the event loops back through `router.navigate()`.
+
+The mechanism is identity-based: `createNavigationBrowser` tags every router-driven `nav.navigate` and `nav.traverseTo` call with `info: PLUGIN_SYNC_INFO` (a stable string sentinel exported from `navigation-browser.ts` and re-exported from the package barrel). The navigate-event handler checks `event.info === PLUGIN_SYNC_INFO` at entry and intercepts with a noop handler:
 
 ```typescript
-// plugin-utils.ts
-setSyncing(true);
-browser.replaceState(historyState, url); // fires navigate event
-setSyncing(false);
+// navigation-browser.ts (createNavigationBrowser)
+navigate: (url, options) => {
+  nav.navigate(url, { ...options, info: PLUGIN_SYNC_INFO });
+},
+
+// navigate-handler.ts (createNavigateHandler)
+if (event.info === PLUGIN_SYNC_INFO) {
+  event.intercept({ handler: async () => {} });
+  return;
+}
 ```
 
-The navigate handler checks `isSyncingFromRouter()` at the top and returns early if true.
+The bare `return` is not enough — per Navigation API spec, a same-origin `canIntercept` event left un-intercepted triggers Chromium's cross-document fallback (full reload). The noop intercept cancels that fallback without running router logic.
 
-The same flag is set in `onTransitionSuccess` around all `browser.navigate()` / `browser.traverseTo()` / `browser.updateCurrentEntry()` calls.
+**Why identity, not a flag**: the previous design used a per-instance `SyncingFlag` raised before each call and lowered in a synchronous `finally`. It assumed `navigate` events fire synchronously inside `nav.navigate(...)` (Chromium behaviour). Safari 26.2 WKWebView delivers them on a subsequent task — by then the flag was already cleared, the handler treated the plugin's own write as user-initiated, and the cycle became a render-loop on macOS 26.2 Tauri releases (#580). `event.info` travels with the event, so detection is timing-independent.
+
+`updateCurrentEntry` is **not** tagged: it dispatches `currententrychange`, not `navigate`, so there is no event to short-circuit.
+
+## Same-URL guard in onTransitionSuccess (#580)
+
+When the destination URL of a transition is canonically equal to the browser's current URL, the plugin writes router state via `browser.updateCurrentEntry({ state })` instead of `browser.navigate(url, { history: "replace" })`. Both leave a single history entry with the new state, but `updateCurrentEntry` does not fire a navigate event — and crucially does not trigger Safari WKWebView's cross-document fallback for custom-protocol same-URL replaces (the actual root cause of #580).
+
+```typescript
+if (
+  toState.name === UNKNOWN_ROUTE ||
+  isSameHref(finalUrl, this.#browser.currentEntry?.url)
+) {
+  this.#browser.updateCurrentEntry({ state: historyState });
+} else {
+  this.#browser.navigate(finalUrl, { state: historyState, history: replace ? "replace" : "push" });
+}
+```
+
+`isSameHref(target, currentHref)` lives in `href-utils.ts` as a pure helper. It returns `true` when `new URL(target, currentHref).href === new URL(currentHref).href` — URL-canonical equality, so `scheme://host` and `scheme://host/` (special-scheme trailing-slash canonicalisation) compare equal. Returns `false` when `currentHref` is null/empty or either URL construction throws. The function is total over `string × (string | null | undefined)` and never throws. Property-tested in `tests/property/href-utils.properties.ts` (K1–K9 in INVARIANTS.md).
+
+**Behavioural consequence**: same-URL transitions (initial transition to a route whose path equals the bootstrap URL; `router.navigate(name, params, { reload: true })` to current state; `forwardTo` redirects that don't change the path) no longer fire navigate events. `state.context.navigation.navigationType` still reports `"reload"` / `"replace"` for downstream consumers.
 
 ## Performance
 
-| Optimization                     | Location                | Effect                                                 |
-| -------------------------------- | ----------------------- | ------------------------------------------------------ |
-| `String.startsWith` + `slice`    | `url-utils.ts`          | No regex needed for base path stripping                |
-| Navigation API serialization     | Browser (native)        | No deferred queue needed — browser handles concurrency |
-| `state.context.navigation`       | `plugin.ts`             | Metadata lives on state — no separate storage needed   |
-| `Object.freeze(meta)`           | `plugin.ts`             | Subscriber mutation protection without copies           |
-| `entryToState` via URL matching  | `history-extensions.ts` | Always authoritative — no stale state issues           |
-| `createNavigationBrowser()` once | `factory.ts`            | Environment check and browser wrapping don't repeat    |
-| `isSyncingFromRouter` flag       | `plugin.ts`             | Blocks navigate event re-entry without a queue         |
+| Optimization                     | Location                | Effect                                                                          |
+| -------------------------------- | ----------------------- | ------------------------------------------------------------------------------- |
+| `String.startsWith` + `slice`    | `url-utils.ts`          | No regex needed for base path stripping                                          |
+| Navigation API serialization     | Browser (native)        | No deferred queue needed — browser handles concurrency                           |
+| `state.context.navigation`       | `plugin.ts`             | Metadata lives on state — no separate storage needed                             |
+| `Object.freeze(meta)`            | `plugin.ts`             | Subscriber mutation protection without copies                                    |
+| `entryToState` via URL matching  | `history-extensions.ts` | Always authoritative — no stale state issues                                     |
+| `createNavigationBrowser()` once | `factory.ts`            | Environment check and browser wrapping don't repeat                              |
+| `PLUGIN_SYNC_INFO` identity check | `navigate-handler.ts`  | Constant-time, timing-independent detection of plugin-originated events (#580)  |
+| Same-URL guard (`isSameHref`)    | `plugin.ts` + `href-utils.ts` | Same-URL transitions skip nav.navigate entirely → no event to short-circuit |
 
 ## Related Documents
 

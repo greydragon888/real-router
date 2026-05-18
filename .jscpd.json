@@ -27,7 +27,7 @@
     "packages/react/src/legacy.ssr.ts",
     "packages/react/src/ink.ts"
   ],
-  "format": ["typescript", "tsx"],
+  "format": ["typescript", "tsx", "svelte"],
   "absolute": false,
   "gitignore": true
 }

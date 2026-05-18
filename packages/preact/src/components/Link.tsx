@@ -12,7 +12,7 @@ import { useIsActiveRoute } from "../hooks/useIsActiveRoute";
 import { useRouter } from "../hooks/useRouter";
 
 import type { LinkProps } from "../types";
-import type { FunctionComponent, JSX } from "preact";
+import type { FunctionComponent, TargetedMouseEvent } from "preact";
 
 /**
  * Custom comparator for `Link`'s `memo()` wrapper.
@@ -95,9 +95,7 @@ export const Link: FunctionComponent<LinkProps> = memo(
       hash === undefined ? undefined : { hash },
     );
 
-    const handleClick = (
-      evt: JSX.TargetedMouseEvent<HTMLAnchorElement>,
-    ): void => {
+    const handleClick = (evt: TargetedMouseEvent<HTMLAnchorElement>): void => {
       if (onClick) {
         onClick(evt);
 

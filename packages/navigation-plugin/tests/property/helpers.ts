@@ -182,6 +182,67 @@ export const arbSpecialCharPath: fc.Arbitrary<string> = fc
   .array(arbSpecialCharSegment, { minLength: 1, maxLength: 4 })
   .map((segments) => `/${segments.join("/")}`);
 
+// --- href arbitraries (for isSameHref property tests, #580 K1–K9) ---
+
+/**
+ * "Special" URL schemes per WHATWG URL spec — these have deterministic
+ * canonicalisation (e.g., trailing-slash normalisation of authority-only
+ * URLs). Non-special schemes like `tauri://` / `app://` have
+ * implementation-defined behaviour and are excluded from property tests
+ * that rely on canonicalisation; they are exercised separately via
+ * example-based tests with concrete strings.
+ */
+export const arbSpecialScheme: fc.Arbitrary<string> = fc.constantFrom(
+  "http",
+  "https",
+  "ws",
+  "wss",
+);
+
+/**
+ * Any URL scheme (special + custom). Used for the totality property —
+ * `isSameHref` must return a boolean for any string input, including ones
+ * built from non-special schemes that may parse differently in `new URL()`.
+ */
+export const arbAnyScheme: fc.Arbitrary<string> = fc.constantFrom(
+  "http",
+  "https",
+  "tauri",
+  "app",
+  "file",
+  "custom-scheme",
+);
+
+export const arbHost: fc.Arbitrary<string> = fc.constantFrom(
+  "localhost",
+  "example.com",
+  "127.0.0.1",
+  "host",
+);
+
+export const arbQuerySuffix: fc.Arbitrary<string> = fc.oneof(
+  fc.constant(""),
+  fc.stringMatching(/^\?[a-z]{1,4}=[a-z0-9]{1,6}$/),
+);
+
+export const arbHashSuffix: fc.Arbitrary<string> = fc.oneof(
+  fc.constant(""),
+  fc.stringMatching(/^#[a-z]{1,8}$/),
+);
+
+/**
+ * Arbitrary syntactically-valid absolute href built from a special scheme.
+ * Round-trips through the URL constructor (so its `.href` is canonical),
+ * giving property tests a stable comparison anchor.
+ */
+export const arbValidHref: fc.Arbitrary<string> = fc
+  .tuple(arbSpecialScheme, arbHost, arbUrlPath, arbQuerySuffix, arbHashSuffix)
+  .map(([scheme, host, path, query, hash]) => {
+    const raw = `${scheme}://${host}${path}${query}${hash}`;
+
+    return new URL(raw).href;
+  });
+
 // --- non-matching paths (guaranteed to miss all fixture routes) ---
 
 const KNOWN_PREFIXES = new Set(["home", "users", "index"]);
