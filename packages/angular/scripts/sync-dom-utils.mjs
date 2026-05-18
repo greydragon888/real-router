@@ -25,7 +25,12 @@ const sourceDir = join(angularRoot, "..", "..", "shared", "dom-utils");
 const targetDir = join(angularRoot, "src", "dom-utils");
 
 rmSync(targetDir, { recursive: true, force: true });
-cpSync(sourceDir, targetDir, { recursive: true });
+// Skip test-helper directories (prefixed with `__`) — Angular doesn't use them
+// and ng-packagr would otherwise try to bundle the helper into the lib output.
+cpSync(sourceDir, targetDir, {
+  recursive: true,
+  filter: (src) => !src.includes("/__"),
+});
 
 const stripJsExtension = /\.js"/g;
 let stripped = 0;

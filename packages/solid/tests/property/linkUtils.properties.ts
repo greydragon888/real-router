@@ -26,6 +26,7 @@ import {
   buildHref,
   shouldNavigate,
 } from "../../src/dom-utils";
+import { computeExpectedFragment } from "../../src/dom-utils/__test-helpers";
 
 import type { Router } from "@real-router/core";
 
@@ -502,7 +503,7 @@ describe("buildHref — Property Tests (Solid)", () => {
         return;
       }
 
-      const expectedHash = encodeURI(stripped).replaceAll("#", "%23");
+      const expectedHash = computeExpectedFragment(stripped);
 
       expect(href).toBe(`${path}#${expectedHash}`);
 
