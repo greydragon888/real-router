@@ -14,7 +14,7 @@
     "@real-router/memory-plugin": "workspace:^",
     "@real-router/react": "workspace:^",
     "ink": "7.0.1",
-    "react": "19.2.0"
+    "react": "19.2.6"
   },
   "devDependencies": {
     "@types/react": "19.2.14",
