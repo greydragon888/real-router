@@ -24,6 +24,6 @@
     "type-guards": "workspace:^"
   },
   "devDependencies": {
-    "jsdom": "28.1.0"
+    "jsdom": "29.1.1"
   }
 }
