@@ -464,6 +464,9 @@ Full documentation is available in the [Wiki](https://github.com/greydragon888/r
 
 Many runnable examples across the most popular frameworks — each is a standalone Vite app:
 
+<details>
+<summary><b>Feature matrix — 6 adapters × 12 features (+ framework-specific)</b></summary>
+
 | Feature                 | [React](examples/web/react) | [Preact](examples/web/preact) | [Solid](examples/web/solid) | [Vue](examples/web/vue) | [Svelte](examples/web/svelte) | [Angular](examples/web/angular) |
 | ----------------------- | --------------------------- | ----------------------------- | --------------------------- | ----------------------- | ----------------------------- | ------------------------------- |
 | Basic routing           | [basic](examples/web/react/basic) | [basic](examples/web/preact/basic) | [basic](examples/web/solid/basic) | [basic](examples/web/vue/basic) | [basic](examples/web/svelte/basic) | [basic](examples/web/angular/basic) |
@@ -480,9 +483,14 @@ Many runnable examples across the most popular frameworks — each is a standalo
 | Combined (all features) | [combined](examples/web/react/combined) | [combined](examples/web/preact/combined) | [combined](examples/web/solid/combined) | [combined](examples/web/vue/combined) | [combined](examples/web/svelte/combined) | [combined](examples/web/angular/combined) |
 | **Framework-specific**  | [keepAlive](examples/web/react/keepAlive), [legacy-entry](examples/web/react/legacy-entry), [hmr](examples/web/react/hmr), [link-hash](examples/web/react/link-hash), [navigation-api](examples/web/react/navigation-api), [scroll-restoration](examples/web/react/scroll-restoration), [ink-demo](examples/console/react-ink) | — | [store-based-state](examples/web/solid/store-based-state), [use-link-directive](examples/web/solid/use-link-directive), [signal-primitives](examples/web/solid/signal-primitives) | [plugin-installation](examples/web/vue/plugin-installation), [v-link-directive](examples/web/vue/v-link-directive), [keep-alive](examples/web/vue/keep-alive) | [link-action](examples/web/svelte/link-action), [lazy-loading-svelte](examples/web/svelte/lazy-loading-svelte), [snippets-routing](examples/web/svelte/snippets-routing), [reactive-source](examples/web/svelte/reactive-source) | — |
 
+</details>
+
 ### Server rendering — cross-framework symmetry
 
 Every pipeline below ships as a standalone Vite app per adapter — `pnpm dev` from any folder. All 6 web adapters cover the same 4 SSR pipelines through one `ssr-data-plugin` contract; React additionally has RSC + Flight via `@real-router/rsc-server-plugin`.
+
+<details>
+<summary><b>SSR pipeline matrix — 6 adapters × 4 pipelines (+ RSC for React)</b></summary>
 
 | Pipeline       | [React](examples/web/react/ssr-examples)                       | [Preact](examples/web/preact/ssr-examples)                       | [Vue](examples/web/vue/ssr-examples)                       | [Solid](examples/web/solid/ssr-examples)                       | [Svelte](examples/web/svelte/ssr-examples)                       | [Angular](examples/web/angular/ssr-examples)                       |
 | -------------- | -------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------ |
@@ -492,9 +500,14 @@ Every pipeline below ships as a standalone Vite app per adapter — `pnpm dev` f
 | SSG            | [ssg](examples/web/react/ssr-examples/ssg)                     | [ssg](examples/web/preact/ssr-examples/ssg)                      | [ssg](examples/web/vue/ssr-examples/ssg)                   | [ssg](examples/web/solid/ssr-examples/ssg)                     | [ssg](examples/web/svelte/ssr-examples/ssg)                      | [ssg](examples/web/angular/ssr-examples/ssg)                       |
 | RSC + Flight   | [ssr-rsc](examples/web/react/ssr-examples/ssr-rsc)             | —                                                                | —                                                          | —                                                              | —                                                                | —                                                                  |
 
+</details>
+
 ### Animations — cross-framework symmetry
 
 Each adapter ships four standalone animation pipelines under `animation-examples/` (24 apps in total). See [Routing Animations](https://github.com/greydragon888/real-router/wiki/Routing-Animations) and [View Transitions](https://github.com/greydragon888/real-router/wiki/View-Transitions).
+
+<details>
+<summary><b>Animation pipeline matrix — 6 adapters × 4 pipelines</b></summary>
 
 | Pipeline          | [React](examples/web/react/animation-examples) | [Preact](examples/web/preact/animation-examples) | [Solid](examples/web/solid/animation-examples) | [Vue](examples/web/vue/animation-examples) | [Svelte](examples/web/svelte/animation-examples) | [Angular](examples/web/angular/animation-examples) |
 | ----------------- | ---------------------------------------------- | ------------------------------------------------ | ---------------------------------------------- | ------------------------------------------ | ------------------------------------------------ | -------------------------------------------------- |
@@ -502,6 +515,8 @@ Each adapter ships four standalone animation pipelines under `animation-examples
 | Page animations   | [page-animations](examples/web/react/animation-examples/page-animations)     | [page-animations](examples/web/preact/animation-examples/page-animations)     | [page-animations](examples/web/solid/animation-examples/page-animations)     | [page-animations](examples/web/vue/animation-examples/page-animations)     | [page-animations](examples/web/svelte/animation-examples/page-animations)     | [page-animations](examples/web/angular/animation-examples/page-animations)     |
 | Route animations  | [route-animations](examples/web/react/animation-examples/route-animations)   | [route-animations](examples/web/preact/animation-examples/route-animations)   | [route-animations](examples/web/solid/animation-examples/route-animations)   | [route-animations](examples/web/vue/animation-examples/route-animations)   | [route-animations](examples/web/svelte/animation-examples/route-animations)   | [route-animations](examples/web/angular/animation-examples/route-animations)   |
 | View Transitions  | [view-transitions](examples/web/react/animation-examples/view-transitions)   | [view-transitions](examples/web/preact/animation-examples/view-transitions)   | [view-transitions](examples/web/solid/animation-examples/view-transitions)   | [view-transitions](examples/web/vue/animation-examples/view-transitions)   | [view-transitions](examples/web/svelte/animation-examples/view-transitions)   | [view-transitions](examples/web/angular/animation-examples/view-transitions)   |
+
+</details>
 
 | **Terminal UI (Ink)** | [ink-demo](examples/console/react-ink) — CLI app via [@real-router/react/ink](packages/react/README.md#ink-terminal-ui) + memory-plugin |
 

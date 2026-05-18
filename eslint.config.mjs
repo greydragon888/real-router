@@ -5,7 +5,9 @@
 // Using globalIgnores helper with typescript-eslint
 // ============================================
 
-import { globalIgnores } from "eslint/config";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+import { globalIgnores, includeIgnoreFile } from "eslint/config";
 import eslint from "@eslint/js";
 import stylistic from "@stylistic/eslint-plugin";
 import tsEslint from "typescript-eslint";
@@ -19,20 +21,22 @@ import jsdoc from "eslint-plugin-jsdoc";
 import unicorn from "eslint-plugin-unicorn";
 import noOnlyTests from "eslint-plugin-no-only-tests";
 
+const gitignorePath = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  ".gitignore",
+);
+
 export default tsEslint.config(
   // ============================================
   // 1. GLOBAL IGNORES (ESLint 9.30+ globalIgnores helper)
   // ============================================
+  // ESLint 10.4+ includeIgnoreFile(): inherit .gitignore patterns
+  // (build artifacts, .stryker-tmp, .turbo, .angular, .svelte-kit, tools/, .spike/, etc.)
+  includeIgnoreFile(gitignorePath, "Imported .gitignore patterns"),
   globalIgnores([
-    "**/dist/**",
-    "**/build/**",
-    "**/coverage/**",
-    "**/.turbo/**",
-    "**/node_modules/**",
     "**/*.min.js",
     "**/*.d.ts",
     "**/generated/**",
-    "**/.DS_Store", // macOS system files
     "**/*.bak*", // Backup files
     "**/*.mjs", // JS config files - no TypeScript type-checking needed
     "cz.config.js", // cz-git configuration
