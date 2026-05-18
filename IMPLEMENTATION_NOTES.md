@@ -3339,3 +3339,31 @@ Six `ssr-mixed/` examples (React, Preact, Vue, Solid, Svelte, Angular) — each 
 4. **Function form** — same route with `?format=html` ↔ `?format=pdf` toggles the mode; assertion via `response.text()` body length and presence of `<script>__SSR_STATE__</script>`.
 
 Angular `ssr-mixed/` is uniquely structured: `AngularNodeAppEngine` takes control of the request immediately after invocation, so per-route mode branching happens in **Express middleware before Angular** (`server.ts` performs `cloneRouter` + `ssrDataPluginFactory` + `await router.start(url)` BEFORE `angularApp.handle(req)`, reads `getSsrDataMode(state)`, branches: `next()` → AngularNodeAppEngine for `"full"` mode, or `res.send(shell)` for shell modes). The TransferState bridge applies automatically only in the `"full"` mode path; the shell modes use `<script>__SSR_STATE__</script>` directly (no Angular bootstrap, so no `TransferState` involvement). Documented in `packages/angular/CLAUDE.md` SSR section.
+
+## Preact 11 forward-compat & peer-dep floor bump (#592)
+
+### Problem
+
+Preact 11 (currently in beta) restructures the `JSX` namespace: only `JSX.Element` and `JSX.IntrinsicElements` remain inside it; everything else (`HTMLAttributes`, `TargetedMouseEvent`, …) moves to the top-level `preact` namespace. Our `@real-router/preact` adapter referenced `JSX.HTMLAttributes` and `JSX.TargetedMouseEvent` in two source files (`src/types.ts`, `src/components/Link.tsx`), so the bundle would not type-check against v11. Peer dep `>=10.0.0` also had no way to opt into Preact 11 betas.
+
+### Solution
+
+- Source imports switched to the top-level form: `import type { HTMLAttributes, TargetedMouseEvent } from "preact"`. This compiles against Preact 10.28+ AND Preact 11 — Preact 10.28 introduced `src/dom.d.ts` and re-exported these types from the package root while keeping the legacy `JSXInternal` namespace as a backward-compat shim; Preact 11 retains the top-level exports and drops the namespace shim.
+- `peerDependencies.preact` widened to `">=10.28.0 || ^11.0.0-0"`. The `-0` suffix lets `npm`/`pnpm` accept Preact 11 pre-release tags during the beta window. The floor moves from 10.0 → 10.28 because the new import path does not exist in earlier 10.x typings.
+- `syncpack.config.mjs` adds an "Ignore preact peer dependency range" version group. The `sameRange` consistency policy panics on compound `||` ranges, and this peer dep is structurally a one-off.
+- `packages/preact/devDependencies.preact` bumped from `10.25.4` → `10.29.2` so the adapter's own type-check exercises the new import path.
+
+### Why this bumps the floor
+
+We deliberately do **not** keep `JSX.HTMLAttributes` in the source even though it still works on Preact 10.28+. The whole point of the migration is to write code that compiles on Preact 11 without conditional types — keeping the namespace import would defer the change and leave a v11 footgun. The 10.0–10.27 user is a year+ behind on patches; the cost of asking them to bump is lower than carrying a back-compat shim through every adapter source.
+
+### Stress-test regression — `combined-spa.stress.tsx` 8.2
+
+Bumping the dev floor surfaced a latent stress-test issue: Preact 10.28 backported the v11 cascading-render fix (preactjs/preact#4966 + #4967), which now correctly coalesces same-microtask `setState` pairs whose final value equals the previous one. The transition stress test relied on **un**-batched rendering: it counted `useRouterTransition` renders across 100 fully-synchronous navigations, and because `IDLE_SNAPSHOT` is a frozen singleton, the polyfill's `Object.is(prev, next)` bail-out now collapses `IDLE → transitioning → IDLE` round trips to zero renders.
+
+Fix: split each navigation into two `act` blocks using manually-resolved `addActivateGuard` promises so `TRANSITION_START` commits before `TRANSITION_SUCCESS` is fired. This mirrors how real apps interleave a microtask (guards, lazy loads, fetches) between start and end, which is what makes the transitioning state observable. The 100-render lower bound stays — the test is back to exercising both edges of the transition lifecycle, not whatever Preact's batcher chose to drop on that particular release.
+
+### Forward direction
+
+- `@testing-library/preact@3.2.4` (current pin) does not yet ship a Preact 11 compatible release. Matrix-testing the adapter against Preact 11 is blocked on the testing library — the issue carries the `upstream` label for this reason.
+- Once `@testing-library/preact` ships an 11-compatible version, run the unit suite against both majors (manual matrix or pnpm-overrides per CI job) before publishing the 1.0 of the adapter.

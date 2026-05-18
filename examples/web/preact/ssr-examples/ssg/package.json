@@ -15,8 +15,8 @@
     "@real-router/core": "workspace:^",
     "@real-router/preact": "workspace:^",
     "@real-router/ssr-data-plugin": "workspace:^",
-    "preact": "10.28.2",
-    "preact-render-to-string": "6.6.7"
+    "preact": "10.29.2",
+    "preact-render-to-string": "6.7.0"
   },
   "devDependencies": {
     "@playwright/test": "1.58.2",
