@@ -27,7 +27,11 @@ import { fc, test } from "@fast-check/vitest";
 import { describe, expect, vi } from "vitest";
 
 import { NUM_RUNS, arbDottedNameExtended, arbHash } from "./helpers";
+import { computeExpectedFragment } from "../../../../shared/dom-utils/__test-helpers/expected-fragment";
 import { buildHref } from "../../src/dom-utils";
+// Imported directly from `shared/` because Angular's `sync-dom-utils.mjs`
+// strips `__`-prefixed test-helper dirs from its `src/dom-utils/` copy
+// (ng-packagr would otherwise bundle them into the lib output).
 
 import type { Params, Router } from "@real-router/core";
 
@@ -156,7 +160,7 @@ describe("buildHref — Property Tests", () => {
         return;
       }
 
-      const expectedHash = encodeURI(stripped).replaceAll("#", "%23");
+      const expectedHash = computeExpectedFragment(stripped);
 
       expect(href).toBe(`${path}#${expectedHash}`);
 
@@ -437,10 +441,6 @@ describe("buildHref — Property Tests", () => {
   // `shared/browser-env/url-context.ts` (`encodeHashFragment`). Three copies
   // must stay aligned; this drift sentinel pins the documented formula.
   describe("Invariant 12: encodeFragmentInline matches the documented RFC 3986 + %23 formula", () => {
-    function referenceEncodeFragment(decoded: string): string {
-      return encodeURI(decoded).replaceAll("#", "%23");
-    }
-
     test.prop([arbHash, fc.string({ minLength: 1, maxLength: 16 })], {
       numRuns: NUM_RUNS.thorough,
     })(
@@ -460,7 +460,7 @@ describe("buildHref — Property Tests", () => {
           return;
         }
 
-        const reference = referenceEncodeFragment(stripped);
+        const reference = computeExpectedFragment(stripped);
 
         expect(result).toBe(`${path}#${reference}`);
       },
