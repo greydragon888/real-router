@@ -1024,7 +1024,14 @@ Evaluated `eslint-plugin-solid@0.14.5` for the Solid adapter. Decision: not adde
 
 **Bisected:** 8.57.1 OK → 8.57.2 CRASH. The main `typescript-eslint` package is now at `8.59.0`, but pnpm overrides still pin the transitive `@typescript-eslint/eslint-plugin` and `@typescript-eslint/parser` to `8.57.1` to avoid the crashing code path in the plugin package.
 
-**TODO:** Remove overrides when typescript-eslint ships a fix for the `no-unnecessary-type-arguments` crash.
+**The original crash is fixed upstream (verified on 2026-05-18):** dropping the pin and reinstalling against `@typescript-eslint/eslint-plugin@8.59.0` + `@typescript-eslint/parser@8.59.0` produces no `no-unnecessary-type-arguments` crash. The blocker for lifting the pin is no longer the crash itself — it's the **accumulated tightening of unrelated rules** that the pin parallel-suppresses.
+
+**What snapping the pin exposes** (measured on the same 2026-05-18 attempt — `git restore` and re-run to reproduce):
+
+- ~20 hand-tracked errors across 5 packages: `@typescript-eslint/no-base-to-string` (4 in path-matcher), `@typescript-eslint/no-unnecessary-condition` (2 in core), `@typescript-eslint/prefer-promise-reject-errors` (3 in core), `sonarjs/no-undefined-argument` (7 in core test), `sonarjs/unused-import` (4 unused imports).
+- `eslint --fix` auto-corrects ~130 files but is **too aggressive** in at least one shape: removes load-bearing `as X` type assertions (e.g., `(record as Record<symbol, unknown>)[sym] = …` collapsed to `record[sym] = …` in `preact/tests/property/shallowEqual.properties.ts:337` and `shared/dom-utils/scroll-restore.ts:404`), which then trips `tsc --noEmit` with `TS2538: Type 'unique symbol' cannot be used as an index type`. Every `--fix` change needs case-by-case audit before committing.
+
+**TODO:** Removing the pin is **technically safe** (the original crash is gone). What it actually requires is a focused cleanup PR that (a) lands the ~20 manual fixes, (b) audits each `--fix` rewrite for over-correction (cast removal, conditional removal) and reverts the load-bearing ones, (c) re-runs `pnpm build` end-to-end. Out of scope for piggy-back commits.
 
 ### New Rules Added
 
