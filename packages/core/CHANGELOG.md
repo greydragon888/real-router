@@ -1,5 +1,98 @@
 # @real-router/core
 
+## 0.53.0
+
+### Minor Changes
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `createRequestScope(req, base, deps)` SSR helper ([#603](https://github.com/greydragon888/real-router/issues/603))
+
+  New utility export from `@real-router/core/utils` that bundles the four-step
+  per-request boilerplate every server entry repeats:
+  1. `new AbortController()` per request
+  2. `req.on("close", () => controller.abort())`
+  3. `cloneRouter(base, { ...deps, abortSignal: signal })`
+  4. `try { ... } finally { router.dispose() }`
+
+  ```typescript
+  import { createRequestScope } from "@real-router/core/utils";
+
+  export async function render(url: string, req: IncomingMessage) {
+    const scope = createRequestScope(req, baseRouter, { currentUser });
+    try {
+      scope.router.usePlugin(ssrDataPluginFactory(loaders));
+      return await renderShell(scope.router, url);
+    } finally {
+      await scope.dispose();
+    }
+  }
+  ```
+
+  Accepts both Node `IncomingMessage` (subscribes to its `"close"` event) and
+  Web `Request` shapes (uses `request.signal` directly). The injected
+  `abortSignal` is available to loaders via `getDep("abortSignal")` for
+  cooperative cancellation.
+
+  The scope also implements `Symbol.asyncDispose`, so `await using scope = …`
+  is supported on Node 24+, Bun, Deno, and modern browsers (Chrome/Edge 127+,
+  Firefox 141+). On Node 22 LTS the well-known symbol is unavailable, so the
+  bundled SSR examples use the explicit `try/finally` form shown above for
+  maximum compatibility — see JSDoc for the full runtime matrix.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `serialize` / `deserialize` options to SSR helpers for non-JSON types ([#606](https://github.com/greydragon888/real-router/issues/606))
+
+  `serializeState`, `serializeRouterState`, and `hydrateRouter` now accept an
+  optional user-supplied serializer pair. The defaults remain `JSON.stringify`
+  and `JSON.parse` — pass `devalue.stringify` / `devalue.parse` (or
+  `superjson.stringify` / `superjson.parse`) to round-trip non-JSON types
+  (`Date` / `Map` / `Set` / `RegExp` / `BigInt`) through SSR transport.
+
+  The custom serializer's output is still XSS-escaped (`<` / `>` / `&` →
+  `<` / `>` / `&`) before embedding into the inline `<script>`
+  tag — XSS safety remains a property of `serializeState`, independent of
+  which serializer produced the JSON.
+
+  `devalue` and `superjson` are not bundled — install whichever you prefer as
+  a peer dependency.
+
+  ```typescript
+  // Server
+  import * as devalue from "devalue";
+  import { serializeRouterState } from "@real-router/core/utils";
+
+  const json = serializeRouterState(state, { serialize: devalue.stringify });
+  const html = `<script>window.__SSR_STATE__=${json}</script>`;
+
+  // Client
+  import { hydrateRouter } from "@real-router/core/utils";
+
+  await hydrateRouter(router, window.__SSR_STATE__, {
+    deserialize: devalue.parse,
+  });
+  ```
+
+  New types exported from `@real-router/core/utils`:
+  - `Serialize` — `(data: unknown) => string`
+  - `Deserialize` — `(json: string) => unknown`
+  - `SerializeStateOptions` — `{ serialize?: Serialize }`
+  - `HydrateRouterOptions` — `{ deserialize?: Deserialize }`
+
+  `SerializeRouterStateOptions` gains an optional `serialize` field alongside
+  the existing `excludeContext`. Both are non-breaking — existing call sites
+  without options continue to use `JSON.stringify` / `JSON.parse` unchanged.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Eliminate post-hydration loader re-run via one-shot hydration scratchpad ([#596](https://github.com/greydragon888/real-router/issues/596))
+
+  `hydrateRouter()` now deposits the parsed `SerializedRouterState` (incl. plugin
+  context namespaces) onto a one-shot internal scratchpad before delegating to
+  `router.start(parsed.path)`, then clears it in `finally`. SSR loader plugins
+  read the scratchpad via a monorepo-internal helper to skip their loader call
+  when the server-resolved value is already present — avoiding the duplicate
+  loader fire on first paint.
+
+  The new `SerializedRouterState` type is exported from `@real-router/core/utils`
+  to give consumers a stable name for the parsed-state shape produced by
+  `serializeRouterState()`.
+
 ## 0.52.0
 
 ### Minor Changes

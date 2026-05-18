@@ -3,20 +3,42 @@ import { safelyEncodePath, extractPath } from "./browser-env";
 import type { NavigationBrowser } from "./types";
 
 /**
- * Mutable cell carrying the "syncing-from-router" flag shared between
- * `wrapNavigationBrowserWithSyncing` (which raises it around every router-driven
- * mutation) and the plugin's navigate handler (which reads it to short-circuit
- * the event fired by the plugin's own write).
+ * Sentinel carried on `event.info` for every router-driven mutation.
  *
- * Internal to navigation-plugin — not part of the public type surface.
+ * The navigate-event handler reads `event.info === PLUGIN_SYNC_INFO` to detect
+ * plugin-originated events and short-circuit them with a noop intercept.
+ * Identity-based detection works regardless of whether the navigate event is
+ * delivered synchronously inside `nav.navigate(...)` (Chromium) or
+ * asynchronously on the next task (Safari 26.2 WKWebView — #580).
+ *
+ * The previous `SyncingFlag` mechanism raised a per-instance boolean before
+ * the call and lowered it in a synchronous `finally`. Under Safari WKWebView
+ * the flag was already `false` by the time the event arrived, so the handler
+ * treated the plugin's own write as user-initiated and re-issued
+ * `router.navigate(...)` — render loop on macOS 26.2 Tauri release.
+ *
+ * Consumers supplying a custom `NavigationBrowser` should pass this value as
+ * `info` in their `nav.navigate` / `nav.traverseTo` calls so the plugin can
+ * recognise plugin-initiated events. See packages/navigation-plugin/CLAUDE.md.
  */
-export interface SyncingFlag {
-  current: boolean;
-}
+export const PLUGIN_SYNC_INFO = "@real-router/navigation-plugin:syncing";
+
+// `traverseTo` options never carry per-call data — the sentinel `info` is the
+// only field — so a single frozen constant is reused across every traversal.
+// Saves one allocation per `nav.traverseTo` on the hot path.
+const TRAVERSE_OPTS: NavigationOptions = Object.freeze({
+  info: PLUGIN_SYNC_INFO,
+});
 
 /**
  * Creates a NavigationBrowser wrapping the real Navigation API.
  * Only call this when `"navigation" in globalThis` is true.
+ *
+ * Every router-driven mutation (`navigate`, `replaceState`, `traverseTo`)
+ * tags `info` with `PLUGIN_SYNC_INFO` so the navigate-event handler can
+ * recognise and short-circuit the event it fires — see `PLUGIN_SYNC_INFO`
+ * for the rationale. `updateCurrentEntry` is excluded because it fires
+ * `currententrychange`, not `navigate`.
  */
 export function createNavigationBrowser(base: string): NavigationBrowser {
   const nav = globalThis.navigation;
@@ -29,13 +51,14 @@ export function createNavigationBrowser(base: string): NavigationBrowser {
     getHash: () => globalThis.location.hash,
 
     navigate: (url, options) => {
-      nav.navigate(url, options);
+      nav.navigate(url, { ...options, info: PLUGIN_SYNC_INFO });
     },
 
     replaceState: (state, url) => {
       nav.navigate(url, {
         state,
         history: "replace",
+        info: PLUGIN_SYNC_INFO,
       });
     },
 
@@ -44,7 +67,7 @@ export function createNavigationBrowser(base: string): NavigationBrowser {
     },
 
     traverseTo: (key) => {
-      nav.traverseTo(key);
+      nav.traverseTo(key, TRAVERSE_OPTS);
     },
 
     addNavigateListener: (fn) => {
@@ -62,73 +85,5 @@ export function createNavigationBrowser(base: string): NavigationBrowser {
     },
 
     getActivationType: () => nav.activation?.navigationType,
-  };
-}
-
-/**
- * Wraps every router-driven mutation of a NavigationBrowser with the syncing
- * flag — raised before the underlying call, lowered after, including the
- * throw path. The plugin's navigate handler reads `syncing.current` to
- * short-circuit the navigate event fired by the plugin's own write
- * (`nav.navigate(...)` and `nav.navigate({history:"replace"})` both fire
- * navigate events synchronously).
- *
- * Applied at the factory level to both the built-in `createNavigationBrowser`
- * and any user-supplied browser, so consumers don't need to manage the flag.
- */
-export function wrapNavigationBrowserWithSyncing(
-  browser: NavigationBrowser,
-  syncing: SyncingFlag,
-): NavigationBrowser {
-  // Hot path: each mutation is called on every navigation. Inline the
-  // try/finally instead of routing through a generic `wrap` helper — that
-  // helper created two closure layers (outer arrow + the `() => fn()` arg)
-  // per call. Inlining drops to a single closure and lets V8 monomorphize
-  // the call sites.
-  return {
-    getLocation: () => browser.getLocation(),
-    getHash: () => browser.getHash(),
-
-    navigate: (url, options) => {
-      syncing.current = true;
-      try {
-        browser.navigate(url, options);
-      } finally {
-        syncing.current = false;
-      }
-    },
-    replaceState: (state, url) => {
-      syncing.current = true;
-      try {
-        browser.replaceState(state, url);
-      } finally {
-        syncing.current = false;
-      }
-    },
-    updateCurrentEntry: (options) => {
-      syncing.current = true;
-      try {
-        browser.updateCurrentEntry(options);
-      } finally {
-        syncing.current = false;
-      }
-    },
-    traverseTo: (key) => {
-      syncing.current = true;
-      try {
-        browser.traverseTo(key);
-      } finally {
-        syncing.current = false;
-      }
-    },
-
-    addNavigateListener: (fn) => browser.addNavigateListener(fn),
-    entries: () => browser.entries(),
-
-    get currentEntry() {
-      return browser.currentEntry;
-    },
-
-    getActivationType: () => browser.getActivationType(),
   };
 }

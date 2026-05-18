@@ -1,5 +1,127 @@
 # @real-router/svelte
 
+## 0.11.0
+
+### Minor Changes
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `<ClientOnly>` and `<ServerOnly>` SSR-aware components ([#604](https://github.com/greydragon888/real-router/issues/604))
+
+  Two paired components for opt-in client/server rendering boundaries.
+  Both use `$state` + `$effect` — `$effect` is browser-only, so the
+  server emits the SSR-side branch (fallback for `<ClientOnly>`, children
+  for `<ServerOnly>`). After hydration the rune flips and the `{#if}` /
+  `{#else if}` branch swaps.
+
+  ```svelte
+  <script lang="ts">
+    import { ClientOnly, ServerOnly } from "@real-router/svelte";
+  </script>
+
+  <ClientOnly>
+    {#snippet children()}
+      <BrowserApiWidget />
+    {/snippet}
+    {#snippet fallback()}
+      <Skeleton />
+    {/snippet}
+  </ClientOnly>
+  ```
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `<HttpStatusCode code={N}/>` + `<HttpStatusProvider>` + `createHttpStatusSink()` to `/ssr` ([#611](https://github.com/greydragon888/real-router/issues/611))
+
+  Render-time HTTP status declaration for SSR. Svelte 5-native idioms (`setContext` / `getContext`). The sink write happens at component init via `getContext`, no DOM is rendered.
+
+  ```svelte
+  <script lang="ts">
+    import {
+      HttpStatusProvider,
+      createHttpStatusSink,
+    } from "@real-router/svelte/ssr";
+
+    const sink = createHttpStatusSink();
+  </script>
+
+  <HttpStatusProvider {sink}>
+    {#snippet children()}
+      <App />
+    {/snippet}
+  </HttpStatusProvider>
+
+  <!-- inside NotFound.svelte -->
+  <HttpStatusCode code={404} />
+  ```
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - `defer()` consumers + `/ssr` subpath split ([#611](https://github.com/greydragon888/real-router/issues/611))
+
+  Mirrors the React Stage 1 + Stage 0a roll-out ([#609](https://github.com/greydragon888/real-router/issues/609) / [#610](https://github.com/greydragon888/real-router/issues/610)). Svelte ships
+  three new SSR-feature exports under `@real-router/svelte/ssr`:
+  - `useDeferred<T>(key)` — reads the promise published by the loader at
+    `state.context.ssrDataDeferred[key]`.
+  - `<Await>` — `.svelte` component wrapping the native `{#await}` block
+    for ergonomic deferred-payload rendering.
+  - `<Streamed>` — `.svelte` component matching cross-adapter naming.
+
+  Idiom: Native `{#await}` block + Svelte 5 runes.
+
+  **`<ClientOnly>` / `<ServerOnly>` migrated to `/ssr`**:
+
+  ```diff
+  - import { ClientOnly, ServerOnly } from "@real-router/svelte";
+  + import { ClientOnly, ServerOnly } from "@real-router/svelte/ssr";
+  ```
+
+  **Wire-format**: consumes the NDJSON-shaped `<script>__rrDefer__("key",
+json)</script>` settle scripts emitted by `@real-router/ssr-data-plugin/server`'s
+  `injectDeferredScripts` — server-side loaders return `defer({ critical,
+deferred })` once.
+
+  **Streaming behaviour**: no progressive HTTP-flush — 🟡 DX-only — formal
+  API ready for Svelte 6+ streaming.
+
+  **Breaking change** (pre-1.0, allowed in `minor`): `ClientOnly`/`ServerOnly`
+  removed from main entry.
+
+### Patch Changes
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Guard against throwing `getAnnouncementText` in `createRouteAnnouncer` ([#628](https://github.com/greydragon888/real-router/issues/628))
+
+  A user-provided `getAnnouncementText` callback that throws was propagating
+  the exception up through `router.subscribe`'s listener loop, tearing down
+  sibling listeners and breaking navigation tracking elsewhere. The shared
+  `resolveText` helper now wraps the callback in try/catch, logs the error
+  via `console.error` with a `[real-router]` prefix, and falls through to
+  the built-in resolution chain (`<h1>` textContent → `document.title` →
+  route name → pathname).
+
+  User-visible effect: a buggy custom announcer resolver no longer breaks
+  router subscriptions — the announcer announces the fallback text and
+  logs the underlying error so the bug surfaces in dev tools.
+
+  Discovered during the React audit (`review-2026-05-10` §5.7, MED
+  severity). Applied to `shared/dom-utils/route-announcer.ts` and the
+  git-tracked Angular copy.
+
+- [#643](https://github.com/greydragon888/real-router/pull/643) [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `shallowEqual` asymmetry on disjoint-key records ([#627](https://github.com/greydragon888/real-router/issues/627))
+
+  `shallowEqual({ a: undefined }, { b: "" })` returned `true` while
+  `shallowEqual({ b: "" }, { a: undefined })` returned `false`. The inner loop
+  read missing keys via bracket access as `undefined` and falsely matched
+  `prev[key] === undefined`. Added a `hasOwnProperty` guard mirroring React's
+  own `shallowEqual` (`packages/shared/shallowEqual.js`).
+
+  The helper is inlined from `shared/dom-utils/link-utils.ts` via the symlink
+  graph, so this adapter receives the fix in lockstep with the other 5
+  adapters.
+
+  User-visible effect: `<Link routeParams={{ a: undefined }} />` no longer
+  compares equal to `<Link routeParams={{ b: undefined }} />` — re-render now
+  matches the documented `shallowEqual` contract (key-order-insensitive,
+  `Object.is` per key).
+
+- Updated dependencies [[`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c), [`f243451`](https://github.com/greydragon888/real-router/commit/f24345194efac6bd85cefed0d4de340c6cc9086c)]:
+  - @real-router/core@0.53.0
+  - @real-router/sources@0.8.2
+
 ## 0.10.1
 
 ### Patch Changes
