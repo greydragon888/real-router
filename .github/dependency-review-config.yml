@@ -43,3 +43,9 @@ allow-dependencies-licenses:
   # clause). Functionally permissive; pulled in transitively by Tauri
   # tooling. devDependency only.
   - pkg:npm/json-schema-typed
+  # "WTFPL" — maximally permissive (no notice/attribution requirements,
+  # functionally equivalent to public domain / Unlicense). Pulled in
+  # transitively by electron-builder → dmg-license → sanitize-filename
+  # for macOS .dmg packaging in example apps. devDependency only,
+  # never bundled into the published @real-router/* packages.
+  - pkg:npm/truncate-utf8-bytes
