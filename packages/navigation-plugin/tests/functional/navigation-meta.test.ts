@@ -177,9 +177,13 @@ describe("Navigation Plugin — NavigationMeta", () => {
 
       await finished;
 
-      expect(metaInGuard).toBeDefined();
-      expect(metaInGuard?.navigationType).toBe("push");
-      expect(metaInGuard?.userInitiated).toBe(false);
+      expect(metaInGuard).toStrictEqual({
+        navigationType: "push",
+        userInitiated: false,
+        direction: "forward",
+        sourceElement: null,
+        info: undefined,
+      });
     });
 
     it("meta is undefined in activation guard during programmatic navigation", async () => {

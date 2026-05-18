@@ -82,67 +82,30 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
       sourceElement: event.sourceElement ?? null,
     });
 
-    const withRecovery = async (run: () => Promise<unknown>): Promise<void> => {
-      try {
-        await run();
-      } catch (error) {
-        if (!(error instanceof RouterError)) {
-          recoverFromNavigateError(error, router, browser);
-
-          return;
-        }
-
-        // TRANSITION_CANCELLED: a newer navigation aborted this one — the
-        // newer navigate event is (or will be) handled by this same plugin,
-        // and THAT event is responsible for syncing URL/state. Firing our
-        // own sync here races against it: browser.navigate(replace, same-url)
-        // would cancel the in-flight newer transition, which is exactly the
-        // rapid-fire-events storm failure mode.
-        //
-        // SAME_STATES: router refused because router.getState() already equals
-        // the target. URL and router state are already consistent — no sync
-        // needed.
-        if (
-          error.code === errorCodes.TRANSITION_CANCELLED ||
-          error.code === errorCodes.SAME_STATES
-        ) {
-          return;
-        }
-
-        // Other RouterError codes (CANNOT_DEACTIVATE, CANNOT_ACTIVATE,
-        // ROUTE_NOT_FOUND, …) — router rejected the transition, state is
-        // unchanged, but URL may have already committed to a different
-        // value by the Navigation API. Sync the URL back to the current
-        // router state in a single visible transition (headless Chromium
-        // and some cross-origin setups leave "committed-then-reverted"
-        // windows if we relied on the native rollback via intercept reject).
-        // Observers that care about the error see it through the router's
-        // TRANSITION_ERROR event.
-        syncUrlToRouterState(router, browser);
-      }
-    };
-
     if (matchedState) {
       event.intercept({
         handler: () =>
-          withRecovery(() =>
-            // api.navigateToState: matchPath already applied forwardState +
-            // matchSourceTrailingSlash; reusing the State avoids the redundant
-            // round-trip and preserves trailing slashes (#525). Plugin-only
-            // entry point — not on the public Router/Navigator surface.
-            //
-            // Hash extraction (#532): pass through the destination's hash so
-            // onTransitionSuccess sets state.context.url.hash. When the
-            // browser fires hashChange (same-document fragment-only nav),
-            // add force+hashChange to bypass SAME_STATES — subscribers
-            // disambiguate via state.context.url.hashChanged, not via the
-            // overloaded force flag.
-            api.navigateToState(matchedState, {
-              ...transitionOptions,
-              hash,
-              ...(event.hashChange ? { force: true, hashChange: true } : {}),
-              signal: event.signal,
-            }),
+          withRecovery(
+            () =>
+              // api.navigateToState: matchPath already applied forwardState +
+              // matchSourceTrailingSlash; reusing the State avoids the redundant
+              // round-trip and preserves trailing slashes (#525). Plugin-only
+              // entry point — not on the public Router/Navigator surface.
+              //
+              // Hash extraction (#532): pass through the destination's hash so
+              // onTransitionSuccess sets state.context.url.hash. When the
+              // browser fires hashChange (same-document fragment-only nav),
+              // add force+hashChange to bypass SAME_STATES — subscribers
+              // disambiguate via state.context.url.hashChanged, not via the
+              // overloaded force flag.
+              api.navigateToState(matchedState, {
+                ...transitionOptions,
+                hash,
+                ...(event.hashChange ? { force: true, hashChange: true } : {}),
+                signal: event.signal,
+              }),
+            router,
+            browser,
           ),
       });
     } else if (allowNotFound) {
@@ -167,6 +130,54 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
       });
     }
   };
+}
+
+/**
+ * Module-scope helper hoisted out of handleNavigateEvent so the closure is
+ * not re-allocated on every navigate event. The router/browser refs come from
+ * arguments instead of an enclosing scope; identical behaviour, fewer GC'd
+ * closures.
+ */
+async function withRecovery(
+  run: () => Promise<unknown>,
+  router: Router,
+  browser: NavigationBrowser,
+): Promise<void> {
+  try {
+    await run();
+  } catch (error) {
+    if (!(error instanceof RouterError)) {
+      recoverFromNavigateError(error, router, browser);
+
+      return;
+    }
+
+    // TRANSITION_CANCELLED: a newer navigation aborted this one — the newer
+    // navigate event is (or will be) handled by this same plugin, and THAT
+    // event is responsible for syncing URL/state. Firing our own sync here
+    // races against it: browser.navigate(replace, same-url) would cancel the
+    // in-flight newer transition, which is exactly the rapid-fire-events storm
+    // failure mode.
+    //
+    // SAME_STATES: router refused because router.getState() already equals the
+    // target. URL and router state are already consistent — no sync needed.
+    if (
+      error.code === errorCodes.TRANSITION_CANCELLED ||
+      error.code === errorCodes.SAME_STATES
+    ) {
+      return;
+    }
+
+    // Other RouterError codes (CANNOT_DEACTIVATE, CANNOT_ACTIVATE,
+    // ROUTE_NOT_FOUND, …) — router rejected the transition, state is
+    // unchanged, but URL may have already committed to a different value by
+    // the Navigation API. Sync the URL back to the current router state in a
+    // single visible transition (headless Chromium and some cross-origin
+    // setups leave "committed-then-reverted" windows if we relied on the
+    // native rollback via intercept reject). Observers that care about the
+    // error see it through the router's TRANSITION_ERROR event.
+    syncUrlToRouterState(router, browser);
+  }
 }
 
 function recoverFromNavigateError(

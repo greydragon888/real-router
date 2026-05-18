@@ -10,6 +10,8 @@ import {
   encodeHashFragment,
   getDecodedHash,
   normalizeHashInput,
+  safeParseUrl,
+  decodeHashFragment,
 } from "./browser-env";
 import {
   peekBack,
@@ -78,6 +80,21 @@ export class NavigationPlugin {
 
   #capturedMeta: NavigationMeta | undefined;
   #pendingTraverseKey: string | undefined;
+  // Always set together with #pendingTraverseKey; `""` means "destination has
+  // no fragment". Typed as `string` (not `string | undefined`) so the traverse
+  // branch reads it without a redundant `?? ""` fallback that coverage cannot
+  // exercise.
+  #pendingTraverseHash = "";
+  // Reusable buffer for the {name, params, path} payload passed to
+  // browser.navigate / browser.updateCurrentEntry. The Navigation API
+  // structured-clones state synchronously inside the call, so this object
+  // never escapes — same trick createReplaceHistoryState uses.
+  readonly #historyStateBuffer: { name: string; params: object; path: string } =
+    {
+      name: "",
+      params: {},
+      path: "",
+    };
 
   constructor(
     router: Router,
@@ -201,7 +218,7 @@ export class NavigationPlugin {
     // unmatched url — same three error branches the old inline checks
     // produced. Extracted so the error paths can be unit-tested directly
     // without namespace-level vi.spyOn gymnastics.
-    const { entry, matchedState } = resolveEntryToMatchedState(
+    const { entry, entryUrl, matchedState } = resolveEntryToMatchedState(
       candidate,
       routeName,
       this.#api,
@@ -228,6 +245,10 @@ export class NavigationPlugin {
       sourceElement: null,
     };
     this.#pendingTraverseKey = entry.key;
+    // Capture the destination entry's hash so onTransitionSuccess can populate
+    // state.context.url for the traverse branch — mirrors what navigate-handler
+    // does via navOptions.hash for browser-initiated navigation.
+    this.#pendingTraverseHash = extractHashFromEntryUrl(entryUrl);
 
     return this.#router.navigate(matchedState.name, matchedState.params);
   }
@@ -275,10 +296,26 @@ export class NavigationPlugin {
         // The syncing flag is raised/lowered inside NavigationBrowser around
         // each mutation, so we do not need to manage it here.
         const traverseKey = this.#pendingTraverseKey;
+        const traverseHash = this.#pendingTraverseHash;
 
         this.#pendingTraverseKey = undefined;
+        this.#pendingTraverseHash = "";
+
+        const publishedPrevHash = readPublishedHash(fromState);
 
         if (traverseKey) {
+          // Mirror the urlClaim.write the `else` branch does for non-traverse
+          // navigations — without this, `router.traverseToLast(name)` leaves
+          // state.context.url undefined for subscribers (#urlClaim was set in
+          // navigate-handler for browser-driven traverse, but programmatic
+          // traverseToLast bypasses that path).
+          this.#urlClaim.write(
+            toState,
+            Object.freeze({
+              hash: traverseHash,
+              hashChanged: traverseHash !== publishedPrevHash,
+            }),
+          );
           this.#browser.traverseTo(traverseKey);
         } else {
           // Tri-state hash resolution (#532).
@@ -297,9 +334,6 @@ export class NavigationPlugin {
           // a true signal regardless of whether the value came from
           // navOptions or the browser.
           const browserHash = getDecodedHash(this.#browser);
-          const publishedPrevHash =
-            (fromState?.context as { url?: { hash?: string } } | undefined)?.url
-              ?.hash ?? "";
 
           const hash =
             navOptions.hash === undefined
@@ -316,14 +350,15 @@ export class NavigationPlugin {
 
           const url = buildUrl(toState.path, this.#options.base);
           const finalUrl = hash ? `${url}#${encodeHashFragment(hash)}` : url;
-          const historyState = {
-            name: toState.name,
-            params: toState.params,
-            path: toState.path,
-          };
+
+          this.#historyStateBuffer.name = toState.name;
+          this.#historyStateBuffer.params = toState.params;
+          this.#historyStateBuffer.path = toState.path;
 
           if (toState.name === UNKNOWN_ROUTE) {
-            this.#browser.updateCurrentEntry({ state: historyState });
+            this.#browser.updateCurrentEntry({
+              state: this.#historyStateBuffer,
+            });
           } else {
             // Initial transition (no fromState) means router.start() is
             // resolving the cross-document load — the browser already created
@@ -337,7 +372,7 @@ export class NavigationPlugin {
               frozenMeta.navigationType !== "push" || isInitialTransition;
 
             this.#browser.navigate(finalUrl, {
-              state: historyState,
+              state: this.#historyStateBuffer,
               history: replace ? "replace" : "push",
             });
           }
@@ -347,11 +382,13 @@ export class NavigationPlugin {
       onTransitionCancel: () => {
         this.#capturedMeta = undefined;
         this.#pendingTraverseKey = undefined;
+        this.#pendingTraverseHash = "";
       },
 
       onTransitionError: () => {
         this.#capturedMeta = undefined;
         this.#pendingTraverseKey = undefined;
+        this.#pendingTraverseHash = "";
       },
     };
   }
@@ -364,6 +401,33 @@ interface NavigateLifecycleDeps {
   removeExtensions: () => void;
   releaseClaim: () => void;
   shared: NavigationSharedState;
+}
+
+/**
+ * Reads the previously published hash from `fromState.context.url`.
+ * Returns `""` for the initial transition (no `fromState`), for states whose
+ * `context.url` namespace was not claimed yet, or for the documented `{ hash:
+ * "" }` cleared form. Extracted from `onTransitionSuccess` to share between
+ * the traverse and non-traverse branches.
+ */
+function readPublishedHash(fromState: State | undefined): string {
+  return (
+    (fromState?.context as { url?: { hash?: string } } | undefined)?.url
+      ?.hash ?? ""
+  );
+}
+
+/**
+ * Decodes the URL fragment from a NavigationHistoryEntry's url string.
+ * Returns `""` when no fragment is present. The caller (NavigationPlugin's
+ * `traverseToLast`) only reaches here AFTER `resolveEntryToMatchedState`,
+ * which has already rejected `entry.url === null`, so the input is guaranteed
+ * non-null at runtime.
+ */
+function extractHashFromEntryUrl(entryUrl: string): string {
+  const rawHash = safeParseUrl(entryUrl).hash;
+
+  return rawHash ? decodeHashFragment(rawHash.slice(1)) : "";
 }
 
 function createNavigateLifecycle(deps: NavigateLifecycleDeps): Plugin {

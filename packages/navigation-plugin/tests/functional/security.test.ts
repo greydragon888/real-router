@@ -20,6 +20,7 @@ describe("Cross-Origin Filtering", () => {
     await router.start("/home");
 
     const stateBefore = withoutMeta(router.getState()!);
+    const contextBefore = router.getState()!.context;
 
     // eslint-disable-next-line sonarjs/no-clear-text-protocols -- testing cross-origin filtering requires http
     mock.navigate("http://external.com/page");
@@ -27,6 +28,8 @@ describe("Cross-Origin Filtering", () => {
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     expect(withoutMeta(router.getState()!)).toStrictEqual(stateBefore);
+    // context reference unchanged — no transition was triggered by the cross-origin event
+    expect(router.getState()!.context).toBe(contextBefore);
   });
 });
 

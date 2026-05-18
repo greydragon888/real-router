@@ -75,7 +75,28 @@ class NavigateCommand implements fc.AsyncCommand<HistoryModel, HistoryReal> {
   }
 
   async run(m: HistoryModel, r: HistoryReal) {
+    // B14 inline check — capture visit count BEFORE navigate, assert it grew
+    // by exactly 1 after a push. The check is only valid when there is no
+    // forward history to truncate: a navigate from mid-stack discards the
+    // forward entries, and any of those that matched `routeName` count
+    // toward the BEFORE total but not the AFTER total. In that case the
+    // identity reduces to `after === before - truncatedMatches + 1`, which
+    // is not a clean B14 statement. We restrict the assertion to the
+    // tip-of-stack case (no truncation) where the audit's invariant applies.
+    const atTip = m.cursor === m.stack.length - 1;
+    const countBefore = atTip
+      ? r.router.getRouteVisitCount(this.routeName)
+      : -1;
+
     await r.router.navigate(this.routeName, this.params ?? {});
+
+    if (atTip) {
+      const countAfter = r.router.getRouteVisitCount(this.routeName);
+
+      // B14 — getRouteVisitCount must grow by exactly 1 on push when no
+      // forward history is truncated.
+      expect(countAfter).toBe(countBefore + 1);
+    }
 
     m.stack = m.stack.slice(0, m.cursor + 1);
     m.stack.push({
@@ -569,6 +590,95 @@ class AssertHasVisitedMonotonicityCommand implements fc.AsyncCommand<
   }
 }
 
+/**
+ * A3 Roundtrip — after every model command, the URL in the browser history
+ * must agree with `router.getState().path`. The pure-function suite already
+ * pins `extractPath(buildUrl(path, base), base) === path`, but only the model
+ * exercises the full cycle through `onTransitionSuccess` and the navigate-
+ * handler. A drift here means the bidirectional sync regressed at the plugin
+ * level — exactly what A3 is meant to catch.
+ */
+class AssertUrlMatchesStateCommand implements fc.AsyncCommand<
+  HistoryModel,
+  HistoryReal
+> {
+  check(m: Readonly<HistoryModel>) {
+    return m.started;
+  }
+
+  async run(_m: HistoryModel, r: HistoryReal) {
+    const state = r.router.getState();
+
+    if (!state) {
+      return;
+    }
+
+    const browserUrl = r.mockNav.currentUrl;
+    const parsed = new URL(browserUrl);
+
+    // `state.path` includes query string (e.g. /users?tab=active); the
+    // browser-side pathname loses it. Compare pathname against the path
+    // stripped of query, which is the contract `entryToState` relies on.
+    const statePathname = state.path.includes("?")
+      ? state.path.slice(0, state.path.indexOf("?"))
+      : state.path;
+
+    expect(parsed.pathname).toBe(statePathname);
+  }
+
+  toString() {
+    return "assertUrlMatchesState()";
+  }
+}
+
+/**
+ * B15 Visit-count sum consistency. The sum of `getRouteVisitCount(r)` over
+ * `r ∈ getVisitedRoutes()` must equal the number of "matchable" entries
+ * (entries whose URL resolves to a route). A bug that double-counted the
+ * current entry, dropped routes at depth > 1, or returned unmatchable
+ * entries from `getVisitedRoutes` would break this arithmetic identity.
+ */
+class AssertVisitCountSumCommand implements fc.AsyncCommand<
+  HistoryModel,
+  HistoryReal
+> {
+  check(m: Readonly<HistoryModel>) {
+    return m.started;
+  }
+
+  async run(_m: HistoryModel, r: HistoryReal) {
+    const visited = r.router.getVisitedRoutes();
+    const sum = visited.reduce(
+      (acc, name) => acc + r.router.getRouteVisitCount(name),
+      0,
+    );
+
+    // "Matchable entries" — count entries whose URL resolves via the same
+    // matchPath the plugin uses internally. We compute it independently
+    // from the model so a regression in either side surfaces here.
+    const matchable = r.browser.entries().filter((entry) => {
+      if (!entry.url) {
+        return false;
+      }
+
+      try {
+        const parsed = new URL(entry.url);
+        const match = r.api.matchPath(parsed.pathname + parsed.search);
+
+        return match !== undefined;
+      } catch {
+        return false;
+      }
+    }).length;
+
+    expect(sum).toBe(matchable);
+  }
+
+  toString() {
+    return "assertVisitCountSum()";
+  }
+}
+
 // =============================================================================
 // Test
 // =============================================================================
@@ -597,6 +707,8 @@ const allCommands = [
   fc.constant(new AssertCanGoBackToImpliesCanGoBackCommand()),
   fc.constant(new AssertCanGoBackToImpliesHasVisitedCommand()),
   fc.constant(new AssertHasVisitedMonotonicityCommand()),
+  fc.constant(new AssertUrlMatchesStateCommand()),
+  fc.constant(new AssertVisitCountSumCommand()),
 ];
 
 describe("Navigation Plugin History Model", () => {

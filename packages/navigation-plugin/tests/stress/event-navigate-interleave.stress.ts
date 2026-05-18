@@ -38,6 +38,8 @@ describe("N3 — Navigate Event/Router Interleave Stress", () => {
     const currentUrl = new URL(mockNav.currentUrl);
 
     expect(currentUrl.pathname).toMatch(/^\//);
+    // State ↔ URL consistency: router state path must match browser URL pathname
+    expect(currentUrl.pathname).toBe(finalState!.path);
   });
 
   it("3.2 — router.navigate then navigate event: 100 pairs", async () => {
@@ -51,7 +53,13 @@ describe("N3 — Navigate Event/Router Interleave Stress", () => {
     const finalState = router.getState();
 
     expect(finalState).toBeDefined();
-    expect(typeof finalState!.name).toBe("string");
+    // Route name must be non-empty (not a typeof tautology)
+    expect(finalState!.name.length).toBeGreaterThan(0);
+
+    // State ↔ URL consistency
+    const finalUrl = new URL(mockNav.currentUrl);
+
+    expect(finalUrl.pathname).toBe(finalState!.path);
   });
 
   it("3.3 — alternating event/navigate × 50: state consistent", async () => {
@@ -71,6 +79,8 @@ describe("N3 — Navigate Event/Router Interleave Stress", () => {
     const currentUrl = new URL(mockNav.currentUrl);
 
     expect(currentUrl.pathname).toMatch(/^\//);
+    // State ↔ URL consistency
+    expect(currentUrl.pathname).toBe(finalState!.path);
   });
 
   it("3.4 — fire-and-forget concurrent: no unhandled rejections", async () => {
@@ -87,6 +97,9 @@ describe("N3 — Navigate Event/Router Interleave Stress", () => {
 
     await waitForTransitions();
 
-    expect(router.getState()).toBeDefined();
+    const state = router.getState();
+
+    expect(state).toBeDefined();
+    expect(state!.name.length).toBeGreaterThan(0);
   });
 });

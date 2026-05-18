@@ -223,6 +223,12 @@ describe("SSR Fallback", () => {
     browser.updateCurrentEntry({ state: {} });
     browser.traverseTo("some-key");
 
+    // noop methods must not mutate state
+    expect(browser.getLocation()).toBe("/");
+    expect(browser.getHash()).toBe("");
+    expect(browser.currentEntry).toBeNull();
+    expect(browser.entries()).toStrictEqual([]);
+
     const cleanup = browser.addNavigateListener(() => {});
 
     expect(typeof cleanup).toBe("function");

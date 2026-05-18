@@ -26,16 +26,17 @@ navigation-plugin/
 │   ├── index.ts               — Public API + module augmentation
 │   ├── factory.ts             — navigationPluginFactory (validation, normalization, instance creation)
 │   ├── plugin.ts              — NavigationPlugin class (runtime behavior)
-│   ├── types.ts               — Types (NavigationPluginOptions, NavigationBrowser, NavigationMeta, NavigationDirection, NavigationSharedState)
+│   ├── types.ts               — Types (NavigationPluginOptions, NavigationBrowser, NavigationMeta, NavigationDirection, NavigationSharedState, SyncingFlag)
 │   ├── history-extensions.ts  — Navigation API history extensions (peekBack, peekForward, hasVisited, etc.)
-│   ├── navigate-handler.ts    — Navigate event handler (createNavigateHandler, recoverFromNavigateError)
-│   ├── navigation-browser.ts  — NavigationBrowser implementation (wraps globalThis.navigation)
-│   ├── plugin-utils.ts        — createStartInterceptor, createReplaceHistoryState
+│   ├── navigate-handler.ts    — Navigate event handler (createNavigateHandler, recoverFromNavigateError, withRecovery)
+│   ├── navigation-browser.ts  — NavigationBrowser implementation (createNavigationBrowser + wrapNavigationBrowserWithSyncing)
 │   ├── ssr-fallback.ts        — createNavigationFallbackBrowser (no-op fallback for SSR)
 │   ├── validation.ts          — Options validation (delegates to browser-env)
 │   ├── constants.ts           — Constants (defaultOptions, source, LOGGER_CONTEXT)
-│   └── browser-env/           — Symlink → shared/browser-env (extractPath, buildUrl, urlToPath, safeParseUrl, shouldReplaceHistory, etc.)
+│   └── browser-env/           — Symlink → shared/browser-env (extractPath, buildUrl, urlToPath, safeParseUrl, shouldReplaceHistory, createStartInterceptor, createReplaceHistoryState, createPluginBuildUrl, hash encoding helpers, etc.)
 ```
+
+> **Note (2026-05-18):** `plugin-utils.ts` is **not** a local file — `createStartInterceptor`, `createReplaceHistoryState`, and `createPluginBuildUrl` live in `shared/browser-env/plugin-utils.ts` and are imported via the `./browser-env` symlink. Earlier revisions of this document listed it as local; that was wrong.
 
 ## Module Dependency Graph
 
@@ -169,6 +170,13 @@ interface NavigationBrowser {
   addNavigateListener: (fn: (evt: NavigateEvent) => void) => () => void;
   entries: () => NavigationHistoryEntry[];
   currentEntry: NavigationHistoryEntry | null;
+  /**
+   * Type of the cross-document navigation that activated this document.
+   * Reads `navigation.activation.navigationType`. Returns `undefined` when
+   * unavailable (older browsers, SSR fallback). Consumed once by the plugin's
+   * constructor to prime `#capturedMeta` for the first transition (#531).
+   */
+  getActivationType: () => NavigationMeta["navigationType"] | undefined;
 }
 ```
 

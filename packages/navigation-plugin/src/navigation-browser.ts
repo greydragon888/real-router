@@ -80,38 +80,46 @@ export function wrapNavigationBrowserWithSyncing(
   browser: NavigationBrowser,
   syncing: SyncingFlag,
 ): NavigationBrowser {
-  const wrap = <T>(fn: () => T): T => {
-    syncing.current = true;
-    try {
-      return fn();
-    } finally {
-      syncing.current = false;
-    }
-  };
-
+  // Hot path: each mutation is called on every navigation. Inline the
+  // try/finally instead of routing through a generic `wrap` helper — that
+  // helper created two closure layers (outer arrow + the `() => fn()` arg)
+  // per call. Inlining drops to a single closure and lets V8 monomorphize
+  // the call sites.
   return {
     getLocation: () => browser.getLocation(),
     getHash: () => browser.getHash(),
 
     navigate: (url, options) => {
-      wrap(() => {
+      syncing.current = true;
+      try {
         browser.navigate(url, options);
-      });
+      } finally {
+        syncing.current = false;
+      }
     },
     replaceState: (state, url) => {
-      wrap(() => {
+      syncing.current = true;
+      try {
         browser.replaceState(state, url);
-      });
+      } finally {
+        syncing.current = false;
+      }
     },
     updateCurrentEntry: (options) => {
-      wrap(() => {
+      syncing.current = true;
+      try {
         browser.updateCurrentEntry(options);
-      });
+      } finally {
+        syncing.current = false;
+      }
     },
     traverseTo: (key) => {
-      wrap(() => {
+      syncing.current = true;
+      try {
         browser.traverseTo(key);
-      });
+      } finally {
+        syncing.current = false;
+      }
     },
 
     addNavigateListener: (fn) => browser.addNavigateListener(fn),

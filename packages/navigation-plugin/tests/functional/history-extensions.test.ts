@@ -336,6 +336,44 @@ describe("Navigation Plugin — History Extensions", () => {
       expect(traverseToSpy).toHaveBeenCalledWith(usersListEntry!.key);
     });
 
+    it("populates state.context.url for traverse to a hash-less entry (hash === '')", async () => {
+      // Pins the contract added together with B1 fix: programmatic traverse-
+      // ToLast must mirror what navigate-handler does for browser-initiated
+      // traverse — write urlClaim with the destination entry's hash. Without
+      // the urlClaim.write inside the `if (traverseKey)` branch in
+      // onTransitionSuccess, this assertion regresses to `url === undefined`.
+      await router.start();
+      await router.navigate("users.list");
+      await router.navigate("home");
+
+      const state = await router.traverseToLast("users.list");
+      const url = (
+        state.context as { url?: { hash: string; hashChanged: boolean } }
+      ).url;
+
+      expect(url).toBeDefined();
+      expect(url!.hash).toBe("");
+    });
+
+    it("preserves the destination entry's hash on traverseToLast (B1, #532 parity)", async () => {
+      // Build a history where the target entry carries a fragment. The
+      // destination entry's url ends in #anchor — after traverseToLast, the
+      // resolved state.context.url must report hash="anchor" (decoded form),
+      // not "" (stripped) and not undefined (urlClaim skipped).
+      mockNav.reset("http://localhost/");
+      await router.start();
+      await router.navigate("users.list", {}, { hash: "anchor" });
+      await router.navigate("home");
+
+      const state = await router.traverseToLast("users.list");
+      const url = (
+        state.context as { url?: { hash: string; hashChanged: boolean } }
+      ).url;
+
+      expect(url).toBeDefined();
+      expect(url!.hash).toBe("anchor");
+    });
+
     it("throws invariant-error when browser.currentEntry becomes null mid-call", async () => {
       // Invariant violation scenario: entries() returns valid history but
       // currentEntry is null. The plugin previously silently defaulted
