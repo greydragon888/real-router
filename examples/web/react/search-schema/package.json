@@ -17,7 +17,7 @@
     "@real-router/react": "workspace:^",
     "react": "19.2.0",
     "react-dom": "19.2.0",
-    "zod": "3.24.4"
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@types/react": "19.2.14",

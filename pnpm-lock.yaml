@@ -260,8 +260,8 @@ importers:
         specifier: 3.5.13
         version: 3.5.13(typescript@6.0.3)
       zod:
-        specifier: 3.24.4
-        version: 3.24.4
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
       '@tanstack/router-core':
         specifier: 1.168.9
@@ -887,8 +887,8 @@ importers:
         specifier: 2.8.1
         version: 2.8.1
       zod:
-        specifier: 3.24.4
-        version: 3.24.4
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
       '@analogjs/vite-plugin-angular':
         specifier: 2.4.7
@@ -1756,8 +1756,8 @@ importers:
         specifier: 10.29.2
         version: 10.29.2
       zod:
-        specifier: 3.24.4
-        version: 3.24.4
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
       '@playwright/test':
         specifier: 1.58.2
@@ -2049,8 +2049,8 @@ importers:
         specifier: 10.29.2
         version: 10.29.2
       zod:
-        specifier: 3.24.4
-        version: 3.24.4
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
       '@playwright/test':
         specifier: 1.58.2
@@ -2584,8 +2584,8 @@ importers:
         specifier: 19.2.0
         version: 19.2.0(react@19.2.0)
       zod:
-        specifier: 3.24.4
-        version: 3.24.4
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
       '@playwright/test':
         specifier: 1.58.2
@@ -3168,8 +3168,8 @@ importers:
         specifier: 19.2.0
         version: 19.2.0(react@19.2.0)
       zod:
-        specifier: 3.24.4
-        version: 3.24.4
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
       '@playwright/test':
         specifier: 1.58.2
@@ -3712,8 +3712,8 @@ importers:
         specifier: 1.9.12
         version: 1.9.12
       zod:
-        specifier: 3.24.4
-        version: 3.24.4
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
       '@playwright/test':
         specifier: 1.58.2
@@ -4005,8 +4005,8 @@ importers:
         specifier: 1.9.12
         version: 1.9.12
       zod:
-        specifier: 3.24.4
-        version: 3.24.4
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
       '@playwright/test':
         specifier: 1.58.2
@@ -4527,8 +4527,8 @@ importers:
         specifier: 5.55.7
         version: 5.55.7(@typescript-eslint/types@8.59.3)
       zod:
-        specifier: 3.24.4
-        version: 3.24.4
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
       '@playwright/test':
         specifier: 1.58.2
@@ -4898,8 +4898,8 @@ importers:
         specifier: 5.55.7
         version: 5.55.7(@typescript-eslint/types@8.59.3)
       zod:
-        specifier: 3.24.4
-        version: 3.24.4
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
       '@playwright/test':
         specifier: 1.58.2
@@ -5397,8 +5397,8 @@ importers:
         specifier: 3.5.13
         version: 3.5.13(typescript@6.0.3)
       zod:
-        specifier: 3.24.4
-        version: 3.24.4
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
       '@playwright/test':
         specifier: 1.58.2
@@ -5773,8 +5773,8 @@ importers:
         specifier: 3.5.13
         version: 3.5.13(typescript@6.0.3)
       zod:
-        specifier: 3.24.4
-        version: 3.24.4
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
       '@playwright/test':
         specifier: 1.58.2
@@ -15436,9 +15436,6 @@ packages:
     peerDependencies:
       zod: ^3.25.28 || ^4
 
-  zod@3.24.4:
-    resolution: {integrity: sha512-OdqJE9UDRPwWsrHjLN2F8bPxvwJBK22EHLWtanu0LSYr5YqzsaaW3RMgmjwr8Rypg5k+meEJdSPXJZXE/yqOMg==}
-
   zod@4.3.6:
     resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
 
@@ -24959,8 +24956,6 @@ snapshots:
   zod-to-json-schema@3.25.2(zod@4.3.6):
     dependencies:
       zod: 4.3.6
-
-  zod@3.24.4: {}
 
   zod@4.3.6: {}
 
