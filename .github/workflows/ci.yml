@@ -103,13 +103,23 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Full validation: type-check → lint → test → test:properties → test:stress
+      # Full validation: type-check → lint → test → test:properties.
       # ^bundle for upstream packages runs bundle (tsdown) as a dependency.
       #
+      # `test:stress` intentionally NOT included on PR CI — its leak/race-condition
+      # signal is low-frequency and the iterations are CPU-expensive (saves
+      # ≈5 min of wall time per run, mostly visible on lockfile-bump PRs where
+      # the whole project rebuilds). Stress tests still run locally via the
+      # pre-push hook (`pnpm build` → orchestrator depends on `test:stress`)
+      # and are exercised in turbo.json's `build` task graph for any consumer
+      # of full validation. Re-introduce them here if a memory-leak regression
+      # from a framework adapter bump (React/Vue/Solid/Svelte) ever slips
+      # through pre-push.
+      #
       # Coverage is enabled in `vitest.config.unit.mts` (coverage.enabled: true)
-      # and disabled in property/stress configs (coverage.enabled: false).
-      # Passing `-- --coverage` here overrides `enabled: false` for property/
-      # stress tasks, which then run with vitest's default reporter set (html,
+      # and disabled in property configs (coverage.enabled: false).
+      # Passing `-- --coverage` here overrides `enabled: false` for property
+      # tasks, which then run with vitest's default reporter set (html,
       # clover, json) — no lcov — and their `clean: true` default wipes the
       # lcov.info that `test` produced a moment earlier. The resulting coverage/
       # directory ends up without lcov.info, which in turn makes SonarCloud see
@@ -118,7 +128,7 @@ jobs:
       # coverage.enabled.
       - name: Test with coverage
         run: >-
-          pnpm turbo run test test:properties test:stress
+          pnpm turbo run test test:properties
           --filter='...[${{ needs.check.outputs.turbo_base || 'origin/master' }}]'
           --filter='!./examples/**'
           --filter='!./benchmarks'
