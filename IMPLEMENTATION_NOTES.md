@@ -229,25 +229,26 @@ Enforces conventional commits. Types and scopes defined in `commitlint.config.mj
 
 ### Pre-commit
 
-`.husky/pre-commit` runs:
+`.husky/pre-commit` runs (correctness validation, fast — <2 min on a typical commit):
 
 - **Auto-dedupe** — if `pnpm-lock.yaml` is staged, runs `pnpm dedupe` and re-stages the lockfile. This eliminates manual `pnpm dedupe` runs after dependency updates ([pnpm/pnpm#7258](https://github.com/pnpm/pnpm/issues/7258) — no auto-dedupe setting exists in pnpm 10)
-- `pnpm turbo run test --filter='!./examples/**'` (includes type-check and lint via turbo pipeline, excludes examples)
-- `pnpm lint:unused` (knip - dead code detection)
-- `pnpm lint:duplicates` (jscpd - copy-paste detection)
+- `pnpm lint:deps` (syncpack — workspace version consistency, ~1s static scan)
+- `pnpm turbo run test --filter='!./examples/**'` (includes type-check and lint via turbo task graph, excludes examples)
 - `pnpm lint:e2e` (verifies example e2e directories have spec files)
 
 ### Pre-push
 
 `.husky/pre-push` runs (artifact validation, NOT a superset of pre-commit):
 
-- `pnpm lint:duplicates` (jscpd - copy-paste detection)
-- `pnpm turbo run build:dist-only lint:package lint:types --filter='!./examples/**'` (build + validate .d.ts + validate package.json exports)
-- `pnpm lint:unused` (knip - dead code detection)
-- `pnpm lint:deps` (syncpack - dependency version consistency)
-- `pnpm lint:audit` (osv-scanner - vulnerability scan, non-blocking if not installed)
+- `pnpm lint:duplicates` (jscpd — copy-paste detection across the full tree)
+- `pnpm turbo run build lint:package lint:types --filter='!./examples/**'` (full build + validate package.json exports via publint + validate `.d.ts` via arethetypeswrong)
+- `pnpm lint:unused` (knip — dead code detection across the full tree)
+- `pnpm lint:deps` (syncpack — final gate before the push reaches the remote)
+- `pnpm lint:audit` (osv-scanner — vulnerability scan against the GHSA database; non-blocking if the binary is missing locally)
 
-**Rationale:** Pre-commit validates correctness (auto-dedupe + tests + linting). Pre-push validates artifacts (build + type declarations + package exports + dep consistency + GHSA audit). `lint:deps` was added after #413 — syncpack errors were previously only caught in CI, allowing version mismatches (solid-js 1.9.5 vs 1.9.12) to slip through. `lint:audit` was added after PR #643 (see "Local Dependency Audit" below) so contributors can catch CVEs locally before CI Dependency Review flags them.
+**Rationale:** Pre-commit validates correctness in <2 min so it stays painless on every commit. Pre-push validates artifacts (full build pipeline + dist surface area + dep consistency + GHSA audit) — slower, runs once per push. `lint:deps` lives in **both** layers: pre-commit catches workspace version drift the moment a `package.json` is staged (~1s static check), pre-push acts as the final gate. `lint:duplicates`/`lint:unused` live only in pre-push because their analysis depends on the full tree, not on a single commit's diff. `lint:audit` was added after PR #643 (see "Local Dependency Audit" below) so contributors can catch CVEs locally before CI Dependency Review flags them.
+
+The full build orchestrator (`pnpm turbo run build`) is wired in `turbo.json` to depend on `bundle`, `test`, `test:properties`, AND `test:stress` — so pre-push exercises stress tests for every human push. Stress coverage is intentionally **not** duplicated in CI workflows (see "CI: `test:stress` lives only in pre-push" below).
 
 ## Commit Conventions
 
@@ -346,6 +347,29 @@ concurrency:
 ```
 
 Cancels in-progress runs when new commit pushed.
+
+### CI: `test:stress` lives only in pre-push
+
+**Problem.** A full PR rebuild used to take ~28 min (measured on PR #651, sha=06adf39b parent, lockfile-bump scenario where every package was cache-missed). The `test:stress` stage contributed ~5 min of that budget across ~17 stress tasks (one per package with reactive subscriptions or async pipelines). The signal-to-cost ratio is bad: stress tests catch leak/race-condition regressions that virtually never originate in PR diffs — they appear when a framework adapter's dependency (React/Vue/Solid/Svelte) bumps and changes cleanup semantics, or when a new plugin is introduced.
+
+**Solution (commits `06adf39b`, `d2fbfa4a`).** Drop `test:stress` from both CI workflows that previously ran it:
+
+- `ci.yml` "Test with coverage" step: `pnpm turbo run test test:properties test:stress …` → `pnpm turbo run test test:properties …`
+- `post-merge.yml` "Build" step: `pnpm turbo run build …` → `pnpm turbo run bundle test test:properties …` (avoids the `build` orchestrator dependency on `test:stress` declared in `turbo.json`)
+
+The `build` task in `turbo.json` still lists `test:stress` in its `dependsOn` — so anyone running `pnpm build` locally (and the **pre-push hook**, which does exactly that) continues to exercise the full stress suite. Stress coverage is preserved for every human push.
+
+Post-removal numbers:
+
+| Workflow             | Before        | After                 |
+| -------------------- | ------------- | --------------------- |
+| PR CI full rebuild   | ~28 min       | **~22–23 min**        |
+| Post-Merge Build full rebuild | ~25 min | **~18–20 min**       |
+| Cache hit (any)      | unchanged     | unchanged (~1–5 min)  |
+
+**Why this is safe enough.** Pre-push covers stress for every human push. Dependabot PRs bypass pre-push (the bot pushes directly to its fork), so framework-adapter bumps (React/Vue/Solid/Svelte) lose their stress safety net here — a deliberate trade-off, on the bet that adapter bumps are rare and locally re-runnable when a leak is suspected.
+
+**How to undo.** Re-add `test:stress` to either `ci.yml`'s "Test with coverage" step or to `post-merge.yml`'s explicit task list, and the orchestration kicks back in. Both workflows carry inline comments pointing at this rationale so the trade-off is rediscoverable.
 
 ### pnpm/action-setup v6
 
@@ -489,11 +513,14 @@ ko_fi: greydragon888
   "threshold": 2,
   "minLines": 5,
   "minTokens": 50,
-  "skipComments": true
+  "skipComments": true,
+  "format": ["typescript", "tsx", "svelte"]
 }
 ```
 
 Ignores: `*.d.ts`, `*.test.ts`, `*.test.tsx`, `*.bench.ts`, `*.spec.ts`, `*.properties.ts`, `benchmarks/**`, `packages/preact/src/**`, `packages/hash-plugin/src/**`, `packages/*/src/dom-utils/**`, `packages/dom-utils/src/**` (last two are symlinks to `shared/dom-utils/` — see #437 section; without the ignore jscpd would report 6 false-positive duplicates).
+
+**`svelte` format (jscpd 4.2+).** Adds Svelte SFC tokenization — jscpd parses each `<script>`/`<template>`/`<style>` block with its native format and cross-detects clones across formats (e.g., duplicated logic between a `.svelte` script block and a `.ts` helper). Currently exercised by `packages/svelte/src/RouterProvider.svelte`. No false positives on the current source tree (clones: 4 / 0.15%, well under the 2% threshold).
 
 ### size-limit Configuration
 
@@ -1010,6 +1037,40 @@ All critical promise rules were already covered by `typescript-eslint strictType
 
 **New security rules (recommended):** `hardcoded-secret-signatures`, `dynamically-constructed-templates`, `review-blockchain-mnemonic`, `no-session-cookies-on-static-assets`. Last two disabled as irrelevant for client-side router.
 
+### ESLint 10.4 — `includeIgnoreFile()` for `.gitignore` parity
+
+**Problem.** Our `globalIgnores([...])` list in `eslint.config.mjs` partially duplicated `.gitignore` (build artifacts, coverage, `.turbo`, etc.) and partially diverged (extra entries like `**/*.bak*`, `cz.config.js`). Maintaining two lists invited drift — when CI added `.angular/`, `.svelte-kit/`, `playwright-report/`, `tools/`, `.spike/`, `**/CLAUDE.md` to `.gitignore`, none of those landed in `globalIgnores`. ESLint still skipped them in practice (no `.ts`/`.tsx` files inside) but the defence-in-depth was theoretical.
+
+**Solution (ESLint 10.4+).** `eslint/config` ships `includeIgnoreFile(absolutePath, label?)` — an official helper that reads `.gitignore`-style patterns and converts them into a flat-config ignore block. We prepend it to the config array and trim the manually-maintained list to entries that are NOT in `.gitignore`:
+
+```js
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+import { globalIgnores, includeIgnoreFile } from "eslint/config";
+
+const gitignorePath = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  ".gitignore",
+);
+
+export default tsEslint.config(
+  includeIgnoreFile(gitignorePath, "Imported .gitignore patterns"),
+  globalIgnores([
+    "**/*.min.js",
+    "**/*.d.ts",
+    "**/generated/**",
+    "**/*.bak*",        // Backup files
+    "**/*.mjs",         // JS config files
+    "cz.config.js",
+    ".changeset/**",
+    "**/e2e/**",
+  ]),
+  // ...
+);
+```
+
+After the swap, `globalIgnores` carries only the ESLint-specific exclusions that `.gitignore` legitimately doesn't (mjs configs, e2e tests, generated dirs, backup files). Build artifacts, coverage, `.turbo`, `.stryker-tmp`, `node_modules`, framework outputs, AI tooling dirs — all flow from `.gitignore` automatically and stay in lockstep.
+
 ### Adapter Config Cleanup (~2,000 lines removed)
 
 **Problem:** Each adapter config (React, Preact, Vue, Solid, Svelte) duplicated ~250-300 lines of rules already covered by the root config: TypeScript, JSDoc, Unicorn, Promise, SonarJS, Prettier, Vitest, no-only-tests.
@@ -1035,20 +1096,30 @@ Evaluated `eslint-plugin-solid@0.14.5` for the Solid adapter. Decision: not adde
 - No alternatives exist (checked npm, GitHub, Solid.js org)
 - Solid adapter is 804 lines with 100% test coverage — all Solid patterns are correct (`props.xxx` everywhere, no destructuring, correct `splitProps` usage). The plugin's key rules target mistakes not present in the codebase.
 
-### typescript-eslint transitive pin (8.57.1)
+### typescript-eslint transitive pin saga (8.57.1 → removed 2026-05-19)
 
-`typescript-eslint@8.57.2` introduced a fixer crash in `no-unnecessary-type-arguments`. The rule's `fix()` function accesses `typeArguments.params[-1]` → `undefined` → crash on `.range`. Occurs on both ESLint 9 and 10, even without `--fix`.
+**Historical context.** `typescript-eslint@8.57.2` introduced a fixer crash in `no-unnecessary-type-arguments`. The rule's `fix()` function accessed `typeArguments.params[-1]` → `undefined` → crash on `.range`. Occurred on both ESLint 9 and 10, even without `--fix`. Bisected: 8.57.1 OK → 8.57.2 CRASH. For roughly two months the main `typescript-eslint` umbrella package moved forward (eventually to `8.59.0`) while `pnpm.overrides` pinned the transitive `@typescript-eslint/eslint-plugin` and `@typescript-eslint/parser` to `8.57.1` to avoid the crashing code path.
 
-**Bisected:** 8.57.1 OK → 8.57.2 CRASH. The main `typescript-eslint` package is now at `8.59.0`, but pnpm overrides still pin the transitive `@typescript-eslint/eslint-plugin` and `@typescript-eslint/parser` to `8.57.1` to avoid the crashing code path in the plugin package.
+**Why the pin became a suppressor, not a workaround.** The original crash was fixed upstream by 8.59.0 (verified 2026-05-18), but the pin had silently transitioned into an implicit suppressor for newer typescript-eslint rules introduced between 8.58 and 8.59 — `no-base-to-string`, `no-unnecessary-condition`, `prefer-promise-reject-errors` — plus `@typescript-eslint/no-unnecessary-type-assertion` got noticeably stricter. The pin no longer paid for itself: keeping it meant `pnpm lint:dedupe` failed on every dependabot bump of `typescript-eslint` (transitive `@typescript-eslint/tsconfig-utils`/`types` resolved to the new version, but the pinned umbrella stayed on 8.57.1, breaking pnpm's strict dedupe). Each bump arrived as a CI red and had to be closed by hand.
 
-**The original crash is fixed upstream (verified on 2026-05-18):** dropping the pin and reinstalling against `@typescript-eslint/eslint-plugin@8.59.0` + `@typescript-eslint/parser@8.59.0` produces no `no-unnecessary-type-arguments` crash. The blocker for lifting the pin is no longer the crash itself — it's the **accumulated tightening of unrelated rules** that the pin parallel-suppresses.
+**Removal (commits `a35dcb60`, `53bfb92e`, `42215b52`).** The pin came off in three logical steps:
 
-**What snapping the pin exposes** (measured on the same 2026-05-18 attempt — `git restore` and re-run to reproduce):
+1. **Drop the pin from `pnpm.overrides`** + reinstall to let the umbrella pull the matching transitive versions. `pnpm lint:dedupe` immediately turned green for dependabot bumps.
+2. **Lift the suppression debt explicitly.** 10 `eslint-disable-next-line` markers + 1 file-level disable, each with an inline `-- reason` comment so a future audit can decide whether to refactor or keep:
+   - `@typescript-eslint/no-base-to-string` × 4 — `String(value)` on `unknown`-typed route params (`path-matcher` source + test helpers). Route params are contractually primitive (`string | number | boolean | bigint`) but typed `unknown` — refactor would mean throwing on Symbol/Function values, a runtime semantics change.
+   - `@typescript-eslint/prefer-promise-reject-errors` × 3 — `Promise.reject(error)` from `NavigationNamespace` catch blocks. Wrapping in `error instanceof Error ? error : new Error(...)` brings a defensive untestable branch (RouterError extends Error, the else is unreachable) which breaks the 100% branch-coverage gate; `error as Error` gets reverted by `--fix` as an "unnecessary assertion". The disable is the residual fixed point.
+   - `@typescript-eslint/no-unnecessary-condition` × 2 — `decoder(params) ?? params` / `encoder(params) ?? params` runtime fallbacks in `getRoutesApi.ts`. The `??` guards against a user-provided callback violating its declared return type — removing it would require changing the public API signature to `(p) => Params | null | undefined`.
+   - `sonarjs/no-undefined-argument` (file-level, 7 occurrences) — `tests/.../edge-cases-callback.test.ts` exists specifically to lock the navigate-with-trailing-`undefined` behaviour for Issues #53/#58. Stripping the trailing `undefined` defeats the tests.
+   - Three structural cleanups avoided disables entirely: `Record<string | symbol, unknown>` in two `shallowEqual.properties.ts` files (preact + svelte) lets symbol-keyed writes type-check without a cast, and `react-server-entry.test.ts` swapped string-indexing-via-cast for the `in` operator.
+3. **Eat the `--fix` collateral on the rest.** 103 source/test files had redundant `as X` casts removed by `eslint --fix` once the stricter `no-unnecessary-type-assertion` came online. Three of those casts were load-bearing and re-introduced with a targeted disable: `preact/tests/property/shallowEqual.properties.ts:337-338` (symbol-index on `Record<string, unknown>` — `TS2538`), `svelte/tests/property/shallowEqual.properties.ts:460` (same shape via `buildLargeRecord`'s return type), and `react/tests/functional/react-server-entry.test.ts:34` (typed namespace import widened to `Record<string, unknown>` for dynamic key access — `TS7053`). The remaining 100 cast removals are pure cleanup, no runtime impact (type assertions are compile-time only).
 
-- ~20 hand-tracked errors across 5 packages: `@typescript-eslint/no-base-to-string` (4 in path-matcher), `@typescript-eslint/no-unnecessary-condition` (2 in core), `@typescript-eslint/prefer-promise-reject-errors` (3 in core), `sonarjs/no-undefined-argument` (7 in core test), `sonarjs/unused-import` (4 unused imports).
-- `eslint --fix` auto-corrects ~130 files but is **too aggressive** in at least one shape: removes load-bearing `as X` type assertions (e.g., `(record as Record<symbol, unknown>)[sym] = …` collapsed to `record[sym] = …` in `preact/tests/property/shallowEqual.properties.ts:337` and `shared/dom-utils/scroll-restore.ts:404`), which then trips `tsc --noEmit` with `TS2538: Type 'unique symbol' cannot be used as an index type`. Every `--fix` change needs case-by-case audit before committing.
+**Audit workflow for future strictness bumps.** When `pnpm build` fails after a typescript-eslint major:
 
-**TODO:** Removing the pin is **technically safe** (the original crash is gone). What it actually requires is a focused cleanup PR that (a) lands the ~20 manual fixes, (b) audits each `--fix` rewrite for over-correction (cast removal, conditional removal) and reverts the load-bearing ones, (c) re-runs `pnpm build` end-to-end. Out of scope for piggy-back commits.
+1. Run `pnpm lint` to surface the manual errors. They will be a small set (`<20` typical).
+2. Run once more with `eslint --fix` enabled (already the default in our `lint` script) to absorb the auto-fixable rewrites.
+3. Run `pnpm type-check` — every `TS2538`/`TS7053`/`TS2322` from the `--fix` pass is a load-bearing cast that was wrongly removed. Re-introduce each with `// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- <load-bearing reason>`. The fixed point converges in 2–3 passes.
+
+**Lesson.** A `pnpm.overrides` pin is the right tool for a confirmed upstream bug with a known fix-version ETA. It is the **wrong** tool for "this newer rule annoys me" — that's a config-level decision and belongs in `eslint.config.mjs`, not in dependency overrides. Once a pin starts suppressing things it wasn't installed to suppress, the cost of keeping it grows silently until something forces the audit (in our case, recurring dependabot dedupe failures).
 
 ### New Rules Added
 
