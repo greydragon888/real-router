@@ -59,7 +59,7 @@ export const arbFSMConfig: fc.Arbitrary<GeneratedFSMConfig> = fc
             initial,
             context: null,
             transitions,
-          } as FSMConfig<string, string, null>,
+          },
           states,
           events,
         };
@@ -94,7 +94,7 @@ export const arbFSMConfigWithSelfLoop: fc.Arbitrary<GeneratedFSMConfigWithSelfLo
           initial,
           context: null,
           transitions: updatedTransitions,
-        } as FSMConfig<string, string, null>,
+        },
         selfLoopEvent,
       };
     });

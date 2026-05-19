@@ -75,7 +75,7 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
   ): Unsubscribe {
     const set = this.#getCallbackSet(eventName);
 
-    if (set.has(cb as AnyCallback)) {
+    if (set.has(cb)) {
       throw new Error(`Duplicate listener for "${eventName}"`);
     }
 
@@ -91,7 +91,7 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
       );
     }
 
-    set.add(cb as AnyCallback);
+    set.add(cb);
 
     return () => {
       this.off(eventName, cb);
@@ -105,7 +105,7 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
     eventName: E,
     cb: (...args: TEventMap[E]) => void,
   ): void {
-    this.#callbacks.get(eventName)?.delete(cb as AnyCallback);
+    this.#callbacks.get(eventName)?.delete(cb);
   }
 
   /**

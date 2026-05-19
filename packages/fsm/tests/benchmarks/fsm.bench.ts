@@ -60,12 +60,9 @@ function createRingConfig(size: number): FSMConfig<RingState, RingEvent, null> {
   }
 
   return {
-    initial: "state0" as RingState,
+    initial: "state0",
     context: null,
-    transitions: transitions as Record<
-      RingState,
-      Partial<Record<RingEvent, RingState>>
-    >,
+    transitions: transitions,
   };
 }
 

@@ -17,7 +17,7 @@ const arbArrayParamsBracketsOrIndex = fc.tuple(
     fc.array(arbSafeString, { minLength: 1, maxLength: 5 }),
     { minKeys: 1, maxKeys: 3 },
   ),
-  fc.constantFrom("brackets", "index") as fc.Arbitrary<ArrayFormat>,
+  fc.constantFrom("brackets", "index"),
 );
 
 const arbBoolParams = fc.dictionary(arbSafeKey, fc.boolean(), {
@@ -232,7 +232,7 @@ describe("array element validation", () => {
   );
 
   const arbInvalidElement = fc.oneof(
-    fc.constant(null as unknown),
+    fc.constant(null),
     fc.constant(undefined as unknown),
     fc.record({ key: arbSafeString }) as fc.Arbitrary<unknown>,
   );

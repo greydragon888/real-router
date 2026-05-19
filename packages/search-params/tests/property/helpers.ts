@@ -75,7 +75,7 @@ export const arbSearchParams: fc.Arbitrary<SearchParams> = fc.dictionary(
   arbSafeKey,
   arbQueryValue,
   { minKeys: 0, maxKeys: 5 },
-) as fc.Arbitrary<SearchParams>;
+);
 
 export const arbSearchParamsStrings: fc.Arbitrary<Record<string, string>> =
   fc.dictionary(arbSafeKey, arbSafeString, { minKeys: 0, maxKeys: 5 });
@@ -114,7 +114,7 @@ export const arbOptionsNoAutoNumber: fc.Arbitrary<Options> = fc.record({
   arrayFormat: arbArrayFormat,
   booleanFormat: arbBooleanFormat,
   nullFormat: arbNullFormat,
-  numberFormat: fc.constant("none" as NumberFormat),
+  numberFormat: fc.constant("none"),
 });
 
 export const arbQueryStringWithOpts: fc.Arbitrary<[string, Options]> = fc
