@@ -34,5 +34,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # `test:stress` intentionally NOT included — mirrors PR CI (`ci.yml`).
+      # Leak/race-condition coverage stays in the pre-push hook (`pnpm build`
+      # → orchestrator depends on `test:stress` via turbo.json). If a leak
+      # ever lands on master through a bot-push that bypasses pre-push (e.g.
+      # auto-merged changeset release), re-add `test:stress` to the run line.
       - name: Build
-        run: pnpm turbo run build --filter='!./examples/**'
+        run: >-
+          pnpm turbo run bundle test test:properties
+          --filter='!./examples/**'
