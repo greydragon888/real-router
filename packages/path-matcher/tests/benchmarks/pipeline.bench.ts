@@ -133,7 +133,7 @@ boxplot(() => {
       const result = matcher.match("/users/123");
 
       if (result) {
-        matcher.buildPath("user", result.params as Record<string, string>);
+        matcher.buildPath("user", result.params);
       }
     });
 
@@ -142,10 +142,7 @@ boxplot(() => {
       const result = matcher.match("/users/123/profile");
 
       if (result) {
-        matcher.buildPath(
-          "users.profile",
-          result.params as Record<string, string>,
-        );
+        matcher.buildPath("users.profile", result.params);
       }
     });
   });
@@ -160,7 +157,7 @@ barplot(() => {
       const result = matcher.match("/search?q=test&page=1");
 
       if (result) {
-        matcher.buildPath("search", result.params as Record<string, string>);
+        matcher.buildPath("search", result.params);
       }
     });
 
@@ -168,7 +165,7 @@ barplot(() => {
       const result = matcher.match("/users/123?tab=info");
 
       if (result) {
-        matcher.buildPath("user", result.params as Record<string, string>);
+        matcher.buildPath("user", result.params);
       }
     });
   });
@@ -191,12 +188,7 @@ barplot(() => {
       const result = matcher.match("/users/123/profile");
 
       if (result) {
-        do_not_optimize(
-          matcher.buildPath(
-            "users.profile",
-            result.params as Record<string, string>,
-          ),
-        );
+        do_not_optimize(matcher.buildPath("users.profile", result.params));
       }
     });
 
@@ -235,7 +227,7 @@ boxplot(() => {
       const result = matcher.match("/articles");
 
       if (result) {
-        matcher.buildPath("article", result.params as Record<string, string>);
+        matcher.buildPath("article", result.params);
       }
     });
 
@@ -243,7 +235,7 @@ boxplot(() => {
       const result = matcher.match("/articles/42/hello");
 
       if (result) {
-        matcher.buildPath("article", result.params as Record<string, string>);
+        matcher.buildPath("article", result.params);
       }
     });
   });
@@ -271,12 +263,7 @@ boxplot(() => {
       const result = matcher.match("/files/readme.md");
 
       if (result) {
-        do_not_optimize(
-          matcher.buildPath(
-            "files.catch",
-            result.params as Record<string, string>,
-          ),
-        );
+        do_not_optimize(matcher.buildPath("files.catch", result.params));
       }
     });
 
@@ -284,12 +271,7 @@ boxplot(() => {
       const result = matcher.match("/files/a/b/c.txt");
 
       if (result) {
-        do_not_optimize(
-          matcher.buildPath(
-            "files.catch",
-            result.params as Record<string, string>,
-          ),
-        );
+        do_not_optimize(matcher.buildPath("files.catch", result.params));
       }
     });
 
@@ -297,12 +279,7 @@ boxplot(() => {
       const result = matcher.match("/files/a/b/c/d/e.txt");
 
       if (result) {
-        do_not_optimize(
-          matcher.buildPath(
-            "files.catch",
-            result.params as Record<string, string>,
-          ),
-        );
+        do_not_optimize(matcher.buildPath("files.catch", result.params));
       }
     });
   });

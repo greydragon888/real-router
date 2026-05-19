@@ -57,10 +57,6 @@ function createThrowAfterDestroySource<T>(initial: T): RouterSource<T> & {
       shouldThrow = true;
     },
     getSnapshotCallCount: () => snapshotCalls,
-  } as RouterSource<T> & {
-    emit: (value: T) => void;
-    triggerThrow: () => void;
-    getSnapshotCallCount: () => number;
   };
 }
 

@@ -88,7 +88,7 @@ describe("Factory Options Validation", () => {
 
   it("Valid onError accepted", () => {
     fc.assert(
-      fc.property(fc.func(fc.constant({} as Record<string, unknown>)), (fn) => {
+      fc.property(fc.func(fc.constant({})), (fn) => {
         expect(() => {
           validateOptions({
             onError: fn as NonNullable<SearchSchemaPluginOptions["onError"]>,

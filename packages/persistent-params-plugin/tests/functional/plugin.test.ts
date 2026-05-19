@@ -756,7 +756,7 @@ describe("Persistent params plugin", () => {
           router.navigate("route1", {
             id: "1",
             constructor: { prototype: { polluted: true } },
-          } as unknown as Record<string, string>),
+          }),
         ).rejects.toThrow();
       });
 

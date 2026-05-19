@@ -88,7 +88,7 @@ describe("CR1 — createRoot ownership cleanup (§7.2 #17)", () => {
     const { source, listenerCount } = buildSubscribingSource({
       route: undefined,
       previousRoute: undefined,
-    } as { route: { name: string } | undefined; previousRoute: undefined });
+    });
 
     const heapBefore = takeHeapSnapshot();
 

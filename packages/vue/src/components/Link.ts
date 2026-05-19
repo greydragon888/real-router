@@ -206,7 +206,7 @@ export const Link = defineComponent({
       // Spread + delete avoids the per-key copy loop on every render — one
       // allocation + one property deletion instead of N iterations across
       // data-*, aria-*, role, etc. Hot-path optimisation for Link-heavy pages.
-      const restAttributes = { ...attrs } as Record<string, unknown>;
+      const restAttributes = { ...attrs };
 
       delete restAttributes.onClick;
 

@@ -135,12 +135,12 @@ describe("router.navigate() - error context", () => {
     it("should throw TypeError when 'code' property is passed in options", async () => {
       expect(() => {
         // eslint-disable-next-line sonarjs/constructor-for-side-effects, sonarjs/no-unthrown-error
-        new RouterError(errorCodes.TRANSITION_ERR, { code: 500 } as any);
+        new RouterError(errorCodes.TRANSITION_ERR, { code: 500 });
       }).toThrow(TypeError);
 
       expect(() => {
         // eslint-disable-next-line sonarjs/constructor-for-side-effects, sonarjs/no-unthrown-error
-        new RouterError(errorCodes.TRANSITION_ERR, { code: 500 } as any);
+        new RouterError(errorCodes.TRANSITION_ERR, { code: 500 });
       }).toThrow(/Cannot set reserved property "code"/);
     });
 
@@ -159,7 +159,7 @@ describe("router.navigate() - error context", () => {
 
       expect(() => {
         // eslint-disable-next-line sonarjs/constructor-for-side-effects, sonarjs/no-unthrown-error
-        new RouterError(errorCodes.TRANSITION_ERR, badOptions as any);
+        new RouterError(errorCodes.TRANSITION_ERR, badOptions);
       }).toThrow(TypeError);
     });
 
@@ -205,7 +205,7 @@ describe("router.navigate() - error context", () => {
       const err = new RouterError(errorCodes.TRANSITION_ERR, {
         setCode: "malicious",
         toJSON: "override",
-      } as any);
+      });
 
       // Methods should NOT be overwritten
       expect(typeof err.setCode).toBe("function");
@@ -218,7 +218,7 @@ describe("router.navigate() - error context", () => {
       // Before fix: this would silently overwrite code to 500
       expect(() => {
         // eslint-disable-next-line sonarjs/constructor-for-side-effects, sonarjs/no-unthrown-error
-        new RouterError(errorCodes.CANNOT_ACTIVATE, { code: 500 } as any);
+        new RouterError(errorCodes.CANNOT_ACTIVATE, { code: 500 });
       }).toThrow(TypeError);
     });
   });

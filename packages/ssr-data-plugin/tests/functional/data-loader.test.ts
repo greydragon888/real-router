@@ -1838,7 +1838,7 @@ describe("@real-router/ssr-data-plugin", () => {
       const serverState = buildServerState({
         context: {
           data: { product: { id: "42" } },
-          ssrDataMode: "full" as SsrMode,
+          ssrDataMode: "full",
           ssrDataDeferredKeys: ["reviews", "related"],
         },
       });
@@ -1875,7 +1875,7 @@ describe("@real-router/ssr-data-plugin", () => {
       const serverState = buildServerState({
         context: {
           data: { product: { id: "42" } },
-          ssrDataMode: "full" as SsrMode,
+          ssrDataMode: "full",
           ssrDataDeferredKeys: ["reviews"],
         },
       });
@@ -1918,7 +1918,7 @@ describe("@real-router/ssr-data-plugin", () => {
       const serverState = buildServerState({
         context: {
           data: { product: { id: "42" } },
-          ssrDataMode: "full" as SsrMode,
+          ssrDataMode: "full",
           ssrDataDeferredKeys: "garbage" as unknown as string[],
         },
       });
@@ -1938,7 +1938,7 @@ describe("@real-router/ssr-data-plugin", () => {
       const serverState = buildServerState({
         context: {
           data: { product: { id: "42" } },
-          ssrDataMode: "full" as SsrMode,
+          ssrDataMode: "full",
           ssrDataDeferredKeys: [
             "reviews",
             42,
@@ -1973,7 +1973,7 @@ describe("@real-router/ssr-data-plugin", () => {
       const serverState = buildServerState({
         context: {
           data: { product: { id: "42" } },
-          ssrDataMode: "full" as SsrMode,
+          ssrDataMode: "full",
           ssrDataDeferredKeys: [],
         },
       });
@@ -2024,14 +2024,14 @@ describe("@real-router/ssr-data-plugin", () => {
       const serverState = buildServerState({
         context: {
           data: { product: { id: "42" } },
-          ssrDataMode: "full" as SsrMode,
+          ssrDataMode: "full",
           ssrDataDeferredKeys: [
             "reviews",
             "__proto__",
             "constructor",
             "prototype",
             "related",
-          ] as unknown as string[],
+          ],
         },
       });
 

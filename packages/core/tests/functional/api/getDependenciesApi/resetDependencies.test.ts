@@ -124,7 +124,7 @@ describe("core/dependencies/resetDependencies", () => {
   });
 
   it("should remove falsy values as well", () => {
-    deps.set("foo", 0 as number);
+    deps.set("foo", 0);
     // @ts-expect-error: testing null value
     deps.set("bar", null);
     deps.set("baz", false);

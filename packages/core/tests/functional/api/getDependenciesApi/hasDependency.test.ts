@@ -35,7 +35,7 @@ describe("core/dependencies/hasDependency", () => {
   });
 
   it("should return true for falsy values", () => {
-    deps.set("foo", 0 as number);
+    deps.set("foo", 0);
 
     expect(deps.has("foo")).toBe(true);
 

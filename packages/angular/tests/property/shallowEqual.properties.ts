@@ -392,8 +392,8 @@ describe("shallowEqual — Property Tests", () => {
     })(
       "shallowEqual(a, b) === true ⟹ shallowEqual({k:a}, {k:b}) === true",
       (val, key) => {
-        const a = { [key]: val } as Record<string, unknown>;
-        const b = { [key]: val } as Record<string, unknown>;
+        const a = { [key]: val };
+        const b = { [key]: val };
 
         expect(shallowEqual(a, b)).toBe(true);
       },
@@ -413,10 +413,10 @@ describe("shallowEqual — Property Tests", () => {
 
         expect(
           shallowEqual(
-            { [key]: a } as Record<string, unknown>,
+            { [key]: a },
             {
               [key]: b,
-            } as Record<string, unknown>,
+            },
           ),
         ).toBe(false);
       },

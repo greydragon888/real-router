@@ -499,7 +499,7 @@ describe("createNavigateHandler — direct", () => {
     const event = makeEvent({
       intercept: interceptSpy,
       info: PLUGIN_SYNC_INFO,
-    } as unknown as Partial<NavigateEvent>);
+    });
 
     handler(event);
 

@@ -401,8 +401,8 @@ function canonicalReplacer(_key: string, val: unknown): unknown {
     // on both. Lock-test: scrollRestoreKey.properties.ts Invariant 11.
     const sorted = Object.create(null) as Record<string, unknown>;
     // eslint-disable-next-line unicorn/no-array-sort -- ng-packagr uses pre-ES2023 lib; toSorted unavailable
-    const keys = Object.keys(val as Record<string, unknown>).sort(
-      (left: string, right: string) => left.localeCompare(right),
+    const keys = Object.keys(val).sort((left: string, right: string) =>
+      left.localeCompare(right),
     );
 
     for (const key of keys) {

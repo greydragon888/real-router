@@ -218,10 +218,7 @@ barplot(() => {
       const result = matcherNoRoot.match("/users/123/profile");
 
       if (result) {
-        matcherNoRoot.buildPath(
-          "users.profile",
-          result.params as Record<string, string>,
-        );
+        matcherNoRoot.buildPath("users.profile", result.params);
       }
     });
 
@@ -229,10 +226,7 @@ barplot(() => {
       const result = matcherWithRoot.match("/app/users/123/profile");
 
       if (result) {
-        matcherWithRoot.buildPath(
-          "users.profile",
-          result.params as Record<string, string>,
-        );
+        matcherWithRoot.buildPath("users.profile", result.params);
       }
     });
   });
@@ -297,7 +291,7 @@ lineplot(() => {
       const r = d1.match("/l0/v0");
 
       if (r) {
-        d1.buildPath("l0", r.params as Record<string, string>);
+        d1.buildPath("l0", r.params);
       }
     });
 
@@ -305,7 +299,7 @@ lineplot(() => {
       const r = d3.match("/l0/v0/l1/v1/l2/v2");
 
       if (r) {
-        d3.buildPath("l0.l1.l2", r.params as Record<string, string>);
+        d3.buildPath("l0.l1.l2", r.params);
       }
     });
 
@@ -313,7 +307,7 @@ lineplot(() => {
       const r = d5.match("/l0/v0/l1/v1/l2/v2/l3/v3/l4/v4");
 
       if (r) {
-        d5.buildPath("l0.l1.l2.l3.l4", r.params as Record<string, string>);
+        d5.buildPath("l0.l1.l2.l3.l4", r.params);
       }
     });
   });

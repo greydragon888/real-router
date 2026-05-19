@@ -97,11 +97,9 @@ describe("memory-mount-unmount baseline", () => {
     const mountTree = (): ReturnType<typeof render> =>
       render(() => (
         <RouterProvider router={router}>
-          {
-            Array.from({ length: 100 }, () => (
-              <NodeConsumer nodeName="users" />
-            )) as unknown as JSX.Element
-          }
+          {Array.from({ length: 100 }, () => (
+            <NodeConsumer nodeName="users" />
+          ))}
         </RouterProvider>
       ));
 

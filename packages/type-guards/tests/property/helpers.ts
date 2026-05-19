@@ -135,7 +135,7 @@ export const stateMinimalArbitrary: fc.Arbitrary<State> = fc.record({
   path: validRoutePathArbitrary,
   params: paramsSimpleArbitrary,
   transition: fc.constant(STUB_TRANSITION),
-  context: fc.constant({} as State["context"]),
+  context: fc.constant({}),
 });
 
 /**
@@ -147,7 +147,7 @@ export const stateFullArbitrary = fc.record({
   path: validRoutePathArbitrary,
   params: paramsWithArraysArbitrary,
   transition: fc.constant(STUB_TRANSITION),
-  context: fc.constant({} as State["context"]),
+  context: fc.constant({}),
   extra: fc.option(fc.string(), { nil: undefined }),
 }) as fc.Arbitrary<State>;
 

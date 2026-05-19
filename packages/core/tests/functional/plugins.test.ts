@@ -567,10 +567,10 @@ describe("core/plugins", () => {
         });
 
         expect(() => {
-          router.usePlugin(thenableFactory as any);
+          router.usePlugin(thenableFactory);
         }).toThrow(TypeError);
         expect(() => {
-          router.usePlugin(thenableFactory as any);
+          router.usePlugin(thenableFactory);
         }).toThrow("Factory returned a Promise instead of a plugin object");
       });
 

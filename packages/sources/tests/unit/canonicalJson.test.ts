@@ -185,9 +185,7 @@ describe("canonicalJson", () => {
       // Symbol-valued field disappears; Symbol-keyed field is invisible to
       // Object.keys, so it also doesn't appear in the output.
       expect(canonicalJson({ a: sym, b: 1 })).toBe('{"b":1}');
-      expect(
-        canonicalJson({ a: 1, [sym]: 2 } as unknown as Record<string, number>),
-      ).toBe('{"a":1}');
+      expect(canonicalJson({ a: 1, [sym]: 2 })).toBe('{"a":1}');
     });
 
     it("string keys that LOOK numeric are still sorted by byte order (when not integer-like)", () => {

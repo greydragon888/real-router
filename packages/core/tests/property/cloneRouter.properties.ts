@@ -43,13 +43,10 @@ describe("cloneRouter Properties", () => {
       apiUrl: string;
       token: string;
     }
-    const cloned = cloneRouter<Deps>(
-      router as never,
-      {
-        apiUrl: "https://test",
-        token: "abc",
-      } as Deps,
-    );
+    const cloned = cloneRouter<Deps>(router as never, {
+      apiUrl: "https://test",
+      token: "abc",
+    });
 
     expect(cloned).toBeDefined();
   });

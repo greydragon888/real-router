@@ -145,17 +145,17 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
         );
       },
       validateParentOption(parent, tree) {
-        validateParentOptionRaw(parent as string);
+        validateParentOptionRaw(parent);
         let node = tree as { children: Map<string, unknown> };
 
-        for (const segment of (parent as string).split(".")) {
+        for (const segment of parent.split(".")) {
           const child = node.children.get(segment) as
             | { children: Map<string, unknown> }
             | undefined;
 
           if (!child) {
             throw new ReferenceError(
-              `[router.addRoute] Parent route "${parent as string}" does not exist`,
+              `[router.addRoute] Parent route "${parent}" does not exist`,
             );
           }
 
@@ -316,7 +316,7 @@ export function validationPlugin(): PluginFactory {
       validateDependenciesStructure(deps);
       validateLimitsConsistency(options, store, deps);
       ctx.validator.options.validateOptions(
-        options as unknown,
+        options,
         "constructor (retrospective)",
       );
 

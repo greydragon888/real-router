@@ -79,7 +79,7 @@ describe("getDependenciesApi CRUD Properties", () => {
 
       deps.setAll(depsMap);
 
-      const all = deps.getAll() as Record<string, unknown>;
+      const all = deps.getAll();
 
       for (const [key, value] of Object.entries(depsMap)) {
         expect(all[key]).toBe(value);
@@ -133,7 +133,7 @@ describe("getDependenciesApi CRUD Properties", () => {
     (name) => {
       const { deps } = getTypedDepsApi();
 
-      deps.set(name, undefined as unknown);
+      deps.set(name, undefined);
 
       expect(deps.has(name)).toBe(false);
     },

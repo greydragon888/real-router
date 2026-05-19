@@ -843,9 +843,7 @@ describe("buildHref", () => {
 
     await router.start("/user/1");
 
-    expect(
-      buildHref(router, "user", { id: null as unknown as string }),
-    ).toBeUndefined();
+    expect(buildHref(router, "user", { id: null })).toBeUndefined();
     expect(spy).toHaveBeenCalled();
 
     router.stop();

@@ -53,11 +53,7 @@ describe("makeState", () => {
   it("uses empty params when no params and no defaultParams (line 328)", () => {
     // home route has no defaultParams defined
     // Call makeState with undefined params (no params, no defaults)
-    const state = getPluginApi(router).makeState(
-      "home",
-      undefined as never,
-      "/home",
-    );
+    const state = getPluginApi(router).makeState("home", undefined, "/home");
 
     expect(state.params).toStrictEqual({});
   });

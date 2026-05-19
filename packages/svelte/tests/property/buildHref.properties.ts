@@ -427,11 +427,7 @@ describe("buildHref — Property Tests", () => {
           buildPath: () => "/path",
         } as unknown as import("@real-router/core").Router;
 
-        buildHref(
-          router,
-          "test",
-          params as unknown as import("@real-router/core").Params,
-        );
+        buildHref(router, "test", params);
 
         expect(calls).toHaveLength(1);
         // Same reference handed through verbatim — no defensive copy, no
@@ -453,11 +449,7 @@ describe("buildHref — Property Tests", () => {
           },
         } as unknown as import("@real-router/core").Router;
 
-        buildHref(
-          router,
-          "test",
-          params as unknown as import("@real-router/core").Params,
-        );
+        buildHref(router, "test", params);
 
         expect(calls).toHaveLength(1);
         expect(calls[0].params).toBe(params);

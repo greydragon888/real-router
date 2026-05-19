@@ -492,7 +492,7 @@ describe("@real-router/rsc-server-plugin", () => {
 
       expect(() =>
         rscServerPluginFactory({
-          home: entry as unknown as RscLoaderFactoryMap[string],
+          home: entry,
         }),
       ).not.toThrow();
     });
@@ -610,7 +610,7 @@ describe("@real-router/rsc-server-plugin", () => {
       router.usePlugin(
         rscServerPluginFactory({
           "users.profile": () => loader,
-        } as unknown as RscLoaderFactoryMap),
+        }),
       );
 
       const stateInput = buildServerState({

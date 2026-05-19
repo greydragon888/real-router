@@ -45,7 +45,7 @@ describe("router.start() - edge cases", () => {
       router = createTestRouter({ allowNotFound: false });
 
       try {
-        await router.navigate("users.view", { id: "123", self: {} as any });
+        await router.navigate("users.view", { id: "123", self: {} });
 
         expect.fail("Should have thrown");
       } catch (error: any) {

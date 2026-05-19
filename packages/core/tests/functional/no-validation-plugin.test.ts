@@ -153,7 +153,7 @@ describe("core/without validation plugin", () => {
 
       it("should handle setAll without throwing", () => {
         expect(() => {
-          deps.setAll({ testDep: "value" } as object);
+          deps.setAll({ testDep: "value" });
         }).not.toThrow();
       });
 

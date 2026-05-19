@@ -59,13 +59,13 @@ describe("concurrent force-navs stress", () => {
     const navOptsSeen: { force?: boolean; hashChange?: boolean }[] = [];
     const originalNavigate = router.navigate.bind(router);
 
-    router.navigate = ((name, params, opts) => {
+    router.navigate = (name, params, opts) => {
       navOptsSeen.push(
         (opts ?? {}) as { force?: boolean; hashChange?: boolean },
       );
 
       return originalNavigate(name, params, opts);
-    }) as typeof router.navigate;
+    };
 
     let completedCount = 0;
     let rejectedCount = 0;

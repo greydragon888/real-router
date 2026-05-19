@@ -195,8 +195,8 @@ function processNode(
     paramTypeMap,
   };
 
-  node.fullName = computeFullName(node as RouteTree);
-  node.staticPath = computeStaticPath(node as RouteTree);
+  node.fullName = computeFullName(node);
+  node.staticPath = computeStaticPath(node);
 
   if (mutable.children.length === 0) {
     node.children = EMPTY_CHILDREN_MAP;
@@ -204,7 +204,7 @@ function processNode(
   } else {
     const { childrenMap, nonAbsoluteChildren } = processChildren(
       mutable.children,
-      node as RouteTree,
+      node,
       freeze,
     );
 
@@ -222,7 +222,7 @@ function processNode(
     Object.freeze(node);
   }
 
-  return node as RouteTree;
+  return node;
 }
 
 /**

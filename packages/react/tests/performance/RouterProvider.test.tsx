@@ -235,7 +235,7 @@ describe(
         let captured: object | null = null;
 
         const RouteCapture: FC = () => {
-          captured = use(RouteContext) as object | null;
+          captured = use(RouteContext);
 
           return null;
         };

@@ -79,7 +79,7 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
     const { path, hash } = urlToPathAndHash(event.destination.url, base);
     const matchedState = api.matchPath(path);
 
-    const navType = event.navigationType as NavigationMeta["navigationType"];
+    const navType = event.navigationType;
     const currentIndex = browser.currentEntry?.index ?? -1;
 
     deps.setCapturedMeta({

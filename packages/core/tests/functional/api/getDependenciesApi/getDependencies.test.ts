@@ -44,7 +44,7 @@ describe("core/dependencies/getDependencies", () => {
   });
 
   it("should copy falsy values correctly", () => {
-    deps.set("foo", 0 as number);
+    deps.set("foo", 0);
     // @ts-expect-error: testing null value
     deps.set("bar", null);
 

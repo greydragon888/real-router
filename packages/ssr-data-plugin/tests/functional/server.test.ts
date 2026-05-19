@@ -173,7 +173,7 @@ describe("injectDeferredScripts", () => {
       const html = createHtmlStream(["<body>x</body>"]);
       const value = { circular: undefined as unknown };
 
-      (value as { circular: unknown }).circular = value;
+      value.circular = value;
 
       const out = await consume(
         injectDeferredScripts(

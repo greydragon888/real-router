@@ -75,20 +75,12 @@ describe("validateConstraints", () => {
 
     // Number 42 becomes "42" which matches \d+
     expect(() => {
-      validateConstraints(
-        { id: 42 as unknown },
-        patterns,
-        String.raw`/users/:id<\d+>`,
-      );
+      validateConstraints({ id: 42 }, patterns, String.raw`/users/:id<\d+>`);
     }).not.toThrow();
 
     // Boolean true becomes "true" which does not match \d+
     expect(() => {
-      validateConstraints(
-        { id: true as unknown },
-        patterns,
-        String.raw`/users/:id<\d+>`,
-      );
+      validateConstraints({ id: true }, patterns, String.raw`/users/:id<\d+>`);
     }).toThrow(String.raw`expected to match '\d+'`);
   });
 
@@ -99,7 +91,7 @@ describe("validateConstraints", () => {
 
     expect(() => {
       validateConstraints(
-        { id: undefined as unknown },
+        { id: undefined },
         patterns,
         String.raw`/users/:id<\d+>`,
       );

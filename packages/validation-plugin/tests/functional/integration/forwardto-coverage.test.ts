@@ -75,7 +75,7 @@ describe("validateRouteProperties — direct calls (covers lines unreachable via
 
     expect(() => {
       validateRouteProperties(
-        { name: "test", path: "/test", forwardTo: syncForward as never },
+        { name: "test", path: "/test", forwardTo: syncForward },
         "test",
       );
     }).not.toThrow();
@@ -101,7 +101,7 @@ describe("validateRouteProperties — direct calls (covers lines unreachable via
               name: "child",
               path: "/child",
               canActivate: "not-fn" as never,
-            } as never,
+            },
           ],
         },
         "parent",

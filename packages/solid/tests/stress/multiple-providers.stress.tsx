@@ -54,11 +54,11 @@ describe("MP1 — multiple RouterProvider on one router (§7.2 G18)", () => {
     originalRAF = globalThis.requestAnimationFrame;
     // Stub rAF so announcer/scroll handlers flush synchronously and the
     // tests don't race against jsdom's deferred microtasks.
-    vi.stubGlobal("requestAnimationFrame", ((cb: FrameRequestCallback) => {
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
       cb(0);
 
       return 0;
-    }) as typeof globalThis.requestAnimationFrame);
+    });
   });
 
   afterEach(() => {

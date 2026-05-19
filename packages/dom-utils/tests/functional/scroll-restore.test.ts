@@ -22,7 +22,7 @@ function makeState(
     name,
     params: params as State["params"],
     path: "/",
-    context: context as State["context"],
+    context: context,
     transition: {} as State["transition"],
   };
 }
@@ -582,7 +582,7 @@ describe("createScrollRestoration", () => {
     });
     const elementScrollToSpy = vi.fn();
 
-    element.scrollTo = elementScrollToSpy as unknown as typeof element.scrollTo;
+    element.scrollTo = elementScrollToSpy;
 
     const fake = makeFakeRouter(makeState("home"));
     const windowScrollSpy = vi.spyOn(globalThis, "scrollTo");
@@ -642,7 +642,7 @@ describe("createScrollRestoration", () => {
     });
     const elementScrollToSpy = vi.fn();
 
-    element.scrollTo = elementScrollToSpy as unknown as typeof element.scrollTo;
+    element.scrollTo = elementScrollToSpy;
 
     fake.emit(
       makeState(
@@ -1250,7 +1250,7 @@ describe("createScrollRestoration", () => {
 
       const scrollSpy = vi.fn();
 
-      globalThis.scrollTo = scrollSpy as unknown as typeof globalThis.scrollTo;
+      globalThis.scrollTo = scrollSpy;
 
       const fake = makeFakeRouter(makeState("home"));
       const sr = track(createScrollRestoration(fake.router));

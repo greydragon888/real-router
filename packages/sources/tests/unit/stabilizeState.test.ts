@@ -211,7 +211,7 @@ describe("stabilizeState", () => {
         },
       };
 
-      return clone as State;
+      return clone;
     }
 
     it("same path, different context.url.hash → returns next", () => {

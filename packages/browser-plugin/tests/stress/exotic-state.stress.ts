@@ -51,7 +51,7 @@ describe("B7.6 — exotic popstate.state values", () => {
       for (let i = 0; i < 250; i++) {
         exoticStates.push(
           new Map([["name", "users.view"]]),
-          (() => ({ name: "users.view" })) as unknown,
+          () => ({ name: "users.view" }),
           { [Symbol("name")]: "users.view" },
           new Date(),
         );

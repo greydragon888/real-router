@@ -35,7 +35,7 @@ describe("createOptionsValidator Properties", () => {
       "type-mismatched options throw an Error",
       (opts) => {
         expect(() => {
-          validate(opts as never);
+          validate(opts);
         }).toThrow(Error);
       },
     );

@@ -194,7 +194,7 @@ describe("buildRscPayload", () => {
       // switched to `??` would silently fall back to state.context.rsc.
       const rsc = node("Default");
 
-      const zero = buildRscPayload(buildState({ rsc }), 0 as unknown as null);
+      const zero = buildRscPayload(buildState({ rsc }), 0);
 
       expect(zero.root).toBe(0);
 
@@ -202,10 +202,7 @@ describe("buildRscPayload", () => {
 
       expect(empty.root).toBe("");
 
-      const falseOverride = buildRscPayload(
-        buildState({ rsc }),
-        false as unknown as null,
-      );
+      const falseOverride = buildRscPayload(buildState({ rsc }), false);
 
       expect(falseOverride.root).toBe(false);
     });

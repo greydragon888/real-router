@@ -86,10 +86,10 @@ describe("core/dependencies/setDependency", () => {
   it("should not warn when setting same value repeatedly", () => {
     const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
-    deps.set("foo", 42 as number);
+    deps.set("foo", 42);
     warnSpy.mockClear();
 
-    deps.set("foo", 42 as number);
+    deps.set("foo", 42);
 
     // Same value - no warning expected
     expect(warnSpy).not.toHaveBeenCalled();
@@ -145,7 +145,7 @@ describe("core/dependencies/setDependency", () => {
   });
 
   it("should handle falsy values except undefined", () => {
-    deps.set("foo", 0 as number);
+    deps.set("foo", 0);
 
     expect(deps.get("foo")).toBe(0);
 

@@ -288,7 +288,7 @@ export class MockNavigation implements Navigation {
     const listeners = this._listeners.get(type);
 
     if (listeners) {
-      listeners.add(handler as (evt: NavigateEvent) => void);
+      listeners.add(handler);
     }
   }
 
@@ -298,7 +298,7 @@ export class MockNavigation implements Navigation {
   ): void {
     const handler = typeof fn === "function" ? fn : fn.handleEvent.bind(fn);
 
-    this._listeners.get(type)?.delete(handler as (evt: NavigateEvent) => void);
+    this._listeners.get(type)?.delete(handler);
   }
 
   dispatchEvent(): boolean {

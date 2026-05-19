@@ -24,7 +24,7 @@ describe("core/dependencies/getDependency", () => {
   });
 
   it("should return falsy values correctly", () => {
-    deps.set("foo", 0 as number);
+    deps.set("foo", 0);
 
     expect(deps.get("foo")).toBe(0);
 

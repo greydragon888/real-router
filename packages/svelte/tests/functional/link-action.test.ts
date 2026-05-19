@@ -592,7 +592,7 @@ describe("createLinkAction", () => {
         name: "home",
 
         hash: "section",
-      } as any,
+      },
     });
 
     const button = document.querySelector("button")!;

@@ -129,7 +129,7 @@ export class StateNamespace {
     } else if (!params || params === EMPTY_PARAMS) {
       mergedParams = EMPTY_PARAMS as P;
     } else {
-      mergedParams = Object.freeze({ ...params }) as P;
+      mergedParams = Object.freeze({ ...params });
     }
 
     const state = {
@@ -141,7 +141,7 @@ export class StateNamespace {
     } as State<P>;
 
     if (meta) {
-      setStateMetaParams(state, meta as unknown as Params);
+      setStateMetaParams(state, meta);
     }
 
     return skipFreeze ? state : freezeStateInPlace(state);

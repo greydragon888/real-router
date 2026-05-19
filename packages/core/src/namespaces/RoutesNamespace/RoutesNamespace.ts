@@ -64,7 +64,7 @@ export function createRouteState<P extends RouteParams = RouteParams>(
   return {
     name: resolvedName,
     params: matchResult.params as P,
-    meta: matchResult.meta as Record<string, Record<string, "url" | "query">>,
+    meta: matchResult.meta,
   };
 }
 
@@ -255,7 +255,7 @@ export class RoutesNamespace<
 
     const decodedParams =
       typeof this.#store.config.decoders[name] === "function"
-        ? this.#store.config.decoders[name](params as Params)
+        ? this.#store.config.decoders[name](params)
         : params;
 
     const { name: routeName, params: routeParams } = this.#deps.forwardState<P>(
@@ -503,7 +503,7 @@ export class RoutesNamespace<
       return {
         ...this.#store.config.defaultParams[routeName],
         ...params,
-      } as P;
+      };
     }
 
     return params;

@@ -27,7 +27,7 @@ function clonePathEquivalent(state: State): State {
   // stabilizer's contract is that path equality (plus context.url.hash and
   // transition.reload) determines render identity — every other field can
   // differ without affecting the stabilization result.
-  return { ...state, transition: { ...state.transition } } as State;
+  return { ...state, transition: { ...state.transition } };
 }
 
 describe("stabilizeState — invariants", () => {
@@ -145,7 +145,7 @@ describe("stabilizeState — hash-aware (#532)", () => {
   function withHash(base: State, hash: string | undefined): State {
     const context = { ...base.context, url: { hash } };
 
-    return { ...base, context, transition: { ...base.transition } } as State;
+    return { ...base, context, transition: { ...base.transition } };
   }
 
   test.prop(
@@ -208,7 +208,7 @@ function withReload(base: State, reload: boolean): State {
   return {
     ...base,
     transition: { ...base.transition, reload },
-  } as State;
+  };
 }
 
 describe("stabilizeState — reload-aware (broader PBT)", () => {
@@ -253,13 +253,13 @@ describe("stabilizeState — reload-aware (broader PBT)", () => {
 
 describe("stabilizeState — transitivity, defensive read, hash×reload (audit §2/§6 MEDIUM)", () => {
   function withHash(base: State, hash: string | undefined): State {
-    const ctx = base.context as Record<string, unknown>;
+    const ctx = base.context;
     const url = (ctx.url as Record<string, unknown> | undefined) ?? {};
 
     return {
       ...base,
       context: { ...ctx, url: { ...url, hash } },
-    } as State;
+    };
   }
 
   test.prop([arbRouteName], { numRuns: NUM_RUNS.standard })(

@@ -444,7 +444,7 @@ describe("navigateWithHash — Property Tests", () => {
 
         void navigateWithHash(router, routeName, {}, newHash, {
           force: true,
-        } as NavigationOptions);
+        });
 
         expect(calls).toHaveLength(1);
 
@@ -466,7 +466,7 @@ describe("navigateWithHash — Property Tests", () => {
 
         void navigateWithHash(router, routeName, {}, hash, {
           force: true,
-        } as NavigationOptions);
+        });
 
         expect(calls).toHaveLength(1);
 
@@ -494,7 +494,7 @@ describe("navigateWithHash — Property Tests", () => {
 
         void navigateWithHash(router, targetName, {}, newHash, {
           force: true,
-        } as NavigationOptions);
+        });
 
         expect(calls).toHaveLength(1);
 

@@ -97,7 +97,7 @@ describe("serializeRouterState", () => {
         context: {
           data: { a: 1 },
           rsc: () => null,
-        } as unknown as State["context"],
+        },
         transition: baseTransition,
       };
 
@@ -117,7 +117,7 @@ describe("serializeRouterState", () => {
           data: { x: 1 },
           rsc: { y: 2 },
           source: "server",
-        } as unknown as State["context"],
+        },
         transition: baseTransition,
       };
 
@@ -135,7 +135,7 @@ describe("serializeRouterState", () => {
         name: "page",
         params: {},
         path: "/page",
-        context: { data: { x: 1 } } as unknown as State["context"],
+        context: { data: { x: 1 } },
         transition: baseTransition,
       };
 
@@ -150,7 +150,7 @@ describe("serializeRouterState", () => {
         name: "page",
         params: {},
         path: "/page",
-        context: { data: { x: 1 } } as unknown as State["context"],
+        context: { data: { x: 1 } },
         transition: baseTransition,
       };
 
@@ -170,7 +170,7 @@ describe("serializeRouterState", () => {
           rsc: { node: "x" },
           internal: { z: true },
           keep: { ok: 1 },
-        } as unknown as State["context"],
+        },
         transition: baseTransition,
       };
 
@@ -194,7 +194,7 @@ describe("serializeRouterState", () => {
         name: "page",
         params: {},
         path: "/page",
-        context: { data: { when: date } } as unknown as State["context"],
+        context: { data: { when: date } },
         transition: baseTransition,
       };
 
@@ -237,7 +237,7 @@ describe("serializeRouterState", () => {
         context: {
           data: { a: 1 },
           rsc: () => null,
-        } as unknown as State["context"],
+        },
         transition: baseTransition,
       };
 
@@ -264,7 +264,7 @@ describe("serializeRouterState", () => {
         name: "page",
         params: {},
         path: "/page",
-        context: {} as State["context"],
+        context: {},
         transition: baseTransition,
       };
 
@@ -284,7 +284,7 @@ describe("serializeRouterState", () => {
         name: "page",
         params: {},
         path: "/page",
-        context: { data: { a: 1 } } as unknown as State["context"],
+        context: { data: { a: 1 } },
         transition: baseTransition,
       };
 

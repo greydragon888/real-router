@@ -352,11 +352,9 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
         await router.navigate("users.view", { id: "123" });
 
         // undefined in params means "id must be undefined", not "skip this check"
-        expect(
-          router.isActiveRoute("users.view", { id: undefined } as unknown as {
-            id: string;
-          }),
-        ).toBe(false);
+        expect(router.isActiveRoute("users.view", { id: undefined })).toBe(
+          false,
+        );
       });
 
       it("should not match when param is omitted for exact match (areStatesEqual compares URL params)", async () => {
@@ -375,22 +373,14 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
         await router.navigate("users.view", { id: "123" });
 
         // 123 !== "123" with strict equality
-        expect(
-          router.isActiveRoute("users.view", { id: 123 } as unknown as {
-            id: string;
-          }),
-        ).toBe(false);
+        expect(router.isActiveRoute("users.view", { id: 123 })).toBe(false);
       });
 
       it("should not match null against string param", async () => {
         await router.navigate("users.view", { id: "123" });
 
         // null !== "123"
-        expect(
-          router.isActiveRoute("users.view", { id: null } as unknown as {
-            id: string;
-          }),
-        ).toBe(false);
+        expect(router.isActiveRoute("users.view", { id: null })).toBe(false);
       });
 
       it("should handle undefined in hierarchical check (parent route)", async () => {
@@ -399,11 +389,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
         // Hierarchical check uses paramsMatch
         // { id: undefined } means "id must be undefined in activeState"
         // activeState.params.id === "123", so undefined !== "123" → false
-        expect(
-          router.isActiveRoute("users", { id: undefined } as unknown as {
-            id: string;
-          }),
-        ).toBe(false);
+        expect(router.isActiveRoute("users", { id: undefined })).toBe(false);
 
         // But checking with matching value works
         expect(router.isActiveRoute("users", { id: "123" })).toBe(true);
@@ -490,8 +476,6 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
         expect(
           router.isActiveRoute("usersFiltered", {
             filter: undefined,
-          } as unknown as {
-            filter: string;
           }),
         ).toBe(false);
       });

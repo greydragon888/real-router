@@ -805,9 +805,9 @@ describe("buildHref — Property Tests", () => {
         } as unknown as Router;
         // structuredClone refuses null-prototype records (fast-check may shrink
         // to `{__proto__: null}`); compare by own-entries snapshot instead.
-        const before = snapshotEntries(params as Record<string, unknown>);
+        const before = snapshotEntries(params);
 
-        buildHref(router, "any", params as Params);
+        buildHref(router, "any", params);
 
         expect(
           snapshotEntries(params as Record<string, unknown>),
@@ -836,9 +836,9 @@ describe("buildHref — Property Tests", () => {
           buildUrl: undefined,
           buildPath: () => "/p",
         } as unknown as Router;
-        const before = snapshotEntries(params as Record<string, unknown>);
+        const before = snapshotEntries(params);
 
-        buildHref(router, "any", params as Params, { hash });
+        buildHref(router, "any", params, { hash });
 
         expect(
           snapshotEntries(params as Record<string, unknown>),

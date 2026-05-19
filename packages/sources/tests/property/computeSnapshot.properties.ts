@@ -360,13 +360,13 @@ describe("computeSnapshot — hash-flip propagation through stabilizeState (audi
     state: import("@real-router/core").State<P>,
     hash: string,
   ): import("@real-router/core").State<P> {
-    const ctx = state.context as Record<string, unknown>;
+    const ctx = state.context;
     const url = (ctx.url as Record<string, unknown> | undefined) ?? {};
 
     return {
       ...state,
       context: { ...ctx, url: { ...url, hash } },
-    } as import("@real-router/core").State<P>;
+    };
   }
 
   test.prop([arbRouteName], { numRuns: NUM_RUNS.standard })(

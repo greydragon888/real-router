@@ -37,9 +37,6 @@ function createMockSource<T>(initial: T): RouterSource<T> & {
     get _destroyed() {
       return destroyed;
     },
-  } as RouterSource<T> & {
-    emit: (value: T) => void;
-    readonly _destroyed: boolean;
   };
 }
 

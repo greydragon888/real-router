@@ -193,7 +193,7 @@ describe("deepFreezeState", () => {
       const a = state.params.a as Params;
 
       a.b = { value: "b" };
-      (a.b as Params).ref = a;
+      a.b.ref = a;
 
       // structuredClone handles circular references properly
       expect(() => deepFreezeState(state)).not.toThrow();
@@ -327,7 +327,7 @@ describe("deepFreezeState", () => {
       const state: State = {
         name: "null-param",
         path: "/null",
-        params: { value: null as any },
+        params: { value: null },
         transition: DEFAULT_TRANSITION,
         context: {},
       };
@@ -361,7 +361,7 @@ describe("deepFreezeState", () => {
           str: "string",
           num: 123,
           bool: true,
-          nullVal: null as any,
+          nullVal: null,
           undefVal: undefined,
         },
         transition: DEFAULT_TRANSITION,

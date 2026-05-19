@@ -95,7 +95,7 @@ describe("v-link directive", () => {
 
     it("should throw when v-link mounted without RouterProvider (no router set)", () => {
       // Force _router to null to simulate missing RouterProvider
-      setDirectiveRouter(null as unknown as Router);
+      setDirectiveRouter(null);
 
       const element = document.createElement("div");
       const binding = { value: { name: "home" } };
@@ -119,7 +119,7 @@ describe("v-link directive", () => {
       vLinkHooks.mounted(element, binding as unknown as Binding);
 
       // Then simulate RouterProvider removal
-      setDirectiveRouter(null as unknown as Router);
+      setDirectiveRouter(null);
 
       expect(() => {
         vLinkHooks.updated(element, binding as unknown as Binding);

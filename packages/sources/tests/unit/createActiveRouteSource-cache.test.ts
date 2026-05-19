@@ -187,7 +187,7 @@ describe("createActiveRouteSource (per-router + canonical-args cache)", () => {
     const withProto = Object.fromEntries([
       ["__proto__", "x"],
       ["b", "1"],
-    ]) as Record<string, string>;
+    ]);
     const withoutProto = { b: "1" };
 
     const a = createActiveRouteSource(router, "users", withProto);
@@ -202,7 +202,7 @@ describe("createActiveRouteSource (per-router + canonical-args cache)", () => {
       Object.fromEntries([
         ["__proto__", "x"],
         ["b", "1"],
-      ]) as Record<string, string>,
+      ]),
     );
 
     expect(aAgain).toBe(a);
@@ -211,7 +211,7 @@ describe("createActiveRouteSource (per-router + canonical-args cache)", () => {
     const withDifferentProto = Object.fromEntries([
       ["__proto__", "y"],
       ["b", "1"],
-    ]) as Record<string, string>;
+    ]);
     const c = createActiveRouteSource(router, "users", withDifferentProto);
 
     expect(c).not.toBe(a);

@@ -279,7 +279,7 @@ describe("hydrateRouter", () => {
         name: "users.list",
         params: {},
         path: "/users/list",
-        context: { data: { fetchedAt: date } } as State["context"],
+        context: { data: { fetchedAt: date } },
         transition: {
           phase: "activating",
           reason: "success",

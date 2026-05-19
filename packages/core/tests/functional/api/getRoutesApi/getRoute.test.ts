@@ -281,7 +281,7 @@ describe("core/routes/routeTree/getRoute", () => {
         // Custom properties are stripped during addRoute
         customField: "value",
         meta: { auth: true },
-      } as never);
+      });
 
       const route = routesApi.get("gr-custom");
 

@@ -84,19 +84,19 @@ boxplot(() => {
     });
 
     bench("isNavigationOptions: reject string replace", () => {
-      isNavigationOptions({ replace: "true" } as any);
+      isNavigationOptions({ replace: "true" });
     });
 
     bench("isNavigationOptions: reject number reload", () => {
-      isNavigationOptions({ reload: 1 } as any);
+      isNavigationOptions({ reload: 1 });
     });
 
     bench("isNavigationOptions: reject object force", () => {
-      isNavigationOptions({ force: {} } as any);
+      isNavigationOptions({ force: {} });
     });
 
     bench("isNavigationOptions: reject array forceDeactivate", () => {
-      isNavigationOptions({ forceDeactivate: [] } as any);
+      isNavigationOptions({ forceDeactivate: [] });
     });
 
     bench("isNavigationOptions: reject function redirected", () => {
@@ -107,19 +107,19 @@ boxplot(() => {
       isNavigationOptions({
         replace: true,
         reload: "false",
-      } as any);
+      });
     });
 
     bench("isNavigationOptions: reject number", () => {
-      isNavigationOptions(123 as any);
+      isNavigationOptions(123);
     });
 
     bench("isNavigationOptions: reject string", () => {
-      isNavigationOptions("options" as any);
+      isNavigationOptions("options");
     });
 
     bench("isNavigationOptions: reject array", () => {
-      isNavigationOptions([] as any);
+      isNavigationOptions([]);
     });
   });
 });
@@ -131,7 +131,7 @@ boxplot(() => {
       isNavigationOptions({
         replace: true,
         extra: "ignored",
-      } as any);
+      });
     });
 
     bench("isNavigationOptions: undefined values", () => {

@@ -255,15 +255,23 @@ describe("createRouteNodeSources", () => {
     source.subscribe(() => {});
 
     await router.navigate("users.view", { id: "42" });
-    await router.navigate("users.view", { id: "42" }, {
-      force: true,
-    } as Parameters<typeof router.navigate>[2]);
+    await router.navigate(
+      "users.view",
+      { id: "42" },
+      {
+        force: true,
+      },
+    );
 
     const snapshotAfterFirstForce = source.getSnapshot();
 
-    await router.navigate("users.view", { id: "42" }, {
-      force: true,
-    } as Parameters<typeof router.navigate>[2]);
+    await router.navigate(
+      "users.view",
+      { id: "42" },
+      {
+        force: true,
+      },
+    );
 
     // `force: true` bypasses SAME_STATES so the navigation pipeline runs,
     // but `transition.reload` is unset → stabilization keeps prev refs →

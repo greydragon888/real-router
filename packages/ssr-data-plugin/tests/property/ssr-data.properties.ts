@@ -1170,7 +1170,7 @@ describe("validateLoaders: structural acceptance + rejection", () => {
   )("rejects unknown top-level keys in object-form entries", (unknownKey) => {
     expect(() =>
       ssrDataPluginFactory({
-        home: { [unknownKey]: 1 } as unknown as DataLoaderFactoryMap[string],
+        home: { [unknownKey]: 1 },
       }),
     ).toThrow(/unexpected key/);
   });

@@ -13,7 +13,7 @@ export interface DependenciesStore<
 export function createDependenciesStore<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(
-  initialDependencies: Partial<Dependencies> = {} as Dependencies,
+  initialDependencies: Partial<Dependencies> = {},
 ): DependenciesStore<Dependencies> {
   const dependencies = Object.create(null) as Partial<Dependencies>;
 

@@ -32,14 +32,11 @@ const arbState: fc.Arbitrary<State> = fc
     params: fc.constant({}),
     path: fc.stringMatching(/^\/[a-z]{0,10}$/),
   })
-  .map(
-    (r) =>
-      ({
-        ...r,
-        transition: STUB_TRANSITION,
-        context: {},
-      }) as unknown as State,
-  );
+  .map((r) => ({
+    ...r,
+    transition: STUB_TRANSITION,
+    context: {},
+  }));
 
 const arbNavOptions: fc.Arbitrary<NavigationOptions> = fc.record({
   replace: fc.constantFrom(true, false, undefined),

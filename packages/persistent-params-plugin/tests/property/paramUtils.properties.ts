@@ -83,7 +83,7 @@ describe("merge semantics: mergeParams algebraic properties", () => {
   test.prop([arbDefinedParams, arbKey], { numRuns: NUM_RUNS })(
     "undefined in current removes the key from result",
     (persistent, key) => {
-      const result = mergeParams(persistent, { [key]: undefined } as Params);
+      const result = mergeParams(persistent, { [key]: undefined });
 
       expect(result).not.toHaveProperty(key);
     },

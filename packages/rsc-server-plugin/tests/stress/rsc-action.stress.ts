@@ -190,10 +190,7 @@ describe("RSC Action Stress", () => {
     const projected = results.map(({ i, action }) => ({ i, action }));
     const expected = results.map(({ i }) => ({
       i,
-      action:
-        i % 2 === 0
-          ? ({ returnValue: { ok: true, data: i } } as RscActionResult)
-          : undefined,
+      action: i % 2 === 0 ? { returnValue: { ok: true, data: i } } : undefined,
     }));
 
     expect(projected).toStrictEqual(expected);

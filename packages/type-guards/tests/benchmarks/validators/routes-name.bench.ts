@@ -128,31 +128,31 @@ boxplot(() => {
   summary(() => {
     bench("validateRouteName: non-string number (catches error)", () => {
       try {
-        validateRouteName(123 as any, methodName);
+        validateRouteName(123, methodName);
       } catch {}
     });
 
     bench("validateRouteName: non-string null (catches error)", () => {
       try {
-        validateRouteName(null as any, methodName);
+        validateRouteName(null, methodName);
       } catch {}
     });
 
     bench("validateRouteName: non-string undefined (catches error)", () => {
       try {
-        validateRouteName(undefined as any, methodName);
+        validateRouteName(undefined, methodName);
       } catch {}
     });
 
     bench("validateRouteName: non-string object (catches error)", () => {
       try {
-        validateRouteName({} as any, methodName);
+        validateRouteName({}, methodName);
       } catch {}
     });
 
     bench("validateRouteName: non-string array (catches error)", () => {
       try {
-        validateRouteName([] as any, methodName);
+        validateRouteName([], methodName);
       } catch {}
     });
 

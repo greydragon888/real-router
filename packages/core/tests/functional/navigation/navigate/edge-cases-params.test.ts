@@ -72,11 +72,7 @@ describe("router.navigate() - edge cases params", () => {
       it("should accept array-like object as params", async () => {
         const arrayLikeParams = { length: 2, 0: "a", 1: "b", id: 123 };
 
-        const state = await router.navigate(
-          "users.view",
-          arrayLikeParams as unknown as { id: number },
-          {},
-        );
+        const state = await router.navigate("users.view", arrayLikeParams, {});
 
         expect(state.name).toBe("users.view");
         expect(state.params).toStrictEqual({
@@ -90,11 +86,7 @@ describe("router.navigate() - edge cases params", () => {
       it("should handle object with numeric keys", async () => {
         const numericKeyParams = { 0: "first", 1: "second", id: 456 };
 
-        const state = await router.navigate(
-          "users.view",
-          numericKeyParams as unknown as { id: number },
-          {},
-        );
+        const state = await router.navigate("users.view", numericKeyParams, {});
 
         expect(state.name).toBe("users.view");
         expect(state.params).toStrictEqual({

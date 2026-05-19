@@ -137,9 +137,7 @@ describe("createRouteSources", () => {
     // fix, transition.reload is unset → stabilizer returns prev for both
     // route and previousRoute (matched paths). False branch hit, source
     // listener NOT called.
-    await router.navigate("users", {}, { force: true } as Parameters<
-      typeof router.navigate
-    >[2]);
+    await router.navigate("users", {}, { force: true });
 
     // After force-nav: prev.previousRoute had path "/" (initial), but
     // next.previousRoute has path "/users". Paths differ → stabilizer
@@ -149,9 +147,7 @@ describe("createRouteSources", () => {
     // Step 3: force-navigate again — now prev.previousRoute and
     // next.previousRoute both have path "/users", and same for route.
     // Both branches stabilize to prev → false branch hit.
-    await router.navigate("users", {}, { force: true } as Parameters<
-      typeof router.navigate
-    >[2]);
+    await router.navigate("users", {}, { force: true });
 
     expect(listener).toHaveBeenCalledTimes(1);
   });

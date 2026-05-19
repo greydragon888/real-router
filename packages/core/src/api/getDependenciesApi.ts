@@ -110,12 +110,7 @@ export function getDependenciesApi<
         "setDependency",
       );
 
-      setDependency(
-        ctx.dependenciesGetStore(),
-        name as string,
-        value,
-        ctx.validator,
-      );
+      setDependency(ctx.dependenciesGetStore(), name, value, ctx.validator);
     },
     setAll: (deps) => {
       throwIfDisposed(ctx.isDisposed);
@@ -144,7 +139,7 @@ export function getDependenciesApi<
 
       const store = ctx.dependenciesGetStore();
 
-      if (!Object.hasOwn(store.dependencies, name as string)) {
+      if (!Object.hasOwn(store.dependencies, name)) {
         ctx.validator?.dependencies.warnRemoveNonExistent(name);
       }
 
@@ -159,10 +154,7 @@ export function getDependenciesApi<
     has: (name) => {
       ctx.validator?.dependencies.validateDependencyName(name, "hasDependency");
 
-      return Object.hasOwn(
-        ctx.dependenciesGetStore().dependencies,
-        name as string,
-      );
+      return Object.hasOwn(ctx.dependenciesGetStore().dependencies, name);
     },
   };
 }

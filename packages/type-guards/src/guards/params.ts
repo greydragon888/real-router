@@ -204,7 +204,7 @@ export function isValidParamValueStrict(value: unknown): boolean {
   }
 
   if (type === "number") {
-    return Number.isFinite(value as number);
+    return Number.isFinite(value);
   }
 
   // Arrays of primitives only

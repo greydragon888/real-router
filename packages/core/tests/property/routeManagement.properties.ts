@@ -138,7 +138,7 @@ describe("Route Management (getRoutesApi) Properties", () => {
       name: "custom",
       path: "/custom",
       myField: "value",
-    } as never);
+    });
 
     const config = getPluginApi(router).getRouteConfig("custom");
 

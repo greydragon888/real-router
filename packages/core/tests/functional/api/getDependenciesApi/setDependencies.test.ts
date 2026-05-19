@@ -143,7 +143,7 @@ describe("core/dependencies/setDependencies", () => {
 
   it("should handle falsy values except undefined", () => {
     deps.setAll({
-      foo: 0 as number,
+      foo: 0,
       // @ts-expect-error: testing null value
       bar: null,
       baz: false,

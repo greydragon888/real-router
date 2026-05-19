@@ -200,7 +200,7 @@ export function getPluginApi<
       throwIfDisposed(ctx.isDisposed);
       ctx.emitTransitionError(error);
     },
-    claimContextNamespace: ((namespace: string) => {
+    claimContextNamespace: (namespace: string) => {
       throwIfDisposed(ctx.isDisposed);
 
       if (ctx.contextClaimRecords.has(namespace)) {
@@ -213,13 +213,13 @@ export function getPluginApi<
 
       return {
         write(state: State, value: unknown) {
-          (state.context as Record<string, unknown>)[namespace] = value;
+          state.context[namespace] = value;
         },
         release() {
           ctx.contextClaimRecords.delete(namespace);
         },
       } satisfies ContextNamespaceClaim;
-    }) as PluginApi["claimContextNamespace"],
+    },
   };
 
   cache.set(router, api);

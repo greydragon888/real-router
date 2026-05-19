@@ -129,7 +129,7 @@ describe("preload-plugin — lifecycle", () => {
     const getDep = () => {
       throw new Error("no deps");
     };
-    const plugin = factory(router, getDep as Parameters<typeof factory>[1]);
+    const plugin = factory(router, getDep);
 
     expect(plugin).toStrictEqual({});
 

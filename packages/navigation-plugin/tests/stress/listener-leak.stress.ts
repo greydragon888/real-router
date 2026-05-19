@@ -19,10 +19,10 @@ describe("N12: Listener leak detection", () => {
     const addListenerSpy = vi.spyOn(browser, "addNavigateListener");
 
     addListenerSpy.mockImplementation((fn) => {
-      mockNav.addEventListener("navigate", fn as EventListener);
+      mockNav.addEventListener("navigate", fn);
 
       return () => {
-        mockNav.removeEventListener("navigate", fn as EventListener);
+        mockNav.removeEventListener("navigate", fn);
       };
     });
 

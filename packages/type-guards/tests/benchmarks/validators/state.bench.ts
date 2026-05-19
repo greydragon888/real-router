@@ -164,19 +164,19 @@ boxplot(() => {
 
     bench("validateState: missing name (catches error)", () => {
       try {
-        validateState({ params: {}, path: "/" } as any, methodName);
+        validateState({ params: {}, path: "/" }, methodName);
       } catch {}
     });
 
     bench("validateState: missing params (catches error)", () => {
       try {
-        validateState({ name: "home", path: "/" } as any, methodName);
+        validateState({ name: "home", path: "/" }, methodName);
       } catch {}
     });
 
     bench("validateState: missing path (catches error)", () => {
       try {
-        validateState({ name: "home", params: {} } as any, methodName);
+        validateState({ name: "home", params: {} }, methodName);
       } catch {}
     });
 
@@ -211,7 +211,7 @@ boxplot(() => {
             name: 123,
             params: {},
             path: "/",
-          } as any,
+          },
           methodName,
         );
       } catch {}
@@ -224,7 +224,7 @@ boxplot(() => {
             name: "home",
             params: "invalid",
             path: "/",
-          } as any,
+          },
           methodName,
         );
       } catch {}
@@ -237,7 +237,7 @@ boxplot(() => {
             name: "home",
             params: {},
             path: 123,
-          } as any,
+          },
           methodName,
         );
       } catch {}
@@ -302,7 +302,7 @@ boxplot(() => {
           path: "/test",
           extra: "ignored",
           another: 42,
-        } as any,
+        },
         methodName,
       );
     });
@@ -330,7 +330,7 @@ boxplot(() => {
             params: {},
             path: "/test",
             meta: null,
-          } as any,
+          },
           methodName,
         );
       } catch {}

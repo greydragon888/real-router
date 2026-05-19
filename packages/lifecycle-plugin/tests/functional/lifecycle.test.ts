@@ -625,7 +625,7 @@ describe("@real-router/lifecycle-plugin", () => {
           {
             name: "home",
             path: "/",
-            onEnter: factorySpy as LifecycleHookFactory,
+            onEnter: factorySpy,
           },
           { name: "about", path: "/about" },
         ],

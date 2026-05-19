@@ -42,7 +42,7 @@ export const arbRouteWithParams: fc.Arbitrary<{
     ? fc
         .integer({ min: 1, max: 3 })
         .map((id) => ({ name, params: { id: String(id) } }))
-    : fc.constant({ name, params: {} as Record<string, string> }),
+    : fc.constant({ name, params: {} }),
 );
 
 export type Action =

@@ -504,7 +504,7 @@ describe("navigateWithHash — Property Tests", () => {
 
         void navigateWithHash(router, routeName, {}, newHash, {
           force: true,
-        } as NavigationOptions);
+        });
 
         expect(calls).toHaveLength(1);
 
@@ -526,7 +526,7 @@ describe("navigateWithHash — Property Tests", () => {
 
         void navigateWithHash(router, routeName, {}, hash, {
           force: true,
-        } as NavigationOptions);
+        });
 
         expect(calls).toHaveLength(1);
 
@@ -552,7 +552,7 @@ describe("navigateWithHash — Property Tests", () => {
 
         void navigateWithHash(router, targetName, {}, newHash, {
           force: true,
-        } as NavigationOptions);
+        });
 
         expect(calls).toHaveLength(1);
 
@@ -840,7 +840,7 @@ describe("navigateWithHash — Property Tests", () => {
 
         const opts = calls[0].opts as Record<string, unknown>;
 
-        for (const key of Object.keys(extras as Record<string, unknown>)) {
+        for (const key of Object.keys(extras)) {
           expect(opts[key]).toStrictEqual(
             (extras as Record<string, unknown>)[key],
           );
@@ -892,7 +892,7 @@ describe("navigateWithHash — Property Tests", () => {
 
       void navigateWithHash(router, "home", {}, "new", {
         force: false,
-      } as NavigationOptions);
+      });
 
       expect(calls).toHaveLength(1);
       expect(calls[0].opts.force).toBe(true);
@@ -908,7 +908,7 @@ describe("navigateWithHash — Property Tests", () => {
 
       void navigateWithHash(router, "home", {}, "same", {
         force: false,
-      } as NavigationOptions);
+      });
 
       expect(calls).toHaveLength(1);
       expect(calls[0].opts.force).toBe(false);

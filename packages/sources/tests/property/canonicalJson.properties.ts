@@ -435,8 +435,8 @@ function sortedJson(value: unknown): string {
   }
 
   if (value !== null && typeof value === "object") {
-    const keys = Object.keys(value as Record<string, unknown>).toSorted(
-      (left, right) => left.localeCompare(right),
+    const keys = Object.keys(value).toSorted((left, right) =>
+      left.localeCompare(right),
     );
     const parts = keys.map(
       (key) =>

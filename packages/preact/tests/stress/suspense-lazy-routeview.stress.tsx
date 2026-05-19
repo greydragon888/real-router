@@ -57,7 +57,7 @@ function makeControlledLazy(): LazyControl {
   // preact/compat lazy() is typed as returning T extends ComponentType<any>,
   // but the inferred type for FunctionComponent may not satisfy the
   // ComponentType constraint in all preact versions — cast to bypass.
-  const Component = lazy(() => modulePromise) as unknown as FunctionComponent;
+  const Component = lazy(() => modulePromise);
 
   return {
     Component,
@@ -156,9 +156,7 @@ describe("R — Suspense + RouteView.Match lazy() stress (§7.2 #12, M22)", () =
     const neverResolvingModule = new Promise<{ default: FunctionComponent }>(
       () => undefined,
     );
-    const AlwaysLazy = lazy(
-      () => neverResolvingModule,
-    ) as unknown as FunctionComponent;
+    const AlwaysLazy = lazy(() => neverResolvingModule);
 
     render(
       <RouterProvider router={router}>

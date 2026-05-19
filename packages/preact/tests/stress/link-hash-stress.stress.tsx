@@ -51,7 +51,7 @@ function instrumentNavigate(router: Router): {
   const calls: NavigateCall[] = [];
   const original = router.navigate.bind(router);
 
-  router.navigate = ((
+  router.navigate = (
     name: string,
     params?: Params,
     opts?: NavigationOptions & { hash?: string; hashChange?: boolean },
@@ -59,7 +59,7 @@ function instrumentNavigate(router: Router): {
     calls.push({ name, params: params ?? {}, opts: opts ?? {} });
 
     return original(name, params, opts);
-  }) as Router["navigate"];
+  };
 
   return {
     calls,

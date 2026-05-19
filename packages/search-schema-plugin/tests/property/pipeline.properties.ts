@@ -258,7 +258,7 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
                 {
                   name: "test",
                   path: ROUTE_PATH,
-                  defaultParams: defaults as Params,
+                  defaultParams: defaults,
                   searchSchema: createFailSchema(issues),
                 },
               ],

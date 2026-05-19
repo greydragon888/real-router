@@ -300,7 +300,7 @@ describe("@real-router/rsc-server-plugin — rscActionPluginFactory", () => {
 
         target[thenKey] = (): undefined => undefined;
 
-        return target as unknown as RscActionResult;
+        return target;
       };
       /* eslint-enable unicorn/no-thenable */
 
@@ -352,7 +352,7 @@ describe("@real-router/rsc-server-plugin — rscActionPluginFactory", () => {
     });
 
     it("accepts an empty object (no fields set)", async () => {
-      router.usePlugin(rscActionPluginFactory(() => ({}) as RscActionResult));
+      router.usePlugin(rscActionPluginFactory(() => ({})));
 
       const state = await router.start("/");
 

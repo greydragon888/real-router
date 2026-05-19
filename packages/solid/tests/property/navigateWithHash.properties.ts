@@ -230,7 +230,7 @@ describe("navigateWithHash — Property Tests (Solid)", () => {
         void navigateWithHash(router, routeName, {}, newHash, {
           force: false,
           hashChange: false,
-        } as NavigationOptions & { hashChange?: boolean });
+        });
 
         expect(calls).toHaveLength(1);
 
@@ -291,7 +291,7 @@ describe("navigateWithHash — Property Tests (Solid)", () => {
 
         void navigateWithHash(router, routeName, {}, argHash, {
           hash: optsHash,
-        } as NavigationOptions & { hash?: string });
+        });
 
         expect(calls).toHaveLength(1);
         expect(calls[0].opts.hash).toBe(argHash);
@@ -305,7 +305,7 @@ describe("navigateWithHash — Property Tests (Solid)", () => {
 
         void navigateWithHash(router, routeName, {}, undefined, {
           hash: optsHash,
-        } as NavigationOptions & { hash?: string });
+        });
 
         expect(calls).toHaveLength(1);
         // No `hash` arg → the spread-from-extraOptions value remains.
@@ -351,13 +351,7 @@ describe("navigateWithHash — Property Tests (Solid)", () => {
       (routeName, extra) => {
         const { router, calls } = makeRouter(undefined);
 
-        void navigateWithHash(
-          router,
-          routeName,
-          {},
-          undefined,
-          extra as NavigationOptions,
-        );
+        void navigateWithHash(router, routeName, {}, undefined, extra);
 
         expect(calls).toHaveLength(1);
 

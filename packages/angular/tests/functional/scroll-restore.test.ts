@@ -17,7 +17,7 @@ function makeState(
     name,
     params: params as State["params"],
     path: "/",
-    context: context as State["context"],
+    context: context,
     transition: {} as State["transition"],
   };
 }
@@ -326,7 +326,7 @@ describe("createScrollRestoration (Angular dom-utils copy)", () => {
     });
     const elementScrollToSpy = vi.fn();
 
-    element.scrollTo = elementScrollToSpy as unknown as typeof element.scrollTo;
+    element.scrollTo = elementScrollToSpy;
 
     const fake = makeFakeRouter(makeState("home"));
     const sr = track(

@@ -68,7 +68,7 @@ boxplot(() => {
   summary(() => {
     bench("validateRouteName: reject non-string (catches error)", () => {
       try {
-        validateRouteName(123 as any, methodName);
+        validateRouteName(123, methodName);
       } catch {}
     });
 

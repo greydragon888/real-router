@@ -94,11 +94,11 @@ describe("S1 — scrollRestoration + rapid pushState (§7.2 #10)", () => {
   // page lifetime — invisible to users but compounding in micro-frontend
   // shells that swap routers without tearing down the React/Solid tree.
   it("S2 — N router.stop() without unmount → pagehide listeners growth (documented leak)", async () => {
-    vi.stubGlobal("requestAnimationFrame", ((cb: FrameRequestCallback) => {
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
       cb(0);
 
       return 0;
-    }) as typeof globalThis.requestAnimationFrame);
+    });
 
     const addEventListenerSpy = vi.spyOn(globalThis, "addEventListener");
     const removeEventListenerSpy = vi.spyOn(globalThis, "removeEventListener");

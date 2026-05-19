@@ -45,8 +45,8 @@ import type { State } from "@real-router/core";
 function canonicalReplicaReplacer(_key: string, val: unknown): unknown {
   if (val !== null && typeof val === "object" && !Array.isArray(val)) {
     const sorted: Record<string, unknown> = {};
-    const keys = Object.keys(val as Record<string, unknown>).toSorted(
-      (left: string, right: string) => left.localeCompare(right),
+    const keys = Object.keys(val).toSorted((left: string, right: string) =>
+      left.localeCompare(right),
     );
 
     for (const key of keys) {

@@ -120,9 +120,7 @@ describe("Router Type Guards Properties", () => {
       [fc.oneof(fc.string(), fc.integer(), fc.constant(null), fc.object())],
       { numRuns: 2000 },
     )("rejects non-AbortSignal values for signal field", (signal) => {
-      expect(
-        isNavigationOptions({ signal } as unknown as NavigationOptions),
-      ).toBe(false);
+      expect(isNavigationOptions({ signal })).toBe(false);
     });
   });
 

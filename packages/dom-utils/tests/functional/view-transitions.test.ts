@@ -28,9 +28,9 @@ interface FakeRouter {
 function makeState(name: string): State {
   return {
     name,
-    params: {} as State["params"],
+    params: {},
     path: `/${name}`,
-    context: {} as State["context"],
+    context: {},
     transition: {} as State["transition"],
   };
 }

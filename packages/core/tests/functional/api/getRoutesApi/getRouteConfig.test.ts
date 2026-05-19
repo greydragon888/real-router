@@ -31,7 +31,7 @@ describe("core/routes/routeTree/getRouteConfig", () => {
         path: "/gc-home",
         title: "Home",
         abortRequest: [{ url: "api/**" }],
-      } as never);
+      });
 
       expect(pluginApi.getRouteConfig("gc-home")).toStrictEqual({
         title: "Home",
@@ -55,10 +55,8 @@ describe("core/routes/routeTree/getRouteConfig", () => {
       routesApi.add({
         name: "gc-users",
         path: "/gc-users",
-        children: [
-          { name: "profile", path: "/:id", title: "Profile" } as never,
-        ],
-      } as never);
+        children: [{ name: "profile", path: "/:id", title: "Profile" }],
+      });
 
       expect(pluginApi.getRouteConfig("gc-users.profile")).toStrictEqual({
         title: "Profile",
@@ -72,7 +70,7 @@ describe("core/routes/routeTree/getRouteConfig", () => {
         name: "gc-dynamic",
         path: "/gc-dynamic",
         customField: "value",
-      } as never);
+      });
 
       expect(pluginApi.getRouteConfig("gc-dynamic")).toStrictEqual({
         customField: "value",
@@ -84,7 +82,7 @@ describe("core/routes/routeTree/getRouteConfig", () => {
         name: "gc-remove",
         path: "/gc-remove",
         title: "Remove Me",
-      } as never);
+      });
 
       expect(pluginApi.getRouteConfig("gc-remove")).toStrictEqual({
         title: "Remove Me",
@@ -100,7 +98,7 @@ describe("core/routes/routeTree/getRouteConfig", () => {
         name: "gc-clear",
         path: "/gc-clear",
         title: "Clear Me",
-      } as never);
+      });
 
       expect(pluginApi.getRouteConfig("gc-clear")).toStrictEqual({
         title: "Clear Me",
@@ -116,7 +114,7 @@ describe("core/routes/routeTree/getRouteConfig", () => {
         name: "gc-clonable",
         path: "/gc-clonable",
         title: "Clonable",
-      } as never);
+      });
 
       const clone = cloneRouter(router);
       const clonePluginApi = getPluginApi(clone);
@@ -131,7 +129,7 @@ describe("core/routes/routeTree/getRouteConfig", () => {
         name: "gc-update",
         path: "/gc-update",
         title: "Update Me",
-      } as never);
+      });
 
       routesApi.update("gc-update", { defaultParams: { lang: "en" } });
 
@@ -146,7 +144,7 @@ describe("core/routes/routeTree/getRouteConfig", () => {
       const capturedConfig: unknown[] = [];
 
       const middlewareRouter = createRouter([
-        { name: "gc-mw-home", path: "/", title: "Home" } as never,
+        { name: "gc-mw-home", path: "/", title: "Home" },
       ]);
       const middlewarePluginApi = getPluginApi(middlewareRouter);
 
@@ -170,7 +168,7 @@ describe("core/routes/routeTree/getRouteConfig", () => {
         name: "gc-dispose",
         path: "/gc-dispose",
         title: "Dispose Me",
-      } as never);
+      });
 
       expect(pluginApi.getRouteConfig("gc-dispose")).toStrictEqual({
         title: "Dispose Me",
@@ -195,7 +193,7 @@ describe("core/routes/routeTree/getRouteConfig", () => {
           path: "/",
           title: "Home",
           abortRequest: [{ url: "api/**" }],
-        } as never,
+        },
       ]);
       const freshPluginApi = getPluginApi(freshRouter);
 

@@ -222,7 +222,7 @@ describe("core/routes/replaceRoutes", () => {
         name: "with-custom",
         path: "/with-custom",
         ...({ someCustomField: "custom-value" } as Record<string, unknown>),
-      } as any);
+      });
 
       // Verify custom field is registered
       const configBefore = getPluginApi(router).getRouteConfig("with-custom");

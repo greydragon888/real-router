@@ -644,7 +644,7 @@ describe("navigateToDefault", () => {
       const options = { replace: true };
 
       // This tests the case where we have 2 args and first is treated as options
-      const state = await router.navigateToDefault(options as any);
+      const state = await router.navigateToDefault(options);
 
       expect(state.name).toBe("users");
       expect(state.params).toStrictEqual({ tab: "main" });

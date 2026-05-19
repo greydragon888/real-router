@@ -97,9 +97,7 @@ function canonicalize(value: unknown, path: Set<object>): unknown {
       string,
       unknown
     >;
-    const keys = Object.keys(value as Record<string, unknown>).toSorted(
-      compareKeys,
-    );
+    const keys = Object.keys(value).toSorted(compareKeys);
 
     for (const key of keys) {
       sorted[key] = canonicalize((value as Record<string, unknown>)[key], path);

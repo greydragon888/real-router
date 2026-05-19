@@ -116,7 +116,7 @@ describe("core/dependencies/removeDependency", () => {
 
     const cleanupDeps = ["dep1", "dep2", "dep3"] as const;
 
-    deps.set("dep1" as "foo", 1 as number);
+    deps.set("dep1" as "foo", 1);
 
     expect(() => {
       cleanupDeps.forEach((dep) => {

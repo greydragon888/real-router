@@ -474,7 +474,7 @@ describe("shallowEqual — Property Tests", () => {
     test("each getter is invoked exactly once per shallowEqual call (per side)", () => {
       let aReads = 0;
       let bReads = 0;
-      const a = Object.defineProperty({} as Record<string, number>, "x", {
+      const a = Object.defineProperty({}, "x", {
         get() {
           aReads++;
 
@@ -483,7 +483,7 @@ describe("shallowEqual — Property Tests", () => {
         enumerable: true,
         configurable: true,
       });
-      const b = Object.defineProperty({} as Record<string, number>, "x", {
+      const b = Object.defineProperty({}, "x", {
         get() {
           bReads++;
 
