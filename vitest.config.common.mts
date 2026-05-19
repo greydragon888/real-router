@@ -17,7 +17,6 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 import tsconfigPaths from "vite-tsconfig-paths";
-import codspeedPlugin from "@codspeed/vitest-plugin";
 
 /**
  * Auto-generate resolve aliases from workspace packages.
@@ -113,9 +112,7 @@ export const commonConfig = defineConfig({
    * - tsconfigPaths: Resolve TypeScript path aliases from tsconfig.json
    * - codspeedPlugin: Performance benchmarking (CI only)
    */
-  plugins: process.env.CI
-    ? [tsconfigPaths(), codspeedPlugin()]
-    : [tsconfigPaths()],
+  plugins: process.env.CI ? [tsconfigPaths()] : [tsconfigPaths()],
 
   // Resolve workspace packages to source for test coverage.
   // Without this, Vitest resolves via exports → dist and v8
