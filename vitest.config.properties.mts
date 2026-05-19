@@ -41,9 +41,11 @@ export default mergeConfig(
       /**
        * Timeout configuration
        * Property-based tests run multiple iterations (50-10000+ runs per test)
-       * and need more time than standard example-based tests
+       * and need more time than standard example-based tests.
+       * CI runners with high turbo concurrency cause CPU contention even when
+       * local runs complete in <1s — keep generous headroom to avoid flakes.
        */
-      testTimeout: 30000, // 30 seconds per test
+      testTimeout: 60000, // 60 seconds per test
       hookTimeout: 10000, // 10 seconds for hooks
       teardownTimeout: 10000, // 10 seconds for cleanup
 
