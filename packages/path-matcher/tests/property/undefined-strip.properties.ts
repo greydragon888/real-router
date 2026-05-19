@@ -178,10 +178,8 @@ function createSpyMatcher(): {
           result += "&";
         }
 
-        const valueStr =
-          typeof value === "string"
-            ? value
-            : String(value as number | boolean | null);
+        // eslint-disable-next-line @typescript-eslint/no-base-to-string -- spy engine: param values are typed `unknown` but expected primitive in property tests
+        const valueStr = typeof value === "string" ? value : String(value);
 
         result += `${key}=${valueStr}`;
       }

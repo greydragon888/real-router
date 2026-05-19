@@ -360,8 +360,8 @@ describe("shallowEqual — Property Tests", () => {
     function buildLargeRecord(
       n: number,
       seed: { date: Date; sym: symbol },
-    ): Record<string, unknown> {
-      const record: Record<string, unknown> = {};
+    ): Record<string | symbol, unknown> {
+      const record: Record<string | symbol, unknown> = {};
 
       for (let i = 0; i < n; i++) {
         const key = `k${i}`;
@@ -457,7 +457,7 @@ describe("shallowEqual — Property Tests", () => {
       // so the records still compare equal (locks Inv12 at scale).
       const tagSym = Symbol("hidden-tag");
 
-      (b as Record<string | symbol, unknown>)[tagSym] = "extra-meta";
+      b[tagSym] = "extra-meta";
 
       expect(shallowEqual(a, b)).toBe(true);
     });

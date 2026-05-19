@@ -4,7 +4,7 @@ import { describe, beforeEach, afterEach, it, expect } from "vitest";
 import MountUnmountProbe from "./components/MountUnmountProbe.svelte";
 import { createStressRouter, forceGC, MB, takeHeapSnapshot } from "./helpers";
 
-import type { Router, Unsubscribe } from "@real-router/core";
+import type { Router } from "@real-router/core";
 
 // Audit follow-up #2.1 — rapid mount/unmount of RouterProvider with a child
 // that calls useRouteExit + useRoute, without any navigate() between cycles.
@@ -41,27 +41,27 @@ describe("Stress: start/stop churn (no navigation)", () => {
     let leaveActive = 0;
     let subscribeActive = 0;
 
-    target.subscribeLeave = ((
+    target.subscribeLeave = (
       listener: Parameters<Router["subscribeLeave"]>[0],
     ) => {
       leaveActive++;
       const off = originalSubscribeLeave(listener);
 
-      return ((): void => {
+      return (): void => {
         leaveActive--;
         off();
-      }) as Unsubscribe;
-    }) as Router["subscribeLeave"];
+      };
+    };
 
-    target.subscribe = ((listener: Parameters<Router["subscribe"]>[0]) => {
+    target.subscribe = (listener: Parameters<Router["subscribe"]>[0]) => {
       subscribeActive++;
       const off = originalSubscribe(listener);
 
-      return ((): void => {
+      return (): void => {
         subscribeActive--;
         off();
-      }) as Unsubscribe;
-    }) as Router["subscribe"];
+      };
+    };
 
     return {
       leaveActive: () => leaveActive,

@@ -1,3 +1,7 @@
+/* eslint-disable sonarjs/no-undefined-argument -- this file intentionally tests
+ * navigate() edge cases with explicit `undefined` opts argument (Issues #53/#58).
+ * Removing trailing `undefined` would defeat the test's purpose. */
+
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { errorCodes, events } from "@real-router/core";
@@ -134,11 +138,7 @@ describe("router.navigate() - edge cases callback", () => {
 
     describe("Callback should be called in all argument forms", () => {
       it("should call callback when opts is undefined: navigate(name, params, undefined, callback)", async () => {
-        const state = await router.navigate(
-          "users",
-          { id: 1 },
-          undefined as any,
-        );
+        const state = await router.navigate("users", { id: 1 }, undefined);
 
         expect(state).toBeDefined();
         expect(state.name).toBe("users");
@@ -173,7 +173,7 @@ describe("router.navigate() - edge cases callback", () => {
     describe("Callback receives correct arguments", () => {
       it("should pass error to callback when route not found with undefined opts", async () => {
         try {
-          await router.navigate("nonexistent", {}, undefined as any);
+          await router.navigate("nonexistent", {}, undefined);
 
           expect.fail("Should have thrown");
         } catch (error) {
@@ -186,7 +186,7 @@ describe("router.navigate() - edge cases callback", () => {
         const state = await router.navigate(
           "users.view",
           { id: "123" },
-          undefined as any,
+          undefined,
         );
 
         expect(state).toBeDefined();
@@ -224,7 +224,7 @@ describe("router.navigate() - edge cases callback", () => {
           successListener,
         );
 
-        await router.navigate("users", {}, undefined as any);
+        await router.navigate("users", {}, undefined);
 
         expect(successListener).toHaveBeenCalled();
 
@@ -306,11 +306,7 @@ describe("router.navigate() - edge cases callback", () => {
       await freshRouter.start("/home");
 
       // This form: navigate(name, params, undefined)
-      const state = await freshRouter.navigate(
-        "users",
-        { id: "1" },
-        undefined as any,
-      );
+      const state = await freshRouter.navigate("users", { id: "1" }, undefined);
 
       expect(state).toBeDefined();
       expect(state.name).toBe("users");
@@ -338,7 +334,7 @@ describe("router.navigate() - edge cases callback", () => {
 
       // Navigate to non-existent route
       try {
-        await freshRouter.navigate("nonexistent", {}, undefined as any);
+        await freshRouter.navigate("nonexistent", {}, undefined);
 
         expect.fail("Should have thrown");
       } catch (error) {
@@ -376,7 +372,7 @@ describe("router.navigate() - edge cases callback", () => {
       await freshRouter.navigate("users", {}, { reload: true });
 
       // Form 7: navigate(name, params, undefined, callback) - the bug case - callback pattern removed
-      await freshRouter.navigate("users.view", { id: "3" }, undefined as any);
+      await freshRouter.navigate("users.view", { id: "3" }, undefined);
 
       expect(freshRouter.getState()?.name).toBe("users.view");
 

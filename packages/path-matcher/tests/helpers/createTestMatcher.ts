@@ -87,8 +87,8 @@ function build(params: Record<string, unknown>): string {
       continue;
     }
 
-    const encodedValue =
-      typeof value === "string" ? value : String(value as number | boolean);
+    // eslint-disable-next-line @typescript-eslint/no-base-to-string -- test helper: param values are typed `unknown` but expected primitive
+    const encodedValue = typeof value === "string" ? value : String(value);
 
     result += `${encodedKey}=${encodeURIComponent(encodedValue)}`;
   }

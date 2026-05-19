@@ -9,7 +9,7 @@ import {
 
 import { DEFAULT_TRANSITION } from "../../src/constants";
 
-import type { Route, Router, State, Params } from "@real-router/core";
+import type { Route, Router, State } from "@real-router/core";
 
 // =============================================================================
 // Generators (Arbitraries)
@@ -150,7 +150,7 @@ export const arbSearchParams = fc.record({
 export const arbState: fc.Arbitrary<State> = fc
   .record({
     name: arbRouteName,
-    params: arbParams as fc.Arbitrary<Params>,
+    params: arbParams,
     path: fc.string({ minLength: 1, maxLength: 50 }).map((s) => `/${s}`),
   })
   .map((r) => ({

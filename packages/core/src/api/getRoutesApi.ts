@@ -360,7 +360,8 @@ function updateRouteConfig<
       const decoder = updates.decodeParams;
 
       store.config.decoders[name] = (params: Params): Params =>
-        (decoder(params) as Params | undefined) ?? params;
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime fallback if user-provided decoder violates its return type
+        decoder(params) ?? params;
     }
   }
 
@@ -371,7 +372,8 @@ function updateRouteConfig<
       const encoder = updates.encodeParams;
 
       store.config.encoders[name] = (params: Params): Params =>
-        (encoder(params) as Params | undefined) ?? params;
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime fallback if user-provided encoder violates its return type
+        encoder(params) ?? params;
     }
   }
 }

@@ -8,7 +8,6 @@ import type { CreateMatcherOptions } from "../../../src/createMatcher";
 import type {
   MatchOptions,
   MatchResult,
-  RouteParams,
   RouteTree,
   RouteTreeState,
 } from "../../../src/types";
@@ -83,7 +82,7 @@ export function matchPath(
 
   return {
     name,
-    params: result.params as RouteParams,
+    params: result.params,
     meta: result.meta,
   };
 }

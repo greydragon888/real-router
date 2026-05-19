@@ -12,11 +12,6 @@ describe("react-server entry point (src/index.react-server.ts)", () => {
   });
 
   it("does not leak client-only exports (no hooks, no components, no RouterProvider)", () => {
-    const moduleAsRecord = reactServerEntry as unknown as Record<
-      string,
-      unknown
-    >;
-
     const forbiddenExports = [
       "useRouter",
       "useNavigator",
@@ -34,9 +29,9 @@ describe("react-server entry point (src/index.react-server.ts)", () => {
 
     for (const exportName of forbiddenExports) {
       expect(
-        moduleAsRecord[exportName],
+        exportName in reactServerEntry,
         `${exportName} must NOT be in react-server entry (client-only)`,
-      ).toBeUndefined();
+      ).toBe(false);
     }
   });
 });

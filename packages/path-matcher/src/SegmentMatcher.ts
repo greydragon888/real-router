@@ -189,9 +189,8 @@ export class SegmentMatcher {
 
       if (value !== undefined && value !== null) {
         const stringValue =
-          typeof value === "object"
-            ? JSON.stringify(value)
-            : String(value as string | number | boolean);
+          // eslint-disable-next-line @typescript-eslint/no-base-to-string -- route params are typed `unknown` but contractually primitive
+          typeof value === "object" ? JSON.stringify(value) : String(value);
 
         if (!constraint.pattern.test(stringValue)) {
           throw new Error(
@@ -242,7 +241,8 @@ export class SegmentMatcher {
       } else if (typeof value === "object") {
         stringValue = JSON.stringify(value);
       } else {
-        stringValue = String(value as number | boolean);
+        // eslint-disable-next-line @typescript-eslint/no-base-to-string -- route params are typed `unknown` but contractually primitive
+        stringValue = String(value);
       }
 
       const encoded = slot.encoder(stringValue);

@@ -331,11 +331,11 @@ describe("shallowEqual — Property Tests", () => {
       // properties compare as EQUAL — locks the comparator's "string-keys
       // only" contract.
       const symA = Symbol("a");
-      const a: Record<string, unknown> = { x: 1 };
-      const b: Record<string, unknown> = { x: 1 };
+      const a: Record<string | symbol, unknown> = { x: 1 };
+      const b: Record<string | symbol, unknown> = { x: 1 };
 
-      (a as Record<symbol, unknown>)[symA] = 1;
-      (b as Record<symbol, unknown>)[symA] = 2;
+      a[symA] = 1;
+      b[symA] = 2;
 
       // Symbol values differ but Object.keys excludes them → still equal.
       expect(shallowEqual(a, b)).toBe(true);

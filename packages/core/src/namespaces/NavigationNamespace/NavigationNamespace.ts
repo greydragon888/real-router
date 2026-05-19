@@ -105,7 +105,8 @@ export class NavigationNamespace {
       /* v8 ignore next 3 -- @preserve: reachable only via validator-driven
          throws from buildNavigateState (validateStateBuilderArgs) — covered
          in @real-router/validation-plugin's suite, not in core. */
-      return Promise.reject(error as Error);
+      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- preserve original throw shape from user-provided buildNavigateState
+      return Promise.reject(error);
     }
 
     if (!toState) {
@@ -197,7 +198,8 @@ export class NavigationNamespace {
     try {
       ({ route, params } = deps.resolveDefault());
     } catch (error) {
-      return Promise.reject(error as Error);
+      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- preserve original throw shape from user-provided resolveDefault callback
+      return Promise.reject(error);
     }
 
     if (!route) {
@@ -240,7 +242,7 @@ export class NavigationNamespace {
 
     const state: State = {
       name: constants.UNKNOWN_ROUTE,
-      params: EMPTY_PARAMS as Params,
+      params: EMPTY_PARAMS,
       path,
       transition: transitionMeta,
       context: {},
@@ -404,7 +406,8 @@ export class NavigationNamespace {
         fromState,
       );
 
-      return Promise.reject(error as Error);
+      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- preserve original throw shape from guards or transition pipeline
+      return Promise.reject(error);
     }
   }
 

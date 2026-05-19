@@ -10,7 +10,7 @@ import { RouteView, RouterProvider } from "@real-router/react";
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
 import type { Router } from "@real-router/core";
-import type { FC, ReactNode } from "react";
+import type { FC } from "react";
 
 describe("RouteView", () => {
   let router: Router;
@@ -621,7 +621,7 @@ describe("RouteView", () => {
 
       const { container } = render(
         <RouterProvider router={router}>
-          <RouteView nodeName="">{null as unknown as ReactNode}</RouteView>
+          <RouteView nodeName="">{null}</RouteView>
         </RouterProvider>,
       );
 
