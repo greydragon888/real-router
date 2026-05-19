@@ -14,6 +14,13 @@ if git diff --cached --name-only | grep -q 'pnpm-lock.yaml'; then
   git add pnpm-lock.yaml
 fi
 
+# Check dependency version consistency across workspace packages (~1s).
+# Catches sub-package version drift at commit time instead of waiting for
+# pre-push. Pure static check (no install), so it's cheap enough to run
+# unconditionally.
+echo "🔗 Checking dependency versions..."
+pnpm lint:deps
+
 # Run type checking, linting, and tests via turbo pipeline
 # (turbo caching makes lint-staged redundant)
 echo "🧪 Running tests (includes type-check and lint via turbo)..."
