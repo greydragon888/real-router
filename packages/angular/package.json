@@ -56,11 +56,11 @@
   },
   "devDependencies": {
     "@analogjs/vitest-angular": "2.4.7",
-    "@angular/common": "21.2.9",
-    "@angular/compiler": "21.2.9",
-    "@angular/compiler-cli": "21.2.9",
-    "@angular/core": "21.2.9",
-    "@angular/platform-browser": "21.2.9",
+    "@angular/common": "21.2.13",
+    "@angular/compiler": "21.2.13",
+    "@angular/compiler-cli": "21.2.13",
+    "@angular/core": "21.2.13",
+    "@angular/platform-browser": "21.2.13",
     "ng-packagr": "21.2.2",
     "typescript": "6.0.3"
   },
