@@ -229,28 +229,36 @@ export function createScrollRestoration(
       }
     }
 
-    // Single rAF so DOM is committed before we read anchors / write scroll.
-    // Guard against destroy() racing with the callback.
     requestAnimationFrame(() => {
       if (destroyed) {
         return;
       }
 
-      if (mode === "top" || !nav) {
+      if (mode === "top") {
         scrollToHashOrTop(route);
 
         return;
       }
 
-      if (nav.navigationType === "replace") {
+      if (route.transition.replace || nav?.navigationType === "replace") {
         return;
       }
 
-      if (
-        nav.direction === "back" ||
-        nav.navigationType === "traverse" ||
-        nav.navigationType === "reload"
-      ) {
+      // Both arms are required: `transition.reload` only fires for programmatic
+      // `router.navigate({reload:true})`. F5 under navigation-plugin primes
+      // `nav.navigationType === "reload"` via #531 getActivationType but leaves
+      // opts.reload undefined, so dropping the plugin arm would regress F5
+      // scroll-restore. Same belt-and-suspenders pattern is used for replace
+      // above. Browser-plugin's F5 is not covered (no priming, out of scope).
+      if (route.transition.reload || nav?.navigationType === "reload") {
+        const key = safeKeyOf(route);
+
+        writePos(key === null ? 0 : (loadStore()[key] ?? 0));
+
+        return;
+      }
+
+      if (nav?.direction === "back" || nav?.navigationType === "traverse") {
         const key = safeKeyOf(route);
 
         writePos(key === null ? 0 : (loadStore()[key] ?? 0));

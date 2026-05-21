@@ -524,7 +524,7 @@ Opt-in preservation of scroll position across navigations:
 </RouterProvider>
 ```
 
-Restores scroll on back/forward, scrolls to top (or `#hash`) on push. Three modes: `"restore"` (default), `"top"`, `"native"`. Custom containers via `scrollContainer: () => HTMLElement | null`. Options are read once on mount — changing the prop at runtime does not reconfigure the utility (Solid `onMount` is non-reactive). See [Scroll Restoration guide](https://github.com/greydragon888/real-router/wiki/Scroll-Restoration) for details.
+Restores scroll on back/forward, scrolls to top (or `#hash`) on push. Three modes: `"restore"` (default), `"top"`, `"native"`. Custom containers via `scrollContainer: () => HTMLElement | null`. Options are read once on mount — changing the prop at runtime does not reconfigure the utility (Solid `onMount` is non-reactive). Under `@real-router/browser-plugin`, replace transitions now preserve scroll position and programmatic reloads restore from `sessionStorage` (portable via `state.transition.replace` / `state.transition.reload`). See [Scroll Restoration guide](https://github.com/greydragon888/real-router/wiki/Scroll-Restoration) for the full behaviour matrix.
 
 ## View Transitions
 

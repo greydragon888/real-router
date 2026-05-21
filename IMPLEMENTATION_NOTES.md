@@ -3438,3 +3438,59 @@ Fix: split each navigation into two `act` blocks using manually-resolved `addAct
 
 - `@testing-library/preact@3.2.4` (current pin) does not yet ship a Preact 11 compatible release. Matrix-testing the adapter against Preact 11 is blocked on the testing library — the issue carries the `upstream` label for this reason.
 - Once `@testing-library/preact` ships an 11-compatible version, run the unit suite against both majors (manual matrix or pnpm-overrides per CI job) before publishing the 1.0 of the adapter.
+
+## Replace Flag Propagation in `TransitionMeta` (#XXX)
+
+### Problem
+
+Three of the four "primary" `NavigationOptions` fields — `reload`, `redirected`, and (until now) `replace` — were treated asymmetrically by the transition pipeline. `reload` and `redirected` were lifted into `state.transition.{reload, redirected}` in `completeTransition.ts`, so subscribers could portably discriminate them across any URL plugin (browser, hash, navigation, memory, none). `replace` was not: a subscriber that wanted to know "was this transition a replace?" had to read `state.context.navigation.navigationType === "replace"`, which is set **only** by `@real-router/navigation-plugin`. Under `@real-router/browser-plugin`, `@real-router/hash-plugin`, or no URL plugin at all, the signal was simply unavailable.
+
+The visible damage was in `shared/dom-utils/scroll-restore.ts`. Under navigation-plugin the utility correctly skipped scroll capture on a replace (OAuth callback, params canonicalization, `navigateToNotFound`, auto-force-from-`UNKNOWN_ROUTE`). Under browser-plugin the `state.context.navigation` namespace was undefined, the `!nav` early-return fired, and **every** transition — replace or not — snapped the viewport via `scrollToHashOrTop`. The same asymmetry blocked any subscriber-level "skip programmatic replaces" idiom from being written portably (analytics, view-transitions, route-announcer — none could rely on a plugin-specific namespace).
+
+Internally `replace` is a **core-level decision**: it originates in `router.navigate(name, params, { replace })` and is auto-forced by `forceReplaceFromUnknown()` and `navigateToNotFound()` (Invariants 7 and 12 in `packages/core/INVARIANTS.md`). Subscribers were the one audience that could not see it.
+
+### Solution
+
+`TransitionMeta` gains an optional `replace?: boolean` field, written in three places (symmetric with `reload`):
+
+- `completeTransition.ts` — `if (opts.replace !== undefined) meta.replace = opts.replace;` lifts user-supplied and auto-forced opts (including the result of `forceReplaceFromUnknown`).
+- `NavigationNamespace.navigateToNotFound()` — inline meta gets `replace: true` directly, mirroring the `FROZEN_REPLACE_OPTS = { replace: true }` that plugins already see via `onTransitionSuccess`'s 3rd argument.
+- `DEFAULT_TRANSITION` — unchanged (pre-navigation fallback, no opts to lift).
+
+`shared/dom-utils/scroll-restore.ts` is refactored to consume the portable flag. Under any URL plugin the disambiguation now reads:
+
+- `route.transition.replace || nav?.navigationType === "replace"` → skip restore.
+- `route.transition.reload || nav?.navigationType === "reload"` → restore from `sessionStorage`.
+- `nav?.direction === "back" || nav?.navigationType === "traverse"` → restore.
+- otherwise → `scrollToHashOrTop`.
+
+Both arms in the `replace` and `reload` checks are intentional. The plugin arm preserves F5/cross-document scroll restoration under navigation-plugin (`getActivationType()` #531 priming sets `nav.navigationType === "reload"` while leaving `opts.reload` undefined on the initial transition). Dropping the plugin arm would silently regress F5 under navigation-plugin.
+
+### Why
+
+**Symmetry with the existing precedent.** `reload` and `redirected` proved the pattern; `replace` was the last hold-out. The added field is additive, optional, and zero API-breaking on the core type level.
+
+**Closes a real gap, not a theoretical one.** The verified consumer is `scroll-restore.ts`. Under browser-plugin every replace transition (e.g. an OAuth callback `router.navigate("dashboard", {}, { replace: true })`) used to snap the viewport. Now it preserves position. The same change unblocks `scroll-spy` (#575) under browser-plugin and lets analytics / loaders use a `if (route.transition.replace) return` idiom portably.
+
+**Subscriber/plugin visibility parity.** Plugins received `opts.replace` via `onTransitionSuccess(toState, fromState, opts)` since forever. After this change subscribers see it via `state.transition.replace` — closes the asymmetry between the two audiences that Invariant 7 had documented but not exposed.
+
+### Before / After — scroll-restore behaviour under `browser-plugin` (`scrollRestoration={{ mode: "restore" }}`)
+
+| Transition type                                                                                | Before                                              | After                                                          |
+| ---------------------------------------------------------------------------------------------- | --------------------------------------------------- | -------------------------------------------------------------- |
+| Forward push (`<Link>` without `replace`)                                                      | `scrollToHashOrTop` (snap to top / anchor)          | `scrollToHashOrTop` (unchanged)                                |
+| Replace (`navigate(..., { replace: true })`, OAuth callback, params canonicalization)          | `scrollToHashOrTop` (undesired snap)                | **skip** (preserve scroll position)                            |
+| Programmatic reload (`navigate(..., { reload: true })`)                                        | `scrollToHashOrTop` (snap, lose pre-reload position) | **restore** from `sessionStorage` (via `subscribe`'s `previousRoute` capture; `pagehide` does not fire on same-document programmatic nav) |
+| F5 cross-document (browser-driven reload)                                                      | `scrollToHashOrTop`                                 | `scrollToHashOrTop` (**unchanged** — `opts.reload` is undefined on the initial transition and browser-plugin has no Navigation API `getActivationType` analogue; closing this requires a core-level F5 priming, out of scope) |
+| Browser back/forward (popstate)                                                                | `scrollToHashOrTop` (snap)                          | `scrollToHashOrTop` (unchanged — `direction`/`traverse` disambiguation requires navigation-plugin) |
+| `navigateToNotFound()`                                                                         | `scrollToHashOrTop`                                 | **skip** (driven by inline `transition.replace = true`)        |
+
+Opt-out for users who relied on the legacy snap-on-every-transition behaviour: `scrollRestoration={{ mode: "top" }}`.
+
+Under `@real-router/navigation-plugin` there is **no behaviour change** — every existing branch (`replace` / `reload` / `traverse` / `direction === "back"`) remains active. The new `transition.replace` / `transition.reload` checks short-circuit the same paths slightly earlier with identical observable results.
+
+### Tests
+
+- `packages/core/tests/functional/navigation/navigate/navigation-options.test.ts` — the "transition meta flags" suite gains six new cases covering `replace: true`, `replace: false`, default `undefined`, `navigateToNotFound`, `forceReplaceFromUnknown` auto-force, and the override of an explicit `replace: false` from `UNKNOWN_ROUTE` (the `!opts.replace` condition matches both `undefined` and `false`), plus a timing-parity case mirroring the existing reload guard test.
+- `packages/dom-utils/tests/functional/scroll-restore.test.ts` — a new describe block adds six cases under a browser-plugin-like environment (no `state.context.navigation`) plus a regression test that simulates navigation-plugin's #531 priming (`nav.navigationType === "reload"` with `transition.reload === undefined`) and verifies that the F5 restore path still fires.
+- `packages/angular/src/dom-utils/scroll-restore.ts` is regenerated from `shared/dom-utils/scroll-restore.ts` by the existing `prebundle` script (`pnpm -F @real-router/angular bundle`) — ng-packagr cannot follow the symlinks the other adapters use, so the file is git-tracked and must be kept in sync.

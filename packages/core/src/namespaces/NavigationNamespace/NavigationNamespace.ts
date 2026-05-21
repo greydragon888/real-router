@@ -235,6 +235,7 @@ export class NavigationNamespace {
       phase: "activating",
       ...(fromState && { from: fromState.name }),
       reason: "success",
+      replace: true,
       segments,
     };
 

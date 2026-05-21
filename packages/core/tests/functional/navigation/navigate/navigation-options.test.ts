@@ -162,7 +162,7 @@ describe("router.navigate() - navigation meta and options", () => {
     });
   });
 
-  describe("transition meta flags (transition.reload and transition.redirected)", () => {
+  describe("transition meta flags (reload, replace, redirected)", () => {
     it("sets transition.reload to true when navigating with reload option", async () => {
       const state = await router.navigate("profile", {}, { reload: true });
 
@@ -209,6 +209,82 @@ describe("router.navigate() - navigation meta and options", () => {
       expect(reloadInGuard).toBeUndefined();
       // After success, transition.reload is available
       expect(freshRouter.getState()?.transition?.reload).toBe(true);
+
+      freshRouter.stop();
+    });
+
+    it("sets transition.replace to true when navigating with replace option", async () => {
+      const state = await router.navigate("profile", {}, { replace: true });
+
+      expect(state.transition?.replace).toBe(true);
+    });
+
+    it("does not set transition.replace for normal navigation (undefined)", async () => {
+      const state = await router.navigate("profile", {}, {});
+
+      expect(state.transition?.replace).toBeUndefined();
+    });
+
+    it("sets transition.replace to false when explicitly passed replace: false", async () => {
+      const state = await router.navigate("profile", {}, { replace: false });
+
+      expect(state.transition?.replace).toBe(false);
+    });
+
+    it("navigateToNotFound sets transition.replace = true (symmetric with plugin visibility via FROZEN_REPLACE_OPTS)", () => {
+      const state = router.navigateToNotFound("/bogus");
+
+      expect(state.transition?.replace).toBe(true);
+    });
+
+    it("auto-forces transition.replace = true when navigating FROM UNKNOWN_ROUTE state", async () => {
+      const freshRouter = createTestRouter();
+
+      await freshRouter.start("/home");
+      freshRouter.navigateToNotFound("/unknown");
+
+      const state = await freshRouter.navigate("users", {}, {});
+
+      expect(state.transition?.replace).toBe(true);
+
+      freshRouter.stop();
+    });
+
+    it("auto-forces transition.replace = true even when explicit replace: false is passed FROM UNKNOWN_ROUTE state", async () => {
+      // forceReplaceFromUnknown's `!opts.replace` condition matches BOTH
+      // undefined AND false — intentional: navigation FROM UNKNOWN_ROUTE
+      // always replaces to prevent history pollution (Invariant 12).
+      const freshRouter = createTestRouter();
+
+      await freshRouter.start("/home");
+      freshRouter.navigateToNotFound("/unknown");
+
+      const state = await freshRouter.navigate("users", {}, { replace: false });
+
+      expect(state.transition?.replace).toBe(true);
+
+      freshRouter.stop();
+    });
+
+    it("transition.replace is not available during guard execution (only after success)", async () => {
+      const freshRouter = createTestRouter();
+      let replaceInGuard: boolean | undefined;
+
+      await freshRouter.start("/home");
+
+      getLifecycleApi(freshRouter).addActivateGuard(
+        "profile",
+        () => (toState) => {
+          replaceInGuard = toState.transition?.replace;
+
+          return true;
+        },
+      );
+
+      await freshRouter.navigate("profile", {}, { replace: true });
+
+      expect(replaceInGuard).toBeUndefined();
+      expect(freshRouter.getState()?.transition?.replace).toBe(true);
 
       freshRouter.stop();
     });
