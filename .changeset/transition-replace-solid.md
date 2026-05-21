@@ -2,7 +2,7 @@
 "@real-router/solid": minor
 ---
 
-**BREAKING CHANGE (behaviour):** scroll-restoration disambiguation under `browser-plugin`
+**BREAKING CHANGE (behaviour):** scroll-restoration disambiguation under `browser-plugin` (#658)
 
 `createScrollRestoration` (used by `<RouterProvider scrollRestoration>`) now disambiguates push, replace, and reload transitions under `@real-router/browser-plugin` using the portable `state.transition.replace` / `state.transition.reload` flags introduced in `@real-router/core`. Before this release the utility had no portable way to read `replace` under browser-plugin, so it called `scrollToHashOrTop` on **every** transition. After this release:
 

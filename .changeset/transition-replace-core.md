@@ -2,7 +2,7 @@
 "@real-router/core": minor
 ---
 
-Add `state.transition.replace` for portable push/replace discrimination across URL plugins
+Add `state.transition.replace` for portable push/replace discrimination across URL plugins (#658)
 
 `TransitionMeta` gains an optional `replace?: boolean` field, written in three places — symmetric with the existing `reload` / `redirected` flags:
 
