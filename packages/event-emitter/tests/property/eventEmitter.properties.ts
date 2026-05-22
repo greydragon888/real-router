@@ -242,19 +242,34 @@ describe("EventEmitter Property-Based Tests", () => {
   });
 
   describe("snapshot — listener added during emit is not called", () => {
-    test.prop([arbEventName, arbData], {
-      numRuns: NUM_RUNS.lifecycle,
-    })(
+    // Covers both #emitFast (maxEventDepth=0) and #emitWithDepthTracking (>0).
+    // Initial existing-listener count is varied so size=1 (the historic bug)
+    // and size>=2 paths in both branches are exercised symmetrically.
+    test.prop(
+      [
+        arbEventName,
+        arbData,
+        fc.constantFrom(0, 5),
+        fc.integer({ min: 0, max: 4 }),
+      ],
+      { numRuns: NUM_RUNS.lifecycle },
+    )(
       "listener added inside emit handler is not invoked in the current emit",
-      (eventName, data) => {
-        const emitter = createTestEmitter();
+      (eventName, data, maxEventDepth, extraListenerCount) => {
+        const emitter = createTestEmitter(maxEventDepth);
         const [laterListener] = createUniqueListeners(1);
+        const existingListeners = createUniqueListeners(extraListenerCount);
 
         const firstFn = (_data: number) => {
           emitter.on(eventName, laterListener.fn);
         };
 
         emitter.on(eventName, firstFn);
+
+        for (const { fn } of existingListeners) {
+          emitter.on(eventName, fn);
+        }
+
         emitter.emit(eventName, data);
 
         expect(laterListener.getCallCount()).toBe(0);
@@ -264,6 +279,10 @@ describe("EventEmitter Property-Based Tests", () => {
         expect(laterListener.getCallCount()).toBe(1);
 
         emitter.off(eventName, firstFn);
+
+        for (const { fn } of existingListeners) {
+          emitter.off(eventName, fn);
+        }
       },
     );
   });

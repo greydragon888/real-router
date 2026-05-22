@@ -522,6 +522,21 @@ describe("EventEmitter", () => {
       expect(cb2).toHaveBeenCalledWith(1, 2);
     });
 
+    it("should use snapshot iteration with depth tracking — size=1 listener added during emit NOT called", () => {
+      const emitter = createEmitter({
+        limits: { maxListeners: 0, warnListeners: 0, maxEventDepth: 5 },
+      });
+      const laterCb = vi.fn();
+
+      emitter.on("reset", () => {
+        emitter.on("reset", laterCb);
+      });
+
+      emitter.emit("reset");
+
+      expect(laterCb).not.toHaveBeenCalled();
+    });
+
     it("should call listener with 4+ args when depth tracking is on", () => {
       const emitter = createEmitter({
         limits: { maxListeners: 0, warnListeners: 0, maxEventDepth: 5 },
