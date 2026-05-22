@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-05-22]
 
+### @real-router/core@0.54.1
+
+### Patch Changes
+
+- [#666](https://github.com/greydragon888/real-router/pull/666) [`a12a9de`](https://github.com/greydragon888/real-router/commit/a12a9de6c9dd3c100af601995d5450a9fc9f9d0d) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix EventEmitter snapshot invariant when depth tracking is enabled and only one listener exists ([#659](https://github.com/greydragon888/real-router/issues/659))
+
+  `#emitWithDepthTracking` skipped the snapshot copy for listener sets of size 1
+  and iterated the live `Set` directly, so a listener registered reentrantly
+  inside the lone listener fired in the current emit cycle instead of waiting
+  for the next one. Since core uses `maxEventDepth: 5`, this affected every
+  reentrant `router.subscribe(...)` call made while only one subscriber was
+  registered for the same event.
+
+
 ### @real-router/angular@0.10.0
 
 ### Minor Changes
