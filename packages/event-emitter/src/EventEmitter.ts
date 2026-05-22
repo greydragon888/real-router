@@ -267,7 +267,7 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
     try {
       depthMap.set(eventName, depth + 1);
 
-      const listeners = set.size === 1 ? set : [...set];
+      const listeners = [...set];
 
       for (const cb of listeners) {
         try {

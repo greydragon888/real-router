@@ -46,9 +46,15 @@ export const arbNonFunction: fc.Arbitrary<unknown> = fc.oneof(
   fc.constant(Symbol("test")),
 );
 
-export function createTestEmitter(): EventEmitter<TestEventMap> {
+export function createTestEmitter(
+  maxEventDepth = 0,
+): EventEmitter<TestEventMap> {
   // eslint-disable-next-line unicorn/prefer-event-target -- custom EventEmitter, not Node.js EventEmitter
-  return new EventEmitter<TestEventMap>();
+  return new EventEmitter<TestEventMap>(
+    maxEventDepth === 0
+      ? undefined
+      : { limits: { maxListeners: 0, warnListeners: 0, maxEventDepth } },
+  );
 }
 
 /**
