@@ -257,7 +257,7 @@ fsm.on("TRANSITION_STARTED", "CANCEL", (p) =>
            │
            ▼
 ┌──────────────────────┐
-│  Build TransitionMeta│  { reload?, redirected?, phase, from, reason, segments }
+│  Build TransitionMeta│  { reload?, replace?, redirected?, phase, from, reason, segments }
 │  + deep freeze       │
 └──────────┬───────────┘
            │

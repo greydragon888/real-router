@@ -26,6 +26,7 @@ export interface TransitionMeta {
   phase: TransitionPhase;
   reason: TransitionReason;
   reload?: boolean;
+  replace?: boolean;
   redirected?: boolean;
   from?: string;
   blocker?: string;

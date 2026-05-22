@@ -42,6 +42,10 @@ function buildTransitionMeta(
     meta.reload = opts.reload;
   }
 
+  if (opts.replace !== undefined) {
+    meta.replace = opts.replace;
+  }
+
   if (opts.redirected !== undefined) {
     meta.redirected = opts.redirected;
   }

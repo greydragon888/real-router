@@ -17,13 +17,14 @@ function makeState(
   name: string,
   params: Record<string, unknown> = {},
   context: Record<string, unknown> = {},
+  transition: Partial<State["transition"]> = {},
 ): State {
   return {
     name,
     params: params as State["params"],
     path: "/",
     context: context,
-    transition: {} as State["transition"],
+    transition: transition as State["transition"],
   };
 }
 
@@ -1274,6 +1275,125 @@ describe("createScrollRestoration", () => {
 
       sr.destroy();
       consoleError.mockRestore();
+    });
+  });
+
+  describe("portable disambiguation via transition.replace / transition.reload (RFC)", () => {
+    it("browser-plugin like (no context.navigation) + transition.replace=true → skip restore (no scrollTo)", () => {
+      const fake = makeFakeRouter(makeState("home"));
+      const scrollSpy = vi.spyOn(globalThis, "scrollTo");
+      const sr = track(createScrollRestoration(fake.router));
+
+      fake.emit(
+        makeState("about", {}, {}, { replace: true }),
+        makeState("home"),
+      );
+
+      expect(scrollSpy).not.toHaveBeenCalled();
+
+      sr.destroy();
+    });
+
+    it("browser-plugin like (no context.navigation) + transition.reload=true → restore from sessionStorage", () => {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "home:{}": 333 }));
+
+      const fake = makeFakeRouter(makeState("about"));
+      const scrollSpy = vi.spyOn(globalThis, "scrollTo");
+      const sr = track(createScrollRestoration(fake.router));
+
+      fake.emit(
+        makeState("home", {}, {}, { reload: true }),
+        makeState("about"),
+      );
+
+      expect(scrollSpy).toHaveBeenLastCalledWith({
+        top: 333,
+        left: 0,
+        behavior: "auto",
+      });
+
+      sr.destroy();
+    });
+
+    it("browser-plugin like (no context.navigation) + plain push (no replace/reload) → scrollToHashOrTop", () => {
+      const fake = makeFakeRouter(makeState("home"));
+      const scrollSpy = vi.spyOn(globalThis, "scrollTo");
+      const sr = track(createScrollRestoration(fake.router));
+
+      fake.emit(makeState("about"), makeState("home"));
+
+      expect(scrollSpy).toHaveBeenLastCalledWith({
+        top: 0,
+        left: 0,
+        behavior: "auto",
+      });
+
+      sr.destroy();
+    });
+
+    it("browser-plugin like (no context.navigation) + navigateToNotFound-shaped state (transition.replace=true) → skip restore", () => {
+      const fake = makeFakeRouter(makeState("home"));
+      const scrollSpy = vi.spyOn(globalThis, "scrollTo");
+      const sr = track(createScrollRestoration(fake.router));
+
+      // navigateToNotFound builds state with transition.replace=true inline;
+      // browser-plugin doesn't write state.context.navigation. The portable
+      // transition.replace flag is what drives the skip path now.
+      fake.emit(
+        makeState("@@router/UNKNOWN_ROUTE", {}, {}, { replace: true }),
+        makeState("home"),
+      );
+
+      expect(scrollSpy).not.toHaveBeenCalled();
+
+      sr.destroy();
+    });
+
+    it("browser-plugin F5 regression: no context.navigation AND no transition.reload → scrollToHashOrTop (browser-plugin can't disambiguate F5; out of scope)", () => {
+      // F5 under browser-plugin: opts.reload is undefined on initial
+      // transition, and there's no Navigation API getActivationType analogue
+      // to prime nav.navigationType — neither signal fires. The behaviour
+      // intentionally stays at the legacy "scroll to top / hash" — closing
+      // this gap requires core-level F5 priming, out of scope for this RFC.
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "home:{}": 999 }));
+
+      const fake = makeFakeRouter();
+      const scrollSpy = vi.spyOn(globalThis, "scrollTo");
+      const sr = track(createScrollRestoration(fake.router));
+
+      fake.emit(makeState("home"));
+
+      expect(scrollSpy).toHaveBeenLastCalledWith({
+        top: 0,
+        left: 0,
+        behavior: "auto",
+      });
+
+      sr.destroy();
+    });
+
+    it("navigation-plugin F5 regression: context.navigation.navigationType='reload' + transition.reload=undefined (simulates #531 priming) → restore from sessionStorage", () => {
+      // The plugin arm in the OR-condition is what preserves F5 scroll
+      // restoration under navigation-plugin: getActivationType() primes
+      // nav.navigationType="reload" but opts.reload stays undefined on the
+      // initial transition, so transition.reload alone wouldn't trigger.
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "home:{}": 555 }));
+
+      const fake = makeFakeRouter();
+      const scrollSpy = vi.spyOn(globalThis, "scrollTo");
+      const sr = track(createScrollRestoration(fake.router));
+
+      fake.emit(
+        makeState("home", {}, { navigation: { navigationType: "reload" } }),
+      );
+
+      expect(scrollSpy).toHaveBeenLastCalledWith({
+        top: 555,
+        left: 0,
+        behavior: "auto",
+      });
+
+      sr.destroy();
     });
   });
 });
