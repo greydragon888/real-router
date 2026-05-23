@@ -1,5 +1,19 @@
 # @real-router/core
 
+## 0.54.4
+
+### Patch Changes
+
+- [#674](https://github.com/greydragon888/real-router/pull/674) [`dd6e19a`](https://github.com/greydragon888/real-router/commit/dd6e19a05285518975b7225dfe45e5e21d60960e) Thanks [@greydragon888](https://github.com/greydragon888)! - Document `cloneRouter` shallow-merge dependency semantics for SSR multi-tenancy ([#664](https://github.com/greydragon888/real-router/issues/664))
+
+  Clarifies in JSDoc and `IMPLEMENTATION_NOTES.md` that
+  `base.dependencies` values are shared by reference between the base
+  router and every clone (singleton services like DB clients depend on
+  this). Per-request mutable state — `currentUser`, `traceId`,
+  `sessionId` — must flow through the `cloneRouter` override parameter
+  or `createRequestScope`, never `base.dependencies`. No behaviour
+  change.
+
 ## 0.54.3
 
 ### Patch Changes

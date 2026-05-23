@@ -3494,3 +3494,59 @@ Under `@real-router/navigation-plugin` there is **no behaviour change** — ever
 - `packages/core/tests/functional/navigation/navigate/navigation-options.test.ts` — the "transition meta flags" suite gains six new cases covering `replace: true`, `replace: false`, default `undefined`, `navigateToNotFound`, `forceReplaceFromUnknown` auto-force, and the override of an explicit `replace: false` from `UNKNOWN_ROUTE` (the `!opts.replace` condition matches both `undefined` and `false`), plus a timing-parity case mirroring the existing reload guard test.
 - `packages/dom-utils/tests/functional/scroll-restore.test.ts` — a new describe block adds six cases under a browser-plugin-like environment (no `state.context.navigation`) plus a regression test that simulates navigation-plugin's #531 priming (`nav.navigationType === "reload"` with `transition.reload === undefined`) and verifies that the F5 restore path still fires.
 - `packages/angular/src/dom-utils/scroll-restore.ts` is regenerated from `shared/dom-utils/scroll-restore.ts` by the existing `prebundle` script (`pnpm -F @real-router/angular bundle`) — ng-packagr cannot follow the symlinks the other adapters use, so the file is git-tracked and must be kept in sync.
+
+## `cloneRouter` keeps dependency values shared by reference, on purpose (#664)
+
+### Problem
+
+`cloneRouter(base, deps?)` merges `base.dependencies` and the override via shallow spread:
+
+```typescript
+const mergedDeps = { ...sourceDeps, ...dependencies };
+```
+
+Top-level keys are new; values (`Map`, `Set`, class instances, functions, nested plain objects) are shared by reference between `base` and every clone. An audit (`packages/core/.claude/audit/clone-router-deep-2026-05-22.md` Bug #1) reported this as a CRITICAL SSR data-leak vector and proposed an `isolateDeps: true` flag wired to `structuredClone(sourceDeps)`.
+
+### Solution
+
+**Keep the shallow merge. Document the contract loudly.** Three doc surfaces:
+
+1. JSDoc on `packages/core/src/api/cloneRouter.ts` with the singletons-vs-per-request rule and an `@example` showing the correct shape.
+2. `real-router.wiki/clone.md` — dedicated **SSR multi-tenancy** section with a lifecycle table (singletons → base; per-request → override / `createRequestScope`).
+3. `real-router.wiki/ssr.md` — SSR-safety callout next to the introductory `cloneRouter` example, linking back to (2).
+
+No code changes in `cloneRouter.ts`. `createRequestScope` already routes per-request state through the override slot (`{ ...deps, abortSignal: signal }`) by construction.
+
+### Why
+
+**`structuredClone` of dependency values breaks the common case.** Verified locally:
+
+- Class instances (`new DbClient()`) lose their prototype on clone — methods become `undefined`.
+- Functions (`logger: () => "log"`) throw `DataCloneError`.
+- Singleton pools (DB connection pool, LRU cache) fragment into N un-pooled copies, destroying pool semantics.
+- Circular references throw.
+
+`guardDependencies` in `packages/core/src/guards.ts:6` already constrains the top-level `dependencies` argument to a plain object, but values inside are intentionally unconstrained because most useful deps are class instances or services. Any auto-clone strategy is a regression for those shapes.
+
+**The override slot already solves per-request isolation.** The documented SSR pattern is:
+
+```typescript
+const base = createRouter(routes, options, {
+  db: new DbClient(dbUrl),       // singleton — shared (correct)
+  logger,
+});
+
+// Per request
+const clone = cloneRouter(base, {
+  currentUser,                   // unique per request
+  traceId,
+});
+// or, for Node/Web request lifecycles:
+const scope = createRequestScope(req, base, { currentUser, traceId });
+```
+
+The override is fresh per call and applied last in the merge — it wins over base keys. `createRequestScope` additionally injects a fresh `AbortController().signal` as `abortSignal` per request, so the documented SSR pattern is already isolation-correct by construction.
+
+**Cross-request leaks require misuse, not the documented pattern.** They only occur when per-request mutable state is placed in `base.dependencies` instead of the override — an architectural error no clone strategy can correct without breaking singleton sharing.
+
+**Severity re-classification.** The audit's "CRITICAL CVE-class data leak / GHSA advisory" framing did not survive review (no remote vector, documented behaviour, broken proposed fix). Re-labelled LOW (documentation enhancement). Issue #664 was closed with doc-only changes; no `isolateDeps` flag, no auto-`structuredClone`, no DEV warning (mutable values in deps are normal — DB clients, EventEmitters, Maps).
