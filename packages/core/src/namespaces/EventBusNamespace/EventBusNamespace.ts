@@ -264,6 +264,19 @@ export class EventBusNamespace {
     return this.#currentToState;
   }
 
+  /**
+   * Plugin-author API for subscribing to internal router events.
+   *
+   * @remarks
+   *
+   * **Duplicate-registration semantics — strict (throws).** Passing the same
+   * callback reference twice for the same event throws
+   * `Error("Duplicate listener for ...")` from the underlying `EventEmitter`.
+   * This is loud-on-misuse by design: plugin code is expected to register
+   * each callback once. The contract differs from {@link subscribe} /
+   * {@link subscribeLeave}, which are end-user surfaces and silently accept
+   * duplicates.
+   */
   addEventListener<E extends EventName>(
     eventName: E,
     cb: Plugin[EventMethodMap[E]],
@@ -274,6 +287,22 @@ export class EventBusNamespace {
     );
   }
 
+  /**
+   * End-user / UI-binding API for subscribing to successful transitions.
+   *
+   * @remarks
+   *
+   * **Duplicate-registration semantics — independent.** Each call wraps
+   * `listener` in a fresh closure and registers it as a distinct internal
+   * slot. `router.subscribe(fn)` twice produces **two** active subscriptions;
+   * `fn` fires twice per `TRANSITION_SUCCESS`. The returned `Unsubscribe` is
+   * paired with its specific call — invoking it removes exactly that
+   * registration.
+   *
+   * This contract differs from {@link addEventListener} (plugin API, throws
+   * on duplicate). End-user code that wants idempotent registration must
+   * gate itself, e.g. `if (!unsub) unsub = router.subscribe(fn);`.
+   */
   subscribe(listener: SubscribeFn): Unsubscribe {
     return this.#emitter.on(
       events.TRANSITION_SUCCESS,
@@ -283,6 +312,31 @@ export class EventBusNamespace {
     );
   }
 
+  /**
+   * End-user / UI-binding API for subscribing to confirmed route departures
+   * (`LEAVE_APPROVED` phase). Async listeners block the activation phase.
+   *
+   * @remarks
+   *
+   * **Duplicate-registration semantics — independent (with internal quirk).**
+   * Each call pushes `listener` onto the internal array; `router.subscribeLeave(fn)`
+   * twice produces two array entries. `fn` fires **once** per leave when
+   * iteration snapshots the array (a snapshot is taken on entry to
+   * `awaitLeaveListeners`), but the function reference is invoked once per
+   * array slot — so in practice the wrapper fires twice through the same
+   * closure (no observable difference for stateless `fn`).
+   *
+   * The returned `Unsubscribe` removes the **first** array entry matching the
+   * function reference (`indexOf` semantic), not the most recently added one.
+   * Net effect of N subscribes + M unsubscribes is correct (N - M entries
+   * remain), but the specific physical entry that survives is reverse of the
+   * unsubscribe-call order. Irrelevant in practice — the function reference
+   * is the same; observable behaviour is identical regardless of which
+   * physical entry is removed.
+   *
+   * Contract differs from {@link addEventListener} (throws on duplicate).
+   * For idempotent registration, gate at the call site.
+   */
   subscribeLeave(listener: LeaveFn): Unsubscribe {
     this.#leaveListeners.push(listener);
 
@@ -308,16 +362,27 @@ export class EventBusNamespace {
       return undefined;
     }
 
-    const leaveState: LeaveState = {
+    // Freeze the payload wrapper so listeners cannot mutate it (`payload.route`
+    // is already deep-frozen via the State immutability invariant; this closes
+    // the wrapper-mutation gap surfaced by audit `probe-05-payload-frozen`).
+    const leaveState: LeaveState = Object.freeze({
       route: fromState,
       nextRoute: toState,
       signal,
-    };
+    });
 
     let promises: Promise<void>[] | undefined;
     let firstSyncError: unknown;
 
-    for (const listener of this.#leaveListeners) {
+    // Snapshot before iteration — a listener that reentrantly calls
+    // `subscribeLeave(newFn)` or its own `unsubscribe()` must not affect the
+    // current emit cycle. Symmetric with the EventEmitter snapshot invariant
+    // (PR #666 / #659). Use `Array.from` rather than `[...array]` to keep the
+    // intent explicit (some lint rules treat spread-of-own-array as
+    // redundant and silently revert it).
+    const snapshot = [...this.#leaveListeners];
+
+    for (const listener of snapshot) {
       try {
         const result = listener(leaveState);
 

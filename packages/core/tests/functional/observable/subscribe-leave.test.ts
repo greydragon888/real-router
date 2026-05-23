@@ -415,4 +415,76 @@ describe("core/observable/subscribeLeave", () => {
       expect(bus.isLeaveApproved()).toBe(false);
     });
   });
+
+  // #662 — payload immutability and reentrant-subscribe snapshot.
+  describe("awaitLeaveListeners — payload freeze and reentrant snapshot", () => {
+    it("payload object is frozen — mutation attempts throw in strict mode", async () => {
+      const captured: unknown[] = [];
+
+      bus.subscribeLeave((payload) => {
+        captured.push(payload);
+
+        expect(Object.isFrozen(payload)).toBe(true);
+
+        expect(() => {
+          (payload as { extra?: string }).extra = "added";
+        }).toThrow(TypeError);
+
+        expect(() => {
+          (payload as { route: unknown }).route = null;
+        }).toThrow(TypeError);
+      });
+
+      const result = bus.awaitLeaveListeners(TO_STATE, FROM_STATE, signal);
+
+      await result;
+
+      expect(captured).toHaveLength(1);
+    });
+
+    it("listener that reentrantly subscribes does NOT fire the new listener in the current emit cycle", async () => {
+      const order: string[] = [];
+
+      bus.subscribeLeave(() => {
+        order.push("outer");
+        bus.subscribeLeave(() => {
+          order.push("added-during");
+        });
+      });
+
+      void bus.awaitLeaveListeners(TO_STATE, FROM_STATE, signal);
+
+      // outer fired in this cycle; added-during is registered but NOT invoked
+      expect(order).toStrictEqual(["outer"]);
+
+      // ...and fires on the next emit (verifies the new listener is actually
+      // registered, just not in the current snapshot)
+      void bus.awaitLeaveListeners(TO_STATE, FROM_STATE, signal);
+
+      expect(order).toStrictEqual(["outer", "outer", "added-during"]);
+    });
+
+    it("listener that reentrantly unsubscribes itself does NOT skip other listeners in the current cycle", async () => {
+      const order: string[] = [];
+      let unsubFirst: (() => void) | undefined;
+
+      unsubFirst = bus.subscribeLeave(() => {
+        order.push("first");
+        unsubFirst?.();
+      });
+      bus.subscribeLeave(() => {
+        order.push("second");
+      });
+      bus.subscribeLeave(() => {
+        order.push("third");
+      });
+
+      void bus.awaitLeaveListeners(TO_STATE, FROM_STATE, signal);
+
+      // All three fire — the snapshot taken on entry to awaitLeaveListeners
+      // preserves the original list even after the first listener splices
+      // itself out mid-iteration.
+      expect(order).toStrictEqual(["first", "second", "third"]);
+    });
+  });
 });
