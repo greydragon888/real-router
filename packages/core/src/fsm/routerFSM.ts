@@ -64,11 +64,17 @@ export interface RouterPayloads {}
  *
  * Transitions:
  * - IDLE → STARTING (START), DISPOSED (DISPOSE)
- * - STARTING → READY (STARTED), IDLE (FAIL)
- * - READY → TRANSITION_STARTED (NAVIGATE), READY (FAIL, self-loop for early validation errors), IDLE (STOP)
- * - TRANSITION_STARTED → LEAVE_APPROVED (LEAVE_APPROVE), TRANSITION_STARTED (NAVIGATE, self-loop), READY (CANCEL, FAIL)
- * - LEAVE_APPROVED → READY (COMPLETE, CANCEL, FAIL), TRANSITION_STARTED (NAVIGATE)
+ * - STARTING → READY (STARTED), IDLE (FAIL), DISPOSED (DISPOSE)
+ * - READY → TRANSITION_STARTED (NAVIGATE), READY (FAIL, self-loop for early validation errors), IDLE (STOP), DISPOSED (DISPOSE)
+ * - TRANSITION_STARTED → LEAVE_APPROVED (LEAVE_APPROVE), TRANSITION_STARTED (NAVIGATE, self-loop), READY (CANCEL, FAIL), DISPOSED (DISPOSE)
+ * - LEAVE_APPROVED → READY (COMPLETE, CANCEL, FAIL), TRANSITION_STARTED (NAVIGATE), DISPOSED (DISPOSE)
  * - DISPOSED → (no transitions)
+ *
+ * DISPOSE is wired from every non-DISPOSED state so `router.dispose()` always
+ * settles the FSM at DISPOSED. The facade orchestrates cleanup through IDLE
+ * for healthy flows; the direct transitions guarantee the FSM is not left
+ * stuck if cleanup is skipped (e.g. dispose mid-STARTING when the start
+ * pipeline threw before STARTED/FAIL).
  */
 const routerFSMConfig: FSMConfig<RouterState, RouterEvent, null> = {
   initial: routerStates.IDLE,
@@ -81,23 +87,27 @@ const routerFSMConfig: FSMConfig<RouterState, RouterEvent, null> = {
     [routerStates.STARTING]: {
       [routerEvents.STARTED]: routerStates.READY,
       [routerEvents.FAIL]: routerStates.IDLE,
+      [routerEvents.DISPOSE]: routerStates.DISPOSED,
     },
     [routerStates.READY]: {
       [routerEvents.NAVIGATE]: routerStates.TRANSITION_STARTED,
       [routerEvents.FAIL]: routerStates.READY,
       [routerEvents.STOP]: routerStates.IDLE,
+      [routerEvents.DISPOSE]: routerStates.DISPOSED,
     },
     [routerStates.TRANSITION_STARTED]: {
       [routerEvents.NAVIGATE]: routerStates.TRANSITION_STARTED,
       [routerEvents.LEAVE_APPROVE]: routerStates.LEAVE_APPROVED,
       [routerEvents.CANCEL]: routerStates.READY,
       [routerEvents.FAIL]: routerStates.READY,
+      [routerEvents.DISPOSE]: routerStates.DISPOSED,
     },
     [routerStates.LEAVE_APPROVED]: {
       [routerEvents.NAVIGATE]: routerStates.TRANSITION_STARTED,
       [routerEvents.COMPLETE]: routerStates.READY,
       [routerEvents.CANCEL]: routerStates.READY,
       [routerEvents.FAIL]: routerStates.READY,
+      [routerEvents.DISPOSE]: routerStates.DISPOSED,
     },
     [routerStates.DISPOSED]: {},
   },
