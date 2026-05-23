@@ -416,16 +416,28 @@ export class Router<
 
     this.#eventBus.sendStart();
 
-    const promiseState = getInternals(this)
-      .start(startPath)
-      .catch((error: unknown) => {
-        if (this.#eventBus.isReady()) {
-          this.#lifecycle.stop();
-          this.#eventBus.sendStop();
-        }
+    // Convert sync interceptor throws to rejections so the recovery branch in
+    // .catch is reachable; otherwise the throw escapes synchronously, FSM is
+    // left in STARTING, and the router is permanently bricked (#668).
+    let internalStart: Promise<State>;
 
-        throw error;
-      });
+    try {
+      internalStart = getInternals(this).start(startPath);
+    } catch (syncError: unknown) {
+      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- preserve original throw shape from user-provided start interceptor
+      internalStart = Promise.reject(syncError);
+    }
+
+    const promiseState = internalStart.catch((error: unknown) => {
+      if (this.#eventBus.isReady()) {
+        this.#lifecycle.stop();
+        this.#eventBus.sendStop();
+      } else if (this.#eventBus.isStarting()) {
+        this.#eventBus.sendFail(undefined, undefined, error);
+      }
+
+      throw error;
+    });
 
     Router.#suppressUnhandledRejection(promiseState);
 

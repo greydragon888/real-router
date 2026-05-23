@@ -514,4 +514,64 @@ describe("router.start() - error handling", () => {
       });
     });
   });
+
+  // #668: a misbehaving start interceptor must not brick the router. The
+  // catch block in Router.start() now recovers from STARTING by emitting
+  // sendFail() (FSM → IDLE), so a subsequent start() can succeed.
+  describe("start-pipeline recovery from stuck STARTING", () => {
+    it("recovers FSM after sync-throwing start interceptor — subsequent start() succeeds", async () => {
+      const localRouter = createTestRouter();
+
+      const removeInterceptor = getPluginApi(localRouter).addInterceptor(
+        "start",
+        () => {
+          throw new Error("sync interceptor throw");
+        },
+      );
+
+      await expect(localRouter.start("/home")).rejects.toThrow(
+        "sync interceptor throw",
+      );
+
+      expect(localRouter.isActive()).toBe(false);
+
+      // Drop the bad interceptor and retry — router must be usable
+      removeInterceptor();
+
+      const state = await localRouter.start("/home");
+
+      expect(state.name).toBe("home");
+      expect(localRouter.isActive()).toBe(true);
+
+      localRouter.stop();
+    });
+
+    it("recovers FSM after async-rejecting start interceptor — subsequent start() succeeds", async () => {
+      const localRouter = createTestRouter();
+
+      const removeInterceptor = getPluginApi(localRouter).addInterceptor(
+        "start",
+        async () => {
+          await Promise.resolve();
+
+          throw new Error("async interceptor reject");
+        },
+      );
+
+      await expect(localRouter.start("/home")).rejects.toThrow(
+        "async interceptor reject",
+      );
+
+      expect(localRouter.isActive()).toBe(false);
+
+      removeInterceptor();
+
+      const state = await localRouter.start("/home");
+
+      expect(state.name).toBe("home");
+      expect(localRouter.isActive()).toBe(true);
+
+      localRouter.stop();
+    });
+  });
 });
