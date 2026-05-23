@@ -192,6 +192,11 @@ export class Router<
     registerInternals(this, {
       makeState: (name, params, path, meta) =>
         this.#state.makeState(name, params, path, meta),
+      // `as unknown as` is required: createInterceptable2 returns a
+      // non-generic `(a: A, b: B) => R`, but RouterInternals["forwardState"]
+      // is declared with a generic parameter `<P extends Params = Params>`,
+      // which tsc will not infer from the non-generic source. Sonar S4325
+      // misclassifies this as a redundant cast.
       forwardState: createInterceptable2(
         "forwardState",
         (name: string, params: Params) =>
