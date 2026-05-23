@@ -3550,3 +3550,50 @@ The override is fresh per call and applied last in the merge — it wins over ba
 **Cross-request leaks require misuse, not the documented pattern.** They only occur when per-request mutable state is placed in `base.dependencies` instead of the override — an architectural error no clone strategy can correct without breaking singleton sharing.
 
 **Severity re-classification.** The audit's "CRITICAL CVE-class data leak / GHSA advisory" framing did not survive review (no remote vector, documented behaviour, broken proposed fix). Re-labelled LOW (documentation enhancement). Issue #664 was closed with doc-only changes; no `isolateDeps` flag, no auto-`structuredClone`, no DEV warning (mutable values in deps are normal — DB clients, EventEmitters, Maps).
+
+## `RouteLifecycleNamespace` factory storage split by origin (#661)
+
+### Problem
+
+Guard factories (`canActivate` / `canDeactivate`) had two possible origins:
+
+- **Definition** — declared on the route config: `{ name: "admin", canActivate: ... }`. Subject to `clearDefinitionGuards()` cleanup during `replace()`.
+- **External** — registered post-hoc via `getLifecycleApi().addActivateGuard(name, ...)`. Survives `replace()`.
+
+Storage was a single `Map<string, GuardFnFactory>` per kind plus an auxiliary `Set<string>` per kind tracking which slots came from definitions. Origin was a derived, Set-tracked property — every read had to consult both the Map and the Set to reconstruct it. That layout had three follow-on quirks: `removeActivateGuard` could not distinguish origins (the Set was for HMR cleanup, not for the public API), an external add over an existing definition cleared the Set entry without any signal that the original definition guard was being shadowed, and `cloneRouter`'s `getFactories()` returned a flat record so clones lost origin entirely (every guard re-registered as external).
+
+The original audit (`route-lifecycle-deep-2026-05-22.md` + `clone-router-deep-2026-05-22.md`) framed these as four CRITICAL bugs closing a "CVE-class data leak vector". After running every probe and tracing the call paths, none of the claims survived as CRITICAL — the closure-sharing claim in particular is a documented usage rule (#664-shaped: singletons on base, per-request on clone) that this refactor cannot address regardless of storage layout. Re-classified LOW (code-quality refactor); see issue #661 for the full re-evaluation table.
+
+### Solution
+
+Lift origin to a primary structural invariant by splitting storage into four factory Maps:
+
+```
+#definitionActivateFactories     #externalActivateFactories
+#definitionDeactivateFactories   #externalDeactivateFactories
+```
+
+Each `add*` call lands in exactly one of these Maps according to the `isFromDefinition` flag. The compiled-function view (`#canActivateFunctions` / `#canDeactivateFunctions`, one Map per kind) keeps the pre-refactor **last add wins** runtime semantic, preserving the `replaceRoutes: definition wins on replace` contract. On partial clear, the compiled function falls back to whichever origin Map still holds the slot.
+
+Public namespace surface (consumers inside core):
+
+- `clearCanActivate(name, origin?)` / `clearCanDeactivate(name, origin?)` — optional `"definition"` / `"external"` filter. Default (no filter) keeps the pre-refactor behaviour of clearing both slots.
+- `getFactoriesByOrigin(): { definition: [d, a]; external: [d, a] }` — used by `cloneRouter` to re-register each kind with the original `isFromDefinition` flag preserved. Subsequent `replace()` on the clone now correctly strips inherited definition guards.
+- `getFactories(): [d, a]` — backward-compatible flat shape (external wins on duplicate slot). Used by `getRoutesApi` consumers (`enrichRoute`, route-removal cleanup, the `auto-cleanup` test) without modification.
+- `clearDefinitionGuards()` — iterates `#definitionActivate*` keys; only deletes the compiled function for slots that lack a surviving external entry, otherwise the external function stays in place.
+
+`cloneRouter` was rewired to call `getFactoriesByOrigin()` instead of the flat `getLifecycleFactories()`: definition factories are registered via the namespace directly with `isFromDefinition=true`, external factories flow through the public `lifecycleApi.addActivateGuard` / `addDeactivateGuard` path. The public lifecycle API surface — `removeActivateGuard(name)` / `removeDeactivateGuard(name)` — is unchanged; wiki and JSDoc do not need updates.
+
+### Why
+
+**Origin becomes a property of where the factory lives, not a derived flag.** Set-tracked origin made every consumer (cloneRouter, replace, clearDefinitionGuards) reconstruct the intent from two data structures. With split Maps, "is this a definition guard?" is `definitionActivateFactories.has(name)` — one lookup, no reconstruction.
+
+**Clone semantics become predictable.** Before: `cloneRouter` lost origin, so a `replace()` on a clone couldn't strip inherited definition guards. After: clones round-trip origin and behave identically to the base under `replace()`.
+
+**Enables future API tightening without re-touching internals.** Once the team decides whether `removeActivateGuard` should default to "external only" (cleaner public contract — currently ambiguous in the wiki), the change is one line at the API site: `lifecycleNamespace.clearCanActivate(name, "external")`. Without this refactor, the same API change would require introducing origin-aware storage as part of the same PR.
+
+### Non-goals
+
+- **Closure-sharing across clones (audit Bug #2 / clone-router #2)** — not addressed and cannot be addressed by factory storage layout. A guard factory registered on the base with closure over per-request state is shared by reference with every clone regardless of how the factories are filed. The fix is documentation (singletons on base, per-request state on the clone via the override slot or `createRequestScope`), tracked under #664 for dependencies and applicable to guards verbatim.
+- **`removeActivateGuard` semantics** — unchanged. Default clear of both origin slots is preserved so this PR is a pure refactor at the public surface. Tightening to "external only" is a separate API-contract decision.
+

@@ -20,6 +20,23 @@ function booleanToFactory<Dependencies extends DefaultDependencies>(
 }
 
 /**
+ * Origin of a registered guard. `"definition"` — declared in route config and
+ * thus subject to `clearDefinitionGuards()` cleanup during `replace()`.
+ * `"external"` — registered post-hoc via `getLifecycleApi().add*Guard(...)`
+ * and survives `replace()`.
+ *
+ * Storage is split per origin (two Maps per kind, four Maps total) so origin
+ * is a primary invariant rather than a derived Set-tracked property. The
+ * compiled function (`#canActivateFunctions` / `#canDeactivateFunctions`)
+ * reflects the **last add wins** semantic for the slot (regardless of
+ * origin) — matching the pre-refactor behaviour and the
+ * `replaceRoutes.test.ts` "definition wins on replace" contract. On clear,
+ * the function falls back to whichever origin Map still holds an entry
+ * (external preferred if both remain after a partial clear).
+ */
+export type GuardOrigin = "definition" | "external";
+
+/**
  * Independent namespace for managing route lifecycle handlers.
  *
  * Static methods handle input validation (called by facade).
@@ -28,14 +45,29 @@ function booleanToFactory<Dependencies extends DefaultDependencies>(
 export class RouteLifecycleNamespace<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 > {
-  readonly #canDeactivateFactories = new Map<
+  // Storage split by origin: definition vs external. External wins at compile
+  // time for the same slot; clearDefinitionGuards / removeXGuard semantics are
+  // expressed in terms of these primary Maps.
+  readonly #definitionActivateFactories = new Map<
     string,
     GuardFnFactory<Dependencies>
   >();
-  readonly #canActivateFactories = new Map<
+  readonly #externalActivateFactories = new Map<
     string,
     GuardFnFactory<Dependencies>
   >();
+  readonly #definitionDeactivateFactories = new Map<
+    string,
+    GuardFnFactory<Dependencies>
+  >();
+  readonly #externalDeactivateFactories = new Map<
+    string,
+    GuardFnFactory<Dependencies>
+  >();
+  // Compiled-function view. Single Map per kind because navigation does not
+  // distinguish origin — it just runs the effective guard. Set on add (last
+  // add wins) and recompiled on clear from whichever origin Map still holds
+  // the slot.
   readonly #canDeactivateFunctions = new Map<string, GuardFn>();
   readonly #canActivateFunctions = new Map<string, GuardFn>();
   // Cached tuple — Maps never change reference, so this is stable
@@ -45,8 +77,6 @@ export class RouteLifecycleNamespace<
   ];
 
   readonly #registering = new Set<string>();
-  readonly #definitionActivateGuardNames = new Set<string>();
-  readonly #definitionDeactivateGuardNames = new Set<string>();
 
   #deps!: RouteLifecycleDependencies<Dependencies>;
   #limits: Limits = DEFAULT_LIMITS;
@@ -72,9 +102,30 @@ export class RouteLifecycleNamespace<
   }
 
   getHandlerCount(type: "activate" | "deactivate"): number {
-    return type === "activate"
-      ? this.#canActivateFactories.size
-      : this.#canDeactivateFactories.size;
+    const definitionMap =
+      type === "activate"
+        ? this.#definitionActivateFactories
+        : this.#definitionDeactivateFactories;
+    const externalMap =
+      type === "activate"
+        ? this.#externalActivateFactories
+        : this.#externalDeactivateFactories;
+
+    if (definitionMap.size === 0) {
+      return externalMap.size;
+    }
+
+    if (externalMap.size === 0) {
+      return definitionMap.size;
+    }
+
+    const names = new Set(definitionMap.keys());
+
+    for (const name of externalMap.keys()) {
+      names.add(name);
+    }
+
+    return names.size;
   }
 
   // =========================================================================
@@ -83,90 +134,95 @@ export class RouteLifecycleNamespace<
 
   /**
    * Adds a canActivate guard for a route.
-   * Handles overwrite detection and registration.
    *
    * @param name - Route name (input-validated by facade)
    * @param handler - Guard function or boolean (input-validated by facade)
-   * @param isFromDefinition - True when guard comes from route definition (tracked for HMR replace)
+   * @param isFromDefinition - True when guard comes from route definition
+   *   (lands in the definition Map; subject to `clearDefinitionGuards()`).
+   *   False (default) when added via `getLifecycleApi().addActivateGuard(...)`
+   *   (lands in the external Map; survives `replace()`).
+   *
+   * Last add wins at runtime: the compiled function reflects the factory
+   * passed to the most recent call, regardless of origin. Origin only
+   * determines which Map the factory is filed under (relevant for
+   * `clearDefinitionGuards()` and `cloneRouter` re-registration).
    */
   addCanActivate(
     name: string,
     handler: GuardFnFactory<Dependencies> | boolean,
     isFromDefinition = false,
   ): void {
-    if (isFromDefinition) {
-      this.#definitionActivateGuardNames.add(name);
-    } else {
-      this.#definitionActivateGuardNames.delete(name);
-    }
-
-    const isOverwrite = this.#canActivateFactories.has(name);
-
     this.#registerHandler(
       "activate",
       name,
       handler,
-      this.#canActivateFactories,
-      this.#canActivateFunctions,
+      isFromDefinition,
       "canActivate",
-      isOverwrite,
     );
   }
 
   /**
    * Adds a canDeactivate guard for a route.
-   * Handles overwrite detection and registration.
    *
-   * @param name - Route name (input-validated by facade)
-   * @param handler - Guard function or boolean (input-validated by facade)
-   * @param isFromDefinition - True when guard comes from route definition (tracked for HMR replace)
+   * Symmetric counterpart to {@link addCanActivate}.
    */
   addCanDeactivate(
     name: string,
     handler: GuardFnFactory<Dependencies> | boolean,
     isFromDefinition = false,
   ): void {
-    if (isFromDefinition) {
-      this.#definitionDeactivateGuardNames.add(name);
-    } else {
-      this.#definitionDeactivateGuardNames.delete(name);
-    }
-
-    const isOverwrite = this.#canDeactivateFactories.has(name);
-
     this.#registerHandler(
       "deactivate",
       name,
       handler,
-      this.#canDeactivateFactories,
-      this.#canDeactivateFunctions,
+      isFromDefinition,
       "canDeactivate",
-      isOverwrite,
     );
   }
 
   /**
    * Removes a canActivate guard for a route.
-   * Input already validated by facade (not registering).
    *
    * @param name - Route name (already validated by facade)
+   * @param origin - Optional origin filter. `"definition"` clears only the
+   *   definition slot; `"external"` clears only the external slot; omitted
+   *   (default) clears both — backward compatible with pre-refactor semantics.
    */
-  clearCanActivate(name: string): void {
-    this.#canActivateFactories.delete(name);
-    this.#canActivateFunctions.delete(name);
-    this.#definitionActivateGuardNames.delete(name);
+  clearCanActivate(name: string, origin?: GuardOrigin): void {
+    let cleared = false;
+
+    if (origin !== "external") {
+      cleared = this.#definitionActivateFactories.delete(name) || cleared;
+    }
+
+    if (origin !== "definition") {
+      cleared = this.#externalActivateFactories.delete(name) || cleared;
+    }
+
+    if (cleared) {
+      this.#recompileSlot("activate", name);
+    }
   }
 
   /**
    * Removes a canDeactivate guard for a route.
-   * Input already validated by facade (not registering).
    *
-   * @param name - Route name (already validated by facade)
+   * Symmetric counterpart to {@link clearCanActivate}.
    */
-  clearCanDeactivate(name: string): void {
-    this.#canDeactivateFactories.delete(name);
-    this.#canDeactivateFunctions.delete(name);
-    this.#definitionDeactivateGuardNames.delete(name);
+  clearCanDeactivate(name: string, origin?: GuardOrigin): void {
+    let cleared = false;
+
+    if (origin !== "external") {
+      cleared = this.#definitionDeactivateFactories.delete(name) || cleared;
+    }
+
+    if (origin !== "definition") {
+      cleared = this.#externalDeactivateFactories.delete(name) || cleared;
+    }
+
+    if (cleared) {
+      this.#recompileSlot("deactivate", name);
+    }
   }
 
   /**
@@ -174,36 +230,50 @@ export class RouteLifecycleNamespace<
    * Used by clearRoutes to reset all lifecycle state.
    */
   clearAll(): void {
-    this.#canActivateFactories.clear();
+    this.#definitionActivateFactories.clear();
+    this.#externalActivateFactories.clear();
+    this.#definitionDeactivateFactories.clear();
+    this.#externalDeactivateFactories.clear();
     this.#canActivateFunctions.clear();
-    this.#canDeactivateFactories.clear();
     this.#canDeactivateFunctions.clear();
-    this.#definitionActivateGuardNames.clear();
-    this.#definitionDeactivateGuardNames.clear();
   }
 
   /**
    * Clears only lifecycle handlers that were registered from route definitions.
-   * Used by HMR to remove definition-sourced guards without touching externally-added guards.
+   * Used by HMR `replace()` to remove definition-sourced guards without
+   * touching externally-added guards.
+   *
+   * For slots where both definition and external exist, the external factory
+   * stays and the compiled function is unchanged (external already won at
+   * registration time). For definition-only slots, the compiled function is
+   * dropped.
    */
   clearDefinitionGuards(): void {
-    for (const name of this.#definitionActivateGuardNames) {
-      this.#canActivateFactories.delete(name);
-      this.#canActivateFunctions.delete(name);
-    }
-    for (const name of this.#definitionDeactivateGuardNames) {
-      this.#canDeactivateFactories.delete(name);
-      this.#canDeactivateFunctions.delete(name);
+    for (const name of this.#definitionActivateFactories.keys()) {
+      if (!this.#externalActivateFactories.has(name)) {
+        this.#canActivateFunctions.delete(name);
+      }
     }
 
-    this.#definitionActivateGuardNames.clear();
-    this.#definitionDeactivateGuardNames.clear();
+    for (const name of this.#definitionDeactivateFactories.keys()) {
+      if (!this.#externalDeactivateFactories.has(name)) {
+        this.#canDeactivateFunctions.delete(name);
+      }
+    }
+
+    this.#definitionActivateFactories.clear();
+    this.#definitionDeactivateFactories.clear();
   }
 
   /**
-   * Returns lifecycle factories as records for cloning.
+   * Returns lifecycle factories as a flat `[deactivate, activate]` tuple of
+   * `Record<name, factory>` — the effective view where external wins over
+   * definition for the same slot. Used by `getRoutesApi` to enrich route
+   * objects with their current canActivate / canDeactivate factories and by
+   * the route-removal cleanup path.
    *
-   * @returns Tuple of [canDeactivateFactories, canActivateFactories]
+   * For cloneRouter (which needs to preserve origin on re-registration), use
+   * {@link getFactoriesByOrigin} instead.
    */
   getFactories(): [
     Record<string, GuardFnFactory<Dependencies>>,
@@ -212,15 +282,60 @@ export class RouteLifecycleNamespace<
     const deactivateRecord: Record<string, GuardFnFactory<Dependencies>> = {};
     const activateRecord: Record<string, GuardFnFactory<Dependencies>> = {};
 
-    for (const [name, factory] of this.#canDeactivateFactories) {
+    for (const [name, factory] of this.#definitionDeactivateFactories) {
+      deactivateRecord[name] = factory;
+    }
+    for (const [name, factory] of this.#externalDeactivateFactories) {
       deactivateRecord[name] = factory;
     }
 
-    for (const [name, factory] of this.#canActivateFactories) {
+    for (const [name, factory] of this.#definitionActivateFactories) {
+      activateRecord[name] = factory;
+    }
+    for (const [name, factory] of this.#externalActivateFactories) {
       activateRecord[name] = factory;
     }
 
     return [deactivateRecord, activateRecord];
+  }
+
+  /**
+   * Returns factories tagged by origin — definition and external as separate
+   * `[deactivate, activate]` tuples. Used by `cloneRouter` to re-register
+   * guards on the clone with their original origin flag preserved.
+   */
+  getFactoriesByOrigin(): {
+    definition: [
+      Record<string, GuardFnFactory<Dependencies>>,
+      Record<string, GuardFnFactory<Dependencies>>,
+    ];
+    external: [
+      Record<string, GuardFnFactory<Dependencies>>,
+      Record<string, GuardFnFactory<Dependencies>>,
+    ];
+  } {
+    const defDeact: Record<string, GuardFnFactory<Dependencies>> = {};
+    const defAct: Record<string, GuardFnFactory<Dependencies>> = {};
+    const extensionDeact: Record<string, GuardFnFactory<Dependencies>> = {};
+    const extensionAct: Record<string, GuardFnFactory<Dependencies>> = {};
+
+    for (const [name, factory] of this.#definitionDeactivateFactories) {
+      defDeact[name] = factory;
+    }
+    for (const [name, factory] of this.#definitionActivateFactories) {
+      defAct[name] = factory;
+    }
+    for (const [name, factory] of this.#externalDeactivateFactories) {
+      extensionDeact[name] = factory;
+    }
+    for (const [name, factory] of this.#externalActivateFactories) {
+      extensionAct[name] = factory;
+    }
+
+    return {
+      definition: [defDeact, defAct],
+      external: [extensionDeact, extensionAct],
+    };
   }
 
   /**
@@ -274,44 +389,49 @@ export class RouteLifecycleNamespace<
   // =========================================================================
 
   /**
-   * Registers a handler.
-   * Handles overwrite warning, count threshold warnings, and factory compilation.
-   *
-   * @param type - Guard type for log messages ("activate" or "deactivate")
-   * @param name - Route name to register the guard for
-   * @param handler - Guard factory function or boolean shorthand
-   * @param factories - Target factory map (canActivate or canDeactivate)
-   * @param functions - Target compiled functions map (canActivate or canDeactivate)
-   * @param methodName - Public API method name for error/warning messages
-   * @param isOverwrite - Whether this replaces an existing guard for the same route
+   * Routes a registration into the origin-specific factory Map and compiles
+   * the just-added factory (last add wins for the compiled function).
+   * Emits overwrite / threshold warnings symmetric with the pre-refactor
+   * single-Map behaviour: any prior entry for the slot — same origin or
+   * cross-origin — counts as an overwrite for the warning surface; only a
+   * brand-new slot (no entry in either Map) increments the threshold check.
    */
   #registerHandler(
     type: "activate" | "deactivate",
     name: string,
     handler: GuardFnFactory<Dependencies> | boolean,
-    factories: Map<string, GuardFnFactory<Dependencies>>,
-    functions: Map<string, GuardFn>,
+    isFromDefinition: boolean,
     methodName: string,
-    isOverwrite: boolean,
   ): void {
-    // Emit warnings
+    const factoryMaps = this.#getFactoryMaps(type);
+    const functions =
+      type === "activate"
+        ? this.#canActivateFunctions
+        : this.#canDeactivateFunctions;
+    const targetMap = isFromDefinition
+      ? factoryMaps.definition
+      : factoryMaps.external;
+    const otherMap = isFromDefinition
+      ? factoryMaps.external
+      : factoryMaps.definition;
+
+    const isOverwrite = targetMap.has(name) || otherMap.has(name);
+
     if (isOverwrite) {
       this.#getValidator?.()?.lifecycle.warnOverwrite(name, type, methodName);
     } else {
       this.#getValidator?.()?.lifecycle.validateCountThresholds(
-        factories.size + 1,
+        this.getHandlerCount(type) + 1,
         methodName,
       );
     }
 
-    // Convert boolean to factory if needed
     const factory =
       typeof handler === "boolean"
         ? booleanToFactory<Dependencies>(handler)
         : handler;
 
-    // Store factory
-    factories.set(name, factory);
+    targetMap.set(name, factory);
 
     // Mark route as being registered before calling user factory
     this.#registering.add(name);
@@ -327,13 +447,74 @@ export class RouteLifecycleNamespace<
 
       functions.set(name, fn);
     } catch (error) {
-      // Rollback on failure to maintain consistency
-      factories.delete(name);
+      // Rollback the slot we just touched to keep storage consistent. If a
+      // cross-origin entry exists for the same name, its compiled function
+      // remains in place — recompile so navigation still sees a valid guard.
+      targetMap.delete(name);
+
+      if (otherMap.has(name)) {
+        this.#recompileSlot(type, name);
+      } else {
+        functions.delete(name);
+      }
 
       throw error;
     } finally {
       this.#registering.delete(name);
     }
+  }
+
+  /**
+   * Recompiles the compiled-function slot from whichever origin Map still has
+   * an entry for `name` after a clear. External wins over definition; if
+   * neither has an entry, the compiled function is deleted.
+   */
+  #recompileSlot(type: "activate" | "deactivate", name: string): void {
+    const factoryMaps = this.#getFactoryMaps(type);
+    const functions =
+      type === "activate"
+        ? this.#canActivateFunctions
+        : this.#canDeactivateFunctions;
+
+    const effective =
+      factoryMaps.external.get(name) ?? factoryMaps.definition.get(name);
+
+    if (!effective) {
+      functions.delete(name);
+
+      return;
+    }
+
+    try {
+      const fn = this.#deps.compileFactory(effective);
+
+      /* v8 ignore next 4 -- @preserve: stored factories were validated at add time, compileFactory should yield a function on second call too */
+      if (typeof fn !== "function") {
+        functions.delete(name);
+
+        return;
+      }
+
+      functions.set(name, fn);
+    } catch {
+      /* v8 ignore next 2 -- @preserve: defensive — a user-provided factory could theoretically throw on re-compile (state changed since add time); deleting the function blocks navigation on that slot */
+      functions.delete(name);
+    }
+  }
+
+  #getFactoryMaps(type: "activate" | "deactivate"): {
+    definition: Map<string, GuardFnFactory<Dependencies>>;
+    external: Map<string, GuardFnFactory<Dependencies>>;
+  } {
+    return type === "activate"
+      ? {
+          definition: this.#definitionActivateFactories,
+          external: this.#externalActivateFactories,
+        }
+      : {
+          definition: this.#definitionDeactivateFactories,
+          external: this.#externalDeactivateFactories,
+        };
   }
 
   /**

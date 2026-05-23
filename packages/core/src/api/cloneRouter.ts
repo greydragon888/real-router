@@ -95,8 +95,14 @@ export function cloneRouter<
 
   const options = ctx.cloneOptions();
   const sourceDeps = ctx.cloneDependencies();
-  const [canDeactivateFactories, canActivateFactories] =
-    ctx.getLifecycleFactories();
+  // Origin-aware factory snapshot — definition guards are re-registered with
+  // `isFromDefinition=true` on the clone so `replace()` can still strip them
+  // via `clearDefinitionGuards()`. External guards take the public lifecycle
+  // API path so they survive `replace()` symmetric with the base.
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
+  const sourceLifecycleNamespace = sourceStore.lifecycleNamespace!;
+  const { definition: definitionFactories, external: externalFactories } =
+    sourceLifecycleNamespace.getFactoriesByOrigin();
   const pluginFactories = ctx.getPluginFactories();
 
   const mergedDeps = {
@@ -110,22 +116,35 @@ export function cloneRouter<
     mergedDeps,
   );
 
+  const newCtx = getInternals(newRouter);
+  const newStore = newCtx.routeGetStore();
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
+  const newLifecycleNamespace = newStore.lifecycleNamespace!;
+
+  const [definitionDeactivate, definitionActivate] = definitionFactories;
+  const [externalDeactivate, externalActivate] = externalFactories;
+
+  for (const [name, handler] of Object.entries(definitionDeactivate)) {
+    newLifecycleNamespace.addCanDeactivate(name, handler, true);
+  }
+
+  for (const [name, handler] of Object.entries(definitionActivate)) {
+    newLifecycleNamespace.addCanActivate(name, handler, true);
+  }
+
   const lifecycle = getLifecycleApi(newRouter);
 
-  for (const [name, handler] of Object.entries(canDeactivateFactories)) {
+  for (const [name, handler] of Object.entries(externalDeactivate)) {
     lifecycle.addDeactivateGuard(name, handler);
   }
 
-  for (const [name, handler] of Object.entries(canActivateFactories)) {
+  for (const [name, handler] of Object.entries(externalActivate)) {
     lifecycle.addActivateGuard(name, handler);
   }
 
   if (pluginFactories.length > 0) {
     newRouter.usePlugin(...pluginFactories);
   }
-
-  const newCtx = getInternals(newRouter);
-  const newStore = newCtx.routeGetStore();
 
   // Apply cloned config directly to new store
   Object.assign(newStore.config.decoders, routeConfig.decoders);
