@@ -1,5 +1,63 @@
 # @real-router/core
 
+## 0.54.5
+
+### Patch Changes
+
+- [#676](https://github.com/greydragon888/real-router/pull/676) [`acbacc7`](https://github.com/greydragon888/real-router/commit/acbacc7f38d6995e7a272eb6176f6d31e4ce1395) Thanks [@greydragon888](https://github.com/greydragon888)! - Lift guard origin to a primary invariant in `RouteLifecycleNamespace` ([#661](https://github.com/greydragon888/real-router/issues/661))
+
+  `RouteLifecycleNamespace` previously stored canActivate / canDeactivate
+  factories in a single Map per kind and tracked "is this guard from a
+  route definition vs added externally" via auxiliary `Set<string>`
+  collections. Origin was a derived, Set-tracked property that the public
+  API had to reconstruct, with a handful of subtle consequences for
+  `removeActivateGuard`, `replace()`, and `cloneRouter`.
+
+  Storage is now split per origin: `#definitionActivateFactories` /
+  `#externalActivateFactories` (and symmetric pair for deactivate). The
+  compiled-function view preserves the pre-refactor "last add wins"
+  runtime semantic; on partial clear it falls back to whichever origin
+  Map still holds the slot.
+
+  Behavioural changes:
+  - `clearCanActivate(name, origin?)` / `clearCanDeactivate(name, origin?)`
+    accept an optional `origin` filter (`"definition"` / `"external"`).
+    Default behaviour (no filter) is unchanged — both slots cleared.
+  - `getFactoriesByOrigin()` added for `cloneRouter` consumption — returns
+    `{ definition: [deactivate, activate], external: [deactivate, activate] }`
+    so clones re-register guards with the original origin flag preserved.
+    `replace()` on the clone now correctly strips inherited definition
+    guards via `clearDefinitionGuards()`.
+  - `getFactories()` retains its `[deactivate, activate]` flat shape with
+    external winning over definition for the same slot — backward compatible
+    with `getRoutesApi` and the route-removal cleanup path.
+
+  Non-goals: this refactor does not address closure-sharing across
+  clones (`base.deps` / `base.externalGuards` shared by reference — see
+  [#664](https://github.com/greydragon888/real-router/issues/664) for the documented SSR usage rule: singletons → base, per-request
+  → clone via the override slot or `createRequestScope`).
+
+- [#673](https://github.com/greydragon888/real-router/pull/673) [`98a85e2`](https://github.com/greydragon888/real-router/commit/98a85e2e19ac48a43b06f351a02760b1c3ce1681) Thanks [@greydragon888](https://github.com/greydragon888)! - Unblock navigation pipeline when a `subscribeLeave` listener ignores its abort signal ([#663](https://github.com/greydragon888/real-router/issues/663))
+
+  `EventBusNamespace.awaitLeaveListeners` awaited leave-listener promises via
+  `Promise.allSettled` without observing the abort signal. A
+  `subscribeLeave(() => new Promise(() => {}))` (or any listener that ignores
+  `payload.signal`) hung the pipeline forever — concurrent `router.navigate`
+  calls aborted the controller but `allSettled` kept waiting, so no
+  navigation could complete.
+
+  `settleLeavePromises` now races `Promise.allSettled` against the abort
+  signal: when the signal aborts, the returned Promise rejects with
+  `signal.reason` and the navigation pipeline unwinds via the normal
+  `TRANSITION_CANCELLED` path. The abort event listener is cleaned up on
+  natural completion to avoid leaking handlers.
+
+  **Semantic note for plugin authors:** listeners that have not settled by
+  abort time are **abandoned** — their Promises may still resolve in the
+  background and hold references via closure until they do. Long-running
+  leave listeners must respect `payload.signal` for cooperative cleanup. The
+  router cannot synchronously force a hung Promise to resolve.
+
 ## 0.54.4
 
 ### Patch Changes
