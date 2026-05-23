@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-05-23]
 
+### @real-router/core@0.54.3
+
+### Patch Changes
+
+- [#670](https://github.com/greydragon888/real-router/pull/670) [`516906f`](https://github.com/greydragon888/real-router/commit/516906f401c264179117d40b643381b65c781e17) Thanks [@greydragon888](https://github.com/greydragon888)! - Recover FSM from STARTING when start pipeline throws ([#668](https://github.com/greydragon888/real-router/issues/668))
+
+  `Router.start()` advanced the FSM `IDLE → STARTING` before running the
+  start-interceptor pipeline, but the `.catch` block only recovered from
+  `READY`. A sync-throwing or async-rejecting start interceptor left the FSM
+  stuck in `STARTING` with no FAIL emitted: subsequent `start()` calls rejected
+  with `ROUTER_ALREADY_STARTED` forever, `stop()` was a no-op, and the only
+  escape was `dispose()`.
+
+  `start()` now wraps the interceptor pipeline so sync throws become
+  rejections, and the `.catch` block also recovers from `STARTING` by emitting
+  `sendFail()` to return the FSM to `IDLE`. A misbehaving start interceptor
+  no longer bricks the router — the caller can drop the bad plugin and retry.
+
+
 ### @real-router/core@0.54.2
 
 ### Patch Changes
