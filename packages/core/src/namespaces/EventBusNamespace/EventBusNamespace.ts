@@ -28,19 +28,48 @@ function ensureError(value: unknown): Error {
 function settleLeavePromises(
   promises: Promise<void>[],
   firstSyncError: unknown,
+  signal: AbortSignal,
 ): Promise<void> {
-  return Promise.allSettled(promises).then((results) => {
-    if (firstSyncError !== undefined) {
-      throw ensureError(firstSyncError);
+  return new Promise<void>((resolve, reject) => {
+    const onAbort = (): void => {
+      reject(ensureError(signal.reason));
+    };
+
+    if (signal.aborted) {
+      onAbort();
+
+      return;
     }
 
-    const rejected = results.find(
-      (result): result is PromiseRejectedResult => result.status === "rejected",
-    );
+    signal.addEventListener("abort", onAbort, { once: true });
 
-    if (rejected !== undefined) {
-      throw ensureError(rejected.reason);
-    }
+    void Promise.allSettled(promises).then((results) => {
+      signal.removeEventListener("abort", onAbort);
+
+      if (signal.aborted) {
+        // Race lost to abort — the abort handler already rejected; do nothing
+        return;
+      }
+
+      if (firstSyncError !== undefined) {
+        reject(ensureError(firstSyncError));
+
+        return;
+      }
+
+      const rejected = results.find(
+        (result): result is PromiseRejectedResult =>
+          result.status === "rejected",
+      );
+
+      if (rejected !== undefined) {
+        reject(ensureError(rejected.reason));
+
+        return;
+      }
+
+      resolve();
+    });
   });
 }
 
@@ -311,7 +340,7 @@ export class EventBusNamespace {
       return undefined;
     }
 
-    return settleLeavePromises(promises, firstSyncError);
+    return settleLeavePromises(promises, firstSyncError, signal);
   }
 
   clearAll(): void {
