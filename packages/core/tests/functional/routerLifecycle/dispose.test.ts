@@ -103,6 +103,59 @@ describe("dispose", () => {
 
       expect(stopListener).not.toHaveBeenCalled();
     });
+
+    it("dispose() during LEAVE_APPROVED settles FSM at DISPOSED", async () => {
+      await router.start("/home");
+
+      const lifecycle = getLifecycleApi(router);
+      let resolveActivation: ((v: boolean) => void) | undefined;
+
+      lifecycle.addActivateGuard(
+        "users.list",
+        () => () =>
+          new Promise<boolean>((resolve) => {
+            resolveActivation = resolve;
+          }),
+      );
+
+      const navPromise = router.navigate("users.list").catch(() => {});
+
+      // wait for LEAVE_APPROVED to be reached (deactivation guards have all
+      // run; we are blocked on the activation-side async guard)
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(router.isLeaveApproved()).toBe(true);
+
+      router.dispose();
+
+      expect(router.isActive()).toBe(false);
+      expect(router.getState()).toBeUndefined();
+
+      resolveActivation?.(true);
+      await navPromise;
+    });
+
+    it("dispose() during stuck STARTING settles FSM at DISPOSED", async () => {
+      getPluginApi(router).addInterceptor("start", () => {
+        throw new Error("sync interceptor throw");
+      });
+
+      try {
+        await router.start("/home");
+      } catch {
+        /* expected */
+      }
+
+      // FSM is stuck in STARTING because the catch block in Router.start()
+      // only recovers when isReady(). Before the fix, the next sendDispose()
+      // was a no-op and isActive() remained true.
+      expect(router.isActive()).toBe(true);
+
+      router.dispose();
+
+      expect(router.isActive()).toBe(false);
+      expect(router.getState()).toBeUndefined();
+    });
   });
 
   describe("dispose() clears resources", () => {

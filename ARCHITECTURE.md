@@ -255,23 +255,29 @@ stateDiagram-v2
 
     STARTING --> READY : STARTED
     STARTING --> IDLE : FAIL
+    STARTING --> DISPOSED : DISPOSE
 
     READY --> TRANSITION_STARTED : NAVIGATE
     READY --> READY : FAIL
     READY --> IDLE : STOP
+    READY --> DISPOSED : DISPOSE
 
     TRANSITION_STARTED --> TRANSITION_STARTED : NAVIGATE
     TRANSITION_STARTED --> LEAVE_APPROVED : LEAVE_APPROVE
     TRANSITION_STARTED --> READY : CANCEL
     TRANSITION_STARTED --> READY : FAIL
+    TRANSITION_STARTED --> DISPOSED : DISPOSE
 
     LEAVE_APPROVED --> READY : COMPLETE
     LEAVE_APPROVED --> READY : CANCEL
     LEAVE_APPROVED --> READY : FAIL
     LEAVE_APPROVED --> TRANSITION_STARTED : NAVIGATE
+    LEAVE_APPROVED --> DISPOSED : DISPOSE
 
     DISPOSED --> [*]
 ```
+
+`DISPOSE` is wired from every non-DISPOSED state so `router.dispose()` always settles the FSM at `DISPOSED`. For healthy flows the facade still orchestrates cleanup through `IDLE` (`STOP` → `IDLE` → `DISPOSE`); the direct transitions are a safety net for cases where the FSM cannot be returned to `IDLE` first (e.g. `dispose()` mid-`STARTING` after a start-pipeline throw).
 
 | State                | Description                                           |
 | -------------------- | ----------------------------------------------------- |
