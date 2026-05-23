@@ -242,24 +242,30 @@ describe("buildActiveClassName — Property Tests (Solid)", () => {
     );
   });
 
-  describe("Invariant 7a: Conservation — |outputTokens| ≤ |baseTokens| + |activeTokens| (audit-2026-05-17 §6 Stage-2)", () => {
-    // The dedup logic in buildActiveClassName guarantees no token-count
-    // amplification: the result token set is a subset of `base ∪ active`,
-    // never adds anything else. A regression that double-appended a token
-    // (forgotten `if (!seen.has(token))` guard) or injected a phantom
-    // marker would inflate this count.
+  describe("Invariant 7a: Conservation — no token amplification beyond input (audit-2026-05-17 §6 Stage-2, §5.4 contract)", () => {
+    // Contract per audit-2026-05-17 §5.4: dedup is one-sided — active tokens
+    // are deduped against base, but pre-existing duplicates in base are
+    // preserved (`buildActiveClassName(true, "y", "x  x")` → `"x x y"`).
+    // React's `Behaviour lock` describe (review §5.4) regression-locks this
+    // intent.
+    //
+    // "Conservation" therefore means: the result token sequence is a subset
+    // of the multiset `base-token-array ∪ active-token-set` — duplicates from
+    // base count as-is, active is deduped. A regression that double-appended
+    // an active token (forgotten `if (!seen.has(token))` guard) or injected a
+    // phantom marker would still inflate beyond this bound.
     test.prop([arbActiveClassName, arbBaseClassName], {
       numRuns: NUM_RUNS.standard,
     })(
-      "result token count never exceeds the union of base + active token sets",
+      "result token count never exceeds |baseTokenArray| + |activeTokenSet|",
       (active, base) => {
         const result = buildActiveClassName(true, active, base) ?? "";
         const resultCount = result.split(/\s+/).filter(Boolean).length;
-        const baseTokens = new Set(base.split(/\s+/).filter(Boolean));
-        const activeTokens = new Set(active.split(/\s+/).filter(Boolean));
-        const unionSize = new Set([...baseTokens, ...activeTokens]).size;
+        const baseTokenArray = base.split(/\s+/).filter(Boolean);
+        const activeTokenSet = new Set(active.split(/\s+/).filter(Boolean));
+        const upperBound = baseTokenArray.length + activeTokenSet.size;
 
-        expect(resultCount).toBeLessThanOrEqual(unionSize);
+        expect(resultCount).toBeLessThanOrEqual(upperBound);
       },
     );
   });
