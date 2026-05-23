@@ -227,6 +227,10 @@ export class EventBusNamespace {
     return this.#fsm.getState() === routerStates.READY;
   }
 
+  isStarting(): boolean {
+    return this.#fsm.getState() === routerStates.STARTING;
+  }
+
   getCurrentToState(): State | undefined {
     return this.#currentToState;
   }

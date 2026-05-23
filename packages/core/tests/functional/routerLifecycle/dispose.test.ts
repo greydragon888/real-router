@@ -135,7 +135,13 @@ describe("dispose", () => {
       await navPromise;
     });
 
-    it("dispose() during stuck STARTING settles FSM at DISPOSED", async () => {
+    it("dispose() after a failed start settles FSM at DISPOSED", async () => {
+      // Historically this scenario left the FSM stuck in STARTING (no
+      // recovery in Router.start().catch — #668). #660 added a direct
+      // STARTING → DISPOSED transition as a safety net; #668 then made the
+      // recovery automatic so the FSM returns to IDLE on failure. Either
+      // arm should keep dispose() correct: after a failed start, dispose()
+      // must settle the FSM at DISPOSED.
       getPluginApi(router).addInterceptor("start", () => {
         throw new Error("sync interceptor throw");
       });
@@ -145,11 +151,6 @@ describe("dispose", () => {
       } catch {
         /* expected */
       }
-
-      // FSM is stuck in STARTING because the catch block in Router.start()
-      // only recovers when isReady(). Before the fix, the next sendDispose()
-      // was a no-op and isActive() remained true.
-      expect(router.isActive()).toBe(true);
 
       router.dispose();
 
