@@ -238,6 +238,103 @@ describe("core/observable/subscribeLeave", () => {
     });
   });
 
+  // #663 — pipeline must not block on a listener that ignores its abort
+  // signal. The race rejects the awaitLeaveListeners promise with
+  // signal.reason as soon as the controller aborts; the hung listener
+  // promise is abandoned (may still complete in background).
+  describe("awaitLeaveListeners — signal race", () => {
+    it("rejects with signal.reason when controller aborts mid-await", async () => {
+      const controller = new AbortController();
+      const abortReason = new RouterError("CANCELLED");
+
+      bus.subscribeLeave(() => new Promise<void>(() => {}));
+
+      const result = bus.awaitLeaveListeners(
+        TO_STATE,
+        FROM_STATE,
+        controller.signal,
+      );
+
+      controller.abort(abortReason);
+
+      await expect(result).rejects.toBe(abortReason);
+    });
+
+    it("rejects immediately when signal is already aborted on entry", async () => {
+      const controller = new AbortController();
+      const abortReason = new RouterError("CANCELLED");
+
+      controller.abort(abortReason);
+
+      bus.subscribeLeave(() => new Promise<void>(() => {}));
+
+      const result = bus.awaitLeaveListeners(
+        TO_STATE,
+        FROM_STATE,
+        controller.signal,
+      );
+
+      await expect(result).rejects.toBe(abortReason);
+    });
+
+    it("resolves normally when listeners settle before abort fires", async () => {
+      const controller = new AbortController();
+      let called = false;
+
+      bus.subscribeLeave(async () => {
+        called = true;
+      });
+
+      const result = bus.awaitLeaveListeners(
+        TO_STATE,
+        FROM_STATE,
+        controller.signal,
+      );
+
+      await result;
+
+      expect(called).toBe(true);
+
+      // Abort after natural completion must not affect the resolved promise
+      controller.abort(new RouterError("CANCELLED"));
+    });
+
+    it("cooperatively-cancelling listener still propagates its own rejection", async () => {
+      const controller = new AbortController();
+      const listenerReason = new Error("listener cooperative cancel");
+
+      bus.subscribeLeave(
+        ({ signal: sig }) =>
+          new Promise<void>((_, reject) => {
+            sig.addEventListener(
+              "abort",
+              () => {
+                reject(listenerReason);
+              },
+              {
+                once: true,
+              },
+            );
+          }),
+      );
+
+      const result = bus.awaitLeaveListeners(
+        TO_STATE,
+        FROM_STATE,
+        controller.signal,
+      );
+
+      const abortReason = new RouterError("CANCELLED");
+
+      controller.abort(abortReason);
+
+      // Race winner is the signal arm — abortReason wins over listenerReason.
+      // listenerReason still bubbles via the listener's promise but is
+      // discarded by the pipeline (the navigation is already cancelling).
+      await expect(result).rejects.toBe(abortReason);
+    });
+  });
+
   describe("clearAll", () => {
     it("clears leave listeners", () => {
       const listener = vi.fn();

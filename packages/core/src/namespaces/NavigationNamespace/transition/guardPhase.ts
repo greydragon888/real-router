@@ -202,6 +202,9 @@ async function finishAfterAsyncLeave(
 ): Promise<void> {
   await leaveCompletion;
 
+  /* v8 ignore next 3 -- @preserve: unreachable after #663 — signal abort
+     mid-leave rejects via settleLeavePromises, so `await leaveCompletion`
+     throws directly instead of completing with a stale isActive() */
   if (!isActive()) {
     throw new RouterError(errorCodes.TRANSITION_CANCELLED);
   }
