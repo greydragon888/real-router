@@ -81,7 +81,7 @@
     "@stryker-mutator/typescript-checker": "9.6.1",
     "@stryker-mutator/vitest-runner": "9.6.1",
     "@stylistic/eslint-plugin": "5.10.0",
-    "@types/node": "25.9.0",
+    "@types/node": "25.9.1",
     "@vitest/coverage-v8": "4.1.6",
     "@vitest/eslint-plugin": "1.6.17",
     "@vitest/ui": "4.1.6",
