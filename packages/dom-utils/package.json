@@ -20,7 +20,8 @@
     "test:properties": "vitest run --config vitest.config.properties.mts"
   },
   "dependencies": {
-    "@real-router/core": "workspace:^"
+    "@real-router/core": "workspace:^",
+    "@real-router/sources": "workspace:^"
   },
   "devDependencies": {
     "jsdom": "28.1.0"

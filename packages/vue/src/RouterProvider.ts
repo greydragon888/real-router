@@ -5,11 +5,12 @@ import { pushDirectiveRouter } from "./directives/vLink";
 import {
   createRouteAnnouncer,
   createScrollRestoration,
+  createScrollSpy,
   createViewTransitions,
 } from "./dom-utils";
 import { setupRouteProvision } from "./setupRouteProvision";
 
-import type { ScrollRestorationOptions } from "./dom-utils";
+import type { ScrollRestorationOptions, ScrollSpyOptions } from "./dom-utils";
 import type { Router } from "@real-router/core";
 import type { PropType } from "vue";
 
@@ -62,6 +63,9 @@ export const RouterProvider = defineComponent({
     scrollRestoration: {
       type: Object as PropType<ScrollRestorationOptions>,
     },
+    scrollSpy: {
+      type: Object as PropType<ScrollSpyOptions>,
+    },
     viewTransitions: {
       type: Boolean,
       default: false,
@@ -102,6 +106,29 @@ export const RouterProvider = defineComponent({
           behavior,
           storageKey,
           scrollContainer: props.scrollRestoration?.scrollContainer,
+        });
+      },
+    );
+
+    // Reactive scrollSpy: watch by primitives, omit scrollContainer getter
+    // identity for the same reason scrollRestoration does.
+    watchToggleableUtility(
+      () =>
+        [
+          props.router,
+          props.scrollSpy !== undefined && props.scrollSpy.selector !== "",
+          props.scrollSpy?.selector,
+          props.scrollSpy?.rootMargin,
+        ] as const,
+      ([router, enabled, selector, rootMargin]) => {
+        if (!enabled || !selector) {
+          return;
+        }
+
+        return createScrollSpy(router, {
+          selector,
+          rootMargin,
+          scrollContainer: props.scrollSpy?.scrollContainer,
         });
       },
     );
