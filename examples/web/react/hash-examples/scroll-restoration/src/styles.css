@@ -1,0 +1,217 @@
+/* Long pages give scroll something to do — base content height ~5000-6000px.
+ * Stable min-height on .content (the main container, present across all
+ * routes) gives the browser enough scroll room to satisfy `scrollTo(0, N)`
+ * called by the utility's rAF before React's mount commits the route's
+ * actual content. Without this, scrollY clamps to maxScroll of the
+ * partially-mounted page — Scenario 1's restore lands at e.g. 1707 instead
+ * of 3000. */
+
+main.content {
+  min-height: 7000px;
+}
+
+.long-page {
+  padding: 24px;
+  max-width: 800px;
+  min-height: 6500px;
+}
+
+.long-page h1 {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+.long-page h2 {
+  margin-top: 48px;
+  scroll-margin-top: 80px; /* sticky header offset */
+}
+
+.long-page p {
+  line-height: 1.6;
+  margin: 12px 0;
+}
+
+.docs-toc {
+  position: sticky;
+  top: 80px;
+  float: right;
+  margin-left: 24px;
+  padding: 12px 16px;
+  background: #f5f5f5;
+  border-radius: 4px;
+  font-size: 13px;
+  width: 220px;
+}
+
+.docs-toc h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  text-transform: uppercase;
+  color: #666;
+}
+
+.docs-toc ul {
+  margin: 0;
+  padding-left: 16px;
+}
+
+.docs-toc li {
+  margin: 4px 0;
+}
+
+.articles-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px;
+  min-height: 6500px;
+}
+
+.article-card {
+  display: block;
+  padding: 16px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: #fff;
+  text-decoration: none;
+  color: inherit;
+  min-height: 88px;
+}
+
+.article-card:hover {
+  border-color: #4a8fdf;
+  background: #f7faff;
+}
+
+.article-card h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.article-card p {
+  margin: 0;
+  font-size: 13px;
+  color: #666;
+}
+
+#virtual-scroller {
+  overflow-y: auto;
+  height: 80vh;
+  border: 1px solid #ddd;
+  margin: 24px;
+  padding: 0;
+}
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+  padding: 8px;
+}
+
+.gallery-cell {
+  aspect-ratio: 4 / 3;
+  background: #ddd;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  color: #555;
+}
+
+.scroll-meter {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  width: 280px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  font: 12px/1.4 ui-monospace, "SFMono-Regular", monospace;
+  z-index: 1000;
+}
+
+.scroll-meter h4 {
+  margin: 0 0 6px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #555;
+}
+
+.scroll-meter dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 8px;
+  margin: 0;
+}
+
+.scroll-meter dt {
+  color: #999;
+}
+
+.scroll-meter dd {
+  margin: 0;
+  word-break: break-word;
+}
+
+.scroll-meter pre {
+  margin: 6px 0 0;
+  padding: 6px;
+  background: #f5f5f5;
+  border-radius: 3px;
+  font-size: 11px;
+  max-height: 100px;
+  overflow: auto;
+}
+
+.direction-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  margin: 0 8px;
+  font-size: 12px;
+  background: #eef;
+  border: 1px solid #99f;
+  border-radius: 12px;
+  color: #335;
+}
+
+.mode-toggle {
+  display: flex;
+  gap: 6px;
+  margin: 12px 0;
+}
+
+.mode-toggle button {
+  padding: 6px 14px;
+  border: 1px solid #ccc;
+  background: #fff;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.mode-toggle button[data-active="true"] {
+  background: #4a8fdf;
+  color: #fff;
+  border-color: #4a8fdf;
+}
+
+.demo-button {
+  padding: 8px 14px;
+  margin: 4px 4px 4px 0;
+  font-size: 13px;
+  border: 1px solid #4a8fdf;
+  background: #fff;
+  color: #4a8fdf;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.demo-button:hover {
+  background: #4a8fdf;
+  color: #fff;
+}
