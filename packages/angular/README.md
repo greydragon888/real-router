@@ -428,7 +428,7 @@ Navigation directive for `<a>` elements. Handles click events, sets `href`, and 
 <a [realLink]="'settings'" [hash]="'account'">Account</a>
 ```
 
-Active class is hash-aware — only the matching tab lights up. Live demo: [`examples/web/react/link-hash/`](../../examples/web/react/link-hash/) — behavior is identical across adapters, only template syntax differs. See the [Hash Fragment Support](https://github.com/greydragon888/real-router/wiki/Hash) wiki page for the full surface.
+Active class is hash-aware — only the matching tab lights up. Live demo: [`examples/web/react/hash-examples/link-hash/`](../../examples/web/react/hash-examples/link-hash/) — behavior is identical across adapters, only template syntax differs. See the [Hash Fragment Support](https://github.com/greydragon888/real-router/wiki/Hash) wiki page for the full surface.
 
 ### `[realLinkActive]`
 
@@ -528,11 +528,32 @@ bootstrapApplication(AppComponent, {
 ```typescript
 interface RealRouterOptions {
   scrollRestoration?: ScrollRestorationOptions; // { mode?, anchorScrolling?, scrollContainer? }
+  scrollSpy?: ScrollSpyOptions; // { selector, rootMargin?, scrollContainer? } — #575
   viewTransitions?: boolean;
 }
 ```
 
 Restores scroll on back/forward, scrolls to top (or `#hash`) on push. Three modes: `"restore"` (default), `"top"`, `"native"`. Custom containers via `scrollContainer: () => HTMLElement | null`. The utility is created by `provideEnvironmentInitializer` and torn down via `inject(DestroyRef)`. Options are a snapshot at bootstrap — not reactive to runtime changes. Under `@real-router/browser-plugin`, replace transitions now preserve scroll position and programmatic reloads restore from `sessionStorage` (portable via `state.transition.replace` / `state.transition.reload`). See [Scroll Restoration guide](https://github.com/greydragon888/real-router/wiki/Scroll-Restoration) for the full behaviour matrix.
+
+## Scroll Spy
+
+Opt into router-coordinated `IntersectionObserver`-driven URL hash spy via the same options bag:
+
+```typescript
+bootstrapApplication(AppComponent, {
+  providers: [
+    provideRealRouter(router, {
+      scrollSpy: { selector: "[id]:is(h2,h3)" },
+    }),
+  ],
+});
+```
+
+The URL hash tracks the topmost visible anchor as the user scrolls, syncing `state.context.url.hash` so sibling `<a realLink [hash]>` highlights stay current. Emits a forced same-route transition with `{ hash, replace: true, force: true, hashChange: true }` — same write API as `<a realLink [hash]>` (#532), `replace: true` so spy doesn't pollute history. Anti-flicker gates: `isTransitioning` (skip emits during transitions), `coolingDown` (skip emits during smooth `scrollIntoView` after a hash click; cleared on `scrollend` or 500 ms timeout), `selfEmitting` (spy doesn't rate-limit itself). Hardcoded internals: rAF + 150 ms trailing debounce, MutationObserver re-observe debounced 250 ms.
+
+Options: `{ selector: string, rootMargin?: string, scrollContainer?: () => HTMLElement | null }`. Default `rootMargin`: `"-20% 0px -60% 0px"`. Empty `selector` / `undefined` = off. SSR / browsers without `IntersectionObserver` = NOOP. Requires `browser-plugin` or `navigation-plugin` (hash-plugin / memory-plugin → warn-once + NOOP). The utility is installed via `provideEnvironmentInitializer` (`installScrollSpy`) and torn down on `DestroyRef`; options are a snapshot at bootstrap, not reactive.
+
+Available on both `provideRealRouter(router, { scrollSpy })` (SPA) and `provideRealRouterFactory({ baseRouter, scrollSpy })` (SSR). On the SSR path the utility is correctly NOOP'd on the server pass (`document` is undefined). Behaviour is identical to the React adapter — see the [React Scroll Spy demo](../../examples/web/react/hash-examples/scroll-spy/) (12 sections, TOC sidebar, 10 e2e scenarios) and the [Scroll Spy guide](https://github.com/greydragon888/real-router/wiki/Scroll-Spy).
 
 ## Server-Side Rendering
 
@@ -707,7 +728,7 @@ Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki) �
 
 The shared (cross-framework) wiki pages use the `use*` naming convention — they cover every adapter (React, Preact, Solid, Vue, Svelte, Angular) and each page has an explicit Angular section showing the `inject*` form:
 
-- [RouterProvider](https://github.com/greydragon888/real-router/wiki/RouterProvider) · [RouteView](https://github.com/greydragon888/real-router/wiki/RouteView) · [RouterErrorBoundary](https://github.com/greydragon888/real-router/wiki/RouterErrorBoundary) · [Scroll Restoration](https://github.com/greydragon888/real-router/wiki/Scroll-Restoration)
+- [RouterProvider](https://github.com/greydragon888/real-router/wiki/RouterProvider) · [RouteView](https://github.com/greydragon888/real-router/wiki/RouteView) · [RouterErrorBoundary](https://github.com/greydragon888/real-router/wiki/RouterErrorBoundary) · [Scroll Restoration](https://github.com/greydragon888/real-router/wiki/Scroll-Restoration) · [Scroll Spy](https://github.com/greydragon888/real-router/wiki/Scroll-Spy)
 - [useRouter → `injectRouter`](https://github.com/greydragon888/real-router/wiki/useRouter) · [useRoute → `injectRoute`](https://github.com/greydragon888/real-router/wiki/useRoute) · [useRouteNode → `injectRouteNode`](https://github.com/greydragon888/real-router/wiki/useRouteNode) · [useNavigator → `injectNavigator`](https://github.com/greydragon888/real-router/wiki/useNavigator) · [useRouteUtils → `injectRouteUtils`](https://github.com/greydragon888/real-router/wiki/useRouteUtils) · [useRouterTransition → `injectRouterTransition`](https://github.com/greydragon888/real-router/wiki/useRouterTransition) · [useRouteExit → `injectRouteExit`](https://github.com/greydragon888/real-router/wiki/useRouteExit) · [useRouteEnter → `injectRouteEnter`](https://github.com/greydragon888/real-router/wiki/useRouteEnter)
 
 ## Related Packages

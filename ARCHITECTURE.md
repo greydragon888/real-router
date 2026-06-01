@@ -51,7 +51,7 @@ real-router/
 │   └── type-guards/               # Runtime type validation (internal)
 ├── shared/                         # Bare source files shared across packages via src/ symlinks (minimal workspace entry)
 │   ├── package.json               # Minimal: name, type:commonjs, devDeps on @real-router/core + type-guards
-│   ├── dom-utils/                 # Shared DOM utilities for adapters: route announcer, scroll restoration, link helpers
+│   ├── dom-utils/                 # Shared DOM utilities for adapters: route announcer, scroll restoration, scroll spy (#575), view transitions, direction tracker, link helpers
 │   ├── browser-env/               # Shared browser abstractions for URL plugins: history API, popstate, SSR fallback
 │   └── ssr/                       # Shared SSR plugin scaffolding: createSsrLoaderPlugin generic factory + createLoadersValidator
 ├── examples/

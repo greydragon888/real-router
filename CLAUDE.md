@@ -25,9 +25,12 @@ shared/
 │   ├── validation.ts     # createOptionsValidator
 │   └── index.ts          # barrel
 ├── dom-utils/            # DOM helpers — for framework adapters
-│   ├── link-utils.ts     # shouldNavigate, buildHref, buildActiveClassName, applyLinkA11y
+│   ├── link-utils.ts     # shouldNavigate, buildHref, buildActiveClassName, applyLinkA11y, navigateWithHash, shallowEqual
 │   ├── route-announcer.ts  # createRouteAnnouncer (a11y aria-live region)
 │   ├── scroll-restore.ts   # createScrollRestoration (opt-in scroll capture + restore)
+│   ├── scroll-spy.ts       # createScrollSpy (IntersectionObserver → URL hash; #575)
+│   ├── view-transitions.ts # createViewTransitions (subscribeLeave-based View Transitions API integration; #498)
+│   ├── direction-tracker.ts # createDirectionTracker (back/forward direction annotation; optional, install before browser-plugin)
 │   └── index.ts          # barrel
 └── ssr/                  # SSR plugin scaffolding — for server-side per-route loader plugins
     ├── createSsrLoaderPlugin.ts  # generic factory: validate compile loop + start interceptor + subscribeLeave + claim/teardown (4 claims)
