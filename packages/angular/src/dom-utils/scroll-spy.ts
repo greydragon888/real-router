@@ -31,6 +31,13 @@ import type { NavigationOptions, Router } from "@real-router/core";
  * work is the URL plugin's `onTransitionSuccess` write and the
  * `getTransitionSource` flip — cheap.
  *
+ * **Architecture**: decomposed into 4 private subsystem closure factories
+ * (`createUrlPluginDetector`, `createCooldown`, `createDebouncer`,
+ * `createObserverPair`). The main `createScrollSpy` wires them together
+ * around the shared `silenced` / `destroyed` / `selfEmitting` flags and the
+ * `flush()` emit logic. Each subsystem owns its state + cleanup; `destroy()`
+ * delegates to each. See section banners below.
+ *
  * @returns A `ScrollSpy` handle whose `destroy()` is idempotent.
  */
 export interface ScrollSpyOptions {
@@ -87,86 +94,99 @@ interface UrlContextSlice {
   hashChanged?: boolean;
 }
 
-export function createScrollSpy(
+const getUrlContext = (state: {
+  context?: unknown;
+}): UrlContextSlice | undefined =>
+  (state.context as { url?: UrlContextSlice } | undefined)?.url;
+
+// =============================================================================
+// Picker — pure, no state. RFC §5.2 selection rule.
+// =============================================================================
+
+// Pick the anchor closest to the active zone top in viewport coordinates.
+// `entry.rootBounds.top` already reflects `rootMargin` (per W3C IO spec
+// §3.3) — for `rootMargin: "-20% 0px -60% 0px"` it returns 20% of root
+// height, for `"-50% 0px -50% 0px"` it returns the center, etc. Distance
+// = boundingClientRect.top − zoneTop in viewport pixels: positive = anchor
+// below zone top (just entered), negative = anchor above zone top (body
+// crossing zone from above). We prefer smallest non-negative; fall back to
+// least-negative when no entry has crossed yet.
+// Falls back to zoneTop = 0 when rootBounds is null (cross-origin roots,
+// unit tests). Single pass — handles `Iterable` so flushes can pass
+// `Map.values()` directly without realising the array.
+const pickTopmost = (
+  entries: Iterable<IntersectionObserverEntry>,
+): IntersectionObserverEntry | null => {
+  let bestPositive: IntersectionObserverEntry | null = null;
+  let bestPositiveDist = Number.POSITIVE_INFINITY;
+  let bestNegative: IntersectionObserverEntry | null = null;
+  let bestNegativeDist = Number.NEGATIVE_INFINITY;
+
+  for (const entry of entries) {
+    if (!entry.isIntersecting) {
+      continue;
+    }
+
+    const zoneTop = entry.rootBounds?.top ?? 0;
+    const distance = entry.boundingClientRect.top - zoneTop;
+
+    if (distance >= 0) {
+      if (distance < bestPositiveDist) {
+        bestPositive = entry;
+        bestPositiveDist = distance;
+      }
+    } else if (distance > bestNegativeDist) {
+      bestNegative = entry;
+      bestNegativeDist = distance;
+    }
+  }
+
+  return bestPositive ?? bestNegative;
+};
+
+// =============================================================================
+// Subsystem: URL plugin detector (RFC §5.5)
+// Calls `onMissing` if `state.context` is published but `url` key is missing
+// (i.e. no URL plugin installed). Either synchronous on start, or deferred
+// via a one-shot `router.subscribe` if the router has not started yet.
+// `silenced` flag itself lives in main scope — detector signals via callback
+// (per Oracle Q1 — `silenced` has multiple unrelated triggers; main scope
+// owns the kill switch).
+// =============================================================================
+
+interface UrlPluginDetector {
+  destroy: () => void;
+}
+
+const createUrlPluginDetector = (
   router: Router,
-  options: ScrollSpyOptions,
-): ScrollSpy {
-  // SSR guard (RFC §7.5) — return early without warnings.
-  if (typeof document === "undefined") {
-    return NOOP_INSTANCE;
-  }
+  onMissing: () => void,
+): UrlPluginDetector => {
+  let detectionUnsub: (() => void) | null = null;
 
-  // Feature-detect IntersectionObserver — no polyfill ships (RFC §4).
-  if (typeof IntersectionObserver === "undefined") {
-    return NOOP_INSTANCE;
-  }
-
-  const { selector } = options;
-
-  // Empty selector → disabled. Documented opt-out for conditional enabling
-  // (RFC §5.4 `scrollSpy={{ selector: enable ? "[id]" : "" }}`).
-  if (!selector) {
-    return NOOP_INSTANCE;
-  }
-
-  const rootMargin = options.rootMargin ?? DEFAULT_ROOT_MARGIN;
-  const getContainer = options.scrollContainer;
-
-  let destroyed = false;
-  // Permanent disable after no-URL-plugin detection (RFC §5.5).
-  let silenced = false;
-
-  // Self-emit guard (RFC §5.2): set synchronously around our own
-  // `router.navigate()` so the `router.subscribe` callback skips the cooldown
-  // setup for spy-emitted transitions — otherwise spy would rate-limit
-  // itself to ≤ 2 emits/s, contradicting the ≤ 10/s benchmark target.
-  let selfEmitting = false;
-
-  // Cooldown state — set on user-driven hash transitions, cleared on
-  // `scrollend` or after the safety timeout.
-  let coolingDown = false;
-  let cooldownTimeout: ReturnType<typeof setTimeout> | null = null;
-  let cooldownContainer: HTMLElement | null = null;
-  let activeScrollendListener: (() => void) | null = null;
-
-  // rAF + trailing debounce coalescing.
-  let rafHandle: number | null = null;
-  let debounceTimeout: ReturnType<typeof setTimeout> | null = null;
-
-  // Already-warned set keeps the dev console quiet after the first detection
-  // of duplicate ids on a page (RFC §7.7).
-  let duplicateIdWarned = false;
-
-  const transitionSource = getTransitionSource(router);
-
-  // Detection guard (RFC §5.5): if `state.context.url` is undefined while
-  // the router has started, no URL plugin is installed — warn once and stay
-  // silent for the rest of the spy lifetime.
-  const verifyUrlPluginPresence = (state: { context?: unknown }): void => {
+  const verify = (state: { context?: unknown }): void => {
     const context = state.context as
       | (Record<string, unknown> & { url?: unknown })
       | undefined;
 
     if (context && context.url === undefined) {
-      silenced = true;
-
       console.warn(
         "[real-router] scroll-spy: state.context.url is not claimed. " +
           "Spy requires browser-plugin or navigation-plugin. Disabling.",
       );
+      onMissing();
     }
   };
 
   const peekState = router.getState();
 
   if (peekState) {
-    verifyUrlPluginPresence(peekState);
-  }
-
-  // One-shot deferred detection if router not started yet.
-  let detectionUnsub: (() => void) | null = null;
-
-  if (!peekState) {
+    verify(peekState);
+  } else {
+    // Re-entry guard: `router.subscribe` MAY invoke the callback synchronously
+    // from inside `.subscribe(...)` before the function returns. In that case
+    // `detectionUnsub` is still `null` when the callback fires. Without this
+    // boolean, a hypothetical multi-fire would double-warn.
     let detectionConsumed = false;
 
     detectionUnsub = router.subscribe(({ route }) => {
@@ -175,265 +195,203 @@ export function createScrollSpy(
       }
 
       detectionConsumed = true;
-      verifyUrlPluginPresence(route);
+      verify(route);
 
       detectionUnsub?.();
       detectionUnsub = null;
     });
   }
 
-  // Resolve scroll container lazily on every operation. Returns `null` when
-  // the user didn't pass a getter or the getter returns nothing — that maps
-  // to window viewport (`IntersectionObserver.root === null`).
-  const resolveContainer = (): HTMLElement | null => {
-    const element = getContainer?.();
-
-    return element ?? null;
+  return {
+    destroy(): void {
+      detectionUnsub?.();
+      detectionUnsub = null;
+    },
   };
+};
 
-  // Pick the anchor closest to the active zone top in viewport coordinates.
-  // `entry.rootBounds.top` already reflects `rootMargin` (per W3C IO spec
-  // §3.3) — for `rootMargin: "-20% 0px -60% 0px"` it returns 20% of root
-  // height, for `"-50% 0px -50% 0px"` it returns the center, etc. Distance
-  // = boundingClientRect.top − zoneTop in viewport pixels: positive = anchor
-  // below zone top (just entered), negative = anchor above zone top (body
-  // crossing zone from above). We prefer smallest non-negative; fall back to
-  // least-negative when no entry has crossed yet.
-  // Falls back to zoneTop = 0 when rootBounds is null (cross-origin roots,
-  // unit tests). Single pass — handles `Iterable` so flushes can pass
-  // `Map.values()` directly without realising the array.
-  const pickTopmost = (
-    entries: Iterable<IntersectionObserverEntry>,
-  ): IntersectionObserverEntry | null => {
-    let bestPositive: IntersectionObserverEntry | null = null;
-    let bestPositiveDist = Number.POSITIVE_INFINITY;
-    let bestNegative: IntersectionObserverEntry | null = null;
-    let bestNegativeDist = Number.NEGATIVE_INFINITY;
+// =============================================================================
+// Subsystem: Cooldown gate (RFC §5.2 — anti-flicker for smooth scrollIntoView)
+// Set on user-driven `<Link hash>` click → smooth scroll. Cleared on
+// `scrollend` (Baseline 2026) or 500ms safety timeout (older Safari).
+// =============================================================================
 
-    for (const entry of entries) {
-      if (!entry.isIntersecting) {
-        continue;
-      }
+interface Cooldown {
+  readonly active: boolean;
+  start: () => void;
+  destroy: () => void;
+}
 
-      const zoneTop = entry.rootBounds?.top ?? 0;
-      const distance = entry.boundingClientRect.top - zoneTop;
+const createCooldown = (getContainer: () => HTMLElement | null): Cooldown => {
+  let active = false;
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+  let listenerContainer: HTMLElement | null = null;
+  let listener: (() => void) | null = null;
 
-      if (distance >= 0) {
-        if (distance < bestPositiveDist) {
-          bestPositive = entry;
-          bestPositiveDist = distance;
-        }
-      } else if (distance > bestNegativeDist) {
-        bestNegative = entry;
-        bestNegativeDist = distance;
-      }
+  const clear = (): void => {
+    if (timeout !== null) {
+      clearTimeout(timeout);
+      timeout = null;
     }
 
-    return bestPositive ?? bestNegative;
+    if (listener) {
+      const target: EventTarget = listenerContainer ?? globalThis;
+
+      target.removeEventListener("scrollend", listener);
+    }
+
+    listener = null;
+    listenerContainer = null;
+    active = false;
   };
 
-  // Track currently observed elements so we can `unobserve` removed nodes
-  // on MutationObserver events.
-  const observedElements = new Set<Element>();
-  let intersectionObserver: IntersectionObserver | null = null;
-  let mutationObserver: MutationObserver | null = null;
-  let mutationDebounce: ReturnType<typeof setTimeout> | null = null;
+  return {
+    get active(): boolean {
+      return active;
+    },
+    start(): void {
+      // Reset rather than stack timers if cooldown is already active.
+      clear();
+
+      active = true;
+
+      const lift = (): void => {
+        clear();
+      };
+
+      listener = lift;
+      listenerContainer = getContainer();
+
+      const target: EventTarget = listenerContainer ?? globalThis;
+
+      target.addEventListener("scrollend", lift, { once: true });
+
+      timeout = setTimeout(lift, COOLDOWN_TIMEOUT_MS);
+    },
+    destroy(): void {
+      clear();
+    },
+  };
+};
+
+// =============================================================================
+// Subsystem: rAF + trailing debounce (RFC §5.1)
+// Coalesces a burst of IO events into ≤ 1 callback per debounce window.
+// rAF reduces N setTimeout creations to 1 per animation frame; the trailing
+// 150ms setTimeout waits for the IO stream to quiesce.
+// =============================================================================
+
+interface Debouncer {
+  schedule: () => void;
+  destroy: () => void;
+}
+
+const createDebouncer = (
+  callback: () => void,
+  trailingMs: number,
+): Debouncer => {
+  let raf: number | null = null;
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+
+  return {
+    schedule(): void {
+      if (raf !== null) {
+        return;
+      }
+
+      raf = requestAnimationFrame(() => {
+        raf = null;
+
+        if (timeout !== null) {
+          clearTimeout(timeout);
+        }
+
+        timeout = setTimeout(() => {
+          timeout = null;
+          callback();
+        }, trailingMs);
+      });
+    },
+    destroy(): void {
+      if (raf !== null) {
+        cancelAnimationFrame(raf);
+        raf = null;
+      }
+
+      if (timeout !== null) {
+        clearTimeout(timeout);
+        timeout = null;
+      }
+    },
+  };
+};
+
+// =============================================================================
+// Subsystem: Observer pair (IntersectionObserver + MutationObserver)
+// IO + MO genuinely form one subsystem — both write/read `observed` set and
+// `pending` map, and reconcile flow couples them. Per Oracle Q10, splitting
+// would force cross-subsystem references that re-introduce the wiring
+// problem we're trying to solve.
+//
+// Exposes `pending` directly (per Oracle Q4: hiding behind `consume()` adds
+// boilerplate without isolating the shared mutable state — observers write
+// from IO callbacks while main scope reads in `flush()`).
+// =============================================================================
+
+interface ObserverPair {
+  readonly pending: Map<Element, IntersectionObserverEntry>;
+  destroy: () => void;
+}
+
+const createObserverPair = (
+  selector: string,
+  rootMargin: string,
+  getContainer: () => HTMLElement | null,
+  onIntersection: () => void,
+  onInvalidSelector: () => void,
+  isStopped: () => boolean,
+): ObserverPair => {
+  const observed = new Set<Element>();
   // Latest IO entry per target — accumulated across batches. IO delivers
   // entries only for targets whose intersection state CHANGED (W3C IO
   // §3.2.1), so a fast scroll that lands two callbacks inside the same
   // debounce window must merge by target, not overwrite. Entries are
-  // dropped from the map when their target leaves the DOM (see
-  // `reconcileObservedSet`) and on `destroy()`.
-  const pendingEntries = new Map<Element, IntersectionObserverEntry>();
+  // dropped from the map when their target leaves the DOM (see `reconcile`)
+  // and on `destroy()`.
+  const pending = new Map<Element, IntersectionObserverEntry>();
 
-  const clearCooldown = (): void => {
-    if (cooldownTimeout !== null) {
-      clearTimeout(cooldownTimeout);
-      cooldownTimeout = null;
-    }
-
-    if (activeScrollendListener && cooldownContainer) {
-      cooldownContainer.removeEventListener(
-        "scrollend",
-        activeScrollendListener,
-      );
-    } else if (activeScrollendListener) {
-      globalThis.removeEventListener("scrollend", activeScrollendListener);
-    }
-
-    activeScrollendListener = null;
-    cooldownContainer = null;
-    coolingDown = false;
-  };
-
-  const startCooldown = (): void => {
-    // If a cooldown is already active, reset it instead of stacking timers.
-    clearCooldown();
-
-    coolingDown = true;
-
-    const liftCooldown = (): void => {
-      clearCooldown();
-    };
-
-    activeScrollendListener = liftCooldown;
-    cooldownContainer = resolveContainer();
-
-    // `scrollend` event (Baseline 2026): listen on the scroll container if
-    // present, otherwise on `window`. Fallback timeout guards against
-    // browsers that ship `scrollIntoView({ behavior: "smooth" })` but never
-    // fire `scrollend` (older Safari).
-    const target: EventTarget = cooldownContainer ?? globalThis;
-
-    target.addEventListener("scrollend", liftCooldown, { once: true });
-
-    cooldownTimeout = setTimeout(liftCooldown, COOLDOWN_TIMEOUT_MS);
-  };
-
-  const flush = (): void => {
-    if (destroyed || silenced) {
-      pendingEntries.clear();
-
-      return;
-    }
-
-    // Gate-skipped flushes keep `pendingEntries` populated — the merged
-    // state is still the best-known snapshot, and the next non-gated flush
-    // consumes it. Clearing under a gate would re-introduce the overwrite
-    // bug for any anchor whose intersection state did not change during
-    // the gate window.
-    if (transitionSource.getSnapshot().isTransitioning) {
-      return;
-    }
-
-    if (coolingDown) {
-      return;
-    }
-
-    if (pendingEntries.size === 0) {
-      return;
-    }
-
-    // Successful flush consumes the merged snapshot. We clear so that the
-    // next debounce window starts fresh; an anchor that is still
-    // intersecting will only stay observable if IO emits another event for
-    // it (which it does whenever the anchor's intersection state actually
-    // changes). Skipping the clear here would leak state from one user-
-    // perceived "scroll stop" into the next.
-    const picked = pickTopmost(pendingEntries.values());
-
-    pendingEntries.clear();
-
-    if (!picked) {
-      // No anchor visible / above zone — preserve last hash (RFC §10 #5).
-      return;
-    }
-
-    const newHash = (picked.target as HTMLElement).id;
-
-    if (!newHash) {
-      return;
-    }
-
-    const state = router.getState();
-
-    if (!state) {
-      return;
-    }
-
-    const currentHash =
-      (state.context as { url?: UrlContextSlice } | undefined)?.url?.hash ?? "";
-
-    if (newHash === currentHash) {
-      return;
-    }
-
-    // Emit the same-route same-params hash-only transition. URL plugin
-    // writes `state.context.url.hash = newHash` + `hashChanged = true` in
-    // its `onTransitionSuccess` claim.
-    const opts: HashAwareNavigationOptions = {
-      hash: newHash,
-      replace: true,
-      force: true,
-      hashChange: true,
-    };
-
-    selfEmitting = true;
-    router
-      .navigate(state.name, state.params, opts)
-      .catch(() => {
-        // Fire-and-forget — suppress expected rejections (concurrent
-        // navigate, router stopped, etc.) consistent with `<Link>` adapter
-        // patterns.
-      })
-      .finally(() => {
-        selfEmitting = false;
-      });
-  };
-
-  const scheduleFlush = (): void => {
-    // Coalesce via rAF then trailing debounce so a burst of IO events
-    // produces ≤ 1 emit per debounce window (RFC §5.1 acceptance).
-    if (rafHandle !== null) {
-      return;
-    }
-
-    rafHandle = requestAnimationFrame(() => {
-      rafHandle = null;
-
-      if (debounceTimeout !== null) {
-        clearTimeout(debounceTimeout);
-      }
-
-      debounceTimeout = setTimeout(() => {
-        debounceTimeout = null;
-        flush();
-      }, RAF_DEBOUNCE_MS);
-    });
-  };
+  let duplicateIdWarned = false;
+  let mutationTimer: ReturnType<typeof setTimeout> | null = null;
 
   const handleIntersection: IntersectionObserverCallback = (entries) => {
-    if (destroyed || silenced) {
+    // Defensive: IO callback may fire AFTER `destroy()` if a queued event
+    // was already scheduled by the browser before `disconnect()`. Cheap
+    // belt-and-suspenders.
+    if (isStopped()) {
       return;
     }
 
     for (const entry of entries) {
-      pendingEntries.set(entry.target, entry);
+      pending.set(entry.target, entry);
     }
 
-    scheduleFlush();
+    onIntersection();
   };
 
-  const buildObserver = (): IntersectionObserver | null => {
-    const container = resolveContainer();
-
-    return new IntersectionObserver(handleIntersection, {
-      root: container,
-      rootMargin,
-      threshold: 0,
-    });
-  };
+  const io = new IntersectionObserver(handleIntersection, {
+    root: getContainer(),
+    rootMargin,
+    threshold: 0,
+  });
 
   const observeMatches = (): void => {
-    if (!intersectionObserver) {
-      return;
-    }
-
-    const scope = resolveContainer() ?? document;
+    const scope = getContainer() ?? document;
     let candidates: NodeListOf<Element>;
 
     try {
       candidates = scope.querySelectorAll(selector);
     } catch {
-      // Invalid CSS selector — surface once, then stay silent. Same
-      // defensive shape as `scroll-restore.ts` around `safeKeyOf`.
-      if (!silenced) {
-        silenced = true;
-
-        console.warn(
-          `[real-router] scroll-spy: invalid selector "${selector}". Disabling.`,
-        );
-      }
+      onInvalidSelector();
 
       return;
     }
@@ -459,77 +417,249 @@ export function createScrollSpy(
         seenIds.add(id);
       }
 
-      if (observedElements.has(element)) {
+      if (observed.has(element)) {
         continue;
       }
 
-      intersectionObserver.observe(element);
-      observedElements.add(element);
+      io.observe(element);
+      observed.add(element);
     }
   };
 
-  const reconcileObservedSet = (): void => {
-    if (!intersectionObserver) {
-      return;
-    }
-
+  const reconcile = (): void => {
     // Drop observed elements that left the DOM. Avoids observer holding
     // strong refs to detached nodes. Also drop their accumulated entry so
     // stale "was intersecting" state for a removed node cannot be picked
     // by `pickTopmost` after the node is gone.
-    for (const element of observedElements) {
+    for (const element of observed) {
       if (!element.isConnected) {
-        intersectionObserver.unobserve(element);
-        observedElements.delete(element);
-        pendingEntries.delete(element);
+        io.unobserve(element);
+        observed.delete(element);
+        pending.delete(element);
       }
     }
 
     observeMatches();
   };
 
-  const scheduleMutationReconcile = (): void => {
-    if (mutationDebounce !== null) {
-      clearTimeout(mutationDebounce);
-    }
-
-    mutationDebounce = setTimeout(() => {
-      mutationDebounce = null;
-      reconcileObservedSet();
-    }, MUTATION_DEBOUNCE_MS);
-  };
-
-  intersectionObserver = buildObserver();
   observeMatches();
 
   // MutationObserver targets the scroll container (or document.body for
   // window viewport). `childList: true, subtree: true` catches structural
   // changes; `attributes: true, attributeFilter: ["id"]` catches anchor
   // id renames (typical for client-rendered docs).
-  const mutationTarget = resolveContainer() ?? document.body;
+  const mutationTarget = getContainer() ?? document.body;
 
-  mutationObserver = new MutationObserver(() => {
-    scheduleMutationReconcile();
+  const mo = new MutationObserver(() => {
+    if (mutationTimer !== null) {
+      clearTimeout(mutationTimer);
+    }
+
+    mutationTimer = setTimeout(() => {
+      mutationTimer = null;
+      reconcile();
+    }, MUTATION_DEBOUNCE_MS);
   });
 
-  mutationObserver.observe(mutationTarget, {
+  mo.observe(mutationTarget, {
     childList: true,
     subtree: true,
     attributes: true,
     attributeFilter: ["id"],
   });
 
-  // Cooldown setup on user-driven hash transitions. spy's own emits are
-  // distinguished via the synchronous `selfEmitting` flag (see flush()).
+  return {
+    pending,
+    destroy(): void {
+      io.disconnect();
+      mo.disconnect();
+
+      if (mutationTimer !== null) {
+        clearTimeout(mutationTimer);
+        mutationTimer = null;
+      }
+
+      observed.clear();
+      pending.clear();
+    },
+  };
+};
+
+// =============================================================================
+// Main: compositional wiring
+// =============================================================================
+
+export function createScrollSpy(
+  router: Router,
+  options: ScrollSpyOptions,
+): ScrollSpy {
+  // SSR guard (RFC §7.5) — return early without warnings.
+  if (typeof document === "undefined") {
+    return NOOP_INSTANCE;
+  }
+
+  // Feature-detect IntersectionObserver — no polyfill ships (RFC §4).
+  if (typeof IntersectionObserver === "undefined") {
+    return NOOP_INSTANCE;
+  }
+
+  const { selector } = options;
+
+  // Empty selector → disabled. Documented opt-out for conditional enabling
+  // (RFC §5.4 `scrollSpy={{ selector: enable ? "[id]" : "" }}`).
+  if (!selector) {
+    return NOOP_INSTANCE;
+  }
+
+  const rootMargin = options.rootMargin ?? DEFAULT_ROOT_MARGIN;
+  const getContainer = options.scrollContainer;
+  const resolveContainer = (): HTMLElement | null => getContainer?.() ?? null;
+
+  // Shared lifecycle flags (Oracle Q1 — `silenced` has multiple unrelated
+  // triggers; Oracle Q3 — `selfEmitting` synchronously bracketed around
+  // `router.navigate()` cannot cleanly extract). Kept in main scope.
+  let destroyed = false;
+  let silenced = false;
+  let selfEmitting = false;
+
+  const isStopped = (): boolean => silenced || destroyed;
+
+  // Symmetric late-binding (Oracle Q2): declare `flush` as nullable, wire
+  // debouncer + observers, then assign the real implementation. Reads as
+  // intentional wiring rather than accidental closure capture ordering.
+  // The `flush?.()` call below safely no-ops if a callback somehow fires
+  // before assignment (impossible in practice — IO/debounce are async).
+  let flush: (() => void) | null = null;
+
+  const transitionSource = getTransitionSource(router);
+
+  const detector = createUrlPluginDetector(router, () => {
+    silenced = true;
+  });
+
+  const cooldown = createCooldown(resolveContainer);
+
+  const debouncer = createDebouncer(() => {
+    flush?.();
+  }, RAF_DEBOUNCE_MS);
+
+  const observers = createObserverPair(
+    selector,
+    rootMargin,
+    resolveContainer,
+    () => {
+      debouncer.schedule();
+    },
+    () => {
+      if (silenced) {
+        return;
+      }
+
+      silenced = true;
+
+      console.warn(
+        `[real-router] scroll-spy: invalid selector "${selector}". Disabling.`,
+      );
+    },
+    isStopped,
+  );
+
+  flush = (): void => {
+    if (destroyed || silenced) {
+      observers.pending.clear();
+
+      return;
+    }
+
+    // Gate-skipped flushes keep `pendingEntries` populated — the merged
+    // state is still the best-known snapshot, and the next non-gated flush
+    // consumes it. Clearing under a gate would re-introduce the overwrite
+    // bug for any anchor whose intersection state did not change during
+    // the gate window.
+    if (transitionSource.getSnapshot().isTransitioning) {
+      return;
+    }
+
+    if (cooldown.active) {
+      return;
+    }
+
+    if (observers.pending.size === 0) {
+      return;
+    }
+
+    // Successful flush consumes the merged snapshot. We clear so that the
+    // next debounce window starts fresh; an anchor that is still
+    // intersecting will only stay observable if IO emits another event for
+    // it (which it does whenever the anchor's intersection state actually
+    // changes). Skipping the clear here would leak state from one user-
+    // perceived "scroll stop" into the next.
+    const picked = pickTopmost(observers.pending.values());
+
+    observers.pending.clear();
+
+    if (!picked) {
+      // No anchor visible / above zone — preserve last hash (RFC §10 #5).
+      return;
+    }
+
+    const newHash = (picked.target as HTMLElement).id;
+
+    if (!newHash) {
+      return;
+    }
+
+    const state = router.getState();
+
+    if (!state) {
+      return;
+    }
+
+    const currentHash = getUrlContext(state)?.hash ?? "";
+
+    if (newHash === currentHash) {
+      return;
+    }
+
+    // Emit the same-route same-params hash-only transition. URL plugin
+    // writes `state.context.url.hash = newHash` + `hashChanged = true` in
+    // its `onTransitionSuccess` claim.
+    const opts: HashAwareNavigationOptions = {
+      hash: newHash,
+      replace: true,
+      force: true,
+      hashChange: true,
+    };
+
+    // Self-emit guard (RFC §5.2): set synchronously around our own
+    // `router.navigate()` so the `router.subscribe` callback skips the
+    // cooldown setup for spy-emitted transitions — otherwise spy would
+    // rate-limit itself to ≤ 2 emits/s, contradicting the ≤ 10/s benchmark
+    // target. Test coupling (Q8): preserve exact `.catch(noop).finally(reset)`
+    // chain — migrating to `try/finally` over `await router.navigate(...)`
+    // changes microtask schedule and breaks "spy continues after rejection".
+    selfEmitting = true;
+    router
+      .navigate(state.name, state.params, opts)
+      .catch(() => {
+        // Fire-and-forget — suppress expected rejections (concurrent
+        // navigate, router stopped, etc.) consistent with `<Link>` adapter
+        // patterns.
+      })
+      .finally(() => {
+        selfEmitting = false;
+      });
+  };
+
+  // Cooldown setup on user-driven hash transitions. Spy's own emits are
+  // distinguished via the synchronous `selfEmitting` flag (see `flush`).
   const unsubscribeRouter = router.subscribe(({ route }) => {
     if (selfEmitting) {
       return;
     }
 
-    const ctx = route.context as { url?: UrlContextSlice } | undefined;
-
-    if (ctx?.url?.hashChanged) {
-      startCooldown();
+    if (getUrlContext(route)?.hashChanged) {
+      cooldown.start();
     }
   });
 
@@ -542,43 +672,17 @@ export function createScrollSpy(
       destroyed = true;
 
       // Unsubscribe FIRST to prevent late-arriving router transition
-      // callback from calling `startCooldown()` on a half-destroyed instance.
-      // Without this ordering, a transition with `hashChanged: true` firing
-      // between `clearCooldown()` and `unsubscribeRouter()` would re-install
-      // a 500ms timer that survives `destroy()`. Verified via Oracle review.
+      // callback from calling `cooldown.start()` on a half-destroyed
+      // instance. Without this ordering, a transition with `hashChanged:
+      // true` firing between subsystem teardown and `unsubscribeRouter()`
+      // would re-install a 500ms timer that survives `destroy()`. Verified
+      // via Oracle review (Q5/Q7).
       unsubscribeRouter();
-      detectionUnsub?.();
-      detectionUnsub = null;
 
-      if (intersectionObserver) {
-        intersectionObserver.disconnect();
-        intersectionObserver = null;
-      }
-
-      if (mutationObserver) {
-        mutationObserver.disconnect();
-        mutationObserver = null;
-      }
-
-      if (mutationDebounce !== null) {
-        clearTimeout(mutationDebounce);
-        mutationDebounce = null;
-      }
-
-      if (rafHandle !== null) {
-        cancelAnimationFrame(rafHandle);
-        rafHandle = null;
-      }
-
-      if (debounceTimeout !== null) {
-        clearTimeout(debounceTimeout);
-        debounceTimeout = null;
-      }
-
-      clearCooldown();
-
-      observedElements.clear();
-      pendingEntries.clear();
+      observers.destroy();
+      debouncer.destroy();
+      cooldown.destroy();
+      detector.destroy();
     },
   };
 }
