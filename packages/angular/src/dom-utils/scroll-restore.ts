@@ -2,6 +2,14 @@ import type { Router, State } from "@real-router/core";
 
 const DEFAULT_STORAGE_KEY = "real-router:scroll";
 
+// Bounded retry budget for resolving a late-mounting scroll container on the
+// restore path. A per-route container (e.g. an `overflow:auto` div rendered
+// only on one route) can be committed to the DOM a few frames after the
+// navigation settles — heavier routes paint later than the subscribe's rAF.
+// ~10 frames (≈160ms at 60fps) comfortably covers a React commit of a large
+// route without being perceptible. See the doc-block on `restorePos`.
+const RESTORE_RETRY_FRAMES = 10;
+
 const NOOP_INSTANCE: { destroy: () => void } = Object.freeze({
   destroy: () => {
     /* no-op */
@@ -135,6 +143,74 @@ export function createScrollRestoration(
     }
   };
 
+  // Restore path (back / traverse / reload). Unlike `writePos`, this tolerates a
+  // scroll container that both MOUNTS and LAYS OUT a few frames AFTER the
+  // navigation settles.
+  //
+  // The capture-side `readPos` always runs against an already-mounted DOM (the
+  // route being left). On restore the target route — and its container — is
+  // still being committed by the view layer. The subscribe callback schedules a
+  // single rAF; for a heavy route (e.g. a long virtual list) the framework's
+  // commit can land AFTER that frame. Two distinct failures follow, each losing
+  // the saved position (Scenario 6 e2e, reproduced under CI's slower runner):
+  //
+  //   1. Container not mounted yet → `getContainer()` is `null`, the scroll
+  //      silently falls back to `window`, which on a container-only route has
+  //      nothing to scroll.
+  //   2. Container mounted but its content not laid out yet → `scrollHeight`
+  //      is still small, so a single `scrollTo({ top })` clamps short of the
+  //      saved position and never re-applies once layout grows.
+  //
+  // With no `scrollContainer` getter the target is always `window`, present
+  // from the first frame — restore in a single shot (unchanged behaviour). When
+  // a getter is configured we cannot tell "this route legitimately uses window"
+  // from "the container is still mounting", so re-apply the scroll on every
+  // frame for a bounded budget: window as a fallback while the container is
+  // absent (harmless clamp on container routes), the container itself once it
+  // appears. For instant restores we stop early the moment the position sticks;
+  // smooth restores animate asynchronously, so they run the full budget. The
+  // frame budget is the hard backstop against an unreachable target (saved
+  // position taller than the restored content).
+  const restorePos = (top: number): void => {
+    if (!getContainer) {
+      globalThis.scrollTo({ top, left: 0, behavior });
+
+      return;
+    }
+
+    let frames = 0;
+
+    const attempt = (): void => {
+      if (destroyed) {
+        return;
+      }
+
+      const element = getContainer();
+
+      if (element) {
+        element.scrollTo({ top, left: 0, behavior });
+
+        // Instant restore landed within rounding tolerance → done; no point
+        // re-applying. Smooth restore never matches synchronously, so let it
+        // ride the budget.
+        if (behavior !== "smooth" && Math.abs(element.scrollTop - top) <= 1) {
+          return;
+        }
+      } else {
+        globalThis.scrollTo({ top, left: 0, behavior });
+      }
+
+      if (frames >= RESTORE_RETRY_FRAMES) {
+        return;
+      }
+
+      frames += 1;
+      requestAnimationFrame(attempt);
+    };
+
+    attempt();
+  };
+
   const scrollToHashOrTop = (route: State): void => {
     // URL plugin path (#532): `state.context.url.hash` is the source of truth
     // when one of the URL plugins (browser-plugin / navigation-plugin) is
@@ -240,20 +316,26 @@ export function createScrollRestoration(
         return;
       }
 
-      if (route.transition.replace || nav?.navigationType === "replace") {
-        return;
-      }
-
-      // Both arms are required: `transition.reload` only fires for programmatic
-      // `router.navigate({reload:true})`. F5 under navigation-plugin primes
-      // `nav.navigationType === "reload"` via #531 getActivationType but leaves
-      // opts.reload undefined, so dropping the plugin arm would regress F5
-      // scroll-restore. Same belt-and-suspenders pattern is used for replace
-      // above. Browser-plugin's F5 is not covered (no priming, out of scope).
+      // Restore branches (reload, back/traverse) MUST be evaluated before the
+      // replace-skip below. Since #657 lifted `replace` into TransitionMeta, a
+      // history TRAVERSAL (back/forward) under navigation-plugin carries
+      // `transition.replace === true` — a traversal reuses an existing history
+      // entry, which is replace-shaped at the history level. If the replace-skip
+      // ran first it would swallow every back/forward navigation and restore
+      // would never fire (the Scenario 6 e2e regression). Genuine in-place
+      // replaces (`router.navigate({ replace: true })`, navigateToNotFound) are
+      // not traversals and fall through to the skip below.
+      //
+      // Both arms of each check are required: `transition.reload` only fires for
+      // programmatic `router.navigate({reload:true})`. F5 under navigation-plugin
+      // primes `nav.navigationType === "reload"` via #531 getActivationType but
+      // leaves opts.reload undefined, so dropping the plugin arm would regress F5
+      // scroll-restore. Browser-plugin's F5 is not covered (no priming, out of
+      // scope).
       if (route.transition.reload || nav?.navigationType === "reload") {
         const key = safeKeyOf(route);
 
-        writePos(key === null ? 0 : (loadStore()[key] ?? 0));
+        restorePos(key === null ? 0 : (loadStore()[key] ?? 0));
 
         return;
       }
@@ -261,8 +343,13 @@ export function createScrollRestoration(
       if (nav?.direction === "back" || nav?.navigationType === "traverse") {
         const key = safeKeyOf(route);
 
-        writePos(key === null ? 0 : (loadStore()[key] ?? 0));
+        restorePos(key === null ? 0 : (loadStore()[key] ?? 0));
 
+        return;
+      }
+
+      // Genuine in-place replace (not a traversal) — leave scroll untouched.
+      if (route.transition.replace || nav?.navigationType === "replace") {
         return;
       }
 
