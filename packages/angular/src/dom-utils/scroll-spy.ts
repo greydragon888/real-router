@@ -541,6 +541,15 @@ export function createScrollSpy(
 
       destroyed = true;
 
+      // Unsubscribe FIRST to prevent late-arriving router transition
+      // callback from calling `startCooldown()` on a half-destroyed instance.
+      // Without this ordering, a transition with `hashChanged: true` firing
+      // between `clearCooldown()` and `unsubscribeRouter()` would re-install
+      // a 500ms timer that survives `destroy()`. Verified via Oracle review.
+      unsubscribeRouter();
+      detectionUnsub?.();
+      detectionUnsub = null;
+
       if (intersectionObserver) {
         intersectionObserver.disconnect();
         intersectionObserver = null;
@@ -567,10 +576,6 @@ export function createScrollSpy(
       }
 
       clearCooldown();
-
-      unsubscribeRouter();
-      detectionUnsub?.();
-      detectionUnsub = null;
 
       observedElements.clear();
       pendingEntries.clear();
