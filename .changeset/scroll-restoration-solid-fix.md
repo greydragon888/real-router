@@ -2,7 +2,7 @@
 "@real-router/solid": minor
 ---
 
-Fix scroll restoration not firing on browser back/forward under navigation-plugin (#657)
+Fix scroll restoration not firing on browser back/forward under navigation-plugin (#694)
 
 Since #657 lifted `replace` into `TransitionMeta`, a history **traversal** (back/forward) under `navigation-plugin` now arrives with `transition.replace === true` — a traversal reuses an existing history entry, which is replace-shaped at the history level. `createScrollRestoration` evaluated its replace-skip guard *before* the back/traverse restore branch, so every back/forward navigation was swallowed and the saved scroll position was never restored.
 
