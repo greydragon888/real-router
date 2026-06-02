@@ -1,5 +1,41 @@
 # @real-router/angular
 
+## 0.11.0
+
+### Minor Changes
+
+- [#695](https://github.com/greydragon888/real-router/pull/695) [`51b993e`](https://github.com/greydragon888/real-router/commit/51b993e7877e2b12f4e6ca0b8078f7ab4629501f) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix scroll restoration not firing on browser back/forward under navigation-plugin ([#694](https://github.com/greydragon888/real-router/issues/694))
+
+  Since [#657](https://github.com/greydragon888/real-router/issues/657) lifted `replace` into `TransitionMeta`, a history **traversal** (back/forward) under `navigation-plugin` now arrives with `transition.replace === true` — a traversal reuses an existing history entry, which is replace-shaped at the history level. `createScrollRestoration` evaluated its replace-skip guard _before_ the back/traverse restore branch, so every back/forward navigation was swallowed and the saved scroll position was never restored.
+
+  Reordered the restore decision tree so `reload` and `back`/`traverse` restore branches run **before** the genuine in-place-replace skip (`router.navigate({ replace: true })`, `navigateToNotFound` still skip as before).
+
+  Also hardened restore for a custom `scrollContainer` that mounts or lays out a few frames after the navigation settles (heavy routes): restore now re-applies the scroll across a bounded frame budget until the container exists and the position sticks, instead of a single best-effort `scrollTo` that could clamp to 0 against not-yet-laid-out content.
+
+- [#695](https://github.com/greydragon888/real-router/pull/695) [`51b993e`](https://github.com/greydragon888/real-router/commit/51b993e7877e2b12f4e6ca0b8078f7ab4629501f) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `scrollSpy` option to `provideRealRouter` / `provideRealRouterFactory` — router-coordinated `IntersectionObserver` URL hash spy ([#575](https://github.com/greydragon888/real-router/issues/575))
+
+  New `scrollSpy?: ScrollSpyOptions` field on `RealRouterOptions` / `RealRouterFactoryOptions` wires `createScrollSpy(router, options)` from `shared/dom-utils/` via `provideEnvironmentInitializer` + the new shared `installScrollSpy` helper. The URL hash tracks the topmost visible anchor as the user scrolls, syncing `state.context.url.hash` so sibling `<a realLink [hash]>` highlights re-evaluate via the standard `createActiveRouteSource` pipeline.
+
+  ```typescript
+  bootstrapApplication(AppComponent, {
+    providers: [
+      provideRealRouter(router, {
+        scrollSpy: { selector: "[id]:is(h2,h3)" },
+      }),
+    ],
+  });
+  ```
+
+  Available on both `provideRealRouter` (SPA) and `provideRealRouterFactory` (SSR / SSG); on the SSR path the utility correctly NOOP's on the server pass (`document` is undefined). Teardown wired through `inject(DestroyRef)`. Options are a snapshot at bootstrap — not reactive to runtime changes.
+
+  Emits a forced same-route transition with `{ hash, replace: true, force: true, hashChange: true }` — same write API as `<a realLink [hash]>` ([#532](https://github.com/greydragon888/real-router/issues/532)), `replace: true` so the spy doesn't pollute history. Three anti-flicker gates (`isTransitioning`, `coolingDown` cleared on `scrollend` or 500 ms fallback, `selfEmitting`).
+
+  Requires `browser-plugin` or `navigation-plugin`. Under `hash-plugin` / `memory-plugin` / no URL plugin → warn-once + NOOP. SSR / browsers without `IntersectionObserver` = NOOP.
+
+  The `dom-utils` git-tracked copy now also includes `scroll-spy.ts` (re-materialised from `shared/dom-utils/` via the `prebundle` script — ng-packagr does not follow symlinks).
+
+  See [Scroll Spy guide](https://github.com/greydragon888/real-router/wiki/Scroll-Spy).
+
 ## 0.10.0
 
 ### Minor Changes
