@@ -63,9 +63,12 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm --filter react-combined-example exec playwright install chromium --with-deps
 
-      # Build results cached from examples job via Turbo Remote Cache
+      # Build results cached from examples job via Turbo Remote Cache.
+      # --continue=dependencies-successful: a failing example's e2e must not
+      # cancel the others — run every example's specs, so one CI run yields the
+      # complete list of failing e2e tests instead of stopping at the first.
       - name: Run E2E tests
-        run: pnpm turbo run test:e2e --filter='./examples/**' --concurrency=1
+        run: pnpm turbo run test:e2e --filter='./examples/**' --concurrency=1 --continue=dependencies-successful
 
       - name: Upload Playwright report
         if: failure()

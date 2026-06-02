@@ -53,9 +53,8 @@ jobs:
           config-file: ./.github/dependency-review-config.yml
           comment-summary-in-pr: on-failure
           warn-on-openssf-scorecard-level: 0
-          # GHSA-7mvr-c777-76hp — historical exemption.
           # GHSA-wrw7-89jp-8q8g — glib@0.18.5 (VariantStrIter unsoundness, fixed
           #   in 0.20.0). Transitive via Tauri 2 → GTK/WebKit bindings on Linux
           #   only, pulled by the desktop example apps under
           #   examples/desktop/tauri/*/src-tauri/. Not in any published package.
-          allow-ghsas: GHSA-7mvr-c777-76hp, GHSA-wrw7-89jp-8q8g
+          allow-ghsas: GHSA-wrw7-89jp-8q8g

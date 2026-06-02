@@ -3,7 +3,7 @@ import { RouteView } from "@real-router/react";
 import { Dashboard } from "./pages/Dashboard";
 import { Home } from "./pages/Home";
 import { Settings } from "./pages/Settings";
-import { Layout } from "../../shared/Layout";
+import { Layout } from "../../../shared/Layout";
 
 import type { JSX } from "react";
 

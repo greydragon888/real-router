@@ -5,7 +5,7 @@ import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { routes } from "./routes";
 
-import "../../../../shared/styles.css";
+import "../../../../../shared/styles.css";
 import "./styles.css";
 
 // Mode + behavior persisted in localStorage. Switching them remounts the

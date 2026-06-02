@@ -15,8 +15,22 @@ import type { PluginApi } from "@real-router/core/api";
 // navigate event (the hot path). `event.intercept` reads `handler` once per
 // call per Navigation API spec, so a shared object/function is safe and
 // saves two allocations per intercepted event.
+//
+// `scroll: "manual"` is critical for plugin-originated re-emits: by the time
+// the navigate event fires for a router-driven mutation (e.g. scroll-spy's
+// hash-only nav, scroll-restoration's URL sync), the router has already
+// committed the transition and the app owns scroll position. Default
+// `scroll: "after-transition"` would auto-scroll the new URL fragment into
+// view, fighting against the user's own scroll motion (concrete bug:
+// scroll-spy + slow user scroll → viewport jump on every emit).
+// Aligns with browser-plugin (History API has no auto-scroll on
+// programmatic URL changes). Apps that want hash-anchor auto-scroll opt
+// in via `createScrollRestoration({ anchorScrolling: true })`.
 const NOOP_ASYNC = async (): Promise<void> => {};
-const NOOP_INTERCEPT: NavigationInterceptOptions = { handler: NOOP_ASYNC };
+const NOOP_INTERCEPT: NavigationInterceptOptions = {
+  handler: NOOP_ASYNC,
+  scroll: "manual",
+};
 
 interface NavigateHandlerDeps {
   router: Router;

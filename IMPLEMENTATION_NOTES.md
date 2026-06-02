@@ -3597,3 +3597,81 @@ Public namespace surface (consumers inside core):
 - **Closure-sharing across clones (audit Bug #2 / clone-router #2)** — not addressed and cannot be addressed by factory storage layout. A guard factory registered on the base with closure over per-request state is shared by reference with every clone regardless of how the factories are filed. The fix is documentation (singletons on base, per-request state on the clone via the override slot or `createRequestScope`), tracked under #664 for dependencies and applicable to guards verbatim.
 - **`removeActivateGuard` semantics** — unchanged. Default clear of both origin slots is preserved so this PR is a pure refactor at the public surface. Tightening to "external only" is a separate API-contract decision.
 
+## Scroll Spy via Forced Same-States Transition (#575)
+
+### Problem
+
+Long-form pages with anchored sections want the URL bar to reflect the currently-visible section — bookmarkable, share-able, and to drive sibling `<Link hash>` highlights for a TOC sidebar. Userland packages (`react-waypoint`, `react-scrollspy`, `vue-scrollactive`) solve this by writing `history.replaceState({}, "", "#section")` directly, which updates the URL bar but **bypasses the router**: `state.context.url.hash` stays stale, hash-aware `<Link>` components don't re-highlight, and analytics/loaders subscribed to `router.subscribe` miss the change. The category is also stagnant — ~2M downloads/mo across packages whose median last release is > 5 years.
+
+A scroll-spy plugin layered into the transition pipeline is the wrong shape: `IntersectionObserver` is a DOM concern, the spy doesn't participate in guard / activation phases, and routing-core is intentionally DOM-agnostic. The same rationale that put `createRouteAnnouncer` / `createScrollRestoration` / `createViewTransitions` into `shared/dom-utils/` applies.
+
+### Solution
+
+Added `shared/dom-utils/scroll-spy.ts` exposing `createScrollSpy(router, options)`. On `IntersectionObserver` notifications the utility picks the topmost visible anchor inside the configured scroll container and emits
+
+```ts
+router.navigate(state.name, state.params, {
+  hash: newHash,
+  replace: true,
+  force: true,
+  hashChange: true,
+});
+```
+
+This is a **forced same-route same-params transition** with `hashChange: true`:
+
+- `force: true` bypasses core's `SAME_STATES` short-circuit (name+params didn't change).
+- `hashChange: true` signals URL plugins (`browser-plugin` / `navigation-plugin`) to write `state.context.url = { hash: newHash, hashChanged: true }` in their `onTransitionSuccess` claim.
+- `replace: true` keeps `state.transition.replace === true` portable across both URL plugins so [`createScrollRestoration`](../shared/dom-utils/scroll-restore.ts) skips magnetic-snap on spy-emitted transitions (foundation #648).
+
+Same write API as `<Link hash>` click via `navigateWithHash`, just with `replace: true` so the spy doesn't pollute history with one entry per visible section.
+
+Each framework adapter wires the utility to a `scrollSpy?: ScrollSpyOptions` prop on `RouterProvider` (Angular: options bag on `provideRealRouter` / `provideRealRouterFactory`). Lifecycle is tied to the provider — created on mount, destroyed on unmount.
+
+### Why not `replaceHistoryState` directly?
+
+The userland approach writes `history.replaceState({}, "", "#section")` and calls it a day. This updates the URL bar but does **not**:
+
+1. Update `state.context.url.hash` (which is plugin-domain, claimed via `claimContextNamespace`).
+2. Notify `router.subscribe` listeners — analytics tracking section visibility never fires.
+3. Re-trigger `createActiveRouteSource` for sibling `<Link hash>` — TOC highlights stop matching scroll.
+4. Run lifecycle-plugin's `onStay` / `onNavigate` callbacks (same-route hash-only navigations).
+
+Routing through `router.navigate(...)` keeps the entire transition pipeline aware of the hash change. For same-route same-params transitions, [`getTransitionPath`](../packages/core/src/transitionPath.ts) returns empty `toDeactivate` / `toActivate` arrays — `runGuards` is a no-op. The only work is the URL plugin's `onTransitionSuccess` write and the `getTransitionSource` flip — cheap.
+
+### Anti-flicker mechanisms
+
+`scrollIntoView({ behavior: "smooth" })` after a `<Link hash>` click animates **after** `TRANSITION_SUCCESS` — `isTransitioning` is already `false`, intermediate IO events during the smooth scroll would emit spurious `router.navigate(...)` calls, and the URL bar would flicker through `#section-2 #section-3 #section-4` before landing on `#section-5`. Three composing gates close the loop:
+
+1. **`isTransitioning` gate** — via `getTransitionSource(router)` (per-router cached, eager subscription, auto-resets on success/error/cancel). Skips emits while a transition is in-flight.
+2. **`coolingDown` gate** — set on a user-driven hash transition (e.g. `<Link hash>` click + smooth `scrollIntoView`). Cleared on the `scrollend` event (Baseline 2026: Chrome 114+, Firefox 109+, Safari 17+) or a 500 ms safety timeout. IO events during the smooth animation are silenced.
+3. **`selfEmitting` guard** — set synchronously around the spy's own `router.navigate(...)` call. Without it the spy's own `router.subscribe` callback would see `hashChanged: true` and re-enter the cooldown setup, rate-limiting the spy to ≤ 2 emits/s and contradicting the ≤ 10 emits/s acceptance target.
+
+### Why `createScrollSpy`, not `useScrollSpy`
+
+A hook would require six adapter-specific surfaces; the utility shape requires zero adapter API and slots into the existing `RouterProvider` prop pattern used by `scrollRestoration` / `viewTransitions` / `announceNavigation`. Hash-plugin / memory-plugin / no-URL-plugin runtimes detect missing `state.context.url` at init (or via a one-shot subscriber if the router isn't started yet) and degrade to a `NOOP_INSTANCE` with a single dev-only warn — same defensive shape as `createScrollRestoration` under non-DOM runtimes.
+
+### Why not opt-out the spy via a separate `@real-router/hash-events-plugin`
+
+`hashChanged: true` is symmetric on the bus: every subscriber — `router.subscribe`, `lifecycle-plugin.onStay` / `onNavigate`, `createActiveRouteSource` — sees the spy's emit identically to a user-driven `<Link hash>` click. Consumers who want to ignore hash-only transitions filter at the call site (`if (route.context.url?.hashChanged) return;`). Declarative filtering via a route-config field (`onHashChange`) is a separate plugin scoped to demand evidence; not in this RFC.
+
+## Example e2e runs to completion despite failures (#694)
+
+### Problem
+
+The scheduled `Examples` workflow runs every example's Playwright suite via a single `pnpm turbo run test:e2e --filter='./examples/**' --concurrency=1`. Turbo's default (`--continue=never`) cancels all remaining tasks the moment one fails, so a single broken example aborted the sweep and the job log listed only the **first** failing example — any other red examples stayed invisible until the next run. While triaging #694 (scroll-restoration regression) the run stopped at the first failure, so a single log could not tell whether other examples were also broken.
+
+### Solution
+
+Pass `--continue=dependencies-successful` on the e2e job only:
+
+```yaml
+run: pnpm turbo run test:e2e --filter='./examples/**' --concurrency=1 --continue=dependencies-successful
+```
+
+Every example whose build succeeded now runs its specs regardless of sibling failures, so a single CI run yields the **complete** list of failing e2e tests. The aggregate task still exits non-zero, so the job stays red on any failure — this changes the log, not the gate.
+
+### Why only e2e, not the unit pipelines
+
+`ci.yml` / `post-merge.yml` run the library unit + property tests, where vitest already reports every failure within a package and fail-fast across the package graph is the right default (faster red on a real regression). The aggregation problem is specific to the ~90-example e2e sweep, where a per-example abort discards the rest of the matrix. `dependencies-successful` (not `always`) is deliberate: it does **not** run an example's e2e when that example's own build failed — those are surfaced by the build job, not drowned in Playwright connection errors against a missing `dist/`.
+

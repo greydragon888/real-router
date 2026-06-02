@@ -21,12 +21,13 @@ import { createRouteSource } from "@real-router/sources";
 
 import {
   installScrollRestoration,
+  installScrollSpy,
   installViewTransitions,
 } from "./internal/install";
 import { NAVIGATOR, ROUTE, ROUTER } from "./providers";
 import { sourceToSignal } from "./sourceToSignal";
 
-import type { ScrollRestorationOptions } from "./dom-utils";
+import type { ScrollRestorationOptions, ScrollSpyOptions } from "./dom-utils";
 import type { RouteSignals } from "./types";
 
 /**
@@ -124,6 +125,9 @@ export interface RealRouterFactoryOptions<
   /** Optional scroll restoration — same semantics as `provideRealRouter`. */
   scrollRestoration?: ScrollRestorationOptions;
 
+  /** Optional scroll spy — same semantics as `provideRealRouter`. */
+  scrollSpy?: ScrollSpyOptions;
+
   /** Optional view transitions — same semantics as `provideRealRouter`. */
   viewTransitions?: boolean;
 }
@@ -156,8 +160,14 @@ export interface RealRouterFactoryOptions<
 export function provideRealRouterFactory<
   TDeps extends DefaultDependencies = DefaultDependencies,
 >(options: RealRouterFactoryOptions<TDeps>): EnvironmentProviders {
-  const { baseRouter, plugins, deps, scrollRestoration, viewTransitions } =
-    options;
+  const {
+    baseRouter,
+    plugins,
+    deps,
+    scrollRestoration,
+    scrollSpy,
+    viewTransitions,
+  } = options;
 
   const providers: Parameters<typeof makeEnvironmentProviders>[0] = [
     {
@@ -266,6 +276,14 @@ export function provideRealRouterFactory<
     providers.push(
       provideEnvironmentInitializer(() => {
         installScrollRestoration(scrollRestoration);
+      }),
+    );
+  }
+
+  if (scrollSpy && scrollSpy.selector !== "") {
+    providers.push(
+      provideEnvironmentInitializer(() => {
+        installScrollSpy(scrollSpy);
       }),
     );
   }

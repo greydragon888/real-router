@@ -160,7 +160,7 @@ Navigation link with automatic active state detection. Re-renders only when its 
 </nav>
 ```
 
-Tri-state: `undefined` preserves the current hash, `""` clears it, a value sets it. Active class is hash-aware — only the matching tab lights up. Live demo: [`examples/web/react/link-hash/`](../../examples/web/react/link-hash/). See the [Hash Fragment Support](https://github.com/greydragon888/real-router/wiki/Hash) wiki page for the full surface.
+Tri-state: `undefined` preserves the current hash, `""` clears it, a value sets it. Active class is hash-aware — only the matching tab lights up. Live demo: [`examples/web/react/hash-examples/link-hash/`](../../examples/web/react/hash-examples/link-hash/). See the [Hash Fragment Support](https://github.com/greydragon888/real-router/wiki/Hash) wiki page for the full surface.
 
 ### `<RouteView>` (React 19.2+)
 
@@ -451,6 +451,25 @@ Opt-in preservation of scroll position across navigations:
 
 Restores scroll on back/forward, scrolls to top (or `#hash`) on push. Three modes: `"restore"` (default), `"top"`, `"native"`. Custom containers via `scrollContainer: () => HTMLElement | null`. Lifecycle tied to the provider — created on mount, destroyed on unmount. Under `@real-router/browser-plugin`, replace transitions now preserve scroll position and programmatic reloads restore from `sessionStorage` (portable via `state.transition.replace` / `state.transition.reload`). See [Scroll Restoration guide](https://github.com/greydragon888/real-router/wiki/Scroll-Restoration) for the full behaviour matrix.
 
+## Scroll Spy
+
+Opt-in router-coordinated `IntersectionObserver` scroll spy — the URL hash tracks the topmost visible anchor as the user scrolls, syncing `state.context.url.hash` so sibling `<Link hash>` highlights stay current:
+
+```tsx
+<RouterProvider
+  router={router}
+  scrollSpy={{ selector: "[id]:is(h2,h3)" }}
+>
+  {/* Your app */}
+</RouterProvider>
+```
+
+Emits a forced same-route transition with `{ hash, replace: true, force: true, hashChange: true }` — the same write API as `<Link hash>` (#532), just with `replace: true` so the spy doesn't pollute history. Three anti-flicker gates: `isTransitioning` (skip emits during transitions), `coolingDown` (skip emits during smooth `scrollIntoView` after a `<Link hash>` click; cleared on `scrollend` or 500 ms timeout), and `selfEmitting` (the spy doesn't rate-limit itself). Hardcoded internals: `IntersectionObserver.threshold = 0`, rAF + 150 ms trailing debounce, MutationObserver re-observe debounced 250 ms.
+
+Options: `{ selector: string, rootMargin?: string, scrollContainer?: () => HTMLElement | null }`. Default `rootMargin`: `"-20% 0px -60% 0px"` (anchor active when crossing the top 20% of the viewport). Empty `selector` / `undefined` = off. SSR / browsers without `IntersectionObserver` = NOOP. Requires `browser-plugin` or `navigation-plugin` (hash-plugin and memory-plugin → warn-once + NOOP — they don't claim `state.context.url`).
+
+Live demo: [`examples/web/react/hash-examples/scroll-spy/`](../../examples/web/react/hash-examples/scroll-spy/) (12 sections, TOC sidebar, plugin & spy-mode switchers, 10 e2e scenarios). See [Scroll Spy guide](https://github.com/greydragon888/real-router/wiki/Scroll-Spy) for the full API surface and recipes.
+
 ## View Transitions
 
 Opt-in animated route transitions via the browser's [View Transitions API](https://developer.mozilla.org/en-US/docs/Web/API/View_Transitions_API):
@@ -467,7 +486,7 @@ No-op on unsupported browsers (Firefox as of 2026-04, SSR). Customization is pur
 
 Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 
-- [RouterProvider](https://github.com/greydragon888/real-router/wiki/RouterProvider) · [RouteView](https://github.com/greydragon888/real-router/wiki/RouteView) · [RouterErrorBoundary](https://github.com/greydragon888/real-router/wiki/RouterErrorBoundary) · [Link](https://github.com/greydragon888/real-router/wiki/Link) · [Scroll Restoration](https://github.com/greydragon888/real-router/wiki/Scroll-Restoration) · [View Transitions](https://github.com/greydragon888/real-router/wiki/View-Transitions)
+- [RouterProvider](https://github.com/greydragon888/real-router/wiki/RouterProvider) · [RouteView](https://github.com/greydragon888/real-router/wiki/RouteView) · [RouterErrorBoundary](https://github.com/greydragon888/real-router/wiki/RouterErrorBoundary) · [Link](https://github.com/greydragon888/real-router/wiki/Link) · [Scroll Restoration](https://github.com/greydragon888/real-router/wiki/Scroll-Restoration) · [Scroll Spy](https://github.com/greydragon888/real-router/wiki/Scroll-Spy) · [View Transitions](https://github.com/greydragon888/real-router/wiki/View-Transitions)
 - [useRouter](https://github.com/greydragon888/real-router/wiki/useRouter) · [useRoute](https://github.com/greydragon888/real-router/wiki/useRoute) · [useRouteNode](https://github.com/greydragon888/real-router/wiki/useRouteNode) · [useNavigator](https://github.com/greydragon888/real-router/wiki/useNavigator) · [useRouteUtils](https://github.com/greydragon888/real-router/wiki/useRouteUtils) · [useRouterTransition](https://github.com/greydragon888/real-router/wiki/useRouterTransition) · [useRouteExit](https://github.com/greydragon888/real-router/wiki/useRouteExit) · [useRouteEnter](https://github.com/greydragon888/real-router/wiki/useRouteEnter)
 
 ## Examples

@@ -471,6 +471,38 @@ describe("createScrollRestoration", () => {
     sr.destroy();
   });
 
+  it("back/traverse carrying transition.replace=true (post-#657) restores, not skipped", () => {
+    // Regression guard for the Scenario 6 e2e failure. Since #657 lifted
+    // `replace` into TransitionMeta, a history TRAVERSAL under navigation-plugin
+    // arrives with BOTH navigationType "traverse" AND transition.replace=true
+    // (a traversal reuses an existing entry → replace-shaped). The restore
+    // branch must win over the replace-skip; otherwise every back/forward gets
+    // swallowed and scroll is never restored.
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "about:{}": 640 }));
+
+    const fake = makeFakeRouter(makeState("home"));
+    const scrollSpy = vi.spyOn(globalThis, "scrollTo");
+    const sr = track(createScrollRestoration(fake.router));
+
+    fake.emit(
+      makeState(
+        "about",
+        {},
+        { navigation: { direction: "back", navigationType: "traverse" } },
+        { replace: true },
+      ),
+      makeState("home"),
+    );
+
+    expect(scrollSpy).toHaveBeenCalledWith({
+      top: 640,
+      left: 0,
+      behavior: "auto",
+    });
+
+    sr.destroy();
+  });
+
   it("navigationType 'reload' triggers restore from storage", () => {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "home:{}": 200 }));
 
@@ -686,6 +718,259 @@ describe("createScrollRestoration", () => {
       top: 0,
       left: 0,
       behavior: "auto",
+    });
+
+    sr.destroy();
+  });
+
+  it("restore: late-mounted container resolved via bounded retry; window restored immediately", () => {
+    // The container is not in the DOM when the restore frame fires (heavy route
+    // still committing) — `getContainer()` returns null for the first two
+    // resolves, then the element appears. The synchronous rAF stub drives the
+    // retry loop inline.
+    const element = document.createElement("div");
+
+    element.id = "late-restore-scroller";
+    Object.defineProperty(element, "scrollTop", {
+      value: 0,
+      writable: true,
+      configurable: true,
+    });
+    const elementScrollToSpy = vi.fn();
+
+    element.scrollTo = elementScrollToSpy;
+
+    let calls = 0;
+    const fake = makeFakeRouter(makeState("home"));
+    const windowScrollSpy = vi.spyOn(globalThis, "scrollTo");
+    const sr = track(
+      createScrollRestoration(fake.router, {
+        scrollContainer: () => {
+          calls += 1;
+
+          // Resolve order on this navigation: #1 = capture-side readPos, #2 =
+          // restorePos fast-path probe, #3 = first retry frame. Stay null until
+          // the retry frame so both the fast-path and ≥1 retry see no element.
+          return calls >= 3 ? element : null;
+        },
+      }),
+    );
+
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "about:{}": 350 }));
+    fake.emit(
+      makeState(
+        "about",
+        {},
+        { navigation: { direction: "back", navigationType: "traverse" } },
+      ),
+      makeState("home"),
+    );
+
+    // Window was restored immediately (harmless clamp on a container route)...
+    expect(windowScrollSpy).toHaveBeenCalledWith({
+      top: 350,
+      left: 0,
+      behavior: "auto",
+    });
+    // ...and the late container caught the saved position once it mounted.
+    expect(elementScrollToSpy).toHaveBeenCalledWith({
+      top: 350,
+      left: 0,
+      behavior: "auto",
+    });
+
+    sr.destroy();
+  });
+
+  it("restore: container never mounts → window fallback after retry budget, no element scroll", () => {
+    const elementScrollToSpy = vi.fn();
+    const fake = makeFakeRouter(makeState("home"));
+    const windowScrollSpy = vi.spyOn(globalThis, "scrollTo");
+    const sr = track(
+      createScrollRestoration(fake.router, {
+        // Getter is configured but the route never renders the container.
+        scrollContainer: () => null,
+      }),
+    );
+
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "about:{}": 420 }));
+
+    expect(() => {
+      fake.emit(
+        makeState(
+          "about",
+          {},
+          { navigation: { direction: "back", navigationType: "traverse" } },
+        ),
+        makeState("home"),
+      );
+    }).not.toThrow();
+
+    expect(windowScrollSpy).toHaveBeenCalledWith({
+      top: 420,
+      left: 0,
+      behavior: "auto",
+    });
+    expect(elementScrollToSpy).not.toHaveBeenCalled();
+
+    sr.destroy();
+  });
+
+  it("restore: destroy() during container retry cancels the late scroll", () => {
+    vi.unstubAllGlobals();
+    const pending: FrameRequestCallback[] = [];
+
+    vi.stubGlobal(
+      "requestAnimationFrame",
+      (cb: FrameRequestCallback): number => {
+        pending.push(cb);
+
+        return pending.length;
+      },
+    );
+
+    const element = document.createElement("div");
+
+    element.id = "destroy-during-retry-scroller";
+    const elementScrollToSpy = vi.fn();
+
+    element.scrollTo = elementScrollToSpy;
+
+    // Container is absent while the restore frame runs, becomes resolvable
+    // afterwards — so only the destroyed-guard can stop the late scroll.
+    let mounted = false;
+    const fake = makeFakeRouter(makeState("home"));
+    const sr = createScrollRestoration(fake.router, {
+      scrollContainer: () => (mounted ? element : null),
+    });
+
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "about:{}": 500 }));
+    fake.emit(
+      makeState(
+        "about",
+        {},
+        { navigation: { direction: "back", navigationType: "traverse" } },
+      ),
+      makeState("home"),
+    );
+
+    // pending[0] = subscribe's outer rAF. Fire it → restorePos runs, schedules
+    // the container-retry frame.
+    pending.shift()?.(0);
+
+    // Container would now resolve, but we tear down first.
+    mounted = true;
+    sr.destroy();
+
+    // Fire the retry frame — the destroyed guard must bail before scrolling.
+    pending.shift()?.(0);
+
+    expect(elementScrollToSpy).not.toHaveBeenCalled();
+  });
+
+  it("restore: instant container scroll stops re-applying once it sticks", () => {
+    const element = document.createElement("div");
+
+    element.id = "sticky-scroller";
+    Object.defineProperty(element, "scrollHeight", {
+      value: 5000,
+      configurable: true,
+    });
+    Object.defineProperty(element, "clientHeight", {
+      value: 500,
+      configurable: true,
+    });
+    let top = 0;
+
+    Object.defineProperty(element, "scrollTop", {
+      get: () => top,
+      set: (value: number) => {
+        top = value;
+      },
+      configurable: true,
+    });
+    // A real container updates scrollTop synchronously for instant scrolls.
+    const scrollToSpy = vi.fn((opts?: ScrollToOptions) => {
+      element.scrollTop = Math.min(opts?.top ?? 0, 5000 - 500);
+    });
+
+    element.scrollTo = scrollToSpy as unknown as typeof element.scrollTo;
+
+    const fake = makeFakeRouter(makeState("home"));
+    const sr = track(
+      createScrollRestoration(fake.router, { scrollContainer: () => element }),
+    );
+
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "about:{}": 1200 }));
+    fake.emit(
+      makeState(
+        "about",
+        {},
+        { navigation: { direction: "back", navigationType: "traverse" } },
+      ),
+      makeState("home"),
+    );
+
+    expect(element.scrollTop).toBe(1200);
+    // Stuck on the first apply → no wasted re-applies across the frame budget.
+    expect(scrollToSpy).toHaveBeenCalledTimes(1);
+
+    sr.destroy();
+  });
+
+  it("restore: smooth container scroll re-applies across the whole frame budget", () => {
+    const element = document.createElement("div");
+
+    element.id = "smooth-scroller";
+    Object.defineProperty(element, "scrollHeight", {
+      value: 5000,
+      configurable: true,
+    });
+    Object.defineProperty(element, "clientHeight", {
+      value: 500,
+      configurable: true,
+    });
+    let top = 0;
+
+    Object.defineProperty(element, "scrollTop", {
+      get: () => top,
+      set: (value: number) => {
+        top = value;
+      },
+      configurable: true,
+    });
+    const scrollToSpy = vi.fn((opts?: ScrollToOptions) => {
+      element.scrollTop = Math.min(opts?.top ?? 0, 5000 - 500);
+    });
+
+    element.scrollTo = scrollToSpy as unknown as typeof element.scrollTo;
+
+    const fake = makeFakeRouter(makeState("home"));
+    const sr = track(
+      createScrollRestoration(fake.router, {
+        scrollContainer: () => element,
+        behavior: "smooth",
+      }),
+    );
+
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "about:{}": 1200 }));
+    fake.emit(
+      makeState(
+        "about",
+        {},
+        { navigation: { direction: "back", navigationType: "traverse" } },
+      ),
+      makeState("home"),
+    );
+
+    // Smooth restores animate asynchronously, so the sampled position never
+    // matches synchronously — the loop never early-stops and runs the full
+    // budget (initial attempt + RESTORE_RETRY_FRAMES retries = 11 applies).
+    expect(scrollToSpy).toHaveBeenCalledTimes(11);
+    expect(scrollToSpy).toHaveBeenLastCalledWith({
+      top: 1200,
+      left: 0,
+      behavior: "smooth",
     });
 
     sr.destroy();

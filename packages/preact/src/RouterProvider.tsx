@@ -6,11 +6,12 @@ import { NavigatorContext, RouteContext, RouterContext } from "./context";
 import {
   createRouteAnnouncer,
   createScrollRestoration,
+  createScrollSpy,
   createViewTransitions,
 } from "./dom-utils";
 import { useSyncExternalStore } from "./useSyncExternalStore";
 
-import type { ScrollRestorationOptions } from "./dom-utils";
+import type { ScrollRestorationOptions, ScrollSpyOptions } from "./dom-utils";
 import type { Router } from "@real-router/core";
 import type { FunctionComponent, ComponentChildren } from "preact";
 
@@ -19,6 +20,7 @@ export interface RouteProviderProps {
   children: ComponentChildren;
   announceNavigation?: boolean;
   scrollRestoration?: ScrollRestorationOptions;
+  scrollSpy?: ScrollSpyOptions;
   viewTransitions?: boolean;
 }
 
@@ -27,6 +29,7 @@ export const RouterProvider: FunctionComponent<RouteProviderProps> = ({
   children,
   announceNavigation,
   scrollRestoration,
+  scrollSpy,
   viewTransitions,
 }) => {
   useEffect(() => {
@@ -71,6 +74,30 @@ export const RouterProvider: FunctionComponent<RouteProviderProps> = ({
     // scrollRestoration (for scrollContainer) omitted — see comment above.
     // eslint-disable-next-line @eslint-react/exhaustive-deps
   }, [router, srEnabled, srMode, srAnchor, srBehavior, srStorageKey]);
+
+  const spySelector = scrollSpy?.selector;
+  const spyRootMargin = scrollSpy?.rootMargin;
+  const spyEnabled =
+    scrollSpy !== undefined && spySelector !== undefined && spySelector !== "";
+
+  useEffect(() => {
+    if (!spyEnabled) {
+      return;
+    }
+
+    const spy = createScrollSpy(router, {
+      selector: spySelector,
+      rootMargin: spyRootMargin,
+      scrollContainer: scrollSpy.scrollContainer,
+    });
+
+    return () => {
+      spy.destroy();
+    };
+    // scrollSpy (for scrollContainer) omitted — same rationale as
+    // scrollRestoration above: getter is invoked lazily inside the utility.
+    // eslint-disable-next-line @eslint-react/exhaustive-deps
+  }, [router, spyEnabled, spySelector, spyRootMargin]);
 
   useEffect(() => {
     if (!viewTransitions) {

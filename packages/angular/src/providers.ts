@@ -9,11 +9,12 @@ import { createRouteSource } from "@real-router/sources";
 
 import {
   installScrollRestoration,
+  installScrollSpy,
   installViewTransitions,
 } from "./internal/install";
 import { sourceToSignal } from "./sourceToSignal";
 
-import type { ScrollRestorationOptions } from "./dom-utils";
+import type { ScrollRestorationOptions, ScrollSpyOptions } from "./dom-utils";
 import type { RouteSignals } from "./types";
 
 export const ROUTER = new InjectionToken<Router>("ROUTER");
@@ -24,6 +25,7 @@ export const ROUTE = new InjectionToken<RouteSignals>("ROUTE");
 
 export interface RealRouterOptions {
   scrollRestoration?: ScrollRestorationOptions;
+  scrollSpy?: ScrollSpyOptions;
   viewTransitions?: boolean;
 }
 
@@ -56,6 +58,16 @@ export function provideRealRouter(
     providers.push(
       provideEnvironmentInitializer(() => {
         installScrollRestoration(scrollOpts);
+      }),
+    );
+  }
+
+  if (options?.scrollSpy && options.scrollSpy.selector !== "") {
+    const spyOpts = options.scrollSpy;
+
+    providers.push(
+      provideEnvironmentInitializer(() => {
+        installScrollSpy(spyOpts);
       }),
     );
   }

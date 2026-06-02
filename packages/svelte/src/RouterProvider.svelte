@@ -4,6 +4,7 @@
   import {
     createRouteAnnouncer,
     createScrollRestoration,
+    createScrollSpy,
     createViewTransitions,
   } from "./dom-utils";
   import { setContext, untrack } from "svelte";
@@ -12,7 +13,7 @@
   import { createRouteContext } from "./createRouteContext.svelte";
   import { NAVIGATOR_KEY, ROUTE_KEY, ROUTER_KEY } from "./context";
 
-  import type { ScrollRestorationOptions } from "./dom-utils";
+  import type { ScrollRestorationOptions, ScrollSpyOptions } from "./dom-utils";
   import type { Router } from "@real-router/core";
   import type { Snippet } from "svelte";
 
@@ -21,13 +22,15 @@
     children,
     announceNavigation,
     scrollRestoration,
+    scrollSpy,
     viewTransitions,
   }: {
     router: Router;
     children: Snippet;
-    announceNavigation?: boolean;
-    scrollRestoration?: ScrollRestorationOptions;
-    viewTransitions?: boolean;
+    announceNavigation?: boolean | undefined;
+    scrollRestoration?: ScrollRestorationOptions | undefined;
+    scrollSpy?: ScrollSpyOptions | undefined;
+    viewTransitions?: boolean | undefined;
   } = $props();
 
   $effect(() => {
@@ -71,6 +74,23 @@
       scrollContainer: untrack(() => scrollRestoration?.scrollContainer),
     });
     return () => sr.destroy();
+  });
+
+  const spyEnabled = $derived(
+    scrollSpy !== undefined && scrollSpy.selector !== "",
+  );
+  const spySelector = $derived(scrollSpy?.selector);
+  const spyRootMargin = $derived(scrollSpy?.rootMargin);
+
+  $effect(() => {
+    if (!spyEnabled || !spySelector) return;
+    void spyRootMargin;
+    const spy = createScrollSpy(router, {
+      selector: spySelector,
+      rootMargin: spyRootMargin,
+      scrollContainer: untrack(() => scrollSpy?.scrollContainer),
+    });
+    return () => spy.destroy();
   });
 
   $effect(() => {

@@ -4,10 +4,6 @@
 # vice versa) — they must stay in sync.
 
 [[IgnoredVulns]]
-id = "GHSA-7mvr-c777-76hp"
-reason = "Historical exemption — kept in sync with codeql.yml allowlist."
-
-[[IgnoredVulns]]
 id = "GHSA-wrw7-89jp-8q8g"
 reason = "glib 0.18.5 VariantStrIter unsoundness (RUSTSEC-2024-0429). Transitive via Tauri 2.x → GTK/WebKit on Linux only, pulled by examples/desktop/tauri/*/src-tauri/. Not in any published @real-router/* package. Tauri 2.x pins glib < 0.20, so the fix can only land via an upstream Tauri bump that re-bases its GTK stack."
 
@@ -60,10 +56,6 @@ reason = "Transitive via Tauri 2.x, desktop examples only."
 [[IgnoredVulns]]
 id = "RUSTSEC-2024-0370"  # proc-macro-error unmaintained
 reason = "Transitive via Tauri 2.x build deps, desktop examples only."
-
-[[IgnoredVulns]]
-id = "RUSTSEC-2024-0429"  # glib unsoundness — alias of GHSA-wrw7-89jp-8q8g above
-reason = "Alias of GHSA-wrw7-89jp-8q8g, see that entry."
 
 [[IgnoredVulns]]
 id = "RUSTSEC-2025-0075"  # unic-char-range unmaintained

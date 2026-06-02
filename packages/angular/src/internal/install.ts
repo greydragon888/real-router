@@ -1,9 +1,13 @@
 import { ApplicationRef, DestroyRef, inject } from "@angular/core";
 
-import { createScrollRestoration, createViewTransitions } from "../dom-utils";
+import {
+  createScrollRestoration,
+  createScrollSpy,
+  createViewTransitions,
+} from "../dom-utils";
 import { ROUTER } from "../providers";
 
-import type { ScrollRestorationOptions } from "../dom-utils";
+import type { ScrollRestorationOptions, ScrollSpyOptions } from "../dom-utils";
 
 /**
  * Shared installation helpers for `provideRealRouter` and
@@ -24,6 +28,15 @@ export function installScrollRestoration(
 
   inject(DestroyRef).onDestroy(() => {
     sr.destroy();
+  });
+}
+
+export function installScrollSpy(options: ScrollSpyOptions): void {
+  const router = inject(ROUTER);
+  const spy = createScrollSpy(router, options);
+
+  inject(DestroyRef).onDestroy(() => {
+    spy.destroy();
   });
 }
 

@@ -7,7 +7,7 @@ import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { routes } from "./routes";
 
-import "../../../../shared/styles.css";
+import "../../../../../shared/styles.css";
 
 // Plugin selection driven by `?plugin=hash` in the URL.
 //

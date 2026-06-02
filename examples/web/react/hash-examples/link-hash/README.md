@@ -62,5 +62,6 @@ Five scenarios:
 
 - [issue #532](https://github.com/greydragon888/real-router/issues/532) — design
 - [Wiki: Hash](https://github.com/greydragon888/real-router/wiki/Hash) — full API reference (after Stage 4)
-- `examples/web/react/scroll-restoration/` — anchor scrolling demo (issue #534)
-- `examples/web/react/hash-routing/` — page-level routing via `hash-plugin` (different feature)
+- `../scroll-restoration/` — anchor scrolling demo (issue #534) — sibling in `hash-examples/`
+- `../scroll-spy/` — URL hash mirrors visible section (issue #575) — sibling in `hash-examples/`
+- `examples/web/react/hash-routing/` — page-level routing via `hash-plugin` (different feature, URL strategy)

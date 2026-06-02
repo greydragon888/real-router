@@ -1,0 +1,132 @@
+.plugin-badge {
+  margin-left: 1rem;
+  padding: 0.2rem 0.5rem;
+  background: #1f2937;
+  color: #e5e7eb;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-family: monospace;
+}
+
+.hash-indicator {
+  position: fixed;
+  bottom: 1rem;
+  left: 1rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(15, 23, 42, 0.85);
+  color: #f1f5f9;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-family: monospace;
+  z-index: 100;
+}
+
+.hash-indicator__label {
+  color: #94a3b8;
+}
+
+.scroll-meter {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(15, 23, 42, 0.85);
+  color: #f1f5f9;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-family: monospace;
+  z-index: 100;
+}
+
+.scroll-meter__label {
+  color: #94a3b8;
+}
+
+.article-layout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 2rem;
+  align-items: flex-start;
+}
+
+.toc {
+  position: sticky;
+  top: 1rem;
+  padding: 1rem;
+  background: #f8fafc;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+}
+
+.toc__title {
+  margin-top: 0;
+  font-size: 0.85rem;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.toc__list {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+}
+
+.toc__item {
+  margin: 0.4rem 0;
+}
+
+.toc__item a {
+  color: #475569;
+  text-decoration: none;
+  display: block;
+  padding: 0.2rem 0;
+}
+
+.toc__item a:hover {
+  color: #1e293b;
+}
+
+.toc__link--active {
+  color: #2563eb !important;
+  font-weight: 600;
+}
+
+.article {
+  max-width: 720px;
+}
+
+.article__section {
+  min-height: 80vh;
+  padding: 1rem 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.article__section h2 {
+  scroll-margin-top: 1rem;
+}
+
+.article__section h3 {
+  scroll-margin-top: 1rem;
+}
+
+.article__filler {
+  color: #94a3b8;
+  line-height: 1.6;
+}
+
+.home ul,
+.about ul,
+.guide ul {
+  line-height: 1.8;
+}
+
+.guide__hint {
+  background: #fef3c7;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  border-left: 4px solid #f59e0b;
+  font-size: 0.9rem;
+}

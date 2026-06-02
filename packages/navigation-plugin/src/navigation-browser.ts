@@ -38,7 +38,10 @@ const TRAVERSE_OPTS: NavigationOptions = Object.freeze({
  * tags `info` with `PLUGIN_SYNC_INFO` so the navigate-event handler can
  * recognise and short-circuit the event it fires — see `PLUGIN_SYNC_INFO`
  * for the rationale. `updateCurrentEntry` is excluded because it fires
- * `currententrychange`, not `navigate`.
+ * `currententrychange`, not `navigate`. Scroll-after-transition suppression
+ * (`scroll: "manual"`) lives in `navigate-handler.ts`'s `NOOP_INTERCEPT`
+ * — `scroll` is an `event.intercept()` option, not a `nav.navigate()`
+ * option per WHATWG Navigation API spec.
  */
 export function createNavigationBrowser(base: string): NavigationBrowser {
   const nav = globalThis.navigation;

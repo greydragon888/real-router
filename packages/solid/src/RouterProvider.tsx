@@ -7,10 +7,11 @@ import { createSignalFromSource } from "./createSignalFromSource";
 import {
   createRouteAnnouncer,
   createScrollRestoration,
+  createScrollSpy,
   createViewTransitions,
 } from "./dom-utils";
 
-import type { ScrollRestorationOptions } from "./dom-utils";
+import type { ScrollRestorationOptions, ScrollSpyOptions } from "./dom-utils";
 import type { Router } from "@real-router/core";
 import type { ParentProps, JSX } from "solid-js";
 
@@ -18,6 +19,7 @@ export interface RouteProviderProps {
   router: Router;
   announceNavigation?: boolean;
   scrollRestoration?: ScrollRestorationOptions;
+  scrollSpy?: ScrollSpyOptions;
   viewTransitions?: boolean;
 }
 
@@ -81,6 +83,19 @@ export function RouterProvider(
   mountFeature(props.scrollRestoration, () =>
     createScrollRestoration(props.router, props.scrollRestoration),
   );
+  onMount(() => {
+    const spyOpts = props.scrollSpy;
+
+    if (spyOpts === undefined || spyOpts.selector === "") {
+      return;
+    }
+
+    const spy = createScrollSpy(props.router, spyOpts);
+
+    onCleanup(() => {
+      spy.destroy();
+    });
+  });
   mountFeature(props.viewTransitions, () =>
     createViewTransitions(props.router),
   );
