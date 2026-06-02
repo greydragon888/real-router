@@ -3655,3 +3655,23 @@ A hook would require six adapter-specific surfaces; the utility shape requires z
 
 `hashChanged: true` is symmetric on the bus: every subscriber — `router.subscribe`, `lifecycle-plugin.onStay` / `onNavigate`, `createActiveRouteSource` — sees the spy's emit identically to a user-driven `<Link hash>` click. Consumers who want to ignore hash-only transitions filter at the call site (`if (route.context.url?.hashChanged) return;`). Declarative filtering via a route-config field (`onHashChange`) is a separate plugin scoped to demand evidence; not in this RFC.
 
+## Example e2e runs to completion despite failures (#694)
+
+### Problem
+
+The scheduled `Examples` workflow runs every example's Playwright suite via a single `pnpm turbo run test:e2e --filter='./examples/**' --concurrency=1`. Turbo's default (`--continue=never`) cancels all remaining tasks the moment one fails, so a single broken example aborted the sweep and the job log listed only the **first** failing example — any other red examples stayed invisible until the next run. While triaging #694 (scroll-restoration regression) the run stopped at the first failure, so a single log could not tell whether other examples were also broken.
+
+### Solution
+
+Pass `--continue=dependencies-successful` on the e2e job only:
+
+```yaml
+run: pnpm turbo run test:e2e --filter='./examples/**' --concurrency=1 --continue=dependencies-successful
+```
+
+Every example whose build succeeded now runs its specs regardless of sibling failures, so a single CI run yields the **complete** list of failing e2e tests. The aggregate task still exits non-zero, so the job stays red on any failure — this changes the log, not the gate.
+
+### Why only e2e, not the unit pipelines
+
+`ci.yml` / `post-merge.yml` run the library unit + property tests, where vitest already reports every failure within a package and fail-fast across the package graph is the right default (faster red on a real regression). The aggregation problem is specific to the ~90-example e2e sweep, where a per-example abort discards the rest of the matrix. `dependencies-successful` (not `always`) is deliberate: it does **not** run an example's e2e when that example's own build failed — those are surfaced by the build job, not drowned in Playwright connection errors against a missing `dist/`.
+
