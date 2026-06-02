@@ -68,10 +68,10 @@
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/svelte": "5.3.1",
     "@testing-library/user-event": "14.6.1",
-    "eslint-plugin-svelte": "3.17.1",
+    "eslint-plugin-svelte": "3.19.0",
     "svelte": "5.55.7",
     "svelte-check": "4.4.5",
-    "svelte-eslint-parser": "1.6.0"
+    "svelte-eslint-parser": "1.7.1"
   },
   "peerDependencies": {
     "svelte": ">=5.7.0"
