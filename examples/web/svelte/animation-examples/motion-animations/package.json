@@ -14,7 +14,7 @@
     "@real-router/browser-plugin": "workspace:^",
     "@real-router/core": "workspace:^",
     "@real-router/svelte": "workspace:^",
-    "svelte": "5.55.7"
+    "svelte": "5.56.1"
   },
   "devDependencies": {
     "@playwright/test": "1.58.2",

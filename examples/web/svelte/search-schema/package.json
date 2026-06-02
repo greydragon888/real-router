@@ -15,7 +15,7 @@
     "@real-router/core": "workspace:^",
     "@real-router/search-schema-plugin": "workspace:^",
     "@real-router/svelte": "workspace:^",
-    "svelte": "5.55.7",
+    "svelte": "5.56.1",
     "zod": "4.4.3"
   },
   "devDependencies": {
