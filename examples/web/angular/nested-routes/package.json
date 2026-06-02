@@ -30,10 +30,10 @@
     "@angular/compiler": "21.2.13",
     "@angular/compiler-cli": "21.2.13",
     "@playwright/test": "1.58.2",
-    "jsdom": "26.1.0",
+    "jsdom": "29.1.1",
     "sirv-cli": "3.0.1",
     "typescript": "6.0.3",
     "vite": "7.3.2",
-    "vitest": "4.1.0"
+    "vitest": "4.1.8"
   }
 }

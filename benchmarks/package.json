@@ -69,9 +69,9 @@
     "@vitejs/plugin-react": "5.2.0",
     "@vitejs/plugin-vue": "6.0.5",
     "@vitejs/plugin-vue-jsx": "5.1.5",
-    "jsdom": "28.1.0",
+    "jsdom": "29.1.1",
     "vite": "7.3.2",
     "vite-plugin-solid": "2.11.11",
-    "vitest": "4.1.6"
+    "vitest": "4.1.8"
   }
 }
