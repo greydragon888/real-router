@@ -55,13 +55,13 @@
     "@real-router/sources": "workspace:^"
   },
   "devDependencies": {
-    "@analogjs/vitest-angular": "2.4.7",
+    "@analogjs/vitest-angular": "2.5.3",
     "@angular/common": "21.2.13",
     "@angular/compiler": "21.2.13",
     "@angular/compiler-cli": "21.2.13",
     "@angular/core": "21.2.13",
     "@angular/platform-browser": "21.2.13",
-    "ng-packagr": "21.2.2",
+    "ng-packagr": "21.2.3",
     "typescript": "6.0.3"
   },
   "peerDependencies": {
