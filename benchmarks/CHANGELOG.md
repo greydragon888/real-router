@@ -1,5 +1,14 @@
 # router-benchmarks
 
+## 0.3.65
+
+### Patch Changes
+
+- Updated dependencies [[`51b993e`](https://github.com/greydragon888/real-router/commit/51b993e7877e2b12f4e6ca0b8078f7ab4629501f), [`51b993e`](https://github.com/greydragon888/real-router/commit/51b993e7877e2b12f4e6ca0b8078f7ab4629501f), [`51b993e`](https://github.com/greydragon888/real-router/commit/51b993e7877e2b12f4e6ca0b8078f7ab4629501f), [`51b993e`](https://github.com/greydragon888/real-router/commit/51b993e7877e2b12f4e6ca0b8078f7ab4629501f), [`51b993e`](https://github.com/greydragon888/real-router/commit/51b993e7877e2b12f4e6ca0b8078f7ab4629501f), [`51b993e`](https://github.com/greydragon888/real-router/commit/51b993e7877e2b12f4e6ca0b8078f7ab4629501f)]:
+  - @real-router/react@0.27.0
+  - @real-router/solid@0.14.0
+  - @real-router/vue@0.15.0
+
 ## 0.3.64
 
 ### Patch Changes
