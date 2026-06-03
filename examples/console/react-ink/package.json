@@ -13,12 +13,12 @@
     "@real-router/core": "workspace:^",
     "@real-router/memory-plugin": "workspace:^",
     "@real-router/react": "workspace:^",
-    "ink": "7.0.1",
+    "ink": "7.0.5",
     "react": "19.2.0"
   },
   "devDependencies": {
     "@types/react": "19.2.14",
-    "tsx": "4.20.6",
+    "tsx": "4.22.4",
     "typescript": "6.0.3"
   }
 }

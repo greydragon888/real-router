@@ -28,19 +28,19 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
-    "@analogjs/vite-plugin-angular": "2.4.7",
-    "@analogjs/vitest-angular": "2.4.7",
-    "@angular-devkit/architect": "0.2102.7",
-    "@angular-devkit/schematics": "21.2.7",
+    "@analogjs/vite-plugin-angular": "2.5.3",
+    "@analogjs/vitest-angular": "2.5.3",
+    "@angular-devkit/architect": "0.2102.13",
+    "@angular-devkit/schematics": "21.2.13",
     "@angular/build": "21.2.11",
-    "@angular/cli": "21.2.11",
+    "@angular/cli": "21.2.13",
     "@angular/compiler": "21.2.13",
     "@angular/compiler-cli": "21.2.13",
-    "@playwright/test": "1.58.2",
-    "jsdom": "26.1.0",
+    "@playwright/test": "1.60.0",
+    "jsdom": "29.1.1",
     "sirv-cli": "3.0.1",
     "typescript": "6.0.3",
     "vite": "7.3.2",
-    "vitest": "4.1.0"
+    "vitest": "4.1.8"
   }
 }

@@ -525,6 +525,10 @@ export default tsEslint.config(
       ],
       "jsdoc/check-types": "off", // TypeScript already checks types
 
+      // Ensure a documented @returns matches an actual return statement
+      // (catches stale docs after refactors)
+      "jsdoc/require-returns-check": "warn",
+
       // v61+: Check @template names match actual type parameters
       "jsdoc/check-template-names": "warn",
 
@@ -546,12 +550,19 @@ export default tsEslint.config(
       // ============================================
       "jsdoc/require-hyphen-before-param-description": "warn",
       "jsdoc/tag-lines": ["warn", "any", { startLines: 1 }],
+      // NOTE: jsdoc/no-multi-asterisks intentionally NOT enabled — its
+      // preventAtEnd autofix strips the leading `*` from compact closings
+      // like `* text */` (the dominant multi-line style here), corrupting
+      // valid comments. Cannot distinguish that from the `**/` typo it targets.
 
       // ============================================
       // PROHIBITIONS
       // ============================================
       "jsdoc/no-bad-blocks": "error",
       "jsdoc/no-defaults": "warn",
+      // TS-first: types belong in the TypeScript signature, not in JSDoc
+      // (mirrors check-types: off — no redundant/stale type annotations in docs)
+      "jsdoc/no-types": "warn",
     },
   },
 
