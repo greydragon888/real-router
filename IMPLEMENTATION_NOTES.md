@@ -967,6 +967,14 @@ Previously used `minimum-release-age=1440` in `.npmrc` to block packages publish
 
 Each override addresses a known vulnerability in older versions. Version-scoped overrides (e.g., `"minimatch@3": "~3.1.4"`) prevent inadvertent major bumps of transitive dependencies.
 
+### Compatibility Pin: `fflate` at `0.8.2` (attw breakage)
+
+**Problem:** A Dependabot bump (`ink 7.0.1 → 7.0.5`, [#692](https://github.com/greydragon888/real-router/pull/692)) pulled `fflate@0.8.3` into the tree. `pnpm dedupe --check` (the `lint:dedupe` CI step) then wants to collapse `@arethetypeswrong/core@0.18.2` onto the single newest `fflate@0.8.3`. But `attw` (`lint:types` = `attw --pack .`) reads the packed tarball via `fflate`, and `0.8.3` crashes it for **every** package with `Cannot read properties of undefined (reading 'filename')`. This creates a direct conflict: satisfying `lint:dedupe` (dedupe → 0.8.3) breaks `lint:types` (attw needs 0.8.2).
+
+**Solution:** `"fflate": "0.8.2"` in `pnpm.overrides`. Forces a single `fflate` version across the tree, which simultaneously (a) satisfies `pnpm dedupe --check` (one version, nothing left to collapse) and (b) keeps `attw` on the working `0.8.2`. This is the only override that pins to an exact *older* version for compatibility rather than `>=` for security.
+
+**Why:** `0.8.3` is a patch with no public-API change any consumer depends on, so pinning down is safe. Remove this override once `@arethetypeswrong/core` ships a release compatible with `fflate@0.8.3` (or `fflate` patches the tar-read regression) — verify by deleting the line, running `pnpm install && pnpm -F @real-router/fsm lint:types`, and confirming attw stays green.
+
 ### Dependency License Review
 
 `.github/dependency-review-config.yml` defines allowed licenses for all dependencies. Dependency Review check fails on PRs that introduce packages with licenses outside the allow-list.

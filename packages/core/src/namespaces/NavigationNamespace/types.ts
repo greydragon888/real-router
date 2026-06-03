@@ -23,7 +23,7 @@ export interface NavigationContext {
  *
  * These are function references from other namespaces/facade,
  * avoiding the need to pass the entire Router object.
- **/
+ */
 export interface NavigationDependencies {
   /** Get router options */
   getOptions: () => Options;
