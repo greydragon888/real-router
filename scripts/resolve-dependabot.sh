@@ -81,7 +81,7 @@ while rebase_in_progress; do
     pnpm dedupe
   fi
 
-  git add -A
+  git add -u  # tracked changes only — never sweep in untracked files
   GIT_EDITOR=true git rebase --continue || true
 done
 
@@ -91,7 +91,7 @@ echo "🔒 Reconciling lockfile ..."
 pnpm install
 pnpm dedupe
 if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
-  git add -A
+  git add -u  # tracked changes only — never sweep in untracked files
   git commit --amend --no-edit >/dev/null
 fi
 
