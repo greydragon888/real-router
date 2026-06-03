@@ -231,8 +231,8 @@ importers:
         specifier: 1.168.9
         version: 1.168.9(solid-js@1.9.12)
       '@tanstack/vue-router':
-        specifier: 1.168.9
-        version: 1.168.9(vue@3.5.13(typescript@6.0.3))
+        specifier: 1.170.10
+        version: 1.170.10(vue@3.5.13(typescript@6.0.3))
       mitata:
         specifier: 1.0.34
         version: 1.0.34
@@ -9907,10 +9907,9 @@ packages:
   '@tanstack/store@0.9.3':
     resolution: {integrity: sha512-8reSzl/qGWGGVKhBoxXPMWzATSbZLZFWhwBAFO9NAyp0TxzfBP0mIrGb8CP8KrQTmvzXlR/vFPPUrHTLBGyFyw==}
 
-  '@tanstack/vue-router@1.168.9':
-    resolution: {integrity: sha512-DRXv4sJ/euwc34gDfeWru9NTN43IBdm8lUjCoJx2gwWQCOu7G+JzBb+HndsF5rvz4P3nueFC68Mri8osobM4gg==}
+  '@tanstack/vue-router@1.170.10':
+    resolution: {integrity: sha512-x+69OKLjIDipixTWrL/XJP+JIG2AVj+s5A8Wrs2dV7feAGqQizIrOgqWGnp5Quf5GIcU/UayeNmhG3gk0Wjh8Q==}
     engines: {node: '>=20.19'}
-    hasBin: true
     peerDependencies:
       vue: ^3.3.0
 
@@ -18468,10 +18467,10 @@ snapshots:
 
   '@tanstack/store@0.9.3': {}
 
-  '@tanstack/vue-router@1.168.9(vue@3.5.13(typescript@6.0.3))':
+  '@tanstack/vue-router@1.170.10(vue@3.5.13(typescript@6.0.3))':
     dependencies:
-      '@tanstack/history': 1.161.6
-      '@tanstack/router-core': 1.168.9
+      '@tanstack/history': 1.162.0
+      '@tanstack/router-core': 1.171.8
       '@tanstack/vue-store': 0.9.3(vue@3.5.13(typescript@6.0.3))
       '@vue/runtime-dom': 3.5.33
       isbot: 5.1.39
