@@ -959,13 +959,15 @@ Previously used `minimum-release-age=1440` in `.npmrc` to block packages publish
 "flatted": ">=3.4.2",
 "axios": ">=1.13.5",
 "qs": ">=6.14.2",
-"rollup": ">=4.59.0",
+"rollup": "4.61.0",
 "undici": ">=7.24.0",
 "path-to-regexp": ">=8.4.0",
 "node-forge": ">=1.4.0"
 ```
 
 Each override addresses a known vulnerability in older versions. Version-scoped overrides (e.g., `"minimatch@3": "~3.1.4"`) prevent inadvertent major bumps of transitive dependencies.
+
+**`rollup` is an exact pin, not a `>=` floor (declared↔installed drift).** `rollup` is a direct devDependency of `packages/solid` (it builds with rollup + babel-preset-solid) with an exact, Dependabot-managed version. A `>=` override shadows that exact declaration with a range, and pnpm then keeps whatever rollup version is already locked (it does not bump a satisfied `>=` range to latest) — so the lockfile drifted to `4.60.2` while `packages/solid` declared `4.61.0`, surfacing as an "installed doesn't match declared" diagnostic. Pinning the override to the exact version `packages/solid` declares keeps installed == declared. **Coupling:** when Dependabot bumps rollup in `packages/solid`, this override must be bumped in lockstep (or the exact pin will hold rollup back). The pin still satisfies the original `>=4.59.0` security floor.
 
 ### Compatibility Pin: `fflate` at `0.8.2` (attw breakage)
 
