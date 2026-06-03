@@ -63,11 +63,11 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
-    "@tanstack/router-core": "1.168.9",
+    "@tanstack/router-core": "1.171.8",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "5.2.0",
-    "@vitejs/plugin-vue": "6.0.5",
+    "@vitejs/plugin-vue": "6.0.7",
     "@vitejs/plugin-vue-jsx": "5.1.5",
     "jsdom": "29.1.1",
     "vite": "7.3.2",
