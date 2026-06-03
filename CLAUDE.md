@@ -77,7 +77,10 @@ pnpm lint:deps          # Check dependency versions (syncpack)
 pnpm lint:dedupe        # Check for duplicate deps
 pnpm lint:e2e           # Verify e2e directories have spec files
 pnpm lint:unused        # Check for unused code (knip)
+pnpm resolve:dependabot <PR#>  # Rebase+squash-resolve a CONFLICTING Dependabot PR (keeps master linear)
 ```
+
+**Conflicting Dependabot PRs:** resolve with `pnpm resolve:dependabot <PR#>` (rebase onto master → semver-union resolve → squash-merge). Never resolve them with a merge commit — `master` is protected with "Merge commits are not allowed". See IMPLEMENTATION_NOTES "Squash-resolve for CONFLICTING Dependabot PRs".
 
 ## Non-Obvious Conventions
 

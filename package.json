@@ -26,6 +26,7 @@
     "lint:deps": "syncpack lint",
     "lint:deps:fix": "syncpack fix && pnpm dedupe && pnpm install",
     "lint:dedupe": "pnpm dedupe --check",
+    "resolve:dependabot": "bash scripts/resolve-dependabot.sh",
     "type-check": "turbo run type-check",
     "sonar": "dotenv -- sonar -Dsonar.login=$SONAR_TOKEN",
     "sonar:local": "pnpm type-check && pnpm test:coverage && pnpm sonar",

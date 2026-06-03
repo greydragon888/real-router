@@ -439,6 +439,39 @@ Bundle Size job (in `ci.yml`) compares bundle sizes between PR and base branch:
 - Auto-merges minor dev dependency updates
 - Uses squash merge
 
+#### Squash-resolve for CONFLICTING Dependabot PRs
+
+**Problem:** `dependabot-automerge.yml` only handles cleanly-mergeable PRs. When a
+grouped bump conflicts with `master` (two PRs touching adjacent dependency lines
+in the same `package.json` block, or a lockfile that drifted), the fallback was to
+`git merge origin/master` into the PR branch and fast-forward `master` — which
+drags a **merge commit** onto `master`. The branch is protected with **"Merge
+commits are not allowed"**, so each such push only landed via admin bypass and
+left `master` non-linear.
+
+**Solution:** `pnpm resolve:dependabot <PR#>` (`scripts/resolve-dependabot.sh`).
+It rebases the PR branch onto `origin/master`, auto-resolves the `package.json`
+conflicts with `scripts/resolve-dep-conflicts.mjs`, regenerates the lockfile
+(`git checkout origin/master -- pnpm-lock.yaml` → `pnpm install` → `pnpm dedupe`),
+folds everything into the single dep-bump commit, validates with `pnpm build`,
+then **stops for review** and prints the exact `git push --force-with-lease` +
+`gh pr merge <PR> --squash` commands (or runs them with `--merge`). The reviewer's
+squash-merge lands **one linear commit** — no merge commit.
+
+**`scripts/resolve-dep-conflicts.mjs`** is a semver-union resolver: for each
+conflict block it keeps the **newest** version of every dependency (so a PR's
+testing-group bump and master's other bumps coexist). **Safety:** it only
+auto-resolves a key when both sides are plain `x.y.z` versions and both sides
+declare the same key set; ranges (`>=…`), protocols (`workspace:^`), export maps,
+or added/removed keys are left untouched and reported with a non-zero exit, so a
+human resolves them. Markers-remain and invalid-JSON are hard failures.
+
+**Why rebase+squash, not merge:** keeps `master` linear, matches the automerge
+workflow's `--squash` method, and the semver-union heuristic matches exactly how
+grouped Dependabot bumps conflict (adjacent version lines). Stop-for-review is the
+default because the heuristic is a heuristic — a human eyeballs the resolved
+versions before any force-push.
+
 ### Danger JS
 
 `.github/workflows/danger.yml` runs automated PR review checks via `dangerfile.ts`:
