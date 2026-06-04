@@ -748,4 +748,40 @@ describe("core/routes/replaceRoutes", () => {
       expect(routesApi.has("extra")).toBe(true);
     });
   });
+
+  // Prepare-then-commit atomicity (issue #698): a failing replace must throw
+  // BEFORE the destructive clearRouteData — the old tree must survive intact.
+  describe("atomicity (issue #698)", () => {
+    it("circular forwardTo in new set → throws, old tree intact", () => {
+      expect(() => {
+        routesApi.replace([
+          { name: "a", path: "/a", forwardTo: "b" },
+          { name: "b", path: "/b", forwardTo: "a" },
+        ]);
+      }).toThrow(/Circular forwardTo/);
+
+      // Old routes survive the failed replace.
+      expect(routesApi.has("home")).toBe(true);
+      expect(routesApi.has("users")).toBe(true);
+      expect(getPluginApi(router).matchPath("/home")?.name).toBe("home");
+      expect(routesApi.has("a")).toBe(false);
+    });
+
+    it("async forwardTo in new set → throws, old tree intact", () => {
+      expect(() => {
+        routesApi.replace([
+          {
+            name: "x",
+            path: "/x",
+            forwardTo: (async () => "y") as unknown as string,
+          },
+          { name: "y", path: "/y" },
+        ]);
+      }).toThrow(/cannot be async/);
+
+      expect(routesApi.has("home")).toBe(true);
+      expect(getPluginApi(router).matchPath("/home")?.name).toBe("home");
+      expect(routesApi.has("x")).toBe(false);
+    });
+  });
 });

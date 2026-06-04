@@ -6,16 +6,17 @@ import { createInterceptable, getInternals } from "../internals";
 import {
   clearConfigEntries,
   removeFromDefinitions,
-  sanitizeRoute,
 } from "../namespaces/RoutesNamespace/helpers";
 import {
   validateClearRoutes,
   validateRemoveRoute,
 } from "../namespaces/RoutesNamespace/routeGuards";
 import {
-  clearRouteData,
+  adoptRouteArtifacts,
+  assertAddable,
+  buildAddArtifacts,
+  buildReplaceArtifacts,
   refreshForwardMap,
-  registerAllRouteHandlers,
 } from "../namespaces/RoutesNamespace/routesStore";
 
 import type { RoutesApi } from "./types";
@@ -35,32 +36,6 @@ import type { RouteDefinition, RouteTree } from "route-tree";
 // ============================================================================
 // Helpers
 // ============================================================================
-
-/**
- * Recursively finds a route definition by its full dotted name.
- */
-function findDefinition(
-  definitions: RouteDefinition[],
-  fullName: string,
-  parentPrefix = "",
-): RouteDefinition | undefined {
-  for (const def of definitions) {
-    const currentFullName = parentPrefix
-      ? `${parentPrefix}.${def.name}`
-      : def.name;
-
-    if (currentFullName === fullName) {
-      return def;
-    }
-
-    if (def.children && fullName.startsWith(`${currentFullName}.`)) {
-      return findDefinition(def.children, fullName, currentFullName);
-    }
-  }
-
-  /* v8 ignore next -- @preserve: defensive return, callers validate route exists before calling */
-  return undefined;
-}
 
 /**
  * Clears all config entries and lifecycle handlers for a removed route
@@ -116,20 +91,36 @@ function updateForwardTo<
   name: string,
   forwardTo: string | ForwardToCallback<Dependencies> | null,
   config: RouteConfig,
-  refreshForwardMapFn: (config: RouteConfig) => Record<string, string>,
 ): Record<string, string> {
+  // Prepare-then-commit (issue #698): apply the change to CLONES of the forward
+  // maps, resolve the chain (a cycle throws here), and only then swap the clones
+  // in — so a rejected update never leaves config.forwardMap poisoned.
+  const forwardMap = Object.assign(
+    Object.create(null) as RouteConfig["forwardMap"],
+    config.forwardMap,
+  );
+  const forwardFnMap = Object.assign(
+    Object.create(null) as RouteConfig["forwardFnMap"],
+    config.forwardFnMap,
+  );
+
   if (forwardTo === null) {
-    delete config.forwardMap[name];
-    delete config.forwardFnMap[name];
+    delete forwardMap[name];
+    delete forwardFnMap[name];
   } else if (typeof forwardTo === "string") {
-    delete config.forwardFnMap[name];
-    config.forwardMap[name] = forwardTo;
+    delete forwardFnMap[name];
+    forwardMap[name] = forwardTo;
   } else {
-    delete config.forwardMap[name];
-    config.forwardFnMap[name] = forwardTo;
+    delete forwardMap[name];
+    forwardFnMap[name] = forwardTo;
   }
 
-  return refreshForwardMapFn(config);
+  const resolved = refreshForwardMap({ ...config, forwardMap });
+
+  config.forwardMap = forwardMap;
+  config.forwardFnMap = forwardFnMap;
+
+  return resolved;
 }
 
 /**
@@ -212,37 +203,19 @@ function addRoutes<
   routes: Route<Dependencies>[],
   parentName?: string,
 ): void {
-  if (parentName) {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const parentDef = findDefinition(store.definitions, parentName)!;
-
-    parentDef.children ??= [];
-
-    for (const route of routes) {
-      parentDef.children.push(sanitizeRoute(route));
-    }
-  } else {
-    for (const route of routes) {
-      store.definitions.push(sanitizeRoute(route));
-    }
-  }
-
-  registerAllRouteHandlers(
-    routes,
-    store.config,
-    store.routeCustomFields,
-    store.pendingCanActivate,
-    store.pendingCanDeactivate,
-    store.depsStore,
-    parentName ?? "",
-  );
-
-  store.treeOperations.commitTreeChanges(store);
+  // Prepare-then-commit (issue #698): reject the silent-corruption cases
+  // up front (dup name vs existing, missing parent), build the merged tree /
+  // config into locals (async/circular forwardTo + invalid constraint throw
+  // here), then swap atomically. A rejected add leaves the store untouched.
+  assertAddable(store, routes, parentName);
+  adoptRouteArtifacts(store, buildAddArtifacts(store, routes, parentName));
 }
 
 /**
- * Atomically replaces all routes with a new set.
- * Follows RFC 6-step semantics for HMR support.
+ * Atomically replaces all routes with a new set (HMR / code-splitting).
+ * Prepare-then-commit (issue #698): the new set is fully built into locals
+ * first — a circular/async forwardTo or invalid path throws here, leaving the
+ * existing tree intact — then committed.
  */
 function replaceRoutes<
   Dependencies extends DefaultDependencies = DefaultDependencies,
@@ -253,32 +226,19 @@ function replaceRoutes<
   currentPath: string | undefined,
   previousTransition: TransitionMeta | undefined,
 ): void {
-  // Step 2: Clear route data (WITHOUT tree rebuild)
-  clearRouteData(store);
-
-  // Step 3: Clear definition lifecycle handlers (preserve external guards)
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
-  store.lifecycleNamespace!.clearDefinitionGuards();
-
-  // Step 4: Register new routes
-  for (const route of routes) {
-    store.definitions.push(sanitizeRoute(route));
-  }
-
-  registerAllRouteHandlers(
+  // Build the whole new set BEFORE touching the store.
+  const artifacts = buildReplaceArtifacts(
     routes,
-    store.config,
-    store.routeCustomFields,
-    store.pendingCanActivate,
-    store.pendingCanDeactivate,
-    store.depsStore,
-    "",
+    store.rootPath,
+    store.matcherOptions,
   );
 
-  // Step 5: One tree rebuild
-  store.treeOperations.commitTreeChanges(store);
+  // Clear definition lifecycle handlers (preserve external guards), then swap.
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
+  store.lifecycleNamespace!.clearDefinitionGuards();
+  adoptRouteArtifacts(store, artifacts);
 
-  // Step 6: Revalidate state (preserve transition from previous state)
+  // Revalidate state (preserve transition from previous state)
   if (currentPath !== undefined) {
     const revalidated = ctx.matchPath(currentPath, ctx.getOptions());
 
@@ -341,7 +301,6 @@ function updateRouteConfig<
       name,
       updates.forwardTo,
       store.config,
-      (config) => refreshForwardMap(config),
     );
   }
 

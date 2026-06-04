@@ -1431,4 +1431,57 @@ describe("core/routes/addRoute", () => {
       warnSpy.mockRestore();
     });
   });
+
+  // Prepare-then-commit atomicity (issue #698): without validation-plugin, a
+  // failing add must throw BEFORE mutating the store — never leave a torn tree.
+  describe("atomicity (issue #698)", () => {
+    it("duplicate name vs existing route → throws, existing route unchanged", () => {
+      expect(() => {
+        routesApi.add({ name: "home", path: "/home-2" });
+      }).toThrow(/already exists/);
+
+      // The live "home" route is untouched (not silently overwritten).
+      expect(router.buildPath("home")).toBe("/home");
+      expect(getPluginApi(router).matchPath("/home")?.name).toBe("home");
+      expect(getPluginApi(router).matchPath("/home-2")).toBeUndefined();
+    });
+
+    it("missing parent → clean error (not a TypeError), nothing added", () => {
+      expect(() => {
+        routesApi.add({ name: "orphan", path: "/orphan" }, { parent: "nope" });
+      }).toThrow(/Parent route "nope" does not exist/);
+
+      expect(routesApi.has("orphan")).toBe(false);
+      // Existing tree intact.
+      expect(router.buildPath("home")).toBe("/home");
+    });
+
+    it("circular forwardTo batch → throws, no route from the batch is added", () => {
+      expect(() => {
+        routesApi.add([
+          { name: "cycA", path: "/cyc-a", forwardTo: "cycB" },
+          { name: "cycB", path: "/cyc-b", forwardTo: "cycA" },
+        ]);
+      }).toThrow(/Circular forwardTo/);
+
+      expect(routesApi.has("cycA")).toBe(false);
+      expect(routesApi.has("cycB")).toBe(false);
+      // Existing routes still usable.
+      expect(router.buildPath("home")).toBe("/home");
+    });
+
+    it("invalid constraint → throws, store not dirtied (subsequent add works)", () => {
+      expect(() => {
+        routesApi.add({ name: "bad", path: "/:id<[>" });
+      }).toThrow();
+
+      expect(routesApi.has("bad")).toBe(false);
+      // definitions were not left in a torn state — a later valid add succeeds.
+      expect(() => {
+        routesApi.add({ name: "good-after-bad", path: "/good-after-bad" });
+      }).not.toThrow();
+      expect(routesApi.has("good-after-bad")).toBe(true);
+      expect(router.buildPath("home")).toBe("/home");
+    });
+  });
 });

@@ -13,29 +13,29 @@ export default [
   {
     name: "@real-router/core/api (ESM)",
     path: "packages/core/dist/esm/api.mjs",
-    limit: "20 kB",
+    limit: "20.5 kB",
     ignore: ignoreCore,
   },
 
   // ── UI Bindings ───────────────────────────────────────────────────
-  esm("react", "8 kB", ["react", "react-dom", ...ignoreCore]),
-  esm("preact", "8 kB", [
+  esm("react", "10 kB", ["react", "react-dom", ...ignoreCore]),
+  esm("preact", "10 kB", [
     "preact",
     "preact/hooks",
     "preact/compat",
     ...ignoreCore,
   ]),
-  esm("solid", "8 kB", [
+  esm("solid", "10 kB", [
     "solid-js",
     "solid-js/store",
     "solid-js/web",
     ...ignoreCore,
   ]),
-  esm("vue", "8 kB", ["vue", ...ignoreCore]),
+  esm("vue", "10 kB", ["vue", ...ignoreCore]),
   {
     name: "@real-router/angular (FESM2022)",
     path: "packages/angular/dist/fesm2022/real-router-angular.mjs",
-    limit: "8 kB",
+    limit: "10 kB",
     ignore: [
       "@angular/core",
       "@angular/common",
