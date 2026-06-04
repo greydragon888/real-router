@@ -978,6 +978,24 @@ describe("core/routes/routeTree/updateRoute", () => {
           routesApi.update("ur-self", { forwardTo: "ur-self" });
         }).toThrow(/Circular forwardTo/);
       });
+
+      // Prepare-then-commit atomicity (issue #698): a cycle-creating update must
+      // not poison config.forwardMap, so a later unrelated add must not throw.
+      it("cycle-creating update does not poison forwardMap (subsequent add is clean)", () => {
+        routesApi.add({ name: "ur-poison-a", path: "/ur-poison-a" });
+        routesApi.add({ name: "ur-poison-b", path: "/ur-poison-b" });
+        routesApi.update("ur-poison-a", { forwardTo: "ur-poison-b" });
+
+        expect(() => {
+          routesApi.update("ur-poison-b", { forwardTo: "ur-poison-a" });
+        }).toThrow(/Circular forwardTo/);
+
+        // forwardMap was not corrupted — an unrelated add does not re-throw the cycle.
+        expect(() => {
+          routesApi.add({ name: "ur-poison-c", path: "/ur-poison-c" });
+        }).not.toThrow();
+        expect(routesApi.has("ur-poison-c")).toBe(true);
+      });
     });
 
     describe("sequential updates", () => {

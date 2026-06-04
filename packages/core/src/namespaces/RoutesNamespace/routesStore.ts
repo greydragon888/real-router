@@ -132,6 +132,32 @@ export function refreshForwardMap(config: RouteConfig): Record<string, string> {
 // Route handler registration
 // =============================================================================
 
+/**
+ * Throws if `forwardTo` is an async function (native or transpiled). Async
+ * forwardTo callbacks break the synchronous matchPath/buildPath contract.
+ * Runs inside `registerForwardTo`, which the prepare-phase build invokes via
+ * `registerAllRouteHandlers` — so the check fires before any store mutation.
+ */
+function assertForwardToNotAsync(forwardTo: unknown, fullName: string): void {
+  if (typeof forwardTo !== "function") {
+    return;
+  }
+
+  const isNativeAsync =
+    (forwardTo as { constructor: { name: string } }).constructor.name ===
+    "AsyncFunction";
+  const isTranspiledAsync = (forwardTo as { toString: () => string })
+    .toString()
+    .includes("__awaiter");
+
+  if (isNativeAsync || isTranspiledAsync) {
+    throw new TypeError(
+      `forwardTo callback cannot be async for route "${fullName}". ` +
+        `Async functions break matchPath/buildPath.`,
+    );
+  }
+}
+
 function registerForwardTo<Dependencies extends DefaultDependencies>(
   route: Route<Dependencies>,
   fullName: string,
@@ -163,19 +189,7 @@ function registerForwardTo<Dependencies extends DefaultDependencies>(
     );
   }
 
-  if (typeof route.forwardTo === "function") {
-    const isNativeAsync =
-      (route.forwardTo as { constructor: { name: string } }).constructor
-        .name === "AsyncFunction";
-    const isTranspiledAsync = route.forwardTo.toString().includes("__awaiter");
-
-    if (isNativeAsync || isTranspiledAsync) {
-      throw new TypeError(
-        `forwardTo callback cannot be async for route "${fullName}". ` +
-          `Async functions break matchPath/buildPath.`,
-      );
-    }
-  }
+  assertForwardToNotAsync(route.forwardTo, fullName);
 
   // forwardTo is guaranteed to exist at this point
   if (typeof route.forwardTo === "string") {
@@ -193,7 +207,6 @@ function registerSingleRouteHandlers<Dependencies extends DefaultDependencies>(
   routeCustomFields: Record<string, Record<string, unknown>>,
   pendingCanActivate: Map<string, GuardFnFactory<Dependencies>>,
   pendingCanDeactivate: Map<string, GuardFnFactory<Dependencies>>,
-  depsStore: RoutesDependencies<Dependencies> | undefined,
 ): void {
   const standardKeys = new Set([
     "name",
@@ -214,20 +227,15 @@ function registerSingleRouteHandlers<Dependencies extends DefaultDependencies>(
     routeCustomFields[fullName] = customFields;
   }
 
+  // Guards are collected here and registered into the lifecycle later — by
+  // `adoptRouteArtifacts` (add/replace) or `setDependencies` (initial routes) —
+  // so the build stays a pure, side-effect-free preparation step.
   if (route.canActivate) {
-    if (depsStore) {
-      depsStore.addActivateGuard(fullName, route.canActivate);
-    } else {
-      pendingCanActivate.set(fullName, route.canActivate);
-    }
+    pendingCanActivate.set(fullName, route.canActivate);
   }
 
   if (route.canDeactivate) {
-    if (depsStore) {
-      depsStore.addDeactivateGuard(fullName, route.canDeactivate);
-    } else {
-      pendingCanDeactivate.set(fullName, route.canDeactivate);
-    }
+    pendingCanDeactivate.set(fullName, route.canDeactivate);
   }
 
   if (route.forwardTo) {
@@ -249,15 +257,12 @@ function registerSingleRouteHandlers<Dependencies extends DefaultDependencies>(
   }
 }
 
-export function registerAllRouteHandlers<
-  Dependencies extends DefaultDependencies,
->(
+function registerAllRouteHandlers<Dependencies extends DefaultDependencies>(
   routes: readonly Route<Dependencies>[],
   config: RouteConfig,
   routeCustomFields: Record<string, Record<string, unknown>>,
   pendingCanActivate: Map<string, GuardFnFactory<Dependencies>>,
   pendingCanDeactivate: Map<string, GuardFnFactory<Dependencies>>,
-  depsStore: RoutesDependencies<Dependencies> | undefined,
   parentName = "",
 ): void {
   for (const route of routes) {
@@ -270,7 +275,6 @@ export function registerAllRouteHandlers<
       routeCustomFields,
       pendingCanActivate,
       pendingCanDeactivate,
-      depsStore,
     );
 
     if (route.children) {
@@ -280,10 +284,248 @@ export function registerAllRouteHandlers<
         routeCustomFields,
         pendingCanActivate,
         pendingCanDeactivate,
-        depsStore,
         fullName,
       );
     }
+  }
+}
+
+// =============================================================================
+// Prepare-then-commit (issue #698)
+//
+// add()/replace() build the complete new store state into LOCAL structures, and
+// only swap it into the store once every core-level error has surfaced from the
+// build itself (async/circular forwardTo throw in registerAllRouteHandlers /
+// refreshForwardMap; invalid path constraint throws in rebuildTree). The store
+// is mutated only by `adoptRouteArtifacts`, which cannot throw — so a rejected
+// build leaves the existing routes untouched. The two silent-corruption cases
+// route-tree never throws on (duplicate name vs an existing route, missing
+// parent) are caught up front by `assertAddable`.
+// =============================================================================
+
+/**
+ * The fully-built, ready-to-swap result of preparing a route mutation. Holds
+ * everything `adoptRouteArtifacts` assigns into the store.
+ */
+interface RouteArtifacts<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+> {
+  readonly definitions: RouteDefinition[];
+  readonly config: RouteConfig;
+  readonly routeCustomFields: Record<string, Record<string, unknown>>;
+  readonly pendingCanActivate: Map<string, GuardFnFactory<Dependencies>>;
+  readonly pendingCanDeactivate: Map<string, GuardFnFactory<Dependencies>>;
+  readonly tree: RouteTree;
+  readonly matcher: Matcher;
+  readonly resolvedForwardMap: Record<string, string>;
+}
+
+/** Null-proto shallow clone of a RouteConfig (preserves the 5 maps' contents). */
+function cloneConfig(config: RouteConfig): RouteConfig {
+  const clone = createEmptyConfig();
+
+  Object.assign(clone.decoders, config.decoders);
+  Object.assign(clone.encoders, config.encoders);
+  Object.assign(clone.defaultParams, config.defaultParams);
+  Object.assign(clone.forwardMap, config.forwardMap);
+  Object.assign(clone.forwardFnMap, config.forwardFnMap);
+
+  return clone;
+}
+
+/**
+ * Returns a new definitions array with `added` inserted, without mutating the
+ * input. For a top-level add the existing definitions are shallow-copied and
+ * `added` appended. For a parented add the spine down to the parent is cloned
+ * (siblings/other branches are shared by reference) and `added` appended to the
+ * parent's children. Caller guarantees the parent path exists (see assertAddable).
+ */
+function insertAddedDefinitions(
+  definitions: readonly RouteDefinition[],
+  added: RouteDefinition[],
+  parentSegments: readonly string[],
+): RouteDefinition[] {
+  if (parentSegments.length === 0) {
+    return [...definitions, ...added];
+  }
+
+  const [head, ...rest] = parentSegments;
+
+  return definitions.map((def) => {
+    if (def.name !== head) {
+      return def;
+    }
+
+    const children = def.children ?? [];
+
+    return {
+      ...def,
+      children:
+        rest.length === 0
+          ? [...children, ...added]
+          : insertAddedDefinitions(children, added, rest),
+    };
+  });
+}
+
+/** Depth-first walk yielding each route's full dotted name (no side effects). */
+function walkRouteNames<Dependencies extends DefaultDependencies>(
+  routes: readonly Route<Dependencies>[],
+  parentName: string,
+  onName: (fullName: string) => void,
+): void {
+  for (const route of routes) {
+    const fullName = parentName ? `${parentName}.${route.name}` : route.name;
+
+    onName(fullName);
+
+    if (route.children) {
+      walkRouteNames(route.children, fullName, onName);
+    }
+  }
+}
+
+/**
+ * Up-front guard for `add` against the two corruptions route-tree stays silent
+ * on: a missing `parent`, and a name that collides with an EXISTING route
+ * (which would otherwise be silently overwritten). Throws before any build.
+ */
+export function assertAddable<Dependencies extends DefaultDependencies>(
+  store: RoutesStore<Dependencies>,
+  routes: readonly Route<Dependencies>[],
+  parentName: string | undefined,
+): void {
+  if (parentName !== undefined && !store.matcher.hasRoute(parentName)) {
+    throw new Error(
+      `[router.addRoute] Parent route "${parentName}" does not exist`,
+    );
+  }
+
+  walkRouteNames(routes, parentName ?? "", (fullName) => {
+    if (store.matcher.hasRoute(fullName)) {
+      throw new Error(`[router.addRoute] Route "${fullName}" already exists`);
+    }
+  });
+}
+
+/**
+ * Builds RouteArtifacts from a final definitions array and the routes whose
+ * handlers (config + guards) populate `config`/`routeCustomFields`. Guards are
+ * collected into the returned pending maps (depsStore is intentionally omitted
+ * so nothing compiles or touches the lifecycle here). THROWS on async/circular
+ * forwardTo and invalid path constraint — before the caller mutates the store.
+ */
+function buildArtifacts<Dependencies extends DefaultDependencies>(
+  definitions: RouteDefinition[],
+  routesForHandlers: readonly Route<Dependencies>[],
+  config: RouteConfig,
+  routeCustomFields: Record<string, Record<string, unknown>>,
+  handlerParentName: string,
+  rootPath: string,
+  matcherOptions: CreateMatcherOptions | undefined,
+): RouteArtifacts<Dependencies> {
+  const pendingCanActivate = new Map<string, GuardFnFactory<Dependencies>>();
+  const pendingCanDeactivate = new Map<string, GuardFnFactory<Dependencies>>();
+
+  registerAllRouteHandlers(
+    routesForHandlers,
+    config,
+    routeCustomFields,
+    pendingCanActivate,
+    pendingCanDeactivate,
+    handlerParentName,
+  );
+
+  const resolvedForwardMap = refreshForwardMap(config);
+  const { tree, matcher } = rebuildTree(definitions, rootPath, matcherOptions);
+
+  return {
+    definitions,
+    config,
+    routeCustomFields,
+    pendingCanActivate,
+    pendingCanDeactivate,
+    tree,
+    matcher,
+    resolvedForwardMap,
+  };
+}
+
+/** Builds the merged artifacts for an incremental `add` (existing ∪ new). */
+export function buildAddArtifacts<Dependencies extends DefaultDependencies>(
+  store: RoutesStore<Dependencies>,
+  routes: readonly Route<Dependencies>[],
+  parentName: string | undefined,
+): RouteArtifacts<Dependencies> {
+  const definitions = insertAddedDefinitions(
+    store.definitions,
+    routes.map((route) => sanitizeRoute(route)),
+    parentName === undefined ? [] : parentName.split("."),
+  );
+
+  return buildArtifacts(
+    definitions,
+    routes,
+    cloneConfig(store.config),
+    Object.assign(
+      Object.create(null) as Record<string, Record<string, unknown>>,
+      store.routeCustomFields,
+    ),
+    parentName ?? "",
+    store.rootPath,
+    store.matcherOptions,
+  );
+}
+
+/** Builds the fresh artifacts for a full `replace` (standalone new set). */
+export function buildReplaceArtifacts<Dependencies extends DefaultDependencies>(
+  routes: readonly Route<Dependencies>[],
+  rootPath: string,
+  matcherOptions: CreateMatcherOptions | undefined,
+): RouteArtifacts<Dependencies> {
+  return buildArtifacts(
+    routes.map((route) => sanitizeRoute(route)),
+    routes,
+    createEmptyConfig(),
+    Object.create(null) as Record<string, Record<string, unknown>>,
+    "",
+    rootPath,
+    matcherOptions,
+  );
+}
+
+/**
+ * Commits prepared artifacts into the store in place. Pure assignment — never
+ * throws — so it is the single atomic swap point of the prepare-then-commit
+ * pipeline. Guard registration is deferred to here (the build collected guards
+ * without compiling); `depsStore` is always set on a wired router, which is the
+ * only path that reaches `add`/`replace`.
+ */
+export function adoptRouteArtifacts<Dependencies extends DefaultDependencies>(
+  store: RoutesStore<Dependencies>,
+  artifacts: RouteArtifacts<Dependencies>,
+): void {
+  store.definitions.length = 0;
+
+  for (const def of artifacts.definitions) {
+    store.definitions.push(def);
+  }
+
+  Object.assign(store.config, artifacts.config);
+  store.routeCustomFields = artifacts.routeCustomFields;
+  store.tree = artifacts.tree;
+  store.matcher = artifacts.matcher;
+  store.resolvedForwardMap = artifacts.resolvedForwardMap;
+
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- depsStore is set once the router is wired; add/replace only run on a wired router (constructor-time registration uses createRoutesStore)
+  const deps = store.depsStore!;
+
+  for (const [name, handler] of artifacts.pendingCanActivate) {
+    deps.addActivateGuard(name, handler);
+  }
+
+  for (const [name, handler] of artifacts.pendingCanDeactivate) {
+    deps.addDeactivateGuard(name, handler);
   }
 }
 
@@ -297,46 +539,24 @@ export function createRoutesStore<
   routes: Route<Dependencies>[],
   matcherOptions?: CreateMatcherOptions,
 ): RoutesStore<Dependencies> {
-  const definitions: RouteDefinition[] = [];
-  const config: RouteConfig = createEmptyConfig();
-  const routeCustomFields: Record<
-    string,
-    Record<string, unknown>
-  > = Object.create(null) as Record<string, Record<string, unknown>>;
-  const pendingCanActivate = new Map<string, GuardFnFactory<Dependencies>>();
-  const pendingCanDeactivate = new Map<string, GuardFnFactory<Dependencies>>();
-
-  for (const route of routes) {
-    definitions.push(sanitizeRoute(route));
-  }
-
-  const { tree, matcher } = rebuildTree(definitions, "", matcherOptions);
-
-  registerAllRouteHandlers(
-    routes,
-    config,
-    routeCustomFields,
-    pendingCanActivate,
-    pendingCanDeactivate,
-    undefined,
-    "",
-  );
-
-  const resolvedForwardMap = refreshForwardMap(config);
+  // Initial routes are a standalone set at rootPath "" — same build the
+  // prepare-then-commit `replace` path uses. Guards land in the pending maps
+  // (depsStore is wired later via setDependencies, which flushes them).
+  const artifacts = buildReplaceArtifacts(routes, "", matcherOptions);
 
   return {
-    definitions,
-    config,
-    tree,
-    matcher,
-    resolvedForwardMap,
-    routeCustomFields,
+    definitions: artifacts.definitions,
+    config: artifacts.config,
+    tree: artifacts.tree,
+    matcher: artifacts.matcher,
+    resolvedForwardMap: artifacts.resolvedForwardMap,
+    routeCustomFields: artifacts.routeCustomFields,
     rootPath: "",
     matcherOptions,
     depsStore: undefined,
     lifecycleNamespace: undefined,
-    pendingCanActivate,
-    pendingCanDeactivate,
+    pendingCanActivate: artifacts.pendingCanActivate,
+    pendingCanDeactivate: artifacts.pendingCanDeactivate,
     treeOperations: {
       commitTreeChanges,
       resetStore,

@@ -75,6 +75,10 @@ describe("Route Management (getRoutesApi) Properties", () => {
         { name: "cycB", path: "/cyc-b", forwardTo: "cycA" },
       ]);
     }).toThrow();
+
+    // Atomicity (issue #698): a rejected cyclic batch leaves nothing behind.
+    expect(routesApi.has("cycA")).toBe(false);
+    expect(routesApi.has("cycB")).toBe(false);
   });
 
   it("replace atomicity: old routes gone, new routes present", () => {
