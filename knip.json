@@ -48,8 +48,7 @@
       "ignore": ["src/dom-utils/**"],
       "vitest": {
         "config": ["vitest.config.mts"]
-      },
-      "ignoreDependencies": ["@real-router/browser-plugin"]
+      }
     },
     "packages/dom-utils": {
       "entry": ["tests/**/*.{ts,tsx}"],
@@ -120,7 +119,6 @@
     },
     "packages/angular": {
       "project": ["src/**/*.ts"],
-      "ignore": ["src/dom-utils/**"],
       "vitest": {
         "config": ["vitest.config.mts"]
       }
@@ -136,8 +134,7 @@
     }
   },
   "ignoreWorkspaces": ["examples/**", "benchmarks"],
-  "ignore": ["benchmarks/**"],
-  "ignoreDependencies": ["@stryker-mutator/api", "jsdom"],
+  "ignoreDependencies": ["@stryker-mutator/api"],
   "ignoreBinaries": ["tree", "tsx", "open"],
   "ignoreExportsUsedInFile": true
 }
