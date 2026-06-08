@@ -14,7 +14,7 @@
     "@real-router/core": "workspace:^",
     "@real-router/solid": "workspace:^",
     "@real-router/sources": "workspace:^",
-    "solid-js": "1.9.12"
+    "solid-js": "1.9.13"
   },
   "devDependencies": {
     "typescript": "6.0.3",
