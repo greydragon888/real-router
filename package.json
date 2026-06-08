@@ -20,7 +20,7 @@
     "lint:types": "turbo run lint:types",
     "lint:package": "turbo run lint:package",
     "lint:unused": "knip",
-    "lint:duplicates": "jscpd packages/*/src/",
+    "lint:duplicates": "jscpd packages/*/src/ -i \"packages/preact/src/**,packages/hash-plugin/src/**,packages/*/src/dom-utils/**,packages/*/src/browser-env/**,packages/*/src/shared-ssr/**,packages/*/src/**/*.react-server.ts,packages/react/src/legacy.ts,packages/react/src/legacy.ssr.ts,packages/react/src/ink.ts,**/*.d.ts\"",
     "lint:e2e": "bash scripts/check-e2e-specs.sh",
     "lint:audit": "bash scripts/check-deps-audit.sh",
     "lint:deps": "syncpack lint",

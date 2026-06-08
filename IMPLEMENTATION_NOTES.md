@@ -250,6 +250,16 @@ Enforces conventional commits. Types and scopes defined in `commitlint.config.mj
 
 The full build orchestrator (`pnpm turbo run build`) is wired in `turbo.json` to depend on `bundle`, `test`, `test:properties`, AND `test:stress` — so pre-push exercises stress tests for every human push. Stress coverage is intentionally **not** duplicated in CI workflows (see "CI: `test:stress` lives only in pre-push" below).
 
+### jscpd 5.x ignore patterns live in the CLI, not `.jscpd.json` (#714)
+
+**Problem:** `pnpm lint:duplicates` (the pre-push copy-paste gate) started failing at **6.9%** over the 2% threshold, flagging clones that `.jscpd.json` was supposed to exclude — `packages/preact/src/**` (the deliberate React↔Preact parallel structure), `packages/*/src/dom-utils/**` (the Angular git-tracked copy vs the `dom-utils` package), `packages/hash-plugin/src/**`, the `*.react-server.ts` shims, etc. The `ignore` array in `.jscpd.json` listed every one of them, yet they all still counted.
+
+**Root cause:** jscpd was bumped to **5.x**, a ground-up **Rust rewrite** (`cpd`). It still reads `threshold`, `minLines`, `minTokens`, `skipComments`, and `format` from `.jscpd.json`, but it **silently drops the `ignore` array** — the old Node implementation's key is not part of the new config schema. So every intended exclusion evaporated the moment the binary changed, with no error: the threshold kept being read (hence the failure message cited 2.0%), only the exclusions went missing. The duplication had not grown; the filter had stopped.
+
+**Solution:** Pass the exclusions to the binary via its actual flag — `-i / --ignore-pattern` (comma-separated globs), which the Rust CLI honors — directly in the `lint:duplicates` script. `.jscpd.json` keeps only the keys the new binary respects, plus a `comment` field pointing here so the next person doesn't re-add a dead `ignore` array. Result: **1.0%**, gate green. The node_modules/dist/test/bench exclusions that used to live in `ignore` are unnecessary now — the script scans `packages/*/src/` only (no tests, no build output), and `.gitignore` is respected by default.
+
+**Why not refactor the flagged code:** the largest "clones" are intentional — the Angular `dom-utils` copy is a build-time materialization of `shared/dom-utils/` (ng-packagr can't follow the symlink), and the React/Preact components are deliberately independent per-framework twins. The duplication is by design; the filter is what regressed.
+
 ## Commit Conventions
 
 ### Scope Sync
