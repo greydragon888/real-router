@@ -34,12 +34,28 @@ export type {
   Unsubscribe,
 } from "@real-router/types";
 
+// Route-tree mutation event payloads (observed via getRoutesApi().subscribeChanges)
+export type {
+  TreeChangedEvent,
+  TreeChangedAdd,
+  TreeChangedRemove,
+  TreeChangedUpdate,
+  TreeChangedReplace,
+  TreeChangedClear,
+  TreeStructuralPatch,
+} from "@real-router/types";
+
 export type { ErrorCodes, Constants } from "./constants";
 
 export { events, constants, errorCodes, UNKNOWN_ROUTE } from "./constants";
 
 // RouterError class (migrated from router-error package)
 export { RouterError } from "./RouterError";
+
+// Re-exported so end users can `instanceof RecursionDepthError` at CRUD call
+// sites — the only error that escapes a `subscribeChanges` handler (depth-limit
+// overflow propagates, unlike ordinary listener errors which are isolated).
+export { RecursionDepthError } from "event-emitter";
 
 export { createRouter } from "./createRouter";
 

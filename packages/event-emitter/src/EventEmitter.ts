@@ -17,7 +17,15 @@ type AnyCallback = Function;
  * Sentinel error for recursion depth violations.
  * Re-thrown from the per-listener catch so it propagates to the caller.
  */
-class RecursionDepthError extends Error {}
+export class RecursionDepthError extends Error {
+  constructor(message?: string) {
+    super(message);
+    // Without this, `error.name` inherits "Error" (subclasses don't auto-set
+    // it), breaking `error.name === "RecursionDepthError"` checks at catch sites
+    // that can't `instanceof` across bundle boundaries.
+    this.name = "RecursionDepthError";
+  }
+}
 
 /**
  * Generic typed event emitter with listener limits, duplicate detection,

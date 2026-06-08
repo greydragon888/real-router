@@ -1,4 +1,4 @@
-export { EventEmitter } from "./EventEmitter";
+export { EventEmitter, RecursionDepthError } from "./EventEmitter";
 
 export type {
   EventEmitterLimits,

@@ -383,4 +383,150 @@ describe("Search schema plugin", () => {
       consoleSpy.mockRestore();
     });
   });
+
+  describe("Runtime mutations via TREE_CHANGED (update / replace / remove / clear)", () => {
+    it("validates defaultParams when update() changes them (dev mode)", () => {
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          {
+            name: "search",
+            path: "/search?q",
+            searchSchema: failingSchema([
+              { message: "q is invalid", path: ["q"] },
+            ]),
+          },
+        ],
+        { defaultRoute: "home" },
+      );
+
+      router.usePlugin(searchSchemaPlugin({ mode: "development" }));
+
+      getRoutesApi(router).update("search", { defaultParams: { q: "bad" } });
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Route "search"'),
+        expect.anything(),
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it("does not validate on a non-defaultParams update (dev mode)", () => {
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          { name: "other", path: "/other" },
+          {
+            name: "search",
+            path: "/search?q",
+            searchSchema: failingSchema([
+              { message: "q is invalid", path: ["q"] },
+            ]),
+          },
+        ],
+        { defaultRoute: "home" },
+      );
+
+      router.usePlugin(searchSchemaPlugin({ mode: "development" }));
+
+      getRoutesApi(router).update("search", { forwardTo: "other" });
+
+      expect(consoleSpy).not.toHaveBeenCalled();
+
+      consoleSpy.mockRestore();
+    });
+
+    it("validates the new route set after replace() (dev mode)", () => {
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      router = createRouter([{ name: "home", path: "/" }], {
+        defaultRoute: "home",
+      });
+
+      router.usePlugin(searchSchemaPlugin({ mode: "development" }));
+
+      getRoutesApi(router).replace([
+        { name: "home", path: "/" },
+        {
+          name: "results",
+          path: "/results?q",
+          defaultParams: { q: "bad" },
+          searchSchema: failingSchema([
+            { message: "q is invalid", path: ["q"] },
+          ]),
+        },
+      ]);
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Route "results"'),
+        expect.anything(),
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it("does not validate route mutations in production mode", () => {
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      router = createRouter([{ name: "home", path: "/" }], {
+        defaultRoute: "home",
+      });
+
+      const unsubscribe = router.usePlugin(
+        searchSchemaPlugin({ mode: "production" }),
+      );
+
+      getRoutesApi(router).replace([
+        {
+          name: "results",
+          path: "/results?q",
+          defaultParams: { q: "bad" },
+          searchSchema: failingSchema([
+            { message: "q is invalid", path: ["q"] },
+          ]),
+        },
+      ]);
+
+      // Teardown exercises the production no-op unsubscribe path.
+      unsubscribe();
+
+      expect(consoleSpy).not.toHaveBeenCalled();
+
+      consoleSpy.mockRestore();
+    });
+
+    it("does nothing on remove() and clear() (dev mode)", () => {
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          {
+            name: "search",
+            path: "/search?q",
+            searchSchema: passThroughSchema(),
+          },
+        ],
+        { defaultRoute: "home" },
+      );
+
+      router.usePlugin(searchSchemaPlugin({ mode: "development" }));
+
+      const routesApi = getRoutesApi(router);
+
+      expect(() => {
+        routesApi.remove("search");
+        routesApi.clear();
+      }).not.toThrow();
+
+      expect(consoleSpy).not.toHaveBeenCalled();
+
+      consoleSpy.mockRestore();
+    });
+  });
 });

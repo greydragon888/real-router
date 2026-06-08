@@ -6,7 +6,7 @@ import type {
   StandardSchemaV1,
   StandardSchemaV1Issue,
 } from "./types";
-import type { Params, Plugin, Route } from "@real-router/core";
+import type { Params, Plugin, TreeChangedEvent } from "@real-router/core";
 import type { PluginApi, RoutesApi } from "@real-router/core/api";
 
 export class SearchSchemaPlugin {
@@ -22,7 +22,7 @@ export class SearchSchemaPlugin {
       ) => Params)
     | undefined;
   readonly #removeForwardStateInterceptor: () => void;
-  readonly #removeAddInterceptor: () => void;
+  readonly #removeChangesSubscription: () => void;
 
   constructor(
     pluginApi: PluginApi,
@@ -46,22 +46,48 @@ export class SearchSchemaPlugin {
       },
     );
 
-    this.#removeAddInterceptor = this.#pluginApi.addInterceptor(
-      "add",
-      (next, routes, addOptions) => {
-        next(routes, addOptions);
-        this.#validateRoutesDefaultParams(routes, addOptions?.parent);
-      },
-    );
+    // Dev-time defaultParams validation for runtime tree mutations. Replaces the
+    // old `add` interceptor: TREE_CHANGED additionally covers `update` (changed
+    // defaultParams) and `replace` (new route set) — the gap the interceptor
+    // could not reach. Production mode skips the subscription entirely.
+    this.#removeChangesSubscription =
+      this.#mode === "development"
+        ? this.#routesApi.subscribeChanges((event) => {
+            this.#onTreeChanged(event);
+          })
+        : () => {};
   }
 
   getPlugin(): Plugin {
     return {
       teardown: () => {
         this.#removeForwardStateInterceptor();
-        this.#removeAddInterceptor();
+        this.#removeChangesSubscription();
       },
     };
+  }
+
+  #onTreeChanged(event: TreeChangedEvent): void {
+    switch (event.op) {
+      case "add":
+      case "replace": {
+        // `added` is FLAT (full dotted names, descendants included).
+        for (const route of event.added) {
+          this.#validateSingleRouteDefaultParams(route.name);
+        }
+
+        break;
+      }
+      case "update": {
+        // Only a defaultParams change can newly violate the schema.
+        if (event.patch.defaultParams !== undefined) {
+          this.#validateSingleRouteDefaultParams(event.name);
+        }
+
+        break;
+      }
+      // "remove" / "clear": the routes are gone — nothing to validate.
+    }
   }
 
   #getSchema(routeName: string): StandardSchemaV1 | undefined {
@@ -184,25 +210,6 @@ export class SearchSchemaPlugin {
         `${ERROR_PREFIX} Route "${routeName}": defaultParams do not pass searchSchema`,
         validation.issues,
       );
-    }
-  }
-
-  #validateRoutesDefaultParams(routes: Route[], prefix = ""): void {
-    if (this.#mode !== "development") {
-      return;
-    }
-
-    for (const route of routes) {
-      /* v8 ignore next -- @preserve: Route.name is always a non-empty string */
-      if (route.name) {
-        const fullName = prefix ? `${prefix}.${route.name}` : route.name;
-
-        this.#validateSingleRouteDefaultParams(fullName);
-
-        if (route.children) {
-          this.#validateRoutesDefaultParams(route.children, fullName);
-        }
-      }
     }
   }
 }

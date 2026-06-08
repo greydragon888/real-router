@@ -16,9 +16,18 @@ import type {
   Plugin,
   State,
   SubscribeFn,
+  TreeChangedEvent,
   Unsubscribe,
 } from "@real-router/types";
 import type { EventEmitter } from "event-emitter";
+
+/**
+ * Internal-only event key for route-tree mutations. Lives on the same
+ * `EventEmitter` as the 7 transition events but never enters the public
+ * `EventName` union — reachable only through
+ * `getRoutesApi(router).subscribeChanges()`.
+ */
+const TREE_CHANGED = "TREE_CHANGED";
 
 function ensureError(value: unknown): Error {
   /* v8 ignore next -- @preserve: defensive guard — listeners should always throw Error objects */
@@ -139,6 +148,34 @@ export class EventBusNamespace {
 
   emitTransitionLeaveApprove(toState: State, fromState?: State): void {
     this.#emitter.emit(events.TRANSITION_LEAVE_APPROVE, toState, fromState);
+  }
+
+  /**
+   * Emits the internal `TREE_CHANGED` event after a structural route-tree
+   * mutation. Reuses the shared `EventEmitter` — so depth tracking
+   * (`maxEventDepth`) and per-listener error isolation (`onListenerError`)
+   * apply automatically.
+   */
+  emitTreeChanged(event: TreeChangedEvent): void {
+    this.#emitter.emit(TREE_CHANGED, event);
+  }
+
+  /**
+   * Subscribes to `TREE_CHANGED`. **Lenient** duplicate semantics (mirrors
+   * {@link subscribe}): each call wraps the handler in a fresh closure, so N
+   * registrations of the same reference produce N independent subscriptions.
+   */
+  subscribeTreeChanged(
+    handler: (event: TreeChangedEvent) => void,
+  ): Unsubscribe {
+    return this.#emitter.on(TREE_CHANGED, (event: TreeChangedEvent) => {
+      handler(event);
+    });
+  }
+
+  /** Number of active `TREE_CHANGED` listeners (drives conditional emit). */
+  treeChangedListenerCount(): number {
+    return this.#emitter.listenerCount(TREE_CHANGED);
   }
 
   sendStart(): void {

@@ -2,7 +2,7 @@ import { logger } from "@real-router/logger";
 
 import { throwIfDisposed } from "./helpers";
 import { guardRouteStructure } from "../guards";
-import { createInterceptable, getInternals } from "../internals";
+import { getInternals } from "../internals";
 import {
   clearConfigEntries,
   removeFromDefinitions,
@@ -30,6 +30,8 @@ import type {
   Params,
   Router,
   TransitionMeta,
+  TreeChangedEvent,
+  TreeStructuralPatch,
 } from "@real-router/types";
 import type { RouteDefinition, RouteTree } from "route-tree";
 
@@ -124,6 +126,60 @@ function updateForwardTo<
 }
 
 /**
+ * Re-attaches the stored config (forwardTo / defaultParams / encode-decode) and
+ * lifecycle guards for `lookupName` onto `route`, then returns it (mutates in
+ * place). Shared by {@link enrichRoute} (nested, bare `name`) and
+ * {@link buildFlatRoute} (flat, full dotted `name`) — one source of truth for
+ * the route-config field set.
+ */
+function assignRouteConfig<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+>(
+  route: Route<Dependencies>,
+  lookupName: string,
+  config: RouteConfig,
+  factories: [
+    Record<string, GuardFnFactory<Dependencies>>,
+    Record<string, GuardFnFactory<Dependencies>>,
+  ],
+): Route<Dependencies> {
+  const forwardToFn = config.forwardFnMap[lookupName];
+  const forwardToStr = config.forwardMap[lookupName];
+
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  if (forwardToFn !== undefined) {
+    route.forwardTo = forwardToFn;
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  } else if (forwardToStr !== undefined) {
+    route.forwardTo = forwardToStr;
+  }
+
+  if (lookupName in config.defaultParams) {
+    route.defaultParams = config.defaultParams[lookupName];
+  }
+
+  if (lookupName in config.decoders) {
+    route.decodeParams = config.decoders[lookupName];
+  }
+
+  if (lookupName in config.encoders) {
+    route.encodeParams = config.encoders[lookupName];
+  }
+
+  const [canDeactivateFactories, canActivateFactories] = factories;
+
+  if (lookupName in canActivateFactories) {
+    route.canActivate = canActivateFactories[lookupName];
+  }
+
+  if (lookupName in canDeactivateFactories) {
+    route.canDeactivate = canDeactivateFactories[lookupName];
+  }
+
+  return route;
+}
+
+/**
  * Builds a full Route object from a bare RouteDefinition by re-attaching
  * config entries and lifecycle factories.
  *
@@ -146,38 +202,7 @@ function enrichRoute<
     path: routeDef.path,
   };
 
-  const forwardToFn = config.forwardFnMap[routeName];
-  const forwardToStr = config.forwardMap[routeName];
-
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  if (forwardToFn !== undefined) {
-    route.forwardTo = forwardToFn;
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  } else if (forwardToStr !== undefined) {
-    route.forwardTo = forwardToStr;
-  }
-
-  if (routeName in config.defaultParams) {
-    route.defaultParams = config.defaultParams[routeName];
-  }
-
-  if (routeName in config.decoders) {
-    route.decodeParams = config.decoders[routeName];
-  }
-
-  if (routeName in config.encoders) {
-    route.encodeParams = config.encoders[routeName];
-  }
-
-  const [canDeactivateFactories, canActivateFactories] = factories;
-
-  if (routeName in canActivateFactories) {
-    route.canActivate = canActivateFactories[routeName];
-  }
-
-  if (routeName in canDeactivateFactories) {
-    route.canDeactivate = canDeactivateFactories[routeName];
-  }
+  assignRouteConfig(route, routeName, config, factories);
 
   if (routeDef.children) {
     route.children = routeDef.children.map((child) =>
@@ -186,6 +211,199 @@ function enrichRoute<
   }
 
   return route;
+}
+
+// ============================================================================
+// TREE_CHANGED payload helpers
+// ============================================================================
+
+/**
+ * Builds a single FLAT `Route` for `fullName` from the store config + lifecycle
+ * factories — `name` is the FULL dotted name and there is no `children` array
+ * (consumers want a flat, by-name list). Frozen on construction.
+ */
+function buildFlatRoute<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+>(
+  fullName: string,
+  path: string,
+  config: RouteConfig,
+  factories: [
+    Record<string, GuardFnFactory<Dependencies>>,
+    Record<string, GuardFnFactory<Dependencies>>,
+  ],
+): Route<Dependencies> {
+  const route: Route<Dependencies> = { name: fullName, path };
+
+  assignRouteConfig(route, fullName, config, factories);
+
+  return Object.freeze(route);
+}
+
+/**
+ * Walks the store's definitions depth-first, building a FLAT
+ * `Map<fullName, Route>` for every node whose full dotted name satisfies
+ * `include`. Reads the live store, so call it at the right moment relative to
+ * the mutation (before for removed, after for added).
+ */
+function collectFlatRoutes<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+>(
+  store: RoutesStore<Dependencies>,
+  include: (fullName: string) => boolean,
+): Map<string, Route<Dependencies>> {
+  const result = new Map<string, Route<Dependencies>>();
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
+  const factories = store.lifecycleNamespace!.getFactories();
+
+  const walk = (defs: readonly RouteDefinition[], parentName: string): void => {
+    for (const def of defs) {
+      const fullName = parentName ? `${parentName}.${def.name}` : def.name;
+
+      if (include(fullName)) {
+        result.set(
+          fullName,
+          buildFlatRoute(fullName, def.path, store.config, factories),
+        );
+      }
+
+      if (def.children) {
+        walk(def.children, fullName);
+      }
+    }
+  };
+
+  walk(store.definitions, "");
+
+  return result;
+}
+
+/**
+ * Collects the route `name` and all of its descendants as a FLAT, frozen array.
+ * MUST be called BEFORE the removal mutation — the nodes are gone afterwards.
+ */
+function collectSubtree<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+>(
+  store: RoutesStore<Dependencies>,
+  name: string,
+): readonly Route<Dependencies>[] {
+  const prefix = `${name}.`;
+  const subtree = collectFlatRoutes(
+    store,
+    (fullName) => fullName === name || fullName.startsWith(prefix),
+  );
+
+  return Object.freeze([...subtree.values()]);
+}
+
+/**
+ * Builds the FLAT, frozen payload array for an `add`, walking only the input
+ * routes — O(added), not O(tree). `path` is taken from the input verbatim
+ * (`sanitizeRoute` never rewrites it); config fields are read from the
+ * post-commit store by full name. `add` never removes, so the input subtree is
+ * exactly what changed.
+ */
+function collectAddedRoutes<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+>(
+  routes: readonly Route<Dependencies>[],
+  parentName: string | undefined,
+  store: RoutesStore<Dependencies>,
+): readonly Route<Dependencies>[] {
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
+  const factories = store.lifecycleNamespace!.getFactories();
+  const result: Route<Dependencies>[] = [];
+
+  const walk = (
+    input: readonly Route<Dependencies>[],
+    parent: string,
+  ): void => {
+    for (const route of input) {
+      const fullName = parent ? `${parent}.${route.name}` : route.name;
+
+      result.push(
+        buildFlatRoute(fullName, route.path, store.config, factories),
+      );
+
+      if (route.children) {
+        walk(route.children, fullName);
+      }
+    }
+  };
+
+  walk(routes, parentName ?? "");
+
+  return Object.freeze(result);
+}
+
+/** Diffs two flat route maps by full name into frozen removed/added arrays. */
+function diffFlatRoutes<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+>(
+  before: ReadonlyMap<string, Route<Dependencies>>,
+  after: ReadonlyMap<string, Route<Dependencies>>,
+): {
+  removed: readonly Route<Dependencies>[];
+  added: readonly Route<Dependencies>[];
+} {
+  const removed: Route<Dependencies>[] = [];
+  const added: Route<Dependencies>[] = [];
+
+  for (const [fullName, route] of before) {
+    if (!after.has(fullName)) {
+      removed.push(route);
+    }
+  }
+
+  for (const [fullName, route] of after) {
+    if (!before.has(fullName)) {
+      added.push(route);
+    }
+  }
+
+  return { removed: Object.freeze(removed), added: Object.freeze(added) };
+}
+
+/**
+ * Builds the structural subset of an `update()` patch (forwardTo /
+ * defaultParams / encodeParams / decodeParams) from the already-destructured
+ * update fields — so user getters are not re-invoked. A guard-only patch yields
+ * an empty object → the caller emits no TREE_CHANGED (О-7: guards are
+ * invoked-on-demand, not cached, so they need no observation channel).
+ *
+ * The returned envelope is a fresh object (caller's patch untouched) and is
+ * frozen on construction. Nested values (e.g. `defaultParams`) are kept by
+ * reference — the same objects the router stored — so exotic inputs (circular
+ * refs, class instances) are tolerated, matching `update()`'s existing contract.
+ */
+function buildStructuralPatch<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+>(fields: {
+  forwardTo?: string | ForwardToCallback<Dependencies> | null | undefined;
+  defaultParams?: Params | null | undefined;
+  decodeParams?: ((params: Params) => Params) | null | undefined;
+  encodeParams?: ((params: Params) => Params) | null | undefined;
+}): Readonly<TreeStructuralPatch<Dependencies>> {
+  const patch: TreeStructuralPatch<Dependencies> = {};
+
+  if (fields.forwardTo !== undefined) {
+    patch.forwardTo = fields.forwardTo;
+  }
+
+  if (fields.defaultParams !== undefined) {
+    patch.defaultParams = fields.defaultParams;
+  }
+
+  if (fields.encodeParams !== undefined) {
+    patch.encodeParams = fields.encodeParams;
+  }
+
+  if (fields.decodeParams !== undefined) {
+    patch.decodeParams = fields.decodeParams;
+  }
+
+  return Object.freeze(patch);
 }
 
 // ============================================================================
@@ -225,6 +443,7 @@ function replaceRoutes<
   ctx: RouterInternals<Dependencies>,
   currentPath: string | undefined,
   previousTransition: TransitionMeta | undefined,
+  onCommitted?: () => void,
 ): void {
   // Build the whole new set BEFORE touching the store.
   const artifacts = buildReplaceArtifacts(
@@ -237,6 +456,10 @@ function replaceRoutes<
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
   store.lifecycleNamespace!.clearDefinitionGuards();
   adoptRouteArtifacts(store, artifacts);
+
+  // TREE_CHANGED fires here (О-5): the new tree is committed but state is not
+  // yet revalidated, so the handler sees the new tree and the still-old state.
+  onCommitted?.();
 
   // Revalidate state (preserve transition from previous state)
   if (currentPath !== undefined) {
@@ -372,13 +595,12 @@ export function getRoutesApi<
 
   const store = ctx.routeGetStore();
 
-  const interceptableAdd = createInterceptable(
-    "add",
-    (routeArray: Route<Dependencies>[], options?: { parent?: string }) => {
-      addRoutes(store, routeArray, options?.parent);
-    },
-    ctx.interceptors,
-  );
+  // Single cast site: the channel is typed with default Dependencies on
+  // RouterInternals (RouterEventMap is non-generic), but payloads are built
+  // with this api's Dependencies. The runtime shape is identical.
+  const emitChange = (event: TreeChangedEvent<Dependencies>): void => {
+    ctx.treeChanged.emit(event as TreeChangedEvent);
+  };
 
   return {
     add: (routes, options) => {
@@ -397,10 +619,18 @@ export function getRoutesApi<
       ctx.validator?.routes.validateAddRouteArgs(routeArray);
       ctx.validator?.routes.validateRoutes(routeArray, store);
 
-      interceptableAdd(
-        routeArray,
-        parentName === undefined ? undefined : { parent: parentName },
-      );
+      addRoutes(store, routeArray, parentName);
+
+      // Built from the post-commit store (О-1), only when someone is listening.
+      if (ctx.treeChanged.listenerCount() > 0) {
+        const added = collectAddedRoutes(routeArray, parentName, store);
+
+        emitChange(
+          parentName === undefined
+            ? { op: "add", added }
+            : { op: "add", added, parent: parentName },
+        );
+      }
     },
 
     remove: (name) => {
@@ -419,6 +649,11 @@ export function getRoutesApi<
         return;
       }
 
+      // Snapshot the subtree BEFORE the mutation — the nodes are gone after.
+      const removedSubtree =
+        ctx.treeChanged.listenerCount() > 0
+          ? collectSubtree(store, name)
+          : undefined;
       const wasRemoved = removeRoute(store, name);
 
       if (!wasRemoved) {
@@ -426,6 +661,12 @@ export function getRoutesApi<
           "router.removeRoute",
           `Route "${name}" not found. No changes made.`,
         );
+
+        return;
+      }
+
+      if (removedSubtree !== undefined) {
+        emitChange({ op: "remove", name, removedSubtree });
       }
     },
 
@@ -482,6 +723,22 @@ export function getRoutesApi<
           store.lifecycleNamespace!.addCanDeactivate(name, canDeactivate, true);
         }
       }
+
+      // Conditional emit: structural fields only, built from the destructured
+      // locals (so user getters are not re-invoked). A guard-only or empty
+      // patch produces no event (О-7 + empty-patch rule).
+      if (ctx.treeChanged.listenerCount() > 0) {
+        const patch = buildStructuralPatch<Dependencies>({
+          forwardTo,
+          defaultParams,
+          encodeParams,
+          decodeParams,
+        });
+
+        if (Object.keys(patch).length > 0) {
+          emitChange({ op: "update", name, patch });
+        }
+      }
     },
 
     clear: () => {
@@ -494,10 +751,21 @@ export function getRoutesApi<
         return;
       }
 
+      // Snapshot the routes BEFORE the reset empties them. Emitted whenever
+      // there is a listener — even for an empty clear (О-4).
+      const removed =
+        ctx.treeChanged.listenerCount() > 0
+          ? Object.freeze([...collectFlatRoutes(store, () => true).values()])
+          : undefined;
+
       store.treeOperations.resetStore(store);
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
       store.lifecycleNamespace!.clearAll();
       ctx.clearState();
+
+      if (removed !== undefined) {
+        emitChange({ op: "clear", removed });
+      }
     },
 
     has: (name) => {
@@ -534,13 +802,30 @@ export function getRoutesApi<
 
       const currentState = router.getState();
 
+      // The flat removed/added diff is O(N) — compute it only when someone is
+      // listening (Решение 3.B). Snapshot the old tree BEFORE the swap.
+      const before =
+        ctx.treeChanged.listenerCount() > 0
+          ? collectFlatRoutes(store, () => true)
+          : undefined;
+
       replaceRoutes(
         store,
         routeArray,
         ctx,
         currentState?.path,
         currentState?.transition,
+        before === undefined
+          ? undefined
+          : () => {
+              const after = collectFlatRoutes(store, () => true);
+              const { removed, added } = diffFlatRoutes(before, after);
+
+              emitChange({ op: "replace", removed, added });
+            },
       );
     },
+
+    subscribeChanges: (handler) => ctx.treeChanged.subscribe(handler),
   };
 }
