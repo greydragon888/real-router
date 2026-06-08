@@ -12676,10 +12676,6 @@ packages:
     resolution: {integrity: sha512-gnWD14Jh3FzS3CPhF0AxNOJ8CxqeblPTADzI38r0wt8ZyQl5edpy75myt08EG2oKvpyiqSqsx+Wkz9vtkbTqYQ==}
     engines: {node: '>= 18.0.0'}
 
-  isbot@5.1.40:
-    resolution: {integrity: sha512-yNeeynhhtIVRBk12tBV4eHNxwB42HzR4Q3Ea7vCOiJhImGaAIdIMrbJtacQlBizGLjUPw+akkFI5Dn9T70XoVQ==}
-    engines: {node: '>=18'}
-
   isbot@5.1.41:
     resolution: {integrity: sha512-9WFV/Vhh0FEj6CQ7MoHweEL9/vLKPjeoD2I2htbAjX7kbW7VJs3OCpWOVyd+JraNTWVU6/DRx2MZy2KaUNXHcg==}
     engines: {node: '>=18'}
@@ -18487,7 +18483,7 @@ snapshots:
       '@solidjs/meta': 0.29.4(solid-js@1.9.13)
       '@tanstack/history': 1.161.6
       '@tanstack/router-core': 1.168.9
-      isbot: 5.1.40
+      isbot: 5.1.41
       solid-js: 1.9.13
 
   '@tanstack/store@0.9.3': {}
@@ -18498,7 +18494,7 @@ snapshots:
       '@tanstack/router-core': 1.171.8
       '@tanstack/vue-store': 0.9.3(vue@3.5.13(typescript@6.0.3))
       '@vue/runtime-dom': 3.5.33
-      isbot: 5.1.40
+      isbot: 5.1.41
       jsesc: 3.1.0
       vue: 3.5.13(typescript@6.0.3)
     transitivePeerDependencies:
@@ -21684,8 +21680,6 @@ snapshots:
   isbinaryfile@4.0.10: {}
 
   isbinaryfile@5.0.7: {}
-
-  isbot@5.1.40: {}
 
   isbot@5.1.41: {}
 
