@@ -22,14 +22,14 @@ const slowGuardImpl = () => {
 const slowGuard = () => slowGuardImpl;
 
 describe("S14: Rapid stop/start cycles", () => {
-  it("S14.1 200 start/stop cycles: isActive false at end, heap stable", async () => {
+  it("S14.1 8000 start/stop cycles: isActive false at end, heap stable", async () => {
     const router = createStressRouter(5);
 
     router.usePlugin(fullPluginFactory);
 
     const heapBefore = takeHeapSnapshot();
 
-    for (let i = 0; i < 200; i++) {
+    for (let i = 0; i < 8000; i++) {
       await router.start("/route0");
       router.stop();
     }
@@ -38,7 +38,7 @@ describe("S14: Rapid stop/start cycles", () => {
     const delta = heapAfter - heapBefore;
 
     expect(router.isActive()).toBe(false);
-    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(2 * MB);
+    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(1.5 * MB);
 
     router.dispose();
   }, 30_000);
@@ -97,7 +97,7 @@ describe("S14: Rapid stop/start cycles", () => {
     expect(disposedCount).toBe(100);
   });
 
-  it("S14.4 10 plugins × 100 stop/start cycles: each onStart/onStop called 100 times", async () => {
+  it("S14.4 10 plugins × 8000 stop/start cycles: each onStart/onStop called 8000 times", async () => {
     const router = createStressRouter(5);
 
     const startCounts = Array.from({ length: 10 }, () => 0);
@@ -118,7 +118,7 @@ describe("S14: Rapid stop/start cycles", () => {
 
     const heapBefore = takeHeapSnapshot();
 
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 8000; i++) {
       await router.start("/route0");
       router.stop();
     }
@@ -127,11 +127,11 @@ describe("S14: Rapid stop/start cycles", () => {
     const delta = heapAfter - heapBefore;
 
     for (let p = 0; p < 10; p++) {
-      expect(startCounts[p]).toBe(100);
-      expect(stopCounts[p]).toBe(100);
+      expect(startCounts[p]).toBe(8000);
+      expect(stopCounts[p]).toBe(8000);
     }
 
-    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(2 * MB);
+    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(1.5 * MB);
 
     router.dispose();
   }, 30_000);

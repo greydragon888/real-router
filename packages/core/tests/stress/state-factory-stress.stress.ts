@@ -2,7 +2,12 @@ import { describe, afterEach, it, expect } from "vitest";
 
 import { getPluginApi } from "@real-router/core/api";
 
-import { createStressRouter, takeHeapSnapshot, MB } from "./helpers";
+import {
+  createStressRouter,
+  formatBytes,
+  takeHeapSnapshot,
+  MB,
+} from "./helpers";
 
 import type { Router } from "@real-router/core";
 
@@ -33,7 +38,7 @@ describe("S21: makeState / buildState memory", () => {
     const heapAfter = takeHeapSnapshot();
     const delta = heapAfter - heapBefore;
 
-    expect(delta).toBeLessThan(10 * MB);
+    expect(delta, `heap delta: ${formatBytes(delta)}`).toBeLessThan(1 * MB);
   }, 30_000);
 
   it("S21.2: buildState() × 10,000 — heap stable", async () => {
@@ -53,7 +58,7 @@ describe("S21: makeState / buildState memory", () => {
     const heapAfter = takeHeapSnapshot();
     const delta = heapAfter - heapBefore;
 
-    expect(delta).toBeLessThan(10 * MB);
+    expect(delta, `heap delta: ${formatBytes(delta)}`).toBeLessThan(1 * MB);
   }, 30_000);
 
   it("S21.3: buildNavigationState() × 5,000 — heap stable", async () => {
@@ -75,6 +80,6 @@ describe("S21: makeState / buildState memory", () => {
     const heapAfter = takeHeapSnapshot();
     const delta = heapAfter - heapBefore;
 
-    expect(delta).toBeLessThan(10 * MB);
+    expect(delta, `heap delta: ${formatBytes(delta)}`).toBeLessThan(1 * MB);
   }, 30_000);
 });

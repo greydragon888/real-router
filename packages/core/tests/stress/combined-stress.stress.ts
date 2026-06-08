@@ -57,7 +57,7 @@ describe("S9: Combined load scenarios", () => {
     const heapAfter = takeHeapSnapshot();
     const delta = heapAfter - heapBefore;
 
-    expect(delta, `heap delta: ${formatBytes(delta)}`).toBeLessThan(20 * MB);
+    expect(delta, `heap delta: ${formatBytes(delta)}`).toBeLessThan(2 * MB);
     expect(router.getState()).toBeDefined();
 
     for (const unsub of unsubs) {
@@ -90,7 +90,7 @@ describe("S9: Combined load scenarios", () => {
     router.stop();
     router.dispose();
 
-    expect(delta, `heap delta: ${formatBytes(delta)}`).toBeLessThan(20 * MB);
+    expect(delta, `heap delta: ${formatBytes(delta)}`).toBeLessThan(4 * MB);
   }, 60_000);
 
   it("S9.3: Hot reload simulation — 50 replace cycles, navigate after each, state always valid", async () => {
@@ -132,6 +132,6 @@ describe("S9: Combined load scenarios", () => {
     const heapAfter = takeHeapSnapshot();
     const delta = heapAfter - heapBefore;
 
-    expect(delta, `heap delta: ${formatBytes(delta)}`).toBeLessThan(10 * MB);
+    expect(delta, `heap delta: ${formatBytes(delta)}`).toBeLessThan(2 * MB);
   }, 60_000);
 });

@@ -20,14 +20,14 @@ describe("S26: extendRouter() mass extension/removal", () => {
     router.dispose();
   });
 
-  it("S26.1: 500 extend/remove cycles — no leftover properties, heap stable", async () => {
+  it("S26.1: 10000 extend/remove cycles — no leftover properties, heap stable", async () => {
     router = createStressRouter(5);
     await router.start("/route0");
 
     const pluginApi = getPluginApi(router);
     const before = takeHeapSnapshot();
 
-    for (let i = 0; i < 500; i++) {
+    for (let i = 0; i < 10_000; i++) {
       const key = `ext_${i}`;
 
       const remove = pluginApi.extendRouter({
@@ -44,7 +44,7 @@ describe("S26: extendRouter() mass extension/removal", () => {
     const after = takeHeapSnapshot();
     const delta = after - before;
 
-    expect(delta, `heap delta: ${formatBytes(delta)}`).toBeLessThan(5 * MB);
+    expect(delta, `heap delta: ${formatBytes(delta)}`).toBeLessThan(0.75 * MB);
   });
 
   it("S26.2: 50 concurrent extensions — all accessible, all cleaned up", async () => {

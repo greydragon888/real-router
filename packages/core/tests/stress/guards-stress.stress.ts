@@ -60,7 +60,7 @@ describe("S5: Guards under load", () => {
     const totalCalls = callCounts.reduce((sum, c) => sum + c, 0);
 
     expect(totalCalls).toBeGreaterThanOrEqual(500);
-    expect(delta).toBeLessThan(10 * MB);
+    expect(delta).toBeLessThan(2 * MB);
   }, 30_000);
 
   it("S5.3: Auto-cleanup: 50 routes, 50 guards, 200 navigations — guard count stays ≤ 50", async () => {
@@ -95,7 +95,7 @@ describe("S5: Guards under load", () => {
 
     expect(guardCallCount).toBeGreaterThan(0);
     expect(guardCallCount).toBeLessThanOrEqual(200);
-    expect(delta).toBeLessThan(10 * MB);
+    expect(delta).toBeLessThan(0.5 * MB);
   }, 30_000);
 
   it("S5.4: Guard blocks + concurrent navigation cancels — 100 pairs, no leaked promises", async () => {
@@ -146,7 +146,7 @@ describe("S5: Guards under load", () => {
     const delta = heapAfter - heapBefore;
 
     expect(errors.length + successes.length).toBe(200);
-    expect(delta).toBeLessThan(20 * MB);
+    expect(delta).toBeLessThan(0.75 * MB);
   }, 60_000);
 
   it("S5.5: Mixed canActivate/canDeactivate × 20 each + 200 navigations — correct order", async () => {

@@ -48,7 +48,7 @@ describe("S12: navigateToNotFound() stress", () => {
     const heapAfter = takeHeapSnapshot();
     const delta = heapAfter - heapBefore;
 
-    expect(delta).toBeLessThan(5 * MB);
+    expect(delta).toBeLessThan(1 * MB);
   }, 30_000);
 
   it("S12.2: navigateToNotFound during navigate — navigate cancelled, state = UNKNOWN_ROUTE", async () => {
@@ -91,7 +91,7 @@ describe("S12: navigateToNotFound() stress", () => {
     const delta = heapAfter - heapBefore;
 
     expect(cancelledCount).toBeGreaterThan(0);
-    expect(delta).toBeLessThan(20 * MB);
+    expect(delta).toBeLessThan(2.5 * MB);
   }, 60_000);
 
   it("S12.3: navigateToNotFound + 50 subscribe listeners — onTransitionSuccess × 1,000, no TRANSITION_START", async () => {
@@ -136,7 +136,7 @@ describe("S12: navigateToNotFound() stress", () => {
 
     expect(successCallCount).toBe(50_000);
     expect(transitionStartCount).toBe(0);
-    expect(delta).toBeLessThan(10 * MB);
+    expect(delta).toBeLessThan(0.25 * MB);
   }, 30_000);
 
   it("S12.4: navigateToNotFound → navigate away cycle × 500 — heap stable", async () => {
@@ -160,6 +160,6 @@ describe("S12: navigateToNotFound() stress", () => {
     const heapAfter = takeHeapSnapshot();
     const delta = heapAfter - heapBefore;
 
-    expect(delta).toBeLessThan(10 * MB);
+    expect(delta).toBeLessThan(0.75 * MB);
   }, 30_000);
 });

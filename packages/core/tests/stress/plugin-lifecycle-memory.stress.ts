@@ -68,14 +68,14 @@ const eventListenerFactory: PluginFactory = (r) => {
 };
 
 describe("S3. Plugin lifecycle memory leaks", () => {
-  it("should not leak memory during 100 usePlugin/unsubscribe cycles", async () => {
+  it("should not leak memory during 6000 usePlugin/unsubscribe cycles", async () => {
     const router = createStressRouter(5);
 
     await router.start("/route0");
 
     const before = takeHeapSnapshot();
 
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 6000; i++) {
       const unsub = router.usePlugin(emptyPluginFactory);
 
       unsub();
@@ -84,20 +84,20 @@ describe("S3. Plugin lifecycle memory leaks", () => {
     const after = takeHeapSnapshot();
     const delta = after - before;
 
-    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(5 * MB);
+    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(0.8 * MB);
 
     router.stop();
     router.dispose();
   });
 
-  it("should remove router extensions and not leak memory during 50 extendRouter cycles", async () => {
+  it("should remove router extensions and not leak memory during 4000 extendRouter cycles", async () => {
     const router = createStressRouter(5);
 
     await router.start("/route0");
 
     const before = takeHeapSnapshot();
 
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 4000; i++) {
       const unsub = router.usePlugin(extendRouterFactory);
 
       unsub();
@@ -107,20 +107,20 @@ describe("S3. Plugin lifecycle memory leaks", () => {
     const delta = after - before;
 
     expect("stressExt" in router).toBe(false);
-    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(5 * MB);
+    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(0.9 * MB);
 
     router.stop();
     router.dispose();
   });
 
-  it("should clean up interceptor chain and not leak memory during 50 addInterceptor cycles", async () => {
+  it("should clean up interceptor chain and not leak memory during 3000 addInterceptor cycles", async () => {
     const router = createStressRouter(5);
 
     await router.start("/route0");
 
     const before = takeHeapSnapshot();
 
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 3000; i++) {
       const unsub = router.usePlugin(addInterceptorFactory);
 
       unsub();
@@ -129,20 +129,20 @@ describe("S3. Plugin lifecycle memory leaks", () => {
     const after = takeHeapSnapshot();
     const delta = after - before;
 
-    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(5 * MB);
+    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(0.5 * MB);
 
     router.stop();
     router.dispose();
   });
 
-  it("should remove all event listeners after 50 plugins × 6 addEventListener cycles", async () => {
+  it("should remove all event listeners after 2000 plugins × 6 addEventListener cycles", async () => {
     const router = createStressRouter(5);
 
     await router.start("/route0");
 
     const before = takeHeapSnapshot();
 
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 2000; i++) {
       const unsub = router.usePlugin(eventListenerFactory);
 
       unsub();
@@ -151,7 +151,7 @@ describe("S3. Plugin lifecycle memory leaks", () => {
     const after = takeHeapSnapshot();
     const delta = after - before;
 
-    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(5 * MB);
+    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(1 * MB);
 
     router.stop();
     router.dispose();

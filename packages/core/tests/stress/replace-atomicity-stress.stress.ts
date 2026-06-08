@@ -73,7 +73,7 @@ describe("S25: replace() atomicity under concurrent navigation", () => {
     }
   });
 
-  it("S25.3: 100 replace() cycles — heap stable", async () => {
+  it("S25.3: 3000 replace() cycles — heap stable", async () => {
     router = createStressRouter(10);
     await router.start("/route0");
 
@@ -81,7 +81,7 @@ describe("S25: replace() atomicity under concurrent navigation", () => {
 
     const before = takeHeapSnapshot();
 
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 3000; i++) {
       const routeCount = 10 + (i % 5);
       const newRoutes = createFlatRoutes(routeCount);
 
@@ -100,6 +100,6 @@ describe("S25: replace() atomicity under concurrent navigation", () => {
     const after = takeHeapSnapshot();
     const delta = after - before;
 
-    expect(delta, `heap delta: ${formatBytes(delta)}`).toBeLessThan(5 * MB);
+    expect(delta, `heap delta: ${formatBytes(delta)}`).toBeLessThan(1.8 * MB);
   });
 });

@@ -48,7 +48,7 @@ describe("S11: Error path storm", () => {
 
     expect(cannotActivateCount).toBe(500);
     expect(router.isActive()).toBe(true);
-    expect(delta).toBeLessThan(10 * MB);
+    expect(delta).toBeLessThan(2 * MB);
   }, 30_000);
 
   it("S11.2: SAME_STATES storm — 500 SAME_STATES rejections, no leaks", async () => {
@@ -76,7 +76,7 @@ describe("S11: Error path storm", () => {
     const delta = heapAfter - heapBefore;
 
     expect(sameStatesCount).toBe(500);
-    expect(delta).toBeLessThan(10 * MB);
+    expect(delta).toBeLessThan(0.5 * MB);
   }, 30_000);
 
   it("S11.3: ROUTE_NOT_FOUND storm — 500 correct rejections, emitTransitionError does not leak", async () => {
@@ -103,7 +103,7 @@ describe("S11: Error path storm", () => {
     const delta = heapAfter - heapBefore;
 
     expect(routeNotFoundCount).toBe(500);
-    expect(delta).toBeLessThan(10 * MB);
+    expect(delta).toBeLessThan(0.5 * MB);
   }, 30_000);
 
   it("S11.4: Mixed error recovery — 500 success/failure pairs, FSM always correct", async () => {
@@ -141,7 +141,7 @@ describe("S11: Error path storm", () => {
     expect(errorCount).toBeGreaterThan(0);
     expect(successCount).toBeGreaterThan(0);
     expect(router.isActive()).toBe(true);
-    expect(delta).toBeLessThan(20 * MB);
+    expect(delta).toBeLessThan(2 * MB);
   }, 30_000);
 
   it("S11.5: Plugin onTransitionError storm — 10 plugins × 500 error navigations, all receive errors, heap stable", async () => {
@@ -178,6 +178,6 @@ describe("S11: Error path storm", () => {
       expect(errorCounts[p]).toBe(500);
     }
 
-    expect(delta).toBeLessThan(20 * MB);
+    expect(delta).toBeLessThan(0.5 * MB);
   }, 30_000);
 });
