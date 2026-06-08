@@ -569,7 +569,7 @@ export default tsEslint.config(
   // ============================================
   // 8. UNICORN CONFIGURATION (Modern JS/TS patterns)
   // ============================================
-  // Updated for eslint-plugin-unicorn v64.0.0
+  // Updated for eslint-plugin-unicorn v65.0.0
   // Changelog: https://github.com/sindresorhus/eslint-plugin-unicorn/releases
   {
     files: ["**/*.ts", "**/*.tsx"],
@@ -687,6 +687,23 @@ export default tsEslint.config(
       ],
       "unicorn/no-typeof-undefined": "off", // Incompatible with typescript-eslint
       "unicorn/expiring-todo-comments": "off", // Incompatible with ESLint 9.27
+
+      // v65: new recommended rules temporarily disabled to unblock the
+      // eslint-plugin-unicorn 64 → 65 bump (#706). They fire on existing code
+      // (~58 Array.from(...).fill(...) sites in tests/benchmarks, plus ~21
+      // src/test sites for the others). Migration + re-enable tracked in #712.
+      "unicorn/no-array-from-fill": "off",
+      "unicorn/no-array-fill-with-reference-type": "off",
+      "unicorn/prefer-includes-over-repeated-comparisons": "off",
+      "unicorn/no-this-outside-of-class": "off",
+      "unicorn/prefer-array-some": "off",
+      "unicorn/consistent-compound-words": "off",
+      "unicorn/better-dom-traversing": "off",
+      // Autofix rewrites `[${ATTR}]` -> `[${CSS.escape(ATTR)}]` in
+      // shared/dom-utils/route-announcer.ts; jsdom lacks the `CSS` global, so the
+      // fix breaks dom-utils + every adapter's announcer tests. ATTR is a static
+      // constant (no injection risk), so the escape is unnecessary here.
+      "unicorn/require-css-escape": "off",
     },
   },
 
