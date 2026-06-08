@@ -1,3 +1,5 @@
+import { getRoutesApi } from "@real-router/core/api";
+
 import {
   GHOST_EVENT_THRESHOLD,
   LISTENER_OPTIONS,
@@ -17,6 +19,7 @@ import type {
   PluginFactory,
   Router,
   State,
+  TreeChangedEvent,
 } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
 
@@ -34,6 +37,7 @@ export class PreloadPlugin {
   readonly #options: Required<PreloadPluginOptions>;
   readonly #getDependency: Parameters<PluginFactory>[1];
   readonly #removeExtensions: () => void;
+  readonly #removeChangesSubscription: () => void;
   readonly #compiledPreloads = new Map<
     string,
     { fn: PreloadFn; factory: PreloadFnFactory }
@@ -78,6 +82,17 @@ export class PreloadPlugin {
         return state;
       },
     });
+
+    // Drop compiled-preload entries for routes removed from the tree. Without
+    // this, `#resolvePreload` can never reach them again (matchUrl returns
+    // undefined for a removed route), so the entry would be dead memory until
+    // teardown. `add`/`update` need no handling — `#resolvePreload` already
+    // revalidates lazily via the cached `factory` reference.
+    this.#removeChangesSubscription = getRoutesApi(router).subscribeChanges(
+      (event) => {
+        this.#onTreeChanged(event);
+      },
+    );
   }
 
   getPlugin(): Plugin {
@@ -106,9 +121,52 @@ export class PreloadPlugin {
 
       teardown: () => {
         this.#cleanup();
+        this.#removeChangesSubscription();
         this.#removeExtensions();
       },
     };
+  }
+
+  #onTreeChanged(event: TreeChangedEvent): void {
+    switch (event.op) {
+      case "remove": {
+        for (const route of event.removedSubtree) {
+          this.#compiledPreloads.delete(route.name);
+        }
+
+        this.#invalidateStateCache();
+
+        break;
+      }
+      case "replace": {
+        for (const route of event.removed) {
+          this.#compiledPreloads.delete(route.name);
+        }
+
+        this.#invalidateStateCache();
+
+        break;
+      }
+      case "clear": {
+        this.#compiledPreloads.clear();
+        this.#invalidateStateCache();
+
+        break;
+      }
+      // "add" / "update": lazy factory-reference revalidation in
+      // #resolvePreload handles these — no eager cleanup needed.
+    }
+  }
+
+  /**
+   * Drops all pre-resolved `State` snapshots. `#stateCache` is keyed by `href`,
+   * not route name, so a removed/changed route cannot be pruned selectively —
+   * clearing the whole (≤32-entry) cache prevents `getPreloadedState(href)` from
+   * handing a consumer a `State` that points at a route no longer in the tree.
+   * Entries repopulate on the next hover/touch.
+   */
+  #invalidateStateCache(): void {
+    this.#stateCache.clear();
   }
 
   readonly #handleMouseOver = (event: MouseEvent): void => {
