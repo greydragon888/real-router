@@ -21,7 +21,7 @@
   },
   "devDependencies": {
     "@angular/build": "21.2.11",
-    "@angular/cli": "22.0.0",
+    "@angular/cli": "21.2.13",
     "@angular/compiler": "21.2.13",
     "@angular/compiler-cli": "21.2.13",
     "sirv-cli": "3.0.1",
