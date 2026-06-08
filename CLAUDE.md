@@ -77,10 +77,10 @@ pnpm lint:deps          # Check dependency versions (syncpack)
 pnpm lint:dedupe        # Check for duplicate deps
 pnpm lint:e2e           # Verify e2e directories have spec files
 pnpm lint:unused        # Check for unused code (knip)
-pnpm resolve:dependabot <PR#>  # Rebase+squash-resolve a CONFLICTING Dependabot PR (keeps master linear)
+pnpm resolve:dependabot <PR#>  # Rebase+dedupe a Dependabot PR — conflicting OR lint:dedupe-failing (keeps master linear)
 ```
 
-**Conflicting Dependabot PRs:** resolve with `pnpm resolve:dependabot <PR#>` (rebase onto master → semver-union resolve → squash-merge). Never resolve them with a merge commit — `master` is protected with "Merge commits are not allowed". See IMPLEMENTATION_NOTES "Squash-resolve for CONFLICTING Dependabot PRs".
+**Dependabot PRs needing `resolve:dependabot`:** resolve with `pnpm resolve:dependabot <PR#>` (rebase onto master → semver-union resolve → regenerate + dedupe lockfile → squash-merge). Use it in **two** cases: (1) the PR **conflicts** with master, or (2) the PR's only failure is the **`lint:dedupe`** gate (`ERR_PNPM_DEDUPE_CHECK_ISSUES`) — Dependabot never runs `pnpm dedupe`, so grouped bumps leave duplicate versions in the lockfile (e.g. `semver` 7.8.1 **and** 7.8.2). The script's lockfile-reconcile step (`pnpm install` → `pnpm dedupe` → amend) runs even on a clean rebase, so it fixes the dedupe-only case too. Never resolve with a merge commit — `master` is protected with "Merge commits are not allowed". See IMPLEMENTATION_NOTES "Squash-resolve for CONFLICTING Dependabot PRs". (A lint failure from a linter-plugin **bump itself** — e.g. new `eslint-plugin-unicorn` rules — is a code/config fix, not something `resolve:dependabot` handles.)
 
 ## Non-Obvious Conventions
 
