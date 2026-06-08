@@ -14,11 +14,11 @@
     "@real-router/core": "workspace:^",
     "@real-router/persistent-params-plugin": "workspace:^",
     "@real-router/solid": "workspace:^",
-    "solid-js": "1.9.12"
+    "solid-js": "1.9.13"
   },
   "devDependencies": {
     "typescript": "6.0.3",
     "vite": "7.3.2",
-    "vite-plugin-solid": "2.11.11"
+    "vite-plugin-solid": "2.11.12"
   }
 }

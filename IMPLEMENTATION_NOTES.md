@@ -472,6 +472,27 @@ grouped Dependabot bumps conflict (adjacent version lines). Stop-for-review is t
 default because the heuristic is a heuristic — a human eyeballs the resolved
 versions before any force-push.
 
+**Also the fix for `lint:dedupe`-only failures (not just conflicts).** Dependabot
+never runs `pnpm dedupe`, so a grouped bump frequently leaves duplicate versions in
+`pnpm-lock.yaml` (e.g. `semver@7.8.1` **and** `7.8.2`, `lru-cache`, `undici`,
+`tinyexec`). CI's `lint:dedupe` step (`pnpm dedupe --check`) then fails with
+`ERR_PNPM_DEDUPE_CHECK_ISSUES` even though the PR merges cleanly. The same script
+fixes this: its lockfile-reconcile tail (`pnpm install` → `pnpm dedupe` → amend)
+runs **unconditionally**, including after a clean rebase with zero conflicts, so the
+deduped lockfile is folded into the single dep-bump commit. (For a one-off you can
+also just `pnpm dedupe` on the PR branch and commit the lockfile — that is exactly
+what the script's tail does — but `resolve:dependabot` is the blessed path because it
+also brings the branch up to date with `master`, which the protected branch requires
+before merge.)
+
+**Not a fix for a linter-plugin bump that adds rules.** When the eslint group bumps a
+plugin to a version with new recommended rules (e.g. `eslint-plugin-unicorn` 64 → 65
+added `no-array-from-fill`, `prefer-includes-over-repeated-comparisons`,
+`no-this-outside-of-class`, …), the failure is in `lint`, not `lint:dedupe`. That is a
+code/config decision — fix the flagged sites, or opt out of the new rules in
+`eslint.config.mjs` and track re-enabling (e.g. #712) — and is out of scope for
+`resolve:dependabot`.
+
 ### Danger JS
 
 `.github/workflows/danger.yml` runs automated PR review checks via `dangerfile.ts`:

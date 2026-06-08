@@ -15,15 +15,15 @@
     "@real-router/core": "workspace:^",
     "@real-router/ssr-data-plugin": "workspace:^",
     "@real-router/vue": "workspace:^",
-    "vue": "3.5.13"
+    "vue": "3.5.35"
   },
   "devDependencies": {
     "@playwright/test": "1.60.0",
-    "@types/node": "25.9.1",
+    "@types/node": "25.9.2",
     "@vitejs/plugin-vue": "6.0.7",
     "tsx": "4.22.4",
     "typescript": "6.0.3",
     "vite": "7.3.2",
-    "vue-tsc": "3.3.3"
+    "vue-tsc": "3.3.4"
   }
 }
