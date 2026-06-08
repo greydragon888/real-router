@@ -83,7 +83,7 @@
   "devDependencies": {
     "@real-router/browser-plugin": "workspace:^",
     "@testing-library/jest-dom": "6.9.1",
-    "@vue/test-utils": "2.4.10",
+    "@vue/test-utils": "2.4.11",
     "vue": "3.5.13"
   },
   "peerDependencies": {
