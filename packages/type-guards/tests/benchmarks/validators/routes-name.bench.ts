@@ -164,7 +164,7 @@ boxplot(() => {
 
     bench("validateRouteName: whitespace only (catches error)", () => {
       try {
-        validateRouteName("   ", methodName);
+        validateRouteName(" ".repeat(3), methodName);
       } catch {}
     });
 

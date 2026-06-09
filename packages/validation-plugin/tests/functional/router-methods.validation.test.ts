@@ -232,7 +232,7 @@ describe("router methods validation — with validationPlugin", () => {
         canNavigateTo: (n: unknown) => boolean;
       };
 
-      expect(() => raw.canNavigateTo("   ")).toThrow(TypeError);
+      expect(() => raw.canNavigateTo(" ".repeat(3))).toThrow(TypeError);
     });
 
     it("should accept valid route name", () => {

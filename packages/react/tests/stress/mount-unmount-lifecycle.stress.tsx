@@ -106,7 +106,7 @@ describe("R3 — mount/unmount subscription lifecycle", () => {
   });
 
   it("3.3: 50 components mount → navigate × 10 → unmount → remount → navigate × 10", async () => {
-    const renderCounts: number[] = Array.from<number>({ length: 50 }).fill(0);
+    const renderCounts: number[] = Array.from({ length: 50 }, () => 0);
 
     const consumers = Array.from({ length: 50 }, (_, i) => {
       const Consumer: FC = () => {
@@ -205,7 +205,7 @@ describe("R3 — mount/unmount subscription lifecycle", () => {
   });
 
   it("3.5: React StrictMode double mount + navigation — no errors, reasonable render counts", async () => {
-    const renderCounts: number[] = Array.from<number>({ length: 10 }).fill(0);
+    const renderCounts: number[] = Array.from({ length: 10 }, () => 0);
 
     const consumers = Array.from({ length: 10 }, (_, i) =>
       makeRenderCountingConsumer(renderCounts, i, `StrictConsumer${i}`),
@@ -234,7 +234,7 @@ describe("R3 — mount/unmount subscription lifecycle", () => {
   });
 
   it("3.6: router stop/restart while 50 components mounted — components receive post-restart navigations", async () => {
-    const renderCounts: number[] = Array.from<number>({ length: 50 }).fill(0);
+    const renderCounts: number[] = Array.from({ length: 50 }, () => 0);
 
     const consumers = Array.from({ length: 50 }, (_, i) =>
       makeRenderCountingConsumer(renderCounts, i, `RestartConsumer${i}`),

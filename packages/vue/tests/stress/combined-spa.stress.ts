@@ -28,7 +28,7 @@ describe("combined SPA simulation (Vue)", () => {
 
     await router.start("/page0");
 
-    const sidebarRenders = Array.from<number>({ length: 10 }).fill(0);
+    const sidebarRenders = Array.from({ length: 10 }, () => 0);
 
     const sidebarSubs = Array.from({ length: 10 }, (_, i) => {
       const nodeName = i < 5 ? `page${i}` : "";

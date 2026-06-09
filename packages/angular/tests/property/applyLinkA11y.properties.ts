@@ -169,7 +169,7 @@ describe("applyLinkA11y — Property Tests", () => {
   describe("Invariant 8: SVG elements (non-HTMLElement) — function operates via duck typing", () => {
     it("<svg> element receives role+tabindex via duck-typed attribute API", () => {
       const svg = document.createElementNS(
-        "http://www.w3.org/2000/svg",
+        "https://www.w3.org/2000/svg",
         "svg",
       ) as unknown as HTMLElement;
 
@@ -181,7 +181,7 @@ describe("applyLinkA11y — Property Tests", () => {
 
     it("<svg> with pre-existing role attribute → preserved", () => {
       const svg = document.createElementNS(
-        "http://www.w3.org/2000/svg",
+        "https://www.w3.org/2000/svg",
         "svg",
       ) as unknown as HTMLElement;
 

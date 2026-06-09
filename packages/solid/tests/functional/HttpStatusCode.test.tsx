@@ -60,7 +60,7 @@ describe("HttpStatusCode", () => {
       const content = screen.getByTestId("content");
 
       expect(content.children).toHaveLength(1);
-      expect(content.children[0].tagName).toBe("P");
+      expect(content.firstElementChild?.tagName).toBe("P");
       // No text leaks from HttpStatusCode — text content equals the sibling's.
       expect(content.textContent).toBe("Hello");
     });

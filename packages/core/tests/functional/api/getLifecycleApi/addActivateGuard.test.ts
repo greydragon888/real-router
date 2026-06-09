@@ -468,6 +468,7 @@ describe("core/route-lifecycle/addActivateGuard", () => {
 
     it("should accept bound function", async () => {
       const factory = function (this: { allowed: boolean }) {
+        // eslint-disable-next-line unicorn/no-this-outside-of-class -- intentional: this test verifies a `this`-using function bound via .bind()
         return () => this.allowed;
       }.bind({ allowed: true });
 

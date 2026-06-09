@@ -321,7 +321,7 @@ describe("buildActiveClassName — Property Tests", () => {
             fc.array(arbToken, { minLength: 1, maxLength: 4 }),
             arbWhitespacePadding,
           )
-          .map(([h, tokens, t]) => `${h}${tokens.join("   ")}${t}`),
+          .map(([h, tokens, t]) => `${h}${tokens.join(" ".repeat(3))}${t}`),
       ],
       { numRuns: NUM_RUNS.standard },
     )(

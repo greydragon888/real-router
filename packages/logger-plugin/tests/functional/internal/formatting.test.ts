@@ -84,7 +84,7 @@ describe("formatting utilities", () => {
     });
 
     it("should use exactly 2 decimal places", () => {
-      mockNow.mockReturnValue(100.123_456);
+      mockNow.mockReturnValue(100.123456);
 
       const result = formatTiming(100, mockNow);
 

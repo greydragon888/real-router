@@ -143,13 +143,15 @@ describe("S7 — useRouterTransition stress (Solid)", () => {
 
     await router.start("/route0");
 
-    const snapshots: RouterTransitionSnapshot[] =
-      Array.from<RouterTransitionSnapshot>({ length: 20 }).fill({
+    const snapshots: RouterTransitionSnapshot[] = Array.from(
+      { length: 20 },
+      () => ({
         isTransitioning: false,
         isLeaveApproved: false,
         toRoute: null,
         fromRoute: null,
-      });
+      }),
+    );
 
     function Sub(props: { index: number }) {
       const transition = useRouterTransition();

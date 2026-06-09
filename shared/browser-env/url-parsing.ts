@@ -16,6 +16,8 @@ export interface ParsedUrl {
  * in Electron (`file://`, `app://`), Tauri (`tauri://`, `https://`), and any
  * other webview that may ship with non-HTTP origins. See issue #496.
  */
+const URL_DELIMITERS: ReadonlySet<string> = new Set(["/", "?", "#"]);
+
 export function safeParseUrl(url: string): ParsedUrl {
   let rest = url;
 
@@ -28,7 +30,7 @@ export function safeParseUrl(url: string): ParsedUrl {
     for (let i = authorityStart; i < rest.length; i++) {
       const ch = rest[i];
 
-      if (ch === "/" || ch === "?" || ch === "#") {
+      if (URL_DELIMITERS.has(ch)) {
         pathStart = i;
 
         break;

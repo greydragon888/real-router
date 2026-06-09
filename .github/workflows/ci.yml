@@ -239,6 +239,46 @@ jobs:
       - name: Run smoke test
         run: bash scripts/smoke-test-packages.sh
 
+  # Code duplication — INFORMATIONAL ONLY, never blocks the merge.
+  # The hard duplication gate stays in the pre-push hook (`pnpm lint:duplicates`,
+  # threshold 2% in `.jscpd.json`). This job re-runs jscpd with the SARIF reporter
+  # and `-t 100` (so jscpd itself always exits 0) and uploads the report to GitHub
+  # Code Scanning — duplication then surfaces as PR annotations + Security-tab
+  # entries without gating CI. NOT in the `ci` gate's `needs`, so it can't block.
+  duplication:
+    name: Code Duplication (SARIF)
+    needs: [check]
+    if: needs.check.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Detect duplication (SARIF)
+        run: pnpm lint:duplicates:sarif
+
+      - name: Upload SARIF to Code Scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: jscpd-report/jscpd-report.sarif
+          category: jscpd
+
   coverage:
     name: Coverage (Codecov)
     needs: [check, pipeline]

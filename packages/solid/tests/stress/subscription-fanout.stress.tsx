@@ -25,9 +25,7 @@ describe("subscription-fanout stress tests", () => {
   });
 
   it("1.1: 30 useRouteNode on different nodes + 100 navigations — signals track correctly", async () => {
-    const signalReadCounts: number[] = Array.from<number>({ length: 30 }).fill(
-      0,
-    );
+    const signalReadCounts: number[] = Array.from({ length: 30 }, () => 0);
 
     function NodeSubscriber(props: { readonly index: number }) {
       const routeState = useRouteNode(`route${props.index}`);

@@ -7,6 +7,8 @@ import { Match, NotFound, Self } from "./components";
 import type { MatchProps, NotFoundProps, SelfProps } from "./types";
 import type { ReactElement, ReactNode } from "react";
 
+const MARKER_TYPES: ReadonlySet<unknown> = new Set([Match, Self, NotFound]);
+
 interface FallbackSlots {
   selfChildren: ReactNode;
   selfFallback: ReactNode | undefined;
@@ -56,11 +58,7 @@ export function collectElements(
       return;
     }
 
-    if (
-      child.type === Match ||
-      child.type === Self ||
-      child.type === NotFound
-    ) {
+    if (MARKER_TYPES.has(child.type)) {
       result.push(child);
     } else {
       collectElements(

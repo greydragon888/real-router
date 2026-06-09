@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-extraneous-class -- Angular test host components use empty classes with @Component decorators */
+/* eslint-disable unicorn/no-this-outside-of-class -- this test monkey-patches DOM prototype methods (Element/DOMTokenList); `this` is the patched instance, which an arrow function cannot capture */
 import { Component } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 import { createRouter } from "@real-router/core";

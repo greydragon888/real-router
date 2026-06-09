@@ -567,7 +567,7 @@ describe("navigateToDefault", () => {
         empty: "",
         zero: 0,
         negative: -1,
-        float: 3.141_59,
+        float: 3.14159,
       };
 
       await withDefault("users", defaultParams);

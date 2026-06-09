@@ -55,8 +55,7 @@ describe("core/dependencies/getDependencies", () => {
   });
 
   it("should protect structure but not content (shallow copy)", () => {
-    // eslint-disable-next-line sonarjs/no-clear-text-protocols
-    const service = { baseUrl: "http://api.com" };
+    const service = { baseUrl: "https://api.com" };
 
     // @ts-expect-error: testing object value
     deps.set("foo", service);
@@ -77,11 +76,9 @@ describe("core/dependencies/getDependencies", () => {
     const depsAgain = deps.getAll();
     // @ts-expect-error: accessing object property
 
-    // eslint-disable-next-line sonarjs/no-clear-text-protocols
-    depsAgain.foo.baseUrl = "http://new.com";
+    depsAgain.foo.baseUrl = "https://new.com";
 
-    // eslint-disable-next-line sonarjs/no-clear-text-protocols
-    expect(service.baseUrl).toBe("http://new.com");
+    expect(service.baseUrl).toBe("https://new.com");
   });
 
   it("should integrate with setDependency", () => {

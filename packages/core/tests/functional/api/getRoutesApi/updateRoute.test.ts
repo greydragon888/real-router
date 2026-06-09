@@ -923,6 +923,7 @@ describe("core/routes/routeTree/updateRoute", () => {
         const decoder = {
           prefix: "decoded_",
           decode(params: Params): Params {
+            // eslint-disable-next-line unicorn/no-this-outside-of-class -- intentional: this test verifies an object method using `this` works as decodeParams
             return { ...params, tag: this.prefix + (params.id as string) };
           },
         };

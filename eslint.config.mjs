@@ -688,21 +688,23 @@ export default tsEslint.config(
       "unicorn/no-typeof-undefined": "off", // Incompatible with typescript-eslint
       "unicorn/expiring-todo-comments": "off", // Incompatible with ESLint 9.27
 
-      // v65: new recommended rules temporarily disabled to unblock the
-      // eslint-plugin-unicorn 64 → 65 bump (#706). They fire on existing code
-      // (~58 Array.from(...).fill(...) sites in tests/benchmarks, plus ~21
-      // src/test sites for the others). Migration + re-enable tracked in #712.
-      "unicorn/no-array-from-fill": "off",
-      "unicorn/no-array-fill-with-reference-type": "off",
-      "unicorn/prefer-includes-over-repeated-comparisons": "off",
-      "unicorn/no-this-outside-of-class": "off",
-      "unicorn/prefer-array-some": "off",
-      "unicorn/consistent-compound-words": "off",
-      "unicorn/better-dom-traversing": "off",
-      // Autofix rewrites `[${ATTR}]` -> `[${CSS.escape(ATTR)}]` in
-      // shared/dom-utils/route-announcer.ts; jsdom lacks the `CSS` global, so the
-      // fix breaks dom-utils + every adapter's announcer tests. ATTR is a static
-      // constant (no injection risk), so the escape is unnecessary here.
+      // v65: the new recommended rules were temporarily disabled for the
+      // eslint-plugin-unicorn 64 → 65 bump (#706); #712 migrated the code and
+      // RE-ENABLED 7 of them — they now run at their recommended `error` level
+      // with no override here: no-array-from-fill, no-array-fill-with-reference-type,
+      // prefer-includes-over-repeated-comparisons, no-this-outside-of-class,
+      // prefer-array-some, consistent-compound-words, better-dom-traversing.
+      //
+      // `require-css-escape` is intentionally left OFF (#712 decision). Its whole
+      // value is preventing CSS-selector injection from UNTRUSTED interpolation —
+      // but every site it flagged here is a static constant (the announcer's
+      // `data-real-router-announcer` attr) or a test-controlled value (testids,
+      // loop indices, route names the test itself generates). None carry an
+      // injection vector, so the rule guards nothing real, while enabling it cost
+      // a jsdom `CSS.escape` polyfill (jsdom@29 ships no global `CSS`) plus
+      // `CSS.escape(...)` wrapping of provably-safe values. The router never
+      // builds selectors from untrusted data, so the forward-looking value is
+      // marginal too. Re-enable if that changes.
       "unicorn/require-css-escape": "off",
     },
   },

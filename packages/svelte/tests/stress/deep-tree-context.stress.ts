@@ -63,9 +63,10 @@ describe("SV5 — deep component tree + context cascade (Svelte)", () => {
 
     const chain = buildNodeChain(30);
     const midRoute = chain[15];
-    const renderCounts: number[] = Array.from<number>({
-      length: chain.length,
-    }).fill(0);
+    const renderCounts: number[] = Array.from(
+      { length: chain.length },
+      () => 0,
+    );
 
     const components = chain.map((nodeName, i) =>
       renderWithRouter(router, StressConsumer, {
@@ -103,7 +104,7 @@ describe("SV5 — deep component tree + context cascade (Svelte)", () => {
 
     await router.start("/other");
 
-    const effectRuns: number[] = Array.from<number>({ length: 30 }).fill(0);
+    const effectRuns: number[] = Array.from({ length: 30 }, () => 0);
     const components = Array.from({ length: 30 }, (_, i) =>
       renderWithRouter(router, RouterUserConsumer, {
         onRender: () => {

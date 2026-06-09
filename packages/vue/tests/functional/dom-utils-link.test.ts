@@ -287,7 +287,7 @@ describe("applyLinkA11y — attribute preservation and SVG handling", () => {
     // debatable but the helper's contract is "make non-a/button elements
     // keyboard-focusable" — this locks the current behavior.
     const svg = document.createElementNS(
-      "http://www.w3.org/2000/svg",
+      "https://www.w3.org/2000/svg",
       "g",
     ) as unknown as HTMLElement;
 

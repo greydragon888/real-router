@@ -903,15 +903,17 @@ describe("buildActiveClassName", () => {
   });
 
   it("appends active token when base is pure whitespace", () => {
-    expect(buildActiveClassName(true, "active", "   ")).toBe("active");
+    expect(buildActiveClassName(true, "active", " ".repeat(3))).toBe("active");
   });
 
   it("returns base when activeClassName is whitespace-only", () => {
-    expect(buildActiveClassName(true, "   ", "base")).toBe("base");
+    expect(buildActiveClassName(true, " ".repeat(3), "base")).toBe("base");
   });
 
   it("returns undefined when activeClassName is whitespace-only and no base", () => {
-    expect(buildActiveClassName(true, "   ", undefined)).toBeUndefined();
+    expect(
+      buildActiveClassName(true, " ".repeat(3), undefined),
+    ).toBeUndefined();
   });
 });
 

@@ -8,6 +8,8 @@ import { Match, NotFound, Self } from "./components";
 import type { MatchProps, NotFoundProps, SelfProps } from "./types";
 import type { VNode, ComponentChildren } from "preact";
 
+const MARKER_TYPES: ReadonlySet<unknown> = new Set([Match, Self, NotFound]);
+
 interface FallbackSlots {
   selfChildren: ComponentChildren;
   selfFallback: ComponentChildren | undefined;
@@ -40,11 +42,7 @@ export function collectElements(
       continue;
     }
 
-    if (
-      child.type === Match ||
-      child.type === Self ||
-      child.type === NotFound
-    ) {
+    if (MARKER_TYPES.has(child.type)) {
       result.push(child);
     } else {
       collectElements(

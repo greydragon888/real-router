@@ -134,13 +134,15 @@ describe("V7 — useRouterTransition stress (Vue)", () => {
 
     await router.start("/route0");
 
-    const snapshots: RouterTransitionSnapshot[] =
-      Array.from<RouterTransitionSnapshot>({ length: 20 }).fill({
+    const snapshots: RouterTransitionSnapshot[] = Array.from(
+      { length: 20 },
+      () => ({
         isTransitioning: false,
         isLeaveApproved: false,
         toRoute: null,
         fromRoute: null,
-      });
+      }),
+    );
 
     const subscribers = Array.from({ length: 20 }, (_, i) => {
       const index = i;

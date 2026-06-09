@@ -50,7 +50,7 @@ describe("link-mass-rendering stress tests", () => {
   });
 
   it("2.1: 500 Links mount — exactly 500 renders, no render loops", () => {
-    const renderCounts: number[] = Array.from<number>({ length: 500 }).fill(0);
+    const renderCounts: number[] = Array.from({ length: 500 }, () => 0);
 
     const wrappers = Array.from({ length: 500 }, (_, i) => {
       const W: FC = () => {
@@ -81,9 +81,7 @@ describe("link-mass-rendering stress tests", () => {
   });
 
   it("2.2: 500 Links to different routes + navigate to one — only 1-2 Links re-render", async () => {
-    const wrapperRenders: number[] = Array.from<number>({ length: 500 }).fill(
-      0,
-    );
+    const wrapperRenders: number[] = Array.from({ length: 500 }, () => 0);
 
     const wrappers = makeActiveWrappers(wrapperRenders, 500);
 
@@ -109,9 +107,7 @@ describe("link-mass-rendering stress tests", () => {
   });
 
   it("2.3: 500 Links + 50 navigations round-robin — each Link renders max 2 times total", async () => {
-    const wrapperRenders: number[] = Array.from<number>({ length: 500 }).fill(
-      0,
-    );
+    const wrapperRenders: number[] = Array.from({ length: 500 }, () => 0);
 
     const wrappers = makeActiveWrappers(wrapperRenders, 500);
 
@@ -143,7 +139,7 @@ describe("link-mass-rendering stress tests", () => {
   });
 
   it("2.4: 200 Links with inline routeParams + parent re-render × 10 — useStableValue prevents extra renders", () => {
-    const renderCounts: number[] = Array.from<number>({ length: 200 }).fill(0);
+    const renderCounts: number[] = Array.from({ length: 200 }, () => 0);
 
     const SpyLink = memo(
       ({
@@ -340,9 +336,7 @@ describe("link-mass-rendering stress tests", () => {
   it("2.8: 2000 Links mount + one navigation — bounded fanout, no O(N²) regression", async () => {
     const LINK_COUNT = 2000;
 
-    const renderCounts: number[] = Array.from<number>({
-      length: LINK_COUNT,
-    }).fill(0);
+    const renderCounts: number[] = Array.from({ length: LINK_COUNT }, () => 0);
     const wrappers = makeActiveWrappers(renderCounts, LINK_COUNT);
 
     render(

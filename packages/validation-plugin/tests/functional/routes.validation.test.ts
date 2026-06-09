@@ -242,7 +242,7 @@ describe("routes API validation — with validationPlugin", () => {
     it("should throw TypeError for whitespace-only string", () => {
       const raw = routes as unknown as { get: (n: unknown) => unknown };
 
-      expect(() => raw.get("   ")).toThrow(TypeError);
+      expect(() => raw.get(" ".repeat(3))).toThrow(TypeError);
     });
   });
 

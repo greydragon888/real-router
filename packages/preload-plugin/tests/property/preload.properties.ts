@@ -165,11 +165,11 @@ describe("ghost event suppression", () => {
   /**
    * The ghost event detection logic from PreloadPlugin.#isGhostMouseEvent:
    *
-   *   const delta = event.timeStamp - lastTouchTimeStamp;
+   *   const delta = event.timeStamp - lastTouchTimestamp;
    *   return delta >= 0 && delta < GHOST_EVENT_THRESHOLD
    *          && event.target === lastTouchTarget;
    *
-   * Uses NaN for lastTouchTimeStamp when no touch has occurred (NaN >= 0 is
+   * Uses NaN for lastTouchTimestamp when no touch has occurred (NaN >= 0 is
    * false, so the check naturally short-circuits).
    *
    * Extracted into a standalone function so the property tests mirror the real
@@ -177,11 +177,11 @@ describe("ghost event suppression", () => {
    */
   function isGhostMouseEvent(
     lastTouchTarget: unknown,
-    lastTouchTimeStamp: number,
+    lastTouchTimestamp: number,
     mouseTarget: unknown,
     mouseTimestamp: number,
   ): boolean {
-    const delta = mouseTimestamp - lastTouchTimeStamp;
+    const delta = mouseTimestamp - lastTouchTimestamp;
 
     return (
       delta >= 0 &&

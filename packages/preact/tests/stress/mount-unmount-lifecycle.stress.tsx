@@ -93,7 +93,7 @@ describe("R3 — mount/unmount subscription lifecycle", () => {
   });
 
   it("3.3: 50 components mount -> navigate x 10 -> unmount -> remount -> navigate x 10", async () => {
-    const renderCounts: number[] = Array.from<number>({ length: 50 }).fill(0);
+    const renderCounts: number[] = Array.from({ length: 50 }, () => 0);
 
     const consumers = Array.from({ length: 50 }, (_, i) => {
       const Consumer: FunctionComponent = () => {
@@ -203,7 +203,7 @@ describe("R3 — mount/unmount subscription lifecycle", () => {
   });
 
   it("3.6: router stop/restart while 50 components mounted — components receive post-restart navigations", async () => {
-    const renderCounts: number[] = Array.from<number>({ length: 50 }).fill(0);
+    const renderCounts: number[] = Array.from({ length: 50 }, () => 0);
 
     const consumers = Array.from({ length: 50 }, (_, i) =>
       makeRenderCountingConsumer(renderCounts, i, `RestartConsumer${i}`),
@@ -248,7 +248,7 @@ describe("R3 — mount/unmount subscription lifecycle", () => {
   });
 
   it("3.6b: rapid stop/start cycles with mounted consumers — listeners track current router instance only", async () => {
-    const renderCounts: number[] = Array.from<number>({ length: 20 }).fill(0);
+    const renderCounts: number[] = Array.from({ length: 20 }, () => 0);
 
     const consumers = Array.from({ length: 20 }, (_, i) =>
       makeRenderCountingConsumer(renderCounts, i, `OverlapConsumer${i}`),

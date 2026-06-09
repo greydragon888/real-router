@@ -153,7 +153,7 @@ describe("S1: Listener set integrity", () => {
   it("S1.8: RouteSource: 10 000 concurrent listeners all receive every notification (subscribe storm)", async () => {
     const source = createRouteSource(router);
     const COUNT = 10_000;
-    const calls: number[] = Array.from({ length: COUNT }).fill(0) as number[];
+    const calls: number[] = Array.from({ length: COUNT }, () => 0);
     const unsubs: (() => void)[] = Array.from({ length: COUNT });
 
     for (let i = 0; i < COUNT; i++) {

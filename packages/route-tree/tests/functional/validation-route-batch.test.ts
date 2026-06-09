@@ -130,10 +130,10 @@ describe("validateRoute", () => {
 
     it("should throw for whitespace-only name", () => {
       expect(() => {
-        validateRoute({ name: "   ", path: "/test" }, methodName);
+        validateRoute({ name: " ".repeat(3), path: "/test" }, methodName);
       }).toThrow(TypeError);
       expect(() => {
-        validateRoute({ name: "   ", path: "/test" }, methodName);
+        validateRoute({ name: " ".repeat(3), path: "/test" }, methodName);
       }).toThrow("[router.add] Route name cannot contain only whitespace");
     });
 

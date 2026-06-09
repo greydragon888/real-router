@@ -23,9 +23,9 @@ import type { Route, Router } from "@real-router/core";
 // ============================================================================
 
 function generateDeepRoute(depth: number): { name: string; path: string } {
-  const segments = Array.from({ length: depth })
-    .fill(0)
-    .map((_, i) => `segment${i}`);
+  const segments = Array.from({ length: depth }, () => 0).map(
+    (_, i) => `segment${i}`,
+  );
 
   return {
     name: segments.join("."),

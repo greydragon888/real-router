@@ -274,7 +274,7 @@ describe("router.start() - path string scenarios", () => {
     it("should handle whitespace-only path as invalid route", async () => {
       router = createTestRouter({ allowNotFound: false });
       try {
-        await router.start("   "); // Whitespace is truthy, passed to matchPath, returns undefined
+        await router.start(" ".repeat(3)); // Whitespace is truthy, passed to matchPath, returns undefined
 
         expect.fail("Should have thrown");
       } catch (error: any) {

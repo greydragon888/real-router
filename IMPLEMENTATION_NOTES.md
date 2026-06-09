@@ -260,6 +260,20 @@ The full build orchestrator (`pnpm turbo run build`) is wired in `turbo.json` to
 
 **Why not refactor the flagged code:** the largest "clones" are intentional — the Angular `dom-utils` copy is a build-time materialization of `shared/dom-utils/` (ng-packagr can't follow the symlink), and the React/Preact components are deliberately independent per-framework twins. The duplication is by design; the filter is what regressed.
 
+### jscpd: `--no-tips` + non-blocking SARIF in CI
+
+**Two jscpd 5.x features adopted (the only ones worth it for this repo):**
+
+1. **`--no-tips`** on `lint:duplicates` — the 5.x binary prints promo lines ("Gangsta Agents…", "Support jscpd → opencollective…") after every run; `--no-tips` suppresses them so the pre-push gate output stays clean.
+
+2. **Non-blocking SARIF in CI** (the `Code Duplication (SARIF)` job in `ci.yml`). jscpd used to run **only** in the pre-push hook, so duplication was invisible in PRs. The new job runs `pnpm lint:duplicates:sarif` (`jscpd … --no-tips -t 100 -r sarif -o jscpd-report`) and uploads the report via `github/codeql-action/upload-sarif` — duplication then shows up as **PR annotations + Security-tab entries** without gating the merge. Two deliberate choices keep it informational:
+   - `-t 100` makes jscpd itself always exit 0 (the threshold check is the pre-push hook's job, not CI's), so the step is genuinely green.
+   - The job is **not** in the `ci` gate's `needs` (`[check, pipeline, smoke, sonarcloud]`), so even an upload hiccup can't block a merge. Requires `permissions: security-events: write`.
+
+   The **hard** 2%-threshold gate still lives only in the pre-push hook (`pnpm lint:duplicates`) — CI gains visibility, not a new blocker.
+
+**Rejected 5.x features** (no real value here): `--blame`, `badge`/`markdown` reporters, `--workers` (already ~100 ms), `--max-size`, `--mode`, `--min-duplicated-lines`. `--skip-local` (drops same-directory clones, 7→5 on our tree) was left out pending a look at which clones it hides.
+
 ## Commit Conventions
 
 ### Scope Sync
