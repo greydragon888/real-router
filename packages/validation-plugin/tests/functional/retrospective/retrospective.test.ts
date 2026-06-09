@@ -57,7 +57,7 @@ function makeStore(
     tree: makeTree(treeRoutes),
     matcher: {
       getSegmentsByName: (name: string) => {
-        const found = treeRoutes.find((r) => r.name === name);
+        const found = treeRoutes.some((r) => r.name === name);
 
         return found
           ? [{ paramMeta: { urlParams: [], spatParams: [] } }]
@@ -641,7 +641,7 @@ describe("validateDependenciesStructure", () => {
   it("passes with valid dependencies and limits", () => {
     expect(() => {
       validateDependenciesStructure(
-        makeDeps({ dependencies: { api: "http://example.com" } }),
+        makeDeps({ dependencies: { api: "https://example.com" } }),
       );
     }).not.toThrow();
   });

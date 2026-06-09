@@ -17,7 +17,7 @@ describe("shouldUpdateCache growth (Preact)", () => {
 
     await router.start("/route0");
 
-    const renderCounts: number[] = Array.from<number>({ length: 200 }).fill(0);
+    const renderCounts: number[] = Array.from({ length: 200 }, () => 0);
 
     const Components: FunctionComponent = () => (
       <>
@@ -61,11 +61,10 @@ describe("shouldUpdateCache growth (Preact)", () => {
 
     await router.start("/route0");
 
-    const routeCaptures: (string | undefined)[] = Array.from<
-      string | undefined
-    >({
-      length: 100,
-    }).fill(undefined);
+    const routeCaptures: (string | undefined)[] = Array.from(
+      { length: 100 },
+      () => undefined,
+    );
 
     const Components: FunctionComponent = () => (
       <>

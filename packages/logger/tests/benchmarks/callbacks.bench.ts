@@ -127,11 +127,11 @@ boxplot(() => {
 
     bench("Callback: JSON.stringify large object", () => {
       const largeObject = {
-        data: Array.from({ length: 100 }).fill({
+        data: Array.from({ length: 100 }, () => ({
           id: 1,
           name: "test",
           nested: { value: 42 },
-        }),
+        })),
       };
 
       logger.configure({
@@ -156,7 +156,7 @@ boxplot(() => {
           return result;
         },
       });
-      logger.log(CONTEXT, MESSAGE, ...Array.from({ length: 100 }).fill("arg"));
+      logger.log(CONTEXT, MESSAGE, ...Array.from({ length: 100 }, () => "arg"));
     });
   });
 });

@@ -6,6 +6,13 @@ import { Match, NotFound, Self } from "./components";
 
 import type { VNode } from "vue";
 
+const MARKER_TYPES: ReadonlySet<unknown> = new Set([Match, Self, NotFound]);
+const KEEP_ALIVE_VALUES: ReadonlySet<unknown> = new Set([
+  true,
+  "",
+  "keep-alive",
+]);
+
 type FallbackType = VNode | (() => VNode) | undefined;
 
 interface FallbackSlots {
@@ -34,7 +41,7 @@ export function isSegmentMatch(
 // the hyphenated attribute name) reaches us here. Accept the same trio Vue's
 // runtime does.
 export function isKeepAliveEnabled(value: unknown): boolean {
-  return value === true || value === "" || value === "keep-alive";
+  return KEEP_ALIVE_VALUES.has(value);
 }
 
 function normalizeChildren(children: unknown): VNode[] {
@@ -63,11 +70,7 @@ export function collectElements(children: unknown, result: VNode[]): void {
   const vnodes = normalizeChildren(children);
 
   for (const child of vnodes) {
-    if (
-      child.type === Match ||
-      child.type === Self ||
-      child.type === NotFound
-    ) {
+    if (MARKER_TYPES.has(child.type)) {
       result.push(child);
     } else if (child.type === Fragment) {
       collectElements(child.children, result);

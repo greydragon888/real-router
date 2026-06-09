@@ -43,17 +43,17 @@ export function createRouteTreeBuilder(
 ): RouteTreeBuilder {
   const routes: RouteDefinition[] = [];
 
-  return {
+  const builder: RouteTreeBuilder = {
     add(route: RouteDefinition): RouteTreeBuilder {
       routes.push(route);
 
-      return this;
+      return builder;
     },
 
     addMany(newRoutes: readonly RouteDefinition[]): RouteTreeBuilder {
       routes.push(...newRoutes);
 
-      return this;
+      return builder;
     },
 
     build(options?: TreeBuildOptions): RouteTree {
@@ -66,6 +66,8 @@ export function createRouteTreeBuilder(
       return computeCaches(mutableTree, freeze);
     },
   };
+
+  return builder;
 }
 
 // =============================================================================

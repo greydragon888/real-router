@@ -688,22 +688,15 @@ export default tsEslint.config(
       "unicorn/no-typeof-undefined": "off", // Incompatible with typescript-eslint
       "unicorn/expiring-todo-comments": "off", // Incompatible with ESLint 9.27
 
-      // v65: new recommended rules temporarily disabled to unblock the
-      // eslint-plugin-unicorn 64 → 65 bump (#706). They fire on existing code
-      // (~58 Array.from(...).fill(...) sites in tests/benchmarks, plus ~21
-      // src/test sites for the others). Migration + re-enable tracked in #712.
-      "unicorn/no-array-from-fill": "off",
-      "unicorn/no-array-fill-with-reference-type": "off",
-      "unicorn/prefer-includes-over-repeated-comparisons": "off",
-      "unicorn/no-this-outside-of-class": "off",
-      "unicorn/prefer-array-some": "off",
-      "unicorn/consistent-compound-words": "off",
-      "unicorn/better-dom-traversing": "off",
-      // Autofix rewrites `[${ATTR}]` -> `[${CSS.escape(ATTR)}]` in
-      // shared/dom-utils/route-announcer.ts; jsdom lacks the `CSS` global, so the
-      // fix breaks dom-utils + every adapter's announcer tests. ATTR is a static
-      // constant (no injection risk), so the escape is unnecessary here.
-      "unicorn/require-css-escape": "off",
+      // v65: the new recommended rules were temporarily disabled for the
+      // eslint-plugin-unicorn 64 → 65 bump (#706); #712 migrated the code and
+      // RE-ENABLED all 8 — they now run at their recommended `error` level with
+      // no override here: no-array-from-fill, no-array-fill-with-reference-type,
+      // prefer-includes-over-repeated-comparisons, no-this-outside-of-class,
+      // prefer-array-some, consistent-compound-words, better-dom-traversing,
+      // require-css-escape. (`require-css-escape` injects `CSS.escape(...)`, which
+      // needs a global `CSS` — jsdom@29 ships none, so `vitest.setup.css-escape.ts`
+      // polyfills it via vitest.config.common.mts#test.setupFiles.)
     },
   },
 

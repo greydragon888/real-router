@@ -231,7 +231,7 @@ describe("R — <Link hash> + navigateWithHash stress (§7.2 #13, §7.3)", () =>
     // Snapshot the hrefs.
     const hrefs = linkProps.map((p) => {
       const link = container.querySelector(
-        `[data-testid="${p["data-testid"]}"]`,
+        `[data-testid="${CSS.escape(p["data-testid"])}"]`,
       );
 
       return (link as HTMLAnchorElement | null)?.getAttribute("href");
@@ -267,7 +267,9 @@ describe("R — <Link hash> + navigateWithHash stress (§7.2 #13, §7.3)", () =>
       );
 
       for (let i = 0; i < 20; i++) {
-        const link = container.querySelector(`[data-testid="tab-${i}"]`);
+        const link = container.querySelector(
+          `[data-testid="tab-${CSS.escape(String(i))}"]`,
+        );
 
         for (let j = 0; j < 5; j++) {
           await act(async () => {

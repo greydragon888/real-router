@@ -41,17 +41,17 @@ boxplot(() => {
 
     bench("Arguments: 10 arguments", () => {
       logger.configure({ level: "all" });
-      logger.log(CONTEXT, MESSAGE, ...Array.from({ length: 10 }).fill("arg"));
+      logger.log(CONTEXT, MESSAGE, ...Array.from({ length: 10 }, () => "arg"));
     });
 
     bench("Arguments: 50 arguments", () => {
       logger.configure({ level: "all" });
-      logger.log(CONTEXT, MESSAGE, ...Array.from({ length: 50 }).fill("arg"));
+      logger.log(CONTEXT, MESSAGE, ...Array.from({ length: 50 }, () => "arg"));
     });
 
     bench("Arguments: 100 arguments", () => {
       logger.configure({ level: "all" });
-      logger.log(CONTEXT, MESSAGE, ...Array.from({ length: 100 }).fill("arg"));
+      logger.log(CONTEXT, MESSAGE, ...Array.from({ length: 100 }, () => "arg"));
     });
   });
 });
@@ -131,7 +131,11 @@ boxplot(() => {
 
     bench("Arguments: array (100 items)", () => {
       logger.configure({ level: "all" });
-      logger.log(CONTEXT, MESSAGE, Array.from({ length: 100 }).fill(42));
+      logger.log(
+        CONTEXT,
+        MESSAGE,
+        Array.from({ length: 100 }, () => 42),
+      );
     });
   });
 });
@@ -159,7 +163,7 @@ boxplot(() => {
       logger.log(
         CONTEXT,
         MESSAGE,
-        ...Array.from({ length: 10 }).fill("argument"),
+        ...Array.from({ length: 10 }, () => "argument"),
       );
     });
 

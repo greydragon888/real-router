@@ -57,9 +57,10 @@ describe("S5 — deep component tree + context cascade (Solid)", () => {
 
     const chain = buildNodeChain(30);
     const midRoute = chain[15];
-    const effectCounts: number[] = Array.from<number>({
-      length: chain.length,
-    }).fill(0);
+    const effectCounts: number[] = Array.from(
+      { length: chain.length },
+      () => 0,
+    );
 
     function NodeSubscriber(props: { index: number }) {
       const routeState = useRouteNode(chain[props.index]);

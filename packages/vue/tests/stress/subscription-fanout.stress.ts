@@ -26,7 +26,7 @@ describe("subscription-fanout stress tests (Vue)", () => {
   });
 
   it("1.1: 50 useRouteNode on different nodes + 100 navigations — each re-renders only when its node is navigated to", async () => {
-    const renderCounts: number[] = Array.from<number>({ length: 50 }).fill(0);
+    const renderCounts: number[] = Array.from({ length: 50 }, () => 0);
 
     const subscribers = Array.from({ length: 50 }, (_, i) => {
       const index = i;
@@ -139,7 +139,7 @@ describe("subscription-fanout stress tests (Vue)", () => {
   });
 
   it("1.3: 30 useRouteNode('users') effects fire only during users navigations", async () => {
-    const effectCounts: number[] = Array.from<number>({ length: 30 }).fill(0);
+    const effectCounts: number[] = Array.from({ length: 30 }, () => 0);
 
     const subscribers = Array.from({ length: 30 }, (_, i) => {
       const index = i;
