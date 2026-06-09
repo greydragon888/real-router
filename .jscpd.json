@@ -1,11 +1,22 @@
 {
-  "$schema": "https://json.schemastore.org/jscpd.json",
+  "_comment": "jscpd 5.x is the Rust `cpd` rewrite. It reads this config but RENAMED the old `ignore` key to `ignorePattern` (matching its --ignore-pattern flag); an `ignore` array is silently not read. The schemastore $schema describes the old config shape, so it is intentionally omitted. See IMPLEMENTATION_NOTES 'jscpd 5.x renamed the config ignore key to ignorePattern'.",
   "threshold": 2,
   "minLines": 5,
   "minTokens": 70,
   "skipComments": true,
   "reporters": ["console"],
-  "comment": "Ignore patterns live in the lint:duplicates script via -i, NOT here: jscpd 5.x (the Rust `cpd` rewrite) reads threshold/minLines/minTokens/format from this file but silently DROPS the `ignore` array. See IMPLEMENTATION_NOTES 'jscpd 5.x ignore patterns'.",
+  "ignorePattern": [
+    "packages/preact/src/**",
+    "packages/hash-plugin/src/**",
+    "packages/*/src/dom-utils/**",
+    "packages/*/src/browser-env/**",
+    "packages/*/src/shared-ssr/**",
+    "packages/*/src/**/*.react-server.ts",
+    "packages/react/src/legacy.ts",
+    "packages/react/src/legacy.ssr.ts",
+    "packages/react/src/ink.ts",
+    "**/*.d.ts"
+  ],
   "format": ["typescript", "tsx", "svelte"],
   "absolute": false,
   "gitignore": true
