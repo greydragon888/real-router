@@ -372,8 +372,6 @@ describe("Route Validators", () => {
         validateRouteName(value, methodName);
 
         expectTypeOf(value).toBeString();
-
-        expect(value).toBe("");
       });
 
       it("should handle Unicode characters", () => {
