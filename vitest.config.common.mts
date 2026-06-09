@@ -144,17 +144,6 @@ export const commonConfig = defineConfig({
     environment: "node",
 
     /**
-     * Global setup files (merged with any package-level setupFiles).
-     * `vitest.setup.css-escape.ts` installs a `CSS.escape` polyfill because
-     * jsdom@29 exposes no global `CSS` — needed by code paths using
-     * `CSS.escape(...)` (unicorn/require-css-escape) under the jsdom env.
-     * Absolute path so it resolves identically from every package's config.
-     */
-    setupFiles: [
-      fileURLToPath(new URL("./vitest.setup.css-escape.ts", import.meta.url)),
-    ],
-
-    /**
      * Enable global test APIs (describe, it, expect)
      * Without this, you need to import from 'vitest' in each test file
      */

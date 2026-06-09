@@ -316,9 +316,7 @@ describe("R3 — mount/unmount subscription lifecycle", () => {
     }
 
     const finalName = `route${99 % 10}`;
-    const nodes = container.querySelectorAll(
-      `[data-node="${CSS.escape(finalName)}"]`,
-    );
+    const nodes = container.querySelectorAll(`[data-node="${finalName}"]`);
 
     expect(nodes).toHaveLength(20);
   });

@@ -32,9 +32,7 @@ describe("link-action stress tests (Svelte)", () => {
     await tick();
 
     for (let i = 0; i < 50; i++) {
-      const element = container.querySelector(
-        `[data-testid='action-${CSS.escape(String(i))}']`,
-      );
+      const element = container.querySelector(`[data-testid='action-${i}']`);
 
       expect(element).not.toBeNull();
       expect(element?.getAttribute("role")).toBe("link");

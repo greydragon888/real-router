@@ -38,7 +38,7 @@ describe("createRouteAnnouncer", () => {
 
   afterEach(() => {
     router.stop();
-    document.querySelector(`[${CSS.escape(ANNOUNCER_ATTR)}]`)?.remove();
+    document.querySelector(`[${ANNOUNCER_ATTR}]`)?.remove();
     document.querySelectorAll("h1").forEach((element) => {
       element.remove();
     });
@@ -49,7 +49,7 @@ describe("createRouteAnnouncer", () => {
   it("creates an aria-live announcer element in the DOM", () => {
     const announcer = createRouteAnnouncer(router);
 
-    const element = document.querySelector(`[${CSS.escape(ANNOUNCER_ATTR)}]`);
+    const element = document.querySelector(`[${ANNOUNCER_ATTR}]`);
 
     expect(element).not.toBeNull();
     expect(element?.getAttribute("aria-live")).toBe("assertive");
@@ -60,15 +60,13 @@ describe("createRouteAnnouncer", () => {
 
   it("reuses existing announcer element", () => {
     const announcer1 = createRouteAnnouncer(router);
-    const element1 = document.querySelector(`[${CSS.escape(ANNOUNCER_ATTR)}]`);
+    const element1 = document.querySelector(`[${ANNOUNCER_ATTR}]`);
 
     const announcer2 = createRouteAnnouncer(router);
-    const element2 = document.querySelector(`[${CSS.escape(ANNOUNCER_ATTR)}]`);
+    const element2 = document.querySelector(`[${ANNOUNCER_ATTR}]`);
 
     expect(element1).toBe(element2);
-    expect(
-      document.querySelectorAll(`[${CSS.escape(ANNOUNCER_ATTR)}]`),
-    ).toHaveLength(1);
+    expect(document.querySelectorAll(`[${ANNOUNCER_ATTR}]`)).toHaveLength(1);
 
     announcer1.destroy();
     announcer2.destroy();
@@ -77,20 +75,16 @@ describe("createRouteAnnouncer", () => {
   it("removes announcer on destroy", () => {
     const announcer = createRouteAnnouncer(router);
 
-    expect(
-      document.querySelector(`[${CSS.escape(ANNOUNCER_ATTR)}]`),
-    ).not.toBeNull();
+    expect(document.querySelector(`[${ANNOUNCER_ATTR}]`)).not.toBeNull();
 
     announcer.destroy();
 
-    expect(
-      document.querySelector(`[${CSS.escape(ANNOUNCER_ATTR)}]`),
-    ).toBeNull();
+    expect(document.querySelector(`[${ANNOUNCER_ATTR}]`)).toBeNull();
   });
 
   it("skips initial navigation announcement", async () => {
     const announcer = createRouteAnnouncer(router);
-    const element = document.querySelector(`[${CSS.escape(ANNOUNCER_ATTR)}]`)!;
+    const element = document.querySelector(`[${ANNOUNCER_ATTR}]`)!;
 
     vi.advanceTimersByTime(150);
 
@@ -103,7 +97,7 @@ describe("createRouteAnnouncer", () => {
 
   it("announces text after second navigation once ready", async () => {
     const announcer = createRouteAnnouncer(router);
-    const element = document.querySelector(`[${CSS.escape(ANNOUNCER_ATTR)}]`)!;
+    const element = document.querySelector(`[${ANNOUNCER_ATTR}]`)!;
 
     vi.advanceTimersByTime(150);
 
@@ -116,7 +110,7 @@ describe("createRouteAnnouncer", () => {
 
   it("does not announce before safari ready delay", async () => {
     const announcer = createRouteAnnouncer(router);
-    const element = document.querySelector(`[${CSS.escape(ANNOUNCER_ATTR)}]`)!;
+    const element = document.querySelector(`[${ANNOUNCER_ATTR}]`)!;
 
     await triggerAnnouncement(router);
 
@@ -131,16 +125,14 @@ describe("createRouteAnnouncer", () => {
     vi.advanceTimersByTime(150);
     announcer.destroy();
 
-    expect(
-      document.querySelector(`[${CSS.escape(ANNOUNCER_ATTR)}]`),
-    ).toBeNull();
+    expect(document.querySelector(`[${ANNOUNCER_ATTR}]`)).toBeNull();
   });
 
   it("uses custom getAnnouncementText when provided", async () => {
     const announcer = createRouteAnnouncer(router, {
       getAnnouncementText: (route) => `Custom: ${route.name}`,
     });
-    const element = document.querySelector(`[${CSS.escape(ANNOUNCER_ATTR)}]`)!;
+    const element = document.querySelector(`[${ANNOUNCER_ATTR}]`)!;
 
     vi.advanceTimersByTime(150);
 
@@ -155,7 +147,7 @@ describe("createRouteAnnouncer", () => {
     const announcer = createRouteAnnouncer(router, {
       prefix: "Now at: ",
     });
-    const element = document.querySelector(`[${CSS.escape(ANNOUNCER_ATTR)}]`)!;
+    const element = document.querySelector(`[${ANNOUNCER_ATTR}]`)!;
 
     vi.advanceTimersByTime(150);
 
@@ -168,7 +160,7 @@ describe("createRouteAnnouncer", () => {
 
   it("clears announcement text after 7s delay", async () => {
     const announcer = createRouteAnnouncer(router);
-    const element = document.querySelector(`[${CSS.escape(ANNOUNCER_ATTR)}]`)!;
+    const element = document.querySelector(`[${ANNOUNCER_ATTR}]`)!;
 
     vi.advanceTimersByTime(150);
 
@@ -195,7 +187,7 @@ describe("createRouteAnnouncer", () => {
 
     await triggerAnnouncement(router);
 
-    const element = document.querySelector(`[${CSS.escape(ANNOUNCER_ATTR)}]`)!;
+    const element = document.querySelector(`[${ANNOUNCER_ATTR}]`)!;
 
     expect(element.textContent).toContain("About Page");
 
@@ -248,7 +240,7 @@ describe("createRouteAnnouncer", () => {
 
     await triggerAnnouncement(router);
 
-    const element = document.querySelector(`[${CSS.escape(ANNOUNCER_ATTR)}]`)!;
+    const element = document.querySelector(`[${ANNOUNCER_ATTR}]`)!;
 
     expect(element.textContent).toContain("Test Title");
 
@@ -267,7 +259,7 @@ describe("createRouteAnnouncer", () => {
 
     await triggerAnnouncement(router);
 
-    const element = document.querySelector(`[${CSS.escape(ANNOUNCER_ATTR)}]`)!;
+    const element = document.querySelector(`[${ANNOUNCER_ATTR}]`)!;
 
     expect(element.textContent).toContain("about");
 
@@ -279,7 +271,7 @@ describe("createRouteAnnouncer", () => {
     const announcer = createRouteAnnouncer(router, {
       getAnnouncementText: () => "Same Text",
     });
-    const element = document.querySelector(`[${CSS.escape(ANNOUNCER_ATTR)}]`)!;
+    const element = document.querySelector(`[${ANNOUNCER_ATTR}]`)!;
 
     vi.advanceTimersByTime(150);
 
@@ -304,7 +296,7 @@ describe("createRouteAnnouncer", () => {
     document.title = "";
 
     const announcer = createRouteAnnouncer(router);
-    const element = document.querySelector(`[${CSS.escape(ANNOUNCER_ATTR)}]`)!;
+    const element = document.querySelector(`[${ANNOUNCER_ATTR}]`)!;
 
     vi.advanceTimersByTime(150);
 
@@ -327,7 +319,7 @@ describe("createRouteAnnouncer", () => {
     const announcer = createRouteAnnouncer(router, {
       getAnnouncementText: () => "",
     });
-    const element = document.querySelector(`[${CSS.escape(ANNOUNCER_ATTR)}]`)!;
+    const element = document.querySelector(`[${ANNOUNCER_ATTR}]`)!;
 
     vi.advanceTimersByTime(150);
 
@@ -356,7 +348,7 @@ describe("createRouteAnnouncer", () => {
 
     await triggerAnnouncement(router);
 
-    const element = document.querySelector(`[${CSS.escape(ANNOUNCER_ATTR)}]`)!;
+    const element = document.querySelector(`[${ANNOUNCER_ATTR}]`)!;
 
     expect(element.textContent).toContain("Fallback Title");
 
@@ -378,7 +370,7 @@ describe("createRouteAnnouncer", () => {
 
     await triggerAnnouncement(router);
 
-    const element = document.querySelector(`[${CSS.escape(ANNOUNCER_ATTR)}]`)!;
+    const element = document.querySelector(`[${ANNOUNCER_ATTR}]`)!;
 
     expect(element.textContent).toContain("First Heading");
     expect(element.textContent).not.toContain("Second Heading");
@@ -410,9 +402,7 @@ describe("createRouteAnnouncer", () => {
 
     rAFCallbacks = [];
 
-    expect(
-      document.querySelector(`[${CSS.escape(ANNOUNCER_ATTR)}]`),
-    ).toBeNull();
+    expect(document.querySelector(`[${ANNOUNCER_ATTR}]`)).toBeNull();
   });
 
   // Closes review-2026-05-10 §5.2 ⛔ ("pendingText буферизация — explicit
@@ -424,7 +414,7 @@ describe("createRouteAnnouncer", () => {
   // SAFARI_READY_DELAY (100ms) expires.
   it("buffers announcement when navigation fires before Safari-ready window expires, then flushes on ready", async () => {
     const announcer = createRouteAnnouncer(router);
-    const element = document.querySelector(`[${CSS.escape(ANNOUNCER_ATTR)}]`)!;
+    const element = document.querySelector(`[${ANNOUNCER_ATTR}]`)!;
 
     // Navigation fires WITHIN the 100ms Safari-ready window — text is
     // computed and stored in `pendingText`, NOT announced yet.
@@ -453,7 +443,7 @@ describe("createRouteAnnouncer", () => {
         throw new Error("custom-text failure");
       },
     });
-    const element = document.querySelector(`[${CSS.escape(ANNOUNCER_ATTR)}]`)!;
+    const element = document.querySelector(`[${ANNOUNCER_ATTR}]`)!;
 
     vi.advanceTimersByTime(150);
 
@@ -500,9 +490,7 @@ describe("createRouteAnnouncer", () => {
 
         // The announcer element should be attached to documentElement
         // (since body is null), discoverable via querySelector on document.
-        const element = document.querySelector(
-          `[${CSS.escape(ANNOUNCER_ATTR)}]`,
-        );
+        const element = document.querySelector(`[${ANNOUNCER_ATTR}]`);
 
         expect(element).not.toBeNull();
         expect(element!.parentElement).toBe(document.documentElement);
@@ -589,7 +577,7 @@ describe("createRouteAnnouncer", () => {
     expect(document.querySelector("h1")).toBeNull();
 
     const announcer = createRouteAnnouncer(router);
-    const element = document.querySelector(`[${CSS.escape(ANNOUNCER_ATTR)}]`)!;
+    const element = document.querySelector(`[${ANNOUNCER_ATTR}]`)!;
 
     vi.advanceTimersByTime(150);
     await triggerAnnouncement(router);

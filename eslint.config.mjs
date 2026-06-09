@@ -690,13 +690,22 @@ export default tsEslint.config(
 
       // v65: the new recommended rules were temporarily disabled for the
       // eslint-plugin-unicorn 64 → 65 bump (#706); #712 migrated the code and
-      // RE-ENABLED all 8 — they now run at their recommended `error` level with
-      // no override here: no-array-from-fill, no-array-fill-with-reference-type,
+      // RE-ENABLED 7 of them — they now run at their recommended `error` level
+      // with no override here: no-array-from-fill, no-array-fill-with-reference-type,
       // prefer-includes-over-repeated-comparisons, no-this-outside-of-class,
-      // prefer-array-some, consistent-compound-words, better-dom-traversing,
-      // require-css-escape. (`require-css-escape` injects `CSS.escape(...)`, which
-      // needs a global `CSS` — jsdom@29 ships none, so `vitest.setup.css-escape.ts`
-      // polyfills it via vitest.config.common.mts#test.setupFiles.)
+      // prefer-array-some, consistent-compound-words, better-dom-traversing.
+      //
+      // `require-css-escape` is intentionally left OFF (#712 decision). Its whole
+      // value is preventing CSS-selector injection from UNTRUSTED interpolation —
+      // but every site it flagged here is a static constant (the announcer's
+      // `data-real-router-announcer` attr) or a test-controlled value (testids,
+      // loop indices, route names the test itself generates). None carry an
+      // injection vector, so the rule guards nothing real, while enabling it cost
+      // a jsdom `CSS.escape` polyfill (jsdom@29 ships no global `CSS`) plus
+      // `CSS.escape(...)` wrapping of provably-safe values. The router never
+      // builds selectors from untrusted data, so the forward-looking value is
+      // marginal too. Re-enable if that changes.
+      "unicorn/require-css-escape": "off",
     },
   },
 

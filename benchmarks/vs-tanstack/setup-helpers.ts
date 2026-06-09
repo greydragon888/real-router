@@ -12,7 +12,7 @@ export function getRequiredLink(
   }
 
   const link = container.querySelector<HTMLAnchorElement>(
-    `[data-testid="${CSS.escape(testId)}"]`,
+    `[data-testid="${testId}"]`,
   );
 
   if (!link) {
@@ -31,7 +31,7 @@ export async function waitForRequiredLink(
 ): Promise<HTMLAnchorElement> {
   for (let attempt = 0; attempt < 10; attempt++) {
     const link = container.querySelector<HTMLAnchorElement>(
-      `[data-testid="${CSS.escape(testId)}"]`,
+      `[data-testid="${testId}"]`,
     );
 
     if (link) {

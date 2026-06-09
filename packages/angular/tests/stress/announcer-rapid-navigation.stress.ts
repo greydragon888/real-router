@@ -34,7 +34,7 @@ describe("announcer rapid navigation (Angular)", () => {
 
   afterEach(() => {
     router.stop();
-    document.querySelector(`[${CSS.escape(ANNOUNCER_ATTR)}]`)?.remove();
+    document.querySelector(`[${ANNOUNCER_ATTR}]`)?.remove();
     document.querySelectorAll("h1").forEach((element) => {
       element.remove();
     });
@@ -57,9 +57,7 @@ describe("announcer rapid navigation (Angular)", () => {
       }
     }
 
-    const announcerNodes = document.querySelectorAll(
-      `[${CSS.escape(ANNOUNCER_ATTR)}]`,
-    );
+    const announcerNodes = document.querySelectorAll(`[${ANNOUNCER_ATTR}]`);
 
     expect(announcerNodes).toHaveLength(1);
 
@@ -83,15 +81,11 @@ describe("announcer rapid navigation (Angular)", () => {
 
     announcer.destroy();
 
-    expect(
-      document.querySelector(`[${CSS.escape(ANNOUNCER_ATTR)}]`),
-    ).toBeNull();
+    expect(document.querySelector(`[${ANNOUNCER_ATTR}]`)).toBeNull();
 
     vi.advanceTimersByTime(10_000);
 
-    expect(
-      document.querySelector(`[${CSS.escape(ANNOUNCER_ATTR)}]`),
-    ).toBeNull();
+    expect(document.querySelector(`[${ANNOUNCER_ATTR}]`)).toBeNull();
   });
 
   it("3 announcers attached to same router — single shared announcer element", async () => {
@@ -104,9 +98,7 @@ describe("announcer rapid navigation (Angular)", () => {
     await router.navigate("users");
     await router.navigate("about");
 
-    const announcers = document.querySelectorAll(
-      `[${CSS.escape(ANNOUNCER_ATTR)}]`,
-    );
+    const announcers = document.querySelectorAll(`[${ANNOUNCER_ATTR}]`);
 
     expect(announcers).toHaveLength(1);
 
@@ -114,16 +106,14 @@ describe("announcer rapid navigation (Angular)", () => {
     a2.destroy();
     a3.destroy();
 
-    expect(
-      document.querySelector(`[${CSS.escape(ANNOUNCER_ATTR)}]`),
-    ).toBeNull();
+    expect(document.querySelector(`[${ANNOUNCER_ATTR}]`)).toBeNull();
   });
 
   it("custom getAnnouncementText returning identical text deduplicates", async () => {
     const announcer = createRouteAnnouncer(router, {
       getAnnouncementText: () => "Identical announcement",
     });
-    const element = document.querySelector(`[${CSS.escape(ANNOUNCER_ATTR)}]`)!;
+    const element = document.querySelector(`[${ANNOUNCER_ATTR}]`)!;
 
     vi.advanceTimersByTime(150);
 

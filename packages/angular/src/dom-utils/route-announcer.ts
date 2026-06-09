@@ -123,9 +123,7 @@ export function createRouteAnnouncer(
 }
 
 function getOrCreateAnnouncer(): HTMLElement {
-  const existing = document.querySelector<HTMLElement>(
-    `[${CSS.escape(ANNOUNCER_ATTR)}]`,
-  );
+  const existing = document.querySelector<HTMLElement>(`[${ANNOUNCER_ATTR}]`);
 
   if (existing) {
     return existing;
@@ -158,7 +156,7 @@ function getOrCreateAnnouncer(): HTMLElement {
 }
 
 function removeAnnouncer(): void {
-  document.querySelector(`[${CSS.escape(ANNOUNCER_ATTR)}]`)?.remove();
+  document.querySelector(`[${ANNOUNCER_ATTR}]`)?.remove();
 }
 
 function resolveText(
