@@ -132,9 +132,10 @@ const TEST_DATA = {
       const routeName = "app.module.page";
       const metaParams = generateMetaParams(routeName, 10);
       const params1 = Object.fromEntries(
-        Array.from({ length: 10 })
-          .fill(0)
-          .map((_, i) => [`param${i}`, `value${i}`]),
+        Array.from({ length: 10 }, () => 0).map((_, i) => [
+          `param${i}`,
+          `value${i}`,
+        ]),
       );
       const params2 = { ...params1, param5: "changed" };
 

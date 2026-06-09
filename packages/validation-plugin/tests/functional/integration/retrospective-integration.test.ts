@@ -100,7 +100,7 @@ describe("retrospective validation — triggered at usePlugin() time", () => {
     const r = createRouter<{ api: string }>(
       [{ name: "home", path: "/home" }],
       {},
-      { api: "http://example.com" },
+      { api: "https://example.com" },
     );
 
     expect(() => r.usePlugin(validationPlugin())).not.toThrow();

@@ -22,8 +22,7 @@ describe("Cross-Origin Filtering", () => {
     const stateBefore = withoutMeta(router.getState()!);
     const contextBefore = router.getState()!.context;
 
-    // eslint-disable-next-line sonarjs/no-clear-text-protocols -- testing cross-origin filtering requires http
-    mock.navigate("http://external.com/page");
+    mock.navigate("https://external.com/page");
 
     await new Promise((resolve) => setTimeout(resolve, 10));
 

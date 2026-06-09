@@ -27,7 +27,7 @@ describe("subscription-fanout stress tests", () => {
   });
 
   it("1.1: 50 useRouteNode on different nodes + 100 navigations — each re-renders only when its node is navigated to", async () => {
-    const renderCounts: number[] = Array.from<number>({ length: 50 }).fill(0);
+    const renderCounts: number[] = Array.from({ length: 50 }, () => 0);
 
     const subscribers = Array.from({ length: 50 }, (_, i) => {
       const Sub: FC = () => {

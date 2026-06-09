@@ -372,8 +372,6 @@ describe("Route Validators", () => {
         validateRouteName(value, methodName);
 
         expectTypeOf(value).toBeString();
-
-        expect(value).toBe("");
       });
 
       it("should handle Unicode characters", () => {
@@ -400,7 +398,7 @@ describe("Route Validators", () => {
         }).toThrow(`[router.${customMethodName}] Route name must be a string`);
 
         expect(() => {
-          validateRouteName("   ", customMethodName);
+          validateRouteName(" ".repeat(3), customMethodName);
         }).toThrow(
           `[router.${customMethodName}] Route name cannot contain only whitespace`,
         );

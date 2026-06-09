@@ -77,7 +77,7 @@ describe("S7: createErrorSource — error storm", () => {
 
     const source = createErrorSource(router);
     const N = 50;
-    const counts = Array.from({ length: N }).fill(0) as number[];
+    const counts = Array.from({ length: N }, () => 0);
     const unsubs = Array.from({ length: N }, (_, i) =>
       source.subscribe(() => {
         counts[i]++;

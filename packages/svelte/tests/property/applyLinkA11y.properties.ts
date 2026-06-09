@@ -211,7 +211,7 @@ describe("applyLinkA11y — Property Tests", () => {
       // Use createElementNS to construct a real SVGSVGElement (vs createElement
       // which would yield an unknown HTMLUnknownElement).
       const svg = document.createElementNS(
-        "http://www.w3.org/2000/svg",
+        "https://www.w3.org/2000/svg",
         "svg",
       ) as unknown as HTMLElement;
 
@@ -223,7 +223,7 @@ describe("applyLinkA11y — Property Tests", () => {
 
     it("<svg> with pre-existing role attribute → preserved", () => {
       const svg = document.createElementNS(
-        "http://www.w3.org/2000/svg",
+        "https://www.w3.org/2000/svg",
         "svg",
       ) as unknown as HTMLElement;
 

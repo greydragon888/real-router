@@ -295,7 +295,12 @@ export const routePathArbitrary = fc
 /**
  * Generator for invalid route names (empty strings)
  */
-export const invalidRouteNameArbitrary = fc.constantFrom("", "   ", "\n", "\t");
+export const invalidRouteNameArbitrary = fc.constantFrom(
+  "",
+  " ".repeat(3),
+  "\n",
+  "\t",
+);
 
 /**
  * Generator for invalid route paths (not starting with /)

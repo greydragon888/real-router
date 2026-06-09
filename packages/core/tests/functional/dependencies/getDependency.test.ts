@@ -40,8 +40,7 @@ describe("core/dependencies/getDependency", () => {
   });
 
   it("should return live references, not copies", () => {
-    // eslint-disable-next-line sonarjs/no-clear-text-protocols
-    const service = { baseUrl: "http://api.com", count: 0 };
+    const service = { baseUrl: "https://api.com", count: 0 };
 
     // @ts-expect-error: testing object value
     deps.set("foo", service);
@@ -55,14 +54,14 @@ describe("core/dependencies/getDependency", () => {
 
     // Mutations are visible everywhere
     // @ts-expect-error: accessing object property
-    // eslint-disable-next-line sonarjs/no-clear-text-protocols
-    ref1.baseUrl = "http://new.com";
+
+    ref1.baseUrl = "https://new.com";
 
     // @ts-expect-error: accessing object property
-    // eslint-disable-next-line sonarjs/no-clear-text-protocols
-    expect(ref2.baseUrl).toBe("http://new.com");
-    // eslint-disable-next-line sonarjs/no-clear-text-protocols
-    expect(service.baseUrl).toBe("http://new.com");
+
+    expect(ref2.baseUrl).toBe("https://new.com");
+
+    expect(service.baseUrl).toBe("https://new.com");
 
     // @ts-expect-error: accessing object property
     ref2.count = 42;

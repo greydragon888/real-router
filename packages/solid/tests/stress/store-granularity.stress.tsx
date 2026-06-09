@@ -237,9 +237,7 @@ describe("store-granularity stress tests", () => {
   });
 
   it("S5: useRouteNodeStore — 10 nodes × 50 navigations — only relevant node stores update", async () => {
-    const nodeEffectCounts: number[] = Array.from<number>({ length: 10 }).fill(
-      0,
-    );
+    const nodeEffectCounts: number[] = Array.from({ length: 10 }, () => 0);
 
     function NodeStoreConsumer(props: { readonly index: number }): JSX.Element {
       const state = useRouteNodeStore(`route${props.index}`);

@@ -38,9 +38,10 @@ describe("deep component tree + context cascade (Preact)", () => {
 
     const chain = buildNodeChain(30);
     const midRoute = chain[15];
-    const renderCounts: number[] = Array.from<number>({
-      length: chain.length,
-    }).fill(0);
+    const renderCounts: number[] = Array.from(
+      { length: chain.length },
+      () => 0,
+    );
 
     const Components: FunctionComponent = () => (
       <>

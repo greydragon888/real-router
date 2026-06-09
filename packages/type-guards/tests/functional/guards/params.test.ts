@@ -425,7 +425,7 @@ describe("Params Type Guards", () => {
           // Ensures the number path is actually tested
           expect(isParams({ a: Number.MAX_SAFE_INTEGER })).toBe(true);
           expect(isParams({ a: Number.MIN_SAFE_INTEGER })).toBe(true);
-          expect(isParams({ a: 3.141_59 })).toBe(true);
+          expect(isParams({ a: 3.14159 })).toBe(true);
           expect(isParams({ a: Number.NaN })).toBe(false);
         });
       });

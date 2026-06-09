@@ -19,7 +19,7 @@ describe("nameToIDs Properties", () => {
     (name) => {
       const ids = nameToIDs(name);
 
-      expect(ids[0]).toBe(name.split(".")[0]);
+      expect(ids[0]).toBe(name.split(".", 1)[0]);
     },
   );
 

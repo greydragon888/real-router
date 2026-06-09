@@ -216,7 +216,7 @@ barplot(() => {
       {
         name: "resource",
         path: String.raw`/org/:orgId<\d+>`,
-        children: [{ name: "item", path: String.raw`/:slug<[a-z][a-z0-9-]*>` }],
+        children: [{ name: "item", path: "/:slug<[a-z][a-z0-9-]*>" }],
       },
     ]);
 

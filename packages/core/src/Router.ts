@@ -54,6 +54,14 @@ import type { CreateMatcherOptions } from "route-tree";
 
 const EMPTY_OPTS: Readonly<NavigationOptions> = Object.freeze({});
 
+// Module-level so #onSuppressedError allocates nothing per navigate() call.
+const SUPPRESSED_ERROR_CODES: ReadonlySet<string> = new Set([
+  errorCodes.SAME_STATES,
+  errorCodes.TRANSITION_CANCELLED,
+  errorCodes.ROUTER_NOT_STARTED,
+  errorCodes.ROUTE_NOT_FOUND,
+]);
+
 /**
  * Router class with integrated namespace architecture.
  *
@@ -670,10 +678,7 @@ export class Router<
   static readonly #onSuppressedError = (error: unknown): void => {
     if (
       error instanceof RouterError &&
-      (error.code === errorCodes.SAME_STATES ||
-        error.code === errorCodes.TRANSITION_CANCELLED ||
-        error.code === errorCodes.ROUTER_NOT_STARTED ||
-        error.code === errorCodes.ROUTE_NOT_FOUND)
+      SUPPRESSED_ERROR_CODES.has(error.code)
     ) {
       return;
     }

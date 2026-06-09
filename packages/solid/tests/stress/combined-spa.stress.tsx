@@ -27,7 +27,7 @@ describe("R8 — combined SPA simulation", () => {
 
     await router.start("/page0");
 
-    const sidebarEffects = Array.from<number>({ length: 10 }).fill(0);
+    const sidebarEffects = Array.from({ length: 10 }, () => 0);
 
     function SidebarSubscriber(props: { index: number }) {
       const routeState = useRouteNode(

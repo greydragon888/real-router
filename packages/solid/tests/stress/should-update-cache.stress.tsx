@@ -12,7 +12,7 @@ describe("S6 — shouldUpdateCache growth (Solid)", () => {
 
     await router.start("/route0");
 
-    const effectCounts: number[] = Array.from<number>({ length: 200 }).fill(0);
+    const effectCounts: number[] = Array.from({ length: 200 }, () => 0);
 
     function Sub(props: { index: number }) {
       const routeState = useRouteNode(`route${props.index}`);
@@ -50,9 +50,10 @@ describe("S6 — shouldUpdateCache growth (Solid)", () => {
 
     await router.start("/route0");
 
-    const routeCaptures: (string | undefined)[] = Array.from<
-      string | undefined
-    >({ length: 100 }).fill(undefined);
+    const routeCaptures: (string | undefined)[] = Array.from(
+      { length: 100 },
+      () => undefined,
+    );
 
     function Sub(props: { index: number }) {
       const routeState = useRouteNode("users");

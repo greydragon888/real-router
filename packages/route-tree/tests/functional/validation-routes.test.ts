@@ -340,7 +340,7 @@ describe("validateRoutePath", () => {
     });
 
     it("should handle paths with many segments", () => {
-      const deepPath = `/${Array.from({ length: 100 }).fill("segment").join("/")}`;
+      const deepPath = `/${Array.from({ length: 100 }, () => "segment").join("/")}`;
 
       expect(() => {
         validateRoutePath(deepPath, routeName, methodName);

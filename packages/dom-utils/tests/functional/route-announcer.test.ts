@@ -202,7 +202,7 @@ describe("createRouteAnnouncer", () => {
 
     const h1 = document.createElement("h1");
 
-    h1.textContent = "   ";
+    h1.textContent = " ".repeat(3);
     document.body.append(h1);
     document.title = "About Title Fallback";
 

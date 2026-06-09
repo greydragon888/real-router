@@ -4152,7 +4152,7 @@ describe("SegmentMatcher", () => {
       const matcher = createTestMatcher();
       const slugNode = createInputNode({
         name: "slug",
-        path: String.raw`/posts/:slug<[a-z-]+>`,
+        path: "/posts/:slug<[a-z-]+>",
         fullName: "slug",
       });
       const rootNode = createInputNode({

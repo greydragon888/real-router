@@ -74,7 +74,7 @@ describe("mount/unmount subscription lifecycle (Vue)", () => {
   });
 
   it("3.3: 50 components mount → navigate × 10 → unmount → remount → navigate × 10", async () => {
-    const renderCounts: number[] = Array.from<number>({ length: 50 }).fill(0);
+    const renderCounts: number[] = Array.from({ length: 50 }, () => 0);
 
     const consumers = Array.from({ length: 50 }, (_, i) => {
       const index = i;
@@ -178,7 +178,7 @@ describe("mount/unmount subscription lifecycle (Vue)", () => {
   });
 
   it("3.5: router stop/restart while 50 components mounted — components receive post-restart navigations", async () => {
-    const renderCounts: number[] = Array.from<number>({ length: 50 }).fill(0);
+    const renderCounts: number[] = Array.from({ length: 50 }, () => 0);
 
     const consumers = Array.from({ length: 50 }, (_, i) => {
       const index = i;

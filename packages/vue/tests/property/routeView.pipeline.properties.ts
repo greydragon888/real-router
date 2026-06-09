@@ -559,11 +559,13 @@ describe("RouteView pipeline — Property Tests (Vue)", () => {
           "any-unmatchable",
           "",
         );
-        const expected = input.some(
-          (entry) =>
-            entry.keepAlive === true ||
-            entry.keepAlive === "" ||
-            entry.keepAlive === "keep-alive",
+        const keepAliveValues: ReadonlySet<unknown> = new Set([
+          true,
+          "",
+          "keep-alive",
+        ]);
+        const expected = input.some((entry) =>
+          keepAliveValues.has(entry.keepAlive),
         );
 
         expect(hasPerMatchKA).toBe(expected);

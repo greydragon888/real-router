@@ -118,13 +118,15 @@ describe("SV7 — useRouterTransition stress (Svelte)", () => {
 
     await router.start("/route0");
 
-    const snapshots: RouterTransitionSnapshot[] =
-      Array.from<RouterTransitionSnapshot>({ length: 20 }).fill({
+    const snapshots: RouterTransitionSnapshot[] = Array.from(
+      { length: 20 },
+      () => ({
         isTransitioning: false,
         isLeaveApproved: false,
         toRoute: null,
         fromRoute: null,
-      });
+      }),
+    );
 
     const components = Array.from({ length: 20 }, (_, i) =>
       renderWithRouter(router, TransitionConsumer, {

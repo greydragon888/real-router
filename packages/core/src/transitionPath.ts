@@ -86,10 +86,14 @@ function nameToIDsGeneral(name: string): string[] {
   return ids;
 }
 
-function isPrimitive(value: unknown): value is PrimitiveParam {
-  const type = typeof value;
+const PRIMITIVE_TYPES: ReadonlySet<string> = new Set([
+  "string",
+  "number",
+  "boolean",
+]);
 
-  return type === "string" || type === "number" || type === "boolean";
+function isPrimitive(value: unknown): value is PrimitiveParam {
+  return PRIMITIVE_TYPES.has(typeof value);
 }
 
 /**

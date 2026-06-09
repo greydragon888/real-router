@@ -66,7 +66,7 @@ describe("link-mass-rendering stress tests", () => {
   });
 
   it("2.1: 500 Links mount — exactly 500 renders, no render loops", () => {
-    const renderCounts: number[] = Array.from<number>({ length: 500 }).fill(0);
+    const renderCounts: number[] = Array.from({ length: 500 }, () => 0);
 
     const wrappers = Array.from({ length: 500 }, (_, i) => {
       const W: FunctionComponent = () => {
@@ -97,9 +97,7 @@ describe("link-mass-rendering stress tests", () => {
   });
 
   it("2.2: 500 Links to different routes + navigate to one — only 1-2 Links re-render", async () => {
-    const wrapperRenders: number[] = Array.from<number>({ length: 500 }).fill(
-      0,
-    );
+    const wrapperRenders: number[] = Array.from({ length: 500 }, () => 0);
 
     const wrappers = makeActiveWrappers(wrapperRenders, 500);
 
@@ -123,9 +121,7 @@ describe("link-mass-rendering stress tests", () => {
   });
 
   it("2.3: 500 Links + 50 navigations round-robin — each Link renders max 2 times total", async () => {
-    const wrapperRenders: number[] = Array.from<number>({ length: 500 }).fill(
-      0,
-    );
+    const wrapperRenders: number[] = Array.from({ length: 500 }, () => 0);
 
     const wrappers = makeActiveWrappers(wrapperRenders, 500);
 

@@ -18,20 +18,20 @@ interface FakeIncomingMessage extends IncomingMessageLike {
 function createFakeIncomingMessage(): FakeIncomingMessage {
   const listeners = new Set<() => void>();
 
-  return {
+  const fake: FakeIncomingMessage = {
     on(event, listener) {
       if (event === "close") {
         listeners.add(listener);
       }
 
-      return this;
+      return fake;
     },
     removeListener(event, listener) {
       if (event === "close") {
         listeners.delete(listener);
       }
 
-      return this;
+      return fake;
     },
     emitClose() {
       for (const listener of listeners) {
@@ -42,6 +42,8 @@ function createFakeIncomingMessage(): FakeIncomingMessage {
       return listeners.size;
     },
   };
+
+  return fake;
 }
 
 function isDisposed(scope: RequestScope): boolean {
@@ -143,7 +145,7 @@ describe("createRequestScope", () => {
         on(_event, listener) {
           listeners.add(listener);
 
-          return this;
+          return request;
         },
       };
 
