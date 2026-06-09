@@ -299,4 +299,75 @@ describe("preload-plugin — lifecycle", () => {
 
     router.stop();
   });
+
+  it("cleans compiled-preload entries on remove/replace/clear without breaking preload", async () => {
+    const preloadFn = vi.fn().mockResolvedValue(undefined);
+    const { router } = createTestRouter([
+      { name: "home", path: "/", preload: () => preloadFn },
+      { name: "temp", path: "/temp", preload: () => vi.fn() },
+      { name: "other", path: "/other", preload: () => vi.fn() },
+    ]);
+
+    setupMatchUrl(router);
+    cleanup = router.usePlugin(preloadPluginFactory());
+    await router.start("/");
+
+    const routesApi = getRoutesApi(router);
+
+    // add / update: the no-op fall-through branches of the TREE_CHANGED handler.
+    routesApi.add({ name: "added", path: "/added" });
+    routesApi.update("home", { defaultParams: { a: "1" } });
+
+    // remove: drops temp's entry (removedSubtree loop).
+    routesApi.remove("temp");
+
+    // replace that removes "other": exercises the replace removal loop.
+    routesApi.replace([
+      { name: "home", path: "/", preload: () => preloadFn },
+      { name: "other", path: "/other" },
+    ]);
+    routesApi.replace([{ name: "home", path: "/", preload: () => preloadFn }]);
+
+    // home still preloads after all the churn (regression guard).
+    const anchor = createAnchor("/");
+
+    fireMouseOver(anchor);
+    await waitForTimer(65);
+
+    expect(preloadFn).toHaveBeenCalledTimes(1);
+
+    // clear: empties the whole compiled map.
+    routesApi.clear();
+
+    router.stop();
+  });
+
+  it("invalidates the pre-resolved state cache when a route is removed", async () => {
+    const { router } = createTestRouter([
+      { name: "home", path: "/" },
+      { name: "foo", path: "/foo" },
+    ]);
+
+    setupMatchUrl(router);
+    cleanup = router.usePlugin(preloadPluginFactory());
+    await router.start("/");
+
+    // Hovering resolves and caches a State for /foo (control: it IS cached —
+    // getPreloadedState is single-use, so this consumes it).
+    const anchor = createAnchor("/foo");
+
+    fireMouseOver(anchor);
+
+    expect(router.getPreloadedState?.(anchor.href)).toBeDefined();
+
+    // Re-hover to repopulate, then remove the route.
+    fireMouseOver(createAnchor("/foo"));
+    getRoutesApi(router).remove("foo");
+
+    // The stale snapshot must be gone — otherwise a <FastLink> click would
+    // navigate to a route that no longer exists.
+    expect(router.getPreloadedState?.(anchor.href)).toBeUndefined();
+
+    router.stop();
+  });
 });

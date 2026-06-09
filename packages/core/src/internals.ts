@@ -15,6 +15,7 @@ import type {
   RouteTreeState,
   SimpleState,
   State,
+  TreeChangedEvent,
   Unsubscribe,
 } from "@real-router/types";
 import type { RouteTree } from "route-tree";
@@ -50,6 +51,21 @@ export interface RouterInternals<
     eventName: E,
     cb: Plugin[EventMethodMap[E]],
   ) => Unsubscribe;
+
+  /**
+   * Route-tree mutation channel — internal access for the `getRoutesApi`
+   * wrapper. A dedicated bridge is required because the public
+   * `addEventListener<E extends EventName>` structurally rejects
+   * `"TREE_CHANGED"` (it is not in the public `EventName` union), is strict on
+   * duplicates, and exposes neither `emit` nor `listenerCount`.
+   */
+  readonly treeChanged: {
+    readonly emit: (event: TreeChangedEvent) => void;
+    readonly subscribe: (
+      handler: (event: TreeChangedEvent) => void,
+    ) => Unsubscribe;
+    readonly listenerCount: () => number;
+  };
 
   readonly buildPath: (route: string, params?: Params) => string;
 
@@ -160,6 +176,12 @@ function executeInterceptorChain<T>(
   return chain(...args) as T;
 }
 
+/**
+ * Variadic interceptor wrapper — wraps a function of any arity, returning the
+ * same callable type `T`. Use {@link createBinaryInterceptable} instead when the
+ * wrapped method takes exactly two args and the caller needs the precise
+ * `(a, b) => r` signature preserved (the variadic form widens args to `any[]`).
+ */
 export function createInterceptable<T extends (...args: any[]) => any>(
   name: string,
   original: T,
@@ -179,7 +201,13 @@ export function createInterceptable<T extends (...args: any[]) => any>(
   }) as T;
 }
 
-export function createInterceptable2<A, B, R>(
+/**
+ * Two-argument interceptor wrapper — preserves the exact `(a: A, b: B) => R`
+ * signature, which the variadic {@link createInterceptable} cannot express
+ * (it widens args to `any[]`). Used for the binary interceptable methods
+ * `forwardState(routeName, routeParams)` and `buildPath(route, params)`.
+ */
+export function createBinaryInterceptable<A, B, R>(
   name: string,
   original: (a: A, b: B) => R,
   interceptors: Map<

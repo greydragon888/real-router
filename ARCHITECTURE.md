@@ -303,6 +303,16 @@ FSM events trigger observable emissions through two paths:
 - `LEAVE_APPROVE` (`sendLeaveApprove`) → `forceState(LEAVE_APPROVED)` + `emitTransitionLeaveApprove()`
 - `COMPLETE` (`sendComplete`) → `forceState(READY)` + `emitTransitionSuccess()`
 
+### Route-tree mutation channel — `TREE_CHANGED` (orthogonal to the FSM)
+
+The seven events above are all about **transitions** (FSM state changes). A separate, **non-FSM** channel signals **structural route-tree mutations** (`add` / `remove` / `update` / `replace` / `clear` via `getRoutesApi`). It reuses the same `EventEmitter` through an **internal-only** key — `TREE_CHANGED` lives in `RouterEventMap` but **not** in the public `EventName` union / `events.*` registry / `Plugin` interface — and is observed only via `getRoutesApi(router).subscribeChanges(handler)`:
+
+- **Post-commit, fire-and-forget** — emitted from the five `getRoutesApi` wrappers after the atomic commit, never from the shared internals that `dispose()`/`cloneRouter()`/`setRootPath()` reuse, so teardown and cloning stay silent.
+- **Discriminated payload** (`TreeChangedEvent`, keyed by `op`); `update` emits only on structural fields (guard-only patches are silent).
+- Depth tracking (`maxEventDepth`) and per-listener error isolation come for free from the shared emitter; `RecursionDepthError` is the one error that propagates to the CRUD caller.
+
+Tree mutations are an **infrastructural** concern (DevTools, microfrontend coordinators, file-routes watch, caches keyed by route name), not an app-level event — there is deliberately no `router.subscribeTree()` facade and no `addEventListener` path. See [packages/core/CLAUDE.md](packages/core/CLAUDE.md) for the consumer pattern.
+
 ## Navigation Pipeline
 
 All navigation methods return `Promise<State>`. The pipeline uses **optimistic sync execution** — guards run synchronously until one returns a Promise, then switches to the async path.
@@ -407,7 +417,8 @@ These are deliberately designed constraints. Violating them will break the syste
 
 ### FSM & Events
 
-- **All router events are consequences of FSM transitions** — never manual calls. No boolean flags (`#started`, `#active`, `#navigating` — all removed).
+- **All transition events are consequences of FSM transitions** — never manual calls. No boolean flags (`#started`, `#active`, `#navigating` — all removed). (The `TREE_CHANGED` channel is the one deliberate exception — it is orthogonal to the FSM, emitted by `getRoutesApi` mutations, not by state changes.)
+- **`TREE_CHANGED` is internal-only and wrapper-emitted** — never in the public `EventName` union, and emitted strictly from the five `getRoutesApi` CRUD wrappers, never from shared internals (`adoptRouteArtifacts`/`commitTreeChanges`/`resetStore`). This keeps `dispose()`, `cloneRouter()`, and `setRootPath()` from emitting it.
 - **`dispose()` is terminal** — DISPOSED state has no outbound transitions. All mutating methods throw `RouterError(ROUTER_DISPOSED)` after disposal.
 
 ### Guards & Plugins

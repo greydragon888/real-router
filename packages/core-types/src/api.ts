@@ -22,6 +22,7 @@ import type {
   Route,
   RouteConfigUpdate,
 } from "./router";
+import type { TreeChangedEvent } from "./tree-changed";
 
 /**
  * Maps interceptable method names to their signatures.
@@ -35,7 +36,6 @@ export interface InterceptableMethodMap {
   start: (path?: string) => Promise<State>;
   buildPath: (route: string, params?: Params) => string;
   forwardState: (routeName: string, routeParams: Params) => SimpleState;
-  add: (routes: Route[], options?: { parent?: string }) => void;
 }
 
 /**
@@ -204,6 +204,22 @@ export interface RoutesApi<
   has: (name: string) => boolean;
 
   get: (name: string) => Route<Dependencies> | undefined;
+
+  /**
+   * Subscribe to structural route-tree mutations (`add` / `remove` / `update`
+   * with structural fields / `replace` / `clear`). Fire-and-forget: the handler
+   * cannot cancel the mutation, runs after the atomic commit, and sees the
+   * post-mutation tree via `get()` / `has()`.
+   *
+   * Duplicate-registration semantics are **lenient** (mirrors
+   * `router.subscribe`): each call registers an independent listener and
+   * returns its own unsubscribe.
+   *
+   * @returns Unsubscribe function for this specific registration.
+   */
+  subscribeChanges: (
+    handler: (event: TreeChangedEvent<Dependencies>) => void,
+  ) => Unsubscribe;
 }
 
 /**

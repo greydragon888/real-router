@@ -11,11 +11,11 @@
 **Integration points with the core:**
 
 - `addInterceptor("forwardState", ...)` — validates params of every resolved state (both URL→State and State→URL directions)
-- `addInterceptor("add", ...)` — validates `defaultParams` of dynamically added routes (development mode only)
+- `routesApi.subscribeChanges(...)` — re-validates `defaultParams` on `add`/`update`/`replace` route-tree mutations (development mode only)
 - `pluginApi.getRouteConfig(name)` — reads the `searchSchema` field from a route's config at validation time
 - `pluginApi.getTree()` — walks the full route tree at plugin initialization to validate existing `defaultParams` (development mode only)
 - `routesApi.get(name)` — reads `defaultParams` for error recovery (merging defaults over stripped params)
-- Plugin hook (`teardown`) — removes both interceptors
+- Plugin hook (`teardown`) — removes the interceptor and the TREE_CHANGED subscription
 
 ## Package Structure
 
@@ -24,7 +24,7 @@ search-schema-plugin/
 ├── src/
 │   ├── index.ts        — Public API (exports factory + types + Route module augmentation)
 │   ├── factory.ts      — searchSchemaPlugin (options validation, freeze, returns PluginFactory)
-│   ├── plugin.ts       — SearchSchemaPlugin class (forwardState + add interceptors, tree walk)
+│   ├── plugin.ts       — SearchSchemaPlugin class (forwardState interceptor + TREE_CHANGED subscription, tree walk)
 │   ├── helpers.ts      — Pure param utilities (getInvalidKeys, omitKeys)
 │   ├── types.ts        — StandardSchemaV1 types (inline), SearchSchemaPluginOptions
 │   ├── constants.ts    — ERROR_PREFIX
@@ -81,7 +81,7 @@ searchSchemaPlugin(options)     ← factory.ts
                             │  Constructor:
                             │  - #validateExistingDefaultParams()  ← dev mode: tree walk
                             │  - pluginApi.addInterceptor("forwardState", ...)
-                            │  - pluginApi.addInterceptor("add", ...)
+                            │  - routesApi.subscribeChanges(...)  ← dev mode only
                             │
                             └── .getPlugin()  → Plugin { teardown }
 ```
@@ -90,7 +90,7 @@ searchSchemaPlugin(options)     ← factory.ts
 
 - `factory.ts` runs once — options validation doesn't repeat on every `usePlugin()` call
 - Frozen options object is created once and shared safely across calls (immutable)
-- `SearchSchemaPlugin` encapsulates the two interceptor unsubscribe functions — a class makes the private field discipline explicit
+- `SearchSchemaPlugin` encapsulates the interceptor + subscription unsubscribe functions — a class makes the private field discipline explicit
 - Testability: `SearchSchemaPlugin` can be instantiated directly with a mock `PluginApi` and `RoutesApi`
 
 ### Creation Flow
@@ -116,9 +116,9 @@ export function searchSchemaPlugin(
 }
 ```
 
-### Constructor: Interceptor Registration
+### Constructor: Interceptor + Subscription Registration
 
-The constructor registers both interceptors immediately. Unlike `persistent-params-plugin`, there is no mutable state to set up and no rollback path — interceptor registration in the plugin API is infallible (pure array push):
+The constructor registers the `forwardState` interceptor immediately and, in development mode, subscribes to route-tree mutations. There is no mutable state to set up and no rollback path — both registrations are infallible (pure array push):
 
 ```typescript
 // plugin.ts constructor (simplified)
@@ -132,13 +132,13 @@ this.#removeForwardStateInterceptor = this.#pluginApi.addInterceptor(
   },
 );
 
-this.#removeAddInterceptor = this.#pluginApi.addInterceptor(
-  "add",
-  (next, routes, addOptions) => {
-    next(routes, addOptions); // routes registered first
-    this.#validateRoutesDefaultParams(routes); // then defaultParams checked (dev only)
-  },
-);
+// dev mode only — re-validate defaultParams on add/update/replace
+this.#removeChangesSubscription =
+  this.#mode === "development"
+    ? this.#routesApi.subscribeChanges((event) => {
+        this.#onTreeChanged(event); // validates affected route names
+      })
+    : () => {};
 ```
 
 ### getPlugin(): teardown only, no side effects
@@ -306,7 +306,7 @@ Both unsubscribe calls are unconditional and infallible. Unlike `persistent-para
 
 Throws `TypeError` with a descriptive message on any violation. The factory never returns a `PluginFactory` if options are invalid.
 
-### Dev-time defaultParams validation (constructor + add interceptor)
+### Dev-time defaultParams validation (constructor + TREE_CHANGED)
 
 In development mode only, the plugin validates that each route's `defaultParams` pass its own `searchSchema`. This catches configuration mismatches early — before any navigation happens.
 
@@ -331,19 +331,20 @@ constructor()
                                         YES: console.warn(routeName, issues)
 ```
 
-**At add interceptor time** — dynamically added routes:
+**At TREE_CHANGED time** (dev mode only) — runtime tree mutations:
 
 ```
-router.add(routes) or router.replace(routes)
+routesApi.add / update / replace / remove / clear
         │
         ▼
-  add interceptor
+  TREE_CHANGED event (post-commit)
         │
-        ├── next(routes, addOptions)   ← routes registered in core first
-        │
-        └── #validateRoutesDefaultParams(routes)
-              └── for each route (recursively incl. children):
-                    #validateSingleRouteDefaultParams(route.name)
+        └── #onTreeChanged(event)
+              ├── op "add" / "replace": for each route in event.added (FLAT,
+              │     full dotted names) → #validateSingleRouteDefaultParams(route.name)
+              ├── op "update": if event.patch.defaultParams changed
+              │     → #validateSingleRouteDefaultParams(event.name)
+              └── op "remove" / "clear": no-op (routes gone)
                     (same single-route check as above)
 ```
 
@@ -400,7 +401,7 @@ Recovery applies only when `onError` is not set. The sequence is:
 | Early return when no schema                        | `plugin.ts`  | Routes without `searchSchema` bypass all validation — zero overhead          |
 | `getInvalidKeys` with `Set`                        | `helpers.ts` | O(n issues) build, O(1) membership checks in `omitKeys`                      |
 | `omitKeys` single pass                             | `helpers.ts` | One `Object.keys` iteration — no intermediate structures                     |
-| Dev-time defaultParams check skipped in production | `plugin.ts`  | Tree walk and `add` interceptor check both gated on `mode !== "development"` |
+| Dev-time defaultParams check skipped in production | `plugin.ts`  | Tree walk gated on `mode !== "development"`; the TREE_CHANGED subscription is not registered at all in production |
 
 ## Related Documents
 

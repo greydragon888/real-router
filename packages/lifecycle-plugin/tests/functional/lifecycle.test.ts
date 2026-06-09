@@ -748,4 +748,47 @@ describe("@real-router/lifecycle-plugin", () => {
       expect(onLeaveV2).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe("tree mutation cleanup (TREE_CHANGED)", () => {
+    it("cleans compiled hooks on remove/replace/clear without breaking dispatch", async () => {
+      const onEnter = vi.fn();
+
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          { name: "about", path: "/about", onEnter: () => onEnter },
+          { name: "temp", path: "/temp", onEnter: () => vi.fn() },
+        ],
+        { defaultRoute: "home" },
+      );
+
+      const unsubscribe = router.usePlugin(lifecyclePluginFactory());
+      const routesApi = getRoutesApi(router);
+
+      await router.start("/");
+
+      // add / update: the no-op fall-through branches of the handler.
+      routesApi.add({ name: "added", path: "/added" });
+      routesApi.update("home", { defaultParams: { a: "1" } });
+
+      // remove: drops temp's compiled-hook entries (removedSubtree loop).
+      routesApi.remove("temp");
+
+      // hooks still dispatch correctly after the churn (regression guard).
+      await router.navigate("about");
+
+      expect(onEnter).toHaveBeenCalledTimes(1);
+
+      // replace removing "about"/"added": exercises the replace removal loop.
+      routesApi.replace([{ name: "home", path: "/" }]);
+
+      // clear: empties the whole compiled-hook map.
+      routesApi.clear();
+
+      // teardown: removes the TREE_CHANGED subscription.
+      expect(() => {
+        unsubscribe();
+      }).not.toThrow();
+    });
+  });
 });

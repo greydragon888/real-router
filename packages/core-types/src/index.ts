@@ -71,5 +71,16 @@ export type {
   ContextNamespaceClaim,
 } from "./api";
 
+// Route-tree mutation event (observed via getRoutesApi().subscribeChanges)
+export type {
+  TreeChangedEvent,
+  TreeChangedAdd,
+  TreeChangedRemove,
+  TreeChangedUpdate,
+  TreeChangedReplace,
+  TreeChangedClear,
+  TreeStructuralPatch,
+} from "./tree-changed";
+
 // Note: RouterError type is a forward declaration matching the class in real-router package
 // Use import { RouterError } from "real-router" for the actual class implementation

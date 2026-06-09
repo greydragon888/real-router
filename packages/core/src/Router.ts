@@ -14,8 +14,8 @@ import { createRouterFSM } from "./fsm";
 import { guardDependencies, guardRouteStructure } from "./guards";
 import { createLimits, normalizeParams } from "./helpers";
 import {
+  createBinaryInterceptable,
   createInterceptable,
-  createInterceptable2,
   getInternals,
   registerInternals,
 } from "./internals";
@@ -200,12 +200,12 @@ export class Router<
     registerInternals(this, {
       makeState: (name, params, path, meta) =>
         this.#state.makeState(name, params, path, meta),
-      // `as unknown as` is required: createInterceptable2 returns a
+      // `as unknown as` is required: createBinaryInterceptable returns a
       // non-generic `(a: A, b: B) => R`, but RouterInternals["forwardState"]
       // is declared with a generic parameter `<P extends Params = Params>`,
       // which tsc will not infer from the non-generic source. Sonar S4325
       // misclassifies this as a redundant cast.
-      forwardState: createInterceptable2(
+      forwardState: createBinaryInterceptable(
         "forwardState",
         (name: string, params: Params) =>
           this.#routes.forwardState(name, params),
@@ -218,7 +218,14 @@ export class Router<
       getOptions: () => this.#options.get(),
       addEventListener: (eventName, cb) =>
         this.#eventBus.addEventListener(eventName, cb),
-      buildPath: createInterceptable2(
+      treeChanged: {
+        emit: (event) => {
+          this.#eventBus.emitTreeChanged(event);
+        },
+        subscribe: (handler) => this.#eventBus.subscribeTreeChanged(handler),
+        listenerCount: () => this.#eventBus.treeChangedListenerCount(),
+      },
+      buildPath: createBinaryInterceptable(
         "buildPath",
         (route: string, params?: Params) =>
           this.#routes.buildPath(

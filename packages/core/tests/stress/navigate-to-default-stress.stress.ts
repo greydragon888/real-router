@@ -30,7 +30,7 @@ describe("S23: navigateToDefault under load", () => {
     const heapAfter = takeHeapSnapshot();
     const delta = heapAfter - heapBefore;
 
-    expect(delta).toBeLessThan(10 * MB);
+    expect(delta).toBeLessThan(3 * MB);
   }, 30_000);
 
   it("S23.2: navigateToDefault() with replace option × 500", async () => {

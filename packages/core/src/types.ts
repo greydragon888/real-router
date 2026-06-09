@@ -15,6 +15,7 @@ import type {
   RouterError as RouterErrorType,
   RouteTreeState,
   State,
+  TreeChangedEvent,
 } from "@real-router/types";
 
 // Re-export from @real-router/types (canonical source)
@@ -27,10 +28,16 @@ export type {
 } from "@real-router/types";
 
 /**
- * Event argument tuples for the router's 7 events.
+ * Event argument tuples for the router's 7 transition events plus the internal
+ * `TREE_CHANGED` channel.
  *
  * Uses explicit `| undefined` unions (not optional `?`) to satisfy
  * `exactOptionalPropertyTypes` when passing undefined args from FSM payloads.
+ *
+ * `TREE_CHANGED` is an **internal-only** key: it is deliberately absent from the
+ * public `EventName` union / `events.*` registry / `Plugin` interface. It
+ * reuses the same `EventEmitter` (depth tracking, error isolation) but is only
+ * reachable via `getRoutesApi(router).subscribeChanges()`.
  */
 // eslint-disable-next-line @typescript-eslint/consistent-type-definitions -- must be `type` for Record<string, unknown[]> constraint
 export type RouterEventMap = {
@@ -49,6 +56,7 @@ export type RouterEventMap = {
     error: RouterErrorType | undefined,
   ];
   $$cancel: [toState: State, fromState: State | undefined];
+  TREE_CHANGED: [event: TreeChangedEvent];
 };
 
 /**

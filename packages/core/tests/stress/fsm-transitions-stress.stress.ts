@@ -137,7 +137,7 @@ describe("S8: FSM transitions", () => {
     const after = takeHeapSnapshot();
     const delta = after - before;
 
-    expect(delta, `heap grew by ${formatBytes(delta)}`).toBeLessThan(10 * MB);
+    expect(delta, `heap grew by ${formatBytes(delta)}`).toBeLessThan(0.5 * MB);
 
     router.stop();
     router.dispose();
@@ -157,7 +157,7 @@ describe("S8: FSM transitions", () => {
     const after = takeHeapSnapshot();
     const delta = after - before;
 
-    expect(delta, `heap grew by ${formatBytes(delta)}`).toBeLessThan(5 * MB);
+    expect(delta, `heap grew by ${formatBytes(delta)}`).toBeLessThan(0.5 * MB);
 
     router.stop();
     router.dispose();

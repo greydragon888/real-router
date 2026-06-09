@@ -10,38 +10,12 @@ pnpm monorepo with 32 packages + `benchmarks/` + bare `shared/` sources (symlink
 
 ```
 shared/
-├── browser-env/          # History API + URL primitives — for plugin packages
-│   ├── detect.ts         # isBrowserEnvironment()
-│   ├── history-api.ts    # pushState, replaceState, addPopstateListener, getHash
-│   ├── plugin-utils.ts   # createStartInterceptor, createReplaceHistoryState, shouldReplaceHistory
-│   ├── popstate-handler.ts  # createPopstateHandler, createPopstateLifecycle
-│   ├── popstate-utils.ts # getRouteFromEvent, updateBrowserState
-│   ├── safe-browser.ts   # createSafeBrowser
-│   ├── ssr-fallback.ts   # createWarnOnce, createHistoryFallbackBrowser
-│   ├── types.ts          # HistoryBrowser, Browser, SharedFactoryState
-│   ├── url-parsing.ts    # safeParseUrl
-│   ├── url-utils.ts      # extractPath, buildUrl, urlToPath
-│   ├── utils.ts          # normalizeBase, safelyEncodePath
-│   ├── validation.ts     # createOptionsValidator
-│   └── index.ts          # barrel
-├── dom-utils/            # DOM helpers — for framework adapters
-│   ├── link-utils.ts     # shouldNavigate, buildHref, buildActiveClassName, applyLinkA11y, navigateWithHash, shallowEqual
-│   ├── route-announcer.ts  # createRouteAnnouncer (a11y aria-live region)
-│   ├── scroll-restore.ts   # createScrollRestoration (opt-in scroll capture + restore)
-│   ├── scroll-spy.ts       # createScrollSpy (IntersectionObserver → URL hash; #575)
-│   ├── view-transitions.ts # createViewTransitions (subscribeLeave-based View Transitions API integration; #498)
-│   ├── direction-tracker.ts # createDirectionTracker (back/forward direction annotation; optional, install before browser-plugin)
-│   └── index.ts          # barrel
-└── ssr/                  # SSR plugin scaffolding — for server-side per-route loader plugins
-    ├── createSsrLoaderPlugin.ts  # generic factory: validate compile loop + start interceptor + subscribeLeave + claim/teardown (4 claims)
-    ├── createLoadersValidator.ts # generic shape validator (non-null object → function values; rejects unknown keys, allowed-mode strings only)
-    ├── defer.ts          # defer({ critical, deferred }) API + DEFER_BRAND symbol + shallow-clone freeze (security invariant)
-    ├── deferRegistry.ts  # __rrDeferRegistry__ global Map + escapeForScript + formatSettleScript + getDeferBootstrapScript
-    ├── errors.ts         # LoaderRedirect / LoaderNotFound / LoaderTimeout + withTimeout (AbortSignal.any composer, Node 20.3+)
-    ├── staleRegistry.ts  # markStale / isStale / clearStale — WeakMap<Router, Set<namespace>> for invalidate() CSR channel
-    ├── types.ts          # SsrLoaderFn<T> with optional context, SsrLoaderFnFactory<T,D>, SsrLoaderFactoryMap<T,D>, SsrMode, SsrLoaderPluginConfig
-    └── index.ts          # barrel
+├── browser-env/   # History API + URL primitives — for browser/hash/navigation plugins
+├── dom-utils/     # DOM helpers (links, scroll, a11y, view-transitions) — for framework adapters
+└── ssr/           # SSR per-route loader plugin scaffolding — for ssr-data / rsc-server plugins
 ```
+
+(Per-file contents change often — `ls shared/<dir>` for the current layout; see each consumer package's CLAUDE.md for what it pulls in.)
 
 ### Symlink Consumers
 
@@ -85,6 +59,7 @@ pnpm resolve:dependabot <PR#>  # Rebase+dedupe a Dependabot PR — conflicting O
 ## Non-Obvious Conventions
 
 - 100% test coverage required (enforced in vitest.config). Framework adapters may have slightly lower thresholds for branches/functions due to compiler-generated phantom code (Solid: babel-preset-solid, Vue: defineComponent, Svelte: compiler transforms, Angular: JIT TestBed does not bind signal `input()` so `contentChildren`/directive callbacks are unreachable without AOT — threshold 94/84/94/94)
+- **Heap-threshold stress tests (`tests/stress/*.stress.ts`) MUST have proven discriminating power — coverage does not measure it.** A `expect(delta).toBeLessThan(N * MB)` test is worthless theatre if `N * MB` sits ABOVE the heap the targeted leak would actually add (the test passes even when fully broken). Before trusting any such test, validate it mutationally: (1) measure the **healthy** delta (temporarily force the threshold to `0` and read the printed `formatBytes(delta)`); (2) **simulate the exact leak** it guards — for a cleanup-cycle test (create→destroy loop), delete the cleanup call (`unsub()`/`remove()`/`teardown()`); for a "stable over N ops" test, retain one reference per op — and measure that delta; (3) the threshold MUST sit between them with ≥3× margin on both sides (`healthy < threshold < leak`), so the test fails on the leak and passes when healthy. Anchor the threshold to measured healthy, **never to a round MB guess**. Pitfalls that silently defeat discrimination: iteration count `N` too low (leak signal stays in KB — raise `N`, keep runtime <~2s); **hard caps** bounding the max possible leak (`EventEmitter` caps at 10k listeners/event, dependency store at 100 entries, guard storage is `Map<routeName>` last-add-wins so a removal-leak is bounded to one generation — set the threshold below the capped leak); and **GC-masking** (objects from a `create→dispose` loop left unreferenced are reclaimed regardless of whether `dispose()` ran, so the dispose-leak is structurally invisible to a heap snapshot — such tests are really throughput guards, fix by tightening the threshold to ~8–10× stable healthy, not by chasing a non-existent signal). Leave timing assertions (`< Xms`) alone — they flake under concurrent CPU load.
 - Angular adapter is built with **ng-packagr** (not tsdown) — produces FESM2022 ESM-only (no CJS), partial-Ivy compilation linked by the consumer
 - Pinned versions (`save-exact=true` in .npmrc)
 - Workspace packages use `workspace:^` protocol
@@ -241,4 +216,5 @@ When adding packages or features, keep these root files in sync:
 - [packages/fsm/CLAUDE.md](packages/fsm/CLAUDE.md) — FSM engine internals
 - [benchmarks/CLAUDE.md](benchmarks/CLAUDE.md) — Benchmark suite
 - [MCP Servers Guide](.claude/mcp-guide.md)
+- [Roadmap to 1.0](https://github.com/greydragon888/real-router/issues/296) — issue #296, milestone tracking
 - [Wiki](https://github.com/greydragon888/real-router/wiki) (local: `/Users/olegivanov/WebstormProjects/real-router.wiki`)

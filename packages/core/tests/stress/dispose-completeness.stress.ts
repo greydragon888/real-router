@@ -59,10 +59,10 @@ describe("S4. Router dispose completeness", () => {
     const after = takeHeapSnapshot();
     const delta = after - before;
 
-    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(2 * MB);
+    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(1 * MB);
   });
 
-  it("should not leave unhandled rejections and heap stays below 10 MB when disposing during active navigation × 50", async () => {
+  it("should not leave unhandled rejections and heap stays below 512 KB when disposing during active navigation × 50", async () => {
     const before = takeHeapSnapshot();
 
     for (let i = 0; i < 50; i++) {
@@ -80,7 +80,9 @@ describe("S4. Router dispose completeness", () => {
     const after = takeHeapSnapshot();
     const delta = after - before;
 
-    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(10 * MB);
+    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(
+      512 * 1024,
+    );
   });
 
   it("should be idempotent — double dispose 100 times should not throw", async () => {
@@ -100,6 +102,6 @@ describe("S4. Router dispose completeness", () => {
     const after = takeHeapSnapshot();
     const delta = after - before;
 
-    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(5 * MB);
+    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(1 * MB);
   });
 });

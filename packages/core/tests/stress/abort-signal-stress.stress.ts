@@ -60,7 +60,7 @@ describe("S10: AbortController / Signal stress", () => {
     );
 
     expect(cancelled).toHaveLength(200);
-    expect(delta).toBeLessThan(10 * MB);
+    expect(delta).toBeLessThan(4 * MB);
   }, 30_000);
 
   it("S10.2: Concurrent cancel — new navigation cancels previous × 100 pairs", async () => {
@@ -121,7 +121,7 @@ describe("S10: AbortController / Signal stress", () => {
 
     expect(completedCount + cancelledCount).toBe(200);
     expect(cancelledCount).toBeGreaterThanOrEqual(50);
-    expect(delta).toBeLessThan(20 * MB);
+    expect(delta).toBeLessThan(1 * MB);
   }, 60_000);
 
   it("S10.3: Signal in guards (cooperative cancellation) — 100 navigations", async () => {
@@ -184,7 +184,7 @@ describe("S10: AbortController / Signal stress", () => {
     const delta = heapAfter - heapBefore;
 
     expect(errors.length).toBeGreaterThan(0);
-    expect(delta).toBeLessThan(10 * MB);
+    expect(delta).toBeLessThan(2 * MB);
   }, 30_000);
 
   it("S10.4: AbortController leak check — 500 navigate cycles, no accumulation", async () => {
@@ -202,6 +202,6 @@ describe("S10: AbortController / Signal stress", () => {
     const heapAfter = takeHeapSnapshot();
     const delta = heapAfter - heapBefore;
 
-    expect(delta).toBeLessThan(10 * MB);
+    expect(delta).toBeLessThan(1 * MB);
   }, 30_000);
 });

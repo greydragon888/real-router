@@ -2,7 +2,12 @@ import { describe, afterEach, it, expect } from "vitest";
 
 import { getPluginApi } from "@real-router/core/api";
 
-import { createStressRouter, takeHeapSnapshot, MB } from "./helpers";
+import {
+  createStressRouter,
+  formatBytes,
+  takeHeapSnapshot,
+  MB,
+} from "./helpers";
 
 import type { Router } from "@real-router/core";
 
@@ -14,7 +19,7 @@ describe("S24: setRootPath concurrent changes", () => {
     router.dispose();
   });
 
-  it("S24.1: 100 cycles setRootPath + navigate — consistent behavior", async () => {
+  it("S24.1: 3000 cycles setRootPath + navigate — consistent behavior", async () => {
     router = createStressRouter(10);
     await router.start("/route0");
 
@@ -22,7 +27,7 @@ describe("S24: setRootPath concurrent changes", () => {
 
     const heapBefore = takeHeapSnapshot();
 
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 3000; i++) {
       const prefix = `/app${i}`;
 
       pluginApi.setRootPath(prefix);
@@ -38,7 +43,7 @@ describe("S24: setRootPath concurrent changes", () => {
     const delta = heapAfter - heapBefore;
 
     expect(router.getState()).toBeDefined();
-    expect(delta).toBeLessThan(5 * MB);
+    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(1.5 * MB);
 
     pluginApi.setRootPath("");
   }, 30_000);

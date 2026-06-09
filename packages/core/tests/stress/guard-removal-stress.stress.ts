@@ -58,7 +58,7 @@ describe("S20: Dynamic guard management", () => {
 
     expect(callsBeforeRemoval).toBeGreaterThan(0);
     expect(totalCalls).toBeGreaterThan(callsBeforeRemoval);
-    expect(delta).toBeLessThan(10 * MB);
+    expect(delta).toBeLessThan(0.5 * MB);
   }, 30_000);
 
   it("S20.2: removeActivateGuard() during guard execution — 50 cycles, no crash", async () => {
@@ -94,11 +94,11 @@ describe("S20: Dynamic guard management", () => {
     const heapAfter = takeHeapSnapshot();
     const delta = heapAfter - heapBefore;
 
-    expect(delta).toBeLessThan(5 * MB);
+    expect(delta).toBeLessThan(0.5 * MB);
   }, 30_000);
 
   it("S20.3: 100 cycles add/remove all guards + navigation — heap stable", async () => {
-    const routeCount = 20;
+    const routeCount = 5000;
 
     router = createStressRouter(routeCount);
     await router.start("/route0");
@@ -132,6 +132,6 @@ describe("S20: Dynamic guard management", () => {
     const delta = heapAfter - heapBefore;
 
     expect(router.getState()).toBeDefined();
-    expect(delta).toBeLessThan(10 * MB);
+    expect(delta).toBeLessThan(0.4 * MB);
   }, 30_000);
 });

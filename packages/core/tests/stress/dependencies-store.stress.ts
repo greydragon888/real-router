@@ -3,10 +3,10 @@ import { describe, it, expect } from "vitest";
 import { createRouter } from "@real-router/core";
 import { getDependenciesApi } from "@real-router/core/api";
 
-import { createFlatRoutes, formatBytes, MB, takeHeapSnapshot } from "./helpers";
+import { createFlatRoutes, formatBytes, takeHeapSnapshot } from "./helpers";
 
 describe("S13: Dependencies store churn", () => {
-  it("S13.1 set/remove cycle 1000x: store remains empty, heap growth < 2MB", () => {
+  it("S13.1 set/remove cycle 1000x: store remains empty, heap growth < 128KB", () => {
     const router = createRouter<Record<string, number>>(createFlatRoutes(5), {
       defaultRoute: "route0",
     });
@@ -23,7 +23,9 @@ describe("S13: Dependencies store churn", () => {
     const delta = heapAfter - heapBefore;
 
     expect(deps.has("key")).toBe(false);
-    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(2 * MB);
+    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(
+      128 * 1024,
+    );
 
     router.stop();
     router.dispose();
@@ -55,7 +57,9 @@ describe("S13: Dependencies store churn", () => {
     expect(Object.keys(all)).toHaveLength(50);
     expect(all.key0).toBe(0);
     expect(all.key49).toBe(49);
-    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(2 * MB);
+    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(
+      128 * 1024,
+    );
 
     router.stop();
     router.dispose();
@@ -122,7 +126,9 @@ describe("S13: Dependencies store churn", () => {
     expect(Object.keys(all)).toHaveLength(50);
     expect(all.key0).toBe(0);
     expect(all.key49).toBe(49);
-    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(2 * MB);
+    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(
+      128 * 1024,
+    );
 
     router.stop();
     router.dispose();

@@ -42,7 +42,7 @@ describe("S17: Hot path utilities", () => {
     const delta = heapAfter - heapBefore;
 
     expect(trueCount).toBe(10_000);
-    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(2 * MB);
+    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(0.5 * MB);
 
     router.stop();
     router.dispose();

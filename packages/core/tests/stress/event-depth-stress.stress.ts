@@ -96,7 +96,7 @@ describe("S7: EventEmitter recursion and depth", () => {
     const after = takeHeapSnapshot();
     const delta = after - before;
 
-    expect(delta, `heap delta: ${formatBytes(delta)}`).toBeLessThan(10 * MB);
+    expect(delta, `heap delta: ${formatBytes(delta)}`).toBeLessThan(2 * MB);
 
     router.stop();
     router.dispose();

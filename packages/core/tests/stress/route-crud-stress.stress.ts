@@ -4,6 +4,7 @@ import { getPluginApi, getRoutesApi } from "@real-router/core/api";
 
 import {
   createStressRouter,
+  formatBytes,
   measureTime,
   MB,
   takeHeapSnapshot,
@@ -19,7 +20,7 @@ describe("S19: Route CRUD under load", () => {
     router.dispose();
   });
 
-  it("S19.1: 500 cycles add/remove routes during navigation", async () => {
+  it("S19.1: 3000 cycles add/remove routes during navigation", async () => {
     router = createStressRouter(10);
     await router.start("/route0");
 
@@ -27,7 +28,7 @@ describe("S19: Route CRUD under load", () => {
 
     const heapBefore = takeHeapSnapshot();
 
-    for (let i = 0; i < 500; i++) {
+    for (let i = 0; i < 3000; i++) {
       const dynamicName = `dynamic${i}`;
 
       routesApi.add({ name: dynamicName, path: `/dynamic${i}` });
@@ -44,7 +45,7 @@ describe("S19: Route CRUD under load", () => {
 
     expect(router.getState()).toBeDefined();
     expect(routesApi.has("dynamic0")).toBe(false);
-    expect(delta).toBeLessThan(10 * MB);
+    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(2 * MB);
   }, 30_000);
 
   it("S19.2: update() route config during 200 navigations", async () => {
@@ -123,6 +124,6 @@ describe("S19: Route CRUD under load", () => {
     const delta = heapAfter - heapBefore;
 
     expect(elapsed / 1000).toBeLessThan(1);
-    expect(delta).toBeLessThan(20 * MB);
+    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(1 * MB);
   }, 30_000);
 });

@@ -56,7 +56,7 @@ describe("S16: forwardTo chain resolution", () => {
     router.dispose();
 
     expect(callCount).toBeGreaterThan(0);
-    expect(delta, `heap delta: ${formatBytes(delta)}`).toBeLessThan(10 * MB);
+    expect(delta, `heap delta: ${formatBytes(delta)}`).toBeLessThan(1 * MB);
   }, 30_000);
 
   it("S16.3: Chain depth=99 resolves OK, depth=100+ throws (MAX_DEPTH=100 in RoutesNamespace)", async () => {
@@ -153,6 +153,6 @@ describe("S16: forwardTo chain resolution", () => {
     router.stop();
     router.dispose();
 
-    expect(delta, `heap delta: ${formatBytes(delta)}`).toBeLessThan(10 * MB);
+    expect(delta, `heap delta: ${formatBytes(delta)}`).toBeLessThan(0.5 * MB);
   }, 30_000);
 });

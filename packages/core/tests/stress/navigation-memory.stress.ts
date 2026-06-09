@@ -12,6 +12,14 @@ import {
 
 import type { Route } from "@real-router/core";
 
+// These are catastrophic-leak guards: navigation has no test-side cleanup to
+// remove, so the only simulatable leak is "core/app retains one State per
+// navigation" (~335 B/nav, measured). At these iteration counts that signal is
+// the same order as healthy heap noise, so thresholds are tightened to ~5-18x
+// the (rock-stable) healthy delta — catching a moderate per-nav leak without the
+// flakiness/runtime cost of inflating navigation counts to 10k+. The
+// high-volume retention case is covered by event-listener-memory's 250k-
+// invocation test.
 describe("S1. Navigation memory leaks", () => {
   it("should not leak memory during 1,000 simple navigations between 2 routes", async () => {
     const router = createStressRouter(10);
@@ -27,7 +35,7 @@ describe("S1. Navigation memory leaks", () => {
     const after = takeHeapSnapshot();
     const delta = after - before;
 
-    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(5 * MB);
+    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(1 * MB);
 
     router.stop();
     router.dispose();
@@ -47,7 +55,7 @@ describe("S1. Navigation memory leaks", () => {
     const after = takeHeapSnapshot();
     const delta = after - before;
 
-    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(10 * MB);
+    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(1 * MB);
 
     router.stop();
     router.dispose();
@@ -68,7 +76,7 @@ describe("S1. Navigation memory leaks", () => {
     const after = takeHeapSnapshot();
     const delta = after - before;
 
-    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(10 * MB);
+    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(0.5 * MB);
 
     router.stop();
     router.dispose();
@@ -92,7 +100,7 @@ describe("S1. Navigation memory leaks", () => {
     const after = takeHeapSnapshot();
     const delta = after - before;
 
-    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(10 * MB);
+    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(1 * MB);
 
     router.stop();
     router.dispose();
@@ -123,7 +131,7 @@ describe("S1. Navigation memory leaks", () => {
     const after = takeHeapSnapshot();
     const delta = after - before;
 
-    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(10 * MB);
+    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(0.5 * MB);
 
     router.stop();
     router.dispose();

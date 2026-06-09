@@ -247,6 +247,24 @@ Guards registered via `getLifecycleApi(router)` run during the transition pipeli
 | 1   | LEAVE_APPROVED state only | Returns `true` only when the FSM is in `LEAVE_APPROVED` state — the window between deactivation guards passing and activation guards running. |
 | 2   | All other states false    | Returns `false` in `IDLE`, `STARTING`, `READY`, `TRANSITION_STARTED`, and `DISPOSED` states.                                                  |
 
+## subscribeChanges (TREE_CHANGED)
+
+`getRoutesApi(router).subscribeChanges(handler)` is the single entry point for observing **structural** route-tree mutations. It reuses the router's `EventEmitter` through an internal-only `TREE_CHANGED` key (absent from the public `EventName` union / `Plugin` interface / `events.*` registry). The event is **post-commit** and **fire-and-forget**. See `.claude/rfc-tree-mutation-event.md`.
+
+| #   | Invariant                          | Description                                                                                                                                                                                            |
+| --- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | One emit per CRUD call             | Each `add` / `remove` / `replace` / `clear`, and each structural `update`, emits exactly one event. `add([r1, r2, r3])` is one event, not three (atomicity is per call, not per route).                |
+| 2   | Discriminated by `op`              | Payload is a discriminated union keyed by `op` (`"add" \| "remove" \| "update" \| "replace" \| "clear"`). Consumers must `switch (event.op)` exhaustively, not inspect `Object.keys`/array order.       |
+| 3   | Post-commit timing                 | The handler runs after the atomic commit — `has()` / `get()` reflect the post-mutation tree. For `replace`, the event fires after the tree swap but before state revalidation (handler sees old state). |
+| 4   | update is structural-only          | `update` emits only when the patch contains a structural field (`forwardTo` / `defaultParams` / `encodeParams` / `decodeParams`). Guard-only and empty patches are silent (О-7).                        |
+| 5   | Payload immutability               | `update.patch` is a frozen envelope built from a fresh object (caller's patch untouched); payload route arrays are frozen, with each route frozen on construction. Nested config values are by reference. |
+| 6   | Re-entrancy + depth limit          | CRUD called from inside a handler emits a nested event synchronously (depth-first). The existing `EventEmitter.maxEventDepth` (5) bounds runaway recursion, throwing `RecursionDepthError` to the caller. |
+| 7   | Clone isolation                    | A cloned router has an independent emitter — mutations on the parent never reach the clone's subscribers, and vice versa.                                                                               |
+| 8   | Conditional `replace`/`add` diff   | The flat removed/added diff is computed only when there is at least one listener (`listenerCount > 0`); otherwise the mutation is O(1) on the event path.                                               |
+| 9   | Listener error isolation           | A throwing handler is reported via `onListenerError`; other handlers still run and the CRUD caller never sees a re-throw (except the `RecursionDepthError` carve-out from #6).                          |
+| 10  | FIFO + snapshot delivery           | Handlers fire in registration order. A handler registered re-entrantly during emit `E1` is not invoked for `E1` (snapshot iteration); it participates from the next event onward.                       |
+| 11  | dispose silences the channel       | `router.dispose()` releases all `TREE_CHANGED` listeners (step 4 of cleanup) before the internal route teardown — no event is emitted during disposal (the public `clear()` wrapper is bypassed).      |
+
 ## getDependenciesApi (CRUD)
 
 `getDependenciesApi(router)` provides a key-value store for dependency injection. These invariants verify basic store semantics.
@@ -512,3 +530,4 @@ Guards registered via `getLifecycleApi(router)` run during the transition pipeli
 | `tests/property/error/circular-refs.properties.ts`      | 8          | Deep-freeze with circular references          |
 | `tests/property/error/constants.properties.ts`          | 11         | errorCodes object invariants                  |
 | `tests/property/serializeRouterState.properties.ts`     | 7          | SSR transport (XSS-safe JSON, transition strip) |
+| `tests/property/tree-changed.properties.ts`             | 6          | TREE_CHANGED atomicity, op discriminator, replace diff, nested-subtree flatten, update conditional emit |

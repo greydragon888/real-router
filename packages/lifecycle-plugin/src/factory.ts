@@ -1,7 +1,9 @@
-import { getPluginApi } from "@real-router/core/api";
+import { getPluginApi, getRoutesApi } from "@real-router/core/api";
 
 import type { LifecycleHook, LifecycleHookFactory } from "./types";
-import type { PluginFactory, State } from "@real-router/core";
+import type { PluginFactory, State, TreeChangedEvent } from "@real-router/core";
+
+const HOOK_NAMES = ["onEnter", "onStay", "onLeave", "onNavigate"] as const;
 
 function createPlugin(
   ...args: Parameters<PluginFactory>
@@ -12,6 +14,44 @@ function createPlugin(
     string,
     { hook: LifecycleHook; factory: LifecycleHookFactory }
   >();
+
+  // Drop compiled hooks for routes removed from the tree. `compileHook` can
+  // never reach them again (no navigation to a removed route), so the entries
+  // would be dead memory until teardown. `add`/`update` need no handling —
+  // `compileHook` already revalidates lazily via the cached `factory` reference.
+  const forgetRoute = (routeName: string): void => {
+    for (const hookName of HOOK_NAMES) {
+      compiledHooks.delete(`${hookName}:${routeName}`);
+    }
+  };
+
+  const onTreeChanged = (event: TreeChangedEvent): void => {
+    switch (event.op) {
+      case "remove": {
+        for (const route of event.removedSubtree) {
+          forgetRoute(route.name);
+        }
+
+        break;
+      }
+      case "replace": {
+        for (const route of event.removed) {
+          forgetRoute(route.name);
+        }
+
+        break;
+      }
+      case "clear": {
+        compiledHooks.clear();
+
+        break;
+      }
+      // "add" / "update": lazy factory-reference revalidation handles these.
+    }
+  };
+
+  const removeChangesSubscription =
+    getRoutesApi(router).subscribeChanges(onTreeChanged);
 
   function compileHook(
     hookName: "onEnter" | "onStay" | "onLeave" | "onNavigate",
@@ -61,6 +101,10 @@ function createPlugin(
       }
 
       compileHook("onNavigate", toState.name)?.(toState, fromState);
+    },
+
+    teardown: () => {
+      removeChangesSubscription();
     },
   };
 }
