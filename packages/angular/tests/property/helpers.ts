@@ -180,8 +180,8 @@ export const arbMouseEventPropsExtended: fc.Arbitrary<{
       -Infinity,
       // Fractional values inside the "valid range" — strict === 0 still rejects
       0.5,
-      0.000_000_1,
-      -0.000_000_1,
+      0.0000001,
+      -0.0000001,
       // null / undefined — synthetic events from custom dispatch may omit the field
       null,
       undefined,

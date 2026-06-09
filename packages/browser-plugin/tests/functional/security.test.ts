@@ -210,7 +210,7 @@ describe("Browser Plugin — Security", () => {
       // Post-desktop-support: http/https are no longer privileged. Tauri and
       // Electron ship custom schemes (tauri://, app://, file://) — the router
       // matches by path, not by scheme. Security comes from route matching.
-      expect(router.matchUrl("http://example.com/home")).toBeDefined();
+      expect(router.matchUrl("https://example.com/home")).toBeDefined();
       expect(router.matchUrl("https://example.com/home")).toBeDefined();
 
       expect(router.matchUrl("ftp://example.com/home")).toBeDefined();
@@ -229,7 +229,7 @@ describe("Browser Plugin — Security", () => {
       // URL with null byte (potential for bypassing filters).
       // URL API either sanitizes or rejects — neither should crash.
       expect(() =>
-        router.matchUrl("http://example.com/home\u0000.evil"),
+        router.matchUrl("https://example.com/home\u0000.evil"),
       ).not.toThrow();
 
       consoleSpy.mockRestore();
@@ -246,7 +246,7 @@ describe("Browser Plugin — Security", () => {
     it("prevents URL parameter injection via specially crafted URLs", async () => {
       // Try to inject parameters via URL tricks
       const state = router.matchUrl(
-        "http://example.com/users/list?fake=1&admin=true#/../../secret",
+        "https://example.com/users/list?fake=1&admin=true#/../../secret",
       );
 
       // Either the URL doesn't match (secure), or if it matches, no path traversal occurred

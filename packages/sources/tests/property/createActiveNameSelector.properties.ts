@@ -140,7 +140,7 @@ describe("createActiveNameSelector — invariants", () => {
       );
       // Plus they must occupy different top-level subtrees so no navigation
       // can simultaneously activate both (e.g., "users" + "admin").
-      fc.pre(nameA.split(".")[0] !== nameB.split(".")[0]);
+      fc.pre(nameA.split(".", 1)[0] !== nameB.split(".", 1)[0]);
 
       const router = await createStartedRouter();
       const selector = createActiveNameSelector(router);

@@ -662,7 +662,7 @@ describe("parseTokens — contract locks (via buildActiveClassName)", () => {
       { label: "empty string", input: "", expectedBaseTokens: [] },
       {
         label: "whitespace-only (spaces)",
-        input: "   ",
+        input: " ".repeat(3),
         expectedBaseTokens: [],
       },
       {

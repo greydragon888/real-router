@@ -214,7 +214,7 @@ describe("resolveText — Property Tests", () => {
       [
         arbPublicRouteName,
         arbPrefix,
-        fc.constantFrom("   ", "\t\t", "\n", " \t \n  "),
+        fc.constantFrom(" ".repeat(3), "\t\t", "\n", " \t \n  "),
       ],
       { numRuns: NUM_RUNS.standard },
     )(

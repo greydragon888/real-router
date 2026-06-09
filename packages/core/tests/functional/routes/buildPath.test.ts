@@ -335,7 +335,7 @@ describe("core/routes/routePath/buildPath", () => {
       it("should URL-encode whitespace-only string", () => {
         routesApi.add({ name: "user", path: "/user/:id" });
 
-        const path = router.buildPath("user", { id: "   " });
+        const path = router.buildPath("user", { id: " ".repeat(3) });
 
         expect(path).toMatch(/\/user\/%20%20%20|\/user\/\s{3}/);
       });
