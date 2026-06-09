@@ -1,5 +1,52 @@
 # @real-router/core
 
+## 0.56.0
+
+### Minor Changes
+
+- [#717](https://github.com/greydragon888/real-router/pull/717) [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove the dead `add` interceptable wrapper ([#702](https://github.com/greydragon888/real-router/issues/702))
+
+  **Breaking change:** `getRoutesApi(router).add` is no longer wrapped in the
+  interceptor chain — `addInterceptor("add", fn)` has no effect (the `add` key was
+  removed from `InterceptableMethodMap`). The sole consumer migrated to
+  `subscribeChanges`. `add()` now calls the internal `addRoutes` directly, removing
+  the per-call interceptor lookup. No change to `add()`'s public behavior or
+  signature.
+
+- [#717](https://github.com/greydragon888/real-router/pull/717) [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae) Thanks [@greydragon888](https://github.com/greydragon888)! - Emit `TREE_CHANGED` on route-tree mutations via `getRoutesApi().subscribeChanges` ([#702](https://github.com/greydragon888/real-router/issues/702))
+
+  `getRoutesApi(router)` now exposes `subscribeChanges(handler)` — a single,
+  fire-and-forget channel for observing **structural** route-tree mutations. It is
+  emitted post-commit by `add` / `remove` / `replace` / `clear`, and by `update`
+  only when the patch contains a structural field (`forwardTo` / `defaultParams` /
+  `encodeParams` / `decodeParams`); guard-only and empty patches stay silent.
+
+  ```typescript
+  const routes = getRoutesApi(router);
+  const unsubscribe = routes.subscribeChanges((event) => {
+    switch (event.op) {
+      case "add":
+        event.added.forEach(register);
+        break;
+      case "remove":
+        event.removedSubtree.forEach((r) => cache.delete(r.name));
+        break;
+      // update / replace / clear ...
+    }
+  });
+  ```
+
+  The channel reuses the router's existing `EventEmitter`, so recursion-depth
+  protection (`maxEventDepth`) and per-listener error isolation apply
+  automatically. `RecursionDepthError` (from `@real-router/event-emitter`) is now
+  re-exported from `@real-router/core` so callers can `instanceof`-check the one
+  error that escapes a `subscribeChanges` handler.
+
+### Patch Changes
+
+- Updated dependencies [[`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae)]:
+  - @real-router/types@0.36.0
+
 ## 0.55.0
 
 ### Minor Changes

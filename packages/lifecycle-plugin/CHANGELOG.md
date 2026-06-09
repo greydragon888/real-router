@@ -1,5 +1,24 @@
 # @real-router/lifecycle-plugin
 
+## 0.5.0
+
+### Minor Changes
+
+- [#717](https://github.com/greydragon888/real-router/pull/717) [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae) Thanks [@greydragon888](https://github.com/greydragon888)! - Evict compiled hooks for removed routes via TREE_CHANGED ([#702](https://github.com/greydragon888/real-router/issues/702))
+
+  The plugin now subscribes to `getRoutesApi(router).subscribeChanges()` and drops
+  cached `hookName:routeName` entries for routes removed via `remove`/`replace`
+  (and clears the cache on `clear`). Previously those entries were unreachable dead
+  memory until teardown. `add`/`update` still rely on lazy factory-reference
+  revalidation; hook dispatch behavior is unchanged. A `teardown` was added to
+  remove the subscription on unsubscribe.
+
+### Patch Changes
+
+- Updated dependencies [[`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae)]:
+  - @real-router/core@0.56.0
+  - @real-router/types@0.36.0
+
 ## 0.4.7
 
 ### Patch Changes

@@ -1,5 +1,24 @@
 # @real-router/search-schema-plugin
 
+## 0.3.0
+
+### Minor Changes
+
+- [#717](https://github.com/greydragon888/real-router/pull/717) [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae) Thanks [@greydragon888](https://github.com/greydragon888)! - Migrate dev-time defaultParams validation from the `add` interceptor to `TREE_CHANGED` ([#702](https://github.com/greydragon888/real-router/issues/702))
+
+  The plugin now observes route-tree mutations through
+  `getRoutesApi(router).subscribeChanges()` instead of the `add` interceptor. This
+  closes a verified gap: dynamically changing a route's `defaultParams` via
+  `update()`, or swapping the route set via `replace()`, now re-runs the dev-time
+  `searchSchema` check. `add` (including parented adds and children) keeps working;
+  `remove`/`clear` are no-ops. Production mode registers no subscription. The
+  runtime `forwardState` validation path is unchanged.
+
+### Patch Changes
+
+- Updated dependencies [[`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae)]:
+  - @real-router/core@0.56.0
+
 ## 0.2.9
 
 ### Patch Changes

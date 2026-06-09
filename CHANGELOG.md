@@ -5,6 +5,285 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-06-09]
+
+### @real-router/core@0.56.0
+
+### Minor Changes
+
+- [#717](https://github.com/greydragon888/real-router/pull/717) [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove the dead `add` interceptable wrapper ([#702](https://github.com/greydragon888/real-router/issues/702))
+
+  **Breaking change:** `getRoutesApi(router).add` is no longer wrapped in the
+  interceptor chain — `addInterceptor("add", fn)` has no effect (the `add` key was
+  removed from `InterceptableMethodMap`). The sole consumer migrated to
+  `subscribeChanges`. `add()` now calls the internal `addRoutes` directly, removing
+  the per-call interceptor lookup. No change to `add()`'s public behavior or
+  signature.
+
+- [#717](https://github.com/greydragon888/real-router/pull/717) [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae) Thanks [@greydragon888](https://github.com/greydragon888)! - Emit `TREE_CHANGED` on route-tree mutations via `getRoutesApi().subscribeChanges` ([#702](https://github.com/greydragon888/real-router/issues/702))
+
+  `getRoutesApi(router)` now exposes `subscribeChanges(handler)` — a single,
+  fire-and-forget channel for observing **structural** route-tree mutations. It is
+  emitted post-commit by `add` / `remove` / `replace` / `clear`, and by `update`
+  only when the patch contains a structural field (`forwardTo` / `defaultParams` /
+  `encodeParams` / `decodeParams`); guard-only and empty patches stay silent.
+
+  ```typescript
+  const routes = getRoutesApi(router);
+  const unsubscribe = routes.subscribeChanges((event) => {
+    switch (event.op) {
+      case "add":
+        event.added.forEach(register);
+        break;
+      case "remove":
+        event.removedSubtree.forEach((r) => cache.delete(r.name));
+        break;
+      // update / replace / clear ...
+    }
+  });
+  ```
+
+  The channel reuses the router's existing `EventEmitter`, so recursion-depth
+  protection (`maxEventDepth`) and per-listener error isolation apply
+  automatically. `RecursionDepthError` (from `@real-router/event-emitter`) is now
+  re-exported from `@real-router/core` so callers can `instanceof`-check the one
+  error that escapes a `subscribeChanges` handler.
+
+### Patch Changes
+
+- Updated dependencies [[`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae)]:
+  - @real-router/types@0.36.0
+
+### @real-router/types@0.36.0
+
+### Minor Changes
+
+- [#717](https://github.com/greydragon888/real-router/pull/717) [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `add` from `InterceptableMethodMap` ([#702](https://github.com/greydragon888/real-router/issues/702))
+
+  **Breaking change:** `addInterceptor("add", fn)` is no longer available. The only
+  consumer (`@real-router/search-schema-plugin`) migrated to the `TREE_CHANGED`
+  subscription (`getRoutesApi(router).subscribeChanges`), which also covers
+  `update`/`remove`/`replace`/`clear`. Use `subscribeChanges` to react to dynamic
+  route additions instead.
+
+- [#717](https://github.com/greydragon888/real-router/pull/717) [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `TreeChangedEvent` payload types + `RoutesApi.subscribeChanges` ([#702](https://github.com/greydragon888/real-router/issues/702))
+
+  New discriminated-union types describing structural route-tree mutations —
+  `TreeChangedEvent` (`add` / `remove` / `update` / `replace` / `clear`),
+  `TreeStructuralPatch`, and the per-op variants — plus a new
+  `subscribeChanges(handler)` method on the `RoutesApi` interface for observing
+  them. The `TREE_CHANGED` channel is intentionally internal-only: it is not added
+  to the public `EventName` union or `Plugin` interface.
+
+### @real-router/lifecycle-plugin@0.5.0
+
+### Minor Changes
+
+- [#717](https://github.com/greydragon888/real-router/pull/717) [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae) Thanks [@greydragon888](https://github.com/greydragon888)! - Evict compiled hooks for removed routes via TREE_CHANGED ([#702](https://github.com/greydragon888/real-router/issues/702))
+
+  The plugin now subscribes to `getRoutesApi(router).subscribeChanges()` and drops
+  cached `hookName:routeName` entries for routes removed via `remove`/`replace`
+  (and clears the cache on `clear`). Previously those entries were unreachable dead
+  memory until teardown. `add`/`update` still rely on lazy factory-reference
+  revalidation; hook dispatch behavior is unchanged. A `teardown` was added to
+  remove the subscription on unsubscribe.
+
+### Patch Changes
+
+- Updated dependencies [[`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae)]:
+  - @real-router/core@0.56.0
+  - @real-router/types@0.36.0
+
+### @real-router/preload-plugin@0.5.0
+
+### Minor Changes
+
+- [#717](https://github.com/greydragon888/real-router/pull/717) [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae) Thanks [@greydragon888](https://github.com/greydragon888)! - Invalidate preload caches on route-tree mutations via TREE_CHANGED ([#702](https://github.com/greydragon888/real-router/issues/702))
+
+  The plugin now subscribes to `getRoutesApi(router).subscribeChanges()` and, on
+  `remove`/`replace`/`clear`:
+  - **Fixes a stale pre-resolved `State` bug**: the href-keyed snapshot cache
+    (consumed via `router.getPreloadedState(href)`) is now cleared on structural
+    mutations. Previously a `<FastLink>` could read a cached `State` for a route
+    that had since been removed/changed and commit it via `navigateToState`,
+    navigating to a route no longer in the tree.
+  - Drops `#compiledPreloads` entries for removed routes (previously unreachable
+    dead memory until teardown — `matchUrl` never resolves a removed route).
+
+  `add`/`update` still rely on lazy factory-reference revalidation; runtime preload
+  behavior on a stable tree is unchanged. The subscription is removed in `teardown`.
+
+### Patch Changes
+
+- Updated dependencies [[`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae)]:
+  - @real-router/core@0.56.0
+  - @real-router/types@0.36.0
+
+### @real-router/search-schema-plugin@0.3.0
+
+### Minor Changes
+
+- [#717](https://github.com/greydragon888/real-router/pull/717) [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae) Thanks [@greydragon888](https://github.com/greydragon888)! - Migrate dev-time defaultParams validation from the `add` interceptor to `TREE_CHANGED` ([#702](https://github.com/greydragon888/real-router/issues/702))
+
+  The plugin now observes route-tree mutations through
+  `getRoutesApi(router).subscribeChanges()` instead of the `add` interceptor. This
+  closes a verified gap: dynamically changing a route's `defaultParams` via
+  `update()`, or swapping the route set via `replace()`, now re-runs the dev-time
+  `searchSchema` check. `add` (including parented adds and children) keeps working;
+  `remove`/`clear` are no-ops. Production mode registers no subscription. The
+  runtime `forwardState` validation path is unchanged.
+
+### Patch Changes
+
+- Updated dependencies [[`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae)]:
+  - @real-router/core@0.56.0
+
+### @real-router/angular@0.11.2
+
+### Patch Changes
+
+- Updated dependencies [[`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae)]:
+  - @real-router/core@0.56.0
+  - @real-router/sources@0.8.5
+  - @real-router/route-utils@0.2.3
+
+### @real-router/browser-plugin@0.17.6
+
+### Patch Changes
+
+- Updated dependencies [[`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae)]:
+  - @real-router/core@0.56.0
+  - @real-router/types@0.36.0
+
+### @real-router/hash-plugin@0.7.5
+
+### Patch Changes
+
+- Updated dependencies [[`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae)]:
+  - @real-router/core@0.56.0
+  - @real-router/types@0.36.0
+
+### @real-router/logger-plugin@0.5.9
+
+### Patch Changes
+
+- Updated dependencies [[`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae)]:
+  - @real-router/core@0.56.0
+
+### @real-router/memory-plugin@0.4.5
+
+### Patch Changes
+
+- Updated dependencies [[`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae)]:
+  - @real-router/core@0.56.0
+  - @real-router/types@0.36.0
+
+### @real-router/navigation-plugin@0.7.7
+
+### Patch Changes
+
+- Updated dependencies [[`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae)]:
+  - @real-router/core@0.56.0
+  - @real-router/types@0.36.0
+
+### @real-router/persistent-params-plugin@0.2.9
+
+### Patch Changes
+
+- Updated dependencies [[`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae)]:
+  - @real-router/core@0.56.0
+  - @real-router/types@0.36.0
+
+### @real-router/preact@0.15.2
+
+### Patch Changes
+
+- Updated dependencies [[`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae)]:
+  - @real-router/core@0.56.0
+  - @real-router/sources@0.8.5
+  - @real-router/route-utils@0.2.3
+
+### @real-router/react@0.27.2
+
+### Patch Changes
+
+- Updated dependencies [[`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae)]:
+  - @real-router/core@0.56.0
+  - @real-router/sources@0.8.5
+  - @real-router/route-utils@0.2.3
+
+### @real-router/route-utils@0.2.3
+
+### Patch Changes
+
+- Updated dependencies [[`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae)]:
+  - @real-router/types@0.36.0
+
+### @real-router/rsc-server-plugin@0.2.3
+
+### Patch Changes
+
+- Updated dependencies [[`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae)]:
+  - @real-router/core@0.56.0
+  - @real-router/types@0.36.0
+
+### @real-router/rx@0.3.9
+
+### Patch Changes
+
+- Updated dependencies [[`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae)]:
+  - @real-router/core@0.56.0
+
+### @real-router/solid@0.14.2
+
+### Patch Changes
+
+- Updated dependencies [[`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae)]:
+  - @real-router/core@0.56.0
+  - @real-router/sources@0.8.5
+  - @real-router/route-utils@0.2.3
+
+### @real-router/sources@0.8.5
+
+### Patch Changes
+
+- Updated dependencies [[`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae)]:
+  - @real-router/core@0.56.0
+  - @real-router/route-utils@0.2.3
+
+### @real-router/ssr-data-plugin@0.4.3
+
+### Patch Changes
+
+- Updated dependencies [[`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae)]:
+  - @real-router/core@0.56.0
+  - @real-router/types@0.36.0
+
+### @real-router/svelte@0.13.2
+
+### Patch Changes
+
+- Updated dependencies [[`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae)]:
+  - @real-router/core@0.56.0
+  - @real-router/sources@0.8.5
+  - @real-router/route-utils@0.2.3
+
+### @real-router/validation-plugin@0.7.5
+
+### Patch Changes
+
+- Updated dependencies [[`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae)]:
+  - @real-router/core@0.56.0
+
+### @real-router/vue@0.15.2
+
+### Patch Changes
+
+- Updated dependencies [[`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae)]:
+  - @real-router/core@0.56.0
+  - @real-router/sources@0.8.5
+  - @real-router/route-utils@0.2.3
+
 ## [2026-06-04]
 
 ### @real-router/core@0.55.0
