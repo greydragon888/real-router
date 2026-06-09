@@ -1,5 +1,26 @@
 # @real-router/types
 
+## 0.36.0
+
+### Minor Changes
+
+- [#717](https://github.com/greydragon888/real-router/pull/717) [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `add` from `InterceptableMethodMap` ([#702](https://github.com/greydragon888/real-router/issues/702))
+
+  **Breaking change:** `addInterceptor("add", fn)` is no longer available. The only
+  consumer (`@real-router/search-schema-plugin`) migrated to the `TREE_CHANGED`
+  subscription (`getRoutesApi(router).subscribeChanges`), which also covers
+  `update`/`remove`/`replace`/`clear`. Use `subscribeChanges` to react to dynamic
+  route additions instead.
+
+- [#717](https://github.com/greydragon888/real-router/pull/717) [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `TreeChangedEvent` payload types + `RoutesApi.subscribeChanges` ([#702](https://github.com/greydragon888/real-router/issues/702))
+
+  New discriminated-union types describing structural route-tree mutations —
+  `TreeChangedEvent` (`add` / `remove` / `update` / `replace` / `clear`),
+  `TreeStructuralPatch`, and the per-op variants — plus a new
+  `subscribeChanges(handler)` method on the `RoutesApi` interface for observing
+  them. The `TREE_CHANGED` channel is intentionally internal-only: it is not added
+  to the public `EventName` union or `Plugin` interface.
+
 ## 0.35.0
 
 ### Minor Changes

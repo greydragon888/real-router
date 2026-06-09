@@ -1,5 +1,30 @@
 # @real-router/preload-plugin
 
+## 0.5.0
+
+### Minor Changes
+
+- [#717](https://github.com/greydragon888/real-router/pull/717) [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae) Thanks [@greydragon888](https://github.com/greydragon888)! - Invalidate preload caches on route-tree mutations via TREE_CHANGED ([#702](https://github.com/greydragon888/real-router/issues/702))
+
+  The plugin now subscribes to `getRoutesApi(router).subscribeChanges()` and, on
+  `remove`/`replace`/`clear`:
+  - **Fixes a stale pre-resolved `State` bug**: the href-keyed snapshot cache
+    (consumed via `router.getPreloadedState(href)`) is now cleared on structural
+    mutations. Previously a `<FastLink>` could read a cached `State` for a route
+    that had since been removed/changed and commit it via `navigateToState`,
+    navigating to a route no longer in the tree.
+  - Drops `#compiledPreloads` entries for removed routes (previously unreachable
+    dead memory until teardown — `matchUrl` never resolves a removed route).
+
+  `add`/`update` still rely on lazy factory-reference revalidation; runtime preload
+  behavior on a stable tree is unchanged. The subscription is removed in `teardown`.
+
+### Patch Changes
+
+- Updated dependencies [[`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae), [`2cf5293`](https://github.com/greydragon888/real-router/commit/2cf529322894f48f96152e767bf303806397cfae)]:
+  - @real-router/core@0.56.0
+  - @real-router/types@0.36.0
+
 ## 0.4.4
 
 ### Patch Changes
