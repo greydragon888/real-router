@@ -250,6 +250,16 @@ Enforces conventional commits. Types and scopes defined in `commitlint.config.mj
 
 The full build orchestrator (`pnpm turbo run build`) is wired in `turbo.json` to depend on `bundle`, `test`, `test:properties`, AND `test:stress` — so pre-push exercises stress tests for every human push. Stress coverage is intentionally **not** duplicated in CI workflows (see "CI: `test:stress` lives only in pre-push" below).
 
+### jscpd 5.x renamed the config `ignore` key to `ignorePattern` (#714)
+
+**Problem:** `pnpm lint:duplicates` (the pre-push copy-paste gate) started failing at **6.9%** over the 2% threshold, flagging clones that `.jscpd.json` was supposed to exclude — `packages/preact/src/**` (the deliberate React↔Preact parallel structure), `packages/*/src/dom-utils/**` (the Angular git-tracked copy vs the `dom-utils` package), `packages/hash-plugin/src/**`, the `*.react-server.ts` shims, etc. The `ignore` array in `.jscpd.json` listed every one of them, yet they all still counted.
+
+**Root cause:** jscpd was bumped to **5.x**, a ground-up **Rust rewrite** (`cpd`). It still reads `threshold`, `minLines`, `minTokens`, and `format` from `.jscpd.json` under their old names (verified by toggling each against 5.0.4) — but the exclusion list key was **renamed `ignore` → `ignorePattern`** (matching the new CLI flag `--ignore-pattern`). The old `ignore` array is silently not read, so every exclusion evaporated with no error: the threshold kept being applied (hence the failure cited 2.0%), only the filter went missing. The duplication had not grown; the key name had changed underneath the config.
+
+**Solution:** Rename the key in `.jscpd.json` from `ignore` to `ignorePattern` — the exclusions stay in the config (single source of truth), and `lint:duplicates` remains the plain `jscpd packages/*/src/`. Verified empirically against jscpd 5.0.4: a config with `ignorePattern` excludes the listed globs (1.0%, gate green); the same list under `ignore` does not. The schemastore `$schema` (old config shape) is dropped, and an inline `_comment` records the rename. (An earlier fix moved the list to the `-i` CLI flag in the script — that also works, but splitting the exclusions out of the config was unnecessary; the key rename is the minimal correct fix.)
+
+**Why not refactor the flagged code:** the largest "clones" are intentional — the Angular `dom-utils` copy is a build-time materialization of `shared/dom-utils/` (ng-packagr can't follow the symlink), and the React/Preact components are deliberately independent per-framework twins. The duplication is by design; the filter is what regressed.
+
 ## Commit Conventions
 
 ### Scope Sync
@@ -370,6 +380,16 @@ Post-removal numbers:
 **Why this is safe enough.** Pre-push covers stress for every human push. Dependabot PRs bypass pre-push (the bot pushes directly to its fork), so framework-adapter bumps (React/Vue/Solid/Svelte) lose their stress safety net here — a deliberate trade-off, on the bet that adapter bumps are rare and locally re-runnable when a leak is suspected.
 
 **How to undo.** Re-add `test:stress` to either `ci.yml`'s "Test with coverage" step or to `post-merge.yml`'s explicit task list, and the orchestration kicks back in. Both workflows carry inline comments pointing at this rationale so the trade-off is rediscoverable.
+
+### CI: artifact-gated downstream jobs (config-only PRs don't fail Coverage/Sonar/Bundle Size)
+
+**Problem.** A PR that changes only **root config/docs that aren't packages** (e.g. the `lint:duplicates` script in `package.json`, `.jscpd.json`) failed four checks — Bundle Size, Coverage (Codecov), SonarCloud, and the **CI Result** gate — with `Unable to download artifact(s): Artifact not found for name: dist / coverage-reports`.
+
+Two heuristics disagreed. The `check` job's "is this a code change?" filter only excludes `.github/**` and `*.md`, so a `package.json`/`.jscpd.json` edit sets `should_run=true`. But `pipeline`'s test/bundle steps use turbo's affected filter `--filter='...[origin/master]'`, which selects **zero** packages for a root-config change — so nothing is built or tested, and `packages/*/dist/` + `packages/*/coverage/` never exist. The upload steps produced no artifact, and the downstream consumers (`coverage`, `sonarcloud`, `bundle-size`) hard-failed on the missing download. `sonarcloud` is in the `ci` gate's `needs`, so its failure failed the single required **CI Result** check and blocked the PR.
+
+**Solution.** `pipeline` now emits a `built` output, set by a "Detect produced artifacts" step (`id: artifacts`) that checks whether any `packages/*/dist` or `packages/*/coverage` dir exists post-bundle. The two upload steps gate on the step-local `steps.artifacts.outputs.built == 'true'`; the three downstream artifact-consuming jobs (`coverage`, `sonarcloud`, `bundle-size`) gate on the job output `needs.pipeline.outputs.built == 'true'`. On a zero-affected PR they **skip** instead of failing; the `ci` gate already treats `skipped` as a pass (`ok() { [[ "$1" == "success" || "$1" == "skipped" ]]; }`), so CI Result goes green. A real source change still produces `dist/coverage` → `built=true` → the jobs run normally, including their fill-in-from-cache logic for non-affected packages.
+
+**Why not widen the `check` filter instead.** Excluding `package.json` from the `should_run` heuristic is unsafe — a root `package.json` dependency/override bump genuinely affects every package's build and must run full CI. Gating on *artifacts actually produced* is the precise signal; it can't false-negative a real source change.
 
 ### pnpm/action-setup v6
 
