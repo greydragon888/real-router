@@ -199,6 +199,11 @@ jobs:
           for lcov in $(find packages -path '*/coverage/lcov.info' 2>/dev/null); do
             pkg_dir=$(echo "$lcov" | sed 's|/coverage/lcov.info||')
             sed -i "s|^SF:|SF:${pkg_dir}/|" "$lcov"
+            # Shared-source owners (#809) emit SF:../../shared/<dir>/x.ts — the
+            # prefix above turns those into packages/<owner>/../../shared/…;
+            # collapse the parent-dir hops to repo-root-relative shared/<dir>/x.ts
+            # so Codecov components and Sonar score them at their real location.
+            sed -i -E 's|^SF:packages/[^/]+/\.\./\.\./|SF:|' "$lcov"
           done
 
       - name: Upload coverage artifacts

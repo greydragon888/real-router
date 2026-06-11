@@ -82,9 +82,12 @@ component_management:
     - component_id: angular
       paths:
         - packages/angular/src/**
+    # browser-env / dom-utils are shared-source owners (#809): their src is a
+    # symlink, so their coverage lands at the shared/<dir> realpath (CI
+    # normalizes the lcov SF paths to repo-root-relative shared/<dir>/…).
     - component_id: browser-env
       paths:
-        - packages/browser-env/src/**
+        - shared/browser-env/**
     - component_id: browser-plugin
       paths:
         - packages/browser-plugin/src/**
@@ -93,7 +96,7 @@ component_management:
         - packages/core/src/**
     - component_id: dom-utils
       paths:
-        - packages/dom-utils/src/**
+        - shared/dom-utils/**
     - component_id: event-emitter
       paths:
         - packages/event-emitter/src/**
@@ -157,9 +160,12 @@ component_management:
     - component_id: sources
       paths:
         - packages/sources/src/**
+    # ssr-data-plugin is also the coverage owner of shared/ssr (#809) — no
+    # dedicated owner package exists, so the shared sources ride its component.
     - component_id: ssr-data-plugin
       paths:
         - packages/ssr-data-plugin/src/**
+        - shared/ssr/**
     - component_id: svelte
       paths:
         - packages/svelte/src/**

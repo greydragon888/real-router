@@ -14,14 +14,17 @@
  *      would be inert.)
  *   2. `sonar-project.properties` `sonar.coverage.exclusions` — must exclude
  *      exactly the packages whose `src/` legitimately lacks a clean lcov
- *      (no-tests → no lcov at all; phantom code → lowered vitest thresholds),
- *      plus `shared/**` (analysed at its real location, but NO lcov record for
- *      that code exists anywhere: v8 coverage resolves symlinked files to their
- *      shared/ realpath, which the root include filter `packages/<pkg>/src`
- *      drops — the owning packages emit empty lcov, consumers' lcov omit the
- *      symlinked files; only the angular dom-utils real copy is measured).
+ *      (no-tests → no lcov at all; phantom code → lowered vitest thresholds).
  *      Both directions are asserted — a missing entry AND a stale entry fail,
  *      so a package that becomes healthy can't stay silently excluded forever.
+ *      `shared/**` must NOT be excluded (#809): each shared dir is measured at
+ *      100% by an owner package (coverage.allowExternal + a shared/<dir>
+ *      include in the owner's vitest.config.mts), and the CI "Fix coverage
+ *      paths" step normalizes the owner lcov SF paths to repo-root-relative
+ *      shared/<dir>/… — so Sonar scores shared sources from real lcov.
+ *   2b. Every shared/<dir> must have a measuring owner vitest config AND a
+ *      codecov.yml component path `shared/<dir>/**` — a new shared dir cannot
+ *      silently reopen the pre-#809 blind spot.
  *   3. Every tests-having package has its own `vitest.config.mts` — phantom
  *      detection reads only that file, so its absence must be loud, not a
  *      silent fail-open.
@@ -154,11 +157,44 @@ for (const entry of exclusions) {
     );
   }
 }
-// shared/* is in sonar.sources but its lcov records live under packages/* paths.
-if (sharedDirs.length > 0 && !exclusions.has("shared/**")) {
-  errors.push(
-    `sonar-project.properties: "shared/**" missing from sonar.coverage.exclusions — shared sources are in sonar.sources but have no lcov records under shared/ paths`,
+// --- Check 2b: shared/* must be measured, not excluded (#809) ----------------
+// Each shared dir is owner-measured (allowExternal + shared/<dir> include in
+// some package's vitest.config.mts) and its lcov is normalized to shared/<dir>
+// paths in CI — so a sonar coverage-exclusion would silently un-score it, and
+// a shared dir without an owner or codecov routing reopens the blind spot.
+for (const entry of exclusions) {
+  if (entry === "shared/**" || entry.startsWith("shared/")) {
+    errors.push(
+      `sonar-project.properties: stale coverage exclusion "${entry}" — shared sources are owner-measured at 100% (#809), remove the exclusion so Sonar scores them`,
+    );
+  }
+}
+
+const ownerConfigs = packages
+  .filter((p) => existsSync(join(PKG_DIR, p, "vitest.config.mts")))
+  .map((p) => ({
+    pkg: p,
+    text: readFileSync(join(PKG_DIR, p, "vitest.config.mts"), "utf8"),
+  }));
+
+for (const dir of sharedDirs) {
+  // Match the include GLOB (`**/shared/<dir>/`), not a bare `shared/<dir>`
+  // substring — config comments mention sibling shared dirs in prose and a
+  // loose match would let a deleted include pass on a comment alone.
+  const owner = ownerConfigs.find(
+    (c) =>
+      c.text.includes("allowExternal") && c.text.includes(`**/shared/${dir}/`),
   );
+  if (!owner) {
+    errors.push(
+      `shared/${dir}: no measuring owner — no packages/*/vitest.config.mts sets coverage.allowExternal with a "**/shared/${dir}/**" include (see #809; without an owner this dir is measured nowhere)`,
+    );
+  }
+  if (!codecov.includes(`shared/${dir}/**`)) {
+    errors.push(
+      `codecov.yml: no component path "shared/${dir}/**" — the owner's lcov lands at shared/${dir}/… after CI path normalization and would not be attributed to any component`,
+    );
+  }
 }
 
 // --- Check 3: phantom detection must be able to see every package -----------

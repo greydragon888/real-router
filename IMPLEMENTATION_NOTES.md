@@ -474,12 +474,14 @@ and `sonarcloud` jobs run it on the runner's system node without `pnpm install`.
   sonar-scanner, which does not index files under symlinked directories — so the `src` symlinks of
   `browser-env`/`dom-utils` and the symlinked copies inside consumers like
   `packages/react/src/dom-utils` are invisible to Sonar) **plus `shared/*`**: the shared code is
-  analysed at its real location, coverage-excluded via `shared/**` because **no lcov record for that
-  code exists anywhere**: v8 coverage resolves symlinked files to their `shared/` realpath, which the
-  root vitest include filter (`packages/*/src/**`) drops — `browser-env`/`dom-utils` emit *empty*
-  lcov (their 100% thresholds pass vacuously over zero files) and consumers' lcov omit the symlinked
-  files (verified: zero `browser-env`/`dom-utils`/`shared` SF records across all 31 lcov, except the
-  angular copy below). `packages/angular/src/dom-utils` — the git-tracked **copy** of
+  analysed at its real location. It was *initially* coverage-excluded via `shared/**` because **no
+  lcov record for that code existed anywhere**: v8 coverage resolves symlinked files to their
+  `shared/` realpath, which the root vitest include filter (`packages/*/src/**`) drops —
+  `browser-env`/`dom-utils` emitted *empty* lcov (their 100% thresholds passed vacuously over zero
+  files) and consumers' lcov omit the symlinked files (verified: zero
+  `browser-env`/`dom-utils`/`shared` SF records across all 31 lcov, except the angular copy below).
+  **Superseded by #809** (next section): the shared dirs are now owner-measured at 100% and the
+  `shared/**` coverage-exclusion is removed. `packages/angular/src/dom-utils` — the git-tracked **copy** of
   `shared/dom-utils` (prebundle re-materializes it; ng-packagr can't follow symlinks) — is excluded
   from analysis entirely (`sonar.exclusions`) so the same code isn't analysed and CPD-matched twice.
 - The stale static `sonar.sources`/`sonar.tests`/`reportPaths` lines were **deleted** from
@@ -512,12 +514,13 @@ upload loop needed.
 **Drift guard.** The same script in check mode (`pnpm lint:coverage-scope` in `.husky/pre-commit` —
 before the expensive test pipeline — and the `pipeline` job) asserts (1) every package with a
 `tests/` dir has a `codecov.yml` component, (2) every no-tests **or** phantom (lowered-threshold)
-package is in `sonar.coverage.exclusions`, plus `shared/**`, and (3) every tests-having package has
+package is in `sonar.coverage.exclusions`, and (3) every tests-having package has
 its own `vitest.config.mts` — phantom detection reads only that file, so its absence must fail loud
 rather than silently fail open. Checks 1–2 are **bidirectional**: a stale component and a stale
 exclusion (package became healthy → Sonar would silently keep ignoring its coverage) fail too. The
 generated CI lists can't drift by construction; the guard covers the two remaining static surfaces —
-a new adapter/plugin fails the guard until wired in.
+a new adapter/plugin fails the guard until wired in. (The original "shared/** must be
+coverage-excluded" assertion was **inverted** by #809 — see check 2b in the next section.)
 
 **Residual.** Codecov's `patch` (new-code 100%) status may now red on a PR touching adapter phantom
 code. Codecov is **not** part of the in-repo `CI Result` gate, so it can't block CI directly; if a
@@ -531,6 +534,65 @@ the owner packages' 100% thresholds are vacuous and the Codecov `browser-env`/`d
 will stay empty; the only measured copy is `packages/angular/src/dom-utils` at lowered thresholds.
 Tracked in #809 (widen the owner packages' coverage include to the realpath'd `shared/**` files —
 and then revisit this section's `shared/**` Sonar exclusion + the guard's check for it).
+**Resolved by #809** — see the next section.
+
+### Shared sources are owner-measured at 100% (#809)
+
+**Problem.** The #732 residual above: `shared/{browser-env,dom-utils,ssr}` code shipped in every
+consumer bundle but was **measured nowhere** — v8 resolves a symlinked `src` to its `shared/`
+realpath, which the base vitest `coverage.include` (`packages/*/src/**`) drops and
+`coverage.allowExternal: false` (the default) excludes. The owner packages (`browser-env`,
+`dom-utils`) emitted 0-byte lcov and their 100% thresholds passed **vacuously over zero files**.
+
+**Solution — owner-only measurement, NOT aggregate-union.** vitest's glob-pattern thresholds don't
+*exclude* files from the global threshold ("Vitest counts all files … into the global coverage
+thresholds"), so a consumer can't include shared code in its lcov without it gating the consumer's
+own 100%. Instead, each shared dir gets exactly one **measuring owner** whose vitest config sets
+`coverage.allowExternal = true` and **replaces** (not concatenates — keeping the base
+`packages/*/src/**` alongside `allowExternal` drags the whole aliased workspace graph into the
+report) `coverage.include` with the shared glob:
+
+| Shared dir           | Measuring owner                       | Include                                                          |
+| -------------------- | ------------------------------------- | ---------------------------------------------------------------- |
+| `shared/browser-env` | `packages/browser-env` (owner pkg)    | `["**/shared/browser-env/**/*.ts"]`                              |
+| `shared/dom-utils`   | `packages/dom-utils` (owner pkg)      | `["**/shared/dom-utils/**/*.ts"]`                                |
+| `shared/ssr`         | `packages/ssr-data-plugin` (consumer) | `["**/packages/ssr-data-plugin/src/**/*.ts", "**/shared/ssr/**/*.ts"]` |
+
+`shared/ssr` has no dedicated owner package (both consumers carry their own `src`), so the
+measurement rides on `ssr-data-plugin` with a dual include — the *specific* own-src path doesn't
+leak the workspace graph the way the bare `src/**` wildcard does. Its tests cover the generic
+`createSsrLoaderPlugin` for both wirings (incl. the rsc-server-plugin shape: no deferred
+namespaces). Audit rule applied throughout (classify before testing): genuinely dead branches were
+**removed** (resolveMode `client-only` reject, parseTokens empty-value guard, withTimeout timer
+guard), defensive-for-impossible-input branches got a justified `/* v8 ignore … -- @preserve */`
+(scroll-spy detection re-entry, deferRegistry `?? c` escape fallback — the `@preserve` is required
+or esbuild strips the hint during transform and v8 never sees it), and everything reachable got a
+real test (dom-utils 100%, browser-env 50→100%, shared/ssr 95.5→100%).
+
+**Gate flips (the #732 wiring assumed the blind spot):**
+
+- **`ci.yml` "Fix coverage paths"** — owner lcovs carry `SF:../../shared/<dir>/x.ts`; after the
+  existing `packages/<owner>/` prefixing they read `packages/<owner>/../../shared/…`. A second sed
+  (`s|^SF:packages/[^/]+/\.\./\.\./|SF:|`) collapses the parent-dir hops to repo-root-relative
+  `shared/<dir>/x.ts` (verified locally on real dom-utils / ssr-data-plugin / core lcov samples —
+  mixed and ordinary lcovs are untouched).
+- **`sonar-project.properties`** — `shared/**` removed from `sonar.coverage.exclusions`; Sonar now
+  scores shared sources from the real lcov at their analysed location.
+- **`codecov.yml`** — `browser-env`/`dom-utils` components repointed from the (always-empty)
+  `packages/<pkg>/src/**` to `shared/<dir>/**`; `shared/ssr/**` added to the `ssr-data-plugin`
+  component.
+- **`scripts/check-coverage-scope.mjs`** — the shared assertion is **inverted** (check 2b): any
+  `shared/…` entry in `sonar.coverage.exclusions` is now an error, every `shared/<dir>` must have a
+  measuring owner (a `packages/*/vitest.config.mts` with `allowExternal` **and** the
+  `**/shared/<dir>/` include glob — the glob form, not a bare substring, because config comments
+  mention sibling shared dirs in prose), and every `shared/<dir>/**` must be routed to a
+  `codecov.yml` component. All three assertions mutation-tested (re-add the exclusion / delete the
+  include / drop the codecov path → each fails the guard).
+
+**Why it's this way.** Owner-measurement keeps the repo invariant "one dir, one gate at 100%"
+without a fake aggregate project; the CI path normalization means Codecov/Sonar see shared code at
+the same path Sonar analyses it (no duplicate-path attribution); and the inverted guard makes the
+blind spot structurally non-reopenable — a future `shared/<dir>` without an owner fails pre-commit.
 
 ### Bundle Size Reporting
 
