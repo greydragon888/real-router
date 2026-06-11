@@ -448,6 +448,90 @@ All CI workflows use `pnpm/action-setup@v6` (`ci.yml`, `changesets.yml`, `danger
 
 **Removed:** `build.yml`, `sonarcloud.yml`, `coverage.yml`, `size.yml`, `release.yml` (consolidated into `ci.yml` and `changesets.yml`)
 
+### Coverage scope is generated, not hardcoded (#732)
+
+**Problem.** The external quality gates' scope lived in three hand-maintained lists that were never
+updated as packages were added: Codecov's `files:` in `ci.yml` (16 stale paths, several *private*),
+`codecov.yml` `flags:` (17), and `sonar-project.properties` `sonar.sources` (11). Result: of 25
+published packages, Codecov saw 16 and Sonar 11 — ~14 public packages (all adapters except React,
+half the plugins) were in **neither**, so their coverage regressions went uncaught by Codecov/Sonar.
+(Coverage was still *enforced* per-package by vitest thresholds in the `pipeline` job — the gap was
+external-gate **visibility**, not enforcement.)
+
+**Solution.** Generate the scope from the filesystem; keep `sonar-project.properties` for stable
+policy only. **One source of truth:** `scripts/check-coverage-scope.mjs` both *guards* the static
+config (check mode, below) and *generates* the CI scope (`--emit` mode prints `sources=`/`tests=`/
+`reports=` lines for `$GITHUB_OUTPUT`) — the same filesystem walk feeds both, so the CI scope and
+the drift guard cannot disagree by construction. The script is `node:fs`-only, so the `coverage`
+and `sonarcloud` jobs run it on the runner's system node without `pnpm install`.
+
+- **Codecov `files:`** — the `Collect coverage reports` step runs the script with `--emit`; the
+  upload references `steps.lcov.outputs.reports` (every existing `packages/*/coverage/lcov.info`).
+  Auto-includes every produced lcov, auto-drops core-types (no tests → no lcov) and partial-run gaps.
+- **Sonar scope** — the `Compute Sonar scope` step emits `sonar.sources`, `sonar.tests`, and
+  `sonar.javascript.lcov.reportPaths`, passed as scanner `-D` args (which override the properties
+  file). Sources are the **real (non-symlink)** `packages/*/src` dirs (`lstat`, mirroring
+  sonar-scanner, which does not index files under symlinked directories — so the `src` symlinks of
+  `browser-env`/`dom-utils` and the symlinked copies inside consumers like
+  `packages/react/src/dom-utils` are invisible to Sonar) **plus `shared/*`**: the shared code is
+  analysed at its real location, coverage-excluded via `shared/**` because **no lcov record for that
+  code exists anywhere**: v8 coverage resolves symlinked files to their `shared/` realpath, which the
+  root vitest include filter (`packages/*/src/**`) drops — `browser-env`/`dom-utils` emit *empty*
+  lcov (their 100% thresholds pass vacuously over zero files) and consumers' lcov omit the symlinked
+  files (verified: zero `browser-env`/`dom-utils`/`shared` SF records across all 31 lcov, except the
+  angular copy below). `packages/angular/src/dom-utils` — the git-tracked **copy** of
+  `shared/dom-utils` (prebundle re-materializes it; ng-packagr can't follow symlinks) — is excluded
+  from analysis entirely (`sonar.exclusions`) so the same code isn't analysed and CPD-matched twice.
+- The stale static `sonar.sources`/`sonar.tests`/`reportPaths` lines were **deleted** from
+  `sonar-project.properties` (a comment forbids re-adding them). In `--emit` mode the script fails
+  loudly if no lcov exists (broken artifact upload/download) instead of handing the scanner/uploader
+  a blank argument.
+
+**Caveat handled — don't let phantom/no-coverage code red the Sonar gate.** Adapters
+(angular/solid/svelte/vue) carry compiler-phantom code via **lowered vitest thresholds**, and
+`core-types` has no tests → no lcov. A file in `sonar.sources` without clean coverage is scored as
+**uncovered** by Sonar, which would red the new-code-coverage gate (a *required* check via
+`sonarcloud` in the `ci` gate). So `sonar.coverage.exclusions` gains
+`packages/{angular,solid,svelte,vue,core-types}/src/**` — those stay in `sources` (bugs/smells
+analysis runs) but Sonar doesn't score their coverage. Their coverage remains enforced by vitest and
+visible in Codecov. Aggregate line coverage across all 31 lcov is **99.34%** (drag ≈ all angular),
+still inside Codecov's project `target:100% threshold:1%` (≥99% floor) — if angular's phantom code
+ever pushes it under 99%, switch `status.project.default.target` to `auto`.
+
+**Components, not flags.** `codecov.yml` previously declared per-package `flags:` (with
+`carryforward: false`). Codecov **flags only exist when uploads are tagged with them** (`flags:`
+on the action / `-F` on the CLI) — our CI does a single *untagged* upload of all lcov files, so no
+per-flag report was ever created: the whole `flags:` section, including any `carryforward` setting,
+was **inert**. (It also means partial affected-only runs were never "zeroed" by
+`carryforward: false` — with untagged uploads, project coverage is simply computed over the files
+present in the report.) The section is replaced with
+`component_management.individual_components` — Components are sliced **server-side from `paths:`**,
+so they give per-package coverage views with the existing single untagged upload, no per-package
+upload loop needed.
+
+**Drift guard.** The same script in check mode (`pnpm lint:coverage-scope` in `.husky/pre-commit` —
+before the expensive test pipeline — and the `pipeline` job) asserts (1) every package with a
+`tests/` dir has a `codecov.yml` component, (2) every no-tests **or** phantom (lowered-threshold)
+package is in `sonar.coverage.exclusions`, plus `shared/**`, and (3) every tests-having package has
+its own `vitest.config.mts` — phantom detection reads only that file, so its absence must fail loud
+rather than silently fail open. Checks 1–2 are **bidirectional**: a stale component and a stale
+exclusion (package became healthy → Sonar would silently keep ignoring its coverage) fail too. The
+generated CI lists can't drift by construction; the guard covers the two remaining static surfaces —
+a new adapter/plugin fails the guard until wired in.
+
+**Residual.** Codecov's `patch` (new-code 100%) status may now red on a PR touching adapter phantom
+code. Codecov is **not** part of the in-repo `CI Result` gate, so it can't block CI directly; if a
+`codecov/patch` status is required in branch protection, relax it for the phantom adapters.
+The "sonar-scanner skips symlinked dirs" premise should be confirmed on the first scan after this
+lands: search SonarCloud for a `shared/` file (e.g. `link-utils.ts`) — it must appear under
+`shared/dom-utils`, and only there.
+Discovered while verifying the above (pre-existing, not introduced here): **coverage of `shared/`
+code is neither measured nor enforced anywhere** — v8 coverage drops realpath'd symlinked files, so
+the owner packages' 100% thresholds are vacuous and the Codecov `browser-env`/`dom-utils` components
+will stay empty; the only measured copy is `packages/angular/src/dom-utils` at lowered thresholds.
+Tracked in #809 (widen the owner packages' coverage include to the realpath'd `shared/**` files —
+and then revisit this section's `shared/**` Sonar exclusion + the guard's check for it).
+
 ### Bundle Size Reporting
 
 Bundle Size job (in `ci.yml`) compares bundle sizes between PR and base branch:

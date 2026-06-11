@@ -21,6 +21,12 @@ fi
 echo "🔗 Checking dependency versions..."
 pnpm lint:deps
 
+# Coverage-scope drift guard — keeps codecov.yml components + Sonar coverage
+# exclusions in sync with the package set (#732). Cheap static check, so it
+# runs before the expensive turbo test pipeline (fail-fast).
+echo "📊 Checking coverage scope..."
+pnpm lint:coverage-scope
+
 # Run type checking, linting, and tests via turbo pipeline
 # (turbo caching makes lint-staged redundant)
 echo "🧪 Running tests (includes type-check and lint via turbo)..."

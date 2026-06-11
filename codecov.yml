@@ -70,76 +70,108 @@ ignore:
   - "**/__mocks__/**" # Mocks
   - "**/__fixtures__/**" # Fixtures
 
-# Flags for organizing coverage by package
-flags:
-  browser-env:
-    paths:
-      - packages/browser-env/src/
-    carryforward: false
-  browser-plugin:
-    paths:
-      - packages/browser-plugin/src/
-    carryforward: false
-  core:
-    paths:
-      - packages/core/src/
-    carryforward: false
-  event-emitter:
-    paths:
-      - packages/event-emitter/src/
-    carryforward: false
-  fsm:
-    paths:
-      - packages/fsm/src/
-    carryforward: false
-  hash-plugin:
-    paths:
-      - packages/hash-plugin/src/
-    carryforward: false
-  logger:
-    paths:
-      - packages/logger/src/
-    carryforward: false
-  logger-plugin:
-    paths:
-      - packages/logger-plugin/src/
-    carryforward: false
-  path-matcher:
-    paths:
-      - packages/path-matcher/src/
-    carryforward: false
-  persistent-params-plugin:
-    paths:
-      - packages/persistent-params-plugin/src/
-    carryforward: false
-  react:
-    paths:
-      - packages/react/src/
-    carryforward: false
-  route-tree:
-    paths:
-      - packages/route-tree/src/
-    carryforward: false
-  route-utils:
-    paths:
-      - packages/route-utils/src/
-    carryforward: false
-  rx:
-    paths:
-      - packages/rx/src/
-    carryforward: false
-  search-params:
-    paths:
-      - packages/search-params/src/
-    carryforward: false
-  sources:
-    paths:
-      - packages/sources/src/
-    carryforward: false
-  type-guards:
-    paths:
-      - packages/type-guards/src/
-    carryforward: false
+# Per-package coverage breakdown — Components, NOT flags (#732).
+# Codecov flags only exist if every upload is tagged with them (`flags:`/-F at
+# upload time); our CI does a single untagged upload of all lcov files, so a
+# `flags:` section here would be inert (no per-flag reports → carryforward has
+# nothing to act on). Components are sliced server-side from `paths:`, so they
+# work with the single untagged upload as-is.
+# Complete + auto-checked by scripts/check-coverage-scope.mjs.
+component_management:
+  individual_components:
+    - component_id: angular
+      paths:
+        - packages/angular/src/**
+    - component_id: browser-env
+      paths:
+        - packages/browser-env/src/**
+    - component_id: browser-plugin
+      paths:
+        - packages/browser-plugin/src/**
+    - component_id: core
+      paths:
+        - packages/core/src/**
+    - component_id: dom-utils
+      paths:
+        - packages/dom-utils/src/**
+    - component_id: event-emitter
+      paths:
+        - packages/event-emitter/src/**
+    - component_id: fsm
+      paths:
+        - packages/fsm/src/**
+    - component_id: hash-plugin
+      paths:
+        - packages/hash-plugin/src/**
+    - component_id: lifecycle-plugin
+      paths:
+        - packages/lifecycle-plugin/src/**
+    - component_id: logger
+      paths:
+        - packages/logger/src/**
+    - component_id: logger-plugin
+      paths:
+        - packages/logger-plugin/src/**
+    - component_id: memory-plugin
+      paths:
+        - packages/memory-plugin/src/**
+    - component_id: navigation-plugin
+      paths:
+        - packages/navigation-plugin/src/**
+    - component_id: path-matcher
+      paths:
+        - packages/path-matcher/src/**
+    - component_id: persistent-params-plugin
+      paths:
+        - packages/persistent-params-plugin/src/**
+    - component_id: preact
+      paths:
+        - packages/preact/src/**
+    - component_id: preload-plugin
+      paths:
+        - packages/preload-plugin/src/**
+    - component_id: react
+      paths:
+        - packages/react/src/**
+    - component_id: route-tree
+      paths:
+        - packages/route-tree/src/**
+    - component_id: route-utils
+      paths:
+        - packages/route-utils/src/**
+    - component_id: rsc-server-plugin
+      paths:
+        - packages/rsc-server-plugin/src/**
+    - component_id: rx
+      paths:
+        - packages/rx/src/**
+    - component_id: search-params
+      paths:
+        - packages/search-params/src/**
+    - component_id: search-schema-plugin
+      paths:
+        - packages/search-schema-plugin/src/**
+    - component_id: solid
+      paths:
+        - packages/solid/src/**
+    - component_id: sources
+      paths:
+        - packages/sources/src/**
+    - component_id: ssr-data-plugin
+      paths:
+        - packages/ssr-data-plugin/src/**
+    - component_id: svelte
+      paths:
+        - packages/svelte/src/**
+    - component_id: type-guards
+      paths:
+        - packages/type-guards/src/**
+    - component_id: validation-plugin
+      paths:
+        - packages/validation-plugin/src/**
+    - component_id: vue
+      paths:
+        - packages/vue/src/**
 
 # GitHub Checks Integration
 github_checks:

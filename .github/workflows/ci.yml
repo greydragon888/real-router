@@ -187,6 +187,11 @@ jobs:
       - name: Check for duplicate dependencies
         run: pnpm lint:dedupe
 
+      # Guard: codecov.yml components + Sonar coverage-exclusions stay in sync
+      # with the package set, so external quality gates can't silently drift (#732).
+      - name: Check coverage scope
+        run: pnpm lint:coverage-scope
+
       - name: Fix coverage paths
         run: |
           # vitest generates lcov.info with package-relative paths (SF:src/plugin.ts)
@@ -305,17 +310,34 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      # Pin Node for the --emit script (fs-only, no pnpm install) instead of
+      # relying on the runner image's system node.
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
       - name: Download coverage artifacts
         uses: actions/download-artifact@v8
         with:
           name: coverage-reports
           path: packages
 
+      # Collect every produced lcov dynamically — a hardcoded `files:` list drifts
+      # out of sync as packages are added (#732): it had 16 stale paths (several
+      # private) and missed ~14 public packages. The scope comes from the same
+      # script that guards codecov.yml/sonar-project.properties (--emit mode),
+      # so the CI scope and the drift guard cannot disagree. The script fails
+      # loudly if no lcov.info exists after the artifact download.
+      - name: Collect coverage reports
+        id: lcov
+        run: node scripts/check-coverage-scope.mjs --emit >> "$GITHUB_OUTPUT"
+
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: packages/browser-env/coverage/lcov.info,packages/browser-plugin/coverage/lcov.info,packages/core/coverage/lcov.info,packages/event-emitter/coverage/lcov.info,packages/fsm/coverage/lcov.info,packages/hash-plugin/coverage/lcov.info,packages/logger/coverage/lcov.info,packages/logger-plugin/coverage/lcov.info,packages/persistent-params-plugin/coverage/lcov.info,packages/react/coverage/lcov.info,packages/route-tree/coverage/lcov.info,packages/route-utils/coverage/lcov.info,packages/rx/coverage/lcov.info,packages/search-params/coverage/lcov.info,packages/sources/coverage/lcov.info,packages/type-guards/coverage/lcov.info
+          files: ${{ steps.lcov.outputs.reports }}
           disable_search: true
           fail_ci_if_error: true
 
@@ -329,6 +351,13 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+
+      # Pin Node for the `node -p` version read and the --emit scope script
+      # (fs-only, no pnpm install) instead of relying on the runner's system node.
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
 
       - name: Download coverage artifacts
         uses: actions/download-artifact@v8
@@ -348,11 +377,30 @@ jobs:
           VERSION=$(node -p 'require("./packages/core/package.json").version')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
+      # Generate analysis scope from the filesystem (#732). The static lists in
+      # sonar-project.properties drifted (11 sources vs 25 public packages);
+      # scanner CLI args override the properties file, so this is the source of
+      # truth. The scope comes from scripts/check-coverage-scope.mjs --emit —
+      # the same script that guards codecov.yml/sonar-project.properties, so the
+      # CI scope and the drift guard cannot disagree. sources = real (non-symlink)
+      # packages/*/src dirs + shared/* (sonar-scanner does not index files under
+      # symlinked directories, so browser-env/dom-utils src symlinks are skipped
+      # and the shared code is analysed at its real location, coverage-excluded
+      # via `shared/**`). reportPaths = every produced lcov; core-types has none
+      # → it stays in sources but is coverage-excluded so Sonar doesn't score
+      # it 0%. Runs on the runner's system node — fs-only, no install needed.
+      - name: Compute Sonar scope
+        id: scope
+        run: node scripts/check-coverage-scope.mjs --emit >> "$GITHUB_OUTPUT"
+
       - name: SonarCloud Scan
         uses: SonarSource/sonarqube-scan-action@7006c4492b2e0ee0f816d36501671557c97f5995 # v7
         with:
           args: >
             -Dsonar.projectVersion=${{ steps.version.outputs.version }}
+            -Dsonar.sources=${{ steps.scope.outputs.sources }}
+            -Dsonar.tests=${{ steps.scope.outputs.tests }}
+            -Dsonar.javascript.lcov.reportPaths=${{ steps.scope.outputs.reports }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
