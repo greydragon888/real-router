@@ -1681,4 +1681,211 @@ describe("createScrollRestoration", () => {
       sr.destroy();
     });
   });
+
+  describe("#809 — owner edge-case coverage", () => {
+    it("SSR — returns NOOP when window is undefined", () => {
+      const realWindow = globalThis.window;
+
+      vi.stubGlobal("window", undefined);
+
+      try {
+        const sr = createScrollRestoration(
+          makeFakeRouter(makeState("home")).router,
+        );
+
+        expect(typeof sr.destroy).toBe("function");
+        expect(() => {
+          sr.destroy();
+        }).not.toThrow();
+      } finally {
+        vi.stubGlobal("window", realWindow);
+      }
+    });
+
+    it("uses the scroll container for read and write when scrollContainer returns an element", () => {
+      const container = document.createElement("div");
+      const scrollToSpy = vi.fn();
+
+      container.scrollTo = scrollToSpy;
+      Object.defineProperty(container, "scrollTop", {
+        value: 42,
+        configurable: true,
+      });
+
+      const fake = makeFakeRouter(makeState("home"));
+      const sr = track(
+        createScrollRestoration(fake.router, {
+          scrollContainer: () => container,
+        }),
+      );
+
+      fake.emit(
+        makeState("about", {}, { navigation: { navigationType: "push" } }),
+        makeState("home"),
+      );
+
+      // write side: scrollToHashOrTop → writePos(0) → container.scrollTo
+      expect(scrollToSpy).toHaveBeenCalledWith({
+        top: 0,
+        left: 0,
+        behavior: "auto",
+      });
+
+      // read side: previous position captured from container.scrollTop
+      const store = JSON.parse(
+        sessionStorage.getItem(STORAGE_KEY) ?? "{}",
+      ) as Record<string, number>;
+
+      expect(store["home:{}"]).toBe(42);
+
+      sr.destroy();
+    });
+
+    it("anchor scrolling: scrollIntoView on the element matching context.url.hash", () => {
+      const target = document.createElement("div");
+      const scrollIntoViewSpy = vi.fn();
+
+      target.id = "sec";
+      target.scrollIntoView = scrollIntoViewSpy;
+      document.body.append(target);
+
+      const fake = makeFakeRouter(makeState("home"));
+      const sr = track(
+        createScrollRestoration(fake.router, { anchorScrolling: true }),
+      );
+
+      fake.emit(
+        makeState(
+          "about",
+          {},
+          { url: { hash: "sec" }, navigation: { navigationType: "push" } },
+        ),
+        makeState("home"),
+      );
+
+      expect(scrollIntoViewSpy).toHaveBeenCalledWith({ behavior: "auto" });
+
+      sr.destroy();
+    });
+
+    it("anchor scrolling: falls back to top when the hash element is missing", () => {
+      const scrollToSpy = vi.spyOn(globalThis, "scrollTo");
+      const fake = makeFakeRouter(makeState("home"));
+      const sr = track(
+        createScrollRestoration(fake.router, { anchorScrolling: true }),
+      );
+
+      fake.emit(
+        makeState(
+          "about",
+          {},
+          { url: { hash: "nope" }, navigation: { navigationType: "push" } },
+        ),
+        makeState("home"),
+      );
+
+      expect(scrollToSpy).toHaveBeenCalledWith({
+        top: 0,
+        left: 0,
+        behavior: "auto",
+      });
+
+      sr.destroy();
+    });
+
+    it("anchor scrolling: empty context hash scrolls to top", () => {
+      const scrollToSpy = vi.spyOn(globalThis, "scrollTo");
+      const fake = makeFakeRouter(makeState("home"));
+      const sr = track(
+        createScrollRestoration(fake.router, { anchorScrolling: true }),
+      );
+
+      fake.emit(
+        makeState(
+          "about",
+          {},
+          { url: { hash: "" }, navigation: { navigationType: "push" } },
+        ),
+        makeState("home"),
+      );
+
+      expect(scrollToSpy).toHaveBeenCalledWith({
+        top: 0,
+        left: 0,
+        behavior: "auto",
+      });
+
+      sr.destroy();
+    });
+
+    it("restores the saved position on nav.navigationType === 'reload' (F5 priming, #531)", () => {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "about:{}": 500 }));
+
+      const scrollToSpy = vi.spyOn(globalThis, "scrollTo");
+      const fake = makeFakeRouter(makeState("about"));
+      const sr = track(createScrollRestoration(fake.router));
+
+      // transition.reload is undefined; the plugin-primed nav arm drives restore.
+      fake.emit(
+        makeState("about", {}, { navigation: { navigationType: "reload" } }),
+      );
+
+      expect(scrollToSpy).toHaveBeenCalledWith({
+        top: 500,
+        left: 0,
+        behavior: "auto",
+      });
+
+      sr.destroy();
+    });
+
+    it("restores the saved position on transition.reload (programmatic reload arm)", () => {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "about:{}": 300 }));
+
+      const scrollToSpy = vi.spyOn(globalThis, "scrollTo");
+      const fake = makeFakeRouter(makeState("about"));
+      const sr = track(createScrollRestoration(fake.router));
+
+      // The left arm of `route.transition.reload || nav?.navigationType`.
+      fake.emit(makeState("about", {}, {}, { reload: true }));
+
+      expect(scrollToSpy).toHaveBeenCalledWith({
+        top: 300,
+        left: 0,
+        behavior: "auto",
+      });
+
+      sr.destroy();
+    });
+
+    it("safeKeyOf substitutes <fn>/<sym> sentinels for function/symbol param values", () => {
+      Object.defineProperty(globalThis, "scrollY", {
+        value: 10,
+        configurable: true,
+      });
+
+      const fake = makeFakeRouter(makeState("home"));
+      const sr = track(createScrollRestoration(fake.router));
+
+      // Runtime type violation: Params forbids function/symbol values, but the
+      // canonical replacer defends against a buggy caller smuggling them
+      // (audit §5 MEDIUM — prevents silent scroll-key collisions).
+      const prev = makeState("page", {
+        fn: (() => undefined) as unknown as string,
+        sym: Symbol("x") as unknown as string,
+      });
+
+      fake.emit(
+        makeState("about", {}, { navigation: { navigationType: "push" } }),
+        prev,
+      );
+
+      const store = sessionStorage.getItem(STORAGE_KEY) ?? "";
+
+      expect(store).toContain("<fn>");
+      expect(store).toContain("<sym>");
+
+      sr.destroy();
+    });
+  });
 });

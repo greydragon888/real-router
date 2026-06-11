@@ -573,4 +573,78 @@ describe("createRouteAnnouncer", () => {
     ann.destroy();
     router.stop();
   });
+
+  it("SSR guard — returns a NOOP instance when `document` is undefined", () => {
+    const realDocument = globalThis.document;
+
+    vi.stubGlobal("document", undefined);
+
+    try {
+      const ann = createRouteAnnouncer(makeRouter());
+
+      // Frozen NOOP: destroy is callable and inert, no element created.
+      expect(typeof ann.destroy).toBe("function");
+      expect(() => {
+        ann.destroy();
+      }).not.toThrow();
+    } finally {
+      vi.stubGlobal("document", realDocument);
+    }
+  });
+
+  it("falls back to documentElement when document.body is null", async () => {
+    Object.defineProperty(document, "body", {
+      configurable: true,
+      value: null,
+    });
+
+    try {
+      const router = makeRouter();
+      const ann = setupAnnouncer(router);
+
+      await router.start("/");
+
+      const element = document.documentElement.querySelector(ANNOUNCER_ATTR);
+
+      expect(element).not.toBeNull();
+      expect(element?.parentElement).toBe(document.documentElement);
+
+      ann.destroy();
+      router.stop();
+    } finally {
+      // Drop the instance override so the Document.prototype `body` getter
+      // is restored for afterEach (which reads document.body).
+      delete (document as { body?: HTMLElement }).body;
+    }
+  });
+
+  it("logs and falls back to the default chain when getAnnouncementText throws", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const router = makeRouter();
+    const ann = setupAnnouncer(router, {
+      getAnnouncementText: () => {
+        throw new Error("boom");
+      },
+    });
+
+    await router.start("/");
+    vi.advanceTimersByTime(100);
+
+    document.title = "Fallback Title";
+    await router.navigate("about");
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      "[real-router] getAnnouncementText threw; falling back to default resolution.",
+      expect.any(Error),
+    );
+    // The throw is swallowed; resolution continues down the default chain
+    // (h1 → document.title → route.name), so the announcer still updates.
+    expect(getAnnouncerElement()?.textContent).toBe(
+      "Navigated to Fallback Title",
+    );
+
+    errorSpy.mockRestore();
+    ann.destroy();
+    router.stop();
+  });
 });

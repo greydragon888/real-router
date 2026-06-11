@@ -3,11 +3,13 @@ import { describe, it, expect, vi } from "vitest";
 import {
   shouldNavigate,
   buildHref,
+  navigateWithHash,
   buildActiveClassName,
+  shallowEqual,
   applyLinkA11y,
 } from "../../src";
 
-import type { Router } from "@real-router/core";
+import type { Router, State } from "@real-router/core";
 
 describe("shouldNavigate", () => {
   it("1 — returns true for left click with no modifiers", () => {
@@ -489,5 +491,175 @@ describe("applyLinkA11y", () => {
 
     expect(setAttribute).toHaveBeenCalledWith("role", "link");
     expect(setAttribute).toHaveBeenCalledWith("tabindex", "0");
+  });
+});
+
+describe("buildHref — fragment encoding (encodeFragmentInline)", () => {
+  const routerWith = (path: string): Router =>
+    ({ buildPath: vi.fn().mockReturnValue(path) }) as unknown as Router;
+
+  it("re-encodes an already-percent-encoded hash via the decode→encode roundtrip", () => {
+    // %E2%9C%93 = ✓ — probe matches, decodeURIComponent succeeds.
+    const href = buildHref(routerWith("/p"), "r", {}, { hash: "%E2%9C%93" });
+
+    expect(href).toBe("/p#%E2%9C%93");
+  });
+
+  it("falls through to plain encoding on a malformed percent-escape", () => {
+    // %C3%28 — probe matches but decodeURIComponent throws (bad UTF-8) → catch →
+    // plain encodeURI, which treats each literal `%` as a character (`%` → `%25`).
+    const href = buildHref(routerWith("/p"), "r", {}, { hash: "%C3%28" });
+
+    expect(href).toBe("/p#%25C3%2528");
+  });
+
+  it("encodes a plain (non-percent) hash directly", () => {
+    const href = buildHref(routerWith("/p"), "r", {}, { hash: "a b" });
+
+    expect(href).toBe("/p#a%20b");
+  });
+
+  it("strips a single leading '#' before encoding", () => {
+    const href = buildHref(routerWith("/p"), "r", {}, { hash: "#frag" });
+
+    expect(href).toBe("/p#frag");
+  });
+});
+
+describe("navigateWithHash", () => {
+  const makeRouter = (state: State | undefined): Router =>
+    ({
+      getState: vi.fn().mockReturnValue(state),
+      navigate: vi.fn().mockResolvedValue({}),
+    }) as unknown as Router;
+
+  it("adds force + hashChange when the same route+params gets a new hash", async () => {
+    const router = makeRouter({
+      name: "r",
+      params: { id: "1" },
+      context: { url: { hash: "old" } },
+    } as unknown as State);
+
+    await navigateWithHash(router, "r", { id: "1" }, "new");
+
+    expect(router.navigate).toHaveBeenCalledWith(
+      "r",
+      { id: "1" },
+      { hash: "new", force: true, hashChange: true },
+    );
+  });
+
+  it("does not force when the hash is unchanged on the same route+params", async () => {
+    const router = makeRouter({
+      name: "r",
+      params: { id: "1" },
+      context: { url: { hash: "same" } },
+    } as unknown as State);
+
+    await navigateWithHash(router, "r", { id: "1" }, "same");
+
+    expect(router.navigate).toHaveBeenCalledWith(
+      "r",
+      { id: "1" },
+      { hash: "same" },
+    );
+  });
+
+  it("does a plain navigate for a different route (no same-route branch)", async () => {
+    const router = makeRouter({
+      name: "other",
+      params: {},
+      context: { url: { hash: "x" } },
+    } as unknown as State);
+
+    await navigateWithHash(router, "r", {}, "h");
+
+    expect(router.navigate).toHaveBeenCalledWith("r", {}, { hash: "h" });
+  });
+
+  it("omits the hash option entirely when hash is undefined", async () => {
+    const router = makeRouter(undefined);
+
+    await navigateWithHash(router, "r", {}, undefined);
+
+    expect(router.navigate).toHaveBeenCalledWith("r", {}, {});
+  });
+
+  it("treats a missing context.url.hash as empty (same route, new hash forces)", async () => {
+    // context has no url.hash → currentHash falls back to "" (the `?? ""`).
+    const router = makeRouter({
+      name: "r",
+      params: {},
+      context: {},
+    } as unknown as State);
+
+    await navigateWithHash(router, "r", {}, "frag");
+
+    expect(router.navigate).toHaveBeenCalledWith(
+      "r",
+      {},
+      {
+        hash: "frag",
+        force: true,
+        hashChange: true,
+      },
+    );
+  });
+
+  it("keeps the current hash when called with hash=undefined on the same route", async () => {
+    // newHash = hash ?? currentHash → currentHash, so it equals current: no force.
+    const router = makeRouter({
+      name: "r",
+      params: {},
+      context: { url: { hash: "keep" } },
+    } as unknown as State);
+
+    await navigateWithHash(router, "r", {}, undefined);
+
+    expect(router.navigate).toHaveBeenCalledWith("r", {}, {});
+  });
+});
+
+describe("shallowEqual", () => {
+  it("true for an identical reference (Object.is short-circuit)", () => {
+    const obj = { a: 1 };
+
+    expect(shallowEqual(obj, obj)).toBe(true);
+  });
+
+  it("false when either side is null/undefined", () => {
+    expect(shallowEqual({ a: 1 }, undefined)).toBe(false);
+    expect(shallowEqual(undefined, { a: 1 })).toBe(false);
+  });
+
+  it("false on a key-count mismatch", () => {
+    expect(shallowEqual({ a: 1 }, { a: 1, b: 2 })).toBe(false);
+  });
+
+  it("false when a key is absent in the other record (hasOwnProperty guard)", () => {
+    // Same key count, both values `undefined`, but different keys — the
+    // hasOwnProperty guard prevents a false match.
+    expect(shallowEqual({ a: undefined }, { b: undefined })).toBe(false);
+  });
+
+  it("false on a per-key value mismatch", () => {
+    expect(shallowEqual({ a: 1 }, { a: 2 })).toBe(false);
+  });
+
+  it("true for shallow-equal records", () => {
+    expect(shallowEqual({ a: 1, b: "x" }, { a: 1, b: "x" })).toBe(true);
+  });
+});
+
+describe("buildActiveClassName — whitespace-only active class", () => {
+  it("treats a whitespace-only active class as no tokens, returning the base", () => {
+    // parseTokens("   ") → match(/\S+/g) === null → [] → activeTokens.length === 0.
+    expect(buildActiveClassName(true, " ".repeat(3), "base")).toBe("base");
+  });
+
+  it("returns undefined when active class is whitespace-only and no base", () => {
+    expect(
+      buildActiveClassName(true, " ".repeat(3), undefined),
+    ).toBeUndefined();
   });
 });
