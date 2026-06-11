@@ -137,7 +137,10 @@ export function withTimeout<T>(
   });
 
   const work = (async () => loader({ signal: composed }))().finally(() => {
-    if (timer !== undefined) clearTimeout(timer);
+    // The Promise executor above runs synchronously, so `timer` is always
+    // assigned by the time `finally` fires — and `clearTimeout` accepts
+    // `undefined` anyway, so no guard is needed.
+    clearTimeout(timer);
   });
 
   return Promise.race<T>([work, timeoutPromise]);

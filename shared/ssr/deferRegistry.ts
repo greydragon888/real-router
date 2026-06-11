@@ -200,6 +200,10 @@ export function escapeForScript(value: string): string {
 
   return json.replace(
     ESCAPE_FOR_SCRIPT_REGEX,
+    // The `?? c` arm is structurally unreachable — the regex char class is
+    // built from the table's own keys, so every match has a table entry; the
+    // fallback only satisfies the `string | undefined` index signature.
+    /* v8 ignore next -- @preserve: TS index-access fallback, regex ⊆ table keys */
     (c) => ESCAPE_FOR_SCRIPT_TABLE[c] ?? c,
   );
 }
