@@ -190,6 +190,7 @@ const createUrlPluginDetector = (
     let detectionConsumed = false;
 
     detectionUnsub = router.subscribe(({ route }) => {
+      /* v8 ignore next 3 -- @preserve: the multi-fire is hypothetical (see above) — the real router never invokes a subscriber synchronously twice before unsub; defensive guard, not testable without a contract-violating fake */
       if (detectionConsumed) {
         return;
       }
