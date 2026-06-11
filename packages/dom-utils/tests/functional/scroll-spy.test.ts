@@ -988,4 +988,237 @@ describe("createScrollSpy", () => {
       router.stop();
     });
   });
+
+  describe("#809 — edge coverage", () => {
+    it("SSR — returns NOOP when document is undefined", async () => {
+      const realDocument = globalThis.document;
+
+      vi.stubGlobal("document", undefined);
+
+      try {
+        const router = await createTestRouter();
+        const spy = createScrollSpy(router, { selector: "[id]" });
+
+        expect(ioInstances).toHaveLength(0);
+        expect(typeof spy.destroy).toBe("function");
+
+        spy.destroy();
+        router.stop();
+      } finally {
+        vi.stubGlobal("document", realDocument);
+      }
+    });
+
+    it("picks the best anchor above the zone when none are below (negative distance)", async () => {
+      const router = await createTestRouter();
+      const navigateSpy = vi.spyOn(router, "navigate");
+      const [s1, s2] = setupAnchors(["section-1", "section-2"]);
+
+      track(createScrollSpy(router, { selector: "[id]" }));
+
+      // Both anchors are ABOVE the zone (boundingClientRect.top < zoneTop) →
+      // all distances negative. s2 (-20) is processed first and becomes the
+      // best negative; s1 (-200) is then the worse candidate that fails the
+      // `distance > bestNegativeDist` check, exercising both arms.
+      ioInstances[0].trigger([
+        buildEntryWithZone(s2, 480, 50, 500),
+        buildEntryWithZone(s1, 300, 50, 500),
+      ]);
+
+      flushTimersAndRaf();
+
+      expect(navigateSpy.mock.calls[0]?.[2]).toMatchObject({
+        hash: "section-2",
+      });
+
+      router.stop();
+    });
+
+    it("wires the observer once the router starts (deferred detection)", async () => {
+      const router = await createTestRouter({ start: false });
+
+      setupAnchors(["section-1"]);
+      track(createScrollSpy(router, { selector: "[id]" }));
+
+      // Unstarted router → peekState is null → detection deferred to subscribe.
+      await router.start("/docs");
+
+      expect(ioInstances.length).toBeGreaterThanOrEqual(1);
+
+      router.stop();
+    });
+
+    it("debounce destroy clears a pending trailing timeout", async () => {
+      const router = await createTestRouter();
+      const [s1] = setupAnchors(["section-1"]);
+      const spy = track(createScrollSpy(router, { selector: "[id]" }));
+
+      ioInstances[0].trigger([buildEntry(s1, 50)]);
+      // Fire only the rAF shim (0ms) so the trailing 150ms timeout is armed
+      // but not yet fired, then destroy → clears the live timeout.
+      vi.advanceTimersByTime(1);
+      spy.destroy();
+
+      expect(() => {
+        flushTimersAndRaf();
+      }).not.toThrow();
+
+      router.stop();
+    });
+
+    it("debounce reschedule clears the previous trailing timeout", async () => {
+      const router = await createTestRouter();
+      const navigateSpy = vi.spyOn(router, "navigate");
+      const [s1] = setupAnchors(["section-1"]);
+
+      track(createScrollSpy(router, { selector: "[id]" }));
+
+      ioInstances[0].trigger([buildEntry(s1, 50)]);
+      vi.advanceTimersByTime(1); // rAF fires → trailing timeout armed
+      ioInstances[0].trigger([buildEntry(s1, 60)]);
+      vi.advanceTimersByTime(1); // second rAF fires → clears the first timeout
+
+      flushTimersAndRaf();
+
+      expect(navigateSpy).toHaveBeenCalledTimes(1);
+
+      router.stop();
+    });
+
+    it("MutationObserver destroy clears a pending reconcile timer", async () => {
+      const router = await createTestRouter();
+
+      setupAnchors(["section-1"]);
+      const spy = track(createScrollSpy(router, { selector: "[id]" }));
+
+      moInstances[0]?.trigger([]); // arms the mutation-debounce timer
+      spy.destroy(); // mutationTimer !== null → clearTimeout
+
+      expect(() => {
+        flushTimersAndRaf();
+      }).not.toThrow();
+
+      router.stop();
+    });
+
+    it("silences once on an invalid selector (second reconcile is a no-op)", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const router = await createTestRouter();
+
+      setupAnchors(["section-1"]);
+      // "###" throws in querySelectorAll → onInvalidSelector → warn once.
+      track(createScrollSpy(router, { selector: "###" }));
+
+      // A second reconcile (MutationObserver, after its debounce timer fires)
+      // re-enters onInvalidSelector but `silenced` short-circuits it — still
+      // exactly one warning.
+      moInstances[0]?.trigger([]);
+      flushTimersAndRaf();
+
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(warnSpy.mock.calls[0]?.[0]).toContain("invalid selector");
+
+      warnSpy.mockRestore();
+      router.stop();
+    });
+
+    it("no-op flush when there are no pending entries", async () => {
+      const router = await createTestRouter();
+      const navigateSpy = vi.spyOn(router, "navigate");
+
+      setupAnchors(["section-1"]);
+      track(createScrollSpy(router, { selector: "[id]" }));
+
+      // Empty IO batch → schedules a flush with an empty pending map.
+      ioInstances[0].trigger([]);
+      flushTimersAndRaf();
+
+      expect(navigateSpy).not.toHaveBeenCalled();
+
+      router.stop();
+    });
+
+    it("skips the emit when the picked anchor hash equals the current hash", async () => {
+      const router = createRouter([
+        { name: "home", path: "/" },
+        { name: "docs", path: "/docs" },
+      ]);
+
+      // Seed the URL context hash to match the anchor we will intersect.
+      router.usePlugin((r) => {
+        const claim = getPluginApi(r).claimContextNamespace("url");
+
+        return {
+          onTransitionSuccess: (toState) => {
+            claim.write(toState, { hash: "section-1" });
+          },
+        };
+      });
+      await router.start("/docs");
+
+      const navigateSpy = vi.spyOn(router, "navigate");
+      const [s1] = setupAnchors(["section-1"]);
+
+      track(createScrollSpy(router, { selector: "[id]" }));
+
+      ioInstances[0].trigger([buildEntry(s1, 50)]);
+      flushTimersAndRaf();
+
+      // newHash "section-1" === currentHash "section-1" → no navigate.
+      expect(navigateSpy).not.toHaveBeenCalled();
+
+      router.stop();
+    });
+
+    it("treats a url context without a hash field as an empty current hash", async () => {
+      const router = createRouter([
+        { name: "home", path: "/" },
+        { name: "docs", path: "/docs" },
+      ]);
+
+      // Third-party URL plugins can claim the `url` namespace with a partial
+      // slice (scroll-spy types it as `hash?: string`). A slice without
+      // `hash` must read as "" — the spy still emits for a real anchor.
+      router.usePlugin((r) => {
+        const claim = getPluginApi(r).claimContextNamespace("url");
+
+        return {
+          onTransitionSuccess: (toState) => {
+            claim.write(toState, { hashChanged: false });
+          },
+        };
+      });
+      await router.start("/docs");
+
+      const navigateSpy = vi.spyOn(router, "navigate");
+      const [s1] = setupAnchors(["section-1"]);
+
+      track(createScrollSpy(router, { selector: "[id]" }));
+
+      ioInstances[0].trigger([buildEntry(s1, 50)]);
+      flushTimersAndRaf();
+
+      // currentHash resolved to "" → "section-1" !== "" → emit happens.
+      expect(navigateSpy.mock.calls[0]?.[2]).toMatchObject({
+        hash: "section-1",
+      });
+
+      router.stop();
+    });
+
+    it("skips the emit when the router has no active state", async () => {
+      const router = await createTestRouter();
+      const navigateSpy = vi.spyOn(router, "navigate");
+      const [s1] = setupAnchors(["section-1"]);
+
+      track(createScrollSpy(router, { selector: "[id]" }));
+
+      ioInstances[0].trigger([buildEntry(s1, 50)]);
+      router.stop(); // getState() now returns undefined
+
+      flushTimersAndRaf();
+
+      expect(navigateSpy).not.toHaveBeenCalled();
+    });
+  });
 });

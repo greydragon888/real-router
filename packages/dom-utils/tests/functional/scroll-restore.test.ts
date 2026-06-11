@@ -1858,6 +1858,47 @@ describe("createScrollRestoration", () => {
       sr.destroy();
     });
 
+    it("restores position 0 on reload when the store has no entry for the route", () => {
+      const scrollToSpy = vi.spyOn(globalThis, "scrollTo");
+      // No sessionStorage seed: F5 on a route whose position was never
+      // captured (fresh session / cleared storage) → `loadStore()[key]` is
+      // undefined → the `?? 0` fallback scrolls to top.
+      const fake = makeFakeRouter(makeState("about"));
+      const sr = track(createScrollRestoration(fake.router));
+
+      fake.emit(makeState("about", {}, {}, { reload: true }));
+
+      expect(scrollToSpy).toHaveBeenCalledWith({
+        top: 0,
+        left: 0,
+        behavior: "auto",
+      });
+
+      sr.destroy();
+    });
+
+    it("restores position 0 on reload when safeKeyOf yields null (uncanonicalizable params)", () => {
+      const scrollToSpy = vi.spyOn(globalThis, "scrollTo");
+      // A cyclic params object makes canonicalJson throw → safeKeyOf returns
+      // null → the reload restore falls back to position 0 (key === null arm).
+      const cyclic: Record<string, unknown> = {};
+
+      cyclic.self = cyclic;
+
+      const fake = makeFakeRouter(makeState("about", cyclic));
+      const sr = track(createScrollRestoration(fake.router));
+
+      fake.emit(makeState("about", cyclic, {}, { reload: true }));
+
+      expect(scrollToSpy).toHaveBeenCalledWith({
+        top: 0,
+        left: 0,
+        behavior: "auto",
+      });
+
+      sr.destroy();
+    });
+
     it("safeKeyOf substitutes <fn>/<sym> sentinels for function/symbol param values", () => {
       Object.defineProperty(globalThis, "scrollY", {
         value: 10,
