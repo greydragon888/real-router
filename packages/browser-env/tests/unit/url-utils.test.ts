@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
 
-import { buildUrl, extractPath, urlToPath } from "../../src/url-utils";
+import {
+  buildUrl,
+  extractPath,
+  extractPathFromAbsoluteUrl,
+  urlToPath,
+  urlToPathAndHash,
+} from "../../src/url-utils";
 
 describe("extractPath", () => {
   it("returns '/' for empty pathname", () => {
@@ -67,6 +73,10 @@ describe("buildUrl", () => {
     expect(buildUrl("users", "/app")).toBe("/app/users");
   });
 
+  it("collapses the index path '/' to the canonical base (no trailing slash)", () => {
+    expect(buildUrl("/", "/app")).toBe("/app");
+  });
+
   it("never produces consecutive slashes when base is normalized", () => {
     expect(buildUrl("/x", "/app")).not.toMatch(/\/{2,}/);
     expect(buildUrl("x", "/app")).not.toMatch(/\/{2,}/);
@@ -92,5 +102,28 @@ describe("urlToPath", () => {
 
   it("strips base from URL path", () => {
     expect(urlToPath("https://example.com/app/users", "/app")).toBe("/users");
+  });
+});
+
+describe("urlToPathAndHash", () => {
+  it("returns path + decoded hash without the leading '#' (#532)", () => {
+    expect(
+      urlToPathAndHash("https://example.com/app/users?q=1#sec%20one", "/app"),
+    ).toStrictEqual({ path: "/users?q=1", hash: "sec one" });
+  });
+
+  it("returns an empty hash when the URL has no fragment", () => {
+    expect(urlToPathAndHash("https://example.com/users", "")).toStrictEqual({
+      path: "/users",
+      hash: "",
+    });
+  });
+});
+
+describe("extractPathFromAbsoluteUrl", () => {
+  it("is an alias of urlToPath for absolute URLs", () => {
+    expect(
+      extractPathFromAbsoluteUrl("https://example.com/app/users?q=1", "/app"),
+    ).toBe("/users?q=1");
   });
 });
