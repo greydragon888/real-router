@@ -158,9 +158,22 @@ jobs:
       - name: Detect produced artifacts
         id: artifacts
         run: |
-          shopt -s nullglob
-          produced=(packages/*/dist packages/*/coverage)
-          if [ ${#produced[@]} -gt 0 ]; then
+          # Gate on real FILES, not directory existence (#730). A root config
+          # change that isn't a turbo input (.jscpd.json, codecov.yml, knip.json,
+          # …) passes the `check` heuristic yet affects ZERO packages, so
+          # test/bundle produce nothing — but empty packages/*/dist and
+          # packages/*/coverage dirs can still be present. The old
+          # nullglob-on-directories check saw those empty dirs and set
+          # built=true, while upload-artifact (which needs files inside) created
+          # nothing — leaving coverage/sonarcloud/bundle-size to fail on a
+          # missing artifact download and blocking the config-only PR via the
+          # required CI Result gate.
+          #
+          # The grouped \( … \) is required: `-path A -o -path B -type f` binds
+          # as `A OR (B AND -type f AND -print)`, so a lcov.info match on branch
+          # A would never print. Grouping applies -type f/-print/-quit to BOTH.
+          produced="$(find packages \( -path '*/coverage/lcov.info' -o -path '*/dist/*' \) -type f -print -quit)"
+          if [ -n "$produced" ]; then
             echo "built=true" >> "$GITHUB_OUTPUT"
             echo "🏗️  Affected packages produced artifacts — downstream jobs will run"
           else
