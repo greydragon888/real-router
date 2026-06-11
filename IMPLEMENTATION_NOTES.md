@@ -918,6 +918,26 @@ For external consumers (Vite, Webpack, Node.js, etc.):
 - **#425** — Incomplete `.d.ts` from tsdown+rolldown RC. No longer affects monorepo `tsc`. Still affects external consumers until tsdown/rolldown stabilize, but that's out of our hands.
 - **#403** — Build:dist-only optimization. Evolved into the `bundle` task — lightweight bundling without test dependencies. CI bundle size and smoke test use `turbo run bundle` instead of `turbo run build`.
 
+### Published packages ship `dist/` only — drop `src/` from `files[]` (#728)
+
+**Problem:** Every public package declared `files: ["dist", "src"]` (`@real-router/angular`: `["dist", "src", "ssr"]`), so the npm tarball shipped the original `src/` tree **and** full sourcemaps (`tsdown.base.ts` sets `sourcemap: true` + `dts.sourcemap: true`, and the emitted `*.map` embed `sourcesContent`). Repo-wide that meant ≈ **4.3 MB** of `src/` + maps versus only ≈ **0.9 MB** of actual runtime JS — install footprint dominated by non-runtime files (~5× the runtime). `@real-router/core` alone was 1.5 MB unpacked (842 KB maps + 299 KB src + 160 KB JS).
+
+The shipped `src/` was not just redundant but **broken** for every symlink-consuming package. `npm pack` does **not** follow symlinked directories, so packages that symlink shared sources into `src/` (`src/dom-utils → shared/dom-utils`, `src/browser-env → shared/browser-env`, `src/shared-ssr → shared/ssr`) shipped a `src/` graph with dangling imports — e.g. `react`/`preact`/`solid`/`vue` tarballs contained **0** `src/dom-utils/*` files, `rsc-server-plugin`/`ssr-data-plugin` contained **0** `src/shared-ssr/*`. The `"@real-router/internal-source": "./src/..."` export condition in the published `package.json` therefore pointed at a non-resolvable graph.
+
+**Solution:** Drop `src` from `files[]` on **all** public packages (kept `dist`; `@real-router/angular` → `["dist", "ssr"]`). Sourcemaps stay — with `sourcesContent` embedded they already provide source-level debugging into the library, which is exactly why the separate `src/` tree is redundant. Policy: **keep maps (the debugging mechanism), drop `src/` (the broken, redundant duplicate)**.
+
+`@real-router/svelte` needed an extra cleanup: `svelte-package` materializes the symlinked `dom-utils` **per file** into `dist/dom-utils/*` (unlike tsdown, which bundles it inline), and dragged `dist/dom-utils/__test-helpers/*` (test fixtures) and `dist/dom-utils/CLAUDE.md` (internal doc) along with it. Its `bundle` script now appends `rimraf dist/dom-utils/__test-helpers dist/dom-utils/CLAUDE.md` (rimraf `6.1.3`, matching `@real-router/solid`). `@sveltejs/package` 2.x removed the `config.package.files` filter hook (throws "config.package is no longer supported"), so post-build removal is the supported path.
+
+**Why this is safe:**
+
+- **No external resolution path used `src/`.** External consumers (Vite/Webpack/Node) resolve via `import`/`require` → `dist/`; only monorepo `tsc` activates `@real-router/internal-source`, and it resolves off the **workspace source tree**, not the tarball (`customConditions` works in-repo regardless of `files[]`). The published `internal-source` key still points at `./src/...`, but no external resolver activates that scoped condition — see "Custom `@real-router/internal-source` Export Condition" above.
+- **Verified with `publint` + `attw`.** Both pass clean on every package after the change — neither flags the now-dangling `internal-source` condition, because both check only the standard conditions (`types`/`import`/`require`/`default`/`bundler`/`node10`/`node16`).
+- **No consumer-bundle impact.** Tree-shaking already excluded `src/`/maps from application bundles; this is purely a `node_modules` / install-size reduction. `@real-router/svelte` dropped from 114 → 78 tarball files (≈ 154 kB unpacked).
+
+**Verification recipe (per package):** `npm pack --dry-run` → confirm `0` `src/` entries; `pnpm lint:package` (publint) + `pnpm lint:types` (attw) → green.
+
+**Each affected package gets a `patch` changeset** so the smaller tarball actually reaches npm on the next release (the `files[]` edit doesn't touch `src/`, so `changeset-check.yml`'s `require-changeset` gate wouldn't otherwise demand one).
+
 ### `test:e2e` Task
 
 New turbo task for Playwright e2e tests in example applications:

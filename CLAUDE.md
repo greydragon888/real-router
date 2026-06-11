@@ -32,6 +32,7 @@ shared/
 ## Rules
 
 - **NEVER** push without explicit user request
+- **Infrastructure tasks go straight to `master` — no PR, no changeset.** Build/tooling/CI/packaging changes that don't touch `packages/*/src/` are committed directly on `master` (no feature branch, no PR). They need no changeset either — `changeset-check.yml` only requires one when public-package `src/` changes, so the fix simply ships with each package's next release
 - After completing a task, run: `pnpm build` (turbo runs the full graph: type-check → lint → test → build)
 - Prefer editing existing files over creating new ones
 - Keep changes minimal and focused

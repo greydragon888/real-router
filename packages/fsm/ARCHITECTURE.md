@@ -215,6 +215,18 @@ onTransition(listener) {
 
 **Trade-off:** Listener order after unsubscribe may differ — new listeners fill vacated slots.
 
+**No snapshot — live iteration (diverges from `event-emitter`).** `send()` iterates the **live** `#listeners` array, not a pre-iteration copy. Two consequences within a single `send()`:
+
+- A listener **added during** the transition fires **in that same `send()`** (it occupies the next/reused slot the loop will reach).
+- A listener **removed during** the transition is skipped (its slot is `null`).
+
+```typescript
+// A unsubscribes C and registers D, all during the same send():
+// fired order = ["A", "D", "B"]   (C skipped; D called this same send)
+```
+
+This **intentionally differs** from the sibling `@real-router/event-emitter`, which snapshots the listener set (`[...set]`) before iterating, so mutations there only affect the *next* emit. Do not assume the two repo primitives share mutation-during-dispatch semantics. (See [#755](https://github.com/greydragon888/real-router/issues/755).)
+
 ## Hot-Path Optimizations
 
 | Optimization                | Purpose                                                              |
@@ -258,6 +270,24 @@ fsm.send("START"); // triggers IDLE → STARTING → READY
 - No queue, no deferred execution — synchronous inline
 - **Caller responsible for preventing infinite loops**
 
+### Sharp edge: `TransitionInfo` staleness under reentrancy
+
+`info` is captured **once** per `send()` (before the listener loop) and the reentrant call mutates the shared `#state` without save/restore. Consequently:
+
+- An **outer** listener's `info.to` reflects *its own* transition's target, but `getState()` may already reflect a deeper (nested) state — `info.to !== getState()` is possible.
+- Observations run in **reverse-causal order**: the nested transition is fully observed *before* the outer transition's listener loop resumes.
+
+```typescript
+// transitions: { a:{go:"b"}, b:{go:"c"}, c:{} }
+fsm.onTransition((info) => { if (first) { first = false; fsm.send("go"); }
+  obs.push({ to: info.to, live: fsm.getState() }); });
+fsm.send("go");
+// obs = [ {to:"c", live:"c"},   ← reentrant (b→c) listener runs first
+//         {to:"b", live:"c"} ]  ← outer (a→b) listener: info.to="b" but getState()="c"
+```
+
+**Do not** assume `info.to === getState()` in listeners that reentrant-`send()`. Reentrancy is intentionally unbounded and is **not** restricted; this is a documented edge, not a bug. (Router-unreachable: core's FSM actions emit events, they do not reentrant-`send()`.)
+
 ## Exception Semantics
 
 If a listener or action throws:
@@ -292,6 +322,8 @@ fsm.send("START", {}); // TS error
 ```
 
 Default `TPayloadMap = Record<never, never>` — all events are payload-free.
+
+> ⚠️ **Known gap ([#753](https://github.com/greydragon888/real-router/issues/753)):** the snippet above describes the *intended* contract, but the current `send` signature is `send(event: TEvents, payload?: TPayloadMap[TEvents])` — `TPayloadMap[TEvents]` indexes by the **full** event union, so `send` does **not** correlate the payload to the specific event (e.g. `send("NAVIGATE")` and a wrong-event payload both compile). Only `on(from, event, action)` correlates the payload. The fix is a distributive `send<E extends TEvents>` signature. Dormant for core (`RouterPayloads` is empty).
 
 ## Self-Transitions
 

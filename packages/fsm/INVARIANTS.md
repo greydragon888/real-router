@@ -20,6 +20,7 @@
 | 2   | Unsubscribe | After calling the unsubscribe function returned by `onTransition()`, the listener is never called again, regardless of how many transitions follow.                                |
 | 3   | Clear all   | After unsubscribing every registered listener, no listener is called on subsequent transitions. This verifies the `#listenerCount` fast-path optimization.                         |
 | 4   | Reentrancy  | Calling `send()` inside an `onTransition` listener does not corrupt FSM state. After the full reentrant call chain completes, `getState()` still returns a valid state.            |
+| 5   | Live iteration (no snapshot) † | `send()` iterates the **live** listener array — it does **not** snapshot before iterating. A listener registered during a transition is invoked within that same `send()`; an unsubscribed listener is skipped via its null slot. This **diverges from the sibling `event-emitter`**, which snapshots the listener set before iterating. Consumers must not assume the two primitives share mutation-during-dispatch semantics. |
 
 ## Self-Transitions
 
@@ -51,6 +52,9 @@
 | 3   | Null-slot reuse     | After unsubscribing a listener and registering a new one, the new listener fills the vacated slot in the array. It fires at that position, potentially before listeners registered earlier.             |
 | 4   | Return value        | `send()` returns `getState()` at the moment it returns. With reentrant `send()` inside a listener, the return value reflects the final state after all reentrant transitions, not the immediate target. |
 | 5   | Context identity    | `getContext()` returns the exact same reference as `config.context`. The FSM does not clone or wrap the context object.                                                                                 |
+| 6   | Reentrant info staleness † | When a listener performs a reentrant `send()`, an **outer** listener still receives `info.to` equal to *its own* transition's target, while `getState()` may already reflect a later (nested) state, and observations run in reverse-causal order (the nested transition is observed before the outer one completes). Listeners must **not** assume `info.to === getState()` under reentrancy. (Edge #4 covers `send()`'s **return value**; this covers the **`TransitionInfo`** seen by listeners.) |
+
+> † Documented behavioral guarantees (sharp edges), not yet covered by dedicated property tests — see [#755](https://github.com/greydragon888/real-router/issues/755). The count in the table below reflects currently-tested invariants only.
 
 ## Test Files
 

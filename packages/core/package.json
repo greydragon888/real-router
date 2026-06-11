@@ -58,8 +58,7 @@
     }
   },
   "files": [
-    "dist",
-    "src"
+    "dist"
   ],
   "repository": {
     "type": "git",
