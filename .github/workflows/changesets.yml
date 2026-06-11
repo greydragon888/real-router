@@ -24,9 +24,13 @@ on:
 #   * Repository: real-router
 #   * Workflow: changesets.yml
 
+# Serialize publishing — never cancel a run mid-flight. cancel-in-progress: true
+# could kill `changeset publish` between npm publish and tag/release creation,
+# leaving packages on npm with no tag/Release (a latent path to the partial
+# state of #731). Queued runs wait; the reconcile step makes them idempotent.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -233,77 +237,103 @@ jobs:
             echo "=== After fallback: pushed=$PUSHED ==="
           fi
 
-      # Create GitHub releases for packages published in previous step.
-      # Two-pass approach: GitHub Releases page shows newest-first, so we
-      # create dep-bump-only releases first (they sink to the bottom) and
-      # releases with actual code changes last (they float to the top).
-      - name: Create GitHub Releases
-        if: steps.unpublished.outputs.has_unpublished == 'true'
+      # Reconcile GitHub Releases — create a Release for EVERY published package
+      # tag that lacks one, on every run (NOT gated on has_unpublished). The old
+      # step was gated `if: has_unpublished == 'true'`; a one-time failure left
+      # tags on npm+git with no Release forever, because the next run saw
+      # local==npm (has_unpublished=false) and skipped the whole release path
+      # (#731, 0.56.0 batch). Tag-driven + idempotent: existing releases are
+      # fetched once and skipped, so this can also backfill misses that an
+      # earlier failed run dropped. `set -euo pipefail` + per-step `::group::`
+      # tracing so a failure is diagnosable (the original exit 128 was not).
+      - name: Reconcile GitHub Releases
+        if: steps.check.outputs.changesets_count == '0'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
+
+          echo "::group::Fetch tags + existing releases"
+          git fetch --tags --force origin
+          # One API call for the full release set — 800+ package tags exist, so
+          # a per-tag `gh release view` sweep would be 800+ calls. Fail-fast if
+          # the list can't be fetched rather than treating all tags as missing.
+          existing=$(gh release list --limit 1000 --json tagName --jq '.[].tagName')
+          declare -A HAS_RELEASE=()
+          while IFS= read -r r; do [ -n "$r" ] && HAS_RELEASE["$r"]=1; done <<< "$existing"
+          echo "Existing releases: ${#HAS_RELEASE[@]} | package tags: $(git tag -l '*@*' | wc -l | tr -d ' ')"
+          echo "::endgroup::"
+
+          # name -> dir for packages present at HEAD (source of per-version notes)
+          declare -A PKG_DIR=()
+          for dir in packages/*/; do
+            [ -f "${dir}package.json" ] || continue
+            pname=$(node -p "require('./${dir}package.json').name")
+            PKG_DIR["$pname"]="$dir"
+          done
+
+          # Notes = the '## <version>' section of a CHANGELOG (between two headers).
+          version_notes() {
+            [ -f "$1" ] || return 1
+            awk -v v="## $2" '$0==v{f=1;next} f&&/^## /{exit} f{print}' "$1"
+          }
+          # True when that version section has a non-dependency bullet.
+          version_has_own_changes() {
+            version_notes "$1" "$2" | grep -E '^- ' | grep -qvF 'Updated dependencies'
+          }
+
           RELEASES_CREATED=""
 
-          has_own_changes() {
-            local changelog="$1/CHANGELOG.md"
-            [ -f "$changelog" ] || return 1
-            awk '/^## /{if(found) exit; found=1; next} found{print}' "$changelog" \
-              | grep -E '^- ' | grep -qvF 'Updated dependencies'
+          # $1 = deponly|featured — controls GitHub display order. GitHub lists
+          # newest-created first, so create dep-bump-only releases first (sink to
+          # bottom) and featured ones last (float to top).
+          reconcile_pass() {
+            local tag version name dir changelog notes pre
+            while IFS= read -r tag; do
+              [ -z "$tag" ] && continue
+              [ -n "${HAS_RELEASE[$tag]:-}" ] && continue
+              version="${tag##*@}"
+              name="${tag%@*}"
+              dir="${PKG_DIR[$name]:-}"
+              if [ -z "$dir" ]; then
+                echo "⏭️  $tag — no package dir at HEAD, skipping"
+                continue
+              fi
+              changelog="${dir}CHANGELOG.md"
+              if version_has_own_changes "$changelog" "$version"; then
+                [ "$1" = "featured" ] || continue
+              else
+                [ "$1" = "deponly" ] || continue
+              fi
+              # Late guard against a stale bulk list — never recreate.
+              if gh release view "$tag" >/dev/null 2>&1; then
+                echo "⏭️  $tag — release exists (late check), skipping"
+                continue
+              fi
+              notes=$(version_notes "$changelog" "$version" || true)
+              [ -n "$notes" ] || notes="Release $version"
+              pre=""
+              case "$version" in *-*) pre="--prerelease" ;; esac
+              echo "🏷️  Creating release $tag"
+              # --verify-tag: attach to the existing remote tag, never mint a new one.
+              gh release create "$tag" --verify-tag --title "$tag" --notes "$notes" $pre
+              RELEASES_CREATED="$RELEASES_CREATED $tag"
+              echo "✅ Created $tag"
+            done < <(git tag -l --sort=creatordate '*@*')
           }
 
-          create_release() {
-            local dir="$1"
-            [ -f "$dir/package.json" ] || return
-
-            local name version private tag changelog_path NOTES PRERELEASE_FLAG
-            name=$(node -p "require('./${dir}package.json').name")
-            version=$(node -p "require('./${dir}package.json').version")
-            private=$(node -p "require('./${dir}package.json').private || false")
-
-            [ "$private" = "true" ] && return
-
-            tag="${name}@${version}"
-            git rev-parse "$tag" > /dev/null 2>&1 || return
-
-            if gh release view "$tag" > /dev/null 2>&1; then
-              echo "⏭️ Release $tag already exists, skipping"
-              return
-            fi
-
-            changelog_path="${dir}CHANGELOG.md"
-            if [ -f "$changelog_path" ]; then
-              NOTES=$(awk '/^## /{if(found) exit; found=1; next} found{print}' "$changelog_path")
-            else
-              NOTES="Release ${version}"
-            fi
-
-            PRERELEASE_FLAG=""
-            if echo "$version" | grep -q "-"; then
-              PRERELEASE_FLAG="--prerelease"
-            fi
-
-            echo "🏷️ Creating release: $tag"
-            gh release create "$tag" \
-              --title "$name@$version" \
-              --notes "$NOTES" \
-              $PRERELEASE_FLAG
-
-            RELEASES_CREATED="$RELEASES_CREATED $tag"
-            echo "✅ Created release: $tag"
-          }
-
-          # Pass 1: Dep-bump-only releases (created first → appear last on GitHub)
-          for dir in packages/*/; do
-            has_own_changes "$dir" || create_release "$dir"
-          done
-
-          # Pass 2: Featured releases (created last → appear first on GitHub)
-          for dir in packages/*/; do
-            has_own_changes "$dir" && create_release "$dir"
-          done
+          echo "::group::Pass 1 — dep-bump-only"
+          reconcile_pass deponly
+          echo "::endgroup::"
+          echo "::group::Pass 2 — featured"
+          reconcile_pass featured
+          echo "::endgroup::"
 
           if [ -n "$RELEASES_CREATED" ]; then
-            echo "RELEASES_CREATED=$RELEASES_CREATED" >> $GITHUB_ENV
+            echo "RELEASES_CREATED=$RELEASES_CREATED" >> "$GITHUB_ENV"
+            echo "✅ Reconciled releases:$RELEASES_CREATED"
+          else
+            echo "✅ All package tags already have GitHub Releases"
           fi
 
       - name: Summary
@@ -315,9 +345,11 @@ jobs:
             echo "📝 Release PR created/updated" >> $GITHUB_STEP_SUMMARY
           elif [ "${{ steps.unpublished.outputs.has_unpublished }}" = "true" ]; then
             echo "📦 Published packages:${{ steps.unpublished.outputs.packages }}" >> $GITHUB_STEP_SUMMARY
-            if [ -n "$RELEASES_CREATED" ]; then
+            if [ -n "${RELEASES_CREATED:-}" ]; then
               echo "🏷️ Created releases:$RELEASES_CREATED" >> $GITHUB_STEP_SUMMARY
             fi
+          elif [ -n "${RELEASES_CREATED:-}" ]; then
+            echo "🏷️ Reconciled missing releases:$RELEASES_CREATED" >> $GITHUB_STEP_SUMMARY
           else
             echo "✅ All packages are up to date" >> $GITHUB_STEP_SUMMARY
           fi

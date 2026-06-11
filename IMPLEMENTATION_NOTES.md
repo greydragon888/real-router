@@ -189,12 +189,27 @@ This approach ensures:
 **Removed:** `dts-bundle-generator` and `scripts/generate-dts.mjs` are no longer used.
 
 **GitHub Releases:**
-Per-package releases — each published package gets its own GitHub release via `gh release create`:
+Per-package releases — every published package tag gets its own GitHub release via `gh release create`:
 
 - Tag format: `{package-name}@{version}` (e.g., `@real-router/core@0.2.0`)
-- Release notes extracted from each package's `CHANGELOG.md` (first `## ` section)
-- Skips if release already exists (idempotent)
+- Release notes extracted from that **version's** `## <version>` section of the package's `CHANGELOG.md`
+- Skips if release already exists (idempotent — existing releases fetched once via `gh release list`)
 - Two-pass creation: dep-bump-only releases first (sink to bottom on GitHub), then featured releases with actual code changes (float to top)
+- Reconciled on **every** run, tag-driven (not gated on "did we publish this run") — see "Idempotent GitHub-Release reconciliation (#731)" below
+
+### Idempotent GitHub-Release reconciliation (#731)
+
+**Problem.** The release pipeline was **not idempotent across runs**. `Create GitHub Releases` was gated `if: steps.unpublished.outputs.has_unpublished == 'true'` and iterated *current* `packages/*/` versions. When that step failed once (observed: run 27213292219, `exit 128`, no diagnostics — the `run:` had no `set -euo pipefail`/tracing), the packages were already on npm with tags pushed, so the **next** run saw `local == npm` → `has_unpublished=false` → the entire publish/release branch was skipped → the missing releases were never recreated. The 0.56.0 batch shipped to npm with 15/16 GitHub Releases missing, recoverable only by hand. A second latent path: `concurrency.cancel-in-progress: true` could cancel a run between `npm publish` and tag/release creation.
+
+**Solution.** Three changes in `changesets.yml`:
+
+1. **Replaced `Create GitHub Releases` with `Reconcile GitHub Releases`** — gated only on `changesets_count == '0'` (the publish branch), **not** on `has_unpublished`, so it runs on every publish-path invocation including no-op ones. It is **tag-driven**: enumerate `git tag -l '*@*'`, skip any tag already in the one-shot `gh release list` set, and create the rest. This both creates this run's releases *and* backfills any an earlier failed run dropped. Per-version notes come from the `## <version>` CHANGELOG section (not the file's top section, so backfilled older tags get correct notes). `--verify-tag` ensures it attaches to the existing remote tag and never mints a new one.
+2. **`set -euo pipefail` + `::group::` tracing** so a failure is diagnosable (the original `exit 128` was not). `gh release list` failure is fail-fast, not silently "treat all tags as missing".
+3. **`concurrency.cancel-in-progress: false`** — serialize publishing, never cancel a run mid-`changeset publish`.
+
+**Why tag-driven, not current-version.** Iterating current `packages/*/` versions only reconciles the latest batch; if a release is missed and then a *newer* version is published before the next reconcile, the older miss is orphaned forever. Enumerating tags closes that gap. Cost is bounded by fetching the full release set in a single `gh release list --limit 1000` call (800+ tags exist — a per-tag `gh release view` sweep would be 800+ API calls) and a late per-candidate `gh release view` guard only for the few that look missing.
+
+**Verified** (dry-run of the exact reconcile shell against the live repo, `gh release create` stubbed): on the real tag set it flags exactly the genuine gaps — e.g. it surfaced `@real-router/ssr-data-plugin@0.3.4` (tag present, Release absent) with correct notes, while skipping all 864 existing releases; the two-pass ordering and per-version notes/`--prerelease` detection were confirmed against `@real-router/core@0.56.0` (featured, 36-line notes) vs `@real-router/sources@0.8.5` (dep-only, 4-line notes). `actionlint` on the workflow: no new findings.
 
 ### SonarCloud Version
 
