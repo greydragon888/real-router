@@ -198,11 +198,10 @@ export function navigateWithHash(
 const WHITESPACE_PROBE = /\s/;
 const WHITESPACE_SPLIT = /\S+/g;
 
-function parseTokens(value: string | undefined): string[] {
-  if (!value) {
-    return [];
-  }
-
+// `value` is always a truthy class string: both call sites narrow it first
+// (`if (isActive && activeClassName)` / `if (!baseClassName) return …`), so the
+// former `if (!value) return []` guard was unreachable dead code (#809).
+function parseTokens(value: string): string[] {
   // Hot-path fast-path (audit-2026-05-17 §8b #1): >99% of active-class
   // inputs at `<Link>` emit are single-token strings like `"active"` or
   // `"is-current"` — no whitespace, no leading/trailing pad. Skip the

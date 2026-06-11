@@ -155,13 +155,12 @@ function resolveMode(
 ): SsrMode {
   if (ssr === undefined || ssr === true) return "full";
 
-  if (ssr === false) {
-    if (!allowed.includes("client-only")) {
-      rejectMode("client-only", allowed, prefix, route);
-    }
-
-    return "client-only";
-  }
+  // `ssr: false` always means client-only. Both consumers of this factory
+  // (ssr-data-plugin: all modes; rsc-server-plugin: ["full", "client-only"])
+  // permit client-only, so there is no reachable config that would reject it
+  // here — the former defensive `if (!allowed.includes("client-only")) reject`
+  // was dead code (verified by union coverage across both plugins, #809).
+  if (ssr === false) return "client-only";
 
   const value = typeof ssr === "function" ? ssr(state) : ssr;
 
