@@ -3987,3 +3987,24 @@ A **post-commit, fire-and-forget** event `TREE_CHANGED`, emitted after each stru
 
 **Consumer guidance.** The recommended way to consume `TREE_CHANGED` — declarative `switch (event.op)` in the cache owner's constructor, per-cache subscription, no centralized `CacheManager` — is documented in [packages/core/CLAUDE.md](packages/core/CLAUDE.md) ("Recommended pattern: declarative reactive cache invalidation"). Consumers migrated: `search-schema-plugin` (closes a real `update`/`replace` validation gap), `preload-plugin` and `lifecycle-plugin` (evict route-keyed compiled caches for removed routes; preload additionally invalidates its href-keyed pre-resolved `State` cache to prevent `getPreloadedState` from returning a snapshot for a removed route). `ssr-data-plugin` / `rsc-server-plugin` were intentionally not migrated — their compiled map is derived from the developer-provided `loaders` config, not the tree, so a tree mutation never makes a loader stale.
 
+## Electron e2e: explicit binary install in CI (`examples.yml`)
+
+### Problem
+
+The scheduled **Examples** workflow's E2E job failed every run on all three `desktop/electron/*` examples with `electron.launch: ENOENT: no such file or directory, open '…/electron/path.txt'`. Playwright's `_electron.launch` resolves the Electron binary through `path.txt`, written by Electron's `postinstall` (`install.js`) after it downloads + extracts the binary. The file was simply not there.
+
+### Solution
+
+Added an **Install Electron binary** step to the `e2e` job (after `playwright install`), mirroring the existing Playwright-browser step:
+
+```yaml
+- name: Install Electron binary
+  run: node "$(pnpm --filter electron-react-example exec node -p "require.resolve('electron/install.js')")"
+```
+
+Resolving `electron/install.js` from an example package (electron is a transitive dep, hoisted under `node_modules/.pnpm`) and running it with `node` re-runs the installer directly. `pnpm rebuild electron` / `pnpm rebuild -r electron` do **not** work here — electron is not a direct dependency of any workspace root pnpm will match, so they no-op.
+
+### Why the postinstall is skipped (and a CI step is the right fix)
+
+`electron` is in root `pnpm.onlyBuiltDependencies`, so its build script is approved. But its side effects — the binary under `~/.cache/electron` and `path.txt` in `node_modules` — are **not** captured by `cache: pnpm` (which only caches the pnpm store, not `node_modules` or `~/.cache`). pnpm 10 records a per-package "built" flag in the store; on a warm-store runner it sees electron as already built and skips re-running `install.js` into the fresh `node_modules`, so `path.txt` never reappears. Verified locally: deleting `dist/` + `path.txt` and re-running `pnpm install --frozen-lockfile` does **not** regenerate them, while running `install.js` directly does. An explicit install step is deterministic regardless of store-cache warmth. (The Electron tests themselves are healthy — they pass locally once the binary is present.)
+

@@ -62,11 +62,11 @@ test.describe("SSR (Solid)", () => {
     // client and server bundles. Server output must therefore carry
     // `data-hk` attributes on hydratable nodes — the absence proves the
     // plugin option was missed and a hydration mismatch is imminent.
-    // Solid emits `data-hk=<hex>` (no quotes around the value).
+    // Solid emits the marker as `data-hk="<hex>"` (quoted hex value).
     const response = await request.get("/users");
     const html = await response.text();
 
-    expect(html).toMatch(/<\w+ [^>]*data-hk=[0-9a-f]+/);
+    expect(html).toMatch(/<\w+ [^>]*data-hk="?[0-9a-f]+/);
   });
 
   test("client-side navigation works after hydration", async ({ page }) => {

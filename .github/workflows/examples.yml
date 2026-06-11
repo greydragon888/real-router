@@ -63,6 +63,18 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm --filter react-combined-example exec playwright install chromium --with-deps
 
+      # The desktop/electron/* examples launch the real Electron binary via
+      # Playwright's `_electron.launch`. Electron's binary is fetched by its
+      # postinstall (install.js), whose side effects — the binary under
+      # ~/.cache/electron and the `path.txt` pointer in node_modules — are NOT
+      # captured by `cache: pnpm` (which only caches the pnpm store). pnpm 10
+      # records the "built" flag in the cached store, so on a warm-store runner
+      # it skips re-running the postinstall, leaving `path.txt` absent and
+      # `electron.launch` failing with `ENOENT … electron/path.txt`. Run the
+      # installer explicitly so the binary is materialised before e2e.
+      - name: Install Electron binary
+        run: node "$(pnpm --filter electron-react-example exec node -p "require.resolve('electron/install.js')")"
+
       # Build results cached from examples job via Turbo Remote Cache.
       # --continue=dependencies-successful: a failing example's e2e must not
       # cancel the others — run every example's specs, so one CI run yields the
