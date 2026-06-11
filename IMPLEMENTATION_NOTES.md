@@ -725,6 +725,24 @@ pnpm danger:local
 
 **Configuration:** `dangerfile.ts` in project root.
 
+### Required-Check Gaps: `actionlint` for workflow-only PRs + `Validate Changesets` gating (#733)
+
+**Problem:** Two classes of change bypassed the required CI gate entirely.
+
+1. **Workflow-only PRs ran zero validation.** A PR touching only `.github/workflows/*.yml` matches the `check` job's docs/CI exclusion (`grep -vE '^(\.github/|.*\.md$)'`, `ci.yml`) → `should_run=false` → `pipeline`/`smoke`/`sonarcloud` skip → `CI Result` exits 0 early. There was no `actionlint`/yaml-lint anywhere (not in `scripts/`, hooks, or CI), and CodeQL doesn't validate workflow YAML. So the highest-risk code class — executable workflows with access to secrets and the publish path — merged through the required gate with **no** automated validation.
+2. **`Validate Changesets` was advisory.** The `protect-master` ruleset listed only `Require Changeset` + `CI Result` as required checks; the separate `Validate Changesets` job (multi-package, major-bump-before-1.0, private-package, missing-PR-ref) could `exit 1` while the PR stayed mergeable, so the pre-1.0 versioning guards didn't actually gate.
+
+**Solution:**
+
+- Added an **`actionlint` job** to `ci.yml` that runs on **every** PR with **no `should_run` gate** — so workflow-only PRs are validated. Pinned by digest: `docker://rhysd/actionlint@sha256:96d4a8c8…` (actionlint 1.7.8). The image bundles `shellcheck` + `pyflakes` (`FROM koalaman/shellcheck-alpine`), so shell bugs in `run:` blocks are caught too. Its result is folded into **`CI Result`** (added to `needs`, checked *before* the docs/CI short-circuit) — so the existing single required check now covers it, no new ruleset context needed for actionlint.
+- `SHELLCHECK_OPTS: --severity=warning` drops the ~45 benign `SC2086` info findings (`>> $GITHUB_OUTPUT` and friends — unquoted but space-free) plus `SC2001` style noise, while keeping warnings, errors, and actionlint's own expression/script-injection rules **gating**.
+- Fixed the two genuine findings the linter surfaced so the gate passes clean: (a) `github.head_ref` interpolated directly into the `check` step's `run:` (script-injection class + an `SC2193` "can never be equal" **false positive** from actionlint substituting the `${{ }}` into the glob compare) → now passed via `env: HEAD_REF:` and compared as `"$HEAD_REF"`; (b) the lcov path-fix loop's `for … in $(find)` (`SC2044`) + `echo|sed` (`SC2001`) → rewritten as NUL-delimited `find -print0 | while read -r -d ''` with `${lcov%…}` parameter expansion.
+- Added **`Validate Changesets`** to `required_status_checks` in the `protect-master` ruleset (repo setting, applied via `gh api -X PUT repos/greydragon888/real-router/rulesets/12148150`). The job runs on every PR with no job-level `if` and handles release-PR deleted changesets gracefully (`[ -f "$file" ]` skip), so it always reports a status and won't deadlock the automated `changeset-release/*` PR.
+
+**Why folding actionlint into `CI Result` instead of a new required context:** keeps the "single required status check" invariant (`ci.yml` GATE comment) — one context to configure, and the gate already aggregates skip-aware results. actionlint has no `if`, so its result is always `success`/`failure` (never `skipped`); the gate requires strict `success` for it, checked ahead of the `should_run != true` early-exit precisely so a workflow-only PR can't pass without it.
+
+**Verification:** ran the pinned version locally (`actionlint` 1.7.8 + shellcheck 0.11.0). With `SHELLCHECK_OPTS=--severity=warning` the full workflow set lints clean (exit 0); at full severity only the suppressed `SC2086` info remains, and no expression/injection findings survive.
+
 ## GitHub Repository Config
 
 ### CODEOWNERS
