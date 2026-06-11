@@ -46,13 +46,9 @@ jobs:
             exit 0
           fi
 
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BASE="${{ github.event.pull_request.base.sha }}"
-            HEAD="${{ github.event.pull_request.head.sha }}"
-          else
-            BASE="${{ github.event.before }}"
-            HEAD="${{ github.sha }}"
-          fi
+          # pull_request-only workflow — base/head come straight from the PR event.
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
 
           # Get changed files, excluding docs and CI configs
           CODE_CHANGES=$(git diff --name-only "$BASE" "$HEAD" | grep -vE '^(\.github/|.*\.md$)' | head -1)
@@ -65,9 +61,13 @@ jobs:
             echo "🔍 Code changes detected, running full CI"
           fi
 
-      # Set Turbo SCM base for --affected:
-      # - Push: compare with previous commit (github.event.before)
-      # - PR: turbo auto-detects merge base with master (no override needed)
+      # Turbo `--affected` base. This is a pull_request-only workflow, so the
+      # step below is currently inert: its push branch never runs, `turbo_base`
+      # stays empty, and the pipeline/bundle filters use their
+      # `|| 'origin/master'` fallback — i.e. affected packages are computed
+      # relative to origin/master, NOT auto-detected per the old comment (#735).
+      # The push branch is retained so the step keeps working if a push trigger
+      # is ever added.
       - name: Set Turbo SCM base
         id: turbo
         run: |
@@ -586,7 +586,7 @@ jobs:
               }
             }
 
-            body += `\n<details><summary>Size limits configured in <code>.size-limit.json</code></summary>\n\n`;
+            body += `\n<details><summary>Size limits configured in <code>.size-limit.js</code></summary>\n\n`;
             body += `Run \`pnpm size\` locally to check bundle sizes.\n</details>`;
 
             const { data: comments } = await github.rest.issues.listComments({

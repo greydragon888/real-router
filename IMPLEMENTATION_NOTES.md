@@ -759,6 +759,22 @@ pnpm danger:local
 
 **Verification:** actionlint clean on both edited workflows (CI config, exit 0). Simulated both shell blocks' success + fallback paths (JSON-with-exit-1 captured, empty→`[]`, no-run→`[]`, no-artifact→`[]`, all producing valid `GITHUB_OUTPUT` heredocs). Confirmed `size-limit --json` shape (`[{name,size,passed,sizeLimit}]`) matches what `bundle-size`'s comparison script consumes, and the `package.json` version read returns `5.0.4`.
 
+### Config hygiene batch (#735)
+
+**Problem:** Low-risk config inconsistencies and dead/misleading bits found in the infra review — none blocked CI, each a correctness/clarity fix.
+
+**Solution (one fix per item):**
+
+1. **size-limit filename.** The config is `.size-limit.js`, but `dangerfile.ts` matched `/^\.size-limit\.json$/` and `ci.yml`'s bundle-size comment printed `.size-limit.json`. → Danger's IMPLEMENTATION_NOTES reminder never fired on `.size-limit.js` edits, and the PR comment named the wrong file. Widened the Danger regex to `/^\.size-limit\.(js|cjs|mjs|json)$/` and corrected the `ci.yml` comment to `.size-limit.js`.
+2. **czg ↔ commitlint scope drift.** `cz.config.js` had `allowCustomScopes: true` while `commitlint.config.mjs` errors on any scope outside `SCOPES` (`scope-enum`), so an interactive `pnpm commit` could produce a message the `commit-msg` hook then rejected. → `allowCustomScopes: false` (czg already imports `TYPES`/`SCOPES` from the commitlint config, so the allowed set stays single-sourced).
+3. **Stale Sonar version.** `sonar-project.properties` pinned `sonar.projectVersion=0.1.0`; CI overrides it per-run from `packages/core/package.json` (`-D` arg beats the file), so the literal only misled local `pnpm sonar`. → Dropped the line, replaced with a comment pointing at the CI step.
+4. **Dead `else` in `check`.** The `BASE`/`HEAD` block had a `push` branch (`github.event.before`/`github.sha`), but the workflow is `pull_request`-only → unreachable. → Removed; `BASE`/`HEAD` now come straight from the PR event.
+5. **Misleading Turbo SCM comment.** Said "PR: turbo auto-detects merge base (no override needed)", but the pipeline filter always falls back to `[origin/master]` (`turbo_base` is empty on PRs), diffing against master's tip. → Comment rewritten to state the step is inert on PRs and affected is computed relative to `origin/master`. (Step body kept — issue scoped this to the comment.)
+6. **PAT persisted in `.git/config`.** `changesets.yml` did `git remote set-url origin "https://x-access-token:${GH_TOKEN}@…"`, writing the PAT into `.git/config` in plaintext for the rest of the job. → Push to a one-shot authenticated URL (`git push "$REMOTE" …`) so the token lives only in the step's env, never on disk. No other command relied on an authenticated `origin` (the later `git fetch origin` is read-only / public).
+7. **EOL alignment.** `prettier.config.mjs` had `endOfLine: "auto"` (preserves whatever's there) vs `.editorconfig` `end_of_line = lf`. The repo has **zero** CRLF-tracked files. → `endOfLine: "lf"` to actually enforce it; verified no new `prettier/prettier` violations on real source.
+
+**Verification:** actionlint clean (CI config) on the edited `ci.yml` + `changesets.yml`; the Danger regex matches `.js/.cjs/.mjs/.json` and rejects near-misses; `cz.config.js` loads with `allowCustomScopes: false` and `commitlint.config.mjs` still exposes the shared `scope-enum`; `git grep -Il $'\r'` returns 0 tracked CRLF files and `eslint` over `packages/core/src/**` reports no `prettier/prettier` issues under `lf` (`dangerfile.ts`'s pre-existing lint errors are out of the gate — per-package lint only globs each package's `src/`+`tests/`).
+
 ## GitHub Repository Config
 
 ### CODEOWNERS

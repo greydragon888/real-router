@@ -18,7 +18,7 @@ const INFRASTRUCTURE_PATTERNS = [
   /\.config\.(js|mjs|mts|ts)$/,
   /^turbo\.json$/,
   /^tsconfig\.json$/,
-  /^\.size-limit\.json$/,
+  /^\.size-limit\.(js|cjs|mjs|json)$/,
   /^\.jscpd\.json$/,
   /^knip\.json$/,
   /^syncpack\.config\.mjs$/,

@@ -13,7 +13,9 @@ const config = {
   trailingComma: "all",
   bracketSpacing: true,
   arrowParens: "always",
-  endOfLine: "auto"
+  // lf to match .editorconfig `end_of_line = lf` (the repo has no CRLF files);
+  // "auto" only preserved whatever was there, leaving EOL unenforced (#735).
+  endOfLine: "lf",
 };
 
 export default config;
