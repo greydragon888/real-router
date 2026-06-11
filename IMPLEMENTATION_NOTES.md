@@ -743,6 +743,22 @@ pnpm danger:local
 
 **Verification:** ran the pinned version locally (`actionlint` 1.7.8 + shellcheck 0.11.0). With `SHELLCHECK_OPTS=--severity=warning` the full workflow set lints clean (exit 0); at full severity only the suppressed `SC2086` info remains, and no expression/injection findings survive.
 
+### CI minute savings: `duplication` dlx-only + `bundle-size` base-from-master (#734)
+
+**Problem:** Two **informational** downstream jobs (neither in the required gate) spent CI minutes on redundant installs/builds. With turbo's remote-cache hit-rate high, the dominant cost is repeated `pnpm install`, not rebuilds.
+
+1. `duplication` ran a full 32-package `pnpm install --frozen-lockfile` purely to get the `jscpd` binary, then `pnpm lint:duplicates:sarif`.
+2. `bundle-size` did a **double install + double bundle**: PR side (download dist + install + `turbo run bundle`) **and** base side (checkout base + install + full bundle) to measure the diff.
+
+**Solution:**
+
+- **`duplication`:** dropped the install step; the duplication step now runs `pnpm dlx "jscpd@$(node -p '…devDependencies.jscpd')" packages/*/src/ …`. jscpd 5.x is the Rust `cpd` rewrite with **no** workspace-package dependencies — its engine ships as a platform binary via `optionalDependencies` (`cpd-linux-x64-gnu` on CI), and it only reads `packages/*/src/`. dlx hardlinks jscpd from the setup-node pnpm-store cache, skipping the 32-package link. Version is read from `package.json` so a Dependabot bump can't drift; args mirror the root `lint:duplicates:sarif` script (`-t 100` ⇒ always exit 0). Verified locally: `pnpm dlx jscpd@5.0.4 …` emits byte-identical SARIF (7 results) to the installed binary.
+- **`bundle-size` base side:** `post-merge.yml` (push → master) now measures `size-limit --json` after its build and uploads a `master-bundle-sizes` artifact (90-day retention). The PR job downloads that artifact for base sizes via `gh run list/download` (latest successful post-merge run; `github.base_ref` *is* master, so that run built the exact baseline) instead of re-checking-out + re-installing + re-bundling the base branch. This removes one full `pnpm install`, one full `turbo run bundle`, the base checkout, and the `turbo.json` save/restore dance — net **simpler** job. Needs `actions: read` on the job for the cross-workflow artifact read.
+
+**Why a download-with-fallback, not a hard dependency:** the base artifact can be absent — the first PR after this lands (before that PR's own post-merge run uploads one) or after retention ages out. Both new shell blocks degrade to a valid `[]`: `size-limit` exits non-zero when a limit is exceeded but still prints its JSON, so post-merge captures it with `… || true` then guards `[ -s file ] || echo '[]'`; the PR side falls back to `sizes='[]'` when `gh` finds no run/artifact. Empty base ⇒ every package shows as "new" — exactly the pre-existing behaviour when base measurement failed, so the comparison comment never errors. Both jobs stay **informational** (not in `CI Result`'s `needs`), so even a hard failure can't block a merge.
+
+**Verification:** actionlint clean on both edited workflows (CI config, exit 0). Simulated both shell blocks' success + fallback paths (JSON-with-exit-1 captured, empty→`[]`, no-run→`[]`, no-artifact→`[]`, all producing valid `GITHUB_OUTPUT` heredocs). Confirmed `size-limit --json` shape (`[{name,size,passed,sizeLimit}]`) matches what `bundle-size`'s comparison script consumes, and the `package.json` version read returns `5.0.4`.
+
 ## GitHub Repository Config
 
 ### CODEOWNERS

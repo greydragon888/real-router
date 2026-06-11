@@ -299,11 +299,18 @@ jobs:
           node-version: 24
           cache: pnpm
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
+      # jscpd only reads packages/*/src/ and has NO workspace-package deps — its
+      # engine ships as a platform binary via optionalDependencies (cpd-<arch>).
+      # So skip the full 32-package `pnpm install` (~30-60s on a store cache-miss,
+      # #734) and fetch only jscpd via dlx (hardlinked from the setup-node pnpm
+      # store cache). The version is read from package.json so a Dependabot jscpd
+      # bump can't drift. Args mirror the root `lint:duplicates:sarif` script
+      # (-t 100 = threshold 100 so jscpd always exits 0 — this job is
+      # informational, it only uploads SARIF to Code Scanning, never gates).
       - name: Detect duplication (SARIF)
-        run: pnpm lint:duplicates:sarif
+        run: |
+          jscpd_version="$(node -p "require('./package.json').devDependencies.jscpd")"
+          pnpm dlx "jscpd@${jscpd_version}" packages/*/src/ --no-tips -t 100 -r sarif -o jscpd-report
 
       - name: Upload SARIF to Code Scanning
         if: always()
@@ -429,6 +436,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+      actions: read # gh run list/download of the master bundle-size artifact (#734)
     steps:
       # ── PR sizes: start from pipeline's dist artifact (affected + upstream),
       #    then fill in non-affected packages from turbo remote cache so
@@ -469,32 +477,37 @@ jobs:
           echo "${output:-[]}" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      # ── Base sizes: use PR's turbo.json (build task is guaranteed to exist) ──
-      - name: Save turbo.json from PR
-        run: cp turbo.json /tmp/turbo.json.pr
-
-      - name: Checkout base branch
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ github.base_ref }}
-          clean: false
-
-      - name: Restore turbo.json from PR
-        run: cp /tmp/turbo.json.pr turbo.json
-
-      - name: Install base dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build base branch
-        run: pnpm turbo run bundle --filter='./packages/*'
-
-      - name: Get base sizes
+      # ── Base sizes: download master's sizes published by post-merge.yml (#734)
+      #    instead of re-checking-out + re-installing + re-bundling the base
+      #    branch on every PR. github.base_ref is master, and the latest
+      #    successful post-merge run built exactly that tip, so its artifact is
+      #    the right baseline. Falls back to [] (every package shown as "new",
+      #    same as the old behaviour when base measurement failed) when no
+      #    artifact exists yet — e.g. the first PR opened before this change's
+      #    own post-merge run lands, or after the 90-day retention ages out.
+      - name: Download base sizes from master
         id: base_sizes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "sizes<<EOF" >> $GITHUB_OUTPUT
-          output=$(npx size-limit --json 2>/dev/null) || true
-          echo "${output:-[]}" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          sizes='[]'
+          run_id="$(gh run list -R "$GITHUB_REPOSITORY" --workflow=post-merge.yml \
+            --branch=master --status=success --limit=1 \
+            --json databaseId --jq '.[0].databaseId' 2>/dev/null || true)"
+          if [ -n "$run_id" ] \
+            && gh run download "$run_id" -R "$GITHUB_REPOSITORY" \
+                 --name master-bundle-sizes --dir /tmp/base-sizes 2>/dev/null \
+            && [ -s /tmp/base-sizes/master-bundle-sizes.json ]; then
+            sizes="$(cat /tmp/base-sizes/master-bundle-sizes.json)"
+            echo "✓ Base sizes from post-merge run $run_id"
+          else
+            echo "ℹ️ No master bundle-size artifact — base defaults to [] (sizes shown as new)"
+          fi
+          {
+            echo "sizes<<EOF"
+            echo "$sizes"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Compare and comment
         uses: actions/github-script@v9

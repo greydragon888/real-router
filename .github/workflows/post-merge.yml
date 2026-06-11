@@ -43,3 +43,21 @@ jobs:
         run: >-
           pnpm turbo run bundle test test:properties
           --filter='!./examples/**'
+
+      # Publish master's bundle sizes so each PR's `bundle-size` job can diff
+      # against them via artifact download — instead of re-checking-out,
+      # re-installing, and re-bundling the base branch on every PR (#734).
+      # size-limit exits non-zero when a limit is exceeded but still prints the
+      # JSON report; capture it and keep the step green (this is a measurement,
+      # not a gate). The guard guarantees valid JSON even if nothing was emitted.
+      - name: Measure bundle sizes (base for PR diffs)
+        run: |
+          npx size-limit --json > master-bundle-sizes.json 2>/dev/null || true
+          [ -s master-bundle-sizes.json ] || echo '[]' > master-bundle-sizes.json
+
+      - name: Upload base bundle sizes
+        uses: actions/upload-artifact@v7
+        with:
+          name: master-bundle-sizes
+          path: master-bundle-sizes.json
+          retention-days: 90
