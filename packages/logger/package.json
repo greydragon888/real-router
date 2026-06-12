@@ -47,7 +47,9 @@
     "bench": "NODE_OPTIONS='--expose-gc --max-old-space-size=4096' npx tsx tests/benchmarks/index.ts",
     "test:mutation": "stryker run",
     "test:mutation:report": "open reports/mutation-report.html",
-    "bundle": "tsdown --config-loader unrun"
+    "bundle": "tsdown --config-loader unrun",
+    "lint:package": "publint",
+    "lint:types": "attw --pack ."
   },
   "sideEffects": false
 }

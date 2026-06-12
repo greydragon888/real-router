@@ -118,7 +118,7 @@ echo
 
 # Printed as copy-paste hints in the review path below; in --merge they're run
 # directly with quoted args, never via eval (#814).
-PUSH_CMD="git push --force-with-lease origin $BRANCH"
+PUSH_CMD="git push --force-with-lease origin \"$BRANCH\""
 MERGE_CMD="gh pr merge $PR --squash --delete-branch"
 
 if [ "$DO_MERGE" -eq 1 ]; then

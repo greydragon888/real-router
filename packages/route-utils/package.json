@@ -44,7 +44,9 @@
     "test": "vitest run",
     "test:properties": "vitest --config vitest.config.properties.mts --run",
     "bench": "NODE_OPTIONS='--expose-gc --max-old-space-size=4096' npx tsx tests/benchmarks/index.ts",
-    "bundle": "tsdown --config-loader unrun"
+    "bundle": "tsdown --config-loader unrun",
+    "lint:package": "publint",
+    "lint:types": "attw --pack ."
   },
   "sideEffects": false,
   "devDependencies": {
