@@ -89,8 +89,17 @@ jobs:
       # --continue=dependencies-successful: a failing example's e2e must not
       # cancel the others — run every example's specs, so one CI run yields the
       # complete list of failing e2e tests instead of stopping at the first.
+      #
+      # xvfb-run: the desktop/electron/* examples launch a real Electron (a GUI
+      # app) via `_electron.launch`. The runner is headless, so without a virtual
+      # display Electron dies on platform init ("Missing X server or $DISPLAY" →
+      # SIGSEGV). Xvfb is preinstalled on ubuntu-latest; depth 24 (Chromium
+      # dislikes the 8-bit default). Web examples run headless Chromium and ignore
+      # the display. (#812)
       - name: Run E2E tests
-        run: pnpm turbo run test:e2e --filter='./examples/**' --concurrency=1 --continue=dependencies-successful
+        run: >-
+          xvfb-run -a --server-args="-screen 0 1280x1024x24"
+          pnpm turbo run test:e2e --filter='./examples/**' --concurrency=1 --continue=dependencies-successful
 
       - name: Upload Playwright report
         if: failure()

@@ -4068,6 +4068,27 @@ The script resolves the shared `.pnpm/electron@X` dir, downloads `electron-v<ver
 
 Both failed the **same** way on the ubuntu runner: the install step exited **0 after printing only the first log line**, with no `path.txt` written and the postcondition guard never reached — a green step that installed nothing, so `_electron.launch` still threw `ENOENT … path.txt`. Root cause: `@electron/get`'s download does **not keep the Node event loop alive** on this runner, so the process drains and exits 0 **at the `await`** — `await` cannot keep a process alive for a promise that schedules no libuv work. (`electron/index.js:47` reads `path.txt` outside its `try`, turning the missing file into the launch ENOENT.) Locally on macOS the same download *does* keep the loop alive (verified: a forced cache-miss download stayed running >6 s), so the race was invisible there — which is exactly why a Node-based fix can't be trusted for this. The bash version removes Node from the download path entirely: `curl` blocks under `set -e`, and the postcondition is a `[ -f ]` test that always runs. `pnpm rebuild electron` / `pnpm rebuild -r electron` do **not** help — electron is not a direct dependency of any workspace root pnpm will match, so they no-op.
 
+#### Second layer: headless runner has no display (xvfb)
+
+Once the binary actually launched (curl fix above), a **different** failure surfaced — previously masked by the missing `path.txt`: Electron is a GUI app and the runner is headless, so it died on platform init:
+
+```
+[ERROR:ui/ozone/platform/x11/ozone_platform_x11.cc:257] Missing X server or $DISPLAY
+[ERROR:ui/aura/env.cc:246] The platform failed to initialize.  Exiting.
+<process did exit: signal=SIGSEGV>
+```
+
+`_electron.launch` then reported `Process failed to launch!` (or timed out before `firstWindow`). Fix: run the whole e2e step under **`xvfb-run`** (Xvfb is preinstalled on ubuntu-latest), with `-screen 0 1280x1024x24` (Chromium needs ≥24-bit depth; the xvfb-run default is 8-bit):
+
+```yaml
+- name: Run E2E tests
+  run: >-
+    xvfb-run -a --server-args="-screen 0 1280x1024x24"
+    pnpm turbo run test:e2e --filter='./examples/**' --concurrency=1 --continue=dependencies-successful
+```
+
+Web examples run headless Chromium and ignore the virtual display; only the electron examples need it. Wrapping at the CI level (not in the examples' own `test:e2e` scripts) keeps the examples cross-platform — a developer on macOS/Windows still runs them against the native display.
+
 ### Why the postinstall is skipped (and a CI step is the right fix)
 
 `electron` is in root `pnpm.onlyBuiltDependencies`, so its build script is approved. But its side effects — the binary under `~/.cache/electron` and `path.txt` in `node_modules` — are **not** captured by `cache: pnpm` (which only caches the pnpm store, not `node_modules` or `~/.cache`). pnpm 10 records a per-package "built" flag in the store; on a warm-store runner it sees electron as already built and skips re-running `install.js` into the fresh `node_modules`, so `path.txt` never reappears. Verified locally: deleting `dist/` + `path.txt` and re-running `pnpm install --frozen-lockfile` does **not** regenerate them, while running `install.js` directly does. An explicit install step is deterministic regardless of store-cache warmth. (The Electron tests themselves are healthy — they pass locally once the binary is present.)
