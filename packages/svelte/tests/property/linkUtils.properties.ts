@@ -673,22 +673,22 @@ describe("parseTokens — contract locks (via buildActiveClassName)", () => {
       { label: "undefined input", input: undefined, expectedBaseTokens: [] },
       {
         label: "NBSP separator (U+00A0)",
-        input: "a b",
+        input: "a\u00A0b",
         expectedBaseTokens: ["a", "b"],
       },
       {
         label: "LINE SEPARATOR (U+2028)",
-        input: "a b",
+        input: "a\u2028b",
         expectedBaseTokens: ["a", "b"],
       },
       {
         label: "PARAGRAPH SEPARATOR (U+2029)",
-        input: "a b",
+        input: "a\u2029b",
         expectedBaseTokens: ["a", "b"],
       },
       {
         label: "OGHAM SPACE MARK (U+1680)",
-        input: "a b",
+        input: "a\u1680b",
         expectedBaseTokens: ["a", "b"],
       },
       {

@@ -99,12 +99,20 @@
     return () => vt.destroy();
   });
 
+  // svelte-ignore state_referenced_locally
+  // The router instance is stable for the provider lifetime.
   const navigator = getNavigator(router);
+  // svelte-ignore state_referenced_locally
+  // The route source intentionally captures the initial router instance.
   const source = createRouteSource(router);
   const reactive = createReactiveSource(source);
   const routeContext = createRouteContext(navigator, reactive);
 
+  // svelte-ignore state_referenced_locally
+  // Context exposes the same stable router instance for this provider.
   setContext(ROUTER_KEY, router);
+  // svelte-ignore state_referenced_locally
+  // Context exposes the navigator derived once from the stable router.
   setContext(NAVIGATOR_KEY, navigator);
   setContext(ROUTE_KEY, routeContext);
 </script>

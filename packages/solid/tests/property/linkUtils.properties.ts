@@ -243,23 +243,29 @@ describe("buildActiveClassName — Property Tests (Solid)", () => {
   });
 
   describe("Invariant 7a: Conservation — |outputTokens| ≤ |baseTokens| + |activeTokens| (audit-2026-05-17 §6 Stage-2)", () => {
-    // The dedup logic in buildActiveClassName guarantees no token-count
-    // amplification: the result token set is a subset of `base ∪ active`,
-    // never adds anything else. A regression that double-appended a token
-    // (forgotten `if (!seen.has(token))` guard) or injected a phantom
-    // marker would inflate this count.
+    // No token amplification: buildActiveClassName only ever DROPS tokens
+    // (active tokens already present in base), never invents them — so the
+    // output count can never exceed base + active combined.
+    //
+    // The bound is the COMBINED token counts (multiset cardinalities), exactly
+    // as this block's title states (`|out| ≤ |base| + |active|`). It is
+    // deliberately NOT a set-union: per the frozen contract (review §5.4,
+    // locked in the react/preact/vue linkUtils PBTs + functional suites) the
+    // helper dedups active-vs-base only — duplicates *within* a single string
+    // are preserved (`buildActiveClassName(true, "y", "x x")` → `"x x y"`). A
+    // set-union bound would falsely assume base-internal dedup the helper never
+    // promised and flake whenever the generator emits a base with repeats.
     test.prop([arbActiveClassName, arbBaseClassName], {
       numRuns: NUM_RUNS.standard,
     })(
-      "result token count never exceeds the union of base + active token sets",
+      "result token count never exceeds the combined base + active token counts",
       (active, base) => {
         const result = buildActiveClassName(true, active, base) ?? "";
         const resultCount = result.split(/\s+/).filter(Boolean).length;
-        const baseTokens = new Set(base.split(/\s+/).filter(Boolean));
-        const activeTokens = new Set(active.split(/\s+/).filter(Boolean));
-        const unionSize = new Set([...baseTokens, ...activeTokens]).size;
+        const baseCount = base.split(/\s+/).filter(Boolean).length;
+        const activeCount = active.split(/\s+/).filter(Boolean).length;
 
-        expect(resultCount).toBeLessThanOrEqual(unionSize);
+        expect(resultCount).toBeLessThanOrEqual(baseCount + activeCount);
       },
     );
   });
