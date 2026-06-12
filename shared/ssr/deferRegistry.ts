@@ -133,11 +133,11 @@ export function getDeferBootstrapScript(): string {
 // terminate string literals / regex literals at parse time on legacy
 // JS engines and even in modern TS parsers under some configs).
 const ESCAPE_FOR_SCRIPT_PAIRS: readonly (readonly [string, string])[] = [
-  ["<", "\\u003c"],
-  [">", "\\u003e"],
-  ["&", "\\u0026"],
-  [String.fromCodePoint(0x20_28), "\\u2028"],
-  [String.fromCodePoint(0x20_29), "\\u2029"],
+  ["<", String.raw`\u003c`],
+  [">", String.raw`\u003e`],
+  ["&", String.raw`\u0026`],
+  [String.fromCodePoint(0x20_28), String.raw`\u2028`],
+  [String.fromCodePoint(0x20_29), String.raw`\u2029`],
 ] as const;
 const ESCAPE_FOR_SCRIPT_TABLE: Record<string, string> = Object.fromEntries(
   ESCAPE_FOR_SCRIPT_PAIRS,
