@@ -4049,10 +4049,10 @@ Added an **Install Electron binary** step to the `e2e` job (after `playwright in
 
 ```yaml
 - name: Cache Electron binary
-  uses: actions/cache@v4
+  uses: actions/cache@v5
   with:
     path: ~/.cache/electron-zip
-    key: electron-zip-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+    key: electron-zip-${{ runner.os }}-${{ hashFiles('examples/desktop/electron/*/package.json') }}
     restore-keys: electron-zip-${{ runner.os }}-
 
 - name: Install Electron binary
@@ -4060,6 +4060,13 @@ Added an **Install Electron binary** step to the `e2e` job (after `playwright in
 ```
 
 The script resolves the shared `.pnpm/electron@X` dir, downloads `electron-v<ver>-linux-x64.zip` with **curl** (a blocking subprocess), verifies sha256 against electron's own `checksums.json`, `unzip`s it into `dist/`, writes `path.txt`, and asserts `dist/electron` + `path.txt` exist. All three electron examples share one `.pnpm/electron@42.3.3`, so one install covers all. The zip is cached so repeat runs skip the ~128 MB download; the script self-heals on a stale/corrupt cache (checksum re-verify → re-download).
+
+**Hardening follow-up (post-review, #812):**
+
+- **Platform guard** — the script refuses to run on anything but `Linux/x86_64`. The zip name, the `path.txt` payload (`electron`), and the unzip layout are linux-x64 specific: running it locally on macOS would wipe the native `dist/` and install a foreign binary (recoverable only by re-running electron's own `install.js`); on a future arm runner it would silently install an x64 binary that can't exec.
+- **Cache key = electron examples' manifests, not `pnpm-lock.yaml`** — the lockfile changes with every dependency bump (weekly dependabot churn), and each new key mints a new immutable ~128 MB cache entry, pressuring the 10 GB LRU quota shared with the pnpm store cache. `examples/desktop/electron/*/package.json` only changes when the electron examples themselves do.
+- **Prune stale zips** — `restore-keys` restores the previous cache directory; after an electron bump the old `electron-v*.zip` would otherwise ride along into every newly saved entry (+~128 MB per bump). The script deletes zips that don't match the current version after a successful verify.
+- **One full re-download on checksum mismatch** — `curl --retry` does not cover a truncated `200 OK` body; a single retry absorbs one flaky transfer instead of failing the twice-weekly run.
 
 #### Why two earlier fixes failed (both superseded)
 

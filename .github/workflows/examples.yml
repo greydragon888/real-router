@@ -64,13 +64,18 @@ jobs:
         run: pnpm --filter react-combined-example exec playwright install chromium --with-deps
 
       # Persist the downloaded Electron zip across runs (~128 MB), keyed by the
-      # lockfile so an electron bump re-downloads. The installer self-heals on a
-      # stale/corrupt cache (checksum re-verify → re-download).
+      # electron examples' manifests — the only place the electron version is
+      # pinned — so only an electron bump rotates the key. (Keying by
+      # pnpm-lock.yaml minted a new immutable ~128 MB cache entry on every
+      # lockfile change — weekly dependabot churn that pressures the 10 GB LRU
+      # quota shared with the pnpm store cache.) The installer self-heals on a
+      # stale/corrupt cache (checksum re-verify → re-download) and prunes zips
+      # of other versions restored via restore-keys.
       - name: Cache Electron binary
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/electron-zip
-          key: electron-zip-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: electron-zip-${{ runner.os }}-${{ hashFiles('examples/desktop/electron/*/package.json') }}
           restore-keys: electron-zip-${{ runner.os }}-
 
       # The desktop/electron/* examples launch the real Electron binary via
