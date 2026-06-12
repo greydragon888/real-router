@@ -63,28 +63,27 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm --filter react-combined-example exec playwright install chromium --with-deps
 
-      # Persist the downloaded Electron zip across runs. `cache: pnpm` only
-      # caches the pnpm store, NOT ~/.cache/electron (where @electron/get keeps
-      # the downloaded artifact), so without this every run re-downloads ~110 MB.
+      # Persist the downloaded Electron zip across runs (~128 MB), keyed by the
+      # lockfile so an electron bump re-downloads. The installer self-heals on a
+      # stale/corrupt cache (checksum re-verify → re-download).
       - name: Cache Electron binary
         uses: actions/cache@v4
         with:
-          path: ~/.cache/electron
-          key: electron-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: electron-${{ runner.os }}-
+          path: ~/.cache/electron-zip
+          key: electron-zip-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: electron-zip-${{ runner.os }}-
 
       # The desktop/electron/* examples launch the real Electron binary via
       # Playwright's `_electron.launch`, which reads `node_modules/electron/path.txt`.
       # pnpm 10 records a "built" flag in the cached store, so on a warm-store
-      # runner it skips electron's postinstall, leaving `path.txt` absent. The
-      # previous fix (`node install.js`) inherited install.js's un-awaited
-      # download: the process could exit 0 before `path.txt` was written, so
-      # `electron.launch` still failed with `ENOENT … path.txt` (#812). This
-      # wrapper awaits the full download→extract→write and asserts the
-      # postcondition. All three electron examples share one .pnpm/electron@X,
-      # so installing via one example materialises the binary for all.
+      # runner it skips electron's postinstall, leaving `path.txt` absent. Both
+      # `node install.js` and a Node wrapper around @electron/get exit 0 *at the
+      # await* on this runner (the download never keeps the event loop alive),
+      # writing no path.txt and bypassing any guard (#812). This script downloads
+      # the release zip with curl (a blocking subprocess), verifies sha256, and
+      # extracts — no Node async — so the step cannot go green without a binary.
       - name: Install Electron binary
-        run: pnpm --filter electron-react-example exec node "$GITHUB_WORKSPACE/scripts/ci-install-electron.cjs"
+        run: bash scripts/ci-install-electron.sh
 
       # Build results cached from examples job via Turbo Remote Cache.
       # --continue=dependencies-successful: a failing example's e2e must not

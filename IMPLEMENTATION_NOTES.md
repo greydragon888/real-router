@@ -4043,34 +4043,30 @@ A **post-commit, fire-and-forget** event `TREE_CHANGED`, emitted after each stru
 
 The scheduled **Examples** workflow's E2E job failed every run on all three `desktop/electron/*` examples with `electron.launch: ENOENT: no such file or directory, open '…/electron/path.txt'`. Playwright's `_electron.launch` resolves the Electron binary through `path.txt`, written by Electron's `postinstall` (`install.js`) after it downloads + extracts the binary. The file was simply not there.
 
-### Solution (current — awaited wrapper, #812)
+### Solution (current — curl + unzip in bash, #812)
 
-Added an **Install Electron binary** step to the `e2e` job (after `playwright install`) that runs a small awaited wrapper, plus an `actions/cache` step for `~/.cache/electron`:
+Added an **Install Electron binary** step to the `e2e` job (after `playwright install`) that runs `scripts/ci-install-electron.sh`, plus an `actions/cache` step for the downloaded zip:
 
 ```yaml
 - name: Cache Electron binary
   uses: actions/cache@v4
   with:
-    path: ~/.cache/electron
-    key: electron-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-    restore-keys: electron-${{ runner.os }}-
+    path: ~/.cache/electron-zip
+    key: electron-zip-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+    restore-keys: electron-zip-${{ runner.os }}-
 
 - name: Install Electron binary
-  run: pnpm --filter electron-react-example exec node "$GITHUB_WORKSPACE/scripts/ci-install-electron.cjs"
+  run: bash scripts/ci-install-electron.sh
 ```
 
-`scripts/ci-install-electron.cjs` resolves `electron` from the example's perspective (cwd under `pnpm exec`), then **awaits** `downloadArtifact → extract → writeFile('path.txt')` and asserts the binary + `path.txt` exist before exiting. All three electron examples share one `.pnpm/electron@42.3.3`, so installing via one materialises it for all.
+The script resolves the shared `.pnpm/electron@X` dir, downloads `electron-v<ver>-linux-x64.zip` with **curl** (a blocking subprocess), verifies sha256 against electron's own `checksums.json`, `unzip`s it into `dist/`, writes `path.txt`, and asserts `dist/electron` + `path.txt` exist. All three electron examples share one `.pnpm/electron@42.3.3`, so one install covers all. The zip is cached so repeat runs skip the ~128 MB download; the script self-heals on a stale/corrupt cache (checksum re-verify → re-download).
 
-#### Why the previous `node install.js` step was not enough (superseded)
+#### Why two earlier fixes failed (both superseded)
 
-The first fix ran electron's own installer directly:
+1. `node "$(… require.resolve('electron/install.js'))"` — re-ran electron's own installer.
+2. A Node wrapper (`scripts/ci-install-electron.cjs`) that `await`ed `@electron/get`'s `downloadArtifact → extract → writeFile('path.txt')` with a postcondition assert.
 
-```yaml
-# superseded — inherited install.js's un-awaited download
-run: node "$(pnpm --filter electron-react-example exec node -p "require.resolve('electron/install.js')")"
-```
-
-`electron/install.js` fires the download as a **fire-and-forget** promise (`downloadArtifact(...).then(extractFile).catch(...)`) and writes `path.txt` only inside `extractFile`. On the ubuntu runner the process exited 0 **before** that chain settled (the install step finished in ~2 s with no output; at test time `spawnSync(install.js)` from `electron/index.js` repeated the same no-op, and the `readFileSync(path.txt)` at `electron/index.js:47` — outside the `try` — threw the observed `ENOENT … path.txt`). Locally on macOS the same un-awaited download keeps the event loop alive, so the flaw was invisible there — an environment-specific race. The wrapper removes the race by awaiting every stage and verifying the postcondition, so the step can never exit green without a usable binary. It also `rm`s any partial `dist/` first, avoiding the `EEXIST` that a half-populated dist throws on re-extract (reproduced locally). `pnpm rebuild electron` / `pnpm rebuild -r electron` do **not** help — electron is not a direct dependency of any workspace root pnpm will match, so they no-op.
+Both failed the **same** way on the ubuntu runner: the install step exited **0 after printing only the first log line**, with no `path.txt` written and the postcondition guard never reached — a green step that installed nothing, so `_electron.launch` still threw `ENOENT … path.txt`. Root cause: `@electron/get`'s download does **not keep the Node event loop alive** on this runner, so the process drains and exits 0 **at the `await`** — `await` cannot keep a process alive for a promise that schedules no libuv work. (`electron/index.js:47` reads `path.txt` outside its `try`, turning the missing file into the launch ENOENT.) Locally on macOS the same download *does* keep the loop alive (verified: a forced cache-miss download stayed running >6 s), so the race was invisible there — which is exactly why a Node-based fix can't be trusted for this. The bash version removes Node from the download path entirely: `curl` blocks under `set -e`, and the postcondition is a `[ -f ]` test that always runs. `pnpm rebuild electron` / `pnpm rebuild -r electron` do **not** help — electron is not a direct dependency of any workspace root pnpm will match, so they no-op.
 
 ### Why the postinstall is skipped (and a CI step is the right fix)
 
