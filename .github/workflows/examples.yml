@@ -9,6 +9,12 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Least-privilege default; the `notify-failure` job declares its own
+# `issues: write`, which overrides this. No-op today (repo default is `read`) —
+# insurance against a future flip of default_workflow_permissions.
+permissions:
+  contents: read
+
 # Self-hosted ducktors/turborepo-remote-cache on Cloud Run + Cloudflare R2 (#490)
 env:
   TURBO_API: ${{ vars.TURBO_API }}

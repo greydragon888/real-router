@@ -8,6 +8,14 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Least-privilege default. Jobs that need write (duplication→security-events,
+# coverage/bundle-size→pull-requests/checks) declare their own job-level
+# `permissions:`, which fully overrides this. No-op today (repo
+# default_workflow_permissions is already `read`) — this is insurance against a
+# future flip of that global setting silently over-permissioning every job.
+permissions:
+  contents: read
+
 # Turbo Remote Cache - shared across all jobs
 # Self-hosted ducktors/turborepo-remote-cache on Cloud Run + Cloudflare R2 (#490)
 env:
