@@ -4100,3 +4100,25 @@ Web examples run headless Chromium and ignore the virtual display; only the elec
 
 `electron` is in root `pnpm.onlyBuiltDependencies`, so its build script is approved. But its side effects — the binary under `~/.cache/electron` and `path.txt` in `node_modules` — are **not** captured by `cache: pnpm` (which only caches the pnpm store, not `node_modules` or `~/.cache`). pnpm 10 records a per-package "built" flag in the store; on a warm-store runner it sees electron as already built and skips re-running `install.js` into the fresh `node_modules`, so `path.txt` never reappears. Verified locally: deleting `dist/` + `path.txt` and re-running `pnpm install --frozen-lockfile` does **not** regenerate them, while running `install.js` directly does. An explicit install step is deterministic regardless of store-cache warmth. (The Electron tests themselves are healthy — they pass locally once the binary is present.)
 
+
+## Turbo hashes `shared/` symlink content via a carpet glob (#810)
+
+### Problem
+
+The `shared/{browser-env,dom-utils,ssr}` source trees are symlinked into 10 public packages (`src/browser-env`, `src/dom-utils`, `src/shared-ssr`) plus the two owner packages `browser-env` / `dom-utils` (whose entire `src` is the symlink). Turbo hashes inputs through git, and **git stores a symlink as a blob containing the target path** — the bytes on the other side never enter the package hash, and a `src/**/*.ts` glob does not traverse the link. So `shared/` was invisible to every task's input hash:
+
+- A PR touching **only** `shared/browser-env/*` (or `ssr/*`) matched no task input of any package; `@real-router/shared-sources` has no scripts → **0 tasks ran** → `CI Result` green with no build and no tests. Shipped code merged unbuilt/untested.
+- On any shared change, consumers' `test`/`lint`/`type-check` replayed **stale cache** (only `bundle` saw `dom-utils` via a single root glob). Owner-measured coverage (#809) silently used pre-change lcov.
+- Process gates were blind too: `changeset-check.yml` (`^packages/<public>/src/`) and `dangerfile.ts` (`/^packages\/.*\/src\//`) didn't match `shared/`, so shipped-code changes needed no changeset and triggered no Danger.
+
+### Solution
+
+Add a carpet glob `../../shared/**/*.ts` to the root `bundle`, `test`, `lint`, and `type-check` task inputs (replacing the narrower `../../shared/dom-utils/**/*.ts` that was bundle-only). Plus the process gates: `^shared/` in `changeset-check.yml`'s `SOURCE_CHANGED`, and `/^shared\//` in `dangerfile.ts`'s `SOURCE_PATTERNS`.
+
+Verified: a working-tree change to `shared/ssr/createSsrLoaderPlugin.ts` now yields a **non-empty** affected graph (565 `test` tasks incl. both `ssr-data-plugin` and `rsc-server-plugin` across all four tasks); each consumer type sees its shared files in `bundle`/`test`/`lint`/`type-check` (`--dry=json`).
+
+### Why a carpet glob, not per-package `turbo.json`
+
+The audit (#810) first proposed per-package `turbo.json` (`extends: ["//"]`) adding only each consumer's own shared glob, for precise invalidation. Empirically rejected: **package-level `inputs` _replace_ the root array, they don't merge** (and `$TURBO_DEFAULT$` changes the input set), so each of 12 packages × 4 tasks would have to **restate the full root input list** + the shared glob — 48 duplicated arrays that silently drift (under-hashing) the moment a root input changes, and would need a dedicated drift-guard to police. That is a fresh instance of the exact "list-drift" class the audit decries.
+
+The carpet glob has **no consumer list anywhere** → structurally drift-free, no guard needed. Cost: a `shared/` change now cache-misses every package's four tasks, not just consumers. Accepted because (a) `shared/` is stable infra that changes rarely, (b) it merely completes the over-invalidation the repo already lived with for `dom-utils#bundle`, and (c) when `shared/dom-utils` does change, the adapters *should* rebuild anyway. `packages/angular` is unaffected — it consumes a git-tracked **copy** of `dom-utils` (real files, hashed via `src/**`), re-synced by its `prebundle` script.

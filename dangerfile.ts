@@ -26,7 +26,9 @@ const INFRASTRUCTURE_PATTERNS = [
   /^\.npmrc$/,
 ];
 
-const SOURCE_PATTERNS = [/^packages\/.*\/src\//];
+// `^shared/` is shipped source: shared/{browser-env,dom-utils,ssr} is symlinked
+// into 10 public packages, so a change there ships in a release (#810).
+const SOURCE_PATTERNS = [/^packages\/.*\/src\//, /^shared\//];
 
 const ARCHITECTURE_PATTERNS = [
   /^packages\/[^/]+\/src\/index\.ts$/,        // Public API exports

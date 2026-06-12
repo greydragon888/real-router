@@ -28,8 +28,12 @@ jobs:
             fi
           done
 
-          # Check if any source files in public packages changed
-          SOURCE_CHANGED=$(echo "$CHANGED" | grep -E "^packages/($PUBLIC_PACKAGES)/src/" || true)
+          # Check if any source files in public packages changed.
+          # `^shared/` is shipped source too: shared/{browser-env,dom-utils,ssr}
+          # is symlinked into 10 public packages, so a change there ships in a
+          # release and needs a changeset (turbo now hashes it — see turbo.json
+          # `../../shared/**/*.ts`; #810).
+          SOURCE_CHANGED=$(echo "$CHANGED" | grep -E "^packages/($PUBLIC_PACKAGES)/src/|^shared/" || true)
 
           if [ -z "$SOURCE_CHANGED" ]; then
             echo "No source files changed in public packages"
