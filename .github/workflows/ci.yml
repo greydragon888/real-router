@@ -117,6 +117,25 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # packages/angular/src/dom-utils is a git-tracked COPY of shared/dom-utils
+      # (ng-packagr can't follow symlinks; the prebundle script re-materializes
+      # it). If a shared/dom-utils edit lands without re-running the sync,
+      # angular's tests exercise the stale committed copy while ng-packagr ships
+      # the fresh one — green CI, untested dist (#810). Re-run the sync and fail
+      # when the committed copy is out of date. `git status --porcelain` (not
+      # `git diff`) so newly added shared files (untracked in the copy) are
+      # caught too. The script is dependency-free (node:fs only) and <1s, so it
+      # runs before the expensive turbo steps (fail-fast); when the copy is in
+      # sync the rewrite is byte-identical and downstream hashes are unaffected.
+      - name: Check angular dom-utils copy is in sync
+        run: |
+          node packages/angular/scripts/sync-dom-utils.mjs
+          if [ -n "$(git status --porcelain packages/angular/src/dom-utils)" ]; then
+            git status --porcelain packages/angular/src/dom-utils
+            echo "::error::packages/angular/src/dom-utils is out of sync with shared/dom-utils — run 'pnpm -F @real-router/angular bundle' (or node packages/angular/scripts/sync-dom-utils.mjs) and commit the result"
+            exit 1
+          fi
+
       # Full validation: type-check → lint → test → test:properties.
       # ^bundle for upstream packages runs bundle (tsdown) as a dependency.
       #
