@@ -23,7 +23,10 @@ jobs:
           PUBLIC_PACKAGES=""
           for dir in packages/*/; do
             [ -f "$dir/package.json" ] || continue
-            if ! grep -q '"private"' "$dir/package.json"; then
+            # Read the actual JSON field, not a `grep '"private"'` substring,
+            # which mislabels `"private": false` / a "private" mention as private
+            # → a silent loss of the changeset gate for that package's src (3.4).
+            if [ "$(node -p "require('./${dir}package.json').private === true" 2>/dev/null)" != "true" ]; then
               PUBLIC_PACKAGES="${PUBLIC_PACKAGES:+$PUBLIC_PACKAGES|}$(basename "$dir")"
             fi
           done
@@ -150,8 +153,8 @@ jobs:
           PRIVATE_PKGS=""
           for dir in packages/*/; do
             [ -f "$dir/package.json" ] || continue
-            if grep -q '"private"' "$dir/package.json"; then
-              pkg=$(grep -m1 '"name"' "$dir/package.json" | sed 's/.*"name"[[:space:]]*:[[:space:]]*"//;s/".*//')
+            if [ "$(node -p "require('./${dir}package.json').private === true" 2>/dev/null)" = "true" ]; then
+              pkg=$(node -p "require('./${dir}package.json').name")
               PRIVATE_PKGS="${PRIVATE_PKGS:+$PRIVATE_PKGS|}$pkg"
             fi
           done

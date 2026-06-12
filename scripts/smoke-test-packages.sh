@@ -36,8 +36,10 @@ echo "=== Phase 1: Pack all public packages ==="
 # Collect public package names and pack them
 PACKAGES=()
 for pkg_json in "$REPO_ROOT"/packages/*/package.json; do
-  # Skip private packages
-  if grep -q '"private"' "$pkg_json" 2>/dev/null; then
+  # Skip private packages. Read the actual JSON field — `grep '"private"'`
+  # also matched `"private": false` and any "private" substring elsewhere,
+  # misclassifying a public package as private (#810 audit 3.4).
+  if [ "$(node -p "require('$pkg_json').private === true" 2>/dev/null)" = "true" ]; then
     continue
   fi
 
