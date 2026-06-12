@@ -4147,7 +4147,7 @@ The carpet glob has **no consumer list anywhere** → structurally drift-free, n
 `changesets.yml`'s publish step ran `OUTPUT=$(pnpm changeset publish 2>&1) || true`, then derived the step's fate from a downstream tag-grep — not from the publish itself. So the step's success/failure was decoupled from whether the release actually happened:
 
 - **Partial publish** (npm 5xx / OIDC hiccup on a subset; some packages publish, others fail): the published ones print `New tag:` lines → the grep succeeds → step **green**, with the failure silently dropped. Maintainer believes the version shipped; npm is missing packages. Self-heal only on the next push to `master` (re-detects `has_unpublished`), possibly days away.
-- **Total failure** went red only by accident — `NEW_TAGS=$(… | grep "New tag:" | …)` finds nothing and aborts under `set -eo pipefail` (verified: `var=$(pipeline-with-failing-grep)` exits the step). Fragile, not intentional.
+- **Total failure was green too.** The step declares no `shell:`, so it runs under the Actions default `bash -e {0}` — **without pipefail** (pipefail is only added with an explicit `shell: bash`). In `… | grep "New tag:" | sed …` the no-match grep's exit 1 is masked by the trailing `sed` (exit 0), the assignment succeeds with an empty string, and the step survives. Verified in both shell modes: survives under `bash -e`, aborts only under `bash -eo pipefail`. (An earlier revision of this note claimed total failure went red "by accident" via pipefail — wrong, that verification ran in a pipefail shell the workflow doesn't use.)
 
 ### Solution
 
@@ -4170,3 +4170,10 @@ NEW_TAGS=$(echo "$OUTPUT" | grep "New tag:" … || true)   # never aborts on no-
 ### Why
 
 A red run on a partial publish is the desired outcome — a human re-runs the workflow (publish is idempotent: already-published versions are skipped, `Reconcile` backfills missing Releases), which is far cheaper than a silent under-release discovered later. The `|| true` was originally there to let the tag-push fallback run even when `changeset publish` swallowed a `git tag` failure (changesets#1621); that intent is preserved — tags/Releases still push on a non-zero publish — but the error signal is no longer thrown away with it.
+
+### Post-review hardening
+
+- **Summary guard for early aborts** — `Summary` is `always()`, so when the job dies before "Check for changesets" its output is `''` and a bare `[ "" != "0" ]` is true, falsely printing "Release PR created/updated". An explicit empty-check now reports "Run aborted before the changeset check" instead.
+- **Failure post-mortem names the gap** — `Fail if publish errored` lists the planned packages whose local version is still absent from npm (same local-vs-npm comparison as the unpublished check) in the `::error::` and the step summary, instead of "see the log". When everything IS on npm despite the non-zero exit, it says so (post-publish error — tagging/changelog) and points at re-run-to-reconcile.
+- **`timeout-minutes: 30` on the release job** — a hung npm/OIDC exchange would otherwise hold the job for the 6h default and, with `cancel-in-progress: false`, block every queued release behind it. Typical runs are 3-8 min.
+- **Reconcile backfills missing *tags*, not just Releases** — the last unrecoverable partial state was "npm published, tag push failed": the next run sees local==npm → `has_unpublished=false` → publish path skipped, and the Release reconcile only covered *existing* tags. Now, for every public package at HEAD whose local version is on npm (`npm view name@version`, checked only when the tag is missing — zero calls in steady state) but whose tag is absent, the tag is created at HEAD via `gh api …/git/refs` (the checkout has `persist-credentials: false`, so plain `git push` can't; the API works with the workflow's `contents: write` GITHUB_TOKEN) and mirrored locally so the same run's Release passes pick it up.

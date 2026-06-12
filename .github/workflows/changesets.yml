@@ -49,6 +49,10 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
+    # A hung step (e.g. a stalled npm/OIDC exchange) would otherwise hold the
+    # job for the 6h default — and with concurrency cancel-in-progress: false
+    # it also blocks every queued release behind it. Typical runs are 3-8 min.
+    timeout-minutes: 30
     # Only run if CI workflow succeeded
     if: github.event.workflow_run.conclusion == 'success'
     steps:
@@ -292,6 +296,33 @@ jobs:
             PKG_DIR["$pname"]="$dir"
           done
 
+          echo "::group::Backfill missing tags for npm-published versions"
+          # A tag-push failure after a successful npm publish is otherwise
+          # unrecoverable: the next run sees local==npm (has_unpublished=false)
+          # and skips the publish path entirely, and the Release passes below
+          # only cover EXISTING tags. For every public package at HEAD whose
+          # local version is already on npm but whose tag is absent, create the
+          # tag at HEAD via the API (works with the read/write GITHUB_TOKEN —
+          # checkout has persist-credentials: false, so plain `git push` can't)
+          # and mirror it locally so the Release passes pick it up in this run.
+          # `npm view` runs only for missing tags — zero calls in steady state.
+          HEAD_SHA=$(git rev-parse HEAD)
+          for dir in packages/*/; do
+            [ -f "${dir}package.json" ] || continue
+            [ "$(node -p "require('./${dir}package.json').private || false")" = "true" ] && continue
+            pname=$(node -p "require('./${dir}package.json').name")
+            version=$(node -p "require('./${dir}package.json').version")
+            tag="${pname}@${version}"
+            git rev-parse -q --verify "refs/tags/${tag}" >/dev/null && continue
+            # Tag missing — backfill only if npm really has this exact version
+            # (a never-published new package legitimately has no tag).
+            npm view "${tag}" version >/dev/null 2>&1 || continue
+            echo "🏷️  Backfilling missing tag ${tag} at ${HEAD_SHA}"
+            gh api "repos/${GITHUB_REPOSITORY}/git/refs" -f ref="refs/tags/${tag}" -f sha="${HEAD_SHA}" --silent
+            git tag "${tag}" "${HEAD_SHA}"
+          done
+          echo "::endgroup::"
+
           # Notes = the '## <version>' section of a CHANGELOG (between two headers).
           version_notes() {
             [ -f "$1" ] || return 1
@@ -364,8 +395,14 @@ jobs:
         run: |
           echo "## Changesets Workflow Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ steps.check.outputs.changesets_count }}" != "0" ]; then
-            echo "✏️ Found ${{ steps.check.outputs.changesets_count }} changeset(s)" >> $GITHUB_STEP_SUMMARY
+          # Empty count = the job died before "Check for changesets" ran (this
+          # step is always()). A bare `!= "0"` would then be true and falsely
+          # report "Release PR created/updated" — name the abort instead.
+          CHANGESETS_COUNT="${{ steps.check.outputs.changesets_count }}"
+          if [ -z "$CHANGESETS_COUNT" ]; then
+            echo "⚠️ Run aborted before the changeset check — see the failed step above" >> $GITHUB_STEP_SUMMARY
+          elif [ "$CHANGESETS_COUNT" != "0" ]; then
+            echo "✏️ Found $CHANGESETS_COUNT changeset(s)" >> $GITHUB_STEP_SUMMARY
             echo "📝 Release PR created/updated" >> $GITHUB_STEP_SUMMARY
           elif [ "${{ steps.unpublished.outputs.has_unpublished }}" = "true" ]; then
             if [ "${{ steps.publish.outputs.publish_status }}" = "0" ]; then
@@ -391,5 +428,27 @@ jobs:
       - name: Fail if publish errored
         if: always() && steps.publish.outputs.publish_status != '' && steps.publish.outputs.publish_status != '0'
         run: |
-          echo "::error::changeset publish exited ${{ steps.publish.outputs.publish_status }} — the release is incomplete. Tags and GitHub Releases for packages that DID publish were still pushed; check the 'Publish to npm' log above, then re-run this workflow (already-published versions are skipped)."
+          # Post-mortem: name the gap instead of "see the log" — list the
+          # planned packages whose local version is still absent from npm
+          # (same local-vs-npm comparison the "Check for unpublished" step
+          # uses). Only runs on the failure path, so the ~30 `npm view`
+          # calls cost nothing in the steady state.
+          MISSING=""
+          for dir in packages/*/; do
+            [ -f "${dir}package.json" ] || continue
+            [ "$(node -p "require('./${dir}package.json').private || false")" = "true" ] && continue
+            name=$(node -p "require('./${dir}package.json').name")
+            local_version=$(node -p "require('./${dir}package.json').version")
+            npm_version=$(npm view "$name" version 2>/dev/null || echo "none")
+            if [ "$local_version" != "$npm_version" ]; then
+              MISSING="$MISSING $name@$local_version"
+            fi
+          done
+
+          if [ -n "$MISSING" ]; then
+            echo "::error::changeset publish exited ${{ steps.publish.outputs.publish_status }} — still unpublished:$MISSING. Tags/Releases for packages that DID publish were pushed; re-run this workflow (already-published versions are skipped, reconcile backfills tags/Releases)."
+            echo "❗ Still unpublished:$MISSING" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "::error::changeset publish exited ${{ steps.publish.outputs.publish_status }}, but every planned version is now on npm — likely a post-publish error (tagging/changelog); re-run this workflow to reconcile tags and Releases."
+          fi
           exit 1
