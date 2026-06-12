@@ -156,7 +156,7 @@ const ESCAPE_FOR_SCRIPT_REGEX = new RegExp(
  * - The raw HTML parser sees no `<`, `>`, U+2028, or U+2029 — so it cannot
  *   terminate the script tag prematurely (`</script>`, `<!--`) or trigger
  *   legacy JS line-terminator interpretation.
- * - The JS parser interprets `<`/`>`/` `/` ` back to
+ * - The JS parser interprets `<`/`>`/`U+2028`/`U+2029` back to
  *   their original chars, so the runtime string value is bit-identical to
  *   the input.
  * - Crucially, the same encoding works for two consumer paths:

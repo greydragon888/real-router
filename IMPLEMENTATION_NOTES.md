@@ -528,6 +528,19 @@ code. Codecov is **not** part of the in-repo `CI Result` gate, so it can't block
 The "sonar-scanner skips symlinked dirs" premise should be confirmed on the first scan after this
 lands: search SonarCloud for a `shared/` file (e.g. `link-utils.ts`) — it must appear under
 `shared/dom-utils`, and only there.
+**First-scan outcome (2026-06-12, PR #817 run):** the expanded scope crashed the scanner
+(`EXECUTION FAILURE`, exit 3) on **raw U+2028/U+2029 line separators** in newly-scanned files
+(`shared/ssr/deferRegistry.ts` JSDoc; `packages/{angular,svelte}/tests/property/linkUtils.properties.ts`
+string constants). The JS bridge counts LS/PS as line terminators per the ES spec, the Java side does
+not — the line tables diverge (`Line 238 is out of range … has 237 lines`), and slicing by the shifted
+offsets cuts a 3-byte UTF-8 sequence mid-char (`Failed to deserialize Protobuf message: Protocol
+message had invalid UTF-8`). Fixed by replacing the raw chars with `\uXXXX` escapes (bit-identical
+runtime values; tests unchanged). Why nothing caught it earlier: ESLint's `no-irregular-whitespace`
+skips string literals by default (`skipStrings: true`), and `shared/` sources are linted by no one —
+ESLint doesn't traverse the consumers' `src/*` symlinks and the `shared` workspace has no `lint`
+task. Possible follow-up guards: `no-irregular-whitespace: ["error", {skipStrings: false}]`
+(needs a repo-wide raw-whitespace sweep first) and/or a lint task for `shared/`. The symlink premise
+itself held: the bridge indexed the file at `shared/ssr/…`, its real location.
 Discovered while verifying the above (pre-existing, not introduced here): **coverage of `shared/`
 code is neither measured nor enforced anywhere** — v8 coverage drops realpath'd symlinked files, so
 the owner packages' 100% thresholds are vacuous and the Codecov `browser-env`/`dom-utils` components

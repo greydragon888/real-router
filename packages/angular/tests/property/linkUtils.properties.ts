@@ -787,10 +787,10 @@ describe("parseTokens — contract locks (via buildActiveClassName)", () => {
   });
 
   describe("NBSP and other Unicode whitespace are token separators", () => {
-    const NBSP = " ";
-    const LINE_SEP = " ";
-    const PARA_SEP = " ";
-    const OGHAM = " ";
+    const NBSP = "\u00A0";
+    const LINE_SEP = "\u2028";
+    const PARA_SEP = "\u2029";
+    const OGHAM = "\u1680";
 
     it("NBSP-separated base tokens split correctly", () => {
       const baseWithNbsp = `foo${NBSP}bar${NBSP}baz`;
