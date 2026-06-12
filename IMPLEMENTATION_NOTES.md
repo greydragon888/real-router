@@ -261,9 +261,22 @@ Enforces conventional commits. Types and scopes defined in `commitlint.config.mj
 - `pnpm lint:deps` (syncpack — final gate before the push reaches the remote)
 - `pnpm lint:audit` (osv-scanner — vulnerability scan against the GHSA database; non-blocking if the binary is missing locally)
 
-**Rationale:** Pre-commit validates correctness in <2 min so it stays painless on every commit. Pre-push validates artifacts (full build pipeline + dist surface area + dep consistency + GHSA audit) — slower, runs once per push. `lint:deps` lives in **both** layers: pre-commit catches workspace version drift the moment a `package.json` is staged (~1s static check), pre-push acts as the final gate. `lint:duplicates`/`lint:unused` live only in pre-push because their analysis depends on the full tree, not on a single commit's diff. `lint:audit` was added after PR #643 (see "Local Dependency Audit" below) so contributors can catch CVEs locally before CI Dependency Review flags them.
+**Rationale:** Pre-commit validates correctness in <2 min so it stays painless on every commit. Pre-push validates artifacts (full build pipeline + dist surface area + dep consistency + GHSA audit) — slower, runs once per push. `lint:deps` lives in **both** layers: pre-commit catches workspace version drift the moment a `package.json` is staged (~1s static check), pre-push acts as the final gate. `lint:package`/`lint:types`/`lint:unused` **also run in CI** now (#813 — see below); only `lint:duplicates`' hard threshold stays pre-push-only (CI keeps an informational jscpd SARIF channel). `lint:audit` was added after PR #643 (see "Local Dependency Audit" below) so contributors can catch CVEs locally before CI Dependency Review flags them.
 
 The full build orchestrator (`pnpm turbo run build`) is wired in `turbo.json` to depend on `bundle`, `test`, `test:properties`, AND `test:stress` — so pre-push exercises stress tests for every human push. Stress coverage is intentionally **not** duplicated in CI workflows (see "CI: `test:stress` lives only in pre-push" below).
+
+#### CI parity for publint / attw / knip (#813)
+
+**Problem:** publint (`lint:package`), attw (`lint:types`), and knip (`lint:unused`) existed **only** in `.husky/pre-push` — `grep` over `.github/workflows/` found them only in comments. Pre-push is routinely bypassed: **Dependabot automerge** (the bot pushes hookless; automerge gates only on `CI Result` + changeset checks — a standing weekly PR stream), `git push --no-verify`, and web edits. So a dep/build bump that broke a package's export map, `.d.ts` resolution, or introduced an unused graph merged **green** — "green CI" did not mean "publishable" (smoke only resolves exports, not tarball/type structure).
+
+**Solution:** two steps added to the `pipeline` job in `ci.yml`:
+
+- `Validate published artifacts (publint + attw)` — `pnpm turbo run lint:package lint:types` with the **same affected filter** as the Bundle step; gated on `steps.artifacts.outputs.built == 'true'`. Both tasks `dependsOn bundle`, already run above → cache hit, seconds.
+- `Check for unused code` — `pnpm lint:unused` (knip), **unconditional** (pure source-graph analysis, no dist), beside the other cheap lints. Catches unused even on PRs the affected filter scored as "nothing built".
+
+Both fold into the required `CI Result` (they're steps in `pipeline`).
+
+**Why not jscpd too:** the hard 2% duplication threshold deliberately stays in the hook; CI keeps the **informational** jscpd SARIF job (`-t 100`, exit 0) — a conscious choice from the prior audit (see "jscpd …SARIF" below), so duplication is visible as PR annotations without gating merges.
 
 ### jscpd 5.x renamed the config `ignore` key to `ignorePattern` (#714)
 

@@ -206,6 +206,22 @@ jobs:
             echo "ℹ️ No packages affected — downstream artifact jobs will skip"
           fi
 
+      # publint (lint:package) + attw (lint:types) validate the published tarball
+      # shape and the type resolution of the dist just built. Both dependsOn
+      # bundle, which ran above with the same filter → cache hit, so this is
+      # seconds. Previously pre-push only — which Dependabot automerge,
+      # `--no-verify`, and web edits all bypass, so a dep/build bump that broke
+      # export or .d.ts validity could merge green (#813). Gated on built:
+      # nothing bundled → nothing to validate (the affected filter would run zero
+      # tasks anyway). Folds into the required CI Result via this job.
+      - name: Validate published artifacts (publint + attw)
+        if: steps.artifacts.outputs.built == 'true'
+        run: >-
+          pnpm turbo run lint:package lint:types
+          --filter='...[${{ needs.check.outputs.turbo_base || 'origin/master' }}]'
+          --filter='!./examples/**'
+          --filter='!./benchmarks'
+
       - name: Check dependency consistency
         run: pnpm lint:deps
 
@@ -216,6 +232,15 @@ jobs:
       # with the package set, so external quality gates can't silently drift (#732).
       - name: Check coverage scope
         run: pnpm lint:coverage-scope
+
+      # Dead-code / unused-export / unused-dependency detection (knip). Pure
+      # source-graph analysis — no dist needed — so it runs unconditionally
+      # alongside the other cheap lints (and catches unused introduced by a PR
+      # that turbo's affected filter scored as "nothing built"). Previously
+      # pre-push only (#813). The hard jscpd duplication threshold deliberately
+      # stays in the hook — CI keeps the informational SARIF channel instead.
+      - name: Check for unused code
+        run: pnpm lint:unused
 
       - name: Fix coverage paths
         run: |
