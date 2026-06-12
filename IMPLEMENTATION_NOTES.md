@@ -4139,3 +4139,34 @@ Verified: a working-tree change to `shared/ssr/createSsrLoaderPlugin.ts` now yie
 The audit (#810) first proposed per-package `turbo.json` (`extends: ["//"]`) adding only each consumer's own shared glob, for precise invalidation. Empirically rejected: **package-level `inputs` _replace_ the root array, they don't merge** (and `$TURBO_DEFAULT$` changes the input set), so each of 12 packages × 4 tasks would have to **restate the full root input list** + the shared glob — 48 duplicated arrays that silently drift (under-hashing) the moment a root input changes, and would need a dedicated drift-guard to police. That is a fresh instance of the exact "list-drift" class the audit decries.
 
 The carpet glob has **no consumer list anywhere** → structurally drift-free, no guard needed. Cost: a `shared/` change now cache-misses every package's four tasks, not just consumers. Accepted because (a) `shared/` is stable infra that changes rarely, (b) it merely completes the over-invalidation the repo already lived with for `dom-utils#bundle`, and (c) when `shared/dom-utils` does change, the adapters *should* rebuild anyway. `packages/angular` is unaffected — it consumes a git-tracked **copy** of `dom-utils` (real files, hashed via `src/**`), re-synced by its `prebundle` script.
+
+## Release: `changeset publish` failure no longer masked by `|| true` (#811)
+
+### Problem
+
+`changesets.yml`'s publish step ran `OUTPUT=$(pnpm changeset publish 2>&1) || true`, then derived the step's fate from a downstream tag-grep — not from the publish itself. So the step's success/failure was decoupled from whether the release actually happened:
+
+- **Partial publish** (npm 5xx / OIDC hiccup on a subset; some packages publish, others fail): the published ones print `New tag:` lines → the grep succeeds → step **green**, with the failure silently dropped. Maintainer believes the version shipped; npm is missing packages. Self-heal only on the next push to `master` (re-detects `has_unpublished`), possibly days away.
+- **Total failure** went red only by accident — `NEW_TAGS=$(… | grep "New tag:" | …)` finds nothing and aborts under `set -eo pipefail` (verified: `var=$(pipeline-with-failing-grep)` exits the step). Fragile, not intentional.
+
+### Solution
+
+Capture the publish exit code explicitly and enforce it **last**, after tags/Releases for whatever did publish are pushed:
+
+```bash
+set +e
+OUTPUT=$(pnpm changeset publish 2>&1)
+PUBLISH_STATUS=$?
+set -e
+echo "$OUTPUT"
+echo "publish_status=$PUBLISH_STATUS" >> "$GITHUB_OUTPUT"
+NEW_TAGS=$(echo "$OUTPUT" | grep "New tag:" … || true)   # never aborts on no-match
+```
+
+- `Push git tags` and `Reconcile GitHub Releases` run as before (so a partial publish still records the packages that succeeded).
+- New final step `Fail if publish errored` — `if: always() && publish_status != '' && publish_status != '0'` → `exit 1`. Skipped on the Release-PR path (publish didn't run → output `''`) and on success (`'0'`).
+- `Summary` is now `if: always()` and reports the **actual** status (`❌ Publish FAILED …` vs `📦 Published packages`), not the plan.
+
+### Why
+
+A red run on a partial publish is the desired outcome — a human re-runs the workflow (publish is idempotent: already-published versions are skipped, `Reconcile` backfills missing Releases), which is far cheaper than a silent under-release discovered later. The `|| true` was originally there to let the tag-push fallback run even when `changeset publish` swallowed a `git tag` failure (changesets#1621); that intent is preserved — tags/Releases still push on a non-zero publish — but the error signal is no longer thrown away with it.
