@@ -25,7 +25,7 @@
       "outputs": ["dist/**"],
       "inputs": [
         "src/**/*.{ts,tsx,vue,svelte}",
-        "../../shared/dom-utils/**/*.ts",
+        "../../shared/**/*.ts",
         "tsdown.config.*",
         "tsconfig.json",
         "package.json"
@@ -89,6 +89,7 @@
       "outputs": ["coverage/**"],
       "inputs": [
         "src/**/*.{ts,tsx}",
+        "../../shared/**/*.ts",
         "tests/**/*.{ts,tsx}",
         "vitest.config.*",
         "**/*.test.{ts,tsx}",
@@ -105,6 +106,7 @@
       "outputs": [],
       "inputs": [
         "**/*.{ts,tsx,js,jsx}",
+        "../../shared/**/*.ts",
         "!dist/**",
         "!coverage/**",
         "!**/node_modules/**",
@@ -118,6 +120,7 @@
       "outputs": [],
       "inputs": [
         "**/*.{ts,tsx,vue,svelte}",
+        "../../shared/**/*.ts",
         "!dist/**",
         "!**/node_modules/**",
         "tsconfig.json",

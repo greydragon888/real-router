@@ -26,7 +26,11 @@ const INFRASTRUCTURE_PATTERNS = [
   /^\.npmrc$/,
 ];
 
-const SOURCE_PATTERNS = [/^packages\/.*\/src\//];
+// shared/<dir>/*.ts is shipped source: shared/{browser-env,dom-utils,ssr} is
+// symlinked into 10 public packages, so a change there ships in a release
+// (#810). Narrowed to .ts (mirrors the turbo glob) and to non-`__` dirs so
+// shared docs and __test-helpers/ don't count as shipped source.
+const SOURCE_PATTERNS = [/^packages\/.*\/src\//, /^shared\/[^/]+\/(?!__).*\.ts$/];
 
 const ARCHITECTURE_PATTERNS = [
   /^packages\/[^/]+\/src\/index\.ts$/,        // Public API exports
