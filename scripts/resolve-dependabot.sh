@@ -46,6 +46,16 @@ BRANCH="$(gh pr view "$PR" --json headRefName --jq .headRefName)"
 [ -n "$BRANCH" ] || { echo "❌ Could not resolve head branch for PR #$PR." >&2; exit 1; }
 echo "📦 PR head branch: $BRANCH"
 
+# Guard: only operate on Dependabot branches (#814). The branch name comes from
+# `gh pr view` on an arbitrary PR number and is attacker-controlled — git-refs
+# permit shell metacharacters (; | & $ ( )), which `dependabot/*` never carries.
+# Restricting here both closes the injection vector and refuses a wrong-PR run
+# before anything is fetched or checked out.
+case "$BRANCH" in
+  dependabot/*) ;;
+  *) echo "❌ PR #$PR head branch is '$BRANCH', not a dependabot/* branch — refusing." >&2; exit 1 ;;
+esac
+
 git fetch origin "$BRANCH"
 git checkout -B "$BRANCH" "origin/$BRANCH"
 
@@ -106,13 +116,15 @@ echo "=== Resolved. Version changes vs origin/master: ==="
 git diff origin/master -- '**/package.json' | grep -E '^[+-]\s+"' | grep -vE '^[+-]{3}' || echo "  (none)"
 echo
 
+# Printed as copy-paste hints in the review path below; in --merge they're run
+# directly with quoted args, never via eval (#814).
 PUSH_CMD="git push --force-with-lease origin $BRANCH"
 MERGE_CMD="gh pr merge $PR --squash --delete-branch"
 
 if [ "$DO_MERGE" -eq 1 ]; then
   echo "🚀 --merge: force-pushing and squash-merging ..."
-  eval "$PUSH_CMD"
-  eval "$MERGE_CMD"
+  git push --force-with-lease origin "$BRANCH"
+  gh pr merge "$PR" --squash --delete-branch
   echo "✅ PR #$PR squash-merged."
 else
   echo "🛑 Stopping for review (no force-push, no merge)."
