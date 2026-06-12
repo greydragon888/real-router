@@ -39,7 +39,11 @@ export default {
         "browser-env",
         "dom-utils",
       ],
-      dependencyTypes: ["prod", "dev", "peer"],
+      // No "peer": a @real-router/* peer dep must NOT be forced to workspace:^
+      // (on 0.x, ^0.x.y is patch-only → any minor bump triggers a major via
+      // changesets — CLAUDE.md "Never use workspace:^ for peerDependencies on
+      // 0.x"). Peer deps fall through to the ">= ranges" group below.
+      dependencyTypes: ["prod", "dev"],
       range: "workspace:^",
     },
     {

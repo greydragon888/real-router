@@ -110,9 +110,8 @@ export const commonConfig = defineConfig({
   /**
    * Plugins
    * - tsconfigPaths: Resolve TypeScript path aliases from tsconfig.json
-   * - codspeedPlugin: Performance benchmarking (CI only)
    */
-  plugins: process.env.CI ? [tsconfigPaths()] : [tsconfigPaths()],
+  plugins: [tsconfigPaths()],
 
   // Resolve workspace packages to source for test coverage.
   // Without this, Vitest resolves via exports → dist and v8
