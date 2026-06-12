@@ -18,6 +18,8 @@
     [key: string]: Snippet | string | undefined;
   } = $props();
 
+  // svelte-ignore state_referenced_locally
+  // The node source is selected once for this mounted RouteView.
   const routeContext = useRouteNode(nodeName);
 </script>
 

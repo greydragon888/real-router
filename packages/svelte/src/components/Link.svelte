@@ -49,6 +49,8 @@
   const router = useRouter();
   // Hash-aware active (#532): tab links sharing routeName but differing in
   // hash should only light up the matching variant.
+  // svelte-ignore state_referenced_locally
+  // Active-route state is captured at mount; href remains reactive separately.
   const activeState = useIsActiveRoute(
     routeName,
     routeParams,
