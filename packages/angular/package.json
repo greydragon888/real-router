@@ -54,7 +54,7 @@
     "@real-router/sources": "workspace:^"
   },
   "devDependencies": {
-    "@analogjs/vitest-angular": "2.6.0",
+    "@analogjs/vitest-angular": "2.6.1",
     "@angular/common": "21.2.13",
     "@angular/compiler": "21.2.13",
     "@angular/compiler-cli": "21.2.13",
