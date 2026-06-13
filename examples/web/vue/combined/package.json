@@ -20,7 +20,7 @@
     "@real-router/persistent-params-plugin": "workspace:^",
     "@real-router/search-schema-plugin": "workspace:^",
     "@real-router/vue": "workspace:^",
-    "vue": "3.5.35",
+    "vue": "3.5.38",
     "zod": "4.4.3"
   },
   "devDependencies": {
