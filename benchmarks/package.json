@@ -54,7 +54,7 @@
     "@tanstack/vue-router": "1.170.15",
     "mitata": "1.0.34",
     "nanostores": "0.11.4",
-    "react": "19.2.0",
+    "react": "19.2.7",
     "react-dom": "19.2.0",
     "router5": "8.0.1",
     "router6": "1.0.2",
@@ -64,7 +64,7 @@
   },
   "devDependencies": {
     "@tanstack/router-core": "1.171.13",
-    "@types/react": "19.2.14",
+    "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "5.2.0",
     "@vitejs/plugin-vue": "6.0.7",
