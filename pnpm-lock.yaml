@@ -232,8 +232,8 @@ importers:
         specifier: 1.168.9
         version: 1.168.9(solid-js@1.9.13)
       '@tanstack/vue-router':
-        specifier: 1.170.10
-        version: 1.170.10(vue@3.5.35(typescript@6.0.3))
+        specifier: 1.170.15
+        version: 1.170.15(vue@3.5.35(typescript@6.0.3))
       mitata:
         specifier: 1.0.34
         version: 1.0.34
@@ -9609,10 +9609,6 @@ packages:
     resolution: {integrity: sha512-+NOwEj1kO/6IGmpHRIZHasYxYWpyBQGNIZAST9aNrk9Q3YlU9SgqVnl1pbLa9qAKfeNdXQIRve0RQb/0kyDeDA==}
     engines: {node: '>=20.19'}
 
-  '@tanstack/router-core@1.171.8':
-    resolution: {integrity: sha512-PbrTBbofFcacrH3RLgHYILRqTFnAGq+gXrXoA/vo7qUSkJpSO4GWfLtrtCahD4VayzRm19IPwcjPPLEugag6pw==}
-    engines: {node: '>=20.19'}
-
   '@tanstack/solid-router@1.168.9':
     resolution: {integrity: sha512-ZgfcBS7lVhVlScxMhoh3U37K/LnNltMJV6Lor98ON3mKnE9XkOwZKvzkOVYj1JEi5HiQsYnC1lmZR5Ww0tc2og==}
     engines: {node: '>=20.19'}
@@ -9623,8 +9619,8 @@ packages:
   '@tanstack/store@0.9.3':
     resolution: {integrity: sha512-8reSzl/qGWGGVKhBoxXPMWzATSbZLZFWhwBAFO9NAyp0TxzfBP0mIrGb8CP8KrQTmvzXlR/vFPPUrHTLBGyFyw==}
 
-  '@tanstack/vue-router@1.170.10':
-    resolution: {integrity: sha512-x+69OKLjIDipixTWrL/XJP+JIG2AVj+s5A8Wrs2dV7feAGqQizIrOgqWGnp5Quf5GIcU/UayeNmhG3gk0Wjh8Q==}
+  '@tanstack/vue-router@1.170.15':
+    resolution: {integrity: sha512-+V/zoRXx8s6Do/wGw15tIrobMQZeQKWtyIAbfHBsliu5Jeg9OpxyPs0xiJwwemLf995FSnee/i2DmZzfW4RSpA==}
     engines: {node: '>=20.19'}
     peerDependencies:
       vue: ^3.3.0
@@ -10247,11 +10243,20 @@ packages:
   '@vue/reactivity@3.5.35':
     resolution: {integrity: sha512-tVc+SsHConvh/Lz64qq1pP3rYArBmK42xonovEcxY74SQtvctZodG/zhq54P5dr38cVuw25d27cPNRdlMidpGQ==}
 
+  '@vue/reactivity@3.5.38':
+    resolution: {integrity: sha512-pG6LV/NDNRbKizcUjFFLAfjaL8mcv4DmR9avNcUw2gDHBzZneuS2TWCmp633ynzxz9YYKNeEPK2I8Wraqy2HUQ==}
+
   '@vue/runtime-core@3.5.35':
     resolution: {integrity: sha512-A/xFNX9loIcWDygeQuNCfKuh0CoYBzxhqEMNah5TSFg9Z53DrFYEN2qi5CU9necjM1OWYegYREUTHmXTmhfXtg==}
 
+  '@vue/runtime-core@3.5.38':
+    resolution: {integrity: sha512-iyW8WVfF1CpCXxncZY5Ei6rSd6oZr5DgEom//fUjRBRl56AXPD+s9ATvukRt77ZFTuYlnVA1bxY+dJB94tWVYw==}
+
   '@vue/runtime-dom@3.5.35':
     resolution: {integrity: sha512-odrJ1C391dbGnyDRh8U+rnP7J2amIEzfmRk5vXy7xi3aZhEXofTvpi0T4HJb6jlNqQZTNPR5MPHSB3RHNkIORA==}
+
+  '@vue/runtime-dom@3.5.38':
+    resolution: {integrity: sha512-apX2wt9sdfDshS+a2xueFZLVpt0GkRJZSoPmrW/SA4yzXTznhfcMVW59gr7h4YQeY0vJhdJkk2rsIDwgfFgC5A==}
 
   '@vue/server-renderer@3.5.35':
     resolution: {integrity: sha512-NkebSOYdB97wi8OQcO3HqzZSlymJi/aWsN/7h74OSVhRTm6qGs3Jp3e0rCXynmWwSlKeRrnlIug+ilYoHBmQDA==}
@@ -12301,8 +12306,8 @@ packages:
     resolution: {integrity: sha512-gnWD14Jh3FzS3CPhF0AxNOJ8CxqeblPTADzI38r0wt8ZyQl5edpy75myt08EG2oKvpyiqSqsx+Wkz9vtkbTqYQ==}
     engines: {node: '>= 18.0.0'}
 
-  isbot@5.1.41:
-    resolution: {integrity: sha512-9WFV/Vhh0FEj6CQ7MoHweEL9/vLKPjeoD2I2htbAjX7kbW7VJs3OCpWOVyd+JraNTWVU6/DRx2MZy2KaUNXHcg==}
+  isbot@5.1.42:
+    resolution: {integrity: sha512-/SXsVh7KpPRISrD4ffrGSxnTLlUBzEQUfWIusaJPrpJ93FW1P0YEZri5vAUkFsA0m2HRUhQRQadk2wJ+EeKowQ==}
     engines: {node: '>=18'}
 
   isexe@2.0.0:
@@ -17869,7 +17874,7 @@ snapshots:
       '@tanstack/history': 1.162.0
       '@tanstack/react-store': 0.9.3(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       '@tanstack/router-core': 1.171.13
-      isbot: 5.1.41
+      isbot: 5.1.42
       react: 19.2.0
       react-dom: 19.2.0(react@19.2.0)
 
@@ -17894,13 +17899,6 @@ snapshots:
       seroval: 1.5.4
       seroval-plugins: 1.5.4(seroval@1.5.4)
 
-  '@tanstack/router-core@1.171.8':
-    dependencies:
-      '@tanstack/history': 1.162.0
-      cookie-es: 3.1.1
-      seroval: 1.5.4
-      seroval-plugins: 1.5.4(seroval@1.5.4)
-
   '@tanstack/solid-router@1.168.9(solid-js@1.9.13)':
     dependencies:
       '@solid-devtools/logger': 0.9.11(solid-js@1.9.13)
@@ -17908,19 +17906,18 @@ snapshots:
       '@solidjs/meta': 0.29.4(solid-js@1.9.13)
       '@tanstack/history': 1.161.6
       '@tanstack/router-core': 1.168.9
-      isbot: 5.1.41
+      isbot: 5.1.42
       solid-js: 1.9.13
 
   '@tanstack/store@0.9.3': {}
 
-  '@tanstack/vue-router@1.170.10(vue@3.5.35(typescript@6.0.3))':
+  '@tanstack/vue-router@1.170.15(vue@3.5.35(typescript@6.0.3))':
     dependencies:
       '@tanstack/history': 1.162.0
-      '@tanstack/router-core': 1.171.8
+      '@tanstack/router-core': 1.171.13
       '@tanstack/vue-store': 0.9.3(vue@3.5.35(typescript@6.0.3))
-      '@vue/runtime-dom': 3.5.35
-      isbot: 5.1.41
-      jsesc: 3.1.0
+      '@vue/runtime-dom': 3.5.38
+      isbot: 5.1.42
       vue: 3.5.35(typescript@6.0.3)
     transitivePeerDependencies:
       - '@vue/composition-api'
@@ -18624,16 +18621,32 @@ snapshots:
     dependencies:
       '@vue/shared': 3.5.35
 
+  '@vue/reactivity@3.5.38':
+    dependencies:
+      '@vue/shared': 3.5.38
+
   '@vue/runtime-core@3.5.35':
     dependencies:
       '@vue/reactivity': 3.5.35
       '@vue/shared': 3.5.35
+
+  '@vue/runtime-core@3.5.38':
+    dependencies:
+      '@vue/reactivity': 3.5.38
+      '@vue/shared': 3.5.38
 
   '@vue/runtime-dom@3.5.35':
     dependencies:
       '@vue/reactivity': 3.5.35
       '@vue/runtime-core': 3.5.35
       '@vue/shared': 3.5.35
+      csstype: 3.2.3
+
+  '@vue/runtime-dom@3.5.38':
+    dependencies:
+      '@vue/reactivity': 3.5.38
+      '@vue/runtime-core': 3.5.38
+      '@vue/shared': 3.5.38
       csstype: 3.2.3
 
   '@vue/server-renderer@3.5.35(vue@3.5.35(typescript@6.0.3))':
@@ -20917,7 +20930,7 @@ snapshots:
 
   isbinaryfile@5.0.7: {}
 
-  isbot@5.1.41: {}
+  isbot@5.1.42: {}
 
   isexe@2.0.0: {}
 
