@@ -49,7 +49,8 @@ export const SCOPES = [
   "sources",
   "dom-utils",
   "benchmarks",
-  "deps",
+  "deps", // Dependabot prod-dependency bumps (chore(deps): …)
+  "deps-dev", // Dependabot dev-dependency bumps (chore(deps-dev): …)
   "config",
   "ci",
 ];
