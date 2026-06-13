@@ -50,7 +50,7 @@
     "@real-router/types": "workspace:^",
     "@real-router/vue": "workspace:^",
     "@tanstack/react-router": "1.170.15",
-    "@tanstack/solid-router": "1.168.9",
+    "@tanstack/solid-router": "1.170.15",
     "@tanstack/vue-router": "1.170.15",
     "mitata": "1.0.34",
     "nanostores": "0.11.4",
