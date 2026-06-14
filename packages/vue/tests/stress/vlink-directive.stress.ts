@@ -97,7 +97,15 @@ describe("v-link directive stress tests (Vue)", () => {
 
     const heapAfter = takeHeapSnapshot();
 
-    expect(heapAfter - heapBefore).toBeLessThan(200 * MB);
+    // THROUGHPUT GUARD (not a leak gate). Each of the 100 cycles mounts a fresh
+    // App, then unmounts it and drops the ref, so the GC reclaims the 200
+    // directive instances per cycle regardless of whether vLink's WeakMap
+    // cleanup ran — a per-element leak is structurally invisible to a heap
+    // snapshot here (the WeakMap is GC-keyed on the elements, which also die).
+    // WeakMap cleanup correctness is proven by the functional v-link tests.
+    // Healthy delta measured ~2.7MB (stable <1.5% across 3 runs); guard set to
+    // ~9× (was an absurd 200MB ≈ 75× healthy).
+    expect(heapAfter - heapBefore).toBeLessThan(24 * MB);
   });
 
   it("5.3: v-link update 100 times — handlers updated correctly", async () => {
