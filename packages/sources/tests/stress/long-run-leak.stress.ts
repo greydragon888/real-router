@@ -45,8 +45,11 @@ describe("S8: long-run leak detection (10k cycle navigations)", () => {
     forceGC();
     const after = takeHeapSnapshot();
 
-    // 10k navs through one cached node source must not allocate more than
-    // a few MB. Linear closure growth would explode this number.
+    // Throughput guard (not a leak discriminator): the node source is cached
+    // and shared, so a broken router-subscription teardown cannot accumulate
+    // here — deleting the cleanup leaves the same single subscription. Measured
+    // healthy delta ≈ 0.5 MB across runs; threshold set ~10× that as an honest
+    // upper bound that still catches gross per-navigation closure growth.
     expect(after - baseline).toBeLessThan(5 * MB);
 
     unsub();
@@ -73,7 +76,13 @@ describe("S8: long-run leak detection (10k cycle navigations)", () => {
     forceGC();
     const after = takeHeapSnapshot();
 
-    expect(after - baseline).toBeLessThan(5 * MB);
+    // Discriminating leak guard. Each iteration creates a non-cached RouteSource
+    // and immediately unsub()+destroy()s it, leaving nothing referenced — so a
+    // healthy run reclaims everything (measured delta ≈ 0.04–0.06 MB). If the
+    // teardown were broken (router subscription retained), all 10 000 sources
+    // stay live: simulated leak measured ≈ 9.6 MB. Threshold 1 MB sits ~16×
+    // above healthy and ~9× below the leak — fails on the leak, passes healthy.
+    expect(after - baseline).toBeLessThan(MB);
   });
 });
 

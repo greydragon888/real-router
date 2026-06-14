@@ -114,6 +114,12 @@ describe("S7: createErrorSource — error storm", () => {
 
     const after = takeHeapSnapshot();
 
-    expect(after - baseline).toBeLessThan(MB);
+    // Throughput guard (not a clean leak discriminator): per-iteration
+    // navigation churn dominates the heap delta, masking the comparatively tiny
+    // ErrorSource subscription. Skipping destroy() moves the delta by only ~25%
+    // (measured 0.37 MB healthy vs 0.47 MB leak at this N), so heap cannot
+    // cleanly separate the two. Threshold ~10× healthy as an honest upper bound;
+    // the destroy/unsubscribe correctness is exercised directly in S7.1–S7.3.
+    expect(after - baseline).toBeLessThan(4 * MB);
   });
 });

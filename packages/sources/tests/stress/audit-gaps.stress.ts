@@ -292,7 +292,15 @@ describe("S11.3: createActiveNameSelector — N names × M listeners", () => {
 
     const after = takeHeapSnapshot();
 
-    expect(after - baseline).toBeLessThan(2 * MB);
+    // Throughput guard (not a reliable leak discriminator): the selector caps
+    // at one shared Set for the "users" name, so a missed unsubscribe is bounded
+    // to listeners retained in that single Set rather than unbounded growth.
+    // Each cycle here fully unsubscribes, so healthy delta is dominated by GC
+    // jitter (measured swing roughly ±0.25 MB, often net-negative). The
+    // unsubscribe correctness itself is asserted by the count-based sibling
+    // tests above ("diversified unsubscribe order"); this only bounds churn.
+    // Threshold 0.5 MB sits above the observed noise band.
+    expect(after - baseline).toBeLessThan(MB / 2);
   });
 });
 
@@ -308,10 +316,10 @@ describe("S11.4: createActiveRouteSource BigInt fallback — heap stability", ()
     router.stop();
   });
 
-  it("1000 create+destroy cycles with BigInt params do not leak", () => {
+  it("3000 create+destroy cycles with BigInt params do not leak", () => {
     const baseline = takeHeapSnapshot();
 
-    for (let i = 0; i < 1000; i++) {
+    for (let i = 0; i < 3000; i++) {
       const source = createActiveRouteSource(router, "users", {
         id: BigInt(i),
       } as unknown as Record<string, string>);
@@ -326,9 +334,13 @@ describe("S11.4: createActiveRouteSource BigInt fallback — heap stability", ()
 
     const after = takeHeapSnapshot();
 
-    // Each fallback source allocates router.subscribe handle + BaseSource
-    // instance. With proper unwind, heap stays bounded.
-    expect(after - baseline).toBeLessThan(3 * MB);
+    // Discriminating leak guard. The BigInt key takes the non-cached fallback
+    // path, so each source owns a REAL router subscription with a working
+    // teardown. unsub()+destroy() per iteration leaves nothing referenced →
+    // healthy delta ≈ 0.07 MB. If the teardown were broken (subscription
+    // retained), all 3000 fallback sources stay live: simulated leak measured
+    // ≈ 3 MB. Threshold 0.5 MB sits ~7× above healthy and ~6× below the leak.
+    expect(after - baseline).toBeLessThan(MB / 2);
   });
 });
 
