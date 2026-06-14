@@ -55,7 +55,12 @@ describe("link-action stress tests (Svelte)", () => {
 
     const heapAfter = takeHeapSnapshot();
 
-    expect(heapAfter - heapBefore).toBeLessThan(200 * MB);
+    // Throughput guard (GC-masked): 50 createLinkAction elements mounted then
+    // unmounted per cycle, refs dropped — a per-cycle destroy-cleanup leak is
+    // reclaimed by GC and invisible here. Per-cycle a11y/destroy cleanup is
+    // proven functionally by 4.1/4.3/4.4. Threshold = ~8x measured healthy
+    // (~2.99MB over 50 cycles); was 200MB (~67x — extreme theatre).
+    expect(heapAfter - heapBefore).toBeLessThan(25 * MB);
   });
 
   it("4.3: createLinkAction click navigates correctly after mass mount", async () => {

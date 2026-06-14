@@ -91,6 +91,11 @@ describe("S7 shouldUpdateCache growth", () => {
     forceGC();
     const after = takeHeapSnapshot();
 
+    // Throughput / GC-eligibility guard: after the scoped router is disposed
+    // and dropped, its per-router WeakMap source caches become collectable.
+    // The retained leak (router not GC'd) cannot be deterministically simulated
+    // through a WeakMap, so this is not a strict discriminator. Healthy delta
+    // ≈ 0.09 MB after forceGC; threshold ~10× that as an honest upper bound.
     expect(after - baseline).toBeLessThan(MB);
   });
 

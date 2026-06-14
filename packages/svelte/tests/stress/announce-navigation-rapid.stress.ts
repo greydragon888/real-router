@@ -78,7 +78,13 @@ describe("Stress: announceNavigation rapid navigations", () => {
     forceGC();
     const finalHeap = getHeapUsedBytes();
 
-    expect(finalHeap - baseline).toBeLessThan(30 * MB);
+    // Throughput guard (GC-masked): one live RouterProvider drives 200 navs;
+    // a per-nav listener/closure leak on the live router is ~bytes/closure and
+    // stays in KB at this scale — verified invisible to this snapshot (200
+    // retained subscribe closures moved the delta only ~30KB). The real
+    // per-nav leak detector is the single-announcer-element + zero-console.error
+    // assertions below. Threshold = ~8x measured healthy (~2.17MB).
+    expect(finalHeap - baseline).toBeLessThan(18 * MB);
     // Single announcer element survives — no per-nav orphans.
     expect(document.querySelectorAll(ANNOUNCER_SEL)).toHaveLength(1);
     expect(consoleError).not.toHaveBeenCalled();
@@ -143,7 +149,11 @@ describe("Stress: announceNavigation rapid navigations", () => {
     forceGC();
     const finalHeap = getHeapUsedBytes();
 
-    expect(finalHeap - baseline).toBeLessThan(30 * MB);
+    // Throughput guard (GC-masked): 50 mount→nav→unmount cycles, refs dropped.
+    // The per-cycle announcer-orphan leak is caught by the in-loop
+    // querySelectorAll length checks, not the heap. Threshold = ~9x measured
+    // healthy (~1.46MB).
+    expect(finalHeap - baseline).toBeLessThan(13 * MB);
     expect(consoleError).not.toHaveBeenCalled();
   });
 

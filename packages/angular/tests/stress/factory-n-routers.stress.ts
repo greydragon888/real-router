@@ -6,23 +6,20 @@ import { createStressRouter, takeHeapSnapshot, MB } from "./helpers";
 import { injectRoute } from "../../src/functions/injectRoute";
 import { provideRealRouter } from "../../src/providers";
 
-import type { Router } from "@real-router/core";
-
 describe("factory reuse with N distinct routers (Angular)", () => {
-  it("100 different createRouter instances — each disposable independently", async () => {
+  it("200 different createRouter instances — each disposed+dropped independently", async () => {
     @Component({ template: "" })
     class Consumer {
       route = injectRoute();
     }
 
-    const routers: Router[] = [];
+    const ITERATIONS = 200;
     const heapBefore = takeHeapSnapshot();
 
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < ITERATIONS; i++) {
       const router = createStressRouter(5);
 
       await router.start("/route0");
-      routers.push(router);
 
       TestBed.resetTestingModule();
       TestBed.configureTestingModule({
@@ -38,16 +35,33 @@ describe("factory reuse with N distinct routers (Angular)", () => {
         "route0",
       );
 
+      // Destroy the fixture AND dispose+drop the router INSIDE the loop. The
+      // prior version pushed every router into a `routers[]` array kept alive
+      // until after the snapshot, so a per-router dispose/stop leak was
+      // unobservable by construction — every router (and its WeakMap-cached
+      // sources) was reachable at snapshot regardless of cleanup. Disposing
+      // here (the loop-scoped `const` ref dies each iteration) means a leak is
+      // only visible if some *global* strong-ref structure survives router GC.
+      // (Structural-defect fix.)
       fixture.destroy();
+      router.dispose();
     }
 
-    for (const router of routers) {
-      router.stop();
-    }
-
+    // THROUGHPUT GUARD (not a discriminating leak gate). Measured healthy delta
+    // over 200 create→start→mount→destroy→dispose→drop cycles: ~4.33-4.34 MB
+    // (3 runs: 4337/4337/4341 KB). Per-router state is rooted in the router
+    // itself and its sources live in `WeakMap<Router, …>` caches
+    // (@real-router/sources) — once the router is disposed and dropped, the
+    // whole graph is GC-collectible, so a genuine per-cycle leak is
+    // structurally invisible to a heap snapshot (GC-masked). There is no
+    // countable cross-router proxy to assert on (the caches are WeakMaps).
+    // Threshold = 40 MB ≈ 9.2× measured healthy max: catches a gross runaway
+    // (e.g. a global registry retaining routers) while not flaking on the
+    // ~4 MB steady state. Per-cycle teardown correctness is verified by the
+    // functional/dispose tests (factory-dispose-vs-stop.stress.ts) in this dir.
     const heapAfter = takeHeapSnapshot();
 
-    expect(heapAfter - heapBefore).toBeLessThan(100 * MB);
+    expect(heapAfter - heapBefore).toBeLessThan(40 * MB);
   }, 60_000);
 
   it("100 routers running concurrently — independent state transitions", async () => {

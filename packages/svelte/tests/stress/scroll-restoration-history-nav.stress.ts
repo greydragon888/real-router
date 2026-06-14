@@ -113,9 +113,12 @@ describe("Stress: scroll restoration + history.back/forward", () => {
     forceGC();
     const finalHeap = getHeapUsedBytes();
 
-    // No leak — 50 back/forward cycles must fit well under the same 30MB
-    // budget as 100 programmatic navigations.
-    expect(finalHeap - baseline).toBeLessThan(30 * MB);
+    // Throughput guard (GC-masked): one live RouterProvider over 50 back/forward
+    // cycles; a per-popstate listener leak stays in KB and is invisible here.
+    // The real detector is the history.scrollRestoration==='manual' + zero
+    // console.error assertions below. Threshold = ~9x measured healthy
+    // (~0.82MB).
+    expect(finalHeap - baseline).toBeLessThan(8 * MB);
     // Mode must NOT flip back to "auto" mid-session — popstate handlers in
     // browser-plugin must not toggle it.
     expect(history.scrollRestoration).toBe("manual");

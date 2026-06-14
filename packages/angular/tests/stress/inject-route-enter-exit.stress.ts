@@ -84,7 +84,13 @@ describe("injectRouteEnter / injectRouteExit stress", () => {
 
     const heapAfter = takeHeapSnapshot();
 
-    expect(heapAfter - heapBefore).toBeLessThan(50 * MB);
+    // THROUGHPUT GUARD (GC-masked). 200 mount→navigate→unmount cycles; the
+    // fixture is destroyed each cycle so a per-cycle subscribeLeave-unsubscribe
+    // leak is reclaimed before the snapshot — heap cannot discriminate it. (A
+    // real unsubscribe leak surfaces FUNCTIONALLY: the next nav would block on
+    // dead leave-promises and the test would TIME OUT, not grow heap.) Measured
+    // healthy: ~3.71 MB (3 runs: 3796/3796/3798 KB). Threshold 14 MB ≈ 3.7×.
+    expect(heapAfter - heapBefore).toBeLessThan(14 * MB);
   }, 60_000);
 
   it("(b) 1000 navigations with stable injectRouteEnter — fires exactly once per nav", async () => {

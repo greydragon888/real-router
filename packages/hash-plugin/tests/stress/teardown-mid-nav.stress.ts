@@ -49,13 +49,25 @@ describe("Teardown Mid-Navigation (Hash)", () => {
 
     const pending = router.navigate("users.view", { id: "1" }).catch(noop);
 
-    // Tear down while the guard is still resolving.
+    // Tear down (plugin only) while the guard is still resolving. The core
+    // router stays active, so the in-flight transition still settles — but it
+    // must settle into a COHERENT state, never a half-committed / corrupt one.
     unsubscribe();
 
     await pending;
     await waitForTransitions(60);
 
     expect(unhandled).toHaveLength(0);
+
+    // Whatever route won, the committed state must be internally consistent:
+    // its path must be exactly what buildPath() produces for its name+params
+    // (a torn/corrupt commit would leave name and path disagreeing).
+    const after = router.getState();
+
+    expect(after).toBeDefined();
+    expect(after?.name).toBe("users.view");
+    expect(after?.path).toBe(router.buildPath(after!.name, after!.params));
+    expect(after?.params).toStrictEqual({ id: "1" });
 
     (globalThis as any).removeEventListener?.("unhandledrejection", listener);
   });
@@ -174,25 +186,45 @@ describe("Teardown Mid-Navigation (Hash)", () => {
 
     expect(unhandled).toHaveLength(0);
 
+    // The handler must have swallowed the buildUrl-after-teardown path WITHOUT
+    // corrupting state. Whatever route is current (the popstate-driven "home"
+    // or the prior "users.list"), it must be a real route with a consistent
+    // name↔path pairing — never a torn state with name and path disagreeing.
+    const after = router.getState();
+
+    expect(after).toBeDefined();
+    expect(["home", "users.list"]).toContain(after?.name);
+    expect(after?.path).toBe(router.buildPath(after!.name, after!.params));
+
     (globalThis as any).removeEventListener?.("unhandledrejection", listener);
   });
 
-  it("navigate() called after teardown: rejects but stays consistent (M8)", async () => {
+  it("navigate() called after teardown: resolves fresh & consistent, never stale (M8)", async () => {
     const { router, unsubscribe } = createStressRouter();
 
     await router.start();
+    const stateBefore = router.getState();
+
     unsubscribe();
 
-    // After teardown the plugin is gone, but the router itself is stopped by
-    // teardown; calling navigate() now must either resolve with a fresh state
-    // or reject cleanly — never throw synchronously.
-    const result = await router
-      .navigate("users.list")
-      .catch((error: unknown) => error);
+    // Teardown unsubscribes the PLUGIN only (removes the popstate handler and
+    // router extensions); the core router stays active, so navigate() resolves
+    // with a fresh state for the requested route — never throws synchronously,
+    // and never resolves to a stale/wrong state.
+    const resolved = await router.navigate("users.list").catch(() => null);
 
-    expect(result).toBeDefined();
-    // Router is stopped; navigate on a stopped router should not corrupt state.
     expect(() => router.getState()).not.toThrow();
+
+    // The resolution is the genuinely-requested route (not the stale
+    // pre-teardown route), getState() agrees with the resolved value, and the
+    // committed state is internally consistent (name↔path).
+    expect(resolved).not.toBeNull();
+    expect(resolved?.name).toBe("users.list");
+    expect(resolved?.name).not.toBe(stateBefore?.name);
+    expect(router.getState()?.name).toBe("users.list");
+    expect(resolved?.path).toBe(
+      router.buildPath(resolved!.name, resolved!.params),
+    );
   });
 
   it("replaceHistoryState called during an active transition: URL updates do not corrupt state (M3)", async () => {

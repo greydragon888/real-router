@@ -162,7 +162,12 @@ describe("provideRealRouterFactory dispose vs stop (Angular)", () => {
     TestBed.resetTestingModule();
     const heapAfter = takeHeapSnapshot();
 
-    expect(heapAfter - heapBefore).toBeLessThan(50 * MB);
+    // THROUGHPUT GUARD (GC-masked). 100 per-request router-clone cycles, each
+    // disposed via resetTestingModule — a per-cycle leak is reclaimed before the
+    // snapshot. Measured healthy: ~0 MB (3 runs: -38/-42/-44 KB — clones fully
+    // collected). Threshold 4 MB. FIFO start/teardown ordering in test (a) is
+    // the real discriminator for dispose correctness.
+    expect(heapAfter - heapBefore).toBeLessThan(4 * MB);
   }, 90_000);
 
   it("(c) plugin teardown observed via context-namespace claim — claim is released on dispose", async () => {

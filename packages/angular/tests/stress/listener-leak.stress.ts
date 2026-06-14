@@ -48,7 +48,18 @@ describe("listener leak stress (Angular)", () => {
 
     const heapAfter = takeHeapSnapshot();
 
-    expect(heapAfter - heapBefore).toBeLessThan(100 * MB);
+    // DISCRIMINATING (cap-bounded). The component + its node source stay LIVE
+    // across all 10k navigations, so a per-nav subscription leak accumulates on
+    // the live router and is reachable here. The router's EventEmitter HARD-CAPS
+    // at 10k listeners, so the worst-case subscription leak is bounded: a probe
+    // retaining 9999 router.subscribe() handles measured ~2.27 MB total delta.
+    // Measured HEALTHY over 10k navs: ~0.43-0.44 MB (3 runs: 436/439/442 KB) —
+    // route snapshots are tiny and largely shared, so no per-nav heap growth.
+    // Threshold 2 MB sits ABOVE healthy (≈4.5× max, no flakes — healthy variance
+    // <2%) and BELOW the ~2.27 MB capped subscription leak, so a maxed listener
+    // leak trips it. (An UNCAPPED listener leak throws "Listener limit (10000)
+    // reached" before the snapshot — also a failure.)
+    expect(heapAfter - heapBefore).toBeLessThan(2 * MB);
 
     fixture.destroy();
   }, 120_000);
@@ -82,6 +93,15 @@ describe("listener leak stress (Angular)", () => {
 
     const heapAfter = takeHeapSnapshot();
 
-    expect(heapAfter - heapBefore).toBeLessThan(50 * MB);
+    // THROUGHPUT GUARD (GC-masked). Each cycle resets the TestBed module and
+    // destroys the fixture, so a per-cycle subscription leak is unreferenced at
+    // snapshot and reclaimed regardless — heap cannot discriminate it (and an
+    // accumulating live listener would hit the 10k EventEmitter cap and throw).
+    // Measured healthy over 500 cycles: ~4.06-4.13 MB (3 runs: 4123/4126/4056
+    // KB) — Angular JIT TestBed churn. Threshold 15 MB ≈ 3.6× healthy max.
+    // Per-cycle teardown correctness is verified by the "no listener
+    // accumulation" behaviour (no cap throw) and by mount-unmount-lifecycle's
+    // DestroyRef test.
+    expect(heapAfter - heapBefore).toBeLessThan(15 * MB);
   }, 60_000);
 });

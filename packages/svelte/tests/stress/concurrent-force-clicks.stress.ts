@@ -58,9 +58,13 @@ describe("Stress: concurrent Link clicks with force:true", () => {
       );
     }
 
-    // Each click invokes router.navigate (via navigateWithHash → router.navigate).
-    // The router internally last-wins; the spy was called once per click.
-    expect(navigateSpy).toHaveBeenCalled();
+    // Each click invokes router.navigate (via navigateWithHash → router.navigate)
+    // exactly once. With `force: true`, core's SAME_STATES dedup is bypassed, so
+    // every one of the 100 synchronous clicks MUST reach navigate — a weaker
+    // `toHaveBeenCalled()` (>= 1) would silently pass under listener-loss where
+    // 99 clicks fell through. The clicks are fired deterministically (no awaits),
+    // so the count is exact.
+    expect(navigateSpy).toHaveBeenCalledTimes(100);
 
     // Drain microtasks so any catch handlers settle.
     await new Promise((resolve) => setTimeout(resolve, 16));
@@ -98,7 +102,11 @@ describe("Stress: concurrent Link clicks with force:true", () => {
     forceGC();
     const finalHeap = getHeapUsedBytes();
 
-    expect(finalHeap - baseline).toBeLessThan(30 * MB);
+    // Throughput guard (GC-masked): 50 mount→click→unmount cycles, refs dropped
+    // per cycle. The per-cycle click-listener leak is reclaimed by GC; the real
+    // detector is the zero-console.error (no unhandled rejections from
+    // catch(NOOP)) assertion. Threshold = ~10x measured healthy (~0.95MB).
+    expect(finalHeap - baseline).toBeLessThan(10 * MB);
     expect(consoleError).not.toHaveBeenCalled();
   });
 

@@ -84,8 +84,15 @@ describe("memory-mount-unmount baseline", () => {
 
     logBaseline("transition-1000", iterations, delta);
 
-    // After cached getTransitionSource: ~2.5KB/iter (baseline 3.9KB).
-    expect(delta).toBeLessThan(3500 * iterations);
+    // THROUGHPUT GUARD (not a leak gate). The mount→unmount loop drops every
+    // component ref each cycle, so the GC reclaims the churn and the only true
+    // leak (a stale getTransitionSource subscription if onScopeDispose broke)
+    // is ~0.3KB/iter — far below the ~2.6KB/iter healthy churn that dominates
+    // the snapshot, so heap cannot discriminate it (verified: disabling
+    // onScopeDispose moves per-iter 2592B→2878B only). Per-cycle subscription
+    // cleanup is proven by the functional mount/unmount tests instead. Healthy
+    // per-iter measured 2592B (stable <0.1% across 3 runs); guard set to ~8×.
+    expect(delta).toBeLessThan(21_000 * iterations);
   });
 
   it("Pattern B: useRouteNode × 100 + 50 navigations", async () => {
@@ -148,10 +155,16 @@ describe("memory-mount-unmount baseline", () => {
       "(10 trees × 100 consumers)",
     );
 
-    // Cached RouteNodeSource shares across 1000 consumers, but Vue still
-    // allocates shallowRef + 2 computed + RouteContext per consumer.
-    // Baseline ~8.3 KB/iter; regression gate.
-    expect(delta).toBeLessThan(9500 * 10 * 100);
+    // THROUGHPUT GUARD (not a leak gate). Cached RouteNodeSource is shared via
+    // ref-counting across all 1000 consumers, but Vue still allocates
+    // shallowRef + 2 computed + RouteContext per consumer; trees are unmounted
+    // at the end so the GC reclaims that churn. The only true leak (stale
+    // source subscriptions) is ~0.3KB/iter, far below the ~8.5KB/iter healthy
+    // churn (verified: disabling onScopeDispose moves per-iter 8481B→8790B
+    // only), so heap cannot discriminate it. Per-cycle cleanup is proven by the
+    // functional tests. Healthy per-iter measured 8481B (stable <0.1% across 3
+    // runs); guard set to ~8×.
+    expect(delta).toBeLessThan(68_000 * 10 * 100);
   });
 
   it("Pattern C: 500 RouterErrorBoundary with fresh routers", async () => {

@@ -6,26 +6,25 @@ import { getDependenciesApi } from "@real-router/core/api";
 import { createFlatRoutes, formatBytes, takeHeapSnapshot } from "./helpers";
 
 describe("S13: Dependencies store churn", () => {
-  it("S13.1 set/remove cycle 1000x: store remains empty, heap growth < 128KB", () => {
+  it("S13.1 set/remove cycle 1000x: store releases the key (remains empty)", () => {
     const router = createRouter<Record<string, number>>(createFlatRoutes(5), {
       defaultRoute: "route0",
     });
     const deps = getDependenciesApi(router);
-
-    const heapBefore = takeHeapSnapshot();
 
     for (let i = 0; i < 1000; i++) {
       deps.set("key", i);
       deps.remove("key");
     }
 
-    const heapAfter = takeHeapSnapshot();
-    const delta = heapAfter - heapBefore;
-
+    // The cleanup invariant is the real discriminator here, NOT a heap delta.
+    // The store is a single string-keyed plain object with last-write-wins on
+    // one key, so its retained size is hard-capped at ONE entry regardless of
+    // whether remove() works — a broken remove() leaves `{ key: 999 }` (~8 bytes),
+    // structurally far below any KB-scale heap threshold. A heap assertion here
+    // would pass even with cleanup fully broken (theatre by construction).
+    // `has("key") === false` fails exactly when remove() leaks the key.
     expect(deps.has("key")).toBe(false);
-    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(
-      128 * 1024,
-    );
 
     router.stop();
     router.dispose();
@@ -43,23 +42,21 @@ describe("S13: Dependencies store churn", () => {
       batch[`key${i}`] = i;
     }
 
-    const heapBefore = takeHeapSnapshot();
-
     for (let cycle = 0; cycle < 100; cycle++) {
       deps.setAll(batch);
     }
 
-    const heapAfter = takeHeapSnapshot();
-    const delta = heapAfter - heapBefore;
-
     const all = deps.getAll();
 
+    // The entry-count invariant is the real discriminator, NOT a heap delta.
+    // 100 setAll() of the SAME 50 keys is last-write-wins, so the store holds
+    // exactly 50 entries no matter how many cycles run — retained size is
+    // hard-capped at 50 numbers (~tens of bytes). A heap assertion would pass
+    // even if setAll() never reused slots (theatre by construction). The length
+    // and value checks fail exactly if overwrite semantics regress.
     expect(Object.keys(all)).toHaveLength(50);
     expect(all.key0).toBe(0);
     expect(all.key49).toBe(49);
-    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(
-      128 * 1024,
-    );
 
     router.stop();
     router.dispose();

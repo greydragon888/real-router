@@ -131,6 +131,11 @@ describe("N2 — Entry Accumulation", () => {
 
     const initialState = router.getState();
     const initialEntriesCount = mockNav.entries().length;
+    // Snapshot the entry identities (history keys) before the storm. A replace
+    // reuses the current entry's key — so no new keys may appear and none may
+    // vanish. This catches history corruption (splicing/dropping entries) that
+    // a bare count check cannot.
+    const initialKeys = mockNav.entries().map((entry) => entry.key);
 
     for (let i = 0; i < 200; i++) {
       const name = i % 2 === 0 ? "home" : "users.list";
@@ -139,6 +144,11 @@ describe("N2 — Entry Accumulation", () => {
     }
 
     expect(mockNav.entries()).toHaveLength(initialEntriesCount);
+    // Entry identities unchanged — replaceHistoryState rewrites the current
+    // entry in place, never spawning or removing history entries.
+    expect(mockNav.entries().map((entry) => entry.key)).toStrictEqual(
+      initialKeys,
+    );
     expect(router.getState()).toStrictEqual(initialState);
   });
 });

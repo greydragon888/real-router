@@ -175,7 +175,12 @@ describe("viewTransitions stress — mid-transition router.stop() / destroy", ()
 
     const heapAfter = takeHeapSnapshot();
 
-    expect(heapAfter - heapBefore).toBeLessThan(50 * MB);
+    // THROUGHPUT GUARD (GC-masked). 100 stop/restart cycles, fresh router +
+    // fixture per cycle, both torn down inside the loop — a per-cycle VT/source
+    // leak is reclaimed before the snapshot. Measured healthy: ~8.5 MB (3 runs:
+    // 8697/8693/8702 KB). Threshold 28 MB ≈ 3.2× healthy max. startSpy ≥ 100 +
+    // skipTransition-called assertions below are the real discriminators.
+    expect(heapAfter - heapBefore).toBeLessThan(28 * MB);
     // Every cycle invoked startViewTransition once, every instance had
     // skipTransition called (utility's destroy path).
     expect(stub.startSpy.mock.calls.length).toBeGreaterThanOrEqual(100);

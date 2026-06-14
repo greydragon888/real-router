@@ -80,7 +80,12 @@ describe("Stress: RouterErrorBoundary", () => {
     forceGC();
     const final = getHeapUsedBytes();
 
-    expect(final - baseline).toBeLessThan(50 * MB);
+    // Throughput guard (GC-masked): 200 mount→nav→unmount cycles, refs dropped.
+    // A per-cycle error-subscription leak is reclaimed by GC and invisible to
+    // this snapshot; the real cleanup proof is the boundary-stays-alive +
+    // wrapped-console.error tests (10.1/10.3). Threshold = ~8x measured healthy
+    // (~3.30MB over 200 cycles).
+    expect(final - baseline).toBeLessThan(28 * MB);
   });
 
   it("10.3 throwing onError does not break subsequent successful navigation reactivity", async () => {

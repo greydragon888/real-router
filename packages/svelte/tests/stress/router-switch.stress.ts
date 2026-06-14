@@ -69,10 +69,12 @@ describe("Stress: dynamic router switch in RouterProvider", () => {
     forceGC();
     const heapAfter = takeHeapSnapshot();
 
-    // 200 swaps with the previous router stopped each time should not
-    // accumulate heap. 50 MB is generous; a real listener leak would push
-    // this much higher.
-    expect(heapAfter - heapBefore).toBeLessThan(50 * MB);
+    // Throughput guard (GC-masked): each {#key} swap destroys the prior subtree
+    // and stops the prior router, refs dropped — a per-swap subscription leak is
+    // reclaimed by GC. The cyclic-state-preservation test (15.2) proves the
+    // swap rebinds correctly. Threshold = ~8x measured healthy (~5.87MB over
+    // 200 swaps).
+    expect(heapAfter - heapBefore).toBeLessThan(48 * MB);
 
     mounted.unmount();
     previousRouters.at(-1)?.stop();

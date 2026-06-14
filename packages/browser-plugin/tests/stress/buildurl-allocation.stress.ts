@@ -18,18 +18,24 @@ import { createStressRouter, noop } from "./helpers";
  * links (dashboards, tables) call it in tight loops. Even a single
  * extra closure allocation per call becomes visible at that scale.
  *
- * This test burns 10 000 buildUrl calls with varied inputs, forces GC
- * before/after, and asserts the heap delta stays within a generous
+ * This test burns 30 000 buildUrl calls with varied inputs, forces GC
+ * before/after, and asserts the heap delta stays within a tuned
  * ceiling. Primarily catches:
  *   - closure reallocation per call (a regression in plugin-utils)
  *   - accidental memoization leaks (Map that grows unboundedly)
  *   - Symbol/WeakMap churn inside `buildPath`
  *
- * Threshold 20 MiB is intentionally loose — V8 background overhead
- * alone can reach single-digit MiB on fork start. We're after obvious
- * unbounded growth, not tight allocation regressions.
+ * Discrimination (measured at N = 30 000, `--expose-gc`, jsdom fork):
+ *   - healthy delta:  ~0.11 MiB (flat — buildUrl retains nothing per call)
+ *   - simulated leak: ~3.24 MiB (retain every result string in a sink array,
+ *     i.e. an unbounded per-call cache that never evicts)
+ *   - chosen threshold: 1.0 MiB → 8.6x above healthy, 3.24x below the leak.
+ *     Both margins are >=3x, so the test fails on a growing cache and stays
+ *     green on the healthy path. Anchored to measured healthy, NOT a round
+ *     guess — the old 20 MiB ceiling sat ~6x ABOVE even the leak signal and
+ *     would have passed a fully-broken unbounded cache.
  */
-describe("B7.8 — heap stability across 10 000 buildUrl calls", () => {
+describe("B7.8 — heap stability across 30 000 buildUrl calls", () => {
   beforeAll(() => {
     vi.spyOn(console, "warn").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
@@ -57,7 +63,7 @@ describe("B7.8 — heap stability across 10 000 buildUrl calls", () => {
     try {
       await router.start();
 
-      const ITER = 10_000;
+      const ITER = 30_000;
       const ROUTES = ["home", "users.list", "users.view"] as const;
 
       // Warm-up — drains one-shot allocations (JIT, route-node cache).
@@ -79,7 +85,8 @@ describe("B7.8 — heap stability across 10 000 buildUrl calls", () => {
 
       const deltaMB = (heapAfter - heapBefore) / (1024 * 1024);
 
-      expect(deltaMB).toBeLessThan(20);
+      // measured healthy ~0.11 MiB, simulated unbounded-cache leak ~3.24 MiB.
+      expect(deltaMB).toBeLessThan(1);
     } finally {
       router.stop();
     }

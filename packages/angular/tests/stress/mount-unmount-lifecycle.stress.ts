@@ -44,7 +44,18 @@ describe("mount/unmount subscription lifecycle (Angular)", () => {
 
     const heapAfter = takeHeapSnapshot();
 
-    expect(heapAfter - heapBefore).toBeLessThan(50 * MB);
+    // THROUGHPUT GUARD (GC-masked). Each cycle resets the TestBed module and
+    // destroys the fixture, so the per-cycle component + its source listener
+    // are unreferenced at snapshot and reclaimed regardless of whether the
+    // subscription leaked — a heap snapshot cannot discriminate the per-cycle
+    // leak. (A dead listener would accrue in the live cached source's Set, but
+    // that is a few hundred bytes/cycle = KB total, and the source exposes no
+    // public listener count to assert on.) Measured healthy over 200 cycles:
+    // ~9.77-10.00 MB (3 runs: 10003/10002/9999 KB) — dominated by Angular JIT
+    // TestBed compilation churn, not by router state. Threshold 35 MB ≈ 3.5×
+    // healthy max: catches a gross runaway without flaking. Per-cycle teardown
+    // is verified by "DestroyRef.onDestroy fires on every unmount cycle" below.
+    expect(heapAfter - heapBefore).toBeLessThan(35 * MB);
   });
 
   it("mount/unmount injectRoute x200 — no errors, bounded heap", () => {
@@ -69,7 +80,11 @@ describe("mount/unmount subscription lifecycle (Angular)", () => {
 
     const heapAfter = takeHeapSnapshot();
 
-    expect(heapAfter - heapBefore).toBeLessThan(50 * MB);
+    // THROUGHPUT GUARD (GC-masked) — see the injectRouteNode test above for the
+    // rationale. Measured healthy over 200 cycles: ~7.19-7.21 MB (3 runs:
+    // 7210/7210/7188 KB). Threshold 28 MB ≈ 3.9× healthy max. Per-cycle
+    // teardown verified by "DestroyRef.onDestroy fires on every unmount cycle".
+    expect(heapAfter - heapBefore).toBeLessThan(28 * MB);
   });
 
   it("mount/unmount injectRouterTransition x200 — no errors, bounded heap", () => {
@@ -94,7 +109,11 @@ describe("mount/unmount subscription lifecycle (Angular)", () => {
 
     const heapAfter = takeHeapSnapshot();
 
-    expect(heapAfter - heapBefore).toBeLessThan(50 * MB);
+    // THROUGHPUT GUARD (GC-masked) — see the injectRouteNode test above for the
+    // rationale. Measured healthy over 200 cycles: ~7.16-7.37 MB (3 runs:
+    // 7177/7164/7371 KB). Threshold 28 MB ≈ 3.8× healthy max. Per-cycle
+    // teardown verified by "DestroyRef.onDestroy fires on every unmount cycle".
+    expect(heapAfter - heapBefore).toBeLessThan(28 * MB);
   });
 
   it("DestroyRef.onDestroy fires on every unmount cycle", () => {

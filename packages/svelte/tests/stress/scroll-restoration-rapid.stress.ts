@@ -69,7 +69,12 @@ describe("Stress: scrollRestoration + rapid pushState", () => {
     forceGC();
     const finalHeap = getHeapUsedBytes();
 
-    expect(finalHeap - baseline).toBeLessThan(30 * MB);
+    // Throughput guard (GC-masked): one live RouterProvider over 100 navs; a
+    // per-nav snapshot/listener leak stays in KB and is invisible here. Real
+    // detectors are the history.scrollRestoration==='manual' + zero
+    // console.error assertions below. Threshold = ~10x measured healthy
+    // (~0.66MB).
+    expect(finalHeap - baseline).toBeLessThan(7 * MB);
     // history mode must not flip during rapid navigation.
     expect(history.scrollRestoration).toBe("manual");
     expect(consoleError).not.toHaveBeenCalled();
@@ -102,7 +107,11 @@ describe("Stress: scrollRestoration + rapid pushState", () => {
     forceGC();
     const finalHeap = getHeapUsedBytes();
 
-    expect(finalHeap - baseline).toBeLessThan(30 * MB);
+    // Throughput guard (GC-masked): 50 mount→nav→unmount cycles, refs dropped.
+    // The per-cycle mode-flip / listener leak is caught by the in-loop
+    // 'manual'↔'auto' assertions, not the heap. Threshold = ~10x measured
+    // healthy (~0.98MB).
+    expect(finalHeap - baseline).toBeLessThan(10 * MB);
     expect(consoleError).not.toHaveBeenCalled();
   });
 

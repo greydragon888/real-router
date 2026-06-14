@@ -117,10 +117,14 @@ describe("Data Loader Stress", () => {
       clone.dispose();
     }
 
-    // Each loader called roughly 200/3 times (66-67)
-    expect(homeLoader.mock.calls.length).toBeGreaterThanOrEqual(66);
-    expect(profileLoader.mock.calls.length).toBeGreaterThanOrEqual(66);
-    expect(aboutLoader.mock.calls.length).toBeGreaterThanOrEqual(66);
+    // Distribution is fully deterministic: 200 starts cycled over 3 paths
+    // via `i % 3`. i≡0 (home): i=0,3,…,198 → 67. i≡1 (profile): i=1,4,…,199
+    // → 67. i≡2 (about): i=2,5,…,197 → 66. A `>=66` lower bound passed even
+    // if one loader fired 0 and another 200; pin the exact split so a routing
+    // regression (wrong loader per route) fails here.
+    expect(homeLoader).toHaveBeenCalledTimes(67);
+    expect(profileLoader).toHaveBeenCalledTimes(67);
+    expect(aboutLoader).toHaveBeenCalledTimes(66);
   });
 
   it("100 usePlugin/unsubscribe cycles: unsubscribe completes without error", async () => {
@@ -186,13 +190,31 @@ describe("Data Loader Stress", () => {
       unsub();
     }
 
-    // Verify router still works after rapid plugin churn
-    router.usePlugin(ssrDataPluginFactory(loaders));
+    // Isolation check: the 200 churned plugins must each have fully torn
+    // down — released the "data" claim AND removed their start interceptor.
+    // A leaked claim would make this re-register throw
+    // CONTEXT_NAMESPACE_ALREADY_CLAIMED; a leaked interceptor would corrupt
+    // the value written below. Registering a *fresh* plugin and asserting
+    // ITS data populates correctly proves the prior churn left no broken
+    // listeners or held claims.
+    const freshUnsub = router.usePlugin(ssrDataPluginFactory(loaders));
     const state = await router.start("/");
 
     expect(state.context.data).toBe("data");
+    // Mode marker also lands — confirms the claim is genuinely the fresh
+    // plugin's, not a stale write from the churn.
+    expect(state.context.ssrDataMode).toBe("full");
 
+    // And the fresh plugin itself tears down cleanly, freeing the claim
+    // for one more re-register — a held claim here would throw.
     router.stop();
+    freshUnsub();
+
+    expect(() => {
+      const reUnsub = router.usePlugin(ssrDataPluginFactory(loaders));
+
+      reUnsub();
+    }).not.toThrow();
   });
 
   it("100 start() interceptor mid-await + unsubscribe race: no crashes, claim.write tolerates released claim", async () => {

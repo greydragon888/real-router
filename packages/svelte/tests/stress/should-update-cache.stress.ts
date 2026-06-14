@@ -219,10 +219,12 @@ describe("SV6 — shouldUpdateCache growth (Svelte)", () => {
     forceGC();
     const heapAfter = takeHeapSnapshot();
 
-    // 100 router instances each holding a tiny route tree should not
-    // exceed 50 MB residual. A leaked WeakMap entry (e.g. accidental
-    // strong reference in @real-router/sources) would push this far
-    // higher.
-    expect(heapAfter - heapBefore).toBeLessThan(50 * MB);
+    // Throughput guard (GC-masked): each of the 100 routers is unmounted +
+    // stopped + dropped per cycle, so its WeakMap-keyed source-cache entry is
+    // GC-reclaimable — a strong-reference leak in @real-router/sources would
+    // grow this, but with refs dropped a healthy run reclaims everything and a
+    // leaked entry only registers if the WeakMap turned into a strong Map.
+    // Threshold = ~10x measured healthy (~0.94MB over 100 routers).
+    expect(heapAfter - heapBefore).toBeLessThan(10 * MB);
   });
 });

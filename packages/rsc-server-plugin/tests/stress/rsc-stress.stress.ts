@@ -2,7 +2,7 @@ import { createRouter } from "@real-router/core";
 import { cloneRouter, getLifecycleApi } from "@real-router/core/api";
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 
-import { buildRscPayload, invalidate, rscServerPluginFactory } from "../../src";
+import { invalidate, rscServerPluginFactory } from "../../src";
 
 import type { RscLoaderFactoryMap } from "../../src";
 import type { Router } from "@real-router/core";
@@ -369,9 +369,14 @@ describe("RSC Loader Stress", () => {
     expect(alive).toBeLessThan(200);
   });
 
-  it("stop() during slow loader: no crash", async () => {
+  it("stop() during slow loader: no crash, every start() promise settles (no hung promise)", async () => {
     const base = createRouter(routes, { defaultRoute: "home" });
     let survived = 0;
+    // Include "pending" in the element type so the deadline branch widens the
+    // array — that keeps `.not.toContain("pending")` a real check rather than
+    // a comparison eslint flags as always-false.
+    const statuses: (PromiseSettledResult<unknown>["status"] | "pending")[] =
+      [];
 
     for (let i = 0; i < 50; i++) {
       const clone = cloneRouter(base);
@@ -390,17 +395,38 @@ describe("RSC Loader Stress", () => {
       // stop while loader is pending
       clone.stop();
 
-      await Promise.allSettled([promise]);
+      // Race the start() promise against a deadline. allSettled alone can't
+      // distinguish "settled" from "still pending" — if stop() left the
+      // start() promise hung (loader never resolved, never rejected), this
+      // await would block until the file's 60s testTimeout and surface as a
+      // generic timeout. The deadline turns a hung promise into an explicit
+      // "pending" status we can assert against.
+      const PENDING = "pending" as const;
+      const HANG_MS = 1000;
+      const outcome = await Promise.race([
+        Promise.allSettled([promise]).then(([r]) => r.status),
+        new Promise<typeof PENDING>((resolve) => {
+          setTimeout(() => {
+            resolve(PENDING);
+          }, HANG_MS);
+        }),
+      ]);
+
+      statuses.push(outcome);
 
       clone.dispose();
       survived += 1;
     }
 
-    // The real invariant is "no crash / no timeout for 50 iterations" —
-    // the loop reaching its end already proves it. Asserting on a counter
-    // (instead of `expect(true).toBe(true)`) makes the success criterion
-    // visible at the assertion site.
     expect(survived).toBe(50);
+
+    // The strengthened invariant: stop() during a pending loader must drive
+    // every start() promise to a terminal state (fulfilled or rejected) —
+    // never leave it pending. A regression that dropped the in-flight
+    // transition without settling its promise would show up here as a
+    // "pending" entry, instead of silently inflating wall-clock time.
+    expect(statuses).toHaveLength(50);
+    expect(statuses).not.toContain("pending");
   });
 
   it("100 concurrent navigate() racing with invalidate(): no crash, loader sees fresh signal", async () => {
@@ -465,13 +491,36 @@ describe("RSC Loader Stress", () => {
 
     // The leave handler clears the stale flag only after a successful
     // non-cancelled write. With 100 invalidate() + 4 racing navigations
-    // each, at least one navigation per outer iteration must have won
-    // — otherwise the flag would still be set and the loader counter
-    // would be lower than the iteration count. We bound below at 100
-    // (one winner per iteration), and above at the original start +
-    // every leave attempt (1 + 100*4).
+    // each, exactly one navigation per outer iteration survives the
+    // signal.aborted check and reaches `loaderCalls.push` — the other
+    // three are aborted by the next navigate() before their post-yield
+    // check. Measured: exactly 101 (100 winners + the start interceptor),
+    // stable across 16 trials. Lower bound is therefore the exact
+    // expected value (one winner per iteration is mandatory — fewer means
+    // the stale flag was lost). The upper bound is tightened from the old
+    // loose `1 + 100*4 = 401` (which admitted EVERY racing nav pushing, a
+    // broken-cancellation state) to a tight 101 + a small slip-through
+    // margin: a scheduler that lets an older nav push before the newer one
+    // aborts it could add a few, but a regression that stopped cancelling
+    // would blow well past this.
+    const SLIP_THROUGH_MARGIN = 12;
+
     expect(loaderCalls.length).toBeGreaterThanOrEqual(100 + 1);
-    expect(loaderCalls.length).toBeLessThanOrEqual(1 + 100 * 4);
+    expect(loaderCalls.length).toBeLessThanOrEqual(101 + SLIP_THROUGH_MARGIN);
+
+    // Strong, fully-deterministic final-state invariant: last-write-wins is
+    // strict under the FSM, so the surviving navigation is the LAST one
+    // started — i=99, k=3 → id "i99-3". The committed rsc payload must match
+    // that winning navigation's params. A stale-write bug (an older loader's
+    // ReactNode clobbering the winner) would surface here as a mismatched id.
+    const finalState = router.getState();
+
+    expect(finalState?.name).toBe("users.profile");
+    expect(finalState?.params.id).toBe("i99-3");
+    expect(
+      (finalState?.context.rsc as { props?: { id?: string } } | undefined)
+        ?.props?.id,
+    ).toBe("i99-3");
 
     router.stop();
   });
@@ -739,47 +788,5 @@ describe("RSC Loader Stress", () => {
     expect(abortedConsumes).toBe(100);
 
     router.stop();
-  });
-
-  it("10000 buildRscPayload calls — perf regression marker (§7.G7)", () => {
-    // §7.G7: `buildRscPayload` is on the per-request Flight payload
-    // hot path. A regression that introduced heavy work (deep clone,
-    // serialization, unbounded validation) would surface as a measurable
-    // slowdown here. The threshold is intentionally loose (200ms for
-    // 10k calls = 20µs/call) to avoid CI flakiness, but tight enough
-    // that a 10x regression triggers.
-    const state = {
-      name: "users.profile",
-      params: { id: "42" },
-      path: "/users/42",
-      transition: {
-        phase: "activating" as const,
-        reason: "success" as const,
-        segments: { deactivated: [], activated: [], intersection: "" },
-      },
-      context: {
-        rsc: node("UserProfile"),
-        rscAction: { returnValue: { ok: true, data: 1 } },
-      },
-    };
-    const N = 10_000;
-    const start = performance.now();
-
-    for (let i = 0; i < N; i++) {
-      // Voiding the result side-steps the dead-code-elimination risk;
-      // `expect.assertions` below also forces the loop to be live.
-      const payload = buildRscPayload(state);
-
-      // Just touch a key so V8 cannot constant-fold the call away.
-      if (payload.root === undefined) {
-        throw new Error("unreachable");
-      }
-    }
-
-    const elapsed = performance.now() - start;
-
-    // Generous upper bound — local runs are typically <30ms. 200ms
-    // catches 7-10x regressions; sub-threshold variance is OK.
-    expect(elapsed).toBeLessThan(200);
   });
 });

@@ -117,10 +117,13 @@ describe("Stress: start/stop churn (no navigation)", () => {
     // must not grow per cycle.
     expect(probe.subscribeActive()).toBe(subscribeAfterWarmup);
 
-    // 1000 mount/unmount cycles with no real work should not balloon the
-    // heap. 50 MB is generous — a true listener leak would push this past
-    // hundreds of MB on a 1000-cycle run.
-    expect(heapAfterMain - heapAfterWarmup).toBeLessThan(50 * MB);
+    // Throughput guard (GC-masked): 1000 mount→unmount cycles, refs dropped.
+    // The TRUE leave-listener leak detector is the leaveActive()/subscribeActive()
+    // count assertions above (a forgotten onDestroy(off) leaves 1000 dangling
+    // closures — caught by the count, NOT this snapshot). Threshold = ~8.5x
+    // measured healthy (~18.7MB over 1000 cycles); raised from 50MB which sat
+    // only ~2.7x above healthy and risked flaking.
+    expect(heapAfterMain - heapAfterWarmup).toBeLessThan(160 * MB);
 
     probe.restore();
   });

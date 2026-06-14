@@ -217,6 +217,12 @@ describe("N5: Navigation plugin lifecycle churn", () => {
 
       await router.start();
       await router.navigate("users.list").catch(noop);
+
+      // Per-cycle correctness: each fresh router must actually reach the
+      // navigated route before teardown — a loop counter alone proves nothing
+      // about whether navigation worked.
+      expect(router.getState()?.name).toBe("users.list");
+
       router.stop();
       unsubscribe();
 

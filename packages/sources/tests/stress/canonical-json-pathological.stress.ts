@@ -146,10 +146,13 @@ describe("S13 canonicalJson pathological inputs", () => {
 
     const after = takeHeapSnapshot();
 
-    // The internal `Set<object>` used by `canonicalize` is created per call
-    // and unwound in the finally block, so even 5k throw-and-clear cycles
-    // should not retain the cyclic objects. A leak (e.g. a missed
-    // `path.delete()`) would show as multi-MB heap growth.
-    expect(after - baseline).toBeLessThan(MB);
+    // Throughput / GC guard. The `Set<object>` is created fresh per
+    // canonicalJson() call (a local), and each iteration's cyclic object is
+    // dropped after the catch — so the objects are reclaimable regardless of
+    // whether the `finally { path.delete() }` runs, which makes the dispose-leak
+    // structurally invisible to a heap snapshot here. Healthy delta is reliably
+    // near-zero / net-negative (≈ -0.02 MB); threshold 0.25 MB is a tight,
+    // honest upper bound on per-call allocation churn over 5k throws.
+    expect(after - baseline).toBeLessThan(MB / 4);
   });
 });

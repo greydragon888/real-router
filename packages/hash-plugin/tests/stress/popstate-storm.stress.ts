@@ -167,6 +167,10 @@ describe("Popstate Storm (Hash)", () => {
 
     await waitForTransitions();
 
+    // Deferred-popstate dedup collapses the 50-event storm into a SINGLE
+    // not-found navigation — not 50 redundant ones. The count is the real
+    // invariant here: without dedup the spy would fire ~50 times.
+    expect(spy).toHaveBeenCalledTimes(1);
     expect(spy).toHaveBeenCalledWith("/nonexistent");
   });
 

@@ -47,7 +47,13 @@ describe("mount/unmount subscription lifecycle (Vue)", () => {
 
     const heapAfter = takeHeapSnapshot();
 
-    expect(heapAfter - heapBefore).toBeLessThan(50 * MB);
+    // THROUGHPUT GUARD (not a leak gate). Each cycle drops the wrapper ref, so
+    // the GC reclaims the churn and a broken useRouteNode cleanup leaks only
+    // ~0.3KB/iter on the shared ref-counted source (verified via the
+    // useRefFromSource leak-sim) — far below the ~2MB healthy churn that
+    // dominates. Per-cycle cleanup is proven by the functional tests. Healthy
+    // delta measured ~1994KB (stable <0.1% across 3 runs); guard set to ~9×.
+    expect(heapAfter - heapBefore).toBeLessThan(18 * MB);
   });
 
   it("3.2: mount/unmount useRoute × 200 cycles — no errors, bounded heap", () => {
@@ -70,7 +76,13 @@ describe("mount/unmount subscription lifecycle (Vue)", () => {
 
     const heapAfter = takeHeapSnapshot();
 
-    expect(heapAfter - heapBefore).toBeLessThan(50 * MB);
+    // THROUGHPUT GUARD (not a leak gate). Healthy delta is actually NEGATIVE
+    // (~ -111KB — the GC reclaims more than the cycle allocates), so there is
+    // no leak signal heap can resolve here; a broken useRoute cleanup leaks
+    // ~0.3KB/iter on the shared source (verified via the useRefFromSource
+    // leak-sim). Per-cycle cleanup is proven by the functional tests. Ceiling
+    // anchored at a few MB to catch only gross runaway growth.
+    expect(heapAfter - heapBefore).toBeLessThan(5 * MB);
   });
 
   it("3.3: 50 components mount → navigate × 10 → unmount → remount → navigate × 10", async () => {
@@ -334,7 +346,16 @@ describe("mount/unmount subscription lifecycle (Vue)", () => {
 
     const heapAfter = takeHeapSnapshot();
 
-    expect(heapAfter - heapBefore).toBeLessThan(100 * MB);
+    // THROUGHPUT GUARD (not a strict leak gate). One consumer stays mounted on
+    // the live router while 10k navs fire, so a per-nav subscription leak would
+    // be reachable-at-snapshot — but it is structurally bounded here: routes
+    // round-robin over only 49 names (→ ≤49 unique frozen state snapshots) and
+    // the core EventEmitter caps at 10k listeners/event, so neither a state-
+    // retention nor a listener-accumulation leak can exceed ~0.5MB (verified:
+    // a state-retaining leak-sim moved delta 650KB→1121KB only). Healthy delta
+    // measured ~650KB (stable <0.1% across 3 runs); guard set to ~9× to catch
+    // gross regressions without chasing a signal heap cannot resolve.
+    expect(heapAfter - heapBefore).toBeLessThan(6 * MB);
 
     expect(router.getState()?.name).toBeDefined();
 
@@ -351,8 +372,11 @@ describe("mount/unmount subscription lifecycle (Vue)", () => {
 
     const heapAfter = takeHeapSnapshot();
 
-    // Each start/stop round-trip should not leak FSM/event-bus state.
-    expect(heapAfter - heapBefore).toBeLessThan(50 * MB);
+    // THROUGHPUT GUARD (not a leak gate). Each start/stop round-trip resets
+    // FSM/event-bus state; healthy delta is actually NEGATIVE (~ -37KB), so
+    // there is no positive leak signal heap can resolve. Ceiling anchored at a
+    // few MB to catch only gross FSM/event-bus state runaway.
+    expect(heapAfter - heapBefore).toBeLessThan(5 * MB);
 
     // Final router is healthy: navigation still resolves.
     await router.navigate("route1");

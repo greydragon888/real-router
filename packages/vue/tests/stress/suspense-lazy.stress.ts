@@ -166,7 +166,13 @@ describe("V11 — Suspense + lazy components stress (Vue)", () => {
 
     const heapAfter = takeHeapSnapshot();
 
-    expect(heapAfter - heapBefore).toBeLessThan(50 * MB);
+    // THROUGHPUT GUARD (not a leak gate). Each cycle mounts a fresh wrapper
+    // around a resolved lazy <Match>, then unmounts and drops it — the
+    // suspended scope and its boundary are freed regardless of cleanup, so a
+    // per-cycle leak is GC-masked. Listener cleanup is proven by the functional
+    // RouteView/Suspense tests. Healthy delta measured ~1.15MB (stable <0.2%
+    // across 3 runs); guard set to ~9× (was 50MB ≈ 43× healthy).
+    expect(heapAfter - heapBefore).toBeLessThan(11 * MB);
   });
 
   it("11.3a: nested Suspense fallback chain (3 levels) × 30 rapid navs — fallbacks resolve, no dangling state (§7.2 #17)", async () => {
@@ -371,6 +377,12 @@ describe("V11 — Suspense + lazy components stress (Vue)", () => {
 
     const heapAfter = takeHeapSnapshot();
 
-    expect(heapAfter - heapBefore).toBeLessThan(50 * MB);
+    // THROUGHPUT GUARD (not a leak gate). Each of the 50 cycles mounts a fresh
+    // wrapper, drives the fallback→content swap, then unmounts and drops it;
+    // the suspended scope frees regardless of cleanup, so a per-cycle leak is
+    // GC-masked. Swap correctness + cleanup are proven by the functional
+    // assertions inside the loop. Healthy delta measured ~4.0MB (stable <0.4%
+    // across 3 runs); guard set to ~9× (was 50MB ≈ 12× healthy).
+    expect(heapAfter - heapBefore).toBeLessThan(36 * MB);
   });
 });

@@ -52,7 +52,10 @@ describe("S3. Eager subscription — shared cached sources do not leak", () => {
     forceGC();
     const heapAfter = takeHeapSnapshot();
 
-    expect(heapAfter - heapBefore).toBeLessThan(MB);
+    // Throughput guard (not a leak discriminator): all 200 calls return the
+    // SAME shared cached instance (asserted above), so no per-call accumulation
+    // is possible. Healthy delta ranged ≈ 0.07–0.13 MB; threshold ~10× the max.
+    expect(heapAfter - heapBefore).toBeLessThan(1.5 * MB);
   });
 
   it("S3.2: createActiveRouteSource destroy() is a no-op — heap stable during 100 navigations", async () => {
@@ -76,7 +79,11 @@ describe("S3. Eager subscription — shared cached sources do not leak", () => {
     const heapAfterNavs = takeHeapSnapshot();
     const delta = heapAfterNavs - heapBaseline;
 
-    expect(delta).toBeLessThan(MB);
+    // Throughput guard (not a leak discriminator): the cached active source is
+    // shared and its destroy() is a no-op, so the 100 navigations drive ONE
+    // shared snapshot with no per-op accumulation. Healthy delta ≈ 0.006 MB;
+    // threshold 0.25 MB is an honest floor above run-to-run heap jitter.
+    expect(delta).toBeLessThan(MB / 4);
   });
 
   it("S3.3: getTransitionSource × 200 returns shared instance — heap stable", async () => {
@@ -100,7 +107,11 @@ describe("S3. Eager subscription — shared cached sources do not leak", () => {
     forceGC();
     const heapAfter = takeHeapSnapshot();
 
-    expect(heapAfter - heapBefore).toBeLessThan(MB);
+    // Throughput guard (not a leak discriminator): getTransitionSource is
+    // per-router cached, so all 200 calls return the SAME shared instance
+    // (asserted above) — no per-call accumulation. Healthy delta ≈ 0.04–0.05 MB;
+    // threshold 0.5 MB is ~10× the max.
+    expect(heapAfter - heapBefore).toBeLessThan(MB / 2);
   });
 
   it("S3.4: getTransitionSource destroy() no-op — heap stable during 100 navigations", async () => {
@@ -121,7 +132,12 @@ describe("S3. Eager subscription — shared cached sources do not leak", () => {
     const heapAfterNavs = takeHeapSnapshot();
     const delta = heapAfterNavs - heapBaseline;
 
-    expect(delta).toBeLessThan(MB);
+    // Throughput guard (not a leak discriminator): getTransitionSource is
+    // cached and its destroy() is a no-op, so the 100 navigations drive ONE
+    // shared snapshot with no per-op accumulation. Healthy delta ≈ 0 MB (often
+    // negative — GC reclaims more than allocated); threshold 0.25 MB is an
+    // honest floor above run-to-run heap jitter.
+    expect(delta).toBeLessThan(MB / 4);
   });
 
   it("S3.5: lazy RouteSource auto-cleanup + eager ActiveRouteSource cached share — heap bounded", async () => {
@@ -220,8 +236,11 @@ describe("S3. Eager subscription — shared cached sources do not leak", () => {
 
     const heapAfter = takeHeapSnapshot();
 
-    // Two-orders-of-magnitude lower than a leak: each event would otherwise
-    // need to retain ≥1KB to breach 1MB at 1000 iterations.
+    // Throughput guard (not a leak discriminator): the cached shared source
+    // collapses every event into ONE rolling snapshot — events are not
+    // retained, so heap cannot accumulate per-navigation regardless of
+    // teardown. Healthy delta ≈ 0.10 MB across 1000 navigations; threshold
+    // ~10× that as an honest upper bound on per-event allocation churn.
     expect(heapAfter - heapBaseline).toBeLessThan(MB);
   });
 });

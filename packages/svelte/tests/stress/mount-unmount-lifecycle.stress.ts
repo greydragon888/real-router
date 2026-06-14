@@ -38,7 +38,13 @@ describe("mount/unmount subscription lifecycle (Svelte)", () => {
 
     const heapAfter = takeHeapSnapshot();
 
-    expect(heapAfter - heapBefore).toBeLessThan(50 * MB);
+    // Throughput guard (GC-masked): each cycle mounts then unmounts, refs
+    // dropped — a per-cycle subscription leak is reclaimed by GC and invisible
+    // to this snapshot. Real per-cycle cleanup is proven by the functional
+    // mount/unmount tests (3.3) and start-stop-churn's listener-count probe.
+    // Threshold = ~9x measured healthy (~1.64MB over 100 cycles); catches a
+    // gross regression only.
+    expect(heapAfter - heapBefore).toBeLessThan(15 * MB);
   });
 
   it("3.2: mount/unmount useRoute × 100 cycles — bounded heap", () => {
@@ -52,7 +58,9 @@ describe("mount/unmount subscription lifecycle (Svelte)", () => {
 
     const heapAfter = takeHeapSnapshot();
 
-    expect(heapAfter - heapBefore).toBeLessThan(50 * MB);
+    // Throughput guard (GC-masked): mount→unmount loop, refs dropped per cycle.
+    // Threshold = ~9x measured healthy (~1.63MB over 100 cycles).
+    expect(heapAfter - heapBefore).toBeLessThan(15 * MB);
   });
 
   it("3.3: 30 components mount → 10 navs → unmount → remount → 10 navs", async () => {

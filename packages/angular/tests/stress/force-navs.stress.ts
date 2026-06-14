@@ -108,7 +108,11 @@ describe("concurrent force-navs stress", () => {
     expect(hashChangeCount).toBeGreaterThanOrEqual(50);
 
     // 100 force-navs through cached-source machinery — bounded heap.
-    expect(heapAfter - heapBefore).toBeLessThan(50 * MB);
+    // THROUGHPUT GUARD. The router stays LIVE across 100 navigateWithHash calls;
+    // no per-call accumulation (cached source machinery). Measured healthy:
+    // ~0 MB (3 runs: -131/-134/126 KB — GC noise around zero). Threshold 2 MB.
+    // The force/hashChange option counts above are the real discriminators.
+    expect(heapAfter - heapBefore).toBeLessThan(2 * MB);
   }, 120_000);
 
   it("(b) router.navigate({force:true}) storm — 100 rapid programmatic force-bypass calls", async () => {
@@ -132,7 +136,11 @@ describe("concurrent force-navs stress", () => {
     // 100 force-bypassed identical navs → router's transition pipeline
     // re-runs every time (each emit + state diff + commit). Heap should
     // stay bounded — no listener accumulation, no transition queue leak.
-    expect(heapAfter - heapBefore).toBeLessThan(50 * MB);
+    // THROUGHPUT GUARD. 100 force-bypassed identical navs on the LIVE router —
+    // transition pipeline re-runs but nothing accumulates. Measured healthy:
+    // ~0 MB (3 runs: -41/-32/-32 KB). Threshold 2 MB. completedCount + final
+    // state above are the real discriminators.
+    expect(heapAfter - heapBefore).toBeLessThan(2 * MB);
   }, 60_000);
 
   it("(c) <a realLink> click storm — 50 rapid clicks reach navigate() through onClick", async () => {

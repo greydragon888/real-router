@@ -76,7 +76,11 @@ describe("injectIsActiveRoute fanout stress", () => {
 
     const heapAfter = takeHeapSnapshot();
 
-    expect(heapAfter - heapBefore).toBeLessThan(50 * MB);
+    // THROUGHPUT GUARD. One-shot mount of 100 distinct-param injectIsActiveRoute
+    // consumers, snapshot brackets detectChanges(). All sources held by the LIVE
+    // fixture. Measured healthy: ~0.73 MB (3 runs: 746/746/748 KB). Threshold
+    // 4 MB ≈ 5.4× healthy max. The 100-div count above is the real discriminator.
+    expect(heapAfter - heapBefore).toBeLessThan(4 * MB);
 
     fixture.destroy();
   });
@@ -171,7 +175,13 @@ describe("injectIsActiveRoute fanout stress", () => {
     TestBed.resetTestingModule();
     const heapAfter = takeHeapSnapshot();
 
-    expect(heapAfter - heapBefore).toBeLessThan(50 * MB);
+    // THROUGHPUT GUARD (GC-masked). 50 mount/unmount cycles × 50 consumers;
+    // resetTestingModule + destroy drops each fixture, so a per-cycle source
+    // leak is reclaimed before the snapshot — heap cannot discriminate it.
+    // Measured healthy: ~3.75 MB (3 runs: 3839/3825/3835 KB). Threshold 14 MB
+    // ≈ 3.6× healthy max. Per-cycle consistency verified by the div-count
+    // assertions inside the loop and the shared-cache test (b).
+    expect(heapAfter - heapBefore).toBeLessThan(14 * MB);
   }, 60_000);
 
   it("(d) 100 fanout consumers × 50 navigations — at most one signal is 'true' at a time", async () => {
