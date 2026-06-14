@@ -64,7 +64,11 @@ describe("B3 — Popstate/Navigate Interleave Stress", () => {
     const finalState = router.getState();
 
     expect(finalState).toBeDefined();
-    expect(globalThis.location.pathname).toMatch(/^\//);
+    // URL ↔ state parity: the browser URL must reflect the settled router state,
+    // not merely "be a valid path". A regression where the URL push/replace lags
+    // behind (or races ahead of) the final transition would leave location and
+    // state desynced — the original `/^\//` check could not detect that.
+    expect(globalThis.location.pathname).toBe(finalState!.path);
   });
 
   it("3.2 — navigate then popstate: 100 pairs, popstate processed immediately, no stuck transitions", async () => {
