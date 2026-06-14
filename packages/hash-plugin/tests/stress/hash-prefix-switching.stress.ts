@@ -60,12 +60,17 @@ describe("Hash Prefix Switching Under Load", () => {
     let completed = 0;
 
     for (const prefix of prefixes) {
-      for (let i = 0; i < 4; i++) {
-        const router = createRouter(routeConfig, { defaultRoute: "home" });
+      // Escape the prefix for the regex assertion (".", etc. are regex-special).
+      const escapedPrefix = prefix.replaceAll(
+        /[.*+?^${}()|[\]\\]/g,
+        String.raw`\$&`,
+      );
+      const expectedHashFormat = new RegExp(`^#${escapedPrefix}/`);
 
-        const unsub = router.usePlugin(
-          hashPluginFactory({ hashPrefix: prefix }),
-        );
+      for (let i = 0; i < 4; i++) {
+        const { router, browser, unsubscribe } = createStressRouter({
+          hashPrefix: prefix,
+        });
 
         await router.start("/home");
 
@@ -73,12 +78,23 @@ describe("Hash Prefix Switching Under Load", () => {
 
         expect(state?.name).toBe("home");
 
+        const pushStateSpy = vi.spyOn(browser, "pushState");
+
         await router.navigate("users.list").catch(noop);
 
         expect(router.getState()?.name).toBe("users.list");
 
+        // The navigation must have pushed exactly one URL, in the expected
+        // #<prefix>/ format for this router's prefix.
+        expect(pushStateSpy).toHaveBeenCalledTimes(1);
+
+        for (const [, url] of pushStateSpy.mock.calls) {
+          expect(url).toMatch(expectedHashFormat);
+        }
+
+        pushStateSpy.mockRestore();
         router.stop();
-        unsub();
+        unsubscribe();
         completed++;
       }
     }
@@ -112,6 +128,9 @@ describe("Hash Prefix Switching Under Load", () => {
   });
 
   it("rapid factory creation with different prefixes: 50 factories, no leaks or errors", async () => {
+    const addSpy = vi.spyOn(globalThis, "addEventListener");
+    const removeSpy = vi.spyOn(globalThis, "removeEventListener");
+
     const unsubscribes: Unsubscribe[] = [];
     let completed = 0;
 
@@ -133,5 +152,20 @@ describe("Hash Prefix Switching Under Load", () => {
     }
 
     expect(completed).toBe(50);
+
+    // Listener balance: every popstate listener added across the 50 factories
+    // must have been removed on teardown (no leaked browser listeners).
+    const added = addSpy.mock.calls.filter(
+      ([event]) => event === "popstate",
+    ).length;
+    const removed = removeSpy.mock.calls.filter(
+      ([event]) => event === "popstate",
+    ).length;
+
+    expect(added).toBe(50);
+    expect(removed).toBe(added);
+
+    addSpy.mockRestore();
+    removeSpy.mockRestore();
   });
 });
