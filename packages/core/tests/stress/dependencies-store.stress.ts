@@ -99,7 +99,7 @@ describe("S13: Dependencies store churn", () => {
     router.dispose();
   });
 
-  it("S13.4 reset + refill 100 cycles: store correct, heap stable", () => {
+  it("S13.4 reset + refill 2000 cycles: store correct, heap stable", () => {
     const router = createRouter<Record<string, number>>([], {
       limits: { maxDependencies: 0 },
     });
@@ -113,7 +113,15 @@ describe("S13: Dependencies store churn", () => {
 
     const heapBefore = takeHeapSnapshot();
 
-    for (let cycle = 0; cycle < 100; cycle++) {
+    // 2000 cycles (not 100): with maxDependencies:0 a broken reset() accumulates
+    // a fresh generation of entries per cycle, unbounded, so the leak signal
+    // scales with N. At N=100 that leak adds only ~300KB — indistinguishable from
+    // the cross-test heap/JIT noise floor (residual from S13.1-S13.3 in the same
+    // worker), which made the old 128KB threshold flaky (passed/failed ~50/50).
+    // Mutationally validated: at N=2000 the simulated reset leak measures ~9MB
+    // while a healthy run's delta stays ≤~60KB isolated (well under the 1MB
+    // threshold on full-file runs), giving ≥3× margin on both sides. Runtime <100ms.
+    for (let cycle = 0; cycle < 2000; cycle++) {
       deps.reset();
       deps.setAll(batch);
     }
@@ -126,8 +134,10 @@ describe("S13: Dependencies store churn", () => {
     expect(Object.keys(all)).toHaveLength(50);
     expect(all.key0).toBe(0);
     expect(all.key49).toBe(49);
+    // Anchored to measured healthy (≤~60KB isolated, noise-padded for in-file
+    // runs); leak is ~9MB. Threshold sits between with wide margin both ways.
     expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(
-      128 * 1024,
+      1024 * 1024,
     );
 
     router.stop();

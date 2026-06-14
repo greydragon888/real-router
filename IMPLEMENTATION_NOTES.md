@@ -290,6 +290,19 @@ Both fold into the required `CI Result` (they're steps in `pipeline`).
 
 **Why not refactor the flagged code:** the largest "clones" are intentional — the Angular `dom-utils` copy is a build-time materialization of `shared/dom-utils/` (ng-packagr can't follow the symlink), and the React/Preact components are deliberately independent per-framework twins. The duplication is by design; the filter is what regressed.
 
+### jscpd 5.0.9 re-renamed the config keys again — `ignorePattern` → `ignore`, `skipComments` → `mode` (#831)
+
+**Problem:** the `jscpd` 5.0.4 → 5.0.9 bump in the dev-dependencies group (#831) re-broke the pre-push duplication gate: `pnpm lint:duplicates` failed at **6.84%** over 2%, again counting the deliberately-excluded clones (`packages/preact/src/**`, etc.) that `.jscpd.json`'s `ignorePattern` list named. jscpd also began emitting `config file .jscpd.json: unknown field '_comment'` and `unknown field 'skipComments'` warnings.
+
+**Root cause:** the Rust `cpd` rewrite reshuffled its option vocabulary *again* between 5.0.4 and 5.0.9 (verified against the installed 5.0.9 `--help`):
+- **File-level glob ignore moved back to `ignore`** (`-i, --ignore` — "File-level glob patterns to ignore"). `ignorePattern` was **reassigned** to a *different* feature: `--ignore-pattern` is now "Code-level regex patterns to skip matching tokens" (e.g. `//\s*cpd-disable`). So our `ignorePattern: [globs]` was silently reinterpreted as token-regexes that match no code → every file exclusion evaporated (same failure mode as #714, opposite key).
+- **`skipComments` is gone**, replaced by `--skip-comments` = "Alias for `--mode weak`". The config key is now `mode` (`mild | weak | strict`).
+- `_comment` is rejected as an unknown field (5.0.9 validates the config shape and warns on anything it doesn't recognize), so the inline doc-comment had to leave the file.
+
+**Solution:** in `.jscpd.json`, rename `ignorePattern` → `ignore` (the exclusion list is unchanged), replace `skipComments: true` → `mode: "weak"`, and drop the `_comment` field (this note is its replacement). Verified empirically against jscpd 5.0.9: gate is green at **0.98%** with zero "unknown field" warnings; preact/hash-plugin/etc. are excluded as intended. `threshold`, `minLines`, `minTokens`, `reporters`, `format`, `absolute`, `gitignore` are still read under their existing names. This fix ships **with** the 5.0.9 bump in the same PR — a linter bump that changes its own config contract must carry the matching config change (CLAUDE.md: "a lint failure from a linter-plugin bump itself is a code/config fix"). CI is unaffected either way (the blocking gate is pre-push-only; CI's jscpd SARIF job runs `-t 100` and stays informational).
+
+**Lesson:** jscpd 5.x config keys are unstable across patch releases (`ignore` → `ignorePattern` in #714 at 5.0.4, back to `ignore` in #831 at 5.0.9). Pin jscpd exactly (`save-exact`) and re-verify the ignore list actually excludes after any jscpd bump — a green-looking config can silently stop filtering.
+
 ### jscpd: `--no-tips` + non-blocking SARIF in CI
 
 **Two jscpd 5.x features adopted (the only ones worth it for this repo):**
