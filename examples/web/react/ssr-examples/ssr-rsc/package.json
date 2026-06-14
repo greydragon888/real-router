@@ -17,7 +17,7 @@
     "@real-router/rsc-server-plugin": "workspace:^",
     "express": "5.1.0",
     "react": "19.2.7",
-    "react-dom": "19.2.0",
+    "react-dom": "19.2.7",
     "rsc-html-stream": "0.0.7"
   },
   "devDependencies": {

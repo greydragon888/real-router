@@ -16,7 +16,7 @@
     "@real-router/search-schema-plugin": "workspace:^",
     "@real-router/react": "workspace:^",
     "react": "19.2.7",
-    "react-dom": "19.2.0",
+    "react-dom": "19.2.7",
     "zod": "4.4.3"
   },
   "devDependencies": {
