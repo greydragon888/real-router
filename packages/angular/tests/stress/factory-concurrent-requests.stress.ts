@@ -83,7 +83,13 @@ describe("provideRealRouterFactory request-scope stress", () => {
     TestBed.resetTestingModule();
     const heapAfter = takeHeapSnapshot();
 
-    expect(heapAfter - heapBefore).toBeLessThan(100 * MB);
+    // THROUGHPUT GUARD. NOTE: seenRouters[] deliberately retains all 100 clones
+    // until after the snapshot (required by the distinct-instance assertions),
+    // so ~100 live routers are counted as healthy. Measured healthy: ~1.90 MB
+    // (3 runs: 1946/1941/1940 KB). Threshold 8 MB ≈ 4.1× healthy max. The
+    // distinct-router + per-request state assertions above are the real
+    // discriminators; this is a loose secondary ceiling.
+    expect(heapAfter - heapBefore).toBeLessThan(8 * MB);
   }, 90_000);
 
   it("(b) 100 requests — deps factory is called per request with the matching REQUEST", async () => {

@@ -127,7 +127,12 @@ describe("createDirectionTracker stress (Angular copy)", () => {
     expect(backCount).toBeGreaterThanOrEqual(30);
     expect(forwardCount).toBeGreaterThanOrEqual(30);
 
-    expect(heapAfter - heapBefore).toBeLessThan(50 * MB);
+    // THROUGHPUT GUARD. `tracker` stays LIVE across 100 navs + 50 popstates but
+    // only toggles a single dataset attribute — nothing accumulates. Measured
+    // healthy: ~0 MB (3 runs: -1/0/-4 KB, i.e. GC reclaims more than is added).
+    // Threshold 2 MB is a small honest ceiling; the back/forward direction
+    // counts above are the real discriminators.
+    expect(heapAfter - heapBefore).toBeLessThan(2 * MB);
 
     tracker.destroy();
   }, 60_000);
@@ -147,7 +152,13 @@ describe("createDirectionTracker stress (Angular copy)", () => {
 
     const heapAfter = takeHeapSnapshot();
 
-    expect(heapAfter - heapBefore).toBeLessThan(50 * MB);
+    // THROUGHPUT GUARD (GC-masked). createDirectionTracker()/destroy() each
+    // cycle drops the tracker, so a per-cycle popstate-listener leak is reclaimed
+    // — heap cannot discriminate it. The genuine teardown invariant (listener
+    // removed) IS discriminated by the post-loop popstate no-op + `dataset
+    // undefined` assertions below. Measured healthy over 100 cycles: ~0.07 MB
+    // (3 runs: 74/73/73 KB). Threshold 2 MB.
+    expect(heapAfter - heapBefore).toBeLessThan(2 * MB);
 
     // After 100 install/destroy cycles, dispatch popstate one last time —
     // no listener should be registered, so dataset stays undefined.

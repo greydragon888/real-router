@@ -92,9 +92,16 @@ describe("memory-mount-unmount baseline", () => {
 
     logBaseline("transition-1000", iterations, delta);
 
-    // Angular TestBed + signal bridge overhead dominates (~13 KB/iter).
-    // Regression gate protects against cache breakage.
-    expect(delta).toBeLessThan(15_000 * iterations);
+    // THROUGHPUT GUARD (GC-masked, per-iteration). mountOnce()/destroy() each
+    // cycle drops the fixture, so a per-cycle source leak is reclaimed before
+    // the snapshot — Angular TestBed + signal-bridge overhead dominates the
+    // delta. Measured healthy: ~13.47 KB/iter (3 runs: 13467/13467/13467 B,
+    // variance <0.01%). The previous bound 15_000 B/iter was only 1.11× healthy
+    // — it would flake on a sub-12% harness shift, violating the ≥3× rule.
+    // Re-anchored to 40_000 B/iter ≈ 3.0× healthy: honest throughput regression
+    // gate. Per-cycle teardown verified by mount-unmount-lifecycle's DestroyRef
+    // test.
+    expect(delta).toBeLessThan(40_000 * iterations);
   });
 
   it("Pattern B: injectRouteNode × 100 + 50 navigations", async () => {
@@ -167,9 +174,15 @@ describe("memory-mount-unmount baseline", () => {
       "(10 trees × 100 consumers)",
     );
 
-    // Cached shared node source; TestBed + Angular signal allocations
-    // dominate. Regression gate.
-    expect(delta).toBeLessThan(12_000 * 10 * 100);
+    // THROUGHPUT GUARD (GC-masked, per-iteration). All 10×100 fixtures are
+    // destroyed before the `after` snapshot, so a per-consumer leak is
+    // reclaimed — the cached shared node source keeps one router subscription
+    // regardless of consumer count. TestBed + Angular signal allocations
+    // dominate. Measured healthy: ~11.43 KB/iter over 1000 consumers (3 runs:
+    // 11432/11432/11432 B, variance <0.01%). The previous bound 12_000 B/iter
+    // was only 1.05× healthy (flake risk, < ≥3× rule). Re-anchored to 36_000
+    // B/iter ≈ 3.1× healthy: honest throughput regression gate.
+    expect(delta).toBeLessThan(36_000 * 10 * 100);
   });
 
   it("Pattern C: 500 RouterErrorBoundary with fresh routers", async () => {

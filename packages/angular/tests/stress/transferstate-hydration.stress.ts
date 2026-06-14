@@ -117,7 +117,12 @@ describe("provideRealRouterFactory TransferState hydration stress", () => {
     const heapAfter = takeHeapSnapshot();
 
     // (3) bounded heap — 100 EnvironmentInjector + cloned router lifecycle cycles.
-    expect(heapAfter - heapBefore).toBeLessThan(100 * MB);
+    // THROUGHPUT GUARD (GC-masked). 100 hydration cycles via resetTestingModule.
+    // Measured healthy: ~1.72 MB (3 runs: 1756/1765/1752 KB). Threshold 8 MB ≈
+    // 4.5× healthy max. The genuine invariants (one-shot TransferState removal,
+    // per-cycle distinct params) are discriminated by the assertions inside the
+    // loop, not by heap.
+    expect(heapAfter - heapBefore).toBeLessThan(8 * MB);
   }, 120_000);
 
   it("(b) hydration cycles preserve isolation — distinct router instance per cycle", async () => {

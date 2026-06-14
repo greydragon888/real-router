@@ -76,7 +76,14 @@ describe("scrollRestoration stress — rapid pushState", () => {
 
     const heapAfter = takeHeapSnapshot();
 
-    expect(heapAfter - heapBefore).toBeLessThan(50 * MB);
+    // THROUGHPUT GUARD. The fixture stays LIVE across all 1000 navigations, so
+    // the scroll-restore capture map (keyed by `name:canonicalParams`) is
+    // reachable here — but it is HARD-CAPPED at the 50 unique routes
+    // (last-write-wins per key), so heap cannot grow unboundedly regardless.
+    // The genuine leak vector (sessionStorage growth) is discriminated by the
+    // size/count assertions below. Measured healthy over 1000 navs: ~0.95 MB
+    // (3 runs: 950/956/950 KB). Threshold 4 MB ≈ 4.2× healthy max.
+    expect(heapAfter - heapBefore).toBeLessThan(4 * MB);
 
     // sessionStorage holds positions keyed by `name:canonicalParams`. With
     // 50 unique routes, at most 50 keys + one value each (≈ 1KB total).
@@ -128,7 +135,16 @@ describe("scrollRestoration stress — rapid pushState", () => {
 
     const heapAfter = takeHeapSnapshot();
 
-    expect(heapAfter - heapBefore).toBeLessThan(50 * MB);
+    // THROUGHPUT GUARD (GC-masked). Each cycle resets the TestBed module and
+    // destroys the fixture; the per-cycle scroll-restore utility (subscription
+    // + pagehide listener) is unreferenced at snapshot and reclaimed — heap
+    // cannot discriminate a per-cycle leak. The genuine teardown invariants
+    // (history.scrollRestoration restored, pagehide listener removed) are
+    // discriminated by the `toBe(original)` assertions in the loop above and
+    // the "pagehide after destroy is a no-op" test. Measured healthy over 100
+    // cycles: ~5.13-5.39 MB (3 runs: 5383/5388/5134 KB). Threshold 18 MB ≈ 3.3×
+    // healthy max.
+    expect(heapAfter - heapBefore).toBeLessThan(18 * MB);
   });
 
   it("pagehide event after destroy is a no-op (no exception, no sessionStorage write)", () => {

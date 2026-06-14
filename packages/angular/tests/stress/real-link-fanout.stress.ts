@@ -82,7 +82,11 @@ describe("RealLink / RealLinkActive directive fanout stress", () => {
     // 100 active sources × 100 navs would leak ~MBs if subscribe path
     // allocated per-emit. The cached `createActiveRouteSource` keeps this
     // bounded.
-    expect(heapAfter - heapBefore).toBeLessThan(50 * MB);
+    // THROUGHPUT GUARD. 100 <a realLink> directives stay LIVE across 100 navs;
+    // the cached createActiveRouteSource keeps one shared subscription, so no
+    // per-emit allocation. Measured healthy: ~0 MB (3 runs: -126/-105/-100 KB).
+    // Threshold 2 MB. The 100-anchor count above is the real discriminator.
+    expect(heapAfter - heapBefore).toBeLessThan(2 * MB);
 
     fixture.destroy();
   }, 60_000);
@@ -132,7 +136,13 @@ describe("RealLink / RealLinkActive directive fanout stress", () => {
     TestBed.resetTestingModule();
     const heapAfter = takeHeapSnapshot();
 
-    expect(heapAfter - heapBefore).toBeLessThan(50 * MB);
+    // THROUGHPUT GUARD (GC-masked). 50 mount/unmount cycles × 50 anchors;
+    // resetTestingModule + destroy drops each fixture — a per-cycle directive/
+    // source leak is reclaimed before the snapshot. Measured healthy: ~6.38 MB
+    // (3 runs: 6532/6532/6533 KB). Threshold 22 MB ≈ 3.4× healthy max. Clean
+    // teardown / no a11y cross-contamination verified by the role/tabindex
+    // assertions inside the loop.
+    expect(heapAfter - heapBefore).toBeLessThan(22 * MB);
   }, 60_000);
 
   it("(c) RealLinkActive on 100 <div> elements — applyLinkA11y stamps role/tabindex, idempotent across CD", () => {
@@ -282,7 +292,11 @@ describe("RealLink / RealLinkActive directive fanout stress", () => {
 
     const heapAfter = takeHeapSnapshot();
 
-    expect(heapAfter - heapBefore).toBeLessThan(50 * MB);
+    // THROUGHPUT GUARD. 100 <div realLinkActive> directives stay LIVE across 50
+    // navs; realLinkActive="" early-returns so no class side-effects accrue.
+    // Measured healthy: ~0 MB (3 runs: -285/-264/-264 KB). Threshold 2 MB. The
+    // className=="" assertions above are the real discriminators.
+    expect(heapAfter - heapBefore).toBeLessThan(2 * MB);
 
     fixture.destroy();
   }, 60_000);
