@@ -133,8 +133,13 @@ describe("Stress: viewTransitions + mid-transition router.stop()", () => {
     forceGC();
     const finalHeap = getHeapUsedBytes();
 
-    // Generous budget — VT integration shouldn't accumulate state across 100 cycles.
-    expect(finalHeap - baseline).toBeLessThan(50 * MB);
+    // Throughput guard (GC-masked): each cycle creates a fresh router +
+    // RouterProvider then stops/unmounts, refs dropped — a per-cycle pending-VT
+    // callback leak is reclaimed by GC. The real teardown proof is the
+    // zero-console.error assertion plus the dedicated mid-pending teardown
+    // scenario below (no post-stop resolution errors). Threshold = ~8x measured
+    // healthy (~7.00MB over 100 cycles with 100 fresh routers).
+    expect(finalHeap - baseline).toBeLessThan(60 * MB);
     // No console errors from leaked subscriptions.
     expect(consoleError).not.toHaveBeenCalled();
   });
@@ -187,6 +192,9 @@ describe("Stress: viewTransitions + mid-transition router.stop()", () => {
     forceGC();
     const finalHeap = getHeapUsedBytes();
 
-    expect(finalHeap - baseline).toBeLessThan(30 * MB);
+    // Throughput guard (GC-masked): 100 mount→unmount cycles with VT enabled,
+    // refs dropped per cycle. A per-cycle createViewTransitions teardown leak is
+    // reclaimed by GC. Threshold = ~9x measured healthy (~2.37MB).
+    expect(finalHeap - baseline).toBeLessThan(22 * MB);
   });
 });

@@ -87,7 +87,11 @@ describe("Stress: useRouteExit", () => {
     forceGC();
     const finalHeap = getHeapUsedBytes();
 
-    expect(finalHeap - baseline).toBeLessThan(30 * MB);
+    // Throughput guard (GC-masked): 100 mount→nav→unmount cycles, refs dropped.
+    // A per-cycle subscribeLeave leak is reclaimed by GC; the real cleanup proof
+    // is the handler-called-once-per-transition + zero-console.error tests.
+    // Threshold = ~9x measured healthy (~1.65MB).
+    expect(finalHeap - baseline).toBeLessThan(15 * MB);
     expect(consoleError).not.toHaveBeenCalled();
   });
 
@@ -181,7 +185,11 @@ describe("Stress: useRouteEnter", () => {
     forceGC();
     const finalHeap = getHeapUsedBytes();
 
-    expect(finalHeap - baseline).toBeLessThan(30 * MB);
+    // Throughput guard (GC-masked): 100 mount→nav→unmount cycles, refs dropped.
+    // A per-cycle $effect leak is reclaimed by GC; the real proof is the
+    // handler-fires-exactly-100-times + zero-console.error tests. Threshold =
+    // ~10x measured healthy (~0.94MB).
+    expect(finalHeap - baseline).toBeLessThan(10 * MB);
     expect(consoleError).not.toHaveBeenCalled();
   });
 
@@ -240,7 +248,10 @@ describe("Stress: useRouteEnter", () => {
       expect(n).toBeLessThanOrEqual(2);
     });
 
-    expect(finalHeap - baseline).toBeLessThan(30 * MB);
+    // Throughput guard (GC-masked): 50 mount→2-nav→unmount cycles, refs dropped.
+    // The no-double-fire proof is the per-cycle handlerCounts ≤ 2 assertion
+    // above. Threshold = ~10x measured healthy (~0.51MB).
+    expect(finalHeap - baseline).toBeLessThan(6 * MB);
     expect(consoleError).not.toHaveBeenCalled();
   });
 });

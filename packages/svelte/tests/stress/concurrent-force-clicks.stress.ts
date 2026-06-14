@@ -98,7 +98,11 @@ describe("Stress: concurrent Link clicks with force:true", () => {
     forceGC();
     const finalHeap = getHeapUsedBytes();
 
-    expect(finalHeap - baseline).toBeLessThan(30 * MB);
+    // Throughput guard (GC-masked): 50 mount→click→unmount cycles, refs dropped
+    // per cycle. The per-cycle click-listener leak is reclaimed by GC; the real
+    // detector is the zero-console.error (no unhandled rejections from
+    // catch(NOOP)) assertion. Threshold = ~10x measured healthy (~0.95MB).
+    expect(finalHeap - baseline).toBeLessThan(10 * MB);
     expect(consoleError).not.toHaveBeenCalled();
   });
 

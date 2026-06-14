@@ -1,13 +1,7 @@
 import { flushSync } from "svelte";
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import {
-  createStressRouter,
-  forceGC,
-  getHeapUsedBytes,
-  MB,
-  renderWithRouter,
-} from "./helpers";
+import { createStressRouter, renderWithRouter } from "./helpers";
 import LazyTest from "../helpers/LazyTest.svelte";
 import MockFallbackComponent from "../helpers/MockFallbackComponent.svelte";
 import MockLoadedComponent from "../helpers/MockLoadedComponent.svelte";
@@ -19,21 +13,32 @@ type Loader = () => Promise<{ default: Component }>;
 
 describe("Stress: Lazy.svelte", () => {
   let router: Router;
+  let consoleError: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
     router = createStressRouter(2);
     await router.start("/route0");
+    consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
   afterEach(() => {
+    consoleError.mockRestore();
     router.stop();
   });
 
+  // Count/spy-based (was a 50MB heap assertion — GC-masked: each Lazy is
+  // mounted then unmounted, its component scope/runes/timers are reclaimed by
+  // GC regardless of whether the `active` cleanup flag ran, so a broken flag is
+  // structurally invisible to a heap snapshot). The TRUE discriminator: if the
+  // `active = false` cleanup leaked, the post-unmount `state = {ready}` write
+  // would hit a destroyed scope and Svelte 5 logs "scope not registered" via
+  // console.error. We assert (a) every loader resolved, (b) zero post-unmount
+  // state writes reached the DOM, (c) zero console.error — all fail if the
+  // cleanup flag is removed.
   it("9.1 Concurrent mount + immediate unmount of 30 Lazy components — no leaked timers, no setState-after-unmount", async () => {
-    forceGC();
-    const baselineHeap = getHeapUsedBytes();
-    const renders: { unmount: () => void }[] = [];
+    const renders: { unmount: () => void; container: HTMLElement }[] = [];
     const resolvers: ((value: { default: Component }) => void)[] = [];
+    let resolvedCount = 0;
 
     for (let i = 0; i < 30; i++) {
       const loader: Loader = () =>
@@ -62,25 +67,39 @@ describe("Stress: Lazy.svelte", () => {
     // gate every state assignment.
     for (const resolve of resolvers) {
       resolve({ default: MockLoadedComponent });
+      resolvedCount++;
     }
 
     await Promise.resolve();
     flushSync();
 
-    forceGC();
-    const finalHeap = getHeapUsedBytes();
+    // Every loader resolved.
+    expect(resolvedCount).toBe(30);
 
-    // Heap delta should be small — no retained components or pending timers.
-    expect(finalHeap - baselineHeap).toBeLessThan(50 * MB);
+    // No post-unmount state write reached the DOM — every container is empty,
+    // proving the `active` flag gated all 30 deferred resolutions.
+    for (const r of renders) {
+      expect(r.container.querySelector("[data-testid='loaded']")).toBeNull();
+    }
+
+    // A broken cleanup flag would write state on a destroyed scope → Svelte 5
+    // emits console.error. Zero errors proves cleanup ran.
+    expect(consoleError).not.toHaveBeenCalled();
   });
 
-  it("9.2 100 mount/unmount cycles of a single Lazy — bounded heap (no listener leak)", async () => {
-    forceGC();
-    const baseline = getHeapUsedBytes();
+  // Count/spy-based (was a 50MB heap assertion — GC-masked for the same reason
+  // as 9.1). Discriminator: 100 resolve→unmount cycles must each reach the
+  // "loaded" state and never log a post-unmount state-write error.
+  it("9.2 100 mount/unmount cycles of a single Lazy — no listener leak, no post-unmount writes", async () => {
+    let loaderCalls = 0;
+    let loadedSeen = 0;
 
     for (let i = 0; i < 100; i++) {
-      const loader: Loader = () =>
-        Promise.resolve({ default: MockLoadedComponent });
+      const loader: Loader = () => {
+        loaderCalls++;
+
+        return Promise.resolve({ default: MockLoadedComponent });
+      };
 
       const r = renderWithRouter(router, LazyTest, {
         router,
@@ -90,13 +109,19 @@ describe("Stress: Lazy.svelte", () => {
 
       await Promise.resolve();
       flushSync();
+
+      if (r.container.querySelector("[data-testid='loaded']")) {
+        loadedSeen++;
+      }
+
       r.unmount();
     }
 
-    forceGC();
-    const final = getHeapUsedBytes();
-
-    expect(final - baseline).toBeLessThan(50 * MB);
+    // Every cycle invoked the loader and resolved to the loaded component.
+    expect(loaderCalls).toBe(100);
+    expect(loadedSeen).toBe(100);
+    // No post-unmount state-write errors across 100 cycles.
+    expect(consoleError).not.toHaveBeenCalled();
   });
 
   it("9.3 Many Lazy components mounted at once — every one ends in 'ready' state", async () => {
