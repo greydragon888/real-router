@@ -31,6 +31,8 @@
 | 11  | Case insensitivity                   | With `caseSensitive: false`, matching produces the same route name regardless of the case of static path segments.                                                                          |
 | 12  | buildPath starts with `/`            | `buildPath` always returns a string starting with `/`, for param routes, splat routes, and optional-param routes alike.                                                                     |
 | 13  | Trailing slash option                | With `trailingSlash: "always"`, `buildPath` always returns a string ending with `/`.                                                                                                        |
+| 14  | Param-name grammar agreement         | The match-path and build-path grammars accept the **same** param-name character class (canonical set: any char except `/`, `?`, `<` — derived from the single `PARAM_NAME_PATTERN`). For any valid name (incl. `-`, `.`, `~`, not just `\w`), `match()` captures the value under exactly the name `buildPath()` expects — they can never disagree (#738). |
+| 15  | Constraint-aware query detection     | A `?` inside a `<...>` constraint (lazy quantifier, optional group — `:id<\d?>`) is never mistaken for the query separator. `buildParamMeta` preserves `urlParams`, the constraint, and `pathPattern`; `queryParams` is unaffected. A real query after the constraint is still detected (#738). |
 
 ## Path Rejection
 

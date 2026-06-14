@@ -1,3 +1,4 @@
+import { PARAM_NAME_PATTERN } from "./buildParamMeta";
 import { ENCODING_METHODS } from "./encoding";
 import {
   buildFullPath,
@@ -517,8 +518,13 @@ function compileBuildParts(
   const parts: string[] = [];
   const slots: BuildParamSlot[] = [];
 
-  // eslint-disable-next-line sonarjs/single-char-in-character-classes -- character class is more readable than alternation
-  const paramRgx = /[:*]([\w]+)(?:<[^>]*>)?(\?)?/gu;
+  // Name class derives from the single source of truth in buildParamMeta so the
+  // build-path grammar matches the match-path grammar exactly (#738) — e.g.
+  // `:my-param` builds under the same name it matched under.
+  const paramRgx = new RegExp(
+    String.raw`[:*](${PARAM_NAME_PATTERN})(?:<[^>]*>)?(\?)?`,
+    "gu",
+  );
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 

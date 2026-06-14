@@ -580,6 +580,63 @@ describe("SegmentMatcher", () => {
   });
 
   // ===========================================================================
+  // build↔match grammar agreement (#738)
+  // ===========================================================================
+  //
+  // The build-path grammar was narrower than the match-path grammar: match()
+  // recognized names/constraints that buildPath() then rejected with "Missing
+  // required param", crashing start() via rewritePathOnMatch. These lock the
+  // two grammars together.
+
+  describe("build↔match grammar agreement (#738)", () => {
+    function singleRouteMatcher(name: string, path: string): SegmentMatcher {
+      const matcher = createTestMatcher();
+      const route = createInputNode({ name, path, fullName: name });
+      const root = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([[name, route]]),
+        nonAbsoluteChildren: [route],
+      });
+
+      matcher.registerTree(root);
+
+      return matcher;
+    }
+
+    it.each([
+      ["/h/:my-param", "my-param"],
+      ["/h/:a.b", "a.b"],
+      ["/h/:user~id", "user~id"],
+    ])(
+      "round-trips a non-word-char param name in '%s' (match key === build key)",
+      (path, key) => {
+        const matcher = singleRouteMatcher("h", path);
+
+        expect(matcher.match("/h/v")?.params).toStrictEqual({ [key]: "v" });
+        expect(() => matcher.buildPath("h", { [key]: "v" })).not.toThrow();
+        expect(matcher.buildPath("h", { [key]: "v" })).toBe("/h/v");
+      },
+    );
+
+    it("does not crash building a route whose constraint contains a `?`", () => {
+      const matcher = singleRouteMatcher("a", String.raw`/a/:id<\d?>`);
+
+      // The lazy-quantifier `?` no longer destroys the slot/metadata.
+      expect(matcher.match("/a/5")?.params).toStrictEqual({ id: "5" });
+      expect(matcher.buildPath("a", { id: "5" })).toBe("/a/5");
+    });
+
+    it("enforces the constraint that survived query detection (#738)", () => {
+      const matcher = singleRouteMatcher("a", String.raw`/a/:id<\d?>`);
+
+      // \d? matches a single digit or empty — two digits must be rejected.
+      expect(matcher.match("/a/55")).toBeUndefined();
+    });
+  });
+
+  // ===========================================================================
   // Static Route Matching
   // ===========================================================================
 
