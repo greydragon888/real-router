@@ -1,13 +1,18 @@
 name: CodeQL
 
 on:
+  # No workflow-level paths-ignore: `Dependency Review` is a REQUIRED status
+  # check (protect-master ruleset), and a workflow skipped at the `on:` level
+  # never reports its check → the PR blocks forever on a pending required check.
+  # Release PRs (`changeset-release/*`, which only bump versions/changelogs and
+  # have nothing to scan) are skipped at the JOB level via head-ref `if:` below
+  # — a job skipped by `if:` reports a "skipped" conclusion, which branch
+  # protection treats as a pass, so the required check is satisfied without
+  # running. This mirrors the head-ref gating already used in danger.yml (#811-
+  # era hardening). Dependabot dep PRs change pnpm-lock.yaml too, so they were
+  # never matched by the old `**/package.json` ignore anyway — they keep running.
   pull_request:
     branches: [master]
-    # Skip changesets release PRs entirely — they only bump versions/changelogs.
-    paths-ignore:
-      - "**/package.json"
-      - "**/CHANGELOG.md"
-      - ".changeset/**"
   schedule:
     - cron: "0 3 * * 1"
 
@@ -15,6 +20,9 @@ jobs:
   analyze:
     name: Analyze
     runs-on: ubuntu-latest
+    # Skip release PRs (no code to analyze); always run on schedule + other PRs.
+    # CodeQL stays advisory (not a required check), so a skip here can't block.
+    if: github.event_name == 'schedule' || !startsWith(github.head_ref, 'changeset-release/')
     permissions:
       actions: read
       contents: read
@@ -38,7 +46,11 @@ jobs:
   dependency-review:
     name: Dependency Review
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
+    # Required status check (protect-master). Runs on every non-release PR so a
+    # dependency change is always scanned; skipped on release PRs via head-ref
+    # → "skipped" conclusion → treated as a pass (no deadlock). Not on schedule
+    # (no PR diff to review).
+    if: github.event_name == 'pull_request' && !startsWith(github.head_ref, 'changeset-release/')
     permissions:
       contents: read
       pull-requests: write
