@@ -528,6 +528,24 @@ visible in Codecov. Aggregate line coverage across all 31 lcov is **99.34%** (dr
 still inside Codecov's project `target:100% threshold:1%` (≥99% floor) — if angular's phantom code
 ever pushes it under 99%, switch `status.project.default.target` to `auto`.
 
+**Extended to `.size-limit.js` — same guard, same class (check 4).** `.size-limit.js` was the third
+hand-maintained per-package list and had drifted the same way (it lacked an entry for the public
+`@real-router/fsm`). The fix is not "add the missing entry" but "close the class": the SAME question
+*"is this package public?"* must be answered consistently by every per-package list, not
+independently — a package can otherwise be `private:false` + published on npm + a Codecov component +
+smoke-tested, yet silently absent from size tracking (exactly `fsm`'s state). Check 4 asserts every
+**npm-public** package (`private !== true`) has a `.size-limit.js` entry (matched by `esm("<name>"…)`
+helper calls **or** literal `packages/<name>/dist/…` paths — the helper templates its path, so both
+regexes are needed), unless it is in a tiny justified `SIZE_LIMIT_EXCEPTIONS` map (`svelte`:
+svelte-package emits individual files, no single ESM bundle; `core-types`: types-only). Both
+directions fail loudly — a missing entry **and** a stale exception (a now-covered or now-private
+package still listed). Mutation-validated: removing `fsm`, marking a covered package as excepted, or
+dropping the `svelte` exception each makes the guard red. Wired into `lint:coverage-scope`
+(pre-commit + CI `pipeline`), so a new public package without a size entry can't merge. `fsm` itself
+was kept public on purpose (last-chance candidate for the mini-apps standard); if it ends up unused
+there, making it `private:true` will flip Check 1/4 in lockstep (drop from Codecov components +
+size-limit) — the guard will demand exactly that.
+
 **Components, not flags.** `codecov.yml` previously declared per-package `flags:` (with
 `carryforward: false`). Codecov **flags only exist when uploads are tagged with them** (`flags:`
 on the action / `-F` on the CLI) — our CI does a single *untagged* upload of all lcov files, so no

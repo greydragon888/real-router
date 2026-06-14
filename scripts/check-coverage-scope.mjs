@@ -28,6 +28,14 @@
  *   3. Every tests-having package has its own `vitest.config.mts` — phantom
  *      detection reads only that file, so its absence must be loud, not a
  *      silent fail-open.
+ *   4. `.size-limit.js` — every **npm-public** package (`private !== true`) has
+ *      a bundle-size entry, unless it is in SIZE_LIMIT_EXCEPTIONS with a reason
+ *      (svelte: no single ESM bundle; core-types: types-only, nothing to
+ *      measure). Both directions are asserted. This closes the "list-drift"
+ *      class the codecov/sonar checks address — the SAME question "is this
+ *      package public?" must be answered consistently by every per-package list,
+ *      not independently (a package can otherwise be public on npm + a codecov
+ *      component + smoke-tested yet silently absent from size tracking).
  *
  * Emit mode (`--emit`, used by the coverage and sonarcloud CI jobs):
  *   prints `sources=…`, `tests=…`, `reports=…` lines for `$GITHUB_OUTPUT`,
@@ -71,6 +79,19 @@ const packages = readdirSync(PKG_DIR)
 
 const hasTests = (name) => existsSync(join(PKG_DIR, name, "tests"));
 const hasRealSrc = (name) => isRealDir(join(PKG_DIR, name, "src"));
+
+/** npm-public = not `private: true` in package.json (the same notion smoke,
+ * changesets and publint use to decide a package ships). */
+const isPublic = (name) => {
+  try {
+    return (
+      JSON.parse(readFileSync(join(PKG_DIR, name, "package.json"), "utf8"))
+        .private !== true
+    );
+  } catch {
+    return false;
+  }
+};
 
 /** Phantom = a vitest threshold below 100 (compiler-generated phantom code). */
 const isPhantom = (name) => {
@@ -206,6 +227,56 @@ for (const pkg of coverageProducing) {
   }
 }
 
+// --- Check 4: .size-limit.js ⇔ npm-public packages --------------------------
+// Public packages that legitimately have no measurable single-bundle entry.
+// Key = package dir name; value = why it is exempt (shown if a stale exemption
+// is detected). Keep this list TINY and justified — it is the only escape hatch.
+const SIZE_LIMIT_EXCEPTIONS = new Map([
+  [
+    "svelte",
+    "svelte-package emits individual compiled files, not a single ESM bundle measurable by size-limit/esbuild",
+  ],
+  ["core-types", "types-only package — no runtime entry to measure"],
+]);
+
+const sizeLimitSrc = read(".size-limit.js");
+// Covered = every package referenced by an `esm("<name>"…)` helper call OR by a
+// literal `packages/<name>/dist/…` path (the inline FESM/subpath entries). The
+// `esm()` helper builds its path from a `${name}` template, so the literal-path
+// regex alone misses helper entries — both are needed. `${name}` can't match
+// `[\w-]+`, so the path regex only picks up genuinely-literal paths.
+const sizeLimitCovered = new Set([
+  ...[...sizeLimitSrc.matchAll(/\besm\("([\w-]+)"/g)].map((m) => m[1]),
+  ...[...sizeLimitSrc.matchAll(/packages\/([\w-]+)\/dist/g)].map((m) => m[1]),
+]);
+
+for (const pkg of packages.filter(isPublic)) {
+  const covered = sizeLimitCovered.has(pkg);
+  const excepted = SIZE_LIMIT_EXCEPTIONS.has(pkg);
+  if (!covered && !excepted) {
+    errors.push(
+      `.size-limit.js: npm-public package "${pkg}" has no bundle-size entry and no documented exception — add esm("${pkg}", "<limit>") to .size-limit.js, or (if it has no measurable bundle) add it to SIZE_LIMIT_EXCEPTIONS in scripts/check-coverage-scope.mjs with a reason`,
+    );
+  }
+  if (covered && excepted) {
+    errors.push(
+      `.size-limit.js: "${pkg}" has a size entry yet is also in SIZE_LIMIT_EXCEPTIONS — remove the stale exception`,
+    );
+  }
+}
+// Reverse: an exception for a package that is gone or now private is stale.
+for (const pkg of SIZE_LIMIT_EXCEPTIONS.keys()) {
+  if (!packages.includes(pkg)) {
+    errors.push(
+      `SIZE_LIMIT_EXCEPTIONS lists "${pkg}" which is not a package — remove it`,
+    );
+  } else if (!isPublic(pkg)) {
+    errors.push(
+      `SIZE_LIMIT_EXCEPTIONS lists "${pkg}" which is private (size-limit only tracks public packages) — remove it`,
+    );
+  }
+}
+
 // --- Report ------------------------------------------------------------------
 if (errors.length > 0) {
   console.error("✖ Coverage-scope drift detected (#732):\n");
@@ -235,8 +306,10 @@ if (emitMode) {
       `${sonarTests.length} test dirs, ${lcovReports.length} lcov reports`,
   );
 } else {
+  const publicCount = packages.filter(isPublic).length;
   console.error(
     `✓ Coverage scope in sync: ${coverageProducing.length} components, ` +
-      `${mustCoverageExclude.length} Sonar coverage-exclusions (${mustCoverageExclude.join(", ")}).`,
+      `${mustCoverageExclude.length} Sonar coverage-exclusions (${mustCoverageExclude.join(", ")}); ` +
+      `${publicCount} public packages size-tracked (exceptions: ${[...SIZE_LIMIT_EXCEPTIONS.keys()].join(", ")}).`,
   );
 }
