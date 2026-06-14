@@ -1,4 +1,4 @@
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import ManyLinks from "./components/ManyLinks.svelte";
 import { createStressRouter, renderWithRouter } from "./helpers";
@@ -23,6 +23,12 @@ describe("Stress: teardown race", () => {
   });
 
   it("11.1 Click 100 Links and immediately unmount — no unhandled rejections, no thrown errors", async () => {
+    // Spy on navigate so we can prove the click handlers actually ran — without
+    // this the "no unhandled rejections" assertion passes even if NO click fired
+    // (an empty set of clicks trivially produces zero rejections). Each of the 8
+    // distinct Links must drive exactly one router.navigate call.
+    const navigateSpy = vi.spyOn(router, "navigate");
+
     const { container, unmount } = renderWithRouter(router, ManyLinks, {
       count: 8,
     });
@@ -46,7 +52,15 @@ describe("Stress: teardown race", () => {
       await Promise.resolve();
     }
 
+    // The race was real: every one of the 8 Link click handlers reached
+    // router.navigate (SAME_STATES dedup happens INSIDE navigate, so even the
+    // current-route Link still calls it). A listener-loss or a handler that
+    // never wired up would drop the count below 8.
+    expect(navigateSpy).toHaveBeenCalledTimes(8);
+
     expect(unhandled).toHaveLength(0);
+
+    navigateSpy.mockRestore();
   });
 
   it("11.2 Repeated mount → click → unmount cycle (50 iterations) — bounded by Link.svelte's catch-noop, no leaks", async () => {

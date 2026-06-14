@@ -58,9 +58,13 @@ describe("Stress: concurrent Link clicks with force:true", () => {
       );
     }
 
-    // Each click invokes router.navigate (via navigateWithHash → router.navigate).
-    // The router internally last-wins; the spy was called once per click.
-    expect(navigateSpy).toHaveBeenCalled();
+    // Each click invokes router.navigate (via navigateWithHash → router.navigate)
+    // exactly once. With `force: true`, core's SAME_STATES dedup is bypassed, so
+    // every one of the 100 synchronous clicks MUST reach navigate — a weaker
+    // `toHaveBeenCalled()` (>= 1) would silently pass under listener-loss where
+    // 99 clicks fell through. The clicks are fired deterministically (no awaits),
+    // so the count is exact.
+    expect(navigateSpy).toHaveBeenCalledTimes(100);
 
     // Drain microtasks so any catch handlers settle.
     await new Promise((resolve) => setTimeout(resolve, 16));
