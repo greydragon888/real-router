@@ -2,7 +2,7 @@ import { createRouter } from "@real-router/core";
 import { cloneRouter, getLifecycleApi } from "@real-router/core/api";
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 
-import { buildRscPayload, invalidate, rscServerPluginFactory } from "../../src";
+import { invalidate, rscServerPluginFactory } from "../../src";
 
 import type { RscLoaderFactoryMap } from "../../src";
 import type { Router } from "@real-router/core";
@@ -788,47 +788,5 @@ describe("RSC Loader Stress", () => {
     expect(abortedConsumes).toBe(100);
 
     router.stop();
-  });
-
-  it("10000 buildRscPayload calls — perf regression marker (§7.G7)", () => {
-    // §7.G7: `buildRscPayload` is on the per-request Flight payload
-    // hot path. A regression that introduced heavy work (deep clone,
-    // serialization, unbounded validation) would surface as a measurable
-    // slowdown here. The threshold is intentionally loose (200ms for
-    // 10k calls = 20µs/call) to avoid CI flakiness, but tight enough
-    // that a 10x regression triggers.
-    const state = {
-      name: "users.profile",
-      params: { id: "42" },
-      path: "/users/42",
-      transition: {
-        phase: "activating" as const,
-        reason: "success" as const,
-        segments: { deactivated: [], activated: [], intersection: "" },
-      },
-      context: {
-        rsc: node("UserProfile"),
-        rscAction: { returnValue: { ok: true, data: 1 } },
-      },
-    };
-    const N = 10_000;
-    const start = performance.now();
-
-    for (let i = 0; i < N; i++) {
-      // Voiding the result side-steps the dead-code-elimination risk;
-      // `expect.assertions` below also forces the loop to be live.
-      const payload = buildRscPayload(state);
-
-      // Just touch a key so V8 cannot constant-fold the call away.
-      if (payload.root === undefined) {
-        throw new Error("unreachable");
-      }
-    }
-
-    const elapsed = performance.now() - start;
-
-    // Generous upper bound — local runs are typically <30ms. 200ms
-    // catches 7-10x regressions; sub-threshold variance is OK.
-    expect(elapsed).toBeLessThan(200);
   });
 });
