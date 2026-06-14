@@ -1,11 +1,10 @@
 {
-  "_comment": "jscpd 5.x is the Rust `cpd` rewrite. It reads this config but RENAMED the old `ignore` key to `ignorePattern` (matching its --ignore-pattern flag); an `ignore` array is silently not read. The schemastore $schema describes the old config shape, so it is intentionally omitted. See IMPLEMENTATION_NOTES 'jscpd 5.x renamed the config ignore key to ignorePattern'.",
   "threshold": 2,
   "minLines": 5,
   "minTokens": 70,
-  "skipComments": true,
+  "mode": "weak",
   "reporters": ["console"],
-  "ignorePattern": [
+  "ignore": [
     "packages/preact/src/**",
     "packages/hash-plugin/src/**",
     "packages/*/src/dom-utils/**",
