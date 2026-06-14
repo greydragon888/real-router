@@ -1,3 +1,4 @@
+import { UNKNOWN_ROUTE } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
 import {
   describe,
@@ -154,6 +155,14 @@ describe("N1 — Navigate Event Storm", () => {
     await waitForTransitions();
 
     expect(spy).toHaveBeenCalled();
+
+    // The router must actually land on the UNKNOWN_ROUTE state — not stay
+    // stuck on the previous route or end up undefined. The spy alone proves
+    // navigateToNotFound was invoked; this proves the state committed.
+    const finalState = router.getState();
+
+    expect(finalState).toBeDefined();
+    expect(finalState!.name).toBe(UNKNOWN_ROUTE);
   });
 
   it("1.5 — 50 same-route navigate events: handled gracefully", async () => {

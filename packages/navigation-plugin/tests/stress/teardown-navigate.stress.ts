@@ -22,9 +22,16 @@ describe("N9: Navigate event during teardown", () => {
 
       router.stop();
 
+      // Snapshot the state captured at stop() — the post-stop navigate event
+      // must be ignored (handler detached in teardown), so state cannot move.
+      const stateAfterStop = router.getState();
+
       // Immediately fire navigate event after stop — should be ignored
       mockNav.navigate("http://localhost/home");
       await waitForTransitions();
+
+      // The ignored event must leave the state exactly as it was at stop().
+      expect(router.getState()).toStrictEqual(stateAfterStop);
     }
 
     // After all cycles, router should be startable without corruption
@@ -47,6 +54,16 @@ describe("N9: Navigate event during teardown", () => {
       router.stop();
 
       await waitForTransitions();
+
+      // Snapshot the state once the router is stopped, then fire another
+      // navigate event during teardown — it must be ignored, so the state
+      // stays frozen.
+      const stateAfterStop = router.getState();
+
+      mockNav.navigate("http://localhost/home");
+      await waitForTransitions();
+
+      expect(router.getState()).toStrictEqual(stateAfterStop);
     }
 
     // After 50 cycles, router is in stopped state and restartable

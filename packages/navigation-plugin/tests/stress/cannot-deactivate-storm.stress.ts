@@ -95,6 +95,15 @@ describe("N4 — Cannot Deactivate Storm", () => {
     await waitForTransitions();
 
     expect(browserNavigateSpy).toHaveBeenCalled();
+
+    // The recovery path (syncUrlToRouterState) re-syncs the browser URL to the
+    // current router state. navigateToState is mocked to reject, so the router
+    // never advances past users.list — the URL must be pulled back to parity.
+    const finalState = router.getState();
+
+    expect(finalState).toBeDefined();
+    expect(finalState!.name).toBe("users.list");
+    expect(new URL(mockNav.currentUrl).pathname).toBe(finalState!.path);
   });
 
   it("4.4 — double error recovery × 20: no unhandled exceptions", async () => {
@@ -124,6 +133,14 @@ describe("N4 — Cannot Deactivate Storm", () => {
       expect.stringContaining("Failed to sync URL to router state"),
       expect.any(Error),
     );
+
+    // Even under the double-failure storm, the router state must not be
+    // corrupted or stuck/undefined — it stays pinned to the pre-storm route
+    // (navigateToState never resolves, so the router never advances).
+    const finalState = router.getState();
+
+    expect(finalState).toBeDefined();
+    expect(finalState!.name).toBe("users.list");
 
     consoleSpy.mockRestore();
   });

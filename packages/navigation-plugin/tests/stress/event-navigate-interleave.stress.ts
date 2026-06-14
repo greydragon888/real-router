@@ -84,6 +84,12 @@ describe("N3 — Navigate Event/Router Interleave Stress", () => {
   });
 
   it("3.4 — fire-and-forget concurrent: no unhandled rejections", async () => {
+    const firedRoutes: string[] = [];
+
+    router.subscribe(({ route }) => {
+      firedRoutes.push(route.name);
+    });
+
     for (let i = 0; i < 50; i++) {
       const routeName = i % 2 === 0 ? "users.list" : "home";
       const targetUrl =
@@ -100,6 +106,9 @@ describe("N3 — Navigate Event/Router Interleave Stress", () => {
     const state = router.getState();
 
     expect(state).toBeDefined();
-    expect(state!.name.length).toBeGreaterThan(0);
+    // The final state must be one of the routes that actually fired during the
+    // storm — not just any non-empty name. A corrupted final state (a route
+    // never navigated to, or a stale carry-over) would fail this.
+    expect(firedRoutes).toContain(state!.name);
   });
 });
