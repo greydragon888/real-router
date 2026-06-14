@@ -15,12 +15,12 @@
     "@real-router/core": "workspace:^",
     "@real-router/hash-plugin": "workspace:^",
     "@real-router/react": "workspace:^",
-    "react": "19.2.0",
-    "react-dom": "19.2.0"
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
   },
   "devDependencies": {
     "@playwright/test": "1.60.0",
-    "@types/react": "19.2.14",
+    "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "5.2.0",
     "typescript": "6.0.3",

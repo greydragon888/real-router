@@ -15,13 +15,13 @@
     "@real-router/core": "workspace:^",
     "@real-router/react": "workspace:^",
     "@real-router/ssr-data-plugin": "workspace:^",
-    "react": "19.2.0",
-    "react-dom": "19.2.0"
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
   },
   "devDependencies": {
     "@playwright/test": "1.60.0",
     "@types/node": "25.9.3",
-    "@types/react": "19.2.14",
+    "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "5.2.0",
     "tsx": "4.22.4",
