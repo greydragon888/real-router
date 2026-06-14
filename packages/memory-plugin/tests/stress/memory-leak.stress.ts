@@ -3,16 +3,31 @@ import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { createStressRouter, noop } from "./helpers";
 
 /**
- * Heap-usage assertion is intentionally loose: GC in V8 is non-deterministic
- * and Node does not guarantee a forced collection even with --expose-gc.
- * What we DO assert: after 1000 full start → navigate → stop → unsubscribe
- * cycles, allocated memory must not grow more than 25× the measured baseline.
- * The 25× headroom covers:
- *   - `pool: "threads"` fan-out (other tests running in the same worker),
- *   - JIT warm-up allocations,
- *   - transient coverage instrumentation buffers.
- * A genuine listener/closure leak (entries arrays never GC'd, unsubscribe
- * not released) would typically produce 100×+ growth in a 1000-cycle loop.
+ * S13.1 is a GROSS-LEAK / THROUGHPUT guard, not a per-cycle teardown probe.
+ *
+ * The loop creates a NEW router each cycle and drops it. An unreferenced
+ * router is reclaimed by GC regardless of whether its `teardown()`/`stop()`/
+ * `unsubscribe()` actually released anything, so a per-cycle cleanup leak is
+ * structurally invisible to a heap snapshot here (GC-masked). This test
+ * therefore CANNOT prove per-cycle cleanup correctness — that is covered by
+ * the functional teardown unit tests (tests/functional/*: onStop clears
+ * history, teardown removes extensions + clears).
+ *
+ * What it CAN catch: a gross, process-global accumulation across 1000 cycles
+ * (e.g. a module-level registry that retains every router, a global listener
+ * array that never releases) — those survive GC and show up as absolute heap
+ * growth over the baseline.
+ *
+ * Threshold is anchored to a MEASURED healthy delta, not a round MB guess:
+ *   measured healthy delta over baseline (3× isolated runs, --expose-gc):
+ *     min 1.117 MB / med 1.118 MB / max 1.119 MB  (baseline ~13.2–13.9 MB).
+ * THRESHOLD = 12 MB ≈ 10× max-observed-healthy (≥3× margin required → satisfied),
+ * so the gate trips on a multi-MB gross leak while staying clear of normal
+ * JIT/allocation noise.
+ *
+ * NOTE: a ratio metric (finalHeap/baselineHeap) was previously used here and
+ * was non-discriminating — healthy ratio is ~1.08, so a ratio<25 gate only
+ * trips at ~330 MB. The absolute-delta assertion below replaces it.
  */
 
 describe("S13: memory leak detection across start/navigate/stop cycles", () => {
@@ -62,10 +77,14 @@ describe("S13: memory leak detection across start/navigate/stop cycles", () => {
     (globalThis as { gc?: () => void }).gc?.();
 
     const finalHeap = process.memoryUsage().heapUsed;
-    const growthRatio = finalHeap / baselineHeap;
 
-    // Very loose upper bound. See comment at top of file.
-    expect(growthRatio).toBeLessThan(25);
+    // Absolute gross-leak / throughput guard. Threshold = 12 MB ≈ 10× the
+    // measured healthy delta (~1.12 MB). See comment at top of file for why a
+    // ratio metric was non-discriminating and why per-cycle leaks are
+    // GC-masked here.
+    const MB = 1024 * 1024;
+
+    expect(finalHeap - baselineHeap).toBeLessThan(12 * MB);
   });
 
   it("S13.2: single long-lived router with 10 000 navigations respects maxHistoryLength", async () => {
