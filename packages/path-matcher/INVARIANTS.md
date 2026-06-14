@@ -39,7 +39,8 @@
 | 1   | Raw Unicode rejection                | `match()` returns `undefined` for paths containing raw Unicode characters (U+0080–U+FFFF). Unencoded Unicode in URL paths is rejected before trie traversal.                   |
 | 2   | Double-slash rejection               | `match()` returns `undefined` for paths containing `//`. Consecutive slashes are invalid path structure.                                                                       |
 | 3   | Hash fragment stripping              | `match(path + "#fragment")` produces the same result as `match(path)`. Fragment identifiers are silently stripped before matching.                                             |
-| 4   | Malformed percent-encoding rejection | `match()` returns `undefined` when a matched param contains a malformed percent sequence (`%XX` where X is not a hex digit). Invalid encoding is caught during param decoding. |
+| 4   | Malformed percent-encoding rejection | `match()` returns `undefined` (never throws) when a matched param contains a percent sequence that is either **syntactically** malformed (`%XX` where X is not a hex digit, or truncated) **or** syntactically valid but **semantically invalid UTF-8** (`%E0%41`, `%C0%80`, `%FF`, surrogate halves). The first is caught by `validatePercentEncoding`; the second by a try/catch around `decodeURIComponent`/`decodeURI` in `#decodeParams` (#737). |
+| 5   | Undecodable query rejection          | `match()` returns `undefined` (never throws) when the query string makes the injected query parser throw (e.g. `?x=%E0%41` → `decodeURIComponent` URIError). The `parseQueryString` call in `#buildResult` is wrapped in try/catch so a malformed query yields an unmatched URL, not a crash (#737). |
 
 ## Roundtrip Extensions
 

@@ -394,24 +394,11 @@ export class SegmentMatcher {
     params: Record<string, unknown>,
     queryString: string | undefined,
   ): MatchResult | undefined {
-    if (queryString !== undefined) {
-      const queryParams = this.#options.parseQueryString(queryString);
-
-      if (this.#options.strictQueryParams) {
-        const declared = route.declaredQueryParamsSet;
-
-        for (const key in queryParams) {
-          if (!declared.has(key)) {
-            return undefined;
-          }
-
-          params[key] = queryParams[key];
-        }
-      } else {
-        for (const key in queryParams) {
-          params[key] = queryParams[key];
-        }
-      }
+    if (
+      queryString !== undefined &&
+      !this.#mergeQueryParams(route, params, queryString)
+    ) {
+      return undefined;
     }
 
     return {
@@ -419,6 +406,46 @@ export class SegmentMatcher {
       params,
       meta: route.meta,
     };
+  }
+
+  // Parses the query string and folds it into `params`. Returns false (→ match
+  // yields undefined) when the URL is unmatchable: the injected parser threw, or
+  // strict mode saw an undeclared key.
+  #mergeQueryParams(
+    route: CompiledRoute,
+    params: Record<string, unknown>,
+    queryString: string,
+  ): boolean {
+    let queryParams: Record<string, unknown>;
+
+    try {
+      queryParams = this.#options.parseQueryString(queryString);
+    } catch {
+      // The injected query parser decodes percent-encoding too, so the same
+      // valid-hex/invalid-UTF-8 sequence that breaks path params (e.g.
+      // `?x=%E0%41`) makes it throw a URIError. `match()` must never throw —
+      // treat the whole URL as unmatched so the router resolves to
+      // UNKNOWN_ROUTE instead of crashing on start() (#737).
+      return false;
+    }
+
+    if (this.#options.strictQueryParams) {
+      const declared = route.declaredQueryParamsSet;
+
+      for (const key in queryParams) {
+        if (!declared.has(key)) {
+          return false;
+        }
+
+        params[key] = queryParams[key];
+      }
+    } else {
+      for (const key in queryParams) {
+        params[key] = queryParams[key];
+      }
+    }
+
+    return true;
   }
 
   #checkTrailingSlash(cleanPath: string, route: CompiledRoute): boolean {
@@ -522,7 +549,16 @@ export class SegmentMatcher {
         return false;
       }
 
-      params[key] = decode(value);
+      try {
+        params[key] = decode(value);
+      } catch {
+        // `validatePercentEncoding` only checks `%XX` *syntax*. A sequence that
+        // is syntactically valid but semantically invalid UTF-8 (e.g. `%E0%41`,
+        // `%C0%80`, `%FF`) still makes `decodeURIComponent`/`decodeURI` throw a
+        // URIError. `match()` must never throw — reject the path so the router
+        // resolves to UNKNOWN_ROUTE instead of crashing on start() (#737).
+        return false;
+      }
     }
 
     return true;

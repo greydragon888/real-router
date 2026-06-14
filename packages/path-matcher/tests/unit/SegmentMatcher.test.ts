@@ -1326,6 +1326,46 @@ describe("SegmentMatcher", () => {
       expect(matcher.match("/users/hello%")).toBeUndefined();
     });
 
+    // #737: syntactically valid `%XX` (hex digits) but semantically invalid
+    // UTF-8 — `validatePercentEncoding` passes, `decodeURIComponent` throws
+    // URIError. `match()` must return undefined, never throw.
+    it.each([
+      ["%E0%41", "lead byte of a 3-byte seq followed by a non-continuation"],
+      ["%C0%80", "overlong encoding of U+0000"],
+      ["%FF", "0xFF is never a valid UTF-8 byte"],
+      ["%ED%A0%80", "UTF-16 surrogate half (U+D800)"],
+      ["a%E0%41b", "invalid sequence embedded in otherwise valid text"],
+    ])(
+      "should return undefined for valid-hex/invalid-UTF-8 param '%s' (%s)",
+      (encoded) => {
+        const matcher = createParamMatcher();
+
+        expect(() => matcher.match(`/users/${encoded}`)).not.toThrow();
+        expect(matcher.match(`/users/${encoded}`)).toBeUndefined();
+      },
+    );
+
+    it("should still decode valid multi-byte UTF-8 after the URIError guard", () => {
+      const matcher = createParamMatcher();
+
+      // 中 = %E4%B8%AD — proves the try/catch only rejects truly invalid bytes.
+      const result = matcher.match("/users/%E4%B8%AD");
+
+      expect(result).toBeDefined();
+      expect(result!.params).toStrictEqual({ id: "中" });
+    });
+
+    it("should NOT reject valid-hex/invalid-UTF-8 when urlParamsEncoding is none", () => {
+      // With `none`, decoding is skipped entirely — the raw value passes through
+      // and the bytes are never interpreted, so there is nothing to throw.
+      const matcher = createParamMatcher({ urlParamsEncoding: "none" });
+
+      const result = matcher.match("/users/%E0%41");
+
+      expect(result).toBeDefined();
+      expect(result!.params).toStrictEqual({ id: "%E0%41" });
+    });
+
     it("should skip decoding when urlParamsEncoding is none", () => {
       const matcher = createParamMatcher({ urlParamsEncoding: "none" });
 
@@ -2920,6 +2960,13 @@ describe("SegmentMatcher", () => {
       expect(matcher.match("/files/bad%ZZpath")).toBeUndefined();
     });
 
+    it("should return undefined (not throw) for valid-hex/invalid-UTF-8 splat (#737)", () => {
+      const matcher = createSplatMatcher();
+
+      expect(() => matcher.match("/files/a/%E0%41")).not.toThrow();
+      expect(matcher.match("/files/a/%E0%41")).toBeUndefined();
+    });
+
     it("should handle case-insensitive static + splat", () => {
       const matcher = createTestMatcher({ caseSensitive: false });
 
@@ -3829,6 +3876,23 @@ describe("SegmentMatcher", () => {
 
       expect(result).toBeDefined();
       expect(result!.params).toStrictEqual({});
+    });
+
+    // #737: the injected query parser decodes percent-encoding too, so a
+    // valid-hex/invalid-UTF-8 query value makes it throw URIError. match() must
+    // honor its never-throw contract — a malformed query → unmatched URL.
+    it("should return undefined (not throw) for valid-hex/invalid-UTF-8 query value (#737)", () => {
+      const matcher = createQueryMatcher();
+
+      expect(() => matcher.match("/search?query=%E0%41")).not.toThrow();
+      expect(matcher.match("/search?query=%E0%41")).toBeUndefined();
+    });
+
+    it("should return undefined for invalid-UTF-8 query value in strict mode too (#737)", () => {
+      const matcher = createQueryMatcher({ strictQueryParams: true });
+
+      expect(() => matcher.match("/search?query=%C0%80")).not.toThrow();
+      expect(matcher.match("/search?query=%C0%80")).toBeUndefined();
     });
 
     it("should merge URL params with query params", () => {
