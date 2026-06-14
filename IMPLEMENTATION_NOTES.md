@@ -4226,3 +4226,25 @@ A red run on a partial publish is the desired outcome — a human re-runs the wo
 - **Failure post-mortem names the gap** — `Fail if publish errored` lists the planned packages whose local version is still absent from npm (same local-vs-npm comparison as the unpublished check) in the `::error::` and the step summary, instead of "see the log". When everything IS on npm despite the non-zero exit, it says so (post-publish error — tagging/changelog) and points at re-run-to-reconcile.
 - **`timeout-minutes: 30` on the release job** — a hung npm/OIDC exchange would otherwise hold the job for the 6h default and, with `cancel-in-progress: false`, block every queued release behind it. Typical runs are 3-8 min.
 - **Reconcile backfills missing *tags*, not just Releases** — the last unrecoverable partial state was "npm published, tag push failed": the next run sees local==npm → `has_unpublished=false` → publish path skipped, and the Release reconcile only covered *existing* tags. Now, for every public package at HEAD whose local version is on npm (`npm view name@version`, checked only when the tag is missing — zero calls in steady state) but whose tag is absent, the tag is created at HEAD via `gh api …/git/refs` (the checkout has `persist-credentials: false`, so plain `git push` can't; the API works with the workflow's `contents: write` GITHUB_TOKEN) and mirrored locally so the same run's Release passes pick it up.
+
+## `Dependency Review` is a required check; CodeQL gating moved to head-ref (audit 1.1/3.1)
+
+### Problem
+
+The supply-chain gate was advisory. `protect-master` required only `Require Changeset`, `CI Result`, `Validate Changesets` — all *functional*. `Dependency Review` (`codeql.yml`, `fail-on-severity: moderate`) and CodeQL `Analyze` were not required, so a PR introducing a moderate-severity vulnerable dependency could merge green. For **Dependabot automerge** this is not hypothetical: `gh pr merge --auto` fires on the *required* checks only, and `semver-patch` (any dep) / `semver-minor` (dev) bumps could pull a vulnerable transitive without blocking.
+
+Naively adding `Dependency Review` to the required set would have **deadlocked release PRs**: `codeql.yml` had a workflow-level `paths-ignore: ["**/package.json", "**/CHANGELOG.md", ".changeset/**"]`, and a `changeset-release/*` PR changes only those paths → the whole workflow is skipped at the `on:` level → the required check *never reports* → the PR blocks forever on a pending check (GitHub does not auto-satisfy a required check whose workflow was skipped by a path/branch filter).
+
+### Solution
+
+- **`codeql.yml`: drop the workflow-level `paths-ignore`; gate by head-ref at the job level** (mirrors the danger.yml pattern from `80f0ff62`):
+  - `dependency-review`: `if: github.event_name == 'pull_request' && !startsWith(github.head_ref, 'changeset-release/')`.
+  - `analyze`: `if: github.event_name == 'schedule' || !startsWith(github.head_ref, 'changeset-release/')`.
+  A job skipped by `if:` (workflow *did* trigger) reports a **"skipped" conclusion**, which branch protection treats as a **pass** — so a release PR satisfies the required `Dependency Review` without running it, no deadlock. Dependabot dep PRs change `pnpm-lock.yaml` (never matched the old ignore), so they kept running and keep running.
+- **Ruleset `protect-master`: add `Dependency Review` to `required_status_checks`** (integration_id 15368, GitHub Actions). CodeQL `Analyze` stays advisory — SAST on a router library is low-signal and autobuild occasionally flakes; the supply-chain gate is the one worth enforcing.
+
+### Why / ordering
+
+The required-check change is only safe once the head-ref-gated `codeql.yml` is **live on master** — otherwise master's old `paths-ignore` skips the workflow on a release PR and the required check can't report. Land (push) the workflow commit before the next release cycle; until then a release PR would need a one-time maintainer ruleset bypass (`bypass_actors` already grants it). The "skipped job ⇒ required check passes" semantics is the documented conditional-required-check pattern but should be eyeballed on the first release PR after this lands.
+
+Also fixed alongside: the `sonarqube-scan-action` pin comment said `# v7` while the SHA is `v8.2.0` (Dependabot bumped the SHA, comment drifted) — corrected to `# v8.2.0`.
