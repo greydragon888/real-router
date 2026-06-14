@@ -183,6 +183,14 @@ describe("S10: AbortController / Signal stress", () => {
     const heapAfter = takeHeapSnapshot();
     const delta = heapAfter - heapBefore;
 
+    // Every pre-aborted navigation (i % 3 === 0 → 34 of the 100) MUST propagate
+    // its aborted signal into the guard — the guard increments _abortedCount on
+    // either the `signal.aborted` fast-path or the `abort` event. If signal
+    // propagation regressed, _abortedCount would stay 0 even though errors fire
+    // for unrelated reasons. Anchored to the 34 deterministically-aborted navs.
+    const preAbortedNavs = Math.floor(100 / 3) + 1; // i = 0,3,...,99 → 34
+
+    expect(_abortedCount).toBeGreaterThanOrEqual(preAbortedNavs);
     expect(errors.length).toBeGreaterThan(0);
     expect(delta).toBeLessThan(2 * MB);
   }, 30_000);
