@@ -67,14 +67,25 @@ describe("S5: Cross-source interaction", () => {
       }),
     );
 
-    for (let i = 0; i < 200; i++) {
+    const navCount = 200;
+
+    for (let i = 0; i < navCount; i++) {
       await router.navigate(navRoutes[i % navRoutes.length]);
     }
 
     expect(routeCounter.count).toBe(200);
 
+    // Each navigation emits at most 3 transition events that this source
+    // notifies on (TRANSITION_START, TRANSITION_LEAVE_APPROVE,
+    // TRANSITION_SUCCESS). The UPPER bound is the real invariant: a duplicated/
+    // leaked subscription would fire 2× per event and blow past navCount * 3.
+    // (Each of the 50 sources is an independent createTransitionSource, so all
+    // 50 counters land on the same value — here, exactly navCount * 3.)
+    const maxTransitionsPerNav = 3;
+
     transCounters.forEach((c) => {
       expect(c.count).toBeGreaterThan(0);
+      expect(c.count).toBeLessThanOrEqual(navCount * maxTransitionsPerNav);
     });
 
     nodeSources.forEach((_, i) => {
