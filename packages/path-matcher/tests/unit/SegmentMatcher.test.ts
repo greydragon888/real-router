@@ -306,6 +306,280 @@ describe("SegmentMatcher", () => {
   });
 
   // ===========================================================================
+  // registerTree — param-name conflict detection (#736)
+  // ===========================================================================
+  //
+  // A parametric/splat position in the trie is keyed by POSITION but its value
+  // is written under the NAME recorded on that position. Two routes sharing a
+  // position under DIFFERENT names is unrepresentable — first registration wins
+  // the name and the second route silently captures under the wrong key, which
+  // through core's rewritePathOnMatch becomes a hard start() crash. Registration
+  // must reject the ambiguity loudly instead of corrupting matches.
+
+  describe("registerTree — param-name conflict detection (#736)", () => {
+    /** Builds a root with two sibling top-level routes. */
+    function twoRouteRoot(
+      a: MatcherInputNode,
+      b: MatcherInputNode,
+    ): MatcherInputNode {
+      return createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([
+          [a.fullName, a],
+          [b.fullName, b],
+        ]),
+        nonAbsoluteChildren: [a, b],
+      });
+    }
+
+    it("throws when two routes share a param position under different names (issue repro)", () => {
+      const matcher = createTestMatcher();
+
+      const profile = createInputNode({
+        name: "profile",
+        path: "/profile",
+        fullName: "userP.profile",
+      });
+      const user = createInputNode({
+        name: "user",
+        path: "/user/:id",
+        fullName: "user",
+      });
+      const userP = createInputNode({
+        name: "userP",
+        path: "/user/:slug",
+        fullName: "userP",
+        children: new Map([["profile", profile]]),
+        nonAbsoluteChildren: [profile],
+      });
+
+      expect(() => {
+        matcher.registerTree(twoRouteRoot(user, userP));
+      }).toThrow(/Parameter name conflict/);
+    });
+
+    it("error names both conflicting params and the marker", () => {
+      const matcher = createTestMatcher();
+
+      const user = createInputNode({
+        name: "user",
+        path: "/user/:id",
+        fullName: "user",
+      });
+      const userP = createInputNode({
+        name: "userP",
+        path: "/user/:slug",
+        fullName: "userP",
+      });
+
+      expect(() => {
+        matcher.registerTree(twoRouteRoot(user, userP));
+      }).toThrow(/':id' and ':slug'/);
+    });
+
+    it("throws when two routes share a splat position under different names", () => {
+      const matcher = createTestMatcher();
+
+      const file = createInputNode({
+        name: "file",
+        path: "/files/*path",
+        fullName: "file",
+      });
+      const fileR = createInputNode({
+        name: "fileR",
+        path: "/files/*rest",
+        fullName: "fileR",
+      });
+
+      expect(() => {
+        matcher.registerTree(twoRouteRoot(file, fileR));
+      }).toThrow(/'\*path' and '\*rest'/);
+    });
+
+    it("throws when two routes share an optional-param position under different names", () => {
+      const matcher = createTestMatcher();
+
+      const search = createInputNode({
+        name: "search",
+        path: "/search/:q?",
+        fullName: "search",
+      });
+      const searchT = createInputNode({
+        name: "searchT",
+        path: "/search/:term?",
+        fullName: "searchT",
+      });
+
+      expect(() => {
+        matcher.registerTree(twoRouteRoot(search, searchT));
+      }).toThrow(/Parameter name conflict/);
+    });
+
+    it("throws for a conflict nested deep in the tree", () => {
+      const matcher = createTestMatcher();
+
+      const a = createInputNode({
+        name: "a",
+        path: "/shop/:cat/items/:id",
+        fullName: "a",
+      });
+      const b = createInputNode({
+        name: "b",
+        path: "/shop/:cat/items/:sku",
+        fullName: "b",
+      });
+
+      expect(() => {
+        matcher.registerTree(twoRouteRoot(a, b));
+      }).toThrow(/':id' and ':sku'/);
+    });
+
+    it("does NOT throw when both routes use the same param name", () => {
+      const matcher = createTestMatcher();
+
+      const profile = createInputNode({
+        name: "profile",
+        path: "/profile",
+        fullName: "userP.profile",
+      });
+      const user = createInputNode({
+        name: "user",
+        path: "/user/:id",
+        fullName: "user",
+      });
+      const userP = createInputNode({
+        name: "userP",
+        path: "/user/:id",
+        fullName: "userP",
+        children: new Map([["profile", profile]]),
+        nonAbsoluteChildren: [profile],
+      });
+
+      expect(() => {
+        matcher.registerTree(twoRouteRoot(user, userP));
+      }).not.toThrow();
+    });
+
+    it("does NOT throw when same-named splat positions are shared", () => {
+      const matcher = createTestMatcher();
+
+      const file = createInputNode({
+        name: "file",
+        path: "/files/*path",
+        fullName: "file",
+      });
+      const fileMeta = createInputNode({
+        name: "fileMeta",
+        path: "/files/*path",
+        fullName: "fileMeta",
+      });
+
+      expect(() => {
+        matcher.registerTree(twoRouteRoot(file, fileMeta));
+      }).not.toThrow();
+    });
+
+    it("does NOT treat a single route's consecutive optionals as a conflict", () => {
+      // Within ONE route, omitting `:b?` lets the next param occupy `:b?`'s
+      // slot — established positional-optional semantics, not a cross-route
+      // collision. The guard must stay silent here even though two differently
+      // named params (`b`, `c`) land on the same trie position.
+      const matcher = createTestMatcher();
+
+      const route = createInputNode({
+        name: "route",
+        path: "/a/:b?/:c?/d",
+        fullName: "route",
+      });
+
+      expect(() => {
+        matcher.registerTree(
+          createInputNode({
+            name: "",
+            path: "",
+            fullName: "",
+            children: new Map([["route", route]]),
+            nonAbsoluteChildren: [route],
+          }),
+        );
+      }).not.toThrow();
+    });
+
+    it("does NOT treat a single route's optional-then-required param as a conflict", () => {
+      const matcher = createTestMatcher();
+
+      const route = createInputNode({
+        name: "route",
+        path: "/a/:b?/:c/d",
+        fullName: "route",
+      });
+
+      expect(() => {
+        matcher.registerTree(
+          createInputNode({
+            name: "",
+            path: "",
+            fullName: "",
+            children: new Map([["route", route]]),
+            nonAbsoluteChildren: [route],
+          }),
+        );
+      }).not.toThrow();
+    });
+
+    it("does NOT throw for different names at DIFFERENT positions", () => {
+      const matcher = createTestMatcher();
+
+      const a = createInputNode({
+        name: "a",
+        path: "/a/:x",
+        fullName: "a",
+      });
+      const b = createInputNode({
+        name: "b",
+        path: "/b/:y",
+        fullName: "b",
+      });
+
+      expect(() => {
+        matcher.registerTree(twoRouteRoot(a, b));
+      }).not.toThrow();
+    });
+
+    it("captures params under the terminal route's name once the conflict is removed", () => {
+      const matcher = createTestMatcher();
+
+      // Same position, same name — the only valid shared-position config.
+      const profile = createInputNode({
+        name: "profile",
+        path: "/profile",
+        fullName: "userP.profile",
+      });
+      const user = createInputNode({
+        name: "user",
+        path: "/user/:id",
+        fullName: "user",
+      });
+      const userP = createInputNode({
+        name: "userP",
+        path: "/user/:id",
+        fullName: "userP",
+        children: new Map([["profile", profile]]),
+        nonAbsoluteChildren: [profile],
+      });
+
+      matcher.registerTree(twoRouteRoot(user, userP));
+
+      expect(matcher.match("/user/joe")?.params).toStrictEqual({ id: "joe" });
+      expect(matcher.match("/user/joe/profile")?.params).toStrictEqual({
+        id: "joe",
+      });
+    });
+  });
+
+  // ===========================================================================
   // Static Route Matching
   // ===========================================================================
 
