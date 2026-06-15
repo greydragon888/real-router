@@ -258,6 +258,32 @@ describe("buildParamMeta", () => {
       expect(meta.constraintPatterns.has("id")).toBe(true);
       expect(meta.pathPattern).toBe(String.raw`/a/:id<\d?>`);
     });
+
+    // Found by the structural property suite: an optional-param marker
+    // immediately followed by a query (`/:id??tab` → `:id?` then `?tab`) was
+    // mis-parsed — the optional `?` was taken as the query separator, giving
+    // `queryParams:["?tab"]` and dropping the `?` from `pathPattern`.
+    it("separates an optional-param marker from a directly-following query", () => {
+      const meta = buildParamMeta("/users/:id??tab&sort");
+
+      expect(meta.urlParams).toStrictEqual(["id"]);
+      expect(meta.queryParams).toStrictEqual(["tab", "sort"]);
+      expect(meta.pathPattern).toBe("/users/:id?");
+      expect(meta.paramTypeMap).toStrictEqual({
+        id: "url",
+        tab: "query",
+        sort: "query",
+      });
+    });
+
+    it("handles optional + constraint + query together", () => {
+      const meta = buildParamMeta(String.raw`/a/:id<\d+>??tab`);
+
+      expect(meta.urlParams).toStrictEqual(["id"]);
+      expect(meta.queryParams).toStrictEqual(["tab"]);
+      expect(meta.constraintPatterns.has("id")).toBe(true);
+      expect(meta.pathPattern).toBe(String.raw`/a/:id<\d+>?`);
+    });
   });
 
   // #738: the param-name grammar is a single source of truth — names may contain

@@ -345,7 +345,23 @@ export class SegmentMatcher {
     }
 
     const pathPart = qIdx >= 0 ? path.slice(0, qIdx) : path;
-    const queryString = qIdx >= 0 ? path.slice(qIdx + 1) : undefined;
+    let queryString = qIdx >= 0 ? path.slice(qIdx + 1) : undefined;
+
+    // #842: a fragment (`#…`) AFTER the query separator is not seen by
+    // #scanPath (it returns at the first `?`), so it would otherwise be folded
+    // into the query string and parsed into a param value (e.g. `?a=1#frag` →
+    // `a="1#frag"`). A fragment is everything after the first `#` in the whole
+    // URL and must be stripped before query parsing — a native indexOf on the
+    // (short) query substring, only when a query exists, is ~free (a `#` BEFORE
+    // the `?` is already handled by #scanPath via the -3 truncation branch).
+    if (queryString !== undefined) {
+      const hashIdx = queryString.indexOf("#");
+
+      if (hashIdx !== -1) {
+        queryString = queryString.slice(0, hashIdx);
+      }
+    }
+
     const normalized = normalizeTrailingSlash(pathPart);
 
     this.#prepared.cleanPath = pathPart;

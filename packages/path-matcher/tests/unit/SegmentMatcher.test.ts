@@ -766,6 +766,61 @@ describe("SegmentMatcher", () => {
       expect(result!.segments[0].fullName).toBe("about");
     });
 
+    it("should strip a fragment that appears AFTER the query string (#842)", () => {
+      const matcher = createStaticMatcher();
+
+      const plain = matcher.match("/about?key=value");
+      const withHash = matcher.match("/about?key=value#section");
+
+      expect(withHash).toBeDefined();
+      // Without the fix, `key` would capture "value#section" (the fragment
+      // folded into the query value). Result must equal the no-fragment match.
+      expect(withHash!.params).toStrictEqual(plain!.params);
+      expect(withHash!.params).toStrictEqual({ key: "value" });
+    });
+
+    it("should treat a fragment right after the query separator as empty query (#842)", () => {
+      const matcher = createStaticMatcher();
+
+      const result = matcher.match("/about?#section");
+
+      expect(result).toBeDefined();
+      expect(result!.segments[0].fullName).toBe("about");
+      expect(result!.params).toStrictEqual({});
+    });
+
+    it("should strip a post-query fragment for a param route + declared query (#842)", () => {
+      const matcher = createTestMatcher();
+      const profileNode = createInputNode({
+        name: "profile",
+        path: "/:id?tab",
+        fullName: "users.profile",
+      });
+      const usersNode = createInputNode({
+        name: "users",
+        path: "/users",
+        fullName: "users",
+        children: new Map([["profile", profileNode]]),
+        nonAbsoluteChildren: [profileNode],
+      });
+
+      matcher.registerTree(
+        createInputNode({
+          name: "",
+          path: "",
+          fullName: "",
+          children: new Map([["users", usersNode]]),
+          nonAbsoluteChildren: [usersNode],
+        }),
+      );
+
+      const result = matcher.match("/users/v?tab=x#frag");
+
+      expect(result).toBeDefined();
+      // `tab` must be "x", not "x#frag".
+      expect(result!.params).toStrictEqual({ id: "v", tab: "x" });
+    });
+
     it("should return correct meta", () => {
       const matcher = createStaticMatcher();
 
