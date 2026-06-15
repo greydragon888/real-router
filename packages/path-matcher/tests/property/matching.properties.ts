@@ -374,4 +374,45 @@ describe("Matching Properties", () => {
       },
     );
   });
+
+  // Audit 1.5: documents the actual per-strategy contract for a `/` inside a
+  // NON-splat param value (the previous generator excluded `/`, so this was
+  // untested). `default`/`uriComponent` percent-encode `/` → roundtrip holds;
+  // `uri` (encodeURI) and `none` (identity) leave `/` raw → it becomes an extra
+  // path segment and the single-param route no longer matches. For multi-segment
+  // values use a splat (`*path`), which encodes per segment.
+  describe("roundtrip — non-splat value containing '/' is strategy-dependent (1.5)", () => {
+    const arbValueWithSlash = fc
+      .array(fc.stringMatching(/^[a-zA-Z0-9]{1,6}$/), {
+        minLength: 2,
+        maxLength: 4,
+      })
+      .map((segments) => segments.join("/"));
+
+    test.prop([arbValueWithSlash], { numRuns: NUM_RUNS.standard })(
+      "default & uriComponent encode '/' and roundtrip",
+      (value) => {
+        for (const enc of ["default", "uriComponent"] as const) {
+          const matcher = createParamMatcher({ urlParamsEncoding: enc });
+          const path = matcher.buildPath("users.profile", { id: value });
+
+          expect(matcher.match(path)?.params).toStrictEqual({ id: value });
+        }
+      },
+    );
+
+    test.prop([arbValueWithSlash], { numRuns: NUM_RUNS.standard })(
+      "uri & none leave '/' raw → extra segment → no match (documented limit)",
+      (value) => {
+        for (const enc of ["uri", "none"] as const) {
+          const matcher = createParamMatcher({ urlParamsEncoding: enc });
+          const path = matcher.buildPath("users.profile", { id: value });
+
+          // The raw '/' splits the value across segments the 1-param route
+          // cannot absorb — use a splat param for multi-segment values.
+          expect(matcher.match(path)).toBeUndefined();
+        }
+      },
+    );
+  });
 });

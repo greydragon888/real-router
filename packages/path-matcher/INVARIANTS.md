@@ -50,7 +50,7 @@
 | #   | Invariant                      | Description                                                                                                                                                                                  |
 | --- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | Optional param value roundtrip | `match(buildPath("search", {query})).params` equals `{query}`. Optional parameter values survive the build/match cycle, not just the route name (which Matching #3 already covers).          |
-| 2   | Encoding-aware roundtrip       | `match(buildPath(name, params)).params` equals the original params for all 4 encoding strategies (`default`, `uri`, `uriComponent`, `none`). Matching #1/#2 only test with default encoding. |
+| 2   | Encoding-aware roundtrip       | `match(buildPath(name, params)).params` equals the original params for all 4 encoding strategies (`default`, `uri`, `uriComponent`, `none`) **for values without `/` in a non-splat param**. Matching #1/#2 only test with default encoding. **Scope caveat (audit 1.5):** a `/` inside a non-splat param value only roundtrips under `default`/`uriComponent` (which percent-encode `/`→`%2F`); under `uri` (`encodeURI`) and `none` (identity) the `/` stays raw and becomes an extra path segment, so the single-param route no longer matches. Use a **splat** param (`*path`) for multi-segment values — Encoding #2/#3 cover splat roundtrip across all strategies. |
 
 ## Undefined-strip (Layered Contract)
 
