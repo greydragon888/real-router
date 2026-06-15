@@ -12,8 +12,7 @@
 
 import { barplot, bench, boxplot, do_not_optimize, summary } from "mitata";
 
-import { createTestMatcher } from "../helpers/createTestMatcher";
-import { buildTree, createMatcher } from "./helpers/buildTree";
+import { createMatcher } from "./helpers/buildTree";
 
 import type { SimpleRoute } from "./helpers/buildTree";
 
@@ -80,10 +79,6 @@ const constraintRoutes: SimpleRoute[] = [
     urlParamsEncoding: "uriComponent",
   });
 
-  const warmupRootPath = createMatcher(standardRoutes);
-
-  warmupRootPath.setRootPath("/app");
-
   for (let i = 0; i < 100; i++) {
     warmupMatcher.match("/about");
     warmupMatcher.match("/users/123");
@@ -103,9 +98,6 @@ const constraintRoutes: SimpleRoute[] = [
 
     warmupEncoding.match("/users/hello%20world");
     warmupEncoding.buildPath("user", { id: "hello world" });
-
-    warmupRootPath.match("/app/about");
-    warmupRootPath.buildPath("about");
   }
 }
 
@@ -430,56 +422,5 @@ barplot(() => {
 });
 
 // =============================================================================
-// 8. rootPath: pipeline overhead when rootPath is set
-//    match() strips prefix, buildPath() prepends it.
+// (8. rootPath pipeline overhead removed — matcher-level rootPath dropped, #836)
 // =============================================================================
-
-barplot(() => {
-  summary(() => {
-    const matcherNoRoot = createMatcher(standardRoutes);
-
-    const tree = buildTree(standardRoutes);
-    const matcherWithRoot = createTestMatcher();
-
-    matcherWithRoot.registerTree(tree);
-    matcherWithRoot.setRootPath("/app");
-
-    const deepTree = buildTree([
-      {
-        name: "a",
-        path: "/a/:p1",
-        children: [
-          {
-            name: "b",
-            path: "/b/:p2",
-            children: [{ name: "c", path: "/c/:p3" }],
-          },
-        ],
-      },
-    ]);
-    const matcherDeepRoot = createTestMatcher();
-
-    matcherDeepRoot.registerTree(deepTree);
-    matcherDeepRoot.setRootPath("/base/app");
-
-    bench("rootPath: match without rootPath", () => {
-      do_not_optimize(matcherNoRoot.match("/users/123"));
-    });
-
-    bench("rootPath: match with rootPath /app", () => {
-      do_not_optimize(matcherWithRoot.match("/app/users/123"));
-    });
-
-    bench("rootPath: buildPath without rootPath", () => {
-      do_not_optimize(matcherNoRoot.buildPath("user", { id: "123" }));
-    });
-
-    bench("rootPath: buildPath with rootPath /app", () => {
-      do_not_optimize(matcherWithRoot.buildPath("user", { id: "123" }));
-    });
-
-    bench("rootPath: deep match with rootPath /base/app", () => {
-      do_not_optimize(matcherDeepRoot.match("/base/app/a/v1/b/v2/c/v3"));
-    });
-  });
-});

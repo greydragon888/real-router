@@ -59,7 +59,6 @@ export class SegmentMatcher {
     queryString: undefined as string | undefined,
   };
 
-  #rootPath = "";
   #rootQueryParams: readonly string[] = [];
   #scanTruncated = "";
 
@@ -194,10 +193,6 @@ export class SegmentMatcher {
     return this.#routesByName.has(name);
   }
 
-  setRootPath(rootPath: string): void {
-    this.#rootPath = rootPath;
-  }
-
   #validateBuildConstraints(
     route: CompiledRoute,
     name: string,
@@ -228,10 +223,10 @@ export class SegmentMatcher {
     const slots = route.buildParamSlots;
 
     if (slots.length === 0) {
-      return this.#rootPath + parts[0];
+      return parts[0];
     }
 
-    let result = this.#rootPath + parts[0];
+    let result = parts[0];
 
     for (const [i, slot] of slots.entries()) {
       const value = params?.[slot.paramName];
@@ -337,33 +332,6 @@ export class SegmentMatcher {
 
     if (path.codePointAt(0) !== 0x2f /* / */) {
       return false;
-    }
-
-    const rootLength = this.#rootPath.length;
-
-    if (rootLength > 0) {
-      if (path.length < rootLength || !path.startsWith(this.#rootPath)) {
-        return false;
-      }
-
-      // Strip the root prefix, but only at a real segment boundary, and always
-      // leave a leading "/" for #traverseFrom (#736-cluster 1.6). Without the
-      // boundary check `/apple` falsely matched root "/app" → route "/e"
-      // (mis-routing); without re-adding "/" the first char was silently eaten.
-      const rest = path.slice(rootLength);
-
-      if (rest === "") {
-        path = "/";
-      } else if (rest.codePointAt(0) === 0x2f /* / */) {
-        // root had no trailing slash; the boundary slash starts `rest`.
-        path = rest;
-      } else if (this.#rootPath.codePointAt(rootLength - 1) === 0x2f /* / */) {
-        // root ended with "/", which consumed the boundary — re-add a leading "/".
-        path = `/${rest}`;
-      } else {
-        // No segment boundary after the prefix (e.g. "/apple" under "/app").
-        return false;
-      }
     }
 
     const qIdx = this.#scanPath(path);

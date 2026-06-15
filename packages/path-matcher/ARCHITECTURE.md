@@ -69,7 +69,6 @@ class SegmentMatcher {
     name: string,
   ): Readonly<Record<string, Record<string, "url" | "query">>> | undefined;
   hasRoute(name: string): boolean;
-  setRootPath(rootPath: string): void;
 }
 ```
 

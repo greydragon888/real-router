@@ -569,7 +569,7 @@ function collectDeclaredQueryParams(
 ): readonly string[] {
   const queryParams: string[] = [];
 
-  // Include query params declared on the root node (e.g., from setRootPath("?mode"))
+  // Include query params declared on the root node (e.g., a root path like "?mode")
   if (rootQueryParams.length > 0) {
     queryParams.push(...rootQueryParams);
   }

@@ -1028,14 +1028,6 @@ describe("SegmentMatcher", () => {
       );
     });
 
-    it("should prepend rootPath", () => {
-      const matcher = createStaticMatcher();
-
-      matcher.setRootPath("/app");
-
-      expect(matcher.buildPath("about")).toBe("/app/about");
-    });
-
     it("should build nested static path", () => {
       const matcher = createTestMatcher();
       const settingsNode = createInputNode({
@@ -1206,105 +1198,6 @@ describe("SegmentMatcher", () => {
       const meta = matcher.getMetaByName("about");
 
       expect(Object.isFrozen(meta)).toBe(true);
-    });
-  });
-
-  // ===========================================================================
-  // setRootPath
-  // ===========================================================================
-
-  describe("setRootPath", () => {
-    it("should accept root path string", () => {
-      const matcher = createTestMatcher();
-
-      expect(() => {
-        matcher.setRootPath("/app");
-      }).not.toThrow();
-    });
-
-    it("should affect buildPath output", () => {
-      const matcher = createTestMatcher();
-      const aboutNode = createInputNode({
-        name: "about",
-        path: "/about",
-        fullName: "about",
-      });
-      const rootNode = createInputNode({
-        name: "",
-        path: "",
-        fullName: "",
-        children: new Map([["about", aboutNode]]),
-        nonAbsoluteChildren: [aboutNode],
-      });
-
-      matcher.registerTree(rootNode);
-      matcher.setRootPath("/app");
-
-      expect(matcher.buildPath("about")).toBe("/app/about");
-    });
-
-    // 1.6: prefix must only strip at a segment boundary, and the stripped path
-    // must keep a leading "/" — otherwise `/apple` falsely matched root "/app"
-    // and the first char of the remainder was silently eaten (mis-routing).
-    describe("rootPath segment-boundary matching (#736-cluster 1.6)", () => {
-      function rootedMatcher(rootPath: string): SegmentMatcher {
-        const matcher = createTestMatcher();
-        const routeE = createInputNode({
-          name: "e",
-          path: "/e",
-          fullName: "e",
-        });
-        const page = createInputNode({
-          name: "page",
-          path: "/page/:id",
-          fullName: "page",
-        });
-        const rootNode = createInputNode({
-          name: "",
-          path: "",
-          fullName: "",
-          children: new Map([
-            ["e", routeE],
-            ["page", page],
-          ]),
-          nonAbsoluteChildren: [routeE, page],
-        });
-
-        matcher.registerTree(rootNode);
-        matcher.setRootPath(rootPath);
-
-        return matcher;
-      }
-
-      it("does NOT match a path that only shares the prefix string", () => {
-        const matcher = rootedMatcher("/app");
-
-        // "/apple" shares the "/app" prefix but has no boundary → no match.
-        expect(matcher.match("/apple")).toBeUndefined();
-        expect(matcher.match("/appe")).toBeUndefined();
-      });
-
-      it("matches inside the root and preserves the leading slash", () => {
-        const matcher = rootedMatcher("/app");
-
-        expect(matcher.match("/app/e")?.segments.at(-1)?.fullName).toBe("e");
-        expect(matcher.match("/app/page/7")?.params).toStrictEqual({ id: "7" });
-      });
-
-      it("rejects a path outside the root entirely", () => {
-        const matcher = rootedMatcher("/app");
-
-        expect(matcher.match("/other/e")).toBeUndefined();
-      });
-
-      it("handles a root path declared with a trailing slash", () => {
-        const matcher = rootedMatcher("/app/");
-
-        expect(matcher.match("/app/e")?.segments.at(-1)?.fullName).toBe("e");
-        expect(matcher.match("/app/page/7")?.params).toStrictEqual({ id: "7" });
-        // Still no false prefix match.
-        expect(matcher.match("/apple")).toBeUndefined();
-      });
     });
   });
 
@@ -1942,16 +1835,6 @@ describe("SegmentMatcher", () => {
       );
 
       expect(() => matcher.buildPath("search", { q: "" })).not.toThrow();
-    });
-
-    it("should prepend rootPath to param path", () => {
-      const matcher = createParamBuildMatcher();
-
-      matcher.setRootPath("/app");
-
-      expect(matcher.buildPath("users.profile", { id: "123" })).toBe(
-        "/app/users/123",
-      );
     });
 
     it("should build path with multiple params", () => {
@@ -3253,31 +3136,6 @@ describe("SegmentMatcher", () => {
         "/files/docs/readme.md",
       );
     });
-
-    it("should prepend rootPath to splat path", () => {
-      const matcher = createTestMatcher();
-
-      const filesNode = createInputNode({
-        name: "files",
-        path: "/files/*path",
-        fullName: "files",
-      });
-
-      const rootNode = createInputNode({
-        name: "",
-        path: "",
-        fullName: "",
-        children: new Map([["files", filesNode]]),
-        nonAbsoluteChildren: [filesNode],
-      });
-
-      matcher.registerTree(rootNode);
-      matcher.setRootPath("/app");
-
-      expect(matcher.buildPath("files", { path: "docs/readme.md" })).toBe(
-        "/app/files/docs/readme.md",
-      );
-    });
   });
 
   // ===========================================================================
@@ -4416,149 +4274,6 @@ describe("SegmentMatcher", () => {
       matcher.registerTree(rootNode);
 
       expect(matcher.match("/USERS")).toBeUndefined();
-    });
-  });
-
-  // ===========================================================================
-  // setRootPath (match behavior)
-  // ===========================================================================
-
-  describe("match — setRootPath", () => {
-    function createRootPathMatcher(): SegmentMatcher {
-      const matcher = createTestMatcher();
-
-      const profileNode = createInputNode({
-        name: "profile",
-        path: "/:id",
-        fullName: "users.profile",
-      });
-
-      const usersNode = createInputNode({
-        name: "users",
-        path: "/users",
-        fullName: "users",
-        children: new Map([["profile", profileNode]]),
-        nonAbsoluteChildren: [profileNode],
-      });
-
-      const homeNode = createInputNode({
-        name: "home",
-        path: "/",
-        fullName: "home",
-      });
-
-      const rootNode = createInputNode({
-        name: "",
-        path: "",
-        fullName: "",
-        children: new Map([
-          ["home", homeNode],
-          ["users", usersNode],
-        ]),
-        nonAbsoluteChildren: [homeNode, usersNode],
-      });
-
-      matcher.registerTree(rootNode);
-
-      return matcher;
-    }
-
-    it("should strip rootPath prefix before matching", () => {
-      const matcher = createRootPathMatcher();
-
-      matcher.setRootPath("/app");
-
-      const result = matcher.match("/app/users/123");
-
-      expect(result).toBeDefined();
-      expect(result!.params).toStrictEqual({ id: "123" });
-      expect(result!.segments[1].fullName).toBe("users.profile");
-    });
-
-    it("should return undefined when path does not start with rootPath", () => {
-      const matcher = createRootPathMatcher();
-
-      matcher.setRootPath("/app");
-
-      expect(matcher.match("/users/123")).toBeUndefined();
-    });
-
-    it("should match root path with rootPath prefix", () => {
-      const matcher = createRootPathMatcher();
-
-      matcher.setRootPath("/app");
-
-      const result = matcher.match("/app/");
-
-      expect(result).toBeDefined();
-      expect(result!.segments[0].fullName).toBe("home");
-    });
-
-    it("should match root path when rootPath is the entire path", () => {
-      const matcher = createRootPathMatcher();
-
-      matcher.setRootPath("/app");
-
-      const result = matcher.match("/app");
-
-      expect(result).toBeDefined();
-      expect(result!.segments[0].fullName).toBe("home");
-    });
-
-    it("should prepend rootPath in buildPath", () => {
-      const matcher = createRootPathMatcher();
-
-      matcher.setRootPath("/app");
-
-      expect(matcher.buildPath("users.profile", { id: "123" })).toBe(
-        "/app/users/123",
-      );
-    });
-
-    it("should handle nested rootPath", () => {
-      const matcher = createRootPathMatcher();
-
-      matcher.setRootPath("/base/app");
-
-      const result = matcher.match("/base/app/users");
-
-      expect(result).toBeDefined();
-      expect(result!.segments[0].fullName).toBe("users");
-    });
-
-    it("should handle rootPath with query string", () => {
-      const matcher = createRootPathMatcher();
-
-      matcher.setRootPath("/app");
-
-      const result = matcher.match("/app/users?page=1");
-
-      expect(result).toBeDefined();
-      expect(result!.segments[0].fullName).toBe("users");
-      expect(result!.params).toStrictEqual({ page: "1" });
-    });
-
-    it("should not affect matching when rootPath is empty", () => {
-      const matcher = createRootPathMatcher();
-
-      const result = matcher.match("/users/123");
-
-      expect(result).toBeDefined();
-      expect(result!.params).toStrictEqual({ id: "123" });
-    });
-
-    it("should use cache keys that are post-strip", () => {
-      const matcher = createRootPathMatcher();
-
-      matcher.setRootPath("/app");
-
-      const result1 = matcher.match("/app/users");
-      const result2 = matcher.match("/app/users");
-
-      expect(result1).toBeDefined();
-      expect(result2).toBeDefined();
-      expect(result1!.segments[0].fullName).toBe("users");
-      expect(result2!.segments[0].fullName).toBe("users");
     });
   });
 
