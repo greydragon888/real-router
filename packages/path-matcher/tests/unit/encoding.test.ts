@@ -5,7 +5,7 @@ import {
   encodeParam,
   ENCODING_METHODS,
   encodeURIComponentExcludingSubDelims,
-} from "../../src";
+} from "../../src/encoding";
 
 describe("encodeURIComponentExcludingSubDelims", () => {
   it("should return safe strings unchanged", () => {

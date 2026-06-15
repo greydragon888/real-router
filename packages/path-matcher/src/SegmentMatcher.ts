@@ -14,6 +14,25 @@ import type {
 } from "./types";
 
 // =============================================================================
+// Helpers
+// =============================================================================
+
+/** Coerces a route param value (typed `unknown`, contractually primitive) to
+ *  the string the encoder receives. Objects are JSON-stringified. */
+function stringifyParamValue(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (typeof value === "object") {
+    return JSON.stringify(value);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-base-to-string -- route params are typed `unknown` but contractually primitive
+  return String(value);
+}
+
+// =============================================================================
 // SegmentMatcher Class
 // =============================================================================
 
@@ -233,19 +252,17 @@ export class SegmentMatcher {
         continue;
       }
 
-      // M2: fast-path for string values (most common case)
-      let stringValue: string;
-
-      if (typeof value === "string") {
-        stringValue = value;
-      } else if (typeof value === "object") {
-        stringValue = JSON.stringify(value);
-      } else {
-        // eslint-disable-next-line @typescript-eslint/no-base-to-string -- route params are typed `unknown` but contractually primitive
-        stringValue = String(value);
+      // #740 item 3: an empty value for a REQUIRED param would collapse the
+      // segment, silently producing a path that matches the parent route
+      // (`buildPath("u.p", {id:""})` → `/users/` → matches `u`). Reject it like
+      // a missing param. Optional params keep their existing behavior.
+      if (value === "" && !slot.isOptional) {
+        throw new Error(
+          `[SegmentMatcher.buildPath] Missing required param '${slot.paramName}' (empty string)`,
+        );
       }
 
-      const encoded = slot.encoder(stringValue);
+      const encoded = slot.encoder(stringifyParamValue(value));
 
       result += encoded + parts[i + 1];
     }

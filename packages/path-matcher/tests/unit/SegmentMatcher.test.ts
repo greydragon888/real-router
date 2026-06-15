@@ -1565,6 +1565,59 @@ describe("SegmentMatcher", () => {
       expect(paramResult!.params).toStrictEqual({ id: "123" });
     });
 
+    // #740 item 2: the trie is greedy — once a segment matches a static child it
+    // does NOT backtrack to a param sibling if the rest of the path fails. This
+    // is an intentional, documented limitation (INVARIANTS Matching #16).
+    it("does NOT backtrack from a static segment to a param sibling (#740)", () => {
+      const matcher = createTestMatcher();
+
+      const postsNode = createInputNode({
+        name: "posts",
+        path: "/posts",
+        fullName: "users.profile.posts",
+      });
+      const profileNode = createInputNode({
+        name: "profile",
+        path: "/:id",
+        fullName: "users.profile",
+        children: new Map([["posts", postsNode]]),
+        nonAbsoluteChildren: [postsNode],
+      });
+      const newNode = createInputNode({
+        name: "new",
+        path: "/new",
+        fullName: "users.new",
+      });
+      const usersNode = createInputNode({
+        name: "users",
+        path: "/users",
+        fullName: "users",
+        children: new Map([
+          ["new", newNode],
+          ["profile", profileNode],
+        ]),
+        nonAbsoluteChildren: [newNode, profileNode],
+      });
+
+      matcher.registerTree(
+        createInputNode({
+          name: "",
+          path: "",
+          fullName: "",
+          children: new Map([["users", usersNode]]),
+          nonAbsoluteChildren: [usersNode],
+        }),
+      );
+
+      // Commits to static "new", which has no "/posts" child, and does not
+      // retry ":id"="new" → "/posts".
+      expect(matcher.match("/users/new/posts")).toBeUndefined();
+      // A non-static value reaches the param subtree normally.
+      expect(matcher.match("/users/42/posts")?.segments.at(-1)?.fullName).toBe(
+        "users.profile.posts",
+      );
+    });
+
     it("should return undefined when no param and no static match", () => {
       const matcher = createTestMatcher();
 
@@ -1858,6 +1911,37 @@ describe("SegmentMatcher", () => {
       expect(() => matcher.buildPath("users.profile", { id: null })).toThrow(
         "[SegmentMatcher.buildPath] Missing required param 'id'",
       );
+    });
+
+    // #740 item 3: an empty value for a required param silently collapsed the
+    // segment (`/users/` → matched the parent), so it is now rejected at build.
+    it("should throw for an empty-string required param (#740)", () => {
+      const matcher = createParamBuildMatcher();
+
+      expect(() => matcher.buildPath("users.profile", { id: "" })).toThrow(
+        "[SegmentMatcher.buildPath] Missing required param 'id' (empty string)",
+      );
+    });
+
+    it("does NOT reject an empty-string value for an optional param (#740)", () => {
+      const matcher = createTestMatcher();
+      const search = createInputNode({
+        name: "search",
+        path: "/search/:q?",
+        fullName: "search",
+      });
+
+      matcher.registerTree(
+        createInputNode({
+          name: "",
+          path: "",
+          fullName: "",
+          children: new Map([["search", search]]),
+          nonAbsoluteChildren: [search],
+        }),
+      );
+
+      expect(() => matcher.buildPath("search", { q: "" })).not.toThrow();
     });
 
     it("should prepend rootPath to param path", () => {
