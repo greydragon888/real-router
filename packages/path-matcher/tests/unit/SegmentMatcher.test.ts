@@ -1242,6 +1242,70 @@ describe("SegmentMatcher", () => {
 
       expect(matcher.buildPath("about")).toBe("/app/about");
     });
+
+    // 1.6: prefix must only strip at a segment boundary, and the stripped path
+    // must keep a leading "/" — otherwise `/apple` falsely matched root "/app"
+    // and the first char of the remainder was silently eaten (mis-routing).
+    describe("rootPath segment-boundary matching (#736-cluster 1.6)", () => {
+      function rootedMatcher(rootPath: string): SegmentMatcher {
+        const matcher = createTestMatcher();
+        const routeE = createInputNode({
+          name: "e",
+          path: "/e",
+          fullName: "e",
+        });
+        const page = createInputNode({
+          name: "page",
+          path: "/page/:id",
+          fullName: "page",
+        });
+        const rootNode = createInputNode({
+          name: "",
+          path: "",
+          fullName: "",
+          children: new Map([
+            ["e", routeE],
+            ["page", page],
+          ]),
+          nonAbsoluteChildren: [routeE, page],
+        });
+
+        matcher.registerTree(rootNode);
+        matcher.setRootPath(rootPath);
+
+        return matcher;
+      }
+
+      it("does NOT match a path that only shares the prefix string", () => {
+        const matcher = rootedMatcher("/app");
+
+        // "/apple" shares the "/app" prefix but has no boundary → no match.
+        expect(matcher.match("/apple")).toBeUndefined();
+        expect(matcher.match("/appe")).toBeUndefined();
+      });
+
+      it("matches inside the root and preserves the leading slash", () => {
+        const matcher = rootedMatcher("/app");
+
+        expect(matcher.match("/app/e")?.segments.at(-1)?.fullName).toBe("e");
+        expect(matcher.match("/app/page/7")?.params).toStrictEqual({ id: "7" });
+      });
+
+      it("rejects a path outside the root entirely", () => {
+        const matcher = rootedMatcher("/app");
+
+        expect(matcher.match("/other/e")).toBeUndefined();
+      });
+
+      it("handles a root path declared with a trailing slash", () => {
+        const matcher = rootedMatcher("/app/");
+
+        expect(matcher.match("/app/e")?.segments.at(-1)?.fullName).toBe("e");
+        expect(matcher.match("/app/page/7")?.params).toStrictEqual({ id: "7" });
+        // Still no false prefix match.
+        expect(matcher.match("/apple")).toBeUndefined();
+      });
+    });
   });
 
   // ===========================================================================

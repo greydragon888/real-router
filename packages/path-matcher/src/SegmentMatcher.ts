@@ -329,7 +329,24 @@ export class SegmentMatcher {
         return false;
       }
 
-      path = path.length === rootLength ? "/" : path.slice(rootLength);
+      // Strip the root prefix, but only at a real segment boundary, and always
+      // leave a leading "/" for #traverseFrom (#736-cluster 1.6). Without the
+      // boundary check `/apple` falsely matched root "/app" → route "/e"
+      // (mis-routing); without re-adding "/" the first char was silently eaten.
+      const rest = path.slice(rootLength);
+
+      if (rest === "") {
+        path = "/";
+      } else if (rest.codePointAt(0) === 0x2f /* / */) {
+        // root had no trailing slash; the boundary slash starts `rest`.
+        path = rest;
+      } else if (this.#rootPath.codePointAt(rootLength - 1) === 0x2f /* / */) {
+        // root ended with "/", which consumed the boundary — re-add a leading "/".
+        path = `/${rest}`;
+      } else {
+        // No segment boundary after the prefix (e.g. "/apple" under "/app").
+        return false;
+      }
     }
 
     const qIdx = this.#scanPath(path);

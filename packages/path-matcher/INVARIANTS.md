@@ -43,6 +43,7 @@
 | 3   | Hash fragment stripping              | `match(path + "#fragment")` produces the same result as `match(path)`. Fragment identifiers are silently stripped before matching.                                             |
 | 4   | Malformed percent-encoding rejection | `match()` returns `undefined` (never throws) when a matched param contains a percent sequence that is either **syntactically** malformed (`%XX` where X is not a hex digit, or truncated) **or** syntactically valid but **semantically invalid UTF-8** (`%E0%41`, `%C0%80`, `%FF`, surrogate halves). The first is caught by `validatePercentEncoding`; the second by a try/catch around `decodeURIComponent`/`decodeURI` in `#decodeParams` (#737). |
 | 5   | Undecodable query rejection          | `match()` returns `undefined` (never throws) when the query string makes the injected query parser throw (e.g. `?x=%E0%41` → `decodeURIComponent` URIError). The `parseQueryString` call in `#buildResult` is wrapped in try/catch so a malformed query yields an unmatched URL, not a crash (#737). |
+| 6   | rootPath segment-boundary rejection  | With a configured `rootPath`, `match()` accepts a path only when it equals the root or continues it at a `/` segment boundary. A path that merely shares the prefix string (`/apple` under root `/app`) returns `undefined` — never a false match — and the stripped remainder keeps its leading `/` (works for roots declared with or without a trailing slash) (#736-cluster 1.6). |
 
 ## Roundtrip Extensions
 
