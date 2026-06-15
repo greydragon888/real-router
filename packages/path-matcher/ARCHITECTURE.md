@@ -20,7 +20,6 @@ path-matcher/
 │   ├── buildParamMeta.ts         — Parameter metadata extraction from patterns
 │   ├── encoding.ts               — URL parameter encoding/decoding (4 strategies)
 │   ├── percentEncoding.ts        — Percent encoding validation (%XX)
-│   ├── constraintValidation.ts   — Regex constraint validation
 │   ├── pathUtils.ts              — SegmentNode factory, trailing slash normalization, buildFullPath
 │   ├── types.ts                  — All type definitions
 │   └── index.ts                  — Public API exports
@@ -38,7 +37,6 @@ graph LR
 
     PM -.->|provides| SM[SegmentMatcher]
     PM -.->|provides| BPM[buildParamMeta]
-    PM -.->|provides| VC[validateConstraints]
 ```
 
 | Consumer       | What it uses                          | Purpose                                         |
@@ -79,13 +77,17 @@ class SegmentMatcher {
 
 ```typescript
 buildParamMeta(path: string): ParamMeta
-validateConstraints(params: Record<string, unknown>, constraintPatterns: ReadonlyMap<string, ConstraintPattern>, path: string): void
-encodeParam(param: string | number | boolean, encoding: URLParamsEncodingType, isSpatParam: boolean): string
-encodeURIComponentExcludingSubDelims(segment: string): string
-createSegmentNode(): SegmentNode
-ENCODING_METHODS: Record<URLParamsEncodingType, (param: string) => string>
-DECODING_METHODS: Record<URLParamsEncodingType, (param: string) => string>
 ```
+
+> The public surface is intentionally narrow (#740): `index.ts` exports only
+> `SegmentMatcher`, `buildParamMeta`, and the shared types. Encoding helpers
+> (`ENCODING_METHODS`/`DECODING_METHODS`/`encodeParam`/
+> `encodeURIComponentExcludingSubDelims`), `createSegmentNode`, and constraint
+> validation are internal — used inside `SegmentMatcher`/`registration` and, in
+> tests, imported directly from `src/*`. The standalone `validateConstraints`
+> was dead and has been removed; constraint checking lives in two private
+> matcher paths (`#validateConstraints` for `match()`, `#validateBuildConstraints`
+> for `buildPath()`).
 
 ## Core Data Structures
 
@@ -248,6 +250,8 @@ At each path segment, the traversal tries in order:
 3. **Splat child** — tries splat's own static/param children first, then captures remaining path
 
 **Splat backtracking:** Before capturing as wildcard, splat child attempts to match its own children for more specific routes. This ensures `/files/special` matches a static route under splat before falling back to `*path` capture.
+
+**Static no-backtrack (intentional limitation, #740):** Unlike splat, a **static** match does not backtrack. Once a segment matches a static child, traversal commits to it; if the remainder fails, the matcher does **not** retry a param sibling. With `/users/new` + `/users/:id/posts`, `match("/users/new/posts")` returns `undefined` (it commits to static `new`). This keeps matching greedy/deterministic and O(depth); model overlapping routes so the static prefix is also a valid stem, or avoid the overlap. See INVARIANTS Matching #16.
 
 ### Path Preparation
 
@@ -417,7 +421,6 @@ Splat params are split on `/`, each segment encoded separately, then rejoined wi
 | ------------- | ----------------------------- | ---------------------------------------- |
 | `match()`     | `#validateConstraints()`      | Test captured values, reject on fail     |
 | `buildPath()` | `#validateBuildConstraints()` | Validate provided params before encoding |
-| External      | `validateConstraints()`       | Public utility for external validation   |
 
 ## Matcher Options
 
@@ -442,9 +445,8 @@ types.ts (leaf — no imports)
     ├── percentEncoding.ts (leaf)
     ├── encoding.ts → types
     ├── pathUtils.ts → types
-    ├── constraintValidation.ts → types
-    ├── buildParamMeta.ts → types
-    ├── registration.ts → types, pathUtils, encoding
+    ├── buildParamMeta.ts → types  (exports PARAM_NAME_PATTERN — the single param-name grammar)
+    ├── registration.ts → types, pathUtils, encoding, buildParamMeta
     └── SegmentMatcher.ts → types, encoding, pathUtils, registration,
                             percentEncoding
 ```
