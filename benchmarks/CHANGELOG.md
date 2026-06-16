@@ -1,5 +1,18 @@
 # router-benchmarks
 
+## 0.3.68
+
+### Patch Changes
+
+- Updated dependencies [[`e6b8340`](https://github.com/greydragon888/real-router/commit/e6b83400a0ced7245ad33adf7be9e9b29b818f16), [`e6b8340`](https://github.com/greydragon888/real-router/commit/e6b83400a0ced7245ad33adf7be9e9b29b818f16), [`e6b8340`](https://github.com/greydragon888/real-router/commit/e6b83400a0ced7245ad33adf7be9e9b29b818f16), [`e6b8340`](https://github.com/greydragon888/real-router/commit/e6b83400a0ced7245ad33adf7be9e9b29b818f16), [`e6b8340`](https://github.com/greydragon888/real-router/commit/e6b83400a0ced7245ad33adf7be9e9b29b818f16), [`e6b8340`](https://github.com/greydragon888/real-router/commit/e6b83400a0ced7245ad33adf7be9e9b29b818f16), [`e6b8340`](https://github.com/greydragon888/real-router/commit/e6b83400a0ced7245ad33adf7be9e9b29b818f16), [`e6b8340`](https://github.com/greydragon888/real-router/commit/e6b83400a0ced7245ad33adf7be9e9b29b818f16)]:
+  - @real-router/core@0.57.0
+  - @real-router/lifecycle-plugin@0.5.1
+  - @real-router/memory-plugin@0.4.6
+  - @real-router/react@0.27.3
+  - @real-router/search-schema-plugin@0.3.1
+  - @real-router/solid@0.14.3
+  - @real-router/vue@0.15.3
+
 ## 0.3.67
 
 ### Patch Changes
