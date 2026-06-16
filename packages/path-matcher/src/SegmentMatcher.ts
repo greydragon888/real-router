@@ -429,6 +429,13 @@ export class SegmentMatcher {
   // Parses the query string and folds it into `params`. Returns false (→ match
   // yields undefined) when the URL is unmatchable: the injected parser threw, or
   // strict mode saw an undeclared key.
+  //
+  // Precedence (#843, INVARIANTS Matching #25): query params are merged into the
+  // SAME object that already holds the path params, so a query key equal to a
+  // path-param name OVERWRITES the path value (`match("/u/5?id=9")` → `{id:"9"}`).
+  // Intentional and documented: `buildPath` never emits a path param as a query
+  // key, so the build→match roundtrip is unaffected; the collision only arises
+  // for hand-crafted/adversarial URLs where a query shadows a path segment.
   #mergeQueryParams(
     route: CompiledRoute,
     params: Record<string, unknown>,

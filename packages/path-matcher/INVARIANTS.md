@@ -42,6 +42,7 @@
 | 22  | strictTrailingSlash matching         | With `strictTrailingSlash`, the input's trailing-slash-ness must equal the route's: a route declared without a trailing slash rejects a trailing-slash input (and vice-versa). Without the option, both forms match. |
 | 23  | Constraint filtering at match        | `match()` returns `undefined` when a captured value violates the route's constraint regex (route filtered out); a satisfying value is admitted and captured. Complements #9 (satisfaction). |
 | 24  | Splat backtracking                   | When a splat node has a child route, a remainder that matches the child resolves to the more-specific child; a remainder that doesn't falls back to the wildcard capture. |
+| 25  | Query overrides same-named path param | A query key equal to a path-param name **overwrites** the captured path value: `match("/u/5?id=9").params` → `{ id: "9" }`. Query params are merged into the same object as path params (`#mergeQueryParams`), query last. Intentional/documented (#843): `buildPath` never emits a path param as a query key, so the build→match roundtrip is unaffected; the collision only arises for hand-crafted URLs where a query shadows a path segment. |
 
 ## Path Rejection
 

@@ -821,6 +821,40 @@ describe("SegmentMatcher", () => {
       expect(result!.params).toStrictEqual({ id: "v", tab: "x" });
     });
 
+    it("should let a query key override a same-named path param (documented, #843)", () => {
+      const matcher = createTestMatcher();
+      const idNode = createInputNode({
+        name: "id",
+        path: "/:id",
+        fullName: "u.id",
+      });
+      const uNode = createInputNode({
+        name: "u",
+        path: "/u",
+        fullName: "u",
+        children: new Map([["id", idNode]]),
+        nonAbsoluteChildren: [idNode],
+      });
+
+      matcher.registerTree(
+        createInputNode({
+          name: "",
+          path: "",
+          fullName: "",
+          children: new Map([["u", uNode]]),
+          nonAbsoluteChildren: [uNode],
+        }),
+      );
+
+      // INVARIANTS Matching #25: query params merge into the same object as path
+      // params (query last), so a same-named query key overwrites the path value.
+      // `buildPath` never emits this shape — roundtrip is unaffected.
+      const result = matcher.match("/u/5?id=9");
+
+      expect(result).toBeDefined();
+      expect(result!.params).toStrictEqual({ id: "9" });
+    });
+
     it("should return correct meta", () => {
       const matcher = createStaticMatcher();
 
