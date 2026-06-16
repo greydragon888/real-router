@@ -25,7 +25,7 @@
     "@vitejs/plugin-vue": "6.0.7",
     "jsdom": "29.1.1",
     "typescript": "6.0.3",
-    "vite": "7.3.2",
+    "vite": "7.3.5",
     "vitest": "4.1.8",
     "vue-tsc": "3.3.5"
   }

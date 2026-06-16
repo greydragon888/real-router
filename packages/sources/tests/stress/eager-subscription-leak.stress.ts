@@ -68,6 +68,13 @@ describe("S3. Eager subscription — shared cached sources do not leak", () => {
       s.destroy();
     }
 
+    // Settle the heap floor before measuring. A single gc() (takeHeapSnapshot's
+    // internal pass) leaves floating garbage V8 only reclaims on a later cycle,
+    // so the post-GC floor jitters by ±0.4 MB under concurrent build load —
+    // enough to trip the 0.25 MB threshold (#832). The explicit double-forceGC
+    // (matching S3.1/S3.3/S3.8) collapses that jitter to ±0.02 MB.
+    forceGC();
+    forceGC();
     const heapBaseline = takeHeapSnapshot();
 
     const routes = ["users.list", "about", "admin.dashboard", "home"];
@@ -76,13 +83,16 @@ describe("S3. Eager subscription — shared cached sources do not leak", () => {
       await router.navigate(routes[i % routes.length]);
     }
 
+    forceGC();
+    forceGC();
     const heapAfterNavs = takeHeapSnapshot();
     const delta = heapAfterNavs - heapBaseline;
 
     // Throughput guard (not a leak discriminator): the cached active source is
     // shared and its destroy() is a no-op, so the 100 navigations drive ONE
-    // shared snapshot with no per-op accumulation. Healthy delta ≈ 0.006 MB;
-    // threshold 0.25 MB is an honest floor above run-to-run heap jitter.
+    // shared snapshot with no per-op accumulation. With the floor settled above,
+    // healthy delta ≈ 0.006 MB; threshold 0.25 MB is an honest floor (~12×) over
+    // residual heap jitter.
     expect(delta).toBeLessThan(MB / 4);
   });
 
@@ -121,6 +131,11 @@ describe("S3. Eager subscription — shared cached sources do not leak", () => {
       s.destroy();
     }
 
+    // Settle the heap floor before measuring — see S3.2 for the rationale: a
+    // single gc() leaves floating garbage that jitters the post-GC floor enough
+    // to trip the 0.25 MB threshold under concurrent build load (#832).
+    forceGC();
+    forceGC();
     const heapBaseline = takeHeapSnapshot();
 
     const routes = ["users.list", "about", "admin.dashboard", "home"];
@@ -129,14 +144,16 @@ describe("S3. Eager subscription — shared cached sources do not leak", () => {
       await router.navigate(routes[i % routes.length]);
     }
 
+    forceGC();
+    forceGC();
     const heapAfterNavs = takeHeapSnapshot();
     const delta = heapAfterNavs - heapBaseline;
 
     // Throughput guard (not a leak discriminator): getTransitionSource is
     // cached and its destroy() is a no-op, so the 100 navigations drive ONE
-    // shared snapshot with no per-op accumulation. Healthy delta ≈ 0 MB (often
-    // negative — GC reclaims more than allocated); threshold 0.25 MB is an
-    // honest floor above run-to-run heap jitter.
+    // shared snapshot with no per-op accumulation. With the floor settled above,
+    // healthy delta ≈ 0 MB (often negative — GC reclaims more than allocated);
+    // threshold 0.25 MB is an honest floor over residual heap jitter.
     expect(delta).toBeLessThan(MB / 4);
   });
 

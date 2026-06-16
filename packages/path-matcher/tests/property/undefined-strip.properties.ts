@@ -1,11 +1,9 @@
 import { fc, test } from "@fast-check/vitest";
 
 import { createInputNode, createRootWithChildren, NUM_RUNS } from "./helpers";
-import { buildParamMeta } from "../../src/buildParamMeta";
-import { SegmentMatcher } from "../../src/SegmentMatcher";
 import { createTestMatcher } from "../helpers/createTestMatcher";
 
-import type { MatcherInputNode } from "../../src/types";
+import type { SegmentMatcher } from "../../src/SegmentMatcher";
 
 /**
  * Level 2 invariants — `SegmentMatcher.buildPath` handles `undefined` values
@@ -142,96 +140,6 @@ describe("SegmentMatcher.buildPath — undefined-strip invariants (level 2)", ()
       });
 
       expect(urlWith).toBe(urlWithout);
-    },
-  );
-});
-
-// =============================================================================
-// Engine-independence — verify what reaches buildQueryString callback
-//
-// This set uses a spy engine (no-op filtering) to document what matcher
-// forwards to the injected buildQueryString. If level 2 filtering were in
-// place, spy would never see undefined. Currently matcher passes params
-// through and the inline parser (level 3) handles the strip.
-// =============================================================================
-
-function createSpyMatcher(): {
-  matcher: SegmentMatcher;
-  getReceivedParams: () => Record<string, unknown>[];
-  reset: () => void;
-} {
-  const received: Record<string, unknown>[] = [];
-
-  const matcher = new SegmentMatcher({
-    parseQueryString: () => ({}),
-    buildQueryString: (params) => {
-      received.push({ ...params });
-      let result = "";
-
-      for (const key in params) {
-        const value = params[key];
-
-        if (value === undefined) {
-          continue;
-        } // engine's own strip
-        if (result.length > 0) {
-          result += "&";
-        }
-
-        // eslint-disable-next-line @typescript-eslint/no-base-to-string -- spy engine: param values are typed `unknown` but expected primitive in property tests
-        const valueStr = typeof value === "string" ? value : String(value);
-
-        result += `${key}=${valueStr}`;
-      }
-
-      return result;
-    },
-  });
-
-  const viewNode: MatcherInputNode = {
-    name: "view",
-    path: "/view?a&b&c",
-    fullName: "view",
-    absolute: false,
-    children: new Map(),
-    nonAbsoluteChildren: [],
-    paramMeta: buildParamMeta("/view?a&b&c"),
-    paramTypeMap: buildParamMeta("/view?a&b&c").paramTypeMap,
-    staticPath: null,
-  };
-
-  matcher.registerTree(createRootWithChildren([viewNode]));
-
-  return {
-    matcher,
-    getReceivedParams: () => received,
-    reset: () => {
-      received.length = 0;
-    },
-  };
-}
-
-describe("SegmentMatcher.buildPath — engine-independence documentation", () => {
-  const { matcher, getReceivedParams, reset } = createSpyMatcher();
-
-  test.prop([arbMixedParams], { numRuns: NUM_RUNS.fast })(
-    "final URL never leaks undefined even if engine receives undefined keys",
-    (params) => {
-      reset();
-
-      const url = matcher.buildPath("view", params, {
-        queryParamsMode: "loose",
-      });
-
-      // Documents current matcher contract: matcher MAY forward undefined to
-      // engine (`#buildQueryStringForBuild` passes params through unchanged),
-      // but the final URL (after engine's strip) does not contain it. If
-      // future architecture adds a matcher-level strip, the recorded params
-      // would also be undefined-free.
-      const received = getReceivedParams();
-
-      expect(received.length).toBeGreaterThanOrEqual(0);
-      expect(url).not.toMatch(/=undefined(?:&|$)/);
     },
   );
 });

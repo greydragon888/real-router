@@ -220,4 +220,91 @@ describe("buildParamMeta", () => {
       expect(constraint?.pattern.test("123")).toBe(true);
     });
   });
+
+  // #738: a `?` inside a `<...>` constraint (lazy quantifier / optional group)
+  // must NOT be mistaken for the query separator — it destroyed metadata before.
+  describe("constraint-aware query detection (#738)", () => {
+    it("does not treat a lazy-quantifier `?` inside a constraint as query", () => {
+      const meta = buildParamMeta(String.raw`/a/:id<\d?>`);
+
+      expect(meta.urlParams).toStrictEqual(["id"]);
+      expect(meta.queryParams).toStrictEqual([]);
+      expect(meta.pathPattern).toBe(String.raw`/a/:id<\d?>`);
+
+      const constraint = meta.constraintPatterns.get("id");
+
+      expect(constraint).toBeDefined();
+      expect(constraint?.pattern.test("5")).toBe(true);
+      expect(constraint?.pattern.test("")).toBe(true); // \d? allows empty
+    });
+
+    it.each([
+      [String.raw`/a/:id<\d{1,3}?>`, "id"],
+      ["/a/:slug<(ab)?c>", "slug"],
+      ["/a/:x<.+?>", "x"],
+    ])("preserves constraint with embedded `?` in '%s'", (path, name) => {
+      const meta = buildParamMeta(path);
+
+      expect(meta.urlParams).toStrictEqual([name]);
+      expect(meta.queryParams).toStrictEqual([]);
+      expect(meta.constraintPatterns.has(name)).toBe(true);
+    });
+
+    it("still detects a real query after a constraint containing `?`", () => {
+      const meta = buildParamMeta(String.raw`/a/:id<\d?>?tab&page`);
+
+      expect(meta.urlParams).toStrictEqual(["id"]);
+      expect(meta.queryParams).toStrictEqual(["tab", "page"]);
+      expect(meta.constraintPatterns.has("id")).toBe(true);
+      expect(meta.pathPattern).toBe(String.raw`/a/:id<\d?>`);
+    });
+
+    // Found by the structural property suite: an optional-param marker
+    // immediately followed by a query (`/:id??tab` → `:id?` then `?tab`) was
+    // mis-parsed — the optional `?` was taken as the query separator, giving
+    // `queryParams:["?tab"]` and dropping the `?` from `pathPattern`.
+    it("separates an optional-param marker from a directly-following query", () => {
+      const meta = buildParamMeta("/users/:id??tab&sort");
+
+      expect(meta.urlParams).toStrictEqual(["id"]);
+      expect(meta.queryParams).toStrictEqual(["tab", "sort"]);
+      expect(meta.pathPattern).toBe("/users/:id?");
+      expect(meta.paramTypeMap).toStrictEqual({
+        id: "url",
+        tab: "query",
+        sort: "query",
+      });
+    });
+
+    it("handles optional + constraint + query together", () => {
+      const meta = buildParamMeta(String.raw`/a/:id<\d+>??tab`);
+
+      expect(meta.urlParams).toStrictEqual(["id"]);
+      expect(meta.queryParams).toStrictEqual(["tab"]);
+      expect(meta.constraintPatterns.has("id")).toBe(true);
+      expect(meta.pathPattern).toBe(String.raw`/a/:id<\d+>?`);
+    });
+  });
+
+  // #738: the param-name grammar is a single source of truth — names may contain
+  // any char except `/`, `?`, `<` (not just `\w`). match-path and build-path agree.
+  describe("param-name grammar (#738)", () => {
+    it.each([
+      ["/h/:my-param", "my-param"],
+      ["/h/:a.b", "a.b"],
+      ["/h/:user~id", "user~id"],
+    ])("accepts non-word characters in '%s'", (path, name) => {
+      const meta = buildParamMeta(path);
+
+      expect(meta.urlParams).toStrictEqual([name]);
+      expect(meta.paramTypeMap).toStrictEqual({ [name]: "url" });
+    });
+
+    it("captures a hyphenated splat name", () => {
+      const meta = buildParamMeta("/files/*deep-path");
+
+      expect(meta.spatParams).toStrictEqual(["deep-path"]);
+      expect(meta.urlParams).toStrictEqual(["deep-path"]);
+    });
+  });
 });

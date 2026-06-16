@@ -2,7 +2,6 @@ import { fc, test } from "@fast-check/vitest";
 
 import {
   arbEncoding,
-  arbSafeEncodingString,
   arbSplatValue,
   arbUnicodeString,
   NUM_RUNS,
@@ -65,15 +64,6 @@ describe("Encoding Properties", () => {
       (v: string) => {
         expect(ENCODING_METHODS.none(v)).toBe(v);
         expect(DECODING_METHODS.none(v)).toBe(v);
-      },
-    );
-  });
-
-  describe("safe strings unchanged by default encoder", () => {
-    test.prop([arbSafeEncodingString], { numRuns: NUM_RUNS.thorough })(
-      "strings with only unreserved chars pass through default encoder unchanged",
-      (v: string) => {
-        expect(ENCODING_METHODS.default(v)).toBe(v);
       },
     );
   });

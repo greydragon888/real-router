@@ -141,9 +141,6 @@ export interface CompiledRoute {
   readonly buildParamNamesSet: ReadonlySet<string>;
 
   cachedResult?: MatchResult;
-
-  readonly forwardTo?: string;
-  readonly defaultParams?: Readonly<Record<string, unknown>>;
 }
 
 export interface BuildParamSlot {

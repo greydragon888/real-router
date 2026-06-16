@@ -31,6 +31,18 @@
 | 11  | Case insensitivity                   | With `caseSensitive: false`, matching produces the same route name regardless of the case of static path segments.                                                                          |
 | 12  | buildPath starts with `/`            | `buildPath` always returns a string starting with `/`, for param routes, splat routes, and optional-param routes alike.                                                                     |
 | 13  | Trailing slash option                | With `trailingSlash: "always"`, `buildPath` always returns a string ending with `/`.                                                                                                        |
+| 14  | Param-name grammar agreement         | The match-path and build-path grammars accept the **same** param-name character class (canonical set: any char except `/`, `?`, `<` — derived from the single `PARAM_NAME_PATTERN`). For any valid name (incl. `-`, `.`, `~`, not just `\w`), `match()` captures the value under exactly the name `buildPath()` expects — they can never disagree (#738). |
+| 15  | Constraint-aware query detection     | A `?` inside a `<...>` constraint (lazy quantifier, optional group — `:id<\d?>`) is never mistaken for the query separator. `buildParamMeta` preserves `urlParams`, the constraint, and `pathPattern`; `queryParams` is unaffected. A real query after the constraint is still detected (#738). |
+| 16  | Static-segment no-backtrack (limitation) | The segment trie is **greedy**: once a path segment matches a static child, `match()` does NOT backtrack to a param sibling if the remainder fails. With `/users/new` + `/users/:id/posts`, `match("/users/new/posts")` returns `undefined` (it commits to static `new`). Intentional for determinism/performance — model overlapping routes so the static prefix is also a valid stem, or avoid the overlap (#740). |
+| 17  | Empty required param rejected at build | `buildPath` throws `Missing required param '<name>' (empty string)` when a **required** param is given `""` — an empty value would collapse the segment and silently match the parent route (`buildPath("u.p", {id:""})` → `/users/`). Treated like a missing param. Optional params are unaffected (#740). |
+| 18  | Canonicalization fixpoint (`build∘match`) | Matching a built path and re-building from the recovered params reproduces the **same** path and params: `buildPath(name, match(buildPath(name, p)).params) === buildPath(name, p)`, and a second `match` agrees. The property `core`'s `rewritePathOnMatch` depends on — holds for any value under `default`/`uriComponent` (incl. `/`) and for splat under all 4 strategies. |
+| 19  | strictQueryParams rejection          | With `strictQueryParams`, `match()` returns `undefined` when the query contains a key not declared by the route; a query of only declared keys matches and captures them. |
+| 20  | queryParamsMode loose vs default     | `buildPath` drops an **undeclared** query key in default mode (bare path), and keeps it under `queryParamsMode: "loose"`. |
+| 21  | Declared query value roundtrip       | A declared query param value survives `build → match`: `match(buildPath(name, {q})).params` equals `{q}`. |
+| 22  | strictTrailingSlash matching         | With `strictTrailingSlash`, the input's trailing-slash-ness must equal the route's: a route declared without a trailing slash rejects a trailing-slash input (and vice-versa). Without the option, both forms match. |
+| 23  | Constraint filtering at match        | `match()` returns `undefined` when a captured value violates the route's constraint regex (route filtered out); a satisfying value is admitted and captured. Complements #9 (satisfaction). |
+| 24  | Splat backtracking                   | When a splat node has a child route, a remainder that matches the child resolves to the more-specific child; a remainder that doesn't falls back to the wildcard capture. |
+| 25  | Query overrides same-named path param | A query key equal to a path-param name **overwrites** the captured path value: `match("/u/5?id=9").params` → `{ id: "9" }`. Query params are merged into the same object as path params (`#mergeQueryParams`), query last. Intentional/documented (#843): `buildPath` never emits a path param as a query key, so the build→match roundtrip is unaffected; the collision only arises for hand-crafted URLs where a query shadows a path segment. |
 
 ## Path Rejection
 
@@ -38,15 +50,29 @@
 | --- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 1   | Raw Unicode rejection                | `match()` returns `undefined` for paths containing raw Unicode characters (U+0080–U+FFFF). Unencoded Unicode in URL paths is rejected before trie traversal.                   |
 | 2   | Double-slash rejection               | `match()` returns `undefined` for paths containing `//`. Consecutive slashes are invalid path structure.                                                                       |
-| 3   | Hash fragment stripping              | `match(path + "#fragment")` produces the same result as `match(path)`. Fragment identifiers are silently stripped before matching.                                             |
-| 4   | Malformed percent-encoding rejection | `match()` returns `undefined` when a matched param contains a malformed percent sequence (`%XX` where X is not a hex digit). Invalid encoding is caught during param decoding. |
+| 3   | Hash fragment stripping              | `match(path + "#fragment")` produces the same result as `match(path)`. A fragment (everything after the **first** `#`) is stripped before matching **and before query parsing** — whether it follows the path directly (`/a#f`) or a query string (`/a?q=1#f`). A `#` before the `?` is handled by `#scanPath`'s truncation branch; a `#` after the `?` is stripped from the query substring by an `indexOf("#")` in `#preparePath` — without it the fragment was folded into the query value (`?ref=v#f` → `ref="v#f"`, #842). |
+| 4   | Malformed percent-encoding rejection | `match()` returns `undefined` (never throws) when a matched param contains a percent sequence that is either **syntactically** malformed (`%XX` where X is not a hex digit, or truncated) **or** syntactically valid but **semantically invalid UTF-8** (`%E0%41`, `%C0%80`, `%FF`, surrogate halves). The first is caught by `validatePercentEncoding`; the second by a try/catch around `decodeURIComponent`/`decodeURI` in `#decodeParams` (#737). |
+| 5   | Undecodable query rejection          | `match()` returns `undefined` (never throws) when the query string makes the injected query parser throw (e.g. `?x=%E0%41` → `decodeURIComponent` URIError). The `parseQueryString` call in `#buildResult` is wrapped in try/catch so a malformed query yields an unmatched URL, not a crash (#737). |
+| 6   | Never-throw across the option matrix | `match()` never throws for **any** input string under **any** combination of options (`caseSensitive`, `strictTrailingSlash`, `strictQueryParams`, all 4 `urlParamsEncoding` values) — in the path, splat, and query positions. |
+
+## buildParamMeta (parser)
+
+Structural invariants of the pure path-pattern parser, verified **model-based**: a random structural model is rendered to a path and `buildParamMeta`'s output is checked against the model (the model — not the parser — is the oracle).
+
+| #   | Invariant                       | Description                                                                                                                                                              |
+| --- | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Exact classification            | `urlParams` / `queryParams` / `spatParams` / `paramTypeMap` / `pathPattern` and the set of constrained names all equal the independently-derived model, order included. |
+| 2   | Splat ⊆ url, disjoint type map  | Every splat name is also a url param; no name is classified as both url and query.                                                                                      |
+| 3   | pathPattern is the query-free residue | Re-parsing `meta.pathPattern` yields the same `urlParams` and an empty `queryParams`.                                                                              |
+| 4   | Determinism / purity            | Two calls on the same input produce structurally equal output.                                                                                                          |
+| 5   | Optional marker vs directly-following query | A `?` optional marker immediately followed by a query (`/:id??tab` → `:id?` + `?tab`) is separated correctly — the optional `?` is not mistaken for the query separator, `pathPattern` keeps the marker, and `queryParams` has no spurious `?`. (Bug found by the structural suite; same class as #738.) |
 
 ## Roundtrip Extensions
 
 | #   | Invariant                      | Description                                                                                                                                                                                  |
 | --- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | Optional param value roundtrip | `match(buildPath("search", {query})).params` equals `{query}`. Optional parameter values survive the build/match cycle, not just the route name (which Matching #3 already covers).          |
-| 2   | Encoding-aware roundtrip       | `match(buildPath(name, params)).params` equals the original params for all 4 encoding strategies (`default`, `uri`, `uriComponent`, `none`). Matching #1/#2 only test with default encoding. |
+| 2   | Encoding-aware roundtrip       | `match(buildPath(name, params)).params` equals the original params for all 4 encoding strategies (`default`, `uri`, `uriComponent`, `none`) **for values without `/` in a non-splat param**. Matching #1/#2 only test with default encoding. **Scope caveat (audit 1.5):** a `/` inside a non-splat param value only roundtrips under `default`/`uriComponent` (which percent-encode `/`→`%2F`); under `uri` (`encodeURI`) and `none` (identity) the `/` stays raw and becomes an extra path segment, so the single-param route no longer matches. Use a **splat** param (`*path`) for multi-segment values — Encoding #2/#3 cover splat roundtrip across all strategies. |
 
 ## Undefined-strip (Layered Contract)
 
@@ -61,8 +87,15 @@ Level 2 of the layered `undefined`-strip contract defined in [rfc-query-param-se
 
 ## Test Files
 
-| File                                           | Invariants | Category                                                                            |
-| ---------------------------------------------- | ---------- | ----------------------------------------------------------------------------------- |
-| `tests/property/encoding.properties.ts`        | 7          | URL parameter encoding/decoding                                                     |
-| `tests/property/matching.properties.ts`        | 21         | Segment Trie matching, path building, rejection, hash stripping, encoding roundtrip |
-| `tests/property/undefined-strip.properties.ts` | 4          | Undefined-strip layered contract (RFC 5.3 bis, level 2)                             |
+| File                                              | Category                                                                            |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `tests/property/encoding.properties.ts`           | URL parameter encoding/decoding                                                      |
+| `tests/property/matching.properties.ts`           | Segment Trie matching, path building, rejection, hash stripping, encoding roundtrip |
+| `tests/property/buildparammeta.properties.ts`     | `buildParamMeta` structural invariants (model-based)                                |
+| `tests/property/canonicalization.properties.ts`   | `build∘match` fixpoint (rewritePathOnMatch contract)                                 |
+| `tests/property/query-modes.properties.ts`        | strictQueryParams, queryParamsMode loose/default, query value roundtrip             |
+| `tests/property/match-semantics.properties.ts`    | strictTrailingSlash, constraint filtering, splat backtracking, never-throw matrix   |
+| `tests/property/decode-safety.properties.ts`      | `match()` never-throw on valid-hex/invalid-UTF-8 percent (#737)                      |
+| `tests/property/param-grammar.properties.ts`      | Unified param-name grammar + constraint-`?` no-leak (#738)                           |
+| `tests/property/param-name-conflict.properties.ts`| Param-name aliasing conflict detection (#736)                                       |
+| `tests/property/undefined-strip.properties.ts`    | Undefined-strip layered contract (RFC 5.3 bis, level 2)                             |
