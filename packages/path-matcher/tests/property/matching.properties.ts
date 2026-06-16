@@ -107,21 +107,11 @@ describe("Matching Properties", () => {
     );
   });
 
-  describe("priority — static route beats param route at same level", () => {
-    const matcher = createStaticParamPriorityMatcher();
-
-    test.prop([fc.constantFrom("new")], { numRuns: NUM_RUNS.fast })(
-      "/users/new matches the static route, not the param route",
-      (segment: string) => {
-        const result = matcher.match(`/users/${segment}`);
-
-        expect(result).toBeDefined();
-        expect(result!.segments.at(-1)!.fullName).toBe("users.new");
-        expect(result!.params).toStrictEqual({});
-      },
-    );
-  });
-
+  // NB: "static route beats param route" (the `/users/new` → `users.new`
+  // direction) is a single-value assertion, not a property — it lives as a unit
+  // (tests/unit/SegmentMatcher.test.ts, "static 'new' should win over param").
+  // The genuine property is the inverse below: ANY non-static value falls
+  // through to the param route.
   describe("param fallback for non-static values", () => {
     const matcher = createStaticParamPriorityMatcher();
 
@@ -154,17 +144,22 @@ describe("Matching Properties", () => {
   describe("constraint satisfaction — matched params satisfy constraint regex", () => {
     const matcher = createConstrainedMatcher();
 
-    test.prop([arbNumericParam], { numRuns: NUM_RUNS.standard })(
-      "params from a matched constrained route satisfy the constraint pattern",
-      (id: string) => {
-        const path = matcher.buildPath("users.profile", { id });
-        const result = matcher.match(path);
+    // Match a RAW path with an arbitrary (numeric OR non-numeric) segment. The
+    // invariant: *if* it matches the constrained route, the captured value
+    // satisfies the constraint. Feeding only numeric values (as before) made the
+    // assertion tautological — it passed even with constraint validation
+    // disabled, since the input was always numeric. A non-numeric value that
+    // matched would only happen if filtering were broken — which this catches.
+    test.prop([fc.oneof(arbNumericParam, arbNonNumericParam)], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "any value that matches the constrained route satisfies the constraint",
+      (seg: string) => {
+        const result = matcher.match(`/users/${seg}`);
 
-        expect(result).toBeDefined();
-
-        const paramId = String(result!.params.id);
-
-        expect(/^\d+$/.test(paramId)).toBe(true);
+        if (result?.segments.at(-1)!.fullName === "users.profile") {
+          expect(/^\d+$/.test(String(result.params.id))).toBe(true);
+        }
       },
     );
   });
@@ -283,16 +278,29 @@ describe("Matching Properties", () => {
   });
 
   describe("rejection — match returns undefined for paths with //", () => {
-    const matcher = createParamMatcher();
+    const paramMatcher = createParamMatcher();
+    // A splat route is the discriminating case: a splat captures the remainder,
+    // so without the `//` guard `/files/a//b` would wrongly capture `a//b`
+    // instead of being rejected. The param-route case alone passes via the
+    // trie's natural rejection of the empty segment, so it does not exercise
+    // the guard — the splat case does.
+    const splatMatcher = createSplatMatcher();
 
     test.prop([arbSafeParamValue, arbSafeParamValue], {
       numRuns: NUM_RUNS.standard,
     })(
-      "path containing // between segments is rejected",
+      "path containing // between segments is rejected (param route)",
       (seg1: string, seg2: string) => {
-        const path = `/${seg1}//${seg2}`;
+        expect(paramMatcher.match(`/${seg1}//${seg2}`)).toBeUndefined();
+      },
+    );
 
-        expect(matcher.match(path)).toBeUndefined();
+    test.prop([arbSafeParamValue, arbSafeParamValue], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "path containing // is rejected even for a splat route (not captured)",
+      (seg1: string, seg2: string) => {
+        expect(splatMatcher.match(`/files/${seg1}//${seg2}`)).toBeUndefined();
       },
     );
   });
@@ -317,6 +325,33 @@ describe("Matching Properties", () => {
           resultPlain!.segments.map((s) => s.fullName),
         );
         expect(resultWithHash!.params).toStrictEqual(resultPlain!.params);
+      },
+    );
+
+    // #842: the property above only builds a QUERY-LESS path (`/users/<id>`),
+    // so a fragment AFTER a query string was never generated — the bug (the
+    // fragment folded into the query value, `?ref=v#frag` → `ref="v#frag"`)
+    // survived the whole suite. This builds `path?ref=<v>` then appends
+    // `#<fragment>`: the fragment must be stripped before query parsing, so the
+    // result must equal the no-fragment match and recover `ref` intact.
+    test.prop([arbSafeParamValue, arbSafeParamValue, arbSafeParamValue], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "match(path + '?query#fragment') produces same result as match(path + '?query')",
+      (id: string, refValue: string, fragment: string) => {
+        const base = `${matcher.buildPath("users.profile", { id })}?ref=${refValue}`;
+
+        const resultPlain = matcher.match(base);
+        const resultWithHash = matcher.match(`${base}#${fragment}`);
+
+        expect(resultPlain).toBeDefined();
+        expect(resultWithHash).toBeDefined();
+
+        expect(resultWithHash!.segments.map((s) => s.fullName)).toStrictEqual(
+          resultPlain!.segments.map((s) => s.fullName),
+        );
+        expect(resultWithHash!.params).toStrictEqual(resultPlain!.params);
+        expect(resultWithHash!.params).toStrictEqual({ id, ref: refValue });
       },
     );
   });
@@ -371,6 +406,47 @@ describe("Matching Properties", () => {
         expect(result).toBeDefined();
         expect(result!.segments.at(-1)!.fullName).toBe("users.profile");
         expect(result!.params).toStrictEqual({ id });
+      },
+    );
+  });
+
+  // Audit 1.5: documents the actual per-strategy contract for a `/` inside a
+  // NON-splat param value (the previous generator excluded `/`, so this was
+  // untested). `default`/`uriComponent` percent-encode `/` → roundtrip holds;
+  // `uri` (encodeURI) and `none` (identity) leave `/` raw → it becomes an extra
+  // path segment and the single-param route no longer matches. For multi-segment
+  // values use a splat (`*path`), which encodes per segment.
+  describe("roundtrip — non-splat value containing '/' is strategy-dependent (1.5)", () => {
+    const arbValueWithSlash = fc
+      .array(fc.stringMatching(/^[a-zA-Z0-9]{1,6}$/), {
+        minLength: 2,
+        maxLength: 4,
+      })
+      .map((segments) => segments.join("/"));
+
+    test.prop([arbValueWithSlash], { numRuns: NUM_RUNS.standard })(
+      "default & uriComponent encode '/' and roundtrip",
+      (value) => {
+        for (const enc of ["default", "uriComponent"] as const) {
+          const matcher = createParamMatcher({ urlParamsEncoding: enc });
+          const path = matcher.buildPath("users.profile", { id: value });
+
+          expect(matcher.match(path)?.params).toStrictEqual({ id: value });
+        }
+      },
+    );
+
+    test.prop([arbValueWithSlash], { numRuns: NUM_RUNS.standard })(
+      "uri & none leave '/' raw → extra segment → no match (documented limit)",
+      (value) => {
+        for (const enc of ["uri", "none"] as const) {
+          const matcher = createParamMatcher({ urlParamsEncoding: enc });
+          const path = matcher.buildPath("users.profile", { id: value });
+
+          // The raw '/' splits the value across segments the 1-param route
+          // cannot absorb — use a splat param for multi-segment values.
+          expect(matcher.match(path)).toBeUndefined();
+        }
       },
     );
   });

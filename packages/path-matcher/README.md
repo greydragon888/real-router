@@ -46,9 +46,7 @@ matcher.getSegmentsByName("users"); // [usersNode]
 
 Extracts parameter metadata from a raw route path string: URL params, query params, splat params, constraint patterns.
 
-### `validateConstraints(params, constraintPatterns, path)`
-
-Validates parameter values against constraint regex patterns. Throws on mismatch.
+A parameter name may contain any character except `/`, `?`, `<` (the canonical `PARAM_NAME_PATTERN`). Constraint bodies (`<...>`) are masked before query detection, so a `?` inside a constraint — e.g. the lazy quantifier in `:id<\d?>` — is never mistaken for the query separator.
 
 ## Trie Structure
 

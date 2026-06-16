@@ -7,7 +7,6 @@
  * This file tests route-tree-specific concerns:
  * - 4. Lookup operations: hasRoute, getSegmentsByName, getMetaByName
  * - 5. registerTree startup cost
- * - 6. setRootPath scenarios
  * - 7. Pipeline depth scaling
  *
  * IMPORTANT: All operations are non-mutating after setup.
@@ -188,46 +187,6 @@ barplot(() => {
       const m = createMatcherFactory();
 
       m.registerTree(largeTree);
-    });
-  });
-});
-
-// =============================================================================
-// 6. setRootPath scenarios
-//    Used when router has a base path (e.g., "/app", "/v2").
-//    Tests that rootPath stripping doesn't add significant overhead.
-// =============================================================================
-
-barplot(() => {
-  summary(() => {
-    const matcherNoRoot = createMatcher(standardRoutes);
-
-    const matcherWithRoot = createMatcher(standardRoutes);
-
-    matcherWithRoot.setRootPath("/app");
-
-    bench("rootPath: match without rootPath", () => {
-      matcherNoRoot.match("/users/123/profile");
-    });
-
-    bench("rootPath: match with rootPath /app", () => {
-      matcherWithRoot.match("/app/users/123/profile");
-    });
-
-    bench("rootPath: pipeline without rootPath", () => {
-      const result = matcherNoRoot.match("/users/123/profile");
-
-      if (result) {
-        matcherNoRoot.buildPath("users.profile", result.params);
-      }
-    });
-
-    bench("rootPath: pipeline with rootPath /app", () => {
-      const result = matcherWithRoot.match("/app/users/123/profile");
-
-      if (result) {
-        matcherWithRoot.buildPath("users.profile", result.params);
-      }
     });
   });
 });

@@ -684,6 +684,8 @@ Bundle Size job (in `ci.yml`) compares bundle sizes between PR and base branch:
 
 **Sync rule:** when adding a new exemption, update **both** files (`scripts/osv-scanner.toml` + `.github/workflows/codeql.yml`) — they must stay aligned.
 
+**npm allowlist entries (vs the Rust/Tauri ones):** prefer a **bump** over an exemption — patch/minor bumps go in the affected `package.json`; transitive vulns whose dependency hard-pins the bad version get a `pnpm.overrides` security floor in the root `package.json` (the established pattern: `axios`/`qs`/`follow-redirects`/`node-forge`/`@babel/core`/`vite`/…). Only allowlist when **no in-range fix exists**. First such entry: `GHSA-h67p-54hq-rp68` (`js-yaml@3.14.2` special-char DoS) — fixed only in `js-yaml` 4.x, but it is pinned by `read-yaml-file@1.1.0` (`js-yaml@^3`, unmaintained) deep under `@changesets/cli`; a 4.x override breaks `read-yaml-file` (the v3 `safeLoad` API was removed in v4). Dev-tooling only, never parses untrusted YAML, not in any published `@real-router/*` package — so it is exempted rather than force-bumped. Unlike the RUSTSEC entries it carries a CVSS, so it must live in **both** files (CI Dependency Review would otherwise flag it).
+
 **Coverage difference vs CI Dependency Review:**
 - CI: only flags vulns introduced by the PR (delta vs base).
 - Local: full state of current lockfiles (catches pre-existing CVEs too).

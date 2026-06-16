@@ -306,6 +306,337 @@ describe("SegmentMatcher", () => {
   });
 
   // ===========================================================================
+  // registerTree — param-name conflict detection (#736)
+  // ===========================================================================
+  //
+  // A parametric/splat position in the trie is keyed by POSITION but its value
+  // is written under the NAME recorded on that position. Two routes sharing a
+  // position under DIFFERENT names is unrepresentable — first registration wins
+  // the name and the second route silently captures under the wrong key, which
+  // through core's rewritePathOnMatch becomes a hard start() crash. Registration
+  // must reject the ambiguity loudly instead of corrupting matches.
+
+  describe("registerTree — param-name conflict detection (#736)", () => {
+    /** Builds a root with two sibling top-level routes. */
+    function twoRouteRoot(
+      a: MatcherInputNode,
+      b: MatcherInputNode,
+    ): MatcherInputNode {
+      return createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([
+          [a.fullName, a],
+          [b.fullName, b],
+        ]),
+        nonAbsoluteChildren: [a, b],
+      });
+    }
+
+    it("throws when two routes share a param position under different names (issue repro)", () => {
+      const matcher = createTestMatcher();
+
+      const profile = createInputNode({
+        name: "profile",
+        path: "/profile",
+        fullName: "userP.profile",
+      });
+      const user = createInputNode({
+        name: "user",
+        path: "/user/:id",
+        fullName: "user",
+      });
+      const userP = createInputNode({
+        name: "userP",
+        path: "/user/:slug",
+        fullName: "userP",
+        children: new Map([["profile", profile]]),
+        nonAbsoluteChildren: [profile],
+      });
+
+      expect(() => {
+        matcher.registerTree(twoRouteRoot(user, userP));
+      }).toThrow(/Parameter name conflict/);
+    });
+
+    it("error names both conflicting params and the marker", () => {
+      const matcher = createTestMatcher();
+
+      const user = createInputNode({
+        name: "user",
+        path: "/user/:id",
+        fullName: "user",
+      });
+      const userP = createInputNode({
+        name: "userP",
+        path: "/user/:slug",
+        fullName: "userP",
+      });
+
+      expect(() => {
+        matcher.registerTree(twoRouteRoot(user, userP));
+      }).toThrow(/':id' and ':slug'/);
+    });
+
+    it("throws when two routes share a splat position under different names", () => {
+      const matcher = createTestMatcher();
+
+      const file = createInputNode({
+        name: "file",
+        path: "/files/*path",
+        fullName: "file",
+      });
+      const fileR = createInputNode({
+        name: "fileR",
+        path: "/files/*rest",
+        fullName: "fileR",
+      });
+
+      expect(() => {
+        matcher.registerTree(twoRouteRoot(file, fileR));
+      }).toThrow(/'\*path' and '\*rest'/);
+    });
+
+    it("throws when two routes share an optional-param position under different names", () => {
+      const matcher = createTestMatcher();
+
+      const search = createInputNode({
+        name: "search",
+        path: "/search/:q?",
+        fullName: "search",
+      });
+      const searchT = createInputNode({
+        name: "searchT",
+        path: "/search/:term?",
+        fullName: "searchT",
+      });
+
+      expect(() => {
+        matcher.registerTree(twoRouteRoot(search, searchT));
+      }).toThrow(/Parameter name conflict/);
+    });
+
+    it("throws for a conflict nested deep in the tree", () => {
+      const matcher = createTestMatcher();
+
+      const a = createInputNode({
+        name: "a",
+        path: "/shop/:cat/items/:id",
+        fullName: "a",
+      });
+      const b = createInputNode({
+        name: "b",
+        path: "/shop/:cat/items/:sku",
+        fullName: "b",
+      });
+
+      expect(() => {
+        matcher.registerTree(twoRouteRoot(a, b));
+      }).toThrow(/':id' and ':sku'/);
+    });
+
+    it("does NOT throw when both routes use the same param name", () => {
+      const matcher = createTestMatcher();
+
+      const profile = createInputNode({
+        name: "profile",
+        path: "/profile",
+        fullName: "userP.profile",
+      });
+      const user = createInputNode({
+        name: "user",
+        path: "/user/:id",
+        fullName: "user",
+      });
+      const userP = createInputNode({
+        name: "userP",
+        path: "/user/:id",
+        fullName: "userP",
+        children: new Map([["profile", profile]]),
+        nonAbsoluteChildren: [profile],
+      });
+
+      expect(() => {
+        matcher.registerTree(twoRouteRoot(user, userP));
+      }).not.toThrow();
+    });
+
+    it("does NOT throw when same-named splat positions are shared", () => {
+      const matcher = createTestMatcher();
+
+      const file = createInputNode({
+        name: "file",
+        path: "/files/*path",
+        fullName: "file",
+      });
+      const fileMeta = createInputNode({
+        name: "fileMeta",
+        path: "/files/*path",
+        fullName: "fileMeta",
+      });
+
+      expect(() => {
+        matcher.registerTree(twoRouteRoot(file, fileMeta));
+      }).not.toThrow();
+    });
+
+    it("does NOT treat a single route's consecutive optionals as a conflict", () => {
+      // Within ONE route, omitting `:b?` lets the next param occupy `:b?`'s
+      // slot — established positional-optional semantics, not a cross-route
+      // collision. The guard must stay silent here even though two differently
+      // named params (`b`, `c`) land on the same trie position.
+      const matcher = createTestMatcher();
+
+      const route = createInputNode({
+        name: "route",
+        path: "/a/:b?/:c?/d",
+        fullName: "route",
+      });
+
+      expect(() => {
+        matcher.registerTree(
+          createInputNode({
+            name: "",
+            path: "",
+            fullName: "",
+            children: new Map([["route", route]]),
+            nonAbsoluteChildren: [route],
+          }),
+        );
+      }).not.toThrow();
+    });
+
+    it("does NOT treat a single route's optional-then-required param as a conflict", () => {
+      const matcher = createTestMatcher();
+
+      const route = createInputNode({
+        name: "route",
+        path: "/a/:b?/:c/d",
+        fullName: "route",
+      });
+
+      expect(() => {
+        matcher.registerTree(
+          createInputNode({
+            name: "",
+            path: "",
+            fullName: "",
+            children: new Map([["route", route]]),
+            nonAbsoluteChildren: [route],
+          }),
+        );
+      }).not.toThrow();
+    });
+
+    it("does NOT throw for different names at DIFFERENT positions", () => {
+      const matcher = createTestMatcher();
+
+      const a = createInputNode({
+        name: "a",
+        path: "/a/:x",
+        fullName: "a",
+      });
+      const b = createInputNode({
+        name: "b",
+        path: "/b/:y",
+        fullName: "b",
+      });
+
+      expect(() => {
+        matcher.registerTree(twoRouteRoot(a, b));
+      }).not.toThrow();
+    });
+
+    it("captures params under the terminal route's name once the conflict is removed", () => {
+      const matcher = createTestMatcher();
+
+      // Same position, same name — the only valid shared-position config.
+      const profile = createInputNode({
+        name: "profile",
+        path: "/profile",
+        fullName: "userP.profile",
+      });
+      const user = createInputNode({
+        name: "user",
+        path: "/user/:id",
+        fullName: "user",
+      });
+      const userP = createInputNode({
+        name: "userP",
+        path: "/user/:id",
+        fullName: "userP",
+        children: new Map([["profile", profile]]),
+        nonAbsoluteChildren: [profile],
+      });
+
+      matcher.registerTree(twoRouteRoot(user, userP));
+
+      expect(matcher.match("/user/joe")?.params).toStrictEqual({ id: "joe" });
+      expect(matcher.match("/user/joe/profile")?.params).toStrictEqual({
+        id: "joe",
+      });
+    });
+  });
+
+  // ===========================================================================
+  // build↔match grammar agreement (#738)
+  // ===========================================================================
+  //
+  // The build-path grammar was narrower than the match-path grammar: match()
+  // recognized names/constraints that buildPath() then rejected with "Missing
+  // required param", crashing start() via rewritePathOnMatch. These lock the
+  // two grammars together.
+
+  describe("build↔match grammar agreement (#738)", () => {
+    function singleRouteMatcher(name: string, path: string): SegmentMatcher {
+      const matcher = createTestMatcher();
+      const route = createInputNode({ name, path, fullName: name });
+      const root = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([[name, route]]),
+        nonAbsoluteChildren: [route],
+      });
+
+      matcher.registerTree(root);
+
+      return matcher;
+    }
+
+    it.each([
+      ["/h/:my-param", "my-param"],
+      ["/h/:a.b", "a.b"],
+      ["/h/:user~id", "user~id"],
+    ])(
+      "round-trips a non-word-char param name in '%s' (match key === build key)",
+      (path, key) => {
+        const matcher = singleRouteMatcher("h", path);
+
+        expect(matcher.match("/h/v")?.params).toStrictEqual({ [key]: "v" });
+        expect(() => matcher.buildPath("h", { [key]: "v" })).not.toThrow();
+        expect(matcher.buildPath("h", { [key]: "v" })).toBe("/h/v");
+      },
+    );
+
+    it("does not crash building a route whose constraint contains a `?`", () => {
+      const matcher = singleRouteMatcher("a", String.raw`/a/:id<\d?>`);
+
+      // The lazy-quantifier `?` no longer destroys the slot/metadata.
+      expect(matcher.match("/a/5")?.params).toStrictEqual({ id: "5" });
+      expect(matcher.buildPath("a", { id: "5" })).toBe("/a/5");
+    });
+
+    it("enforces the constraint that survived query detection (#738)", () => {
+      const matcher = singleRouteMatcher("a", String.raw`/a/:id<\d?>`);
+
+      // \d? matches a single digit or empty — two digits must be rejected.
+      expect(matcher.match("/a/55")).toBeUndefined();
+    });
+  });
+
+  // ===========================================================================
   // Static Route Matching
   // ===========================================================================
 
@@ -433,6 +764,95 @@ describe("SegmentMatcher", () => {
 
       expect(result).toBeDefined();
       expect(result!.segments[0].fullName).toBe("about");
+    });
+
+    it("should strip a fragment that appears AFTER the query string (#842)", () => {
+      const matcher = createStaticMatcher();
+
+      const plain = matcher.match("/about?key=value");
+      const withHash = matcher.match("/about?key=value#section");
+
+      expect(withHash).toBeDefined();
+      // Without the fix, `key` would capture "value#section" (the fragment
+      // folded into the query value). Result must equal the no-fragment match.
+      expect(withHash!.params).toStrictEqual(plain!.params);
+      expect(withHash!.params).toStrictEqual({ key: "value" });
+    });
+
+    it("should treat a fragment right after the query separator as empty query (#842)", () => {
+      const matcher = createStaticMatcher();
+
+      const result = matcher.match("/about?#section");
+
+      expect(result).toBeDefined();
+      expect(result!.segments[0].fullName).toBe("about");
+      expect(result!.params).toStrictEqual({});
+    });
+
+    it("should strip a post-query fragment for a param route + declared query (#842)", () => {
+      const matcher = createTestMatcher();
+      const profileNode = createInputNode({
+        name: "profile",
+        path: "/:id?tab",
+        fullName: "users.profile",
+      });
+      const usersNode = createInputNode({
+        name: "users",
+        path: "/users",
+        fullName: "users",
+        children: new Map([["profile", profileNode]]),
+        nonAbsoluteChildren: [profileNode],
+      });
+
+      matcher.registerTree(
+        createInputNode({
+          name: "",
+          path: "",
+          fullName: "",
+          children: new Map([["users", usersNode]]),
+          nonAbsoluteChildren: [usersNode],
+        }),
+      );
+
+      const result = matcher.match("/users/v?tab=x#frag");
+
+      expect(result).toBeDefined();
+      // `tab` must be "x", not "x#frag".
+      expect(result!.params).toStrictEqual({ id: "v", tab: "x" });
+    });
+
+    it("should let a query key override a same-named path param (documented, #843)", () => {
+      const matcher = createTestMatcher();
+      const idNode = createInputNode({
+        name: "id",
+        path: "/:id",
+        fullName: "u.id",
+      });
+      const uNode = createInputNode({
+        name: "u",
+        path: "/u",
+        fullName: "u",
+        children: new Map([["id", idNode]]),
+        nonAbsoluteChildren: [idNode],
+      });
+
+      matcher.registerTree(
+        createInputNode({
+          name: "",
+          path: "",
+          fullName: "",
+          children: new Map([["u", uNode]]),
+          nonAbsoluteChildren: [uNode],
+        }),
+      );
+
+      // INVARIANTS Matching #25: query params merge into the same object as path
+      // params (query last), so a same-named query key overwrites the path value.
+      // `buildPath` never emits this shape — roundtrip is unaffected.
+      const result = matcher.match("/u/5?id=9");
+
+      expect(result).toBeDefined();
+      expect(result!.params).toStrictEqual({ id: "9" });
     });
 
     it("should return correct meta", () => {
@@ -697,14 +1117,6 @@ describe("SegmentMatcher", () => {
       );
     });
 
-    it("should prepend rootPath", () => {
-      const matcher = createStaticMatcher();
-
-      matcher.setRootPath("/app");
-
-      expect(matcher.buildPath("about")).toBe("/app/about");
-    });
-
     it("should build nested static path", () => {
       const matcher = createTestMatcher();
       const settingsNode = createInputNode({
@@ -879,41 +1291,6 @@ describe("SegmentMatcher", () => {
   });
 
   // ===========================================================================
-  // setRootPath
-  // ===========================================================================
-
-  describe("setRootPath", () => {
-    it("should accept root path string", () => {
-      const matcher = createTestMatcher();
-
-      expect(() => {
-        matcher.setRootPath("/app");
-      }).not.toThrow();
-    });
-
-    it("should affect buildPath output", () => {
-      const matcher = createTestMatcher();
-      const aboutNode = createInputNode({
-        name: "about",
-        path: "/about",
-        fullName: "about",
-      });
-      const rootNode = createInputNode({
-        name: "",
-        path: "",
-        fullName: "",
-        children: new Map([["about", aboutNode]]),
-        nonAbsoluteChildren: [aboutNode],
-      });
-
-      matcher.registerTree(rootNode);
-      matcher.setRootPath("/app");
-
-      expect(matcher.buildPath("about")).toBe("/app/about");
-    });
-  });
-
-  // ===========================================================================
   // hasRoute
   // ===========================================================================
 
@@ -1052,6 +1429,46 @@ describe("SegmentMatcher", () => {
       expect(matcher.match("/users/hello%")).toBeUndefined();
     });
 
+    // #737: syntactically valid `%XX` (hex digits) but semantically invalid
+    // UTF-8 — `validatePercentEncoding` passes, `decodeURIComponent` throws
+    // URIError. `match()` must return undefined, never throw.
+    it.each([
+      ["%E0%41", "lead byte of a 3-byte seq followed by a non-continuation"],
+      ["%C0%80", "overlong encoding of U+0000"],
+      ["%FF", "0xFF is never a valid UTF-8 byte"],
+      ["%ED%A0%80", "UTF-16 surrogate half (U+D800)"],
+      ["a%E0%41b", "invalid sequence embedded in otherwise valid text"],
+    ])(
+      "should return undefined for valid-hex/invalid-UTF-8 param '%s' (%s)",
+      (encoded) => {
+        const matcher = createParamMatcher();
+
+        expect(() => matcher.match(`/users/${encoded}`)).not.toThrow();
+        expect(matcher.match(`/users/${encoded}`)).toBeUndefined();
+      },
+    );
+
+    it("should still decode valid multi-byte UTF-8 after the URIError guard", () => {
+      const matcher = createParamMatcher();
+
+      // 中 = %E4%B8%AD — proves the try/catch only rejects truly invalid bytes.
+      const result = matcher.match("/users/%E4%B8%AD");
+
+      expect(result).toBeDefined();
+      expect(result!.params).toStrictEqual({ id: "中" });
+    });
+
+    it("should NOT reject valid-hex/invalid-UTF-8 when urlParamsEncoding is none", () => {
+      // With `none`, decoding is skipped entirely — the raw value passes through
+      // and the bytes are never interpreted, so there is nothing to throw.
+      const matcher = createParamMatcher({ urlParamsEncoding: "none" });
+
+      const result = matcher.match("/users/%E0%41");
+
+      expect(result).toBeDefined();
+      expect(result!.params).toStrictEqual({ id: "%E0%41" });
+    });
+
     it("should skip decoding when urlParamsEncoding is none", () => {
       const matcher = createParamMatcher({ urlParamsEncoding: "none" });
 
@@ -1128,6 +1545,59 @@ describe("SegmentMatcher", () => {
       expect(paramResult).toBeDefined();
       expect(paramResult!.segments[1].fullName).toBe("users.profile");
       expect(paramResult!.params).toStrictEqual({ id: "123" });
+    });
+
+    // #740 item 2: the trie is greedy — once a segment matches a static child it
+    // does NOT backtrack to a param sibling if the rest of the path fails. This
+    // is an intentional, documented limitation (INVARIANTS Matching #16).
+    it("does NOT backtrack from a static segment to a param sibling (#740)", () => {
+      const matcher = createTestMatcher();
+
+      const postsNode = createInputNode({
+        name: "posts",
+        path: "/posts",
+        fullName: "users.profile.posts",
+      });
+      const profileNode = createInputNode({
+        name: "profile",
+        path: "/:id",
+        fullName: "users.profile",
+        children: new Map([["posts", postsNode]]),
+        nonAbsoluteChildren: [postsNode],
+      });
+      const newNode = createInputNode({
+        name: "new",
+        path: "/new",
+        fullName: "users.new",
+      });
+      const usersNode = createInputNode({
+        name: "users",
+        path: "/users",
+        fullName: "users",
+        children: new Map([
+          ["new", newNode],
+          ["profile", profileNode],
+        ]),
+        nonAbsoluteChildren: [newNode, profileNode],
+      });
+
+      matcher.registerTree(
+        createInputNode({
+          name: "",
+          path: "",
+          fullName: "",
+          children: new Map([["users", usersNode]]),
+          nonAbsoluteChildren: [usersNode],
+        }),
+      );
+
+      // Commits to static "new", which has no "/posts" child, and does not
+      // retry ":id"="new" → "/posts".
+      expect(matcher.match("/users/new/posts")).toBeUndefined();
+      // A non-static value reaches the param subtree normally.
+      expect(matcher.match("/users/42/posts")?.segments.at(-1)?.fullName).toBe(
+        "users.profile.posts",
+      );
     });
 
     it("should return undefined when no param and no static match", () => {
@@ -1425,14 +1895,35 @@ describe("SegmentMatcher", () => {
       );
     });
 
-    it("should prepend rootPath to param path", () => {
+    // #740 item 3: an empty value for a required param silently collapsed the
+    // segment (`/users/` → matched the parent), so it is now rejected at build.
+    it("should throw for an empty-string required param (#740)", () => {
       const matcher = createParamBuildMatcher();
 
-      matcher.setRootPath("/app");
-
-      expect(matcher.buildPath("users.profile", { id: "123" })).toBe(
-        "/app/users/123",
+      expect(() => matcher.buildPath("users.profile", { id: "" })).toThrow(
+        "[SegmentMatcher.buildPath] Missing required param 'id' (empty string)",
       );
+    });
+
+    it("does NOT reject an empty-string value for an optional param (#740)", () => {
+      const matcher = createTestMatcher();
+      const search = createInputNode({
+        name: "search",
+        path: "/search/:q?",
+        fullName: "search",
+      });
+
+      matcher.registerTree(
+        createInputNode({
+          name: "",
+          path: "",
+          fullName: "",
+          children: new Map([["search", search]]),
+          nonAbsoluteChildren: [search],
+        }),
+      );
+
+      expect(() => matcher.buildPath("search", { q: "" })).not.toThrow();
     });
 
     it("should build path with multiple params", () => {
@@ -2646,6 +3137,13 @@ describe("SegmentMatcher", () => {
       expect(matcher.match("/files/bad%ZZpath")).toBeUndefined();
     });
 
+    it("should return undefined (not throw) for valid-hex/invalid-UTF-8 splat (#737)", () => {
+      const matcher = createSplatMatcher();
+
+      expect(() => matcher.match("/files/a/%E0%41")).not.toThrow();
+      expect(matcher.match("/files/a/%E0%41")).toBeUndefined();
+    });
+
     it("should handle case-insensitive static + splat", () => {
       const matcher = createTestMatcher({ caseSensitive: false });
 
@@ -2725,31 +3223,6 @@ describe("SegmentMatcher", () => {
 
       expect(matcher.buildPath("files", { path: "docs/readme.md" })).toBe(
         "/files/docs/readme.md",
-      );
-    });
-
-    it("should prepend rootPath to splat path", () => {
-      const matcher = createTestMatcher();
-
-      const filesNode = createInputNode({
-        name: "files",
-        path: "/files/*path",
-        fullName: "files",
-      });
-
-      const rootNode = createInputNode({
-        name: "",
-        path: "",
-        fullName: "",
-        children: new Map([["files", filesNode]]),
-        nonAbsoluteChildren: [filesNode],
-      });
-
-      matcher.registerTree(rootNode);
-      matcher.setRootPath("/app");
-
-      expect(matcher.buildPath("files", { path: "docs/readme.md" })).toBe(
-        "/app/files/docs/readme.md",
       );
     });
   });
@@ -3557,6 +4030,23 @@ describe("SegmentMatcher", () => {
       expect(result!.params).toStrictEqual({});
     });
 
+    // #737: the injected query parser decodes percent-encoding too, so a
+    // valid-hex/invalid-UTF-8 query value makes it throw URIError. match() must
+    // honor its never-throw contract — a malformed query → unmatched URL.
+    it("should return undefined (not throw) for valid-hex/invalid-UTF-8 query value (#737)", () => {
+      const matcher = createQueryMatcher();
+
+      expect(() => matcher.match("/search?query=%E0%41")).not.toThrow();
+      expect(matcher.match("/search?query=%E0%41")).toBeUndefined();
+    });
+
+    it("should return undefined for invalid-UTF-8 query value in strict mode too (#737)", () => {
+      const matcher = createQueryMatcher({ strictQueryParams: true });
+
+      expect(() => matcher.match("/search?query=%C0%80")).not.toThrow();
+      expect(matcher.match("/search?query=%C0%80")).toBeUndefined();
+    });
+
     it("should merge URL params with query params", () => {
       const matcher = createTestMatcher();
 
@@ -3873,149 +4363,6 @@ describe("SegmentMatcher", () => {
       matcher.registerTree(rootNode);
 
       expect(matcher.match("/USERS")).toBeUndefined();
-    });
-  });
-
-  // ===========================================================================
-  // setRootPath (match behavior)
-  // ===========================================================================
-
-  describe("match — setRootPath", () => {
-    function createRootPathMatcher(): SegmentMatcher {
-      const matcher = createTestMatcher();
-
-      const profileNode = createInputNode({
-        name: "profile",
-        path: "/:id",
-        fullName: "users.profile",
-      });
-
-      const usersNode = createInputNode({
-        name: "users",
-        path: "/users",
-        fullName: "users",
-        children: new Map([["profile", profileNode]]),
-        nonAbsoluteChildren: [profileNode],
-      });
-
-      const homeNode = createInputNode({
-        name: "home",
-        path: "/",
-        fullName: "home",
-      });
-
-      const rootNode = createInputNode({
-        name: "",
-        path: "",
-        fullName: "",
-        children: new Map([
-          ["home", homeNode],
-          ["users", usersNode],
-        ]),
-        nonAbsoluteChildren: [homeNode, usersNode],
-      });
-
-      matcher.registerTree(rootNode);
-
-      return matcher;
-    }
-
-    it("should strip rootPath prefix before matching", () => {
-      const matcher = createRootPathMatcher();
-
-      matcher.setRootPath("/app");
-
-      const result = matcher.match("/app/users/123");
-
-      expect(result).toBeDefined();
-      expect(result!.params).toStrictEqual({ id: "123" });
-      expect(result!.segments[1].fullName).toBe("users.profile");
-    });
-
-    it("should return undefined when path does not start with rootPath", () => {
-      const matcher = createRootPathMatcher();
-
-      matcher.setRootPath("/app");
-
-      expect(matcher.match("/users/123")).toBeUndefined();
-    });
-
-    it("should match root path with rootPath prefix", () => {
-      const matcher = createRootPathMatcher();
-
-      matcher.setRootPath("/app");
-
-      const result = matcher.match("/app/");
-
-      expect(result).toBeDefined();
-      expect(result!.segments[0].fullName).toBe("home");
-    });
-
-    it("should match root path when rootPath is the entire path", () => {
-      const matcher = createRootPathMatcher();
-
-      matcher.setRootPath("/app");
-
-      const result = matcher.match("/app");
-
-      expect(result).toBeDefined();
-      expect(result!.segments[0].fullName).toBe("home");
-    });
-
-    it("should prepend rootPath in buildPath", () => {
-      const matcher = createRootPathMatcher();
-
-      matcher.setRootPath("/app");
-
-      expect(matcher.buildPath("users.profile", { id: "123" })).toBe(
-        "/app/users/123",
-      );
-    });
-
-    it("should handle nested rootPath", () => {
-      const matcher = createRootPathMatcher();
-
-      matcher.setRootPath("/base/app");
-
-      const result = matcher.match("/base/app/users");
-
-      expect(result).toBeDefined();
-      expect(result!.segments[0].fullName).toBe("users");
-    });
-
-    it("should handle rootPath with query string", () => {
-      const matcher = createRootPathMatcher();
-
-      matcher.setRootPath("/app");
-
-      const result = matcher.match("/app/users?page=1");
-
-      expect(result).toBeDefined();
-      expect(result!.segments[0].fullName).toBe("users");
-      expect(result!.params).toStrictEqual({ page: "1" });
-    });
-
-    it("should not affect matching when rootPath is empty", () => {
-      const matcher = createRootPathMatcher();
-
-      const result = matcher.match("/users/123");
-
-      expect(result).toBeDefined();
-      expect(result!.params).toStrictEqual({ id: "123" });
-    });
-
-    it("should use cache keys that are post-strip", () => {
-      const matcher = createRootPathMatcher();
-
-      matcher.setRootPath("/app");
-
-      const result1 = matcher.match("/app/users");
-      const result2 = matcher.match("/app/users");
-
-      expect(result1).toBeDefined();
-      expect(result2).toBeDefined();
-      expect(result1!.segments[0].fullName).toBe("users");
-      expect(result2!.segments[0].fullName).toBe("users");
     });
   });
 

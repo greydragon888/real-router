@@ -1,3 +1,4 @@
+import { PARAM_NAME_PATTERN } from "./buildParamMeta";
 import { ENCODING_METHODS } from "./encoding";
 import {
   buildFullPath,
@@ -228,6 +229,82 @@ function isSlashChild(matchPath: string, parentPath: string): boolean {
 }
 
 // =============================================================================
+// Param-Name Conflict Detection
+// =============================================================================
+
+/**
+ * Guards against param-name aliasing in the segment trie (issue #736).
+ *
+ * A parametric (`:name`) or splat (`*name`) position in the trie is keyed by
+ * **position**, not by name — but the captured value is written under the name
+ * recorded on that position. When two *different* routes share a position under
+ * *different* names (e.g. `/user/:id` and `/user/:slug/profile`),
+ * first-registration wins the name, so the second route silently captures its
+ * value under the wrong key. Through `rewritePathOnMatch` that silent key-swap
+ * becomes a hard `start()` crash on a legitimate config — so we reject the
+ * ambiguity loudly at registration instead of corrupting matches.
+ *
+ * The conflict is strictly **cross-route**. A single route may legitimately land
+ * two differently-named params on the same trie position via the optional-omit
+ * branch — e.g. `/a/:b?/:c?/d` or `/a/:b?/:c/d`, where omitting `:b?` lets the
+ * next param occupy `:b?`'s slot. That intra-route aliasing is the established,
+ * tested semantics (first optional wins the slot), not a bug. We tell the two
+ * apart with `ownNodes`: the set of nodes whose param/splat child was *created
+ * during the current route's insertion*. A differing name on a node in that set
+ * is the same route revisiting its own slot (keep-first); on any other node it
+ * is a prior route's slot (throw).
+ */
+function throwParamNameConflict(
+  existingName: string,
+  newName: string,
+  marker: ":" | "*",
+): never {
+  throw new Error(
+    `[SegmentMatcher.registerTree] Parameter name conflict at the same path ` +
+      `position: '${marker}${existingName}' and '${marker}${newName}'. A ` +
+      `parametric URL segment binds to a single name across every route that ` +
+      `shares that position — the value cannot be captured under two names. ` +
+      `Rename one so both routes agree (e.g. use '${marker}${existingName}' in both).`,
+  );
+}
+
+/**
+ * Returns the param child of `node`, creating it on first use. A pre-existing
+ * child with a *different* name is a #736 conflict unless `node` is in
+ * `ownNodes` (the current route created this slot — the optional-omit branch).
+ */
+function ensureParamChild(
+  node: SegmentNode,
+  paramName: string,
+  ownNodes: Set<SegmentNode>,
+): SegmentNode {
+  if (!node.paramChild) {
+    node.paramChild = { node: createSegmentNode(), name: paramName };
+    ownNodes.add(node);
+  } else if (node.paramChild.name !== paramName && !ownNodes.has(node)) {
+    throwParamNameConflict(node.paramChild.name, paramName, ":");
+  }
+
+  return node.paramChild.node;
+}
+
+/** Splat counterpart of {@link ensureParamChild}. */
+function ensureSplatChild(
+  node: SegmentNode,
+  splatName: string,
+  ownNodes: Set<SegmentNode>,
+): SegmentNode {
+  if (!node.splatChild) {
+    node.splatChild = { node: createSegmentNode(), name: splatName };
+    ownNodes.add(node);
+  } else if (node.splatChild.name !== splatName && !ownNodes.has(node)) {
+    throwParamNameConflict(node.splatChild.name, splatName, "*");
+  }
+
+  return node.splatChild.node;
+}
+
+// =============================================================================
 // Trie Insertion
 // =============================================================================
 
@@ -244,7 +321,24 @@ function insertIntoTrie(
     return;
   }
 
-  insertIntoTrieFrom(state, state.root, normalized, 1, compiled);
+  // Nodes whose param/splat child is created during THIS route's insertion.
+  // Lets the conflict guard distinguish a route revisiting its own slot (the
+  // optional-omit branch) from a genuine cross-route collision (#736).
+  const ownNodes = new Set<SegmentNode>();
+
+  // Visited (node, start) pairs for THIS insertion — collapses the take/skip
+  // fan-out of consecutive optional params from O(2^N) to polynomial (#849).
+  const visited = new Map<SegmentNode, Set<number>>();
+
+  insertIntoTrieFrom(
+    state,
+    state.root,
+    normalized,
+    1,
+    compiled,
+    ownNodes,
+    visited,
+  );
 }
 
 function insertIntoTrieFrom(
@@ -253,7 +347,29 @@ function insertIntoTrieFrom(
   path: string,
   start: number,
   compiled: CompiledRoute,
+  ownNodes: Set<SegmentNode>,
+  visited: Map<SegmentNode, Set<number>>,
 ): void {
+  // #849: each optional param forks this function into a "take" and a "skip"
+  // branch, and those branches converge on the same (node, start) pairs across
+  // consecutive optionals — without memoization that is O(2^N) work for N
+  // optionals (the trie stays small; only the work explodes). Inserting from a
+  // given (node, start) is deterministic for a fixed (path, compiled), and the
+  // only side effects (ensureParamChild returning an existing child,
+  // `node.route ??=`/`=` with the same compiled) are idempotent, so a revisit is
+  // pure redundancy — record the entry and skip repeats. This collapses the
+  // fan-out to O(distinct (node, start) pairs).
+  let seenStarts = visited.get(node);
+
+  if (seenStarts === undefined) {
+    seenStarts = new Set<number>();
+    visited.set(node, seenStarts);
+  } else if (seenStarts.has(start)) {
+    return;
+  }
+
+  seenStarts.add(start);
+
   const length = path.length;
 
   while (start <= length) {
@@ -267,28 +383,38 @@ function insertIntoTrieFrom(
         .replaceAll(CONSTRAINT_PATTERN_RGX, "")
         .replace(/\?$/, "");
 
-      node.paramChild ??= { node: createSegmentNode(), name: paramName };
+      const paramChildNode = ensureParamChild(node, paramName, ownNodes);
 
       // Path with param: continue recursively from paramChild
       insertIntoTrieFrom(
         state,
-        node.paramChild.node,
+        paramChildNode,
         path,
         segmentEnd + 1,
         compiled,
+        ownNodes,
+        visited,
       );
 
       // Path without param: skip this segment and continue from node
       if (segmentEnd >= length) {
         node.route ??= compiled;
       } else {
-        insertIntoTrieFrom(state, node, path, segmentEnd + 1, compiled);
+        insertIntoTrieFrom(
+          state,
+          node,
+          path,
+          segmentEnd + 1,
+          compiled,
+          ownNodes,
+          visited,
+        );
       }
 
       return;
     }
 
-    node = processSegment(state, node, segment);
+    node = processSegment(state, node, segment, ownNodes);
     start = segmentEnd + 1;
   }
 
@@ -330,6 +456,11 @@ function walkTrieFrom(
   let start = 1;
   const length = normalized.length;
 
+  // Slash-child re-walks an already-inserted path of the same route family —
+  // names always match, so the conflict guard never fires; a throwaway set
+  // keeps the shared `processSegment` signature satisfied.
+  const ownNodes = new Set<SegmentNode>();
+
   while (start <= length) {
     const end = normalized.indexOf("/", start);
     const segmentEnd = end === -1 ? length : end;
@@ -342,7 +473,7 @@ function walkTrieFrom(
 
     const segment = normalized.slice(start, segmentEnd);
 
-    node = processSegment(state, node, segment);
+    node = processSegment(state, node, segment, ownNodes);
     start = segmentEnd + 1;
   }
 
@@ -357,14 +488,15 @@ function processSegment(
   state: RegistrationState,
   node: SegmentNode,
   segment: string,
+  ownNodes: Set<SegmentNode>,
 ): SegmentNode {
   if (segment.startsWith("*")) {
     const splatName = segment.slice(1);
+    const child = ensureSplatChild(node, splatName, ownNodes);
 
-    node.splatChild ??= { node: createSegmentNode(), name: splatName };
     node.hasChildren = true;
 
-    return node.splatChild.node;
+    return child;
   }
 
   if (segment.startsWith(":")) {
@@ -372,11 +504,11 @@ function processSegment(
       .slice(1)
       .replaceAll(CONSTRAINT_PATTERN_RGX, "")
       .replace(/\?$/, "");
+    const child = ensureParamChild(node, paramName, ownNodes);
 
-    node.paramChild ??= { node: createSegmentNode(), name: paramName };
     node.hasChildren = true;
 
-    return node.paramChild.node;
+    return child;
   }
 
   const key = state.options.caseSensitive ? segment : segment.toLowerCase();
@@ -421,8 +553,13 @@ function compileBuildParts(
   const parts: string[] = [];
   const slots: BuildParamSlot[] = [];
 
-  // eslint-disable-next-line sonarjs/single-char-in-character-classes -- character class is more readable than alternation
-  const paramRgx = /[:*]([\w]+)(?:<[^>]*>)?(\?)?/gu;
+  // Name class derives from the single source of truth in buildParamMeta so the
+  // build-path grammar matches the match-path grammar exactly (#738) — e.g.
+  // `:my-param` builds under the same name it matched under.
+  const paramRgx = new RegExp(
+    String.raw`[:*](${PARAM_NAME_PATTERN})(?:<[^>]*>)?(\?)?`,
+    "gu",
+  );
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
@@ -467,7 +604,7 @@ function collectDeclaredQueryParams(
 ): readonly string[] {
   const queryParams: string[] = [];
 
-  // Include query params declared on the root node (e.g., from setRootPath("?mode"))
+  // Include query params declared on the root node (e.g., a root path like "?mode")
   if (rootQueryParams.length > 0) {
     queryParams.push(...rootQueryParams);
   }

@@ -10,7 +10,6 @@
  * 6. Large registration
  * 7. Cache effectiveness
  * 8. Worst-case no-match
- * 9. rootPath impact on matching
  * 10. Splat backtracking scaling
  * 11. Mixed pattern priority (static vs param vs splat)
  * 12. buildPath scaling with constraints
@@ -312,42 +311,6 @@ lineplot(() => {
         do_not_optimize(matcher.match("/this-path-does-not-exist"));
       };
     }).args("count", [10, 100, 500, 1000]);
-  });
-});
-
-// =============================================================================
-// 9. rootPath impact on matching
-// =============================================================================
-
-barplot(() => {
-  summary(() => {
-    const routes = generateWideRoutes(100);
-
-    const matcherNoRoot = createMatcher(routes);
-
-    const tree = buildTree(routes);
-    const matcherShortRoot = createTestMatcher();
-
-    matcherShortRoot.registerTree(tree);
-    matcherShortRoot.setRootPath("/app");
-
-    const tree2 = buildTree(routes);
-    const matcherLongRoot = createTestMatcher();
-
-    matcherLongRoot.registerTree(tree2);
-    matcherLongRoot.setRootPath("/base/v2/app");
-
-    bench("stress: match without rootPath (100 routes)", () => {
-      do_not_optimize(matcherNoRoot.match("/route50"));
-    });
-
-    bench("stress: match with rootPath /app (100 routes)", () => {
-      do_not_optimize(matcherShortRoot.match("/app/route50"));
-    });
-
-    bench("stress: match with rootPath /base/v2/app (100 routes)", () => {
-      do_not_optimize(matcherLongRoot.match("/base/v2/app/route50"));
-    });
   });
 });
 

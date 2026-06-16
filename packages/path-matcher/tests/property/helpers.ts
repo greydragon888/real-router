@@ -314,12 +314,3 @@ export const arbNonNumericParam: fc.Arbitrary<string> =
 export const arbUnicodeString: fc.Arbitrary<string> = fc.string({
   maxLength: 30,
 });
-
-/**
- * String consisting only of characters in the "safe" charset for default encoding.
- * NEEDS_ENCODING_TEST = /[^\w!$'()*+,.:;|~-]/u — chars NOT in this set need encoding.
- * These chars are already in the safe set and should pass through unchanged.
- */
-export const arbSafeEncodingString: fc.Arbitrary<string> = fc.stringMatching(
-  /^[\w!$'()*+,.:;|~-]*$/,
-);

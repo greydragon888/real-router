@@ -14,6 +14,25 @@ import type {
 } from "./types";
 
 // =============================================================================
+// Helpers
+// =============================================================================
+
+/** Coerces a route param value (typed `unknown`, contractually primitive) to
+ *  the string the encoder receives. Objects are JSON-stringified. */
+function stringifyParamValue(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (typeof value === "object") {
+    return JSON.stringify(value);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-base-to-string -- route params are typed `unknown` but contractually primitive
+  return String(value);
+}
+
+// =============================================================================
 // SegmentMatcher Class
 // =============================================================================
 
@@ -40,7 +59,6 @@ export class SegmentMatcher {
     queryString: undefined as string | undefined,
   };
 
-  #rootPath = "";
   #rootQueryParams: readonly string[] = [];
   #scanTruncated = "";
 
@@ -175,10 +193,6 @@ export class SegmentMatcher {
     return this.#routesByName.has(name);
   }
 
-  setRootPath(rootPath: string): void {
-    this.#rootPath = rootPath;
-  }
-
   #validateBuildConstraints(
     route: CompiledRoute,
     name: string,
@@ -209,10 +223,10 @@ export class SegmentMatcher {
     const slots = route.buildParamSlots;
 
     if (slots.length === 0) {
-      return this.#rootPath + parts[0];
+      return parts[0];
     }
 
-    let result = this.#rootPath + parts[0];
+    let result = parts[0];
 
     for (const [i, slot] of slots.entries()) {
       const value = params?.[slot.paramName];
@@ -233,19 +247,17 @@ export class SegmentMatcher {
         continue;
       }
 
-      // M2: fast-path for string values (most common case)
-      let stringValue: string;
-
-      if (typeof value === "string") {
-        stringValue = value;
-      } else if (typeof value === "object") {
-        stringValue = JSON.stringify(value);
-      } else {
-        // eslint-disable-next-line @typescript-eslint/no-base-to-string -- route params are typed `unknown` but contractually primitive
-        stringValue = String(value);
+      // #740 item 3: an empty value for a REQUIRED param would collapse the
+      // segment, silently producing a path that matches the parent route
+      // (`buildPath("u.p", {id:""})` → `/users/` → matches `u`). Reject it like
+      // a missing param. Optional params keep their existing behavior.
+      if (value === "" && !slot.isOptional) {
+        throw new Error(
+          `[SegmentMatcher.buildPath] Missing required param '${slot.paramName}' (empty string)`,
+        );
       }
 
-      const encoded = slot.encoder(stringValue);
+      const encoded = slot.encoder(stringifyParamValue(value));
 
       result += encoded + parts[i + 1];
     }
@@ -322,16 +334,6 @@ export class SegmentMatcher {
       return false;
     }
 
-    const rootLength = this.#rootPath.length;
-
-    if (rootLength > 0) {
-      if (path.length < rootLength || !path.startsWith(this.#rootPath)) {
-        return false;
-      }
-
-      path = path.length === rootLength ? "/" : path.slice(rootLength);
-    }
-
     const qIdx = this.#scanPath(path);
 
     if (qIdx === -2) {
@@ -343,7 +345,23 @@ export class SegmentMatcher {
     }
 
     const pathPart = qIdx >= 0 ? path.slice(0, qIdx) : path;
-    const queryString = qIdx >= 0 ? path.slice(qIdx + 1) : undefined;
+    let queryString = qIdx >= 0 ? path.slice(qIdx + 1) : undefined;
+
+    // #842: a fragment (`#…`) AFTER the query separator is not seen by
+    // #scanPath (it returns at the first `?`), so it would otherwise be folded
+    // into the query string and parsed into a param value (e.g. `?a=1#frag` →
+    // `a="1#frag"`). A fragment is everything after the first `#` in the whole
+    // URL and must be stripped before query parsing — a native indexOf on the
+    // (short) query substring, only when a query exists, is ~free (a `#` BEFORE
+    // the `?` is already handled by #scanPath via the -3 truncation branch).
+    if (queryString !== undefined) {
+      const hashIdx = queryString.indexOf("#");
+
+      if (hashIdx !== -1) {
+        queryString = queryString.slice(0, hashIdx);
+      }
+    }
+
     const normalized = normalizeTrailingSlash(pathPart);
 
     this.#prepared.cleanPath = pathPart;
@@ -394,24 +412,11 @@ export class SegmentMatcher {
     params: Record<string, unknown>,
     queryString: string | undefined,
   ): MatchResult | undefined {
-    if (queryString !== undefined) {
-      const queryParams = this.#options.parseQueryString(queryString);
-
-      if (this.#options.strictQueryParams) {
-        const declared = route.declaredQueryParamsSet;
-
-        for (const key in queryParams) {
-          if (!declared.has(key)) {
-            return undefined;
-          }
-
-          params[key] = queryParams[key];
-        }
-      } else {
-        for (const key in queryParams) {
-          params[key] = queryParams[key];
-        }
-      }
+    if (
+      queryString !== undefined &&
+      !this.#mergeQueryParams(route, params, queryString)
+    ) {
+      return undefined;
     }
 
     return {
@@ -419,6 +424,53 @@ export class SegmentMatcher {
       params,
       meta: route.meta,
     };
+  }
+
+  // Parses the query string and folds it into `params`. Returns false (→ match
+  // yields undefined) when the URL is unmatchable: the injected parser threw, or
+  // strict mode saw an undeclared key.
+  //
+  // Precedence (#843, INVARIANTS Matching #25): query params are merged into the
+  // SAME object that already holds the path params, so a query key equal to a
+  // path-param name OVERWRITES the path value (`match("/u/5?id=9")` → `{id:"9"}`).
+  // Intentional and documented: `buildPath` never emits a path param as a query
+  // key, so the build→match roundtrip is unaffected; the collision only arises
+  // for hand-crafted/adversarial URLs where a query shadows a path segment.
+  #mergeQueryParams(
+    route: CompiledRoute,
+    params: Record<string, unknown>,
+    queryString: string,
+  ): boolean {
+    let queryParams: Record<string, unknown>;
+
+    try {
+      queryParams = this.#options.parseQueryString(queryString);
+    } catch {
+      // The injected query parser decodes percent-encoding too, so the same
+      // valid-hex/invalid-UTF-8 sequence that breaks path params (e.g.
+      // `?x=%E0%41`) makes it throw a URIError. `match()` must never throw —
+      // treat the whole URL as unmatched so the router resolves to
+      // UNKNOWN_ROUTE instead of crashing on start() (#737).
+      return false;
+    }
+
+    if (this.#options.strictQueryParams) {
+      const declared = route.declaredQueryParamsSet;
+
+      for (const key in queryParams) {
+        if (!declared.has(key)) {
+          return false;
+        }
+
+        params[key] = queryParams[key];
+      }
+    } else {
+      for (const key in queryParams) {
+        params[key] = queryParams[key];
+      }
+    }
+
+    return true;
   }
 
   #checkTrailingSlash(cleanPath: string, route: CompiledRoute): boolean {
@@ -522,7 +574,16 @@ export class SegmentMatcher {
         return false;
       }
 
-      params[key] = decode(value);
+      try {
+        params[key] = decode(value);
+      } catch {
+        // `validatePercentEncoding` only checks `%XX` *syntax*. A sequence that
+        // is syntactically valid but semantically invalid UTF-8 (e.g. `%E0%41`,
+        // `%C0%80`, `%FF`) still makes `decodeURIComponent`/`decodeURI` throw a
+        // URIError. `match()` must never throw — reject the path so the router
+        // resolves to UNKNOWN_ROUTE instead of crashing on start() (#737).
+        return false;
+      }
     }
 
     return true;
