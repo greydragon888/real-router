@@ -89,8 +89,10 @@ describe("S1: build/match round-trip holds across thousands of non-word names", 
       );
     }
 
-    // Generous ceiling — guards against a quadratic regression in per-route
-    // RegExp construction, not micro-timing.
+    // Catastrophe-guard (healthy ~20 ms, ≈100× margin): catches a severe
+    // super-linear blowup in per-route RegExp construction, not a mild O(n²)
+    // (under this ceiling at 5k). The build/match round-trip sampled above is
+    // the precise #738 guard.
     expect(registerMs).toBeLessThan(2000);
   });
 });

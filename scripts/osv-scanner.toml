@@ -76,3 +76,10 @@ reason = "Transitive via Tauri 2.x, desktop examples only."
 [[IgnoredVulns]]
 id = "RUSTSEC-2025-0100"  # unic-ucd-ident unmaintained
 reason = "Transitive via Tauri 2.x, desktop examples only."
+
+# npm advisory without an in-range fix (fixed only in a major bump that an
+# unmaintained intermediary cannot take).
+
+[[IgnoredVulns]]
+id = "GHSA-h67p-54hq-rp68"  # js-yaml@3.14.2 special-char DoS
+reason = "Transitive dev-tool dep: @changesets/cli -> @manypkg/get-packages -> read-yaml-file@1.1.0, pinned to js-yaml@^3 (unmaintained). Fixed only in js-yaml 4.x, which read-yaml-file cannot consume; no 3.x patch exists. Dev-only, never parses untrusted YAML, not in any published @real-router/* package."

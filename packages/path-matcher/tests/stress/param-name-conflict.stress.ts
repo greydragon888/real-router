@@ -102,8 +102,10 @@ describe("S1: wide shared-param tree — no aliasing across thousands of routes"
     // The shallow route at the shared position also captures under 'id'.
     expect(matcher.match("/u/solo")?.params).toStrictEqual({ id: "solo" });
 
-    // Generous ceiling — registration of 5k routes is sub-second; this only
-    // guards against an accidental quadratic regression in the name check.
+    // Catastrophe-guard (healthy ~20 ms, ≈90× margin): catches a severe /
+    // super-linear registration blowup (e.g. a reintroduced exponential), not a
+    // mild O(n²) — which at 5k sits under this ceiling. The no-aliasing
+    // correctness sampled above is the precise #736 guard.
     expect(registerMs).toBeLessThan(2000);
   });
 });
@@ -216,6 +218,9 @@ describe("S3: conflict detection survives a large tree", () => {
 
     const elapsedMs = performance.now() - start;
 
+    // The throw + message is the precise guard (mutation-validated: disabling
+    // the #736 check makes `caught` undefined). The timing is a catastrophe-guard
+    // that detection stays cheap at scale, not a micro-timing assert.
     expect(caught).toBeDefined();
     expect(caught?.message).toMatch(/Parameter name conflict/);
     expect(caught?.message).toMatch(/':id' and ':slug'/);

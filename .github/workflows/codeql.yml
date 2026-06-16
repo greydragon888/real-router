@@ -69,4 +69,8 @@ jobs:
           #   in 0.20.0). Transitive via Tauri 2 → GTK/WebKit bindings on Linux
           #   only, pulled by the desktop example apps under
           #   examples/desktop/tauri/*/src-tauri/. Not in any published package.
-          allow-ghsas: GHSA-wrw7-89jp-8q8g
+          # GHSA-h67p-54hq-rp68 — js-yaml@3.14.2 (special-char DoS, fixed only in
+          #   4.x). Transitive dev-tool dep: @changesets/cli →
+          #   @manypkg/get-packages → read-yaml-file@1.1.0 (pinned to js-yaml@^3,
+          #   unmaintained). No 3.x patch exists; never parses untrusted YAML.
+          allow-ghsas: GHSA-wrw7-89jp-8q8g, GHSA-h67p-54hq-rp68
