@@ -22,6 +22,18 @@ describe("encodeURIComponentExcludingSubDelims", () => {
     expect(encodeURIComponentExcludingSubDelims("a+b:c,d")).toBe("a+b:c,d");
   });
 
+  // The full default-mode passthrough contract, asserted against a hand-written
+  // literal (independent oracle — NOT derived from the encoder's own
+  // NEEDS_ENCODING regex). Every char here is RFC 3986 unreserved
+  // (`A-Za-z0-9-._~`) or a sub-delimiter the "default" mode intentionally
+  // preserves (`!$'()*+,:;|`). Several of them (`$+,:;|`) ARE escaped by raw
+  // `encodeURIComponent`, so this would fail if any dropped out of the safe set.
+  it("should leave the entire unreserved + preserved-subdelim set unchanged", () => {
+    const preserved = "azAZ09_-.~!$'()*+,:;|";
+
+    expect(encodeURIComponentExcludingSubDelims(preserved)).toBe(preserved);
+  });
+
   it("should encode unicode characters", () => {
     expect(encodeURIComponentExcludingSubDelims("日本")).toBe(
       "%E6%97%A5%E6%9C%AC",

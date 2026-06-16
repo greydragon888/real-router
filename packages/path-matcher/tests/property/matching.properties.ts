@@ -107,21 +107,11 @@ describe("Matching Properties", () => {
     );
   });
 
-  describe("priority — static route beats param route at same level", () => {
-    const matcher = createStaticParamPriorityMatcher();
-
-    test.prop([fc.constantFrom("new")], { numRuns: NUM_RUNS.fast })(
-      "/users/new matches the static route, not the param route",
-      (segment: string) => {
-        const result = matcher.match(`/users/${segment}`);
-
-        expect(result).toBeDefined();
-        expect(result!.segments.at(-1)!.fullName).toBe("users.new");
-        expect(result!.params).toStrictEqual({});
-      },
-    );
-  });
-
+  // NB: "static route beats param route" (the `/users/new` → `users.new`
+  // direction) is a single-value assertion, not a property — it lives as a unit
+  // (tests/unit/SegmentMatcher.test.ts, "static 'new' should win over param").
+  // The genuine property is the inverse below: ANY non-static value falls
+  // through to the param route.
   describe("param fallback for non-static values", () => {
     const matcher = createStaticParamPriorityMatcher();
 
