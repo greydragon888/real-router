@@ -326,7 +326,19 @@ function insertIntoTrie(
   // optional-omit branch) from a genuine cross-route collision (#736).
   const ownNodes = new Set<SegmentNode>();
 
-  insertIntoTrieFrom(state, state.root, normalized, 1, compiled, ownNodes);
+  // Visited (node, start) pairs for THIS insertion — collapses the take/skip
+  // fan-out of consecutive optional params from O(2^N) to polynomial (#849).
+  const visited = new Map<SegmentNode, Set<number>>();
+
+  insertIntoTrieFrom(
+    state,
+    state.root,
+    normalized,
+    1,
+    compiled,
+    ownNodes,
+    visited,
+  );
 }
 
 function insertIntoTrieFrom(
@@ -336,7 +348,28 @@ function insertIntoTrieFrom(
   start: number,
   compiled: CompiledRoute,
   ownNodes: Set<SegmentNode>,
+  visited: Map<SegmentNode, Set<number>>,
 ): void {
+  // #849: each optional param forks this function into a "take" and a "skip"
+  // branch, and those branches converge on the same (node, start) pairs across
+  // consecutive optionals — without memoization that is O(2^N) work for N
+  // optionals (the trie stays small; only the work explodes). Inserting from a
+  // given (node, start) is deterministic for a fixed (path, compiled), and the
+  // only side effects (ensureParamChild returning an existing child,
+  // `node.route ??=`/`=` with the same compiled) are idempotent, so a revisit is
+  // pure redundancy — record the entry and skip repeats. This collapses the
+  // fan-out to O(distinct (node, start) pairs).
+  let seenStarts = visited.get(node);
+
+  if (seenStarts === undefined) {
+    seenStarts = new Set<number>();
+    visited.set(node, seenStarts);
+  } else if (seenStarts.has(start)) {
+    return;
+  }
+
+  seenStarts.add(start);
+
   const length = path.length;
 
   while (start <= length) {
@@ -360,6 +393,7 @@ function insertIntoTrieFrom(
         segmentEnd + 1,
         compiled,
         ownNodes,
+        visited,
       );
 
       // Path without param: skip this segment and continue from node
@@ -373,6 +407,7 @@ function insertIntoTrieFrom(
           segmentEnd + 1,
           compiled,
           ownNodes,
+          visited,
         );
       }
 
