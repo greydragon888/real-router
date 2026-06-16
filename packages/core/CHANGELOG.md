@@ -1,5 +1,172 @@
 # @real-router/core
 
+## 0.57.0
+
+### Minor Changes
+
+- [#832](https://github.com/greydragon888/real-router/pull/832) [`e6b8340`](https://github.com/greydragon888/real-router/commit/e6b83400a0ced7245ad33adf7be9e9b29b818f16) Thanks [@greydragon888](https://github.com/greydragon888)! - Reject an empty required param value at build time ([#740](https://github.com/greydragon888/real-router/issues/740))
+
+  `buildPath` treated `""` for a **required** param as a valid value and produced a
+  collapsed segment that silently matched the parent route:
+
+  ```js
+  buildPath("users.profile", { id: "" }); // → "/users/" (matched parent "users", not "users.profile")
+  ```
+
+  It now throws, the same way a missing (`undefined`/`null`) required param does:
+
+  ```
+  [SegmentMatcher.buildPath] Missing required param 'id' (empty string)
+  ```
+
+  **Breaking (pre-1.0 → minor):** code that relied on the previous silent
+  collapse must pass a non-empty value (or use a splat/optional param). Optional
+  params are unaffected. Part of the foundation-audit path-matcher hardening
+  cluster ([#740](https://github.com/greydragon888/real-router/issues/740)).
+
+- [#832](https://github.com/greydragon888/real-router/pull/832) [`e6b8340`](https://github.com/greydragon888/real-router/commit/e6b83400a0ced7245ad33adf7be9e9b29b818f16) Thanks [@greydragon888](https://github.com/greydragon888)! - Reject param-name aliasing at registration instead of corrupting matches ([#736](https://github.com/greydragon888/real-router/issues/736))
+
+  **Breaking Change (pre-1.0):** Two routes that share a parametric (`:name`) or splat (`*name`) **position** in the URL trie under **different** names are now rejected at registration with a clear error, instead of silently capturing the parameter under the first-registered route's name.
+
+  Previously a config like:
+
+  ```js
+  createRouter([
+    { name: "user", path: "/user/:id" },
+    {
+      name: "userP",
+      path: "/user/:slug",
+      children: [{ name: "profile", path: "/profile" }],
+    },
+  ]);
+  ```
+
+  would compile, then crash on `start("/user/joe/profile")` with a misleading `Missing required param 'slug'` — because the shared `/user/:…` position bound the value under `id` (first registration wins), and `rewritePathOnMatch` then rebuilt the path under `slug`.
+
+  Now this throws immediately at `createRouter()` / route registration:
+
+  ```
+  [SegmentMatcher.registerTree] Parameter name conflict at the same path position:
+  ':id' and ':slug'. A parametric URL segment binds to a single name across every
+  route that shares that position …
+  ```
+
+  **Migration:** use one agreed name for the shared position (e.g. `:id` in both routes). A single route's own consecutive optional params (`/a/:b?/:c?/d`) are unaffected — only cross-route collisions are rejected.
+
+### Patch Changes
+
+- [#832](https://github.com/greydragon888/real-router/pull/832) [`e6b8340`](https://github.com/greydragon888/real-router/commit/e6b83400a0ced7245ad33adf7be9e9b29b818f16) Thanks [@greydragon888](https://github.com/greydragon888)! - Unify build-path and match-path param grammars ([#738](https://github.com/greydragon888/real-router/issues/738))
+
+  The build-path param grammar was narrower than the match-path grammar, so
+  `matchPath` accepted patterns/names that `buildPath` then rejected with
+  `Missing required param` — crashing `router.start()` on valid configs via
+  `rewritePathOnMatch`. Two mechanisms, one root cause (no single source of truth
+  for "what a parameter is / how it is named"):
+
+  ```js
+  // (a) lazy quantifier '?' inside a constraint
+  await createRouter([{ name: "a", path: "/a/:id<\\d?>" }]).start("/a/5");
+  // before: throws "Missing required param 'id'"  →  now: matches, id="5"
+
+  // (b) hyphen (or '.', '~', …) in a param name
+  await createRouter([{ name: "h", path: "/h/:my-param" }]).start("/h/v");
+  // before: throws "Missing required param 'my'"  →  now: matches, "my-param"="v"
+  ```
+
+  - **(a)** `buildParamMeta` now detects the query separator on a length-preserving
+    mask that neutralizes `?` inside `<...>` constraints (and the optional-param
+    marker), so a constraint's lazy quantifier no longer truncates `pathPattern`
+    or drops the constraint.
+  - **(b)** The build-path name class is derived from a single `PARAM_NAME_PATTERN`
+    shared with the match-path grammar, so a name that matches always builds under
+    the same key. The canonical param-name set is now any char except `/`, `?`,
+    `<` (not just `\w`).
+
+  Non-breaking: existing `\w` names and constraints are unaffected; only
+  previously-crashing configs now work.
+
+- [#832](https://github.com/greydragon888/real-router/pull/832) [`e6b8340`](https://github.com/greydragon888/real-router/commit/e6b83400a0ced7245ad33adf7be9e9b29b818f16) Thanks [@greydragon888](https://github.com/greydragon888)! - Stop `start()` crashing on valid-hex/invalid-UTF-8 percent sequences ([#737](https://github.com/greydragon888/real-router/issues/737))
+
+  `SegmentMatcher.match()` threw a `URIError` on a percent sequence that is
+  syntactically valid (`%XX` with hex digits) but semantically invalid UTF-8
+  (e.g. `%E0%41`, `%C0%80`, `%FF`). `validatePercentEncoding` only checks `%XX`
+  syntax, so `decodeURIComponent` later threw — and through core, `router.start()`
+  crashed and left the router inactive instead of resolving the unmatched URL.
+
+  ```js
+  const r = createRouter([
+    { name: "users", path: "/users", children: [{ name: "p", path: "/:id" }] },
+  ]);
+  await r.start("/users/%E0%41"); // before: throws URIError; after: ROUTE_NOT_FOUND / UNKNOWN_ROUTE
+  ```
+
+  `match()` now honors its never-throw contract: a `URIError` during param
+  decoding (`#decodeParams`) or query parsing (`#buildResult`) makes `match()`
+  return `undefined`, so the router resolves to `UNKNOWN_ROUTE` (with
+  `allowNotFound`) or rejects with the normal `ROUTE_NOT_FOUND` instead of
+  crashing. The query path (`?x=%E0%41`) had the same gap via the injected
+  parser and is fixed too. Behavior is unchanged for all valid URLs.
+
+- [#832](https://github.com/greydragon888/real-router/pull/832) [`e6b8340`](https://github.com/greydragon888/real-router/commit/e6b83400a0ced7245ad33adf7be9e9b29b818f16) Thanks [@greydragon888](https://github.com/greydragon888)! - Parse an optional param immediately followed by a query string ([#741](https://github.com/greydragon888/real-router/issues/741))
+
+  `buildParamMeta` mis-parsed a route whose optional param marker is directly
+  followed by a query — e.g. `/users/:id??tab` (`:id?` optional + `?tab` query).
+  The optional `?` was taken as the query separator, yielding `queryParams: ["?tab"]`
+  (a spurious `?`) and a `pathPattern` that lost the optional marker, so the route
+  registered and matched incorrectly.
+
+  The optional-marker regex now treats a following query `?` as a valid marker
+  boundary, so `/users/:id??tab` parses as optional param `id` + query param `tab`.
+  Same class as [#738](https://github.com/greydragon888/real-router/issues/738) (marker-vs-query-separator); surfaced by a new model-based
+  property suite for `buildParamMeta`.
+
+- [#832](https://github.com/greydragon888/real-router/pull/832) [`e6b8340`](https://github.com/greydragon888/real-router/commit/e6b83400a0ced7245ad33adf7be9e9b29b818f16) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix O(2^N) trie registration for consecutive optional params ([#849](https://github.com/greydragon888/real-router/issues/849))
+
+  Registering a route with N consecutive optional params (e.g.
+  `/x/:a?/:b?/.../:z?`) took exponential time: every optional forked the trie
+  insertion into a take-the-param and a skip-the-param branch, and those branches
+  re-explored the same `(node, position)` pairs without memoization (N=22 ≈ 475 ms,
+  doubling per added optional). The resulting trie was small — only the work blew
+  up — so a pathological route config could hang router startup.
+
+  `insertIntoTrieFrom` now records visited `(node, start)` pairs per insertion and
+  skips repeats. Inserting from a given `(node, start)` is deterministic and its
+  side effects are idempotent, so this is behavior-preserving (same trie, same
+  matches) and collapses the fan-out to polynomial — N=40 now registers in well
+  under a millisecond. A stress guard locks the sub-second ceiling.
+
+- [#832](https://github.com/greydragon888/real-router/pull/832) [`e6b8340`](https://github.com/greydragon888/real-router/commit/e6b83400a0ced7245ad33adf7be9e9b29b818f16) Thanks [@greydragon888](https://github.com/greydragon888)! - Strip a URL fragment that appears after a query string ([#842](https://github.com/greydragon888/real-router/issues/842))
+
+  `SegmentMatcher.match()` did not strip a fragment (`#…`) when it followed a
+  query string: the single-pass scanner returns at the first `?`, so a later `#`
+  was folded into the query string and parsed into a param value — e.g.
+  `/users/v?ref=1#section` captured `ref: "1#section"` instead of `ref: "1"`,
+  corrupting both declared and undeclared query params (reachable via
+  `router.start(url)`). This violated the documented hash-stripping contract
+  (INVARIANTS Path Rejection [#3](https://github.com/greydragon888/real-router/issues/3)).
+
+  `#preparePath` now strips the fragment from the query substring with a native
+  `indexOf("#")` (only when a query exists, ~free), so a fragment is removed
+  before query parsing regardless of whether it follows the path or a query.
+  The hash-stripping property test previously only built query-less paths, so the
+  bug survived the whole suite; a `path?query#fragment` property + unit tests were
+  added.
+
+- [#832](https://github.com/greydragon888/real-router/pull/832) [`e6b8340`](https://github.com/greydragon888/real-router/commit/e6b83400a0ced7245ad33adf7be9e9b29b818f16) Thanks [@greydragon888](https://github.com/greydragon888)! - Match rootPath only at a segment boundary ([#740](https://github.com/greydragon888/real-router/issues/740))
+
+  With a configured `rootPath`, `SegmentMatcher.match()` stripped the prefix with a
+  bare `startsWith` and no boundary check, then lost the leading `/` of the
+  remainder. A path that merely shared the prefix string mis-routed: under root
+  `/app`, `/apple` matched the route `/e` (the `l` was silently eaten as a phantom
+  leading slash).
+
+  `match()` now accepts a rooted path only when it equals the root or continues it
+  at a `/` segment boundary, and the stripped remainder always keeps its leading
+  `/` — for roots declared with or without a trailing slash. Prefix-only paths
+  (`/apple` under `/app`) now correctly return `undefined`.
+
+  Closes the rootPath mis-routing item of the foundation-audit path-matcher cluster ([#740](https://github.com/greydragon888/real-router/issues/740)).
+
 ## 0.56.0
 
 ### Minor Changes
