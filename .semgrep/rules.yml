@@ -1,0 +1,31 @@
+rules:
+  # Mirrors CodeQL `js/incomplete-multi-character-sanitization`, runnable locally
+  # on the pre-push diff so the class is caught before it reaches CI. Stripping a
+  # multi-character delimiter (`<...>`, `<!--...-->`, etc.) with a single regex
+  # `replace`/`replaceAll` to "" is incomplete: nested/overlapping input (e.g.
+  # `<<x>script>`) can leave a partial `<script` behind. If the goal is HTML
+  # sanitization, use a real sanitizer; if it is delimiter detection (as in
+  # route-tree's validateRoutePath), use an explicit scan and never reuse the
+  # stripped string as output.
+  - id: incomplete-multi-character-sanitization
+    languages: [typescript, javascript]
+    severity: WARNING
+    message: >-
+      Incomplete multi-character sanitization: stripping `<...>`-style content
+      with a single regex replace can leave a partial delimiter (e.g. `<script`)
+      behind. Use a real sanitizer for HTML, or an explicit scan for delimiter
+      detection — and don't reuse the stripped string as output.
+    metadata:
+      category: security
+      cwe: "CWE-116: Improper Encoding or Escaping of Output"
+      references:
+        - https://codeql.github.com/codeql-query-help/javascript/js-incomplete-multi-character-sanitization/
+    patterns:
+      - pattern-either:
+          - pattern: $S.replace($RE, "")
+          - pattern: $S.replaceAll($RE, "")
+          - pattern: $S.replace($RE, '')
+          - pattern: $S.replaceAll($RE, '')
+      - metavariable-regex:
+          metavariable: $RE
+          regex: ^/.*<.*>.*/[a-z]*$

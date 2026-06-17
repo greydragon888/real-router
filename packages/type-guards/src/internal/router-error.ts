@@ -18,6 +18,7 @@ export const HAS_NON_WHITESPACE = /\S/;
  *
  * @internal
  */
+// eslint-disable-next-line security/detect-unsafe-regex -- safe: each `(?:\.…)*` repetition is anchored by a literal `.`, which `[\w-]*` cannot match, so the inner/outer quantifiers consume disjoint classes — no catastrophic backtracking (safe-regex over-flags the nested `*`).
 export const FULL_ROUTE_PATTERN = /^[A-Z_a-z][\w-]*(?:\.[A-Z_a-z][\w-]*)*$/;
 
 /**
