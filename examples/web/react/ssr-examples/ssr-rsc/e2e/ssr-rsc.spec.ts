@@ -120,6 +120,38 @@ test.describe("RSC SSR Example", () => {
         if (req.url().includes("/__rsc")) rscRequests.push(req.url());
       });
 
+      // The two clicks below are dispatched synchronously via page.evaluate
+      // (raw DOM clicks) to exercise the in-flight cancellation path — that
+      // deliberately bypasses Playwright's actionability auto-waiting. So we
+      // MUST first wait until React has hydrated the button and attached its
+      // onClick handler. Otherwise, on a slow runner (CI under load), the
+      // clicks land before hydration: they hit a still-inert <button>, no
+      // navigation starts, no /__rsc fetch fires, and the DOM stays at the
+      // SSR-rendered "alice@example.com" — the #833 flake. The presence of a
+      // `__reactProps$…` key carrying an `onClick` function is React 19's
+      // signal that this node is hydrated and interactive.
+      await page.waitForFunction(() => {
+        const btn = document.querySelector("[data-testid='revalidate']");
+
+        if (btn === null) {
+          return false;
+        }
+
+        const reactPropsKey = Object.keys(btn).find((key) =>
+          key.startsWith("__reactProps$"),
+        );
+
+        if (reactPropsKey === undefined) {
+          return false;
+        }
+
+        const props = (btn as unknown as Record<string, { onClick?: unknown }>)[
+          reactPropsKey
+        ];
+
+        return typeof props.onClick === "function";
+      });
+
       // Two synchronous clicks — RevalidateButton's pending guard disables
       // the second visually, but the in-flight cancellation contract still
       // holds at the router level: App.tsx's subscribe → fetch handler
