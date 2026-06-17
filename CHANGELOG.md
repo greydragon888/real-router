@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-06-17]
 
+### @real-router/core@0.57.2
+
+### Patch Changes
+
+- [#853](https://github.com/greydragon888/real-router/pull/853) [`30da63d`](https://github.com/greydragon888/real-router/commit/30da63d6c467b537174aa628cb99f43293e44fc6) Thanks [@greydragon888](https://github.com/greydragon888)! - Freeze nested `paramMeta` on the route tree ([#747](https://github.com/greydragon888/real-router/issues/747))
+
+  The route tree is documented as immutable, but the nested `paramMeta` object and
+  its `urlParams`/`queryParams`/`spatParams` arrays were left mutable — a tree
+  reachable from the public API (`getPluginApi(router).getTree()`) could be
+  mutated via e.g. `node.paramMeta.urlParams.push(...)`. They are now frozen,
+  closing the immutability contract (invariant CC1).
+
+  `constraintPatterns` is a `Map`, which `Object.freeze` cannot make read-only; it
+  stays protected at the type level via `ReadonlyMap` and is documented as an
+  explicit CC1 exception.
+
+- [#853](https://github.com/greydragon888/real-router/pull/853) [`30da63d`](https://github.com/greydragon888/real-router/commit/30da63d6c467b537174aa628cb99f43293e44fc6) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove the dead `staticPath` cache from `RouteTree` ([#748](https://github.com/greydragon888/real-router/issues/748))
+
+  Internal cleanup. `RouteTree.staticPath` was computed at build time but read by no
+  runtime consumer — the matcher recomputes its own static paths — and it held a
+  wrong value for a static route nested under a pathless grouping node (e.g.
+  `b.staticPath` was `"/b"` instead of `"/a/b"` for `/a` → `""` → `/b`). Matching
+  never read it, so runtime behavior is unchanged; the unused, latent-buggy field
+  is gone.
+
+  The field is removed from the `RouteTree` type exposed via
+  `getPluginApi(router).getTree()`. Nothing reads it in practice; if you derived a
+  URL from `node.staticPath`, build it from `node.path` / the route chain or use
+  `router.buildPath(name)`. Also drops `computeStaticPath`/`joinPaths` per-build
+  work and a few hundred bundle bytes, and retires invariant CC1.
+
+### @real-router/validation-plugin@0.7.7
+
+### Patch Changes
+
+- [#853](https://github.com/greydragon888/real-router/pull/853) [`30da63d`](https://github.com/greydragon888/real-router/commit/30da63d6c467b537174aa628cb99f43293e44fc6) Thanks [@greydragon888](https://github.com/greydragon888)! - Reject unbalanced constraint delimiters in route paths ([#749](https://github.com/greydragon888/real-router/issues/749))
+
+  `validateRoute` now rejects route paths with an unbalanced `<` or `>` constraint
+  delimiter (e.g. `/u/:id<\d+` with no closing `>`, or a dangling `/u/:id<`).
+  Previously these passed validation but crashed later in `buildPath` with
+  `Missing required param` — the param name was truncated at the stray `<` while
+  the unclosed constraint survived as a literal in the trie node path.
+
+  Balanced constraints and hyphenated param names (`/a/:id<\d?>`, `/h/:my-param`)
+  continue to pass — those were fixed by [#738](https://github.com/greydragon888/real-router/issues/738) and are valid configs.
+
+- Updated dependencies [[`30da63d`](https://github.com/greydragon888/real-router/commit/30da63d6c467b537174aa628cb99f43293e44fc6), [`30da63d`](https://github.com/greydragon888/real-router/commit/30da63d6c467b537174aa628cb99f43293e44fc6)]:
+  - @real-router/core@0.57.2
+
+
 ### @real-router/core@0.57.1
 
 ### Patch Changes
