@@ -1,5 +1,21 @@
 # @real-router/core
 
+## 0.57.1
+
+### Patch Changes
+
+- [`7f63a6d`](https://github.com/greydragon888/real-router/commit/7f63a6dbd2b04fcbf8f53b8deb7c1364a5571a08) Thanks [@greydragon888](https://github.com/greydragon888)! - Set `RouterError.name` to `"RouterError"`
+
+  `RouterError` previously inherited `error.name` as `"Error"` from the base
+  `Error` class (subclasses don't auto-set it). It now sets
+  `this.name = "RouterError"` in the constructor, so `error.name`-based checks —
+  logging, serialization, and cross-bundle `instanceof`-free detection
+  (`error.name === "RouterError"`) — work correctly. This mirrors the existing
+  `RecursionDepthError` pattern.
+
+  `toJSON()` output is unchanged: `name` is excluded as class metadata (like
+  `stack`), so serialized errors keep their existing shape.
+
 ## 0.57.0
 
 ### Minor Changes
