@@ -211,37 +211,3 @@ describe("mutation testing coverage - buildTree", () => {
     });
   });
 });
-
-describe("mutation testing coverage - computeCaches", () => {
-  describe("staticPath computation", () => {
-    it("should return null for routes with urlParams only", () => {
-      const tree = createRouteTree("", "", [
-        { name: "user", path: "/user/:id" },
-      ]);
-
-      expect([...tree.children.values()][0].staticPath).toBeNull();
-    });
-
-    it("should return null for routes with queryParams only", () => {
-      const tree = createRouteTree("", "", [
-        { name: "search", path: "/search?q" },
-      ]);
-
-      expect([...tree.children.values()][0].staticPath).toBeNull();
-    });
-
-    it("should return null for routes with spatParams only", () => {
-      const tree = createRouteTree("", "", [
-        { name: "files", path: "/files/*path" },
-      ]);
-
-      expect([...tree.children.values()][0].staticPath).toBeNull();
-    });
-
-    it("should return static path for routes without any params", () => {
-      const tree = createRouteTree("", "", [{ name: "about", path: "/about" }]);
-
-      expect([...tree.children.values()][0].staticPath).toBe("/about");
-    });
-  });
-});

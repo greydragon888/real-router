@@ -68,7 +68,6 @@ describe("createMatcher", () => {
               pathPattern: "/search",
             },
             paramTypeMap: { q: "query", active: "query" },
-            staticPath: "/search",
           },
         ],
       ]),
@@ -82,7 +81,6 @@ describe("createMatcher", () => {
         pathPattern: "",
       },
       paramTypeMap: {},
-      staticPath: null,
     });
 
     // Verify query string parsing with booleanFormat: "auto"
@@ -122,7 +120,6 @@ describe("createMatcher", () => {
               pathPattern: "/search",
             },
             paramTypeMap: { q: "query", active: "query" },
-            staticPath: "/search",
           },
         ],
       ]),
@@ -136,7 +133,6 @@ describe("createMatcher", () => {
         pathPattern: "",
       },
       paramTypeMap: {},
-      staticPath: null,
     });
 
     // buildPath with queryParamsMode "loose" to include query params
@@ -183,7 +179,6 @@ describe("createMatcher", () => {
               pathPattern: "/search",
             },
             paramTypeMap: { page: "query", limit: "query" },
-            staticPath: "/search",
           },
         ],
       ]),
@@ -197,7 +192,6 @@ describe("createMatcher", () => {
         pathPattern: "",
       },
       paramTypeMap: {},
-      staticPath: null,
     });
 
     const result = matcher.match("/search?page=3&limit=20");

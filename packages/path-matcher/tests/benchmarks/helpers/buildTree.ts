@@ -63,7 +63,6 @@ function buildNode(
     nonAbsoluteChildren,
     paramMeta,
     paramTypeMap: paramMeta.paramTypeMap,
-    staticPath: null,
   };
 }
 
@@ -77,7 +76,6 @@ export function buildTree(routes: SimpleRoute[]): MatcherInputNode {
     nonAbsoluteChildren: [],
     paramMeta: buildParamMeta(""),
     paramTypeMap: {},
-    staticPath: null,
   };
 
   const childNodes: MatcherInputNode[] = [];

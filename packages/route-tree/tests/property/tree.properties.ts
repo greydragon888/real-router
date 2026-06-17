@@ -4,7 +4,6 @@ import { fc, test } from "@fast-check/vitest";
 
 import {
   ABSOLUTE_PATH_TREE,
-  arbDeepTreeRouteName,
   DEEP_TREE,
   MIXED_ABSOLUTE_TREE,
   MIXED_TREE,
@@ -91,20 +90,6 @@ function collectAllNodes(tree: RouteTree): RouteTree[] {
   return nodes;
 }
 
-function hasParamsInChain(node: RouteTree): boolean {
-  let current: RouteTree | null = node;
-
-  while (current !== null && current.path !== "") {
-    if (Object.keys(current.paramTypeMap).length > 0) {
-      return true;
-    }
-
-    current = current.parent;
-  }
-
-  return false;
-}
-
 // =============================================================================
 // Tests
 // =============================================================================
@@ -186,28 +171,6 @@ describe("createRouteTree Properties", () => {
 // =============================================================================
 
 describe("Computed Cache Properties", () => {
-  const deepTreeNodesByName = new Map(
-    collectAllNodes(DEEP_TREE).map((n) => [n.fullName, n]),
-  );
-
-  describe("staticPath — non-null iff route and all ancestors have zero params (high)", () => {
-    test.prop([arbDeepTreeRouteName], { numRuns: NUM_RUNS.standard })(
-      "staticPath is non-null exactly when no node in the ancestor chain has params",
-      (name: string) => {
-        const node = deepTreeNodesByName.get(name)!;
-
-        expect(node).toBeDefined();
-
-        if (hasParamsInChain(node)) {
-          expect(node.staticPath).toBeNull();
-        } else {
-          expect(node.staticPath).not.toBeNull();
-          expect(typeof node.staticPath).toBe("string");
-        }
-      },
-    );
-  });
-
   describe("immutability — all tree nodes are frozen by default (medium)", () => {
     const ALL_TREES: readonly RouteTree[] = [
       PARAM_TREE,

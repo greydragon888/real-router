@@ -78,7 +78,6 @@ interface RouteTree {
   readonly parent: RouteTree | null; // null for root
   readonly nonAbsoluteChildren: readonly RouteTree[]; // filtered children
   readonly fullName: string; // "users.profile"
-  readonly staticPath: string | null; // pre-built for parameterless routes
   readonly paramTypeMap: Readonly<Record<string, "url" | "query">>;
 }
 ```
@@ -88,7 +87,6 @@ interface RouteTree {
 | Cache                 | Avoids                                       | Used by                          |
 | --------------------- | -------------------------------------------- | -------------------------------- |
 | `fullName`            | Runtime `parent.join(".")` on every lookup   | All name-based operations        |
-| `staticPath`          | `inject()` + path building for static routes | `buildPath()` fast path          |
 | `paramTypeMap`        | Recomputing url vs query classification      | `buildState()`, meta computation |
 | `nonAbsoluteChildren` | Filtering on every match iteration           | Segment Trie matching            |
 | `children` Map        | O(n) array scan for child lookup             | `getSegmentsByName()`            |
@@ -148,8 +146,7 @@ graph TD
         C1[buildParamMeta per node] --> C2[Build paramTypeMap]
         C2 --> C3[Compute fullName]
         C3 --> C4[processChildren — recursive Map + nonAbsoluteChildren]
-        C4 --> C5[Compute staticPath]
-        C5 --> C6["Object.freeze()"]
+        C4 --> C6["Object.freeze()"]
     end
 ```
 
@@ -413,13 +410,11 @@ Tree is read synchronously — no concurrency concerns in single-threaded JS.
 | ------------------------- | ----------- | ------------------------- |
 | `match(path)`             | O(segments) | Segment Trie traversal    |
 | `buildPath(name, params)` | O(segments) | Path injection            |
-| `buildPath` (static)      | O(1)        | Pre-computed `staticPath` |
 | `getSegmentsByName(name)` | O(depth)    | Map.get() per level       |
 | `hasRoute(name)`          | O(depth)    | Map.get() per level       |
 
 ### Memory Optimizations
 
-- `staticPath` — avoids `inject()` overhead for parameterless routes
 - `nonAbsoluteChildren` — pre-filtered array, no allocation during matching
 - `children` Map — O(1) vs O(n) array iteration
 - `paramTypeMap` — cached classification, avoids recomputing per navigation
@@ -476,7 +471,7 @@ Reusable, composable constraints instead of inline regex patterns.
 
 #### Lazy Cache Computation
 
-Compute `staticPath`, `paramTypeMap` lazily (on first access) instead of eagerly for all nodes.
+Compute `paramTypeMap` lazily (on first access) instead of eagerly for all nodes.
 
 - **Why unlikely:** `computeCaches()` runs once at build time. For typical SPA (50-200 routes) this is microseconds. Lazy computation would add a "is computed?" check on every navigation — likely slower overall due to branch prediction overhead on the hot path
 - **When it could matter:** Trees with 10,000+ routes where most are never matched (unlikely in practice)

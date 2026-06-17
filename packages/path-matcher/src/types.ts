@@ -115,7 +115,6 @@ export interface MatcherInputNode {
   readonly nonAbsoluteChildren: readonly MatcherInputNode[];
   readonly paramMeta: ParamMeta;
   readonly paramTypeMap: Readonly<Record<string, "url" | "query">>;
-  readonly staticPath: string | null;
 }
 
 // =============================================================================
