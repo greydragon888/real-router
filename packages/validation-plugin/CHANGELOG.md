@@ -1,5 +1,23 @@
 # @real-router/validation-plugin
 
+## 0.7.7
+
+### Patch Changes
+
+- [#853](https://github.com/greydragon888/real-router/pull/853) [`30da63d`](https://github.com/greydragon888/real-router/commit/30da63d6c467b537174aa628cb99f43293e44fc6) Thanks [@greydragon888](https://github.com/greydragon888)! - Reject unbalanced constraint delimiters in route paths ([#749](https://github.com/greydragon888/real-router/issues/749))
+
+  `validateRoute` now rejects route paths with an unbalanced `<` or `>` constraint
+  delimiter (e.g. `/u/:id<\d+` with no closing `>`, or a dangling `/u/:id<`).
+  Previously these passed validation but crashed later in `buildPath` with
+  `Missing required param` — the param name was truncated at the stray `<` while
+  the unclosed constraint survived as a literal in the trie node path.
+
+  Balanced constraints and hyphenated param names (`/a/:id<\d?>`, `/h/:my-param`)
+  continue to pass — those were fixed by [#738](https://github.com/greydragon888/real-router/issues/738) and are valid configs.
+
+- Updated dependencies [[`30da63d`](https://github.com/greydragon888/real-router/commit/30da63d6c467b537174aa628cb99f43293e44fc6), [`30da63d`](https://github.com/greydragon888/real-router/commit/30da63d6c467b537174aa628cb99f43293e44fc6)]:
+  - @real-router/core@0.57.2
+
 ## 0.7.6
 
 ### Patch Changes
