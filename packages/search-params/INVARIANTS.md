@@ -53,9 +53,10 @@
 | 8   | Plus-as-space equivalence            | `parse(qs.replace(/%20/g, '+'))` produces the same result as `parse(qs)`. The decoder treats `+` as a space, equivalent to `%20`.                                                                                                                        |
 | 9   | Array element type partition         | `build({key: [v]})` succeeds for `v: string \| number \| boolean` and throws `TypeError` for `v: null \| undefined \| object`. Array elements must be primitives (excluding null).                                                                       |
 | 10  | None format: single-element collapse | `parse(build({a: [x]}, {arrayFormat: "none"}))` returns `{a: x}` (scalar), not `{a: [x]}` (array). Single-element arrays lose their array type through the none-format roundtrip because the parser cannot distinguish a single-value key from a scalar. |
-| 11  | Number format: auto integers         | `parse(build(params, {numberFormat: "auto"}), {numberFormat: "auto"}) === params` for non-negative integer values. Numbers roundtrip through the encode/decode cycle losslessly.                                                                            |
+| 11  | Number format: auto integers         | `parse(build(params, {numberFormat: "auto"}), {numberFormat: "auto"}) === params` for non-negative **safe** integer values. `auto` recognizes a canonical decimal number (optional leading `-`, no leading zeros except `0`, no exponent); leading-zero and unsafe-integer magnitudes are kept as strings to preserve their exact text — so `"007"` and `"9007199254740992"` do **not** become numbers. The narrowing is symmetric for negatives (invariant #14). |
 | 12  | Number format: auto decimals         | `parse(build(params, {numberFormat: "auto"}), {numberFormat: "auto"}) === params` for decimal values (e.g., `12.5`). Decimal numbers survive the roundtrip.                                                                                                  |
 | 13  | Number format: none preserves strings | `typeof parse(build({a: 42}, {numberFormat: "none"}), {numberFormat: "none"}).a === "string"`. With `numberFormat: "none"`, numbers become strings after the build/parse cycle.                                                                               |
+| 14  | Number format: auto negatives        | `parse(build(params, {numberFormat: "auto"}), {numberFormat: "auto"}) === params` for negative integer values. `build({n: -5})` emits `"n=-5"` and `parse` decodes it back to the number `-5`, so a param keeps the same type whether it arrives from a URL or from a programmatic `navigate({n: -5})`. Non-canonical negatives (`"-007"`, `"-9007199254740992"`) stay strings, mirroring the unsigned rules. (#742) |
 
 ## Test Files
 
@@ -64,4 +65,4 @@
 | `tests/property/parseBuild.properties.ts` | 1–9        | Core parse/build cycle     |
 | `tests/property/omitKeep.properties.ts`   | 1–10       | Omit and keep operations   |
 | `tests/property/parseInto.properties.ts`  | 1–3        | parseInto equivalence      |
-| `tests/property/formats.properties.ts`    | 1–13       | Format-specific roundtrips |
+| `tests/property/formats.properties.ts`    | 1–14       | Format-specific roundtrips |

@@ -47,7 +47,10 @@ export type NullFormat = "default" | "hidden";
  *
  * @remarks
  * - `none` - no special handling
- * - `auto` - decode numeric strings (/^\d+(\.\d+)?$/) to Number()
+ * - `auto` - decode canonical decimal numbers (`/^-?(0|[1-9]\d*)(\.\d+)?$/`) to
+ *   `Number()`. Recognizes negatives so the parsed type matches what
+ *   `build`/`navigate` produce; rejects leading zeros (`"007"`), exponent
+ *   notation, and unsafe integers — those keep their exact text as strings.
  */
 export type NumberFormat = "none" | "auto";
 

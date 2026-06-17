@@ -153,6 +153,26 @@ describe("search-params", () => {
       });
     });
 
+    it("decodes negative numbers as numbers under auto (matches navigate/build roundtrip)", () => {
+      // build({ n: -5 }) emits "n=-5"; parse must round-trip it back to a number,
+      // mirroring the type a programmatic navigate({ n: -5 }) keeps. (#742)
+      expect(parse("n=-5&d=-5.5&z=0", { numberFormat: "auto" })).toStrictEqual({
+        n: -5,
+        d: -5.5,
+        z: 0,
+      });
+    });
+
+    it("keeps non-canonical negatives as strings under auto", () => {
+      // Leading-zero and unsafe-int rejection apply symmetrically to negatives. (#742)
+      expect(
+        parse("a=-007&b=-9007199254740992", { numberFormat: "auto" }),
+      ).toStrictEqual({
+        a: "-007",
+        b: "-9007199254740992",
+      });
+    });
+
     it("parses key with empty value after = as empty string", () => {
       expect(parse("key=")).toStrictEqual({ key: "" });
     });

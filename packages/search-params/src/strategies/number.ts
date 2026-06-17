@@ -33,6 +33,12 @@ export const noneNumberStrategy: NumberStrategy = {
 /**
  * Auto-detect numeric values and parse as numbers.
  * Matches integers and decimals via charCode scan (faster than regex for short strings).
+ *
+ * Recognizes an optional leading `-` so negatives round-trip symmetrically with the
+ * values `navigate()`/`build()` produce (`build({ n: -5 })` → `"n=-5"`). Leading-zero
+ * and unsafe-integer rejection apply to the magnitude regardless of sign. Exponent
+ * notation stays a string — `build` never emits a canonical safe exponent, and unsafe
+ * exponents would lose precision. (#742)
  */
 export const autoNumberStrategy: NumberStrategy = {
   decode: (value) => {
@@ -42,26 +48,34 @@ export const autoNumberStrategy: NumberStrategy = {
       return null;
     }
 
-    // Leading zeros are not canonical numbers ("00", "007") — preserve as strings.
+    // Optional leading minus; the magnitude (digits) begins at `start`.
+    const start = value.codePointAt(0) === 45 ? 1 : 0; // '-'
+
+    // A bare "-" has no magnitude.
+    if (start === length) {
+      return null;
+    }
+
+    // Leading zeros are not canonical numbers ("00", "007", "-007") — preserve as strings.
     // Allow "0" and "0.x" (single zero or decimal starting with 0).
     if (
-      length > 1 &&
-      value.codePointAt(0) === 48 &&
-      value.codePointAt(1) !== 46
+      length - start > 1 &&
+      value.codePointAt(start) === 48 &&
+      value.codePointAt(start + 1) !== 46
     ) {
       return null;
     }
 
     let hasDot = false;
 
-    for (let i = 0; i < length; i++) {
+    for (let i = start; i < length; i++) {
       const ch = value.codePointAt(i);
 
       if (ch !== undefined && ch >= 48 && ch <= 57) {
         continue; // '0'-'9'
       }
 
-      if (ch === 46 && !hasDot && i !== 0 && i !== length - 1) {
+      if (ch === 46 && !hasDot && i !== start && i !== length - 1) {
         hasDot = true;
 
         continue;

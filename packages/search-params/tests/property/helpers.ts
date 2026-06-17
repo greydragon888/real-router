@@ -129,53 +129,28 @@ export const arbQueryString: fc.Arbitrary<string> = fc
   .map(([params, opts]) => build(params, opts));
 
 /**
- * Matches the actual autoNumberStrategy.decode() logic:
- * - No leading zeros (except "0" and "0.x")
- * - Only safe integers (for non-decimals)
- * - Digits and optional single decimal point
+ * Contract oracle for `numberFormat: "auto"` — deliberately expressed as a
+ * declarative grammar, NOT a copy of `autoNumberStrategy.decode()`'s scan loop,
+ * so a mutation in the implementation cannot be silently mirrored here (#746).
+ *
+ * Contract: `auto` coerces a *canonical decimal number* to `Number`:
+ * - optional leading `-` (negatives round-trip with build/navigate, #742)
+ * - integer part is `0` or a non-zero-leading digit run (no `"007"`, no `"-007"`)
+ * - optional fractional part with at least one digit after the point
+ * - no exponent notation
+ * - integers must be safe (decimals are accepted as-is — precision is the caller's)
+ * Anything else stays a string.
  */
+const CANONICAL_NUMBER = /^-?(?:0|[1-9]\d*)(?:\.\d+)?$/;
+
 function isAutoNumber(str: string): boolean {
-  if (str.length === 0) {
-    return false;
-  }
+  const isCanonical = CANONICAL_NUMBER.test(str);
 
-  // Leading zero check: "00", "007" etc. are not canonical numbers
-  if (
-    str.length > 1 &&
-    str.codePointAt(0) === 48 &&
-    str.codePointAt(1) !== 46
-  ) {
-    return false;
-  }
+  // Unsafe integers (no fractional part) lose precision through Number() — kept as strings.
+  const isSafeMagnitude =
+    str.includes(".") || Number.isSafeInteger(Number(str));
 
-  let hasDot = false;
-
-  for (let i = 0; i < str.length; i++) {
-    const ch = str.codePointAt(i)!;
-
-    if (ch >= 48 && ch <= 57) {
-      continue;
-    }
-
-    if (ch === 46 && !hasDot && i !== 0 && i !== str.length - 1) {
-      hasDot = true;
-
-      continue;
-    }
-
-    return false;
-  }
-
-  // Unsafe integer check
-  if (!hasDot) {
-    const num = Number(str);
-
-    if (!Number.isSafeInteger(num)) {
-      return false;
-    }
-  }
-
-  return true;
+  return isCanonical && isSafeMagnitude;
 }
 
 function normalizeNumber(value: number, numFmt: NumberFormat): number | string {

@@ -191,6 +191,23 @@ describe("number format roundtrip", () => {
     },
   );
 
+  const arbNegativeParams = fc.dictionary(
+    arbSafeKey,
+    fc.integer({ min: -99_999, max: -1 }),
+    { minKeys: 1, maxKeys: 5 },
+  );
+
+  test.prop([arbNegativeParams], { numRuns: NUM_RUNS.standard })(
+    "numberFormat 'auto': parse(build(params, opts), opts) === params for negative integers",
+    (params: Record<string, number>) => {
+      const opts = { numberFormat: "auto" as NumberFormat };
+      const qs = build(params, opts);
+      const parsed = parse(qs, opts);
+
+      expect(parsed).toStrictEqual({ ...params });
+    },
+  );
+
   test.prop([arbNatParams], { numRuns: NUM_RUNS.standard })(
     "numberFormat 'none': numbers become strings after roundtrip",
     (params: Record<string, number>) => {

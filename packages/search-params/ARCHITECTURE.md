@@ -187,7 +187,7 @@ interface ArrayStrategy {
 | Format   | Decoding                                                                  |
 | -------- | ------------------------------------------------------------------------- |
 | `"none"` | No conversion — numbers remain strings                                    |
-| `"auto"` | `/^\d+(\.\d+)?$/` → `Number()` (codePointAt scan, no regex engine)       |
+| `"auto"` | `/^-?(0\|[1-9]\d*)(\.\d+)?$/` → `Number()` (codePointAt scan, no regex engine; rejects leading-zero/exponent/unsafe-int) |
 
 Encoding is not needed — `encode.ts` handles `typeof value === "number"` via `encodeURIComponent` regardless of format.
 
