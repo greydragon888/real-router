@@ -3,8 +3,32 @@
 import { fc, test } from "@fast-check/vitest";
 
 import { NUM_RUNS, PARAM_TREE } from "./helpers";
+import { createRouteTree } from "../../src/builder/createRouteTree";
 import { validateRoute } from "../../src/validation/route-batch";
 import { validateRoutePath } from "../../src/validation/routes";
+
+import type { RouteDefinition } from "../../src/types";
+
+/**
+ * Validates a batch the way `@real-router/validation-plugin` does: shared
+ * tracking structures, no existing tree (so only the batch-level name/path
+ * duplicate checks run). `validateRoute` recurses into `children`.
+ */
+function validateBatch(routes: RouteDefinition[]): void {
+  const seenNames = new Set<string>();
+  const seenPathsByParent = new Map<string, Set<string>>();
+
+  for (const route of routes) {
+    validateRoute(
+      route,
+      "addRoute",
+      undefined,
+      "",
+      seenNames,
+      seenPathsByParent,
+    );
+  }
+}
 
 // =============================================================================
 // Arbitraries
@@ -111,6 +135,15 @@ const arbDoubleSlashPath = arbSafeSegment.map((seg) => `/${seg}//${seg}`);
  * Tilde-prefixed paths for absolute-under-parameterized-parent test.
  */
 const arbTildePath = arbSafeSegment.map((seg) => `~${seg}`);
+
+/**
+ * Param paths with an unbalanced constraint delimiter — a stray `<` (no closing
+ * `>`) or a stray `>` (no opening `<`). None of these contain a balanced
+ * `<...>`, so every generated value must be rejected (#749).
+ */
+const arbUnbalancedConstraintPath = fc
+  .tuple(arbSafeSegment, fc.constantFrom("<", ">", String.raw`<\d+`, "<[a-z]"))
+  .map(([seg, stray]) => `/:${seg}${stray}`);
 
 // =============================================================================
 // Route Name Validation
@@ -223,6 +256,140 @@ describe("Route Path Validation", () => {
         expect(() => {
           validateRoutePath(path, "test", "add", parentWithUrlParams);
         }).toThrow(TypeError);
+      },
+    );
+  });
+
+  describe("6: unbalanced constraint rejection — stray < or > throws TypeError (high)", () => {
+    test.prop([arbUnbalancedConstraintPath], { numRuns: NUM_RUNS.fast })(
+      "path with an unbalanced constraint delimiter throws with a constraint message",
+      (path: string) => {
+        expect(() => {
+          validateRoutePath(path, "test", "add");
+        }).toThrow(/constraint/);
+      },
+    );
+  });
+});
+
+// =============================================================================
+// Route Duplicate Detection
+// =============================================================================
+
+describe("Route Duplicate Detection", () => {
+  // Distinct valid route names — the building block for every duplicate case.
+  const arbDistinctNames = (min: number, max: number) =>
+    fc.uniqueArray(arbValidRouteName, { minLength: min, maxLength: max });
+
+  describe("1: batch name duplicate — a repeated name in the batch throws (high)", () => {
+    test.prop([arbDistinctNames(2, 6), fc.nat()], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "re-using a name anywhere in the batch throws, even buried mid-list",
+      (names: string[], pos: number) => {
+        const routes: RouteDefinition[] = names.map((name, i) => ({
+          name,
+          path: `/p${i}`,
+        }));
+
+        // Insert a second route with an already-used name at a random position.
+        routes.splice(pos % (routes.length + 1), 0, {
+          name: names[0],
+          path: "/dupe",
+        });
+
+        expect(() => {
+          validateBatch(routes);
+        }).toThrow(/Duplicate route/);
+      },
+    );
+  });
+
+  describe("2: batch path duplicate — same path at the same parent level throws (high)", () => {
+    test.prop([arbDistinctNames(2, 6)], { numRuns: NUM_RUNS.standard })(
+      "distinct names but a shared path at one level throws",
+      (names: string[]) => {
+        const routes: RouteDefinition[] = names.map((name, i) => ({
+          name,
+          path: `/p${i}`,
+        }));
+
+        // Force two siblings to share a path (names stay distinct).
+        routes[1] = { name: names[1], path: routes[0].path };
+
+        expect(() => {
+          validateBatch(routes);
+        }).toThrow(/already defined/);
+      },
+    );
+  });
+
+  describe("3: same path under different parents is allowed — no false positive (high)", () => {
+    test.prop([arbDistinctNames(4, 4)], { numRuns: NUM_RUNS.standard })(
+      "two children under different parents may share a path",
+      ([parentA, parentB, childA, childB]: string[]) => {
+        const routes: RouteDefinition[] = [
+          {
+            name: parentA,
+            path: "/a",
+            children: [{ name: childA, path: "/same" }],
+          },
+          {
+            name: parentB,
+            path: "/b",
+            children: [{ name: childB, path: "/same" }],
+          },
+        ];
+
+        expect(() => {
+          validateBatch(routes);
+        }).not.toThrow();
+      },
+    );
+  });
+
+  describe("4: tree name duplicate — re-adding an existing tree name throws (high)", () => {
+    test.prop([arbDistinctNames(1, 5), fc.nat()], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "validating a route whose name already exists in the tree throws",
+      (names: string[], pick: number) => {
+        const routes: RouteDefinition[] = names.map((name, i) => ({
+          name,
+          path: `/p${i}`,
+        }));
+        const tree = createRouteTree("", "", routes);
+        const existing = names[pick % names.length];
+
+        const seenNames = new Set<string>();
+        const seenPathsByParent = new Map<string, Set<string>>();
+
+        expect(() => {
+          validateRoute(
+            { name: existing, path: "/fresh" },
+            "addRoute",
+            tree,
+            "",
+            seenNames,
+            seenPathsByParent,
+          );
+        }).toThrow(/already exists/);
+      },
+    );
+  });
+
+  describe("5: all-distinct batch — unique names and paths never throw (high)", () => {
+    test.prop([arbDistinctNames(1, 8)], { numRuns: NUM_RUNS.standard })(
+      "a batch with unique names and unique paths passes validation",
+      (names: string[]) => {
+        const routes: RouteDefinition[] = names.map((name, i) => ({
+          name,
+          path: `/p${i}`,
+        }));
+
+        expect(() => {
+          validateBatch(routes);
+        }).not.toThrow();
       },
     );
   });

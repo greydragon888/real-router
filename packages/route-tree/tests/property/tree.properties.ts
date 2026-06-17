@@ -2,16 +2,7 @@
 
 import { fc, test } from "@fast-check/vitest";
 
-import {
-  ABSOLUTE_PATH_TREE,
-  arbDeepTreeRouteName,
-  DEEP_TREE,
-  MIXED_ABSOLUTE_TREE,
-  MIXED_TREE,
-  NUM_RUNS,
-  PARAM_TREE,
-  QUERY_TREE,
-} from "./helpers";
+import { arbRouteForest, NUM_RUNS } from "./helpers";
 import { createRouteTree } from "../../src/builder/createRouteTree";
 import {
   nodeToDefinition,
@@ -21,21 +12,9 @@ import {
 import type { RouteDefinition, RouteTree } from "../../src/types";
 
 // =============================================================================
-// Fixed route pool (all unique names and paths — no conflicts)
+// Fixed nested+absolute pool — retained for N4's explicit per-node absolute-flag
+// roundtrip check (arbRouteForest covers structure generatively elsewhere).
 // =============================================================================
-
-const ROUTE_POOL: RouteDefinition[] = [
-  { name: "home", path: "/" },
-  { name: "about", path: "/about" },
-  { name: "users", path: "/users" },
-  { name: "docs", path: "/docs" },
-  { name: "blog", path: "/blog" },
-  { name: "contact", path: "/contact" },
-  { name: "faq", path: "/faq" },
-  { name: "news", path: "/news" },
-];
-
-const arbRouteCount = fc.integer({ min: 3, max: ROUTE_POOL.length });
 
 const ABSOLUTE_PARENT_POOL: RouteDefinition[] = [
   {
@@ -74,13 +53,6 @@ const ABSOLUTE_PARENT_POOL: RouteDefinition[] = [
 // Helpers
 // =============================================================================
 
-function extractStructure(tree: RouteTree): { name: string; path: string }[] {
-  return routeTreeToDefinitions(tree).map((def) => ({
-    name: def.name,
-    path: def.path,
-  }));
-}
-
 function collectAllNodes(tree: RouteTree): RouteTree[] {
   const nodes: RouteTree[] = [];
 
@@ -91,18 +63,11 @@ function collectAllNodes(tree: RouteTree): RouteTree[] {
   return nodes;
 }
 
-function hasParamsInChain(node: RouteTree): boolean {
-  let current: RouteTree | null = node;
-
-  while (current !== null && current.path !== "") {
-    if (Object.keys(current.paramTypeMap).length > 0) {
-      return true;
-    }
-
-    current = current.parent;
-  }
-
-  return false;
+function countDefs(defs: readonly RouteDefinition[]): number {
+  return defs.reduce(
+    (acc, def) => acc + 1 + (def.children ? countDefs(def.children) : 0),
+    0,
+  );
 }
 
 // =============================================================================
@@ -110,40 +75,39 @@ function hasParamsInChain(node: RouteTree): boolean {
 // =============================================================================
 
 describe("createRouteTree Properties", () => {
-  describe("1: idempotency — building from extracted definitions gives same structure (high)", () => {
-    test.prop([arbRouteCount], { numRuns: NUM_RUNS.standard })(
-      "routeTreeToDefinitions(createRouteTree(routes)) roundtrips correctly",
-      (count: number) => {
-        const routes = ROUTE_POOL.slice(0, count);
-        const tree1 = createRouteTree("", "", routes);
-        const extracted = routeTreeToDefinitions(tree1);
-        const tree2 = createRouteTree("", "", extracted);
+  describe("1: idempotency — build→extract→build preserves the full nested structure (high)", () => {
+    test.prop([arbRouteForest], { numRuns: NUM_RUNS.standard })(
+      "routeTreeToDefinitions ∘ createRouteTree is a faithful, idempotent roundtrip over arbitrary nested trees",
+      (routes: RouteDefinition[]) => {
+        const defs1 = routeTreeToDefinitions(createRouteTree("", "", routes));
+        const defs2 = routeTreeToDefinitions(createRouteTree("", "", defs1));
 
-        expect(extractStructure(tree1)).toStrictEqual(extractStructure(tree2));
-        expect(tree2.children.size).toBe(tree1.children.size);
+        // Full fidelity: extracting the built tree reproduces the input exactly
+        // (names, paths incl. `~`/params/query/splat, nesting, child order).
+        expect(defs1).toStrictEqual(routes);
+        // Idempotent: a second roundtrip is a fixed point.
+        expect(defs2).toStrictEqual(defs1);
       },
     );
   });
 
-  describe("2: preservation — createRouteTree keeps all top-level routes (high)", () => {
-    test.prop([arbRouteCount], { numRuns: NUM_RUNS.standard })(
-      "tree.children.size equals the number of routes passed",
-      (count: number) => {
-        const routes = ROUTE_POOL.slice(0, count);
+  describe("2: preservation — createRouteTree keeps every route at every level (high)", () => {
+    test.prop([arbRouteForest], { numRuns: NUM_RUNS.standard })(
+      "no route is dropped: top-level count and total node count both match the input",
+      (routes: RouteDefinition[]) => {
         const tree = createRouteTree("", "", routes);
 
-        expect(tree.children.size).toBe(count);
+        expect(tree.children.size).toBe(routes.length);
+        expect(collectAllNodes(tree)).toHaveLength(countDefs(routes));
       },
     );
   });
 
-  describe("3: normalization — absolute path marker stripped after tree build (medium)", () => {
-    test.prop([fc.constant(ABSOLUTE_PATH_TREE)], { numRuns: NUM_RUNS.fast })(
-      "no node in the tree has a path starting with ~",
-      (tree: RouteTree) => {
-        const allNodes = collectAllNodes(tree);
-
-        for (const node of allNodes) {
+  describe("3: normalization — absolute path marker stripped after tree build (high)", () => {
+    test.prop([arbRouteForest], { numRuns: NUM_RUNS.standard })(
+      "no node anywhere in the built tree has a path starting with ~",
+      (routes: RouteDefinition[]) => {
+        for (const node of collectAllNodes(createRouteTree("", "", routes))) {
           expect(node.path.startsWith("~")).toBe(false);
         }
       },
@@ -186,79 +150,39 @@ describe("createRouteTree Properties", () => {
 // =============================================================================
 
 describe("Computed Cache Properties", () => {
-  const deepTreeNodesByName = new Map(
-    collectAllNodes(DEEP_TREE).map((n) => [n.fullName, n]),
-  );
+  describe("immutability — every node and its caches are frozen, over arbitrary shapes (high)", () => {
+    test.prop([arbRouteForest], { numRuns: NUM_RUNS.standard })(
+      "every node + children Map + paramTypeMap + nonAbsoluteChildren + paramMeta arrays pass Object.isFrozen",
+      (routes: RouteDefinition[]) => {
+        const tree = createRouteTree("", "", routes);
 
-  describe("staticPath — non-null iff route and all ancestors have zero params (high)", () => {
-    test.prop([arbDeepTreeRouteName], { numRuns: NUM_RUNS.standard })(
-      "staticPath is non-null exactly when no node in the ancestor chain has params",
-      (name: string) => {
-        const node = deepTreeNodesByName.get(name)!;
-
-        expect(node).toBeDefined();
-
-        if (hasParamsInChain(node)) {
-          expect(node.staticPath).toBeNull();
-        } else {
-          expect(node.staticPath).not.toBeNull();
-          expect(typeof node.staticPath).toBe("string");
-        }
-      },
-    );
-  });
-
-  describe("immutability — all tree nodes are frozen by default (medium)", () => {
-    const ALL_TREES: readonly RouteTree[] = [
-      PARAM_TREE,
-      QUERY_TREE,
-      MIXED_TREE,
-      DEEP_TREE,
-      ABSOLUTE_PATH_TREE,
-      MIXED_ABSOLUTE_TREE,
-    ];
-
-    test.prop(
-      [
-        fc.constantFrom(
-          ...(ALL_TREES as unknown as [RouteTree, ...RouteTree[]]),
-        ),
-      ],
-      { numRuns: NUM_RUNS.fast },
-    )(
-      "every node and its collections pass Object.isFrozen",
-      (tree: RouteTree) => {
         for (const node of [tree, ...collectAllNodes(tree)]) {
           expect(Object.isFrozen(node)).toBe(true);
           expect(Object.isFrozen(node.children)).toBe(true);
           expect(Object.isFrozen(node.paramTypeMap)).toBe(true);
           expect(Object.isFrozen(node.nonAbsoluteChildren)).toBe(true);
+          // CC1 also covers the nested paramMeta object and its arrays (#747).
+          // constraintPatterns is a Map — excluded by design (Object.freeze
+          // can't lock Map entries; protected at the type level via ReadonlyMap).
+          expect(Object.isFrozen(node.paramMeta)).toBe(true);
+          expect(Object.isFrozen(node.paramMeta.urlParams)).toBe(true);
+          expect(Object.isFrozen(node.paramMeta.queryParams)).toBe(true);
+          expect(Object.isFrozen(node.paramMeta.spatParams)).toBe(true);
         }
       },
     );
   });
 
-  describe("nonAbsoluteChildren — excludes exactly the absolute children (high)", () => {
-    const TREES_WITH_VARIETY: readonly RouteTree[] = [
-      DEEP_TREE,
-      PARAM_TREE,
-      ABSOLUTE_PATH_TREE,
-      MIXED_ABSOLUTE_TREE,
-    ];
+  describe("nonAbsoluteChildren — excludes exactly the absolute children, over arbitrary shapes (high)", () => {
+    test.prop([arbRouteForest], { numRuns: NUM_RUNS.standard })(
+      "nonAbsoluteChildren equals children.values().filter(c => !c.absolute) at every node",
+      (routes: RouteDefinition[]) => {
+        const tree = createRouteTree("", "", routes);
 
-    test.prop(
-      [
-        fc.constantFrom(
-          ...(TREES_WITH_VARIETY as unknown as [RouteTree, ...RouteTree[]]),
-        ),
-      ],
-      { numRuns: NUM_RUNS.fast },
-    )(
-      "nonAbsoluteChildren matches children.values().filter(c => !c.absolute)",
-      (tree: RouteTree) => {
         for (const node of [tree, ...collectAllNodes(tree)]) {
-          const allChildren = [...node.children.values()];
-          const expected = allChildren.filter((c) => !c.absolute);
+          const expected = [...node.children.values()].filter(
+            (c) => !c.absolute,
+          );
 
           expect(node.nonAbsoluteChildren).toHaveLength(expected.length);
 
@@ -270,27 +194,34 @@ describe("Computed Cache Properties", () => {
     );
   });
 
-  describe("paramTypeMap classification — URL params typed 'url', query params typed 'query' (high)", () => {
+  describe("paramTypeMap classification — URL/splat typed 'url', query typed 'query' (high)", () => {
     const arbParamName = fc.stringMatching(/^[a-zA-Z_]\w{0,8}$/);
 
+    // url params, query params, and 0–1 splat param — all names globally unique.
     const arbParamGroups = fc
       .tuple(
         fc.array(arbParamName, { minLength: 0, maxLength: 3 }),
         fc.array(arbParamName, { minLength: 0, maxLength: 3 }),
+        fc.array(arbParamName, { minLength: 0, maxLength: 1 }),
       )
-      .filter(([urls, queries]) => {
-        const all = [...urls, ...queries];
+      .filter(([urls, queries, splats]) => {
+        const all = [...urls, ...queries, ...splats];
 
         return all.length > 0 && new Set(all).size === all.length;
       });
 
     test.prop([arbParamGroups], { numRuns: NUM_RUNS.standard })(
-      "every URL param is typed 'url' and every query param is typed 'query'",
-      ([urlParams, queryParams]: [string[], string[]]) => {
+      "every URL/splat param is typed 'url' (splat also in spatParams) and every query param is typed 'query'",
+      ([urlParams, queryParams, splatParams]: [
+        string[],
+        string[],
+        string[],
+      ]) => {
         const urlSegments = urlParams.map((p) => `/:${p}`).join("");
+        const splatSegments = splatParams.map((p) => `/*${p}`).join("");
         const queryString =
           queryParams.length > 0 ? `?${queryParams.join("&")}` : "";
-        const path = `/base${urlSegments}${queryString}`;
+        const path = `/base${urlSegments}${splatSegments}${queryString}`;
 
         const tree = createRouteTree("", "", [{ name: "test", path }]);
         const node = tree.children.get("test")!;
@@ -299,13 +230,44 @@ describe("Computed Cache Properties", () => {
           expect(node.paramTypeMap[p]).toBe("url");
         }
 
+        for (const s of splatParams) {
+          expect(node.paramTypeMap[s]).toBe("url");
+          expect(node.paramMeta.spatParams).toContain(s);
+        }
+
         for (const q of queryParams) {
           expect(node.paramTypeMap[q]).toBe("query");
         }
 
         expect(Object.keys(node.paramTypeMap)).toHaveLength(
-          urlParams.length + queryParams.length,
+          urlParams.length + splatParams.length + queryParams.length,
         );
+      },
+    );
+  });
+
+  describe("fullName — equals dot-joined ancestor chain at every node, over arbitrary shapes (high)", () => {
+    test.prop([arbRouteForest], { numRuns: NUM_RUNS.standard })(
+      "every node's fullName is the dot-joined chain of names from the root to it",
+      (routes: RouteDefinition[]) => {
+        const tree = createRouteTree("", "", routes);
+
+        for (const node of collectAllNodes(tree)) {
+          const parts: string[] = [];
+          let current: RouteTree = node;
+
+          while (current.name !== "") {
+            parts.unshift(current.name);
+
+            if (!current.parent) {
+              break;
+            }
+
+            current = current.parent;
+          }
+
+          expect(node.fullName).toBe(parts.join("."));
+        }
       },
     );
   });
@@ -316,34 +278,22 @@ describe("Computed Cache Properties", () => {
 // =============================================================================
 
 describe("nodeToDefinition Properties", () => {
-  const allFixtureNodes = [
-    PARAM_TREE,
-    QUERY_TREE,
-    MIXED_TREE,
-    DEEP_TREE,
-    ABSOLUTE_PATH_TREE,
-    MIXED_ABSOLUTE_TREE,
-  ].flatMap((tree) => collectAllNodes(tree));
-
-  describe("absolute restoration — absolute flag maps to ~ prefix in output (high)", () => {
-    test.prop(
-      [
-        fc.constantFrom(
-          ...(allFixtureNodes as unknown as [RouteTree, ...RouteTree[]]),
-        ),
-      ],
-      { numRuns: NUM_RUNS.standard },
-    )(
+  describe("absolute restoration — absolute flag maps to ~ prefix in output, over arbitrary shapes (high)", () => {
+    test.prop([arbRouteForest], { numRuns: NUM_RUNS.standard })(
       "nodeToDefinition output path has ~ prefix iff node.absolute is true",
-      (node: RouteTree) => {
-        const def = nodeToDefinition(node);
+      (routes: RouteDefinition[]) => {
+        const tree = createRouteTree("", "", routes);
 
-        if (node.absolute) {
-          expect(def.path.startsWith("~")).toBe(true);
-          expect(def.path.slice(1)).toBe(node.path);
-        } else {
-          expect(def.path.startsWith("~")).toBe(false);
-          expect(def.path).toBe(node.path);
+        for (const node of collectAllNodes(tree)) {
+          const def = nodeToDefinition(node);
+
+          if (node.absolute) {
+            expect(def.path.startsWith("~")).toBe(true);
+            expect(def.path.slice(1)).toBe(node.path);
+          } else {
+            expect(def.path.startsWith("~")).toBe(false);
+            expect(def.path).toBe(node.path);
+          }
         }
       },
     );

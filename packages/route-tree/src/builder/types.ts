@@ -70,13 +70,6 @@ export interface RouteTree {
   readonly fullName: string;
 
   /**
-   * Pre-computed static path for routes without parameters.
-   * Used by buildPath fast path to avoid inject() overhead.
-   * Only set when route has no URL params, query params, or splat params.
-   */
-  readonly staticPath: string | null;
-
-  /**
    * Pre-computed parameter type map for this segment.
    * Cached to avoid recomputing on every navigation.
    * Maps param name → "url" | "query".

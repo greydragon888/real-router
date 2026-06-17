@@ -17,7 +17,7 @@ Provides the core data structure that the router operates on: an immutable, pre-
 
 ### `createRouteTree(name, path, routes, options?)`
 
-Creates an immutable route tree from route definitions. Pre-computes `fullName`, `staticPath`, `paramTypeMap`, and build templates.
+Creates an immutable route tree from route definitions. Pre-computes `fullName`, `paramTypeMap`, and build templates.
 
 ```typescript
 const tree = createRouteTree("", "", [
@@ -69,7 +69,6 @@ interface RouteTree {
   readonly absolute: boolean;                       // path starts with "~"
   readonly children: ReadonlyMap<string, RouteTree>;// O(1) lookup by name
   readonly parent: RouteTree | null;
-  readonly staticPath: string | null;               // pre-built for parameterless routes
   readonly paramTypeMap: Readonly<Record<string, "url" | "query">>;
   readonly nonAbsoluteChildren: readonly RouteTree[];
 }

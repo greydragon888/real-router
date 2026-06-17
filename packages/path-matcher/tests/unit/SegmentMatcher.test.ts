@@ -25,7 +25,6 @@ function createInputNode(
     nonAbsoluteChildren: [],
     paramMeta,
     paramTypeMap: paramMeta.paramTypeMap,
-    staticPath: paramMeta.urlParams.length === 0 ? overrides.path : null,
     ...overrides,
   };
 }
@@ -49,7 +48,6 @@ describe("type compilation", () => {
     expect(node.nonAbsoluteChildren).toStrictEqual([]);
     expect(node.paramMeta).toBeDefined();
     expect(node.paramTypeMap).toStrictEqual({});
-    expect(node.staticPath).toBe("/");
   });
 
   it("should compile CompiledRoute interface", () => {

@@ -111,6 +111,25 @@ describe("validateRoutePath", () => {
           }).not.toThrow();
         });
       });
+
+      // Regression guard (#749): these were the original "#738 breakers" but
+      // #738 made them valid configs (lazy quantifier inside a constraint, and
+      // hyphen in a param name). The #749 delimiter-balance check must NOT
+      // reject them — they have balanced `<...>` / no constraint at all.
+      it("should accept hyphenated names and balanced lazy-quantifier constraints", () => {
+        const paths = [
+          "/h/:my-param",
+          String.raw`/a/:id<\d?>`,
+          String.raw`/a/:id<\d?>?tab`,
+          "/:id<[a<b]>", // `<` legitimately inside a constraint body
+        ];
+
+        paths.forEach((path) => {
+          expect(() => {
+            validateRoutePath(path, routeName, methodName);
+          }).not.toThrow();
+        });
+      });
     });
 
     describe("Query parameters", () => {
@@ -274,6 +293,28 @@ describe("validateRoutePath", () => {
           expect(() => {
             validateRoutePath(path, routeName, methodName);
           }).toThrow(/invalid path format/);
+        });
+      });
+    });
+
+    describe("Constraint syntax errors (#749)", () => {
+      // An unbalanced `<` desyncs match vs build grammars: the param name is
+      // truncated at `<`, but the unclosed constraint survives as a literal in
+      // the trie node path, so `buildPath` later throws `Missing required
+      // param`. `validateRoute` is the gatekeeper that must reject it early.
+      it("should throw for unbalanced constraint delimiters", () => {
+        const paths = [
+          String.raw`/u/:id<\d+`, // no closing '>'
+          "/u/:id<", // dangling '<'
+          "/u/:id>", // stray '>' with no '<'
+          String.raw`/u/:id<\d+>>`, // extra '>'
+          String.raw`/a/:id<\d?>?tab<`, // trailing dangling '<' after a valid constraint
+        ];
+
+        paths.forEach((path) => {
+          expect(() => {
+            validateRoutePath(path, routeName, methodName);
+          }).toThrow(/constraint/);
         });
       });
     });

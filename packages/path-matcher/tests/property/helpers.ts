@@ -51,7 +51,6 @@ export function createInputNode(
     nonAbsoluteChildren: [],
     paramMeta,
     paramTypeMap: paramMeta.paramTypeMap,
-    staticPath: paramMeta.urlParams.length === 0 ? overrides.path : null,
     ...overrides,
   };
 }

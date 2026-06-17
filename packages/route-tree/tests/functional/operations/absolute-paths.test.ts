@@ -22,7 +22,7 @@ describe("New API - absolute paths", () => {
     expect(result?.name).toBe("parent.absolute");
   });
 
-  it("should compute staticPath for child of absolute route", () => {
+  it("should match a static child under an absolute route", () => {
     const tree = createRouteTree("", "", [
       {
         name: "admin",
@@ -37,10 +37,28 @@ describe("New API - absolute paths", () => {
       },
     ]);
 
-    // Child of an absolute route should have correct staticPath
     const result = matchPath(tree, "/dashboard/stats");
 
     expect(result?.name).toBe("admin.dashboard.stats");
+  });
+
+  // #748 regression guard: a static child under a pathless grouping node must
+  // still match end-to-end (the dead staticPath cache held a wrong value for
+  // this shape; removing the cache must not change matching behavior).
+  it("should match a static child through a pathless grouping node", () => {
+    const tree = createRouteTree("", "", [
+      {
+        name: "a",
+        path: "/a",
+        children: [
+          { name: "g", path: "", children: [{ name: "b", path: "/b" }] },
+        ],
+      },
+    ]);
+
+    const result = matchPath(tree, "/a/b");
+
+    expect(result?.name).toBe("a.g.b");
   });
 
   it("should match absolute path with route params", () => {

@@ -398,8 +398,7 @@ boxplot(() => {
 // ============================================================================
 // Category 10: R6/R7 Fast Path - Deep Static Routes
 // ============================================================================
-// Tests the fast path optimization for pre-computed staticPath on deeply
-// nested routes WITHOUT parameters. This is where the optimization shines.
+// Tests buildPath on deeply nested routes WITHOUT parameters.
 
 boxplot(() => {
   summary(() => {

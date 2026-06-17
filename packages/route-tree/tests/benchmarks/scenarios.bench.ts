@@ -41,7 +41,7 @@ function createMatcher(tree: any): Matcher {
   const warmupRoutes = generateSpaRoutes();
 
   for (let i = 0; i < 100; i++) {
-    // Warmup: createRouteTree (freeze, paramMeta, staticPath)
+    // Warmup: createRouteTree (freeze, paramMeta)
     const tree = createRouteTree("", "", warmupRoutes);
 
     // Warmup: createRouteTreeBuilder + add + build
