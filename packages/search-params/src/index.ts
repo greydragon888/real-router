@@ -8,7 +8,7 @@
  * @module search-params
  */
 
-export { build, keep, omit, parse, parseInto } from "./searchParams";
+export { build, keep, omit, parse } from "./searchParams";
 
 export { DEFAULT_QUERY_PARAMS } from "./encode";
 

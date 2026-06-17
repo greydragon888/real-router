@@ -31,14 +31,6 @@
 | 9   | Omit/keep duality          | `{...parse(omit(qs, keys).querystring, opts), ...parse(keep(qs, keys).querystring, opts)} ≡ parse(qs, opts)`. Removing keys with `omit` and keeping the same keys with `keep` produces complementary subsets that reconstruct the original. |
 | 10  | Keep no `?` prefix         | `keep(qs, keys).querystring` never starts with `?`, regardless of whether the input has a `?` prefix. This contrasts with `omit` which preserves the `?` prefix (invariant #7).                                                             |
 
-## parseInto
-
-| #   | Invariant              | Description                                                                                                                                              |
-| --- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Equivalence with parse | `parseInto(qs, {})` produces the same result as `parse("?" + qs)`. `parseInto` is an allocation-free optimization of `parse`, not a different operation. |
-| 2   | Non-destructive merge  | `parseInto(qs, target)` does not overwrite keys in the target object that are absent from the query string. Pre-existing values survive the call.        |
-| 3   | Additive behavior      | After `parseInto(qs, target)`, the target contains all keys from both the original target and the parsed query string.                                   |
-
 ## Format Roundtrips
 
 | #   | Invariant                            | Description                                                                                                                                                                                                                                              |
@@ -65,5 +57,4 @@
 | ----------------------------------------- | ---------- | -------------------------- |
 | `tests/property/parseBuild.properties.ts` | 1–9        | Core parse/build cycle     |
 | `tests/property/omitKeep.properties.ts`   | 1–10       | Omit and keep operations   |
-| `tests/property/parseInto.properties.ts`  | 1–3        | parseInto equivalence      |
 | `tests/property/formats.properties.ts`    | 1–15       | Format-specific roundtrips |

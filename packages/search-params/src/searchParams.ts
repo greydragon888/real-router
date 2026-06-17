@@ -191,30 +191,8 @@ export const parse = (
 };
 
 /**
- * Parse query string directly into a target object.
- * Avoids creating intermediate object and Object.assign.
- * Optimized for loose mode query params handling.
- *
- * Uses the cached default (auto) strategies, matching `parse`/`build`, so
- * `parseInto(qs, {})` stays equivalent to `parse("?" + qs)`. (#744)
- *
- * @param queryString - Query string without leading "?"
- * @param target - Object to add params to
- */
-export function parseInto(
-  queryString: string,
-  target: Record<string, unknown>,
-): void {
-  if (queryString === "") {
-    return;
-  }
-
-  parseIntoInternal(queryString, target, makeOptions().strategies);
-}
-
-/**
  * Internal function to parse a query string into a target object.
- * Shared by `parse` and `parseInto`.
+ * The shared parse engine behind `parse`.
  *
  * @internal
  */

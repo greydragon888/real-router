@@ -13,7 +13,7 @@
 ```
 search-params/
 ├── src/
-│   ├── searchParams.ts       — Core functions: parse, parseInto, build, omit, keep
+│   ├── searchParams.ts       — Core functions: parse, build, omit, keep
 │   ├── encode.ts             — Encoding logic + option resolution (makeOptions)
 │   ├── decode.ts             — Decoding logic (value + strategy dispatch)
 │   ├── utils.ts              — getSearch() — query string extraction
@@ -66,9 +66,6 @@ new SegmentMatcher({
 ```typescript
 parse(path: string, opts?: Options): Record<string, unknown>
 // Parse query string to object. Extracts "?" portion from full path.
-
-parseInto(queryString: string, target: Record<string, unknown>): void
-// Parse directly into existing object (allocation-free). No leading "?" expected.
 
 build(params: Record<string, unknown>, opts?: Options): string
 // Build query string from object. Returns string without leading "?".
@@ -357,7 +354,6 @@ No circular dependencies.
 | `build()`     | O(n)       | n = total value lengths               |
 | `omit()`      | O(n + m)   | n = query string length, m = omit set |
 | `keep()`      | O(n + m)   | n = query string length, m = keep set |
-| `parseInto()` | O(n)       | Same as parse, no object allocation   |
 
 ### Optimizations
 
@@ -375,12 +371,10 @@ No circular dependencies.
 | Loop instead of `.map().join()` in arrays | No intermediate array during encoding              |
 | `codePointAt` scan in numberFormat       | No regex engine overhead                          |
 | Set-based omit/keep                      | O(1) per-param lookup instead of O(m) scan        |
-| `parseInto()` mutation                   | Avoids intermediate object + `Object.assign`      |
 
 ### Memory
 
 - No intermediate arrays in parse (index-based iteration)
-- `parseInto()` mutates target directly
 - Strategy objects are singletons (one per format combination)
 - `Set` for omit/keep (O(m) space, recycled after call)
 - No intermediate arrays in omit/keep (string concatenation via `appendChunk`)

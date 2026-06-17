@@ -8,7 +8,7 @@
 
 import { describe, it, expect } from "vitest";
 
-import { build, keep, omit, parse, parseInto } from "../../src";
+import { build, keep, omit, parse } from "../../src";
 import { decodeValue } from "../../src/decode";
 import { encode, encodeValue, makeOptions } from "../../src/encode";
 import { getSearch } from "../../src/utils";
@@ -231,56 +231,6 @@ describe("search-params", () => {
         price: 12.5,
         name: "abc",
       });
-    });
-  });
-
-  // ===========================================================================
-  // parseInto
-  // ===========================================================================
-
-  describe("parseInto", () => {
-    it("parses query string directly into target object", () => {
-      const target: Record<string, unknown> = { existing: "value" };
-
-      parseInto("page=1&sort=name", target);
-
-      expect(target).toStrictEqual({
-        existing: "value",
-        page: 1,
-        sort: "name",
-      });
-    });
-
-    it("handles empty query string (fast path)", () => {
-      const target: Record<string, unknown> = { existing: "value" };
-
-      parseInto("", target);
-
-      expect(target).toStrictEqual({ existing: "value" });
-    });
-
-    it("handles multiple values for same parameter", () => {
-      const target: Record<string, unknown> = {};
-
-      parseInto("id=1&id=2", target);
-
-      expect(target).toStrictEqual({ id: [1, 2] });
-    });
-
-    it("handles bracket notation for arrays", () => {
-      const target: Record<string, unknown> = {};
-
-      parseInto("items[]=a&items[]=b", target);
-
-      expect(target).toStrictEqual({ items: ["a", "b"] });
-    });
-
-    it("handles key-only parameters", () => {
-      const target: Record<string, unknown> = {};
-
-      parseInto("flag&enabled", target);
-
-      expect(target).toStrictEqual({ flag: null, enabled: null });
     });
   });
 

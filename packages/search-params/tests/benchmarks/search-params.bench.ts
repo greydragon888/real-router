@@ -10,7 +10,7 @@
 
 import { barplot, bench, boxplot, lineplot, summary } from "mitata";
 
-import { build, keep, omit, parse, parseInto } from "../../src";
+import { build, keep, omit, parse } from "../../src";
 import { decodeValue } from "../../src/decode";
 import { makeOptions } from "../../src/encode";
 
@@ -170,43 +170,6 @@ boxplot(() => {
         nullFormat: "default",
       });
     });
-  });
-});
-
-// =============================================================================
-// parseInto() benchmarks
-// =============================================================================
-
-// 1.6 parseInto vs parse
-boxplot(() => {
-  summary(() => {
-    const qs = "page=1&sort=name&limit=10";
-
-    bench("parse (3 params)", () => {
-      parse(qs);
-    });
-
-    bench("parseInto (3 params)", () => {
-      const target: Record<string, unknown> = {};
-
-      parseInto(qs, target);
-    });
-  });
-});
-
-// 1.7 parseInto scaling
-lineplot(() => {
-  summary(() => {
-    bench("parseInto: $count params", function* (state: BenchState) {
-      const count = state.get("count") as number;
-      const queryString = generateQueryString(count);
-
-      yield () => {
-        const target: Record<string, unknown> = {};
-
-        parseInto(queryString, target);
-      };
-    }).args("count", [5, 10, 20, 50]);
   });
 });
 

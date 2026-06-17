@@ -17,7 +17,6 @@ Fast, configurable query string operations. Injected into `path-matcher` via `ro
 | Function | Description |
 |----------|-------------|
 | `parse(queryString, options?)` | Parse query string to object |
-| `parseInto(queryString, target)` | Parse directly into existing object (avoids allocation) |
 | `build(params, options?)` | Build query string from object |
 | `omit(path, paramsToOmit, options?)` | Remove specified parameters |
 | `keep(path, paramsToKeep, options?)` | Keep only specified parameters |
@@ -107,7 +106,6 @@ Use `booleanFormat: "empty-true"` together with [@real-router/search-schema-plug
 ## Key Design Decisions
 
 - **Single-pass parsing** — no intermediate arrays
-- **`parseInto` direct mutation** — avoids object allocation on hot path
 - **Set-based filtering** — O(1) lookup for omit/keep operations
 - **Zero intermediate allocations in omit/keep** — inline loop with string concatenation instead of array accumulation
 - **Loop-based array encoding** — replaces `.map().join()` to avoid intermediate arrays
