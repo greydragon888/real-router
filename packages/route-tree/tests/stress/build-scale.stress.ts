@@ -11,30 +11,30 @@ import type { RouteDefinition, RouteTree } from "../../src/types";
  * yet path-matcher's stress suite covers only the MATCH side (via its own inline
  * buildTree), so the real build pipeline has no scale coverage.
  *
- * Deliberately NO heap-delta assertions: `createRouteTree` builds a frozen tree
- * that the caller discards on the next rebuild, so old trees are GC'd regardless
- * of correctness. A "build N trees, assert heap bounded" test would be GC-masked
- * theatre (see CLAUDE.md stress-test doctrine). The discriminating signals here
- * are timing-anchored-to-measured-healthy plus structural correctness at scale.
+ * Two deliberate omissions, both verified by mutation during the stress audit:
+ *  - NO heap-delta assertions: `createRouteTree` builds a frozen tree the caller
+ *    discards on the next rebuild, so old trees are GC'd regardless of cleanup →
+ *    a "build N trees, assert heap bounded" test is GC-masked theatre.
+ *  - NO wall-clock timing assertions: the build is structurally O(n) with no
+ *    quadratic-prone hot spot. A 100M-op O(n²) regression injected into buildTree
+ *    stayed UNDER a 1 s ceiling at 10k routes, so any non-flaky timing bound here
+ *    would be theatre. (The one genuine anti-quadratic timing guard lives in
+ *    validate-scale.stress.ts, where dup detection has a real Set-vs-array target.)
+ *
+ * The discriminating signal here is structural correctness at scale (no dropped
+ * or corrupted nodes) plus recursion-depth robustness (no premature overflow).
  */
 
 const SIBLINGS = 10_000;
-// Measured healthy build of 10k siblings ≈ 6 ms. Ceiling is a catastrophe guard
-// (~170×): a superlinear regression in the build (e.g. an O(n) scan per node
-// turning the whole build O(n²)) pushes 10k routes into hundreds of ms / seconds.
-// Generous margin tolerates CPU-load jitter without flaking.
-const BUILD_MS_CEILING = 1000;
 
-describe("S1: wide build — 10k sibling routes build correctly and cheaply", () => {
-  it(`builds ${SIBLINGS} siblings under ${BUILD_MS_CEILING}ms with no dropped routes`, () => {
+describe("S1: wide build — 10k sibling routes build correctly at scale", () => {
+  it(`builds ${SIBLINGS} siblings with no dropped or corrupted routes`, () => {
     const routes: RouteDefinition[] = Array.from(
       { length: SIBLINGS },
       (_, i) => ({ name: `r${i}`, path: `/r${i}` }),
     );
 
-    const t0 = performance.now();
     const tree = createRouteTree("", "", routes);
-    const buildMs = performance.now() - t0;
 
     expect(tree.children.size).toBe(SIBLINGS);
 
@@ -46,8 +46,6 @@ describe("S1: wide build — 10k sibling routes build correctly and cheaply", ()
       expect(node?.path).toBe(`/r${i}`);
       expect(node?.fullName).toBe(`r${i}`);
     }
-
-    expect(buildMs).toBeLessThan(BUILD_MS_CEILING);
   });
 });
 
@@ -60,12 +58,12 @@ const DEPTH = 1000;
 // comfortably below the forks cliff (confirmed OK at 2000) for non-flaky margin,
 // and is still ~50× deeper than any realistic route tree.
 //
-// Discriminates: a refactor that adds recursion frames per level lowers the cliff
-// below 1000 → the build throws RangeError here. Build time stays ~linear in
-// depth (V8 cons-strings keep `parent.fullName + "." + name` O(1) per node), so
-// the ms ceiling is a loose anti-catastrophe bound only — the primary guard is
-// "no premature stack overflow + all levels processed".
-const DEEP_BUILD_MS_CEILING = 500;
+// Discriminates two ways (both mutation-verified): a refactor that adds recursion
+// frames per level lowers the cliff below 1000 → the build throws RangeError
+// here; and a truncation bug that stops recursing early → the level walk below
+// reaches < DEPTH-1. No timing assertion — build time is ~linear in depth (V8
+// cons-strings keep `parent.fullName + "." + name` O(1) per node), so a ms ceiling
+// would guard nothing real.
 
 describe("S2: deep nesting — realistic-deep tree builds without stack overflow", () => {
   it(`builds a ${DEPTH}-level linear nesting without RangeError`, () => {
@@ -80,9 +78,7 @@ describe("S2: deep nesting — realistic-deep tree builds without stack overflow
       def = { name: `n${i}`, path: `/s${i}`, children: [def] };
     }
 
-    const t0 = performance.now();
     const tree = createRouteTree("", "", [def]);
-    const buildMs = performance.now() - t0;
 
     // Walk to the deepest node; assert all DEPTH levels were processed (not
     // silently truncated). Reaching n{DEPTH-1} proves the recursion ran full.
@@ -96,7 +92,5 @@ describe("S2: deep nesting — realistic-deep tree builds without stack overflow
 
     expect(level).toBe(DEPTH - 1);
     expect(node?.name).toBe(`n${DEPTH - 1}`);
-
-    expect(buildMs).toBeLessThan(DEEP_BUILD_MS_CEILING);
   });
 });

@@ -10,28 +10,25 @@ import type { RouteDefinition, RouteTree } from "../../src/types";
  * inverse of `createRouteTree` used by `cloneRouter` and route introspection. It
  * runs on every SSR clone, so its scale behaviour is on a real hot path.
  *
- * No heap assertions (same GC-masking reasoning as build-scale): the signals are
- * structural fidelity at scale and anti-catastrophe timing. The functional/
- * property suites already prove round-trip correctness on small trees; these add
- * the breadth + recursion-depth dimensions those cannot.
+ * No heap assertions (same GC-masking reasoning as build-scale) and no wall-clock
+ * timing (serialize is O(n) with no quadratic target — a timing bound would be
+ * theatre, see build-scale header). The signal is structural fidelity at scale:
+ * the functional/property suites prove round-trip correctness on small trees;
+ * these add the breadth + recursion-depth dimensions those cannot.
  */
 
 const SIBLINGS = 10_000;
-// Measured healthy round-trip (serialize 10k + rebuild) ≈ 6 ms. Ceiling ~100×.
-const ROUNDTRIP_MS_CEILING = 600;
 
 describe("S3: round-trip — serialize + rebuild preserves structure at scale", () => {
-  it(`round-trips ${SIBLINGS} routes under ${ROUNDTRIP_MS_CEILING}ms with no drift`, () => {
+  it(`round-trips ${SIBLINGS} routes with no structural drift`, () => {
     const routes: RouteDefinition[] = Array.from(
       { length: SIBLINGS },
       (_, i) => ({ name: `r${i}`, path: `/r${i}` }),
     );
     const tree = createRouteTree("", "", routes);
 
-    const t0 = performance.now();
     const defs = routeTreeToDefinitions(tree);
     const rebuilt = createRouteTree("", "", defs);
-    const rtMs = performance.now() - t0;
 
     expect(defs).toHaveLength(SIBLINGS);
     expect(rebuilt.children.size).toBe(SIBLINGS);
@@ -41,8 +38,6 @@ describe("S3: round-trip — serialize + rebuild preserves structure at scale", 
     for (let i = 0; i < SIBLINGS; i += 131) {
       expect(rebuilt.children.get(`r${i}`)?.path).toBe(`/r${i}`);
     }
-
-    expect(rtMs).toBeLessThan(ROUNDTRIP_MS_CEILING);
   });
 
   // Separate recursion cliff from build-scale's S2: routeTreeToDefinitions'
