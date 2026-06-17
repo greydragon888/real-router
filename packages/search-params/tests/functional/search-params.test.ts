@@ -19,16 +19,25 @@ describe("search-params", () => {
   // ===========================================================================
 
   describe("parse", () => {
+    it("uses the same auto defaults as build when no options are given", () => {
+      // build() without options uses auto strategies; parse() must match so
+      // parse(build(x)) === x without options (no silent type loss). (#744)
+      const original = { n: 5, flag: true, sort: "name" };
+
+      expect(parse(build(original))).toStrictEqual(original);
+    });
+
     it("parses simple query string", () => {
+      // No options ⇒ auto defaults (same as build): "1" decodes to number 1.
       expect(parse("page=1&sort=name")).toStrictEqual({
-        page: "1",
+        page: 1,
         sort: "name",
       });
     });
 
     it("parses query string with ? prefix", () => {
       expect(parse("?page=1&sort=name")).toStrictEqual({
-        page: "1",
+        page: 1,
         sort: "name",
       });
     });
@@ -43,7 +52,7 @@ describe("search-params", () => {
 
     it("handles multiple values for same parameter", () => {
       expect(parse("id=1&id=2&id=3")).toStrictEqual({
-        id: ["1", "2", "3"],
+        id: [1, 2, 3],
       });
     });
 
@@ -237,7 +246,7 @@ describe("search-params", () => {
 
       expect(target).toStrictEqual({
         existing: "value",
-        page: "1",
+        page: 1,
         sort: "name",
       });
     });
@@ -255,7 +264,7 @@ describe("search-params", () => {
 
       parseInto("id=1&id=2", target);
 
-      expect(target).toStrictEqual({ id: ["1", "2"] });
+      expect(target).toStrictEqual({ id: [1, 2] });
     });
 
     it("handles bracket notation for arrays", () => {

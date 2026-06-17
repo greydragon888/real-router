@@ -213,13 +213,12 @@ parse(path, opts?)
        │
        ▼
 ┌───────────────┐
-│  Fast paths   │  Empty string → {}
-│               │  No opts → parseSimple() (skip strategy resolution)
+│  Fast path    │  Empty string → {}
 └──────┬────────┘
        │
        ▼
 ┌───────────────┐
-│  makeOptions()│  Resolve strategies once (cached DEFAULT_OPTIONS)
+│  makeOptions()│  Resolve strategies once; no opts → cached DEFAULT_OPTIONS (auto)
 └──────┬────────┘
        │
        ▼
@@ -233,12 +232,12 @@ parse(path, opts?)
 └───────────────┘
 ```
 
-**Dual parsing modes:**
+**Parsing modes:**
 
-| Mode                       | Trigger          | Behavior                                |
-| -------------------------- | ---------------- | --------------------------------------- |
-| `parseSimple()`            | No options       | String values only, no strategies       |
-| Full parse with strategies | Options provided | Boolean/null conversion, array handling |
+| Mode                       | Trigger          | Behavior                                          |
+| -------------------------- | ---------------- | ------------------------------------------------- |
+| Default strategies         | No options       | Cached `DEFAULT_OPTIONS` (auto) — same as `build` |
+| Full parse with strategies | Options provided | Boolean/null/number conversion, array handling    |
 
 ### Build Flow
 
@@ -365,7 +364,7 @@ No circular dependencies.
 | Optimization                             | Benefit                                          |
 | ---------------------------------------- | ------------------------------------------------ |
 | Empty string fast path                   | O(1) for empty query strings                     |
-| No-options fast path                     | Skip strategy resolution (most common case)      |
+| No-options path                          | Reuses cached `DEFAULT_OPTIONS` — no re-resolution or allocation |
 | `DEFAULT_OPTIONS` constant               | Cached default strategies, no allocation         |
 | Index-based iteration                    | No `split("&")` intermediate array               |
 | `decodeValue` two-check                  | Most values skip decoding entirely               |

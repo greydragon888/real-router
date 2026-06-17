@@ -147,7 +147,7 @@ boxplot(() => {
   summary(() => {
     const qs = "page=1&sort=name&limit=10&offset=0&active=true";
 
-    bench("parse: no options (parseSimple)", () => {
+    bench("parse: no options (cached default strategies)", () => {
       parse(qs);
     });
 

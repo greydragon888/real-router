@@ -82,7 +82,7 @@ function addToParams(
 }
 
 /**
- * Decodes a parameter value based on whether strategies are provided.
+ * Decodes a parameter value through the resolved strategies.
  *
  * @internal
  */
@@ -91,15 +91,11 @@ function decodeParamValue(
   eqPos: number,
   end: number,
   hasValue: boolean,
-  strategies: ResolvedStrategies | undefined,
+  strategies: ResolvedStrategies,
 ): unknown {
-  if (strategies) {
-    const rawValue = hasValue ? searchPart.slice(eqPos + 1, end) : undefined;
+  const rawValue = hasValue ? searchPart.slice(eqPos + 1, end) : undefined;
 
-    return decode(rawValue, strategies);
-  }
-
-  return hasValue ? decodeValue(searchPart.slice(eqPos + 1, end)) : null;
+  return decode(rawValue, strategies);
 }
 
 /**
@@ -112,7 +108,7 @@ function processParamChunk(
   start: number,
   end: number,
   params: Record<string, unknown>,
-  strategies?: ResolvedStrategies,
+  strategies: ResolvedStrategies,
 ): void {
   const eqPos = searchPart.indexOf("=", start);
   const hasValue = eqPos !== -1 && eqPos < end;
@@ -134,7 +130,7 @@ function processParamChunk(
   const decodedName = decodeValue(searchPart.slice(start, nameEnd));
 
   // Comma array decode: split raw value before individual element decoding
-  if (!hasBrackets && hasValue && strategies?.array.decodeValue) {
+  if (!hasBrackets && hasValue && strategies.array.decodeValue) {
     const rawValue = searchPart.slice(eqPos + 1, end);
     const parts = strategies.array.decodeValue(rawValue);
 
@@ -185,51 +181,22 @@ export const parse = (
     return {};
   }
 
-  // Fast path: no options - use simplified parser (skip strategy resolution)
-  if (!opts) {
-    return parseSimple(searchPart);
-  }
-
-  const options = makeOptions(opts);
+  // makeOptions(undefined) returns the cached DEFAULT_OPTIONS (auto) — the same
+  // defaults `build` uses — so parse(build(x)) === x even without options. (#744)
   const params: Record<string, unknown> = {};
 
-  // Process each parameter
-  let start = 0;
-  const length = searchPart.length;
-
-  while (start < length) {
-    let end = searchPart.indexOf("&", start);
-
-    if (end === -1) {
-      end = length;
-    }
-
-    processParamChunk(searchPart, start, end, params, options.strategies);
-    start = end + 1;
-  }
+  parseIntoInternal(searchPart, params, makeOptions(opts).strategies);
 
   return params;
 };
 
 /**
- * Simplified parse without strategy resolution.
- * Used when no options are provided (most common case).
- * Returns string values only (no boolean/null conversion).
- *
- * @internal
- */
-function parseSimple(searchPart: string): Record<string, unknown> {
-  const params: Record<string, unknown> = {};
-
-  parseIntoInternal(searchPart, params);
-
-  return params;
-}
-
-/**
  * Parse query string directly into a target object.
  * Avoids creating intermediate object and Object.assign.
  * Optimized for loose mode query params handling.
+ *
+ * Uses the cached default (auto) strategies, matching `parse`/`build`, so
+ * `parseInto(qs, {})` stays equivalent to `parse("?" + qs)`. (#744)
  *
  * @param queryString - Query string without leading "?"
  * @param target - Object to add params to
@@ -242,18 +209,19 @@ export function parseInto(
     return;
   }
 
-  parseIntoInternal(queryString, target);
+  parseIntoInternal(queryString, target, makeOptions().strategies);
 }
 
 /**
- * Internal function to parse query string into target object.
- * Shared by parseSimple and parseInto.
+ * Internal function to parse a query string into a target object.
+ * Shared by `parse` and `parseInto`.
  *
  * @internal
  */
 function parseIntoInternal(
   searchPart: string,
   params: Record<string, unknown>,
+  strategies: ResolvedStrategies,
 ): void {
   let start = 0;
   const length = searchPart.length;
@@ -265,8 +233,7 @@ function parseIntoInternal(
       end = length;
     }
 
-    // No strategies = simple decoding
-    processParamChunk(searchPart, start, end, params);
+    processParamChunk(searchPart, start, end, params, strategies);
     start = end + 1;
   }
 }

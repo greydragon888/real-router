@@ -52,7 +52,13 @@ describe("Roundtrip Properties", () => {
   });
 
   describe("query-only", () => {
-    const matcher = createQueryMatcher();
+    // Pin none strategies so arbitrary string values round-trip verbatim — this
+    // test checks structural URL roundtrip, not type coercion (default is now
+    // auto, which would coerce "0"→0 / "true"→true; that's covered in search-params). (#744)
+    const matcher = createQueryMatcher({
+      numberFormat: "none",
+      booleanFormat: "none",
+    });
 
     test.prop([arbAnyQueryValue, arbAnyQueryValue], {
       numRuns: NUM_RUNS.thorough,
@@ -144,7 +150,12 @@ describe("Roundtrip Properties", () => {
   });
 
   describe("URL params and query params are isolated in match result", () => {
-    const matcher = createMixedMatcher();
+    // none strategies keep the arbitrary query value an opaque string (default
+    // auto would coerce numeric/boolean-looking values). (#744)
+    const matcher = createMixedMatcher({
+      numberFormat: "none",
+      booleanFormat: "none",
+    });
 
     test.prop([arbAnyParamValue, arbAnyQueryValue], {
       numRuns: NUM_RUNS.standard,
