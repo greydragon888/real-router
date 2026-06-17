@@ -15,16 +15,35 @@ function createRouterError(methodName: string, message: string): TypeError {
 }
 
 /**
- * Matches a balanced `<...>` parameter constraint.
+ * Reports whether a path's `<...>` constraint delimiters are balanced.
  *
- * Mirrors path-matcher's `CONSTRAINT_PATTERN_RGX` (registration.ts): the body
- * is `[^>]*`, so a `<` may legitimately appear inside a constraint regex
- * (e.g. `<[a<b]>`). Stripping every balanced constraint leaves only *stray*
- * `<`/`>` delimiters, which is how `validateRoutePath` detects an unbalanced
- * constraint without re-implementing the param grammar.
+ * Single linear scan: a `<` opens a constraint and the first following `>`
+ * closes it; a `<` inside the body is allowed (mirrors path-matcher's `<[^>]*>`
+ * grammar, e.g. `<[a<b]>`). A `>` seen outside a constraint, or a `<` left
+ * unclosed at the end, is a stray/unbalanced delimiter.
+ *
+ * Implemented as a scan rather than a `replaceAll(/<[^>]*>/, "")` strip so the
+ * intent — delimiter *balance*, not HTML *sanitization* — is unambiguous to both
+ * readers and static analysis (the regex strip is the classic incomplete-tag
+ * sanitizer pattern, which it is not).
  */
-// eslint-disable-next-line sonarjs/slow-regex -- bounded input from route definitions, not user input
-const CONSTRAINT_PATTERN_RGX = /<[^>]*>/g;
+function hasBalancedConstraints(path: string): boolean {
+  let insideConstraint = false;
+
+  for (const char of path) {
+    if (char === "<") {
+      insideConstraint = true;
+    } else if (char === ">") {
+      if (!insideConstraint) {
+        return false; // stray `>` with no open `<`
+      }
+
+      insideConstraint = false;
+    }
+  }
+
+  return !insideConstraint; // a still-open `<` is an unclosed constraint
+}
 
 /**
  * Validates route path format.
@@ -114,16 +133,13 @@ export function validateRoutePath(
     );
   }
 
-  // Balanced constraint delimiters. After stripping every balanced `<...>`
-  // constraint, any remaining `<` or `>` is a stray/unbalanced delimiter. Such
-  // a path passes the format checks but desyncs match vs build downstream: the
-  // param name is truncated at the stray `<`, the unclosed constraint survives
-  // as a literal in the trie node path, and `buildPath` then throws
-  // `Missing required param`. Reject it here, at the gatekeeper (#749 — the
-  // residual gap left by #738, which only unified the *balanced* grammar).
-  const residualDelimiters = path.replaceAll(CONSTRAINT_PATTERN_RGX, "");
-
-  if (residualDelimiters.includes("<") || residualDelimiters.includes(">")) {
+  // Balanced constraint delimiters. A stray/unbalanced `<` or `>` passes the
+  // format checks above but desyncs match vs build downstream: the param name is
+  // truncated at the stray `<`, the unclosed constraint survives as a literal in
+  // the trie node path, and `buildPath` then throws `Missing required param`.
+  // Reject it here, at the gatekeeper (#749 — the residual gap left by #738,
+  // which only unified the *balanced* grammar).
+  if (!hasBalancedConstraints(path)) {
     throw createRouterError(
       methodName,
       `Invalid path for route "${routeName}": unbalanced constraint delimiter ('<' or '>') in "${path}"`,
