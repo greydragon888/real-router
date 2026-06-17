@@ -124,6 +124,22 @@ describe("search-params", () => {
       });
     });
 
+    it("decodes empty-true false back to a boolean (build/parse roundtrip)", () => {
+      // build({ flag: false }, empty-true) emits "flag=false"; parse must
+      // round-trip it back to boolean false, not the string "false". (#743)
+      expect(
+        parse("flag=false", { booleanFormat: "empty-true" }),
+      ).toStrictEqual({ flag: false });
+    });
+
+    it("decodes empty-true booleans in arrays without true/false asymmetry", () => {
+      // Array elements carry explicit values ("a=true&a=false"), so both must
+      // decode back to booleans — not false→bool but true→string. (#743)
+      expect(
+        parse("a=true&a=false", { booleanFormat: "empty-true" }),
+      ).toStrictEqual({ a: [true, false] });
+    });
+
     it("handles auto boolean format", () => {
       expect(
         parse("enabled=true&disabled=false", { booleanFormat: "auto" }),

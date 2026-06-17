@@ -47,7 +47,7 @@
 | 2   | Array format: none (multi-element)   | Multi-element string arrays roundtrip correctly with `arrayFormat: "none"` via repeated keys.                                                                                                                                                            |
 | 3   | Array format: comma (multi-element)  | Multi-element string arrays roundtrip correctly with `arrayFormat: "comma"`. Unencoded commas are separators; encoded `%2C` stays literal. Single values without commas remain scalars.                                                                   |
 | 4   | Boolean format: auto                 | `parse(build(params, {booleanFormat: "auto"}), {booleanFormat: "auto"}) === params`. Boolean types are preserved through the cycle.                                                                                                                      |
-| 5   | Boolean format: empty-true           | `true` values roundtrip correctly with `booleanFormat: "empty-true"` (key-only encoding).                                                                                                                                                                |
+| 5   | Boolean format: empty-true (true)    | `true` values roundtrip correctly with `booleanFormat: "empty-true"` (key-only `?flag` encoding → `decodeUndefined` → `true`).                                                                                                                            |
 | 6   | Null format: default                 | `parse(build(params, {nullFormat: "default"})) === params`. `null` is encoded as a key-only entry and parsed back as `null`.                                                                                                                             |
 | 7   | Null format: hidden                  | With `nullFormat: "hidden"`, `build` produces an empty string and `parse` returns `{}`. Null values are fully suppressed.                                                                                                                                |
 | 8   | Plus-as-space equivalence            | `parse(qs.replace(/%20/g, '+'))` produces the same result as `parse(qs)`. The decoder treats `+` as a space, equivalent to `%20`.                                                                                                                        |
@@ -57,6 +57,7 @@
 | 12  | Number format: auto decimals         | `parse(build(params, {numberFormat: "auto"}), {numberFormat: "auto"}) === params` for decimal values (e.g., `12.5`). Decimal numbers survive the roundtrip.                                                                                                  |
 | 13  | Number format: none preserves strings | `typeof parse(build({a: 42}, {numberFormat: "none"}), {numberFormat: "none"}).a === "string"`. With `numberFormat: "none"`, numbers become strings after the build/parse cycle.                                                                               |
 | 14  | Number format: auto negatives        | `parse(build(params, {numberFormat: "auto"}), {numberFormat: "auto"}) === params` for negative integer values. `build({n: -5})` emits `"n=-5"` and `parse` decodes it back to the number `-5`, so a param keeps the same type whether it arrives from a URL or from a programmatic `navigate({n: -5})`. Non-canonical negatives (`"-007"`, `"-9007199254740992"`) stay strings, mirroring the unsigned rules. (#742) |
+| 15  | Boolean format: empty-true (true & false) | `parse(build(params, {booleanFormat: "empty-true"}), {booleanFormat: "empty-true"}) === params` for **both** boolean values. `build({flag: false})` emits `"flag=false"` and `parse` decodes it back to boolean `false` (not the string `"false"`); array elements (`"a=true&a=false"`) decode both `"true"`→`true` and `"false"`→`false` symmetrically. (#743) |
 
 ## Test Files
 
@@ -65,4 +66,4 @@
 | `tests/property/parseBuild.properties.ts` | 1–9        | Core parse/build cycle     |
 | `tests/property/omitKeep.properties.ts`   | 1–10       | Omit and keep operations   |
 | `tests/property/parseInto.properties.ts`  | 1–3        | parseInto equivalence      |
-| `tests/property/formats.properties.ts`    | 1–14       | Format-specific roundtrips |
+| `tests/property/formats.properties.ts`    | 1–15       | Format-specific roundtrips |

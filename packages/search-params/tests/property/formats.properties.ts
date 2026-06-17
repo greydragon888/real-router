@@ -127,6 +127,22 @@ describe("boolean format roundtrip", () => {
       expect(parsed).toStrictEqual(trueOnly);
     },
   );
+
+  test.prop(
+    [fc.dictionary(arbSafeKey, fc.boolean(), { minKeys: 1, maxKeys: 5 })],
+    {
+      numRuns: NUM_RUNS.standard,
+    },
+  )(
+    "booleanFormat 'empty-true': both true and false roundtrip preserving boolean type",
+    (params: Record<string, boolean>) => {
+      const opts = { booleanFormat: "empty-true" as BooleanFormat };
+      const qs = build(params, opts);
+      const parsed = parse(qs, opts);
+
+      expect(parsed).toStrictEqual({ ...params });
+    },
+  );
 });
 
 describe("null format roundtrip", () => {

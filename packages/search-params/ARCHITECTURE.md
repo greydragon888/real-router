@@ -180,7 +180,7 @@ interface ArrayStrategy {
 | -------------- | ----------------- | ------------------ | ------------------------------------------------- |
 | `"auto"`       | `flag=true`       | `flag=false`       | `"true"`/`"false"` → `boolean`                    |
 | `"none"`       | `flag=true`       | `flag=false`       | No conversion — remains string                    |
-| `"empty-true"` | `flag`            | `flag=false`       | Key-only → `true`, value passed through as string |
+| `"empty-true"` | `flag`            | `flag=false`       | Key-only → `true`; `"true"`/`"false"` → `boolean` |
 
 #### Number Formats
 

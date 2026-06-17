@@ -50,7 +50,7 @@ omit("page=1&sort=name&limit=10", ["sort", "limit"]);
 |--------|---------|---------|
 | `"auto"` (default) | `active=true` | `{ active: true }` |
 | `"none"` | `active=true` | `{ active: "true" }` |
-| `"empty-true"` | `active` | `{ active: true }` |
+| `"empty-true"` | `active` (true), `active=false` (false) | `{ active: true }` / `{ active: false }` |
 
 ### `nullFormat`
 

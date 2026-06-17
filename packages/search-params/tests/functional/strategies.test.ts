@@ -75,7 +75,9 @@ describe("search-params strategies", () => {
         expect(emptyTrueBooleanStrategy.decodeUndefined()).toBe(true);
       });
 
-      it("should return null for decodeRaw (no raw matching)", () => {
+      it("should decode raw 'true'/'false' to booleans, null otherwise", () => {
+        expect(emptyTrueBooleanStrategy.decodeRaw("true")).toBe(true);
+        expect(emptyTrueBooleanStrategy.decodeRaw("false")).toBe(false);
         expect(emptyTrueBooleanStrategy.decodeRaw("anything")).toBe(null);
       });
 

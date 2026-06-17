@@ -193,7 +193,8 @@ function normalizePrimitive(
         return value;
       }
       case "empty-true": {
-        return value ? true : "false";
+        // true → key-only (?flag), false → ?flag=false; both decode back to boolean
+        return value;
       }
       default: {
         return maybeParseAutoNumber(String(value), numFmt);
@@ -216,7 +217,9 @@ function normalizeArrayElement(
     return normalizeNumber(value, numFmt);
   }
   if (typeof value === "boolean") {
-    return boolFmt === "auto"
+    // "auto" and "empty-true" both preserve the boolean type ("empty-true"
+    // decodes a "false" element back to false); "none" stringifies it.
+    return boolFmt === "auto" || boolFmt === "empty-true"
       ? value
       : maybeParseAutoNumber(String(value), numFmt);
   }
