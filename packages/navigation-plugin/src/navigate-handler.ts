@@ -127,7 +127,7 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
               api.navigateToState(matchedState, {
                 ...transitionOptions,
                 hash,
-                ...(event.hashChange ? { force: true, hashChange: true } : {}),
+                ...(event.hashChange && { force: true, hashChange: true }),
                 signal: event.signal,
               }),
             router,

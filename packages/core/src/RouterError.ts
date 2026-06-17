@@ -88,6 +88,11 @@ export class RouterError extends Error {
   ) {
     super(message ?? code);
 
+    // Subclasses don't auto-set `name`; without this `error.name` inherits
+    // "Error", breaking `error.name === "RouterError"` checks at catch sites that
+    // can't `instanceof` across bundle boundaries (cf. `RecursionDepthError`).
+    this.name = "RouterError";
+
     this.code = code;
     this.segment = segment;
     this.path = path;
@@ -311,6 +316,10 @@ export class RouterError extends Error {
       "path",
       "redirect",
       "stack",
+      // `name` is now an own enumerable prop (constructor sets it to
+      // "RouterError"); it's class metadata, not a custom field — keep it out of
+      // the serialized output (preserves toJSON shape).
+      "name",
     ]);
 
     for (const key in this) {

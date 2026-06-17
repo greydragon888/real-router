@@ -325,6 +325,7 @@ export class NavigationNamespace {
         /* v8 ignore stop */
       }
 
+      // eslint-disable-next-line unicorn/prefer-else-if -- two exhaustive `if`s read clearer here than an else-if; merging cascades into no-negated-condition / no-unnecessary-condition in this hot guard-setup branch
       if (hasGuards) {
         controller = new AbortController();
         this.#currentController = controller;

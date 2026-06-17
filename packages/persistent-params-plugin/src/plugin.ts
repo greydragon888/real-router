@@ -85,9 +85,7 @@ export class PersistentParamsPlugin {
     const safeParams = extractOwnParams(additionalParams);
     let newParams: Params | undefined;
 
-    for (const key of Object.keys(safeParams)) {
-      const value = safeParams[key];
-
+    for (const [key, value] of Object.entries(safeParams)) {
       if (value === undefined && this.#paramNamesSet.has(key)) {
         this.#paramNamesSet.delete(key);
         newParams ??= { ...this.#persistentParams };

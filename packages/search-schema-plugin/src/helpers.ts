@@ -30,9 +30,9 @@ export function getInvalidKeys(
 export function omitKeys(params: Params, keys: Set<string>): Params {
   const result: Params = {};
 
-  for (const key of Object.keys(params)) {
+  for (const [key, value] of Object.entries(params)) {
     if (!keys.has(key)) {
-      result[key] = params[key];
+      result[key] = value;
     }
   }
 

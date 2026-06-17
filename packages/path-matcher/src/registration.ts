@@ -71,18 +71,18 @@ export function registerNode(
 
   const matchPath = isAbsolute ? nodePath : buildFullPath(parentPath, nodePath);
 
-  let currentRoute: CompiledRoute | null = parentRoute;
+  const compileParentPath = isAbsolute ? "" : parentPath;
 
-  if (!isRoot) {
-    currentRoute = compileAndRegisterRoute(
-      state,
-      node,
-      matchPath,
-      isAbsolute ? "" : parentPath,
-      segments,
-      parentRoute,
-    );
-  }
+  const currentRoute: CompiledRoute | null = isRoot
+    ? parentRoute
+    : compileAndRegisterRoute(
+        state,
+        node,
+        matchPath,
+        compileParentPath,
+        segments,
+        parentRoute,
+      );
 
   for (const child of node.children.values()) {
     registerNode(state, child, matchPath, segments, currentRoute);

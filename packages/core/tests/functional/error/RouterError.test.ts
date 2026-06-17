@@ -300,10 +300,10 @@ describe("RouterError", () => {
       expect(err).toBeInstanceOf(RouterError);
     });
 
-    it("should have error name", () => {
+    it('should set name to "RouterError"', () => {
       const err = new RouterError("ERR");
 
-      expect(err.name).toBe("Error");
+      expect(err.name).toBe("RouterError");
     });
   });
 

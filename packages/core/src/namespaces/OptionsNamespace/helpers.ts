@@ -9,9 +9,7 @@ import type { Options, Params } from "@real-router/types";
 export function deepFreeze<T extends object>(obj: T): Readonly<T> {
   Object.freeze(obj);
 
-  for (const key of Object.keys(obj)) {
-    const value = (obj as Record<string, unknown>)[key];
-
+  for (const value of Object.values(obj as Record<string, unknown>)) {
     if (value && typeof value === "object" && value.constructor === Object) {
       deepFreeze(value);
     }

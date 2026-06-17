@@ -11,9 +11,9 @@ export interface RouteState<P extends Params = Params> {
   previousRoute?: State | undefined;
 }
 
-export type RouteContext<P extends Params = Params> = {
+export type RouteContext<P extends Params = Params> = RouteState<P> & {
   navigator: Navigator;
-} & RouteState<P>;
+};
 
 export interface LinkProps<
   P extends Params = Params,

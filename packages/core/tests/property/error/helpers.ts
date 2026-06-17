@@ -98,23 +98,29 @@ export const redirectArbitrary = fc.oneof(
  * Excludes reserved method names and dangerous keys
  */
 export const customFieldsArbitrary = fc.dictionary(
-  fc
-    .string({ minLength: 1, maxLength: 20 })
-    .filter(
-      (key) =>
-        ![
-          "setCode",
-          "setErrorInstance",
-          "setAdditionalFields",
-          "hasField",
-          "getField",
-          "toJSON",
-        ].includes(key) &&
-        !["code", "segment", "path", "redirect", "message", "stack"].includes(
-          key,
-        ) &&
-        !["__proto__", "constructor", "prototype"].includes(key),
-    ),
+  fc.string({ minLength: 1, maxLength: 20 }).filter(
+    (key) =>
+      ![
+        "setCode",
+        "setErrorInstance",
+        "setAdditionalFields",
+        "hasField",
+        "getField",
+        "toJSON",
+      ].includes(key) &&
+      ![
+        "code",
+        "segment",
+        "path",
+        "redirect",
+        "message",
+        "stack",
+        // `name` is Error metadata: the constructor sets it to "RouterError"
+        // and toJSON excludes it (like `stack`) — not a round-trippable field.
+        "name",
+      ].includes(key) &&
+      !["__proto__", "constructor", "prototype"].includes(key),
+  ),
   fc.anything(),
   { maxKeys: 5 },
 );

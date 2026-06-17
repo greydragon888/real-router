@@ -98,9 +98,9 @@ export function serializeRouterState(
     const filtered: Record<string, unknown> = {};
     const source = state.context;
 
-    for (const key of Object.keys(source)) {
+    for (const [key, value] of Object.entries(source)) {
       if (!exclude.includes(key)) {
-        filtered[key] = source[key];
+        filtered[key] = value;
       }
     }
 

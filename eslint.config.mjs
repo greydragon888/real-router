@@ -26,6 +26,41 @@ const gitignorePath = path.resolve(
   ".gitignore",
 );
 
+// ============================================
+// v66/v67 unicorn rules — NON-SHIPPED carve-out
+// ============================================
+// Adopted for production `src` only. Tests, benchmarks and test helpers keep the
+// v65 surface — these rules fire on idiomatic non-shipped patterns (callback
+// `push`, deeply-nested `expect()`, `forEach`, boundary constants, `break` in
+// nested loops) where modernizing is pure churn with no shipped value. Applied
+// via the broad files block (section 13.4) so .test/.properties/.stress/helpers/
+// *.bench.ts/benchmarks/** are all covered regardless of file naming.
+/** @type {import("eslint").Linter.RulesRecord} */
+const UNICORN_NON_SHIPPED_OFF = {
+  "unicorn/no-for-each": "off",
+  "unicorn/no-return-array-push": "off",
+  "unicorn/no-break-in-nested-loop": "off",
+  "unicorn/no-optional-chaining-on-undeclared-variable": "off",
+  "unicorn/no-global-object-property-assignment": "off",
+  "unicorn/no-error-property-assignment": "off",
+  "unicorn/no-unreadable-for-of-expression": "off",
+  "unicorn/no-duplicate-loops": "off",
+  "unicorn/no-unnecessary-splice": "off",
+  "unicorn/no-useless-else": "off",
+  "unicorn/no-useless-template-literals": "off",
+  "unicorn/prefer-number-coercion": "off",
+  "unicorn/prefer-type-literal-last": "off",
+  "unicorn/prefer-object-iterable-methods": "off",
+  "unicorn/prefer-array-from-map": "off",
+  "unicorn/prefer-object-define-properties": "off",
+  // Adopted opt-in rule, but tests use innerHTML for DOM fixtures (48 sites):
+  "unicorn/no-unsafe-dom-html": "off",
+  // Pre-existing rules whose v66/v67 detection newly reached test/bench files:
+  "unicorn/no-useless-fallback-in-spread": "off",
+  "unicorn/prefer-at": "off",
+  "unicorn/prefer-object-from-entries": "off",
+};
+
 export default tsEslint.config(
   // ============================================
   // 1. GLOBAL IGNORES (ESLint 9.30+ globalIgnores helper)
@@ -569,7 +604,7 @@ export default tsEslint.config(
   // ============================================
   // 8. UNICORN CONFIGURATION (Modern JS/TS patterns)
   // ============================================
-  // Updated for eslint-plugin-unicorn v65.0.0
+  // Updated for eslint-plugin-unicorn v67.0.0
   // Changelog: https://github.com/sindresorhus/eslint-plugin-unicorn/releases
   {
     files: ["**/*.ts", "**/*.tsx"],
@@ -616,6 +651,22 @@ export default tsEslint.config(
       "unicorn/prefer-simple-condition-first": "warn",
       // v64: Enforce consistent break position in switch cases
       "unicorn/switch-case-break-position": "warn",
+
+      // ============================================
+      // v66/v67 OPT-IN rule adopted (recommended:false → explicit enable)
+      // ============================================
+      // NOTE: `custom-error-definition` was evaluated and NOT adopted — the public
+      // `RouterError` uses a `(code, { … })` constructor that conflicts with the
+      // rule's rigid `(message, options)` requirement (unsatisfiable without a
+      // breaking redesign of RouterError's public API). The dead route-tree error
+      // classes it flagged were deleted as genuine cleanup, and `RouterError` got
+      // the one valuable finding (`this.name`) applied standalone. See
+      // .claude/unicorn-v67-rules-audit.md.
+      //
+      // Security guard against unsafe DOM HTML sinks (innerHTML/outerHTML/
+      // insertAdjacentHTML) in dom-utils. 0 prod today — forward-looking XSS
+      // guard. Off in non-shipped code below (tests use innerHTML for fixtures).
+      "unicorn/no-unsafe-dom-html": "error",
 
       // ============================================
       // DISABLED RULES (too strict or unsuitable)
@@ -678,7 +729,12 @@ export default tsEslint.config(
       "unicorn/prefer-module": "off", // We already have ESM
       "unicorn/prefer-node-protocol": "warn", // Replaces import/enforce-node-protocol-usage
       "unicorn/filename-case": "off", // We have our own file naming conventions
-      "unicorn/no-array-for-each": "off", // forEach is more readable than for-of in some cases
+      // v66 renamed `no-array-for-each` → `no-for-each` (unopinionated → ON via
+      // recommended). Enforced in production src: 0 violations — the only
+      // `.forEach` is React's `Children.forEach(children, cb)`, a 2-arg call the
+      // rule ignores (it matches only single-arg `<receiver>.forEach(cb)`). The
+      // rule is turned OFF for tests below (section 12) to avoid churning 165
+      // readable test usages into `for…of`.
       "unicorn/prefer-spread": "warn",
       "unicorn/prefer-ternary": "warn",
       "unicorn/no-useless-undefined": [
@@ -706,6 +762,75 @@ export default tsEslint.config(
       // builds selectors from untrusted data, so the forward-looking value is
       // marginal too. Re-enable if that changes.
       "unicorn/require-css-escape": "off",
+
+      // ============================================
+      // v66/v67 (#NNN) — DISABLED globally. The 66.0.0 release added ~74 rules and
+      // 67.0.0 another ~16; most we adopt via `recommended`. The ones below are
+      // declined for the documented reason. Lean adoption: enforce the high-value
+      // bug-catchers + safe modernizations in production `src`, decline the rest.
+      // ============================================
+
+      // --- Hard conflict with another active rule ---
+      // Two member-order rules → fighting autofixes. The typescript-eslint rule
+      // above (with its detailed group config) is the single source of truth.
+      "unicorn/consistent-class-member-order": "off",
+
+      // --- Fights INTENTIONAL architecture patterns (false positives by design) ---
+      // Module-level memoization caches (e.g. transitionPath.ts `cached1Result`)
+      // are assigned from inside the memoized fn — that IS the optimization.
+      "unicorn/no-top-level-assignment-in-function": "off",
+      // The router looks up routes/params by dynamic key (`name in routes`) all
+      // over core — that is the data model, not a smell.
+      "unicorn/no-computed-property-existence-check": "off",
+      // Frozen constants / module-init in the namespaces are deliberate top-level
+      // effects (immutability, registration), not accidental side effects.
+      "unicorn/no-top-level-side-effects": "off",
+      // The DI store, RouterError#toJSON, etc. copy via `for (key in obj)` with a
+      // string key — legitimate dynamic-key iteration, same model the rule above
+      // fights. The "unsafe key" here is a plain `string`, not an injection vector.
+      "unicorn/no-unsafe-property-key": "off",
+
+      // --- Semantic / coverage-annotation risk (not mechanical) ---
+      // `Number.isInteger()` → `Number.isSafeInteger()` is a BEHAVIOR change
+      // (rejects > 2^53); our checked values are small/bounded (status codes,
+      // cache sizes), so isInteger is correct and clearer. No autofix by design.
+      "unicorn/prefer-number-is-safe-integer": "off",
+      // The autofix relocates code across `/* v8 ignore next N */` boundaries
+      // (e.g. preact/Await.tsx), mis-targeting our precise coverage annotations
+      // and silently regressing the 100%-coverage gate. Control-flow inversion is
+      // not worth that risk; declined repo-wide.
+      "unicorn/prefer-early-return": "off",
+
+      // --- Naming / style opinions (high churn, low value here) ---
+      // Would rename 154 internal boolean identifiers (is/has/should/…); pure
+      // convention, and auto-renaming identifiers risks touching the API surface.
+      "unicorn/consistent-boolean-name": "off",
+      "unicorn/no-non-function-verb-prefix": "off",
+      "unicorn/prefer-short-arrow-method": "off",
+      // Would rewrite the `_private` underscore convention to `#private` fields —
+      // a runtime-semantics change (hard-private), not a lint fix.
+      "unicorn/prefer-private-class-fields": "off",
+      // Promise chaining is a legitimate style; no autofix, ~600 sites of churn.
+      "unicorn/prefer-await": "off",
+      "unicorn/prefer-minimal-ternary": "off",
+      "unicorn/max-nested-calls": "off",
+
+      // --- Library runtime-target risk (push toward too-new runtime APIs) ---
+      // `Iterator#toArray()` is ES2025 (Node 22+, limited browsers) — unsafe to
+      // emit from a library that targets a broad range of consumer runtimes.
+      "unicorn/prefer-iterator-to-array": "off",
+      // `Array#toSpliced()` is ES2023 AND changes mutate→copy semantics.
+      "unicorn/no-array-splice": "off",
+
+      // --- Low-value stylistic whose ONLY prod sites are the symlinked shared
+      // sources (shared/browser-env, shared/dom-utils). Those lint under several
+      // path views (packages/dom-utils/src/X vs packages/angular/src/dom-utils/X
+      // vs adapter symlinks), so a `files` glob carve-out is unreliable — and
+      // shared/dom-utils is frozen (no cleanliness refactors, hand-synced angular
+      // copy). Not worth it for escape-style / `Infinity` / decl-ordering. ---
+      "unicorn/prefer-unicode-code-point-escapes": "off",
+      "unicorn/prefer-global-number-constants": "off",
+      "unicorn/no-declarations-before-early-exit": "off",
     },
   },
 
@@ -833,6 +958,9 @@ export default tsEslint.config(
       "no-useless-assignment": "off", // Common test pattern: callIndex++ in mock setup
       "no-unassigned-vars": "off", // Common test pattern: let unsubscribe in describe scope, assigned in beforeEach
       "unicorn/consistent-function-scoping": "off",
+      // v66/v67 new-rule carve-out for non-shipped code is applied separately via
+      // a broad files block (see UNICORN_NON_SHIPPED_OFF) so it also covers
+      // *.bench.ts / benchmarks/** and arbitrarily-named test helpers.
       "import-x/no-default-export": "off",
       "import-x/no-unresolved": "off",
       "import-x/no-extraneous-dependencies": "off",
@@ -970,6 +1098,24 @@ export default tsEslint.config(
       // "always-truthy" to TS, but the framework wraps them in callable values.
       "@typescript-eslint/no-unnecessary-condition": "off",
     },
+  },
+
+  // ============================================
+  // 13.3 NON-SHIPPED CODE — v66/v67 unicorn carve-out
+  // ============================================
+  // Tests, benchmarks, and test helpers (ANY file name) — see the
+  // UNICORN_NON_SHIPPED_OFF rationale near the top of this file. Broad coverage so
+  // *.bench.ts and arbitrarily-named helpers (mockPlugins.ts, test-utils.ts) are
+  // all included, not just the narrow set section 12 matches.
+  {
+    files: [
+      "**/tests/**/*.ts",
+      "**/tests/**/*.tsx",
+      "**/*.bench.ts",
+      "**/*.mitata.ts",
+      "**/benchmarks/**/*.ts",
+    ],
+    rules: UNICORN_NON_SHIPPED_OFF,
   },
 
   // ============================================

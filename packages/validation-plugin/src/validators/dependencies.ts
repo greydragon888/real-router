@@ -100,7 +100,8 @@ export function validateDependencyCount(
     throw new RangeError(
       `[router.${methodName}] Dependency limit exceeded (${maxDependencies}). Current: ${currentCount}.`,
     );
-  } else if (currentCount === error) {
+  }
+  if (currentCount === error) {
     logger.error(
       `router.${methodName}`,
       `${currentCount} dependencies registered! This indicates architectural problems. Hard limit at ${maxDependencies}.`,

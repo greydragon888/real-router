@@ -24,7 +24,6 @@ route-tree/
 │   │   ├── routeTreeToDefinitions.ts — Tree → RouteDefinition[] (for cloneRouter)
 │   │   └── types.ts               — MatchResult, RouteTreeState, mode types
 │   ├── validation/
-│   │   ├── errors.ts              — RouteNodeError hierarchy
 │   │   ├── route-batch.ts         — Full route validation with duplicate detection
 │   │   └── routes.ts              — Path format validation
 │   ├── createMatcher.ts           — Matcher factory (SegmentMatcher + search-params DI)
@@ -282,17 +281,11 @@ validateRoutePath(path, routeName, methodName, parentNode?)
 | Double slashes                   | `"//users"`                | Malformed URLs                  |
 | Tilde under parameterized parent | `"~/admin"` under `"/:id"` | Ambiguous matching              |
 
-### Error Hierarchy
+### Validation Errors
 
-```
-RouteNodeError (base)       — not exported from package
-├── DuplicateRouteError     — { duplicateValue, duplicateType: "name" | "path" }  ← exported
-├── InvalidRouteError       — malformed route definition                          ← exported
-├── RouteNotFoundError      — { routeName }                                       ← internal only
-└── ParentNotFoundError     — { routeName }                                       ← internal only
-```
-
-**Note:** Only `DuplicateRouteError` and `InvalidRouteError` are exported from the package's public surface (via `builder/index.ts`). `RouteNotFoundError`, `ParentNotFoundError`, and the base `RouteNodeError` are defined in `validation/errors.ts` but not re-exported — consumers cannot `instanceof`-check these types.
+Validation failures surface as `RouterError` (via `createRouterError`, see
+`validation/routes.ts`) or `TypeError` (`validation/route-batch.ts`). There is no
+package-specific error-subclass hierarchy.
 
 ## Query Operations
 

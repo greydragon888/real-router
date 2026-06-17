@@ -38,11 +38,11 @@ export const formatTiming = (
     const durationMks = (durationMs * 1000).toFixed(2);
 
     return ` (${durationMks}μs)`;
-  } else {
-    const duration = durationMs.toFixed(2);
-
-    return ` (${duration}ms)`;
   }
+
+  const duration = durationMs.toFixed(2);
+
+  return ` (${duration}ms)`;
 };
 
 /**

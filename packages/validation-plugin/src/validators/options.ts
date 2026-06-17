@@ -190,7 +190,7 @@ function validateQueryParamsOptions(
 
   const qp = queryParams as Record<string, unknown>;
 
-  for (const key of Object.keys(qp)) {
+  for (const [key, value] of Object.entries(qp)) {
     if (!isObjKey(key, VALID_QUERY_PARAMS)) {
       throw new TypeError(
         `[router.${methodName}] Invalid "queryParams.${key}": unknown option`,
@@ -198,7 +198,7 @@ function validateQueryParamsOptions(
     }
 
     validateStringEnum(
-      qp[key],
+      value,
       `queryParams.${key}`,
       VALID_QUERY_PARAMS[key],
       methodName,

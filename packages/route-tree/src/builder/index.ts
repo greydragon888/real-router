@@ -10,8 +10,6 @@
 
 export { createRouteTree, createRouteTreeBuilder } from "./createRouteTree";
 
-export { DuplicateRouteError, InvalidRouteError } from "../validation/errors";
-
 export type {
   RouteDefinition,
   RouteTree,

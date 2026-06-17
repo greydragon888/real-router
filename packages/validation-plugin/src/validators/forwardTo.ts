@@ -135,6 +135,7 @@ function collectPathsToRoute<Dependencies extends DefaultDependencies>(
     }
 
     if (route.children && routeName.startsWith(`${fullName}.`)) {
+      // eslint-disable-next-line unicorn/no-useless-recursion -- intentional route-tree descent; a loop rewrite needs a labeled break and obscures path resolution
       return collectPathsToRoute(
         route.children,
         routeName,

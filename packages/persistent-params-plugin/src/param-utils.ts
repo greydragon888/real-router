@@ -48,9 +48,7 @@ export function mergeParams(
     }
   }
 
-  for (const key of Object.keys(current)) {
-    const value = current[key];
-
+  for (const [key, value] of Object.entries(current)) {
     if (value === undefined) {
       delete result[key];
     } else {
