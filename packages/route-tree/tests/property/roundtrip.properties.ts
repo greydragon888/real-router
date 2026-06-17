@@ -5,8 +5,8 @@ import { test } from "@fast-check/vitest";
 import {
   arbArrayFormat,
   arbArrayItems,
-  arbSafeParamValue,
-  arbSafeQueryValue,
+  arbAnyParamValue,
+  arbAnyQueryValue,
   arbSplatValue,
   createArrayMatcher,
   createMixedMatcher,
@@ -22,7 +22,7 @@ describe("Roundtrip Properties", () => {
   describe("buildPath→match", () => {
     const matcher = createParamMatcher();
 
-    test.prop([arbSafeParamValue], { numRuns: NUM_RUNS.thorough })(
+    test.prop([arbAnyParamValue], { numRuns: NUM_RUNS.thorough })(
       "matched route name equals the name used to build the path",
       (id: string) => {
         const path = matcher.buildPath("users.profile", { id });
@@ -54,7 +54,7 @@ describe("Roundtrip Properties", () => {
   describe("query-only", () => {
     const matcher = createQueryMatcher();
 
-    test.prop([arbSafeQueryValue, arbSafeQueryValue], {
+    test.prop([arbAnyQueryValue, arbAnyQueryValue], {
       numRuns: NUM_RUNS.thorough,
     })(
       "query params decoded after match equal original values",
@@ -124,7 +124,7 @@ describe("Roundtrip Properties", () => {
       return m;
     })();
 
-    test.prop([arbSafeParamValue, arbSafeParamValue, arbSafeParamValue], {
+    test.prop([arbAnyParamValue, arbAnyParamValue, arbAnyParamValue], {
       numRuns: NUM_RUNS.standard,
     })(
       "3-level nested route roundtrips name and all params",
@@ -146,7 +146,7 @@ describe("Roundtrip Properties", () => {
   describe("URL params and query params are isolated in match result", () => {
     const matcher = createMixedMatcher();
 
-    test.prop([arbSafeParamValue, arbSafeQueryValue], {
+    test.prop([arbAnyParamValue, arbAnyQueryValue], {
       numRuns: NUM_RUNS.standard,
     })(
       "URL param is typed url, query param is typed query in result meta",

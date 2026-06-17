@@ -8,8 +8,11 @@
  * - Route tree builders for testing tree invariants
  * - fast-check arbitraries for param values, query values, etc.
  *
- * Strategy: fixed route tree shapes, randomized input values —
- * same approach as path-matcher property tests.
+ * Strategy: a mix of (a) fixed route tree shapes with randomized input values
+ * (for value-roundtrip and getSegmentsByName invariants), and (b) `arbRouteForest`
+ * — a generator of random nested trees — for the STRUCTURE invariants (build
+ * idempotency, immutability, nonAbsoluteChildren, fullName, normalization) so
+ * they run over thousands of shapes rather than a handful of fixtures.
  */
 
 import { fc } from "@fast-check/vitest";
@@ -18,7 +21,7 @@ import { createRouteTree } from "../../src/builder/createRouteTree";
 import { createMatcher } from "../../src/createMatcher";
 
 import type { QueryParamsConfig } from "../../src/createMatcher";
-import type { RouteTree } from "../../src/types";
+import type { RouteDefinition, RouteTree } from "../../src/types";
 
 // =============================================================================
 // Constants
@@ -123,43 +126,6 @@ export const DEEP_TREE: RouteTree = createRouteTree("", "", [
         path: "/settings",
         children: [{ name: "theme", path: "/theme" }],
       },
-    ],
-  },
-]);
-
-/**
- * Tree with absolute path child (for normalization test).
- *
- * Structure: root > parent(/parent) > dashboard(~dashboard) [absolute]
- * The absolute path "~dashboard" → node.path = "dashboard", node.absolute = true
- */
-export const ABSOLUTE_PATH_TREE: RouteTree = createRouteTree("", "", [
-  {
-    name: "parent",
-    path: "/parent",
-    children: [{ name: "dashboard", path: "~/dashboard" }],
-  },
-]);
-
-/**
- * Tree with both absolute and non-absolute children under the same parent.
- * Used for testing nonAbsoluteChildren filtering and absolute path roundtrips.
- *
- * Structure:
- *   root
- *   └── app (/app)
- *       ├── dashboard (~/dashboard) [absolute]
- *       ├── settings (/settings)
- *       └── profile (~/profile) [absolute]
- */
-export const MIXED_ABSOLUTE_TREE: RouteTree = createRouteTree("", "", [
-  {
-    name: "app",
-    path: "/app",
-    children: [
-      { name: "dashboard", path: "~/dashboard" },
-      { name: "settings", path: "/settings" },
-      { name: "profile", path: "~/profile" },
     ],
   },
 ]);
@@ -289,19 +255,53 @@ export { getSegmentsByName } from "../../src/operations/query";
 // =============================================================================
 
 /**
- * URL-safe param value: alphanumeric + hyphen/underscore/tilde/dot.
- * Safe for ALL encoding types in URL paths.
+ * `:param` value over the FULL valid domain — safe chars AND chars that REQUIRE
+ * percent-encoding (`/ % # ? & = +`, space, unicode). buildPath must encode them
+ * and match must decode them back, so this exercises the encode/decode inverse a
+ * safe-only generator never reaches. Non-empty (an empty required param is
+ * rejected by design, #740).
  */
-export const arbSafeParamValue: fc.Arbitrary<string> = fc.stringMatching(
-  /^[a-zA-Z0-9_\-.~]{1,15}$/,
+export const arbAnyParamValue: fc.Arbitrary<string> = fc.oneof(
+  fc.stringMatching(/^[a-zA-Z0-9_\-.~]{1,15}$/),
+  fc.constantFrom(
+    "a/b",
+    "a b",
+    "a%b",
+    "a#b",
+    "a?b",
+    "a&b=c",
+    "中文",
+    "a+b",
+    "100%",
+    "<x>",
+    "a:b",
+    "a=b",
+  ),
+  fc.string({ minLength: 1, maxLength: 12 }),
 );
 
 /**
- * Safe query param value: alphanumeric + hyphen/dot/underscore.
- * No special query string chars (no &, =, ?, #, +, %)
+ * Query param value over the FULL valid domain — safe chars AND query-special
+ * chars (`& = + % # ?`, space, unicode) the serializer must encode and the parser
+ * decode. A safe-only generator never exercises that inverse.
  */
-export const arbSafeQueryValue: fc.Arbitrary<string> = fc.stringMatching(
-  /^[a-zA-Z0-9_.-]{1,15}$/,
+export const arbAnyQueryValue: fc.Arbitrary<string> = fc.oneof(
+  fc.stringMatching(/^[a-zA-Z0-9_.-]{1,15}$/),
+  fc.constantFrom(
+    "a b",
+    "a&b",
+    "a=b",
+    "a+b",
+    "100%",
+    "a#b",
+    "a?b",
+    "中文",
+    "a/b",
+    "<x>",
+    "a;b",
+    "a,b",
+  ),
+  fc.string({ minLength: 1, maxLength: 12 }),
 );
 
 /**
@@ -321,22 +321,45 @@ export const arbQueryParamNames: fc.Arbitrary<string[]> = fc
   );
 
 /**
- * Splat param value: 1–4 path segments joined by "/".
- * Each segment is a safe alphanumeric string (no slashes or special chars).
- * Produces values like "docs/readme.md" or "a/b/c".
+ * Splat param value: 1–4 NON-empty path segments joined by a single "/". Each
+ * segment now spans the encoding class (`% # ? & =`, space, unicode) — buildPath
+ * percent-encodes each segment and match decodes it. Segments never contain "/"
+ * (the separator) nor are empty, so a degenerate "//" (which match never emits,
+ * i.e. outside the splat-value domain) is excluded by construction, not to hide a
+ * bug.
  */
 export const arbSplatValue: fc.Arbitrary<string> = fc
-  .array(fc.stringMatching(/^[a-zA-Z0-9_\-.~]{1,10}$/), {
-    minLength: 1,
-    maxLength: 4,
-  })
+  .array(
+    fc.oneof(
+      fc.stringMatching(/^[a-zA-Z0-9_\-.~]{1,10}$/),
+      fc.constantFrom(
+        "a b",
+        "a%b",
+        "a#b",
+        "a?b",
+        "a&b",
+        "中文",
+        "100%",
+        "<x>",
+        "a:b",
+        "a=b",
+      ),
+    ),
+    { minLength: 1, maxLength: 4 },
+  )
   .map((segments) => segments.join("/"));
 
 /**
- * Array of 1–4 safe string items for array query param tests.
+ * Array of 1–4 string items for array query param tests. Items span the encoding
+ * class with value-only chars (space, `%`, unicode) — deliberately NOT the array
+ * format separators (`,` for comma, `[` `]` for brackets), since an item equal to
+ * its own format's separator is outside that format's roundtrippable domain.
  */
 export const arbArrayItems: fc.Arbitrary<string[]> = fc.array(
-  fc.stringMatching(/^[a-zA-Z0-9_.-]{1,10}$/),
+  fc.oneof(
+    fc.stringMatching(/^[a-zA-Z0-9_.-]{1,10}$/),
+    fc.constantFrom("a b", "a%b", "100%", "中文", "x.y"),
+  ),
   { minLength: 1, maxLength: 4 },
 );
 
@@ -380,3 +403,111 @@ export const arbUnknownRouteName: fc.Arbitrary<string> = fc.constantFrom(
   "admin.missing",
   "x.y.z.w.v",
 );
+
+// =============================================================================
+// Generative tree structure (random shapes — complements the fixed fixtures)
+// =============================================================================
+
+/**
+ * Per-node shape: which kind of param the path declares, whether it is absolute,
+ * and its children. Names and unique ids are assigned later so the generator
+ * never produces name/path collisions (which would silently last-write-wins in
+ * the children Map and break preservation/idempotency assertions).
+ */
+interface TreeShape {
+  absolute: boolean;
+  paramShape: "plain" | "url" | "query" | "urlquery" | "splat";
+  children: TreeShape[];
+}
+
+const arbParamShape: fc.Arbitrary<TreeShape["paramShape"]> = fc.constantFrom(
+  "plain",
+  "url",
+  "query",
+  "urlquery",
+  "splat",
+);
+
+/**
+ * Depth-bounded recursive shape generator. Depth is capped explicitly (instead
+ * of via fc.letrec) so trees stay small enough for hundreds of build cycles.
+ */
+function arbShape(depth: number): fc.Arbitrary<TreeShape> {
+  const children: fc.Arbitrary<TreeShape[]> =
+    depth <= 0
+      ? fc.constant([])
+      : fc.array(arbShape(depth - 1), { minLength: 0, maxLength: 3 });
+
+  return fc.record({
+    absolute: fc.boolean(),
+    paramShape: arbParamShape,
+    children,
+  });
+}
+
+/**
+ * Generates a random VALID nested route forest (`RouteDefinition[]`) with:
+ * - globally unique names (`n0`, `n1`, …) and base paths (`/s0`, `/s1`, …) — no
+ *   collisions, so every node survives the children Map;
+ * - param variety: plain, URL param (`/:p<id>`), query (`?q<id>`), both, or
+ *   splat (`/*p<id>`) — exercises every `paramMeta` branch;
+ * - absolute (`~`) flags at any level;
+ * - nesting up to 3 levels deep, up to 4 roots.
+ *
+ * Use this to verify STRUCTURE invariants (idempotency, immutability,
+ * nonAbsoluteChildren, fullName, normalization) over thousands of shapes instead
+ * of the handful of hand-written fixtures.
+ */
+export const arbRouteForest: fc.Arbitrary<RouteDefinition[]> = fc
+  .array(arbShape(3), { minLength: 1, maxLength: 4 })
+  .map((shapes) => {
+    let id = 0;
+
+    const toDef = (shape: TreeShape): RouteDefinition => {
+      const myId = id;
+
+      id += 1;
+
+      let path: string;
+
+      switch (shape.paramShape) {
+        case "url": {
+          path = `/s${myId}/:p${myId}`;
+
+          break;
+        }
+        case "query": {
+          path = `/s${myId}?q${myId}`;
+
+          break;
+        }
+        case "urlquery": {
+          path = `/s${myId}/:p${myId}?q${myId}`;
+
+          break;
+        }
+        case "splat": {
+          path = `/s${myId}/*p${myId}`;
+
+          break;
+        }
+        default: {
+          path = `/s${myId}`;
+        }
+      }
+
+      if (shape.absolute) {
+        path = `~${path}`;
+      }
+
+      const def: RouteDefinition = { name: `n${myId}`, path };
+
+      if (shape.children.length > 0) {
+        def.children = shape.children.map((child) => toDef(child));
+      }
+
+      return def;
+    };
+
+    return shapes.map((shape) => toDef(shape));
+  });
