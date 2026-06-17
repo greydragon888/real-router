@@ -233,6 +233,13 @@ describe("Computed Cache Properties", () => {
           expect(Object.isFrozen(node.children)).toBe(true);
           expect(Object.isFrozen(node.paramTypeMap)).toBe(true);
           expect(Object.isFrozen(node.nonAbsoluteChildren)).toBe(true);
+          // CC2 also covers the nested paramMeta object and its arrays (#747).
+          // constraintPatterns is a Map — excluded by design (Object.freeze
+          // can't lock Map entries; protected at the type level via ReadonlyMap).
+          expect(Object.isFrozen(node.paramMeta)).toBe(true);
+          expect(Object.isFrozen(node.paramMeta.urlParams)).toBe(true);
+          expect(Object.isFrozen(node.paramMeta.queryParams)).toBe(true);
+          expect(Object.isFrozen(node.paramMeta.spatParams)).toBe(true);
         }
       },
     );

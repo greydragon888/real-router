@@ -122,6 +122,24 @@ describe("createRouteTree", () => {
       expect(Object.isFrozen(tree)).toBe(true);
       expect(Object.isFrozen(tree.children)).toBe(true);
     });
+
+    // #747: the "immutable" tree leaked a mutable paramMeta — node was frozen
+    // but paramMeta and its arrays were not, so a push() on a tree reachable
+    // from the public API succeeded.
+    it("should freeze nested paramMeta and its arrays", () => {
+      const tree = createRouteTree("", "", [{ name: "u", path: "/u/:id?q" }]);
+      const node = tree.children.get("u")!;
+
+      expect(Object.isFrozen(node.paramMeta)).toBe(true);
+      expect(Object.isFrozen(node.paramMeta.urlParams)).toBe(true);
+      expect(Object.isFrozen(node.paramMeta.queryParams)).toBe(true);
+      expect(Object.isFrozen(node.paramMeta.spatParams)).toBe(true);
+
+      expect(() => {
+        (node.paramMeta.urlParams as string[]).push("HACKED");
+      }).toThrow(TypeError);
+      expect(node.paramMeta.urlParams).not.toContain("HACKED");
+    });
   });
 });
 
