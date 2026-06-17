@@ -11,6 +11,9 @@
 # - lint:audit: Vulnerability scan (osv-scanner, mirrors GHSA database
 #               used by GitHub Dependency Review; non-blocking if
 #               osv-scanner is not installed locally)
+# - lint:security: Diff-aware SAST (semgrep, fast local complement to cloud
+#                  CodeQL; only NEW findings on the branch; non-blocking if
+#                  semgrep is not installed locally)
 
 set -e
 
@@ -35,5 +38,9 @@ pnpm lint:deps
 # Vulnerability scan against GHSA database
 echo "🔒 Auditing dependencies for known vulnerabilities..."
 pnpm lint:audit
+
+# Diff-aware SAST on the pushed source (fast local complement to cloud CodeQL)
+echo "🔎 Running SAST diff scan (semgrep)..."
+pnpm lint:security
 
 echo "✅ All pre-push checks passed! Pushing to remote..."

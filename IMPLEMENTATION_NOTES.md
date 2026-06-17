@@ -260,10 +260,22 @@ Enforces conventional commits. Types and scopes defined in `commitlint.config.mj
 - `pnpm lint:unused` (knip — dead code detection across the full tree)
 - `pnpm lint:deps` (syncpack — final gate before the push reaches the remote)
 - `pnpm lint:audit` (osv-scanner — vulnerability scan against the GHSA database; non-blocking if the binary is missing locally)
+- `pnpm lint:security` (semgrep — diff-aware SAST over shipped `src`; fast local complement to cloud CodeQL; non-blocking if the binary is missing locally — see "Local SAST" below)
 
 **Rationale:** Pre-commit validates correctness in <2 min so it stays painless on every commit. Pre-push validates artifacts (full build pipeline + dist surface area + dep consistency + GHSA audit) — slower, runs once per push. `lint:deps` lives in **both** layers: pre-commit catches workspace version drift the moment a `package.json` is staged (~1s static check), pre-push acts as the final gate. `lint:package`/`lint:types`/`lint:unused` **also run in CI** now (#813 — see below); only `lint:duplicates`' hard threshold stays pre-push-only (CI keeps an informational jscpd SARIF channel). `lint:audit` was added after PR #643 (see "Local Dependency Audit" below) so contributors can catch CVEs locally before CI Dependency Review flags them.
 
 The full build orchestrator (`pnpm turbo run build`) is wired in `turbo.json` to depend on `bundle`, `test`, `test:properties`, AND `test:stress` — so pre-push exercises stress tests for every human push. Stress coverage is intentionally **not** duplicated in CI workflows (see "CI: `test:stress` lives only in pre-push" below).
+
+#### Local SAST: semgrep diff scan + eslint-plugin-security
+
+**Problem.** Security findings (e.g. the `js/incomplete-multi-character-sanitization` CodeQL alert on `validateRoutePath`) surfaced only in **cloud CodeQL**, after pushing and opening a PR — a slow feedback loop, and CodeQL's interprocedural taint engine is far too heavy (minutes of DB build) to run on pre-push. There was no fast, local SAST layer to catch the common classes before they reached CI.
+
+**Solution.** Two complementary local layers, mirroring the existing "external tool, non-blocking if absent" pattern of `lint:audit`:
+
+1. **`eslint-plugin-security`** (`eslint.config.mjs`, **shipped `src` only**) — in-process, zero marginal cost (runs in the existing `lint` pass, already in the pre-push build graph). High-signal rules stay ON (`detect-unsafe-regex`, `detect-eval-with-expression`, `detect-child-process`, `detect-pseudoRandomBytes`, …). Three rules are OFF as **structural** false positives for a view-layer router: `detect-object-injection` (fires on every `obj[key]`), `detect-non-literal-regexp` (the matcher builds RegExps from trusted route *config*, not user input), `detect-possible-timing-attacks` (no secret comparison exists). One verified-safe `detect-unsafe-regex` hit (`FULL_ROUTE_PATTERN` — a `.`-anchored nested `*` with disjoint classes, no backtracking) is suppressed inline with justification, keeping the rule active everywhere else.
+2. **`scripts/check-semgrep.sh`** (`pnpm lint:security`, pre-push) — semgrep over `packages/**/src`, **diff-aware** via `--baseline-commit $(git merge-base origin/master HEAD)` so only findings **introduced by the branch** can block (a legacy finding never blocks an unrelated push). Rulesets: `p/javascript` (registry breadth, cached after first fetch) + `.semgrep/rules.yml` (local custom rules, incl. an `incomplete-multi-character-sanitization` rule that mirrors the exact CodeQL alert, network-independent). Resolves a runner (`semgrep`, else `uvx semgrep`); **skips gracefully** if neither is present. Findings (exit 1) block; tool/network errors (exit ≥2) only warn.
+
+**Why this split.** No free tool is both as deep as CodeQL *and* pre-push-fast: CodeQL's depth comes from its compiled DB. So CodeQL stays the authoritative gate in CI; the local layers are **shift-left** convenience — pattern-based (eslint-security) + AST-based diff scan (semgrep) catch the common, recognizable classes (including the one that fired here) seconds after editing, while genuinely deep taint analysis remains in CI. Both local layers are non-blocking when their tool is absent, matching `lint:audit` — fresh clones and `--no-verify`/automerge pushes are never wedged, and CI CodeQL still runs.
 
 #### CI parity for publint / attw / knip (#813)
 

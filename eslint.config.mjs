@@ -20,6 +20,7 @@ import { createTypeScriptImportResolver } from "eslint-import-resolver-typescrip
 import jsdoc from "eslint-plugin-jsdoc";
 import unicorn from "eslint-plugin-unicorn";
 import noOnlyTests from "eslint-plugin-no-only-tests";
+import security from "eslint-plugin-security";
 
 const gitignorePath = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -887,6 +888,40 @@ export default tsEslint.config(
       // v4.0.0: New security rules — disable irrelevant for client-side router
       "sonarjs/review-blockchain-mnemonic": "off",
       "sonarjs/no-session-cookies-on-static-assets": "off",
+    },
+  },
+
+  // ============================================
+  // 11b. SECURITY (eslint-plugin-security) — SHIPPED src only
+  // ============================================
+  // Fast, in-process SAST in the existing lint pass: flags eval / non-literal
+  // child_process / non-literal regexp / pseudo-random for security / unsafe
+  // buffer, etc. Scoped to `**/src/**` (shipped code) — tests/benchmarks build
+  // throwaway inputs that trip these rules with no shipped risk.
+  //
+  // Three recommended rules are OFF as structural false positives for a
+  // client-side router library (kept narrow — the high-signal rules like
+  // detect-unsafe-regex, detect-eval-with-expression, detect-child-process stay
+  // ON). Complements CodeQL (cloud, deep taint) + semgrep diff scan (pre-push) —
+  // see IMPLEMENTATION_NOTES "Local SAST".
+  //
+  //  - detect-object-injection: fires on EVERY `obj[variable]` (`map[name]`,
+  //    `params[key]`) — ~100% false positives in a router.
+  //  - detect-non-literal-regexp: the matcher builds RegExps from route
+  //    *definitions* (constraint patterns) — trusted developer config, not user
+  //    input, so non-literal here is by design, not an injection vector.
+  //  - detect-possible-timing-attacks: there is no secret/credential comparison
+  //    in a view-layer router — every hit is a plain boolean/string equality.
+  {
+    files: ["**/src/**/*.ts", "**/src/**/*.tsx"],
+    plugins: {
+      security,
+    },
+    rules: {
+      ...security.configs.recommended.rules,
+      "security/detect-object-injection": "off",
+      "security/detect-non-literal-regexp": "off",
+      "security/detect-possible-timing-attacks": "off",
     },
   },
 
