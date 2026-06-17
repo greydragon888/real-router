@@ -15,6 +15,18 @@ function createRouterError(methodName: string, message: string): TypeError {
 }
 
 /**
+ * Matches a balanced `<...>` parameter constraint.
+ *
+ * Mirrors path-matcher's `CONSTRAINT_PATTERN_RGX` (registration.ts): the body
+ * is `[^>]*`, so a `<` may legitimately appear inside a constraint regex
+ * (e.g. `<[a<b]>`). Stripping every balanced constraint leaves only *stray*
+ * `<`/`>` delimiters, which is how `validateRoutePath` detects an unbalanced
+ * constraint without re-implementing the param grammar.
+ */
+// eslint-disable-next-line sonarjs/slow-regex -- bounded input from route definitions, not user input
+const CONSTRAINT_PATTERN_RGX = /<[^>]*>/g;
+
+/**
  * Validates route path format.
  * Throws a descriptive error if validation fails.
  *
@@ -99,6 +111,22 @@ export function validateRoutePath(
     throw createRouterError(
       methodName,
       `Invalid path for route "${routeName}": double slashes not allowed in "${path}"`,
+    );
+  }
+
+  // Balanced constraint delimiters. After stripping every balanced `<...>`
+  // constraint, any remaining `<` or `>` is a stray/unbalanced delimiter. Such
+  // a path passes the format checks but desyncs match vs build downstream: the
+  // param name is truncated at the stray `<`, the unclosed constraint survives
+  // as a literal in the trie node path, and `buildPath` then throws
+  // `Missing required param`. Reject it here, at the gatekeeper (#749 — the
+  // residual gap left by #738, which only unified the *balanced* grammar).
+  const residualDelimiters = path.replaceAll(CONSTRAINT_PATTERN_RGX, "");
+
+  if (residualDelimiters.includes("<") || residualDelimiters.includes(">")) {
+    throw createRouterError(
+      methodName,
+      `Invalid path for route "${routeName}": unbalanced constraint delimiter ('<' or '>') in "${path}"`,
     );
   }
 

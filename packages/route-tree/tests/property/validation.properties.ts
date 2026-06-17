@@ -112,6 +112,15 @@ const arbDoubleSlashPath = arbSafeSegment.map((seg) => `/${seg}//${seg}`);
  */
 const arbTildePath = arbSafeSegment.map((seg) => `~${seg}`);
 
+/**
+ * Param paths with an unbalanced constraint delimiter — a stray `<` (no closing
+ * `>`) or a stray `>` (no opening `<`). None of these contain a balanced
+ * `<...>`, so every generated value must be rejected (#749).
+ */
+const arbUnbalancedConstraintPath = fc
+  .tuple(arbSafeSegment, fc.constantFrom("<", ">", String.raw`<\d+`, "<[a-z]"))
+  .map(([seg, stray]) => `/:${seg}${stray}`);
+
 // =============================================================================
 // Route Name Validation
 // =============================================================================
@@ -223,6 +232,17 @@ describe("Route Path Validation", () => {
         expect(() => {
           validateRoutePath(path, "test", "add", parentWithUrlParams);
         }).toThrow(TypeError);
+      },
+    );
+  });
+
+  describe("6: unbalanced constraint rejection — stray < or > throws TypeError (high)", () => {
+    test.prop([arbUnbalancedConstraintPath], { numRuns: NUM_RUNS.fast })(
+      "path with an unbalanced constraint delimiter throws with a constraint message",
+      (path: string) => {
+        expect(() => {
+          validateRoutePath(path, "test", "add");
+        }).toThrow(/constraint/);
       },
     );
   });

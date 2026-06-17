@@ -71,6 +71,7 @@
 | 3   | Whitespace rejection                | Paths containing whitespace characters (space, tab, newline) cause `validateRoutePath` to throw `TypeError`. Whitespace is never valid in route paths.                                                      |
 | 4   | Double-slash rejection              | Paths containing consecutive slashes (`//`) cause `validateRoutePath` to throw `TypeError`. Double slashes indicate a path construction error.                                                              |
 | 5   | Absolute under parameterized parent | Tilde-prefixed paths (`~path`) under a parent node that has URL parameters in its `paramTypeMap` cause `validateRoutePath` to throw `TypeError`. Absolute paths cannot be used under parameterized parents. |
+| 6   | Unbalanced constraint rejection     | Paths with a stray constraint delimiter — a `<` with no closing `>` (`/:id<\d+`, `/:id<`) or a `>` with no opening `<` — cause `validateRoutePath` to throw `TypeError`. After stripping balanced `<...>` constraints, any residual `<`/`>` is unbalanced and would desync match vs build downstream (`buildPath` throws `Missing required param`). Balanced constraints (`/:id<\d+>`) and a `<` inside a constraint body (`/:id<[a<b]>`) are accepted (#749). |
 
 ## Test Files
 
@@ -80,4 +81,4 @@
 | `tests/property/tree.properties.ts`        | N1–N4, CC1–CC4, ND1 | createRouteTree normalization + caches + nodeToDef |
 | `tests/property/segments.properties.ts`    | S1–S6               | getSegmentsByName correctness                      |
 | `tests/property/queryParams.properties.ts` | Q1–Q2               | Query param extraction and separation              |
-| `tests/property/validation.properties.ts`  | VN1–VN4, VP1–VP5    | Route name and path validation                     |
+| `tests/property/validation.properties.ts`  | VN1–VN4, VP1–VP6    | Route name and path validation                     |
