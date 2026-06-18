@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-06-18]
 
+### @real-router/validation-plugin@0.7.9
+
+### Patch Changes
+
+- [#864](https://github.com/greydragon888/real-router/pull/864) [`bc01f46`](https://github.com/greydragon888/real-router/commit/bc01f4695ac70b4ce5dd06e2368952909d27b7af) Thanks [@greydragon888](https://github.com/greydragon888)! - Reject name-less parameter markers (`:`/`*` with no name) at route validation ([#863](https://github.com/greydragon888/real-router/issues/863))
+
+  `validateRoute` now rejects paths whose `:`/`*` marker has no name — `/x/:`, `/x/*`, `/x/:?`, `/x/:<\d+>` — instead of letting them pass and fail later at the matcher (`registerTree`, [#858](https://github.com/greydragon888/real-router/issues/858)) with a non-route-contextual error. Validation now fails fast with `[router.<method>] Invalid path for route "<name>": parameter marker (':' or '*') without a name`. The check derives from path-matcher's single `PARAM_NAME_PATTERN` grammar (so the validation gate cannot drift from the matcher) and scans only the URL-path portion, so a `:`/`*` inside a query declaration (`/x?:`) is not flagged. A bare `/*` is not a catch-all — use the named `/*rest`.
+
+
 ### @real-router/core@0.58.0
 
 ### Minor Changes
