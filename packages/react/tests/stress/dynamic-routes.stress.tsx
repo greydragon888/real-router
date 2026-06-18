@@ -64,6 +64,9 @@ describe("R8 — dynamic route tree mutations mid-session", () => {
 
     const heapAfter = takeHeapSnapshot();
 
+    // Coarse guard only (~33× healthy ~1.5MB). The real protection against an
+    // add/remove leak is the has()===false + getState() checks inside the loop —
+    // mutation-validated that this heap bound does not detect a listener leak.
     expect(heapAfter - heapBefore).toBeLessThan(50 * MB);
 
     unmount();

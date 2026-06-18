@@ -65,7 +65,9 @@ describe("R4 — RouterErrorBoundary stress", () => {
     // Fallback still attached to latest error.
     expect(screen.getByTestId("fallback")).toBeInTheDocument();
     expect(screen.getByTestId("children")).toBeInTheDocument();
-    // Error snapshot versioning must not accumulate memory.
+    // Coarse guard only (~19× healthy ~0.8MB), mutation-validated non-
+    // discriminating for snapshot accumulation. The real protection is the
+    // seenCodes length check above — every rejection reached onError.
     expect(heapAfter - heapBefore).toBeLessThan(15 * MB);
   });
 

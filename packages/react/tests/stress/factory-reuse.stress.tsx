@@ -87,10 +87,13 @@ describe("R12 — factory reuse on single router × N mounts", () => {
 
     const heapAfter = takeHeapSnapshot();
 
-    // The cached sources outlive this loop (WeakMap-keyed by the surviving
-    // router). What MUST be bounded is the cumulative size of their listener
-    // sets — every iteration must shed exactly the listeners it added.
-    expect(heapAfter - heapBefore).toBeLessThan(20 * MB);
+    // Coarse catastrophe guard, NOT a listener-leak detector. The cached sources
+    // outlive this loop (WeakMap-keyed by the surviving router), but a real
+    // listener leak is KB-scale and invisible here — mutation-validated: skipping
+    // BaseSource#listeners.delete leaves this delta unchanged and the suite green.
+    // The "listener set sheds what it added" contract is discriminated by
+    // @real-router/sources BaseSource.test.ts. Threshold ≈ 3.8× healthy (~8MB).
+    expect(heapAfter - heapBefore).toBeLessThan(30 * MB);
 
     // Sanity: a final mount on the same router still routes correctly.
     const { getByTestId, unmount } = render(
@@ -150,10 +153,12 @@ describe("R12 — factory reuse on single router × N mounts", () => {
 
     const heapFinal = takeHeapSnapshot();
 
-    // After the last unmount no listener should remain. With perfect cleanup
-    // the delta is dominated by jsdom + React fiber slack; 15 MB is a wide
-    // safety margin that still bites if a leak accumulates per cycle.
-    expect(heapFinal - heapBaseline).toBeLessThan(15 * MB);
+    // Coarse catastrophe guard, NOT a listener-leak detector — mutation-validated
+    // that a real BaseSource cleanup leak leaves this delta unchanged (KB signal
+    // under jsdom/React fiber slack). The listener-cleanup contract is
+    // discriminated by @real-router/sources BaseSource.test.ts. Threshold ≈ 3.3×
+    // measured healthy (~13.6MB); the prior 15MB sat at 1.1× and flaked.
+    expect(heapFinal - heapBaseline).toBeLessThan(45 * MB);
 
     // Final sanity: router is still functional after the burst.
     const finalRender = render(

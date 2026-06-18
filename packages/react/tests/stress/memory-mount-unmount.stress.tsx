@@ -102,9 +102,14 @@ describe("memory-mount-unmount baseline", () => {
 
     logBaseline("transition-1000", iterations, delta);
 
-    // React runtime overhead dominates (~68KB/iter); regression gate
-    // protects against catastrophic leaks.
-    expect(delta).toBeLessThan(75_000 * iterations);
+    // Coarse catastrophe guard — NOT a leak detector. React runtime churn
+    // dominates this delta (~68KB/iter ≈ 68MB healthy). Mutation-validated:
+    // skipping BaseSource#listeners.delete (a real cleanup leak) leaves the delta
+    // unchanged and the suite green — the leak signal is KB-scale, swamped by
+    // jsdom/React mount churn. The cleanup contract is discriminated by
+    // @real-router/sources BaseSource.test.ts. Threshold ≈ 3× healthy; the prior
+    // 75MB sat at ~1.1× and flaked.
+    expect(delta).toBeLessThan(210 * 1024 * 1024);
   });
 
   it("Pattern B: useRouteNode × 100 + 50 navigations", async () => {
@@ -159,9 +164,19 @@ describe("memory-mount-unmount baseline", () => {
       "(10 trees × 100 consumers)",
     );
 
-    // Shared cached RouteNodeSource — React runtime dominates; regression
-    // gate protects against cache breakage.
-    expect(delta).toBeLessThan(2500 * 10 * 100);
+    // Coarse catastrophe guard, NOT a cache-breakage detector. React runtime
+    // allocation dominates this delta (~3.3KB/consumer: fiber + hooks + the
+    // useSyncExternalStore subscription), and the "N consumers of one nodeName
+    // share one RouteNodeSource" guarantee is GC-masked here — broken sources are
+    // created at mount and reclaimed at unmount, so the post-unmount delta does
+    // NOT move when the cache breaks. Mutation-confirmed: disabling the
+    // createRouteNodeSource cache leaves the delta unchanged (~3.3MB healthy vs
+    // ~3.4MB cache-disabled, in isolation). The cache-sharing contract is covered
+    // by @real-router/sources functional tests; this only guards against a
+    // catastrophic mount/navigate/unmount heap blow-up. Measured healthy: ~2.5MB
+    // (full suite) / ~3.3MB (isolated) — threshold set ~9× above so runtime/GC
+    // variance never flakes it.
+    expect(delta).toBeLessThan(30 * 1024 * 1024);
   });
 
   it("Pattern C: 500 RouterErrorBoundary with fresh routers", async () => {

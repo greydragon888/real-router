@@ -78,7 +78,10 @@ describe("validateRoutePath", () => {
       });
 
       it("should accept splat parameters", () => {
-        const paths = ["/*", "/*rest", "/files/*path", "/api/*endpoint"];
+        // Named splats only. A bare `/*` is a NAME-LESS marker — path-matcher
+        // rejects it at registerTree (#858), so the gate rejects it too (#863);
+        // the catch-all form is the named `/*rest`, asserted invalid below.
+        const paths = ["/*rest", "/files/*path", "/api/*endpoint"];
 
         paths.forEach((path) => {
           expect(() => {
@@ -316,6 +319,38 @@ describe("validateRoutePath", () => {
             validateRoutePath(path, routeName, methodName);
           }).toThrow(/constraint/);
         });
+      });
+    });
+
+    describe("Name-less parameter markers (#863)", () => {
+      // A `:`/`*` with no name passes every format check above but path-matcher
+      // rejects it at `registerTree` (#858) with a non-route-contextual error.
+      // The gate rejects it earlier, derived from the single `PARAM_NAME_PATTERN`.
+      it("should throw for a marker with no parameter name", () => {
+        const paths = [
+          "/:", // bare colon at root
+          "/*", // bare splat at root (NOT a catch-all — name-less)
+          "/x/:", // bare colon at end
+          "/x/*", // bare splat at end
+          "/x/:?", // colon + optional modifier, no name
+          String.raw`/x/:<\d+>`, // colon + constraint, no name
+          "/x/:/n", // colon at a segment boundary
+          "/x/*/n", // splat at a segment boundary
+        ];
+
+        paths.forEach((path) => {
+          expect(() => {
+            validateRoutePath(path, routeName, methodName);
+          }).toThrow(/parameter marker/);
+        });
+      });
+
+      it("should NOT flag a `:`/`*` inside a query declaration (url-path scope)", () => {
+        // The query portion is not trie'd, so a name-less marker there is not a
+        // url-param — must not be falsely rejected (no divergence from matcher).
+        expect(() => {
+          validateRoutePath("/x?:", routeName, methodName);
+        }).not.toThrow();
       });
     });
 
