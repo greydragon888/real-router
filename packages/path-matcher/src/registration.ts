@@ -1,5 +1,5 @@
 import { PARAM_NAME_PATTERN } from "./buildParamMeta";
-import { ENCODING_METHODS } from "./encoding";
+import { encodeParam, ENCODING_METHODS } from "./encoding";
 import {
   buildFullPath,
   createSegmentNode,
@@ -603,18 +603,11 @@ function compileBuildParts(
     parts.push(normalizedPath.slice(lastIndex, match.index));
 
     const isSplat = allSplatParams.has(paramName);
+    // Splat segments are encoded individually (preserving "/") by the single
+    // `encodeParam` implementation — the same one the encoding unit/property
+    // suites assert, so prod and the oracle can't drift (#860).
     const encoder = isSplat
-      ? (value: string): string => {
-          const enc = ENCODING_METHODS[encoding];
-          const segs = value.split("/");
-          let result = enc(segs[0]);
-
-          for (let i = 1; i < segs.length; i++) {
-            result += `/${enc(segs[i])}`;
-          }
-
-          return result;
-        }
+      ? (value: string): string => encodeParam(value, encoding, true)
       : ENCODING_METHODS[encoding];
 
     slots.push({ paramName, isOptional, encoder });
