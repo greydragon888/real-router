@@ -218,14 +218,14 @@ Trie:
          │
          ▼
 ┌──────────────────┐
-│  Constraints     │  Test captured params against regex patterns
-│  #validateConst. │  (:id<\d+> → /^(\d+)$/.test(value))
+│  #decodeParams() │  URL-decode captured values
+│                  │  + validate percent encoding (%XX)
 └────────┬─────────┘
          │
          ▼
 ┌──────────────────┐
-│  #decodeParams() │  URL-decode captured values
-│                  │  + validate percent encoding (%XX)
+│  Constraints     │  Test DECODED params against regex patterns (#857)
+│  #validateConst. │  (:id<\d+> → /^(\d+)$/.test(decodedValue))
 └────────┬─────────┘
          │
          ▼

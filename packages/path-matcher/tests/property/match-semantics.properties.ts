@@ -100,6 +100,23 @@ describe("constraint filtering at match time", () => {
       expect(matcher.match(`/users/${id}`)?.params).toStrictEqual({ id });
     },
   );
+
+  test.prop([arbNumericParam], { numRuns: NUM_RUNS.standard })(
+    "an over-encoded value matches when its DECODED form satisfies the constraint (#857)",
+    (id) => {
+      const matcher = createConstrainedMatcher(); // /users/:id<\d+>
+
+      // Percent-encode every digit ("5" → "%35"); the raw form does NOT match
+      // \d+, but it decodes back to `id`, which does. The constraint is checked
+      // on the decoded value, so the route must match and recover `id`. With the
+      // old pre-decode order the raw "%3X…" was rejected → undefined.
+      const overEncoded = id.replaceAll(/\d/g, (digit) => `%3${digit}`);
+
+      expect(matcher.match(`/users/${overEncoded}`)?.params).toStrictEqual({
+        id,
+      });
+    },
+  );
 });
 
 // =============================================================================

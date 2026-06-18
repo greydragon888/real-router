@@ -635,6 +635,45 @@ describe("SegmentMatcher", () => {
   });
 
   // ===========================================================================
+  // Constraint validation uses the DECODED value (#857)
+  // ===========================================================================
+
+  describe("constraint validation uses the decoded value (#857)", () => {
+    function constrainedMatcher(path: string): SegmentMatcher {
+      const matcher = createTestMatcher();
+      const route = createInputNode({ name: "r", path, fullName: "r" });
+      const root = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["r", route]]),
+        nonAbsoluteChildren: [route],
+      });
+
+      matcher.registerTree(root);
+
+      return matcher;
+    }
+
+    it("matches an over-encoded value whose decoded form satisfies the constraint", () => {
+      // `%35` decodes to "5", which satisfies <\d+>. The constraint must be
+      // checked on the decoded value, not the raw segment (#857).
+      const matcher = constrainedMatcher(String.raw`/:n<\d+>`);
+
+      expect(matcher.match("/%35")?.params).toStrictEqual({ n: "5" });
+    });
+
+    it("extracted param always satisfies the constraint (Matching #9)", () => {
+      // `%41` is 3 chars (raw satisfies <.{3}>) but decodes to "A" (1 char), which
+      // does NOT. match() must reject it, not return a value violating its own
+      // constraint (the old order returned { n: "A" }).
+      const matcher = constrainedMatcher("/:n<.{3}>");
+
+      expect(matcher.match("/%41")).toBeUndefined();
+    });
+  });
+
+  // ===========================================================================
   // Static Route Matching
   // ===========================================================================
 
@@ -4437,7 +4476,7 @@ describe("SegmentMatcher", () => {
       expect(result!.params).toStrictEqual({ id: "abc" });
     });
 
-    it("should validate constraint against raw (pre-decode) param value", () => {
+    it("should validate constraint against the DECODED param value (#857)", () => {
       const matcher = createTestMatcher();
       const userNode = createInputNode({
         name: "user",
@@ -4454,10 +4493,11 @@ describe("SegmentMatcher", () => {
 
       matcher.registerTree(rootNode);
 
-      // %33 decodes to "3", but raw value "%33" does NOT match \d+
+      // `%33` decodes to "3", which satisfies <\d+>. The constraint describes the
+      // logical (decoded) value, so the over-encoded form must match (#857).
       const result = matcher.match("/users/%33");
 
-      expect(result).toBeUndefined();
+      expect(result?.params).toStrictEqual({ id: "3" });
     });
 
     it("should validate multiple constraints on different params", () => {
