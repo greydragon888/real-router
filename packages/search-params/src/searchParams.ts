@@ -60,7 +60,38 @@ function sliceParamName(source: string, start: number, end: number): string {
 }
 
 /**
+ * Assigns a parameter as an own data property.
+ *
+ * Plain `params[name] = value` invokes the inherited `__proto__` accessor for the
+ * literal key `"__proto__"`, so that key would mutate the prototype instead of
+ * becoming a real entry; `defineProperty` writes a genuine own property.
+ *
+ * @internal
+ */
+function assignParam(
+  params: Record<string, unknown>,
+  name: string,
+  value: unknown,
+): void {
+  if (name === "__proto__") {
+    Object.defineProperty(params, name, {
+      value,
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
+  } else {
+    params[name] = value;
+  }
+}
+
+/**
  * Adds a decoded value to params object, handling array accumulation.
+ *
+ * Collisions are detected via `Object.hasOwn`, not `params[name] !== undefined`:
+ * a query key that shadows an `Object.prototype` member (`valueOf`, `constructor`,
+ * `toString`, …) would otherwise read the inherited function and be mistaken for
+ * a pre-existing value, corrupting the result into `[<fn>, value]`. (#855)
  *
  * @internal
  */
@@ -70,14 +101,22 @@ function addToParams(
   decodedValue: unknown,
   hasBrackets: boolean,
 ): void {
+  if (!Object.hasOwn(params, decodedName)) {
+    assignParam(
+      params,
+      decodedName,
+      hasBrackets ? [decodedValue] : decodedValue,
+    );
+
+    return;
+  }
+
   const currentValue = params[decodedName];
 
-  if (currentValue === undefined) {
-    params[decodedName] = hasBrackets ? [decodedValue] : decodedValue;
-  } else if (Array.isArray(currentValue)) {
+  if (Array.isArray(currentValue)) {
     currentValue.push(decodedValue);
   } else {
-    params[decodedName] = [currentValue, decodedValue];
+    assignParam(params, decodedName, [currentValue, decodedValue]);
   }
 }
 

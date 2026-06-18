@@ -198,6 +198,36 @@ describe("search-params", () => {
       });
     });
 
+    it("treats keys shadowing Object.prototype members as plain params", () => {
+      // `valueOf`/`constructor`/etc. must not read the inherited function and be
+      // mistaken for a pre-existing value (would corrupt into [<fn>, "x"]). (#855)
+      expect(
+        parse("valueOf=1&constructor=2&toString=3&hasOwnProperty=4", {
+          numberFormat: "none",
+        }),
+      ).toStrictEqual({
+        valueOf: "1",
+        constructor: "2",
+        toString: "3",
+        hasOwnProperty: "4",
+      });
+    });
+
+    it("decodes a literal __proto__ key as an own property (no prototype pollution)", () => {
+      const result = parse("__proto__=x", { numberFormat: "none" });
+
+      expect(Object.hasOwn(result, "__proto__")).toBe(true);
+      expect(result.__proto__).toBe("x");
+      // The accumulator's own prototype is untouched.
+      expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
+    });
+
+    it("accumulates repeated Object.prototype-named keys into an array", () => {
+      expect(
+        parse("toString=a&toString=b", { numberFormat: "none" }),
+      ).toStrictEqual({ toString: ["a", "b"] });
+    });
+
     it("parses key with empty value after = as empty string", () => {
       expect(parse("key=")).toStrictEqual({ key: "" });
     });
