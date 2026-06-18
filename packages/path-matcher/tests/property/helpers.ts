@@ -136,6 +136,30 @@ export function createConstrainedMatcher(
 }
 
 /**
+ * Matcher with a single constrained param route under an arbitrary constraint.
+ *
+ * Tree: root > r(/:n<constraint>)
+ * Used to exercise constraints other than the default `\d+` — e.g. a length
+ * constraint `<.{3}>` — against over-encoded inputs (#857/#859).
+ */
+export function createConstraintMatcher(
+  constraint: string,
+  options?: Partial<SegmentMatcherOptions>,
+): SegmentMatcher {
+  const matcher = createTestMatcher(options);
+
+  const node = createInputNode({
+    name: "r",
+    path: `/:n${constraint}`,
+    fullName: "r",
+  });
+
+  matcher.registerTree(createRootWithChildren([node]));
+
+  return matcher;
+}
+
+/**
  * Matcher with an optional param route.
  *
  * Tree: root > search(/search/:query?)
@@ -305,6 +329,24 @@ export const arbNumericParam: fc.Arbitrary<string> =
  */
 export const arbNonNumericParam: fc.Arbitrary<string> =
   fc.stringMatching(/^[a-zA-Z]{1,10}$/);
+
+/**
+ * Percent-encodes every character of an ASCII string to its `%XX` form
+ * ("A" → "%41", "5" → "%35"). Builds over-encoded constraint inputs whose raw
+ * form differs from the decoded value — the discriminating shape for the
+ * decode-then-validate contract (#857/#859).
+ */
+export function percentEncodeAscii(value: string): string {
+  let out = "";
+
+  for (const ch of value) {
+    const code = ch.codePointAt(0) ?? 0;
+
+    out += `%${code.toString(16).toUpperCase().padStart(2, "0")}`;
+  }
+
+  return out;
+}
 
 /**
  * Arbitrary Unicode string for pure encoding function tests.
