@@ -17,7 +17,6 @@ Fast, configurable query string operations. Injected into `path-matcher` via `ro
 | Function | Description |
 |----------|-------------|
 | `parse(queryString, options?)` | Parse query string to object |
-| `parseInto(queryString, target)` | Parse directly into existing object (avoids allocation) |
 | `build(params, options?)` | Build query string from object |
 | `omit(path, paramsToOmit, options?)` | Remove specified parameters |
 | `keep(path, paramsToKeep, options?)` | Keep only specified parameters |
@@ -50,7 +49,7 @@ omit("page=1&sort=name&limit=10", ["sort", "limit"]);
 |--------|---------|---------|
 | `"auto"` (default) | `active=true` | `{ active: true }` |
 | `"none"` | `active=true` | `{ active: "true" }` |
-| `"empty-true"` | `active` | `{ active: true }` |
+| `"empty-true"` | `active` (true), `active=false` (false) | `{ active: true }` / `{ active: false }` |
 
 ### `nullFormat`
 
@@ -66,13 +65,18 @@ omit("page=1&sort=name&limit=10", ["sort", "limit"]);
 | `"auto"` (default) | `{ page: 1 }` (number) |
 | `"none"` | `{ page: "1" }` (string) |
 
-Detects integers and decimals matching `/^\d+(\.\d+)?$/`. No encoding change needed — numbers are encoded identically regardless of format.
+Detects canonical decimal numbers matching `/^-?(0|[1-9]\d*)(\.\d+)?$/` — including
+negatives (`?offset=-10` → `-10`). No encoding change needed — numbers are encoded
+identically regardless of format, so a value keeps the same type whether it arrives
+from a URL or from a programmatic `navigate({ offset: -10 })`.
 
-**Note:** Negative numbers (e.g., `-1`, `-42`) are NOT automatically coerced from strings. This is by design — URL query params like `?offset=-10` remain as the string `"-10"`. Use explicit parsing in your application if negative number support is needed.
+**Note:** Leading-zero values (`"007"`), exponent notation (`"1e3"`), and unsafe
+integers (`"9007199254740992"`) are deliberately kept as strings to preserve their
+exact text — they would otherwise change or lose precision through `Number()`.
 
 ```typescript
-parse("page=1&price=12.5&name=abc", { numberFormat: "auto" });
-// → { page: 1, price: 12.5, name: "abc" }
+parse("page=1&price=12.5&offset=-10&name=abc", { numberFormat: "auto" });
+// → { page: 1, price: 12.5, offset: -10, name: "abc" }
 ```
 
 ## Value Semantics
@@ -102,7 +106,6 @@ Use `booleanFormat: "empty-true"` together with [@real-router/search-schema-plug
 ## Key Design Decisions
 
 - **Single-pass parsing** — no intermediate arrays
-- **`parseInto` direct mutation** — avoids object allocation on hot path
 - **Set-based filtering** — O(1) lookup for omit/keep operations
 - **Zero intermediate allocations in omit/keep** — inline loop with string concatenation instead of array accumulation
 - **Loop-based array encoding** — replaces `.map().join()` to avoid intermediate arrays

@@ -13,7 +13,7 @@
 ```
 search-params/
 ├── src/
-│   ├── searchParams.ts       — Core functions: parse, parseInto, build, omit, keep
+│   ├── searchParams.ts       — Core functions: parse, build, omit, keep
 │   ├── encode.ts             — Encoding logic + option resolution (makeOptions)
 │   ├── decode.ts             — Decoding logic (value + strategy dispatch)
 │   ├── utils.ts              — getSearch() — query string extraction
@@ -66,9 +66,6 @@ new SegmentMatcher({
 ```typescript
 parse(path: string, opts?: Options): Record<string, unknown>
 // Parse query string to object. Extracts "?" portion from full path.
-
-parseInto(queryString: string, target: Record<string, unknown>): void
-// Parse directly into existing object (allocation-free). No leading "?" expected.
 
 build(params: Record<string, unknown>, opts?: Options): string
 // Build query string from object. Returns string without leading "?".
@@ -171,7 +168,7 @@ interface ArrayStrategy {
 | ------------ | --------------- | ----------------------- |
 | `"none"`     | `a=1&a=2`       | Repeated keys → array   |
 | `"brackets"` | `a[]=1&a[]=2`   | `[]` suffix → array     |
-| `"index"`    | `a[0]=1&a[1]=2` | Numeric index → array   |
+| `"index"`    | `a[0]=1&a[1]=2` | Ordered by `[n]` index  |
 | `"comma"`    | `a=1,2`         | Comma-separated → array |
 
 #### Boolean Formats
@@ -180,14 +177,14 @@ interface ArrayStrategy {
 | -------------- | ----------------- | ------------------ | ------------------------------------------------- |
 | `"auto"`       | `flag=true`       | `flag=false`       | `"true"`/`"false"` → `boolean`                    |
 | `"none"`       | `flag=true`       | `flag=false`       | No conversion — remains string                    |
-| `"empty-true"` | `flag`            | `flag=false`       | Key-only → `true`, value passed through as string |
+| `"empty-true"` | `flag`            | `flag=false`       | Key-only → `true`; `"true"`/`"false"` → `boolean` |
 
 #### Number Formats
 
 | Format   | Decoding                                                                  |
 | -------- | ------------------------------------------------------------------------- |
 | `"none"` | No conversion — numbers remain strings                                    |
-| `"auto"` | `/^\d+(\.\d+)?$/` → `Number()` (codePointAt scan, no regex engine)       |
+| `"auto"` | `/^-?(0\|[1-9]\d*)(\.\d+)?$/` → `Number()` (codePointAt scan, no regex engine; rejects leading-zero/exponent/unsafe-int) |
 
 Encoding is not needed — `encode.ts` handles `typeof value === "number"` via `encodeURIComponent` regardless of format.
 
@@ -213,13 +210,12 @@ parse(path, opts?)
        │
        ▼
 ┌───────────────┐
-│  Fast paths   │  Empty string → {}
-│               │  No opts → parseSimple() (skip strategy resolution)
+│  Fast path    │  Empty string → {}
 └──────┬────────┘
        │
        ▼
 ┌───────────────┐
-│  makeOptions()│  Resolve strategies once (cached DEFAULT_OPTIONS)
+│  makeOptions()│  Resolve strategies once; no opts → cached DEFAULT_OPTIONS (auto)
 └──────┬────────┘
        │
        ▼
@@ -233,12 +229,12 @@ parse(path, opts?)
 └───────────────┘
 ```
 
-**Dual parsing modes:**
+**Parsing modes:**
 
-| Mode                       | Trigger          | Behavior                                |
-| -------------------------- | ---------------- | --------------------------------------- |
-| `parseSimple()`            | No options       | String values only, no strategies       |
-| Full parse with strategies | Options provided | Boolean/null conversion, array handling |
+| Mode                       | Trigger          | Behavior                                          |
+| -------------------------- | ---------------- | ------------------------------------------------- |
+| Default strategies         | No options       | Cached `DEFAULT_OPTIONS` (auto) — same as `build` |
+| Full parse with strategies | Options provided | Boolean/null/number conversion, array handling    |
 
 ### Build Flow
 
@@ -358,14 +354,13 @@ No circular dependencies.
 | `build()`     | O(n)       | n = total value lengths               |
 | `omit()`      | O(n + m)   | n = query string length, m = omit set |
 | `keep()`      | O(n + m)   | n = query string length, m = keep set |
-| `parseInto()` | O(n)       | Same as parse, no object allocation   |
 
 ### Optimizations
 
 | Optimization                             | Benefit                                          |
 | ---------------------------------------- | ------------------------------------------------ |
 | Empty string fast path                   | O(1) for empty query strings                     |
-| No-options fast path                     | Skip strategy resolution (most common case)      |
+| No-options path                          | Reuses cached `DEFAULT_OPTIONS` — no re-resolution or allocation |
 | `DEFAULT_OPTIONS` constant               | Cached default strategies, no allocation         |
 | Index-based iteration                    | No `split("&")` intermediate array               |
 | `decodeValue` two-check                  | Most values skip decoding entirely               |
@@ -376,12 +371,10 @@ No circular dependencies.
 | Loop instead of `.map().join()` in arrays | No intermediate array during encoding              |
 | `codePointAt` scan in numberFormat       | No regex engine overhead                          |
 | Set-based omit/keep                      | O(1) per-param lookup instead of O(m) scan        |
-| `parseInto()` mutation                   | Avoids intermediate object + `Object.assign`      |
 
 ### Memory
 
 - No intermediate arrays in parse (index-based iteration)
-- `parseInto()` mutates target directly
 - Strategy objects are singletons (one per format combination)
 - `Set` for omit/keep (O(m) space, recycled after call)
 - No intermediate arrays in omit/keep (string concatenation via `appendChunk`)

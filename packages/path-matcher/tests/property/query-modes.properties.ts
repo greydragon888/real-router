@@ -59,6 +59,32 @@ describe("Query-parameter properties", () => {
         });
       },
     );
+
+    // The single-undeclared-key test above only ever exercises an all-undeclared
+    // query, so it passes even for a strict check that validates "≥1 declared key
+    // present" instead of "EVERY key declared" (it captures the declared key and
+    // tolerates the rest). The invariant is `undefined` whenever ANY key is
+    // undeclared — so the discriminating input is a query MIXING a declared key
+    // with an undeclared one, in BOTH orders (the tolerance bug typically only
+    // triggers once a declared key has already been seen).
+    test.prop([arbUndeclaredKey, arbVal, arbVal], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "an undeclared key mixed with a declared key still unmatches",
+      (extra, declaredVal, extraVal) => {
+        const matcher = queryMatcher({ strictQueryParams: true });
+
+        // undeclared AFTER a declared key
+        expect(
+          matcher.match(`/search?q=${declaredVal}&${extra}=${extraVal}`),
+        ).toBeUndefined();
+
+        // undeclared BEFORE a declared key
+        expect(
+          matcher.match(`/search?${extra}=${extraVal}&q=${declaredVal}`),
+        ).toBeUndefined();
+      },
+    );
   });
 
   describe("queryParamsMode (build)", () => {

@@ -142,11 +142,17 @@ export class SegmentMatcher {
       return undefined;
     }
 
-    if (route.hasConstraints && !this.#validateConstraints(params, route)) {
+    // Decode BEFORE validating constraints: a constraint describes the logical
+    // (decoded) value, not the raw URL segment. Validating the raw segment let an
+    // over-encoded valid value be rejected (`/%35` vs `<\d+>`) and a raw form that
+    // satisfied the constraint but decoded to a value that did not slip through
+    // (`/%41` vs `<.{3}>` → returned "A", violating Matching #9, and crashing
+    // start() via rewritePathOnMatch → buildPath). (#857)
+    if (!this.#decodeParams(params)) {
       return undefined;
     }
 
-    if (!this.#decodeParams(params)) {
+    if (route.hasConstraints && !this.#validateConstraints(params, route)) {
       return undefined;
     }
 

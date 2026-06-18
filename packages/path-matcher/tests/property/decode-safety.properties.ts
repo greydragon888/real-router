@@ -119,12 +119,30 @@ describe("Decode-safety properties (#737)", () => {
       },
     );
 
-    // Concatenated percent-octets specifically (the URIError-prone class).
+    // Query-slot decode mirror (result, not just no-throw). The param/splat
+    // mirrors above pin the path `#decodeParams` try/catch; the query guard lives
+    // in a SEPARATE try/catch (`#mergeQueryParams`, around the injected parser).
+    // `not.toThrow` alone is blind to a guard that swallows the URIError but
+    // returns `true` (match succeeds with the bad query silently dropped) instead
+    // of `false` (unmatched). Asserting the RESULT — undefined iff the value is
+    // undecodable — is what discriminates `catch { return false }` from
+    // `catch { return true }`. Path slot still asserted never-throw on the same input.
     test.prop([arbPercentSeq], { numRuns: NUM_RUNS.standard })(
-      "never throws for arbitrary percent-octet sequences in path or query",
+      "query-slot accept/reject mirrors decodeURIComponent (result, not just no-throw)",
       (seq) => {
+        let result: ReturnType<typeof matcher.match>;
+
+        expect(() => {
+          result = matcher.match(`/users?q=${seq}`);
+        }).not.toThrow();
+
+        if (decodesCleanly(seq)) {
+          expect(result).toBeDefined();
+        } else {
+          expect(result).toBeUndefined();
+        }
+
         expect(() => matcher.match(`/users/${seq}`)).not.toThrow();
-        expect(() => matcher.match(`/users?q=${seq}`)).not.toThrow();
       },
     );
   });

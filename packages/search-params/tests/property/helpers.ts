@@ -51,6 +51,97 @@ export const arbEncodableString: fc.Arbitrary<string> = fc.string({
 export const arbSearchParamsEncodable: fc.Arbitrary<Record<string, string>> =
   fc.dictionary(arbSafeKey, arbEncodableString, { minKeys: 1, maxKeys: 5 });
 
+/**
+ * Non-empty key made of characters that require percent-encoding (space, `&`,
+ * `=`, `?`, `#`, `+`, `/`). `encodeURIComponent` makes these structurally safe,
+ * so they must survive the build→parse cycle as keys, not just as values. (#745)
+ */
+export const arbEncodableKey: fc.Arbitrary<string> = fc.string({
+  unit: fc.constantFrom(...ENCODABLE_CHARS),
+  minLength: 1,
+  maxLength: 8,
+});
+
+// Curated multibyte characters (no lone surrogates → encodeURIComponent is safe).
+const UNICODE_CHARS = [
+  "é",
+  "ü",
+  "ñ",
+  "ß",
+  "ç",
+  "α",
+  "β",
+  "д",
+  "и",
+  "中",
+  "文",
+  "図",
+  "書",
+  "🎉",
+  "✓",
+  "—",
+  "…",
+];
+
+/**
+ * Multibyte string value — verifies the encodeURIComponent/decodeURIComponent
+ * roundtrip for non-ASCII content, not just the curated ASCII set.
+ */
+export const arbUnicodeString: fc.Arbitrary<string> = fc.string({
+  unit: fc.constantFrom(...UNICODE_CHARS),
+  minLength: 1,
+  maxLength: 10,
+});
+
+const arbSafeNonEmpty: fc.Arbitrary<string> = fc.string({
+  unit: fc.constantFrom(...SAFE_CHARS),
+  minLength: 1,
+  maxLength: 6,
+});
+
+/**
+ * A string that may contain literal commas (`"a,b"`). Under `arrayFormat:"comma"`
+ * the comma inside a value must be encoded as `%2C` and survive as a literal,
+ * distinct from the unencoded `,` element separator. (INVARIANTS Format #3)
+ */
+export const arbStringWithComma: fc.Arbitrary<string> = fc
+  .array(arbSafeNonEmpty, { minLength: 1, maxLength: 3 })
+  .map((parts) => parts.join(","));
+
+const arbDigit = fc.constantFrom(
+  "0",
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9",
+);
+
+/**
+ * Numeric-looking strings that are deliberately NOT coerced by `numberFormat:"auto"`:
+ * leading zeros (`"007"`), unsafe integers (>2^53), and exponent notation. They
+ * must stay strings to preserve their exact text/precision. (#742, INVARIANTS #11/#14)
+ */
+export const arbNonCanonicalNumericString: fc.Arbitrary<string> = fc.oneof(
+  // Leading zero: "0" repeated + digits → always starts "0" with length > 1.
+  fc
+    .tuple(fc.integer({ min: 1, max: 4 }), fc.integer({ min: 0, max: 9999 }))
+    .map(([zeros, n]) => "0".repeat(zeros) + String(n)),
+  // Unsafe integer: 17–20 digits (≥ 10^16 > Number.MAX_SAFE_INTEGER).
+  fc
+    .tuple(
+      arbDigit.filter((d) => d !== "0"),
+      fc.string({ unit: arbDigit, minLength: 16, maxLength: 19 }),
+    )
+    .map(([first, rest]) => `${first}${rest}`),
+  // Exponent notation — never matched by the canonical-number grammar.
+  fc.constantFrom("1e5", "2e10", "1E4", "1.5e3", "6e2", "9e9", "1e+5", "1e-3"),
+);
+
 export const arbQueryPrimitive: fc.Arbitrary<QueryParamPrimitive> = fc.oneof(
   arbSafeString,
   fc.integer({ min: -1000, max: 1000 }),
@@ -110,9 +201,16 @@ export const arbOptions: fc.Arbitrary<Options> = fc.record({
   numberFormat: arbNumberFormat,
 });
 
-export const arbOptionsNoAutoNumber: fc.Arbitrary<Options> = fc.record({
+/**
+ * Options that apply no scalar coercion: both `numberFormat` and `booleanFormat`
+ * are pinned to `none`. Required for exact string-roundtrip tests — otherwise a
+ * generated value of `"123"` (numberFormat auto) or `"true"`/`"false"`
+ * (booleanFormat auto/empty-true) would coerce and break exact equality, a leak
+ * that previously passed only because such tokens are rarely generated. (#746)
+ */
+export const arbOptionsStringSafe: fc.Arbitrary<Options> = fc.record({
   arrayFormat: arbArrayFormat,
-  booleanFormat: arbBooleanFormat,
+  booleanFormat: fc.constant("none"),
   nullFormat: arbNullFormat,
   numberFormat: fc.constant("none"),
 });
@@ -129,53 +227,28 @@ export const arbQueryString: fc.Arbitrary<string> = fc
   .map(([params, opts]) => build(params, opts));
 
 /**
- * Matches the actual autoNumberStrategy.decode() logic:
- * - No leading zeros (except "0" and "0.x")
- * - Only safe integers (for non-decimals)
- * - Digits and optional single decimal point
+ * Contract oracle for `numberFormat: "auto"` — deliberately expressed as a
+ * declarative grammar, NOT a copy of `autoNumberStrategy.decode()`'s scan loop,
+ * so a mutation in the implementation cannot be silently mirrored here (#746).
+ *
+ * Contract: `auto` coerces a *canonical decimal number* to `Number`:
+ * - optional leading `-` (negatives round-trip with build/navigate, #742)
+ * - integer part is `0` or a non-zero-leading digit run (no `"007"`, no `"-007"`)
+ * - optional fractional part with at least one digit after the point
+ * - no exponent notation
+ * - integers must be safe (decimals are accepted as-is — precision is the caller's)
+ * Anything else stays a string.
  */
+const CANONICAL_NUMBER = /^-?(?:0|[1-9]\d*)(?:\.\d+)?$/;
+
 function isAutoNumber(str: string): boolean {
-  if (str.length === 0) {
-    return false;
-  }
+  const isCanonical = CANONICAL_NUMBER.test(str);
 
-  // Leading zero check: "00", "007" etc. are not canonical numbers
-  if (
-    str.length > 1 &&
-    str.codePointAt(0) === 48 &&
-    str.codePointAt(1) !== 46
-  ) {
-    return false;
-  }
+  // Unsafe integers (no fractional part) lose precision through Number() — kept as strings.
+  const isSafeMagnitude =
+    str.includes(".") || Number.isSafeInteger(Number(str));
 
-  let hasDot = false;
-
-  for (let i = 0; i < str.length; i++) {
-    const ch = str.codePointAt(i)!;
-
-    if (ch >= 48 && ch <= 57) {
-      continue;
-    }
-
-    if (ch === 46 && !hasDot && i !== 0 && i !== str.length - 1) {
-      hasDot = true;
-
-      continue;
-    }
-
-    return false;
-  }
-
-  // Unsafe integer check
-  if (!hasDot) {
-    const num = Number(str);
-
-    if (!Number.isSafeInteger(num)) {
-      return false;
-    }
-  }
-
-  return true;
+  return isCanonical && isSafeMagnitude;
 }
 
 function normalizeNumber(value: number, numFmt: NumberFormat): number | string {
@@ -201,6 +274,30 @@ function maybeParseAutoNumber(
   return numFmt === "auto" && isAutoNumber(value) ? Number(value) : value;
 }
 
+/**
+ * Models how `decode` coerces a *string* value: the boolean strategy's
+ * `decodeRaw` runs first (so `"true"`/`"false"` become booleans under `auto` and
+ * `empty-true`), then the number strategy. Mirrors the decode order in
+ * `decode.ts`, so a string literal like `"true"` round-trips to `true` — not the
+ * string — under coercing boolean formats. (#746)
+ */
+function normalizeStringValue(
+  value: string,
+  boolFmt: BooleanFormat,
+  numFmt: NumberFormat,
+): QueryParamPrimitive {
+  if (boolFmt === "auto" || boolFmt === "empty-true") {
+    if (value === "true") {
+      return true;
+    }
+    if (value === "false") {
+      return false;
+    }
+  }
+
+  return maybeParseAutoNumber(value, numFmt);
+}
+
 function normalizePrimitive(
   value: QueryParamPrimitive,
   boolFmt: BooleanFormat,
@@ -218,7 +315,8 @@ function normalizePrimitive(
         return value;
       }
       case "empty-true": {
-        return value ? true : "false";
+        // true → key-only (?flag), false → ?flag=false; both decode back to boolean
+        return value;
       }
       default: {
         return maybeParseAutoNumber(String(value), numFmt);
@@ -226,7 +324,7 @@ function normalizePrimitive(
     }
   }
 
-  return maybeParseAutoNumber(value, numFmt);
+  return normalizeStringValue(value, boolFmt, numFmt);
 }
 
 function normalizeArrayElement(
@@ -241,12 +339,14 @@ function normalizeArrayElement(
     return normalizeNumber(value, numFmt);
   }
   if (typeof value === "boolean") {
-    return boolFmt === "auto"
+    // "auto" and "empty-true" both preserve the boolean type ("empty-true"
+    // decodes a "false" element back to false); "none" stringifies it.
+    return boolFmt === "auto" || boolFmt === "empty-true"
       ? value
       : maybeParseAutoNumber(String(value), numFmt);
   }
 
-  return maybeParseAutoNumber(value, numFmt);
+  return normalizeStringValue(value, boolFmt, numFmt);
 }
 
 function normalizeValue(
@@ -259,8 +359,14 @@ function normalizeValue(
   result: Record<string, unknown>,
 ): void {
   if (value === null) {
+    // Contract oracle, NOT a mirror of the implementation: a faithful nullFormat
+    // round-trips null back to null. The `empty-true` exception (null collapses to
+    // the bare-key `true` token — INVARIANTS #18) is a documented, deterministic
+    // loss, so it is *excluded* from the roundtrip property (see the `fc.pre` guard
+    // in parseBuild.properties.ts) and asserted explicitly in formats.properties.ts
+    // — never silently absorbed here, which would mask future null-handling regressions.
     if (nullFmt !== "hidden") {
-      result[key] = boolFmt === "empty-true" ? true : null;
+      result[key] = null;
     }
 
     return;

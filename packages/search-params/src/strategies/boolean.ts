@@ -89,13 +89,26 @@ export const autoBooleanStrategy: BooleanStrategy = {
 };
 
 /**
- * True values are key-only (no =value), false values are omitted.
- * Example: ?flag instead of ?flag=true
+ * Scalar true values are key-only (no =value); scalar false keeps an explicit
+ * `=false`. Example: `?flag` for true, `?flag=false` for false. Array elements
+ * always carry an explicit value (`?a=true&a=false`), so decoding must map both
+ * `"true"`→true and `"false"`→false to round-trip booleans losslessly in either
+ * position — a key-only param is `true` (decodeUndefined), and any explicit
+ * `=true`/`=false` decodes back to the boolean (not the string).
  */
 export const emptyTrueBooleanStrategy: BooleanStrategy = {
   encode: (name, value) => (value ? name : `${name}=false`),
   decodeUndefined: () => true, // Key-only means true
-  decodeRaw: () => null, // No raw value matching
+  decodeRaw: (raw) => {
+    if (raw === "true") {
+      return true;
+    }
+    if (raw === "false") {
+      return false;
+    }
+
+    return null; // Continue with URI decoding
+  },
   decodeValue: (decoded) => decoded, // Return as-is
 };
 

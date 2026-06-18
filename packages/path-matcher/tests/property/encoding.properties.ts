@@ -1,6 +1,8 @@
 import { fc, test } from "@fast-check/vitest";
 
 import {
+  arbEncodableSplatValue,
+  arbEncodableValue,
   arbEncoding,
   arbSplatValue,
   arbUnicodeString,
@@ -27,18 +29,44 @@ describe("Encoding Properties", () => {
         expect(decoded).toBe(v);
       },
     );
+
+    // Roundtrip alone is blind to an under-encoding stub: a permissive decode
+    // inverts whatever encode left raw, so `decode(encode(v))===v` survives
+    // `encode = identity`. Anti-identity closes that: a value with an
+    // encode-requiring char (space / multibyte) must NOT pass through a
+    // non-identity strategy unchanged — and must still round-trip.
+    test.prop([arbEncoding, arbEncodableValue], {
+      numRuns: NUM_RUNS.thorough,
+    })(
+      "a non-identity strategy actually transforms an encode-requiring value",
+      (enc: URLParamsEncodingType, v: string) => {
+        const encoded = ENCODING_METHODS[enc](v);
+
+        if (enc === "none") {
+          expect(encoded).toBe(v);
+        } else {
+          expect(encoded).not.toBe(v);
+          expect(DECODING_METHODS[enc](encoded)).toBe(v);
+        }
+      },
+    );
   });
 
   describe("splat roundtrip — decode(encodeParam(v, enc, true)) === v", () => {
-    test.prop([arbEncoding, arbSplatValue], {
+    test.prop([arbEncoding, arbEncodableSplatValue], {
       numRuns: NUM_RUNS.thorough,
     })(
-      "splat encode+decode restores original value preserving slashes",
+      "splat encode+decode restores the value and actually encodes each segment",
       (enc: URLParamsEncodingType, v: string) => {
         const encoded = encodeParam(v, enc, true);
-        const decoded = DECODING_METHODS[enc](encoded);
 
-        expect(decoded).toBe(v);
+        // roundtrip (catches a wrong/over-decode)
+        expect(DECODING_METHODS[enc](encoded)).toBe(v);
+
+        // anti-identity (catches a per-segment encode that does nothing)
+        if (enc !== "none") {
+          expect(encoded).not.toBe(v);
+        }
       },
     );
   });
@@ -68,6 +96,32 @@ describe("Encoding Properties", () => {
     );
   });
 
+  // Invariant Encoding #5 — the DISTINCTIVE contract of `default` vs `uriComponent`:
+  // sub-delimiter preservation. `default` intentionally leaves `$ + , : ; |` raw,
+  // whereas `uriComponent` (plain encodeURIComponent) percent-encodes them. This is
+  // the only part of "safe strings unchanged" with discriminating teeth: the
+  // truly-unreserved chars (`[A-Za-z0-9-._~]`) pass through encodeURIComponent
+  // ITSELF, so a fast-path mutation can't change them (asserting that is a
+  // tautology). Here, dropping any of `$+,:;|` from the default skip-set makes the
+  // first assert fail; the second assert (uriComponent DOES encode them) keeps the
+  // first non-vacuous. The roundtrip/anti-identity tests above are blind to this:
+  // a decode inverts an over-encoded sub-delim, so the roundtrip still holds.
+  const arbDefaultPreservedSubDelim = fc
+    .stringMatching(/^[a-zA-Z0-9$+,:;|]{1,15}$/)
+    .filter((s) => /[$+,:;|]/.test(s));
+
+  describe("default preserves sub-delimiters that uriComponent encodes", () => {
+    test.prop([arbDefaultPreservedSubDelim], { numRuns: NUM_RUNS.thorough })(
+      "default leaves $ + , : ; | raw while uriComponent percent-encodes them",
+      (v: string) => {
+        // default is a no-op on its preserved set …
+        expect(ENCODING_METHODS.default(v)).toBe(v);
+        // … and that is non-trivial: uriComponent DOES encode these (anti-tautology).
+        expect(ENCODING_METHODS.uriComponent(v)).not.toBe(v);
+      },
+    );
+  });
+
   describe("encoder determinism", () => {
     test.prop([arbEncoding, arbUnicodeString], {
       numRuns: NUM_RUNS.standard,
@@ -83,7 +137,9 @@ describe("Encoding Properties", () => {
   });
 
   describe("splat single-segment equals non-splat encode", () => {
-    test.prop([arbEncoding, fc.stringMatching(/^[a-zA-Z0-9_\-.~]{0,20}$/)], {
+    // Encode-requiring value (no "/") so the cross-check has teeth: a stub that
+    // skips encoding the first splat segment diverges from the direct encoder.
+    test.prop([arbEncoding, arbEncodableValue], {
       numRuns: NUM_RUNS.thorough,
     })(
       "encodeParam(v, enc, true) === ENCODING_METHODS[enc](v) when v has no slashes",

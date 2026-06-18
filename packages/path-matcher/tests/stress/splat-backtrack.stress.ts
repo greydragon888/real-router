@@ -81,16 +81,35 @@ describe("S2: repeated splat fallback does not degrade throughput", () => {
 
     const ITER = 50_000;
     const start = performance.now();
+    // Accumulate exact-correctness per iteration WITHOUT an `expect` in the hot
+    // loop (50k assertions would dominate the timing measurement and defeat the
+    // throughput guard). Each fallback must (a) resolve to the wildcard `n.all`,
+    // never the `/edit` child, and (b) capture the FULL remainder `a{k}/b{k}` —
+    // a strictly stronger check than `lastRest.startsWith("a")`, which survives
+    // both an end-truncation and a wrong-route regression. This is Matching #24
+    // (more-specific-vs-wildcard) verified at scale, op by op.
+    let mismatches = 0;
     let lastRest = "";
 
     for (let i = 0; i < ITER; i++) {
-      lastRest = matcher.match(`/n/a${i % 500}/b${i % 500}`)!.params
-        .rest as string;
+      const k = i % 500;
+      const expectedRest = `a${k}/b${k}`;
+      const result = matcher.match(`/n/${expectedRest}`)!;
+
+      if (
+        result.params.rest !== expectedRest ||
+        result.segments.at(-1)?.fullName !== "n.all"
+      ) {
+        mismatches++;
+      }
+
+      lastRest = result.params.rest as string;
     }
 
     const totalMs = performance.now() - start;
 
-    expect(lastRest.startsWith("a")).toBe(true);
+    expect(mismatches).toBe(0);
+    expect(lastRest).toBe(`a${(ITER - 1) % 500}/b${(ITER - 1) % 500}`);
     expect(totalMs / ITER).toBeLessThan(0.05);
   });
 });

@@ -170,8 +170,10 @@ export function createQueryMatcher(
  * Tree: root > results(/results/:category?q)
  * Routes: "results"
  */
-export function createMixedMatcher(): ReturnType<typeof createMatcher> {
-  const matcher = createMatcher();
+export function createMixedMatcher(
+  qpConfig?: QueryParamsConfig,
+): ReturnType<typeof createMatcher> {
+  const matcher = createMatcher(qpConfig ? { queryParams: qpConfig } : {});
 
   matcher.registerTree(MIXED_TREE);
 

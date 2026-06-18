@@ -251,7 +251,8 @@ describe("queryParamsMode strict behavior", () => {
     });
 
     expect(result?.name).toBe("search");
-    expect(result?.params).toStrictEqual({ q: "test", page: "1" });
+    // No queryParams config ⇒ default (auto) strategies, same as buildPath. (#744)
+    expect(result?.params).toStrictEqual({ q: "test", page: 1 });
   });
 
   it("should reject path with only query params remaining when queryParamsMode=strict", () => {
@@ -585,7 +586,7 @@ describe("additional edge cases for mutation coverage", () => {
     const result = matchPath(tree, "/modal?globalParam=1");
 
     expect(result?.name).toBe("app.section.modal");
-    expect(result?.params.globalParam).toBe("1");
+    expect(result?.params.globalParam).toBe(1); // auto default (no queryParams) (#744)
   });
 
   it("should handle absolute segment matching", () => {

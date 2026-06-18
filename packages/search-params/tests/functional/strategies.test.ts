@@ -75,7 +75,9 @@ describe("search-params strategies", () => {
         expect(emptyTrueBooleanStrategy.decodeUndefined()).toBe(true);
       });
 
-      it("should return null for decodeRaw (no raw matching)", () => {
+      it("should decode raw 'true'/'false' to booleans, null otherwise", () => {
+        expect(emptyTrueBooleanStrategy.decodeRaw("true")).toBe(true);
+        expect(emptyTrueBooleanStrategy.decodeRaw("false")).toBe(false);
         expect(emptyTrueBooleanStrategy.decodeRaw("anything")).toBe(null);
       });
 
@@ -123,11 +125,23 @@ describe("search-params strategies", () => {
       it("should return null for non-numeric strings", () => {
         expect(autoNumberStrategy.decode("abc")).toBe(null);
         expect(autoNumberStrategy.decode("12abc")).toBe(null);
-        expect(autoNumberStrategy.decode("-1")).toBe(null);
         expect(autoNumberStrategy.decode("")).toBe(null);
         expect(autoNumberStrategy.decode(".5")).toBe(null);
         expect(autoNumberStrategy.decode("1.")).toBe(null);
         expect(autoNumberStrategy.decode("1.2.3")).toBe(null);
+      });
+
+      it("should decode negative numbers (round-trips with build/navigate)", () => {
+        expect(autoNumberStrategy.decode("-1")).toBe(-1);
+        expect(autoNumberStrategy.decode("-42")).toBe(-42);
+        expect(autoNumberStrategy.decode("-5.5")).toBe(-5.5);
+      });
+
+      it("should return null for a bare minus or non-canonical negatives", () => {
+        expect(autoNumberStrategy.decode("-")).toBe(null);
+        expect(autoNumberStrategy.decode("-007")).toBe(null); // leading zero
+        expect(autoNumberStrategy.decode("-.5")).toBe(null); // dot right after sign
+        expect(autoNumberStrategy.decode("-5.")).toBe(null); // trailing dot
       });
 
       it("should preserve leading zeros as strings (not parse as numbers)", () => {
@@ -139,6 +153,7 @@ describe("search-params strategies", () => {
       it("should preserve unsafe integers as strings (not parse as numbers)", () => {
         expect(autoNumberStrategy.decode("99999999999999999")).toBeNull();
         expect(autoNumberStrategy.decode("9007199254740992")).toBeNull(); // MAX_SAFE_INTEGER + 1
+        expect(autoNumberStrategy.decode("-9007199254740992")).toBeNull(); // MIN_SAFE_INTEGER - 1
       });
 
       it("should parse safe integers", () => {

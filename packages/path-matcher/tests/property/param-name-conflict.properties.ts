@@ -151,6 +151,113 @@ describe("Param-name conflict properties (#736)", () => {
   });
 });
 
+/**
+ * A name-less marker (#858): a bare `:` / `*`, optionally carrying ONLY a
+ * constraint and/or optional `?` modifier but still no name. Each compiles to a
+ * phantom empty-named slot (match captures under `""`, build emits the literal
+ * marker, buildParamMeta sees no param) and MUST be rejected at registration —
+ * the same match/build/meta desync class as #736/#738.
+ */
+const arbNamelessMarker = fc.constantFrom(
+  ":",
+  "*",
+  ":?",
+  String.raw`:<\d+>`,
+  ":<[a-z]+>?",
+);
+
+// A clean static segment, used only to vary the marker's position in the path.
+const arbStaticSeg = fc.stringMatching(/^[a-z]{1,6}$/);
+
+describe("Name-less marker rejection (#858)", () => {
+  test.prop([fc.array(arbStaticSeg, { maxLength: 3 }), arbNamelessMarker], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "a bare ':' or '*' (no name) is rejected at registration, at any position",
+    (prefix, marker) => {
+      const path = `/${[...prefix, marker].join("/")}`;
+
+      const build = (): SegmentMatcher => {
+        const matcher = createTestMatcher();
+
+        matcher.registerTree(
+          createRootWithChildren([
+            createInputNode({ name: "r", path, fullName: "r" }),
+          ]),
+        );
+
+        return matcher;
+      };
+
+      expect(build).toThrow(/Empty parameter name/);
+    },
+  );
+});
+
+/**
+ * The conflict guard (#736) is strictly CROSS-route. A SINGLE route may
+ * legitimately revisit ONE trie position under different param names via the
+ * optional-omit branch: in `/a/:b?/:c?/end`, when `:b?` is omitted `:c?` lands on
+ * the very position `:b?` created. The per-route `ownNodes` set lets the guard
+ * tell this apart from a real cross-route conflict. This is the OTHER half of the
+ * dichotomy whose "conflict ⇒ throw" partners sit above: legitimate intra-route
+ * reuse ⇒ NO throw, and every value still binds under its own declared name.
+ * Without the `ownNodes` exception the guard would wrongly throw on a valid route
+ * — a mutation that the "conflict ⇒ throw" tests cannot catch (they only ever
+ * feed two distinct routes).
+ */
+describe("intra-route optional reuse ⇒ no throw (ownNodes, #736)", () => {
+  const arbOptName = fc.stringMatching(/^[a-z][a-z0-9]{0,5}$/);
+  const arbTwoOptNames = fc
+    .tuple(arbOptName, arbOptName)
+    .filter(([a, b]) => a !== b);
+  // Segment values: no "/", and never the literal static terminal "end".
+  const arbSegValue = fc
+    .stringMatching(/^[a-z0-9]{1,8}$/)
+    .filter((s) => s !== "end");
+
+  test.prop([arbTwoOptNames, arbSegValue, arbSegValue], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "consecutive optionals on ONE route register and bind under their own names",
+    ([nameB, nameC], valB, valC) => {
+      const build = (): SegmentMatcher => {
+        const matcher = createTestMatcher();
+
+        matcher.registerTree(
+          createRootWithChildren([
+            createInputNode({
+              name: "r",
+              path: `/a/:${nameB}?/:${nameC}?/end`,
+              fullName: "r",
+            }),
+          ]),
+        );
+
+        return matcher;
+      };
+
+      // The ownNodes exception: a single route reusing its own slot must NOT throw.
+      expect(build).not.toThrow();
+
+      // Both optionals present → each binds under its DECLARED name, no aliasing.
+      const matcher = build();
+      const full = matcher.match(`/a/${valB}/${valC}/end`);
+
+      expect(full?.params).toStrictEqual({ [nameB]: valB, [nameC]: valC });
+
+      // Every captured key belongs to the route's declared params.
+      const declared = new Set(
+        full!.segments.flatMap((s) => [...s.paramMeta.urlParams]),
+      );
+
+      for (const key of Object.keys(full!.params)) {
+        expect(declared.has(key)).toBe(true);
+      }
+    },
+  );
+});
+
 // URL-safe single-segment value (no "/", no reserved chars).
 function arbStr(): fc.Arbitrary<string> {
   return fc.stringMatching(/^[a-zA-Z0-9_\-.~]{1,15}$/);

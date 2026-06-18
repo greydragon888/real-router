@@ -53,17 +53,36 @@ describe("S2: the fragment strip stays cheap on the hot query path", () => {
 
     const ITER = 50_000;
     const start = performance.now();
-    let lastRef = "";
+    let leaked = 0;
+    let mismatched = 0;
 
     for (let i = 0; i < ITER; i++) {
-      lastRef = matcher.match(`/users/u${i % 500}?ref=v${i}#section${i}`)!
+      const got = matcher.match(`/users/u${i % 500}?ref=v${i}#section${i}`)!
         .params.ref as string;
+
+      // Result-parity guard on the hot path: each op must recover exactly the
+      // declared value `v${i}` with no fragment folded in. A bare
+      // `startsWith("v")` liveness check would pass even when `#section${i}`
+      // leaks (`v123#section123` still starts with `v`); equality + a `#` scan
+      // make this loop fail on the #842 regression, not just on a crash.
+      // (Both counters increment only on failure, so they are ~free on the
+      // healthy path and do not perturb the timing measurement below.)
+      if (got !== `v${i}`) {
+        mismatched++;
+      }
+
+      if (got.includes("#")) {
+        leaked++;
+      }
     }
 
     const totalMs = performance.now() - start;
 
-    expect(lastRef.startsWith("v")).toBe(true);
-    // Generous per-op ceiling; the native indexOf strip must stay ~free.
+    expect(mismatched).toBe(0);
+    expect(leaked).toBe(0);
+    // Generous per-op ceiling (~50× measured healthy of ~0.0009ms/op); the
+    // native indexOf strip must stay ~free. Wide on purpose — CPU-load tolerant,
+    // a throughput floor only, not a tight timing assertion.
     expect(totalMs / ITER).toBeLessThan(0.05);
   });
 });

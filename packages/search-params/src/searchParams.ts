@@ -60,7 +60,38 @@ function sliceParamName(source: string, start: number, end: number): string {
 }
 
 /**
+ * Assigns a parameter as an own data property.
+ *
+ * Plain `params[name] = value` invokes the inherited `__proto__` accessor for the
+ * literal key `"__proto__"`, so that key would mutate the prototype instead of
+ * becoming a real entry; `defineProperty` writes a genuine own property.
+ *
+ * @internal
+ */
+function assignParam(
+  params: Record<string, unknown>,
+  name: string,
+  value: unknown,
+): void {
+  if (name === "__proto__") {
+    Object.defineProperty(params, name, {
+      value,
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
+  } else {
+    params[name] = value;
+  }
+}
+
+/**
  * Adds a decoded value to params object, handling array accumulation.
+ *
+ * Collisions are detected via `Object.hasOwn`, not `params[name] !== undefined`:
+ * a query key that shadows an `Object.prototype` member (`valueOf`, `constructor`,
+ * `toString`, …) would otherwise read the inherited function and be mistaken for
+ * a pre-existing value, corrupting the result into `[<fn>, value]`. (#855)
  *
  * @internal
  */
@@ -70,19 +101,27 @@ function addToParams(
   decodedValue: unknown,
   hasBrackets: boolean,
 ): void {
+  if (!Object.hasOwn(params, decodedName)) {
+    assignParam(
+      params,
+      decodedName,
+      hasBrackets ? [decodedValue] : decodedValue,
+    );
+
+    return;
+  }
+
   const currentValue = params[decodedName];
 
-  if (currentValue === undefined) {
-    params[decodedName] = hasBrackets ? [decodedValue] : decodedValue;
-  } else if (Array.isArray(currentValue)) {
+  if (Array.isArray(currentValue)) {
     currentValue.push(decodedValue);
   } else {
-    params[decodedName] = [currentValue, decodedValue];
+    assignParam(params, decodedName, [currentValue, decodedValue]);
   }
 }
 
 /**
- * Decodes a parameter value based on whether strategies are provided.
+ * Decodes a parameter value through the resolved strategies.
  *
  * @internal
  */
@@ -91,19 +130,120 @@ function decodeParamValue(
   eqPos: number,
   end: number,
   hasValue: boolean,
-  strategies: ResolvedStrategies | undefined,
+  strategies: ResolvedStrategies,
 ): unknown {
-  if (strategies) {
-    const rawValue = hasValue ? searchPart.slice(eqPos + 1, end) : undefined;
+  const rawValue = hasValue ? searchPart.slice(eqPos + 1, end) : undefined;
 
-    return decode(rawValue, strategies);
+  return decode(rawValue, strategies);
+}
+
+/**
+ * Reads the non-negative integer index from a bracketed name (`a[12]`).
+ *
+ * `open` points at the `[`; digits up to the matching `]` form the index. Returns
+ * `null` for `[]`, non-digit content (`a[x]`), or a missing `]` — those fall back
+ * to insertion-order accumulation. (#856)
+ *
+ * @internal
+ */
+function bracketIndex(
+  searchPart: string,
+  open: number,
+  limit: number,
+): number | null {
+  let i = open + 1;
+  let value = 0;
+  let hasDigit = false;
+
+  while (i < limit) {
+    const ch = searchPart.codePointAt(i);
+
+    if (ch === 93) {
+      // ']' — a numeric index only if at least one digit preceded it ("[]" → null)
+      return hasDigit ? value : null;
+    }
+
+    if (ch !== undefined && ch >= 48 && ch <= 57) {
+      value = value * 10 + (ch - 48);
+      hasDigit = true;
+      i++;
+
+      continue;
+    }
+
+    return null; // non-digit inside brackets — not a numeric index
   }
 
-  return hasValue ? decodeValue(searchPart.slice(eqPos + 1, end)) : null;
+  return null; // no closing ']' (incl. "[" at end) — malformed, fall back
+}
+
+/**
+ * A single parsed query chunk: the source string plus the boundary offsets and
+ * decoded name that `processParamChunk` computes once. Bundled into one
+ * descriptor so the indexed-format collector reuses them without a long
+ * parameter list (#856).
+ *
+ * @internal
+ */
+interface ParsedChunk {
+  searchPart: string;
+  /** Offset of `[` (bracket notation), or the name terminator. */
+  nameEnd: number;
+  /** Offset where the raw name ends (`=` for valued chunks, else `end`). */
+  nameSourceEnd: number;
+  /** Offset of `=`, or -1 when the chunk has no value. */
+  eqPos: number;
+  /** Offset one past the chunk. */
+  end: number;
+  hasValue: boolean;
+  decodedName: string;
+}
+
+/**
+ * Collects a bracketed chunk into the index-format group, to be sorted by index
+ * after the full pass. Returns `false` when the bracket is not a numeric index
+ * (`a[]`, `a[x]`, `a[`), so the caller falls back to insertion-order push. (#856)
+ *
+ * @internal
+ */
+function collectIndexedChunk(
+  chunk: ParsedChunk,
+  strategies: ResolvedStrategies,
+  indexedGroups: Map<string, [number, unknown][]>,
+): boolean {
+  const {
+    searchPart,
+    nameEnd,
+    nameSourceEnd,
+    eqPos,
+    end,
+    hasValue,
+    decodedName,
+  } = chunk;
+  const index = bracketIndex(searchPart, nameEnd, nameSourceEnd);
+
+  if (index === null) {
+    return false;
+  }
+
+  const value = decodeParamValue(searchPart, eqPos, end, hasValue, strategies);
+  const group = indexedGroups.get(decodedName);
+
+  if (group === undefined) {
+    indexedGroups.set(decodedName, [[index, value]]);
+  } else {
+    group.push([index, value]);
+  }
+
+  return true;
 }
 
 /**
  * Processes a single query parameter chunk and adds to params.
+ *
+ * `indexedGroups` is supplied only for `arrayFormat: "index"`: bracketed chunks
+ * with a numeric index are collected there (to be sorted by index after the full
+ * pass) instead of pushed in insertion order. (#856)
  *
  * @internal
  */
@@ -112,7 +252,8 @@ function processParamChunk(
   start: number,
   end: number,
   params: Record<string, unknown>,
-  strategies?: ResolvedStrategies,
+  strategies: ResolvedStrategies,
+  indexedGroups?: Map<string, [number, unknown][]>,
 ): void {
   const eqPos = searchPart.indexOf("=", start);
   const hasValue = eqPos !== -1 && eqPos < end;
@@ -133,8 +274,22 @@ function processParamChunk(
 
   const decodedName = decodeValue(searchPart.slice(start, nameEnd));
 
+  // Index array format: order by the bracket index, not insertion. A non-numeric
+  // bracket (`a[]`, `a[x]`) returns false → falls through to insertion-order push.
+  if (
+    indexedGroups !== undefined &&
+    hasBrackets &&
+    collectIndexedChunk(
+      { searchPart, nameEnd, nameSourceEnd, eqPos, end, hasValue, decodedName },
+      strategies,
+      indexedGroups,
+    )
+  ) {
+    return;
+  }
+
   // Comma array decode: split raw value before individual element decoding
-  if (!hasBrackets && hasValue && strategies?.array.decodeValue) {
+  if (!hasBrackets && hasValue && strategies.array.decodeValue) {
     const rawValue = searchPart.slice(eqPos + 1, end);
     const parts = strategies.array.decodeValue(rawValue);
 
@@ -185,76 +340,32 @@ export const parse = (
     return {};
   }
 
-  // Fast path: no options - use simplified parser (skip strategy resolution)
-  if (!opts) {
-    return parseSimple(searchPart);
-  }
-
-  const options = makeOptions(opts);
+  // makeOptions(undefined) returns the cached DEFAULT_OPTIONS (auto) — the same
+  // defaults `build` uses — so parse(build(x)) === x even without options. (#744)
   const params: Record<string, unknown> = {};
 
-  // Process each parameter
-  let start = 0;
-  const length = searchPart.length;
-
-  while (start < length) {
-    let end = searchPart.indexOf("&", start);
-
-    if (end === -1) {
-      end = length;
-    }
-
-    processParamChunk(searchPart, start, end, params, options.strategies);
-    start = end + 1;
-  }
+  parseIntoInternal(searchPart, params, makeOptions(opts).strategies);
 
   return params;
 };
 
 /**
- * Simplified parse without strategy resolution.
- * Used when no options are provided (most common case).
- * Returns string values only (no boolean/null conversion).
- *
- * @internal
- */
-function parseSimple(searchPart: string): Record<string, unknown> {
-  const params: Record<string, unknown> = {};
-
-  parseIntoInternal(searchPart, params);
-
-  return params;
-}
-
-/**
- * Parse query string directly into a target object.
- * Avoids creating intermediate object and Object.assign.
- * Optimized for loose mode query params handling.
- *
- * @param queryString - Query string without leading "?"
- * @param target - Object to add params to
- */
-export function parseInto(
-  queryString: string,
-  target: Record<string, unknown>,
-): void {
-  if (queryString === "") {
-    return;
-  }
-
-  parseIntoInternal(queryString, target);
-}
-
-/**
- * Internal function to parse query string into target object.
- * Shared by parseSimple and parseInto.
+ * Internal function to parse a query string into a target object.
+ * The shared parse engine behind `parse`.
  *
  * @internal
  */
 function parseIntoInternal(
   searchPart: string,
   params: Record<string, unknown>,
+  strategies: ResolvedStrategies,
 ): void {
+  // `index` format orders by the bracket index; collect (index, value) pairs and
+  // sort after the pass. `undefined` for every other format (no overhead). (#856)
+  const indexedGroups = strategies.array.indexed
+    ? new Map<string, [number, unknown][]>()
+    : undefined;
+
   let start = 0;
   const length = searchPart.length;
 
@@ -265,9 +376,27 @@ function parseIntoInternal(
       end = length;
     }
 
-    // No strategies = simple decoding
-    processParamChunk(searchPart, start, end, params);
+    processParamChunk(
+      searchPart,
+      start,
+      end,
+      params,
+      strategies,
+      indexedGroups,
+    );
     start = end + 1;
+  }
+
+  if (indexedGroups !== undefined) {
+    for (const [name, pairs] of indexedGroups) {
+      // Stable sort by index (V8 sort is stable) → equal indices keep arrival order.
+      pairs.sort((left, right) => left[0] - right[0]);
+      assignParam(
+        params,
+        name,
+        pairs.map((pair) => pair[1]),
+      );
+    }
   }
 }
 
@@ -280,7 +409,7 @@ function parseIntoInternal(
  *
  * Note: Empty arrays produce an empty string, so `parse(build({ items: [] }))`
  * will not contain the `items` key. This is expected behavior for all array
- * formats except `comma` (which produces `"items="` for empty arrays).
+ * formats including `comma` — the key is erased uniformly (INVARIANTS #9).
  *
  * @example
  * ```typescript

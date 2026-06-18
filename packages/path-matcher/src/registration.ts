@@ -1,5 +1,5 @@
 import { PARAM_NAME_PATTERN } from "./buildParamMeta";
-import { ENCODING_METHODS } from "./encoding";
+import { encodeParam, ENCODING_METHODS } from "./encoding";
 import {
   buildFullPath,
   createSegmentNode,
@@ -269,6 +269,51 @@ function throwParamNameConflict(
 }
 
 /**
+ * A bare marker (`:` or `*` with no name) compiles to a phantom empty-named
+ * slot: match captures the value under `""`, buildPath emits the literal marker,
+ * and buildParamMeta reports no param at all — a three-way match/build/meta
+ * desync of the same class as #736/#738 (#858). Reject it at registration,
+ * symmetrically for both markers, instead of corrupting the trie.
+ */
+function throwEmptyParamName(marker: ":" | "*"): never {
+  throw new Error(
+    `[SegmentMatcher.registerTree] Empty parameter name: a bare '${marker}' ` +
+      `marker must be followed by a name (e.g. '${marker}id'). A name-less ` +
+      `marker would capture under an empty key at match but emit a literal ` +
+      `'${marker}' at build — the two disagree, so it is rejected.`,
+  );
+}
+
+/**
+ * The param name is the run of grammar chars right after the marker, up to a
+ * `<…>` constraint or a trailing optional `?`. `PARAM_NAME_PATTERN` (`[^/?<]+`)
+ * already excludes `/`, `?`, and `<`, so one positive match captures the name.
+ */
+const PARAM_NAME_RGX = new RegExp(`^[:*](${PARAM_NAME_PATTERN})`);
+
+/**
+ * Extracts the param name from a `:name` / `:name?` / `:name<…>` segment,
+ * rejecting a name-less `:` (#858). Single source for the param branch in
+ * `processSegment` and the optional fork in `insertIntoTrieFrom`, so the two
+ * can't diverge.
+ *
+ * Matches the name **positively** against the grammar rather than stripping the
+ * `<…>` constraint with a global replace: the strip form leaves a dangling `<`
+ * on a malformed/unterminated constraint (`:id<…` with no `>`) — which CodeQL
+ * flags as incomplete multi-character sanitization — whereas the positive match
+ * stops at the first `<`/`?` and never lets constraint text leak into the name.
+ */
+function extractParamName(segment: string): string {
+  const paramName = PARAM_NAME_RGX.exec(segment)?.[1] ?? "";
+
+  if (paramName === "") {
+    throwEmptyParamName(":");
+  }
+
+  return paramName;
+}
+
+/**
  * Returns the param child of `node`, creating it on first use. A pre-existing
  * child with a *different* name is a #736 conflict unless `node` is in
  * `ownNodes` (the current route created this slot — the optional-omit branch).
@@ -378,11 +423,7 @@ function insertIntoTrieFrom(
     const segment = path.slice(start, segmentEnd);
 
     if (segment.endsWith("?")) {
-      const paramName = segment
-        .slice(1)
-        .replaceAll(CONSTRAINT_PATTERN_RGX, "")
-        .replace(/\?$/, "");
-
+      const paramName = extractParamName(segment);
       const paramChildNode = ensureParamChild(node, paramName, ownNodes);
 
       // Path with param: continue recursively from paramChild
@@ -492,6 +533,11 @@ function processSegment(
 ): SegmentNode {
   if (segment.startsWith("*")) {
     const splatName = segment.slice(1);
+
+    if (splatName === "") {
+      throwEmptyParamName("*");
+    }
+
     const child = ensureSplatChild(node, splatName, ownNodes);
 
     node.hasChildren = true;
@@ -500,10 +546,7 @@ function processSegment(
   }
 
   if (segment.startsWith(":")) {
-    const paramName = segment
-      .slice(1)
-      .replaceAll(CONSTRAINT_PATTERN_RGX, "")
-      .replace(/\?$/, "");
+    const paramName = extractParamName(segment);
     const child = ensureParamChild(node, paramName, ownNodes);
 
     node.hasChildren = true;
@@ -570,18 +613,11 @@ function compileBuildParts(
     parts.push(normalizedPath.slice(lastIndex, match.index));
 
     const isSplat = allSplatParams.has(paramName);
+    // Splat segments are encoded individually (preserving "/") by the single
+    // `encodeParam` implementation — the same one the encoding unit/property
+    // suites assert, so prod and the oracle can't drift (#860).
     const encoder = isSplat
-      ? (value: string): string => {
-          const enc = ENCODING_METHODS[encoding];
-          const segs = value.split("/");
-          let result = enc(segs[0]);
-
-          for (let i = 1; i < segs.length; i++) {
-            result += `/${enc(segs[i])}`;
-          }
-
-          return result;
-        }
+      ? (value: string): string => encodeParam(value, encoding, true)
       : ENCODING_METHODS[encoding];
 
     slots.push({ paramName, isOptional, encoder });

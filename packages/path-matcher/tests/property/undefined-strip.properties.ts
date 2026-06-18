@@ -6,9 +6,18 @@ import { createTestMatcher } from "../helpers/createTestMatcher";
 import type { SegmentMatcher } from "../../src/SegmentMatcher";
 
 /**
- * Level 2 invariants — `SegmentMatcher.buildPath` handles `undefined` values
- * in query params correctly, regardless of how the injected query engine
- * behaves.
+ * Level 2 of the LAYERED `undefined`-strip contract (RFC 5.3 bis §5.3).
+ *
+ * **Where the strip actually lives (audit correction).** `SegmentMatcher.buildPath`
+ * does NOT strip `undefined` query values itself — `#buildQueryStringForBuild`
+ * copies the params object (undefined values included) straight to the injected
+ * `buildQueryString`. The clean URL is produced by that engine
+ * (production: `search-params`; here: the inline mirror in `createTestMatcher`,
+ * which drops `undefined`). So the first three tests below verify a LAYERED
+ * contract — the matcher faithfully delegates AND the engine strips — not a
+ * matcher-owned guard. The fourth test is the negative witness that pins the
+ * boundary: with a deliberately non-filtering engine, `buildPath` emits the value
+ * verbatim, proving the matcher performs no strip of its own.
  *
  * These tests pair with:
  * - Level 1 invariants: `packages/core/tests/functional/navigation/navigate/query-params.test.ts`
@@ -140,6 +149,62 @@ describe("SegmentMatcher.buildPath — undefined-strip invariants (level 2)", ()
       });
 
       expect(urlWith).toBe(urlWithout);
+    },
+  );
+});
+
+// =============================================================================
+// Negative witness — the strip is engine-owned, not matcher-owned (#4 boundary)
+// =============================================================================
+
+/**
+ * A `buildQueryString` that performs NO undefined-filtering: it renders every
+ * key it is given, so an `undefined` value surfaces literally as `=undefined`.
+ * This is exactly the engine the (now-corrected) "engine-independence" claim
+ * assumed away. Used to prove that the clean URLs in the tests above come from
+ * the engine's strip, not from `SegmentMatcher`.
+ */
+function noFilterBuildQueryString(params: Record<string, unknown>): string {
+  return Object.keys(params)
+    .map((k) => `${k}=${String(params[k])}`)
+    .join("&");
+}
+
+function createNoFilterMatcher(): SegmentMatcher {
+  const matcher = createTestMatcher({
+    buildQueryString: noFilterBuildQueryString,
+  });
+  const viewNode = createInputNode({
+    name: "view",
+    path: "/view?a&b",
+    fullName: "view",
+  });
+
+  matcher.registerTree(createRootWithChildren([viewNode]));
+
+  return matcher;
+}
+
+describe("SegmentMatcher.buildPath — strip is engine-owned (#4 boundary)", () => {
+  // Defined value kept simple so the assertion targets the strip, not encoding.
+  const arbSimpleValue = fc.stringMatching(/^[a-z0-9]{1,8}$/);
+
+  test.prop([arbSimpleValue], { numRuns: NUM_RUNS.standard })(
+    "with a non-filtering engine, buildPath emits `=undefined` verbatim (no matcher strip)",
+    (definedVal) => {
+      const matcher = createNoFilterMatcher();
+
+      // `a` is undefined, `b` is defined — both DECLARED query params.
+      const url = matcher.buildPath("view", { a: undefined, b: definedVal });
+
+      // The matcher passed `a: undefined` through to the engine unchanged: had it
+      // stripped undefined itself, `a=undefined` could never appear. (A mutation
+      // adding a matcher-side strip makes this fail.) The three tests above cannot
+      // catch such a mutation — their filtering engine drops undefined regardless.
+      expect(url).toContain("a=undefined");
+
+      // The defined declared value survives alongside it.
+      expect(url).toContain(`b=${definedVal}`);
     },
   );
 });

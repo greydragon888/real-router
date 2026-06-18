@@ -8,7 +8,7 @@
 
 import { describe, it, expect } from "vitest";
 
-import { build, keep, omit, parse, parseInto } from "../../src";
+import { build, keep, omit, parse } from "../../src";
 import { decodeValue } from "../../src/decode";
 import { encode, encodeValue, makeOptions } from "../../src/encode";
 import { getSearch } from "../../src/utils";
@@ -19,16 +19,25 @@ describe("search-params", () => {
   // ===========================================================================
 
   describe("parse", () => {
+    it("uses the same auto defaults as build when no options are given", () => {
+      // build() without options uses auto strategies; parse() must match so
+      // parse(build(x)) === x without options (no silent type loss). (#744)
+      const original = { n: 5, flag: true, sort: "name" };
+
+      expect(parse(build(original))).toStrictEqual(original);
+    });
+
     it("parses simple query string", () => {
+      // No options ⇒ auto defaults (same as build): "1" decodes to number 1.
       expect(parse("page=1&sort=name")).toStrictEqual({
-        page: "1",
+        page: 1,
         sort: "name",
       });
     });
 
     it("parses query string with ? prefix", () => {
       expect(parse("?page=1&sort=name")).toStrictEqual({
-        page: "1",
+        page: 1,
         sort: "name",
       });
     });
@@ -43,7 +52,7 @@ describe("search-params", () => {
 
     it("handles multiple values for same parameter", () => {
       expect(parse("id=1&id=2&id=3")).toStrictEqual({
-        id: ["1", "2", "3"],
+        id: [1, 2, 3],
       });
     });
 
@@ -69,6 +78,50 @@ describe("search-params", () => {
 
       expect(result).toStrictEqual({ items: ["a"] });
       expect(Array.isArray(result.items)).toBe(true);
+    });
+
+    it("orders index-format elements by their bracket index, not insertion", () => {
+      // Out-of-order indexed query must sort by [n], not arrival order. (#856)
+      expect(
+        parse("a[2]=z&a[0]=x&a[1]=y", {
+          arrayFormat: "index",
+          numberFormat: "none",
+        }),
+      ).toStrictEqual({ a: ["x", "y", "z"] });
+    });
+
+    it("index format: a sparse/huge index compacts (no sparse allocation)", () => {
+      // Sorted then compacted — `a[1000000]` does not allocate a giant array. (#856)
+      expect(
+        parse("a[1000000]=x&a[2]=y", {
+          arrayFormat: "index",
+          numberFormat: "none",
+        }),
+      ).toStrictEqual({ a: ["y", "x"] });
+    });
+
+    it("index format: duplicate indices keep arrival order (stable)", () => {
+      expect(
+        parse("a[0]=x&a[0]=y", { arrayFormat: "index", numberFormat: "none" }),
+      ).toStrictEqual({ a: ["x", "y"] });
+    });
+
+    it("index format: non-numeric/empty/unclosed brackets fall back to insertion order", () => {
+      const o = {
+        arrayFormat: "index" as const,
+        numberFormat: "none" as const,
+      };
+
+      expect(parse("a[]=x&a[]=y", o)).toStrictEqual({ a: ["x", "y"] }); // "[]"
+      expect(parse("a[k]=v", o)).toStrictEqual({ a: ["v"] }); // non-digit
+      expect(parse("a[=v", o)).toStrictEqual({ a: ["v"] }); // nothing after "["
+      expect(parse("a[2=v", o)).toStrictEqual({ a: ["v"] }); // no closing "]"
+    });
+
+    it("index format: a non-bracketed key stays a scalar", () => {
+      expect(
+        parse("a=v", { arrayFormat: "index", numberFormat: "none" }),
+      ).toStrictEqual({ a: "v" });
     });
 
     it("handles comma-separated arrays", () => {
@@ -124,6 +177,34 @@ describe("search-params", () => {
       });
     });
 
+    it("decodes empty-true false back to a boolean (build/parse roundtrip)", () => {
+      // build({ flag: false }, empty-true) emits "flag=false"; parse must
+      // round-trip it back to boolean false, not the string "false". (#743)
+      expect(
+        parse("flag=false", { booleanFormat: "empty-true" }),
+      ).toStrictEqual({ flag: false });
+    });
+
+    it("decodes empty-true booleans in arrays without true/false asymmetry", () => {
+      // Array elements carry explicit values ("a=true&a=false"), so both must
+      // decode back to booleans — not false→bool but true→string. (#743)
+      expect(
+        parse("a=true&a=false", { booleanFormat: "empty-true" }),
+      ).toStrictEqual({ a: [true, false] });
+    });
+
+    it("empty-true reserves the bare key for true, so null is not representable", () => {
+      // The bare-key form `?flag` is `true` under empty-true; a null value
+      // (nullFormat default) encodes to the same token and decodes back as `true`,
+      // not null — a documented, deterministic loss. (INVARIANTS #18)
+      const opts = { booleanFormat: "empty-true" as const };
+
+      expect(build({ flag: null }, opts)).toBe("flag");
+      expect(parse("flag", opts)).toStrictEqual({ flag: true });
+      // contrast: under the default auto format the same bare key decodes to null
+      expect(parse("flag")).toStrictEqual({ flag: null });
+    });
+
     it("handles auto boolean format", () => {
       expect(
         parse("enabled=true&disabled=false", { booleanFormat: "auto" }),
@@ -151,6 +232,56 @@ describe("search-params", () => {
         name: "abc",
         price: 12.5,
       });
+    });
+
+    it("decodes negative numbers as numbers under auto (matches navigate/build roundtrip)", () => {
+      // build({ n: -5 }) emits "n=-5"; parse must round-trip it back to a number,
+      // mirroring the type a programmatic navigate({ n: -5 }) keeps. (#742)
+      expect(parse("n=-5&d=-5.5&z=0", { numberFormat: "auto" })).toStrictEqual({
+        n: -5,
+        d: -5.5,
+        z: 0,
+      });
+    });
+
+    it("keeps non-canonical negatives as strings under auto", () => {
+      // Leading-zero and unsafe-int rejection apply symmetrically to negatives. (#742)
+      expect(
+        parse("a=-007&b=-9007199254740992", { numberFormat: "auto" }),
+      ).toStrictEqual({
+        a: "-007",
+        b: "-9007199254740992",
+      });
+    });
+
+    it("treats keys shadowing Object.prototype members as plain params", () => {
+      // `valueOf`/`constructor`/etc. must not read the inherited function and be
+      // mistaken for a pre-existing value (would corrupt into [<fn>, "x"]). (#855)
+      expect(
+        parse("valueOf=1&constructor=2&toString=3&hasOwnProperty=4", {
+          numberFormat: "none",
+        }),
+      ).toStrictEqual({
+        valueOf: "1",
+        constructor: "2",
+        toString: "3",
+        hasOwnProperty: "4",
+      });
+    });
+
+    it("decodes a literal __proto__ key as an own property (no prototype pollution)", () => {
+      const result = parse("__proto__=x", { numberFormat: "none" });
+
+      expect(Object.hasOwn(result, "__proto__")).toBe(true);
+      expect(result.__proto__).toBe("x");
+      // The accumulator's own prototype is untouched.
+      expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
+    });
+
+    it("accumulates repeated Object.prototype-named keys into an array", () => {
+      expect(
+        parse("toString=a&toString=b", { numberFormat: "none" }),
+      ).toStrictEqual({ toString: ["a", "b"] });
     });
 
     it("parses key with empty value after = as empty string", () => {
@@ -186,56 +317,6 @@ describe("search-params", () => {
         price: 12.5,
         name: "abc",
       });
-    });
-  });
-
-  // ===========================================================================
-  // parseInto
-  // ===========================================================================
-
-  describe("parseInto", () => {
-    it("parses query string directly into target object", () => {
-      const target: Record<string, unknown> = { existing: "value" };
-
-      parseInto("page=1&sort=name", target);
-
-      expect(target).toStrictEqual({
-        existing: "value",
-        page: "1",
-        sort: "name",
-      });
-    });
-
-    it("handles empty query string (fast path)", () => {
-      const target: Record<string, unknown> = { existing: "value" };
-
-      parseInto("", target);
-
-      expect(target).toStrictEqual({ existing: "value" });
-    });
-
-    it("handles multiple values for same parameter", () => {
-      const target: Record<string, unknown> = {};
-
-      parseInto("id=1&id=2", target);
-
-      expect(target).toStrictEqual({ id: ["1", "2"] });
-    });
-
-    it("handles bracket notation for arrays", () => {
-      const target: Record<string, unknown> = {};
-
-      parseInto("items[]=a&items[]=b", target);
-
-      expect(target).toStrictEqual({ items: ["a", "b"] });
-    });
-
-    it("handles key-only parameters", () => {
-      const target: Record<string, unknown> = {};
-
-      parseInto("flag&enabled", target);
-
-      expect(target).toStrictEqual({ flag: null, enabled: null });
     });
   });
 

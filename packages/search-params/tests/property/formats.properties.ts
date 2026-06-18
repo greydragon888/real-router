@@ -5,11 +5,15 @@ import {
   arbSafeKey,
   arbSafeString,
   arbSearchParamsEncodable,
+  arbStringWithComma,
+  arbNonCanonicalNumericString,
   NUM_RUNS,
 } from "./helpers";
 import { build, parse } from "../../src";
 
 import type { ArrayFormat, BooleanFormat, NumberFormat } from "../../src";
+
+const STRING_SAFE = { numberFormat: "none", booleanFormat: "none" } as const;
 
 const arbArrayParamsBracketsOrIndex = fc.tuple(
   fc.dictionary(
@@ -30,6 +34,9 @@ const arbNullParams = fc.dictionary(arbSafeKey, fc.constant(null), {
   maxKeys: 5,
 });
 
+// empty-true is intentionally excluded: it reserves the bare-key form for `true`,
+// so null is not representable and would round-trip to `true` (INVARIANTS #18) —
+// that documented loss is asserted in its own test below, not here.
 const arbBoolFormatForNull = fc.constantFrom(
   "none",
   "auto",
@@ -44,6 +51,26 @@ describe("array format roundtrip", () => {
       const parsed = parse(qs, opts);
 
       expect(parsed).toStrictEqual({ ...params });
+    },
+  );
+
+  test.prop([fc.array(arbSafeString, { minLength: 2, maxLength: 6 })], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "index format: out-of-order indexed chunks parse back in index order",
+    (values: string[]) => {
+      // Emit a[i]=v in REVERSED order; parse must sort by the bracket index and
+      // recover the original array (not insertion order). (#856)
+      const opts = {
+        arrayFormat: "index" as ArrayFormat,
+        numberFormat: "none" as NumberFormat,
+      };
+      const reversed = values
+        .map((v, i) => `a[${i}]=${encodeURIComponent(v)}`)
+        .toReversed()
+        .join("&");
+
+      expect(parse(reversed, opts)).toStrictEqual({ a: values });
     },
   );
 
@@ -92,6 +119,28 @@ describe("array format roundtrip", () => {
       expect(parsed).toStrictEqual({ ...params });
     },
   );
+
+  test.prop(
+    [
+      fc.dictionary(
+        arbSafeKey,
+        fc.array(arbStringWithComma, { minLength: 2, maxLength: 4 }),
+        { minKeys: 1, maxKeys: 3 },
+      ),
+    ],
+    { numRuns: NUM_RUNS.standard },
+  )(
+    "comma format: values containing commas survive via %2C (encoded comma stays literal)",
+    (params: Record<string, string[]>) => {
+      // Inner commas are encoded as %2C and must round-trip as literal commas,
+      // distinct from the unencoded ',' element separator. (INVARIANTS Format #3)
+      const opts = { arrayFormat: "comma" as ArrayFormat, ...STRING_SAFE };
+      const qs = build(params, opts);
+      const parsed = parse(qs, opts);
+
+      expect(parsed).toStrictEqual({ ...params });
+    },
+  );
 });
 
 describe("boolean format roundtrip", () => {
@@ -127,6 +176,22 @@ describe("boolean format roundtrip", () => {
       expect(parsed).toStrictEqual(trueOnly);
     },
   );
+
+  test.prop(
+    [fc.dictionary(arbSafeKey, fc.boolean(), { minKeys: 1, maxKeys: 5 })],
+    {
+      numRuns: NUM_RUNS.standard,
+    },
+  )(
+    "booleanFormat 'empty-true': both true and false roundtrip preserving boolean type",
+    (params: Record<string, boolean>) => {
+      const opts = { booleanFormat: "empty-true" as BooleanFormat };
+      const qs = build(params, opts);
+      const parsed = parse(qs, opts);
+
+      expect(parsed).toStrictEqual({ ...params });
+    },
+  );
 });
 
 describe("null format roundtrip", () => {
@@ -151,6 +216,22 @@ describe("null format roundtrip", () => {
 
       expect(qs).toBe("");
       expect(parse(qs, opts)).toStrictEqual({});
+    },
+  );
+
+  // INVARIANTS #18: under empty-true the bare-key form `?key` is reserved for
+  // `true`, so a null value (nullFormat default) is NOT representable — it shares
+  // the wire form with `true` and decodes back as `true`. This documents the
+  // deterministic loss explicitly instead of letting the roundtrip oracle absorb
+  // the asymmetry (the leak the `helpers.ts` honest-oracle + `fc.pre` removes). (1.A)
+  test.prop([arbSafeKey], { numRuns: NUM_RUNS.standard })(
+    "nullFormat 'default' + empty-true: null is not representable — encodes to a bare key and decodes to true",
+    (key: string) => {
+      const opts = { booleanFormat: "empty-true" as BooleanFormat };
+      const qs = build({ [key]: null }, opts);
+
+      expect(qs).toBe(key); // null and true collapse to the same bare-key token
+      expect(parse(qs, opts)).toStrictEqual({ [key]: true });
     },
   );
 });
@@ -191,6 +272,23 @@ describe("number format roundtrip", () => {
     },
   );
 
+  const arbNegativeParams = fc.dictionary(
+    arbSafeKey,
+    fc.integer({ min: -99_999, max: -1 }),
+    { minKeys: 1, maxKeys: 5 },
+  );
+
+  test.prop([arbNegativeParams], { numRuns: NUM_RUNS.standard })(
+    "numberFormat 'auto': parse(build(params, opts), opts) === params for negative integers",
+    (params: Record<string, number>) => {
+      const opts = { numberFormat: "auto" as NumberFormat };
+      const qs = build(params, opts);
+      const parsed = parse(qs, opts);
+
+      expect(parsed).toStrictEqual({ ...params });
+    },
+  );
+
   test.prop([arbNatParams], { numRuns: NUM_RUNS.standard })(
     "numberFormat 'none': numbers become strings after roundtrip",
     (params: Record<string, number>) => {
@@ -201,6 +299,21 @@ describe("number format roundtrip", () => {
       for (const key of Object.keys(params)) {
         expect(typeof parsed[key]).toBe("string");
       }
+    },
+  );
+
+  test.prop([arbSafeKey, arbNonCanonicalNumericString], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "numberFormat 'auto': non-canonical numeric strings (leading-zero/unsafe/exponent) stay strings",
+    (key: string, value: string) => {
+      // Build the value as a string (numberFormat none), then parse under auto:
+      // the narrowing must keep "007"/unsafe-int/"1e5" as their exact text. (#742)
+      const qs = build({ [key]: value }, { numberFormat: "none" });
+      const parsed = parse(qs, { numberFormat: "auto" });
+
+      expect(parsed[key]).toBe(value);
+      expect(typeof parsed[key]).toBe("string");
     },
   );
 });

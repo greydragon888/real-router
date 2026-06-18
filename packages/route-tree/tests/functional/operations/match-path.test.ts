@@ -271,7 +271,8 @@ describe("New API - matchPath", () => {
     const result = matchPath(tree, "/path?a=1&b=2");
 
     expect(result?.name).toBe("route");
-    expect(result?.params).toStrictEqual({ a: "1", b: "2" });
+    // No queryParams config ⇒ default (auto) strategies. (#744)
+    expect(result?.params).toStrictEqual({ a: 1, b: 2 });
   });
 
   it("should handle empty query string in loose mode (fast path)", () => {
@@ -298,7 +299,8 @@ describe("New API - matchPath", () => {
     });
 
     expect(result?.name).toBe("home");
-    expect(result?.params).toStrictEqual({ extra: "value", other: "123" });
+    // No queryParams config ⇒ default (auto) strategies. (#744)
+    expect(result?.params).toStrictEqual({ extra: "value", other: 123 });
   });
 
   it("should include root with parser in segments", () => {

@@ -6,11 +6,12 @@ import {
   arbOptions,
   arbQueryString,
   arbSafeKey,
+  arbSafeString,
   NUM_RUNS,
 } from "./helpers";
 import { build, omit, keep, parse } from "../../src";
 
-import type { Options } from "../../src";
+import type { ArrayFormat, Options } from "../../src";
 
 const arbParamsWithSubset = fc
   .tuple(arbSearchParamsStrings, arbOptions)
@@ -23,6 +24,33 @@ const arbParamsWithSubset = fc
       params,
       keysToOmit,
       allKeys,
+    }));
+  });
+
+// Array-valued params (multi-chunk for none/brackets/index, single-chunk for
+// comma) paired with a random subset of keys to omit.
+const arbArrayParamsWithSubset = fc
+  .tuple(
+    fc.dictionary(
+      arbSafeKey,
+      fc.array(arbSafeString, { minLength: 2, maxLength: 4 }),
+      { minKeys: 1, maxKeys: 4 },
+    ),
+    fc.constantFrom<ArrayFormat>("none", "brackets", "index", "comma"),
+  )
+  .chain(([params, arrayFormat]) => {
+    const opts: Options = {
+      arrayFormat,
+      numberFormat: "none",
+      booleanFormat: "none",
+    };
+    const allKeys = Object.keys(params);
+
+    return fc.subarray(allKeys).map((keysToOmit) => ({
+      qs: build(params, opts),
+      opts,
+      allKeys,
+      keysToOmit,
     }));
   });
 
@@ -46,6 +74,37 @@ describe("omit/keep partitioning", () => {
       const remaining = parse(result.querystring, opts);
       const removed = result.removedParams;
 
+      for (const key of allKeys) {
+        if (omitSet.has(key)) {
+          expect(key in removed).toBe(true);
+          expect(key in remaining).toBe(false);
+        } else {
+          expect(key in remaining).toBe(true);
+          expect(key in removed).toBe(false);
+        }
+      }
+    },
+  );
+
+  test.prop([arbArrayParamsWithSubset], { numRuns: NUM_RUNS.standard })(
+    "partitioning holds for array-valued params across all array formats",
+    ({
+      qs,
+      opts,
+      allKeys,
+      keysToOmit,
+    }: {
+      qs: string;
+      opts: Options;
+      allKeys: string[];
+      keysToOmit: string[];
+    }) => {
+      const result = omit(qs, keysToOmit, opts);
+      const omitSet = new Set(keysToOmit);
+      const remaining = parse(result.querystring, opts);
+      const removed = result.removedParams;
+
+      // Every chunk of a multi-chunk (repeated/bracket) key must land on one side.
       for (const key of allKeys) {
         if (omitSet.has(key)) {
           expect(key in removed).toBe(true);
@@ -142,19 +201,31 @@ describe("omit complement", () => {
     },
   );
 
-  test.prop([fc.tuple(arbSearchParamsStrings, arbOptions, arbSafeKey)], {
-    numRuns: NUM_RUNS.standard,
-  })(
-    "complement: keep(qs, keys) has none of the keys NOT in keys",
-    ([params, opts, extraKey]: [Record<string, string>, Options, string]) => {
-      fc.pre(!Object.prototype.hasOwnProperty.call(params, extraKey));
+  test.prop([arbParamsWithSubset], { numRuns: NUM_RUNS.standard })(
+    "complement: keep(qs, subset).keptParams holds exactly the kept keys, none outside",
+    ({
+      qs,
+      opts,
+      allKeys,
+      keysToOmit,
+    }: {
+      qs: string;
+      opts: Options;
+      allKeys: string[];
+      keysToOmit: string[];
+    }) => {
+      // Reuse the random subset as the keep-list and assert `keptParams` membership
+      // tracks it (`has(key) === requested`). The previous version compared against
+      // an external key never present in the input, so the assertion held no matter
+      // what `keep` returned (tautology) — and `keptParams` went untested. (#746)
+      const keepSet = new Set(keysToOmit);
+      const keptKeys = new Set(
+        Object.keys(keep(qs, keysToOmit, opts).keptParams),
+      );
 
-      const qs = build(params, opts);
-      const keepKeys = Object.keys(params);
-      const result = keep(qs, keepKeys, opts);
-      const keptKeys = new Set(Object.keys(result.keptParams));
-
-      expect(keptKeys.has(extraKey)).toBe(false);
+      for (const key of allKeys) {
+        expect(keptKeys.has(key)).toBe(keepSet.has(key));
+      }
     },
   );
 });

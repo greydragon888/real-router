@@ -578,6 +578,60 @@ describe("SegmentMatcher", () => {
   });
 
   // ===========================================================================
+  // registerTree — bare unnamed marker rejection (#858)
+  // ===========================================================================
+  //
+  // A bare marker (`:` or `*` with no name) is a name-less param/splat: at match
+  // the trie captures the value under an EMPTY key, while buildPath emits a
+  // literal `:`/`*` and buildParamMeta reports no param at all — a three-way
+  // match/build/meta desync of the same signature class as #736/#738.
+  // registerTree must reject it loudly instead of creating a phantom
+  // empty-named slot. (`:` behaves identically to `*` — the root is ANY
+  // name-less marker, not just bare splat.)
+
+  describe("registerTree — bare unnamed marker rejection (#858)", () => {
+    function singleRoute(path: string): MatcherInputNode {
+      const route = createInputNode({ name: "r", path, fullName: "r" });
+
+      return createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["r", route]]),
+        nonAbsoluteChildren: [route],
+      });
+    }
+
+    it("throws on a bare splat '*' with no name", () => {
+      expect(() => {
+        createTestMatcher().registerTree(singleRoute("/files/*"));
+      }).toThrow(/\[SegmentMatcher\.registerTree\].*'\*'/);
+    });
+
+    it("throws on a bare param ':' with no name", () => {
+      expect(() => {
+        createTestMatcher().registerTree(singleRoute("/files/:"));
+      }).toThrow(/\[SegmentMatcher\.registerTree\].*':'/);
+    });
+
+    it("throws on a bare param carrying only a constraint or optional marker", () => {
+      expect(() => {
+        createTestMatcher().registerTree(singleRoute("/x/:?"));
+      }).toThrow(/\[SegmentMatcher\.registerTree\]/);
+
+      expect(() => {
+        createTestMatcher().registerTree(singleRoute(String.raw`/y/:<\d+>`));
+      }).toThrow(/\[SegmentMatcher\.registerTree\]/);
+    });
+
+    it("still accepts a named splat (control)", () => {
+      expect(() => {
+        createTestMatcher().registerTree(singleRoute("/files/*path"));
+      }).not.toThrow();
+    });
+  });
+
+  // ===========================================================================
   // build↔match grammar agreement (#738)
   // ===========================================================================
   //
@@ -631,6 +685,45 @@ describe("SegmentMatcher", () => {
 
       // \d? matches a single digit or empty — two digits must be rejected.
       expect(matcher.match("/a/55")).toBeUndefined();
+    });
+  });
+
+  // ===========================================================================
+  // Constraint validation uses the DECODED value (#857)
+  // ===========================================================================
+
+  describe("constraint validation uses the decoded value (#857)", () => {
+    function constrainedMatcher(path: string): SegmentMatcher {
+      const matcher = createTestMatcher();
+      const route = createInputNode({ name: "r", path, fullName: "r" });
+      const root = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["r", route]]),
+        nonAbsoluteChildren: [route],
+      });
+
+      matcher.registerTree(root);
+
+      return matcher;
+    }
+
+    it("matches an over-encoded value whose decoded form satisfies the constraint", () => {
+      // `%35` decodes to "5", which satisfies <\d+>. The constraint must be
+      // checked on the decoded value, not the raw segment (#857).
+      const matcher = constrainedMatcher(String.raw`/:n<\d+>`);
+
+      expect(matcher.match("/%35")?.params).toStrictEqual({ n: "5" });
+    });
+
+    it("extracted param always satisfies the constraint (Matching #9)", () => {
+      // `%41` is 3 chars (raw satisfies <.{3}>) but decodes to "A" (1 char), which
+      // does NOT. match() must reject it, not return a value violating its own
+      // constraint (the old order returned { n: "A" }).
+      const matcher = constrainedMatcher("/:n<.{3}>");
+
+      expect(matcher.match("/%41")).toBeUndefined();
     });
   });
 
@@ -4437,7 +4530,7 @@ describe("SegmentMatcher", () => {
       expect(result!.params).toStrictEqual({ id: "abc" });
     });
 
-    it("should validate constraint against raw (pre-decode) param value", () => {
+    it("should validate constraint against the DECODED param value (#857)", () => {
       const matcher = createTestMatcher();
       const userNode = createInputNode({
         name: "user",
@@ -4454,10 +4547,11 @@ describe("SegmentMatcher", () => {
 
       matcher.registerTree(rootNode);
 
-      // %33 decodes to "3", but raw value "%33" does NOT match \d+
+      // `%33` decodes to "3", which satisfies <\d+>. The constraint describes the
+      // logical (decoded) value, so the over-encoded form must match (#857).
       const result = matcher.match("/users/%33");
 
-      expect(result).toBeUndefined();
+      expect(result?.params).toStrictEqual({ id: "3" });
     });
 
     it("should validate multiple constraints on different params", () => {
