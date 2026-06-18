@@ -201,19 +201,31 @@ describe("omit complement", () => {
     },
   );
 
-  test.prop([fc.tuple(arbSearchParamsStrings, arbOptions, arbSafeKey)], {
-    numRuns: NUM_RUNS.standard,
-  })(
-    "complement: keep(qs, keys) has none of the keys NOT in keys",
-    ([params, opts, extraKey]: [Record<string, string>, Options, string]) => {
-      fc.pre(!Object.prototype.hasOwnProperty.call(params, extraKey));
+  test.prop([arbParamsWithSubset], { numRuns: NUM_RUNS.standard })(
+    "complement: keep(qs, subset).keptParams holds exactly the kept keys, none outside",
+    ({
+      qs,
+      opts,
+      allKeys,
+      keysToOmit,
+    }: {
+      qs: string;
+      opts: Options;
+      allKeys: string[];
+      keysToOmit: string[];
+    }) => {
+      // Reuse the random subset as the keep-list and assert `keptParams` membership
+      // tracks it (`has(key) === requested`). The previous version compared against
+      // an external key never present in the input, so the assertion held no matter
+      // what `keep` returned (tautology) — and `keptParams` went untested. (#746)
+      const keepSet = new Set(keysToOmit);
+      const keptKeys = new Set(
+        Object.keys(keep(qs, keysToOmit, opts).keptParams),
+      );
 
-      const qs = build(params, opts);
-      const keepKeys = Object.keys(params);
-      const result = keep(qs, keepKeys, opts);
-      const keptKeys = new Set(Object.keys(result.keptParams));
-
-      expect(keptKeys.has(extraKey)).toBe(false);
+      for (const key of allKeys) {
+        expect(keptKeys.has(key)).toBe(keepSet.has(key));
+      }
     },
   );
 });
