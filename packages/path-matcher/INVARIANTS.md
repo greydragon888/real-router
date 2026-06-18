@@ -44,6 +44,7 @@
 | 24  | Splat backtracking                   | When a splat node has a child route, a remainder that matches the child resolves to the more-specific child; a remainder that doesn't falls back to the wildcard capture. |
 | 25  | Query overrides same-named path param | A query key equal to a path-param name **overwrites** the captured path value: `match("/u/5?id=9").params` → `{ id: "9" }`. Query params are merged into the same object as path params (`#mergeQueryParams`), query last. Intentional/documented (#843): `buildPath` never emits a path param as a query key, so the build→match roundtrip is unaffected; the collision only arises for hand-crafted URLs where a query shadows a path segment. |
 | 26  | Constraint decode-consistency        | Constraints are validated **after** percent-decoding, so they describe the decoded value. An over-encoded value whose decoded form satisfies the constraint matches (`/users/%35` ⊨ `<\d+>` because it decodes to `"5"`); a raw form that satisfies the regex but whose decoded value does not is rejected (`/%41` ⊭ `<.{3}>` because it decodes to `"A"`). Without this, `match` validated the raw segment, diverging from `buildPath` (which validates the value) and from #9. (#857) |
+| 27  | Name-less marker rejection           | `registerTree` throws for a bare marker with no name — `:`, `*`, or one carrying only a constraint/optional modifier (`:?`, `:<\d+>`) — at every child-creation site (param branch, optional fork, splat). A name-less marker would otherwise capture under an empty key at `match` while `buildPath` emits a literal `:`/`*` and `buildParamMeta` reports no param: a three-way match/build/meta desync of the #736/#738 class (#858). |
 
 ## Path Rejection
 
@@ -98,5 +99,5 @@ Level 2 of the layered `undefined`-strip contract defined in [rfc-query-param-se
 | `tests/property/match-semantics.properties.ts`    | strictTrailingSlash, constraint filtering, splat backtracking, never-throw matrix   |
 | `tests/property/decode-safety.properties.ts`      | `match()` never-throw on valid-hex/invalid-UTF-8 percent (#737)                      |
 | `tests/property/param-grammar.properties.ts`      | Unified param-name grammar + constraint-`?` no-leak (#738)                           |
-| `tests/property/param-name-conflict.properties.ts`| Param-name aliasing conflict detection (#736)                                       |
+| `tests/property/param-name-conflict.properties.ts`| Param-name aliasing conflict detection (#736) + name-less marker rejection (#858)   |
 | `tests/property/undefined-strip.properties.ts`    | Undefined-strip layered contract (RFC 5.3 bis, level 2)                             |

@@ -309,6 +309,7 @@ registerNode() — recursive walk of MatcherInputNode tree
 - **`:param` segments** → create `paramChild` with captured name
 - **`*splat` segments** → create `splatChild` with captured name
 - **Optional params** (`:param?`) → fork: insert both WITH and WITHOUT param node
+- **Name-less markers** (bare `:` / `*`, or `:?` / `:<…>` with no name) → **rejected** via `throwEmptyParamName`: an empty-keyed slot would desync match/build/meta (#858)
 
 ### Build Parts Compilation
 

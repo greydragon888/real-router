@@ -151,6 +151,49 @@ describe("Param-name conflict properties (#736)", () => {
   });
 });
 
+/**
+ * A name-less marker (#858): a bare `:` / `*`, optionally carrying ONLY a
+ * constraint and/or optional `?` modifier but still no name. Each compiles to a
+ * phantom empty-named slot (match captures under `""`, build emits the literal
+ * marker, buildParamMeta sees no param) and MUST be rejected at registration —
+ * the same match/build/meta desync class as #736/#738.
+ */
+const arbNamelessMarker = fc.constantFrom(
+  ":",
+  "*",
+  ":?",
+  String.raw`:<\d+>`,
+  ":<[a-z]+>?",
+);
+
+// A clean static segment, used only to vary the marker's position in the path.
+const arbStaticSeg = fc.stringMatching(/^[a-z]{1,6}$/);
+
+describe("Name-less marker rejection (#858)", () => {
+  test.prop([fc.array(arbStaticSeg, { maxLength: 3 }), arbNamelessMarker], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "a bare ':' or '*' (no name) is rejected at registration, at any position",
+    (prefix, marker) => {
+      const path = `/${[...prefix, marker].join("/")}`;
+
+      const build = (): SegmentMatcher => {
+        const matcher = createTestMatcher();
+
+        matcher.registerTree(
+          createRootWithChildren([
+            createInputNode({ name: "r", path, fullName: "r" }),
+          ]),
+        );
+
+        return matcher;
+      };
+
+      expect(build).toThrow(/Empty parameter name/);
+    },
+  );
+});
+
 // URL-safe single-segment value (no "/", no reserved chars).
 function arbStr(): fc.Arbitrary<string> {
   return fc.stringMatching(/^[a-zA-Z0-9_\-.~]{1,15}$/);

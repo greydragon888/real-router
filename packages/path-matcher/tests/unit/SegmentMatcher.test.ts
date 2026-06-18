@@ -578,6 +578,60 @@ describe("SegmentMatcher", () => {
   });
 
   // ===========================================================================
+  // registerTree — bare unnamed marker rejection (#858)
+  // ===========================================================================
+  //
+  // A bare marker (`:` or `*` with no name) is a name-less param/splat: at match
+  // the trie captures the value under an EMPTY key, while buildPath emits a
+  // literal `:`/`*` and buildParamMeta reports no param at all — a three-way
+  // match/build/meta desync of the same signature class as #736/#738.
+  // registerTree must reject it loudly instead of creating a phantom
+  // empty-named slot. (`:` behaves identically to `*` — the root is ANY
+  // name-less marker, not just bare splat.)
+
+  describe("registerTree — bare unnamed marker rejection (#858)", () => {
+    function singleRoute(path: string): MatcherInputNode {
+      const route = createInputNode({ name: "r", path, fullName: "r" });
+
+      return createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["r", route]]),
+        nonAbsoluteChildren: [route],
+      });
+    }
+
+    it("throws on a bare splat '*' with no name", () => {
+      expect(() => {
+        createTestMatcher().registerTree(singleRoute("/files/*"));
+      }).toThrow(/\[SegmentMatcher\.registerTree\].*'\*'/);
+    });
+
+    it("throws on a bare param ':' with no name", () => {
+      expect(() => {
+        createTestMatcher().registerTree(singleRoute("/files/:"));
+      }).toThrow(/\[SegmentMatcher\.registerTree\].*':'/);
+    });
+
+    it("throws on a bare param carrying only a constraint or optional marker", () => {
+      expect(() => {
+        createTestMatcher().registerTree(singleRoute("/x/:?"));
+      }).toThrow(/\[SegmentMatcher\.registerTree\]/);
+
+      expect(() => {
+        createTestMatcher().registerTree(singleRoute(String.raw`/y/:<\d+>`));
+      }).toThrow(/\[SegmentMatcher\.registerTree\]/);
+    });
+
+    it("still accepts a named splat (control)", () => {
+      expect(() => {
+        createTestMatcher().registerTree(singleRoute("/files/*path"));
+      }).not.toThrow();
+    });
+  });
+
+  // ===========================================================================
   // build↔match grammar agreement (#738)
   // ===========================================================================
   //
