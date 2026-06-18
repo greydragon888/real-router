@@ -47,10 +47,12 @@ describe("S1: 10,000 distinct routes register and match without drop or alias", 
       expect(result?.params).toStrictEqual({ [`id${i}`]: `v${i}` });
     }
 
-    // Catastrophe-guard (healthy ~40 ms, ≈47× margin): catches a severe
-    // super-linear registration blowup; a cheap-constant O(n²) at 10k can sit
-    // under this ceiling, so the no-drop/alias correctness sampled above is the
-    // precise guard.
+    // Catastrophe-guard (measured healthy ~50 ms, ≈35× margin): catches a
+    // severe super-linear registration blowup (verified: an O(n²) body heavy
+    // enough to model a real regression pushes registerMs past this ceiling). A
+    // cheap-constant O(n²) at 10k still sits UNDER it (~230 ms measured), so this
+    // is deliberately a catastrophe ceiling, not a quadratic detector — the
+    // no-drop/alias correctness sampled above is the precise guard.
     expect(registerMs).toBeLessThan(2000);
   });
 });

@@ -44,7 +44,7 @@ describe("S2: a ~1MB splat value is captured in bounded time", () => {
   });
 });
 
-describe("S3: a 10,000-key query string merges in linear time", () => {
+describe("S3: a large query string merges in linear time (10k loose, 50k strict)", () => {
   it("merges 10k query params (non-strict) without quadratic blowup", () => {
     const matcher = createMatcher([{ name: "s", path: "/s" }]);
     const query = Array.from({ length: 10_000 }, (_, i) => `k${i}=v${i}`).join(
@@ -60,17 +60,21 @@ describe("S3: a 10,000-key query string merges in linear time", () => {
     expect(elapsedMs).toBeLessThan(500); // healthy ~6 ms
   });
 
-  it("strict mode with 10k declared keys stays O(1)-per-key (Set, not array scan)", () => {
+  it("strict mode with 50k declared keys stays O(1)-per-key (Set, not array scan)", () => {
     // The discriminating case: strict mode checks each query key against the
-    // declared set. With 10k declared × 10k query, a `Set.has` lookup is linear
-    // overall; an array `includes` regression would be O(n²) (~seconds).
-    const declared = Array.from({ length: 10_000 }, (_, i) => `k${i}`).join(
+    // declared set. With 50k declared × 50k query, a `Set.has` lookup is linear
+    // (~27 ms measured healthy); an array `includes` regression is O(n²)
+    // (~1000 ms measured). N=50k anchors the ceiling between them: 300 ms is 11×
+    // over healthy (flake-proof) and 3.3× under the mutant. At the old N=10k the
+    // includes-regression measured ~440 ms and slipped under a 500 ms ceiling —
+    // the test passed on the very bug it exists to catch.
+    const declared = Array.from({ length: 50_000 }, (_, i) => `k${i}`).join(
       "&",
     );
     const matcher = createMatcher([{ name: "s", path: `/s?${declared}` }], {
       strictQueryParams: true,
     });
-    const query = Array.from({ length: 10_000 }, (_, i) => `k${i}=v${i}`).join(
+    const query = Array.from({ length: 50_000 }, (_, i) => `k${i}=v${i}`).join(
       "&",
     );
 
@@ -79,7 +83,7 @@ describe("S3: a 10,000-key query string merges in linear time", () => {
     const elapsedMs = performance.now() - start;
 
     expect(result).toBeDefined();
-    expect(Object.keys(result!.params)).toHaveLength(10_000);
-    expect(elapsedMs).toBeLessThan(500);
+    expect(Object.keys(result!.params)).toHaveLength(50_000);
+    expect(elapsedMs).toBeLessThan(300);
   });
 });
