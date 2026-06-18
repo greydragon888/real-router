@@ -6,11 +6,12 @@ import {
   arbOptions,
   arbQueryString,
   arbSafeKey,
+  arbSafeString,
   NUM_RUNS,
 } from "./helpers";
 import { build, omit, keep, parse } from "../../src";
 
-import type { Options } from "../../src";
+import type { ArrayFormat, Options } from "../../src";
 
 const arbParamsWithSubset = fc
   .tuple(arbSearchParamsStrings, arbOptions)
@@ -23,6 +24,33 @@ const arbParamsWithSubset = fc
       params,
       keysToOmit,
       allKeys,
+    }));
+  });
+
+// Array-valued params (multi-chunk for none/brackets/index, single-chunk for
+// comma) paired with a random subset of keys to omit.
+const arbArrayParamsWithSubset = fc
+  .tuple(
+    fc.dictionary(
+      arbSafeKey,
+      fc.array(arbSafeString, { minLength: 2, maxLength: 4 }),
+      { minKeys: 1, maxKeys: 4 },
+    ),
+    fc.constantFrom<ArrayFormat>("none", "brackets", "index", "comma"),
+  )
+  .chain(([params, arrayFormat]) => {
+    const opts: Options = {
+      arrayFormat,
+      numberFormat: "none",
+      booleanFormat: "none",
+    };
+    const allKeys = Object.keys(params);
+
+    return fc.subarray(allKeys).map((keysToOmit) => ({
+      qs: build(params, opts),
+      opts,
+      allKeys,
+      keysToOmit,
     }));
   });
 
@@ -46,6 +74,37 @@ describe("omit/keep partitioning", () => {
       const remaining = parse(result.querystring, opts);
       const removed = result.removedParams;
 
+      for (const key of allKeys) {
+        if (omitSet.has(key)) {
+          expect(key in removed).toBe(true);
+          expect(key in remaining).toBe(false);
+        } else {
+          expect(key in remaining).toBe(true);
+          expect(key in removed).toBe(false);
+        }
+      }
+    },
+  );
+
+  test.prop([arbArrayParamsWithSubset], { numRuns: NUM_RUNS.standard })(
+    "partitioning holds for array-valued params across all array formats",
+    ({
+      qs,
+      opts,
+      allKeys,
+      keysToOmit,
+    }: {
+      qs: string;
+      opts: Options;
+      allKeys: string[];
+      keysToOmit: string[];
+    }) => {
+      const result = omit(qs, keysToOmit, opts);
+      const omitSet = new Set(keysToOmit);
+      const remaining = parse(result.querystring, opts);
+      const removed = result.removedParams;
+
+      // Every chunk of a multi-chunk (repeated/bracket) key must land on one side.
       for (const key of allKeys) {
         if (omitSet.has(key)) {
           expect(key in removed).toBe(true);

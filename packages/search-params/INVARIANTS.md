@@ -12,15 +12,17 @@
 | 4   | Build determinism                 | Two calls to `build(params, opts)` with identical arguments always return the same string. The function has no hidden state.                                                                    |
 | 5   | Boundary value acceptance         | `parse("")` returns `{}`, `parse("?")` returns `{}`, and `build({})` returns `""`. Empty inputs are handled without errors.                                                                     |
 | 6   | No `?` prefix from build          | `build(params, opts)` never returns a string starting with `?`. Callers are responsible for prepending the separator when needed.                                                               |
-| 7   | Percent-encoding roundtrip        | Values containing special characters (spaces, `&`, `=`, `?`, `#`, `+`, `/`) survive the `build → parse` cycle losslessly via `encodeURIComponent`/`decodeURIComponent`.                         |
+| 7   | Percent-encoding roundtrip        | **Keys and values** containing special characters (spaces, `&`, `=`, `?`, `#`, `+`, `/`) and multibyte/unicode content survive the `build → parse` cycle losslessly via `encodeURIComponent`/`decodeURIComponent`. Includes keys that shadow `Object.prototype` members (`valueOf`, `constructor`, `toString`, `__proto__`), which decode to plain own properties, not the inherited functions. |
 | 8   | Undefined exclusion               | `build(params)` silently drops keys whose value is `undefined`, producing the same output as building without those keys.                                                                       |
 | 9   | Empty array erasure               | `build({key: []})` produces an empty string for that key (all formats including comma), so `parse(build({key: []}))` does not contain `key`.                                                    |
+| 10  | No-options defaults symmetry      | `parse(build(params)) ≈ normalizeForComparison(params, {})` — without options, `build` and `parse` resolve to the same cached `auto` defaults, so the roundtrip holds with no options passed. (#744) |
+| 11  | String boolean-token coercion     | A string value equal to `"true"`/`"false"` decodes to a **boolean** under `booleanFormat: "auto"` or `"empty-true"` — `decodeRaw` runs before the number/string strategies. Guards the property-oracle from silently mis-modelling this. (#746) |
 
 ## Omit / Keep
 
 | #   | Invariant                  | Description                                                                                                                                                                                                                                 |
 | --- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Partitioning               | Every key from `parse(qs)` ends up in exactly one of `removedParams` or the remaining `querystring` after `omit`. No key is lost or duplicated.                                                                                             |
+| 1   | Partitioning               | Every key from `parse(qs)` ends up in exactly one of `removedParams` or the remaining `querystring` after `omit`. No key is lost or duplicated. Holds for **array-valued** params across all array formats, where one key spans multiple chunks. |
 | 2   | Omit idempotency           | `omit(omit(qs, keys).querystring, keys).querystring === omit(qs, keys).querystring`. Applying `omit` twice with the same keys changes nothing on the second pass.                                                                           |
 | 3   | Omit identity              | `omit(qs, []).querystring === qs`. Omitting an empty key list leaves the query string unchanged.                                                                                                                                            |
 | 4   | Keep identity              | `keep(qs, allKeys).querystring === qs`. Keeping all keys leaves the query string unchanged.                                                                                                                                                 |
@@ -50,11 +52,12 @@
 | 13  | Number format: none preserves strings | `typeof parse(build({a: 42}, {numberFormat: "none"}), {numberFormat: "none"}).a === "string"`. With `numberFormat: "none"`, numbers become strings after the build/parse cycle.                                                                               |
 | 14  | Number format: auto negatives        | `parse(build(params, {numberFormat: "auto"}), {numberFormat: "auto"}) === params` for negative integer values. `build({n: -5})` emits `"n=-5"` and `parse` decodes it back to the number `-5`, so a param keeps the same type whether it arrives from a URL or from a programmatic `navigate({n: -5})`. Non-canonical negatives (`"-007"`, `"-9007199254740992"`) stay strings, mirroring the unsigned rules. (#742) |
 | 15  | Boolean format: empty-true (true & false) | `parse(build(params, {booleanFormat: "empty-true"}), {booleanFormat: "empty-true"}) === params` for **both** boolean values. `build({flag: false})` emits `"flag=false"` and `parse` decodes it back to boolean `false` (not the string `"false"`); array elements (`"a=true&a=false"`) decode both `"true"`→`true` and `"false"`→`false` symmetrically. (#743) |
+| 16  | Number format: auto non-canonical    | Under `numberFormat: "auto"`, numeric-looking strings that are **not** canonical — leading-zero (`"007"`), unsafe integers (`> 2^53`), and exponent notation (`"1e5"`) — stay strings, preserving their exact text/precision (the inverse of #11/#14). (#742) |
 
 ## Test Files
 
 | File                                      | Invariants | Category                   |
 | ----------------------------------------- | ---------- | -------------------------- |
-| `tests/property/parseBuild.properties.ts` | 1–9        | Core parse/build cycle     |
+| `tests/property/parseBuild.properties.ts` | 1–11       | Core parse/build cycle     |
 | `tests/property/omitKeep.properties.ts`   | 1–10       | Omit and keep operations   |
-| `tests/property/formats.properties.ts`    | 1–15       | Format-specific roundtrips |
+| `tests/property/formats.properties.ts`    | 1–16       | Format-specific roundtrips |

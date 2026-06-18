@@ -5,11 +5,15 @@ import {
   arbSafeKey,
   arbSafeString,
   arbSearchParamsEncodable,
+  arbStringWithComma,
+  arbNonCanonicalNumericString,
   NUM_RUNS,
 } from "./helpers";
 import { build, parse } from "../../src";
 
 import type { ArrayFormat, BooleanFormat, NumberFormat } from "../../src";
+
+const STRING_SAFE = { numberFormat: "none", booleanFormat: "none" } as const;
 
 const arbArrayParamsBracketsOrIndex = fc.tuple(
   fc.dictionary(
@@ -86,6 +90,28 @@ describe("array format roundtrip", () => {
         arrayFormat: "comma" as ArrayFormat,
         numberFormat: "none" as NumberFormat,
       };
+      const qs = build(params, opts);
+      const parsed = parse(qs, opts);
+
+      expect(parsed).toStrictEqual({ ...params });
+    },
+  );
+
+  test.prop(
+    [
+      fc.dictionary(
+        arbSafeKey,
+        fc.array(arbStringWithComma, { minLength: 2, maxLength: 4 }),
+        { minKeys: 1, maxKeys: 3 },
+      ),
+    ],
+    { numRuns: NUM_RUNS.standard },
+  )(
+    "comma format: values containing commas survive via %2C (encoded comma stays literal)",
+    (params: Record<string, string[]>) => {
+      // Inner commas are encoded as %2C and must round-trip as literal commas,
+      // distinct from the unencoded ',' element separator. (INVARIANTS Format #3)
+      const opts = { arrayFormat: "comma" as ArrayFormat, ...STRING_SAFE };
       const qs = build(params, opts);
       const parsed = parse(qs, opts);
 
@@ -234,6 +260,21 @@ describe("number format roundtrip", () => {
       for (const key of Object.keys(params)) {
         expect(typeof parsed[key]).toBe("string");
       }
+    },
+  );
+
+  test.prop([arbSafeKey, arbNonCanonicalNumericString], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "numberFormat 'auto': non-canonical numeric strings (leading-zero/unsafe/exponent) stay strings",
+    (key: string, value: string) => {
+      // Build the value as a string (numberFormat none), then parse under auto:
+      // the narrowing must keep "007"/unsafe-int/"1e5" as their exact text. (#742)
+      const qs = build({ [key]: value }, { numberFormat: "none" });
+      const parsed = parse(qs, { numberFormat: "auto" });
+
+      expect(parsed[key]).toBe(value);
+      expect(typeof parsed[key]).toBe("string");
     },
   );
 });
