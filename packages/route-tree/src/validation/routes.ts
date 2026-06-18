@@ -1,5 +1,7 @@
 // packages/route-node/modules/validation/routes.ts
 
+import { buildParamMeta, PARAM_NAME_PATTERN } from "path-matcher";
+
 import type { RouteTree } from "../types";
 
 /**
@@ -13,6 +15,16 @@ import type { RouteTree } from "../types";
 function createRouterError(methodName: string, message: string): TypeError {
   return new TypeError(`[router.${methodName}] ${message}`);
 }
+
+/**
+ * Matches a `:`/`*` marker NOT followed by a valid param-name char — a name-less
+ * marker (`:`, `*`, `:?`, `:<\d+>`). Derived from the single `PARAM_NAME_PATTERN`
+ * grammar (#738) so this validation gate can never drift from the matcher's own
+ * grammar: `[:*]` then a negative lookahead for the name class. path-matcher
+ * rejects name-less markers at `registerTree` (#858); this catches them earlier,
+ * at the validation layer, with a route-contextual error (#863).
+ */
+const EMPTY_PARAM_MARKER_RGX = new RegExp(`[:*](?!${PARAM_NAME_PATTERN})`);
 
 /**
  * Reports whether a path's `<...>` constraint delimiters are balanced.
@@ -143,6 +155,18 @@ export function validateRoutePath(
     throw createRouterError(
       methodName,
       `Invalid path for route "${routeName}": unbalanced constraint delimiter ('<' or '>') in "${path}"`,
+    );
+  }
+
+  // Name-less parameter marker. A `:`/`*` with no following name passes every
+  // format check above, but path-matcher rejects it at `registerTree` (#858) with
+  // a non-route-contextual error. Reject it here at the gate too (#863), scanning
+  // only the URL-path portion: `buildParamMeta` strips the query the same way the
+  // trie does, so a `:`/`*` inside a query declaration is not falsely flagged.
+  if (EMPTY_PARAM_MARKER_RGX.test(buildParamMeta(path).pathPattern)) {
+    throw createRouterError(
+      methodName,
+      `Invalid path for route "${routeName}": parameter marker (':' or '*') without a name in "${path}"`,
     );
   }
 

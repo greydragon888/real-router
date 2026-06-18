@@ -145,6 +145,20 @@ const arbUnbalancedConstraintPath = fc
   .tuple(arbSafeSegment, fc.constantFrom("<", ">", String.raw`<\d+`, "<[a-z]"))
   .map(([seg, stray]) => `/:${seg}${stray}`);
 
+/**
+ * Param paths with a NAME-LESS marker — `:` or `*` immediately followed by a
+ * boundary (`/`, `?`, `<`, or end-of-string), i.e. no parameter name. path-matcher
+ * rejects these at `registerTree` (#858); `validateRoute` must reject them at the
+ * gate too, deriving from the single `PARAM_NAME_PATTERN` grammar (#863).
+ */
+const arbEmptyParamPath = fc
+  .tuple(
+    arbSafeSegment,
+    fc.constantFrom(":", "*"),
+    fc.constantFrom("", "?", String.raw`<\d+>`, "/n"),
+  )
+  .map(([seg, marker, tail]) => `/${seg}/${marker}${tail}`);
+
 // =============================================================================
 // Route Name Validation
 // =============================================================================
@@ -284,6 +298,17 @@ describe("Route Path Validation", () => {
         expect(() => {
           validateRoutePath(path, "test", "add");
         }).toThrow(/constraint/);
+      },
+    );
+  });
+
+  describe("7: name-less param marker rejection — ':'/'*' with no name throws TypeError (high)", () => {
+    test.prop([arbEmptyParamPath], { numRuns: NUM_RUNS.fast })(
+      "a marker without a parameter name throws (gate-level, consistent with path-matcher #858)",
+      (path: string) => {
+        expect(() => {
+          validateRoutePath(path, "test", "add");
+        }).toThrow(/parameter marker/);
       },
     );
   });
