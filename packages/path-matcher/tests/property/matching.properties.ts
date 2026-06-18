@@ -2,6 +2,7 @@ import { fc, test } from "@fast-check/vitest";
 
 import {
   arbEncoding,
+  arbMatchSafeEncodableValue,
   arbNonNumericParam,
   arbNumericParam,
   arbSafeParamValue,
@@ -194,11 +195,14 @@ describe("Matching Properties", () => {
         expect(resultLower).toBeDefined();
         expect(resultUpper).toBeDefined();
 
-        const nameFromLower = resultLower!.segments.at(-1)!.fullName;
-        const nameFromUpper = resultUpper!.segments.at(-1)!.fullName;
+        expect(resultLower!.segments.at(-1)!.fullName).toBe("users.profile");
+        expect(resultUpper!.segments.at(-1)!.fullName).toBe("users.profile");
 
-        expect(nameFromLower).toBe("users.profile");
-        expect(nameFromUpper).toBe("users.profile");
+        // Param values are captured case-sensitively (only the STATIC segment
+        // folds); assert the capture so a broken param branch can't hide behind
+        // the route-name check.
+        expect(resultLower!.params).toStrictEqual({ id: id.toLowerCase() });
+        expect(resultUpper!.params).toStrictEqual({ id: id.toUpperCase() });
       },
     );
   });
@@ -393,11 +397,17 @@ describe("Matching Properties", () => {
     );
   });
 
-  describe("roundtrip — build→match works with all 4 encoding types", () => {
-    test.prop([arbEncoding, arbSafeParamValue], {
+  describe("roundtrip — build→match across all 4 encodings, with anti-identity", () => {
+    // A space-bearing value round-trips through build→match under every strategy
+    // (`none` keeps the space raw and the matcher accepts it; the rest encode it
+    // to %20), so params must survive in all four; AND a non-identity strategy
+    // must actually encode it in the URL. The anti-identity arm catches an
+    // under-encoding stub that the roundtrip alone (permissive decode) misses —
+    // exercised through the real matcher, not just the pure encoder.
+    test.prop([arbEncoding, arbMatchSafeEncodableValue], {
       numRuns: NUM_RUNS.standard,
     })(
-      "build→match roundtrip preserves params with any encoding",
+      "build→match preserves an encode-requiring param, and non-none encodes it in the URL",
       (enc, id: string) => {
         const matcher = createParamMatcher({ urlParamsEncoding: enc });
         const path = matcher.buildPath("users.profile", { id });
@@ -406,6 +416,14 @@ describe("Matching Properties", () => {
         expect(result).toBeDefined();
         expect(result!.segments.at(-1)!.fullName).toBe("users.profile");
         expect(result!.params).toStrictEqual({ id });
+
+        // anti-identity: space is raw under `none`, percent-encoded otherwise.
+        if (enc === "none") {
+          expect(path).toContain(" ");
+        } else {
+          expect(path).not.toContain(" ");
+          expect(path).toContain("%");
+        }
       },
     );
   });

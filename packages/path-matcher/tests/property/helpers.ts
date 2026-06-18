@@ -331,6 +331,48 @@ export const arbNonNumericParam: fc.Arbitrary<string> =
   fc.stringMatching(/^[a-zA-Z]{1,10}$/);
 
 /**
+ * A single path-segment value (no "/") that EVERY non-identity strategy must
+ * transform — it always contains a space or a multibyte char, which `default`,
+ * `uri`, and `uriComponent` all percent-encode. Unlike `arbSafeParamValue` (a
+ * fixpoint of all four encoders), this distinguishes a real encoder from an
+ * identity stub, so a roundtrip test can add an anti-identity assertion that a
+ * permissive decode-oracle cannot otherwise catch (PBT audit).
+ */
+export const arbEncodableValue: fc.Arbitrary<string> = fc
+  .stringMatching(/^[a-zA-Z0-9 é€中]{1,12}$/u)
+  .filter((s) => /[ é€中]/u.test(s));
+
+/**
+ * Splat value whose segments are individually encode-requiring (each is an
+ * `arbEncodableValue`), joined by "/". Forces real per-segment encoding so the
+ * splat roundtrip is non-trivial (vs `arbSplatValue`, an encoder fixpoint).
+ */
+export const arbEncodableSplatValue: fc.Arbitrary<string> = fc
+  .array(arbEncodableValue, { minLength: 1, maxLength: 4 })
+  .map((segments) => segments.join("/"));
+
+/**
+ * A value that every non-identity strategy percent-encodes (it always contains a
+ * space → `%20`) yet whose RAW form still survives `match()` in a single path
+ * segment — no "/", "#", "?", "%", control, or Unicode, and clean non-space
+ * boundaries. This is the one class that round-trips through build→match under
+ * ALL four strategies (incl. `none`, which keeps the space raw and the matcher
+ * accepts it) while still distinguishing a real encoder from an identity stub:
+ * the URL contains a space under `none` and `%20` under the rest. Use it to give
+ * a build→match-through-the-matcher test anti-identity teeth (vs
+ * `arbSafeParamValue`, an encoder fixpoint).
+ */
+export const arbMatchSafeEncodableValue: fc.Arbitrary<string> = fc
+  .stringMatching(/^[a-zA-Z0-9][a-zA-Z0-9 ]{0,10}[a-zA-Z0-9]$/)
+  .filter((s) => s.includes(" "));
+
+/** Splat counterpart of {@link arbMatchSafeEncodableValue}: space-bearing
+ * match-safe segments joined by "/". */
+export const arbMatchSafeEncodableSplatValue: fc.Arbitrary<string> = fc
+  .array(arbMatchSafeEncodableValue, { minLength: 1, maxLength: 3 })
+  .map((segments) => segments.join("/"));
+
+/**
  * Percent-encodes every character of an ASCII string to its `%XX` form
  * ("A" → "%41", "5" → "%35"). Builds over-encoded constraint inputs whose raw
  * form differs from the decoded value — the discriminating shape for the
@@ -349,9 +391,13 @@ export function percentEncodeAscii(value: string): string {
 }
 
 /**
- * Arbitrary Unicode string for pure encoding function tests.
- * fast-check generates valid Unicode (no lone surrogates).
+ * Arbitrary string covering the full Unicode range for pure encoding-function
+ * tests. fast-check v4's bare `fc.string()` emits printable ASCII only
+ * (0x20–0x7E); `unit: "grapheme"` is what actually exercises the multibyte/emoji
+ * path the encoders' `u`-flag exists to handle — valid clusters, no lone
+ * surrogates (so `encodeURIComponent` never throws on this generator).
  */
 export const arbUnicodeString: fc.Arbitrary<string> = fc.string({
+  unit: "grapheme",
   maxLength: 30,
 });

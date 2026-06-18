@@ -37,7 +37,10 @@ interface Spec {
   pool: string[];
 }
 
-const arbName = fc.stringMatching(/^[a-z][a-z0-9]{0,5}$/);
+// Includes a hyphen so the model exercises the #738 name class (`:my-param`)
+// that PARAM_NAME_PATTERN (`[^/?<]+`) admits — not just `\w`. The leading char
+// stays `[a-z]` so a name never starts with `-`.
+const arbName = fc.stringMatching(/^[a-z][a-z0-9-]{0,5}$/);
 
 const arbSpec = fc.record({
   kinds: fc.array(

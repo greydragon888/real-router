@@ -2,7 +2,7 @@ import { fc, test } from "@fast-check/vitest";
 
 import {
   arbEncoding,
-  arbSplatValue,
+  arbMatchSafeEncodableSplatValue,
   createParamMatcher,
   createSplatMatcher,
   NUM_RUNS,
@@ -64,11 +64,17 @@ describe("Canonicalization — build∘match is a fixpoint", () => {
     },
   );
 
-  test.prop([arbEncoding, arbSplatValue], { numRuns: NUM_RUNS.standard })(
-    "splat route: build∘match is a fixpoint across all 4 encodings",
+  test.prop([arbEncoding, arbMatchSafeEncodableSplatValue], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "splat route: build∘match is a fixpoint, and non-none encodes the spaces",
     (encoding, value) => {
-      // Splat encodes per segment preserving `/`, and arbSplatValue is built
-      // from encode-safe chars — so the fixpoint holds for every strategy.
+      // Space-bearing splat segments round-trip under every strategy (`none`
+      // keeps them raw; the rest encode each segment's space to %20), so the
+      // fixpoint must hold for all four; AND a non-identity strategy must encode
+      // in the URL. Anti-identity gives the encoding axis real teeth (vs
+      // `arbSplatValue`, an encoder fixpoint) on top of the structural fixpoint
+      // and per-segment `/`-preservation.
       const matcher = createSplatMatcher({ urlParamsEncoding: encoding });
 
       const path0 = matcher.buildPath("files", { path: value });
@@ -81,6 +87,14 @@ describe("Canonicalization — build∘match is a fixpoint", () => {
 
       expect(path1).toBe(path0);
       expect(matcher.match(path1)!.params).toStrictEqual(match1!.params);
+
+      // anti-identity: spaces are raw under `none`, percent-encoded otherwise.
+      if (encoding === "none") {
+        expect(path0).toContain(" ");
+      } else {
+        expect(path0).not.toContain(" ");
+        expect(path0).toContain("%");
+      }
     },
   );
 });
