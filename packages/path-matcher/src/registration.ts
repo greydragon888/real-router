@@ -285,16 +285,26 @@ function throwEmptyParamName(marker: ":" | "*"): never {
 }
 
 /**
- * Extracts the param name from a `:name` / `:name?` / `:name<…>` segment (strips
- * the marker, any `<…>` constraint, and a trailing optional `?`), rejecting a
- * name-less `:` (#858). Single source for the param branch in `processSegment`
- * and the optional fork in `insertIntoTrieFrom`, so the two can't diverge.
+ * The param name is the run of grammar chars right after the marker, up to a
+ * `<…>` constraint or a trailing optional `?`. `PARAM_NAME_PATTERN` (`[^/?<]+`)
+ * already excludes `/`, `?`, and `<`, so one positive match captures the name.
+ */
+const PARAM_NAME_RGX = new RegExp(`^[:*](${PARAM_NAME_PATTERN})`);
+
+/**
+ * Extracts the param name from a `:name` / `:name?` / `:name<…>` segment,
+ * rejecting a name-less `:` (#858). Single source for the param branch in
+ * `processSegment` and the optional fork in `insertIntoTrieFrom`, so the two
+ * can't diverge.
+ *
+ * Matches the name **positively** against the grammar rather than stripping the
+ * `<…>` constraint with a global replace: the strip form leaves a dangling `<`
+ * on a malformed/unterminated constraint (`:id<…` with no `>`) — which CodeQL
+ * flags as incomplete multi-character sanitization — whereas the positive match
+ * stops at the first `<`/`?` and never lets constraint text leak into the name.
  */
 function extractParamName(segment: string): string {
-  const paramName = segment
-    .slice(1)
-    .replaceAll(CONSTRAINT_PATTERN_RGX, "")
-    .replace(/\?$/, "");
+  const paramName = PARAM_NAME_RGX.exec(segment)?.[1] ?? "";
 
   if (paramName === "") {
     throwEmptyParamName(":");
