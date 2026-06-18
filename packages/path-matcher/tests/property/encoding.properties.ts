@@ -96,6 +96,32 @@ describe("Encoding Properties", () => {
     );
   });
 
+  // Invariant Encoding #5 — the DISTINCTIVE contract of `default` vs `uriComponent`:
+  // sub-delimiter preservation. `default` intentionally leaves `$ + , : ; |` raw,
+  // whereas `uriComponent` (plain encodeURIComponent) percent-encodes them. This is
+  // the only part of "safe strings unchanged" with discriminating teeth: the
+  // truly-unreserved chars (`[A-Za-z0-9-._~]`) pass through encodeURIComponent
+  // ITSELF, so a fast-path mutation can't change them (asserting that is a
+  // tautology). Here, dropping any of `$+,:;|` from the default skip-set makes the
+  // first assert fail; the second assert (uriComponent DOES encode them) keeps the
+  // first non-vacuous. The roundtrip/anti-identity tests above are blind to this:
+  // a decode inverts an over-encoded sub-delim, so the roundtrip still holds.
+  const arbDefaultPreservedSubDelim = fc
+    .stringMatching(/^[a-zA-Z0-9$+,:;|]{1,15}$/)
+    .filter((s) => /[$+,:;|]/.test(s));
+
+  describe("default preserves sub-delimiters that uriComponent encodes", () => {
+    test.prop([arbDefaultPreservedSubDelim], { numRuns: NUM_RUNS.thorough })(
+      "default leaves $ + , : ; | raw while uriComponent percent-encodes them",
+      (v: string) => {
+        // default is a no-op on its preserved set …
+        expect(ENCODING_METHODS.default(v)).toBe(v);
+        // … and that is non-trivial: uriComponent DOES encode these (anti-tautology).
+        expect(ENCODING_METHODS.uriComponent(v)).not.toBe(v);
+      },
+    );
+  });
+
   describe("encoder determinism", () => {
     test.prop([arbEncoding, arbUnicodeString], {
       numRuns: NUM_RUNS.standard,
