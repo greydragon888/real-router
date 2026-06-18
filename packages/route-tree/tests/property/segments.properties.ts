@@ -2,114 +2,104 @@
 
 import { test } from "@fast-check/vitest";
 
-import {
-  arbDeepTreeRouteName,
-  arbShallowDeepTreeRouteName,
-  arbUnknownRouteName,
-  DEEP_TREE,
-  getSegmentsByName,
-  NUM_RUNS,
-} from "./helpers";
+import { arbRouteForest, getSegmentsByName, NUM_RUNS } from "./helpers";
+import { createRouteTree } from "../../src/builder/createRouteTree";
 
-describe("getSegmentsByName Properties (nameToIDs equivalent)", () => {
-  describe("correctness — last segment fullName equals the queried name (high)", () => {
-    test.prop([arbDeepTreeRouteName], { numRuns: NUM_RUNS.thorough })(
-      "last segment fullName matches the searched route name",
-      (name: string) => {
-        const segments = getSegmentsByName(DEEP_TREE, name);
+import type { RouteDefinition, RouteTree } from "../../src/types";
 
-        expect(segments).not.toBeNull();
-        expect(segments!.at(-1)!.fullName).toBe(name);
-      },
-    );
-  });
+/**
+ * getSegmentsByName invariants, generalized from the old fixed DEEP_TREE fixture
+ * to random nested trees (`arbRouteForest`) — previously the lone fixed-fixture
+ * holdout in the property suite. The oracle is the tree STRUCTURE itself: the
+ * chain returned by getSegmentsByName (a Map-walk DOWN from the root) must equal
+ * an independent walk UP the `parent` backrefs — a model-based cross-check of two
+ * traversals, run over every node of thousands of shapes instead of 8 fixed names.
+ */
 
-  describe("length — segments count equals dot-segment count (high)", () => {
-    test.prop([arbDeepTreeRouteName], { numRuns: NUM_RUNS.thorough })(
-      "number of segments returned equals the number of dot-separated parts",
-      (name: string) => {
-        const segments = getSegmentsByName(DEEP_TREE, name);
+// Every non-root node of the built tree (root is excluded — it is never queried).
+function collectAllNodes(tree: RouteTree): RouteTree[] {
+  const nodes: RouteTree[] = [];
 
-        expect(segments).not.toBeNull();
-        expect(segments!).toHaveLength(name.split(".").length);
-      },
-    );
-  });
+  for (const child of tree.children.values()) {
+    nodes.push(child, ...collectAllNodes(child));
+  }
 
-  describe("prefix property — each segment fullName is a prefix of the next (high)", () => {
-    test.prop([arbDeepTreeRouteName], { numRuns: NUM_RUNS.thorough })(
-      "segment[i].fullName + '.' is a prefix of segment[i+1].fullName",
-      (name: string) => {
-        const segments = getSegmentsByName(DEEP_TREE, name);
+  return nodes;
+}
 
-        expect(segments).not.toBeNull();
+// Independent oracle: the root→node chain reconstructed by walking `parent` links
+// up, excluding the path-"" root (which getSegmentsByName also omits). Root-first.
+function parentChain(node: RouteTree): RouteTree[] {
+  const chain: RouteTree[] = [];
+  let current: RouteTree = node;
 
-        for (let i = 0; i < segments!.length - 1; i++) {
-          const current = segments![i].fullName;
-          const next = segments![i + 1].fullName;
+  while (current.name !== "") {
+    chain.unshift(current);
 
-          expect(next.startsWith(`${current}.`)).toBe(true);
+    if (!current.parent) {
+      break;
+    }
+
+    current = current.parent;
+  }
+
+  return chain;
+}
+
+describe("getSegmentsByName Properties (generative, over arbRouteForest)", () => {
+  describe("chain fidelity — returned segments equal the independent parent-walk (high)", () => {
+    test.prop([arbRouteForest], { numRuns: NUM_RUNS.standard })(
+      "getSegmentsByName(tree, node.fullName) is the exact root→node chain for every node",
+      (routes: RouteDefinition[]) => {
+        const tree = createRouteTree("", "", routes);
+
+        for (const node of collectAllNodes(tree)) {
+          const segments = getSegmentsByName(tree, node.fullName);
+
+          expect(segments).not.toBeNull();
+
+          // Model-based cross-check: the Map-walk-down chain equals the
+          // parent-walk-up chain. One assertion subsumes correctness (last node),
+          // the prefix property, and the fullName-chain invariant.
+          expect(segments!.map((s) => s.fullName)).toStrictEqual(
+            parentChain(node).map((n) => n.fullName),
+          );
+          expect(segments!.at(-1)).toBe(node);
         }
       },
     );
   });
 
-  describe("fast-path consistency — 1–4 segment results match general algorithm (medium)", () => {
-    test.prop([arbShallowDeepTreeRouteName], { numRuns: NUM_RUNS.standard })(
-      "single-segment names use fast path but produce identical structure to multi-segment logic",
-      (name: string) => {
-        const segments = getSegmentsByName(DEEP_TREE, name);
+  describe("length — segment count equals dot-segment count (high)", () => {
+    test.prop([arbRouteForest], { numRuns: NUM_RUNS.standard })(
+      "segments.length === node.fullName.split('.').length for every node",
+      (routes: RouteDefinition[]) => {
+        const tree = createRouteTree("", "", routes);
 
-        expect(segments).not.toBeNull();
+        for (const node of collectAllNodes(tree)) {
+          const segments = getSegmentsByName(tree, node.fullName);
 
-        const parts = name.split(".");
-        let lastFullName = "";
-
-        for (const part of parts) {
-          lastFullName = lastFullName ? `${lastFullName}.${part}` : part;
+          expect(segments).not.toBeNull();
+          expect(segments!).toHaveLength(node.fullName.split(".").length);
         }
-
-        expect(segments!.at(-1)!.fullName).toBe(lastFullName);
-        expect(segments!).toHaveLength(parts.length);
       },
     );
   });
 
-  describe("null return — unknown route name yields null (high)", () => {
-    test.prop([arbUnknownRouteName], { numRuns: NUM_RUNS.standard })(
-      "getSegmentsByName returns null for names not in the tree",
-      (name: string) => {
-        const result = getSegmentsByName(DEEP_TREE, name);
+  describe("null on unknown — an absent name yields null (high)", () => {
+    test.prop([arbRouteForest], { numRuns: NUM_RUNS.standard })(
+      "a real name extended with a non-existent child segment, and a bogus name, return null",
+      (routes: RouteDefinition[]) => {
+        const tree = createRouteTree("", "", routes);
 
-        expect(result).toBeNull();
-      },
-    );
-  });
-
-  describe("fullName — equals dot-joined ancestor names for every segment (high)", () => {
-    test.prop([arbDeepTreeRouteName], { numRuns: NUM_RUNS.thorough })(
-      "every segment's fullName is the dot-joined path from root to that node",
-      (name: string) => {
-        const segments = getSegmentsByName(DEEP_TREE, name);
-
-        expect(segments).not.toBeNull();
-
-        for (const segment of segments!) {
-          const parts: string[] = [];
-          let current = segment;
-
-          while (current.name !== "") {
-            parts.unshift(current.name);
-
-            if (!current.parent) {
-              break;
-            }
-
-            current = current.parent;
-          }
-
-          expect(segment.fullName).toBe(parts.join("."));
+        // Names are always n0/n1/… so the "zzz" segment is never present: this
+        // walks the existing prefix, then misses — the partial-walk null branch.
+        for (const node of collectAllNodes(tree)) {
+          expect(getSegmentsByName(tree, `${node.fullName}.zzz`)).toBeNull();
         }
+
+        // A wholly-unknown top-level name hits the first-lookup null branch.
+        expect(getSegmentsByName(tree, "____absent____")).toBeNull();
       },
     );
   });

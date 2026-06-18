@@ -84,52 +84,6 @@ export const ARRAY_QUERY_TREE: RouteTree = createRouteTree("", "", [
   { name: "items", path: "/items?tags" },
 ]);
 
-/**
- * Deep tree for testing getSegmentsByName (nameToIDs equivalent).
- *
- * Structure:
- *   root
- *   ├── home (/)
- *   ├── users (/users)
- *   │   └── profile (/:id)
- *   │       └── edit (/edit)
- *   │           └── photo (/photo)
- *   └── admin (/admin)
- *       └── settings (/settings)
- *           └── theme (/theme)
- */
-export const DEEP_TREE: RouteTree = createRouteTree("", "", [
-  { name: "home", path: "/" },
-  {
-    name: "users",
-    path: "/users",
-    children: [
-      {
-        name: "profile",
-        path: "/:id",
-        children: [
-          {
-            name: "edit",
-            path: "/edit",
-            children: [{ name: "photo", path: "/photo" }],
-          },
-        ],
-      },
-    ],
-  },
-  {
-    name: "admin",
-    path: "/admin",
-    children: [
-      {
-        name: "settings",
-        path: "/settings",
-        children: [{ name: "theme", path: "/theme" }],
-      },
-    ],
-  },
-]);
-
 // =============================================================================
 // Matcher Factories (pre-configured with trees)
 // =============================================================================
@@ -231,24 +185,6 @@ export const SPLAT_TREE: RouteTree = createRouteTree("", "", [
     children: [{ name: "catchAll", path: "/*path" }],
   },
 ]);
-
-// =============================================================================
-// Valid route names in DEEP_TREE (for getSegmentsByName tests)
-// =============================================================================
-
-/**
- * All valid route names in DEEP_TREE — used as constants for segment tests.
- */
-export const DEEP_TREE_ROUTE_NAMES = [
-  "home",
-  "users",
-  "users.profile",
-  "users.profile.edit",
-  "users.profile.edit.photo",
-  "admin",
-  "admin.settings",
-  "admin.settings.theme",
-] as const;
 
 export { getSegmentsByName } from "../../src/operations/query";
 
@@ -371,40 +307,6 @@ export const arbArrayItems: fc.Arbitrary<string[]> = fc.array(
 export const arbArrayFormat: fc.Arbitrary<
   "none" | "brackets" | "index" | "comma"
 > = fc.constantFrom("none", "brackets", "index", "comma");
-
-/**
- * Valid route name from DEEP_TREE (for getSegmentsByName tests).
- */
-export const arbDeepTreeRouteName: fc.Arbitrary<string> = fc.constantFrom(
-  ...(DEEP_TREE_ROUTE_NAMES as unknown as [string, ...string[]]),
-);
-
-/**
- * Valid route name with 1–4 segments (fast-path range in getSegmentsByName).
- */
-export const arbShallowDeepTreeRouteName: fc.Arbitrary<string> =
-  fc.constantFrom(
-    "home",
-    "users",
-    "users.profile",
-    "users.profile.edit",
-    "admin",
-    "admin.settings",
-    "admin.settings.theme",
-  );
-
-/**
- * Route names guaranteed NOT to exist in DEEP_TREE.
- * Used for S5 (null return on unknown name).
- */
-export const arbUnknownRouteName: fc.Arbitrary<string> = fc.constantFrom(
-  "nonexistent",
-  "foo",
-  "bar.baz",
-  "users.unknown",
-  "admin.missing",
-  "x.y.z.w.v",
-);
 
 // =============================================================================
 // Generative tree structure (random shapes — complements the fixed fixtures)

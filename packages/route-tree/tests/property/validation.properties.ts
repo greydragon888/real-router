@@ -183,13 +183,22 @@ describe("Route Name Validation", () => {
     );
   });
 
-  describe("4: non-string name rejection — non-string values throw TypeError (high)", () => {
+  describe("4: non-string name rejection — non-string values throw the typeof-guard TypeError (high)", () => {
     test.prop([arbNonStringName], { numRuns: NUM_RUNS.fast })(
-      "number, null, undefined, boolean all throw TypeError",
+      "number, null, undefined, boolean throw TypeError with the 'must be a string' guard message",
       (name: unknown) => {
+        // Assert the SPECIFIC guard message, not just `toThrow(TypeError)`: with
+        // the typeof guard removed a non-string name still throws an *incidental*
+        // runtime TypeError later (`name.startsWith is not a function`, `Cannot
+        // read properties of null (reading 'length')`), so a type-only assertion
+        // passes even when the guard is gone (mutation-verified). The message
+        // pins the assertion to the validation guard itself.
         expect(() => {
           validateRoute({ name, path: "" }, "add");
         }).toThrow(TypeError);
+        expect(() => {
+          validateRoute({ name, path: "" }, "add");
+        }).toThrow(/Route name must be a string/);
       },
     );
   });
@@ -211,13 +220,21 @@ describe("Route Path Validation", () => {
     );
   });
 
-  describe("2: non-string path rejection — non-string values throw TypeError (high)", () => {
+  describe("2: non-string path rejection — non-string values throw the typeof-guard TypeError (high)", () => {
     test.prop([arbNonStringPath], { numRuns: NUM_RUNS.fast })(
-      "number, null, undefined, boolean, array all throw TypeError",
+      "number, null, undefined, boolean, array throw TypeError with the 'must be a string' guard message",
       (path: unknown) => {
+        // Assert the SPECIFIC guard message, not just `toThrow(TypeError)`: with
+        // the typeof guard removed a non-string path still throws an *incidental*
+        // runtime TypeError later (`path.includes`/`path.startsWith` is not a
+        // function), so a type-only assertion passes even when the guard is gone
+        // (mutation-verified). The message pins the assertion to the guard.
         expect(() => {
           validateRoutePath(path, "test", "add");
         }).toThrow(TypeError);
+        expect(() => {
+          validateRoutePath(path, "test", "add");
+        }).toThrow(/Route path must be a string/);
       },
     );
   });
