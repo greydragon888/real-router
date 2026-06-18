@@ -390,7 +390,7 @@ function parseIntoInternal(
  *
  * Note: Empty arrays produce an empty string, so `parse(build({ items: [] }))`
  * will not contain the `items` key. This is expected behavior for all array
- * formats except `comma` (which produces `"items="` for empty arrays).
+ * formats including `comma` — the key is erased uniformly (INVARIANTS #9).
  *
  * @example
  * ```typescript
