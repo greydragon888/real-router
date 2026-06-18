@@ -80,6 +80,50 @@ describe("search-params", () => {
       expect(Array.isArray(result.items)).toBe(true);
     });
 
+    it("orders index-format elements by their bracket index, not insertion", () => {
+      // Out-of-order indexed query must sort by [n], not arrival order. (#856)
+      expect(
+        parse("a[2]=z&a[0]=x&a[1]=y", {
+          arrayFormat: "index",
+          numberFormat: "none",
+        }),
+      ).toStrictEqual({ a: ["x", "y", "z"] });
+    });
+
+    it("index format: a sparse/huge index compacts (no sparse allocation)", () => {
+      // Sorted then compacted — `a[1000000]` does not allocate a giant array. (#856)
+      expect(
+        parse("a[1000000]=x&a[2]=y", {
+          arrayFormat: "index",
+          numberFormat: "none",
+        }),
+      ).toStrictEqual({ a: ["y", "x"] });
+    });
+
+    it("index format: duplicate indices keep arrival order (stable)", () => {
+      expect(
+        parse("a[0]=x&a[0]=y", { arrayFormat: "index", numberFormat: "none" }),
+      ).toStrictEqual({ a: ["x", "y"] });
+    });
+
+    it("index format: non-numeric/empty/unclosed brackets fall back to insertion order", () => {
+      const o = {
+        arrayFormat: "index" as const,
+        numberFormat: "none" as const,
+      };
+
+      expect(parse("a[]=x&a[]=y", o)).toStrictEqual({ a: ["x", "y"] }); // "[]"
+      expect(parse("a[k]=v", o)).toStrictEqual({ a: ["v"] }); // non-digit
+      expect(parse("a[=v", o)).toStrictEqual({ a: ["v"] }); // nothing after "["
+      expect(parse("a[2=v", o)).toStrictEqual({ a: ["v"] }); // no closing "]"
+    });
+
+    it("index format: a non-bracketed key stays a scalar", () => {
+      expect(
+        parse("a=v", { arrayFormat: "index", numberFormat: "none" }),
+      ).toStrictEqual({ a: "v" });
+    });
+
     it("handles comma-separated arrays", () => {
       expect(parse("items=a,b,c", { arrayFormat: "comma" })).toStrictEqual({
         items: ["a", "b", "c"],

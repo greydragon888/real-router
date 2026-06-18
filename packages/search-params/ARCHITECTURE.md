@@ -168,7 +168,7 @@ interface ArrayStrategy {
 | ------------ | --------------- | ----------------------- |
 | `"none"`     | `a=1&a=2`       | Repeated keys → array   |
 | `"brackets"` | `a[]=1&a[]=2`   | `[]` suffix → array     |
-| `"index"`    | `a[0]=1&a[1]=2` | Numeric index → array   |
+| `"index"`    | `a[0]=1&a[1]=2` | Ordered by `[n]` index  |
 | `"comma"`    | `a=1,2`         | Comma-separated → array |
 
 #### Boolean Formats

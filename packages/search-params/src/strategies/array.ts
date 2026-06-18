@@ -33,6 +33,12 @@ export interface ArrayStrategy {
    * @returns Array of raw parts, or null if not an array
    */
   decodeValue?: (rawValue: string) => string[] | null;
+
+  /**
+   * When true, the parser orders bracketed elements (`a[n]`) by the numeric
+   * index `n` rather than insertion order. Only `index` format sets this. (#856)
+   */
+  indexed?: boolean;
 }
 
 // =============================================================================
@@ -108,6 +114,8 @@ export const indexArrayStrategy: ArrayStrategy = {
 
     return result;
   },
+
+  indexed: true,
 };
 
 /**

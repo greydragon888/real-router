@@ -53,6 +53,7 @@
 | 14  | Number format: auto negatives        | `parse(build(params, {numberFormat: "auto"}), {numberFormat: "auto"}) === params` for negative integer values. `build({n: -5})` emits `"n=-5"` and `parse` decodes it back to the number `-5`, so a param keeps the same type whether it arrives from a URL or from a programmatic `navigate({n: -5})`. Non-canonical negatives (`"-007"`, `"-9007199254740992"`) stay strings, mirroring the unsigned rules. (#742) |
 | 15  | Boolean format: empty-true (true & false) | `parse(build(params, {booleanFormat: "empty-true"}), {booleanFormat: "empty-true"}) === params` for **both** boolean values. `build({flag: false})` emits `"flag=false"` and `parse` decodes it back to boolean `false` (not the string `"false"`); array elements (`"a=true&a=false"`) decode both `"true"`→`true` and `"false"`→`false` symmetrically. (#743) |
 | 16  | Number format: auto non-canonical    | Under `numberFormat: "auto"`, numeric-looking strings that are **not** canonical — leading-zero (`"007"`), unsafe integers (`> 2^53`), and exponent notation (`"1e5"`) — stay strings, preserving their exact text/precision (the inverse of #11/#14). (#742) |
+| 17  | Array format: index ordering         | Under `arrayFormat: "index"`, `parse` orders elements by the bracket index `[n]`, not arrival order: emitting `a[i]=v` chunks out of order (e.g. reversed) still parses back to the original array. Indices are sorted then compacted (a huge index like `a[1000000]` does not allocate a sparse array); non-numeric/empty brackets (`a[]`, `a[x]`) fall back to insertion order. (#856) |
 
 ## Test Files
 
@@ -60,4 +61,4 @@
 | ----------------------------------------- | ---------- | -------------------------- |
 | `tests/property/parseBuild.properties.ts` | 1–11       | Core parse/build cycle     |
 | `tests/property/omitKeep.properties.ts`   | 1–10       | Omit and keep operations   |
-| `tests/property/formats.properties.ts`    | 1–16       | Format-specific roundtrips |
+| `tests/property/formats.properties.ts`    | 1–17       | Format-specific roundtrips |

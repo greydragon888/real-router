@@ -51,6 +51,26 @@ describe("array format roundtrip", () => {
     },
   );
 
+  test.prop([fc.array(arbSafeString, { minLength: 2, maxLength: 6 })], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "index format: out-of-order indexed chunks parse back in index order",
+    (values: string[]) => {
+      // Emit a[i]=v in REVERSED order; parse must sort by the bracket index and
+      // recover the original array (not insertion order). (#856)
+      const opts = {
+        arrayFormat: "index" as ArrayFormat,
+        numberFormat: "none" as NumberFormat,
+      };
+      const reversed = values
+        .map((v, i) => `a[${i}]=${encodeURIComponent(v)}`)
+        .toReversed()
+        .join("&");
+
+      expect(parse(reversed, opts)).toStrictEqual({ a: values });
+    },
+  );
+
   test.prop(
     [
       fc.dictionary(

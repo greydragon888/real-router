@@ -138,7 +138,87 @@ function decodeParamValue(
 }
 
 /**
+ * Reads the non-negative integer index from a bracketed name (`a[12]`).
+ *
+ * `open` points at the `[`; digits up to the matching `]` form the index. Returns
+ * `null` for `[]`, non-digit content (`a[x]`), or a missing `]` — those fall back
+ * to insertion-order accumulation. (#856)
+ *
+ * @internal
+ */
+function bracketIndex(
+  searchPart: string,
+  open: number,
+  limit: number,
+): number | null {
+  let i = open + 1;
+  let value = 0;
+  let hasDigit = false;
+
+  while (i < limit) {
+    const ch = searchPart.codePointAt(i);
+
+    if (ch === 93) {
+      // ']' — a numeric index only if at least one digit preceded it ("[]" → null)
+      return hasDigit ? value : null;
+    }
+
+    if (ch !== undefined && ch >= 48 && ch <= 57) {
+      value = value * 10 + (ch - 48);
+      hasDigit = true;
+      i++;
+
+      continue;
+    }
+
+    return null; // non-digit inside brackets — not a numeric index
+  }
+
+  return null; // no closing ']' (incl. "[" at end) — malformed, fall back
+}
+
+/**
+ * Collects a bracketed chunk into the index-format group, to be sorted by index
+ * after the full pass. Returns `false` when the bracket is not a numeric index
+ * (`a[]`, `a[x]`, `a[`), so the caller falls back to insertion-order push. (#856)
+ *
+ * @internal
+ */
+function collectIndexedChunk(
+  searchPart: string,
+  nameEnd: number,
+  nameSourceEnd: number,
+  eqPos: number,
+  end: number,
+  hasValue: boolean,
+  decodedName: string,
+  strategies: ResolvedStrategies,
+  indexedGroups: Map<string, [number, unknown][]>,
+): boolean {
+  const index = bracketIndex(searchPart, nameEnd, nameSourceEnd);
+
+  if (index === null) {
+    return false;
+  }
+
+  const value = decodeParamValue(searchPart, eqPos, end, hasValue, strategies);
+  const group = indexedGroups.get(decodedName);
+
+  if (group === undefined) {
+    indexedGroups.set(decodedName, [[index, value]]);
+  } else {
+    group.push([index, value]);
+  }
+
+  return true;
+}
+
+/**
  * Processes a single query parameter chunk and adds to params.
+ *
+ * `indexedGroups` is supplied only for `arrayFormat: "index"`: bracketed chunks
+ * with a numeric index are collected there (to be sorted by index after the full
+ * pass) instead of pushed in insertion order. (#856)
  *
  * @internal
  */
@@ -148,6 +228,7 @@ function processParamChunk(
   end: number,
   params: Record<string, unknown>,
   strategies: ResolvedStrategies,
+  indexedGroups?: Map<string, [number, unknown][]>,
 ): void {
   const eqPos = searchPart.indexOf("=", start);
   const hasValue = eqPos !== -1 && eqPos < end;
@@ -167,6 +248,26 @@ function processParamChunk(
   }
 
   const decodedName = decodeValue(searchPart.slice(start, nameEnd));
+
+  // Index array format: order by the bracket index, not insertion. A non-numeric
+  // bracket (`a[]`, `a[x]`) returns false → falls through to insertion-order push.
+  if (
+    indexedGroups !== undefined &&
+    hasBrackets &&
+    collectIndexedChunk(
+      searchPart,
+      nameEnd,
+      nameSourceEnd,
+      eqPos,
+      end,
+      hasValue,
+      decodedName,
+      strategies,
+      indexedGroups,
+    )
+  ) {
+    return;
+  }
 
   // Comma array decode: split raw value before individual element decoding
   if (!hasBrackets && hasValue && strategies.array.decodeValue) {
@@ -240,6 +341,12 @@ function parseIntoInternal(
   params: Record<string, unknown>,
   strategies: ResolvedStrategies,
 ): void {
+  // `index` format orders by the bracket index; collect (index, value) pairs and
+  // sort after the pass. `undefined` for every other format (no overhead). (#856)
+  const indexedGroups = strategies.array.indexed
+    ? new Map<string, [number, unknown][]>()
+    : undefined;
+
   let start = 0;
   const length = searchPart.length;
 
@@ -250,8 +357,27 @@ function parseIntoInternal(
       end = length;
     }
 
-    processParamChunk(searchPart, start, end, params, strategies);
+    processParamChunk(
+      searchPart,
+      start,
+      end,
+      params,
+      strategies,
+      indexedGroups,
+    );
     start = end + 1;
+  }
+
+  if (indexedGroups !== undefined) {
+    for (const [name, pairs] of indexedGroups) {
+      // Stable sort by index (V8 sort is stable) → equal indices keep arrival order.
+      pairs.sort((left, right) => left[0] - right[0]);
+      assignParam(
+        params,
+        name,
+        pairs.map((pair) => pair[1]),
+      );
+    }
   }
 }
 
