@@ -178,6 +178,28 @@ function bracketIndex(
 }
 
 /**
+ * A single parsed query chunk: the source string plus the boundary offsets and
+ * decoded name that `processParamChunk` computes once. Bundled into one
+ * descriptor so the indexed-format collector reuses them without a long
+ * parameter list (#856).
+ *
+ * @internal
+ */
+interface ParsedChunk {
+  searchPart: string;
+  /** Offset of `[` (bracket notation), or the name terminator. */
+  nameEnd: number;
+  /** Offset where the raw name ends (`=` for valued chunks, else `end`). */
+  nameSourceEnd: number;
+  /** Offset of `=`, or -1 when the chunk has no value. */
+  eqPos: number;
+  /** Offset one past the chunk. */
+  end: number;
+  hasValue: boolean;
+  decodedName: string;
+}
+
+/**
  * Collects a bracketed chunk into the index-format group, to be sorted by index
  * after the full pass. Returns `false` when the bracket is not a numeric index
  * (`a[]`, `a[x]`, `a[`), so the caller falls back to insertion-order push. (#856)
@@ -185,16 +207,19 @@ function bracketIndex(
  * @internal
  */
 function collectIndexedChunk(
-  searchPart: string,
-  nameEnd: number,
-  nameSourceEnd: number,
-  eqPos: number,
-  end: number,
-  hasValue: boolean,
-  decodedName: string,
+  chunk: ParsedChunk,
   strategies: ResolvedStrategies,
   indexedGroups: Map<string, [number, unknown][]>,
 ): boolean {
+  const {
+    searchPart,
+    nameEnd,
+    nameSourceEnd,
+    eqPos,
+    end,
+    hasValue,
+    decodedName,
+  } = chunk;
   const index = bracketIndex(searchPart, nameEnd, nameSourceEnd);
 
   if (index === null) {
@@ -255,13 +280,7 @@ function processParamChunk(
     indexedGroups !== undefined &&
     hasBrackets &&
     collectIndexedChunk(
-      searchPart,
-      nameEnd,
-      nameSourceEnd,
-      eqPos,
-      end,
-      hasValue,
-      decodedName,
+      { searchPart, nameEnd, nameSourceEnd, eqPos, end, hasValue, decodedName },
       strategies,
       indexedGroups,
     )
