@@ -3,7 +3,7 @@ import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 import { errorCodes, events, RouterError } from "@real-router/core";
 import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 
-import { createTestRouter } from "../../helpers";
+import { captureUnhandledRejections, createTestRouter } from "../../helpers";
 
 import type { Params, Router } from "@real-router/core";
 import type { LifecycleApi } from "@real-router/core/api";
@@ -893,6 +893,22 @@ describe("navigateToDefault", () => {
       await expect(router.navigateToDefault()).rejects.toMatchObject({
         code: errorCodes.ROUTE_NOT_FOUND,
       });
+    });
+
+    it("does not leak an unhandledRejection when fire-and-forget after start() (#721)", async () => {
+      router.stop();
+      router = createTestRouter({ defaultRoute: "" });
+      // start() leaves the sync-resolution flag set; navigateToDefault() must
+      // reset it so its early ROUTE_NOT_FOUND rejection is still suppressed.
+      await router.start("/home");
+
+      const leaks = await captureUnhandledRejections(() => {
+        // Fire-and-forget: `void` only silences the lint rule; it attaches no
+        // handler, so the unhandled-rejection behaviour under test is intact.
+        void router.navigateToDefault();
+      });
+
+      expect(leaks).toHaveLength(0);
     });
   });
 
