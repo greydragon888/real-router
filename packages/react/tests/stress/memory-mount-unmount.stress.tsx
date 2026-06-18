@@ -102,9 +102,14 @@ describe("memory-mount-unmount baseline", () => {
 
     logBaseline("transition-1000", iterations, delta);
 
-    // React runtime overhead dominates (~68KB/iter); regression gate
-    // protects against catastrophic leaks.
-    expect(delta).toBeLessThan(75_000 * iterations);
+    // Coarse catastrophe guard — NOT a leak detector. React runtime churn
+    // dominates this delta (~68KB/iter ≈ 68MB healthy). Mutation-validated:
+    // skipping BaseSource#listeners.delete (a real cleanup leak) leaves the delta
+    // unchanged and the suite green — the leak signal is KB-scale, swamped by
+    // jsdom/React mount churn. The cleanup contract is discriminated by
+    // @real-router/sources BaseSource.test.ts. Threshold ≈ 3× healthy; the prior
+    // 75MB sat at ~1.1× and flaked.
+    expect(delta).toBeLessThan(210 * 1024 * 1024);
   });
 
   it("Pattern B: useRouteNode × 100 + 50 navigations", async () => {
