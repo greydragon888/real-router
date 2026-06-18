@@ -20,7 +20,8 @@ overrides:
   ajv@8: ~8.18.0
   underscore: '>=1.13.8'
   http-proxy-agent: 7.0.2
-  undici: '>=7.24.0 <8.0.0'
+  undici: '>=7.28.0 <8.0.0'
+  piscina: '>=5.2.0 <6.0.0'
   flatted: '>=3.4.2'
   path-to-regexp: '>=8.4.0'
   brace-expansion@1: 1.1.13
@@ -13034,8 +13035,8 @@ packages:
   pinpoint@1.1.0:
     resolution: {integrity: sha512-+04FTD9x7Cls2rihLlo57QDCcHoLBGn5Dk51SwtFBWkUWLxZaBXyNVpCw1S+atvE7GmnFjeaRZ0WLq3UYuqAdg==}
 
-  piscina@5.1.4:
-    resolution: {integrity: sha512-7uU4ZnKeQq22t9AsmHGD2w4OYQGonwFnTypDypaWi7Qr2EvQIFVtG8J5D/3bE7W123Wdc9+v4CZDu5hJXVCtBg==}
+  piscina@5.2.0:
+    resolution: {integrity: sha512-DszUCKeVN/5G5QKo6jAVHL8fmKnkJvQ0ACiVgY7YGCq3TUB2oznAOayvZPIAdEThvhczkXR+qm3IHsNXpFCYfA==}
     engines: {node: '>=20.x'}
 
   pkce-challenge@5.0.1:
@@ -14177,8 +14178,8 @@ packages:
   undici-types@7.24.6:
     resolution: {integrity: sha512-WRNW+sJgj5OBN4/0JpHFqtqzhpbnV0GuB+OozA9gCL7a993SmU+1JBZCzLNxYsbMfIeDL+lTsphD5jN5N+n0zg==}
 
-  undici@7.27.2:
-    resolution: {integrity: sha512-uZsKNuzQxDMUY6M3pIMvy5tvlGmtq8XJ2oLAkfRKGNu+1VQAIvLy2xIVG5ATZl5wDXl/tddByAWCizRbOme+TA==}
+  undici@7.28.0:
+    resolution: {integrity: sha512-cRZYrTDwWznlnRiPjggAGxZXanty6M8RV1ff8Wm4LWXBp7/IG8v5DnOm74DtUBp9OONpK75YlPnIjQqX0dBDtA==}
     engines: {node: '>=20.18.1'}
 
   unicode-emoji-modifier-base@1.0.0:
@@ -14814,7 +14815,7 @@ snapshots:
       mrmime: 2.0.1
       parse5-html-rewriting-stream: 8.0.0
       picomatch: 4.0.4
-      piscina: 5.1.4
+      piscina: 5.2.0
       rolldown: 1.0.0-rc.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)
       sass: 1.97.3
       semver: 7.7.4
@@ -14822,7 +14823,7 @@ snapshots:
       tinyglobby: 0.2.15
       tslib: 2.8.1
       typescript: 6.0.3
-      undici: 7.27.2
+      undici: 7.28.0
       vite: 7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.97.3)(tsx@4.22.4)(yaml@2.8.3)
       watchpack: 2.5.1
     optionalDependencies:
@@ -15629,7 +15630,7 @@ snapshots:
       semver: 7.8.4
       sumchecker: 3.0.1
     optionalDependencies:
-      undici: 7.27.2
+      undici: 7.28.0
     transitivePeerDependencies:
       - supports-color
 
@@ -20506,7 +20507,7 @@ snapshots:
       saxes: 6.0.0
       symbol-tree: 3.2.4
       tough-cookie: 6.0.1
-      undici: 7.27.2
+      undici: 7.28.0
       w3c-xmlserializer: 5.0.0
       webidl-conversions: 8.0.1
       whatwg-mimetype: 5.0.0
@@ -21006,7 +21007,7 @@ snapshots:
       jsonc-parser: 3.3.1
       less: 4.6.4
       ora: 9.4.0
-      piscina: 5.1.4
+      piscina: 5.2.0
       postcss: 8.5.15
       rollup-plugin-dts: 6.4.1(rollup@4.62.0)(typescript@6.0.3)
       rxjs: 7.8.2
@@ -21061,7 +21062,7 @@ snapshots:
       semver: 7.8.4
       tar: 7.5.16
       tinyglobby: 0.2.17
-      undici: 7.27.2
+      undici: 7.28.0
       which: 6.0.1
 
   node-html-parser@6.1.13:
@@ -21445,7 +21446,7 @@ snapshots:
 
   pinpoint@1.1.0: {}
 
-  piscina@5.1.4:
+  piscina@5.2.0:
     optionalDependencies:
       '@napi-rs/nice': 1.1.1
 
@@ -22692,7 +22693,7 @@ snapshots:
 
   undici-types@7.24.6: {}
 
-  undici@7.27.2: {}
+  undici@7.28.0: {}
 
   unicode-emoji-modifier-base@1.0.0: {}
 
