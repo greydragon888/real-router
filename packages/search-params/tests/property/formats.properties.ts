@@ -34,6 +34,9 @@ const arbNullParams = fc.dictionary(arbSafeKey, fc.constant(null), {
   maxKeys: 5,
 });
 
+// empty-true is intentionally excluded: it reserves the bare-key form for `true`,
+// so null is not representable and would round-trip to `true` (INVARIANTS #18) —
+// that documented loss is asserted in its own test below, not here.
 const arbBoolFormatForNull = fc.constantFrom(
   "none",
   "auto",
@@ -213,6 +216,22 @@ describe("null format roundtrip", () => {
 
       expect(qs).toBe("");
       expect(parse(qs, opts)).toStrictEqual({});
+    },
+  );
+
+  // INVARIANTS #18: under empty-true the bare-key form `?key` is reserved for
+  // `true`, so a null value (nullFormat default) is NOT representable — it shares
+  // the wire form with `true` and decodes back as `true`. This documents the
+  // deterministic loss explicitly instead of letting the roundtrip oracle absorb
+  // the asymmetry (the leak the `helpers.ts` honest-oracle + `fc.pre` removes). (1.A)
+  test.prop([arbSafeKey], { numRuns: NUM_RUNS.standard })(
+    "nullFormat 'default' + empty-true: null is not representable — encodes to a bare key and decodes to true",
+    (key: string) => {
+      const opts = { booleanFormat: "empty-true" as BooleanFormat };
+      const qs = build({ [key]: null }, opts);
+
+      expect(qs).toBe(key); // null and true collapse to the same bare-key token
+      expect(parse(qs, opts)).toStrictEqual({ [key]: true });
     },
   );
 });

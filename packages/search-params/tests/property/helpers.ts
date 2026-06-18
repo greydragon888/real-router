@@ -359,8 +359,14 @@ function normalizeValue(
   result: Record<string, unknown>,
 ): void {
   if (value === null) {
+    // Contract oracle, NOT a mirror of the implementation: a faithful nullFormat
+    // round-trips null back to null. The `empty-true` exception (null collapses to
+    // the bare-key `true` token — INVARIANTS #18) is a documented, deterministic
+    // loss, so it is *excluded* from the roundtrip property (see the `fc.pre` guard
+    // in parseBuild.properties.ts) and asserted explicitly in formats.properties.ts
+    // — never silently absorbed here, which would mask future null-handling regressions.
     if (nullFmt !== "hidden") {
-      result[key] = boolFmt === "empty-true" ? true : null;
+      result[key] = null;
     }
 
     return;

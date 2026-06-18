@@ -193,6 +193,18 @@ describe("search-params", () => {
       ).toStrictEqual({ a: [true, false] });
     });
 
+    it("empty-true reserves the bare key for true, so null is not representable", () => {
+      // The bare-key form `?flag` is `true` under empty-true; a null value
+      // (nullFormat default) encodes to the same token and decodes back as `true`,
+      // not null — a documented, deterministic loss. (INVARIANTS #18)
+      const opts = { booleanFormat: "empty-true" as const };
+
+      expect(build({ flag: null }, opts)).toBe("flag");
+      expect(parse("flag", opts)).toStrictEqual({ flag: true });
+      // contrast: under the default auto format the same bare key decodes to null
+      expect(parse("flag")).toStrictEqual({ flag: null });
+    });
+
     it("handles auto boolean format", () => {
       expect(
         parse("enabled=true&disabled=false", { booleanFormat: "auto" }),

@@ -38,6 +38,16 @@ describe("parse/build roundtrip", () => {
   })(
     "roundtrip with type normalization: parse(build(params, opts), opts) ≈ normalizeForComparison(params, opts)",
     (params: SearchParams, opts: Options) => {
+      // `null` is not representable under empty-true: the bare-key `?key` form is
+      // reserved for `true`, so null collapses to `true` (a documented loss —
+      // INVARIANTS #18, asserted explicitly in formats.properties.ts). Exclude it
+      // here so the oracle stays an honest contract instead of mirroring the
+      // asymmetry to stay green.
+      fc.pre(
+        opts.booleanFormat !== "empty-true" ||
+          !Object.values(params).includes(null),
+      );
+
       const qs = build(params, opts);
       const parsed = parse(qs, opts);
       const expected = normalizeForComparison(params, opts);

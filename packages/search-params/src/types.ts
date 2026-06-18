@@ -30,6 +30,13 @@ export type ArrayFormat = "none" | "brackets" | "index" | "comma";
  * - `none` - no special handling
  * - `auto` - auto-detect "true"/"false" strings as boolean values
  * - `empty-true` - true values have no value: `?flag` instead of `?flag=true`
+ *
+ * @remarks
+ * Under `empty-true` the bare-key wire form (`?flag`) is reserved for `true`, so
+ * a `null` value with `nullFormat: "default"` (which also encodes to a bare key)
+ * is **not representable**: it round-trips back as `true`, not `null`. Both null
+ * and true collapse to the same token and only `true` decodes back. Pair
+ * `empty-true` with `nullFormat: "hidden"`, or avoid null query values.
  */
 export type BooleanFormat = "none" | "auto" | "empty-true";
 
@@ -37,7 +44,8 @@ export type BooleanFormat = "none" | "auto" | "empty-true";
  * Null parameter encoding format.
  *
  * @remarks
- * - `default` - key only: `?key`
+ * - `default` - key only: `?key` (collides with `booleanFormat: "empty-true"`,
+ *   which reserves the bare-key form for `true` — null then decodes as `true`)
  * - `hidden` - omit from query string
  */
 export type NullFormat = "default" | "hidden";
