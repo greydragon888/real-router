@@ -574,4 +574,44 @@ describe("router.start() - error handling", () => {
       localRouter.stop();
     });
   });
+
+  // #763: a start interceptor that throws AFTER calling next() fails post-commit
+  // — navigateToState already committed the state and emitted TRANSITION_SUCCESS
+  // to subscribers (the SSR/RSC loader plugins run their loader in exactly this
+  // window). Rolling the start back to IDLE retracts a success subscribers
+  // already observed ("phantom success"). The committed navigation must stand;
+  // the loader error surfaces only through the rejected start() promise.
+  describe("#763: post-commit start-interceptor failure keeps observed success", () => {
+    it("does not retract the committed state when an interceptor throws after next()", async () => {
+      const localRouter = createTestRouter();
+      const observed: string[] = [];
+
+      localRouter.subscribe(({ route }) => observed.push(route.name));
+
+      const removeInterceptor = getPluginApi(localRouter).addInterceptor(
+        "start",
+        async (next, path) => {
+          await next(path); // commits state + emits TRANSITION_SUCCESS("home")
+
+          throw new Error("loader failed after commit");
+        },
+      );
+
+      // The loader error still propagates — "Loader errors propagate" contract.
+      await expect(localRouter.start("/home")).rejects.toThrow(
+        "loader failed after commit",
+      );
+
+      // The subscriber observed TRANSITION_SUCCESS("home")...
+      expect(observed).toStrictEqual(["home"]);
+
+      // ...so the router must NOT have rolled the start back: the committed
+      // state stands and the router stays started (no phantom success).
+      expect(localRouter.getState()?.name).toBe("home");
+      expect(localRouter.isActive()).toBe(true);
+
+      removeInterceptor();
+      localRouter.stop();
+    });
+  });
 });

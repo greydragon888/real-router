@@ -720,10 +720,11 @@ describe("@real-router/ssr-data-plugin", () => {
       );
 
       expect(loader).not.toHaveBeenCalled();
-      // `?.` is intentional here: a rejected `start()` leaves the FSM in a
-      // pre-init state, so `getState()` returns `undefined`. The assertion
-      // remains meaningful — "no state at all" passes "data is undefined"
-      // just like "state with data: undefined" would.
+      // `resolveMode` throws AFTER `next()` committed, so post-#763 the
+      // router stays started and `getState()` returns the committed state
+      // (no rollback — the observed success is not retracted). The loader
+      // never ran and `modeClaim.write` never reached, so both context
+      // fields stay undefined; the `?.` is now defensive, not load-bearing.
       expect(router.getState()?.context.data).toBeUndefined();
       expect(router.getState()?.context.ssrDataMode).toBeUndefined();
     });
