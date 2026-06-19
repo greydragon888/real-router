@@ -8,7 +8,7 @@ import {
 } from "@real-router/core";
 import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 
-import { createTestRouter } from "../../helpers";
+import { captureUnhandledRejections, createTestRouter } from "../../helpers";
 
 import type { Router, State } from "@real-router/core";
 import type { LifecycleApi } from "@real-router/core/api";
@@ -202,6 +202,30 @@ describe("navigateToState", () => {
         getPluginApi(router).navigateToState(matched!),
       ).rejects.toBeInstanceOf(RouterError);
       expect(router.getState()?.name).toBe("home");
+    });
+  });
+
+  describe("fire-and-forget safety (#721)", () => {
+    it("does not leak an unhandledRejection when a removed-route state is not awaited", async () => {
+      const ghost: State = {
+        name: "ghost.route",
+        params: {},
+        path: "/ghost",
+        transition: {
+          phase: "activating",
+          reason: "success",
+          segments: { deactivated: [], activated: [], intersection: "" },
+        },
+        context: {},
+      };
+
+      const leaks = await captureUnhandledRejections(() => {
+        // Fire-and-forget: `void` only silences the lint rule; it attaches no
+        // handler, so the unhandled-rejection behaviour under test is intact.
+        void getPluginApi(router).navigateToState(ghost);
+      });
+
+      expect(leaks).toHaveLength(0);
     });
   });
 

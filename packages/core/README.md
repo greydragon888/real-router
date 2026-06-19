@@ -53,7 +53,7 @@ await router.navigate("users.profile", { id: "123" });
 | Method                              | Returns          | Description                               |
 | ----------------------------------- | ---------------- | ----------------------------------------- |
 | `navigate(name, params?, options?)` | `Promise<State>` | Navigate to a route. Fire-and-forget safe |
-| `navigateToDefault(options?)`       | `Promise<State>` | Navigate to the default route             |
+| `navigateToDefault(options?)`       | `Promise<State>` | Navigate to the default route. Fire-and-forget safe |
 | `navigateToNotFound(path?)`         | `State`          | Synchronously set UNKNOWN_ROUTE state     |
 | `canNavigateTo(name, params?)`      | `boolean`        | Check if guards allow navigation          |
 

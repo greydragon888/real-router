@@ -55,11 +55,19 @@ import type { CreateMatcherOptions } from "route-tree";
 const EMPTY_OPTS: Readonly<NavigationOptions> = Object.freeze({});
 
 // Module-level so #onSuppressedError allocates nothing per navigate() call.
+// These are expected navigation outcomes owned by the caller, not internal
+// bugs — the safety net stays silent for them and lets awaiting callers see
+// the rejection. CANNOT_ACTIVATE / CANNOT_DEACTIVATE belong here: a guard
+// blocking (or a plugin's guard-blocked back()/forward()) is a normal result,
+// so a fire-and-forget call must not emit a spurious "Unexpected navigation
+// error" (#721).
 const SUPPRESSED_ERROR_CODES: ReadonlySet<string> = new Set([
   errorCodes.SAME_STATES,
   errorCodes.TRANSITION_CANCELLED,
   errorCodes.ROUTER_NOT_STARTED,
   errorCodes.ROUTE_NOT_FOUND,
+  errorCodes.CANNOT_ACTIVATE,
+  errorCodes.CANNOT_DEACTIVATE,
 ]);
 
 /**
