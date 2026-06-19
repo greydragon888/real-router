@@ -183,7 +183,61 @@ describe("RX6: Symbol.asyncIterator backpressure", () => {
     expect(finishedCount).toStrictEqual(50);
 
     for (const count of receivedCounts) {
+      // Liveness: no iterator is starved. Upper bound catches duplicate delivery —
+      // only two values are emitted before complete(), so a count above 2 means a
+      // value was re-yielded (latest-wins collapses them to a single yield here).
       expect(count).toBeGreaterThanOrEqual(1);
+      expect(count).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it("6.7: 50 iterators over a value + synchronous complete → every iterator yields the terminal value", async () => {
+    // The value and the complete() both fire synchronously inside subscribeFn,
+    // before the for-await loop runs — the terminal batch must still be drained.
+    const source = new RxObservable<number>((observer) => {
+      observer.next?.(42);
+      observer.complete?.();
+    });
+
+    const results = await Promise.all(
+      Array.from({ length: 50 }, async () => {
+        const got: number[] = [];
+
+        for await (const value of source) {
+          got.push(value);
+        }
+
+        return got;
+      }),
+    );
+
+    for (const got of results) {
+      expect(got).toStrictEqual([42]);
+    }
+  });
+
+  it("6.8: 50 iterators over a synchronous error → every iterator throws", async () => {
+    const source = new RxObservable<number>((observer) => {
+      observer.error?.(new Error("sync iter error"));
+    });
+
+    const outcomes = await Promise.all(
+      Array.from({ length: 50 }, async () => {
+        try {
+          // eslint-disable-next-line sonarjs/no-unused-vars
+          for await (const _value of source) {
+            // never runs — the source errors synchronously
+          }
+
+          return "completed";
+        } catch (error) {
+          return (error as Error).message;
+        }
+      }),
+    );
+
+    for (const outcome of outcomes) {
+      expect(outcome).toBe("sync iter error");
     }
   });
 });

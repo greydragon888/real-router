@@ -13,7 +13,7 @@ declare global {
 }
 
 export class RxObservable<T> {
-  #subscribeFn: SubscribeFn<T>;
+  readonly #subscribeFn: SubscribeFn<T>;
 
   constructor(subscribeFn: SubscribeFn<T>) {
     this.#subscribeFn = subscribeFn;
@@ -40,6 +40,27 @@ export class RxObservable<T> {
     let closed = false;
     // eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- matches SubscribeFn return type
     let teardown: void | (() => void);
+
+    // Release the subscription's resources (abort listener + teardown). Runs on
+    // every terminal path — unsubscribe AND complete — so a self-completing
+    // source still releases its resource. `teardown` is undefined until
+    // subscribeFn returns, so a synchronous complete() fires finalize() before
+    // teardown exists; the post-subscribe `if (closed) finalize()` re-runs it
+    // once teardown is assigned. teardown therefore executes at most once, and
+    // removeEventListener is idempotent, so the double call is harmless.
+    const finalize = () => {
+      if (abortHandler) {
+        signal?.removeEventListener("abort", abortHandler);
+      }
+
+      if (teardown) {
+        try {
+          teardown();
+        } catch {
+          // Teardown errors are caught silently
+        }
+      }
+    };
 
     const safeNext = (value: T) => {
       if (closed) {
@@ -81,6 +102,8 @@ export class RxObservable<T> {
       } catch {
         // Errors in complete handler are caught silently
       }
+
+      finalize();
     };
 
     const subscription: Subscription = {
@@ -91,17 +114,7 @@ export class RxObservable<T> {
 
         closed = true;
 
-        if (abortHandler) {
-          signal?.removeEventListener("abort", abortHandler);
-        }
-
-        if (teardown) {
-          try {
-            teardown();
-          } catch {
-            // Teardown errors are caught silently
-          }
-        }
+        finalize();
       },
       get closed() {
         return closed;
@@ -125,6 +138,14 @@ export class RxObservable<T> {
       });
     } catch (error) {
       safeError(error);
+    }
+
+    // A synchronous complete() inside subscribeFn ran finalize() before
+    // `teardown` was assigned above — run it now that the teardown exists. Read
+    // via the getter: TS control-flow analysis can't see the closure mutation of
+    // `closed`, so a bare `if (closed)` is flagged as always-false.
+    if (subscription.closed) {
+      finalize();
     }
 
     return subscription;
@@ -168,7 +189,7 @@ export class RxObservable<T> {
     op6: Operator<E, F>,
     op7: Operator<F, G>,
   ): RxObservable<G>;
-  pipe<A, B, C, D, E, F, G, H>(
+  pipe<A, B, C, D, E, F, G, H>( // NOSONAR -- typed pipe overload (RxJS shape, 1-9 operators); param count is the public API, not refactorable
     op1: Operator<T, A>,
     op2: Operator<A, B>,
     op3: Operator<B, C>,
@@ -178,7 +199,7 @@ export class RxObservable<T> {
     op7: Operator<F, G>,
     op8: Operator<G, H>,
   ): RxObservable<H>;
-  pipe<A, B, C, D, E, F, G, H, I>(
+  pipe<A, B, C, D, E, F, G, H, I>( // NOSONAR -- typed pipe overload (RxJS shape, 1-9 operators); param count is the public API, not refactorable
     op1: Operator<T, A>,
     op2: Operator<A, B>,
     op3: Operator<B, C>,
@@ -231,7 +252,6 @@ export class RxObservable<T> {
           resolveCallback();
         }
       },
-      /* v8 ignore start -- v8 coverage can't track branches inside suspended async generators */
       error: (err) => {
         error = err;
         completed = true;
@@ -251,28 +271,37 @@ export class RxObservable<T> {
           resolveCallback();
         }
       },
-      /* v8 ignore stop */
     });
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- v8 ignore affects analysis
-      while (!completed) {
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- v8 ignore affects analysis
+      for (;;) {
+        // Drain a buffered value before honoring a terminal: a value emitted
+        // immediately before a synchronous complete()/error() must still be
+        // yielded (the terminal batch), and a fresh value can arrive while the
+        // generator is suspended at the await below.
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- flags are mutated by subscription closures, invisible to CFA
         if (hasValue) {
           const value = latestValue as T;
 
           hasValue = false;
           yield value;
-        } else {
-          await new Promise<void>((_resolve) => {
-            resolve = _resolve;
-          });
 
+          continue;
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- flags are mutated by subscription closures, invisible to CFA
+        if (completed) {
           if (error !== null) {
             // eslint-disable-next-line @typescript-eslint/only-throw-error
             throw error;
           }
+
+          break;
         }
+
+        await new Promise<void>((_resolve) => {
+          resolve = _resolve;
+        });
       }
     } finally {
       subscription.unsubscribe();

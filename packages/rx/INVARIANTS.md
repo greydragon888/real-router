@@ -13,6 +13,7 @@
 | 5   | Distinct reference equivalence        | `distinctUntilChanged()` output is identical to `values.filter((v, i) => i === 0 \|\| v !== values[i - 1])`. The operator performs exact sequential deduplication. |
 | 6   | Distinct-custom reference equivalence | `distinctUntilChanged(eq)` output is identical to sequential dedup using the same comparator: `values.filter((v, i) => i === 0 \|\| !eq(values[i - 1], v))`.       |
 | 7   | Identity                              | `pipe(map(x => x))` preserves all values unchanged. Mapping with the identity function is equivalent to no transformation.                                         |
+| 8   | Map reference equivalence             | `map(f)` output is identical to `values.map(f)` — `f` is applied to every value, in order. The direct map-correctness law (mirrors filter correctness and distinct reference equivalence). The functor / identity / length laws are all invariant under `map → identity`, so they miss a "map drops its projection function" regression; this one catches it. |
 
 ## Subscription
 
@@ -23,6 +24,10 @@
 | 3   | Unsubscribe             | After calling `unsubscribe()`, no further values are delivered to that subscriber. Values emitted after unsubscription are silently dropped for that subscription.                |
 | 4   | Cold behavior           | Each `subscribe()` call triggers an independent execution of the subscribe function. Two subscriptions to the same observable each receive the full value sequence independently. |
 | 5   | Complete stops delivery | After `complete()` is called, no further values emitted via `next()` are delivered. The `closed` flag prevents all subsequent emissions.                                          |
+| 6   | Error does NOT stop delivery | **Divergence from TC39/RxJS (by design).** `error()` is non-terminal: it does not set `closed`, so values emitted after an `error()` are still delivered, multiple `error()` calls are all forwarded, and the subscription stays open. One throwing subscriber must not permanently kill an infinite router stream (`state$`/`events$`). Only `complete()` and `unsubscribe()` are terminal. |
+| 7   | Terminal teardown runs exactly once | A `complete()` or `unsubscribe()` runs the subscription's teardown (and removes the abort listener) exactly once. Any sequence of terminal operations — `complete` then `unsubscribe`, double-`unsubscribe`, double-`complete` — still runs teardown a single time. |
+| 8   | AbortSignal ≡ unsubscribe | Subscribing with `{ signal }` and aborting after _k_ emissions delivers exactly the same prefix as subscribing and calling `unsubscribe()` after _k_. The abort path is divergence-free from the manual unsubscribe path. |
+| 9   | Pre-aborted signal is inert | Subscribing with an already-aborted signal returns a closed subscription immediately (`closed === true`), never runs the subscribe function, and delivers no values. |
 
 ## Pipe Composition
 
@@ -43,12 +48,15 @@
 | 5   | Distinct idempotence    | `distinct() ∘ distinct() ≡ distinct()`. Applying `distinctUntilChanged` twice produces the same result as once — an already-deduplicated stream is unchanged.        |
 | 6   | Map preserves length    | `map(f)` emits exactly as many values as the source. Every source value produces exactly one output value (1:1 mapping).                                             |
 | 7   | debounceTime validation | `debounceTime(duration)` accepts non-negative finite numbers. Negative, `NaN`, or infinite durations throw `RangeError` synchronously before returning the operator. |
+| 8   | Filter conjunction      | `filter(p) ∘ filter(q) ≡ filter(x => p(x) && q(x))`. Chaining two filters equals filtering by the conjunction of their predicates (generalizes filter idempotence to distinct predicates). |
+| 9   | debounceTime burst      | For any non-empty synchronous burst of values, `debounceTime(d)` emits exactly the last value of the burst once the window elapses (latest-wins within the debounce window). |
+| 10  | Operator chain reference | Any random `map` / `filter` / `distinctUntilChanged` pipeline produces the same output as applying the same operations as plain array methods in JS — catches operator-interaction and value bugs that the per-operator laws miss. |
 
 ## Test Files
 
 | File                                        | Invariants | Category                                                                                                                              |
 | ------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `tests/property/operators.properties.ts`    | 16         | Operator laws: functor, filter, distinct (+ reference equivalence), identity, takeUntil, idempotence, length, debounceTime validation |
-| `tests/property/subscription.properties.ts` | 5          | Subscription: delivery, ordering, unsubscribe, cold behavior, complete stops delivery                                                 |
+| `tests/property/operators.properties.ts`    | 20         | Operator laws: functor, filter, distinct (+ reference equivalence), identity, map reference equivalence, takeUntil, idempotence, length, debounceTime validation, filter conjunction, debounceTime burst, random-chain reference |
+| `tests/property/subscription.properties.ts` | 9          | Subscription: delivery, ordering, unsubscribe, cold behavior, complete stops delivery, error does NOT stop delivery (non-terminal), terminal teardown once, AbortSignal ≡ unsubscribe, pre-aborted inert |
 | `tests/property/pipe.properties.ts`         | 3          | Pipe composition: associativity, empty-pipe identity, single-operator equivalence                                                     |
 | `tests/property/helpers.ts`                 | —          | Shared arbitraries and observable factory helpers                                                                                     |

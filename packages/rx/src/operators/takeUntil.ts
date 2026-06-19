@@ -51,6 +51,11 @@ export function takeUntil<T>(notifier: RxObservable<unknown>): Operator<T, T> {
           if (sourceSubscription) {
             sourceSubscription.unsubscribe();
           }
+          // notifierSubscription may be undefined when erroring synchronously —
+          // released by the post-subscribe `if (completed)` block below (#773)
+          if (notifierSubscription) {
+            notifierSubscription.unsubscribe();
+          }
 
           observer.error?.(error);
         },
@@ -58,6 +63,12 @@ export function takeUntil<T>(notifier: RxObservable<unknown>): Operator<T, T> {
 
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- defensive
       if (completed) {
+        // The notifier emitted/errored synchronously inside its own subscribe,
+        // so complete()/error ran before `notifierSubscription` was assigned and
+        // the wrapper exposes no teardown (early return). Release the now-assigned
+        // notifier subscription here so it does not dangle forever (#773).
+        notifierSubscription.unsubscribe();
+
         return;
       }
 

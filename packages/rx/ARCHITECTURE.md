@@ -4,7 +4,7 @@
 
 ## Overview
 
-`@real-router/rx` provides a **zero-cost opt-in** reactive programming interface for the router via TC39 Observable-compliant streams. Cold observables, composable operators, and `for await...of` support — all without requiring RxJS as a dependency.
+`@real-router/rx` provides a **zero-cost opt-in** reactive programming interface for the router via **TC39-style** Observable streams (`Symbol.observable` interop). Cold observables, composable operators, and `for await...of` support — all without requiring RxJS as a dependency. One deliberate divergence from TC39/RxJS: `error` is **non-terminal** (see [Error Semantics](#error-semantics) below).
 
 **Key role:** Bridges the router's event system into a functional reactive model. `state$()` and `events$()` factories create observables from the router's plugin API. The `pipe()` method chains operators for filtering, mapping, and deduplication.
 
@@ -70,22 +70,29 @@ subscribe(observerOrNext, options?)
            │
            ▼
 ┌───────────────────────┐
-│  Create safe wrappers │  safeNext, safeError, safeComplete
+│  Create safe wrappers │  safeNext, safeError, safeComplete, finalize
 │  (closed-guard +      │  - safeNext: try { next(value) } catch → safeError
-│   try/catch each)     │  - safeError: try { error(err) } catch → silent
-│                       │  - safeComplete: set closed, try { complete() } catch → silent
+│   try/catch each)     │  - safeError: try { error(err) } catch → silent (non-terminal)
+│                       │  - safeComplete: set closed, try { complete() } catch → silent, finalize()
+│                       │  - finalize: removeEventListener("abort") + teardown() (once)
 └──────────┬────────────┘
            │
            ▼
 ┌──────────────────────┐
 │  Wire AbortSignal    │  signal.addEventListener("abort", unsubscribe)
-│  (if provided)       │  Cleaned up on unsubscribe
+│  (if provided)       │  Cleaned up by finalize() — on unsubscribe OR complete
 └──────────┬───────────┘
            │
            ▼
 ┌──────────────────────┐
 │  Call #subscribeFn   │  teardown = subscribeFn({ next, error, complete })
 │  (may throw → error) │  Errors caught → safeError
+└──────────┬───────────┘
+           │
+           ▼
+┌──────────────────────┐
+│  if (closed)         │  sync complete() inside subscribeFn ran finalize()
+│    finalize()        │  before teardown existed — run it now (#772)
 └──────────┬───────────┘
            │
            ▼
@@ -99,6 +106,8 @@ subscribe(observerOrNext, options?)
 - Error in `complete` callback → caught silently
 - Error in teardown → caught silently
 - No `error` callback → `console.error("Unhandled error in RxObservable:", err)`
+
+**Terminal teardown (#772):** teardown and abort-listener removal run via a shared `finalize()` on **every** terminal path — `unsubscribe()` AND `complete()` — so a self-completing source still releases its resource (`unsubscribe()` after `complete()` is a no-op). `finalize()` runs teardown at most once; a synchronous `complete()` inside the subscribe function defers it to the post-subscribe `if (closed) finalize()`. `error` is intentionally **non-terminal** (does not set `closed`, does not finalize) — resources release on the consumer's `unsubscribe()`.
 
 ### pipe() — Operator Composition
 
@@ -125,13 +134,15 @@ for await (const value of observable) {
 └──────────┬───────────┘
            │
            ▼
-┌──────────────────────────────┐
-│  Loop while !completed       │
-│  ├── hasValue?               │
-│  │   ├── YES → yield value   │  (clears hasValue)
-│  │   └── NO  → await Promise │  (resolved by next/error/complete)
-│  └── error? → throw error    │
-└──────────────────────────────┘
+┌──────────────────────────────────┐
+│  Loop forever                    │
+│  ├── hasValue?                   │
+│  │   └── YES → yield, then loop  │  (drains the buffered value first)
+│  ├── completed?                  │
+│  │   ├── error → throw error     │
+│  │   └── else  → break (done)    │
+│  └── else → await Promise        │  (resolved by next/error/complete)
+└──────────────────────────────────┘
            │
            ▼
 ┌────────────────────────┐
@@ -140,6 +151,8 @@ for await (const value of observable) {
 ```
 
 **Latest-value:** If multiple values arrive while the iterator is suspended in `yield`, only the most recent value is yielded next. Intermediate values are skipped.
+
+**Terminal batch (#774):** the buffered value is checked **before** `completed`, so a value emitted immediately before a synchronous `complete()` is still yielded, and a synchronous `error()` is thrown rather than swallowed. The terminal is honored only once the value buffer is drained.
 
 ## Stream Factories
 
@@ -152,14 +165,17 @@ state$(router, options?)
   new RxObservable(observer => {
     │
     ├── api = getPluginApi(router)
-    ├── unsubscribe = api.addEventListener(TRANSITION_SUCCESS, (toState, fromState) =>
+    ├── sawEvent = false
+    ├── unsubscribe = api.addEventListener(TRANSITION_SUCCESS, (toState, fromState) => {
+    │       sawEvent = true
     │       observer.next({ route: toState, previousRoute: fromState })
-    │   )
+    │   })
     │
     ├── if replay (default: true) && router.getState() exists:
-    │       queueMicrotask(() =>
+    │       queueMicrotask(() => {
+    │           if (sawEvent) return   // a live event already delivered a fresher snapshot
     │           observer.next({ route: currentState, previousRoute: undefined })
-    │       )
+    │       })
     │
     └── return unsubscribe   // teardown
   })
@@ -167,7 +183,8 @@ state$(router, options?)
 
 - **Cold observable:** No work until `.subscribe()` is called
 - **Replay via microtask:** Initial state emitted asynchronously to ensure subscriber's `next` is wired
-- **Default `replay: true`** — always emits current state on subscribe
+- **Replay yields to live events (#771):** a synchronous navigation can fire `TRANSITION_SUCCESS` inside the subscribe→microtask window (core's optimistic-sync commit). The `sawEvent` guard suppresses the deferred replay in that case — the live event already delivered a fresher snapshot, so emitting the captured (now stale) state afterwards would deliver values out of chronological order
+- **Default `replay: true`** — emits current state on subscribe (unless a live event superseded it first, see above)
 
 ### events$() — Event Stream
 
@@ -228,13 +245,13 @@ createStatefulOperator(subscribeFn) — Stateful operators (distinctUntilChanged
 | Event            | Action                       |
 | ---------------- | ---------------------------- |
 | Notifier emits   | Complete + unsubscribe both  |
-| Notifier errors  | Error + unsubscribe source   |
+| Notifier errors  | Error + unsubscribe both     |
 | Source emits     | Forward to observer          |
 | Source errors    | Error + unsubscribe notifier |
 | Source completes | Complete + unsubscribe both  |
 | Unsubscribe      | Unsubscribe both             |
 
-**Subscription order:** Notifier subscribes first (handles synchronous emission), then source. Early return if notifier completes/errors synchronously before source subscription.
+**Subscription order:** Notifier subscribes first (handles synchronous emission), then source. Early return if notifier completes/errors synchronously before source subscription — the now-assigned notifier subscription is unsubscribed on that early return so it never dangles (#773).
 
 ## Error Isolation
 
@@ -262,6 +279,20 @@ const rxjsObservable = from(observable(router));
 
 Both symbol methods return `this`, enabling any TC39/RxJS consumer to wrap `RxObservable` instances.
 
+### Error Semantics
+
+**`error` is non-terminal — a deliberate divergence from TC39 proposal-observable / RxJS**, where `error` is a terminal event that triggers cleanup. Here:
+
+| Aspect                       | TC39 / RxJS            | `@real-router/rx`                                  |
+| ---------------------------- | ---------------------- | -------------------------------------------------- |
+| `error` sets `closed`        | yes (terminal)         | **no** — subscription stays open                   |
+| values after `error`         | dropped                | **still delivered**                                |
+| multiple `error()` calls     | only the first         | **each forwarded** to the handler                  |
+| sync `throw` from subscribeFn| terminates             | forwarded to `error`, **`closed` stays `false`**   |
+| terminal events              | `error`, `complete`    | **only `complete()` / `unsubscribe()`**            |
+
+Rationale: `state$`/`events$` are **infinite** streams driven by the router's lifetime. If `error` were terminal, a single throwing subscriber would permanently kill the stream for every other consumer — the same failure-isolation argument behind `@real-router/sources` `notify()`. Pinned by `tests/stress/error-cascade.stress.ts` and property invariant 6 (`tests/property/subscription.properties.ts`). Terminal cleanup (`complete`/`unsubscribe`) still runs teardown exactly once (invariant 7).
+
 ## Performance Characteristics
 
 | Operation                  | Complexity | Notes                                          |
@@ -270,7 +301,7 @@ Both symbol methods return `this`, enabling any TC39/RxJS consumer to wrap `RxOb
 | `pipe()` — no operators    | O(1)       | Returns `this`                                 |
 | `pipe()` — N operators     | O(N)       | One new `RxObservable` per operator            |
 | `state$()` subscribe       | O(1)       | Single `addEventListener` + optional microtask |
-| `events$()` subscribe      | O(1)       | 6 `addEventListener` calls                     |
+| `events$()` subscribe      | O(1)       | 7 `addEventListener` calls                     |
 | `map` / `filter` per value | O(1)       | Single function call + forward                 |
 | `distinctUntilChanged`     | O(1)       | Compare + optional forward                     |
 | `debounceTime` per value   | O(1)       | `clearTimeout` + `setTimeout`                  |
@@ -282,20 +313,21 @@ Both symbol methods return `this`, enabling any TC39/RxJS consumer to wrap `RxOb
 | ------------------------ | ------ | -------------------------------- |
 | Per `subscribe()` call   | ~300 B | Closures for safe wrappers       |
 | Per operator in `pipe()` | ~200 B | New `RxObservable` + closure     |
-| `events$()` teardown     | ~100 B | Array of 6 unsubscribe functions |
+| `events$()` teardown     | ~100 B | Array of 7 unsubscribe functions |
 | `debounceTime` state     | ~50 B  | Timer ID + pending value         |
 
 ## Stress Test Coverage
 
-46 stress tests across 8 files in `tests/stress/` validate behavior under extreme conditions:
+54 stress tests across 9 files in `tests/stress/` validate behavior under extreme conditions:
 
 | Category       | Tests (file count) | Test count | What they verify                                               |
 | -------------- | ------------------ | ---------- | -------------------------------------------------------------- |
-| Subscription   | 2 files            | 11 tests   | Rapid subscribe/unsubscribe churn, parallel pipeline isolation |
-| Operators      | 3 files            | 18 tests   | Deep pipe chains, timer cleanup, takeUntil race conditions     |
+| Subscription   | 2 files            | 12 tests   | Rapid subscribe/unsubscribe churn, parallel pipeline isolation, re-entrant abort inside subscribeFn |
+| Operators      | 3 files            | 19 tests   | Deep pipe chains, timer cleanup (incl. error-interleave), takeUntil race conditions |
 | Error handling | 1 file             | 6 tests    | Error propagation through operator chains under load           |
-| Backpressure   | 1 file             | 5 tests    | Async iterator under slow consumer / fast producer             |
+| Backpressure   | 1 file             | 7 tests    | Async iterator under slow consumer / fast producer, synchronous terminal batch under concurrency |
 | Fan-out        | 1 file             | 6 tests    | Many subscribers on single events$ stream                      |
+| Resource leaks | 1 file             | 4 tests    | Abort-listener / notifier-subscription / teardown-once accumulation under repetition (count-based, no heap noise) |
 
 ## See Also
 

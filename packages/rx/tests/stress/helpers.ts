@@ -25,20 +25,30 @@ export function createControllableSource<T>(): {
     };
   });
 
+  // Broadcast over a snapshot: a terminal complete()/error() now runs each
+  // subscription's teardown synchronously (which splices `observers`), so
+  // iterating the live array would skip observers. Mirrors RxJS Subject, which
+  // copies its observer list before emitting for this exact reason.
   return {
     observable,
     emit: (value: T) => {
-      for (const obs of observers) {
+      const snapshot = [...observers];
+
+      for (const obs of snapshot) {
         obs.next?.(value);
       }
     },
     complete: () => {
-      for (const obs of observers) {
+      const snapshot = [...observers];
+
+      for (const obs of snapshot) {
         obs.complete?.();
       }
     },
     error: (err: unknown) => {
-      for (const obs of observers) {
+      const snapshot = [...observers];
+
+      for (const obs of snapshot) {
         obs.error?.(err);
       }
     },

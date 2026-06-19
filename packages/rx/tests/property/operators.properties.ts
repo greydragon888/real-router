@@ -1,8 +1,10 @@
 import { fc, test } from "@fast-check/vitest";
-import { describe, expect } from "vitest";
+import { describe, expect, vi } from "vitest";
 
 import {
+  arbDupHeavyIntArray,
   arbIntArray,
+  arbNonEmptyIntArray,
   arbNumFn,
   arbNumPred,
   collectSync,
@@ -54,7 +56,9 @@ describe("Operator Properties", () => {
   });
 
   describe("distinct: distinctUntilChanged never emits two identical consecutive values", () => {
-    test.prop([arbIntArray], { numRuns: NUM_RUNS.standard })(
+    // arbDupHeavyIntArray (small alphabet) so consecutive duplicates actually
+    // occur — exercises the dedup branch; arbIntArray almost never collides.
+    test.prop([arbDupHeavyIntArray], { numRuns: NUM_RUNS.standard })(
       "no two consecutive emitted values are strictly equal",
       (values) => {
         const results = collectSync(
@@ -69,7 +73,9 @@ describe("Operator Properties", () => {
   });
 
   describe("distinct reference equivalence: distinctUntilChanged output ≡ filter((v,i) => i===0 || v!==prev)", () => {
-    test.prop([arbIntArray], { numRuns: NUM_RUNS.standard })(
+    // arbDupHeavyIntArray so the input reliably contains consecutive duplicates;
+    // otherwise dedup(input) === input and a passthrough-mutated distinct passes.
+    test.prop([arbDupHeavyIntArray], { numRuns: NUM_RUNS.standard })(
       "output equals sequential dedup of the input array",
       (values) => {
         const results = collectSync(
@@ -273,6 +279,17 @@ describe("Operator Properties", () => {
     );
   });
 
+  describe("map reference equivalence: map(f) applies f to every value (≡ values.map(f))", () => {
+    test.prop([arbIntArray, arbNumFn], { numRuns: NUM_RUNS.standard })(
+      "mapped output equals applying f to each source value in order",
+      (values, f) => {
+        const actual = collectSync(makeSource(values).pipe(map(f)));
+
+        expect(actual).toStrictEqual(values.map((v) => f(v)));
+      },
+    );
+  });
+
   describe("debounceTime validation: invalid durations throw RangeError, valid ones are accepted", () => {
     test.prop([fc.integer({ min: 0, max: 10_000 })], {
       numRuns: NUM_RUNS.fast,
@@ -300,5 +317,94 @@ describe("Operator Properties", () => {
         debounceTime(duration);
       }).toThrow(RangeError);
     });
+  });
+
+  describe("filter composition: filter(p) ∘ filter(q) ≡ filter(x => p(x) && q(x))", () => {
+    test.prop([arbIntArray, arbNumPred, arbNumPred], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "chaining two filters equals filtering by their conjunction",
+      (values, p, q) => {
+        const chained = collectSync(
+          makeSource(values).pipe(filter(p), filter(q)),
+        );
+        const conjunction = collectSync(
+          makeSource(values).pipe(filter((x) => p(x) && q(x))),
+        );
+
+        expect(chained).toStrictEqual(conjunction);
+        expect(chained).toStrictEqual(values.filter((v) => p(v) && q(v)));
+      },
+    );
+  });
+
+  describe("debounceTime burst: a synchronous burst emits exactly the last value", () => {
+    test.prop([arbNonEmptyIntArray, fc.integer({ min: 1, max: 1000 })], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "after a synchronous burst, debounceTime(d) emits only the final value",
+      (burst, duration) => {
+        vi.useFakeTimers();
+
+        try {
+          const emitted: number[] = [];
+
+          makeSource(burst)
+            .pipe(debounceTime(duration))
+            .subscribe({ next: (v) => emitted.push(v) });
+
+          vi.advanceTimersByTime(duration + 1);
+
+          expect(emitted).toStrictEqual([burst[burst.length - 1]]);
+        } finally {
+          vi.useRealTimers();
+        }
+      },
+    );
+  });
+
+  describe("operator chain ≡ manual reference: random map/filter/distinct pipelines", () => {
+    const arbOp = fc.oneof(
+      arbNumFn.map((f) => ({ kind: "map" as const, f })),
+      arbNumPred.map((p) => ({ kind: "filter" as const, p })),
+      fc.constant({ kind: "distinct" as const }),
+    );
+
+    test.prop([arbIntArray, fc.array(arbOp, { maxLength: 6 })], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "a random pipeline equals applying the same operators manually in JS",
+      (values, ops) => {
+        let piped: RxObservable<number> = makeSource(values);
+
+        for (const op of ops) {
+          if (op.kind === "map") {
+            piped = piped.pipe(map(op.f));
+          } else if (op.kind === "filter") {
+            piped = piped.pipe(filter(op.p));
+          } else {
+            piped = piped.pipe(distinctUntilChanged());
+          }
+        }
+
+        const actual = collectSync(piped);
+
+        let reference = values;
+
+        for (const op of ops) {
+          if (op.kind === "map") {
+            reference = reference.map((v) => op.f(v));
+          } else if (op.kind === "filter") {
+            reference = reference.filter((v) => op.p(v));
+          } else {
+            reference = reference.filter(
+              (v, i, arr) => i === 0 || v !== arr[i - 1],
+            );
+          }
+        }
+
+        expect(actual).toStrictEqual(reference);
+      },
+    );
   });
 });

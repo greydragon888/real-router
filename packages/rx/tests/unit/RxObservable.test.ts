@@ -192,6 +192,67 @@ describe("RxObservable", () => {
       expect(teardownCalls).toStrictEqual([1]);
     });
 
+    it("calls teardown function on complete", () => {
+      const teardownCalls: number[] = [];
+      let complete!: () => void;
+      const observable = new RxObservable((observer) => {
+        complete = () => observer.complete?.();
+
+        return () => teardownCalls.push(1);
+      });
+
+      observable.subscribe({});
+      complete();
+
+      expect(teardownCalls).toStrictEqual([1]);
+    });
+
+    it("calls teardown function on synchronous complete", () => {
+      const teardownCalls: number[] = [];
+      const observable = new RxObservable((observer) => {
+        observer.complete?.(); // terminates before teardown is returned
+
+        return () => teardownCalls.push(1);
+      });
+
+      observable.subscribe({});
+
+      expect(teardownCalls).toStrictEqual([1]);
+    });
+
+    it("removes the abort listener on complete", () => {
+      const controller = new AbortController();
+      const removeSpy = vi.spyOn(controller.signal, "removeEventListener");
+      let complete!: () => void;
+      const observable = new RxObservable((observer) => {
+        complete = () => observer.complete?.();
+
+        return () => {};
+      });
+
+      observable.subscribe({}, { signal: controller.signal });
+      complete();
+
+      expect(removeSpy).toHaveBeenCalledWith("abort", expect.any(Function));
+    });
+
+    it("runs teardown only once when unsubscribed after complete", () => {
+      const teardownCalls: number[] = [];
+      let complete!: () => void;
+      const observable = new RxObservable((observer) => {
+        complete = () => observer.complete?.();
+
+        return () => teardownCalls.push(1);
+      });
+
+      const subscription = observable.subscribe({});
+
+      complete();
+      subscription.unsubscribe();
+
+      expect(teardownCalls).toStrictEqual([1]);
+    });
+
     it("handles observer without next handler", () => {
       const observable = new RxObservable<number>((observer) => {
         observer.next?.(1);
@@ -727,6 +788,34 @@ describe("RxObservable", () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
 
       await expect(iterator.next()).rejects.toThrow("delayed error");
+    });
+
+    it("yields a value emitted immediately before a synchronous complete", async () => {
+      const values: number[] = [];
+
+      const observable = new RxObservable<number>((observer) => {
+        observer.next?.(42);
+        observer.complete?.();
+      });
+
+      for await (const value of observable) {
+        values.push(value);
+      }
+
+      expect(values).toStrictEqual([42]);
+    });
+
+    it("throws when the observable errors synchronously on subscribe", async () => {
+      const observable = new RxObservable<number>((observer) => {
+        observer.error?.(new Error("sync error"));
+      });
+
+      await expect(async () => {
+        // eslint-disable-next-line sonarjs/no-unused-vars
+        for await (const _value of observable) {
+          // body never runs
+        }
+      }).rejects.toThrow("sync error");
     });
   });
 });

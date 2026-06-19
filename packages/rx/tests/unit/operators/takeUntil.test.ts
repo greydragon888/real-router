@@ -417,4 +417,45 @@ describe("takeUntil()", () => {
 
     expect(errors).toStrictEqual([]);
   });
+
+  it("should release the notifier subscription when the notifier errors", () => {
+    const notifierCleanups: number[] = [];
+    let notifierErrorFn: ((error: Error) => void) | undefined;
+
+    const notifier = new RxObservable<void>((observer) => {
+      notifierErrorFn = (error) => observer.error?.(error);
+
+      return () => notifierCleanups.push(1);
+    });
+
+    const source = new RxObservable<number>(() => {
+      return () => {};
+    });
+
+    source.pipe(takeUntil(notifier)).subscribe({
+      error: () => {},
+    });
+
+    notifierErrorFn?.(new Error("notifier error"));
+
+    expect(notifierCleanups).toStrictEqual([1]);
+  });
+
+  it("should release the notifier subscription when the notifier emits synchronously", () => {
+    const notifierCleanups: number[] = [];
+
+    const notifier = new RxObservable<void>((observer) => {
+      observer.next?.();
+
+      return () => notifierCleanups.push(1);
+    });
+
+    const source = new RxObservable<number>(() => {
+      return () => {};
+    });
+
+    source.pipe(takeUntil(notifier)).subscribe({});
+
+    expect(notifierCleanups).toStrictEqual([1]);
+  });
 });

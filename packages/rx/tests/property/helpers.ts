@@ -57,6 +57,18 @@ export const arbNonEmptyIntArray = fc.array(
 );
 
 /**
+ * Array drawn from a small alphabet (0–3) so consecutive duplicates occur on
+ * (almost) every run. The wide `arbIntArray` almost never produces adjacent
+ * equal values, so it leaves `distinctUntilChanged`'s dedup branch unexercised —
+ * a passthrough-mutated `distinct` survives it. Use this for the default-comparator
+ * distinct invariants that must actually see consecutive duplicates.
+ */
+export const arbDupHeavyIntArray = fc.array(fc.integer({ min: 0, max: 3 }), {
+  minLength: 0,
+  maxLength: 50,
+});
+
+/**
  * Arbitrary integer-to-integer function.
  * fast-check generates pure, deterministic functions.
  */
