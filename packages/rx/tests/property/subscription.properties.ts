@@ -215,4 +215,78 @@ describe("Subscription Properties", () => {
       },
     );
   });
+
+  describe("AbortSignal equivalence: aborting ≡ unsubscribing at the same point", () => {
+    test.prop([arbIntArray, fc.nat({ max: 50 })], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "aborting after k emissions delivers the same prefix as unsubscribing after k",
+      (values, k) => {
+        const drive = (
+          terminate: (
+            controller: AbortController,
+            sub: { unsubscribe: () => void },
+          ) => void,
+        ): number[] => {
+          const received: number[] = [];
+          let emit: ((v: number) => void) | undefined;
+          const source = new RxObservable<number>((observer) => {
+            emit = (v) => observer.next?.(v);
+          });
+          const controller = new AbortController();
+          const sub = source.subscribe(
+            { next: (v) => received.push(v) },
+            { signal: controller.signal },
+          );
+
+          values.forEach((v, i) => {
+            if (i === k) {
+              terminate(controller, sub);
+            }
+
+            emit?.(v);
+          });
+
+          return received;
+        };
+
+        const viaAbort = drive((controller) => {
+          controller.abort();
+        });
+        const viaUnsubscribe = drive((_controller, sub) => {
+          sub.unsubscribe();
+        });
+
+        expect(viaAbort).toStrictEqual(viaUnsubscribe);
+        expect(viaAbort).toStrictEqual(values.slice(0, k));
+      },
+    );
+
+    test.prop([arbIntArray], { numRuns: NUM_RUNS.standard })(
+      "a pre-aborted signal delivers nothing and closes immediately",
+      (values) => {
+        const controller = new AbortController();
+
+        controller.abort();
+
+        const received: number[] = [];
+        let emit: ((v: number) => void) | undefined;
+        const source = new RxObservable<number>((observer) => {
+          emit = (v) => observer.next?.(v);
+        });
+
+        const sub = source.subscribe(
+          { next: (v) => received.push(v) },
+          { signal: controller.signal },
+        );
+
+        for (const v of values) {
+          emit?.(v);
+        }
+
+        expect(sub.closed).toBe(true);
+        expect(received).toStrictEqual([]);
+      },
+    );
+  });
 });
