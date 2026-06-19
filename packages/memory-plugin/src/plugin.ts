@@ -66,6 +66,13 @@ export class MemoryPlugin {
         opts: NavigationOptions,
       ) => {
         if (this.#navigatingFromHistory) {
+          // Consume the flag on observing the commit, not in a later microtask.
+          // Core commits navigateToState synchronously (optimistic-sync), so a
+          // navigate() fired in the SAME tick as back()/forward()/go() would
+          // otherwise still see the flag set — the .then reset is a microtask
+          // that has not run yet — and be swallowed as a phantom history-restore
+          // (no push, stale direction/historyIndex, orphan forward leg) (#807).
+          this.#navigatingFromHistory = false;
           this.#writeMemoryContext(toState, this.#pendingDirection);
 
           return;
@@ -157,19 +164,19 @@ export class MemoryPlugin {
     // forwardState + buildPath re-resolution and their interceptors; route
     // mutations between record and replay do not retroactively change what
     // back/forward commits (#561).
-    void this.#api.navigateToState(entry, { replace: true }).then(
-      () => {
-        if (this.#goGeneration === generation) {
-          this.#navigatingFromHistory = false;
-        }
-      },
-      () => {
-        if (this.#goGeneration === generation) {
-          this.#index = previousIndex;
-          this.#navigatingFromHistory = false;
-        }
-      },
-    );
+    this.#api.navigateToState(entry, { replace: true }).catch(() => {
+      // Reject only: guard block, ROUTE_NOT_FOUND, or cancellation by a newer
+      // navigation. onTransitionSuccess never fired, so the flag was not
+      // consumed there — revert the optimistic index and clear the flag here. A
+      // successful navigateToState always emits onTransitionSuccess (which now
+      // resets the flag), so no resolve handler is needed. The generation guard
+      // skips a superseded #go whose optimistic target a newer #go has already
+      // overtaken — it must not revert the newer call's index or flag (#505).
+      if (this.#goGeneration === generation) {
+        this.#index = previousIndex;
+        this.#navigatingFromHistory = false;
+      }
+    });
   }
 
   #clear(): void {

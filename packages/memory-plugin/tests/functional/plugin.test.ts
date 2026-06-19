@@ -430,6 +430,56 @@ describe("Memory plugin", () => {
     expect(stateBefore.context.memory?.historyIndex).toBe(1);
   });
 
+  it("does not emit a transition on a same-path short-circuit back() — subscribers are not notified, only context.memory is rewritten (#808)", async () => {
+    router.usePlugin(memoryPluginFactory());
+    await router.start("/");
+
+    await router.navigate("users");
+    await router.navigate("home", {}, { replace: true });
+
+    // History: [home, home], index=1. Both entries have path "/".
+    const stateBefore = router.getState()!;
+
+    let notifications = 0;
+    const unsub = router.subscribe(() => {
+      notifications++;
+    });
+
+    router.back(); // short-circuit: index 1 → 0, no navigateToState, no emission
+
+    // A short-circuit move is metadata-only (the visible route is unchanged), so
+    // it emits no transition: router.subscribe listeners — and adapters keyed on
+    // TRANSITION_SUCCESS — are NOT notified.
+    expect(notifications).toBe(0);
+    // ...but context.memory is still rewritten in place, so a synchronous read
+    // reflects the new direction/historyIndex (the real value of #508).
+    expect(router.getState()).toBe(stateBefore);
+    expect(stateBefore.context.memory).toStrictEqual({
+      direction: "back",
+      historyIndex: 0,
+    });
+
+    unsub();
+
+    // Discriminating control: a back() to a DIFFERENT path is a full transition
+    // and DOES notify exactly once.
+    await router.navigate("users"); // [home, users], index=1
+    await router.navigate("home"); //  [home, users, home], index=2
+
+    let fullNavNotifications = 0;
+    const unsubFull = router.subscribe(() => {
+      fullNavNotifications++;
+    });
+
+    router.back(); // → users (path "/users" ≠ "/") → full transition
+    await settle();
+
+    expect(fullNavNotifications).toBe(1);
+    expect(router.getState()?.name).toBe("users");
+
+    unsubFull();
+  });
+
   it("should navigate back normally when target entry has a different path", async () => {
     router.usePlugin(memoryPluginFactory());
     await router.start("/");
@@ -529,6 +579,41 @@ describe("Memory plugin", () => {
       expect(router.canGoForward()).toBe(false);
       expect(router.canGoBack()).toBe(true);
 
+      await waitForHistoryNavigation(router, () => {
+        router.back();
+      });
+
+      expect(router.getState()?.name).toBe("users");
+    });
+
+    it("should record a synchronous navigate() fired in the same tick as back() as a fresh push (#807)", async () => {
+      router.usePlugin(memoryPluginFactory());
+      await router.start("/");
+
+      await router.navigate("users");
+      await router.navigate("settings");
+
+      // History: [home, users, settings], index=2.
+      // back() commits synchronously (optimistic-sync) and only resets the
+      // #navigatingFromHistory flag in a later microtask. A navigate() fired
+      // in the SAME tick must still be recorded as a fresh push — it must not
+      // be swallowed by the stale history-restore flag.
+      router.back(); // → users (index 1), flag set true
+      await router.navigate("user", { id: "1" }); // same tick: must push, not restore
+
+      // The push landed and truncated the forward leg: history is
+      // [home, users, user] at index 2, recorded as a normal "navigate".
+      expect(router.getState()?.name).toBe("user");
+      expect(router.getState()?.context.memory).toStrictEqual({
+        direction: "navigate",
+        historyIndex: 2,
+      });
+      // No phantom forward entry left over from the cancelled back().
+      expect(router.canGoForward()).toBe(false);
+      expect(router.canGoBack()).toBe(true);
+
+      // Entry ↔ state consistency: back() from the recorded push lands on
+      // "users" (the truncated forward "settings" is gone).
       await waitForHistoryNavigation(router, () => {
         router.back();
       });

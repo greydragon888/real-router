@@ -39,6 +39,25 @@ describe("S11: back() in flight + immediate navigate() race", () => {
       expect(router.getState()?.name).toBe("profile");
       expect(router.canGoBack()).toBe(true);
 
+      // The push must be recorded as a fresh "navigate", NOT swallowed as a
+      // history-restore. Before the #807 fix the flag was still true when
+      // profile committed, so the entry was never pushed: direction stuck at
+      // "back", historyIndex stuck at 1, and a phantom forward leg ("settings")
+      // survived. These four assertions fail on the corrupt stack — name and
+      // canGoBack alone do not discriminate it.
+      expect(router.getState()?.context.memory).toStrictEqual({
+        direction: "navigate",
+        historyIndex: 2,
+      });
+      expect(router.canGoForward()).toBe(false);
+
+      // Entry ↔ router-state consistency: forward() from the freshly pushed
+      // profile must go nowhere (no phantom "settings" forward entry).
+      router.forward();
+      await settle();
+
+      expect(router.getState()?.name).toBe("profile");
+
       // Verify follow-up navigation also records normally (flag not stuck).
       await router.navigate("users");
 
