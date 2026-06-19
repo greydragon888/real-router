@@ -1,5 +1,25 @@
 # @real-router/rx
 
+## 0.3.13
+
+### Patch Changes
+
+- [#875](https://github.com/greydragon888/real-router/pull/875) [`8a0cf25`](https://github.com/greydragon888/real-router/commit/8a0cf2585067503165d829de2290bf0f4445ae48) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `RxObservable` async iterator dropping the terminal batch ([#774](https://github.com/greydragon888/real-router/issues/774))
+
+  `for await (const v of observable)` now yields a value emitted immediately before a synchronous `complete()`, and throws when the observable errors synchronously on subscribe. Previously the iterator loop checked `completed` before the buffered value and raised errors only after an `await`, so a synchronous terminal skipped the loop body entirely — dropping the final value and swallowing the error. The loop now drains a buffered value before honoring the terminal and raises the error from a single point.
+
+- [#875](https://github.com/greydragon888/real-router/pull/875) [`8a0cf25`](https://github.com/greydragon888/real-router/commit/8a0cf2585067503165d829de2290bf0f4445ae48) Thanks [@greydragon888](https://github.com/greydragon888)! - Run terminal teardown when an `RxObservable` completes ([#772](https://github.com/greydragon888/real-router/issues/772))
+
+  `complete()` now runs the subscription's teardown and removes the abort listener, instead of deferring them to `unsubscribe()` — which was a no-op after completion. A self-completing source (intervals, DOM listeners, finite producers) previously leaked its resource, and under a long-lived shared `AbortSignal` leaked one abort listener per completed stream. Synchronous completion inside the subscribe function is handled as well: teardown runs once the subscribe function has returned it.
+
+- [#875](https://github.com/greydragon888/real-router/pull/875) [`8a0cf25`](https://github.com/greydragon888/real-router/commit/8a0cf2585067503165d829de2290bf0f4445ae48) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `state$` out-of-order stale replay after a synchronous navigation ([#771](https://github.com/greydragon888/real-router/issues/771))
+
+  The deferred `queueMicrotask` replay no longer overrides a fresher `TRANSITION_SUCCESS` emission. When a synchronous navigation commits between `subscribe` and the replay microtask (core's optimistic-sync path), the replay now yields to the live event instead of delivering the stale subscribe-time snapshot after it — which previously rolled "latest emission" consumers back to the previous route.
+
+- [#875](https://github.com/greydragon888/real-router/pull/875) [`8a0cf25`](https://github.com/greydragon888/real-router/commit/8a0cf2585067503165d829de2290bf0f4445ae48) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `takeUntil` leaking the notifier subscription ([#773](https://github.com/greydragon888/real-router/issues/773))
+
+  `takeUntil` now unsubscribes the notifier when the notifier errors, and when the notifier emits or errors synchronously on subscribe. Previously the notifier-error branch released only the source, and a synchronous notifier terminal returned before exposing a teardown — leaving the notifier subscription dangling forever (a long-lived notifier such as an `events$` router-listener stream stayed held until GC), with no way for the consumer's `unsubscribe()` to reach it after the sync terminal.
+
 ## 0.3.12
 
 ### Patch Changes
