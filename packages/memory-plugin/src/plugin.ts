@@ -164,7 +164,7 @@ export class MemoryPlugin {
     // forwardState + buildPath re-resolution and their interceptors; route
     // mutations between record and replay do not retroactively change what
     // back/forward commits (#561).
-    void this.#api.navigateToState(entry, { replace: true }).catch(() => {
+    this.#api.navigateToState(entry, { replace: true }).catch(() => {
       // Reject only: guard block, ROUTE_NOT_FOUND, or cancellation by a newer
       // navigation. onTransitionSuccess never fired, so the flag was not
       // consumed there — revert the optimistic index and clear the flag here. A
