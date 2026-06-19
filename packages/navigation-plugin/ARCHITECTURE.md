@@ -563,6 +563,8 @@ The factory may be called again — for example, during HMR or when reusing the 
 
 `shared` is intentionally mutable. It's the only shared state between instances of the same factory.
 
+**Factory pool — last-wins (concurrent-live caveat, #758).** Because the single `removeNavigateListener` slot is shared — and there is a single global `window.navigation` — each `onStart` removes the previous instance's navigate listener before installing its own. The pattern is built for a pool where routers are created/destroyed **sequentially** (one live router at a time). If two routers from the same factory are live **at the same time**, only the **last-started** one receives `navigate` events; the earlier one silently desyncs. This mutual exclusivity is inherent to the single global Navigation API. For genuinely concurrent routers, give each its own factory instance. Locked by `tests/stress/listener-leak.stress.ts` (N12.3).
+
 ## Plugin-event detection (PLUGIN_SYNC_INFO sentinel, #518 + #580)
 
 `navigation.navigate({ history: "replace" })` fires a navigate event — unlike `history.replaceState()` which does not fire popstate. The plugin must mark its own events so the handler short-circuits them, otherwise the event loops back through `router.navigate()`.

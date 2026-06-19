@@ -19,7 +19,11 @@ import {
   routeConfig,
 } from "./helpers";
 import { createSafeBrowser, safelyEncodePath } from "../../src/browser-env";
-import { createHashPrefixRegex, extractHashPath } from "../../src/hash-utils";
+import {
+  buildHashLocation,
+  createHashPrefixRegex,
+  extractHashPath,
+} from "../../src/hash-utils";
 
 import type { Router } from "@real-router/core";
 
@@ -158,5 +162,94 @@ describe("Hash Plugin Lifecycle Churn", () => {
 
     router.stop();
     unsubscribe();
+  });
+});
+
+/**
+ * Factory pool: concurrently-live routers (last-wins popstate) — #758.
+ *
+ * `SharedFactoryState` is allocated once per `hashPluginFactory(...)` call and
+ * shared across every router that consumes that factory. Each `onStart` removes
+ * the previous instance's popstate listener before installing its own, so when
+ * two routers from the same factory are live at the same time only the
+ * LAST-started one tracks `popstate`; the earlier one silently desyncs.
+ *
+ * This is documented design (the pool pattern assumes sequential router
+ * lifetimes). The leak tests above assert net-zero listeners but never check
+ * which router a popstate reaches — this locks the last-wins contract.
+ */
+describe("Hash factory pool: only the last concurrently-live router tracks popstate", () => {
+  beforeAll(() => {
+    vi.spyOn(console, "warn").mockImplementation(noop);
+    vi.spyOn(console, "error").mockImplementation(noop);
+  });
+
+  beforeEach(() => {
+    globalThis.history.replaceState({}, "", "/");
+  });
+
+  afterAll(() => {
+    (console.warn as unknown as { mockRestore?: () => void }).mockRestore?.();
+    (console.error as unknown as { mockRestore?: () => void }).mockRestore?.();
+  });
+
+  it("routes a popstate to the last-started router; the earlier one does not react", async () => {
+    const prefixRegex = createHashPrefixRegex("");
+    const safeBrowser = createSafeBrowser(
+      () =>
+        buildHashLocation(
+          globalThis.location.hash,
+          globalThis.location.search,
+          prefixRegex,
+        ),
+      "hash-plugin-pool",
+    );
+    const browser = {
+      ...safeBrowser,
+      pushState: (state: unknown, url: string) => {
+        safeBrowser.pushState(state, url);
+      },
+      replaceState: (state: unknown, url: string) => {
+        safeBrowser.replaceState(state, url);
+      },
+    };
+
+    const factory = hashPluginFactory({}, browser);
+
+    const r1 = createRouter(routeConfig, {
+      defaultRoute: "home",
+      allowNotFound: true,
+    });
+    const r2 = createRouter(routeConfig, {
+      defaultRoute: "home",
+      allowNotFound: true,
+    });
+    const unsub1 = r1.usePlugin(factory);
+    const unsub2 = r2.usePlugin(factory);
+
+    await r1.start();
+    // r2.start() removes r1's popstate listener and installs its own (last-wins).
+    await r2.start();
+
+    const r1Before = r1.getState()?.name;
+
+    globalThis.history.replaceState({}, "", "/#/users/view/5");
+    globalThis.dispatchEvent(
+      new PopStateEvent("popstate", {
+        state: makePopstateState("users.view", { id: "5" }, "/users/view/5"),
+      }),
+    );
+
+    await waitForTransitions();
+
+    // Only the last-started router reacts; the earlier one silently desyncs.
+    expect(r2.getState()?.name).toBe("users.view");
+    expect(r2.getState()?.params).toMatchObject({ id: "5" });
+    expect(r1.getState()?.name).toBe(r1Before);
+
+    unsub1();
+    r1.stop();
+    unsub2();
+    r2.stop();
   });
 });

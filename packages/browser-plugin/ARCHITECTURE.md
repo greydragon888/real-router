@@ -275,6 +275,8 @@ Each new plugin instance registers its own popstate listener in `onStart`. Witho
 
 `shared` is intentionally mutable. It's the only shared state between instances of the same factory.
 
+**Factory pool — last-wins (concurrent-live caveat, #758).** Because the single `removePopStateListener` slot is shared, each `onStart` removes the previous instance's listener before installing its own. The pattern is built for a pool where routers are created/destroyed **sequentially** (one live router at a time). If two routers from the same factory are live **at the same time** on one window, only the **last-started** one tracks `popstate` — the earlier one silently desyncs from the URL. There is a single `popstate` stream and a single URL, so this mutual exclusivity is inherent (who owns the URL with two live routers?). For genuinely concurrent routers, give each its own factory instance. Locked by `tests/stress/factory-instance-cleanup.stress.ts` (B7.5).
+
 ## Data Flow: Navigation
 
 ```
