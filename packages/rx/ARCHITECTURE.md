@@ -134,13 +134,15 @@ for await (const value of observable) {
 └──────────┬───────────┘
            │
            ▼
-┌──────────────────────────────┐
-│  Loop while !completed       │
-│  ├── hasValue?               │
-│  │   ├── YES → yield value   │  (clears hasValue)
-│  │   └── NO  → await Promise │  (resolved by next/error/complete)
-│  └── error? → throw error    │
-└──────────────────────────────┘
+┌──────────────────────────────────┐
+│  Loop forever                    │
+│  ├── hasValue?                   │
+│  │   └── YES → yield, then loop  │  (drains the buffered value first)
+│  ├── completed?                  │
+│  │   ├── error → throw error     │
+│  │   └── else  → break (done)    │
+│  └── else → await Promise        │  (resolved by next/error/complete)
+└──────────────────────────────────┘
            │
            ▼
 ┌────────────────────────┐
@@ -149,6 +151,8 @@ for await (const value of observable) {
 ```
 
 **Latest-value:** If multiple values arrive while the iterator is suspended in `yield`, only the most recent value is yielded next. Intermediate values are skipped.
+
+**Terminal batch (#774):** the buffered value is checked **before** `completed`, so a value emitted immediately before a synchronous `complete()` is still yielded, and a synchronous `error()` is thrown rather than swallowed. The terminal is honored only once the value buffer is drained.
 
 ## Stream Factories
 

@@ -77,4 +77,4 @@ Calling `.pipe()` without arguments returns the observable itself (identity).
 
 ### Async iterator yields latest value only
 
-The `[Symbol.asyncIterator]()` implementation yields the most recent value when awaited. If multiple values arrive between yields, intermediate values are dropped (latest-wins).
+The `[Symbol.asyncIterator]()` implementation yields the most recent value when awaited. If multiple values arrive between yields, intermediate values are dropped (latest-wins). The **terminal batch** is preserved, though: a value emitted immediately before a synchronous `complete()` is still yielded, and a synchronous `error()` is thrown — the buffered value is drained before the terminal is honored (#774).

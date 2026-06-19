@@ -252,7 +252,6 @@ export class RxObservable<T> {
           resolveCallback();
         }
       },
-      /* v8 ignore start -- v8 coverage can't track branches inside suspended async generators */
       error: (err) => {
         error = err;
         completed = true;
@@ -272,28 +271,37 @@ export class RxObservable<T> {
           resolveCallback();
         }
       },
-      /* v8 ignore stop */
     });
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- v8 ignore affects analysis
-      while (!completed) {
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- v8 ignore affects analysis
+      for (;;) {
+        // Drain a buffered value before honoring a terminal: a value emitted
+        // immediately before a synchronous complete()/error() must still be
+        // yielded (the terminal batch), and a fresh value can arrive while the
+        // generator is suspended at the await below.
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- flags are mutated by subscription closures, invisible to CFA
         if (hasValue) {
           const value = latestValue as T;
 
           hasValue = false;
           yield value;
-        } else {
-          await new Promise<void>((_resolve) => {
-            resolve = _resolve;
-          });
 
+          continue;
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- flags are mutated by subscription closures, invisible to CFA
+        if (completed) {
           if (error !== null) {
             // eslint-disable-next-line @typescript-eslint/only-throw-error
             throw error;
           }
+
+          break;
         }
+
+        await new Promise<void>((_resolve) => {
+          resolve = _resolve;
+        });
       }
     } finally {
       subscription.unsubscribe();

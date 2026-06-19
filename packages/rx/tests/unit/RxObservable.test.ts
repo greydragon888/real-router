@@ -789,5 +789,33 @@ describe("RxObservable", () => {
 
       await expect(iterator.next()).rejects.toThrow("delayed error");
     });
+
+    it("yields a value emitted immediately before a synchronous complete", async () => {
+      const values: number[] = [];
+
+      const observable = new RxObservable<number>((observer) => {
+        observer.next?.(42);
+        observer.complete?.();
+      });
+
+      for await (const value of observable) {
+        values.push(value);
+      }
+
+      expect(values).toStrictEqual([42]);
+    });
+
+    it("throws when the observable errors synchronously on subscribe", async () => {
+      const observable = new RxObservable<number>((observer) => {
+        observer.error?.(new Error("sync error"));
+      });
+
+      await expect(async () => {
+        // eslint-disable-next-line sonarjs/no-unused-vars
+        for await (const _value of observable) {
+          // body never runs
+        }
+      }).rejects.toThrow("sync error");
+    });
   });
 });
