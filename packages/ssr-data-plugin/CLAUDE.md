@@ -334,6 +334,8 @@ In practice this only matters for in-memory hydration paths — JSON-roundtrip s
 
 If a loader throws, the error propagates through the `start()` promise. The caller's `try/catch` handles it — same as any async guard failure.
 
+On the `start()` path the loader runs **after** `await next(path)` committed the state and emitted `TRANSITION_SUCCESS`. When that loader rejects, core does **not** roll the start back (#763): the committed state stands and `router.isActive()` stays `true` — only the `start()` promise rejects. On SSR the per-request router is discarded so this is moot; on the client the router stays consistent with the success subscribers already observed. (The CSR `invalidate(...)` path runs the loader in the awaited LEAVE_APPROVE phase, *before* `TRANSITION_SUCCESS`, so a rejection there fails the `navigate()` before any commit.)
+
 ## Composition with `rsc-server-plugin`
 
 `@real-router/ssr-data-plugin` and `@real-router/rsc-server-plugin` follow the **same factory pattern** (claim-based namespace + `start()` interceptor) and are designed to run **side-by-side** on the same router. Their namespaces are distinct:

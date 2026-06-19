@@ -457,7 +457,16 @@ export class Router<
     }
 
     const promiseState = internalStart.catch((error: unknown) => {
-      if (this.#eventBus.isReady()) {
+      // Unwind a READY FSM back to IDLE only when nothing was committed —
+      // e.g. an activation guard blocked the start navigation, so no
+      // TRANSITION_SUCCESS was emitted (`getState()` is undefined). If a
+      // start interceptor instead threw AFTER navigateToState committed and
+      // emitted TRANSITION_SUCCESS (the SSR/RSC loader window), `getState()`
+      // is defined: subscribers already observed the success, so rolling back
+      // would retract it (phantom success, #763). Keep the committed state —
+      // the error still surfaces via the rejection below. A throw before
+      // `next()` never reached READY and unwinds via the STARTING branch.
+      if (this.#eventBus.isReady() && this.#state.get() === undefined) {
         this.#lifecycle.stop();
         this.#eventBus.sendStop();
       } else if (this.#eventBus.isStarting()) {
