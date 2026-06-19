@@ -241,13 +241,13 @@ createStatefulOperator(subscribeFn) — Stateful operators (distinctUntilChanged
 | Event            | Action                       |
 | ---------------- | ---------------------------- |
 | Notifier emits   | Complete + unsubscribe both  |
-| Notifier errors  | Error + unsubscribe source   |
+| Notifier errors  | Error + unsubscribe both     |
 | Source emits     | Forward to observer          |
 | Source errors    | Error + unsubscribe notifier |
 | Source completes | Complete + unsubscribe both  |
 | Unsubscribe      | Unsubscribe both             |
 
-**Subscription order:** Notifier subscribes first (handles synchronous emission), then source. Early return if notifier completes/errors synchronously before source subscription.
+**Subscription order:** Notifier subscribes first (handles synchronous emission), then source. Early return if notifier completes/errors synchronously before source subscription — the now-assigned notifier subscription is unsubscribed on that early return so it never dangles (#773).
 
 ## Error Isolation
 
