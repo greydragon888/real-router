@@ -36,3 +36,44 @@ export const makeState = (
 
   return state;
 };
+
+/**
+ * Runs `action` (a fire-and-forget navigation that returns a promise the
+ * caller intentionally does NOT await) and returns every process-level
+ * `unhandledRejection` it leaked.
+ *
+ * Ambient `unhandledRejection` listeners (e.g. vitest's, which would fail the
+ * whole run) are detached for the duration so a leak surfaces as a returned
+ * array entry, then restored. Used to assert the "fire-and-forget safety"
+ * invariant: navigation methods called without `await` must internally
+ * suppress expected rejections (#721).
+ */
+export async function captureUnhandledRejections(
+  action: () => void,
+): Promise<unknown[]> {
+  const captured: unknown[] = [];
+  const previous = process.listeners("unhandledRejection");
+
+  process.removeAllListeners("unhandledRejection");
+
+  const handler = (reason: unknown): void => {
+    captured.push(reason);
+  };
+
+  process.on("unhandledRejection", handler);
+
+  try {
+    action();
+    // `unhandledRejection` fires only after the microtask queue settles; one
+    // macrotask tick reliably flushes it before we read `captured`.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  } finally {
+    process.off("unhandledRejection", handler);
+
+    for (const listener of previous) {
+      process.on("unhandledRejection", listener);
+    }
+  }
+
+  return captured;
+}

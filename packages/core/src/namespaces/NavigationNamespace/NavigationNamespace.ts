@@ -159,8 +159,13 @@ export class NavigationNamespace {
       });
 
       deps.emitTransitionError(undefined, deps.getState(), err);
-      this.lastSyncRejected = true;
 
+      // This is a FRESH reject (carries `routeName`), not one of the
+      // pre-suppressed CACHED_*_REJECTION singletons. `lastSyncRejected`
+      // contractually means "I returned a pre-suppressed cached rejection —
+      // skip your .catch()", so leaving it unset lets the facade attach its
+      // own suppression. Setting it here leaked an unhandledRejection on
+      // fire-and-forget calls (#721).
       return Promise.reject(err);
     }
 
@@ -181,6 +186,13 @@ export class NavigationNamespace {
   }
 
   navigateToDefault(opts: NavigationOptions): Promise<State> {
+    // Reset the sync-resolution flag on entry, mirroring navigate() and
+    // navigateToState(). start() leaves `lastSyncResolved = true`, and the
+    // early reject paths below return before delegating to navigate(), so a
+    // stale `true` would make the facade take the "already resolved" branch
+    // and skip .catch() suppression — leaking an unhandledRejection on
+    // fire-and-forget calls (#721).
+    this.lastSyncResolved = false;
     const deps = this.#deps;
     const options = deps.getOptions();
 
