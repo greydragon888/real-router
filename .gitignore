@@ -68,7 +68,6 @@ packages/**/.eslintcache
 .angular
 
 # AI / tooling
-**/CLAUDE.md
 .claude
 .sisyphus
 

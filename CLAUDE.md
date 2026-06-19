@@ -29,6 +29,27 @@ shared/
 
 `packages/angular/src/dom-utils` is **not** a symlink — it is a git-tracked copy, re-materialized from `shared/dom-utils/` by the `prebundle` npm script before every build (ng-packagr does not follow symlinks the same way tsdown does). **When editing `shared/dom-utils/*.ts`, also update `packages/angular/src/dom-utils/*.ts`** — or run `pnpm -F @real-router/angular bundle` to sync the copy. Verify with `readlink packages/angular/src/dom-utils`; returns empty.
 
+## Toolchain Versions
+
+`major.minor` of the key tooling/runtime, kept in context so suggested APIs, flags and config formats match what's actually installed (this stack is bleeding-edge — TS 6, ESLint 10 flat-config, Vitest 4, Turbo 2 — so defaults from training tend to lag). **When a version changes, or you notice a mismatch with the "source of truth" column, update this table.** `major.minor` only — patch drift is noise.
+
+| Tool / runtime  | Version | Source of truth (actualize from here)                                      |
+| --------------- | ------- | -------------------------------------------------------------------------- |
+| Node.js         | 24.16   | CI pins major `24` (`.github/workflows/*`); no `engines`/`.nvmrc`, minor floats |
+| npm             | 11.6    | bundled with Node 24; used for **publishing** (`changeset publish` → npm OIDC Trusted Publishing in `changesets.yml`; manual `npm publish` for a new package's first release). Installs/builds are pnpm, not npm |
+| pnpm            | 10.33   | `packageManager` field, root `package.json`                                |
+| TypeScript      | 6.0     | root `devDependencies` (pinned exact, `save-exact`)                         |
+| Vitest          | 4.1     | root `devDependencies`                                                      |
+| tsdown          | 0.22    | root `devDependencies`                                                      |
+| Turbo           | 2.9     | root `devDependencies`                                                      |
+| ESLint          | 10.5    | root `devDependencies` (flat config)                                        |
+| @changesets/cli | 2.31    | root `devDependencies`                                                      |
+| Prettier        | 3.8     | root `devDependencies`                                                      |
+| husky           | 9.1     | root `devDependencies` (v9 config format — `.husky/*` are plain scripts)    |
+| fast-check      | 4.8     | root `devDependencies` (property tests)                                     |
+| OS              | dev: macOS (Darwin 26.x) · CI: Ubuntu (Linux) | local `uname` / `runs-on` in workflows         |
+| bash            | dev: **3.2** (macOS) · CI: 5.x (Ubuntu) | scripts must target the **3.2 lower bound** — no associative arrays, no `${v^^}`, no `mapfile` |
+
 ## Rules
 
 - **NEVER** push without explicit user request
