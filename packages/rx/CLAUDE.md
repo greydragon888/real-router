@@ -67,6 +67,10 @@ Event listeners are registered one by one inside a try block. If any `addEventLi
 
 Pass `{ signal }` in subscribe options. If already aborted, returns immediately with `{ closed: true }`. Otherwise adds an abort listener that calls `unsubscribe()`.
 
+### Terminal teardown runs on `complete()`, not just `unsubscribe()`
+
+When a stream completes, the subscription's teardown runs and the abort listener is removed via a shared `finalize()` — so a self-completing source (intervals, DOM listeners, finite producers) releases its resource. `unsubscribe()` after `complete()` is a no-op because teardown already ran (exactly once). A **synchronous** `complete()` inside the subscribe function fires `finalize()` before `teardown` is assigned, so a post-subscribe `if (closed) finalize()` runs it once the subscribe function has returned. `error` is intentionally **non-terminal** (does not set `closed`, does not finalize) — resources release on the consumer's `unsubscribe()`. (#772)
+
 ### `pipe()` with zero operators returns `this`
 
 Calling `.pipe()` without arguments returns the observable itself (identity).

@@ -41,6 +41,27 @@ export class RxObservable<T> {
     // eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- matches SubscribeFn return type
     let teardown: void | (() => void);
 
+    // Release the subscription's resources (abort listener + teardown). Runs on
+    // every terminal path — unsubscribe AND complete — so a self-completing
+    // source still releases its resource. `teardown` is undefined until
+    // subscribeFn returns, so a synchronous complete() fires finalize() before
+    // teardown exists; the post-subscribe `if (closed) finalize()` re-runs it
+    // once teardown is assigned. teardown therefore executes at most once, and
+    // removeEventListener is idempotent, so the double call is harmless.
+    const finalize = () => {
+      if (abortHandler) {
+        signal?.removeEventListener("abort", abortHandler);
+      }
+
+      if (teardown) {
+        try {
+          teardown();
+        } catch {
+          // Teardown errors are caught silently
+        }
+      }
+    };
+
     const safeNext = (value: T) => {
       if (closed) {
         return;
@@ -81,6 +102,8 @@ export class RxObservable<T> {
       } catch {
         // Errors in complete handler are caught silently
       }
+
+      finalize();
     };
 
     const subscription: Subscription = {
@@ -91,17 +114,7 @@ export class RxObservable<T> {
 
         closed = true;
 
-        if (abortHandler) {
-          signal?.removeEventListener("abort", abortHandler);
-        }
-
-        if (teardown) {
-          try {
-            teardown();
-          } catch {
-            // Teardown errors are caught silently
-          }
-        }
+        finalize();
       },
       get closed() {
         return closed;
@@ -125,6 +138,14 @@ export class RxObservable<T> {
       });
     } catch (error) {
       safeError(error);
+    }
+
+    // A synchronous complete() inside subscribeFn ran finalize() before
+    // `teardown` was assigned above — run it now that the teardown exists. Read
+    // via the getter: TS control-flow analysis can't see the closure mutation of
+    // `closed`, so a bare `if (closed)` is flagged as always-false.
+    if (subscription.closed) {
+      finalize();
     }
 
     return subscription;

@@ -70,22 +70,29 @@ subscribe(observerOrNext, options?)
            │
            ▼
 ┌───────────────────────┐
-│  Create safe wrappers │  safeNext, safeError, safeComplete
+│  Create safe wrappers │  safeNext, safeError, safeComplete, finalize
 │  (closed-guard +      │  - safeNext: try { next(value) } catch → safeError
-│   try/catch each)     │  - safeError: try { error(err) } catch → silent
-│                       │  - safeComplete: set closed, try { complete() } catch → silent
+│   try/catch each)     │  - safeError: try { error(err) } catch → silent (non-terminal)
+│                       │  - safeComplete: set closed, try { complete() } catch → silent, finalize()
+│                       │  - finalize: removeEventListener("abort") + teardown() (once)
 └──────────┬────────────┘
            │
            ▼
 ┌──────────────────────┐
 │  Wire AbortSignal    │  signal.addEventListener("abort", unsubscribe)
-│  (if provided)       │  Cleaned up on unsubscribe
+│  (if provided)       │  Cleaned up by finalize() — on unsubscribe OR complete
 └──────────┬───────────┘
            │
            ▼
 ┌──────────────────────┐
 │  Call #subscribeFn   │  teardown = subscribeFn({ next, error, complete })
 │  (may throw → error) │  Errors caught → safeError
+└──────────┬───────────┘
+           │
+           ▼
+┌──────────────────────┐
+│  if (closed)         │  sync complete() inside subscribeFn ran finalize()
+│    finalize()        │  before teardown existed — run it now (#772)
 └──────────┬───────────┘
            │
            ▼
@@ -99,6 +106,8 @@ subscribe(observerOrNext, options?)
 - Error in `complete` callback → caught silently
 - Error in teardown → caught silently
 - No `error` callback → `console.error("Unhandled error in RxObservable:", err)`
+
+**Terminal teardown (#772):** teardown and abort-listener removal run via a shared `finalize()` on **every** terminal path — `unsubscribe()` AND `complete()` — so a self-completing source still releases its resource (`unsubscribe()` after `complete()` is a no-op). `finalize()` runs teardown at most once; a synchronous `complete()` inside the subscribe function defers it to the post-subscribe `if (closed) finalize()`. `error` is intentionally **non-terminal** (does not set `closed`, does not finalize) — resources release on the consumer's `unsubscribe()`.
 
 ### pipe() — Operator Composition
 
