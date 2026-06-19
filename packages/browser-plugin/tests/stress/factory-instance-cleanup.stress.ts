@@ -11,7 +11,12 @@ import {
 
 import { browserPluginFactory } from "@real-router/browser-plugin";
 
-import { noop, routeConfig, expectedStressError } from "./helpers";
+import {
+  noop,
+  routeConfig,
+  expectedStressError,
+  waitForTransitions,
+} from "./helpers";
 import { createSafeBrowser } from "../../src/browser-env";
 
 import type { Browser } from "../../src/browser-env";
@@ -109,5 +114,92 @@ describe("B7.4 — factory pool: 100 routers, all disposed", () => {
       addSpy.mockRestore();
       removeSpy.mockRestore();
     }
+  });
+});
+
+/**
+ * B7.5 — Factory pool: concurrently-live routers (last-wins popstate)
+ *
+ * `SharedFactoryState` is allocated once per `browserPluginFactory(...)` call
+ * and shared across every router that consumes that factory. Each `onStart`
+ * removes the previous instance's popstate listener before installing its own
+ * — so when two routers from the same factory are live **at the same time**,
+ * only the LAST-started one tracks `popstate`; the earlier one silently
+ * desyncs from the URL.
+ *
+ * This is documented design (the factory-pool pattern assumes routers are
+ * created/destroyed sequentially). B7.4 above only asserts net-zero listeners
+ * — it never checks *which* router a popstate reaches. This test locks the
+ * last-wins contract so a regression where the expected (last) router stops
+ * tracking would be caught (#758).
+ */
+describe("B7.5 — factory pool: only the last concurrently-live router tracks popstate", () => {
+  beforeAll(() => {
+    vi.spyOn(console, "warn").mockImplementation(noop);
+    vi.spyOn(console, "error").mockImplementation(noop);
+  });
+
+  beforeEach(() => {
+    globalThis.history.replaceState({}, "", "/");
+  });
+
+  afterAll(() => {
+    (console.warn as unknown as { mockRestore?: () => void }).mockRestore?.();
+    (console.error as unknown as { mockRestore?: () => void }).mockRestore?.();
+  });
+
+  it("routes a popstate to the last-started router; the earlier one does not react", async () => {
+    const safeBrowser = createSafeBrowser(
+      () => globalThis.location.pathname + globalThis.location.search,
+      "browser-plugin-pool",
+    );
+    const browser: Browser = {
+      ...safeBrowser,
+      pushState: (state: unknown, url: string) => {
+        safeBrowser.pushState(state, url);
+      },
+      replaceState: (state: unknown, url: string) => {
+        safeBrowser.replaceState(state, url);
+      },
+    };
+
+    const factory = browserPluginFactory({}, browser);
+
+    const r1 = createRouter(routeConfig, {
+      defaultRoute: "home",
+      allowNotFound: true,
+    });
+    const r2 = createRouter(routeConfig, {
+      defaultRoute: "home",
+      allowNotFound: true,
+    });
+    const unsub1 = r1.usePlugin(factory);
+    const unsub2 = r2.usePlugin(factory);
+
+    await r1.start();
+    // r2.start() removes r1's popstate listener and installs its own (last-wins).
+    await r2.start();
+
+    // Browser sits on a back/forward entry for /users/view/5.
+    const entry = {
+      name: "users.view",
+      params: { id: "5" },
+      path: "/users/view/5",
+    };
+
+    globalThis.history.replaceState(entry, "", "/users/view/5");
+    globalThis.dispatchEvent(new PopStateEvent("popstate", { state: entry }));
+
+    await waitForTransitions();
+
+    // Only the last-started router reacts; the earlier one silently desyncs.
+    expect(r2.getState()?.name).toBe("users.view");
+    expect(r2.getState()?.params).toMatchObject({ id: "5" });
+    expect(r1.getState()?.name).toBe("index");
+
+    unsub1();
+    r1.stop();
+    unsub2();
+    r2.stop();
   });
 });

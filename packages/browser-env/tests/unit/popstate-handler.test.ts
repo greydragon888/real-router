@@ -355,6 +355,61 @@ describe("popstate handler", () => {
         TRANSITION_OPTIONS,
       );
     });
+
+    it("resolves a deferred null-state event against the location captured at defer time, not the overwritten live location (#757)", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      router.stop();
+      router = createRouter([
+        { name: "home", path: "/" },
+        { name: "users", path: "/users/:id" },
+      ]);
+      await router.start("/");
+
+      const deps = makeDeps({ allowNotFound: true });
+
+      // Mutable live location — mirrors how a real browser's getLocation()
+      // reflects the most recent history mutation.
+      let liveLocation = "/users/1";
+
+      deps.browser.getLocation = () => liveLocation;
+
+      let releaseFirst!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        releaseFirst = resolve;
+      });
+
+      deps.api.navigateToState
+        .mockImplementationOnce(async () => {
+          await gate;
+
+          return router.getState()!;
+        })
+        .mockResolvedValue(router.getState()!);
+
+      const handler = createPopstateHandler(deps);
+
+      // Event #1: null state @ /users/1 → in-flight nav (gated).
+      handler(makePopStateEvent(null));
+      // Event #2: null state @ /users/2 arrives mid-transition → deferred.
+      liveLocation = "/users/2";
+      handler(makePopStateEvent(null));
+
+      // The in-flight nav's onTransitionSuccess → replaceState overwrites the
+      // live location back to /users/1 before the deferred event is processed.
+      liveLocation = "/users/1";
+      releaseFirst();
+      await flushAsync();
+
+      // The deferred event was captured @ /users/2 — it must resolve there,
+      // not against the overwritten /users/1 the completed nav left behind.
+      expect(deps.api.navigateToState).toHaveBeenLastCalledWith(
+        expect.objectContaining({ name: "users", params: { id: "2" } }),
+        TRANSITION_OPTIONS,
+      );
+
+      warnSpy.mockRestore();
+    });
   });
 
   describe("createPopstateLifecycle", () => {

@@ -360,6 +360,53 @@ describe("Browser Plugin — Popstate", () => {
         name: "users.list",
       });
     });
+
+    it("resolves a deferred null-state event against the URL captured at defer time, not the in-flight nav's overwritten location (#757)", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(noop);
+
+      // Gate the in-flight nav (users.view) until we release it; the deferred
+      // target (users.list) is unguarded, so it settles in a single tick.
+      let releaseGuard!: () => void;
+      const guardGate = new Promise<boolean>((resolve) => {
+        releaseGuard = () => {
+          resolve(true);
+        };
+      });
+
+      getLifecycleApi(router).addActivateGuard(
+        "users.view",
+        () => () => guardGate,
+      );
+
+      // Event #1: typed-URL back entry (null history.state) to /users/view/1.
+      // Resolves via the matchPath fallback; nav goes in flight behind guard.
+      globalThis.history.replaceState({}, "", "/users/view/1");
+      globalThis.dispatchEvent(new PopStateEvent("popstate", { state: null }));
+
+      // Event #2: another null-state entry to /users/list arrives mid-
+      // transition → deferred. The browser now sits at /users/list.
+      globalThis.history.replaceState({}, "", "/users/list");
+      globalThis.dispatchEvent(new PopStateEvent("popstate", { state: null }));
+
+      // The second event must have been deferred behind the in-flight nav.
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Transition in progress"),
+      );
+
+      // Release the in-flight nav. Its onTransitionSuccess → replaceState
+      // rewrites location back to /users/view/1 BEFORE the deferred event is
+      // processed — the exact overwrite that desynced the fallback.
+      releaseGuard();
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      // The deferred event targeted /users/list — it must win, not the
+      // /users/view/1 the completed in-flight nav left in location.
+      expect(router.getState()?.name).toBe("users.list");
+      expect(mockedBrowser.getLocation()).toBe("/users/list");
+
+      warnSpy.mockRestore();
+    });
   });
 
   describe("Error Recovery", () => {

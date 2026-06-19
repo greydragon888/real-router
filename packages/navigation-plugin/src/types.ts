@@ -45,7 +45,17 @@ export interface NavigationBrowser {
 
 /**
  * Shared mutable state across plugin instances created by the same factory.
- * Enables cleanup of a previous instance's navigate listener when the factory is reused.
+ * Enables cleanup of a previous instance's navigate listener when the factory
+ * is reused.
+ *
+ * Factory-pool caveat — last-wins (#758): because this slot is shared — and
+ * there is a single global `window.navigation` — each `onStart` removes the
+ * previous instance's navigate listener before installing its own. The pattern
+ * is built for a pool where routers are created/destroyed **sequentially**. If
+ * two routers from the same factory are live **at the same time**, only the
+ * LAST-started one receives `navigate` events; the earlier one silently
+ * desyncs. For multiple concurrently-live routers, give each its own factory
+ * instance.
  */
 export interface NavigationSharedState {
   removeNavigateListener: (() => void) | undefined;

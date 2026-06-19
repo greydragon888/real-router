@@ -284,6 +284,8 @@ Each new plugin instance registers its own popstate listener in `onStart`. Witho
 
 `shared` is intentionally mutable. It's the only shared state between instances of the same factory.
 
+**Factory pool — last-wins (concurrent-live caveat, #758).** Because the single `removePopStateListener` slot is shared, each `onStart` removes the previous instance's listener before installing its own. The pattern is built for a pool where routers are created/destroyed **sequentially** (one live router at a time). If two routers from the same factory are live **at the same time** on one window, only the **last-started** one tracks `popstate` — the earlier one silently desyncs from the URL. There is a single `popstate` stream and a single URL, so this mutual exclusivity is inherent. For genuinely concurrent routers, give each its own factory instance. Locked by `tests/stress/plugin-lifecycle-churn.stress.ts`.
+
 ## Data Flow: Navigation
 
 ```
@@ -319,23 +321,25 @@ User clicks back or forward
         ▼
   browser.addPopstateListener → handler(evt)  (from createPopstateHandler)
         │
+        ├── location = browser.getLocation()   (snapshot at fire time, #757)
+        │
         ├── isTransitioning === true?
-        │     YES: deferredPopstateEvent = evt  (last-write-wins)
+        │     YES: deferred = { evt, location }  (last-write-wins)
         │          return
         │
         ├── isTransitioning = true
         │
-        ├── getRouteFromEvent(evt, api, browser)
+        ├── getRouteFromEvent(evt, api, location)
         │     │
         │     ├── isState(evt.state)?
         │     │     YES: { name: evt.state.name, params: evt.state.params }
         │     │
-        │     └── NO: api.matchPath(browser.getLocation())
+        │     └── NO: api.matchPath(location)
         │               └── Hash URL matching as fallback
         │
         ├── route found?
         │     YES: await router.navigate(route.name, route.params, transitionOptions)
-        │     NO + allowNotFound: router.navigateToNotFound(browser.getLocation())
+        │     NO + allowNotFound: router.navigateToNotFound(location)
         │     NO + !allowNotFound: api.emitTransitionError(ROUTE_NOT_FOUND) + rollbackUrlToCurrentState()
         │                          (no silent navigateToDefault — see #483)
         │
@@ -354,8 +358,9 @@ User clicks back or forward
 Rapid back/forward clicks generate multiple popstate events in quick succession. Processing each one is pointless — only the final state matters.
 
 The `isTransitioning` flag blocks concurrent processing.
-New events are written to `deferredPopstateEvent` — each one overwrites the previous (last-write-wins).
-After the current transition completes, `processDeferredEvent()` processes the last deferred event.
+New events are written to the single-slot `deferred = { evt, location }` queue — each one overwrites the previous (last-write-wins).
+The `location` is snapshotted when the event fires, not when it is replayed: the in-flight navigation's `onTransitionSuccess → replaceState` overwrites the live hash location before `processDeferredEvent()` runs, so re-reading it then would resolve the wrong target (#757).
+After the current transition completes, `processDeferredEvent()` processes the last deferred event against its snapshotted location.
 
 See [browser-env/ARCHITECTURE.md](../browser-env/ARCHITECTURE.md) for implementation details.
 

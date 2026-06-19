@@ -77,17 +77,21 @@ export function createPopstateHandler(
   deps: PopstateHandlerDeps,
 ): (evt: PopStateEvent) => void {
   let isTransitioning = false;
-  let deferredEvent: PopStateEvent | null = null;
+  // Snapshot the route location alongside the event: a deferred popstate is
+  // replayed only after the in-flight navigation's onTransitionSuccess →
+  // replaceState has overwritten the live location, so re-reading it at
+  // replay time would resolve the wrong target (#757).
+  let deferred: { evt: PopStateEvent; location: string } | null = null;
 
   function processDeferredEvent(): void {
-    if (deferredEvent) {
-      const evt = deferredEvent;
+    if (deferred) {
+      const { evt, location } = deferred;
 
-      deferredEvent = null;
+      deferred = null;
       console.warn(
         `[${deps.loggerContext}] Processing deferred popstate event`,
       );
-      void onPopState(evt);
+      void onPopState(evt, location);
     }
   }
 
@@ -129,12 +133,15 @@ export function createPopstateHandler(
     }
   }
 
-  async function onPopState(evt: PopStateEvent): Promise<void> {
+  async function onPopState(
+    evt: PopStateEvent,
+    location: string,
+  ): Promise<void> {
     if (isTransitioning) {
       console.warn(
         `[${deps.loggerContext}] Transition in progress, deferring popstate event`,
       );
-      deferredEvent = evt;
+      deferred = { evt, location };
 
       return;
     }
@@ -142,7 +149,7 @@ export function createPopstateHandler(
     isTransitioning = true;
 
     try {
-      const matched = getRouteFromEvent(evt, deps.api, deps.browser);
+      const matched = getRouteFromEvent(evt, deps.api, location);
 
       if (matched) {
         // api.navigateToState — plugin-only entry point. Preserves
@@ -154,12 +161,12 @@ export function createPopstateHandler(
           ...resolveHashOptions(deps, matched.path),
         });
       } else if (deps.allowNotFound) {
-        deps.router.navigateToNotFound(deps.browser.getLocation());
+        deps.router.navigateToNotFound(location);
       } else {
         // Strict mode — unmatched URL is an error. Emit $$error and sync URL
         // back to the current router state (no silent fallback to defaultRoute).
         const err = new RouterError(errorCodes.ROUTE_NOT_FOUND, {
-          path: deps.browser.getLocation(),
+          path: location,
         });
 
         deps.api.emitTransitionError(err);
@@ -184,7 +191,10 @@ export function createPopstateHandler(
     }
   }
 
-  return (evt: PopStateEvent) => void onPopState(evt);
+  // Snapshot the location the instant the event fires — before any in-flight
+  // navigation can overwrite it via replaceState (#757).
+  return (evt: PopStateEvent) =>
+    void onPopState(evt, deps.browser.getLocation());
 }
 
 export interface PopstateLifecycleDeps {
