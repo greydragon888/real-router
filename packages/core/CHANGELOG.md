@@ -1,5 +1,22 @@
 # @real-router/core
 
+## 0.58.1
+
+### Patch Changes
+
+- [#866](https://github.com/greydragon888/real-router/pull/866) [`3f9d3cf`](https://github.com/greydragon888/real-router/commit/3f9d3cfcc54cfecc543d6ed2c2378e1088fabde8) Thanks [@greydragon888](https://github.com/greydragon888)! - Suppress spurious "Unexpected navigation error" logs for guard-blocked fire-and-forget navigation ([#721](https://github.com/greydragon888/real-router/issues/721))
+
+  Add `CANNOT_ACTIVATE` / `CANNOT_DEACTIVATE` to the fire-and-forget unhandled-rejection safety net's suppressed-error set. A guard returning `false` — or a plugin's guard-blocked `back()` / `forward()` routed through `navigateToState()` — is an expected navigation outcome, not an internal bug, yet such fire-and-forget calls previously emitted a misleading `logger.error("router.navigate", "Unexpected navigation error", …)`. Awaiting callers and `onTransitionError` plugins still receive the rejection.
+
+- [#866](https://github.com/greydragon888/real-router/pull/866) [`3f9d3cf`](https://github.com/greydragon888/real-router/commit/3f9d3cfcc54cfecc543d6ed2c2378e1088fabde8) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix fire-and-forget unhandled rejection on `navigateToState()` and `navigateToDefault()` ([#721](https://github.com/greydragon888/real-router/issues/721))
+
+  Restore the documented fire-and-forget safety invariant for two navigation entry points that leaked an `unhandledRejection` when the returned promise was not awaited:
+
+  - `getPluginApi(router).navigateToState(state)` with a route no longer in the tree — the fresh `ROUTE_NOT_FOUND` rejection wrongly set the "skip suppression" flag reserved for pre-suppressed cached rejections, so the facade never attached its `.catch()`.
+  - `router.navigateToDefault()` with no `defaultRoute`, called after `router.start()` — the method did not reset the sync-resolution flag on entry, so it read the stale `true` left by `start()` and took the "already resolved" branch, skipping suppression.
+
+  Awaiting callers are unaffected: the rejection is still observable via `await`/`.catch()`.
+
 ## 0.58.0
 
 ### Minor Changes
