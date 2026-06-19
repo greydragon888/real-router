@@ -536,6 +536,41 @@ describe("Memory plugin", () => {
       expect(router.getState()?.name).toBe("users");
     });
 
+    it("should record a synchronous navigate() fired in the same tick as back() as a fresh push (#807)", async () => {
+      router.usePlugin(memoryPluginFactory());
+      await router.start("/");
+
+      await router.navigate("users");
+      await router.navigate("settings");
+
+      // History: [home, users, settings], index=2.
+      // back() commits synchronously (optimistic-sync) and only resets the
+      // #navigatingFromHistory flag in a later microtask. A navigate() fired
+      // in the SAME tick must still be recorded as a fresh push — it must not
+      // be swallowed by the stale history-restore flag.
+      router.back(); // → users (index 1), flag set true
+      await router.navigate("user", { id: "1" }); // same tick: must push, not restore
+
+      // The push landed and truncated the forward leg: history is
+      // [home, users, user] at index 2, recorded as a normal "navigate".
+      expect(router.getState()?.name).toBe("user");
+      expect(router.getState()?.context.memory).toStrictEqual({
+        direction: "navigate",
+        historyIndex: 2,
+      });
+      // No phantom forward entry left over from the cancelled back().
+      expect(router.canGoForward()).toBe(false);
+      expect(router.canGoBack()).toBe(true);
+
+      // Entry ↔ state consistency: back() from the recorded push lands on
+      // "users" (the truncated forward "settings" is gone).
+      await waitForHistoryNavigation(router, () => {
+        router.back();
+      });
+
+      expect(router.getState()?.name).toBe("users");
+    });
+
     it("should handle replace as first navigation after start", async () => {
       router.usePlugin(memoryPluginFactory());
       await router.start("/");

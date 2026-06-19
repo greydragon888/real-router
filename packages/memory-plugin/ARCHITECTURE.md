@@ -31,12 +31,13 @@ graph LR
 
     subgraph plugin [Plugin Instance]
         OTS["onTransitionSuccess"] --> PUSH[push / replace entry]
+        OTS --> CONSUME["consume #navigatingFromHistory on commit (history replay)"]
         OS["onStop"] --> CLEAR[clear entries]
         TD["teardown"] --> RM[removeExtensions + clear]
         GO["#go(delta)"] --> IDXSYNC["#index = targetIndex (optimistic)"]
         IDXSYNC --> NAV["router.navigate()"]
-        NAV --> CATCH[".catch() → revert #index if generation matches"]
-        NAV --> FIN[".finally() → reset flag if generation matches"]
+        NAV -->|commit| OTS
+        NAV --> CATCH[".catch() → revert #index + reset flag if generation matches"]
     end
 ```
 
@@ -55,7 +56,8 @@ Forward navigation: navigate("users", { id: "1" })
     onTransitionSuccess(toState, fromState, opts)
     │
     ├── #navigatingFromHistory === true?
-    │   └── YES → return (skip recording — this is a back/forward replay)
+    │   └── YES → #navigatingFromHistory = false (consume on commit),
+    │             rewrite context, return (skip recording — back/forward replay)
     │
     ├── opts.replace === true AND #index >= 0?
     │   └── YES → #entries[#index] = entry  (overwrite current)
@@ -89,11 +91,12 @@ back() / forward() / go(delta)
         ├── #index = targetIndex  (optimistic sync update)
         │
         └── router.navigate(entry.name, entry.params, { replace: true })
-            ├── .catch()   → if (generation === #goGeneration) #index = previousIndex
-            └── .finally() → if (generation === #goGeneration) #navigatingFromHistory = false
+            ├── SUCCESS → onTransitionSuccess consumes #navigatingFromHistory on commit
+            └── .catch()  → if (generation === #goGeneration)
+                               #index = previousIndex; #navigatingFromHistory = false
 ```
 
-The `navigatingFromHistory` flag prevents `onTransitionSuccess` from recording the replayed navigation as a new history entry. The `#goGeneration` guard ensures that only the latest in-flight `#go` call can revert the index or clear the flag — older superseded calls no-op on settle.
+The `navigatingFromHistory` flag prevents `onTransitionSuccess` from recording the replayed navigation as a new history entry. It is consumed the moment the restore commit is observed inside `onTransitionSuccess` — **not** in a later microtask — so a `navigate()` issued in the same tick as `back()`/`forward()`/`go()` is still recorded as a fresh push ([#807](https://github.com/greydragon888/real-router/issues/807)). A guard-blocked or rejected replay never reaches `onTransitionSuccess`, so the `.catch()` handler clears the flag and reverts the optimistic index instead; the `#goGeneration` guard ensures only the latest in-flight `#go` call can do so — older superseded calls no-op on settle.
 
 ## Data Flow
 
@@ -124,9 +127,9 @@ router.back()
     │
     router.navigate(entry.name, entry.params, { replace: true })
     │
-    ├── SUCCESS → .finally() → if (generation === #goGeneration) #navigatingFromHistory = false
-    └── BLOCKED → .catch()   → if (generation === #goGeneration) #index = previousIndex
-                  .finally() → if (generation === #goGeneration) #navigatingFromHistory = false
+    ├── SUCCESS → onTransitionSuccess → #navigatingFromHistory = false (consume on commit)
+    └── BLOCKED → .catch() → if (generation === #goGeneration)
+                                #index = previousIndex; #navigatingFromHistory = false
 ```
 
 ### Guard blocks back navigation
@@ -141,8 +144,8 @@ router.back()
     │
     CANNOT_ACTIVATE (guard returns false)
     │
-    .catch()   → #index = previousIndex (revert)
-    .finally() → #navigatingFromHistory = false
+    .catch() → #index = previousIndex (revert), #navigatingFromHistory = false
+    (onTransitionSuccess never fired, so the flag is cleared here)
 
 canGoBack() reflects the reverted position
 ```
