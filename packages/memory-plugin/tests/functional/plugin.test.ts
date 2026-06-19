@@ -430,6 +430,56 @@ describe("Memory plugin", () => {
     expect(stateBefore.context.memory?.historyIndex).toBe(1);
   });
 
+  it("does not emit a transition on a same-path short-circuit back() — subscribers are not notified, only context.memory is rewritten (#808)", async () => {
+    router.usePlugin(memoryPluginFactory());
+    await router.start("/");
+
+    await router.navigate("users");
+    await router.navigate("home", {}, { replace: true });
+
+    // History: [home, home], index=1. Both entries have path "/".
+    const stateBefore = router.getState()!;
+
+    let notifications = 0;
+    const unsub = router.subscribe(() => {
+      notifications++;
+    });
+
+    router.back(); // short-circuit: index 1 → 0, no navigateToState, no emission
+
+    // A short-circuit move is metadata-only (the visible route is unchanged), so
+    // it emits no transition: router.subscribe listeners — and adapters keyed on
+    // TRANSITION_SUCCESS — are NOT notified.
+    expect(notifications).toBe(0);
+    // ...but context.memory is still rewritten in place, so a synchronous read
+    // reflects the new direction/historyIndex (the real value of #508).
+    expect(router.getState()).toBe(stateBefore);
+    expect(stateBefore.context.memory).toStrictEqual({
+      direction: "back",
+      historyIndex: 0,
+    });
+
+    unsub();
+
+    // Discriminating control: a back() to a DIFFERENT path is a full transition
+    // and DOES notify exactly once.
+    await router.navigate("users"); // [home, users], index=1
+    await router.navigate("home"); //  [home, users, home], index=2
+
+    let fullNavNotifications = 0;
+    const unsubFull = router.subscribe(() => {
+      fullNavNotifications++;
+    });
+
+    router.back(); // → users (path "/users" ≠ "/") → full transition
+    await settle();
+
+    expect(fullNavNotifications).toBe(1);
+    expect(router.getState()?.name).toBe("users");
+
+    unsubFull();
+  });
+
   it("should navigate back normally when target entry has a different path", async () => {
     router.usePlugin(memoryPluginFactory());
     await router.start("/");
