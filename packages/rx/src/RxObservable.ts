@@ -13,7 +13,7 @@ declare global {
 }
 
 export class RxObservable<T> {
-  #subscribeFn: SubscribeFn<T>;
+  readonly #subscribeFn: SubscribeFn<T>;
 
   constructor(subscribeFn: SubscribeFn<T>) {
     this.#subscribeFn = subscribeFn;
@@ -189,7 +189,7 @@ export class RxObservable<T> {
     op6: Operator<E, F>,
     op7: Operator<F, G>,
   ): RxObservable<G>;
-  pipe<A, B, C, D, E, F, G, H>(
+  pipe<A, B, C, D, E, F, G, H>( // NOSONAR -- typed pipe overload (RxJS shape, 1-9 operators); param count is the public API, not refactorable
     op1: Operator<T, A>,
     op2: Operator<A, B>,
     op3: Operator<B, C>,
@@ -199,7 +199,7 @@ export class RxObservable<T> {
     op7: Operator<F, G>,
     op8: Operator<G, H>,
   ): RxObservable<H>;
-  pipe<A, B, C, D, E, F, G, H, I>(
+  pipe<A, B, C, D, E, F, G, H, I>( // NOSONAR -- typed pipe overload (RxJS shape, 1-9 operators); param count is the public API, not refactorable
     op1: Operator<T, A>,
     op2: Operator<A, B>,
     op3: Operator<B, C>,
