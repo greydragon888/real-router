@@ -68,7 +68,11 @@ packages/**/.eslintcache
 .angular
 
 # AI / tooling
-.claude
+# Ignore all .claude dirs (root + per-package), but track root .claude/commands
+**/.claude/
+!/.claude/
+/.claude/*
+!/.claude/commands/
 .sisyphus
 
 # Logs & reports
