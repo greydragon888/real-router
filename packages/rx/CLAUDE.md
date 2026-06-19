@@ -53,7 +53,7 @@ src/
 
 ### `state$` replays current state by default
 
-`state$` emits the current router state via `queueMicrotask` on subscription when `replay: true` (default). Pass `{ replay: false }` to skip the initial emission.
+`state$` emits the current router state via `queueMicrotask` on subscription when `replay: true` (default). Pass `{ replay: false }` to skip the initial emission. A `sawEvent` guard suppresses the replay when a synchronous navigation fires `TRANSITION_SUCCESS` in the subscribe→microtask window (#771) — the live event already delivered a fresher snapshot, so the deferred replay must yield to it rather than emit the captured (now stale) state out of chronological order.
 
 ### `events$` uses partial registration safety
 

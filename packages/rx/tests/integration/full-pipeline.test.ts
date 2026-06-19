@@ -335,6 +335,25 @@ describe("@real-router/rx - Integration Tests", () => {
 
       expect(values).toStrictEqual(["home"]);
     });
+
+    it("should not deliver a stale replay after a synchronous navigation", async () => {
+      const seen: string[] = [];
+
+      await router.start("/");
+
+      state$(router).subscribe(({ route, previousRoute }) => {
+        seen.push(`${route.name}(prev:${previousRoute?.name ?? "-"})`);
+      });
+
+      // The optimistic-sync commit fires TRANSITION_SUCCESS synchronously,
+      // piercing the subscribe -> replay-microtask window. The fresh event must
+      // not be followed by the stale "home" replay (out-of-order rollback).
+      void router.navigate("about");
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(seen).toStrictEqual(["about(prev:home)"]);
+    });
   });
 
   describe("AbortSignal integration", () => {

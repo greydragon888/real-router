@@ -152,14 +152,17 @@ state$(router, options?)
   new RxObservable(observer => {
     │
     ├── api = getPluginApi(router)
-    ├── unsubscribe = api.addEventListener(TRANSITION_SUCCESS, (toState, fromState) =>
+    ├── sawEvent = false
+    ├── unsubscribe = api.addEventListener(TRANSITION_SUCCESS, (toState, fromState) => {
+    │       sawEvent = true
     │       observer.next({ route: toState, previousRoute: fromState })
-    │   )
+    │   })
     │
     ├── if replay (default: true) && router.getState() exists:
-    │       queueMicrotask(() =>
+    │       queueMicrotask(() => {
+    │           if (sawEvent) return   // a live event already delivered a fresher snapshot
     │           observer.next({ route: currentState, previousRoute: undefined })
-    │       )
+    │       })
     │
     └── return unsubscribe   // teardown
   })
@@ -167,7 +170,8 @@ state$(router, options?)
 
 - **Cold observable:** No work until `.subscribe()` is called
 - **Replay via microtask:** Initial state emitted asynchronously to ensure subscriber's `next` is wired
-- **Default `replay: true`** — always emits current state on subscribe
+- **Replay yields to live events (#771):** a synchronous navigation can fire `TRANSITION_SUCCESS` inside the subscribe→microtask window (core's optimistic-sync commit). The `sawEvent` guard suppresses the deferred replay in that case — the live event already delivered a fresher snapshot, so emitting the captured (now stale) state afterwards would deliver values out of chronological order
+- **Default `replay: true`** — emits current state on subscribe (unless a live event superseded it first, see above)
 
 ### events$() — Event Stream
 
