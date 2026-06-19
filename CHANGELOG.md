@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-06-19]
 
+### @real-router/memory-plugin@0.4.9
+
+### Patch Changes
+
+- [#869](https://github.com/greydragon888/real-router/pull/869) [`ba87793`](https://github.com/greydragon888/real-router/commit/ba8779348b56a83fc3e5a4dd071f8fe515d5c01a) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix a synchronous `navigate()` fired in the same tick as `back()` / `forward()` / `go()` corrupting the in-memory history stack ([#807](https://github.com/greydragon888/real-router/issues/807))
+
+  `back()` / `forward()` / `go()` set an internal `navigatingFromHistory` flag and reset it only in a `.then` microtask, but core commits the history-restore navigation **synchronously**. A `navigate()` issued in the same tick therefore observed the stale flag and was swallowed as a phantom history-restore: the new route was never pushed, `state.context.memory` kept the back/forward `direction` and the old `historyIndex`, and a phantom forward leg survived (`canGoForward()` stayed `true`, `forward()` jumped to a route that no longer matched the router state).
+
+  The flag is now consumed when the restore commit is observed (`onTransitionSuccess`), not in the later microtask, so a same-tick `navigate()` is recorded as a normal push. The fire-and-forget contract and `back()`/`forward()`/`go()` semantics are unchanged; the generation guard still reverts the optimistic index on a guard-blocked or superseded history navigation.
+
+
 ### @real-router/core@0.59.0
 
 ### Minor Changes
