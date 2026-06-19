@@ -7,6 +7,166 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-06-19]
 
+### @real-router/core@0.59.0
+
+### Minor Changes
+
+- [#867](https://github.com/greydragon888/real-router/pull/867) [`e3caf73`](https://github.com/greydragon888/real-router/commit/e3caf7398daf17a85fc652fd4209aa6c5acd6cc1) Thanks [@greydragon888](https://github.com/greydragon888)! - Keep the committed state when a `start` interceptor rejects after commit ([#763](https://github.com/greydragon888/real-router/issues/763))
+
+  A `start` interceptor that throws _after_ `next(path)` already committed the state and emitted `TRANSITION_SUCCESS` — the window where the SSR/RSC loader plugins run their loader — no longer rolls the router back to IDLE. Subscribers had already observed the success, so retracting it left a "phantom success": the event fired, then `getState()` went back to `undefined`.
+
+  - Post-commit interceptor rejection: the committed state stands, `isActive()` stays `true`, and the loader error surfaces only through the rejected `start()` promise (the "Loader errors propagate" contract is preserved).
+  - Pre-commit failures (route not found, a blocked activation guard, a sync interceptor throw before `next()`) are unchanged — the half-started FSM still unwinds to IDLE (two-phase start).
+
+  Breaking for code that relied on a rejected `start()` always leaving the router un-started: after a post-commit interceptor failure the router is now started, so a retry must `stop()` first (a second `start()` rejects with `ROUTER_ALREADY_STARTED`).
+
+### @real-router/angular@0.11.5
+
+### Patch Changes
+
+- Updated dependencies [[`e3caf73`](https://github.com/greydragon888/real-router/commit/e3caf7398daf17a85fc652fd4209aa6c5acd6cc1)]:
+  - @real-router/core@0.59.0
+  - @real-router/sources@0.8.8
+
+### @real-router/browser-plugin@0.17.9
+
+### Patch Changes
+
+- Updated dependencies [[`e3caf73`](https://github.com/greydragon888/real-router/commit/e3caf7398daf17a85fc652fd4209aa6c5acd6cc1)]:
+  - @real-router/core@0.59.0
+
+### @real-router/hash-plugin@0.7.8
+
+### Patch Changes
+
+- Updated dependencies [[`e3caf73`](https://github.com/greydragon888/real-router/commit/e3caf7398daf17a85fc652fd4209aa6c5acd6cc1)]:
+  - @real-router/core@0.59.0
+
+### @real-router/lifecycle-plugin@0.5.3
+
+### Patch Changes
+
+- Updated dependencies [[`e3caf73`](https://github.com/greydragon888/real-router/commit/e3caf7398daf17a85fc652fd4209aa6c5acd6cc1)]:
+  - @real-router/core@0.59.0
+
+### @real-router/logger-plugin@0.5.12
+
+### Patch Changes
+
+- Updated dependencies [[`e3caf73`](https://github.com/greydragon888/real-router/commit/e3caf7398daf17a85fc652fd4209aa6c5acd6cc1)]:
+  - @real-router/core@0.59.0
+
+### @real-router/memory-plugin@0.4.8
+
+### Patch Changes
+
+- Updated dependencies [[`e3caf73`](https://github.com/greydragon888/real-router/commit/e3caf7398daf17a85fc652fd4209aa6c5acd6cc1)]:
+  - @real-router/core@0.59.0
+
+### @real-router/navigation-plugin@0.7.10
+
+### Patch Changes
+
+- Updated dependencies [[`e3caf73`](https://github.com/greydragon888/real-router/commit/e3caf7398daf17a85fc652fd4209aa6c5acd6cc1)]:
+  - @real-router/core@0.59.0
+
+### @real-router/persistent-params-plugin@0.2.12
+
+### Patch Changes
+
+- Updated dependencies [[`e3caf73`](https://github.com/greydragon888/real-router/commit/e3caf7398daf17a85fc652fd4209aa6c5acd6cc1)]:
+  - @real-router/core@0.59.0
+
+### @real-router/preact@0.15.5
+
+### Patch Changes
+
+- Updated dependencies [[`e3caf73`](https://github.com/greydragon888/real-router/commit/e3caf7398daf17a85fc652fd4209aa6c5acd6cc1)]:
+  - @real-router/core@0.59.0
+  - @real-router/sources@0.8.8
+
+### @real-router/preload-plugin@0.5.3
+
+### Patch Changes
+
+- Updated dependencies [[`e3caf73`](https://github.com/greydragon888/real-router/commit/e3caf7398daf17a85fc652fd4209aa6c5acd6cc1)]:
+  - @real-router/core@0.59.0
+
+### @real-router/react@0.27.5
+
+### Patch Changes
+
+- Updated dependencies [[`e3caf73`](https://github.com/greydragon888/real-router/commit/e3caf7398daf17a85fc652fd4209aa6c5acd6cc1)]:
+  - @real-router/core@0.59.0
+  - @real-router/sources@0.8.8
+
+### @real-router/rsc-server-plugin@0.2.6
+
+### Patch Changes
+
+- Updated dependencies [[`e3caf73`](https://github.com/greydragon888/real-router/commit/e3caf7398daf17a85fc652fd4209aa6c5acd6cc1)]:
+  - @real-router/core@0.59.0
+
+### @real-router/rx@0.3.12
+
+### Patch Changes
+
+- Updated dependencies [[`e3caf73`](https://github.com/greydragon888/real-router/commit/e3caf7398daf17a85fc652fd4209aa6c5acd6cc1)]:
+  - @real-router/core@0.59.0
+
+### @real-router/search-schema-plugin@0.3.3
+
+### Patch Changes
+
+- Updated dependencies [[`e3caf73`](https://github.com/greydragon888/real-router/commit/e3caf7398daf17a85fc652fd4209aa6c5acd6cc1)]:
+  - @real-router/core@0.59.0
+
+### @real-router/solid@0.14.5
+
+### Patch Changes
+
+- Updated dependencies [[`e3caf73`](https://github.com/greydragon888/real-router/commit/e3caf7398daf17a85fc652fd4209aa6c5acd6cc1)]:
+  - @real-router/core@0.59.0
+  - @real-router/sources@0.8.8
+
+### @real-router/sources@0.8.8
+
+### Patch Changes
+
+- Updated dependencies [[`e3caf73`](https://github.com/greydragon888/real-router/commit/e3caf7398daf17a85fc652fd4209aa6c5acd6cc1)]:
+  - @real-router/core@0.59.0
+
+### @real-router/ssr-data-plugin@0.4.6
+
+### Patch Changes
+
+- Updated dependencies [[`e3caf73`](https://github.com/greydragon888/real-router/commit/e3caf7398daf17a85fc652fd4209aa6c5acd6cc1)]:
+  - @real-router/core@0.59.0
+
+### @real-router/svelte@0.13.6
+
+### Patch Changes
+
+- Updated dependencies [[`e3caf73`](https://github.com/greydragon888/real-router/commit/e3caf7398daf17a85fc652fd4209aa6c5acd6cc1)]:
+  - @real-router/core@0.59.0
+  - @real-router/sources@0.8.8
+
+### @real-router/validation-plugin@0.7.10
+
+### Patch Changes
+
+- Updated dependencies [[`e3caf73`](https://github.com/greydragon888/real-router/commit/e3caf7398daf17a85fc652fd4209aa6c5acd6cc1)]:
+  - @real-router/core@0.59.0
+
+### @real-router/vue@0.15.5
+
+### Patch Changes
+
+- Updated dependencies [[`e3caf73`](https://github.com/greydragon888/real-router/commit/e3caf7398daf17a85fc652fd4209aa6c5acd6cc1)]:
+  - @real-router/core@0.59.0
+  - @real-router/sources@0.8.8
+
+
 ### @real-router/core@0.58.1
 
 ### Patch Changes
