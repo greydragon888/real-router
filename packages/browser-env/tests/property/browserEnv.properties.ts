@@ -338,7 +338,7 @@ describe("Browser-env Properties", () => {
         const api = createMockPluginApi(undefined);
         const browser = createSpyBrowser();
 
-        const result = getRouteFromEvent(evt, api, browser);
+        const result = getRouteFromEvent(evt, api, browser.getLocation());
 
         // Returns a State produced by api.makeState (#525). Source-of-truth
         // fields (name, params, path) come from history.state; the rest are
@@ -367,7 +367,7 @@ describe("Browser-env Properties", () => {
         const api = createMockPluginApi(matchResult);
         const browser = createSpyBrowser();
 
-        const result = getRouteFromEvent(evt, api, browser);
+        const result = getRouteFromEvent(evt, api, browser.getLocation());
 
         // matchPath's mock returns a full State; assert structural fields.
         expect(result).toMatchObject({ name, params, path: "/matched" });

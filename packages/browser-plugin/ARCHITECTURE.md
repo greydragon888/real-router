@@ -311,23 +311,25 @@ User clicks back or forward
         ▼
   browser.addPopstateListener → handler(evt)  (from createPopstateHandler)
         │
+        ├── location = browser.getLocation()   (snapshot at fire time, #757)
+        │
         ├── isTransitioning === true?
-        │     YES: deferredPopstateEvent = evt  (last-write-wins)
+        │     YES: deferred = { evt, location }  (last-write-wins)
         │          return
         │
         ├── isTransitioning = true
         │
-        ├── getRouteFromEvent(evt, api, browser)
+        ├── getRouteFromEvent(evt, api, location)
         │     │
         │     ├── isState(evt.state)?
         │     │     YES: { name: evt.state.name, params: evt.state.params }
         │     │
-        │     └── NO: api.matchPath(browser.getLocation())
+        │     └── NO: api.matchPath(location)
         │               └── URL matching as fallback
         │
         ├── route found?
         │     YES: await router.navigate(route.name, route.params, transitionOptions)
-        │     NO + allowNotFound: router.navigateToNotFound(browser.getLocation())
+        │     NO + allowNotFound: router.navigateToNotFound(location)
         │     NO + !allowNotFound: api.emitTransitionError(ROUTE_NOT_FOUND) + rollbackUrlToCurrentState()
         │                          (no silent navigateToDefault — see #483)
         │
@@ -346,8 +348,9 @@ User clicks back or forward
 Rapid back/forward clicks generate multiple popstate events in quick succession. Processing each one is pointless — only the final state matters.
 
 The `isTransitioning` flag blocks concurrent processing.
-New events are written to `deferredPopstateEvent` — each one overwrites the previous (last-write-wins).
-After the current transition completes, `processDeferredEvent()` processes the last deferred event.
+New events are written to the single-slot `deferred = { evt, location }` queue — each one overwrites the previous (last-write-wins).
+The `location` is snapshotted when the event fires, not when it is replayed: the in-flight navigation's `onTransitionSuccess → replaceState` overwrites the live location before `processDeferredEvent()` runs, so re-reading it then would resolve the wrong target (#757).
+After the current transition completes, `processDeferredEvent()` processes the last deferred event against its snapshotted location.
 
 ```
 Click 1 → onPopState → isTransitioning=true → navigate("page1")...

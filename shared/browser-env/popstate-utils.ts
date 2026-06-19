@@ -13,13 +13,18 @@ import type { PluginApi } from "@real-router/core/api";
  *   `api.makeState`. The synthesized `transition`/`context` fields are
  *   placeholders; the navigation pipeline (`completeTransition` and plugin
  *   claim writes) replaces them.
- *   This branch is mandatory for hash-plugin: `browser.getLocation()`
- *   returns the History pathname, not the hash, so the matchPath fallback
- *   below cannot extract the hash route.
- * - Otherwise (e.g. manually entered URL with no recorded state), fall
- *   back to `api.matchPath(browser.getLocation())`. browser-plugin's
- *   `getLocation` returns the URL pathname — this works.
+ * - Otherwise (e.g. manually entered URL with no recorded state), fall back
+ *   to `api.matchPath(location)`. `location` is the route location the caller
+ *   captured when the popstate event fired — each plugin derives it from its
+ *   own `browser.getLocation()` (URL pathname for browser-plugin, hash-derived
+ *   path for hash-plugin), so the fallback works for both.
  * - `undefined` when neither path produces a match.
+ *
+ * The caller passes the location it snapshotted at event time rather than
+ * letting this function re-read `browser.getLocation()`: a deferred popstate
+ * is processed only after the in-flight navigation's `replaceState` has
+ * already overwritten the live location, so a late read would resolve the
+ * wrong target (#757).
  *
  * Replaces the previous `{ name, params }` shape so the caller can hand
  * the State directly to `router.navigateToState(state, opts)` and skip
@@ -29,13 +34,13 @@ import type { PluginApi } from "@real-router/core/api";
 export function getRouteFromEvent(
   evt: PopStateEvent,
   api: PluginApi,
-  browser: Browser,
+  location: string,
 ): State | undefined {
   if (isState(evt.state)) {
     return api.makeState(evt.state.name, evt.state.params, evt.state.path);
   }
 
-  return api.matchPath(browser.getLocation());
+  return api.matchPath(location);
 }
 
 /**

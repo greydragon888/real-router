@@ -39,15 +39,15 @@ describe("getRouteFromEvent", () => {
       path: "/users",
     });
 
-    const matched = getRouteFromEvent(evt, api, makeFakeBrowser());
+    const matched = getRouteFromEvent(evt, api, "/");
 
     expect(matched).toMatchObject({ name: "users", path: "/users" });
   });
 
-  it("falls back to api.matchPath(getLocation) when history.state is not a router state", () => {
+  it("falls back to api.matchPath(location) when history.state is not a router state", () => {
     const evt = makePopStateEvent(null);
 
-    const matched = getRouteFromEvent(evt, api, makeFakeBrowser("/users"));
+    const matched = getRouteFromEvent(evt, api, "/users");
 
     expect(matched).toMatchObject({ name: "users" });
   });
@@ -55,9 +55,7 @@ describe("getRouteFromEvent", () => {
   it("returns undefined when neither history.state nor the location match", () => {
     const evt = makePopStateEvent(undefined);
 
-    expect(getRouteFromEvent(evt, api, makeFakeBrowser("/nope"))).toBe(
-      undefined,
-    );
+    expect(getRouteFromEvent(evt, api, "/nope")).toBe(undefined);
   });
 });
 

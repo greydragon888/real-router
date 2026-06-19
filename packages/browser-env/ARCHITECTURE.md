@@ -46,11 +46,16 @@ interface Browser extends HistoryBrowser {
 
 `createPopstateHandler` + `createPopstateLifecycle` serialize popstate processing via a
 single-slot deferred-event queue. Only the **last** deferred event is kept — intermediate
-states are skipped. Critical errors (anything that isn't a `RouterError`) trigger a
-`replaceState` recovery that rolls the URL back to the router's current state.
+states are skipped. Each queued entry stores `{ evt, location }`: the route location is
+snapshotted the instant the event fires, because a deferred event is replayed only after
+the in-flight navigation's `onTransitionSuccess → replaceState` has already overwritten the
+live location — re-reading it at replay time would resolve the wrong target (#757). Critical
+errors (anything that isn't a `RouterError`) trigger a `replaceState` recovery that rolls
+the URL back to the router's current state.
 
-`getRouteFromEvent(evt, api, browser)` tries `isState(evt.state)` first; on failure it
-falls back to `api.matchPath(browser.getLocation())`. `updateBrowserState(state, url, replace, browser)`
+`getRouteFromEvent(evt, api, location)` tries `isState(evt.state)` first; on failure it
+falls back to `api.matchPath(location)`, where `location` is the snapshot the handler
+captured at event time. `updateBrowserState(state, url, replace, browser)`
 writes `{ name, params, path }` — nothing else — into `history.state`.
 
 ## Pure URL utilities
