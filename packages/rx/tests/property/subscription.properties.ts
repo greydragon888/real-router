@@ -139,4 +139,80 @@ describe("Subscription Properties", () => {
       },
     );
   });
+
+  describe("error does not stop delivery: error() is non-terminal (divergence from TC39/RxJS)", () => {
+    test.prop([arbIntArray, fc.nat({ max: 5 })], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "values after error() are still delivered and the subscription stays open",
+      (values, errorCount) => {
+        const received: number[] = [];
+        let errorsSeen = 0;
+        let emit!: (v: number) => void;
+        let fail!: () => void;
+
+        const source = new RxObservable<number>((observer) => {
+          emit = (v) => observer.next?.(v);
+          fail = () => observer.error?.(new Error("boom"));
+        });
+
+        const sub = source.subscribe({
+          next: (v) => received.push(v),
+          error: () => {
+            errorsSeen += 1;
+          },
+        });
+
+        for (let i = 0; i < errorCount; i++) {
+          fail();
+        }
+
+        for (const v of values) {
+          emit(v);
+        }
+
+        expect(received).toStrictEqual(values);
+        expect(errorsSeen).toBe(errorCount);
+        expect(sub.closed).toBe(false);
+      },
+    );
+  });
+
+  describe("terminal teardown: complete()/unsubscribe() run teardown exactly once", () => {
+    test.prop(
+      [
+        fc.array(fc.constantFrom("complete", "unsubscribe"), {
+          minLength: 1,
+          maxLength: 5,
+        }),
+      ],
+      { numRuns: NUM_RUNS.standard },
+    )(
+      "teardown runs exactly once across any sequence of terminal operations",
+      (ops) => {
+        let teardowns = 0;
+        let complete!: () => void;
+
+        const source = new RxObservable<number>((observer) => {
+          complete = () => observer.complete?.();
+
+          return () => {
+            teardowns += 1;
+          };
+        });
+
+        const sub = source.subscribe({});
+
+        for (const op of ops) {
+          if (op === "complete") {
+            complete();
+          } else {
+            sub.unsubscribe();
+          }
+        }
+
+        expect(teardowns).toBe(1);
+      },
+    );
+  });
 });

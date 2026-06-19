@@ -23,6 +23,8 @@
 | 3   | Unsubscribe             | After calling `unsubscribe()`, no further values are delivered to that subscriber. Values emitted after unsubscription are silently dropped for that subscription.                |
 | 4   | Cold behavior           | Each `subscribe()` call triggers an independent execution of the subscribe function. Two subscriptions to the same observable each receive the full value sequence independently. |
 | 5   | Complete stops delivery | After `complete()` is called, no further values emitted via `next()` are delivered. The `closed` flag prevents all subsequent emissions.                                          |
+| 6   | Error does NOT stop delivery | **Divergence from TC39/RxJS (by design).** `error()` is non-terminal: it does not set `closed`, so values emitted after an `error()` are still delivered, multiple `error()` calls are all forwarded, and the subscription stays open. One throwing subscriber must not permanently kill an infinite router stream (`state$`/`events$`). Only `complete()` and `unsubscribe()` are terminal. |
+| 7   | Terminal teardown runs exactly once | A `complete()` or `unsubscribe()` runs the subscription's teardown (and removes the abort listener) exactly once. Any sequence of terminal operations — `complete` then `unsubscribe`, double-`unsubscribe`, double-`complete` — still runs teardown a single time. |
 
 ## Pipe Composition
 
@@ -49,6 +51,6 @@
 | File                                        | Invariants | Category                                                                                                                              |
 | ------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | `tests/property/operators.properties.ts`    | 16         | Operator laws: functor, filter, distinct (+ reference equivalence), identity, takeUntil, idempotence, length, debounceTime validation |
-| `tests/property/subscription.properties.ts` | 5          | Subscription: delivery, ordering, unsubscribe, cold behavior, complete stops delivery                                                 |
+| `tests/property/subscription.properties.ts` | 7          | Subscription: delivery, ordering, unsubscribe, cold behavior, complete stops delivery, error does NOT stop delivery (non-terminal), terminal teardown once |
 | `tests/property/pipe.properties.ts`         | 3          | Pipe composition: associativity, empty-pipe identity, single-operator equivalence                                                     |
 | `tests/property/helpers.ts`                 | —          | Shared arbitraries and observable factory helpers                                                                                     |

@@ -61,7 +61,17 @@ Event listeners are registered one by one inside a try block. If any `addEventLi
 
 ### `RxObservable.subscribe` catches errors in handlers
 
-`next`, `error`, and `complete` callbacks are wrapped in try/catch. Errors in `next` are forwarded to `error`; errors in `error` and `complete` are swallowed silently.
+`next`, `error`, and `complete` callbacks are wrapped in try/catch. Errors in `next` are forwarded to the `error` handler; errors thrown **inside** the `error` and `complete` handlers are swallowed silently. If a stream emits `error()` but the observer supplies **no** `error` handler, the error is logged via `console.error("Unhandled error in RxObservable:", err)` rather than thrown — it never reaches a global error handler.
+
+### Errors are non-terminal — divergence from TC39 / RxJS
+
+`@real-router/rx` exposes a **TC39-style** Observable interface, but deliberately diverges on one point: `error()` is **not terminal**. It does not set `closed`, so:
+
+- values emitted after an `error()` are still delivered;
+- multiple `error()` calls are each forwarded to the handler;
+- a synchronous `throw` from the subscribe function reaches the `error` handler but leaves `closed: false`.
+
+Only `complete()` and `unsubscribe()` are terminal (they run teardown — see below). Rationale: `state$`/`events$` are **infinite** router streams, so one throwing subscriber must not permanently kill the stream for everyone — the same isolation philosophy as `@real-router/sources` `notify()`. A consumer wrapping `from(observable(router))` in RxJS must not rely on `error` completing the stream. Pinned by `tests/stress/error-cascade.stress.ts` and `tests/property/subscription.properties.ts` (invariant 6). (#775)
 
 ### AbortSignal support
 

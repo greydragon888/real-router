@@ -37,7 +37,7 @@ state$(router)
 |---------|---------|-------------|
 | `state$(router, options?)` | `RxObservable<{ route, previousRoute }>` | Router state changes |
 | `events$(router)` | `RxObservable<RouterEvent>` | All router events (start, stop, transition, error, cancel) |
-| `observable(router)` | `RxObservable<SubscribeState>` | TC39 Observable-compliant wrapper for RxJS interop |
+| `observable(router)` | `RxObservable<SubscribeState>` | TC39-style Observable wrapper for RxJS interop |
 
 `state$` accepts `{ signal: AbortSignal }` for automatic unsubscription.
 
@@ -76,7 +76,7 @@ events$(router)
 
 ## RxJS Interop
 
-`observable()` returns a TC39-compliant Observable — pass it to RxJS `from()`:
+`observable()` returns a **TC39-style** Observable (implements `Symbol.observable`) — pass it to RxJS `from()`:
 
 ```typescript
 import { from } from "rxjs";
@@ -89,6 +89,8 @@ from(observable(router))
     console.log("Route:", route.name);
   });
 ```
+
+> **Divergence from TC39 / RxJS — `error` is non-terminal.** Unlike the TC39 proposal and RxJS (where `error` is a terminal event that triggers cleanup), this library keeps the subscription open after `error()`: values keep flowing, multiple errors are each forwarded, and `closed` stays `false`. Only `complete()` and `unsubscribe()` are terminal. This is intentional — `state$`/`events$` are infinite router streams, so a single throwing subscriber must not permanently kill the stream. Don't rely on `error` completing the RxJS chain.
 
 ## Documentation
 

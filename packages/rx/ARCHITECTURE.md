@@ -4,7 +4,7 @@
 
 ## Overview
 
-`@real-router/rx` provides a **zero-cost opt-in** reactive programming interface for the router via TC39 Observable-compliant streams. Cold observables, composable operators, and `for await...of` support — all without requiring RxJS as a dependency.
+`@real-router/rx` provides a **zero-cost opt-in** reactive programming interface for the router via **TC39-style** Observable streams (`Symbol.observable` interop). Cold observables, composable operators, and `for await...of` support — all without requiring RxJS as a dependency. One deliberate divergence from TC39/RxJS: `error` is **non-terminal** (see [Error Semantics](#error-semantics) below).
 
 **Key role:** Bridges the router's event system into a functional reactive model. `state$()` and `events$()` factories create observables from the router's plugin API. The `pipe()` method chains operators for filtering, mapping, and deduplication.
 
@@ -278,6 +278,20 @@ const rxjsObservable = from(observable(router));
 ```
 
 Both symbol methods return `this`, enabling any TC39/RxJS consumer to wrap `RxObservable` instances.
+
+### Error Semantics
+
+**`error` is non-terminal — a deliberate divergence from TC39 proposal-observable / RxJS**, where `error` is a terminal event that triggers cleanup. Here:
+
+| Aspect                       | TC39 / RxJS            | `@real-router/rx`                                  |
+| ---------------------------- | ---------------------- | -------------------------------------------------- |
+| `error` sets `closed`        | yes (terminal)         | **no** — subscription stays open                   |
+| values after `error`         | dropped                | **still delivered**                                |
+| multiple `error()` calls     | only the first         | **each forwarded** to the handler                  |
+| sync `throw` from subscribeFn| terminates             | forwarded to `error`, **`closed` stays `false`**   |
+| terminal events              | `error`, `complete`    | **only `complete()` / `unsubscribe()`**            |
+
+Rationale: `state$`/`events$` are **infinite** streams driven by the router's lifetime. If `error` were terminal, a single throwing subscriber would permanently kill the stream for every other consumer — the same failure-isolation argument behind `@real-router/sources` `notify()`. Pinned by `tests/stress/error-cascade.stress.ts` and property invariant 6 (`tests/property/subscription.properties.ts`). Terminal cleanup (`complete`/`unsubscribe`) still runs teardown exactly once (invariant 7).
 
 ## Performance Characteristics
 
