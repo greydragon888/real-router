@@ -136,4 +136,38 @@ describe("RX4: debounceTime timer churn", () => {
     expect(received).toStrictEqual([100]);
     expect(completeCalled).toStrictEqual(1);
   });
+
+  it("4.7: 1000 × emit→error interleave → each error clears the pending timer (no orphan flush), error is non-terminal", () => {
+    const { observable, emit, error } = createControllableSource<number>();
+    const emitted: number[] = [];
+    let errorsSeen = 0;
+
+    const sub = observable.pipe(debounceTime(50)).subscribe({
+      next: (v) => emitted.push(v),
+      error: () => {
+        errorsSeen += 1;
+      },
+    });
+
+    for (let i = 0; i < 1000; i++) {
+      emit(i); // arms the debounce timer
+      error(new Error("boom")); // must clear it (no flush) and forward (non-terminal)
+      vi.advanceTimersByTime(60); // an un-cleared timer would fire here
+    }
+
+    // Every error is forwarded (non-terminal) and no debounced value leaks: each
+    // error cleared its pending timer before it could fire. Leak (no clearTimeout
+    // on error): all 1000 values orphan-flush.
+    expect(errorsSeen).toBe(1000);
+    expect(emitted).toStrictEqual([]);
+
+    // error is non-terminal — the operator keeps debouncing afterwards.
+    emit(999);
+    vi.advanceTimersByTime(60);
+
+    expect(emitted).toStrictEqual([999]);
+    expect(sub.closed).toBe(false);
+
+    sub.unsubscribe();
+  });
 });

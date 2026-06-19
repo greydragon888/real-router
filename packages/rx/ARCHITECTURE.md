@@ -301,7 +301,7 @@ Rationale: `state$`/`events$` are **infinite** streams driven by the router's li
 | `pipe()` — no operators    | O(1)       | Returns `this`                                 |
 | `pipe()` — N operators     | O(N)       | One new `RxObservable` per operator            |
 | `state$()` subscribe       | O(1)       | Single `addEventListener` + optional microtask |
-| `events$()` subscribe      | O(1)       | 6 `addEventListener` calls                     |
+| `events$()` subscribe      | O(1)       | 7 `addEventListener` calls                     |
 | `map` / `filter` per value | O(1)       | Single function call + forward                 |
 | `distinctUntilChanged`     | O(1)       | Compare + optional forward                     |
 | `debounceTime` per value   | O(1)       | `clearTimeout` + `setTimeout`                  |
@@ -313,20 +313,21 @@ Rationale: `state$`/`events$` are **infinite** streams driven by the router's li
 | ------------------------ | ------ | -------------------------------- |
 | Per `subscribe()` call   | ~300 B | Closures for safe wrappers       |
 | Per operator in `pipe()` | ~200 B | New `RxObservable` + closure     |
-| `events$()` teardown     | ~100 B | Array of 6 unsubscribe functions |
+| `events$()` teardown     | ~100 B | Array of 7 unsubscribe functions |
 | `debounceTime` state     | ~50 B  | Timer ID + pending value         |
 
 ## Stress Test Coverage
 
-46 stress tests across 8 files in `tests/stress/` validate behavior under extreme conditions:
+54 stress tests across 9 files in `tests/stress/` validate behavior under extreme conditions:
 
 | Category       | Tests (file count) | Test count | What they verify                                               |
 | -------------- | ------------------ | ---------- | -------------------------------------------------------------- |
-| Subscription   | 2 files            | 11 tests   | Rapid subscribe/unsubscribe churn, parallel pipeline isolation |
-| Operators      | 3 files            | 18 tests   | Deep pipe chains, timer cleanup, takeUntil race conditions     |
+| Subscription   | 2 files            | 12 tests   | Rapid subscribe/unsubscribe churn, parallel pipeline isolation, re-entrant abort inside subscribeFn |
+| Operators      | 3 files            | 19 tests   | Deep pipe chains, timer cleanup (incl. error-interleave), takeUntil race conditions |
 | Error handling | 1 file             | 6 tests    | Error propagation through operator chains under load           |
-| Backpressure   | 1 file             | 5 tests    | Async iterator under slow consumer / fast producer             |
+| Backpressure   | 1 file             | 7 tests    | Async iterator under slow consumer / fast producer, synchronous terminal batch under concurrency |
 | Fan-out        | 1 file             | 6 tests    | Many subscribers on single events$ stream                      |
+| Resource leaks | 1 file             | 4 tests    | Abort-listener / notifier-subscription / teardown-once accumulation under repetition (count-based, no heap noise) |
 
 ## See Also
 

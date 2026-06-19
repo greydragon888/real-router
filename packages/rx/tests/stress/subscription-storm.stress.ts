@@ -194,4 +194,35 @@ describe("RX1: Subscribe/unsubscribe storm", () => {
       expect(count).toBe(3);
     }
   });
+
+  it("1.8: 2000 × signal aborted synchronously inside subscribeFn → teardown runs exactly once each", () => {
+    let teardowns = 0;
+    let closedCount = 0;
+
+    for (let i = 0; i < 2000; i++) {
+      const controller = new AbortController();
+      const source = new RxObservable<number>(() => {
+        // Re-entrant terminal: aborting here fires subscription.unsubscribe(),
+        // which runs finalize() while teardown is still undefined — before this
+        // teardown is returned. The post-subscribe `if (closed) finalize()` must
+        // then run it exactly once.
+        controller.abort();
+
+        return () => {
+          teardowns += 1;
+        };
+      });
+
+      const sub = source.subscribe({}, { signal: controller.signal });
+
+      if (sub.closed) {
+        closedCount += 1;
+      }
+    }
+
+    // Healthy: 2000 (one teardown per cycle). Leak (#772, no post-subscribe
+    // finalize): teardown never runs for the re-entrant path → 0.
+    expect(teardowns).toBe(2000);
+    expect(closedCount).toBe(2000);
+  });
 });
