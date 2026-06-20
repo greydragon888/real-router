@@ -102,6 +102,11 @@ class EventEmitter<TEventMap> {
   #depthMap: Map<string, number> | null = null;
   // Event name → current recursion depth. Null until first emit with depth tracking.
 
+  #warnedEvents: Set<string> | null = null;
+  // Event names that already fired onListenerWarn. Latches the warning to once
+  // per emitter+event. Null until first warn; the entry is released when the
+  // event's last listener is removed (off → empty Set) or on clearAll().
+
   #limits: EventEmitterLimits;
   // Current limits (mutable via setLimits).
 
@@ -121,6 +126,17 @@ class EventEmitter<TEventMap> {
 
 - Lazy initialization — zero allocation if depth tracking never enabled (`maxEventDepth === 0`)
 - Created on first `emit()` via `??=`
+- The per-event entry is **released when recursion unwinds to zero** (the outermost
+  `finally` deletes `{name → 0}` instead of leaving it), so depth-tracked emits on
+  dynamic event names don't accumulate records unbounded (#750)
+
+**Record lifecycle (no leak for dynamic names, #750)**
+
+All three per-event maps (`#callbacks`, `#depthMap`, `#warnedEvents`) are released the
+moment a name goes idle — `off()` deletes the `Set` (and warn latch) when its last
+listener is removed, and the depth-tracking `emit()` finally deletes the depth entry
+when it returns to 0. `listenerCount()` reports 0 either way, so the release is only
+observable via heap — covered by `tests/stress/event-emitter.stress.ts`.
 
 ## Core Algorithms
 
@@ -130,8 +146,12 @@ class EventEmitter<TEventMap> {
 on(eventName, cb) {
   const set = this.#getCallbackSet(eventName);   // get or create Set (lazy)
   if (set.has(cb)) throw new Error("Duplicate"); // duplicate check
-  if (set.size === warnListeners) onListenerWarn?.(eventName, warnListeners);
-  if (set.size >= maxListeners) throw new Error("Limit reached");
+  if (set.size >= maxListeners) throw new Error("Limit reached"); // limit BEFORE warn
+  // Warn once per event (latched), never for a registration that just threw
+  if (set.size === warnListeners && !this.#warnedEvents.has(eventName)) {
+    this.#warnedEvents.add(eventName);
+    onListenerWarn?.(eventName, warnListeners);
+  }
   set.add(cb);
   return () => this.off(eventName, cb);          // unsubscribe closure
 }
@@ -141,8 +161,15 @@ on(eventName, cb) {
 
 ```typescript
 off(eventName, cb) {
-  this.#callbacks.get(eventName)?.delete(cb);
-  // Idempotent: no-op if event unknown or cb not registered
+  const set = this.#callbacks.get(eventName);
+  if (!set) return;                        // idempotent: no-op if event unknown
+  set.delete(cb);                          // idempotent: no-op if cb not registered
+  if (set.size === 0) {
+    // Release the record once the last listener is gone, so consumers with
+    // dynamic event names don't accumulate empty Sets unbounded (#750).
+    this.#callbacks.delete(eventName);
+    this.#warnedEvents?.delete(eventName); // warn latch released with the Set
+  }
 }
 ```
 
@@ -179,7 +206,7 @@ No depth tracking, no try/finally overhead:
   if (set.size === 1) {
     const [cb] = set;
     try { this.#callListener(cb, argc, a, b, c, d); }
-    catch (error) { this.#onListenerError?.(eventName, error); }
+    catch (error) { this.#handleListenerError(eventName, error); }
     return;
   }
 
@@ -188,15 +215,21 @@ No depth tracking, no try/finally overhead:
     try {
       this.#callListener(cb, argc, a, b, c, d);
     } catch (error) {
-      this.#onListenerError?.(eventName, error); // swallow, continue
+      this.#handleListenerError(eventName, error); // re-throw sentinel, else report
     }
   }
 }
 ```
 
+Both paths route listener errors through the shared `#handleListenerError`, which
+re-throws `RecursionDepthError` and reports everything else to `onListenerError`.
+The fast path historically swallowed the sentinel (it only reported), diverging
+from the depth-tracked path and the "always re-thrown" contract — centralizing the
+handler makes the two paths impossible to diverge again (#751).
+
 #### Depth-Tracked Path (#emitWithDepthTracking)
 
-Same as fast path but with recursion depth check and try/finally. Also uses single-listener fast path (`set.size === 1` skips `[...set]` snapshot).
+Same as fast path but with recursion depth check and try/finally. Like `#emitFast`, it **also special-cases a single listener** (`set.size === 1` → direct call, skipping the `[...set]` snapshot) — measured ~10% faster for one listener (audit 2026-06-20 §2.1). The router runs exclusively on this path (`maxEventDepth = 5`), so single-subscriber events get the shortcut on every emit.
 
 ### #callListener() — Argument Dispatch
 
@@ -218,7 +251,7 @@ Direct calls for 0-4 args by `argc` count — monomorphic call sites, V8 optimiz
 
 - Listener **added** during emit → NOT called in current emit
 - Listener **removed** during emit → STILL called (already in snapshot)
-- **Single listener** → no snapshot, direct call from `set` (optimization: avoids array allocation)
+- **Single listener** → no snapshot, direct call from `set` (optimization: avoids array allocation) — on **both** emit paths (`#emitFast` and `#emitWithDepthTracking`)
 
 Standard pattern in event systems (DOM, Node.js EventEmitter).
 
@@ -229,7 +262,7 @@ Three-level error handling:
 | Level                      | Behavior                                                             |
 | -------------------------- | -------------------------------------------------------------------- |
 | Per-listener `try/catch`   | Each listener isolated — one failing doesn't stop others             |
-| `RecursionDepthError`      | Re-thrown (propagates to caller)                                     |
+| `RecursionDepthError`      | Re-thrown (propagates to caller) on **both** emit paths via the shared `#handleListenerError` |
 | `onListenerError` callback | Called for non-recursion errors; if absent, error silently swallowed |
 
 ## Limits System
@@ -241,8 +274,8 @@ Three-level error handling:
 | `maxEventDepth` | 0 (off) | Yes        | `emit()` throws RecursionDepthError |
 
 - **0 = disabled** for all limits
-- `warnListeners` fires when `set.size === threshold` (exact match, fires once)
-- `maxListeners` checks `set.size >= limit` (prevents exceeding)
+- `maxListeners` checks `set.size >= limit` and throws **before** the warn check — a registration that hits the limit never warns
+- `warnListeners` fires when `set.size === threshold`, latched to **exactly once per emitter+event** (off/on churn does not re-fire; `clearAll()` resets the latch)
 - `maxEventDepth` checks `depth >= limit` before incrementing
 
 ## Usage in @real-router/core
@@ -293,7 +326,7 @@ createRouter(routes, {
 | Operation                | Time    | Notes                                |
 | ------------------------ | ------- | ------------------------------------ |
 | `emit()` — no listeners  | ~5.8 ns | Early return, zero work              |
-| `emit()` — 1 listener    | ~30 ns  | Direct call, snapshot of 1           |
+| `emit()` — 1 listener    | ~30 ns  | Direct call, no snapshot (both emit paths special-case `set.size === 1`) |
 | `emit()` — 10 listeners  | ~90 ns  | Linear: ~18 ns + 5.5 ns per listener |
 | `emit()` — 100 listeners | ~565 ns | Same linear scaling                  |
 | Depth tracking overhead  | +3.8 ns | +12.5% per emit                      |

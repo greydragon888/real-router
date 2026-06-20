@@ -3,6 +3,7 @@ import { describe, expect } from "vitest";
 
 import {
   NUM_RUNS,
+  EVENT_NAMES,
   arbDistinctEventPair,
   arbData,
   arbEventName,
@@ -14,8 +15,9 @@ import {
   createTestEmitter,
   createUniqueListeners,
   type TestEventMap,
+  type EventName,
 } from "./helpers";
-import { EventEmitter } from "../../src/EventEmitter.js";
+import { EventEmitter, RecursionDepthError } from "../../src/EventEmitter.js";
 
 describe("EventEmitter Property-Based Tests", () => {
   describe("delivery — all listeners receive emitted data", () => {
@@ -436,7 +438,7 @@ describe("EventEmitter Property-Based Tests", () => {
       "a listener that throws does not block subsequent listeners",
       (eventName, listenerCount, data) => {
         const errors: unknown[] = [];
-        // eslint-disable-next-line unicorn/prefer-event-target -- custom EventEmitter
+
         const emitter = new EventEmitter<TestEventMap>({
           onListenerError: (_name, error) => {
             errors.push(error);
@@ -475,7 +477,6 @@ describe("EventEmitter Property-Based Tests", () => {
     })(
       "registering more than maxListeners throws",
       (eventName, maxListeners) => {
-        // eslint-disable-next-line unicorn/prefer-event-target -- custom EventEmitter
         const emitter = new EventEmitter<TestEventMap>({
           limits: { maxListeners, warnListeners: 0, maxEventDepth: 0 },
         });
@@ -514,7 +515,6 @@ describe("EventEmitter Property-Based Tests", () => {
     })(
       "depth counter resets to zero after emit completes",
       (eventName, data1, data2) => {
-        // eslint-disable-next-line unicorn/prefer-event-target -- custom EventEmitter
         const emitter = new EventEmitter<TestEventMap>({
           limits: { maxListeners: 0, warnListeners: 0, maxEventDepth: 1 },
         });
@@ -573,7 +573,7 @@ describe("EventEmitter Property-Based Tests", () => {
       "onListenerWarn fires when registration exceeds warn threshold",
       (eventName, warnThreshold) => {
         const warnings: { event: string; count: number }[] = [];
-        // eslint-disable-next-line unicorn/prefer-event-target -- custom EventEmitter
+
         const emitter = new EventEmitter<TestEventMap>({
           limits: {
             maxListeners: 0,
@@ -587,8 +587,59 @@ describe("EventEmitter Property-Based Tests", () => {
 
         const listeners = createUniqueListeners(warnThreshold + 1);
 
-        for (let i = 0; i <= warnThreshold; i++) {
+        // Register one at a time and pin the exact firing point: the first W
+        // registrations must NOT warn — the warn fires only on the (W+1)th.
+        // A total-count assertion alone is blind to a threshold off-by-one
+        // (fire one early / late); per-step pinning catches both directions.
+        for (let i = 0; i < warnThreshold; i++) {
           emitter.on(eventName, listeners[i].fn);
+
+          expect(warnings).toHaveLength(0);
+        }
+
+        emitter.on(eventName, listeners[warnThreshold].fn);
+
+        expect(warnings).toHaveLength(1);
+        expect(warnings[0]).toStrictEqual({
+          event: eventName,
+          count: warnThreshold,
+        });
+      },
+    );
+  });
+
+  describe("warnListeners — onListenerWarn fires exactly once across churn", () => {
+    test.prop([arbEventName, arbWarnThreshold], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "off/on churn around the threshold never re-fires the warning",
+      (eventName, warnThreshold) => {
+        const warnings: { event: string; count: number }[] = [];
+
+        const emitter = new EventEmitter<TestEventMap>({
+          limits: {
+            maxListeners: 0,
+            warnListeners: warnThreshold,
+            maxEventDepth: 0,
+          },
+          onListenerWarn: (event, count) => {
+            warnings.push({ event, count });
+          },
+        });
+
+        // Fill up to the threshold — no warning yet.
+        for (const { fn } of createUniqueListeners(warnThreshold)) {
+          emitter.on(eventName, fn);
+        }
+
+        // Re-cross the threshold repeatedly: each round adds the (W+1)th
+        // listener (set.size === warnThreshold, the warn trigger) and removes
+        // it again. The latch must keep the warning to a single firing.
+        for (let round = 0; round < 3; round++) {
+          const [extra] = createUniqueListeners(1);
+          const unsub = emitter.on(eventName, extra.fn);
+
+          unsub();
         }
 
         expect(warnings).toHaveLength(1);
@@ -596,6 +647,416 @@ describe("EventEmitter Property-Based Tests", () => {
           event: eventName,
           count: warnThreshold,
         });
+      },
+    );
+  });
+
+  // ===========================================================================
+  // Stateful / sequence consistency — model-based testing
+  // ===========================================================================
+
+  describe("sequence consistency — emitter state matches a reference model", () => {
+    type Op =
+      | { type: "on"; event: EventName; id: number }
+      | { type: "off"; event: EventName; id: number }
+      | { type: "emit"; event: EventName; data: number }
+      | { type: "clear" };
+
+    const arbId = fc.integer({ min: 0, max: 7 });
+    const arbOp: fc.Arbitrary<Op> = fc.oneof(
+      fc.record({
+        type: fc.constant("on" as const),
+        event: arbEventName,
+        id: arbId,
+      }),
+      fc.record({
+        type: fc.constant("off" as const),
+        event: arbEventName,
+        id: arbId,
+      }),
+      fc.record({
+        type: fc.constant("emit" as const),
+        event: arbEventName,
+        data: arbData,
+      }),
+      fc.record({ type: fc.constant("clear" as const) }),
+    );
+
+    test.prop([fc.array(arbOp, { minLength: 1, maxLength: 60 })], {
+      numRuns: NUM_RUNS.lifecycle,
+    })(
+      "any interleaving of on/off/emit/clearAll keeps delivery, order and count consistent",
+      (ops) => {
+        const emitter = createTestEmitter();
+        const calls: number[] = [];
+        // Stable, distinct fn per id; records its id when invoked.
+        const fns = Array.from({ length: 8 }, (_, id) => () => {
+          calls.push(id);
+        });
+        // Reference model: event → ordered list of registered ids (insertion order).
+        const model = new Map<EventName, number[]>();
+
+        for (const op of ops) {
+          switch (op.type) {
+            case "on": {
+              const current = model.get(op.event) ?? [];
+
+              if (current.includes(op.id)) {
+                // Duplicate registration must throw and leave state untouched.
+                expect(() => emitter.on(op.event, fns[op.id])).toThrow(
+                  "Duplicate listener",
+                );
+              } else {
+                emitter.on(op.event, fns[op.id]);
+                model.set(op.event, [...current, op.id]);
+              }
+
+              break;
+            }
+            case "off": {
+              emitter.off(op.event, fns[op.id]);
+              const current = model.get(op.event) ?? [];
+
+              model.set(
+                op.event,
+                current.filter((x) => x !== op.id),
+              );
+
+              break;
+            }
+            case "emit": {
+              calls.length = 0;
+              emitter.emit(op.event, op.data);
+
+              // Exactly the modelled listeners fire, in registration order.
+              expect(calls).toStrictEqual(model.get(op.event) ?? []);
+
+              break;
+            }
+            default: {
+              emitter.clearAll();
+              model.clear();
+            }
+          }
+
+          // Count invariant holds for every event after every operation.
+          for (const event of EVENT_NAMES) {
+            expect(emitter.listenerCount(event)).toBe(
+              (model.get(event) ?? []).length,
+            );
+          }
+        }
+      },
+    );
+  });
+
+  // ===========================================================================
+  // Atomic failure — a throwing on() leaves state untouched
+  // ===========================================================================
+
+  describe("atomic registration — a rejected on() does not mutate state", () => {
+    test.prop([arbEventName, arbListenerCount, arbData], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "a rejected duplicate on() leaves listenerCount and delivery untouched",
+      (eventName, listenerCount, data) => {
+        const emitter = createTestEmitter();
+        const listeners = createUniqueListeners(listenerCount);
+
+        for (const { fn } of listeners) {
+          emitter.on(eventName, fn);
+        }
+
+        expect(() => emitter.on(eventName, listeners[0].fn)).toThrow(
+          "Duplicate listener",
+        );
+        expect(emitter.listenerCount(eventName)).toBe(listenerCount);
+
+        emitter.emit(eventName, data);
+
+        for (const { getCallCount } of listeners) {
+          expect(getCallCount()).toBe(1);
+        }
+      },
+    );
+
+    test.prop([arbEventName, arbMaxListeners, arbData], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "an on() that hits maxListeners throws atomically and never warns (warn === max)",
+      (eventName, maxListeners, data) => {
+        const warnings: number[] = [];
+        const emitter = new EventEmitter<TestEventMap>({
+          limits: {
+            maxListeners,
+            warnListeners: maxListeners,
+            maxEventDepth: 0,
+          },
+          onListenerWarn: (_event, count) => {
+            warnings.push(count);
+          },
+        });
+        const listeners = createUniqueListeners(maxListeners + 1);
+
+        for (let i = 0; i < maxListeners; i++) {
+          emitter.on(eventName, listeners[i].fn);
+        }
+
+        expect(() => emitter.on(eventName, listeners[maxListeners].fn)).toThrow(
+          "Listener limit",
+        );
+        expect(emitter.listenerCount(eventName)).toBe(maxListeners);
+        expect(warnings).toHaveLength(0);
+
+        emitter.emit(eventName, data);
+
+        for (let i = 0; i < maxListeners; i++) {
+          expect(listeners[i].getCallCount()).toBe(1);
+        }
+
+        expect(listeners[maxListeners].getCallCount()).toBe(0);
+      },
+    );
+  });
+
+  // ===========================================================================
+  // maxEventDepth boundary — exactly D nested levels succeed, (D+1)th throws
+  // ===========================================================================
+
+  describe("maxEventDepth boundary — exact recursion depth", () => {
+    test.prop([arbEventName, fc.integer({ min: 1, max: 6 }), arbData], {
+      numRuns: NUM_RUNS.lifecycle,
+    })(
+      "a self-recursive emit nests exactly maxEventDepth levels before throwing",
+      (eventName, maxEventDepth, data) => {
+        const emitter = new EventEmitter<TestEventMap>({
+          limits: { maxListeners: 0, warnListeners: 0, maxEventDepth },
+        });
+
+        let depth = 0;
+        let maxObserved = 0;
+
+        emitter.on(eventName, () => {
+          depth++;
+          maxObserved = Math.max(maxObserved, depth);
+
+          try {
+            emitter.emit(eventName, data);
+          } finally {
+            depth--;
+          }
+        });
+
+        expect(() => {
+          emitter.emit(eventName, data);
+        }).toThrow(RecursionDepthError);
+        expect(maxObserved).toBe(maxEventDepth);
+      },
+    );
+  });
+
+  // ===========================================================================
+  // RecursionDepthError is always re-thrown — on the fast AND depth paths
+  // ===========================================================================
+
+  describe("RecursionDepthError propagation — both emit paths", () => {
+    test.prop(
+      [
+        arbEventName,
+        fc.integer({ min: 0, max: 5 }),
+        fc.integer({ min: 0, max: 5 }),
+      ],
+      { numRuns: NUM_RUNS.lifecycle },
+    )(
+      "a listener throwing RecursionDepthError is re-thrown from emit on any path",
+      (eventName, maxEventDepth, laterCount) => {
+        const errors: unknown[] = [];
+        const emitter = new EventEmitter<TestEventMap>({
+          limits: { maxListeners: 0, warnListeners: 0, maxEventDepth },
+          onListenerError: (_event, error) => {
+            errors.push(error);
+          },
+        });
+        const later = createUniqueListeners(laterCount);
+
+        emitter.on(eventName, () => {
+          throw new RecursionDepthError("sentinel");
+        });
+
+        for (const { fn } of later) {
+          emitter.on(eventName, fn);
+        }
+
+        expect(() => {
+          emitter.emit(eventName, 0);
+        }).toThrow(RecursionDepthError);
+        // Sentinel never routed to onListenerError, and it halts iteration.
+        expect(errors).toHaveLength(0);
+
+        for (const { getCallCount } of later) {
+          expect(getCallCount()).toBe(0);
+        }
+      },
+    );
+  });
+
+  // ===========================================================================
+  // Argument arity — emit dispatches the exact arg count (#callListener switch)
+  // ===========================================================================
+
+  describe("argument arity — emit forwards 0..4 positional args", () => {
+    test.prop(
+      [
+        arbEventName,
+        fc.integer({ min: 0, max: 4 }),
+        fc.tuple(arbData, arbData, arbData, arbData),
+      ],
+      { numRuns: NUM_RUNS.standard },
+    )(
+      "emit dispatches exactly argc positional arguments to listeners",
+      (eventName, argc, [a, b, c, d]) => {
+        const emitter = createTestEmitter();
+        let received: unknown[] = [];
+
+        emitter.on(eventName, (...args: unknown[]) => {
+          received = args;
+        });
+
+        switch (argc) {
+          case 0: {
+            emitter.emit(eventName);
+
+            break;
+          }
+          case 1: {
+            emitter.emit(eventName, a);
+
+            break;
+          }
+          case 2: {
+            emitter.emit(eventName, a, b);
+
+            break;
+          }
+          case 3: {
+            emitter.emit(eventName, a, b, c);
+
+            break;
+          }
+          default: {
+            emitter.emit(eventName, a, b, c, d);
+          }
+        }
+
+        expect(received).toStrictEqual([a, b, c, d].slice(0, argc));
+      },
+    );
+  });
+
+  // ===========================================================================
+  // Error forwarding — all listener errors reported in order, non-throwers run
+  // ===========================================================================
+
+  describe("error forwarding — every error reported in order", () => {
+    test.prop(
+      [
+        arbEventName,
+        fc.array(fc.boolean(), { minLength: 1, maxLength: 8 }),
+        arbData,
+      ],
+      { numRuns: NUM_RUNS.lifecycle },
+    )(
+      "every throwing listener forwards its error in order; non-throwers all run",
+      (eventName, throwFlags, data) => {
+        const reported: unknown[] = [];
+        const emitter = new EventEmitter<TestEventMap>({
+          onListenerError: (_event, error) => {
+            reported.push(error);
+          },
+        });
+
+        const expectedErrors: unknown[] = [];
+        const nonThrowers: ReturnType<typeof createUniqueListeners> = [];
+
+        throwFlags.forEach((shouldThrow, i) => {
+          if (shouldThrow) {
+            const error = new Error(`boom-${i}`);
+
+            expectedErrors.push(error);
+            emitter.on(eventName, () => {
+              throw error;
+            });
+          } else {
+            const [listener] = createUniqueListeners(1);
+
+            nonThrowers.push(listener);
+            emitter.on(eventName, listener.fn);
+          }
+        });
+
+        emitter.emit(eventName, data);
+
+        expect(reported).toStrictEqual(expectedErrors);
+
+        for (const { getCallCount } of nonThrowers) {
+          expect(getCallCount()).toBe(1);
+        }
+      },
+    );
+  });
+
+  // ===========================================================================
+  // Warn latch reset — re-fires after clearAll OR after the last off()
+  // ===========================================================================
+
+  describe("warn latch reset — re-fires after a full reset", () => {
+    test.prop([arbEventName, arbWarnThreshold], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "warn re-fires after the latch is reset by removing the last listener or clearAll",
+      (eventName, warnThreshold) => {
+        const warnings: number[] = [];
+        const emitter = new EventEmitter<TestEventMap>({
+          limits: {
+            maxListeners: 0,
+            warnListeners: warnThreshold,
+            maxEventDepth: 0,
+          },
+          onListenerWarn: (_event, count) => {
+            warnings.push(count);
+          },
+        });
+
+        // Round 1: cross the threshold → warn fires once.
+        const unsubs = createUniqueListeners(warnThreshold + 1).map(({ fn }) =>
+          emitter.on(eventName, fn),
+        );
+
+        expect(warnings).toHaveLength(1);
+
+        // Reset by removing the last listener (off → empty Set).
+        for (const unsub of unsubs) {
+          unsub();
+        }
+
+        expect(emitter.listenerCount(eventName)).toBe(0);
+
+        // Round 2: fresh accumulation → warn fires again.
+        for (const { fn } of createUniqueListeners(warnThreshold + 1)) {
+          emitter.on(eventName, fn);
+        }
+
+        expect(warnings).toHaveLength(2);
+
+        // Reset by clearAll.
+        emitter.clearAll();
+
+        // Round 3: fresh accumulation → warn fires again.
+        for (const { fn } of createUniqueListeners(warnThreshold + 1)) {
+          emitter.on(eventName, fn);
+        }
+
+        expect(warnings).toHaveLength(3);
       },
     );
   });

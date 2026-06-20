@@ -2,9 +2,20 @@ import { createRouter } from "@real-router/core";
 
 import type { Options, Route, Router } from "@real-router/core";
 
-/** Requires `--expose-gc` flag (set in vitest.config.stress.mts pool options). */
+/**
+ * Requires `--expose-gc` flag (set in vitest.config.stress.mts pool options).
+ *
+ * Two passes, not one: a single `gc()` can leave objects freed by its own
+ * sweep (and any pending-finalization registry entries) unreclaimed, so a
+ * one-shot reading drifts under concurrent CPU/memory pressure — the whole-suite
+ * `pnpm build` run schedules every package's `test:stress` at once, and that
+ * jitter was enough to push tight heap deltas (e.g. guards-stress S5.3) over the
+ * threshold. The second pass collects what the first one freed, halving the
+ * measurement noise. Mirrors the event-emitter stress helper.
+ */
 export function forceGC(): void {
   if (typeof globalThis.gc === "function") {
+    globalThis.gc();
     globalThis.gc();
   }
 }

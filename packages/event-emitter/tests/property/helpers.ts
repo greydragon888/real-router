@@ -8,7 +8,13 @@ export const NUM_RUNS = {
   async: 30,
 } as const;
 
-const EVENT_NAMES = ["event1", "event2", "event3", "event4", "event5"] as const;
+export const EVENT_NAMES = [
+  "event1",
+  "event2",
+  "event3",
+  "event4",
+  "event5",
+] as const;
 
 export type EventName = (typeof EVENT_NAMES)[number];
 
@@ -49,7 +55,6 @@ export const arbNonFunction: fc.Arbitrary<unknown> = fc.oneof(
 export function createTestEmitter(
   maxEventDepth = 0,
 ): EventEmitter<TestEventMap> {
-  // eslint-disable-next-line unicorn/prefer-event-target -- custom EventEmitter, not Node.js EventEmitter
   return new EventEmitter<TestEventMap>(
     maxEventDepth === 0
       ? undefined

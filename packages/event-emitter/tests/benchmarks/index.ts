@@ -1,4 +1,3 @@
-/* eslint-disable unicorn/prefer-event-target */
 /**
  * EventEmitter Benchmarks Entry Point
  *

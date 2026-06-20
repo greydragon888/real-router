@@ -36,6 +36,7 @@ export class RecursionDepthError extends Error {
 export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
   readonly #callbacks = new Map<string, Set<AnyCallback>>();
   #depthMap: Map<string, number> | null = null;
+  #warnedEvents: Set<string> | null = null;
   #limits: EventEmitterLimits = DEFAULT_LIMITS;
   readonly #onListenerError:
     | ((eventName: string, error: unknown) => void)
@@ -89,14 +90,29 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
 
     const { maxListeners, warnListeners } = this.#limits;
 
-    if (warnListeners !== 0 && set.size === warnListeners) {
-      this.#onListenerWarn?.(eventName, warnListeners);
-    }
-
+    // Enforce the hard limit before warning, so onListenerWarn never fires for
+    // a registration that then throws (the warnListeners === maxListeners case).
     if (maxListeners !== 0 && set.size >= maxListeners) {
       throw new Error(
         `Listener limit (${maxListeners}) reached for "${eventName}"`,
       );
+    }
+
+    // Warn at most once per emitter+event. `set.size === warnListeners` can be
+    // re-met by off/on churn around the threshold; the latch keeps the advisory
+    // hint "exactly once" rather than re-firing on every re-crossing. Reset by
+    // clearAll().
+    if (
+      warnListeners !== 0 &&
+      set.size === warnListeners &&
+      this.#onListenerWarn !== null
+    ) {
+      this.#warnedEvents ??= new Set();
+
+      if (!this.#warnedEvents.has(eventName)) {
+        this.#warnedEvents.add(eventName);
+        this.#onListenerWarn(eventName, warnListeners);
+      }
     }
 
     set.add(cb);
@@ -113,7 +129,21 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
     eventName: E,
     cb: (...args: TEventMap[E]) => void,
   ): void {
-    this.#callbacks.get(eventName)?.delete(cb);
+    const set = this.#callbacks.get(eventName);
+
+    if (!set) {
+      return;
+    }
+
+    set.delete(cb);
+
+    if (set.size === 0) {
+      // Release per-event records once the last listener is gone, so consumers
+      // with dynamic event names don't accumulate empty Sets unbounded
+      // (listenerCount stays 0 either way, masking the growth). See #750.
+      this.#callbacks.delete(eventName);
+      this.#warnedEvents?.delete(eventName);
+    }
   }
 
   /**
@@ -156,6 +186,7 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
   clearAll(): void {
     this.#callbacks.clear();
     this.#depthMap = null;
+    this.#warnedEvents = null;
   }
 
   /**
@@ -188,7 +219,7 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
       try {
         this.#callListener(cb, argc, arg1, arg2, arg3, arg4);
       } catch (error) {
-        this.#onListenerError?.(eventName, error);
+        this.#handleListenerError(eventName, error);
       }
 
       return;
@@ -200,7 +231,7 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
       try {
         this.#callListener(cb, argc, arg1, arg2, arg3, arg4);
       } catch (error) {
-        this.#onListenerError?.(eventName, error);
+        this.#handleListenerError(eventName, error);
       }
     }
   }
@@ -250,6 +281,21 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
   }
 
   /**
+   * Routes a listener error to onListenerError — except RecursionDepthError,
+   * which is a sentinel that must ALWAYS propagate to the caller: it aborts a
+   * runaway recursion and must never be absorbed by per-listener isolation.
+   * Shared by both emit paths (fast + depth-tracking) so the "always re-thrown"
+   * contract cannot diverge between them.
+   */
+  #handleListenerError(eventName: string, error: unknown): void {
+    if (error instanceof RecursionDepthError) {
+      throw error;
+    }
+
+    this.#onListenerError?.(eventName, error);
+  }
+
+  /**
    * Emit path with recursion depth tracking and protection.
    * Used when maxEventDepth > 0.
    */
@@ -275,23 +321,41 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
     try {
       depthMap.set(eventName, depth + 1);
 
-      const listeners = [...set];
+      // Single-listener fast path — mirrors #emitFast: skip the [...set]
+      // snapshot allocation for one listener. The router runs on this path
+      // (maxEventDepth = 5), so single-subscriber events hit it on every emit
+      // (measured ~10% faster for 1 listener; see audit 2026-06-20 §2.1).
+      if (set.size === 1) {
+        const [cb] = set;
 
-      for (const cb of listeners) {
         try {
           this.#callListener(cb, argc, arg1, arg2, arg3, arg4);
         } catch (error) {
-          if (error instanceof RecursionDepthError) {
-            throw error;
-          }
+          this.#handleListenerError(eventName, error);
+        }
+      } else {
+        const listeners = [...set];
 
-          this.#onListenerError?.(eventName, error);
+        for (const cb of listeners) {
+          try {
+            this.#callListener(cb, argc, arg1, arg2, arg3, arg4);
+          } catch (error) {
+            this.#handleListenerError(eventName, error);
+          }
         }
       }
     } finally {
       // Safe: depthMap.set() at try start guarantees the value exists
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      depthMap.set(eventName, depthMap.get(eventName)! - 1);
+      const remaining = depthMap.get(eventName)! - 1;
+
+      if (remaining === 0) {
+        // Outermost frame — release the entry so dynamic event names don't
+        // accumulate {name → 0} records unbounded. See #750.
+        depthMap.delete(eventName);
+      } else {
+        depthMap.set(eventName, remaining);
+      }
     }
   }
 
