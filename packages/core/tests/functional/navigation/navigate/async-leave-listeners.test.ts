@@ -247,7 +247,9 @@ describe("router.navigate() — async subscribeLeave listeners", () => {
 
       expect(router.getState()?.name).toBe("orders");
       expect(signals).toHaveLength(2);
-      expect(signals[1].aborted).toBe(true);
+      // The second navigation SUCCEEDED — its leave signal must stay unaborted
+      // (the signal aborts only on cancellation, never on success — #722).
+      expect(signals[1].aborted).toBe(false);
 
       vi.useRealTimers();
     });
@@ -282,7 +284,9 @@ describe("router.navigate() — async subscribeLeave listeners", () => {
 
       expect(router.getState()?.name).toBe("orders");
       expect(signals).toHaveLength(2);
-      expect(signals[1].aborted).toBe(true);
+      // The second navigation SUCCEEDED — its leave signal must stay unaborted
+      // (the signal aborts only on cancellation, never on success — #722).
+      expect(signals[1].aborted).toBe(false);
 
       vi.useRealTimers();
     });

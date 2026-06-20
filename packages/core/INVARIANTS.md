@@ -236,7 +236,7 @@ Guards registered via `getLifecycleApi(router)` run during the transition pipeli
 | 5   | Returns unsubscribe            | Returns a function that removes the listener. After calling it, the callback is not invoked on subsequent navigations.                                                                                   |
 | 6   | Async listener blocks pipeline | A listener returning `Promise<void>` blocks the navigation pipeline until resolved. Activation guards run only after all leave listeners complete.                                                       |
 | 7   | Independent error isolation    | A sync throw or async rejection in one listener does not prevent other listeners from executing. All listeners run; first error is re-thrown.                                                            |
-| 8   | Signal aborted on concurrent   | When a new navigation starts during async leave, the `signal` passed to listeners is aborted via the navigation `AbortController`.                                                                       |
+| 8   | Signal aborts only on cancellation | The `signal` passed to listeners aborts **only** when the navigation is cancelled — superseded by a newer `navigate()`, `stop()`, `dispose()`, or an external `opts.signal` abort — and **never** on successful completion. Holds identically on the guard and no-guards pipeline paths (#722). Verified functionally in `tests/functional/navigation/navigate/leave-signal-cancellation.test.ts`. |
 
 ## isLeaveApproved
 
