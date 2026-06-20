@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 
-import { EventEmitter } from "../../src/EventEmitter.js";
+import { EventEmitter, RecursionDepthError } from "../../src/EventEmitter.js";
 
 import type { EventEmitterOptions } from "../../src/types.js";
 
@@ -759,6 +759,46 @@ describe("EventEmitter", () => {
       expect(() => {
         emitter.emit("reset");
       }).toThrow("Maximum recursion depth");
+    });
+  });
+
+  // ===========================================================================
+  // RecursionDepthError propagation on the fast path (maxEventDepth = 0)
+  // ===========================================================================
+
+  describe("RecursionDepthError propagation on the fast path", () => {
+    it("should re-throw RecursionDepthError from a single listener, not route it to onListenerError", () => {
+      const onListenerError = vi.fn();
+      // No maxEventDepth → fast path (#emitFast), single-listener branch.
+      const emitter = createEmitter({ onListenerError });
+
+      emitter.on("reset", () => {
+        throw new RecursionDepthError("nested overflow");
+      });
+
+      expect(() => {
+        emitter.emit("reset");
+      }).toThrow(RecursionDepthError);
+      expect(onListenerError).not.toHaveBeenCalled();
+    });
+
+    it("should re-throw RecursionDepthError from one of several listeners and halt iteration", () => {
+      const onListenerError = vi.fn();
+      const secondListener = vi.fn();
+      // No maxEventDepth → fast path (#emitFast), multi-listener loop branch.
+      const emitter = createEmitter({ onListenerError });
+
+      emitter.on("reset", () => {
+        throw new RecursionDepthError("nested overflow");
+      });
+      emitter.on("reset", secondListener);
+
+      expect(() => {
+        emitter.emit("reset");
+      }).toThrow(RecursionDepthError);
+      expect(onListenerError).not.toHaveBeenCalled();
+      // The sentinel halts the snapshot iteration — later listeners do not run.
+      expect(secondListener).not.toHaveBeenCalled();
     });
   });
 

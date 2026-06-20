@@ -219,7 +219,7 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
       try {
         this.#callListener(cb, argc, arg1, arg2, arg3, arg4);
       } catch (error) {
-        this.#onListenerError?.(eventName, error);
+        this.#handleListenerError(eventName, error);
       }
 
       return;
@@ -231,7 +231,7 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
       try {
         this.#callListener(cb, argc, arg1, arg2, arg3, arg4);
       } catch (error) {
-        this.#onListenerError?.(eventName, error);
+        this.#handleListenerError(eventName, error);
       }
     }
   }
@@ -281,6 +281,21 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
   }
 
   /**
+   * Routes a listener error to onListenerError — except RecursionDepthError,
+   * which is a sentinel that must ALWAYS propagate to the caller: it aborts a
+   * runaway recursion and must never be absorbed by per-listener isolation.
+   * Shared by both emit paths (fast + depth-tracking) so the "always re-thrown"
+   * contract cannot diverge between them.
+   */
+  #handleListenerError(eventName: string, error: unknown): void {
+    if (error instanceof RecursionDepthError) {
+      throw error;
+    }
+
+    this.#onListenerError?.(eventName, error);
+  }
+
+  /**
    * Emit path with recursion depth tracking and protection.
    * Used when maxEventDepth > 0.
    */
@@ -312,11 +327,7 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
         try {
           this.#callListener(cb, argc, arg1, arg2, arg3, arg4);
         } catch (error) {
-          if (error instanceof RecursionDepthError) {
-            throw error;
-          }
-
-          this.#onListenerError?.(eventName, error);
+          this.#handleListenerError(eventName, error);
         }
       }
     } finally {

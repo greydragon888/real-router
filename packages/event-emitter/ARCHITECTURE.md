@@ -206,7 +206,7 @@ No depth tracking, no try/finally overhead:
   if (set.size === 1) {
     const [cb] = set;
     try { this.#callListener(cb, argc, a, b, c, d); }
-    catch (error) { this.#onListenerError?.(eventName, error); }
+    catch (error) { this.#handleListenerError(eventName, error); }
     return;
   }
 
@@ -215,11 +215,17 @@ No depth tracking, no try/finally overhead:
     try {
       this.#callListener(cb, argc, a, b, c, d);
     } catch (error) {
-      this.#onListenerError?.(eventName, error); // swallow, continue
+      this.#handleListenerError(eventName, error); // re-throw sentinel, else report
     }
   }
 }
 ```
+
+Both paths route listener errors through the shared `#handleListenerError`, which
+re-throws `RecursionDepthError` and reports everything else to `onListenerError`.
+The fast path historically swallowed the sentinel (it only reported), diverging
+from the depth-tracked path and the "always re-thrown" contract — centralizing the
+handler makes the two paths impossible to diverge again (#751).
 
 #### Depth-Tracked Path (#emitWithDepthTracking)
 
@@ -256,7 +262,7 @@ Three-level error handling:
 | Level                      | Behavior                                                             |
 | -------------------------- | -------------------------------------------------------------------- |
 | Per-listener `try/catch`   | Each listener isolated — one failing doesn't stop others             |
-| `RecursionDepthError`      | Re-thrown (propagates to caller)                                     |
+| `RecursionDepthError`      | Re-thrown (propagates to caller) on **both** emit paths via the shared `#handleListenerError` |
 | `onListenerError` callback | Called for non-recursion errors; if absent, error silently swallowed |
 
 ## Limits System
