@@ -121,17 +121,23 @@ export class Router<
     options: Partial<Options> = {},
     dependencies: Dependencies = {} as Dependencies,
   ) {
-    // Configure logger if provided
-    if (options.logger && isLoggerConfig(options.logger)) {
-      logger.configure(options.logger);
-      delete options.logger;
+    // Extract the logger config WITHOUT mutating the caller's `options` object
+    // (#724). NOTE: `logger` (from @real-router/logger) is a process-global
+    // singleton — `configure()` applies process-wide and the last call wins
+    // across every router in the process. `routerOptions` is the logger-stripped
+    // view handed to the options pipeline so `logger` never lands in the frozen
+    // router options.
+    const { logger: loggerConfig, ...routerOptions } = options;
+
+    if (loggerConfig && isLoggerConfig(loggerConfig)) {
+      logger.configure(loggerConfig);
     }
 
     // =========================================================================
     // Validate inputs before creating namespaces
     // =========================================================================
 
-    // Always validate options
+    // Always validate the caller's options (catches non-object / array inputs)
     OptionsNamespace.validateOptionsIsObject(options);
 
     // Unconditional guard-level validation before creating namespaces
@@ -145,8 +151,8 @@ export class Router<
     // Create Namespaces
     // =========================================================================
 
-    this.#options = new OptionsNamespace(options);
-    this.#limits = createLimits(options.limits);
+    this.#options = new OptionsNamespace(routerOptions);
+    this.#limits = createLimits(routerOptions.limits);
     this.#dependenciesStore =
       createDependenciesStore<Dependencies>(dependencies);
     this.#state = new StateNamespace();

@@ -86,6 +86,30 @@ describe("createRouter", () => {
       ).toThrow(TypeError);
     });
 
+    it("does not mutate the caller's options object (#724)", () => {
+      const options = {
+        logger: { level: "error-only" },
+        defaultRoute: "a",
+      } as const;
+
+      createRouter([{ name: "a", path: "/a" }], options);
+
+      expect(options).toHaveProperty("logger");
+      expect(options.logger).toStrictEqual({ level: "error-only" });
+    });
+
+    it("allows the same options object to build multiple routers (#724)", () => {
+      const options = { logger: { level: "warn-error" } } as const;
+
+      createRouter([{ name: "a", path: "/a" }], options);
+
+      // logger config must still be present for the second router
+      expect(() =>
+        createRouter([{ name: "b", path: "/b" }], options),
+      ).not.toThrow();
+      expect(options.logger).toStrictEqual({ level: "warn-error" });
+    });
+
     it("should throw for invalid logger level", () => {
       expect(() =>
         createRouter([], { logger: { level: "invalid" as any } }),
