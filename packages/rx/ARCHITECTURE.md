@@ -48,7 +48,7 @@ graph LR
 | Consumer         | What it uses                                | Purpose                           |
 | ---------------- | ------------------------------------------- | --------------------------------- |
 | **state$()**     | `getPluginApi`, `events.TRANSITION_SUCCESS` | Subscribe to state changes        |
-| **events$()**    | `getPluginApi`, all 6 event constants       | Subscribe to all lifecycle events |
+| **events$()**    | `getPluginApi`, all 7 event constants       | Subscribe to all lifecycle events |
 | **observable()** | `state$()`                                  | TC39 Observable interop wrapper   |
 
 ## Core Design
@@ -195,17 +195,18 @@ events$(router)
   new RxObservable(observer => {
     │
     ├── api = getPluginApi(router)
-    ├── Register 6 listeners (with partial-registration safety):
-    │   ├── ROUTER_START      → { type: "ROUTER_START" }
-    │   ├── ROUTER_STOP       → { type: "ROUTER_STOP" }
-    │   ├── TRANSITION_START  → { type, toState, fromState }
-    │   ├── TRANSITION_SUCCESS → { type, toState, fromState, options }
-    │   ├── TRANSITION_ERROR  → { type, toState, fromState, error }
-    │   └── TRANSITION_CANCEL → { type, toState, fromState }
+    ├── Register 7 listeners (with partial-registration safety):
+    │   ├── ROUTER_START             → { type: "ROUTER_START" }
+    │   ├── ROUTER_STOP              → { type: "ROUTER_STOP" }
+    │   ├── TRANSITION_START         → { type, toState, fromState }
+    │   ├── TRANSITION_LEAVE_APPROVE → { type, toState, fromState }
+    │   ├── TRANSITION_SUCCESS       → { type, toState, fromState, options }
+    │   ├── TRANSITION_ERROR         → { type, toState, fromState, error }
+    │   └── TRANSITION_CANCEL        → { type, toState, fromState }
     │
     ├── catch: Unsubscribe all registered listeners, re-throw error
     │
-    └── return () => { unsubscribe all 6 }   // teardown
+    └── return () => { unsubscribe all 7 }   // teardown
   })
 ```
 
@@ -247,11 +248,13 @@ createStatefulOperator(subscribeFn) — Stateful operators (distinctUntilChanged
 | Notifier emits   | Complete + unsubscribe both  |
 | Notifier errors  | Error + unsubscribe both     |
 | Source emits     | Forward to observer          |
-| Source errors    | Error + unsubscribe notifier |
+| Source errors    | Error + unsubscribe both     |
 | Source completes | Complete + unsubscribe both  |
 | Unsubscribe      | Unsubscribe both             |
 
-**Subscription order:** Notifier subscribes first (handles synchronous emission), then source. Early return if notifier completes/errors synchronously before source subscription — the now-assigned notifier subscription is unsubscribed on that early return so it never dangles (#773).
+**Subscription order:** Notifier subscribes first (handles synchronous emission), then source. Early return if notifier completes/errors synchronously before source subscription — the now-assigned notifier subscription is unsubscribed on that early return so it never dangles (#773). Symmetrically, a source that completes/errors **synchronously** is released by a post-subscribe `if (completed)` check, since its handler ran before `sourceSubscription` was assigned (#877).
+
+**Terminal cleanup symmetry (#877):** every branch that sets `completed` releases **both** subscriptions. Because `error` is non-terminal at the `RxObservable` layer, a source `error()` does not close the source on its own — but `takeUntil` is permanently inert after it (`completed = true` drops all later values), so it unsubscribes the source rather than holding a subscription it will never use again.
 
 ## Error Isolation
 

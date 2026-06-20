@@ -70,6 +70,31 @@ describe("RX9: Lifecycle / resource-leak under repetition", () => {
     expect(notifierTeardowns).toBe(1000);
   });
 
+  it("9.5: 1000 takeUntil() with an erroring source → the source subscription is released every time", () => {
+    let sourceTeardowns = 0;
+    let fail: (() => void) | undefined;
+
+    const notifier = new RxObservable<void>(() => () => {});
+    const source = new RxObservable<number>((observer) => {
+      fail = () => observer.error?.(new Error("boom"));
+
+      return () => {
+        sourceTeardowns += 1;
+      };
+    });
+
+    for (let i = 0; i < 1000; i++) {
+      source.pipe(takeUntil(notifier)).subscribe({ error: () => {} });
+      fail?.();
+    }
+
+    // The source-error branch must unsubscribe the now-inert source (completed=true
+    // drops every later value); otherwise every takeUntil leaves a live source
+    // subscription dangling — symmetric to the 9.2 notifier-error leak. Healthy:
+    // 1000. Leak (#877): 0.
+    expect(sourceTeardowns).toBe(1000);
+  });
+
   it("9.3: 2000 cycles of mixed complete/unsubscribe terminals → teardown runs exactly once each", () => {
     let teardowns = 0;
     let complete: (() => void) | undefined;
