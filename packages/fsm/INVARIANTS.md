@@ -20,7 +20,8 @@
 | 2   | Unsubscribe | After calling the unsubscribe function returned by `onTransition()`, the listener is never called again, regardless of how many transitions follow.                                |
 | 3   | Clear all   | After unsubscribing every registered listener, no listener is called on subsequent transitions. This verifies the `#listenerCount` fast-path optimization.                         |
 | 4   | Reentrancy  | Calling `send()` inside an `onTransition` listener does not corrupt FSM state. After the full reentrant call chain completes, `getState()` still returns a valid state.            |
-| 5   | Live iteration (no snapshot) † | `send()` iterates the **live** listener array — it does **not** snapshot before iterating. A listener registered during a transition is invoked within that same `send()`; an unsubscribed listener is skipped via its null slot. This **diverges from the sibling `event-emitter`**, which snapshots the listener set before iterating. Consumers must not assume the two primitives share mutation-during-dispatch semantics. |
+| 5   | Live iteration (no snapshot) | `send()` iterates the **live** listener array — it does **not** snapshot before iterating. A listener registered during a transition is invoked within that same `send()`; an unsubscribed listener is skipped via its null slot. This **diverges from the sibling `event-emitter`**, which snapshots the listener set before iterating. Consumers must not assume the two primitives share mutation-during-dispatch semantics. (`on()` **actions**, by contrast, are **single-captured** per `send` — read into a local before firing, so a reentrant action-overwrite during dispatch does not affect the current `send`; live iteration is listener-only.) |
+| 6   | Churn integrity | After an arbitrary sequence of `onTransition`/unsubscribe operations, exactly the currently-live listeners fire on the next `send()`, in array-slot order (a vacated null slot is reused by a later subscription). |
 
 ## Self-Transitions
 
@@ -33,6 +34,7 @@
 | #   | Invariant               | Description                                                                                                                                                                                                   |
 | --- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | General transition info | For a general transition (`from !== to`), the `onTransition` listener receives a `TransitionInfo` with `from` equal to the source state, `to` equal to the target state, and `event` equal to the sent event. |
+| 2   | Payload delivery        | `send(event, payload)` delivers the *same* `payload` value (by reference) to both the matching `on()` action and `TransitionInfo.payload`. |
 
 ## Transition Actions
 
@@ -42,6 +44,8 @@
 | 2   | Action isolation | An action fires only when both `from` state and `event` match the registration pair. Transitions from other states or with other events do not trigger it. |
 | 3   | Action overwrite | Registering a second action for the same `(from, event)` pair replaces the first. Only the latest action fires on the matching transition.                 |
 | 4   | Action unsub     | The unsubscribe function returned by `on()` removes the action. After calling it, the action no longer fires on the matching transition.                   |
+| 5   | Stale unsub no-op | After an action is replaced by re-registering the same `(from, event)`, calling the *original* action's unsubscribe is a no-op — the replacement still fires (removal is identity-guarded). |
+| 6   | Multi-action isolation | With actions registered on many distinct `(from, event)` pairs, over any event sequence each action fires exactly on its own matching transition and never on another's. |
 
 ## Edge Cases
 
@@ -52,13 +56,18 @@
 | 3   | Null-slot reuse     | After unsubscribing a listener and registering a new one, the new listener fills the vacated slot in the array. It fires at that position, potentially before listeners registered earlier.             |
 | 4   | Return value        | `send()` returns `getState()` at the moment it returns. With reentrant `send()` inside a listener, the return value reflects the final state after all reentrant transitions, not the immediate target. |
 | 5   | Context identity    | `getContext()` returns the exact same reference as `config.context`. The FSM does not clone or wrap the context object.                                                                                 |
-| 6   | Reentrant info staleness † | When a listener performs a reentrant `send()`, an **outer** listener still receives `info.to` equal to *its own* transition's target, while `getState()` may already reflect a later (nested) state, and observations run in reverse-causal order (the nested transition is observed before the outer one completes). Listeners must **not** assume `info.to === getState()` under reentrancy. (Edge #4 covers `send()`'s **return value**; this covers the **`TransitionInfo`** seen by listeners.) |
+| 6   | Declared-state guard | Every state-entry-point — `new FSM({ initial })`, `forceState(state)`, and `on(from, …)` — throws when the state is not declared in `config.transitions` (shared `requireDeclared`). `forceState` runs the guard before the mutation, so a rejected call leaves `#state` unchanged. Narrow-union callers cannot reach this (`TStates`); it hardens `string`-typed / JS / cast callers, mirroring `send()`'s no-op on unknown input (#754 `forceState`; #885 constructor + `on`). |
+| 7   | Reentrant info staleness | When a listener performs a reentrant `send()`, an **outer** listener still receives `info.to` equal to *its own* transition's target, while `getState()` may already reflect a later (nested) state, and observations run in reverse-causal order (the nested transition is observed before the outer one completes). Listeners must **not** assume `info.to === getState()` under reentrancy. (Edge #4 covers `send()`'s **return value**; this covers the **`TransitionInfo`** seen by listeners.) |
+| 8   | Action-throw abort | If an action throws, it propagates through `send()` and **no** `onTransition` listener runs (actions fire before listeners; there is no error isolation). `getState()` already reflects the transition. |
+| 9   | Listener-throw abort | If an `onTransition` listener throws, listeners after it in slot order do **not** run (no per-listener `try/catch`). `getState()` already reflects the transition. |
+| 10  | forceState dispatch | After `forceState(X)`, a subsequent `send(event)` dispatches `X`'s action and transition — the forced state's `#currentTransitions` is active. |
+| 11  | No bricking | After any sequence of `send`, valid `forceState`, and rejected `forceState` (undeclared state → throws), the FSM stays consistent: `getState()` is always a declared state and `canSend()` never throws. |
 
-> † Documented behavioral guarantees (sharp edges), not yet covered by dedicated property tests — see [#755](https://github.com/greydragon888/real-router/issues/755). The count in the table below reflects currently-tested invariants only.
+> Every invariant above is covered by a dedicated property test (see the file table below). The earlier `†` carve-out for reentrancy / live-iteration ([#755](https://github.com/greydragon888/real-router/issues/755)) is now closed.
 
 ## Test Files
 
 | File                               | Invariants | Category                                                                                      |
 | ---------------------------------- | ---------- | --------------------------------------------------------------------------------------------- |
-| `tests/property/fsm.properties.ts` | 20         | State transitions, listener lifecycle, self-transitions, transition info, actions, edge cases |
+| `tests/property/fsm.properties.ts` | 31         | State transitions, listener lifecycle, self-transitions, transition info, actions, edge cases |
 | `tests/property/helpers.ts`        | —          | Shared arbitraries and FSM factory helpers                                                    |

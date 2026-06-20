@@ -40,7 +40,7 @@ fsm.getContext();         // { count: 0 }
 | `getContext()` | Context object (same reference as config) |
 | `onTransition(listener)` | Subscribe to transitions, returns unsubscribe |
 | `on(from, event, action)` | Register action for specific `(from, event)` pair |
-| `forceState(state)` | Direct state update — no actions, no listeners |
+| `forceState(state)` | Direct state update — no actions, no listeners; throws on an undeclared state |
 
 ### Type-Safe Payloads
 

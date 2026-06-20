@@ -163,6 +163,26 @@ describe("FSM", () => {
         }),
       );
     });
+
+    it("should narrow TransitionInfo.payload by info.event (#886)", () => {
+      const fsm = new FSM<PayloadState, PayloadEvent, null, PayloadMap>(
+        payloadConfig,
+      );
+      let url: string | undefined;
+
+      fsm.onTransition((info) => {
+        // TransitionInfo is a discriminated union over `event`, so checking
+        // `info.event === "FETCH"` narrows `info.payload` to PayloadMap["FETCH"]
+        // (= { url: string }) — the same correlation `on()` already gives actions.
+        if (info.event === "FETCH") {
+          url = info.payload.url;
+        }
+      });
+
+      fsm.send("FETCH", { url: "/api/data" });
+
+      expect(url).toBe("/api/data");
+    });
   });
 
   describe("onTransition", () => {
@@ -562,23 +582,43 @@ describe("FSM", () => {
       expect(fsm.getState()).toBe("green");
     });
 
-    it("should ignore extra payload for no-payload event", () => {
+    it("should reject a payload typed for a different event (#753)", () => {
+      const fsm = new FSM<PayloadState, PayloadEvent, null, PayloadMap>(
+        payloadConfig,
+      );
+
+      // FETCH's payload is { url: string }; REJECT's { error: string } is a
+      // different event's payload and must not satisfy FETCH.
+      // @ts-expect-error — send() must correlate the payload to the specific event
+      fsm.send("FETCH", { error: "boom" });
+
+      // The correctly-typed payload still compiles (positive control).
+      fsm.send("FETCH", { url: "/api" });
+
+      expect(fsm.getState()).toBe("loading");
+    });
+
+    it("should reject extra payload for a no-payload event (runtime still ignores it)", () => {
       const fsm = new FSM<PayloadState, PayloadEvent, null, PayloadMap>(
         payloadConfig,
       );
 
       fsm.send("FETCH", { url: "/api" });
 
+      // RESOLVE has no entry in PayloadMap, so it accepts no payload.
+      // @ts-expect-error — a no-payload event must not receive a payload
       fsm.send("RESOLVE", { data: "something" });
 
       expect(fsm.getState()).toBe("done");
     });
 
-    it("should transition without payload for payload event", () => {
+    it("should require the payload for a payload event at the type level (runtime stays lenient)", () => {
       const fsm = new FSM<PayloadState, PayloadEvent, null, PayloadMap>(
         payloadConfig,
       );
 
+      // FETCH declares a payload, so omitting it is now a type error.
+      // @ts-expect-error — a payload event requires its payload argument
       fsm.send("FETCH");
 
       expect(fsm.getState()).toBe("loading");
@@ -651,6 +691,61 @@ describe("FSM", () => {
 
       expect(result).toBe("done");
       expect(fsm.getState()).toBe("done");
+    });
+
+    it("should throw an explicit error when forced to an undeclared state", () => {
+      const fsm = new FSM(lightConfig);
+
+      // The type forbids this; only a JS / cast caller can reach it. forceState
+      // must reject the undeclared state loudly, not brick the FSM for a later
+      // cryptic TypeError in canSend/send.
+      expect(() => {
+        // @ts-expect-error — "GHOST" is not a declared state
+        fsm.forceState("GHOST");
+      }).toThrow("is not declared in config.transitions");
+    });
+
+    it("should leave the FSM usable after rejecting an undeclared state", () => {
+      const fsm = new FSM(lightConfig);
+
+      expect(() => {
+        // @ts-expect-error — "GHOST" is not a declared state
+        fsm.forceState("GHOST");
+      }).toThrow();
+
+      // The guard throws before mutating state, so the FSM is untouched and
+      // still transitions normally.
+      expect(fsm.getState()).toBe("green");
+      expect(fsm.canSend("TIMER")).toBe(true);
+      expect(fsm.send("TIMER")).toBe("yellow");
+    });
+  });
+
+  describe("Declared-state guard (#885)", () => {
+    // `forceState` rejects an undeclared state (#754); the same engine invariant
+    // must hold at the two other state-entry-points — the constructor's `initial`
+    // and `on`'s `from`. Reachable with string-typed states / JS / cast callers.
+    it("should throw when constructed with an undeclared initial state", () => {
+      expect(
+        () =>
+          new FSM<string, string, null>({
+            initial: "GHOST",
+            context: null,
+            transitions: { a: { go: "b" }, b: {} },
+          }),
+      ).toThrow("is not declared in config.transitions");
+    });
+
+    it("should throw when on() targets an undeclared from-state", () => {
+      const fsm = new FSM<string, string, null>({
+        initial: "a",
+        context: null,
+        transitions: { a: { go: "b" }, b: {} },
+      });
+
+      expect(() => {
+        fsm.on("GHOST", "go", () => {});
+      }).toThrow("is not declared in config.transitions");
     });
   });
 

@@ -79,12 +79,16 @@ interface FSMConfig<TStates, TEvents, TContext> {
   transitions: Record<TStates, Partial<Record<TEvents, TStates>>>;
 }
 
-interface TransitionInfo<TStates, TEvents, TPayloadMap> {
-  from: TStates;
-  to: TStates;
-  event: TEvents;
-  payload: TPayloadMap[TEvents] | undefined;
-}
+// Distributive union over the event (#886): narrowing `info.event` narrows
+// `info.payload` to that event's payload — symmetric with `on`'s action.
+type TransitionInfo<TStates, TEvents, TPayloadMap> = TEvents extends infer E extends TEvents
+  ? {
+      from: TStates;
+      to: TStates;
+      event: E;
+      payload: E extends keyof TPayloadMap ? TPayloadMap[E] : undefined;
+    }
+  : never;
 ```
 
 ## Core Data Structures
@@ -227,6 +231,8 @@ onTransition(listener) {
 
 This **intentionally differs** from the sibling `@real-router/event-emitter`, which snapshots the listener set (`[...set]`) before iterating, so mutations there only affect the *next* emit. Do not assume the two repo primitives share mutation-during-dispatch semantics. (See [#755](https://github.com/greydragon888/real-router/issues/755).)
 
+**Actions, by contrast, are single-captured.** The matching `on()` action is read into a local **before** it fires (`const action = …; action(payload)`), so a reentrant `on()` that overwrites the `(from, event)` action **during its own dispatch** does *not* re-fire it in the current `send()` (it applies to the next `send`). Live iteration is a **listener-only** property — actions and listeners intentionally differ on mutation-during-dispatch.
+
 ## Hot-Path Optimizations
 
 | Optimization                | Purpose                                                              |
@@ -240,18 +246,28 @@ This **intentionally differs** from the sibling `@real-router/event-emitter`, wh
 
 ## forceState() — Direct State Bypass
 
-`forceState(state)` updates `#state` and `#currentTransitions` directly — no actions fire, no listeners notified, no validation.
+`forceState(state)` updates `#state` and `#currentTransitions` directly — no actions fire, no listeners notified. It shares the `requireDeclared` guard with the constructor (`initial`) and `on` (`from`): an undeclared state throws **before** any mutation instead of silently leaving `#currentTransitions` undefined and bricking the next `canSend`/`send` ([#754](https://github.com/greydragon888/real-router/issues/754) `forceState`; [#885](https://github.com/greydragon888/real-router/issues/885) constructor + `on`).
 
 ```typescript
+// shared guard — single source of truth for "the state is declared"
+function requireDeclared(transitions, state, where) {
+  const t = transitions[state];
+  if (t === undefined) {
+    throw new Error(`[FSM.${where}] state "${state}" is not declared in config.transitions`);
+  }
+  return t;
+}
+
 forceState(state) {
+  const transitions = requireDeclared(this.#transitions, state, "forceState");
   this.#state = state;
-  this.#currentTransitions = this.#transitions[state];
+  this.#currentTransitions = transitions;
 }
 ```
 
 **Why it exists:** Router's navigate hot path uses `forceState()` for NAVIGATE and COMPLETE transitions to bypass `send()` overhead (~30ns saved per call). The router already handles event emission separately via `EventBusNamespace` — running it through FSM actions would be redundant.
 
-**Contract:** Caller is responsible for maintaining state consistency. No guards, no listeners, no reentrancy handling.
+**Contract:** Caller is responsible for ordering and side effects. The target state must be declared in `config.transitions` — an undeclared state throws and leaves the FSM unchanged. No listeners, no reentrancy handling.
 
 ## Reentrancy
 
@@ -323,7 +339,7 @@ fsm.send("START", {}); // TS error
 
 Default `TPayloadMap = Record<never, never>` — all events are payload-free.
 
-> ⚠️ **Known gap ([#753](https://github.com/greydragon888/real-router/issues/753)):** the snippet above describes the *intended* contract, but the current `send` signature is `send(event: TEvents, payload?: TPayloadMap[TEvents])` — `TPayloadMap[TEvents]` indexes by the **full** event union, so `send` does **not** correlate the payload to the specific event (e.g. `send("NAVIGATE")` and a wrong-event payload both compile). Only `on(from, event, action)` correlates the payload. The fix is a distributive `send<E extends TEvents>` signature. Dormant for core (`RouterPayloads` is empty).
+> **Enforced ([#753](https://github.com/greydragon888/real-router/issues/753)):** the contract above is enforced by a distributive `send<E extends TEvents>(event, ...payload: E extends keyof TPayloadMap ? [TPayloadMap[E]] : [undefined?])` signature — symmetric with `on`, the payload correlates to the **specific** event. Previously `send(event: TEvents, payload?: TPayloadMap[TEvents])` indexed by the **full** `TEvents` union (which collapses to `unknown`), so `send("NAVIGATE")` and a wrong-event payload both compiled. Runtime is unchanged; the fix is type-level only. Dormant for core (`RouterPayloads` is empty).
 
 ## Self-Transitions
 

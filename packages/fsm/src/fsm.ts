@@ -1,6 +1,30 @@
 import type { FSMConfig, TransitionInfo, TransitionListener } from "./types";
 
 /**
+ * Shared guard for the engine-wide invariant "the state is declared in
+ * `config.transitions`". Applied at every state-entry-point (constructor
+ * `initial`, `forceState`, `on`'s `from`) so an undeclared state fails loud with
+ * an explicit error instead of bricking the FSM or dead-registering an action
+ * (#885). Returns the state's transition map for the caller to reuse.
+ */
+function requireDeclared<TStates extends string, TEvents extends string>(
+  transitions: Record<TStates, Partial<Record<TEvents, TStates>>>,
+  state: TStates,
+  where: string,
+): Partial<Record<TEvents, TStates>> {
+  const stateTransitions = transitions[state];
+
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime guard for JS / cast / string-typed callers passing a state outside TStates
+  if (stateTransitions === undefined) {
+    throw new Error(
+      `[FSM.${where}] state "${state}" is not declared in config.transitions`,
+    );
+  }
+
+  return stateTransitions;
+}
+
+/**
  * Synchronous finite state machine engine.
  *
  * Reentrancy: `send()` inside `onTransition` listener is allowed but unbounded —
@@ -33,10 +57,17 @@ export class FSM<
     this.#state = config.initial;
     this.#context = config.context;
     this.#transitions = config.transitions;
-    this.#currentTransitions = config.transitions[config.initial];
+    this.#currentTransitions = requireDeclared(
+      config.transitions,
+      config.initial,
+      "constructor",
+    );
   }
 
-  send(event: TEvents, payload?: TPayloadMap[TEvents]): TStates {
+  send<E extends TEvents>(
+    event: E,
+    ...args: E extends keyof TPayloadMap ? [TPayloadMap[E]] : [undefined?]
+  ): TStates {
     const nextState = this.#currentTransitions[event];
 
     if (nextState === undefined) {
@@ -48,6 +79,8 @@ export class FSM<
     this.#state = nextState;
     this.#currentTransitions = this.#transitions[nextState];
 
+    const payload = args[0] as TPayloadMap[TEvents] | undefined;
+
     if (this.#actions !== null) {
       const action = this.#actions.get(from)?.get(event);
 
@@ -57,12 +90,16 @@ export class FSM<
     }
 
     if (this.#listenerCount > 0) {
-      const info: TransitionInfo<TStates, TEvents, TPayloadMap> = {
+      // `info` is structurally a valid TransitionInfo, but the distributive
+      // union can't be matched to one variant while `event`/`payload` are
+      // generic here — erase through `unknown` (TS2352), same spirit as the
+      // `args[0]` cast above.
+      const info = {
         from,
         to: nextState,
         event,
-        payload: payload,
-      };
+        payload,
+      } as unknown as TransitionInfo<TStates, TEvents, TPayloadMap>;
 
       for (const listener of this.#listeners) {
         if (listener !== null) {
@@ -81,10 +118,16 @@ export class FSM<
   /**
    * Directly sets FSM state without triggering actions or listeners.
    * Use for hot-path optimizations where the caller handles side effects.
+   *
+   * Throws if `state` is not declared in `config.transitions`: an undeclared
+   * state would leave `#currentTransitions` undefined and brick the next
+   * `canSend`/`send`. The state is left unchanged when the guard rejects.
    */
   forceState(state: TStates): void {
+    const transitions = requireDeclared(this.#transitions, state, "forceState");
+
     this.#state = state;
-    this.#currentTransitions = this.#transitions[state];
+    this.#currentTransitions = transitions;
   }
 
   getState(): TStates {
@@ -102,6 +145,8 @@ export class FSM<
       ? (payload: TPayloadMap[E]) => void
       : () => void,
   ): () => void {
+    requireDeclared(this.#transitions, from, "on");
+
     this.#actions ??= new Map();
 
     let stateActions = this.#actions.get(from);
