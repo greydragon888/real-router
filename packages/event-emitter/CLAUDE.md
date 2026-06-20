@@ -44,7 +44,7 @@ src/
 - **Snapshot iteration** -- `emit()` snapshots the listener set before iteration; listeners added/removed during emit do not affect the current invocation
 - **Per-listener error isolation** -- listener exceptions are caught and forwarded to `onListenerError` callback (if provided); other listeners still execute. Exception: `RecursionDepthError` is always re-thrown — both emit paths (fast + depth-tracking) route through the shared `#handleListenerError`, so the sentinel cannot be swallowed on either (#751)
 - **Explicit args, not rest params** -- `emit()` takes up to 4 explicit args to avoid V8 array materialization overhead; extra `undefined` args are harmless (JS ignores extra function arguments)
-- **Fast path for single listener** -- when a set has exactly one listener, `emit` skips array spread for the snapshot
+- **Fast path for single listener** -- when a set has exactly one listener, `emit` skips array spread for the snapshot **on the fast path (`maxEventDepth === 0`) only**. The depth-tracking path (`maxEventDepth > 0`, used by the router via `DEFAULT_LIMITS`) always snapshots `[...set]`, even for one listener — the `set.size === 1` shortcut lives only in `#emitFast`
 - **No dependencies** -- zero runtime dependencies; fully self-contained
 - **Property-based tests** -- `tests/property/` contains fast-check generative tests for emitter invariants
 - **Heap-stress tests** -- `tests/stress/` (`pnpm -F event-emitter test:stress`, runs with `--expose-gc`) guards against the dynamic-event-name heap leak (#750); thresholds are anchored to measured healthy vs leak deltas

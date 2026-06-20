@@ -229,7 +229,7 @@ handler makes the two paths impossible to diverge again (#751).
 
 #### Depth-Tracked Path (#emitWithDepthTracking)
 
-Same as fast path but with recursion depth check and try/finally. Also uses single-listener fast path (`set.size === 1` skips `[...set]` snapshot).
+Same as fast path but with recursion depth check and try/finally. **It always snapshots (`[...set]`), even for a single listener** — the `set.size === 1` shortcut lives only in `#emitFast`. Note: the router runs exclusively on this path (`maxEventDepth = 5`), so the single-listener shortcut never applies to router emits.
 
 ### #callListener() — Argument Dispatch
 
@@ -251,7 +251,7 @@ Direct calls for 0-4 args by `argc` count — monomorphic call sites, V8 optimiz
 
 - Listener **added** during emit → NOT called in current emit
 - Listener **removed** during emit → STILL called (already in snapshot)
-- **Single listener** → no snapshot, direct call from `set` (optimization: avoids array allocation)
+- **Single listener** → no snapshot, direct call from `set` (optimization: avoids array allocation) — **only on the fast path (`maxEventDepth = 0`)**; the depth-tracking path always snapshots `[...set]`, including for one listener
 
 Standard pattern in event systems (DOM, Node.js EventEmitter).
 
@@ -326,7 +326,7 @@ createRouter(routes, {
 | Operation                | Time    | Notes                                |
 | ------------------------ | ------- | ------------------------------------ |
 | `emit()` — no listeners  | ~5.8 ns | Early return, zero work              |
-| `emit()` — 1 listener    | ~30 ns  | Direct call, snapshot of 1           |
+| `emit()` — 1 listener    | ~30 ns  | Fast path: direct call, no snapshot (depth path snapshots `[...set]`) |
 | `emit()` — 10 listeners  | ~90 ns  | Linear: ~18 ns + 5.5 ns per listener |
 | `emit()` — 100 listeners | ~565 ns | Same linear scaling                  |
 | Depth tracking overhead  | +3.8 ns | +12.5% per emit                      |
