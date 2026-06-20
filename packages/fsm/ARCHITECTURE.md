@@ -240,14 +240,20 @@ This **intentionally differs** from the sibling `@real-router/event-emitter`, wh
 
 ## forceState() — Direct State Bypass
 
-`forceState(state)` updates `#state` and `#currentTransitions` directly — no actions fire, no listeners notified. The single guard validates that the target state is declared: an undeclared state throws **before** any mutation instead of silently leaving `#currentTransitions` undefined and bricking the next `canSend`/`send` ([#754](https://github.com/greydragon888/real-router/issues/754)).
+`forceState(state)` updates `#state` and `#currentTransitions` directly — no actions fire, no listeners notified. It shares the `requireDeclared` guard with the constructor (`initial`) and `on` (`from`): an undeclared state throws **before** any mutation instead of silently leaving `#currentTransitions` undefined and bricking the next `canSend`/`send` ([#754](https://github.com/greydragon888/real-router/issues/754) `forceState`; [#885](https://github.com/greydragon888/real-router/issues/885) constructor + `on`).
 
 ```typescript
-forceState(state) {
-  const transitions = this.#transitions[state];
-  if (transitions === undefined) {
-    throw new Error(`[FSM.forceState] state "${state}" is not declared in config.transitions`);
+// shared guard — single source of truth for "the state is declared"
+function requireDeclared(transitions, state, where) {
+  const t = transitions[state];
+  if (t === undefined) {
+    throw new Error(`[FSM.${where}] state "${state}" is not declared in config.transitions`);
   }
+  return t;
+}
+
+forceState(state) {
+  const transitions = requireDeclared(this.#transitions, state, "forceState");
   this.#state = state;
   this.#currentTransitions = transitions;
 }

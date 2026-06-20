@@ -1,6 +1,30 @@
 import type { FSMConfig, TransitionInfo, TransitionListener } from "./types";
 
 /**
+ * Shared guard for the engine-wide invariant "the state is declared in
+ * `config.transitions`". Applied at every state-entry-point (constructor
+ * `initial`, `forceState`, `on`'s `from`) so an undeclared state fails loud with
+ * an explicit error instead of bricking the FSM or dead-registering an action
+ * (#885). Returns the state's transition map for the caller to reuse.
+ */
+function requireDeclared<TStates extends string, TEvents extends string>(
+  transitions: Record<TStates, Partial<Record<TEvents, TStates>>>,
+  state: TStates,
+  where: string,
+): Partial<Record<TEvents, TStates>> {
+  const stateTransitions = transitions[state];
+
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime guard for JS / cast / string-typed callers passing a state outside TStates
+  if (stateTransitions === undefined) {
+    throw new Error(
+      `[FSM.${where}] state "${state}" is not declared in config.transitions`,
+    );
+  }
+
+  return stateTransitions;
+}
+
+/**
  * Synchronous finite state machine engine.
  *
  * Reentrancy: `send()` inside `onTransition` listener is allowed but unbounded —
@@ -33,7 +57,11 @@ export class FSM<
     this.#state = config.initial;
     this.#context = config.context;
     this.#transitions = config.transitions;
-    this.#currentTransitions = config.transitions[config.initial];
+    this.#currentTransitions = requireDeclared(
+      config.transitions,
+      config.initial,
+      "constructor",
+    );
   }
 
   send<E extends TEvents>(
@@ -92,14 +120,7 @@ export class FSM<
    * `canSend`/`send`. The state is left unchanged when the guard rejects.
    */
   forceState(state: TStates): void {
-    const transitions = this.#transitions[state];
-
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime guard for JS/cast callers passing a state outside TStates
-    if (transitions === undefined) {
-      throw new Error(
-        `[FSM.forceState] state "${state}" is not declared in config.transitions`,
-      );
-    }
+    const transitions = requireDeclared(this.#transitions, state, "forceState");
 
     this.#state = state;
     this.#currentTransitions = transitions;
@@ -120,6 +141,8 @@ export class FSM<
       ? (payload: TPayloadMap[E]) => void
       : () => void,
   ): () => void {
+    requireDeclared(this.#transitions, from, "on");
+
     this.#actions ??= new Map();
 
     let stateActions = this.#actions.get(from);

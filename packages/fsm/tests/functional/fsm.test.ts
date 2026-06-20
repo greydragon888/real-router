@@ -701,6 +701,34 @@ describe("FSM", () => {
     });
   });
 
+  describe("Declared-state guard (#885)", () => {
+    // `forceState` rejects an undeclared state (#754); the same engine invariant
+    // must hold at the two other state-entry-points — the constructor's `initial`
+    // and `on`'s `from`. Reachable with string-typed states / JS / cast callers.
+    it("should throw when constructed with an undeclared initial state", () => {
+      expect(
+        () =>
+          new FSM<string, string, null>({
+            initial: "GHOST",
+            context: null,
+            transitions: { a: { go: "b" }, b: {} },
+          }),
+      ).toThrow("is not declared in config.transitions");
+    });
+
+    it("should throw when on() targets an undeclared from-state", () => {
+      const fsm = new FSM<string, string, null>({
+        initial: "a",
+        context: null,
+        transitions: { a: { go: "b" }, b: {} },
+      });
+
+      expect(() => {
+        fsm.on("GHOST", "go", () => {});
+      }).toThrow("is not declared in config.transitions");
+    });
+  });
+
   describe("forceState()", () => {
     it("should set state without triggering actions or listeners", () => {
       const fsm = new FSM(lightConfig);

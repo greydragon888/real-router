@@ -919,3 +919,39 @@ describe("FSM Robustness Properties", () => {
     },
   );
 });
+
+describe("FSM Declared-State Guard Properties", () => {
+  test.prop(
+    [
+      arbFSMConfig.chain((gen) =>
+        fc.tuple(
+          fc.constant(gen),
+          fc
+            .string({ minLength: 1, maxLength: 5 })
+            .filter((s) => !gen.states.includes(s)),
+        ),
+      ),
+    ],
+    { numRuns: NUM_RUNS.standard },
+  )(
+    "constructor, forceState, and on all reject an undeclared state (#885)",
+    ([gen, undeclaredState]) => {
+      // constructor's `initial`
+      expect(
+        () => new FSM({ ...gen.config, initial: undeclaredState }),
+      ).toThrow("is not declared in config.transitions");
+
+      const fsm = createFSM(gen);
+
+      // forceState's `state`
+      expect(() => {
+        fsm.forceState(undeclaredState);
+      }).toThrow("is not declared in config.transitions");
+
+      // on's `from`
+      expect(() => {
+        fsm.on(undeclaredState, gen.events[0], () => {});
+      }).toThrow("is not declared in config.transitions");
+    },
+  );
+});
