@@ -321,13 +321,27 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
     try {
       depthMap.set(eventName, depth + 1);
 
-      const listeners = [...set];
+      // Single-listener fast path — mirrors #emitFast: skip the [...set]
+      // snapshot allocation for one listener. The router runs on this path
+      // (maxEventDepth = 5), so single-subscriber events hit it on every emit
+      // (measured ~10% faster for 1 listener; see audit 2026-06-20 §2.1).
+      if (set.size === 1) {
+        const [cb] = set;
 
-      for (const cb of listeners) {
         try {
           this.#callListener(cb, argc, arg1, arg2, arg3, arg4);
         } catch (error) {
           this.#handleListenerError(eventName, error);
+        }
+      } else {
+        const listeners = [...set];
+
+        for (const cb of listeners) {
+          try {
+            this.#callListener(cb, argc, arg1, arg2, arg3, arg4);
+          } catch (error) {
+            this.#handleListenerError(eventName, error);
+          }
         }
       }
     } finally {

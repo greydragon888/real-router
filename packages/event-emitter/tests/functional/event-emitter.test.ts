@@ -760,6 +760,27 @@ describe("EventEmitter", () => {
         emitter.emit("reset");
       }).toThrow("Maximum recursion depth");
     });
+
+    it("should isolate a throwing listener among several on the depth path (maxEventDepth > 0)", () => {
+      const onListenerError = vi.fn();
+      const second = vi.fn();
+      // maxEventDepth > 0 → depth-tracking path; 2 listeners → multi-listener branch.
+      const emitter = createEmitter({
+        limits: { maxListeners: 0, warnListeners: 0, maxEventDepth: 5 },
+        onListenerError,
+      });
+      const error = new Error("boom");
+
+      emitter.on("reset", () => {
+        throw error;
+      });
+      emitter.on("reset", second);
+
+      emitter.emit("reset");
+
+      expect(onListenerError).toHaveBeenCalledWith("reset", error);
+      expect(second).toHaveBeenCalledTimes(1); // isolation — others still run
+    });
   });
 
   // ===========================================================================
