@@ -8,16 +8,18 @@ export interface FSMConfig<
   transitions: Record<TStates, Partial<Record<TEvents, TStates>>>;
 }
 
-export interface TransitionInfo<
+export type TransitionInfo<
   TStates extends string,
   TEvents extends string,
   TPayloadMap extends Partial<Record<TEvents, unknown>>,
-> {
-  from: TStates;
-  to: TStates;
-  event: TEvents;
-  payload: TPayloadMap[TEvents] | undefined;
-}
+> = TEvents extends infer E extends TEvents
+  ? {
+      from: TStates;
+      to: TStates;
+      event: E;
+      payload: E extends keyof TPayloadMap ? TPayloadMap[E] : undefined;
+    }
+  : never;
 
 export type TransitionListener<
   TStates extends string,

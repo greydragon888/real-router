@@ -79,12 +79,16 @@ interface FSMConfig<TStates, TEvents, TContext> {
   transitions: Record<TStates, Partial<Record<TEvents, TStates>>>;
 }
 
-interface TransitionInfo<TStates, TEvents, TPayloadMap> {
-  from: TStates;
-  to: TStates;
-  event: TEvents;
-  payload: TPayloadMap[TEvents] | undefined;
-}
+// Distributive union over the event (#886): narrowing `info.event` narrows
+// `info.payload` to that event's payload — symmetric with `on`'s action.
+type TransitionInfo<TStates, TEvents, TPayloadMap> = TEvents extends infer E extends TEvents
+  ? {
+      from: TStates;
+      to: TStates;
+      event: E;
+      payload: E extends keyof TPayloadMap ? TPayloadMap[E] : undefined;
+    }
+  : never;
 ```
 
 ## Core Data Structures

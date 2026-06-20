@@ -90,12 +90,16 @@ export class FSM<
     }
 
     if (this.#listenerCount > 0) {
-      const info: TransitionInfo<TStates, TEvents, TPayloadMap> = {
+      // `info` is structurally a valid TransitionInfo, but the distributive
+      // union can't be matched to one variant while `event`/`payload` are
+      // generic here — erase through `unknown` (TS2352), same spirit as the
+      // `args[0]` cast above.
+      const info = {
         from,
         to: nextState,
         event,
-        payload: payload,
-      };
+        payload,
+      } as unknown as TransitionInfo<TStates, TEvents, TPayloadMap>;
 
       for (const listener of this.#listeners) {
         if (listener !== null) {

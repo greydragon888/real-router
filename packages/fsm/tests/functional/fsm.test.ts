@@ -163,6 +163,26 @@ describe("FSM", () => {
         }),
       );
     });
+
+    it("should narrow TransitionInfo.payload by info.event (#886)", () => {
+      const fsm = new FSM<PayloadState, PayloadEvent, null, PayloadMap>(
+        payloadConfig,
+      );
+      let url: string | undefined;
+
+      fsm.onTransition((info) => {
+        // TransitionInfo is a discriminated union over `event`, so checking
+        // `info.event === "FETCH"` narrows `info.payload` to PayloadMap["FETCH"]
+        // (= { url: string }) — the same correlation `on()` already gives actions.
+        if (info.event === "FETCH") {
+          url = info.payload.url;
+        }
+      });
+
+      fsm.send("FETCH", { url: "/api/data" });
+
+      expect(url).toBe("/api/data");
+    });
   });
 
   describe("onTransition", () => {
