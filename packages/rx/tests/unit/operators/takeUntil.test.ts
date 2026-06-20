@@ -458,4 +458,48 @@ describe("takeUntil()", () => {
 
     expect(notifierCleanups).toStrictEqual([1]);
   });
+
+  it("should release the source subscription when the source errors", () => {
+    const sourceCleanups: number[] = [];
+    let sourceErrorFn: ((error: Error) => void) | undefined;
+
+    const notifier = new RxObservable<void>(() => {
+      return () => {};
+    });
+
+    const source = new RxObservable<number>((observer) => {
+      sourceErrorFn = (error) => observer.error?.(error);
+
+      return () => sourceCleanups.push(1);
+    });
+
+    source.pipe(takeUntil(notifier)).subscribe({ error: () => {} });
+
+    sourceErrorFn?.(new Error("source error"));
+
+    // takeUntil sets completed=true on a source error and will never forward
+    // another source value — so the now-inert source subscription must be
+    // released, exactly as the notifier-emit / notifier-error branches do.
+    expect(sourceCleanups).toStrictEqual([1]);
+  });
+
+  it("should release the source subscription when the source errors synchronously", () => {
+    const sourceCleanups: number[] = [];
+
+    const notifier = new RxObservable<void>(() => {
+      return () => {};
+    });
+
+    // Source errors synchronously inside its own subscribe — sourceSubscription is
+    // still unassigned in the error handler, so the post-subscribe block must release it.
+    const source = new RxObservable<number>((observer) => {
+      observer.error?.(new Error("sync source error"));
+
+      return () => sourceCleanups.push(1);
+    });
+
+    source.pipe(takeUntil(notifier)).subscribe({ error: () => {} });
+
+    expect(sourceCleanups).toStrictEqual([1]);
+  });
 });

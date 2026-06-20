@@ -90,6 +90,14 @@ export function takeUntil<T>(notifier: RxObservable<unknown>): Operator<T, T> {
 
           completed = true;
 
+          // takeUntil is now inert (completed=true drops every later source value),
+          // so release the source — exactly as the notifier-emit / notifier-error
+          // branches do. sourceSubscription is undefined only when the source errors
+          // synchronously; the post-subscribe block below releases it in that case.
+          if (sourceSubscription) {
+            sourceSubscription.unsubscribe();
+          }
+
           // notifierSubscription is always defined here (notifier subscribes before source)
           notifierSubscription.unsubscribe();
 
@@ -100,9 +108,18 @@ export function takeUntil<T>(notifier: RxObservable<unknown>): Operator<T, T> {
         },
       });
 
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- defensive
+      if (completed) {
+        // The source completed/errored synchronously inside its own subscribe, so the
+        // handler ran before `sourceSubscription` was assigned and could not release it.
+        // complete() already closed the source (no-op here), but a non-terminal error
+        // leaves it open — release the now-assigned subscription so it does not dangle (#877).
+        sourceSubscription.unsubscribe();
+      }
+
       return () => {
-        // Both guaranteed defined: notifier subscribes first (line 37),
-        // early return on line 60 if sync complete/error, source subscribes after (line 64)
+        // Both guaranteed defined: notifier subscribes first, early return above on
+        // sync notifier complete/error, source subscribes after.
         sourceSubscription.unsubscribe();
         notifierSubscription.unsubscribe();
       };
