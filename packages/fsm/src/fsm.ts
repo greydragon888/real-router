@@ -36,7 +36,10 @@ export class FSM<
     this.#currentTransitions = config.transitions[config.initial];
   }
 
-  send(event: TEvents, payload?: TPayloadMap[TEvents]): TStates {
+  send<E extends TEvents>(
+    event: E,
+    ...args: E extends keyof TPayloadMap ? [TPayloadMap[E]] : [undefined?]
+  ): TStates {
     const nextState = this.#currentTransitions[event];
 
     if (nextState === undefined) {
@@ -47,6 +50,8 @@ export class FSM<
 
     this.#state = nextState;
     this.#currentTransitions = this.#transitions[nextState];
+
+    const payload = args[0] as TPayloadMap[TEvents] | undefined;
 
     if (this.#actions !== null) {
       const action = this.#actions.get(from)?.get(event);

@@ -562,23 +562,43 @@ describe("FSM", () => {
       expect(fsm.getState()).toBe("green");
     });
 
-    it("should ignore extra payload for no-payload event", () => {
+    it("should reject a payload typed for a different event (#753)", () => {
+      const fsm = new FSM<PayloadState, PayloadEvent, null, PayloadMap>(
+        payloadConfig,
+      );
+
+      // FETCH's payload is { url: string }; REJECT's { error: string } is a
+      // different event's payload and must not satisfy FETCH.
+      // @ts-expect-error — send() must correlate the payload to the specific event
+      fsm.send("FETCH", { error: "boom" });
+
+      // The correctly-typed payload still compiles (positive control).
+      fsm.send("FETCH", { url: "/api" });
+
+      expect(fsm.getState()).toBe("loading");
+    });
+
+    it("should reject extra payload for a no-payload event (runtime still ignores it)", () => {
       const fsm = new FSM<PayloadState, PayloadEvent, null, PayloadMap>(
         payloadConfig,
       );
 
       fsm.send("FETCH", { url: "/api" });
 
+      // RESOLVE has no entry in PayloadMap, so it accepts no payload.
+      // @ts-expect-error — a no-payload event must not receive a payload
       fsm.send("RESOLVE", { data: "something" });
 
       expect(fsm.getState()).toBe("done");
     });
 
-    it("should transition without payload for payload event", () => {
+    it("should require the payload for a payload event at the type level (runtime stays lenient)", () => {
       const fsm = new FSM<PayloadState, PayloadEvent, null, PayloadMap>(
         payloadConfig,
       );
 
+      // FETCH declares a payload, so omitting it is now a type error.
+      // @ts-expect-error — a payload event requires its payload argument
       fsm.send("FETCH");
 
       expect(fsm.getState()).toBe("loading");

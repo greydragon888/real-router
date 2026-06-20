@@ -323,7 +323,7 @@ fsm.send("START", {}); // TS error
 
 Default `TPayloadMap = Record<never, never>` — all events are payload-free.
 
-> ⚠️ **Known gap ([#753](https://github.com/greydragon888/real-router/issues/753)):** the snippet above describes the *intended* contract, but the current `send` signature is `send(event: TEvents, payload?: TPayloadMap[TEvents])` — `TPayloadMap[TEvents]` indexes by the **full** event union, so `send` does **not** correlate the payload to the specific event (e.g. `send("NAVIGATE")` and a wrong-event payload both compile). Only `on(from, event, action)` correlates the payload. The fix is a distributive `send<E extends TEvents>` signature. Dormant for core (`RouterPayloads` is empty).
+> **Enforced ([#753](https://github.com/greydragon888/real-router/issues/753)):** the contract above is enforced by a distributive `send<E extends TEvents>(event, ...payload: E extends keyof TPayloadMap ? [TPayloadMap[E]] : [undefined?])` signature — symmetric with `on`, the payload correlates to the **specific** event. Previously `send(event: TEvents, payload?: TPayloadMap[TEvents])` indexed by the **full** `TEvents` union (which collapses to `unknown`), so `send("NAVIGATE")` and a wrong-event payload both compiled. Runtime is unchanged; the fix is type-level only. Dormant for core (`RouterPayloads` is empty).
 
 ## Self-Transitions
 
