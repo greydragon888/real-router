@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-06-20]
 
+### @real-router/core@0.59.2
+
+### Patch Changes
+
+- [#883](https://github.com/greydragon888/real-router/pull/883) [`0c668db`](https://github.com/greydragon888/real-router/commit/0c668db717f1716a674feefb766e4615749a74d0) Thanks [@greydragon888](https://github.com/greydragon888)! - Speed up single-listener event dispatch on the depth-tracking emit path ([#751](https://github.com/greydragon888/real-router/issues/751))
+
+  The internal event emitter (bundled into core) special-cased a single listener — skipping the `[...set]` snapshot allocation for a direct call — only on its fast path (`maxEventDepth = 0`). The router runs exclusively on the depth-tracking path (`maxEventDepth = 5`), so single-subscriber events never got the shortcut and allocated a one-element array on every emit. Mirroring the `set.size === 1` shortcut into `#emitWithDepthTracking` makes single-listener emits ~10% faster (measured via mitata A/B, bracketed against run-to-run drift) — every navigation event with a single subscriber benefits. Behavior is unchanged (snapshot-of-one semantics preserved).
+
+- [#883](https://github.com/greydragon888/real-router/pull/883) [`0c668db`](https://github.com/greydragon888/real-router/commit/0c668db717f1716a674feefb766e4615749a74d0) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix heap leak in the internal event emitter for dynamic event names ([#750](https://github.com/greydragon888/real-router/issues/750))
+
+  The internal event emitter (bundled into core) retained a per-event-name record after the last listener was removed: `off()` deleted the listener from its `Set` but never released the now-empty `Set`, and the depth-tracking `emit()` path left a `{name → 0}` entry behind. The only release point was `clearAll()`, so a consumer with **dynamic event names** accumulated one record per name unbounded — `listenerCount()` returned 0, masking the growth.
+
+  `off()` now releases the record (and its warn latch) once the last listener is gone, and the depth-tracking `emit()` path deletes its entry when recursion unwinds to zero. The router uses a fixed set of event names, so it was only latently affected; the primitive is now leak-free for any naming pattern. Adds heap-stress coverage (healthy ~0.03 MB vs pre-fix ~40 MB).
+
+- [#883](https://github.com/greydragon888/real-router/pull/883) [`0c668db`](https://github.com/greydragon888/real-router/commit/0c668db717f1716a674feefb766e4615749a74d0) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix RecursionDepthError being swallowed on the event emitter's fast path ([#751](https://github.com/greydragon888/real-router/issues/751))
+
+  The internal event emitter (bundled into core) documents that `RecursionDepthError` is **always** re-thrown from `emit()`, but the fast path (`maxEventDepth === 0`) routed it to `onListenerError` like an ordinary listener error, while the depth-tracking path re-threw it — a contract divergence between the two paths.
+
+  Both paths now share a single error-handling helper that re-throws the sentinel unconditionally, so a `RecursionDepthError` bubbling up from a nested depth-tracked emitter propagates to the caller regardless of the outer emitter's `maxEventDepth`. The router configures `maxEventDepth = 5` (depth-tracking path) after wiring, so it was unaffected; the fix restores the contract for the generic primitive.
+
+- [#883](https://github.com/greydragon888/real-router/pull/883) [`0c668db`](https://github.com/greydragon888/real-router/commit/0c668db717f1716a674feefb766e4615749a74d0) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix spurious and duplicate listener-limit warnings ([#752](https://github.com/greydragon888/real-router/issues/752))
+
+  The internal event emitter (bundled into core) violated the documented "exactly once" contract for its listener-limit warning. Two cases are fixed:
+
+  - **No warning for a failed registration** — the hard `maxListeners` limit is now checked **before** the warning, so a registration that throws `"Listener limit"` (e.g. when `limits.warnListeners === limits.maxListeners`) no longer emits the "possible memory leak" warning.
+  - **Warn exactly once per event** — the warning is latched per emitter+event, so off/on listener churn around the threshold no longer re-fires it. `clearAll()` resets the latch.
+
+
 ### @real-router/core@0.59.1
 
 ### Patch Changes
