@@ -8,9 +8,11 @@ import {
   arbFSMConfig,
   arbFSMConfigWithInitialTransition,
   arbFSMConfigWithSelfLoop,
+  arbFSMConfigWithTwoStepChain,
   arbEventSequence,
   arbMixedEventSequence,
   createFSM,
+  createFSMWithPayloads,
 } from "./helpers";
 
 describe("FSM State Transition Properties", () => {
@@ -580,6 +582,340 @@ describe("FSM Edge Case Properties", () => {
       });
 
       expect(fsm.getContext()).toBe(context);
+    },
+  );
+});
+
+// --- Hardening properties: payload delivery (#753), forceState guard (#754),
+// --- and reentrancy / live iteration (#755). ---
+
+describe("FSM Payload Delivery Properties", () => {
+  test.prop(
+    [
+      arbFSMConfigWithInitialTransition.chain((gen) =>
+        fc.tuple(fc.constant(gen), fc.anything()),
+      ),
+    ],
+    { numRuns: NUM_RUNS.standard },
+  )(
+    "send(event, payload) delivers the same payload to the action and to TransitionInfo.payload",
+    ([gen, payload]) => {
+      const fsm = createFSMWithPayloads(gen);
+      let actionCalled = false;
+      let actionPayload: unknown;
+      let infoPayload: unknown;
+
+      fsm.on(gen.config.initial, gen.knownEvent, (p) => {
+        actionCalled = true;
+        actionPayload = p;
+      });
+      fsm.onTransition((info) => {
+        infoPayload = info.payload;
+      });
+
+      fsm.send(gen.knownEvent, payload);
+
+      expect(actionCalled).toBe(true);
+      expect(actionPayload).toBe(payload);
+      expect(infoPayload).toBe(payload);
+    },
+  );
+});
+
+describe("FSM Reentrancy & Live-Iteration Properties", () => {
+  test.prop([arbFSMConfigWithTwoStepChain], { numRuns: NUM_RUNS.lifecycle })(
+    "outer listener sees its own info.to while getState() reflects the reentrant final state",
+    (gen) => {
+      const fsm = createFSM(gen);
+      let firstCall = true;
+      let outerInfoTo: string | undefined;
+      let stateAtOuterReturn: string | undefined;
+
+      fsm.onTransition((info) => {
+        if (firstCall) {
+          firstCall = false;
+          fsm.send(gen.secondEvent); // reentrant: knownTo -> secondTo
+          outerInfoTo = info.to;
+          stateAtOuterReturn = fsm.getState();
+        }
+      });
+
+      fsm.send(gen.knownEvent); // initial -> knownTo
+
+      expect(outerInfoTo).toBe(gen.knownTo);
+      expect(stateAtOuterReturn).toBe(gen.secondTo);
+      expect(outerInfoTo).not.toBe(stateAtOuterReturn);
+      expect(fsm.getState()).toBe(gen.secondTo);
+    },
+  );
+
+  test.prop([arbFSMConfigWithInitialTransition], {
+    numRuns: NUM_RUNS.lifecycle,
+  })(
+    "a listener added during a send fires within that same send (live iteration, no snapshot)",
+    (gen) => {
+      const fsm = createFSM(gen);
+      const log: string[] = [];
+      let added = false;
+
+      fsm.onTransition(() => {
+        log.push("A");
+        if (!added) {
+          added = true;
+          fsm.onTransition(() => log.push("B"));
+        }
+      });
+
+      fsm.send(gen.knownEvent);
+
+      expect(log).toStrictEqual(["A", "B"]);
+    },
+  );
+});
+
+describe("FSM Listener Churn Properties", () => {
+  test.prop(
+    [
+      arbFSMConfigWithInitialTransition.chain((gen) =>
+        fc.tuple(
+          fc.constant(gen),
+          fc.array(fc.integer({ min: 0, max: 1000 }), {
+            minLength: 1,
+            maxLength: 40,
+          }),
+        ),
+      ),
+    ],
+    { numRuns: NUM_RUNS.lifecycle },
+  )(
+    "after random subscribe/unsubscribe churn, exactly the live listeners fire in slot order",
+    ([gen, codes]) => {
+      const fsm = createFSM(gen);
+      const fireLog: number[] = [];
+      const live: { id: number; unsub: () => void }[] = [];
+      const model: (number | null)[] = []; // mirrors the FSM's null-slot array
+      let nextId = 0;
+
+      for (const code of codes) {
+        if (code % 2 === 0 || live.length === 0) {
+          const id = nextId++;
+          const unsub = fsm.onTransition(() => fireLog.push(id));
+
+          live.push({ id, unsub });
+
+          const nullIdx = model.indexOf(null);
+
+          if (nullIdx === -1) {
+            model.push(id);
+          } else {
+            model[nullIdx] = id;
+          }
+        } else {
+          const target = live[code % live.length];
+
+          target.unsub();
+          live.splice(code % live.length, 1);
+          model[model.indexOf(target.id)] = null;
+        }
+      }
+
+      fireLog.length = 0;
+      fsm.send(gen.knownEvent);
+
+      const expected = model.filter((x): x is number => x !== null);
+
+      expect(fireLog).toStrictEqual(expected);
+    },
+  );
+});
+
+describe("FSM Action Hardening Properties", () => {
+  test.prop([arbFSMConfigWithInitialTransition], {
+    numRuns: NUM_RUNS.lifecycle,
+  })(
+    "unsubscribing an overwritten action does not remove its replacement",
+    (gen) => {
+      const fsm = createFSM(gen);
+      let aCalled = false;
+      let bCalled = false;
+
+      const unsubA = fsm.on(gen.config.initial, gen.knownEvent, () => {
+        aCalled = true;
+      });
+
+      fsm.on(gen.config.initial, gen.knownEvent, () => {
+        bCalled = true;
+      });
+
+      unsubA(); // no-op: A was already replaced by B
+
+      fsm.send(gen.knownEvent);
+
+      expect(aCalled).toBe(false);
+      expect(bCalled).toBe(true);
+    },
+  );
+
+  test.prop(
+    [
+      arbFSMConfig.chain((gen) =>
+        fc.tuple(fc.constant(gen), arbEventSequence(gen.events)),
+      ),
+    ],
+    { numRuns: NUM_RUNS.lifecycle },
+  )(
+    "multiple actions on distinct (from, event) pairs each fire exactly on their matching transition",
+    ([gen, events]) => {
+      const fsm = createFSM(gen);
+      const actual = new Map<string, number>();
+      const expected = new Map<string, number>();
+
+      for (const state of gen.states) {
+        for (const event of gen.events) {
+          if (gen.config.transitions[state][event] !== undefined) {
+            const key = `${state}|${event}`;
+
+            fsm.on(state, event, () => {
+              actual.set(key, (actual.get(key) ?? 0) + 1);
+            });
+          }
+        }
+      }
+
+      for (const event of events) {
+        const from = fsm.getState();
+
+        if (gen.config.transitions[from][event] !== undefined) {
+          const key = `${from}|${event}`;
+
+          expected.set(key, (expected.get(key) ?? 0) + 1);
+        }
+
+        fsm.send(event);
+      }
+
+      expect(actual).toStrictEqual(expected);
+    },
+  );
+
+  test.prop([arbFSMConfigWithInitialTransition], {
+    numRuns: NUM_RUNS.lifecycle,
+  })(
+    "when an action throws, onTransition listeners are not reached (action runs first, no isolation)",
+    (gen) => {
+      const fsm = createFSM(gen);
+      let listenerCalled = false;
+
+      fsm.on(gen.config.initial, gen.knownEvent, () => {
+        throw new Error("action boom");
+      });
+      fsm.onTransition(() => {
+        listenerCalled = true;
+      });
+
+      expect(() => fsm.send(gen.knownEvent)).toThrow("action boom");
+      expect(listenerCalled).toBe(false);
+      expect(fsm.getState()).toBe(gen.knownTo);
+    },
+  );
+});
+
+describe("FSM Listener Exception Properties", () => {
+  test.prop([arbFSMConfigWithInitialTransition], {
+    numRuns: NUM_RUNS.lifecycle,
+  })(
+    "a throwing listener aborts the dispatch — listeners registered after it are skipped",
+    (gen) => {
+      const fsm = createFSM(gen);
+      const log: string[] = [];
+
+      fsm.onTransition(() => log.push("first"));
+      fsm.onTransition(() => {
+        throw new Error("listener boom");
+      });
+      fsm.onTransition(() => log.push("third"));
+
+      expect(() => fsm.send(gen.knownEvent)).toThrow("listener boom");
+      expect(log).toStrictEqual(["first"]);
+      expect(fsm.getState()).toBe(gen.knownTo);
+    },
+  );
+});
+
+describe("FSM forceState Interaction Properties", () => {
+  test.prop([arbFSMConfigWithTwoStepChain], { numRuns: NUM_RUNS.lifecycle })(
+    "after forceState(X), the next send dispatches X's action and transition",
+    (gen) => {
+      const fsm = createFSM(gen);
+      let actionCalled = false;
+      let listenerTo: string | undefined;
+
+      fsm.forceState(gen.knownTo);
+      fsm.on(gen.knownTo, gen.secondEvent, () => {
+        actionCalled = true;
+      });
+      fsm.onTransition((info) => {
+        listenerTo = info.to;
+      });
+
+      const result = fsm.send(gen.secondEvent);
+
+      expect(actionCalled).toBe(true);
+      expect(result).toBe(gen.secondTo);
+      expect(listenerTo).toBe(gen.secondTo);
+    },
+  );
+});
+
+describe("FSM Robustness Properties", () => {
+  test.prop(
+    [
+      arbFSMConfig.chain((gen) =>
+        fc.tuple(
+          fc.constant(gen),
+          fc.array(
+            fc.oneof(
+              fc
+                .constantFrom(...(gen.events as [string, ...string[]]))
+                .map((event) => ({ kind: "send" as const, value: event })),
+              fc
+                .constantFrom(...(gen.states as [string, ...string[]]))
+                .map((state) => ({ kind: "force" as const, value: state })),
+              fc
+                .string({ minLength: 1, maxLength: 5 })
+                .filter((s) => !gen.states.includes(s))
+                .map((state) => ({ kind: "forceBad" as const, value: state })),
+            ),
+            { minLength: 1, maxLength: 30 },
+          ),
+        ),
+      ),
+    ],
+    { numRuns: NUM_RUNS.lifecycle },
+  )(
+    "no sequence of send / valid forceState / rejected forceState ever bricks the FSM",
+    ([gen, ops]) => {
+      const fsm = createFSM(gen);
+
+      for (const op of ops) {
+        if (op.kind === "send") {
+          fsm.send(op.value);
+        } else if (op.kind === "force") {
+          fsm.forceState(op.value);
+        } else {
+          expect(() => {
+            fsm.forceState(op.value);
+          }).toThrow();
+        }
+
+        // After every op the FSM stays consistent: the state is declared and
+        // canSend never throws (i.e. #currentTransitions is never undefined).
+        expect(gen.states).toContain(fsm.getState());
+
+        for (const event of gen.events) {
+          expect(typeof fsm.canSend(event)).toBe("boolean");
+        }
+      }
     },
   );
 });

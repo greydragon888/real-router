@@ -125,6 +125,17 @@ export function createFSM(gen: GeneratedFSMConfig): FSM<string, string, null> {
   return new FSM(gen.config);
 }
 
+/**
+ * Like {@link createFSM} but typed with an open payload map (every event carries
+ * an `unknown` payload), so `send(event, payload)` and payload-receiving actions
+ * type-check. Used to exercise runtime payload delivery generatively.
+ */
+export function createFSMWithPayloads(
+  gen: GeneratedFSMConfig,
+): FSM<string, string, null, Record<string, unknown>> {
+  return new FSM<string, string, null, Record<string, unknown>>(gen.config);
+}
+
 // --- Action test support ---
 
 export interface GeneratedFSMConfigWithInitialTransition extends GeneratedFSMConfig {
@@ -150,5 +161,45 @@ export const arbFSMConfigWithInitialTransition: fc.Arbitrary<GeneratedFSMConfigW
         ...gen,
         knownEvent: event,
         knownTo: to,
+      }));
+    });
+
+// --- Two-step chain support (reentrancy + forceState interaction) ---
+
+export interface GeneratedFSMConfigWithTwoStepChain extends GeneratedFSMConfigWithInitialTransition {
+  /** An event with a transition out of `knownTo`. */
+  readonly secondEvent: string;
+  /** The target of `knownTo` --(secondEvent)--> `secondTo` (guaranteed != knownTo). */
+  readonly secondTo: string;
+}
+
+/**
+ * A config with a two-step chain `initial --(knownEvent)--> knownTo
+ * --(secondEvent)--> secondTo`, where `secondTo !== knownTo` so the final state
+ * differs from the intermediate one (required to observe reentrant `info.to`
+ * staleness, where the outer listener's `info.to` is `knownTo` while
+ * `getState()` is already `secondTo`).
+ */
+export const arbFSMConfigWithTwoStepChain: fc.Arbitrary<GeneratedFSMConfigWithTwoStepChain> =
+  arbFSMConfigWithInitialTransition
+    .filter((gen) => {
+      const trans = gen.config.transitions[gen.knownTo];
+
+      return Object.values(trans).some(
+        (to) => to !== undefined && to !== gen.knownTo,
+      );
+    })
+    .chain((gen) => {
+      const trans = gen.config.transitions[gen.knownTo];
+      const entries = Object.entries(trans).filter(
+        (entry): entry is [string, string] =>
+          entry[1] !== undefined && entry[1] !== gen.knownTo,
+      );
+      const [first, ...rest] = entries;
+
+      return fc.constantFrom(first, ...rest).map(([secondEvent, secondTo]) => ({
+        ...gen,
+        secondEvent,
+        secondTo,
       }));
     });
