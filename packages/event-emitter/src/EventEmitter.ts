@@ -129,7 +129,21 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
     eventName: E,
     cb: (...args: TEventMap[E]) => void,
   ): void {
-    this.#callbacks.get(eventName)?.delete(cb);
+    const set = this.#callbacks.get(eventName);
+
+    if (!set) {
+      return;
+    }
+
+    set.delete(cb);
+
+    if (set.size === 0) {
+      // Release per-event records once the last listener is gone, so consumers
+      // with dynamic event names don't accumulate empty Sets unbounded
+      // (listenerCount stays 0 either way, masking the growth). See #750.
+      this.#callbacks.delete(eventName);
+      this.#warnedEvents?.delete(eventName);
+    }
   }
 
   /**
@@ -308,7 +322,15 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
     } finally {
       // Safe: depthMap.set() at try start guarantees the value exists
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      depthMap.set(eventName, depthMap.get(eventName)! - 1);
+      const remaining = depthMap.get(eventName)! - 1;
+
+      if (remaining === 0) {
+        // Outermost frame — release the entry so dynamic event names don't
+        // accumulate {name → 0} records unbounded. See #750.
+        depthMap.delete(eventName);
+      } else {
+        depthMap.set(eventName, remaining);
+      }
     }
   }
 

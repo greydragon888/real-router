@@ -104,7 +104,8 @@ class EventEmitter<TEventMap> {
 
   #warnedEvents: Set<string> | null = null;
   // Event names that already fired onListenerWarn. Latches the warning to once
-  // per emitter+event. Null until first warn; reset by clearAll().
+  // per emitter+event. Null until first warn; the entry is released when the
+  // event's last listener is removed (off → empty Set) or on clearAll().
 
   #limits: EventEmitterLimits;
   // Current limits (mutable via setLimits).
@@ -125,6 +126,17 @@ class EventEmitter<TEventMap> {
 
 - Lazy initialization — zero allocation if depth tracking never enabled (`maxEventDepth === 0`)
 - Created on first `emit()` via `??=`
+- The per-event entry is **released when recursion unwinds to zero** (the outermost
+  `finally` deletes `{name → 0}` instead of leaving it), so depth-tracked emits on
+  dynamic event names don't accumulate records unbounded (#750)
+
+**Record lifecycle (no leak for dynamic names, #750)**
+
+All three per-event maps (`#callbacks`, `#depthMap`, `#warnedEvents`) are released the
+moment a name goes idle — `off()` deletes the `Set` (and warn latch) when its last
+listener is removed, and the depth-tracking `emit()` finally deletes the depth entry
+when it returns to 0. `listenerCount()` reports 0 either way, so the release is only
+observable via heap — covered by `tests/stress/event-emitter.stress.ts`.
 
 ## Core Algorithms
 
@@ -149,8 +161,15 @@ on(eventName, cb) {
 
 ```typescript
 off(eventName, cb) {
-  this.#callbacks.get(eventName)?.delete(cb);
-  // Idempotent: no-op if event unknown or cb not registered
+  const set = this.#callbacks.get(eventName);
+  if (!set) return;                        // idempotent: no-op if event unknown
+  set.delete(cb);                          // idempotent: no-op if cb not registered
+  if (set.size === 0) {
+    // Release the record once the last listener is gone, so consumers with
+    // dynamic event names don't accumulate empty Sets unbounded (#750).
+    this.#callbacks.delete(eventName);
+    this.#warnedEvents?.delete(eventName); // warn latch released with the Set
+  }
 }
 ```
 

@@ -464,6 +464,33 @@ describe("EventEmitter", () => {
 
       expect(onListenerWarn).toHaveBeenCalledTimes(2);
     });
+
+    it("should warn again after off() removes the last listener (latch released with the Set)", () => {
+      const onListenerWarn = vi.fn();
+      const emitter = createEmitter({
+        limits: { maxListeners: 0, warnListeners: 2, maxEventDepth: 0 },
+        onListenerWarn,
+      });
+
+      const u1 = emitter.on("click", vi.fn());
+      const u2 = emitter.on("click", vi.fn());
+      const u3 = emitter.on("click", vi.fn()); // warn fires once
+
+      expect(onListenerWarn).toHaveBeenCalledTimes(1);
+
+      // Remove every listener — the empty Set (and its warn latch) is released.
+      u1();
+      u2();
+      u3();
+
+      expect(emitter.listenerCount("click")).toBe(0);
+
+      emitter.on("click", vi.fn());
+      emitter.on("click", vi.fn());
+      emitter.on("click", vi.fn()); // fresh accumulation → warn fires again
+
+      expect(onListenerWarn).toHaveBeenCalledTimes(2);
+    });
   });
 
   // ===========================================================================
