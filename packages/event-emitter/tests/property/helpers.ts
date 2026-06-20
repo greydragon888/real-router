@@ -8,7 +8,13 @@ export const NUM_RUNS = {
   async: 30,
 } as const;
 
-const EVENT_NAMES = ["event1", "event2", "event3", "event4", "event5"] as const;
+export const EVENT_NAMES = [
+  "event1",
+  "event2",
+  "event3",
+  "event4",
+  "event5",
+] as const;
 
 export type EventName = (typeof EVENT_NAMES)[number];
 
