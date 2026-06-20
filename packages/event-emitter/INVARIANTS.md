@@ -55,7 +55,8 @@
 | #   | Invariant                | Description                                                                                                                                                                                                  |
 | --- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 1   | maxListeners enforcement | When `maxListeners > 0`, attempting to register more listeners than the limit throws `"Listener limit"`. Exactly `maxListeners` registrations succeed; the (N+1)th throws.                                   |
-| 2   | warnListeners threshold  | When `warnListeners > 0`, registering the (W+1)th listener (where W = warnListeners) invokes `onListenerWarn` exactly once with the event name and threshold value. Earlier registrations do not trigger it. |
+| 2   | warnListeners threshold  | When `warnListeners > 0`, the first **successful** registration of the (W+1)th listener (W = warnListeners) invokes `onListenerWarn` once with the event name and threshold value. The hard limit is checked first, so a registration that throws `"Listener limit"` (e.g. `warnListeners === maxListeners`) never warns. Earlier registrations do not trigger it. |
+| 3   | warn latch (exactly once) | The warning fires **exactly once per emitter+event** for the lifetime of the listener set — even when off/on churn re-crosses the threshold (`set.size === warnListeners` is re-met). `clearAll()` resets the latch, so a fresh accumulation past the threshold warns again. |
 
 ## Callback Validation
 
@@ -67,5 +68,5 @@
 
 | File                                        | Invariants | Category                                                                                                                         |
 | ------------------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `tests/property/eventEmitter.properties.ts` | 19         | Delivery, ordering, isolation, unsubscribe, snapshot semantics, listener count, registration, error handling, limits, validation |
+| `tests/property/eventEmitter.properties.ts` | 22         | Delivery, ordering, isolation, unsubscribe, snapshot semantics, listener count, registration, error handling, limits, validation |
 | `tests/property/helpers.ts`                 | —          | Shared arbitraries and emitter factory helpers                                                                                   |

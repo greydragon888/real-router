@@ -599,4 +599,47 @@ describe("EventEmitter Property-Based Tests", () => {
       },
     );
   });
+
+  describe("warnListeners — onListenerWarn fires exactly once across churn", () => {
+    test.prop([arbEventName, arbWarnThreshold], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "off/on churn around the threshold never re-fires the warning",
+      (eventName, warnThreshold) => {
+        const warnings: { event: string; count: number }[] = [];
+        // eslint-disable-next-line unicorn/prefer-event-target -- custom EventEmitter
+        const emitter = new EventEmitter<TestEventMap>({
+          limits: {
+            maxListeners: 0,
+            warnListeners: warnThreshold,
+            maxEventDepth: 0,
+          },
+          onListenerWarn: (event, count) => {
+            warnings.push({ event, count });
+          },
+        });
+
+        // Fill up to the threshold — no warning yet.
+        for (const { fn } of createUniqueListeners(warnThreshold)) {
+          emitter.on(eventName, fn);
+        }
+
+        // Re-cross the threshold repeatedly: each round adds the (W+1)th
+        // listener (set.size === warnThreshold, the warn trigger) and removes
+        // it again. The latch must keep the warning to a single firing.
+        for (let round = 0; round < 3; round++) {
+          const [extra] = createUniqueListeners(1);
+          const unsub = emitter.on(eventName, extra.fn);
+
+          unsub();
+        }
+
+        expect(warnings).toHaveLength(1);
+        expect(warnings[0]).toStrictEqual({
+          event: eventName,
+          count: warnThreshold,
+        });
+      },
+    );
+  });
 });

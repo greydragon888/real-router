@@ -102,6 +102,10 @@ class EventEmitter<TEventMap> {
   #depthMap: Map<string, number> | null = null;
   // Event name → current recursion depth. Null until first emit with depth tracking.
 
+  #warnedEvents: Set<string> | null = null;
+  // Event names that already fired onListenerWarn. Latches the warning to once
+  // per emitter+event. Null until first warn; reset by clearAll().
+
   #limits: EventEmitterLimits;
   // Current limits (mutable via setLimits).
 
@@ -130,8 +134,12 @@ class EventEmitter<TEventMap> {
 on(eventName, cb) {
   const set = this.#getCallbackSet(eventName);   // get or create Set (lazy)
   if (set.has(cb)) throw new Error("Duplicate"); // duplicate check
-  if (set.size === warnListeners) onListenerWarn?.(eventName, warnListeners);
-  if (set.size >= maxListeners) throw new Error("Limit reached");
+  if (set.size >= maxListeners) throw new Error("Limit reached"); // limit BEFORE warn
+  // Warn once per event (latched), never for a registration that just threw
+  if (set.size === warnListeners && !this.#warnedEvents.has(eventName)) {
+    this.#warnedEvents.add(eventName);
+    onListenerWarn?.(eventName, warnListeners);
+  }
   set.add(cb);
   return () => this.off(eventName, cb);          // unsubscribe closure
 }
@@ -241,8 +249,8 @@ Three-level error handling:
 | `maxEventDepth` | 0 (off) | Yes        | `emit()` throws RecursionDepthError |
 
 - **0 = disabled** for all limits
-- `warnListeners` fires when `set.size === threshold` (exact match, fires once)
-- `maxListeners` checks `set.size >= limit` (prevents exceeding)
+- `maxListeners` checks `set.size >= limit` and throws **before** the warn check — a registration that hits the limit never warns
+- `warnListeners` fires when `set.size === threshold`, latched to **exactly once per emitter+event** (off/on churn does not re-fire; `clearAll()` resets the latch)
 - `maxEventDepth` checks `depth >= limit` before incrementing
 
 ## Usage in @real-router/core

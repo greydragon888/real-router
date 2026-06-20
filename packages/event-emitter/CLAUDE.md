@@ -39,6 +39,7 @@ src/
 ## Gotchas
 
 - **Duplicate listeners throw** -- calling `on()` with the same function reference twice for the same event throws an Error, not a silent no-op
+- **`onListenerWarn` is latched, throw-first** -- the warning fires **exactly once per emitter+event** (off/on churn around the threshold does not re-fire; `clearAll()` resets the latch). The `maxListeners` throw is checked **before** the warn, so a registration that hits the hard limit never warns (`warnListeners === maxListeners` → warn is unreachable)
 - **Snapshot iteration** -- `emit()` snapshots the listener set before iteration; listeners added/removed during emit do not affect the current invocation
 - **Per-listener error isolation** -- listener exceptions are caught and forwarded to `onListenerError` callback (if provided); other listeners still execute. Exception: `RecursionDepthError` is always re-thrown
 - **Explicit args, not rest params** -- `emit()` takes up to 4 explicit args to avoid V8 array materialization overhead; extra `undefined` args are harmless (JS ignores extra function arguments)

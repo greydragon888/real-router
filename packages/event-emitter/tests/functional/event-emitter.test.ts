@@ -422,6 +422,48 @@ describe("EventEmitter", () => {
 
       expect(emitter.listenerCount("click")).toBe(2);
     });
+
+    it("should warn exactly once across off/on churn around the threshold", () => {
+      const onListenerWarn = vi.fn();
+      const emitter = createEmitter({
+        limits: { maxListeners: 0, warnListeners: 2, maxEventDepth: 0 },
+        onListenerWarn,
+      });
+
+      emitter.on("click", vi.fn());
+      emitter.on("click", vi.fn());
+      const unsub = emitter.on("click", vi.fn()); // 3rd — size was 2 → warn fires
+
+      expect(onListenerWarn).toHaveBeenCalledTimes(1);
+
+      unsub(); // back to 2 listeners
+      emitter.on("click", vi.fn()); // re-crosses the threshold (size is 2 again)
+
+      // "exactly once" must hold across off/on churn, not only monotonic growth
+      expect(onListenerWarn).toHaveBeenCalledTimes(1);
+    });
+
+    it("should warn again after clearAll() resets the warn latch", () => {
+      const onListenerWarn = vi.fn();
+      const emitter = createEmitter({
+        limits: { maxListeners: 0, warnListeners: 2, maxEventDepth: 0 },
+        onListenerWarn,
+      });
+
+      emitter.on("click", vi.fn());
+      emitter.on("click", vi.fn());
+      emitter.on("click", vi.fn()); // warn fires once
+
+      expect(onListenerWarn).toHaveBeenCalledTimes(1);
+
+      emitter.clearAll();
+
+      emitter.on("click", vi.fn());
+      emitter.on("click", vi.fn());
+      emitter.on("click", vi.fn()); // fresh accumulation → warn fires again
+
+      expect(onListenerWarn).toHaveBeenCalledTimes(2);
+    });
   });
 
   // ===========================================================================
@@ -797,6 +839,21 @@ describe("EventEmitter", () => {
 
       // 5th — throws
       expect(() => emitter.on("click", vi.fn())).toThrow("Listener limit");
+    });
+
+    it("should not warn for a registration that fails the limit (warn === max)", () => {
+      const onListenerWarn = vi.fn();
+      const emitter = createEmitter({
+        limits: { maxListeners: 2, warnListeners: 2, maxEventDepth: 0 },
+        onListenerWarn,
+      });
+
+      emitter.on("click", vi.fn()); // 1st
+      emitter.on("click", vi.fn()); // 2nd — at the limit
+
+      // 3rd registration throws the limit; warn must not fire for a failed add
+      expect(() => emitter.on("click", vi.fn())).toThrow("Listener limit");
+      expect(onListenerWarn).not.toHaveBeenCalled();
     });
   });
 

@@ -36,6 +36,7 @@ export class RecursionDepthError extends Error {
 export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
   readonly #callbacks = new Map<string, Set<AnyCallback>>();
   #depthMap: Map<string, number> | null = null;
+  #warnedEvents: Set<string> | null = null;
   #limits: EventEmitterLimits = DEFAULT_LIMITS;
   readonly #onListenerError:
     | ((eventName: string, error: unknown) => void)
@@ -89,14 +90,29 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
 
     const { maxListeners, warnListeners } = this.#limits;
 
-    if (warnListeners !== 0 && set.size === warnListeners) {
-      this.#onListenerWarn?.(eventName, warnListeners);
-    }
-
+    // Enforce the hard limit before warning, so onListenerWarn never fires for
+    // a registration that then throws (the warnListeners === maxListeners case).
     if (maxListeners !== 0 && set.size >= maxListeners) {
       throw new Error(
         `Listener limit (${maxListeners}) reached for "${eventName}"`,
       );
+    }
+
+    // Warn at most once per emitter+event. `set.size === warnListeners` can be
+    // re-met by off/on churn around the threshold; the latch keeps the advisory
+    // hint "exactly once" rather than re-firing on every re-crossing. Reset by
+    // clearAll().
+    if (
+      warnListeners !== 0 &&
+      set.size === warnListeners &&
+      this.#onListenerWarn !== null
+    ) {
+      this.#warnedEvents ??= new Set();
+
+      if (!this.#warnedEvents.has(eventName)) {
+        this.#warnedEvents.add(eventName);
+        this.#onListenerWarn(eventName, warnListeners);
+      }
     }
 
     set.add(cb);
@@ -156,6 +172,7 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
   clearAll(): void {
     this.#callbacks.clear();
     this.#depthMap = null;
+    this.#warnedEvents = null;
   }
 
   /**
