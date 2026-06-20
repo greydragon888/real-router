@@ -1,5 +1,34 @@
 # @real-router/core
 
+## 0.59.1
+
+### Patch Changes
+
+- [#881](https://github.com/greydragon888/real-router/pull/881) [`c2e0392`](https://github.com/greydragon888/real-router/commit/c2e03921f54fd88743ab76d12a589731c5ed436b) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `canNavigateTo()` throwing instead of returning a boolean on missing required params ([#725](https://github.com/greydragon888/real-router/issues/725))
+
+  `router.canNavigateTo(name, params?)` is typed as a `boolean` predicate but threw a raw `Error` from `SegmentMatcher.buildPath` when the target route had required path params that were not supplied (e.g. `canNavigateTo("user", {})` for `"/u/:id"`). Building the target state is now guarded: if the path can't be built from the given params, the route is unreachable with that input and the predicate returns `false` instead of throwing. Complete params behave exactly as before (the guards decide the result).
+
+- [#881](https://github.com/greydragon888/real-router/pull/881) [`c2e0392`](https://github.com/greydragon888/real-router/commit/c2e03921f54fd88743ab76d12a589731c5ed436b) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `subscribeLeave` signal aborting on successful navigation and never aborting on the no-guards path ([#722](https://github.com/greydragon888/real-router/issues/722))
+
+  The `signal` in the `subscribeLeave` payload now aborts **only** when the navigation is cancelled — superseded by a newer `navigate()`, `stop()`, `dispose()`, or an external `opts.signal` abort — and **never** on successful completion, consistently across both the guard and no-guards pipeline paths.
+
+  - **Guard path (over-abort):** the internal `AbortController` was aborted unconditionally on every settle (including success), so a listener that captured the signal saw `aborted === true` after a navigation that actually succeeded.
+  - **No-guards path (under-abort):** the sync-listener branch never tracked its controller, so the signal never aborted — not even when the navigation was superseded mid-leave.
+
+  Cleanup now distinguishes successful completion from cancellation: on success the controller is released without aborting, and the no-guards path is routed through the same cancellation-aware cleanup as the guard path. The external-`opts.signal` bridge is detached explicitly so it cannot leak onto a reused signal.
+
+- [#881](https://github.com/greydragon888/real-router/pull/881) [`c2e0392`](https://github.com/greydragon888/real-router/commit/c2e03921f54fd88743ab76d12a589731c5ed436b) Thanks [@greydragon888](https://github.com/greydragon888)! - Stop the `Router` constructor from mutating the caller's `options` object ([#724](https://github.com/greydragon888/real-router/issues/724))
+
+  The constructor extracted the logger config with `delete options.logger`, mutating the object the caller passed in — so reusing the same `options` (e.g. to build a second router or read it back) silently lost the `logger` key. The logger config is now read via a non-mutating destructure; the caller's object is left untouched and can be reused across routers.
+
+  Note: `@real-router/logger` remains a process-global singleton — `options.logger` configures one shared logger for the whole process and the last `configure()` wins across routers/`cloneRouter()` (now documented in `RouterOptions`). Per-router logger isolation is out of scope for this fix.
+
+- [#881](https://github.com/greydragon888/real-router/pull/881) [`c2e0392`](https://github.com/greydragon888/real-router/commit/c2e03921f54fd88743ab76d12a589731c5ed436b) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix stale `areStatesEqual` / `isActiveRoute` after route-tree mutations ([#723](https://github.com/greydragon888/real-router/issues/723))
+
+  The per-route-name URL-param cache that backs `areStatesEqual()` and `isActiveRoute()` was invalidated only on `dispose()`, so a route-tree mutation that changed a route's param shape (e.g. `getRoutesApi(router).replace(...)` turning `/item/:id` into `/item/:id/:tab`) left both comparisons frozen to the pre-mutation shape.
+
+  The cache now lives at the routes layer (next to `getUrlParams`, where it is derived from the matcher) and is cleared on every matcher rebuild — covering `add` / `remove` / `replace` / `clear` through both the in-place rebuild and the prepare-then-commit (`replace`) paths. This keeps the comparisons in lock-step with the current tree without subscribing to `TREE_CHANGED` (which would defeat the listener-gated diff optimization).
+
 ## 0.59.0
 
 ### Minor Changes
