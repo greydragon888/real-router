@@ -31,11 +31,6 @@ export class StateNamespace {
    */
   #deps!: StateNamespaceDependencies;
 
-  /**
-   * Cache for URL params by route name.
-   */
-  readonly #urlParamsCache = new Map<string, string[]>();
-
   // =========================================================================
   // Instance methods (trust input - already validated by facade)
   // =========================================================================
@@ -77,7 +72,6 @@ export class StateNamespace {
   reset(): void {
     this.#frozenState = undefined;
     this.#previousState = undefined;
-    this.#urlParamsCache.clear();
   }
 
   // =========================================================================
@@ -169,7 +163,9 @@ export class StateNamespace {
     }
 
     if (ignoreQueryParams) {
-      const urlParams = this.#getUrlParams(state1.name);
+      // URL (path) param names are cached at the routes layer and invalidated
+      // on every tree mutation, so this stays correct after replace() (#723).
+      const urlParams = this.#deps.getUrlParams(state1.name);
 
       for (const urlParam of urlParams) {
         if (
@@ -199,26 +195,5 @@ export class StateNamespace {
     }
 
     return true;
-  }
-
-  // =========================================================================
-  // Private Helpers
-  // =========================================================================
-
-  /**
-   * Gets URL params for a route name, using cache for performance.
-   */
-  #getUrlParams(name: string): string[] {
-    const cached = this.#urlParamsCache.get(name);
-
-    if (cached !== undefined) {
-      return cached;
-    }
-
-    const result = this.#deps.getUrlParams(name);
-
-    this.#urlParamsCache.set(name, result);
-
-    return result;
   }
 }

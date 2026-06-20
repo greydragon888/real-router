@@ -482,13 +482,20 @@ export class RoutesNamespace<
   }
 
   getUrlParams(name: string): string[] {
-    const segments = this.#store.matcher.getSegmentsByName(name);
+    const cached = this.#store.urlParamsCache.get(name);
 
-    if (!segments) {
-      return [];
+    if (cached !== undefined) {
+      return cached;
     }
 
-    return collectUrlParamsArray(segments as readonly RouteTree[]);
+    const segments = this.#store.matcher.getSegmentsByName(name);
+    const result = segments
+      ? collectUrlParamsArray(segments as readonly RouteTree[])
+      : [];
+
+    this.#store.urlParamsCache.set(name, result);
+
+    return result;
   }
 
   getStore(): RoutesStore<Dependencies> {

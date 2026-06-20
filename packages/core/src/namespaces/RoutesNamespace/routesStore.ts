@@ -29,6 +29,13 @@ export interface RoutesStore<
   readonly config: RouteConfig;
   tree: RouteTree;
   matcher: Matcher;
+  /**
+   * Per-route-name cache of URL (path) param names, derived from `matcher` and
+   * read by `RoutesNamespace.getUrlParams` (powers `areStatesEqual` /
+   * `isActiveRoute`). Cleared on every `matcher` rebuild so comparisons never
+   * stay frozen to a route's pre-mutation param shape (#723).
+   */
+  readonly urlParamsCache: Map<string, string[]>;
   resolvedForwardMap: Record<string, string>;
   routeCustomFields: Record<string, Record<string, unknown>>;
   rootPath: string;
@@ -72,6 +79,7 @@ export function rebuildTreeInPlace<
 
   store.tree = result.tree;
   store.matcher = result.matcher;
+  store.urlParamsCache.clear();
 }
 
 export function commitTreeChanges<
@@ -515,6 +523,7 @@ export function adoptRouteArtifacts<Dependencies extends DefaultDependencies>(
   store.routeCustomFields = artifacts.routeCustomFields;
   store.tree = artifacts.tree;
   store.matcher = artifacts.matcher;
+  store.urlParamsCache.clear();
   store.resolvedForwardMap = artifacts.resolvedForwardMap;
 
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- depsStore is set once the router is wired; add/replace only run on a wired router (constructor-time registration uses createRoutesStore)
@@ -549,6 +558,7 @@ export function createRoutesStore<
     config: artifacts.config,
     tree: artifacts.tree,
     matcher: artifacts.matcher,
+    urlParamsCache: new Map(),
     resolvedForwardMap: artifacts.resolvedForwardMap,
     routeCustomFields: artifacts.routeCustomFields,
     rootPath: "",
