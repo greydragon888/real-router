@@ -587,9 +587,17 @@ describe("EventEmitter Property-Based Tests", () => {
 
         const listeners = createUniqueListeners(warnThreshold + 1);
 
-        for (let i = 0; i <= warnThreshold; i++) {
+        // Register one at a time and pin the exact firing point: the first W
+        // registrations must NOT warn — the warn fires only on the (W+1)th.
+        // A total-count assertion alone is blind to a threshold off-by-one
+        // (fire one early / late); per-step pinning catches both directions.
+        for (let i = 0; i < warnThreshold; i++) {
           emitter.on(eventName, listeners[i].fn);
+
+          expect(warnings).toHaveLength(0);
         }
+
+        emitter.on(eventName, listeners[warnThreshold].fn);
 
         expect(warnings).toHaveLength(1);
         expect(warnings[0]).toStrictEqual({
