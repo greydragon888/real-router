@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-06-20]
+
+### @real-router/rx@0.3.14
+
+### Patch Changes
+
+- [#879](https://github.com/greydragon888/real-router/pull/879) [`fe59b3d`](https://github.com/greydragon888/real-router/commit/fe59b3d840a55718339c6deb33ae2b3ab8aa183f) Thanks [@greydragon888](https://github.com/greydragon888)! - Release the source subscription when the source errors under `takeUntil` ([#877](https://github.com/greydragon888/real-router/issues/877))
+
+  `takeUntil` sets `completed = true` on a source `error()` and never forwards another source value, but it previously left the now-inert source subscription open — asymmetric with the notifier-emit, notifier-error, and source-complete branches, which all release the source eagerly. The source-error branch now unsubscribes the source as well, so its resource (e.g. a `state$` router listener reached through a throwing upstream operator) is released immediately instead of dangling until the consumer's `unsubscribe()`. A post-subscribe guard also covers a source that errors synchronously during subscribe.
+
 ## [2026-06-19]
 
 ### @real-router/rx@0.3.13
