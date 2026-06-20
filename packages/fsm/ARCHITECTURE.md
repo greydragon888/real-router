@@ -231,6 +231,8 @@ onTransition(listener) {
 
 This **intentionally differs** from the sibling `@real-router/event-emitter`, which snapshots the listener set (`[...set]`) before iterating, so mutations there only affect the *next* emit. Do not assume the two repo primitives share mutation-during-dispatch semantics. (See [#755](https://github.com/greydragon888/real-router/issues/755).)
 
+**Actions, by contrast, are single-captured.** The matching `on()` action is read into a local **before** it fires (`const action = …; action(payload)`), so a reentrant `on()` that overwrites the `(from, event)` action **during its own dispatch** does *not* re-fire it in the current `send()` (it applies to the next `send`). Live iteration is a **listener-only** property — actions and listeners intentionally differ on mutation-during-dispatch.
+
 ## Hot-Path Optimizations
 
 | Optimization                | Purpose                                                              |
