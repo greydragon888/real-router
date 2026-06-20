@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-06-20]
 
+### @real-router/fsm@0.5.0
+
+### Minor Changes
+
+- [#887](https://github.com/greydragon888/real-router/pull/887) [`db4e2e4`](https://github.com/greydragon888/real-router/commit/db4e2e4aa3faa4e1cb44557ed355913095117a78) Thanks [@greydragon888](https://github.com/greydragon888)! - Type-correlate `send()` payload to the specific event ([#753](https://github.com/greydragon888/real-router/issues/753))
+
+  `send()` now indexes the payload by the specific event instead of the full event union, making it symmetric with `on()`. Previously `send(event: TEvents, payload?: TPayloadMap[TEvents])` collapsed to `payload?: unknown`, so a payload typed for a different event — or no payload at all — compiled without error.
+
+  **Breaking (type-level only — runtime is unchanged):**
+
+  - A payload event now **requires** its correctly-typed payload: `send("FETCH", { wrongShape })` and `send("FETCH")` (missing payload) are type errors.
+  - A no-payload event rejects any payload: `send("START", {})` is a type error.
+
+  ```diff
+  - send(event: TEvents, payload?: TPayloadMap[TEvents]): TStates
+  + send<E extends TEvents>(
+  +   event: E,
+  +   ...args: E extends keyof TPayloadMap ? [TPayloadMap[E]] : [undefined?]
+  + ): TStates
+  ```
+
+  Dormant for `@real-router/core` (`RouterPayloads` is empty — all router events are payload-free).
+
+- [#887](https://github.com/greydragon888/real-router/pull/887) [`db4e2e4`](https://github.com/greydragon888/real-router/commit/db4e2e4aa3faa4e1cb44557ed355913095117a78) Thanks [@greydragon888](https://github.com/greydragon888)! - Correlate `TransitionInfo.payload` to the event ([#886](https://github.com/greydragon888/real-router/issues/886))
+
+  `onTransition` listeners can now narrow `info.payload` by `info.event`: `TransitionInfo` is a distributive (discriminated) union over the event instead of a flat interface, so under `if (info.event === "FETCH")` the payload narrows to that event's type — the same correlation `send`/`on` already provide ([#753](https://github.com/greydragon888/real-router/issues/753)). This completes the payload-correlation contract across input (`send`), action (`on`), and output (`onTransition`).
+
+  **Breaking (type-level only — runtime is unchanged):** `TransitionInfo` is now a `type` (distributive union), not an `interface` — code that interface-merges it or manually constructs a flat `TransitionInfo` value may need adjustment. Listeners that destructure `{ from, to, event, payload }` are unaffected. Dormant for `@real-router/core` (`RouterPayloads` is empty, so every event's payload is `undefined`).
+
+### Patch Changes
+
+- [#887](https://github.com/greydragon888/real-router/pull/887) [`db4e2e4`](https://github.com/greydragon888/real-router/commit/db4e2e4aa3faa4e1cb44557ed355913095117a78) Thanks [@greydragon888](https://github.com/greydragon888)! - Guard `constructor` and `on()` against undeclared states ([#885](https://github.com/greydragon888/real-router/issues/885))
+
+  Extends the `forceState` guard ([#754](https://github.com/greydragon888/real-router/issues/754)) to the engine's two other state-entry-points via a shared `requireDeclared` check, so an undeclared state fails loud with an explicit error instead of bricking the FSM or silently dead-registering an action:
+
+  - `new FSM({ initial, … })` with an undeclared `initial` now throws `[FSM.constructor] state "…" is not declared in config.transitions` instead of bricking the next `canSend`/`send` with a cryptic `TypeError`.
+  - `on(from, …)` with an undeclared `from` now throws `[FSM.on] state "…" is not declared in config.transitions` instead of silently registering an action that can never fire.
+
+  Typed callers with a narrow state union are unaffected (the type forbids an undeclared state); this hardens `string`-typed / JS / cast callers. Dormant for `@real-router/core` (the router uses declared states throughout). Runtime guard only — `forceState`'s message and behavior are unchanged.
+
+- [#887](https://github.com/greydragon888/real-router/pull/887) [`db4e2e4`](https://github.com/greydragon888/real-router/commit/db4e2e4aa3faa4e1cb44557ed355913095117a78) Thanks [@greydragon888](https://github.com/greydragon888)! - Guard `forceState()` against undeclared states ([#754](https://github.com/greydragon888/real-router/issues/754))
+
+  `forceState()` now throws an explicit error when given a state that is not declared in `config.transitions`, instead of silently leaving the FSM unable to transition — previously the next `canSend`/`send` threw a cryptic `TypeError: Cannot read properties of undefined`. The guard reuses the existing transition lookup and throws **before** mutating `#state`, so the FSM is left untouched on rejection. Typed callers are unaffected (`state: TStates` already forbids undeclared states); this hardens JS / cast callers, mirroring how `send()` is already defensive on unknown input.
+
+### @real-router/core@0.59.3
+
+### Patch Changes
+
+- Updated dependencies [[`db4e2e4`](https://github.com/greydragon888/real-router/commit/db4e2e4aa3faa4e1cb44557ed355913095117a78), [`db4e2e4`](https://github.com/greydragon888/real-router/commit/db4e2e4aa3faa4e1cb44557ed355913095117a78), [`db4e2e4`](https://github.com/greydragon888/real-router/commit/db4e2e4aa3faa4e1cb44557ed355913095117a78), [`db4e2e4`](https://github.com/greydragon888/real-router/commit/db4e2e4aa3faa4e1cb44557ed355913095117a78)]:
+  - @real-router/fsm@0.5.0
+
+
 ### @real-router/core@0.59.2
 
 ### Patch Changes
