@@ -257,7 +257,9 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
 
       // Runtime: verify signal is actually delivered to guards.
       let receivedSignal: AbortSignal | undefined;
-      // Capture aborted state at call time (finally block aborts controller after nav)
+      // Capture aborted state at call time — on a successful navigation the
+      // controller is never aborted (the leave/guard signal aborts only on
+      // cancellation — #722), so this stays false after the nav too.
       let signalAbortedAtCallTime = true;
 
       lifecycle.addActivateGuard(
@@ -273,7 +275,7 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
       await router.navigate("users");
 
       expect(receivedSignal).toBeInstanceOf(AbortSignal);
-      // Signal was NOT aborted when the guard ran (only aborted in finally for cleanup)
+      // Signal was NOT aborted when the guard ran — and stays unaborted on success.
       expect(signalAbortedAtCallTime).toBe(false);
     });
 

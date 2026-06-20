@@ -265,4 +265,14 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     expect(router.canNavigateTo("home")).toBe(false);
     expect(guard).toHaveBeenCalled();
   });
+
+  it("returns false instead of throwing when a required path param is missing (#725)", () => {
+    // `items` is "/items/:id" — :id is required to build the target path
+    expect(() => router.canNavigateTo("items", {})).not.toThrow();
+    expect(router.canNavigateTo("items", {})).toBe(false);
+  });
+
+  it("returns true once the required path param is supplied (#725)", () => {
+    expect(router.canNavigateTo("items", { id: "1" })).toBe(true);
+  });
 });

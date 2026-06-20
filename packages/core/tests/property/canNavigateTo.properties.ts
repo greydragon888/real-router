@@ -90,4 +90,25 @@ describe("canNavigateTo Properties", () => {
       router.stop();
     },
   );
+
+  // #725 — the predicate must answer, never throw, on incomplete input. Routes
+  // with required path params (e.g. users.view "/users/:id") used to throw a
+  // raw buildPath Error when called with empty params; they now resolve to false.
+  test.prop([arbNavigableRoute], { numRuns: NUM_RUNS.fast })(
+    "missing required params resolve to false instead of throwing",
+    async (route) => {
+      const router = createFixtureRouter();
+
+      await router.start("/");
+
+      let result: boolean | undefined;
+
+      expect(() => {
+        result = router.canNavigateTo(route, {});
+      }).not.toThrow();
+      expect(typeof result).toBe("boolean");
+
+      router.stop();
+    },
+  );
 });

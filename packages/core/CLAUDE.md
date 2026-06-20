@@ -312,7 +312,7 @@ namespaces/NavigationNamespace/
 - Async cleanup that must complete before activation
 - Data prefetch coordinated with leave event
 
-Sync listeners run inline; their throws abort the navigation with `TRANSITION_CANCELLED` (first error wins if multiple listeners throw). The `signal` in payload aborts when the navigation is cancelled (e.g., by a newer `navigate()`).
+Sync listeners run inline; their throws abort the navigation with `TRANSITION_CANCELLED` (first error wins if multiple listeners throw). The `signal` in the payload aborts **only** when the navigation is cancelled — superseded by a newer `navigate()`, `stop()`, `dispose()`, or an external `opts.signal` abort — and **never** on successful completion. This holds identically on the guard and no-guards pipeline paths: the same controller backs the signal, and core releases it without aborting on success (`#cleanupController(controller, /* cancelled */ false)`), so a listener that captured the signal still observes `aborted === false` after the navigation commits (#722).
 
 **`subscribe(listener)`** — subscribe to `TRANSITION_SUCCESS` (post-commit). In contrast to `subscribeLeave`:
 
@@ -503,6 +503,7 @@ class SearchSchemaPlugin {
 
 - **Pure functions** that derive from tree on every call — no cache, no subscription needed.
 - **Read-mostly state** where invalidation is acceptable on next access — imperative-on-read may be simpler (preload-plugin uses this for compiled functions whose factory identity is the implicit cache key).
+- **Core-internal caches co-located with the rebuilt artifact** — when a core namespace caches data derived 1:1 from the matcher/tree (e.g. `RoutesStore.urlParamsCache`, the path-param-name cache behind `areStatesEqual` / `isActiveRoute`), clear it at the matcher-rebuild choke point itself (`rebuildTreeInPlace` / `adoptRouteArtifacts`), **not** via a `subscribeChanges` listener. A permanent internal `TREE_CHANGED` subscriber would keep `listenerCount > 0` forever, forcing the listener-gated O(N) `replace`/`add` diff (subscribeChanges invariant 8) to run on every mutation even when no application listener exists. Clearing a `Map` at the rebuild is O(1) and never touches the event path (#723).
 
 #### Anti-pattern: centralized CacheManager
 

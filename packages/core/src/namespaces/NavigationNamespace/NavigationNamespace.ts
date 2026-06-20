@@ -330,11 +330,9 @@ export class NavigationNamespace {
           canDeactivateFunctions,
         );
 
-        /* v8 ignore start */
         if (asyncLeave !== undefined) {
           return asyncLeave;
         }
-        /* v8 ignore stop */
       }
 
       // eslint-disable-next-line unicorn/prefer-else-if -- two exhaustive `if`s read clearer here than an else-if; merging cascades into no-negated-condition / no-unnecessary-condition in this hot guard-setup branch
@@ -395,7 +393,7 @@ export class NavigationNamespace {
           throw new RouterError(errorCodes.TRANSITION_CANCELLED);
         }
 
-        this.#cleanupController(controller);
+        this.#cleanupController(controller, false);
       }
 
       this.lastSyncResolved = true;
@@ -437,21 +435,28 @@ export class NavigationNamespace {
       !controller.signal.aborted &&
       deps.isActive();
 
+    const externalSignal = nav.opts.signal;
+    let onExternalAbort: (() => void) | undefined;
+    let succeeded = false;
+
     try {
-      if (nav.opts.signal) {
-        if (nav.opts.signal.aborted) {
+      if (externalSignal) {
+        if (externalSignal.aborted) {
           throw new RouterError(errorCodes.TRANSITION_CANCELLED, {
-            reason: nav.opts.signal.reason,
+            reason: externalSignal.reason,
           });
         }
 
-        nav.opts.signal.addEventListener(
-          "abort",
-          () => {
-            controller.abort(nav.opts.signal?.reason);
-          },
-          { once: true, signal: controller.signal },
-        );
+        // Bridge an external `{ signal }` abort onto the internal controller.
+        // It is NOT scoped to `controller.signal` (the old `{ signal }` option)
+        // because success no longer aborts the controller (#722) — the listener
+        // is detached explicitly in `finally` instead.
+        onExternalAbort = () => {
+          controller.abort(externalSignal.reason);
+        };
+        externalSignal.addEventListener("abort", onExternalAbort, {
+          once: true,
+        });
       }
 
       await guardCompletion;
@@ -460,13 +465,23 @@ export class NavigationNamespace {
         throw new RouterError(errorCodes.TRANSITION_CANCELLED);
       }
 
-      return completeTransition(deps, nav);
+      const state = completeTransition(deps, nav);
+
+      succeeded = true;
+
+      return state;
     } catch (error) {
       routeTransitionError(deps, error, nav.toState, nav.fromState);
 
       throw error;
     } finally {
-      this.#cleanupController(controller);
+      if (onExternalAbort) {
+        externalSignal?.removeEventListener("abort", onExternalAbort);
+      }
+
+      // Success drops the controller without aborting (the subscribeLeave signal
+      // must stay unaborted); cancel/error aborts it so captured signals fire.
+      this.#cleanupController(controller, !succeeded);
     }
   }
 
@@ -478,7 +493,7 @@ export class NavigationNamespace {
     fromState: State | undefined,
   ): void {
     if (controller) {
-      this.#cleanupController(controller);
+      this.#cleanupController(controller, true);
     }
 
     if (transitionStarted && toState) {
@@ -498,18 +513,31 @@ export class NavigationNamespace {
 
     deps.sendLeaveApprove(toState, fromState);
 
-    /* v8 ignore start */
     if (deps.hasLeaveListeners()) {
       const controller = new AbortController();
-      const leaveResult = deps.awaitLeaveListeners(
-        toState,
-        fromState,
-        controller.signal,
-      );
+
+      // Track as the current navigation BEFORE listeners run so a reentrant
+      // navigate() / stop() / dispose() from a sync listener aborts THIS leave
+      // signal — parity with the guard path (#722). On success the controller is
+      // released without aborting (see #cleanupController).
+      this.#currentController = controller;
+
+      let leaveResult: Promise<void> | undefined;
+
+      try {
+        leaveResult = deps.awaitLeaveListeners(
+          toState,
+          fromState,
+          controller.signal,
+        );
+      } catch (error) {
+        // A sync listener threw — the navigation fails; abort the leave signal.
+        this.#cleanupController(controller, true);
+
+        throw error;
+      }
 
       if (leaveResult !== undefined) {
-        this.#currentController = controller;
-
         return this.#finishAsyncNavigation(
           leaveResult,
           {
@@ -525,18 +553,38 @@ export class NavigationNamespace {
           myId,
         );
       }
+
+      // Sync listeners settled. A reentrant navigate() may have superseded us
+      // (it already aborted this controller); surface that as a cancellation.
+      const cancelled = this.#navigationId !== myId;
+
+      this.#cleanupController(controller, cancelled);
+
+      if (cancelled) {
+        throw new RouterError(errorCodes.TRANSITION_CANCELLED);
+      }
+
+      return undefined;
     }
 
     if (this.#navigationId !== myId) {
       throw new RouterError(errorCodes.TRANSITION_CANCELLED);
     }
-    /* v8 ignore stop */
 
     return undefined;
   }
 
-  #cleanupController(controller: AbortController): void {
-    controller.abort();
+  /**
+   * Release a navigation's AbortController. The same `controller.signal` is
+   * handed to `subscribeLeave` listeners, so it must abort **only** when the
+   * navigation is cancelled or errors — never on success (#722). On the success
+   * path pass `cancelled = false`: the reference is dropped without aborting, so
+   * a listener that captured the signal still sees `aborted === false`.
+   */
+  #cleanupController(controller: AbortController, cancelled: boolean): void {
+    if (cancelled) {
+      controller.abort();
+    }
 
     if (this.#currentController === controller) {
       this.#currentController = null;

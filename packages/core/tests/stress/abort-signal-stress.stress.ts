@@ -126,72 +126,61 @@ describe("S10: AbortController / Signal stress", () => {
 
   it("S10.3: Signal in guards (cooperative cancellation) — 100 navigations", async () => {
     const lifecycle = getLifecycleApi(router);
-    let _abortedCount = 0;
+    let abortedCount = 0;
 
-    const signalAwareGuardFn = (
-      _toState: unknown,
-      _fromState: unknown,
-      signal: AbortSignal | undefined,
-    ) => {
-      return new Promise<boolean>((resolve, reject) => {
-        if (signal?.aborted) {
-          _abortedCount++;
-          reject(new DOMException("Aborted", "AbortError"));
+    // Async activation guard that cooperatively cancels: it rejects the moment
+    // its signal aborts, otherwise resolves after a tick. A pre-aborted EXTERNAL
+    // signal can't exercise this — it rejects in #abortPreviousNavigation before
+    // the guard runs — so cancellation must come from a SUPERSEDING navigation
+    // that aborts the in-flight guard's signal (#722).
+    const signalAwareGuard =
+      () =>
+      (
+        _toState: unknown,
+        _fromState: unknown,
+        signal: AbortSignal | undefined,
+      ) =>
+        new Promise<boolean>((resolve, reject) => {
+          signal?.addEventListener(
+            "abort",
+            () => {
+              abortedCount++;
+              reject(new DOMException("Aborted", "AbortError"));
+            },
+            { once: true },
+          );
 
-          return;
-        }
-
-        signal?.addEventListener(
-          "abort",
-          () => {
-            _abortedCount++;
-            reject(new DOMException("Aborted", "AbortError"));
-          },
-          { once: true },
-        );
-
-        setTimeout(() => {
-          resolve(true);
-        }, 5);
-      });
-    };
-
-    const signalAwareGuard = () => signalAwareGuardFn;
+          setTimeout(() => {
+            resolve(true);
+          }, 5);
+        });
 
     lifecycle.addActivateGuard("route1", signalAwareGuard);
 
     const heapBefore = takeHeapSnapshot();
     const errors: unknown[] = [];
 
+    // Each iteration starts navigating to route1 (its async guard suspends on the
+    // timer), then synchronously supersedes with a different route — aborting
+    // route1's in-flight guard signal. The supersede target alternates so it is
+    // never equal to the current committed state (which would early-reject as
+    // SAME_STATES instead of superseding).
     for (let i = 0; i < 100; i++) {
-      const controller = new AbortController();
-      const shouldAbort = i % 3 === 0;
+      const superseded = router.navigate("route1").catch((error: unknown) => {
+        errors.push(error);
+      });
 
-      if (shouldAbort) {
-        controller.abort();
-      }
-
-      await router
-        .navigate("route1", {}, { signal: controller.signal })
-        .catch((error: unknown) => errors.push(error));
-
-      if (router.getState()?.name === "route1") {
-        await router.navigate("route0").catch(() => {});
-      }
+      await router.navigate(i % 2 === 0 ? "route2" : "route3").catch(() => {});
+      await superseded;
     }
 
     const heapAfter = takeHeapSnapshot();
     const delta = heapAfter - heapBefore;
 
-    // Every pre-aborted navigation (i % 3 === 0 → 34 of the 100) MUST propagate
-    // its aborted signal into the guard — the guard increments _abortedCount on
-    // either the `signal.aborted` fast-path or the `abort` event. If signal
-    // propagation regressed, _abortedCount would stay 0 even though errors fire
-    // for unrelated reasons. Anchored to the 34 deterministically-aborted navs.
-    const preAbortedNavs = Math.floor(100 / 3) + 1; // i = 0,3,...,99 → 34
-
-    expect(_abortedCount).toBeGreaterThanOrEqual(preAbortedNavs);
-    expect(errors.length).toBeGreaterThan(0);
+    // Every one of the 100 superseded navigations MUST propagate its abort into
+    // the in-flight guard. If signal propagation regressed, abortedCount stays 0.
+    expect(abortedCount).toBe(100);
+    expect(errors).toHaveLength(100);
     expect(delta).toBeLessThan(2 * MB);
   }, 30_000);
 
