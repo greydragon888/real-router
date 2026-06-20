@@ -211,6 +211,7 @@ Guards registered via `getLifecycleApi(router)` run during the transition pipeli
 | 2   | No guards returns true            | Without any registered guards, `canNavigateTo(existingRoute) === true`. Routes are navigable by default.                  |
 | 3   | Passing sync guard returns true   | When a sync activate guard returns `true`, `canNavigateTo === true`. Guard approval is reflected synchronously.           |
 | 4   | Blocking sync guard returns false | When a sync activate guard returns `false`, `canNavigateTo === false`. Guard rejection is reflected synchronously.        |
+| 5   | Incomplete input never throws     | The predicate is total: calling it with missing required path params returns `false` (the target path can't be built, so the route is unreachable with that input) rather than throwing `buildPath`'s error (#725). |
 
 ## subscribe (event delivery)
 

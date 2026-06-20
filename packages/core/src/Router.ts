@@ -561,7 +561,19 @@ export class Router<
       name,
       params ?? {},
     );
-    const toState = this.#state.makeState(resolvedName, resolvedParams);
+
+    // A capability predicate must answer, not throw: if the target path can't be
+    // built from these params (e.g. a required path param is missing), the route
+    // is simply unreachable with this input — return `false` rather than letting
+    // `buildPath` throw (#725).
+    let toState: State;
+
+    try {
+      toState = this.#state.makeState(resolvedName, resolvedParams);
+    } catch {
+      return false;
+    }
+
     const fromState = this.#state.get();
 
     const { toDeactivate, toActivate } = getTransitionPath(toState, fromState);
