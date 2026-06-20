@@ -48,7 +48,7 @@ graph LR
 | Consumer         | What it uses                                | Purpose                           |
 | ---------------- | ------------------------------------------- | --------------------------------- |
 | **state$()**     | `getPluginApi`, `events.TRANSITION_SUCCESS` | Subscribe to state changes        |
-| **events$()**    | `getPluginApi`, all 6 event constants       | Subscribe to all lifecycle events |
+| **events$()**    | `getPluginApi`, all 7 event constants       | Subscribe to all lifecycle events |
 | **observable()** | `state$()`                                  | TC39 Observable interop wrapper   |
 
 ## Core Design
@@ -195,17 +195,18 @@ events$(router)
   new RxObservable(observer => {
     │
     ├── api = getPluginApi(router)
-    ├── Register 6 listeners (with partial-registration safety):
-    │   ├── ROUTER_START      → { type: "ROUTER_START" }
-    │   ├── ROUTER_STOP       → { type: "ROUTER_STOP" }
-    │   ├── TRANSITION_START  → { type, toState, fromState }
-    │   ├── TRANSITION_SUCCESS → { type, toState, fromState, options }
-    │   ├── TRANSITION_ERROR  → { type, toState, fromState, error }
-    │   └── TRANSITION_CANCEL → { type, toState, fromState }
+    ├── Register 7 listeners (with partial-registration safety):
+    │   ├── ROUTER_START             → { type: "ROUTER_START" }
+    │   ├── ROUTER_STOP              → { type: "ROUTER_STOP" }
+    │   ├── TRANSITION_START         → { type, toState, fromState }
+    │   ├── TRANSITION_LEAVE_APPROVE → { type, toState, fromState }
+    │   ├── TRANSITION_SUCCESS       → { type, toState, fromState, options }
+    │   ├── TRANSITION_ERROR         → { type, toState, fromState, error }
+    │   └── TRANSITION_CANCEL        → { type, toState, fromState }
     │
     ├── catch: Unsubscribe all registered listeners, re-throw error
     │
-    └── return () => { unsubscribe all 6 }   // teardown
+    └── return () => { unsubscribe all 7 }   // teardown
   })
 ```
 

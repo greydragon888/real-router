@@ -6,7 +6,7 @@
 
 | Export                   | Kind     | Description                                                       |
 | ------------------------ | -------- | ----------------------------------------------------------------- |
-| `RxObservable`           | class    | TC39-compatible Observable with `subscribe()`, `pipe()`, `[Symbol.asyncIterator]()` |
+| `RxObservable`           | class    | TC39-style Observable with `subscribe()`, `pipe()`, `[Symbol.asyncIterator]()` |
 | `state$`                 | function | Creates `RxObservable<SubscribeState>` from router state changes  |
 | `events$`                | function | Creates `RxObservable<RouterEvent>` from all router events        |
 | `observable`             | function | Semantic wrapper over `state$()` for RxJS `from()` interop       |
