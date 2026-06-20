@@ -49,7 +49,6 @@ function forceGc(): void {
 
 describe("event-emitter heap leak for dynamic event names (#750)", () => {
   it("S1: off() releases the empty Set — 200k on/off on unique names stays bounded", () => {
-    // eslint-disable-next-line unicorn/prefer-event-target -- custom EventEmitter, not Node.js EventEmitter
     const emitter = new EventEmitter<Record<string, unknown[]>>();
 
     // Warm-up: amortize JIT / lazy allocations before the baseline snapshot.
@@ -76,7 +75,6 @@ describe("event-emitter heap leak for dynamic event names (#750)", () => {
   });
 
   it("S2: depth-tracked emit releases the depthMap entry — 200k on/emit/off on unique names stays bounded", () => {
-    // eslint-disable-next-line unicorn/prefer-event-target -- custom EventEmitter, not Node.js EventEmitter
     const emitter = new EventEmitter<Record<string, unknown[]>>({
       limits: { maxListeners: 0, warnListeners: 0, maxEventDepth: 5 },
     });

@@ -436,7 +436,7 @@ describe("EventEmitter Property-Based Tests", () => {
       "a listener that throws does not block subsequent listeners",
       (eventName, listenerCount, data) => {
         const errors: unknown[] = [];
-        // eslint-disable-next-line unicorn/prefer-event-target -- custom EventEmitter
+
         const emitter = new EventEmitter<TestEventMap>({
           onListenerError: (_name, error) => {
             errors.push(error);
@@ -475,7 +475,6 @@ describe("EventEmitter Property-Based Tests", () => {
     })(
       "registering more than maxListeners throws",
       (eventName, maxListeners) => {
-        // eslint-disable-next-line unicorn/prefer-event-target -- custom EventEmitter
         const emitter = new EventEmitter<TestEventMap>({
           limits: { maxListeners, warnListeners: 0, maxEventDepth: 0 },
         });
@@ -514,7 +513,6 @@ describe("EventEmitter Property-Based Tests", () => {
     })(
       "depth counter resets to zero after emit completes",
       (eventName, data1, data2) => {
-        // eslint-disable-next-line unicorn/prefer-event-target -- custom EventEmitter
         const emitter = new EventEmitter<TestEventMap>({
           limits: { maxListeners: 0, warnListeners: 0, maxEventDepth: 1 },
         });
@@ -573,7 +571,7 @@ describe("EventEmitter Property-Based Tests", () => {
       "onListenerWarn fires when registration exceeds warn threshold",
       (eventName, warnThreshold) => {
         const warnings: { event: string; count: number }[] = [];
-        // eslint-disable-next-line unicorn/prefer-event-target -- custom EventEmitter
+
         const emitter = new EventEmitter<TestEventMap>({
           limits: {
             maxListeners: 0,
@@ -607,7 +605,7 @@ describe("EventEmitter Property-Based Tests", () => {
       "off/on churn around the threshold never re-fires the warning",
       (eventName, warnThreshold) => {
         const warnings: { event: string; count: number }[] = [];
-        // eslint-disable-next-line unicorn/prefer-event-target -- custom EventEmitter
+
         const emitter = new EventEmitter<TestEventMap>({
           limits: {
             maxListeners: 0,

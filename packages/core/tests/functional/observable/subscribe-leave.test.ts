@@ -11,7 +11,7 @@ import type { State } from "@real-router/types";
 
 function createEventBus(): EventBusNamespace {
   const routerFSM = createRouterFSM();
-  // eslint-disable-next-line unicorn/prefer-event-target
+
   const emitter = new EventEmitter<RouterEventMap>({});
 
   return new EventBusNamespace({ routerFSM, emitter });

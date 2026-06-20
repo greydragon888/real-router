@@ -672,6 +672,11 @@ export default tsEslint.config(
       // ============================================
       // DISABLED RULES (too strict or unsuitable)
       // ============================================
+      // The library ships a custom Node-style EventEmitter (the `event-emitter`
+      // package) by design — a view-agnostic core cannot depend on the DOM
+      // `EventTarget`. The rule fired on every internal `new EventEmitter()` in
+      // src, tests and benchmarks, so it is off globally rather than per-site.
+      "unicorn/prefer-event-target": "off",
       "id-length": [
         "error",
         {

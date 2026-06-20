@@ -170,7 +170,7 @@ export class Router<
     // =========================================================================
 
     const routerFSM = createRouterFSM();
-    // eslint-disable-next-line unicorn/prefer-event-target
+
     const emitter = new EventEmitter<RouterEventMap>({
       onListenerError: (eventName, error) => {
         logger.error("Router", `Error in listener for ${eventName}:`, error);

@@ -13,10 +13,8 @@ type TestEventMap = {
   complex: [a: string, b: string, c: string, d: string];
 };
 
-/* eslint-disable unicorn/prefer-event-target -- custom EventEmitter, not Node.js EventEmitter */
 const createEmitter = (opts?: EventEmitterOptions) =>
   new EventEmitter<TestEventMap>(opts);
-/* eslint-enable unicorn/prefer-event-target */
 
 describe("EventEmitter", () => {
   // ===========================================================================
@@ -1013,7 +1011,6 @@ describe("EventEmitter", () => {
 
   describe("constructor", () => {
     it("should work with no options", () => {
-      // eslint-disable-next-line unicorn/prefer-event-target -- custom EventEmitter
       const emitter = new EventEmitter();
       const cb = vi.fn();
 
