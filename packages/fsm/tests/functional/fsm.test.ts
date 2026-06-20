@@ -672,6 +672,33 @@ describe("FSM", () => {
       expect(result).toBe("done");
       expect(fsm.getState()).toBe("done");
     });
+
+    it("should throw an explicit error when forced to an undeclared state", () => {
+      const fsm = new FSM(lightConfig);
+
+      // The type forbids this; only a JS / cast caller can reach it. forceState
+      // must reject the undeclared state loudly, not brick the FSM for a later
+      // cryptic TypeError in canSend/send.
+      expect(() => {
+        // @ts-expect-error — "GHOST" is not a declared state
+        fsm.forceState("GHOST");
+      }).toThrow("is not declared in config.transitions");
+    });
+
+    it("should leave the FSM usable after rejecting an undeclared state", () => {
+      const fsm = new FSM(lightConfig);
+
+      expect(() => {
+        // @ts-expect-error — "GHOST" is not a declared state
+        fsm.forceState("GHOST");
+      }).toThrow();
+
+      // The guard throws before mutating state, so the FSM is untouched and
+      // still transitions normally.
+      expect(fsm.getState()).toBe("green");
+      expect(fsm.canSend("TIMER")).toBe(true);
+      expect(fsm.send("TIMER")).toBe("yellow");
+    });
   });
 
   describe("forceState()", () => {

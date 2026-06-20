@@ -429,6 +429,31 @@ describe("FSM forceState Properties", () => {
       }
     },
   );
+
+  test.prop(
+    [
+      arbFSMConfig.chain((gen) =>
+        fc.tuple(
+          fc.constant(gen),
+          fc
+            .string({ minLength: 1, maxLength: 5 })
+            .filter((s) => !gen.states.includes(s)),
+        ),
+      ),
+    ],
+    { numRuns: NUM_RUNS.standard },
+  )(
+    "forceState throws on an undeclared state and leaves the state unchanged",
+    ([gen, undeclaredState]) => {
+      const fsm = createFSM(gen);
+      const stateBefore = fsm.getState();
+
+      expect(() => {
+        fsm.forceState(undeclaredState);
+      }).toThrow();
+      expect(fsm.getState()).toStrictEqual(stateBefore);
+    },
+  );
 });
 
 describe("FSM Action Exception Properties", () => {

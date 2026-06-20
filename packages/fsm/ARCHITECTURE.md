@@ -240,18 +240,22 @@ This **intentionally differs** from the sibling `@real-router/event-emitter`, wh
 
 ## forceState() — Direct State Bypass
 
-`forceState(state)` updates `#state` and `#currentTransitions` directly — no actions fire, no listeners notified, no validation.
+`forceState(state)` updates `#state` and `#currentTransitions` directly — no actions fire, no listeners notified. The single guard validates that the target state is declared: an undeclared state throws **before** any mutation instead of silently leaving `#currentTransitions` undefined and bricking the next `canSend`/`send` ([#754](https://github.com/greydragon888/real-router/issues/754)).
 
 ```typescript
 forceState(state) {
+  const transitions = this.#transitions[state];
+  if (transitions === undefined) {
+    throw new Error(`[FSM.forceState] state "${state}" is not declared in config.transitions`);
+  }
   this.#state = state;
-  this.#currentTransitions = this.#transitions[state];
+  this.#currentTransitions = transitions;
 }
 ```
 
 **Why it exists:** Router's navigate hot path uses `forceState()` for NAVIGATE and COMPLETE transitions to bypass `send()` overhead (~30ns saved per call). The router already handles event emission separately via `EventBusNamespace` — running it through FSM actions would be redundant.
 
-**Contract:** Caller is responsible for maintaining state consistency. No guards, no listeners, no reentrancy handling.
+**Contract:** Caller is responsible for ordering and side effects. The target state must be declared in `config.transitions` — an undeclared state throws and leaves the FSM unchanged. No listeners, no reentrancy handling.
 
 ## Reentrancy
 

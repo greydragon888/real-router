@@ -52,7 +52,8 @@
 | 3   | Null-slot reuse     | After unsubscribing a listener and registering a new one, the new listener fills the vacated slot in the array. It fires at that position, potentially before listeners registered earlier.             |
 | 4   | Return value        | `send()` returns `getState()` at the moment it returns. With reentrant `send()` inside a listener, the return value reflects the final state after all reentrant transitions, not the immediate target. |
 | 5   | Context identity    | `getContext()` returns the exact same reference as `config.context`. The FSM does not clone or wrap the context object.                                                                                 |
-| 6   | Reentrant info staleness † | When a listener performs a reentrant `send()`, an **outer** listener still receives `info.to` equal to *its own* transition's target, while `getState()` may already reflect a later (nested) state, and observations run in reverse-causal order (the nested transition is observed before the outer one completes). Listeners must **not** assume `info.to === getState()` under reentrancy. (Edge #4 covers `send()`'s **return value**; this covers the **`TransitionInfo`** seen by listeners.) |
+| 6   | forceState guard    | `forceState(state)` throws when `state` is not declared in `config.transitions`, leaving `#state` unchanged (the guard runs before the mutation, so the FSM stays usable). Typed callers cannot reach this (`state: TStates`); it hardens JS / cast callers, mirroring `send()`'s no-op on unknown input. |
+| 7   | Reentrant info staleness † | When a listener performs a reentrant `send()`, an **outer** listener still receives `info.to` equal to *its own* transition's target, while `getState()` may already reflect a later (nested) state, and observations run in reverse-causal order (the nested transition is observed before the outer one completes). Listeners must **not** assume `info.to === getState()` under reentrancy. (Edge #4 covers `send()`'s **return value**; this covers the **`TransitionInfo`** seen by listeners.) |
 
 > † Documented behavioral guarantees (sharp edges), not yet covered by dedicated property tests — see [#755](https://github.com/greydragon888/real-router/issues/755). The count in the table below reflects currently-tested invariants only.
 
@@ -60,5 +61,5 @@
 
 | File                               | Invariants | Category                                                                                      |
 | ---------------------------------- | ---------- | --------------------------------------------------------------------------------------------- |
-| `tests/property/fsm.properties.ts` | 20         | State transitions, listener lifecycle, self-transitions, transition info, actions, edge cases |
+| `tests/property/fsm.properties.ts` | 21         | State transitions, listener lifecycle, self-transitions, transition info, actions, edge cases |
 | `tests/property/helpers.ts`        | —          | Shared arbitraries and FSM factory helpers                                                    |

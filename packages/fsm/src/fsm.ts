@@ -86,10 +86,23 @@ export class FSM<
   /**
    * Directly sets FSM state without triggering actions or listeners.
    * Use for hot-path optimizations where the caller handles side effects.
+   *
+   * Throws if `state` is not declared in `config.transitions`: an undeclared
+   * state would leave `#currentTransitions` undefined and brick the next
+   * `canSend`/`send`. The state is left unchanged when the guard rejects.
    */
   forceState(state: TStates): void {
+    const transitions = this.#transitions[state];
+
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime guard for JS/cast callers passing a state outside TStates
+    if (transitions === undefined) {
+      throw new Error(
+        `[FSM.forceState] state "${state}" is not declared in config.transitions`,
+      );
+    }
+
     this.#state = state;
-    this.#currentTransitions = this.#transitions[state];
+    this.#currentTransitions = transitions;
   }
 
   getState(): TStates {
