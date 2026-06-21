@@ -3,6 +3,7 @@ import { logger } from "@real-router/logger";
 import { throwIfDisposed } from "./helpers";
 import { guardRouteStructure } from "../guards";
 import { getInternals } from "../internals";
+import { STANDARD_ROUTE_KEYS } from "../namespaces/RoutesNamespace/constants";
 import {
   clearConfigEntries,
   removeFromDefinitions,
@@ -28,6 +29,7 @@ import type {
   DefaultDependencies,
   ForwardToCallback,
   Params,
+  RouteConfigUpdate,
   Router,
   TransitionMeta,
   TreeChangedEvent,
@@ -561,6 +563,70 @@ function updateRouteConfig<
 }
 
 /**
+ * Patches a route's plugin-defined **custom fields** — the `update` counterpart
+ * to how `add`/`replace` register them (`registerSingleRouteHandlers`). A custom
+ * field is any patch key not in {@link STANDARD_ROUTE_KEYS}.
+ *
+ * Semantics mirror the structural fields in {@link updateRouteConfig}:
+ * shallow-merge by patch key, `null` removes a single field, `undefined` is a
+ * no-op (leaves the field untouched). When the merge empties the record, the
+ * whole entry is dropped so `getRouteConfig` returns `undefined` — symmetric
+ * with `add`, which only stores a record when at least one custom field exists.
+ *
+ * The merged record is written as a **fresh object**, never mutated in place:
+ * `cloneRouter` shares per-route custom-field records by reference
+ * (`Object.assign`), so replacing the reference keeps a clone isolated from
+ * post-clone updates on the source.
+ */
+function updateRouteCustomFields<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+>(
+  store: RoutesStore<Dependencies>,
+  name: string,
+  updates: RouteConfigUpdate<Dependencies>,
+): void {
+  let next: Record<string, unknown> | undefined;
+
+  // `Object.keys` (not `Object.entries`): a value is read only AFTER the
+  // standard-key guard, so structural-field getters — already read once by
+  // `update`'s destructuring — are not re-invoked. `Object.entries` would read
+  // every value eagerly, double-invoking a `defaultParams`/`forwardTo` getter
+  // and breaking the "user getter called once" invariant.
+  // eslint-disable-next-line unicorn/prefer-object-iterable-methods -- see above
+  for (const key of Object.keys(updates)) {
+    if (STANDARD_ROUTE_KEYS.has(key)) {
+      continue;
+    }
+
+    const value = (updates as Record<string, unknown>)[key];
+
+    // `undefined` mirrors the structural path: leave the field untouched.
+    if (value === undefined) {
+      continue;
+    }
+
+    // Clone-on-first-write — keeps clones (which alias this record) isolated.
+    next ??= { ...store.routeCustomFields[name] };
+
+    if (value === null) {
+      delete next[key];
+    } else {
+      next[key] = value;
+    }
+  }
+
+  if (next === undefined) {
+    return;
+  }
+
+  if (Object.keys(next).length > 0) {
+    store.routeCustomFields[name] = next;
+  } else {
+    delete store.routeCustomFields[name];
+  }
+}
+
+/**
  * Gets a route by name with all its configuration.
  */
 function getRoute<
@@ -696,6 +762,15 @@ export function getRoutesApi<
       }
 
       ctx.validator?.routes.validateUpdateRoute(name, updates, store);
+
+      // Custom (plugin-defined) fields — patched symmetrically with add/replace.
+      // Written before the structural config so a throwing custom-field getter
+      // aborts the update before any store write (atomic), mirroring how a
+      // throwing structural getter aborts at the destructuring above. Consumers
+      // read these lazily via getRouteConfig (lifecycle hooks, preload,
+      // searchSchema), so no TREE_CHANGED is needed — the next read sees the new
+      // value; the emit below stays structural-only by design (О-7).
+      updateRouteCustomFields(store, name, updates);
 
       updateRouteConfig(store, name, {
         forwardTo,

@@ -2,13 +2,14 @@ import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import { errorCodes } from "@real-router/core";
 
-import { getPluginApi, getRoutesApi } from "../../../../src/api";
+import { cloneRouter, getPluginApi, getRoutesApi } from "../../../../src/api";
 import { createTestRouter } from "../../../helpers";
 
 import type {
   Router,
   GuardFnFactory,
   Params,
+  RouteConfigUpdate,
   RouterError,
 } from "@real-router/core";
 import type { RoutesApi } from "@real-router/types";
@@ -590,6 +591,198 @@ describe("core/routes/routeTree/updateRoute", () => {
 
       expect(guard2).toHaveBeenCalled();
       expect(guard1).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("custom fields", () => {
+    // RouteConfigUpdate is a closed interface; plugins augment it with their
+    // own custom fields (symmetric with how they augment Route). Core itself
+    // has no augmentation, so tests pass custom fields via a typed-local patch.
+    // `| undefined` is included so the fixture can express an explicit
+    // `undefined` value (a dynamic/untyped patch shape) and exercise core's
+    // defensive "undefined = no-op" branch under exactOptionalPropertyTypes.
+    type CustomPatch = RouteConfigUpdate & {
+      onView?: (() => () => void) | null | undefined;
+      label?: string | null | undefined;
+    };
+
+    const hook1 = (): (() => void) => (): void => {};
+    const hook2 = (): (() => void) => (): void => {};
+
+    it("should patch a custom field, swapping the stored value", () => {
+      routesApi.add({ name: "ur-cf-swap", path: "/ur-cf-swap", onView: hook1 });
+
+      const patch: CustomPatch = { onView: hook2 };
+
+      routesApi.update("ur-cf-swap", patch);
+
+      expect(getPluginApi(router).getRouteConfig("ur-cf-swap")).toStrictEqual({
+        onView: hook2,
+      });
+    });
+
+    it("should add a custom field to a route that had none", () => {
+      routesApi.add({ name: "ur-cf-new", path: "/ur-cf-new" });
+
+      expect(getPluginApi(router).getRouteConfig("ur-cf-new")).toBeUndefined();
+
+      const patch: CustomPatch = { onView: hook1 };
+
+      routesApi.update("ur-cf-new", patch);
+
+      expect(getPluginApi(router).getRouteConfig("ur-cf-new")).toStrictEqual({
+        onView: hook1,
+      });
+    });
+
+    it("should shallow-merge by patch key, preserving sibling custom fields", () => {
+      routesApi.add({
+        name: "ur-cf-merge",
+        path: "/ur-cf-merge",
+        onView: hook1,
+        label: "keep",
+      });
+
+      const patch: CustomPatch = { onView: hook2 };
+
+      routesApi.update("ur-cf-merge", patch);
+
+      // onView swapped; label untouched.
+      expect(getPluginApi(router).getRouteConfig("ur-cf-merge")).toStrictEqual({
+        onView: hook2,
+        label: "keep",
+      });
+    });
+
+    it("should remove a single custom field when set to null, keeping siblings", () => {
+      routesApi.add({
+        name: "ur-cf-rm-one",
+        path: "/ur-cf-rm-one",
+        onView: hook1,
+        label: "keep",
+      });
+
+      const patch: CustomPatch = { onView: null };
+
+      routesApi.update("ur-cf-rm-one", patch);
+
+      expect(getPluginApi(router).getRouteConfig("ur-cf-rm-one")).toStrictEqual(
+        {
+          label: "keep",
+        },
+      );
+    });
+
+    it("should drop the record entirely when the last custom field is removed", () => {
+      routesApi.add({
+        name: "ur-cf-rm-all",
+        path: "/ur-cf-rm-all",
+        onView: hook1,
+      });
+
+      const patch: CustomPatch = { onView: null };
+
+      routesApi.update("ur-cf-rm-all", patch);
+
+      // Empty record → no entry → getRouteConfig undefined (symmetric with add).
+      expect(
+        getPluginApi(router).getRouteConfig("ur-cf-rm-all"),
+      ).toBeUndefined();
+    });
+
+    it("should treat undefined as a no-op, leaving the custom field untouched", () => {
+      routesApi.add({
+        name: "ur-cf-undef",
+        path: "/ur-cf-undef",
+        onView: hook1,
+      });
+
+      const patch: CustomPatch = { onView: undefined };
+
+      routesApi.update("ur-cf-undef", patch);
+
+      expect(getPluginApi(router).getRouteConfig("ur-cf-undef")).toStrictEqual({
+        onView: hook1,
+      });
+    });
+
+    it("should patch structural and custom fields in the same update", () => {
+      routesApi.add({
+        name: "ur-cf-mixed",
+        path: "/ur-cf-mixed",
+        onView: hook1,
+      });
+
+      const patch: CustomPatch = {
+        defaultParams: { tab: "info" },
+        onView: hook2,
+      };
+
+      routesApi.update("ur-cf-mixed", patch);
+
+      // structural applied...
+      expect(routesApi.get("ur-cf-mixed")?.defaultParams).toStrictEqual({
+        tab: "info",
+      });
+      // ...custom applied, structural field not leaked into the custom record.
+      expect(getPluginApi(router).getRouteConfig("ur-cf-mixed")).toStrictEqual({
+        onView: hook2,
+      });
+    });
+
+    it("should not leak a custom-field update into a previously cloned router", () => {
+      routesApi.add({
+        name: "ur-cf-clone",
+        path: "/ur-cf-clone",
+        onView: hook1,
+      });
+
+      const clone = cloneRouter(router);
+
+      const patch: CustomPatch = { onView: hook2 };
+
+      routesApi.update("ur-cf-clone", patch);
+
+      // Source sees the new value; the clone (which aliases the pre-update
+      // record) keeps the original — fresh-object write preserves isolation.
+      expect(getPluginApi(router).getRouteConfig("ur-cf-clone")).toStrictEqual({
+        onView: hook2,
+      });
+      expect(getPluginApi(clone).getRouteConfig("ur-cf-clone")).toStrictEqual({
+        onView: hook1,
+      });
+
+      clone.dispose();
+    });
+
+    it("should leave config unchanged when a custom-field getter throws", () => {
+      routesApi.add({
+        name: "ur-cf-throw",
+        path: "/ur-cf-throw",
+        onView: hook1,
+        defaultParams: { page: 1 },
+      });
+
+      const throwingPatch: CustomPatch = {
+        defaultParams: { page: 2 },
+        get onView(): () => () => void {
+          throw new Error("custom getter explosion");
+        },
+      };
+
+      expect(() => {
+        routesApi.update("ur-cf-throw", throwingPatch);
+      }).toThrow(/custom getter explosion/);
+
+      // Atomic: neither the custom field nor the structural field was written —
+      // custom fields are applied before the structural config, so the throw
+      // aborts the update before any store write.
+      expect(getPluginApi(router).getRouteConfig("ur-cf-throw")).toStrictEqual({
+        onView: hook1,
+      });
+      expect(routesApi.get("ur-cf-throw")?.defaultParams).toStrictEqual({
+        page: 1,
+      });
     });
   });
 

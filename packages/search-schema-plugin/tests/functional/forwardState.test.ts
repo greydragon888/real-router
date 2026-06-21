@@ -1,4 +1,5 @@
 import { createRouter } from "@real-router/core";
+import { getRoutesApi } from "@real-router/core/api";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { searchSchemaPlugin } from "@real-router/search-schema-plugin";
@@ -6,6 +7,7 @@ import { searchSchemaPlugin } from "@real-router/search-schema-plugin";
 import {
   createMockSchema,
   failingSchema,
+  passThroughSchema,
   searchSchema,
   schemaWithDefaults,
   asyncSchema,
@@ -830,6 +832,41 @@ describe("Search schema plugin", () => {
       const path = router.buildPath("search", { q: "  HELLO  " });
 
       expect(path).not.toContain("q=hello");
+    });
+  });
+
+  describe("hot-swap searchSchema via routes.update (#797)", () => {
+    it("validates against the new schema after update() swaps searchSchema", async () => {
+      // schema1 strips every param (strict mode uses validation.value verbatim).
+      const stripAll = createMockSchema({ validate: () => ({ value: {} }) });
+
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          { name: "search", path: "/search?q", searchSchema: stripAll },
+        ],
+        { defaultRoute: "home" },
+      );
+      router.usePlugin(
+        searchSchemaPlugin({ mode: "development", strict: true }),
+      );
+      await router.start("/");
+
+      // Under schema1, `q` is stripped.
+      await router.navigate("search", { q: "hello" });
+
+      expect(router.getState()?.params).not.toHaveProperty("q");
+
+      // Hot-swap the schema via update — typed precisely via the augmentation.
+      // Before #797 this was silently dropped (the stale schema kept validating).
+      getRoutesApi(router).update("search", {
+        searchSchema: passThroughSchema(),
+      });
+
+      // Under schema2 (pass-through), `q` is now preserved.
+      await router.navigate("search", { q: "world" });
+
+      expect(router.getState()?.params).toMatchObject({ q: "world" });
     });
   });
 });

@@ -3,7 +3,7 @@
 import { logger } from "@real-router/logger";
 import { createMatcher, createRouteTree, nodeToDefinition } from "route-tree";
 
-import { DEFAULT_ROUTE_NAME } from "./constants";
+import { DEFAULT_ROUTE_NAME, STANDARD_ROUTE_KEYS } from "./constants";
 import { resolveForwardChain } from "./forwardChain";
 import { createEmptyConfig, sanitizeRoute } from "./helpers";
 
@@ -216,19 +216,8 @@ function registerSingleRouteHandlers<Dependencies extends DefaultDependencies>(
   pendingCanActivate: Map<string, GuardFnFactory<Dependencies>>,
   pendingCanDeactivate: Map<string, GuardFnFactory<Dependencies>>,
 ): void {
-  const standardKeys = new Set([
-    "name",
-    "path",
-    "children",
-    "canActivate",
-    "canDeactivate",
-    "forwardTo",
-    "encodeParams",
-    "decodeParams",
-    "defaultParams",
-  ]);
   const customFields = Object.fromEntries(
-    Object.entries(route).filter(([key]) => !standardKeys.has(key)),
+    Object.entries(route).filter(([key]) => !STANDARD_ROUTE_KEYS.has(key)),
   );
 
   if (Object.keys(customFields).length > 0) {
