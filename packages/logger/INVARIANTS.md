@@ -13,9 +13,10 @@
 | 5   | getConfig always returns callbackIgnoresLevel as boolean | The `callbackIgnoresLevel` field is always a boolean, never coerced to another type.                                                                              |
 | 6   | getConfig returns a new object on each call              | Each `getConfig()` call returns a fresh object. Mutating the returned config does not affect the logger's internal state.                                         |
 | 7   | Setting callback to undefined clears it                  | After `configure({ callback: undefined })`, `getConfig().callback` is `undefined` and the previously set level is preserved.                                      |
-| 8   | Invalid levels throw                                     | Passing an unrecognized string as `level` throws an error matching `/Invalid log level/`. The logger never silently accepts unknown levels.                       |
+| 8   | Invalid levels throw                                     | Passing an unrecognized string as `level` — including `Object.prototype` keys like `"toString"` — throws an error matching `/Invalid log level/`. Validation is own-property (`Object.hasOwn`), so inherited keys are never silently accepted.                       |
 | 9   | Level switching works correctly                          | Switching level multiple times in sequence always results in the last configured level being active. There is no stale state from previous configurations.        |
 | 10  | callbackIgnoresLevel is preserved during partial updates | Updating `level` or `callback` independently does not reset `callbackIgnoresLevel`. The flag persists until explicitly changed.                                   |
+| 11  | Rejected configure is atomic                             | A `configure()` call that throws on an invalid `level` applies no field at all — the `callback` and `callbackIgnoresLevel` from the same call are not installed, and the previously active config is fully preserved. Validation precedes every mutation. |
 
 ## Level Filtering
 
@@ -25,7 +26,7 @@
 | 2   | level:none filters all messages          | With `level: "none"`, no call to `console.log`, `console.warn`, or `console.error` is made for any message level.                                                                         |
 | 3   | level:all passes all messages            | With `level: "all"`, every message reaches the corresponding console method exactly once.                                                                                                 |
 | 4   | Filtering matches the specification      | The actual filtering behavior matches the documented level matrix: `error` passes on all levels except `none`; `warn` is filtered on `error-only` and `none`; `log` passes only on `all`. |
-| 5   | Messages are formatted with context      | Every message that passes the level filter is sent to the console as `[context] message`. The context prefix is always present and correctly formatted.                                   |
+| 5   | Messages are formatted with context      | Every message that passes the level filter is sent to the console. A **non-empty** context is prefixed as `[context] message`; an **empty** context produces the plain message with no prefix.                                   |
 | 6   | Additional arguments are passed through  | Extra arguments passed to `logger.log/warn/error()` are forwarded to the console method unchanged, after the formatted message string.                                                    |
 | 7   | error passes on all levels except none   | `logger.error()` always reaches `console.error` unless `level` is `"none"`. Errors are never silently dropped by a non-silent level.                                                      |
 | 8   | warn is filtered on error-only and none  | `logger.warn()` is suppressed when `level` is `"error-only"` or `"none"`, and passes through on `"all"` and `"warn-error"`.                                                               |
@@ -50,6 +51,6 @@
 
 | File                                    | Invariants | Category        |
 | --------------------------------------- | ---------- | --------------- |
-| `tests/property/config.properties.ts`   | 10         | Configuration   |
+| `tests/property/config.properties.ts`   | 11         | Configuration   |
 | `tests/property/level.properties.ts`    | 10         | Level Filtering |
 | `tests/property/callback.properties.ts` | 9          | Callback        |

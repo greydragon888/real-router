@@ -1,8 +1,12 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { logger } from "@real-router/logger";
+import { LEVEL_CONFIGS, LOG_LEVELS, logger } from "@real-router/logger";
 
-import type { LogCallback, LogLevelConfig } from "@real-router/logger";
+import type {
+  LogCallback,
+  LoggerConfig,
+  LogLevelConfig,
+} from "@real-router/logger";
 
 const noop = () => {};
 
@@ -15,6 +19,19 @@ const WARNING_MESSAGE = "warning message";
 const ERROR_MESSAGE = "error message";
 const WARN_ERROR = "warn-error";
 const ERROR_ONLY = "error-only";
+
+describe("exported constants (LEVEL_CONFIGS / LOG_LEVELS)", () => {
+  // These constants back the process-global threshold logic
+  // (`#currentThreshold = LEVEL_CONFIGS[level]`); if mutable, any code in the
+  // process could corrupt log filtering for everyone, including core (#897).
+  it("freezes LEVEL_CONFIGS so it cannot be mutated", () => {
+    expect(Object.isFrozen(LEVEL_CONFIGS)).toBe(true);
+  });
+
+  it("freezes LOG_LEVELS so it cannot be mutated", () => {
+    expect(Object.isFrozen(LOG_LEVELS)).toBe(true);
+  });
+});
 
 describe("Logger", () => {
   beforeEach(() => {
@@ -94,6 +111,18 @@ describe("Logger", () => {
       expect(config.callback).toBeUndefined();
     });
 
+    it("should ignore a callback inherited from the prototype (own-property only)", () => {
+      const callback: LogCallback = vi.fn();
+      // `callback` lives on the prototype, not as an own enumerable property.
+      const inherited = Object.create({ callback }) as Partial<LoggerConfig>;
+
+      logger.configure(inherited);
+
+      const config = logger.getConfig();
+
+      expect(config.callback).toBeUndefined();
+    });
+
     it("should accept none level", () => {
       logger.configure({ level: "none" });
       const config = logger.getConfig();
@@ -144,6 +173,15 @@ describe("Logger", () => {
       expect(() => {
         logger.configure({ level: "debug" as LogLevelConfig });
       }).toThrow(/Invalid log level:.*Valid levels are:/);
+    });
+
+    it("should reject Object.prototype keys as level (own-property validation)", () => {
+      // "toString" (and other Object.prototype keys) is inherited on every
+      // object, so a prototype-aware `in` check would accept it as a valid level
+      // and store it. Validation must use own-property semantics (#895).
+      expect(() => {
+        logger.configure({ level: "toString" as LogLevelConfig });
+      }).toThrow(/Invalid log level/);
     });
 
     it("should verify default callbackIgnoresLevel is false in internal config", () => {

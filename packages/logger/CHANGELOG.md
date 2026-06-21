@@ -1,5 +1,21 @@
 # logger
 
+## 0.3.2
+
+### Patch Changes
+
+- [#894](https://github.com/greydragon888/real-router/pull/894) [`0ef5ed0`](https://github.com/greydragon888/real-router/commit/0ef5ed08775704a091f2b9d9b2a073a233bb09e6) Thanks [@greydragon888](https://github.com/greydragon888)! - Ignore a `callback` inherited from the config object's prototype in `logger.configure()` ([#792](https://github.com/greydragon888/real-router/issues/792))
+
+  `configure()` detected the callback key with `"callback" in config`, which walks the prototype chain — so `configure(Object.create({ callback }))` installed an inherited callback. It now uses `Object.hasOwn(config, "callback")`, so only an own property is merged. Explicitly passing `{ callback: undefined }` still clears the callback as before.
+
+- [#894](https://github.com/greydragon888/real-router/pull/894) [`0ef5ed0`](https://github.com/greydragon888/real-router/commit/0ef5ed08775704a091f2b9d9b2a073a233bb09e6) Thanks [@greydragon888](https://github.com/greydragon888)! - Reject `Object.prototype` keys as the configured level in `logger.configure()` ([#895](https://github.com/greydragon888/real-router/issues/895))
+
+  `configure()` validated the level with `config.level in LEVEL_CONFIGS`, which walks the prototype chain — so inherited keys like `"toString"` or `"valueOf"` passed validation and were stored as the active level, corrupting the cached threshold (it became an inherited function, so every message bypassed the filter). It now uses `Object.hasOwn(LEVEL_CONFIGS, config.level)`, so only own, known levels are accepted; every other string throws `Invalid log level` as before. Mirrors the own-property fix applied to the `callback` key in [#792](https://github.com/greydragon888/real-router/issues/792).
+
+- [#894](https://github.com/greydragon888/real-router/pull/894) [`0ef5ed0`](https://github.com/greydragon888/real-router/commit/0ef5ed08775704a091f2b9d9b2a073a233bb09e6) Thanks [@greydragon888](https://github.com/greydragon888)! - Freeze the exported `LEVEL_CONFIGS` and `LOG_LEVELS` constants ([#897](https://github.com/greydragon888/real-router/issues/897))
+
+  `LEVEL_CONFIGS` / `LOG_LEVELS` were exported as plain mutable objects despite backing the process-global threshold logic of the singleton `logger`. Mutating one (`LEVEL_CONFIGS["error-only"] = -100`, or `delete LEVEL_CONFIGS.none`) silently corrupted log filtering for the whole process, including core's own logs. Both are now `Object.freeze`d, so the runtime matches the `Record`/readonly intent — same own-property/immutability discipline already applied to the `callback` ([#792](https://github.com/greydragon888/real-router/issues/792)) and `level` ([#895](https://github.com/greydragon888/real-router/issues/895)) inputs.
+
 ## 0.3.1
 
 ### Patch Changes
