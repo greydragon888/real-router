@@ -49,11 +49,12 @@ Calling the unsubscribe function returned by `router.usePlugin(validationPlugin(
 | Combination                                                                 | Behavior                                   | Location                                      |
 | --------------------------------------------------------------------------- | ------------------------------------------ | --------------------------------------------- |
 | `limits.warnListeners > limits.maxListeners` (and `maxListeners > 0`)       | `throw RangeError`                         | `validators/options.ts::validateLimits`       |
-| `logger.callbackIgnoresLevel: true` without `logger.callback`               | `logger.error("router.<method>", …)` (non-throwing — option would be ignored) | `validators/options.ts::validateLoggerOption` |
 | Static `defaultRoute: "<name>"` that does not exist in the route tree       | `throw Error` with `[validation-plugin]` prefix | Retrospective pass (`validationPlugin.ts`) |
 | `DefaultRouteCallback` returning a name that does not exist in the route tree | `throw Error` with `[validation-plugin]` prefix; propagates as `Promise.reject` via `navigateToDefault()` / `start()` fallback | Runtime hook `options.validateResolvedDefaultRoute` called from core's `resolveDefault()` when `defaultRoute` is a callback |
 
 Callbacks are intentionally **not** probed at registration time — their return value depends on dependencies that may not be set yet. The hook on `resolveDefault()` catches bad return values on the first actual use.
+
+**Logger config is not validated by this plugin.** The Router constructor consumes `options.logger` (applies it to the process-global logger singleton) and strips the key before options are stored (#724), so the retrospective pass — which reads the stored, logger-stripped options — never sees it. Logger config (`level` incl. `"none"`, `callback`, `callbackIgnoresLevel`) is therefore validated solely by core's `isLoggerConfig` guard at construction, the only place the input exists (#789). A prior `validateLoggerOption` here was dead on the live path and was removed.
 
 ### `navigateToDefault()` Promise contract
 

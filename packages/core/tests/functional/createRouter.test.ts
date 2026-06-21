@@ -80,6 +80,24 @@ describe("createRouter", () => {
       ).not.toThrow();
     });
 
+    it('should accept level "none" (wiki-documented surface, #789)', () => {
+      expect(() =>
+        createRouter([], { logger: { level: "none" } }),
+      ).not.toThrow();
+    });
+
+    it("should accept callbackIgnoresLevel (wiki-documented surface, #789)", () => {
+      expect(() =>
+        createRouter([], {
+          logger: {
+            level: "all",
+            callback: () => {},
+            callbackIgnoresLevel: true,
+          },
+        }),
+      ).not.toThrow();
+    });
+
     it("should throw TypeError for invalid logger config", () => {
       expect(() =>
         createRouter([], { logger: { invalid: true } as any }),

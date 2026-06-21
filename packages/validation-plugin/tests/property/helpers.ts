@@ -106,13 +106,9 @@ const validLoggerArbitrary = fc
       }
     }
 
-    // Cross-field invariant (#471 case 4): callbackIgnoresLevel: true has no
-    // effect without callback. Drop the flag in that case so the generated
-    // options don't trigger the validator's noisy logger.error on every run.
-    if (result.callbackIgnoresLevel === true && result.callback === undefined) {
-      delete result.callbackIgnoresLevel;
-    }
-
+    // `logger` content is not validated by validateOptions — core's
+    // isLoggerConfig owns logger validation at construction (#789). Any
+    // well-typed logger object is accepted here, so no cross-field shaping.
     return result;
   });
 
