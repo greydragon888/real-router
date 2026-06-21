@@ -29,7 +29,7 @@ describe("State Edge Cases (Uncovered Branches)", () => {
     )("rejects state with invalid params", (name, path, invalidParams) => {
       const state = { name, path, params: invalidParams };
 
-      // Ensures isParamsStrict check is properly tested
+      // Ensures the params check (via isParams in isRequiredFields) is tested
       expect(isStateStrict(state)).toBe(false);
     });
 

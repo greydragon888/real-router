@@ -1,6 +1,6 @@
 # type-guards
 
-Internal package providing runtime type guards and validators for the Real-Router ecosystem. Not published to npm -- consumed by core and plugins via `workspace:^`.
+Internal package providing runtime type guards and validators for the Real-Router ecosystem. Not published to npm -- consumed via `workspace:^` by the browser, hash, navigation, persistent-params, and validation plugins (and `shared/browser-env`). **Not** a dependency of `@real-router/core` (core uses its own structural guards).
 
 ## Exports
 

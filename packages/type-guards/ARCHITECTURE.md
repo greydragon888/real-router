@@ -47,19 +47,20 @@ graph LR
 
     TG -.->|provides| GUARDS[guards + validators]
 
-    CORE["@real-router/core"] -.->|bundles| TG
+    VP["validation-plugin"] -.->|bundles| TG
     BP["browser-plugin"] -.->|bundles| TG
     HP["hash-plugin"] -.->|bundles| TG
     PP["persistent-params-plugin"] -.->|bundles| TG
 ```
 
-| Consumer                     | What it uses                                                              | Purpose                                  |
-| ---------------------------- | ------------------------------------------------------------------------- | ---------------------------------------- |
-| **@real-router/core**        | `isString`, `isBoolean`, `isParams`, `isRouteName`, `isNavigationOptions` | Input validation in route/navigation API |
-| **@real-router/core**        | `isState`, `validateRouteName`, `validateState`, `getTypeDescription`     | State assertions and error messages      |
-| **browser-plugin**           | `isStateStrict` (re-exported as `isState`)                                | Deep state validation                    |
-| **hash-plugin**              | `isStateStrict` (re-exported as `isState`)                                | Deep state validation                    |
-| **persistent-params-plugin** | `isPrimitiveValue`                                                        | URL-safe param value check               |
+| Consumer                             | What it uses                                                          | Purpose                                             |
+| ------------------------------------ | --------------------------------------------------------------------- | --------------------------------------------------- |
+| **validation-plugin**                | `isParams`, `isString`, `isBoolean`, `isObjKey`, `getTypeDescription` | Opt-in runtime validation + error messages          |
+| **browser-plugin** / **hash-plugin** | `isStateStrict` (re-exported as `isState`)                            | Public `history.state` guard                        |
+| **shared/browser-env**               | `isStateStrict` (as `isState`)                                        | popstate state validation (browser/hash/navigation) |
+| **persistent-params-plugin**         | `isPrimitiveValue`                                                    | URL-safe param value check                          |
+
+> `@real-router/core` is **not** a consumer — it uses its own structural `isStateStructural` guard, not `type-guards`.
 
 ## Public API
 
@@ -92,7 +93,7 @@ function isNavigationOptions(value: unknown): value is NavigationOptions;
 function isState(value: unknown): value is State;
 // Checks presence of name, params, path
 function isStateStrict(value: unknown): value is State;
-// Same + validates params are URL-safe (isParamsStrict)
+// Behaviorally identical to isState (same required-field check); no deeper validation
 ```
 
 ### Validators
@@ -141,29 +142,29 @@ Error messages always include the calling method name for easier stack trace rea
 
 Both require a plain object (`proto === null || proto === Object.prototype`). They differ in allowed value types:
 
-| Feature              | `isParams`                 | `isParamsStrict`                                      |
-| -------------------- | -------------------------- | ----------------------------------------------------- |
-| Primitive values     | ✅                         | ✅                                                    |
-| `null` / `undefined` | ✅                         | ✅                                                    |
-| Arrays of primitives | ✅                         | ✅                                                    |
-| Nested plain objects | ✅ (deep)                  | ❌                                                    |
-| Arrays of objects    | ✅ (deep)                  | ❌                                                    |
-| Circular references  | ❌ detected via `WeakSet`  | ❌                                                    |
-| Class instances      | ❌                         | ❌                                                    |
-| Algorithm            | Two-phase fast → slow path | Single-pass                                           |
-| Used by              | `@real-router/core`        | browser-plugin, hash-plugin, persistent-params-plugin |
+| Feature              | `isParams`                                                              | `isParamsStrict`             |
+| -------------------- | ----------------------------------------------------------------------- | ---------------------------- |
+| Primitive values     | ✅                                                                      | ✅                           |
+| `null` / `undefined` | ✅                                                                      | ✅                           |
+| Arrays of primitives | ✅                                                                      | ✅                           |
+| Nested plain objects | ✅ (deep)                                                               | ❌                           |
+| Arrays of objects    | ✅ (deep)                                                               | ❌                           |
+| Circular references  | ❌ detected via `WeakSet`                                               | ❌                           |
+| Class instances      | ❌                                                                      | ❌                           |
+| Algorithm            | Two-phase fast → slow path                                              | Single-pass                  |
+| Used by              | `validation-plugin`, `isState`/`isStateStrict` (via `isRequiredFields`) | — (currently unused; latent) |
 
-**Why two levels?** `isParams` supports the full `Params` type — arbitrary serializable objects for state management. `isParamsStrict` restricts to URL-encodable values that round-trip through a query string without loss.
+**Why two levels?** `isParams` supports the full `Params` type — arbitrary serializable objects for state management. `isParamsStrict` restricts to URL-encodable values that round-trip through a query string without loss. (`isParamsStrict` currently has no callers — it is a latent part of the public surface.)
 
 ### `isState` vs `isStateStrict`
 
-| Feature         | `isState`                                                 | `isStateStrict`                                |
-| --------------- | --------------------------------------------------------- | ---------------------------------------------- |
-| Required fields | `isRouteName(name)` + `isParams(params)` + `path: string` | Same                                           |
-| `params` field  | `isParams` (allows nested objects)                        | `isParamsStrict` (URL-safe, no nested objects) |
-| Used by         | `@real-router/core` (internal assertions)                 | browser-plugin, hash-plugin (public API)       |
+| Feature         | `isState`                                                 | `isStateStrict`                                        |
+| --------------- | --------------------------------------------------------- | ------------------------------------------------------ |
+| Required fields | `isRouteName(name)` + `isParams(params)` + `path: string` | Same (via `isRequiredFields`)                          |
+| `params` field  | `isParams` (allows nested objects)                        | `isParams` (identical — see below)                     |
+| Used by         | not consumed by core (core has its own structural guard)  | browser-plugin, hash-plugin (re-exported as `isState`) |
 
-**Why two levels?** Core constructs states internally and trusts their structure. Browser and hash plugins expose `isState` as a public user-facing API — user-provided states may have `params` from `history.state` that must pass URL-safe `isParamsStrict` validation.
+**Why two names?** Both currently reduce to the same `isRequiredFields` check — `isStateStrict` is **behaviorally identical** to `isState` (the "strict" name is historical; it does not deep-validate `meta`). Browser and hash plugins re-export `isStateStrict` as their public `isState` for validating `history.state`.
 
 ## Params Validation Algorithm (`isParams`)
 

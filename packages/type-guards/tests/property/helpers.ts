@@ -167,8 +167,9 @@ export const historyStateArbitrary = fc
   })) as unknown as fc.Arbitrary<State>;
 
 /**
- * Generator for invalid State (missing required fields or wrong types)
- * Note: Arrays with primitives are VALID for isParamsStrict, so we exclude them!
+ * Generator for invalid State (missing required fields or wrong types).
+ * The "invalid params" variant uses non-object primitives; top-level array
+ * params are not enumerated here.
  */
 export const invalidStateArbitrary = fc.oneof(
   // Missing name
@@ -314,8 +315,9 @@ export const invalidRoutePathArbitrary = fc
 // ============================================================================
 
 /**
- * Generator for arbitrary invalid types (primitives, arrays, and non-objects)
- * Note: Arrays (even empty) pass isParamsStrict due to implementation - excluded from tests
+ * Generator for arbitrary invalid types (primitives and non-objects).
+ * Top-level arrays are rejected by isParams/isParamsStrict too, but are
+ * exercised elsewhere; this generator stays focused on non-array invalids.
  */
 export const arbitraryInvalidTypes = fc.oneof(
   fc.constant(null),
@@ -325,7 +327,7 @@ export const arbitraryInvalidTypes = fc.oneof(
   fc.string(),
   fc.func(fc.anything()),
   fc.constant(Symbol("test")),
-  // Arrays are technically objects and pass some object checks, so excluded
+  // Arrays (typeof "object") are rejected by the guards too, but kept out here
 );
 
 // ============================================================================
