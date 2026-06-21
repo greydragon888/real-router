@@ -143,17 +143,18 @@
 
 ## Type Description Utilities
 
-| #   | Invariant                                                 | Description                                                                                                                         |
-| --- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | getTypeDescription returns "null" for null                | `null` always produces the string `"null"`, not `"object"`.                                                                         |
-| 2   | getTypeDescription returns "undefined" for undefined      | `undefined` produces `"undefined"` via the `typeof` fallback.                                                                       |
-| 3   | getTypeDescription returns array description with length  | For any array of length N, returns `"array[N]"`. The length is always accurate regardless of array contents.                        |
-| 4   | getTypeDescription returns constructor name for instances | Class instances (`Date`, `Map`, `Set`, `RegExp`) return their constructor name. Only instances with a non-`"Object"` name qualify.  |
-| 5   | getTypeDescription returns "object" for plain objects     | Plain objects (with `Object.prototype`) return `"object"`. Null-prototype objects also return `"object"`.                           |
-| 6   | getTypeDescription returns typeof for primitives          | Strings → `"string"`, numbers → `"number"`, booleans → `"boolean"`. The `typeof` operator provides the description.                 |
-| 7   | getTypeDescription returns "function" for functions       | Functions always produce `"function"` via the `typeof` fallback.                                                                    |
-| 8   | getTypeDescription returns "symbol" for symbols           | Symbols produce `"symbol"` via the `typeof` fallback.                                                                               |
-| 9   | getTypeDescription handles null-prototype objects         | Objects created with `Object.create(null)` return `"object"`. The `"constructor" in value` guard prevents errors on missing fields. |
+| #   | Invariant                                                   | Description                                                                                                                                                                                                                                          |
+| --- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | getTypeDescription returns "null" for null                  | `null` always produces the string `"null"`, not `"object"`.                                                                                                                                                                                          |
+| 2   | getTypeDescription returns "undefined" for undefined        | `undefined` produces `"undefined"` via the `typeof` fallback.                                                                                                                                                                                        |
+| 3   | getTypeDescription returns array description with length    | For any array of length N, returns `"array[N]"`. The length is always accurate regardless of array contents.                                                                                                                                         |
+| 4   | getTypeDescription returns constructor name for instances   | Class instances (`Date`, `Map`, `Set`, `RegExp`) return their constructor name. Only instances with a non-`"Object"` name qualify.                                                                                                                   |
+| 5   | getTypeDescription returns "object" for plain objects       | Plain objects (with `Object.prototype`) return `"object"`. Null-prototype objects also return `"object"`.                                                                                                                                            |
+| 6   | getTypeDescription returns typeof for primitives            | Strings → `"string"`, numbers → `"number"`, booleans → `"boolean"`. The `typeof` operator provides the description.                                                                                                                                  |
+| 7   | getTypeDescription returns "function" for functions         | Functions always produce `"function"` via the `typeof` fallback.                                                                                                                                                                                     |
+| 8   | getTypeDescription returns "symbol" for symbols             | Symbols produce `"symbol"` via the `typeof` fallback.                                                                                                                                                                                                |
+| 9   | getTypeDescription handles null-prototype objects           | Objects created with `Object.create(null)` return `"object"`. Reading `constructor` defensively (a `typeof` function check) prevents errors on missing fields.                                                                                       |
+| 10  | getTypeDescription tolerates an adversarial own constructor | An object whose own `constructor` is not a function (`null`, a string, a number, a plain object) returns `"object"` instead of crashing or returning a non-string. Anonymous class instances (empty constructor name) also return `"object"` (#787). |
 
 ## Test Files
 
@@ -168,4 +169,4 @@
 | `tests/property/guards/routes.properties.ts`              | 10         | Route Name Guards          |
 | `tests/property/validators/state.properties.ts`           | 10         | State Validators           |
 | `tests/property/validators/routes.properties.ts`          | 8          | Route Name Validators      |
-| `tests/property/utilities/type-description.properties.ts` | 9          | Type Description Utilities |
+| `tests/property/utilities/type-description.properties.ts` | 10         | Type Description Utilities |

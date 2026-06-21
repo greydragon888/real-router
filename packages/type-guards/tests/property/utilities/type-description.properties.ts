@@ -65,5 +65,18 @@ describe("Type Description Utilities - Property-Based Tests", () => {
 
       expect(getTypeDescription(obj)).toBe("object");
     });
+
+    // #787: an adversarial own `constructor` must never crash the diagnostic
+    // helper or break its "returns a non-empty string" contract. `fc.object()`
+    // above never emits a `constructor` key, so this gap was invisible.
+    test.prop([fc.anything()], { numRuns: 5000 })(
+      "never throws and always returns a non-empty string for any own constructor value",
+      (ctorValue) => {
+        const result = getTypeDescription({ constructor: ctorValue, bad: 1 });
+
+        expect(typeof result).toBe("string");
+        expect(result.length).toBeGreaterThan(0);
+      },
+    );
   });
 });
