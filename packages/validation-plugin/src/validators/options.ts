@@ -1,6 +1,5 @@
 // packages/validation-plugin/src/validators/options.ts
 
-import { logger } from "@real-router/logger";
 import { isObjKey } from "type-guards";
 
 const VALID_OPTION_VALUES = {
@@ -16,13 +15,13 @@ const VALID_QUERY_PARAMS = {
   numberFormat: ["none", "auto"] as const,
 } as const;
 
-const VALID_LOGGER_LEVELS = [
-  "all",
-  "warn-error",
-  "error-only",
-  "none",
-] as const;
-
+// `logger` is a valid option name, but its contents are NOT validated here.
+// The Router constructor consumes `options.logger` (applies it to the
+// process-global logger singleton via `logger.configure()`) and strips the key
+// before options are stored (#724). The retrospective pass reads the stored,
+// logger-stripped options, so any logger validation in this plugin is dead on
+// the live path. Logger config is therefore validated solely by core's
+// `isLoggerConfig` guard at construction — the only place the input exists (#789).
 const KNOWN_OPTIONS = new Set<string>([
   "defaultRoute",
   "defaultParams",
@@ -206,67 +205,6 @@ function validateQueryParamsOptions(
   }
 }
 
-function validateLoggerOption(loggerOpt: unknown, methodName: string): void {
-  if (loggerOpt === undefined) {
-    return;
-  }
-
-  if (!loggerOpt || typeof loggerOpt !== "object" || Array.isArray(loggerOpt)) {
-    throw new TypeError(
-      `[router.${methodName}] Invalid "logger": expected plain object`,
-    );
-  }
-
-  const loggerOptions = loggerOpt as Record<string, unknown>;
-
-  if (
-    loggerOptions.level !== undefined &&
-    !VALID_LOGGER_LEVELS.includes(
-      loggerOptions.level as (typeof VALID_LOGGER_LEVELS)[number],
-    )
-  ) {
-    const validLevelList = VALID_LOGGER_LEVELS.map((val) => `"${val}"`).join(
-      ", ",
-    );
-    const levelDisplay =
-      typeof loggerOptions.level === "string"
-        ? loggerOptions.level
-        : `(${typeof loggerOptions.level})`;
-
-    throw new TypeError(
-      `[router.${methodName}] Invalid "logger.level": "${levelDisplay}". Must be one of: ${validLevelList}`,
-    );
-  }
-
-  if (
-    loggerOptions.callback !== undefined &&
-    typeof loggerOptions.callback !== "function"
-  ) {
-    throw new TypeError(
-      `[router.${methodName}] Invalid "logger.callback": expected function`,
-    );
-  }
-
-  if (
-    loggerOptions.callbackIgnoresLevel !== undefined &&
-    typeof loggerOptions.callbackIgnoresLevel !== "boolean"
-  ) {
-    throw new TypeError(
-      `[router.${methodName}] Invalid "logger.callbackIgnoresLevel": expected boolean`,
-    );
-  }
-
-  if (
-    loggerOptions.callbackIgnoresLevel === true &&
-    loggerOptions.callback === undefined
-  ) {
-    logger.error(
-      `router.${methodName}`,
-      `"logger.callbackIgnoresLevel: true" has no effect without "logger.callback" — the option is ignored`,
-    );
-  }
-}
-
 export function validateOptions(options: unknown, methodName: string): void {
   if (!options || typeof options !== "object" || Array.isArray(options)) {
     throw new TypeError(
@@ -322,7 +260,6 @@ export function validateOptions(options: unknown, methodName: string): void {
   }
 
   validateQueryParamsOptions(opts.queryParams, methodName);
-  validateLoggerOption(opts.logger, methodName);
 
   if (opts.limits !== undefined) {
     validateLimits(opts.limits, methodName);

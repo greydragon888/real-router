@@ -878,51 +878,6 @@ describe("Phase 2 options validators", () => {
       }).toThrow(TypeError);
     });
 
-    it("throws for invalid logger (non-object)", () => {
-      expect(() => {
-        validateOptions({ logger: "string" }, "test");
-      }).toThrow(TypeError);
-    });
-
-    it("throws for invalid logger (array)", () => {
-      expect(() => {
-        validateOptions({ logger: [] }, "test");
-      }).toThrow(TypeError);
-    });
-
-    it("throws for invalid logger.level (string value)", () => {
-      expect(() => {
-        validateOptions({ logger: { level: "bad" } }, "test");
-      }).toThrow(TypeError);
-      expect(() => {
-        validateOptions({ logger: { level: "bad" } }, "test");
-      }).toThrow("logger.level");
-    });
-
-    it("throws for invalid logger.level (non-string value)", () => {
-      expect(() => {
-        validateOptions({ logger: { level: 99 } }, "test");
-      }).toThrow(TypeError);
-    });
-
-    it("throws for invalid logger.callback (non-function)", () => {
-      expect(() => {
-        validateOptions({ logger: { callback: "not-fn" } }, "test");
-      }).toThrow(TypeError);
-      expect(() => {
-        validateOptions({ logger: { callback: "not-fn" } }, "test");
-      }).toThrow("logger.callback");
-    });
-
-    it("throws for invalid logger.callbackIgnoresLevel (non-boolean)", () => {
-      expect(() => {
-        validateOptions({ logger: { callbackIgnoresLevel: "yes" } }, "test");
-      }).toThrow(TypeError);
-      expect(() => {
-        validateOptions({ logger: { callbackIgnoresLevel: "yes" } }, "test");
-      }).toThrow("logger.callbackIgnoresLevel");
-    });
-
     it("accepts valid complete options", () => {
       expect(() => {
         validateOptions(
@@ -980,71 +935,6 @@ describe("Phase 2 options validators", () => {
       expect(() => {
         validateOptions({ limits: { maxPlugins: -1 } }, "test");
       }).toThrow(RangeError);
-    });
-
-    it("accepts undefined logger level (skips validation)", () => {
-      expect(() => {
-        validateOptions({ logger: {} }, "test");
-      }).not.toThrow();
-    });
-
-    it("accepts undefined logger callback (skips validation)", () => {
-      expect(() => {
-        validateOptions({ logger: { level: "all" } }, "test");
-      }).not.toThrow();
-    });
-
-    it("accepts undefined logger callbackIgnoresLevel (skips validation)", () => {
-      expect(() => {
-        validateOptions({ logger: { callback: () => {} } }, "test");
-      }).not.toThrow();
-    });
-
-    describe("callbackIgnoresLevel without callback (#471 case 4)", () => {
-      let errorSpy: ReturnType<typeof vi.spyOn>;
-
-      beforeEach(() => {
-        errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
-      });
-
-      afterEach(() => {
-        errorSpy.mockRestore();
-      });
-
-      it("logs error when callbackIgnoresLevel is true and callback missing", () => {
-        validateOptions({ logger: { callbackIgnoresLevel: true } }, "test");
-
-        expect(errorSpy).toHaveBeenCalledWith(
-          "router.test",
-          expect.stringContaining("has no effect without"),
-        );
-      });
-
-      it("does not log error when callbackIgnoresLevel is false", () => {
-        validateOptions({ logger: { callbackIgnoresLevel: false } }, "test");
-
-        expect(errorSpy).not.toHaveBeenCalled();
-      });
-
-      it("does not log error when callback is provided alongside callbackIgnoresLevel", () => {
-        validateOptions(
-          {
-            logger: {
-              callbackIgnoresLevel: true,
-              callback: () => {},
-            },
-          },
-          "test",
-        );
-
-        expect(errorSpy).not.toHaveBeenCalled();
-      });
-
-      it("does not log error when callbackIgnoresLevel is undefined", () => {
-        validateOptions({ logger: { level: "all" } }, "test");
-
-        expect(errorSpy).not.toHaveBeenCalled();
-      });
     });
   });
 });
