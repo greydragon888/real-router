@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-06-21]
 
+### @real-router/logger@0.3.1
+
+### Patch Changes
+
+- [#891](https://github.com/greydragon888/real-router/pull/891) [`d78f15e`](https://github.com/greydragon888/real-router/commit/d78f15e3f9bfd8d829ef72bea7e3816025b22603) Thanks [@greydragon888](https://github.com/greydragon888)! - Guard against re-entrant logger callbacks ([#791](https://github.com/greydragon888/real-router/issues/791))
+
+  A `callback` that itself calls `logger.*` on the happy path used to recurse through `#invokeCallback` until a swallowed `RangeError` (~5.9k self-calls and `console.error` per single log). A `#inCallback` re-entrancy guard now skips the nested callback invocation, turning the pattern into a safe no-op. Console output is unaffected: the nested message is still written once.
+
+
 ### @real-router/core@0.59.4
 
 ### Patch Changes
