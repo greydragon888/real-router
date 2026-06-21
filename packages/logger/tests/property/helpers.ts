@@ -7,6 +7,7 @@ import {
 
 import type {
   LogCallback,
+  LoggerConfig,
   LogLevel,
   LogLevelConfig,
 } from "@real-router/logger";
@@ -114,6 +115,21 @@ export const throwingCallbackArbitrary = fc.constant(() => {
   });
 
   return callback;
+});
+
+/**
+ * Config object whose `callback` lives on the PROTOTYPE, not as an own property.
+ *
+ * `configure` must IGNORE it: detection is `Object.hasOwn(config, "callback")`
+ * (own-property only, #792), not a prototype-aware `"callback" in config`.
+ * Returns a thunk so each run gets a fresh inherited callback (mirrors
+ * `callbackArbitrary`); reverting #792 to `in` installs the inherited callback
+ * and fails the property that consumes this generator.
+ */
+export const protoCallbackConfigArbitrary = fc.constant(() => {
+  const callback: LogCallback = vi.fn();
+
+  return Object.create({ callback }) as Partial<LoggerConfig>;
 });
 
 // ============================================================================

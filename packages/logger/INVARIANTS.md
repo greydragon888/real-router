@@ -10,13 +10,14 @@
 | 2   | Partial updates preserve other fields                    | Updating only `level` leaves `callback` and `callbackIgnoresLevel` unchanged. Each field is independent and partial updates are non-destructive.                  |
 | 3   | Partial callback update preserves level                  | Updating only `callback` leaves `level` unchanged. The merge is always additive, never a full replacement.                                                        |
 | 4   | getConfig always returns a valid level                   | After any `configure()` call, `getConfig().level` is always one of the known valid level strings. Invalid levels are rejected before they can be stored.          |
-| 5   | getConfig always returns callbackIgnoresLevel as boolean | The `callbackIgnoresLevel` field is always a boolean, never coerced to another type.                                                                              |
+| 5   | getConfig always returns callbackIgnoresLevel as boolean | For in-contract boolean input (the public `boolean` type), `getConfig().callbackIgnoresLevel` is that same boolean — `configure` stores it verbatim, neither coercing nor re-typing it; the default is the boolean `false`. The boolean contract is upheld by the public type and, at the router boundary, by core's `isLoggerConfig` (which rejects non-boolean before `configure` sees it). Out-of-contract non-boolean input (only reachable by bypassing TypeScript and `isLoggerConfig`) is stored as-is and is outside this invariant.                                                                              |
 | 6   | getConfig returns a new object on each call              | Each `getConfig()` call returns a fresh object. Mutating the returned config does not affect the logger's internal state.                                         |
 | 7   | Setting callback to undefined clears it                  | After `configure({ callback: undefined })`, `getConfig().callback` is `undefined` and the previously set level is preserved.                                      |
 | 8   | Invalid levels throw                                     | Passing an unrecognized string as `level` — including `Object.prototype` keys like `"toString"` — throws an error matching `/Invalid log level/`. Validation is own-property (`Object.hasOwn`), so inherited keys are never silently accepted.                       |
 | 9   | Level switching works correctly                          | Switching level multiple times in sequence always results in the last configured level being active. There is no stale state from previous configurations.        |
 | 10  | callbackIgnoresLevel is preserved during partial updates | Updating `level` or `callback` independently does not reset `callbackIgnoresLevel`. The flag persists until explicitly changed.                                   |
 | 11  | Rejected configure is atomic                             | A `configure()` call that throws on an invalid `level` applies no field at all — the `callback` and `callbackIgnoresLevel` from the same call are not installed, and the previously active config is fully preserved. Validation precedes every mutation. |
+| 12  | Inherited callback is ignored (own-property)             | A config whose `callback` lives on the prototype (e.g. `Object.create({ callback })`) does not install it — `configure` detects the key with `Object.hasOwn(config, "callback")`, not a prototype-aware `"callback" in config`, so inherited keys are never picked up (#792). Mirrors the own-property `level` validation in #8. |
 
 ## Level Filtering
 
@@ -51,6 +52,6 @@
 
 | File                                    | Invariants | Category        |
 | --------------------------------------- | ---------- | --------------- |
-| `tests/property/config.properties.ts`   | 11         | Configuration   |
+| `tests/property/config.properties.ts`   | 12         | Configuration   |
 | `tests/property/level.properties.ts`    | 10         | Level Filtering |
 | `tests/property/callback.properties.ts` | 9          | Callback        |
