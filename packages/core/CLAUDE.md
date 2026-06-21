@@ -105,7 +105,7 @@ namespaces/DependenciesNamespace/
 └── index.ts               — exports
 ```
 
-**Store pattern:** `RoutesStore` and `DependenciesStore` are plain data interfaces (not classes). CRUD logic lives in the corresponding standalone API function (`getRoutesApi.ts`, `getDependenciesApi.ts`).
+**Store pattern:** `RoutesStore` and `DependenciesStore` are data-holder interfaces (not classes). Besides the tree/config/matcher data, `RoutesStore` deliberately carries internal cross-namespace references — `lifecycleNamespace` and `depsStore`, set after construction during wiring — so the standalone CRUD helpers can reach the lifecycle namespace (for `addCanActivate` / `clearDefinitionGuards` / `clearAll`) via `store.lifecycleNamespace` instead of threading a parameter through every helper. The store is the api/ layer's deliberate transport channel, not pure inert data. CRUD logic lives in the corresponding standalone API function (`getRoutesApi.ts`, `getDependenciesApi.ts`).
 
 ### Dependency Injection
 
