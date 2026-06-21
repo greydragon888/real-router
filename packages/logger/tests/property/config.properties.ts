@@ -8,6 +8,7 @@ import {
   invalidLevelArbitrary,
   logLevelConfigArbitrary,
   LOG_LEVEL_CONFIGS,
+  protoCallbackConfigArbitrary,
 } from "./helpers";
 
 import type { LogLevelConfig } from "@real-router/logger";
@@ -161,6 +162,23 @@ describe("Logger Configuration Properties", () => {
         expect(config.callback).toBeUndefined();
         // level should be preserved
         expect(config.level).toBe(level);
+      },
+    );
+  });
+
+  describe("Own-property callback detection", () => {
+    test.prop([protoCallbackConfigArbitrary], { numRuns: 1000 })(
+      "a callback inherited from the prototype is ignored (own-property only)",
+      (makeConfig) => {
+        // Baseline: no callback installed.
+        logger.configure({ callback: undefined });
+
+        // A config whose `callback` lives on the prototype, not as an own key.
+        logger.configure(makeConfig());
+
+        // Own-property detection (#792): the inherited callback must NOT install.
+        // Reverting to `"callback" in config` makes this property fail.
+        expect(logger.getConfig().callback).toBeUndefined();
       },
     );
   });
