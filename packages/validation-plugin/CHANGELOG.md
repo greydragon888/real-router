@@ -1,5 +1,16 @@
 # @real-router/validation-plugin
 
+## 0.7.11
+
+### Patch Changes
+
+- [#889](https://github.com/greydragon888/real-router/pull/889) [`c6560a1`](https://github.com/greydragon888/real-router/commit/c6560a1c7326df939edda51f86fd0c1952d7a5dd) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove dead `validateLoggerOption` ([#789](https://github.com/greydragon888/real-router/issues/789))
+
+  The Router constructor consumes `options.logger` and strips the key before options are stored, so the retrospective pass always saw `logger: undefined` and `validateLoggerOption` never ran on the live path. Logger config is validated solely by core's `isLoggerConfig` guard at construction — the only place the input exists. Removes the unreachable validator, its `VALID_LOGGER_LEVELS` constant, and the now-unreachable `callbackIgnoresLevel`-without-`callback` diagnostic. Behavior-neutral on any reachable path.
+
+- Updated dependencies [[`c6560a1`](https://github.com/greydragon888/real-router/commit/c6560a1c7326df939edda51f86fd0c1952d7a5dd)]:
+  - @real-router/core@0.59.4
+
 ## 0.7.10
 
 ### Patch Changes
