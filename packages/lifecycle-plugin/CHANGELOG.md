@@ -1,5 +1,24 @@
 # @real-router/lifecycle-plugin
 
+## 0.6.0
+
+### Minor Changes
+
+- [#893](https://github.com/greydragon888/real-router/pull/893) [`acc8e7d`](https://github.com/greydragon888/real-router/commit/acc8e7da82fbaccc9058fc9d350868ba57cc0d6e) Thanks [@greydragon888](https://github.com/greydragon888)! - Support updating lifecycle hooks via `routes.update()` ([#797](https://github.com/greydragon888/real-router/issues/797))
+
+  `RouteConfigUpdate` is now augmented with `onEnter` / `onStay` / `onLeave` /
+  `onNavigate` (each `| null` to remove), symmetric with the existing `Route`
+  augmentation. `getRoutesApi(router).update(name, { onNavigate })` hot-swaps a
+  hook factory with precise typing; the plugin recompiles it lazily on the next
+  navigation (the factory-reference change is detected automatically). Previously
+  the hook patch was silently dropped by core and the old hook kept firing.
+
+### Patch Changes
+
+- Updated dependencies [[`acc8e7d`](https://github.com/greydragon888/real-router/commit/acc8e7da82fbaccc9058fc9d350868ba57cc0d6e), [`acc8e7d`](https://github.com/greydragon888/real-router/commit/acc8e7da82fbaccc9058fc9d350868ba57cc0d6e)]:
+  - @real-router/core@0.59.5
+  - @real-router/types@0.36.1
+
 ## 0.5.3
 
 ### Patch Changes

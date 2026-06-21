@@ -1,5 +1,24 @@
 # @real-router/preload-plugin
 
+## 0.6.0
+
+### Minor Changes
+
+- [#893](https://github.com/greydragon888/real-router/pull/893) [`acc8e7d`](https://github.com/greydragon888/real-router/commit/acc8e7da82fbaccc9058fc9d350868ba57cc0d6e) Thanks [@greydragon888](https://github.com/greydragon888)! - Support updating `preload` via `routes.update()` ([#797](https://github.com/greydragon888/real-router/issues/797))
+
+  `RouteConfigUpdate` is now augmented with `preload` (`| null` to remove),
+  symmetric with the existing `Route` augmentation.
+  `getRoutesApi(router).update(name, { preload })` hot-swaps the preload factory
+  with precise typing; it is picked up lazily on the next hover/touch (the factory
+  reference change invalidates the compiled cache). Previously the patch was
+  silently dropped by core and the old factory stayed compiled.
+
+### Patch Changes
+
+- Updated dependencies [[`acc8e7d`](https://github.com/greydragon888/real-router/commit/acc8e7da82fbaccc9058fc9d350868ba57cc0d6e), [`acc8e7d`](https://github.com/greydragon888/real-router/commit/acc8e7da82fbaccc9058fc9d350868ba57cc0d6e)]:
+  - @real-router/core@0.59.5
+  - @real-router/types@0.36.1
+
 ## 0.5.3
 
 ### Patch Changes
