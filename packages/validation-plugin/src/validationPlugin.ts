@@ -80,7 +80,15 @@ import {
 } from "./validators/routes";
 import { validateMakeStateArgs } from "./validators/state";
 
-import type { PluginFactory, RouterValidator } from "@real-router/core";
+import type { EventName, EventMethodMap } from "./validators/eventBus";
+import type {
+  PluginFactory,
+  RouterValidator,
+  Route,
+  RouteTree,
+  Plugin,
+  Options,
+} from "@real-router/core";
 import type { RouterInternals } from "@real-router/core/validation";
 
 function buildValidatorObject(ctx: RouterInternals): RouterValidator {
@@ -93,8 +101,7 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
       validateStateBuilderArgs,
 
       validateAddRouteArgs(routes) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
-        validateAddRouteArgs(routes as any);
+        validateAddRouteArgs(routes as readonly Route[]);
       },
 
       validateRoutes(routes, store) {
@@ -104,10 +111,8 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
         };
 
         validateRoutes(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
-          routes as any,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
-          typedStore.tree as any,
+          routes as Route[],
+          typedStore.tree as RouteTree | undefined,
           typedStore.config?.forwardMap,
         );
       },
@@ -169,8 +174,7 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
       },
 
       throwIfInternalRouteInArray(routes, caller) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
-        throwIfInternalRouteInArray(routes as any, caller);
+        throwIfInternalRouteInArray(routes as readonly Route[], caller);
       },
       validateExistingRoutes,
       validateForwardToConsistency,
@@ -180,8 +184,11 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
     },
     options: {
       validateLimitValue(name, value) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
-        validateLimitValue(name as any, value, "validate");
+        validateLimitValue(
+          name as keyof NonNullable<Options["limits"]>,
+          value,
+          "validate",
+        );
       },
       validateLimits(limits) {
         validateLimits(limits, "validate");
@@ -212,8 +219,11 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
     },
     plugins: {
       validatePluginLimit(count, limits) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
-        validatePluginLimit(count, 1, (limits as any)?.maxPlugins);
+        validatePluginLimit(
+          count,
+          1,
+          (limits as { maxPlugins?: number } | undefined)?.maxPlugins,
+        );
       },
       // eslint-disable-next-line @typescript-eslint/no-empty-function
       validateNoDuplicatePlugins(_factory, _factories) {},
@@ -234,8 +244,8 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
         validateHandlerLimit(
           count,
           caller,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
-          (limits as any)?.maxLifecycleHandlers,
+          (limits as { maxLifecycleHandlers?: number } | undefined)
+            ?.maxLifecycleHandlers,
         );
       },
       validateCountThresholds(count, methodName) {
@@ -279,8 +289,10 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
       validateEventName,
 
       validateListenerArgs(name, cb) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        validateListenerArgs(name as any, cb as any);
+        validateListenerArgs<EventName>(
+          name as EventName,
+          cb as Plugin[EventMethodMap[EventName]],
+        );
       },
     },
   };
