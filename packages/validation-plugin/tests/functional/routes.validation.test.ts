@@ -334,6 +334,23 @@ describe("routes API validation — with validationPlugin", () => {
         raw.update("home", { encodeParams: transpiledEncoder });
       }).toThrow(/cannot be an async function/);
     });
+
+    it("should not reject custom (plugin-defined) fields in the patch (#797)", () => {
+      const raw = routes as unknown as {
+        update: (n: string, u: unknown) => void;
+      };
+
+      // The validator covers only the structural/guard surface; custom fields
+      // (lifecycle hooks, preload, searchSchema) are arbitrary and pass through.
+      // Locks the permissive contract that makes custom-field update work.
+      expect(() => {
+        raw.update("home", {
+          onView: () => () => {},
+          label: "x",
+          decodeParams: (p: unknown) => p,
+        });
+      }).not.toThrow();
+    });
   });
 
   describe("replaceRoutes validation", () => {

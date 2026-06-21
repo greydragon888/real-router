@@ -6,6 +6,7 @@ import { cloneRouter, getRoutesApi } from "@real-router/core/api";
 import type {
   Params,
   Route,
+  RouteConfigUpdate,
   Router,
   TreeChangedEvent,
 } from "@real-router/core";
@@ -333,29 +334,43 @@ describe("core/events/tree-changed", () => {
     expect(b).toHaveBeenCalledTimes(1);
   });
 
-  // Guard-only / empty updates are silent (О-7 + empty-patch rule).
-  it("does not emit for guard-only or empty update patches", () => {
+  // Guard-only / custom-field-only / empty updates are silent (О-7 +
+  // empty-patch rule). Custom fields (lifecycle hooks, preload, searchSchema)
+  // are read lazily by their consumers, so a custom-only patch needs no
+  // observation channel — same rationale as guards.
+  it("does not emit for guard-only, custom-field-only, or empty update patches", () => {
     const router = makeRouter([
       { name: "home", path: "/home" },
       { name: "other", path: "/other" },
     ]);
     const routesApi = getRoutesApi(router);
 
+    // Custom field is not on the closed RouteConfigUpdate; a plugin augments it.
+    type CustomPatch = RouteConfigUpdate & { onView?: (() => void) | null };
+
     const handler = vi.fn();
 
     routesApi.subscribeChanges(handler);
 
+    const setCustom: CustomPatch = { onView: () => {} };
+    const removeCustom: CustomPatch = { onView: null };
+    const mixed: CustomPatch = {
+      forwardTo: "other",
+      canActivate: () => () => true,
+      onView: () => {},
+    };
+
     routesApi.update("home", { canActivate: () => () => false });
     routesApi.update("home", { canActivate: null });
     routesApi.update("home", {});
+    routesApi.update("home", setCustom);
+    routesApi.update("home", removeCustom);
 
     expect(handler).not.toHaveBeenCalled();
 
-    // A structural field alongside a guard still emits — with guard filtered out.
-    routesApi.update("home", {
-      forwardTo: "other",
-      canActivate: () => () => true,
-    });
+    // A structural field alongside a guard AND a custom field still emits — with
+    // both the guard and the custom field filtered out of the structural patch.
+    routesApi.update("home", mixed);
 
     expect(handler).toHaveBeenCalledTimes(1);
 
@@ -363,6 +378,7 @@ describe("core/events/tree-changed", () => {
 
     expect(event.patch).toStrictEqual({ forwardTo: "other" });
     expect("canActivate" in event.patch).toBe(false);
+    expect("onView" in event.patch).toBe(false);
   });
 
   // Payloads carry route config; add-with-parent sets `parent`; update emits on

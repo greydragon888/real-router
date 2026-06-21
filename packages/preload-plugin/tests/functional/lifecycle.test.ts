@@ -300,6 +300,47 @@ describe("preload-plugin — lifecycle", () => {
     router.stop();
   });
 
+  it("invalidates compiled preload cache after routes.update() swaps preload (#797)", async () => {
+    const preloadV1 = vi.fn().mockResolvedValue("v1");
+    const preloadV2 = vi.fn().mockResolvedValue("v2");
+
+    const { router } = createTestRouter([
+      { name: "home", path: "/", preload: () => preloadV1 },
+    ]);
+
+    setupMatchUrl(router);
+    cleanup = router.usePlugin(preloadPluginFactory());
+    await router.start("/");
+
+    const anchor = createAnchor("/");
+
+    // First hover: V1 factory compiled and cached
+    fireMouseOver(anchor);
+    await waitForTimer(65);
+
+    expect(preloadV1).toHaveBeenCalledTimes(1);
+    expect(preloadV2).not.toHaveBeenCalled();
+
+    // Move away to reset currentAnchor
+    const div = document.createElement("div");
+
+    document.body.append(div);
+    fireMouseOver(div);
+
+    // Hot-swap the preload factory via update — typed precisely via the
+    // RouteConfigUpdate augmentation. Before #797 this was silently dropped.
+    getRoutesApi(router).update("home", { preload: () => preloadV2 });
+
+    // Re-hover: should use V2 (lazy revalidation on factory reference change)
+    fireMouseOver(anchor);
+    await waitForTimer(65);
+
+    expect(preloadV1).toHaveBeenCalledTimes(1);
+    expect(preloadV2).toHaveBeenCalledTimes(1);
+
+    router.stop();
+  });
+
   it("cleans compiled-preload entries on remove/replace/clear without breaking preload", async () => {
     const preloadFn = vi.fn().mockResolvedValue(undefined);
     const { router } = createTestRouter([

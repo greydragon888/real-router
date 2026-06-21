@@ -22,12 +22,19 @@
 
 ## Module Augmentation
 
-Extends `Route` interface with `searchSchema` field:
+Extends the `Route` interface with `searchSchema`, and the `RouteConfigUpdate`
+interface with `searchSchema` (`| null`) so the schema is patchable via
+`getRoutesApi(router).update(name, { searchSchema })` (#797) — read lazily, so
+the next navigation validates against the new schema:
 
 ```typescript
 declare module "@real-router/core" {
   interface Route {
     searchSchema?: StandardSchemaV1;
+  }
+
+  interface RouteConfigUpdate {
+    searchSchema?: StandardSchemaV1 | null;
   }
 }
 ```

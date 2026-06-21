@@ -7,6 +7,112 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-06-21]
 
+### @real-router/lifecycle-plugin@0.6.0
+
+### Minor Changes
+
+- [#893](https://github.com/greydragon888/real-router/pull/893) [`acc8e7d`](https://github.com/greydragon888/real-router/commit/acc8e7da82fbaccc9058fc9d350868ba57cc0d6e) Thanks [@greydragon888](https://github.com/greydragon888)! - Support updating lifecycle hooks via `routes.update()` ([#797](https://github.com/greydragon888/real-router/issues/797))
+
+  `RouteConfigUpdate` is now augmented with `onEnter` / `onStay` / `onLeave` /
+  `onNavigate` (each `| null` to remove), symmetric with the existing `Route`
+  augmentation. `getRoutesApi(router).update(name, { onNavigate })` hot-swaps a
+  hook factory with precise typing; the plugin recompiles it lazily on the next
+  navigation (the factory-reference change is detected automatically). Previously
+  the hook patch was silently dropped by core and the old hook kept firing.
+
+### Patch Changes
+
+- Updated dependencies [[`acc8e7d`](https://github.com/greydragon888/real-router/commit/acc8e7da82fbaccc9058fc9d350868ba57cc0d6e), [`acc8e7d`](https://github.com/greydragon888/real-router/commit/acc8e7da82fbaccc9058fc9d350868ba57cc0d6e)]:
+  - @real-router/core@0.59.5
+  - @real-router/types@0.36.1
+
+### @real-router/preload-plugin@0.6.0
+
+### Minor Changes
+
+- [#893](https://github.com/greydragon888/real-router/pull/893) [`acc8e7d`](https://github.com/greydragon888/real-router/commit/acc8e7da82fbaccc9058fc9d350868ba57cc0d6e) Thanks [@greydragon888](https://github.com/greydragon888)! - Support updating `preload` via `routes.update()` ([#797](https://github.com/greydragon888/real-router/issues/797))
+
+  `RouteConfigUpdate` is now augmented with `preload` (`| null` to remove),
+  symmetric with the existing `Route` augmentation.
+  `getRoutesApi(router).update(name, { preload })` hot-swaps the preload factory
+  with precise typing; it is picked up lazily on the next hover/touch (the factory
+  reference change invalidates the compiled cache). Previously the patch was
+  silently dropped by core and the old factory stayed compiled.
+
+### Patch Changes
+
+- Updated dependencies [[`acc8e7d`](https://github.com/greydragon888/real-router/commit/acc8e7da82fbaccc9058fc9d350868ba57cc0d6e), [`acc8e7d`](https://github.com/greydragon888/real-router/commit/acc8e7da82fbaccc9058fc9d350868ba57cc0d6e)]:
+  - @real-router/core@0.59.5
+  - @real-router/types@0.36.1
+
+### @real-router/search-schema-plugin@0.4.0
+
+### Minor Changes
+
+- [#893](https://github.com/greydragon888/real-router/pull/893) [`acc8e7d`](https://github.com/greydragon888/real-router/commit/acc8e7da82fbaccc9058fc9d350868ba57cc0d6e) Thanks [@greydragon888](https://github.com/greydragon888)! - Support updating `searchSchema` via `routes.update()` ([#797](https://github.com/greydragon888/real-router/issues/797))
+
+  `RouteConfigUpdate` is now augmented with `searchSchema` (`| null` to remove),
+  symmetric with the existing `Route` augmentation.
+  `getRoutesApi(router).update(name, { searchSchema })` swaps the schema with
+  precise typing; the next navigation validates against it (the schema is read
+  lazily per navigation). Previously the patch was silently dropped by core and
+  navigation kept validating against the stale schema.
+
+### Patch Changes
+
+- Updated dependencies [[`acc8e7d`](https://github.com/greydragon888/real-router/commit/acc8e7da82fbaccc9058fc9d350868ba57cc0d6e)]:
+  - @real-router/core@0.59.5
+
+### @real-router/core@0.59.5
+
+### Patch Changes
+
+- [#893](https://github.com/greydragon888/real-router/pull/893) [`acc8e7d`](https://github.com/greydragon888/real-router/commit/acc8e7da82fbaccc9058fc9d350868ba57cc0d6e) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `routes.update()` silently dropping plugin-defined custom route fields ([#797](https://github.com/greydragon888/real-router/issues/797))
+
+  `getRoutesApi(router).update(name, patch)` previously applied only the
+  structural/guard subset of the patch and silently discarded custom
+  (plugin-defined) fields — lifecycle hooks, `preload`, `searchSchema`, etc. — so
+  `getPluginApi(router).getRouteConfig(name)` kept returning stale values after an
+  update. `update` now persists custom fields into the store, symmetric with
+  `add`/`replace`.
+
+  Semantics mirror the structural fields:
+
+  - Shallow-merge by patch key — sibling custom fields are preserved.
+  - `null` removes a single field; emptying the record drops it entirely
+    (`getRouteConfig` returns `undefined`, as after `add` with no custom fields).
+  - `undefined` is a no-op (leaves the field untouched).
+
+  Custom-field writes are applied **before** the structural config, so a throwing
+  custom-field getter aborts the update before any store write (atomic), mirroring
+  a throwing structural getter. Each merge writes a fresh record, so a previously
+  cloned router stays isolated from later updates on the source. A custom-field-only
+  patch emits no `TREE_CHANGED` event — consumers read custom fields lazily via
+  `getRouteConfig`, so the next read observes the new value (the event stays
+  structural-only by design).
+
+  The public API surface is unchanged: `RouteConfigUpdate` stays a closed
+  interface, and plugins opt into typed custom-field updates by augmenting it (see
+  `@real-router/lifecycle-plugin`, `@real-router/preload-plugin`,
+  `@real-router/search-schema-plugin`).
+
+- Updated dependencies [[`acc8e7d`](https://github.com/greydragon888/real-router/commit/acc8e7da82fbaccc9058fc9d350868ba57cc0d6e)]:
+  - @real-router/types@0.36.1
+
+### @real-router/types@0.36.1
+
+### Patch Changes
+
+- [#893](https://github.com/greydragon888/real-router/pull/893) [`acc8e7d`](https://github.com/greydragon888/real-router/commit/acc8e7da82fbaccc9058fc9d350868ba57cc0d6e) Thanks [@greydragon888](https://github.com/greydragon888)! - Document `RouteConfigUpdate` custom-field patch semantics and augmentability ([#797](https://github.com/greydragon888/real-router/issues/797))
+
+  `RouteConfigUpdate` now documents that `routes.update()` patches plugin-defined
+  custom fields (shallow-merge by key, `null` removes, `undefined` is a no-op) and
+  that the interface is augmentable — a plugin declares its updatable field via
+  declaration merging, mirroring its `Route` augmentation but with `| null` to
+  allow removal. The interface stays closed (no index signature), so typos in
+  structural field names remain compile errors.
+
+
 ### @real-router/logger@0.3.1
 
 ### Patch Changes
