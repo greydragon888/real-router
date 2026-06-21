@@ -123,8 +123,9 @@ const arbDigit = fc.constantFrom(
 
 /**
  * Numeric-looking strings that are deliberately NOT coerced by `numberFormat:"auto"`:
- * leading zeros (`"007"`), unsafe integers (>2^53), and exponent notation. They
- * must stay strings to preserve their exact text/precision. (#742, INVARIANTS #11/#14)
+ * leading zeros (`"007"`), unsafe integers (>2^53), exponent notation, and negative
+ * zero (`"-0"`). They must stay strings to preserve their exact text/round-trip.
+ * (#742, #898, INVARIANTS #11/#14/#16)
  */
 export const arbNonCanonicalNumericString: fc.Arbitrary<string> = fc.oneof(
   // Leading zero: "0" repeated + digits → always starts "0" with length > 1.
@@ -140,6 +141,8 @@ export const arbNonCanonicalNumericString: fc.Arbitrary<string> = fc.oneof(
     .map(([first, rest]) => `${first}${rest}`),
   // Exponent notation — never matched by the canonical-number grammar.
   fc.constantFrom("1e5", "2e10", "1E4", "1.5e3", "6e2", "9e9", "1e+5", "1e-3"),
+  // Negative zero — a valid number but not round-trippable (build(-0) → "0"). (#898)
+  fc.constantFrom("-0", "-0.0", "-0.00"),
 );
 
 export const arbQueryPrimitive: fc.Arbitrary<QueryParamPrimitive> = fc.oneof(

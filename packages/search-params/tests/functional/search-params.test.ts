@@ -254,6 +254,15 @@ describe("search-params", () => {
       });
     });
 
+    it("keeps negative zero as a string under auto (not round-trippable)", () => {
+      // -0 stringifies to "0" and build(-0) emits "0", so "-0" must stay a
+      // string to round-trip symmetrically. (#898)
+      expect(parse("a=-0&b=-0.0", { numberFormat: "auto" })).toStrictEqual({
+        a: "-0",
+        b: "-0.0",
+      });
+    });
+
     it("treats keys shadowing Object.prototype members as plain params", () => {
       // `valueOf`/`constructor`/etc. must not read the inherited function and be
       // mistaken for a pre-existing value (would corrupt into [<fn>, "x"]). (#855)
