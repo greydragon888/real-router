@@ -71,19 +71,44 @@ describe("S1: deep nesting validates without overflowing the call stack (#901)",
 
 describe("S2: a large fan-out of distinct objects validates in linear time (anti-quadratic)", () => {
   it("validates 300k sibling objects via O(1) WeakSet membership, not an O(n) array scan", () => {
-    // The discriminating case: `isSerializable` records every visited object to
-    // reject cycles and shared references. With a `WeakSet` (O(1) has/add) the walk
-    // is linear; a regression to an array + `.includes` (O(n) membership) makes it
-    // O(n^2). Measured on this machine: healthy ~40 ms; the array-`.includes` mutant
-    // ~6500 ms (161x). The 800 ms ceiling is ~20x over healthy (flake-proof under the
-    // concurrent CPU load of a turbo build) and ~8x under the mutant — N=300k keeps
-    // the mutant margin hardware-robust (a faster CI runner can't slip it under).
+    // The discriminating case: `isSerializable` records every container it visits to
+    // detect cycles and skip already-validated shared references. With a `WeakSet`
+    // (O(1) has/add) the walk is linear; a regression to an array + `.includes`
+    // (O(n) membership) makes it O(n^2). Measured on this machine: healthy ~40 ms;
+    // the array-`.includes` mutant ~6500 ms (161x). The 800 ms ceiling is ~20x over
+    // healthy (flake-proof under the concurrent CPU load of a turbo build) and ~8x
+    // under the mutant — N=300k keeps the mutant margin hardware-robust (a faster CI
+    // runner can't slip it under).
     const input = {
       list: Array.from({ length: 300_000 }, () => ({ a: 1 })),
     };
 
     const start = performance.now();
     const result = isParams(input);
+    const elapsedMs = performance.now() - start;
+
+    expect(result).toBe(true);
+    expect(elapsedMs).toBeLessThan(800);
+  });
+});
+
+describe("S3: a deep diamond chain validates in linear time, not exponential (#786)", () => {
+  it("validates a 1k-level shared-reference chain via the done-set, no exponential blow-up", () => {
+    // The discriminating case for on-path cycle detection: each level references the
+    // next TWICE (a diamond). On-path semantics without a `done` (black) set would
+    // re-walk every shared subtree on each re-entry — O(2^depth) — so even ~40 levels
+    // would hang. The `done` set marks each subtree validated once, keeping the walk
+    // linear (O(depth)); 1000 levels is ~2^1000 unfolded paths but only 1001 nodes.
+    // (The ever-visited regression returns `false` here — a diamond is not a cycle —
+    // which the functional/property suites already guard; this guards the *time*.)
+    let node: Record<string, unknown> = { leaf: 1 };
+
+    for (let i = 0; i < 1000; i++) {
+      node = { a: node, b: node };
+    }
+
+    const start = performance.now();
+    const result = isParams(node);
     const elapsedMs = performance.now() - start;
 
     expect(result).toBe(true);

@@ -181,7 +181,7 @@ isParams(value)
     │
     └── Phase 2 — slow path: isSerializable(value)
         ├── Iteratively validates nested arrays and objects (explicit work-stack)
-        ├── WeakSet tracks visited objects → detects circular / shared references
+        ├── on-path set → rejects cycles; done-set → accepts shared refs (diamonds)
         └── Rejects class instances (proto !== Object.prototype)
 ```
 

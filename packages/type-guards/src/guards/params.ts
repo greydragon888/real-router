@@ -53,15 +53,68 @@ function isSerializableLeaf(value: unknown): boolean {
 }
 
 /**
+ * Marker pushed onto the work-stack after a container's children. Popping it
+ * means that container's whole subtree has been validated, so the container
+ * leaves the active DFS path (`onPath`) and joins the fully-checked set
+ * (`done`). A module-private class, so user data can never be mistaken for it.
+ *
+ * @internal
+ */
+class SubtreeExit {
+  constructor(readonly container: object) {}
+}
+
+/**
+ * Inspects one container popped from the work-stack. Rejects cycles (a back-edge
+ * to a container still on the current DFS path) and class instances; skips
+ * already-validated shared references; otherwise marks the container on-path and
+ * queues its children plus a {@link SubtreeExit} marker.
+ *
+ * @returns false only when the container is invalid (cycle or class instance)
+ * @internal
+ */
+function visitContainer(
+  value: object,
+  stack: unknown[],
+  onPath: WeakSet<object>,
+  done: WeakSet<object>,
+): boolean {
+  if (onPath.has(value)) {
+    return false; // back-edge → genuine circular reference
+  }
+
+  if (done.has(value)) {
+    return true; // shared reference / diamond — subtree already validated
+  }
+
+  if (!isPlainContainer(value)) {
+    return false; // instance of a class
+  }
+
+  onPath.add(value);
+  stack.push(new SubtreeExit(value));
+  pushChildren(value, stack);
+
+  return true;
+}
+
+/**
  * Internal helper to check if value is serializable (no circular refs, functions, instances).
- * Validates the entire object tree with protection against circular references.
+ * Validates the entire object tree.
  *
  * Iterative (explicit work-stack) rather than recursive: a recursive walk overflows
  * the call stack with `RangeError` at ~2.4k levels of nesting on V8, which would break
  * the boolean contract on adversarial input reachable via `history.state` / user-supplied
- * params (#901). A heap-allocated stack scales to any depth. The `WeakSet` records every
- * visited object for the lifetime of the call, so any object reached twice — a cycle or a
- * shared reference — is rejected (cycle-detection semantics unchanged).
+ * params (#901). A heap-allocated stack scales to any depth.
+ *
+ * Cycle detection uses on-path (DFS gray/black) semantics, not "ever-visited":
+ * `onPath` holds the containers on the current branch — a back-edge to one of them is
+ * a genuine cycle and is rejected; `done` holds containers whose subtree is already
+ * fully validated. A shared reference / diamond (the same object reached again *off*
+ * the current path) is serializable — `JSON.stringify` duplicates it — so it is
+ * accepted, and `done` makes the re-encounter O(1), keeping the walk linear on diamond
+ * chains instead of exponential (#786). Genuine cycles stay rejected: the cycle vertex
+ * is still on the path when re-encountered.
  *
  * @param root - Value to check
  * @returns true if value can be serialized
@@ -69,29 +122,30 @@ function isSerializableLeaf(value: unknown): boolean {
  */
 function isSerializable(root: unknown): boolean {
   const stack: unknown[] = [root];
-  const visited = new WeakSet<object>();
+  const onPath = new WeakSet<object>();
+  const done = new WeakSet<object>();
 
   while (stack.length > 0) {
     const value = stack.pop();
+
+    // Subtree fully processed: leave the current path, mark as validated.
+    if (value instanceof SubtreeExit) {
+      onPath.delete(value.container);
+      done.add(value.container);
+
+      continue;
+    }
 
     // null/undefined are serializable (JSON.stringify handles them)
     if (value === null || value === undefined) {
       continue;
     }
 
-    // Arrays and plain objects: reject cycles/shared refs and class instances,
-    // then queue their children. (typeof null is "object", handled above.)
+    // Arrays and plain objects (typeof null is "object", handled above).
     if (typeof value === "object") {
-      if (visited.has(value)) {
-        return false; // circular / shared reference
+      if (!visitContainer(value, stack, onPath, done)) {
+        return false;
       }
-
-      if (!isPlainContainer(value)) {
-        return false; // instance of a class
-      }
-
-      visited.add(value);
-      pushChildren(value, stack);
 
       continue;
     }
@@ -153,6 +207,7 @@ function isPrimitiveValue(value: unknown): boolean {
  * isParams({ matrix: [[1, 2], [3, 4]] }); // true (slow path)
  * isParams({ users: [{ id: 1 }, { id: 2 }] }); // true (slow path)
  * isParams({ scores: [100, null, 85] }); // true (slow path)
+ * isParams({ a: shared, b: shared }); // true (shared reference / diamond, not a cycle)
  *
  * // Invalid
  * isParams({ fn: () => {} }); // false (function)

@@ -385,6 +385,44 @@ describe("Params Type Guards", () => {
       });
     });
 
+    describe("Shared references / diamonds — not cycles (#786)", () => {
+      // A shared reference (the same object/array reached again off the current
+      // path) is a DAG, not a cycle: JSON.stringify duplicates it without error,
+      // so it is serializable and must be accepted. Cycle detection uses on-path
+      // semantics, not "ever-visited".
+      it("accepts the same object referenced under two keys", () => {
+        const shared = { v: 1 };
+
+        expect(isParams({ a: shared, b: shared })).toBe(true);
+      });
+
+      it("accepts the same object repeated in an array", () => {
+        const shared = { v: 1 };
+
+        expect(isParams({ list: [shared, shared] })).toBe(true);
+      });
+
+      it("accepts the same array referenced under two keys", () => {
+        const arr = [1, 2];
+
+        expect(isParams({ x: arr, y: arr })).toBe(true);
+      });
+
+      it("accepts a diamond (one grandchild shared via two parents)", () => {
+        const shared = { v: 1 };
+
+        expect(isParams({ a: { p: shared }, b: { q: shared } })).toBe(true);
+      });
+
+      it("still rejects a self-referencing cycle after the shared-ref fix", () => {
+        const c: Record<string, unknown> = {};
+
+        c.self = c;
+
+        expect(isParams(c)).toBe(false);
+      });
+    });
+
     describe("Deep nesting — no stack overflow (#901)", () => {
       // The native recursion limit is ~2.4k frames on this platform; these use
       // depths ~40x beyond it. A recursive validator throws

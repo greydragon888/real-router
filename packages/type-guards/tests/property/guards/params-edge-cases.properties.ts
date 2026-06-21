@@ -299,6 +299,37 @@ describe("Params Edge Cases (Uncovered Branches)", () => {
   });
 
   // ===================================================================
+  // Shared references / diamonds (not cycles) — #786
+  // ===================================================================
+
+  describe("Shared references / diamonds (#786)", () => {
+    // Sharing a serializable subtree under two keys (or repeating an array
+    // element) is a DAG, not a cycle: JSON.stringify duplicates it without
+    // error, so isParams must accept it. The tree generators never emit shared
+    // refs, so this gap was invisible to the main suite.
+    test.prop([paramsSimpleArbitrary], { numRuns: 2000 })(
+      "isParams accepts the same object referenced under two keys",
+      (sub) => {
+        expect(isParams({ a: sub, b: sub })).toBe(true);
+      },
+    );
+
+    test.prop([paramsSimpleArbitrary], { numRuns: 2000 })(
+      "isParams accepts the same object repeated in an array",
+      (sub) => {
+        expect(isParams({ list: [sub, sub] })).toBe(true);
+      },
+    );
+
+    test.prop([fc.array(fc.integer(), { maxLength: 5 })], { numRuns: 2000 })(
+      "isParams accepts the same array referenced under two keys",
+      (arr) => {
+        expect(isParams({ x: arr, y: arr })).toBe(true);
+      },
+    );
+  });
+
+  // ===================================================================
   // Class instance rejection (custom prototype)
   // ===================================================================
 
