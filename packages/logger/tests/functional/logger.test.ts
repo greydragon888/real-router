@@ -1,6 +1,6 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { logger } from "@real-router/logger";
+import { LEVEL_CONFIGS, LOG_LEVELS, logger } from "@real-router/logger";
 
 import type {
   LogCallback,
@@ -19,6 +19,19 @@ const WARNING_MESSAGE = "warning message";
 const ERROR_MESSAGE = "error message";
 const WARN_ERROR = "warn-error";
 const ERROR_ONLY = "error-only";
+
+describe("exported constants (LEVEL_CONFIGS / LOG_LEVELS)", () => {
+  // These constants back the process-global threshold logic
+  // (`#currentThreshold = LEVEL_CONFIGS[level]`); if mutable, any code in the
+  // process could corrupt log filtering for everyone, including core (#897).
+  it("freezes LEVEL_CONFIGS so it cannot be mutated", () => {
+    expect(Object.isFrozen(LEVEL_CONFIGS)).toBe(true);
+  });
+
+  it("freezes LOG_LEVELS so it cannot be mutated", () => {
+    expect(Object.isFrozen(LOG_LEVELS)).toBe(true);
+  });
+});
 
 describe("Logger", () => {
   beforeEach(() => {
