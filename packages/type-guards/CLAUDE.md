@@ -4,21 +4,21 @@ Internal package providing runtime type guards and validators for the Real-Route
 
 ## Exports
 
-| Export | Kind | Description |
-|--------|------|-------------|
-| `isString(value)` | Guard | Narrows to `string` |
-| `isBoolean(value)` | Guard | Narrows to `boolean` |
-| `isObjKey(key, obj)` | Guard | Narrows key to `Extract<keyof T, string>` |
-| `isPrimitiveValue(value)` | Guard | Narrows to `string \| number \| boolean`; rejects NaN/Infinity |
-| `isParams(value)` | Guard | Checks value is a plain params object |
-| `isParamsStrict(value)` | Guard | Deep validation of params (primitive values only) |
-| `isRouteName(value)` | Guard | Checks value is a valid route name string |
-| `isNavigationOptions(value)` | Guard | Checks value is a valid navigation options object |
-| `isState(value)` | Guard | Checks required fields: name, params, path |
-| `isStateStrict(value)` | Guard | Deep validation of State structure and field types |
-| `validateRouteName(name, methodName)` | Validator | Asserts valid route name or throws TypeError |
-| `validateState(state, method)` | Validator | Asserts valid State structure or throws TypeError |
-| `getTypeDescription(value)` | Utility | Human-readable type string for error messages |
+| Export                                | Kind      | Description                                                                                                              |
+| ------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `isString(value)`                     | Guard     | Narrows to `string`                                                                                                      |
+| `isBoolean(value)`                    | Guard     | Narrows to `boolean`                                                                                                     |
+| `isObjKey(key, obj)`                  | Guard     | Narrows key to `Extract<keyof T, string>`                                                                                |
+| `isPrimitiveValue(value)`             | Guard     | Narrows to `string \| number \| boolean`; rejects NaN/Infinity                                                           |
+| `isParams(value)`                     | Guard     | Checks value is a plain params object                                                                                    |
+| `isParamsStrict(value)`               | Guard     | Strict params: plain object with primitive / array-of-primitive values only (rejects nested objects and class instances) |
+| `isRouteName(value)`                  | Guard     | Checks value is a valid route name string                                                                                |
+| `isNavigationOptions(value)`          | Guard     | Checks value is a valid navigation options object                                                                        |
+| `isState(value)`                      | Guard     | Checks required fields: name, params, path                                                                               |
+| `isStateStrict(value)`                | Guard     | Deep validation of State structure and field types                                                                       |
+| `validateRouteName(name, methodName)` | Validator | Asserts valid route name or throws TypeError                                                                             |
+| `validateState(state, method)`        | Validator | Asserts valid State structure or throws TypeError                                                                        |
+| `getTypeDescription(value)`           | Utility   | Human-readable type string for error messages                                                                            |
 
 ## API Pattern
 

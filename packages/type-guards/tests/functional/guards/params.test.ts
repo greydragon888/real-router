@@ -585,14 +585,41 @@ describe("Params Type Guards", () => {
       expect(isParamsStrict([1, 2, 3])).toBe(false);
     });
 
-    it("ignores inherited properties", () => {
+    it("accepts top-level null-prototype object (Object.create(null))", () => {
+      // proto === null passes the prototype gate (covers the `proto !== null`
+      // short-circuit); own primitive values are valid strict params, matching
+      // isParams which also accepts null-prototype objects.
+      const nullProtoObj = Object.create(null) as Record<string, unknown>;
+
+      nullProtoObj.id = "123";
+      nullProtoObj.page = 1;
+
+      expect(isParamsStrict(nullProtoObj)).toBe(true);
+    });
+
+    it("rejects objects with custom prototype (Object.create(proto)) (#785)", () => {
+      // Even with valid own primitive values, a custom prototype is rejected,
+      // mirroring isParams so the lattice isParamsStrict ⇒ isParams holds.
       const proto = { inherited: "value" };
+      const customProtoObj = Object.create(proto) as { own?: string };
 
-      const params = Object.create(proto);
+      customProtoObj.own = "test";
 
-      params.own = "test";
+      expect(isParamsStrict(customProtoObj)).toBe(false);
+    });
 
-      expect(isParamsStrict(params)).toBe(true);
+    it("rejects class instances at top level (#785)", () => {
+      // Class instances with no own enumerable fields would yield zero for..in
+      // iterations and wrongly pass without the prototype check.
+      class CustomClass {
+        value = 42;
+      }
+
+      expect(isParamsStrict(new Date())).toBe(false);
+      expect(isParamsStrict(new Map())).toBe(false);
+      expect(isParamsStrict(new Set())).toBe(false);
+      expect(isParamsStrict(/test/)).toBe(false);
+      expect(isParamsStrict(new CustomClass())).toBe(false);
     });
 
     it("rejects arrays of arrays (params values must be primitives)", () => {
@@ -608,28 +635,27 @@ describe("Params Type Guards", () => {
       expect(isParamsStrict({ mixed: ["a", ["b"]] })).toBe(false);
     });
 
-    describe("Mutation Testing - inherited properties", () => {
-      it("returns false if inherited property has invalid type (kills 'if (false)' mutant)", () => {
-        // This test ensures that the 'continue' statement is necessary
-        // If mutated to 'if (false)', inherited properties won't be skipped
+    describe("Mutation Testing - prototype check (#785)", () => {
+      it("kills 'proto !== Object.prototype' removal mutant (custom proto rejected)", () => {
+        // If the `proto !== Object.prototype` term is dropped, a custom-prototype
+        // object with valid own values would wrongly pass the strict guard.
         const proto = { inherited: { nested: "object" } };
-        const obj = Object.create(proto);
+        const obj = Object.create(proto) as { own?: string };
 
         obj.own = "valid";
 
-        // Should pass because inherited properties are skipped
-        expect(isParamsStrict(obj)).toBe(true);
+        expect(isParamsStrict(obj)).toBe(false);
       });
 
-      it("validates only own properties (kills empty block mutant)", () => {
-        // If continue is removed, the loop will check inherited properties
-        const proto = { inheritedFunc: noop };
-        const obj = Object.create(proto);
+      it("kills 'proto !== null' removal mutant (null-proto still accepted)", () => {
+        // If the `proto !== null` term is dropped, Object.create(null) would
+        // wrongly be rejected. Plain Object.prototype objects keep passing.
+        const nullProtoObj = Object.create(null) as Record<string, unknown>;
 
-        obj.validProp = "test";
+        nullProtoObj.validProp = "test";
 
-        // Should pass - inherited function is ignored
-        expect(isParamsStrict(obj)).toBe(true);
+        expect(isParamsStrict(nullProtoObj)).toBe(true);
+        expect(isParamsStrict({ validProp: "test" })).toBe(true);
       });
     });
 

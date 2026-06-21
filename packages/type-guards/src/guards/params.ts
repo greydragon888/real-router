@@ -184,7 +184,7 @@ export function isParams(value: unknown): value is Params {
 }
 
 /**
- * Internal helper for strict param validation (browser plugin).
+ * Internal helper for strict param value validation.
  * Only allows primitives and arrays of primitives, no nested objects.
  *
  * @param value - Value to check
@@ -231,8 +231,11 @@ export function isValidParamValueStrict(value: unknown): boolean {
 }
 
 /**
- * Strict type guard for Params (browser plugin version).
- * Only allows primitives and arrays of primitives, no nested objects.
+ * Strict type guard for Params.
+ * Accepts only plain objects (own `Object.prototype` or `null` prototype) whose
+ * values are primitives or arrays of primitives — no nested objects. Like
+ * {@link isParams}, it rejects class instances and custom-prototype objects, so
+ * the lattice `isParamsStrict ⇒ isParams` holds.
  *
  * @param value - Value to check
  * @returns true if value is a valid Params object
@@ -243,8 +246,21 @@ export function isParamsStrict(value: unknown): value is Params {
     return false;
   }
 
+  // Reject objects with custom prototype (e.g., Object.create(proto), class instances).
+  // Mirrors isParams (see above): without this, a class instance with no own
+  // enumerable fields yields zero for..in iterations and would wrongly pass the
+  // strict guard, breaking the lattice isParamsStrict ⇒ isParams (#785).
+  const proto = Object.getPrototypeOf(value) as object | null;
+
+  if (proto !== null && proto !== Object.prototype) {
+    return false;
+  }
+
   // Check all own properties have valid param values
   for (const key in value) {
+    // With the proto === Object.prototype check above, inherited enumerable
+    // properties can only come from Object.prototype pollution (defensive).
+    /* v8 ignore next 3 -- @preserve Defensive: Object.prototype pollution */
     if (!Object.hasOwn(value, key)) {
       continue; // Skip inherited properties
     }

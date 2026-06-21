@@ -1,7 +1,7 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 
-import { isParams } from "type-guards";
+import { isParams, isParamsStrict } from "type-guards";
 
 import { paramsSimpleArbitrary } from "../helpers";
 
@@ -329,6 +329,50 @@ describe("Params Edge Cases (Uncovered Branches)", () => {
       { numRuns: 5000 },
     )("isParams rejects class instances at top level", (instance) => {
       expect(isParams(instance)).toBe(false);
+    });
+
+    // Strict mirror: the strict guard must reject class instances at the top
+    // level too, otherwise the lattice isParamsStrict ⇒ isParams (Params Inv 12)
+    // and ¬isParams ⇒ ¬isParamsStrict (Params Inv 13) break — a class instance
+    // with no own enumerable fields yields zero for..in iterations, so without a
+    // prototype check isParamsStrict would wrongly return true (#785).
+    test.prop(
+      [
+        fc.oneof(
+          fc.constant(0).map(() => new Date()),
+          fc.constant(0).map(() => new Map()),
+          fc.constant(0).map(() => new Set()),
+          fc.constant(0).map(() => /regex/),
+        ),
+      ],
+      { numRuns: 5000 },
+    )("isParamsStrict rejects class instances at top level", (instance) => {
+      expect(isParamsStrict(instance)).toBe(false);
+    });
+
+    // Strict mirror of the lattice itself, exercised with the class-instance
+    // counterexamples the generators behind Params Inv 12/13 cannot produce.
+    test.prop(
+      [
+        fc.oneof(
+          fc.constant(0).map(() => new Date()),
+          fc.constant(0).map(() => new Map()),
+          fc.constant(0).map(() => new Set()),
+          fc.constant(0).map(() => /regex/),
+          fc.constant(0).map(() => Object.create({ inherited: () => {} })),
+          fc.constant(0).map(
+            () =>
+              new (class Foo {
+                id = 1;
+              })(),
+          ),
+        ),
+      ],
+      { numRuns: 5000 },
+    )("isParamsStrict implies isParams for class instances", (instance) => {
+      if (isParamsStrict(instance)) {
+        expect(isParams(instance)).toBe(true);
+      }
     });
   });
 
