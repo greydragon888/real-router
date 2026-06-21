@@ -336,9 +336,9 @@ flowchart TD
     ACTIVATE -->|a guard returned Promise| ASYNC
 
     SYNC["Complete inline
-    no AbortController, no await"]
-    ASYNC["Setup AbortController
-    + await remaining guards"]
+    no await, controller released (not aborted)"]
+    ASYNC["await remaining guards
+    under AbortController"]
 
     SYNC --> COMPLETE
     ASYNC --> COMPLETE
@@ -357,7 +357,7 @@ On error at any step: `emitTransitionError()`, Promise rejects with `RouterError
 
 **`navigateToNotFound()`** bypasses this pipeline entirely — sets state directly and emits only `TRANSITION_SUCCESS` (no guards, no AbortController, no `TRANSITION_START`). Always uses `replace: true`.
 
-**Cancellation sources:** external AbortController (`opts.signal`), concurrent navigation (aborts previous), `stop()`, `dispose()`. AbortController is only created on the async path.
+**Cancellation sources:** external AbortController (`opts.signal`), concurrent navigation (aborts previous), `stop()`, `dispose()`. The internal AbortController is created **synchronously** whenever the navigation has guards or `subscribeLeave` listeners (they receive `signal` before it is known whether they run async); only the pure hot path — no guards, no leave listeners — allocates none. It is aborted solely on cancellation/error, never on success (#722).
 
 ## Extension Points
 
@@ -375,7 +375,6 @@ Plugins intercept router methods via `addInterceptor()` on `PluginApi`. `Interce
 | `start`        | `(path?: string) => Promise<State>`                                      | browser-plugin, hash-plugin, navigation-plugin (via `createStartInterceptor` from `shared/browser-env`); ssr-data-plugin, rsc-server-plugin (via `createSsrLoaderPlugin` from `shared/ssr`) |
 | `buildPath`    | `(route: string, params?: Params) => string`                             | persistent-params-plugin                                                                         |
 | `forwardState` | `(routeName: string, routeParams: Params) => SimpleState`                | persistent-params-plugin, search-schema-plugin                                                   |
-| `add`          | `(routes: Route[], options?: { parent?: string }) => void`               | search-schema-plugin                                                                             |
 
 Multiple interceptors per method execute in **LIFO** order (last-registered wraps first). Each receives `next` (original or previously-wrapped function) plus the method's arguments. Applied via `createInterceptable()` in `RouterInternals`.
 
@@ -505,7 +504,7 @@ pnpm monorepo with Turborepo for task orchestration. Dual ESM/CJS output via tsd
 
 The navigate path is heavily optimized:
 
-- **Optimistic sync execution** — no AbortController/Promise on the sync path
+- **Optimistic sync execution** — no `await`/microtask on the sync path; AbortController allocated only when guards or `subscribeLeave` listeners exist (none on the pure hot path)
 - **FSM `forceState()`** — bypasses `send()` dispatch for NAVIGATE/COMPLETE transitions
 - **EventEmitter explicit params** — `emit(name, a?, b?, c?, d?)` avoids V8 rest-param array allocation
 - **Cached error rejections** — pre-allocated for common error codes

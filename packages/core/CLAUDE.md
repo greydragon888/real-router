@@ -76,10 +76,11 @@ Structural guards remain in namespace folders (`OptionsNamespace/validators.ts`,
 
 ### Invariant Guards (always active, no plugin required)
 
-Core contains two invariant guards that run regardless of whether validation-plugin is installed:
+Core contains three invariant guards that run regardless of whether validation-plugin is installed:
 
 - **`subscribe(listener)`** — validates `typeof listener === "function"`. Prevents deferred crash (non-function stored in EventEmitter, crash on next navigation). Includes actionable hint: "For Observable pattern use @real-router/rx package".
 - **`navigateToNotFound(path)`** — validates `typeof path === "string"` when path is provided. Prevents silent state corruption (`state.path = 42`).
+- **`claimContextNamespace(namespace)`** (on `PluginApi`, `getPluginApi.ts`) — throws `CONTEXT_NAMESPACE_ALREADY_CLAIMED` when a namespace is already claimed by another plugin. Prevents silent corruption: without it two plugins writing the same `state.context.<namespace>` would clobber each other's data.
 
 **Criterion for adding invariant guards:** (a) silent corruption — invalid input doesn't crash but corrupts state, or (b) deferred crash in user-facing API — error stored, crash later with unrelated stack trace.
 
@@ -260,12 +261,12 @@ router.navigate(name, params, opts)
   │
   └── ASYNC PATH (async guard detected):
       └── #finishAsyncNavigation(guardCompletion, ...)
-          ├── AbortController setup (deferred — only on async path)
+          ├── receives AbortController (set up upfront when guards/leave-listeners present)
           ├── await guardCompletion
           └── completeTransition() → same as sync
 ```
 
-**Key optimization:** When no guards return Promises (common case), the entire navigation runs synchronously — no AbortController, no async/await, no microtask delay.
+**Key optimization:** On the pure hot path (no guards, no `subscribeLeave` listeners) the navigation runs fully synchronously — no AbortController, no async/await, no microtask delay. Sync guards/listeners still complete inline (no await) but allocate an AbortController that is released unaborted on success.
 
 On error at any step: `emitTransitionError()` → `Plugin.onTransitionError()` → Promise rejects with `RouterError`.
 
@@ -632,7 +633,7 @@ Both options default to on. `matchPath()` rebuilds `state.path` via `buildPath()
 
 ### Async subscribeLeave overhead
 - **0 listeners (hot path):** `#handleNoGuardsLeave` always called — 1 method call + 1 `{nav}` object literal + 1 `hasLeaveListeners()` check. `{nav}` allocation is avoidable (lazy creation inside async branch only)
-- **N sync listeners:** AbortController created + abort'd (~5µs total with cleanup), LeaveState object, N try/catch (V8 zero-cost on happy path), N×2 thenable checks
+- **N sync listeners:** AbortController created + released (not aborted on success, #722; ~5µs total with cleanup), LeaveState object, N try/catch (V8 zero-cost on happy path), N×2 thenable checks
 - **`isCurrentNav` closure** (pre-existing): created every navigate, unused on no-guards path — can move into `if (hasGuards)` block
 - **Benchmarks:** `tests/benchmarks/navigation/leave-listeners.bench.ts` — run via `pnpm bench`
 

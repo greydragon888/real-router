@@ -2528,7 +2528,7 @@ export function getDependenciesApi(router: Router): DependenciesApi {
 
 **Extracted APIs:** `getRoutesApi`, `getDependenciesApi`, `getLifecycleApi`, `getPluginApi`, `cloneRouter`.
 
-**Tree operations injection:** Heavy route-tree functions (`addRouteNode`, `removeRouteNode`) are injected via `store.treeOperations` at runtime (set during wiring), avoiding static import chains that would pull in route-tree code into every API consumer.
+**Tree operations injection:** `store.treeOperations` carries `commitTreeChanges` / `resetStore` (core helpers in `routesStore.ts`) and `nodeToDefinition` (from `route-tree`), set when the store is created. Injecting `nodeToDefinition` keeps `getRoutesApi` free of a static **runtime** `route-tree` import — it imports only route-tree _types_ (erased at compile) and reaches `nodeToDefinition` through the store. (`commitTreeChanges`/`resetStore` live in `routesStore`, which `getRoutesApi` already imports, so for those two the indirection no longer buys isolation.)
 
 ### FSM Migration: dispose(), TransitionMeta, Event Flow
 
