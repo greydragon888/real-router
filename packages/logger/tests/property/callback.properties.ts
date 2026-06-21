@@ -15,6 +15,8 @@ import {
   throwingCallbackArbitrary,
 } from "./helpers";
 
+import type { LogCallback } from "@real-router/logger";
+
 const noop = () => {};
 
 describe("Logger Callback Properties", () => {
@@ -313,6 +315,32 @@ describe("Logger Callback Properties", () => {
 
         // Result should be the same
         expect(callCount1).toBe(callCount2);
+      },
+    );
+  });
+
+  describe("Re-entrancy guard", () => {
+    test.prop([logLevelArbitrary, contextArbitrary, messageArbitrary], {
+      numRuns: 500,
+    })(
+      "re-entrant callback is invoked exactly once per top-level call",
+      (messageLevel, context, message) => {
+        vi.clearAllMocks();
+
+        let callCount = 0;
+        // A callback that re-enters the logger on the happy path. Without the
+        // #inCallback guard this recurses until a swallowed RangeError (#791).
+        const reentrantCallback: LogCallback = () => {
+          callCount++;
+          logger.error("Inner", "nested");
+        };
+
+        logger.configure({ level: "all", callback: reentrantCallback });
+
+        logger[messageLevel](context, message);
+
+        // The nested logger.error must not re-invoke the callback.
+        expect(callCount).toBe(1);
       },
     );
   });

@@ -52,6 +52,14 @@ class Logger {
   #currentThreshold = 0;
 
   /**
+   * Re-entrancy guard: true while a user callback is executing. Prevents a
+   * callback that itself calls `logger.*` from recursing back through
+   * `#invokeCallback` (which would otherwise spin ~5.9k deep until a swallowed
+   * RangeError, see #791). Console output is unaffected.
+   */
+  #inCallback = false;
+
+  /**
    * Configures the logger with new settings.
    *
    * @param config - Partial configuration to merge with existing config
@@ -287,8 +295,17 @@ class Logger {
       return;
     }
 
+    // Re-entrancy guard: a callback calling logger.* re-enters here via
+    // #writeLog → #invokeCallback. Skip the nested invocation so the pattern is
+    // a safe no-op (console output already happened in #writeLog) instead of
+    // recursing to a swallowed RangeError (#791).
+    if (this.#inCallback) {
+      return;
+    }
+
     // Wrap callback invocation in try-catch to prevent user code errors
     // from breaking the logger or causing cascading failures
+    this.#inCallback = true;
     try {
       this.#config.callback(level, context, message, ...args);
     } catch (error) {
@@ -300,6 +317,8 @@ class Logger {
       ) {
         console.error("[Logger] Error in callback:", error);
       }
+    } finally {
+      this.#inCallback = false;
     }
   }
 }

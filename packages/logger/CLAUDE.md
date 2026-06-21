@@ -38,6 +38,7 @@ src/
 
 - **Singleton** -- `logger` is a module-level instance; all imports share the same config state
 - **Callback errors are swallowed** -- if `callback` throws, the error is caught and reported via `console.error` directly (avoids recursive logger calls)
+- **Re-entrant callbacks are a safe no-op** -- if `callback` calls `logger.*`, an `#inCallback` re-entrancy guard skips the nested callback invocation (the nested message still reaches the console once). Without it the call would recurse ~5.9k deep to a swallowed `RangeError` (#791)
 - **`callbackIgnoresLevel`** -- when true, callback receives ALL messages even if console output is filtered; when false (default), callback follows the same threshold as console
 - **Level `"none"` early exit** -- when level is `"none"` and `callbackIgnoresLevel` is false, `#writeLog` returns immediately without any processing
 - **Console safety** -- `#writeToConsole` checks `typeof console !== "undefined"` and `typeof console[level] === "function"` before calling
