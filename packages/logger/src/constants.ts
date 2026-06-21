@@ -25,11 +25,11 @@ import type { LogLevel, LogLevelConfig } from "./types";
  *
  * @internal This is used for internal filtering logic
  */
-export const LOG_LEVELS: Record<LogLevel, number> = {
+export const LOG_LEVELS: Record<LogLevel, number> = Object.freeze({
   log: 0,
   warn: 1,
   error: 2,
-};
+});
 
 /**
  * Numeric thresholds for logger configuration levels.
@@ -70,9 +70,9 @@ export const LOG_LEVELS: Record<LogLevel, number> = {
  *
  * @internal This is used for internal threshold comparison
  */
-export const LEVEL_CONFIGS: Record<LogLevelConfig, number> = {
+export const LEVEL_CONFIGS: Record<LogLevelConfig, number> = Object.freeze({
   all: 0,
   "warn-error": 1,
   "error-only": 2,
   none: 3,
-};
+});

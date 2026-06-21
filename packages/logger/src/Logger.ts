@@ -84,7 +84,7 @@ class Logger {
   configure(config: Partial<LoggerConfig>): void {
     if (config.level !== undefined) {
       // Validate that the provided level is a valid configuration level
-      if (!(config.level in LEVEL_CONFIGS)) {
+      if (!Object.hasOwn(LEVEL_CONFIGS, config.level)) {
         throw new Error(
           `Invalid log level: "${config.level}". Valid levels are: ${Object.keys(LEVEL_CONFIGS).join(", ")}`,
         );
@@ -93,7 +93,7 @@ class Logger {
       this.#config.level = config.level;
       this.#currentThreshold = LEVEL_CONFIGS[config.level];
     }
-    if ("callback" in config) {
+    if (Object.hasOwn(config, "callback")) {
       this.#config.callback = config.callback;
     }
     if (config.callbackIgnoresLevel !== undefined) {

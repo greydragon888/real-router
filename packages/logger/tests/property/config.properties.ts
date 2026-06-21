@@ -5,6 +5,7 @@ import { logger } from "@real-router/logger";
 
 import {
   callbackArbitrary,
+  invalidLevelArbitrary,
   logLevelConfigArbitrary,
   LOG_LEVEL_CONFIGS,
 } from "./helpers";
@@ -165,33 +166,63 @@ describe("Logger Configuration Properties", () => {
   });
 
   describe("Invalid level handling", () => {
+    test.prop([invalidLevelArbitrary], { numRuns: 5000 })(
+      "should throw error for invalid levels",
+      (invalidLevel) => {
+        // Check that error is thrown
+        expect(() => {
+          logger.configure({ level: invalidLevel as LogLevelConfig });
+        }).toThrow(/Invalid log level/);
+      },
+    );
+  });
+
+  describe("Configuration atomicity on invalid level", () => {
     test.prop(
       [
-        fc.string().filter(
-          (s) =>
-            !LOG_LEVEL_CONFIGS.includes(s as LogLevelConfig) &&
-            // Exclude Object.prototype properties
-            s !== "valueOf" &&
-            s !== "toString" &&
-            s !== "constructor" &&
-            s !== "hasOwnProperty" &&
-            s !== "isPrototypeOf" &&
-            s !== "propertyIsEnumerable" &&
-            s !== "toLocaleString" &&
-            s !== "__proto__" &&
-            s !== "__defineGetter__" &&
-            s !== "__defineSetter__" &&
-            s !== "__lookupGetter__" &&
-            s !== "__lookupSetter__",
-        ),
+        logLevelConfigArbitrary,
+        callbackArbitrary,
+        fc.boolean(),
+        invalidLevelArbitrary,
+        callbackArbitrary,
       ],
       { numRuns: 5000 },
-    )("should throw error for invalid levels", (invalidLevel) => {
-      // Check that error is thrown
-      expect(() => {
-        logger.configure({ level: invalidLevel as LogLevelConfig });
-      }).toThrow(/Invalid log level/);
-    });
+    )(
+      "a configure rejected for an invalid level leaves every field unchanged",
+      (
+        startLevel,
+        getStartCallback,
+        startFlag,
+        invalidLevel,
+        getOtherCallback,
+      ) => {
+        const startCallback = getStartCallback();
+        const otherCallback = getOtherCallback();
+
+        // Establish a known-good baseline.
+        logger.configure({
+          level: startLevel,
+          callback: startCallback,
+          callbackIgnoresLevel: startFlag,
+        });
+        const before = logger.getConfig();
+
+        // This patch would flip callback + callbackIgnoresLevel, but the invalid
+        // level must make configure throw before applying ANY field.
+        expect(() => {
+          logger.configure({
+            level: invalidLevel as LogLevelConfig,
+            callback: otherCallback,
+            callbackIgnoresLevel: !startFlag,
+          });
+        }).toThrow(/Invalid log level/);
+
+        // Atomic rollback: not a single field changed.
+        const after = logger.getConfig();
+
+        expect(after).toStrictEqual(before);
+      },
+    );
   });
 
   describe("Level switching", () => {
