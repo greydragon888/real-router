@@ -1,5 +1,18 @@
 # @real-router/types
 
+## 0.36.1
+
+### Patch Changes
+
+- [#893](https://github.com/greydragon888/real-router/pull/893) [`acc8e7d`](https://github.com/greydragon888/real-router/commit/acc8e7da82fbaccc9058fc9d350868ba57cc0d6e) Thanks [@greydragon888](https://github.com/greydragon888)! - Document `RouteConfigUpdate` custom-field patch semantics and augmentability ([#797](https://github.com/greydragon888/real-router/issues/797))
+
+  `RouteConfigUpdate` now documents that `routes.update()` patches plugin-defined
+  custom fields (shallow-merge by key, `null` removes, `undefined` is a no-op) and
+  that the interface is augmentable — a plugin declares its updatable field via
+  declaration merging, mirroring its `Route` augmentation but with `| null` to
+  allow removal. The interface stays closed (no index signature), so typos in
+  structural field names remain compile errors.
+
 ## 0.36.0
 
 ### Minor Changes
