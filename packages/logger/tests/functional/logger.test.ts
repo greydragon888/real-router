@@ -802,25 +802,37 @@ describe("Logger", () => {
     });
   });
 
-  describe("recursive callback", () => {
-    it("should not infinite loop when logger.log is called inside callback", () => {
+  describe("re-entrant callback (issue #791)", () => {
+    it("should invoke the callback only once when it re-enters the logger", () => {
       let callCount = 0;
 
-      const recursiveCallback: LogCallback = () => {
+      // A callback that re-enters the logger on the happy path (no self-bound).
+      // Without a re-entrancy guard this recurses ~5.9k deep until a swallowed
+      // RangeError, invoking the callback thousands of times.
+      const reentrantCallback: LogCallback = () => {
         callCount++;
-        if (callCount <= 3) {
-          // This will call the callback again, but eventually stops
-          // because each nested call increments callCount
-          logger.log("Inner", "recursive");
-        }
+        logger.error("Inner", "from callback");
       };
 
-      logger.configure({ callback: recursiveCallback });
-      logger.log("Outer", "start");
+      logger.configure({ callback: reentrantCallback });
+      logger.error("Outer", "kick");
 
-      // Should terminate — callback calls logger.log which calls callback again,
-      // but callCount guard prevents infinite recursion
-      expect(callCount).toBe(4); // initial + 3 recursive calls
+      // The nested logger.error must NOT re-invoke the callback (safe no-op).
+      expect(callCount).toBe(1);
+    });
+
+    it("should preserve nested console output without flooding it", () => {
+      const reentrantCallback: LogCallback = () => {
+        logger.error("Inner", "from callback");
+      };
+
+      logger.configure({ callback: reentrantCallback });
+      logger.error("Outer", "kick");
+
+      // Outer message + the single nested message — not ~5.9k console.error.
+      expect(console.error).toHaveBeenCalledTimes(2);
+      expect(console.error).toHaveBeenNthCalledWith(1, "[Outer] kick");
+      expect(console.error).toHaveBeenNthCalledWith(2, "[Inner] from callback");
     });
   });
 

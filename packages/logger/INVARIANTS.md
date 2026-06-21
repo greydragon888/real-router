@@ -44,6 +44,7 @@
 | 6   | Callback and console are consistent when callbackIgnoresLevel is false | The number of times the callback is called equals the number of times the corresponding console method is called. They are never out of sync.                   |
 | 7   | Callback invocation is deterministic                                   | The same `(configLevel, messageLevel, callbackIgnoresLevel)` combination always produces the same callback invocation count.                                    |
 | 8   | Changing callbackIgnoresLevel takes effect immediately                 | Switching `callbackIgnoresLevel` from `false` to `true` causes the very next log call to invoke the callback, even if the message would otherwise be filtered.  |
+| 9   | Re-entrant callback does not recurse                                   | A callback that calls `logger.*` is invoked at most once per top-level log call. The nested re-entry is skipped by the `#inCallback` guard (safe no-op), instead of recursing to a swallowed `RangeError`. Console output for the nested message still happens once. |
 
 ## Test Files
 
@@ -51,4 +52,4 @@
 | --------------------------------------- | ---------- | --------------- |
 | `tests/property/config.properties.ts`   | 10         | Configuration   |
 | `tests/property/level.properties.ts`    | 10         | Level Filtering |
-| `tests/property/callback.properties.ts` | 8          | Callback        |
+| `tests/property/callback.properties.ts` | 9          | Callback        |
