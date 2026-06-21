@@ -17,7 +17,7 @@
 3. On `onTransitionLeaveApprove`: if route changed → calls `onLeave` on the leaving route
 4. On `onTransitionSuccess`: calls `onEnter` or `onStay` (depending on route name change) AND `onNavigate` — hooks are orthogonal, each fires independently based on its own condition
 
-Hook lookup: `api.getRouteConfig(routeName)?.[hookName]` — reads hook factory from route definition, compiles it lazily via `factory(router, getDependency)`, and caches the compiled hook per `hookName:routeName`. Same DI pattern as `GuardFnFactory`. Config changes are picked up lazily (recompiles when the `factory` reference differs); removed routes are evicted eagerly via a `getRoutesApi(router).subscribeChanges()` subscription (drops `hookName:routeName` entries on `remove`/`replace`, clears all on `clear`) so they don't linger as dead memory. The subscription is removed in `teardown`.
+Hook lookup: `api.getRouteConfig(routeName)?.[hookName]` — reads hook factory from route definition, compiles it lazily via `factory(router, getDependency)`, and caches the compiled hook per `hookName:routeName`. Same DI pattern as `GuardFnFactory`. Config changes — including hot-swapping a hook via `getRoutesApi(router).update(name, { onNavigate })` (#797), `replace`, or `remove`+`add` — are picked up lazily (recompiles when the `factory` reference differs); removed routes are evicted eagerly via a `getRoutesApi(router).subscribeChanges()` subscription (drops `hookName:routeName` entries on `remove`/`replace`, clears all on `clear`) so they don't linger as dead memory. The subscription is removed in `teardown`.
 
 ## Hook Semantics
 
@@ -60,7 +60,7 @@ The plugin has no options. Hook callbacks are the configuration — they live on
 
 ### Module augmentation
 
-`declare module "@real-router/core"` in `index.ts` extends the `Route` interface with typed `onEnter`, `onStay`, `onLeave`, `onNavigate` fields. Import the plugin package to get autocomplete.
+`declare module "@real-router/core"` in `index.ts` extends the `Route` interface with typed `onEnter`, `onStay`, `onLeave`, `onNavigate` fields, and the `RouteConfigUpdate` interface with the same fields (each `| null` to remove) so the hooks are patchable via `getRoutesApi(router).update(name, patch)` (#797). Import the plugin package to get autocomplete for both route definitions and update patches.
 
 ## See Also
 

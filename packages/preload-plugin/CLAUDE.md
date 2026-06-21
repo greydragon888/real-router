@@ -77,7 +77,7 @@ The factory function checks `typeof document === "undefined"` before instantiati
 
 ### Module augmentation
 
-`Route.preload`, `Router.getPreloadSettings`, and `Router.getPreloadedState` are declared in `index.ts`. Import the package to get autocomplete for route definitions and both router methods. `getPreloadedState` is typed as optional — it is only present while the plugin is active.
+`Route.preload`, `RouteConfigUpdate.preload` (`| null`), `Router.getPreloadSettings`, and `Router.getPreloadedState` are declared in `index.ts`. The `RouteConfigUpdate` augmentation makes `preload` patchable via `getRoutesApi(router).update(name, { preload })` (#797) — picked up lazily on the next hover/touch. Import the package to get autocomplete for route definitions, update patches, and both router methods. `getPreloadedState` is typed as optional — it is only present while the plugin is active.
 
 ## See Also
 

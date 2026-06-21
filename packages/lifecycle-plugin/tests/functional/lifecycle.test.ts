@@ -791,4 +791,68 @@ describe("@real-router/lifecycle-plugin", () => {
       }).not.toThrow();
     });
   });
+
+  describe("hot-swap hooks via routes.update (#797)", () => {
+    it("recompiles and fires the new onNavigate factory after update()", async () => {
+      const hook1 = vi.fn();
+      const hook2 = vi.fn();
+      const factory1: LifecycleHookFactory = () => hook1;
+      const factory2: LifecycleHookFactory = () => hook2;
+
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          { name: "target", path: "/target", onNavigate: factory1 },
+        ],
+        { defaultRoute: "home" },
+      );
+      router.usePlugin(lifecyclePluginFactory());
+      const routesApi = getRoutesApi(router);
+
+      await router.start("/");
+      await router.navigate("target");
+
+      expect(hook1).toHaveBeenCalledTimes(1);
+      expect(hook2).not.toHaveBeenCalled();
+
+      // Hot-swap the hook factory — typed precisely via the RouteConfigUpdate
+      // augmentation. Before #797 this was silently dropped (factory2 calls: 0).
+      routesApi.update("target", { onNavigate: factory2 });
+
+      await router.navigate("home");
+      await router.navigate("target");
+
+      // New factory fires; old one is not re-invoked.
+      expect(hook2).toHaveBeenCalledTimes(1);
+      expect(hook1).toHaveBeenCalledTimes(1);
+    });
+
+    it("removes the hook when update sets the factory to null", async () => {
+      const hook = vi.fn();
+      const factory: LifecycleHookFactory = () => hook;
+
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          { name: "target", path: "/target", onNavigate: factory },
+        ],
+        { defaultRoute: "home" },
+      );
+      router.usePlugin(lifecyclePluginFactory());
+      const routesApi = getRoutesApi(router);
+
+      await router.start("/");
+      await router.navigate("target");
+
+      expect(hook).toHaveBeenCalledTimes(1);
+
+      routesApi.update("target", { onNavigate: null });
+
+      await router.navigate("home");
+      await router.navigate("target");
+
+      // Hook removed — no further calls.
+      expect(hook).toHaveBeenCalledTimes(1);
+    });
+  });
 });

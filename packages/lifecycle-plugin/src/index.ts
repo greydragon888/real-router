@@ -22,6 +22,16 @@ declare module "@real-router/core" {
      */
     onNavigate?: LifecycleHookFactory<Dependencies>;
   }
+
+  // Makes the hooks patchable via `getRoutesApi(router).update(name, patch)`
+  // (symmetric with the Route augmentation above). `null` removes a hook; the
+  // plugin recompiles lazily on the next navigation when the factory changes.
+  interface RouteConfigUpdate<Dependencies extends DefaultDependencies> {
+    onEnter?: LifecycleHookFactory<Dependencies> | null;
+    onStay?: LifecycleHookFactory<Dependencies> | null;
+    onLeave?: LifecycleHookFactory<Dependencies> | null;
+    onNavigate?: LifecycleHookFactory<Dependencies> | null;
+  }
 }
 
 export type { LifecycleHook, LifecycleHookFactory } from "./types";

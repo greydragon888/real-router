@@ -195,6 +195,16 @@ export interface RoutesApi<
 
   remove: (name: string) => void;
 
+  /**
+   * Patch an existing route's configuration in place (no tree rebuild).
+   *
+   * Applies the structural/guard fields and any plugin-defined custom fields
+   * (lifecycle hooks, `preload`, `searchSchema`, …) from the patch. Fields are
+   * shallow-merged by key; `null` removes a field, `undefined` is a no-op.
+   * `name`/`path`/`children` are immutable — use `remove` + `add` to
+   * restructure. See {@link RouteConfigUpdate} for the full semantics and the
+   * plugin augmentation pattern.
+   */
   update: (name: string, updates: RouteConfigUpdate<Dependencies>) => void;
 
   clear: () => void;

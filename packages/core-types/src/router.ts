@@ -375,8 +375,29 @@ export interface Route<
 }
 
 /**
- * Configuration update options for updateRoute().
- * All properties are optional. Set to null to remove the configuration.
+ * Configuration update options for `updateRoute()`.
+ *
+ * All properties are optional. For every field, `null` removes the
+ * configuration, `undefined` (or omission) leaves it untouched, and any other
+ * value sets it — values are shallow-merged into the route by patch key.
+ *
+ * Besides the structural and guard fields below, `update` also patches
+ * **plugin-defined custom fields** (lifecycle hooks, `preload`, `searchSchema`,
+ * …), symmetric with how `add`/`replace` register them. This interface is
+ * **augmentable**: a plugin declares its updatable field via declaration
+ * merging, mirroring its `Route` augmentation but with `| null` to allow removal:
+ *
+ * ```ts
+ * declare module "@real-router/core" {
+ *   interface RouteConfigUpdate<Dependencies extends DefaultDependencies> {
+ *     onNavigate?: LifecycleHookFactory<Dependencies> | null;
+ *   }
+ * }
+ * ```
+ *
+ * Note: `name` / `path` / `children` are route identity and are NOT patchable —
+ * use `remove` + `add` to restructure. The interface stays closed (no index
+ * signature) so typos in structural field names remain compile errors.
  */
 export interface RouteConfigUpdate<
   Dependencies extends DefaultDependencies = DefaultDependencies,
