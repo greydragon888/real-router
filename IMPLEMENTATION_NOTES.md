@@ -2528,7 +2528,7 @@ export function getDependenciesApi(router: Router): DependenciesApi {
 
 **Extracted APIs:** `getRoutesApi`, `getDependenciesApi`, `getLifecycleApi`, `getPluginApi`, `cloneRouter`.
 
-**Tree operations injection:** `store.treeOperations` carries `commitTreeChanges` / `resetStore` (core helpers in `routesStore.ts`) and `nodeToDefinition` (from `route-tree`), set when the store is created. Injecting `nodeToDefinition` keeps `getRoutesApi` free of a static **runtime** `route-tree` import — it imports only route-tree _types_ (erased at compile) and reaches `nodeToDefinition` through the store. (`commitTreeChanges`/`resetStore` live in `routesStore`, which `getRoutesApi` already imports, so for those two the indirection no longer buys isolation.)
+**Tree operations injection (removed, #909):** `store.treeOperations` used to inject `commitTreeChanges` / `resetStore` / `nodeToDefinition` into the store so `getRoutesApi` could reach them without direct imports. The stated rationale (avoid static `route-tree` import chains) did not hold — `route-tree` is `alwaysBundle`d into core (a direct `nodeToDefinition` import adds no weight), and `commitTreeChanges`/`resetStore` already live in `routesStore`, which `getRoutesApi` imports anyway. Replaced with direct static imports; the per-store `treeOperations` object is gone.
 
 ### FSM Migration: dispose(), TransitionMeta, Event Flow
 

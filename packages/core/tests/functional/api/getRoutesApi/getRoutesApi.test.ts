@@ -29,10 +29,10 @@ describe("getRoutesApi()", () => {
     expect(typeof routesApi.get).toBe("function");
   });
 
-  it("should return a new object on each call", () => {
+  it("should return the same cached instance on repeat calls (#910)", () => {
     const routesApi2 = getRoutesApi(router);
 
-    expect(routesApi).not.toBe(routesApi2);
+    expect(routesApi).toBe(routesApi2);
   });
 
   it("has should check if route exists", () => {

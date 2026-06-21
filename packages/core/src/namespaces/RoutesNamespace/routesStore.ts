@@ -1,7 +1,7 @@
 // packages/core/src/namespaces/RoutesNamespace/routesStore.ts
 
 import { logger } from "@real-router/logger";
-import { createMatcher, createRouteTree, nodeToDefinition } from "route-tree";
+import { createMatcher, createRouteTree } from "route-tree";
 
 import { DEFAULT_ROUTE_NAME, STANDARD_ROUTE_KEYS } from "./constants";
 import { resolveForwardChain } from "./forwardChain";
@@ -44,11 +44,6 @@ export interface RoutesStore<
   lifecycleNamespace: RouteLifecycleNamespace<Dependencies> | undefined;
   readonly pendingCanActivate: Map<string, GuardFnFactory<Dependencies>>;
   readonly pendingCanDeactivate: Map<string, GuardFnFactory<Dependencies>>;
-  readonly treeOperations: {
-    readonly commitTreeChanges: (store: RoutesStore<Dependencies>) => void;
-    readonly resetStore: (store: RoutesStore<Dependencies>) => void;
-    readonly nodeToDefinition: (node: RouteTree) => RouteDefinition;
-  };
 }
 
 // =============================================================================
@@ -556,10 +551,5 @@ export function createRoutesStore<
     lifecycleNamespace: undefined,
     pendingCanActivate: artifacts.pendingCanActivate,
     pendingCanDeactivate: artifacts.pendingCanDeactivate,
-    treeOperations: {
-      commitTreeChanges,
-      resetStore,
-      nodeToDefinition,
-    },
   };
 }
