@@ -70,16 +70,16 @@ describe("S1: deep nesting validates without overflowing the call stack (#901)",
 });
 
 describe("S2: a large fan-out of distinct objects validates in linear time (anti-quadratic)", () => {
-  it("validates 200k sibling objects via O(1) WeakSet membership, not an O(n) array scan", () => {
+  it("validates 300k sibling objects via O(1) WeakSet membership, not an O(n) array scan", () => {
     // The discriminating case: `isSerializable` records every visited object to
     // reject cycles and shared references. With a `WeakSet` (O(1) has/add) the walk
     // is linear; a regression to an array + `.includes` (O(n) membership) makes it
-    // O(n^2). Measured on this machine: healthy ~37 ms; the array-`.includes` mutant
-    // ~2921 ms (79x, and the ratio grows with n: 22x at 50k -> 30x at 100k -> 79x at
-    // 200k). The 800 ms ceiling is ~21x over healthy (flake-proof under the
-    // concurrent CPU load of a turbo build) and ~3.6x under the mutant.
+    // O(n^2). Measured on this machine: healthy ~40 ms; the array-`.includes` mutant
+    // ~6500 ms (161x). The 800 ms ceiling is ~20x over healthy (flake-proof under the
+    // concurrent CPU load of a turbo build) and ~8x under the mutant — N=300k keeps
+    // the mutant margin hardware-robust (a faster CI runner can't slip it under).
     const input = {
-      list: Array.from({ length: 200_000 }, () => ({ a: 1 })),
+      list: Array.from({ length: 300_000 }, () => ({ a: 1 })),
     };
 
     const start = performance.now();
