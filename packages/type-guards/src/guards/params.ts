@@ -3,75 +3,107 @@
 import type { Params } from "@real-router/types";
 
 /**
- * Internal helper to check if value is serializable (no circular refs, functions, instances).
- * Recursively validates the entire object tree with protection against circular references.
+ * Is `value` an array, or a plain object (`Object.prototype` / `null` prototype)?
+ * Class instances (Date, RegExp, Map, Set, ...) are not plain containers.
  *
- * @param value - Value to check
- * @param visited - Set of visited objects to detect circular references
- * @returns true if value can be serialized
  * @internal
  */
-function isSerializable(
-  value: unknown,
-  visited = new WeakSet<object>(),
-): boolean {
-  // null/undefined are serializable (JSON.stringify handles them)
-  if (value === null || value === undefined) {
+function isPlainContainer(value: object): boolean {
+  if (Array.isArray(value)) {
     return true;
   }
 
+  const proto = Object.getPrototypeOf(value) as object | null;
+
+  return proto === null || proto === Object.prototype;
+}
+
+/**
+ * Pushes every child of an array or plain object onto the work-stack.
+ *
+ * @internal
+ */
+function pushChildren(value: object, stack: unknown[]): void {
+  const children = Array.isArray(value) ? value : Object.values(value);
+
+  for (const child of children) {
+    stack.push(child);
+  }
+}
+
+/**
+ * Is `value` a serializable primitive leaf? `string` and `boolean` always are; a
+ * `number` only if finite (NaN/Infinity are not). Everything else (function,
+ * symbol, bigint) is not serializable.
+ *
+ * @internal
+ */
+function isSerializableLeaf(value: unknown): boolean {
   const type = typeof value;
 
-  // Primitives: string, boolean
   if (type === "string" || type === "boolean") {
     return true;
   }
 
-  // Numbers: must be finite (reject NaN and Infinity)
   if (type === "number") {
     return Number.isFinite(value);
   }
 
-  // Functions and symbols cannot be serialized
-  if (type === "function" || type === "symbol") {
-    return false;
-  }
-
-  // Arrays (including nested arrays)
-  if (Array.isArray(value)) {
-    // Circular reference detection
-    if (visited.has(value)) {
-      return false;
-    }
-
-    visited.add(value);
-
-    // Recursively check all items
-    return value.every((item) => isSerializable(item, visited));
-  }
-
-  // Objects
-  if (type === "object") {
-    // Circular reference detection
-    if (visited.has(value)) {
-      return false;
-    }
-
-    // Add to visited set
-    visited.add(value);
-
-    // Only allow plain objects (reject Date, RegExp, Map, Set, etc.)
-    const proto = Object.getPrototypeOf(value) as object | null;
-
-    if (proto !== null && proto !== Object.prototype) {
-      return false; // Instance of a class
-    }
-
-    // Recursively check all values
-    return Object.values(value).every((val) => isSerializable(val, visited));
-  }
-
   return false;
+}
+
+/**
+ * Internal helper to check if value is serializable (no circular refs, functions, instances).
+ * Validates the entire object tree with protection against circular references.
+ *
+ * Iterative (explicit work-stack) rather than recursive: a recursive walk overflows
+ * the call stack with `RangeError` at ~2.4k levels of nesting on V8, which would break
+ * the boolean contract on adversarial input reachable via `history.state` / user-supplied
+ * params (#901). A heap-allocated stack scales to any depth. The `WeakSet` records every
+ * visited object for the lifetime of the call, so any object reached twice — a cycle or a
+ * shared reference — is rejected (cycle-detection semantics unchanged).
+ *
+ * @param root - Value to check
+ * @returns true if value can be serialized
+ * @internal
+ */
+function isSerializable(root: unknown): boolean {
+  const stack: unknown[] = [root];
+  const visited = new WeakSet<object>();
+
+  while (stack.length > 0) {
+    const value = stack.pop();
+
+    // null/undefined are serializable (JSON.stringify handles them)
+    if (value === null || value === undefined) {
+      continue;
+    }
+
+    // Arrays and plain objects: reject cycles/shared refs and class instances,
+    // then queue their children. (typeof null is "object", handled above.)
+    if (typeof value === "object") {
+      if (visited.has(value)) {
+        return false; // circular / shared reference
+      }
+
+      if (!isPlainContainer(value)) {
+        return false; // instance of a class
+      }
+
+      visited.add(value);
+      pushChildren(value, stack);
+
+      continue;
+    }
+
+    // Primitive leaf: string / boolean / finite number pass; function, symbol,
+    // bigint, and NaN/Infinity do not.
+    if (!isSerializableLeaf(value)) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 /**

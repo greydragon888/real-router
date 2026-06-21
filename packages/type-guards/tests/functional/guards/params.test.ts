@@ -385,6 +385,67 @@ describe("Params Type Guards", () => {
       });
     });
 
+    describe("Deep nesting — no stack overflow (#901)", () => {
+      // The native recursion limit is ~2.4k frames on this platform; these use
+      // depths ~40x beyond it. A recursive validator throws
+      // `RangeError: Maximum call stack size exceeded` here, breaking the
+      // documented boolean contract. An iterative validator returns the correct
+      // boolean at any depth. The structures below are otherwise plain and fully
+      // serializable, so the *correct* answer is `true` (object/array chains) or
+      // `false` (invalid leaf / cycle) — never a throw.
+      const DEEP = 100_000;
+
+      const deepObjectChain = (depth: number, leaf: unknown): unknown => {
+        let node: unknown = leaf;
+
+        for (let i = 0; i < depth; i++) {
+          node = { child: node };
+        }
+
+        return node;
+      };
+
+      const deepArrayChain = (depth: number): unknown => {
+        let node: unknown = [1];
+
+        for (let i = 0; i < depth; i++) {
+          node = [node];
+        }
+
+        return node;
+      };
+
+      it("accepts a 100k-deep valid object chain (returns true, does not throw)", () => {
+        expect(isParams(deepObjectChain(DEEP, { leaf: 1 }))).toBe(true);
+      });
+
+      it("accepts a 100k-deep valid array chain nested under a key (returns true, does not throw)", () => {
+        expect(isParams({ chain: deepArrayChain(DEEP) })).toBe(true);
+      });
+
+      it("rejects a 100k-deep chain terminating in a function (returns false, does not throw)", () => {
+        const noop = (): void => {};
+
+        expect(isParams(deepObjectChain(DEEP, { leaf: noop }))).toBe(false);
+      });
+
+      it("rejects a 100k-deep object chain with a back-edge to the root as circular (returns false, does not throw)", () => {
+        const root: Record<string, unknown> = {};
+        let current = root;
+
+        for (let i = 0; i < DEEP; i++) {
+          const next: Record<string, unknown> = {};
+
+          current.child = next;
+          current = next;
+        }
+
+        current.back = root;
+
+        expect(isParams(root)).toBe(false);
+      });
+    });
+
     describe("Unknown type handling", () => {
       it("rejects bigint values (line 74)", () => {
         // bigint is not JSON serializable

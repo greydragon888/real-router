@@ -146,8 +146,8 @@ Both require a plain object (`proto === null || proto === Object.prototype`). Th
 | Primitive values     | ✅                         | ✅                                                    |
 | `null` / `undefined` | ✅                         | ✅                                                    |
 | Arrays of primitives | ✅                         | ✅                                                    |
-| Nested plain objects | ✅ (recursive)             | ❌                                                    |
-| Arrays of objects    | ✅ (recursive)             | ❌                                                    |
+| Nested plain objects | ✅ (deep)                  | ❌                                                    |
+| Arrays of objects    | ✅ (deep)                  | ❌                                                    |
 | Circular references  | ❌ detected via `WeakSet`  | ❌                                                    |
 | Class instances      | ❌                         | ❌                                                    |
 | Algorithm            | Two-phase fast → slow path | Single-pass                                           |
@@ -179,11 +179,17 @@ isParams(value)
     │   ├── function or symbol found? → return false (early reject)
     │   └── non-primitive found → set needsDeepCheck, break
     │
-    └── Phase 2 — slow path: isSerializable(value, new WeakSet())
-        ├── Recursively validates nested arrays and objects
-        ├── WeakSet tracks visited objects → detects circular references
+    └── Phase 2 — slow path: isSerializable(value)
+        ├── Iteratively validates nested arrays and objects (explicit work-stack)
+        ├── WeakSet tracks visited objects → detects circular / shared references
         └── Rejects class instances (proto !== Object.prototype)
 ```
+
+The slow path is **iterative**, not recursive: a recursive walk overflows the call
+stack with `RangeError` at ~2.4k levels of nesting, which would break the boolean
+contract on adversarial input reachable via `history.state` / user-supplied params.
+A heap-allocated work-stack scales to any depth (#901), so `isParams` returns a
+boolean at any nesting depth instead of throwing.
 
 `isParamsStrict` skips both phases entirely — one loop, primitives and flat arrays only.
 

@@ -55,4 +55,6 @@ src/
 - **`validateRouteName` allows empty string** -- `""` is the valid root node name, not an error
 - **System routes bypass validation** -- names starting with `@@` (e.g., `@@router/UNKNOWN_ROUTE`) skip pattern checks in `validateRouteName`
 - **Depends on `@real-router/types`** -- imports `Params`, `State`, and other type definitions; no runtime dependency on core
+- **`isParams` validates iteratively (no stack overflow)** -- the slow path (`isSerializable`) walks nested params with an explicit work-stack, not recursion, so it returns a boolean at any nesting depth instead of throwing `RangeError` on deep adversarial input (`history.state`, user params). It runs at the validation boundary on untrusted input, so depth must not be a crash vector (#901)
 - **Property-based tests** -- `tests/property/` contains fast-check generative tests for guards and validators
+- **Stress tests** -- `tests/stress/` guards robustness (deep nesting → no overflow) and anti-quadratic scaling (`WeakSet` O(1) membership) on untrusted input; run via `pnpm -F type-guards test:stress` (also part of `pnpm build`, not PR CI)
