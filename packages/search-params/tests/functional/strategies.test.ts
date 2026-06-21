@@ -144,6 +144,13 @@ describe("search-params strategies", () => {
         expect(autoNumberStrategy.decode("-5.")).toBe(null); // trailing dot
       });
 
+      it("should return null for negative zero (not round-trippable)", () => {
+        // `-0` is a valid number, but build(-0) emits "0" and String(-0) === "0",
+        // so it can't round-trip; "-0"/"-0.0" must stay strings. (#898)
+        expect(autoNumberStrategy.decode("-0")).toBe(null);
+        expect(autoNumberStrategy.decode("-0.0")).toBe(null);
+      });
+
       it("should preserve leading zeros as strings (not parse as numbers)", () => {
         expect(autoNumberStrategy.decode("01")).toBeNull();
         expect(autoNumberStrategy.decode("007")).toBeNull();

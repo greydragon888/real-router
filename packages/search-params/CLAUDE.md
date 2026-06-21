@@ -53,6 +53,10 @@ src/
 
 Calling `parse()` or `build()` without options resolves to the cached `DEFAULT_OPTIONS` (`DEFAULT_QUERY_PARAMS` — all `auto`), so `parse(build(x)) === x` even with no options. The lookup is allocation-free (a cached singleton), so there is no string-only fast path anymore — the previous asymmetry (`build` used `auto`, `parse` used a `none`-like `parseSimple`) silently dropped types and was removed.
 
+### Negative zero `-0` stays a string under `auto`
+
+`numberFormat: "auto"` rejects negative zero: `"-0"` / `"-0.0"` decode to the **string** `"-0"`, not the number `-0` (#898). `-0` is a valid JS number but not round-trippable — `String(-0) === "0"` and `build(-0)` emits `"0"`, so coercing it would silently drop the sign and break `parse(build(x)) === x`. Same non-round-trippable class as leading-zero / unsafe-int / exponent (`number.ts` `Object.is(num, -0)` guard; INVARIANTS #16).
+
 ### Empty arrays produce empty string
 
 `build({ items: [] })` returns `""` for all array formats including `comma` — the key is erased uniformly (INVARIANTS #9). Roundtripping empty arrays through `build` then `parse` loses the key.

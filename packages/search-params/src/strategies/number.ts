@@ -86,6 +86,12 @@ export const autoNumberStrategy: NumberStrategy = {
 
     const num = Number(value);
 
+    // Negative zero is not round-trippable: build(-0) emits "0" and
+    // String(-0) === "0", so "-0"/"-0.0" must stay strings. (#898)
+    if (Object.is(num, -0)) {
+      return null;
+    }
+
     // Reject unsafe integers — precision loss would corrupt the value on roundtrip.
     if (!Number.isSafeInteger(num) && !hasDot) {
       return null;
