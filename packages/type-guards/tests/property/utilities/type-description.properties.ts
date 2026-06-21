@@ -65,5 +65,38 @@ describe("Type Description Utilities - Property-Based Tests", () => {
 
       expect(getTypeDescription(obj)).toBe("object");
     });
+
+    // #787: an adversarial own `constructor` must never crash the diagnostic
+    // helper. Beyond "does not crash", the exact contract is: a function
+    // constructor named something other than `"Object"` yields its (non-empty)
+    // name, and anything else (a non-function constructor, an anonymous function,
+    // or one named `"Object"`) yields `"object"`. `fc.object()` never emits a
+    // `constructor` key and `fc.anything()` never emits a function, so the
+    // generator below mixes both function and non-function constructor values.
+    const withName = (name: string): (() => void) =>
+      Object.defineProperty((): void => undefined, "name", { value: name });
+    const constructorValueArbitrary = fc.oneof(
+      fc.anything(), // non-function values (null, string, object, …)
+      fc.func(fc.anything()), // functions with engine-assigned names
+      fc.constantFrom(
+        withName("Widget"), // named function → returns the name
+        withName(""), // empty name → "object" (the `|| "object"` branch)
+        withName("Object"), // name exactly "Object" → "object"
+      ),
+    );
+
+    test.prop([constructorValueArbitrary], { numRuns: 10_000 })(
+      "returns the constructor function's name, else 'object', for any own constructor (never throws)",
+      (ctorValue) => {
+        const result = getTypeDescription({ constructor: ctorValue, bad: 1 });
+
+        const expected =
+          typeof ctorValue === "function" && ctorValue.name !== "Object"
+            ? ctorValue.name || "object"
+            : "object";
+
+        expect(result).toBe(expected);
+      },
+    );
   });
 });

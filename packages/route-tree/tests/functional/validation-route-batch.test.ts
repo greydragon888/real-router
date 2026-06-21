@@ -119,6 +119,36 @@ describe("validateRoute", () => {
       }).toThrow();
     });
 
+    it("should keep [method] context for a non-string name with an adversarial own constructor (#903)", () => {
+      // route.name is an object whose own `constructor` is not a real constructor;
+      // the type-description helper used to build the message must not crash, so
+      // the developer still gets the contextual "Route name must be a string".
+      expect(() => {
+        validateRoute(
+          { name: { constructor: null }, path: "/test" },
+          methodName,
+        );
+      }).toThrow(`[router.${methodName}] Route name must be a string`);
+    });
+
+    it("should describe an anonymous-class name as 'object', not '' (#903)", () => {
+      // An anonymous class has an empty constructor name; the message falls back
+      // to "object" rather than an empty "got ".
+      expect(() => {
+        validateRoute(
+          {
+            name: new (class {
+              x = 1;
+            })(),
+            path: "/test",
+          },
+          methodName,
+        );
+      }).toThrow(
+        `[router.${methodName}] Route name must be a string, got object`,
+      );
+    });
+
     it("should throw for empty name", () => {
       expect(() => {
         validateRoute({ name: "", path: "/test" }, methodName);

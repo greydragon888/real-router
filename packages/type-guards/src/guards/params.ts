@@ -3,75 +3,161 @@
 import type { Params } from "@real-router/types";
 
 /**
- * Internal helper to check if value is serializable (no circular refs, functions, instances).
- * Recursively validates the entire object tree with protection against circular references.
+ * Is `value` an array, or a plain object (`Object.prototype` / `null` prototype)?
+ * Class instances (Date, RegExp, Map, Set, ...) are not plain containers.
  *
- * @param value - Value to check
- * @param visited - Set of visited objects to detect circular references
- * @returns true if value can be serialized
  * @internal
  */
-function isSerializable(
-  value: unknown,
-  visited = new WeakSet<object>(),
-): boolean {
-  // null/undefined are serializable (JSON.stringify handles them)
-  if (value === null || value === undefined) {
+function isPlainContainer(value: object): boolean {
+  if (Array.isArray(value)) {
     return true;
   }
 
+  const proto = Object.getPrototypeOf(value) as object | null;
+
+  return proto === null || proto === Object.prototype;
+}
+
+/**
+ * Pushes every child of an array or plain object onto the work-stack.
+ *
+ * @internal
+ */
+function pushChildren(value: object, stack: unknown[]): void {
+  const children = Array.isArray(value) ? value : Object.values(value);
+
+  for (const child of children) {
+    stack.push(child);
+  }
+}
+
+/**
+ * Is `value` a serializable primitive leaf? `string` and `boolean` always are; a
+ * `number` only if finite (NaN/Infinity are not). Everything else (function,
+ * symbol, bigint) is not serializable.
+ *
+ * @internal
+ */
+function isSerializableLeaf(value: unknown): boolean {
   const type = typeof value;
 
-  // Primitives: string, boolean
   if (type === "string" || type === "boolean") {
     return true;
   }
 
-  // Numbers: must be finite (reject NaN and Infinity)
   if (type === "number") {
     return Number.isFinite(value);
   }
 
-  // Functions and symbols cannot be serialized
-  if (type === "function" || type === "symbol") {
-    return false;
-  }
-
-  // Arrays (including nested arrays)
-  if (Array.isArray(value)) {
-    // Circular reference detection
-    if (visited.has(value)) {
-      return false;
-    }
-
-    visited.add(value);
-
-    // Recursively check all items
-    return value.every((item) => isSerializable(item, visited));
-  }
-
-  // Objects
-  if (type === "object") {
-    // Circular reference detection
-    if (visited.has(value)) {
-      return false;
-    }
-
-    // Add to visited set
-    visited.add(value);
-
-    // Only allow plain objects (reject Date, RegExp, Map, Set, etc.)
-    const proto = Object.getPrototypeOf(value) as object | null;
-
-    if (proto !== null && proto !== Object.prototype) {
-      return false; // Instance of a class
-    }
-
-    // Recursively check all values
-    return Object.values(value).every((val) => isSerializable(val, visited));
-  }
-
   return false;
+}
+
+/**
+ * Marker pushed onto the work-stack after a container's children. Popping it
+ * means that container's whole subtree has been validated, so the container
+ * leaves the active DFS path (`onPath`) and joins the fully-checked set
+ * (`done`). A module-private class, so user data can never be mistaken for it.
+ *
+ * @internal
+ */
+class SubtreeExit {
+  constructor(readonly container: object) {}
+}
+
+/**
+ * Inspects one container popped from the work-stack. Rejects cycles (a back-edge
+ * to a container still on the current DFS path) and class instances; skips
+ * already-validated shared references; otherwise marks the container on-path and
+ * queues its children plus a {@link SubtreeExit} marker.
+ *
+ * @returns false only when the container is invalid (cycle or class instance)
+ * @internal
+ */
+function visitContainer(
+  value: object,
+  stack: unknown[],
+  onPath: WeakSet<object>,
+  done: WeakSet<object>,
+): boolean {
+  if (onPath.has(value)) {
+    return false; // back-edge → genuine circular reference
+  }
+
+  if (done.has(value)) {
+    return true; // shared reference / diamond — subtree already validated
+  }
+
+  if (!isPlainContainer(value)) {
+    return false; // instance of a class
+  }
+
+  onPath.add(value);
+  stack.push(new SubtreeExit(value));
+  pushChildren(value, stack);
+
+  return true;
+}
+
+/**
+ * Internal helper to check if value is serializable (no circular refs, functions, instances).
+ * Validates the entire object tree.
+ *
+ * Iterative (explicit work-stack) rather than recursive: a recursive walk overflows
+ * the call stack with `RangeError` at ~2.4k levels of nesting on V8, which would break
+ * the boolean contract on adversarial input reachable via `history.state` / user-supplied
+ * params (#901). A heap-allocated stack scales to any depth.
+ *
+ * Cycle detection uses on-path (DFS gray/black) semantics, not "ever-visited":
+ * `onPath` holds the containers on the current branch — a back-edge to one of them is
+ * a genuine cycle and is rejected; `done` holds containers whose subtree is already
+ * fully validated. A shared reference / diamond (the same object reached again *off*
+ * the current path) is serializable — `JSON.stringify` duplicates it — so it is
+ * accepted, and `done` makes the re-encounter O(1), keeping the walk linear on diamond
+ * chains instead of exponential (#786). Genuine cycles stay rejected: the cycle vertex
+ * is still on the path when re-encountered.
+ *
+ * @param root - Value to check
+ * @returns true if value can be serialized
+ * @internal
+ */
+function isSerializable(root: unknown): boolean {
+  const stack: unknown[] = [root];
+  const onPath = new WeakSet<object>();
+  const done = new WeakSet<object>();
+
+  while (stack.length > 0) {
+    const value = stack.pop();
+
+    // Subtree fully processed: leave the current path, mark as validated.
+    if (value instanceof SubtreeExit) {
+      onPath.delete(value.container);
+      done.add(value.container);
+
+      continue;
+    }
+
+    // null/undefined are serializable (JSON.stringify handles them)
+    if (value === null || value === undefined) {
+      continue;
+    }
+
+    // Arrays and plain objects (typeof null is "object", handled above).
+    if (typeof value === "object") {
+      if (!visitContainer(value, stack, onPath, done)) {
+        return false;
+      }
+
+      continue;
+    }
+
+    // Primitive leaf: string / boolean / finite number pass; function, symbol,
+    // bigint, and NaN/Infinity do not.
+    if (!isSerializableLeaf(value)) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 /**
@@ -121,6 +207,7 @@ function isPrimitiveValue(value: unknown): boolean {
  * isParams({ matrix: [[1, 2], [3, 4]] }); // true (slow path)
  * isParams({ users: [{ id: 1 }, { id: 2 }] }); // true (slow path)
  * isParams({ scores: [100, null, 85] }); // true (slow path)
+ * isParams({ a: shared, b: shared }); // true (shared reference / diamond, not a cycle)
  *
  * // Invalid
  * isParams({ fn: () => {} }); // false (function)
@@ -184,7 +271,7 @@ export function isParams(value: unknown): value is Params {
 }
 
 /**
- * Internal helper for strict param validation (browser plugin).
+ * Internal helper for strict param value validation.
  * Only allows primitives and arrays of primitives, no nested objects.
  *
  * @param value - Value to check
@@ -231,8 +318,11 @@ export function isValidParamValueStrict(value: unknown): boolean {
 }
 
 /**
- * Strict type guard for Params (browser plugin version).
- * Only allows primitives and arrays of primitives, no nested objects.
+ * Strict type guard for Params.
+ * Accepts only plain objects (own `Object.prototype` or `null` prototype) whose
+ * values are primitives or arrays of primitives — no nested objects. Like
+ * {@link isParams}, it rejects class instances and custom-prototype objects, so
+ * the lattice `isParamsStrict ⇒ isParams` holds.
  *
  * @param value - Value to check
  * @returns true if value is a valid Params object
@@ -243,8 +333,21 @@ export function isParamsStrict(value: unknown): value is Params {
     return false;
   }
 
+  // Reject objects with custom prototype (e.g., Object.create(proto), class instances).
+  // Mirrors isParams (see above): without this, a class instance with no own
+  // enumerable fields yields zero for..in iterations and would wrongly pass the
+  // strict guard, breaking the lattice isParamsStrict ⇒ isParams (#785).
+  const proto = Object.getPrototypeOf(value) as object | null;
+
+  if (proto !== null && proto !== Object.prototype) {
+    return false;
+  }
+
   // Check all own properties have valid param values
   for (const key in value) {
+    // With the proto === Object.prototype check above, inherited enumerable
+    // properties can only come from Object.prototype pollution (defensive).
+    /* v8 ignore next 3 -- @preserve Defensive: Object.prototype pollution */
     if (!Object.hasOwn(value, key)) {
       continue; // Skip inherited properties
     }

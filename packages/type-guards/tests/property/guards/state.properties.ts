@@ -9,6 +9,7 @@ import {
   invalidStateArbitrary,
   arbitraryInvalidTypes,
   paramsSimpleArbitrary,
+  structuralParamsArbitrary,
   validRouteNameArbitrary,
   validRoutePathArbitrary,
 } from "../helpers";
@@ -32,10 +33,10 @@ describe("State Type Guards Properties", () => {
     test.prop([invalidStateArbitrary], { numRuns: 10_000 })(
       "returns false for invalid State (missing required fields or wrong types)",
       (state) => {
-        // After refactoring isState validates via isRequiredFields:
+        // isState validates via isRequiredFields:
         // - name must be a valid route name (via isRouteName)
-        // - path must be a valid route path (via isRoutePath)
-        // - params must be valid params (via isParamsStrict)
+        // - path must be a string (typeof check)
+        // - params must be valid params (via isParams)
         //
         // invalidStateArbitrary generates invalid states, so all should be false
         expect(isState(state)).toBe(false);
@@ -93,28 +94,12 @@ describe("State Type Guards Properties", () => {
     test.prop([invalidStateArbitrary], { numRuns: 10_000 })(
       "returns false for invalid State",
       (state) => {
-        // invalidStateArbitrary generates:
-        // 1. Missing fields (name/path/params)
-        // 2. Wrong types (name: number, path: number, params: array)
-
-        // IMPORTANT: Arrays can pass isParamsStrict due to implementation:
-        // 1. Empty arrays [] pass (typeof [] === "object" and for..in finds no keys)
-        // 2. Arrays with empty arrays [[]] pass (each [] passes isValidParamValueStrict)
-        // So some states with params-arrays will pass isStateStrict!
-        const isArrayParams = Array.isArray(state.params);
-        const hasValidStringFields =
-          typeof state.name === "string" && typeof state.path === "string";
-
-        if (isArrayParams && hasValidStringFields) {
-          // Arrays with valid string fields may pass isParamsStrict
-          // depending on content. Check actual behavior.
-          const result = isStateStrict(state);
-
-          // Just verify it's deterministic
-          expect(isStateStrict(state)).toBe(result);
-        } else {
-          expect(isStateStrict(state)).toBe(false);
-        }
+        // invalidStateArbitrary generates missing fields or wrong-typed
+        // name/path/params. isStateStrict performs the required-field check
+        // (name via isRouteName, path string, params via isParams), so every
+        // generated state is rejected. (It never emits array params; isParams
+        // rejects top-level arrays anyway.)
+        expect(isStateStrict(state)).toBe(false);
       },
     );
 
@@ -157,6 +142,25 @@ describe("State Type Guards Properties", () => {
           expect(typeof state.path).toBe("string");
           expect(isParams(state.params)).toBe(true);
         }
+      },
+    );
+
+    // ===================================================================
+    // INV: state guards delegate structural params validation to isParams.
+    // The public path (browser/hash plugins validate history.state via
+    // isStateStrict) must reject cyclic / class-instance params and accept
+    // shared-reference (diamond) params exactly as isParams does — the
+    // history.state value is untrusted and may carry such structures.
+    // ===================================================================
+    test.prop([structuralParamsArbitrary], { numRuns: 10_000 })(
+      "isState and isStateStrict follow isParams for structural params (cycles, diamonds, instances)",
+      (params) => {
+        const state = { name: "home", path: "/", params };
+
+        // With a valid name and path, isState reduces to isParams(params).
+        expect(isState(state)).toBe(isParams(params));
+        // isStateStrict performs the identical required-field check.
+        expect(isStateStrict(state)).toBe(isState(state));
       },
     );
   });

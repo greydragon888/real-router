@@ -385,6 +385,105 @@ describe("Params Type Guards", () => {
       });
     });
 
+    describe("Shared references / diamonds — not cycles (#786)", () => {
+      // A shared reference (the same object/array reached again off the current
+      // path) is a DAG, not a cycle: JSON.stringify duplicates it without error,
+      // so it is serializable and must be accepted. Cycle detection uses on-path
+      // semantics, not "ever-visited".
+      it("accepts the same object referenced under two keys", () => {
+        const shared = { v: 1 };
+
+        expect(isParams({ a: shared, b: shared })).toBe(true);
+      });
+
+      it("accepts the same object repeated in an array", () => {
+        const shared = { v: 1 };
+
+        expect(isParams({ list: [shared, shared] })).toBe(true);
+      });
+
+      it("accepts the same array referenced under two keys", () => {
+        const arr = [1, 2];
+
+        expect(isParams({ x: arr, y: arr })).toBe(true);
+      });
+
+      it("accepts a diamond (one grandchild shared via two parents)", () => {
+        const shared = { v: 1 };
+
+        expect(isParams({ a: { p: shared }, b: { q: shared } })).toBe(true);
+      });
+
+      it("still rejects a self-referencing cycle after the shared-ref fix", () => {
+        const c: Record<string, unknown> = {};
+
+        c.self = c;
+
+        expect(isParams(c)).toBe(false);
+      });
+    });
+
+    describe("Deep nesting — no stack overflow (#901)", () => {
+      // The native recursion limit is ~2.4k frames on this platform; these use
+      // depths ~40x beyond it. A recursive validator throws
+      // `RangeError: Maximum call stack size exceeded` here, breaking the
+      // documented boolean contract. An iterative validator returns the correct
+      // boolean at any depth. The structures below are otherwise plain and fully
+      // serializable, so the *correct* answer is `true` (object/array chains) or
+      // `false` (invalid leaf / cycle) — never a throw.
+      const DEEP = 100_000;
+
+      const deepObjectChain = (depth: number, leaf: unknown): unknown => {
+        let node: unknown = leaf;
+
+        for (let i = 0; i < depth; i++) {
+          node = { child: node };
+        }
+
+        return node;
+      };
+
+      const deepArrayChain = (depth: number): unknown => {
+        let node: unknown = [1];
+
+        for (let i = 0; i < depth; i++) {
+          node = [node];
+        }
+
+        return node;
+      };
+
+      it("accepts a 100k-deep valid object chain (returns true, does not throw)", () => {
+        expect(isParams(deepObjectChain(DEEP, { leaf: 1 }))).toBe(true);
+      });
+
+      it("accepts a 100k-deep valid array chain nested under a key (returns true, does not throw)", () => {
+        expect(isParams({ chain: deepArrayChain(DEEP) })).toBe(true);
+      });
+
+      it("rejects a 100k-deep chain terminating in a function (returns false, does not throw)", () => {
+        const noop = (): void => {};
+
+        expect(isParams(deepObjectChain(DEEP, { leaf: noop }))).toBe(false);
+      });
+
+      it("rejects a 100k-deep object chain with a back-edge to the root as circular (returns false, does not throw)", () => {
+        const root: Record<string, unknown> = {};
+        let current = root;
+
+        for (let i = 0; i < DEEP; i++) {
+          const next: Record<string, unknown> = {};
+
+          current.child = next;
+          current = next;
+        }
+
+        current.back = root;
+
+        expect(isParams(root)).toBe(false);
+      });
+    });
+
     describe("Unknown type handling", () => {
       it("rejects bigint values (line 74)", () => {
         // bigint is not JSON serializable
@@ -585,14 +684,41 @@ describe("Params Type Guards", () => {
       expect(isParamsStrict([1, 2, 3])).toBe(false);
     });
 
-    it("ignores inherited properties", () => {
+    it("accepts top-level null-prototype object (Object.create(null))", () => {
+      // proto === null passes the prototype gate (covers the `proto !== null`
+      // short-circuit); own primitive values are valid strict params, matching
+      // isParams which also accepts null-prototype objects.
+      const nullProtoObj = Object.create(null) as Record<string, unknown>;
+
+      nullProtoObj.id = "123";
+      nullProtoObj.page = 1;
+
+      expect(isParamsStrict(nullProtoObj)).toBe(true);
+    });
+
+    it("rejects objects with custom prototype (Object.create(proto)) (#785)", () => {
+      // Even with valid own primitive values, a custom prototype is rejected,
+      // mirroring isParams so the lattice isParamsStrict ⇒ isParams holds.
       const proto = { inherited: "value" };
+      const customProtoObj = Object.create(proto) as { own?: string };
 
-      const params = Object.create(proto);
+      customProtoObj.own = "test";
 
-      params.own = "test";
+      expect(isParamsStrict(customProtoObj)).toBe(false);
+    });
 
-      expect(isParamsStrict(params)).toBe(true);
+    it("rejects class instances at top level (#785)", () => {
+      // Class instances with no own enumerable fields would yield zero for..in
+      // iterations and wrongly pass without the prototype check.
+      class CustomClass {
+        value = 42;
+      }
+
+      expect(isParamsStrict(new Date())).toBe(false);
+      expect(isParamsStrict(new Map())).toBe(false);
+      expect(isParamsStrict(new Set())).toBe(false);
+      expect(isParamsStrict(/test/)).toBe(false);
+      expect(isParamsStrict(new CustomClass())).toBe(false);
     });
 
     it("rejects arrays of arrays (params values must be primitives)", () => {
@@ -608,28 +734,27 @@ describe("Params Type Guards", () => {
       expect(isParamsStrict({ mixed: ["a", ["b"]] })).toBe(false);
     });
 
-    describe("Mutation Testing - inherited properties", () => {
-      it("returns false if inherited property has invalid type (kills 'if (false)' mutant)", () => {
-        // This test ensures that the 'continue' statement is necessary
-        // If mutated to 'if (false)', inherited properties won't be skipped
+    describe("Mutation Testing - prototype check (#785)", () => {
+      it("kills 'proto !== Object.prototype' removal mutant (custom proto rejected)", () => {
+        // If the `proto !== Object.prototype` term is dropped, a custom-prototype
+        // object with valid own values would wrongly pass the strict guard.
         const proto = { inherited: { nested: "object" } };
-        const obj = Object.create(proto);
+        const obj = Object.create(proto) as { own?: string };
 
         obj.own = "valid";
 
-        // Should pass because inherited properties are skipped
-        expect(isParamsStrict(obj)).toBe(true);
+        expect(isParamsStrict(obj)).toBe(false);
       });
 
-      it("validates only own properties (kills empty block mutant)", () => {
-        // If continue is removed, the loop will check inherited properties
-        const proto = { inheritedFunc: noop };
-        const obj = Object.create(proto);
+      it("kills 'proto !== null' removal mutant (null-proto still accepted)", () => {
+        // If the `proto !== null` term is dropped, Object.create(null) would
+        // wrongly be rejected. Plain Object.prototype objects keep passing.
+        const nullProtoObj = Object.create(null) as Record<string, unknown>;
 
-        obj.validProp = "test";
+        nullProtoObj.validProp = "test";
 
-        // Should pass - inherited function is ignored
-        expect(isParamsStrict(obj)).toBe(true);
+        expect(isParamsStrict(nullProtoObj)).toBe(true);
+        expect(isParamsStrict({ validProp: "test" })).toBe(true);
       });
     });
 

@@ -167,8 +167,9 @@ export const historyStateArbitrary = fc
   })) as unknown as fc.Arbitrary<State>;
 
 /**
- * Generator for invalid State (missing required fields or wrong types)
- * Note: Arrays with primitives are VALID for isParamsStrict, so we exclude them!
+ * Generator for invalid State (missing required fields or wrong types).
+ * The "invalid params" variant uses non-object primitives; top-level array
+ * params are not enumerated here.
  */
 export const invalidStateArbitrary = fc.oneof(
   // Missing name
@@ -314,8 +315,9 @@ export const invalidRoutePathArbitrary = fc
 // ============================================================================
 
 /**
- * Generator for arbitrary invalid types (primitives, arrays, and non-objects)
- * Note: Arrays (even empty) pass isParamsStrict due to implementation - excluded from tests
+ * Generator for arbitrary invalid types (primitives and non-objects).
+ * Top-level arrays are rejected by isParams/isParamsStrict too, but are
+ * exercised elsewhere; this generator stays focused on non-array invalids.
  */
 export const arbitraryInvalidTypes = fc.oneof(
   fc.constant(null),
@@ -325,7 +327,7 @@ export const arbitraryInvalidTypes = fc.oneof(
   fc.string(),
   fc.func(fc.anything()),
   fc.constant(Symbol("test")),
-  // Arrays are technically objects and pass some object checks, so excluded
+  // Arrays (typeof "object") are rejected by the guards too, but kept out here
 );
 
 // ============================================================================
@@ -363,3 +365,277 @@ export const uniqueRoutesArbitrary = fc
       path: paths[i % paths.length],
     })),
   );
+
+// ============================================================================
+// Structural arbitraries + differential oracle for isParams (DAGs, cycles)
+// ============================================================================
+//
+// fast-check's tree generators never emit shared references or cycles and stay
+// shallow, so the structural behaviour of `isParams` (the on-path cycle / done-set
+// walk added for #786, and the unbounded-depth contract from #901) is invisible to
+// the dictionary/letrec arbitraries above. The helpers below close that blind spot:
+// a custom value generator, valid-only / rich-invalid variants, and an INDEPENDENT
+// recursive reference oracle to diff against the production iterative guard.
+
+/** Object keys that are safe to assign as own enumerable properties. */
+const safeKeyArbitrary = fc
+  .string({ minLength: 1, maxLength: 8 })
+  .filter((k) => k !== "__proto__");
+
+/** Leaves that may be valid (string/finite number/boolean/null/undefined) or not. */
+const anyLeafArbitrary = fc.oneof(
+  fc.string(),
+  fc.integer(),
+  fc.double(), // includes NaN / ±Infinity
+  fc.boolean(),
+  fc.constant(null),
+  fc.constant(undefined),
+  fc.constant(Number.NaN),
+  fc.constant(Infinity),
+  fc.func(fc.anything()),
+  fc.constant(Symbol("leaf")),
+  fc.bigInt(),
+  fc.constant(0).map(() => new Date()),
+  fc.constant(0).map(() => new Map()),
+);
+
+/** Arbitrary nested data value: leaves, arrays, and plain objects, mixed validity. */
+export const arbitraryDataValue: fc.Arbitrary<unknown> = fc.letrec((tie) => ({
+  node: fc.oneof(
+    { weight: 4, arbitrary: anyLeafArbitrary },
+    { weight: 1, arbitrary: fc.array(tie("node"), { maxLength: 4 }) },
+    {
+      weight: 1,
+      arbitrary: fc.dictionary(safeKeyArbitrary, tie("node"), { maxKeys: 4 }),
+    },
+  ),
+})).node;
+
+/**
+ * Collects every distinct container (array / plain object) reachable from `root`,
+ * in DFS order. Used to wire shared references and cycles into a generated tree.
+ */
+const collectContainers = (root: unknown): object[] => {
+  const out: object[] = [];
+  const seen = new WeakSet<object>();
+
+  const walk = (v: unknown): void => {
+    if (typeof v !== "object" || v === null || seen.has(v)) {
+      return;
+    }
+
+    seen.add(v);
+    out.push(v);
+
+    const children = Array.isArray(v) ? v : Object.values(v);
+
+    for (const child of children) {
+      walk(child);
+    }
+  };
+
+  walk(root);
+
+  return out;
+};
+
+/**
+ * A plain-object tree with extra edges wired between its containers: each edge
+ * points one container at another reachable container. An edge to a descendant or
+ * self forms a cycle (rejected); an edge elsewhere forms a shared reference /
+ * diamond (accepted). The differential oracle decides the expected result, so the
+ * generator need not classify the edges — this turns the tree generator into a DAG
+ * / cyclic-graph generator and closes the structural blind spot in the oracle.
+ */
+const arbitraryObjectGraph: fc.Arbitrary<unknown> = fc
+  .tuple(
+    fc.dictionary(safeKeyArbitrary, arbitraryDataValue, { maxKeys: 5 }),
+    fc.array(fc.tuple(fc.nat(), fc.nat()), { maxLength: 4 }),
+  )
+  .map(([root, edges]) => {
+    const containers = collectContainers(root);
+
+    if (containers.length > 0) {
+      edges.forEach(([from, to], k) => {
+        const source = containers[from % containers.length];
+        const destination = containers[to % containers.length];
+
+        if (Array.isArray(source)) {
+          source.push(destination);
+        } else {
+          (source as Record<string, unknown>)[`ref${k}`] = destination;
+        }
+      });
+    }
+
+    return root;
+  });
+
+/**
+ * Top-level candidate for `isParams`: usually an object graph (a tree plus wired
+ * shared references / cycles), sometimes a non-object / array / class instance (to
+ * exercise the top-level reject). Mixes accepted and rejected inputs across the
+ * FULL structural space for the differential oracle.
+ */
+export const arbitraryParamsCandidate: fc.Arbitrary<unknown> = fc.oneof(
+  { weight: 6, arbitrary: arbitraryObjectGraph },
+  { weight: 1, arbitrary: anyLeafArbitrary },
+  { weight: 1, arbitrary: fc.array(arbitraryDataValue, { maxLength: 4 }) },
+  { weight: 1, arbitrary: fc.constant(0).map(() => new Date()) },
+);
+
+/** Leaves that are always valid param values. */
+const validLeafArbitrary = fc.oneof(
+  fc.string(),
+  fc.integer(),
+  fc.boolean(),
+  fc.constant(null),
+  fc.constant(undefined),
+);
+
+/** Arbitrary nested data value with ONLY valid leaves (no invalid leaf anywhere). */
+export const validDataValue: fc.Arbitrary<unknown> = fc.letrec((tie) => ({
+  node: fc.oneof(
+    { weight: 3, arbitrary: validLeafArbitrary },
+    { weight: 1, arbitrary: fc.array(tie("node"), { maxLength: 4 }) },
+    {
+      weight: 1,
+      arbitrary: fc.dictionary(safeKeyArbitrary, tie("node"), { maxKeys: 4 }),
+    },
+  ),
+})).node;
+
+/** A valid, non-empty container subtree (object or array) — used for sharing. */
+export const validContainerSubtree: fc.Arbitrary<object> = fc.oneof(
+  fc.dictionary(safeKeyArbitrary, validDataValue, { minKeys: 1, maxKeys: 4 }),
+  fc.array(validDataValue, { minLength: 1, maxLength: 4 }),
+);
+
+/** Structures that `isParams` must reject, spanning the full invalid space. */
+export const richInvalidParamsArbitrary: fc.Arbitrary<unknown> = fc.oneof(
+  // Self-referencing cycle
+  fc.constant(0).map(() => {
+    const o: Record<string, unknown> = { a: 1 };
+
+    o.self = o;
+
+    return o;
+  }),
+  // Cycle through an array
+  fc.constant(0).map(() => {
+    const arr: unknown[] = [1];
+    const o: Record<string, unknown> = { arr };
+
+    arr.push(o);
+
+    return o;
+  }),
+  // Class instance nested as a value
+  fc.oneof(
+    fc.constant(0).map(() => ({ d: new Date() })),
+    fc.constant(0).map(() => ({ m: new Map() })),
+    fc.constant(0).map(() => ({ r: /re/ })),
+  ),
+  // Non-finite number nested as a value
+  fc.constantFrom(
+    { n: Number.NaN },
+    { n: Infinity },
+    { n: -Infinity },
+  ) as fc.Arbitrary<Record<string, unknown>>,
+  // Function / symbol nested as a value
+  fc.dictionary(
+    safeKeyArbitrary,
+    fc.oneof(fc.func(fc.anything()), fc.constant(Symbol("x"))),
+    { minKeys: 1, maxKeys: 3 },
+  ),
+  // Top-level array
+  fc.array(fc.integer(), { maxLength: 4 }),
+);
+
+/** Params VALUES exercising the structural paths through `isState`/`isStateStrict`. */
+export const structuralParamsArbitrary: fc.Arbitrary<unknown> = fc.oneof(
+  // Valid nested params
+  fc.dictionary(safeKeyArbitrary, validDataValue, { maxKeys: 4 }),
+  // Diamond (shared reference, not a cycle) → valid
+  validContainerSubtree.map((sub) => ({ a: sub, b: sub })),
+  // Self-referencing cycle → invalid
+  fc.constant(0).map(() => {
+    const o: Record<string, unknown> = {};
+
+    o.self = o;
+
+    return o;
+  }),
+  // Class instance nested → invalid
+  fc.constant(0).map(() => ({ d: new Date() })),
+);
+
+/**
+ * Independent reference predicate for the `isParams` contract — a deliberately
+ * RECURSIVE implementation (the production guard is iterative), used as a
+ * differential oracle. A value is plain-serializable iff it is a plain object
+ * whose entire tree contains only primitives (finite numbers, strings, booleans),
+ * `null`/`undefined`, arrays, and plain objects — no functions, symbols, bigints,
+ * `NaN`/`Infinity`, or class instances, and no cycle on the current DFS path.
+ * Shared references off the path (diamonds) are accepted. Used only in tests, on
+ * bounded-depth generated input, so the recursion is safe.
+ */
+export function isPlainSerializable(value: unknown): boolean {
+  const isPlainObjectValue = (v: unknown): v is object => {
+    if (typeof v !== "object" || v === null || Array.isArray(v)) {
+      return false;
+    }
+
+    const proto = Object.getPrototypeOf(v) as object | null;
+
+    return proto === null || proto === Object.prototype;
+  };
+
+  // Top-level must be a plain object (not array, null, primitive, or instance).
+  if (!isPlainObjectValue(value)) {
+    return false;
+  }
+
+  const onPath = new Set<object>();
+
+  const check = (v: unknown): boolean => {
+    if (v === null || v === undefined) {
+      return true;
+    }
+
+    const type = typeof v;
+
+    if (type === "string" || type === "boolean") {
+      return true;
+    }
+
+    if (type === "number") {
+      return Number.isFinite(v);
+    }
+
+    if (type !== "object") {
+      return false; // function, symbol, bigint
+    }
+
+    const obj = v;
+
+    if (onPath.has(obj)) {
+      return false; // back-edge to a container on the current path → cycle
+    }
+
+    if (!(Array.isArray(obj) || isPlainObjectValue(obj))) {
+      return false; // class instance / custom prototype
+    }
+
+    onPath.add(obj);
+
+    const children = Array.isArray(obj) ? obj : Object.values(obj);
+    const ok = children.every((child) => check(child));
+
+    onPath.delete(obj); // on-path semantics: leaving this subtree
+
+    return ok;
+  };
+
+  return check(value);
+}

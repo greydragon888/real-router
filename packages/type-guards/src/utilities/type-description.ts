@@ -26,12 +26,17 @@ export function getTypeDescription(value: unknown): string {
   }
 
   if (typeof value === "object") {
+    // Read `constructor` defensively: an adversarial own `constructor` (null, a
+    // string, a number, …) is not a real constructor and must not crash here nor
+    // yield a non-string (#787). Only a function constructor has a usable name.
+    const ctor: unknown = (value as { constructor?: unknown }).constructor;
+
     // Return constructor name for class instances
-    if ("constructor" in value && value.constructor.name !== "Object") {
-      return value.constructor.name;
+    if (typeof ctor === "function" && ctor.name !== "Object") {
+      return ctor.name || "object"; // empty name (anonymous class) → "object"
     }
 
-    // Plain object
+    // Plain object, null-prototype object, or adversarial constructor
     return "object";
   }
 

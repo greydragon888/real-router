@@ -29,15 +29,18 @@ export function isState<P extends Params = Params>(
 }
 
 /**
- * Enhanced type guard for State with deep validation.
- * Checks not only presence but also types of all required fields.
- * Validates params using isParams and meta structure if present.
+ * Type guard for State. Performs the same required-field check as {@link isState}
+ * (`name` via `isRouteName`, `path` is a string, `params` via `isParams`) — the
+ * "Strict" in the name is historical: there is no deeper meta-field validation,
+ * and `meta.id` is intentionally NOT type-checked (history.state restores
+ * serialize it as a string — see the backward-compat property test). Re-exported
+ * as `isState` by the browser and hash plugins for validating `history.state`.
  *
  * @param value - Value to check
- * @returns true if value is a valid State object with correct types
+ * @returns true if value has the required State fields with valid types
  *
  * @example
- * isStateStrict({ name: 'home', params: {}, path: '/', meta: { id: 1 } }); // true
+ * isStateStrict({ name: 'home', params: {}, path: '/' }); // true
  * isStateStrict({ name: 'home', params: 'invalid', path: '/' }); // false
  */
 export function isStateStrict<P extends Params = Params>(

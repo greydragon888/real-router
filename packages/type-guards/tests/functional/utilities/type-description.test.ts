@@ -41,6 +41,28 @@ describe("Helper Functions", () => {
       expect(getTypeDescription(Object.create(null))).toBe("object");
     });
 
+    it("returns 'object' for objects with an adversarial own constructor (#787)", () => {
+      // An own `constructor` that is not a real constructor function must not
+      // crash (null) or yield a non-string (string/number) — only a function
+      // constructor has a usable `.name`.
+      expect(getTypeDescription({ constructor: null })).toBe("object");
+      expect(getTypeDescription({ constructor: "evil" })).toBe("object");
+      expect(getTypeDescription({ constructor: 42 })).toBe("object");
+      expect(getTypeDescription({ constructor: {} })).toBe("object");
+    });
+
+    it("returns 'object' for anonymous class instances (#787)", () => {
+      // An anonymous class has an empty constructor name; fall back to "object"
+      // rather than returning an empty string.
+      expect(
+        getTypeDescription(
+          new (class {
+            x = 1;
+          })(),
+        ),
+      ).toBe("object");
+    });
+
     it("returns typeof for primitives", () => {
       expect(getTypeDescription("string")).toBe("string");
       expect(getTypeDescription(123)).toBe("number");

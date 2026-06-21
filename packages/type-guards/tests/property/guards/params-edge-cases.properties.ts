@@ -1,7 +1,7 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 
-import { isParams } from "type-guards";
+import { isParams, isParamsStrict } from "type-guards";
 
 import { paramsSimpleArbitrary } from "../helpers";
 
@@ -299,6 +299,37 @@ describe("Params Edge Cases (Uncovered Branches)", () => {
   });
 
   // ===================================================================
+  // Shared references / diamonds (not cycles) — #786
+  // ===================================================================
+
+  describe("Shared references / diamonds (#786)", () => {
+    // Sharing a serializable subtree under two keys (or repeating an array
+    // element) is a DAG, not a cycle: JSON.stringify duplicates it without
+    // error, so isParams must accept it. The tree generators never emit shared
+    // refs, so this gap was invisible to the main suite.
+    test.prop([paramsSimpleArbitrary], { numRuns: 2000 })(
+      "isParams accepts the same object referenced under two keys",
+      (sub) => {
+        expect(isParams({ a: sub, b: sub })).toBe(true);
+      },
+    );
+
+    test.prop([paramsSimpleArbitrary], { numRuns: 2000 })(
+      "isParams accepts the same object repeated in an array",
+      (sub) => {
+        expect(isParams({ list: [sub, sub] })).toBe(true);
+      },
+    );
+
+    test.prop([fc.array(fc.integer(), { maxLength: 5 })], { numRuns: 2000 })(
+      "isParams accepts the same array referenced under two keys",
+      (arr) => {
+        expect(isParams({ x: arr, y: arr })).toBe(true);
+      },
+    );
+  });
+
+  // ===================================================================
   // Class instance rejection (custom prototype)
   // ===================================================================
 
@@ -329,6 +360,50 @@ describe("Params Edge Cases (Uncovered Branches)", () => {
       { numRuns: 5000 },
     )("isParams rejects class instances at top level", (instance) => {
       expect(isParams(instance)).toBe(false);
+    });
+
+    // Strict mirror: the strict guard must reject class instances at the top
+    // level too, otherwise the lattice isParamsStrict ⇒ isParams (Params Inv 12)
+    // and ¬isParams ⇒ ¬isParamsStrict (Params Inv 13) break — a class instance
+    // with no own enumerable fields yields zero for..in iterations, so without a
+    // prototype check isParamsStrict would wrongly return true (#785).
+    test.prop(
+      [
+        fc.oneof(
+          fc.constant(0).map(() => new Date()),
+          fc.constant(0).map(() => new Map()),
+          fc.constant(0).map(() => new Set()),
+          fc.constant(0).map(() => /regex/),
+        ),
+      ],
+      { numRuns: 5000 },
+    )("isParamsStrict rejects class instances at top level", (instance) => {
+      expect(isParamsStrict(instance)).toBe(false);
+    });
+
+    // Strict mirror of the lattice itself, exercised with the class-instance
+    // counterexamples the generators behind Params Inv 12/13 cannot produce.
+    test.prop(
+      [
+        fc.oneof(
+          fc.constant(0).map(() => new Date()),
+          fc.constant(0).map(() => new Map()),
+          fc.constant(0).map(() => new Set()),
+          fc.constant(0).map(() => /regex/),
+          fc.constant(0).map(() => Object.create({ inherited: () => {} })),
+          fc.constant(0).map(
+            () =>
+              new (class Foo {
+                id = 1;
+              })(),
+          ),
+        ),
+      ],
+      { numRuns: 5000 },
+    )("isParamsStrict implies isParams for class instances", (instance) => {
+      if (isParamsStrict(instance)) {
+        expect(isParams(instance)).toBe(true);
+      }
     });
   });
 
