@@ -2,7 +2,11 @@ import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import { logger } from "@real-router/logger";
 
-import type { LogCallback, LogLevelConfig } from "@real-router/logger";
+import type {
+  LogCallback,
+  LoggerConfig,
+  LogLevelConfig,
+} from "@real-router/logger";
 
 const noop = () => {};
 
@@ -88,6 +92,18 @@ describe("Logger", () => {
 
       logger.configure({ callback });
       logger.configure({ callback: undefined });
+
+      const config = logger.getConfig();
+
+      expect(config.callback).toBeUndefined();
+    });
+
+    it("should ignore a callback inherited from the prototype (own-property only)", () => {
+      const callback: LogCallback = vi.fn();
+      // `callback` lives on the prototype, not as an own enumerable property.
+      const inherited = Object.create({ callback }) as Partial<LoggerConfig>;
+
+      logger.configure(inherited);
 
       const config = logger.getConfig();
 

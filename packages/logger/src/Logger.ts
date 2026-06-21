@@ -93,7 +93,7 @@ class Logger {
       this.#config.level = config.level;
       this.#currentThreshold = LEVEL_CONFIGS[config.level];
     }
-    if ("callback" in config) {
+    if (Object.hasOwn(config, "callback")) {
       this.#config.callback = config.callback;
     }
     if (config.callbackIgnoresLevel !== undefined) {

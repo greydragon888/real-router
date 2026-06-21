@@ -1,6 +1,6 @@
 # @real-router/logger
 
-Internal package providing a singleton logger with configurable levels and callbacks for Real-Router.
+Public package (`@real-router/logger`, published to npm) providing a singleton logger with configurable levels and callbacks for Real-Router.
 
 ## Exports
 
@@ -44,4 +44,5 @@ src/
 - **Console safety** -- `#writeToConsole` checks `typeof console !== "undefined"` and `typeof console[level] === "function"` before calling
 - **Context formatting** -- empty context produces plain message; non-empty context produces `[context] message`
 - **Invalid level throws** -- `configure()` throws `Error` for invalid level strings (validates against `LEVEL_CONFIGS` keys)
+- **`configure` merges own properties only** -- the `callback` key is detected with `Object.hasOwn(config, "callback")`, so a config whose `callback` lives on the prototype (e.g. `Object.create({ callback })`) is ignored, not installed (#792). Mirrors the own-property discipline used in `search-params`/`type-guards`
 - **Property-based tests** -- `tests/property/` covers callback invocation, level filtering, and error handling with fast-check
