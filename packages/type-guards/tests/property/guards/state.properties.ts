@@ -9,6 +9,7 @@ import {
   invalidStateArbitrary,
   arbitraryInvalidTypes,
   paramsSimpleArbitrary,
+  structuralParamsArbitrary,
   validRouteNameArbitrary,
   validRoutePathArbitrary,
 } from "../helpers";
@@ -141,6 +142,25 @@ describe("State Type Guards Properties", () => {
           expect(typeof state.path).toBe("string");
           expect(isParams(state.params)).toBe(true);
         }
+      },
+    );
+
+    // ===================================================================
+    // INV: state guards delegate structural params validation to isParams.
+    // The public path (browser/hash plugins validate history.state via
+    // isStateStrict) must reject cyclic / class-instance params and accept
+    // shared-reference (diamond) params exactly as isParams does — the
+    // history.state value is untrusted and may carry such structures.
+    // ===================================================================
+    test.prop([structuralParamsArbitrary], { numRuns: 10_000 })(
+      "isState and isStateStrict follow isParams for structural params (cycles, diamonds, instances)",
+      (params) => {
+        const state = { name: "home", path: "/", params };
+
+        // With a valid name and path, isState reduces to isParams(params).
+        expect(isState(state)).toBe(isParams(params));
+        // isStateStrict performs the identical required-field check.
+        expect(isStateStrict(state)).toBe(isState(state));
       },
     );
   });
