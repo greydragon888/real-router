@@ -10,7 +10,6 @@ import {
 } from "@real-router/core/api";
 
 import { EventBusNamespace } from "../../src/namespaces/EventBusNamespace";
-import { PluginsNamespace } from "../../src/namespaces/PluginsNamespace";
 import { createTestRouter } from "../helpers";
 
 import type { Router } from "@real-router/core";
@@ -385,25 +384,6 @@ describe("core/without validation plugin", () => {
   });
 
   describe("internal validator static methods (coverage for validators still in core)", () => {
-    it("should throw when same factory registered twice (validateNoDuplicatePlugins)", () => {
-      const factory = () => ({});
-
-      expect(() => {
-        PluginsNamespace.validateNoDuplicatePlugins(
-          [factory],
-          (f) => f === factory,
-        );
-      }).toThrow();
-    });
-
-    it("should not throw when factory is not duplicate (validateNoDuplicatePlugins)", () => {
-      const factory = () => ({});
-
-      expect(() => {
-        PluginsNamespace.validateNoDuplicatePlugins([factory], () => false);
-      }).not.toThrow();
-    });
-
     it("should throw TypeError when subscribe listener is not a function (validateSubscribeListener)", () => {
       expect(() => {
         EventBusNamespace.validateSubscribeListener(null);

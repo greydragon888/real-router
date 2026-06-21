@@ -40,20 +40,6 @@ export class PluginsNamespace<
     validatePlugin(plugin);
   }
 
-  static validateNoDuplicatePlugins<D extends DefaultDependencies>(
-    newFactories: PluginFactory<D>[],
-    hasPlugin: (factory: PluginFactory<D>) => boolean,
-  ): void {
-    for (const factory of newFactories) {
-      if (hasPlugin(factory)) {
-        throw new Error(
-          `[router.usePlugin] Plugin factory already registered. ` +
-            `To re-register, first unsubscribe the existing plugin.`,
-        );
-      }
-    }
-  }
-
   // =========================================================================
   // Dependency injection
   // =========================================================================

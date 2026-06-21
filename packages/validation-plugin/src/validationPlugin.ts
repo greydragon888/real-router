@@ -23,7 +23,6 @@ import {
 import { validateEventName, validateListenerArgs } from "./validators/eventBus";
 import {
   validateHandler,
-  validateNotRegistering,
   validateHandlerLimit,
   validateLifecycleCountThresholds,
   warnOverwrite as warnLifecycleOverwrite,
@@ -231,9 +230,6 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
     },
     lifecycle: {
       validateHandler,
-      validateNotRegistering(name, _guards, caller) {
-        validateNotRegistering(false, name, caller);
-      },
       validateHandlerLimit(count, limits, caller) {
         validateHandlerLimit(
           count,

@@ -21,18 +21,6 @@ export function validateHandler<D extends DefaultDependencies>(
   }
 }
 
-export function validateNotRegistering(
-  isRegistering: boolean,
-  name: string,
-  methodName: string,
-): void {
-  if (isRegistering) {
-    throw new Error(
-      `[router.${methodName}] Cannot modify route "${name}" during its own registration`,
-    );
-  }
-}
-
 export function validateHandlerLimit(
   currentCount: number,
   methodName: string,

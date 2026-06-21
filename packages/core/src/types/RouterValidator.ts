@@ -103,11 +103,6 @@ export interface RouterValidator {
    */
   lifecycle: {
     validateHandler: (handler: unknown, caller: string) => void;
-    validateNotRegistering: (
-      name: string,
-      guards: unknown,
-      caller: string,
-    ) => void;
     validateHandlerLimit: (
       count: number,
       limits: unknown,

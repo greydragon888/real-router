@@ -16,7 +16,6 @@ import {
 } from "../../src/validators/eventBus";
 import {
   validateHandlerLimit,
-  validateNotRegistering,
   validateLifecycleCountThresholds,
   warnOverwrite as warnLifecycleOverwrite,
   warnAsyncGuardSync,
@@ -223,23 +222,6 @@ describe("lifecycle validators", () => {
       expect(() => {
         validateHandlerLimit(200, "test");
       }).toThrow(/limit exceeded.*200/i);
-    });
-  });
-
-  describe("validateNotRegistering", () => {
-    it("throws when isRegistering is true", () => {
-      expect(() => {
-        validateNotRegistering(true, "home", "canActivate");
-      }).toThrow(Error);
-      expect(() => {
-        validateNotRegistering(true, "home", "canActivate");
-      }).toThrow(/Cannot modify route "home" during its own registration/);
-    });
-
-    it("does not throw when isRegistering is false", () => {
-      expect(() => {
-        validateNotRegistering(false, "home", "canActivate");
-      }).not.toThrow();
     });
   });
 });

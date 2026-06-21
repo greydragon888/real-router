@@ -166,20 +166,6 @@ describe("validationPlugin — lifecycle integration", () => {
     );
   });
 
-  it("validateNotRegistering wrapper — does not throw when not registering", () => {
-    router = createRouter([{ name: "home", path: "/home" }]);
-    router.usePlugin(validationPlugin());
-    const ctx = getInternals(router);
-
-    expect(() =>
-      ctx.validator?.lifecycle.validateNotRegistering(
-        "home",
-        [],
-        "canActivate",
-      ),
-    ).not.toThrow();
-  });
-
   it("validateDependencyExists — missing dependency throws ReferenceError", () => {
     router = createRouter([{ name: "home", path: "/home" }]);
     router.usePlugin(validationPlugin());
