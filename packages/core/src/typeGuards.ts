@@ -5,7 +5,12 @@
  */
 import type { LoggerConfig, LogLevelConfig } from "@real-router/logger";
 
-const VALID_LEVELS_SET = new Set<string>(["all", "warn-error", "error-only"]);
+const VALID_LEVELS_SET = new Set<string>([
+  "all",
+  "warn-error",
+  "error-only",
+  "none",
+]);
 
 function isValidLevel(value: unknown): value is LogLevelConfig {
   return typeof value === "string" && VALID_LEVELS_SET.has(value);
@@ -32,7 +37,11 @@ export function isLoggerConfig(config: unknown): config is LoggerConfig {
 
   // Check for unknown properties
   for (const key of Object.keys(obj)) {
-    if (key !== "level" && key !== "callback") {
+    if (
+      key !== "level" &&
+      key !== "callback" &&
+      key !== "callbackIgnoresLevel"
+    ) {
       throw new TypeError(`Unknown logger config property: "${key}"`);
     }
   }
@@ -40,7 +49,7 @@ export function isLoggerConfig(config: unknown): config is LoggerConfig {
   // Validate level if present
   if ("level" in obj && obj.level !== undefined && !isValidLevel(obj.level)) {
     throw new TypeError(
-      `Invalid logger level: ${formatValue(obj.level)}. Expected: "all" | "warn-error" | "error-only"`,
+      `Invalid logger level: ${formatValue(obj.level)}. Expected: "all" | "warn-error" | "error-only" | "none"`,
     );
   }
 
@@ -52,6 +61,17 @@ export function isLoggerConfig(config: unknown): config is LoggerConfig {
   ) {
     throw new TypeError(
       `Logger callback must be a function, got ${typeof obj.callback}`,
+    );
+  }
+
+  // Validate callbackIgnoresLevel if present (logger.configure does not type-check it)
+  if (
+    "callbackIgnoresLevel" in obj &&
+    obj.callbackIgnoresLevel !== undefined &&
+    typeof obj.callbackIgnoresLevel !== "boolean"
+  ) {
+    throw new TypeError(
+      `Logger callbackIgnoresLevel must be a boolean, got ${typeof obj.callbackIgnoresLevel}`,
     );
   }
 

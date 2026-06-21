@@ -28,6 +28,25 @@ describe("typeGuards", () => {
       expect(isLoggerConfig({ level: "all", callback: () => {} })).toBe(true);
     });
 
+    it('should return true for valid level "none" (#789)', () => {
+      expect(isLoggerConfig({ level: "none" })).toBe(true);
+    });
+
+    it("should return true for callbackIgnoresLevel boolean (#789)", () => {
+      expect(isLoggerConfig({ callbackIgnoresLevel: true })).toBe(true);
+      expect(isLoggerConfig({ callbackIgnoresLevel: false })).toBe(true);
+    });
+
+    it("should return true for the full LoggerConfig surface (#789)", () => {
+      expect(
+        isLoggerConfig({
+          level: "none",
+          callback: () => {},
+          callbackIgnoresLevel: true,
+        }),
+      ).toBe(true);
+    });
+
     it("should throw TypeError for non-object config (null)", () => {
       expect(() => isLoggerConfig(null)).toThrow(TypeError);
       expect(() => isLoggerConfig(null)).toThrow(
@@ -81,9 +100,25 @@ describe("typeGuards", () => {
       );
     });
 
+    it("should throw TypeError for callbackIgnoresLevel that is not a boolean (#789)", () => {
+      expect(() => isLoggerConfig({ callbackIgnoresLevel: "yes" })).toThrow(
+        TypeError,
+      );
+      expect(() => isLoggerConfig({ callbackIgnoresLevel: "yes" })).toThrow(
+        "Logger callbackIgnoresLevel must be a boolean",
+      );
+    });
+
+    it('should list "none" in the invalid-level error message (#789)', () => {
+      expect(() => isLoggerConfig({ level: "invalid" })).toThrow(
+        '"all" | "warn-error" | "error-only" | "none"',
+      );
+    });
+
     it("should accept undefined values for optional properties", () => {
       expect(isLoggerConfig({ level: undefined })).toBe(true);
       expect(isLoggerConfig({ callback: undefined })).toBe(true);
+      expect(isLoggerConfig({ callbackIgnoresLevel: undefined })).toBe(true);
       expect(isLoggerConfig({ level: undefined, callback: undefined })).toBe(
         true,
       );
