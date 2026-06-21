@@ -11,9 +11,7 @@
 import type {
   LimitsConfig,
   NavigationOptions,
-  Params,
   RouterError as RouterErrorType,
-  RouteTreeState,
   State,
   TreeChangedEvent,
 } from "@real-router/types";
@@ -63,15 +61,3 @@ export type RouterEventMap = {
  * Immutable limits configuration type.
  */
 export type Limits = Readonly<LimitsConfig>;
-
-/**
- * Extended build result that includes segments for path building.
- * Used internally to avoid duplicate getSegmentsByName calls.
- *
- * @param segments - Route segments from getSegmentsByName (typed as unknown[] for cross-package compatibility)
- * @internal
- */
-export interface BuildStateResultWithSegments<P extends Params = Params> {
-  readonly state: RouteTreeState<P>;
-  readonly segments: readonly unknown[];
-}

@@ -193,6 +193,10 @@ function pointOfDifference(
  * Validation significantly slows down nameToIDs execution.
  * The input should be validated by the function/method that calls nameToIDs.
  */
+// Module-global cache (shared across all router instances): bounded in practice by
+// the app's route-name vocabulary, which is stable across cloneRouter() requests, so
+// it does not grow per request. Intentionally NOT cleared on dispose() — it is not
+// per-router, so one router's teardown must not evict entries other routers rely on.
 const nameToIDsCache = new Map<string, string[]>();
 
 export function nameToIDs(name: string): string[] {
@@ -326,6 +330,7 @@ function computeNameToIDs(name: string): string[] {
 // Single-entry cache: shouldUpdateNode calls getTransitionPath N times per
 // navigation with the same state objects (once per subscribed node).
 // Cache by reference eliminates N-1 redundant computations.
+// Module-global (≤2 State refs); not cleared on dispose — negligible, not per-router.
 let cached1To: State | undefined;
 let cached1From: State | undefined;
 let cached1Result: TransitionPath | null = null;

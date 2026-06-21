@@ -1,7 +1,7 @@
 // packages/core/src/typeGuards.ts
 
 /**
- * RealRouter-specific type guards for logger configuration
+ * RealRouter-specific assertion for logger configuration.
  */
 import type { LoggerConfig, LogLevelConfig } from "@real-router/logger";
 
@@ -28,7 +28,9 @@ function formatValue(value: unknown): string {
   return String(value);
 }
 
-export function isLoggerConfig(config: unknown): config is LoggerConfig {
+export function assertLoggerConfig(
+  config: unknown,
+): asserts config is LoggerConfig {
   if (typeof config !== "object" || config === null) {
     throw new TypeError("Logger config must be an object");
   }
@@ -74,6 +76,4 @@ export function isLoggerConfig(config: unknown): config is LoggerConfig {
       `Logger callbackIgnoresLevel must be a boolean, got ${typeof obj.callbackIgnoresLevel}`,
     );
   }
-
-  return true;
 }
