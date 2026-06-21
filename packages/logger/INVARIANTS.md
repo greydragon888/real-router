@@ -13,9 +13,10 @@
 | 5   | getConfig always returns callbackIgnoresLevel as boolean | The `callbackIgnoresLevel` field is always a boolean, never coerced to another type.                                                                              |
 | 6   | getConfig returns a new object on each call              | Each `getConfig()` call returns a fresh object. Mutating the returned config does not affect the logger's internal state.                                         |
 | 7   | Setting callback to undefined clears it                  | After `configure({ callback: undefined })`, `getConfig().callback` is `undefined` and the previously set level is preserved.                                      |
-| 8   | Invalid levels throw                                     | Passing an unrecognized string as `level` throws an error matching `/Invalid log level/`. The logger never silently accepts unknown levels.                       |
+| 8   | Invalid levels throw                                     | Passing an unrecognized string as `level` — including `Object.prototype` keys like `"toString"` — throws an error matching `/Invalid log level/`. Validation is own-property (`Object.hasOwn`), so inherited keys are never silently accepted.                       |
 | 9   | Level switching works correctly                          | Switching level multiple times in sequence always results in the last configured level being active. There is no stale state from previous configurations.        |
 | 10  | callbackIgnoresLevel is preserved during partial updates | Updating `level` or `callback` independently does not reset `callbackIgnoresLevel`. The flag persists until explicitly changed.                                   |
+| 11  | Rejected configure is atomic                             | A `configure()` call that throws on an invalid `level` applies no field at all — the `callback` and `callbackIgnoresLevel` from the same call are not installed, and the previously active config is fully preserved. Validation precedes every mutation. |
 
 ## Level Filtering
 
@@ -50,6 +51,6 @@
 
 | File                                    | Invariants | Category        |
 | --------------------------------------- | ---------- | --------------- |
-| `tests/property/config.properties.ts`   | 10         | Configuration   |
+| `tests/property/config.properties.ts`   | 11         | Configuration   |
 | `tests/property/level.properties.ts`    | 10         | Level Filtering |
 | `tests/property/callback.properties.ts` | 9          | Callback        |

@@ -162,6 +162,15 @@ describe("Logger", () => {
       }).toThrow(/Invalid log level:.*Valid levels are:/);
     });
 
+    it("should reject Object.prototype keys as level (own-property validation)", () => {
+      // "toString" (and other Object.prototype keys) is inherited on every
+      // object, so a prototype-aware `in` check would accept it as a valid level
+      // and store it. Validation must use own-property semantics (#895).
+      expect(() => {
+        logger.configure({ level: "toString" as LogLevelConfig });
+      }).toThrow(/Invalid log level/);
+    });
+
     it("should verify default callbackIgnoresLevel is false in internal config", () => {
       // Reset to defaults to verify internal state
       logger.configure({

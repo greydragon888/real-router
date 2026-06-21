@@ -42,6 +42,20 @@ export const logLevelArbitrary = fc.constantFrom(...LOG_LEVELS);
 export const logLevelConfigArbitrary = fc.constantFrom(...LOG_LEVEL_CONFIGS);
 
 /**
+ * Invalid configuration level generator — arbitrary strings that are NOT valid
+ * config levels.
+ *
+ * `Object.prototype` keys (e.g. "toString", "valueOf") no longer need excluding:
+ * since #895 `configure` validates with `Object.hasOwn(LEVEL_CONFIGS, level)`,
+ * inherited keys are rejected like any other unknown string. fast-check seeds
+ * such keys as string edge cases, so keeping them in the pool property-locks the
+ * fix — reverting to `in` lets "valueOf"/"toString" slip through and fails here.
+ */
+export const invalidLevelArbitrary = fc
+  .string()
+  .filter((s) => !LOG_LEVEL_CONFIGS.includes(s as LogLevelConfig));
+
+/**
  * Context string generator
  * Covers different patterns: simple, with dots, with colons, empty
  */
