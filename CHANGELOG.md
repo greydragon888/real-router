@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-06-21]
 
+### @real-router/core@0.59.6
+
+### Patch Changes
+
+- [#899](https://github.com/greydragon888/real-router/pull/899) [`b0d6790`](https://github.com/greydragon888/real-router/commit/b0d6790b8e8052cf23c831d51c686b8241b2b179) Thanks [@greydragon888](https://github.com/greydragon888)! - Keep negative-zero query values as strings under `numberFormat: "auto"` ([#898](https://github.com/greydragon888/real-router/issues/898))
+
+  `search-params` decoded `"-0"` / `"-0.0"` to the number `-0`, which is not round-trippable: `String(-0) === "0"` and `build(-0)` emits `"0"`, so the leading sign was silently dropped (`?q=-0` → `q: -0` → re-serializes as `"0"`). The `auto` strategy now rejects negative zero (`Object.is(num, -0)`), keeping `"-0"` a string — the same non-round-trippable class already excluded for leading-zero / unsafe-int / exponent ([#742](https://github.com/greydragon888/real-router/issues/742)). Fixes a seed-dependent flake in the core query-roundtrip property test.
+
+
 ### @real-router/logger@0.3.2
 
 ### Patch Changes
