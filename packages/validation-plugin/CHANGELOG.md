@@ -1,5 +1,15 @@
 # @real-router/validation-plugin
 
+## 0.8.1
+
+### Patch Changes
+
+- [#913](https://github.com/greydragon888/real-router/pull/913) [`80fdfcd`](https://github.com/greydragon888/real-router/commit/80fdfcd8b5c33269fab4e1314ff1b8092774d215) Thanks [@greydragon888](https://github.com/greydragon888)! - Implement duplicate-plugin detection ([#726](https://github.com/greydragon888/real-router/issues/726))
+
+  `validateNoDuplicatePlugins` was an inert no-op, so re-registering the same plugin factory under the validation plugin (`usePlugin(f); usePlugin(f)` without `unsubscribe()` in between) was silently accepted — registering double interceptors. It now throws `[router.usePlugin] Plugin factory already registered.`.
+
+  Plugins that claim a context namespace (e.g. `persistent-params`) already failed on double-init via core's `claimContextNamespace` collision guard; this closes the gap for plugins that **don't** claim a namespace, where core had no backstop. The check only runs when `@real-router/validation-plugin` is registered; distinct factories are unaffected.
+
 ## 0.8.0
 
 ### Minor Changes
