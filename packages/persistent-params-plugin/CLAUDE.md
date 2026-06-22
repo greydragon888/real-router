@@ -100,7 +100,7 @@ After updating the snapshot, `onTransitionSuccess` publishes it to `state.contex
 
 ### Double initialization throws
 
-`usePlugin` is called once per router. Calling it twice with the same factory (without `unsubscribe()` in between) throws from core. The plugin itself doesn't guard against this.
+`usePlugin` is called once per router. Calling it twice with the same factory (without `unsubscribe()` in between) throws from core: the second instance's `claimContextNamespace("persistentParams")` hits the already-claimed namespace (`CONTEXT_NAMESPACE_ALREADY_CLAIMED`). The plugin itself adds no explicit guard — the core namespace-claim collision is the backstop. (With `@real-router/validation-plugin`, the duplicate **factory** is rejected even earlier, before the factory runs — #726.)
 
 ## Module Structure
 

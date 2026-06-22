@@ -43,6 +43,7 @@ import {
 } from "./validators/options";
 import {
   validatePluginLimit,
+  validateNoDuplicatePlugins,
   validatePluginKeys,
   validateCountThresholds as validatePluginCountThresholds,
   warnBatchDuplicates,
@@ -225,8 +226,7 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
           (limits as { maxPlugins?: number } | undefined)?.maxPlugins,
         );
       },
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
-      validateNoDuplicatePlugins(_factory, _factories) {},
+      validateNoDuplicatePlugins,
       validatePluginKeys,
       validateCountThresholds(count) {
         const maxPlugins = ctx.getOptions().limits?.maxPlugins ?? 50;

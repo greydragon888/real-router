@@ -193,4 +193,31 @@ describe("validationPlugin — lifecycle integration", () => {
     expect(() => router.areStatesEqual(state, state, false)).not.toThrow();
     expect(() => router.areStatesEqual(state, state, true)).not.toThrow();
   });
+
+  describe("duplicate plugin detection (#726)", () => {
+    it("usePlugin throws when the same factory is registered twice", () => {
+      router = createRouter([{ name: "home", path: "/home" }], {
+        defaultRoute: "home",
+      });
+      router.usePlugin(validationPlugin());
+
+      const myPlugin = () => ({});
+
+      router.usePlugin(myPlugin);
+
+      expect(() => router.usePlugin(myPlugin)).toThrow(/already registered/i);
+    });
+
+    it("usePlugin does not throw for distinct factories", () => {
+      router = createRouter([{ name: "home", path: "/home" }], {
+        defaultRoute: "home",
+      });
+      router.usePlugin(validationPlugin());
+
+      expect(() => {
+        router.usePlugin(() => ({}));
+        router.usePlugin(() => ({}));
+      }).not.toThrow();
+    });
+  });
 });
