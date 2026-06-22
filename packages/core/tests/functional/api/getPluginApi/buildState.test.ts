@@ -27,6 +27,6 @@ describe("buildState", () => {
   it("returns undefined if route is unknown", () => {
     const state = getPluginApi(router).buildState("unknown.route", {});
 
-    expect(state).toBe(undefined);
+    expect(state).toBeUndefined();
   });
 });

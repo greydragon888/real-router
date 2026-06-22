@@ -46,7 +46,7 @@ describe("core/routes/routePath/matchPath", () => {
     it("should return undefined for unmatched path", () => {
       const state = getPluginApi(router).matchPath("/unknown");
 
-      expect(state).toBe(undefined);
+      expect(state).toBeUndefined();
     });
 
     it("should return matched path as-is when rewritePathOnMatch is false", () => {

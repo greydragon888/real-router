@@ -11,8 +11,8 @@ describe("RouterError", () => {
     expect(err).toBeInstanceOf(RouterError);
     expect(err.code).toBe("ERR_CODE");
     expect(err.message).toBe("ERR_CODE");
-    expect(err.segment).toBe(undefined);
-    expect(err.redirect).toBe(undefined);
+    expect(err.segment).toBeUndefined();
+    expect(err.redirect).toBeUndefined();
   });
 
   it("should set message, segment, redirect and custom fields", () => {
@@ -156,7 +156,7 @@ describe("RouterError", () => {
     it("should return undefined for non-existing field", () => {
       const err = new RouterError("ERR");
 
-      expect(err.getField("nonExistent")).toBe(undefined);
+      expect(err.getField("nonExistent")).toBeUndefined();
     });
 
     it("should return value for built-in fields", () => {
@@ -283,7 +283,7 @@ describe("RouterError", () => {
     it("should return undefined when redirect is not set", () => {
       const err = new RouterError("ERR");
 
-      expect(err.redirect).toBe(undefined);
+      expect(err.redirect).toBeUndefined();
     });
   });
 

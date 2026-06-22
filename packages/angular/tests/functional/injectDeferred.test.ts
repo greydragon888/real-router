@@ -154,7 +154,7 @@ describe("injectDeferred", () => {
       ),
     ]);
 
-    expect(racer).toBe(undefined);
+    expect(racer).toBeUndefined();
     expect(fixture.componentInstance.missing()).toBeUndefined();
 
     fixture.destroy();

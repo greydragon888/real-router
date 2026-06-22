@@ -925,13 +925,11 @@ export default tsEslint.config(
 
       // v4.1.0: New recommended test-assertion / float rules — disabled as
       // false positives or deliberate idioms for this codebase:
-      //  - prefer-specific-assertions: 48 cosmetic test nits, no autofix;
-      //    adoption tracked in #915
       //  - no-floating-point-equality: exact literal / mock values (e.g.
       //    Number("12.5") === 12.5), not float arithmetic
       //  - no-trivial-assertions: intentional `expect(true).toBe(true)` reach
       //    markers in stress/property tests + type-level `Equal` assertions
-      "sonarjs/prefer-specific-assertions": "off",
+      // (prefer-specific-assertions adopted in tests — #915)
       "sonarjs/no-floating-point-equality": "off",
       "sonarjs/no-trivial-assertions": "off",
     },

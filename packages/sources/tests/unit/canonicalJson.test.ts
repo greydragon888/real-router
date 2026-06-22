@@ -26,7 +26,7 @@ describe("canonicalJson", () => {
   });
 
   it("handles undefined as JSON.stringify does", () => {
-    expect(canonicalJson(undefined)).toBe(undefined);
+    expect(canonicalJson(undefined)).toBeUndefined();
     expect(canonicalJson({ a: undefined, b: 1 })).toBe('{"b":1}');
   });
 

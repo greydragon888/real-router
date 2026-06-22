@@ -249,7 +249,7 @@ describe("RouterError Methods Properties", () => {
         const nonExistentKey = `__non_existent_${randomKey}__`;
 
         expect(err.hasField(nonExistentKey)).toBe(false);
-        expect(err.getField(nonExistentKey)).toBe(undefined);
+        expect(err.getField(nonExistentKey)).toBeUndefined();
       },
     );
 
