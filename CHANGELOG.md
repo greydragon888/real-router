@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-06-22]
 
+### @real-router/core@0.60.2
+
+### Patch Changes
+
+- [#921](https://github.com/greydragon888/real-router/pull/921) [`440c510`](https://github.com/greydragon888/real-router/commit/440c5102a4262bea95d1cd4d5282e0b24b334008) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `getStaticPaths` crashing with `RangeError` on a large static route section ([#920](https://github.com/greydragon888/real-router/issues/920))
+
+  `getStaticPaths` enumerated a subtree's leaf routes via
+  `result.push(...getLeafRouteNames(child))`. The spread passes one argument per
+  leaf, and V8 caps spread/apply arguments (~124k on Node 24), so a section with
+  more static leaf routes than that limit threw
+  `RangeError: Maximum call stack size exceeded` — a cryptic failure that reads
+  like infinite recursion, not "too many routes". Leaf collection now accumulates
+  into a shared array (no spread), which also removes the per-subtree
+  intermediate-array allocation. Enumeration order and output are unchanged.
+
+
 ### @real-router/core@0.60.1
 
 ### Patch Changes
