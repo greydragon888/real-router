@@ -1,5 +1,18 @@
 # @real-router/validation-plugin
 
+## 0.8.0
+
+### Minor Changes
+
+- [#907](https://github.com/greydragon888/real-router/pull/907) [`f87881d`](https://github.com/greydragon888/real-router/commit/f87881d1a9125c55a0a9ff9354f309d87e16e2a6) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove dead `validateNotRegistering` validator ([#906](https://github.com/greydragon888/real-router/issues/906))
+
+  Drops the `validateNotRegistering` implementation (`validators/lifecycle.ts`) and its wiring in `validationPlugin.ts` — it implemented a `RouterValidator` member that core never invoked (dead on both ends). No change to `validationPlugin()` behavior.
+
+### Patch Changes
+
+- Updated dependencies [[`f87881d`](https://github.com/greydragon888/real-router/commit/f87881d1a9125c55a0a9ff9354f309d87e16e2a6), [`f87881d`](https://github.com/greydragon888/real-router/commit/f87881d1a9125c55a0a9ff9354f309d87e16e2a6), [`f87881d`](https://github.com/greydragon888/real-router/commit/f87881d1a9125c55a0a9ff9354f309d87e16e2a6), [`f87881d`](https://github.com/greydragon888/real-router/commit/f87881d1a9125c55a0a9ff9354f309d87e16e2a6)]:
+  - @real-router/core@0.60.0
+
 ## 0.7.12
 
 ### Patch Changes
