@@ -140,7 +140,7 @@ describe("core/dependencies/setDependency", () => {
     // @ts-expect-error: testing null value
     deps.set("foo", null);
 
-    expect(deps.get("foo")).toBe(null);
+    expect(deps.get("foo")).toBeNull();
     expect(deps.has("foo")).toBe(true);
   });
 

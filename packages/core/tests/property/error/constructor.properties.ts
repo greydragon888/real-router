@@ -33,8 +33,8 @@ describe("RouterError Constructor Properties", () => {
         if (options.redirect) {
           expect(err1.redirect).toStrictEqual(err2.redirect);
         } else {
-          expect(err1.redirect).toBe(undefined);
-          expect(err2.redirect).toBe(undefined);
+          expect(err1.redirect).toBeUndefined();
+          expect(err2.redirect).toBeUndefined();
         }
       },
     );
@@ -92,7 +92,7 @@ describe("RouterError Constructor Properties", () => {
           expect(err.redirect).toBeDefined();
           expect(err.redirect).toStrictEqual(redirect);
         } else {
-          expect(err.redirect).toBe(undefined);
+          expect(err.redirect).toBeUndefined();
         }
       },
     );
@@ -192,7 +192,7 @@ describe("RouterError Constructor Properties", () => {
           // Verify original redirect is not modified
           expect(Object.isFrozen(redirect)).toBe(false);
         } else {
-          expect(err.redirect).toBe(undefined);
+          expect(err.redirect).toBeUndefined();
         }
       },
     );

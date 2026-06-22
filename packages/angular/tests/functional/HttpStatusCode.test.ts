@@ -71,9 +71,9 @@ describe("provideHttpStatusSink", () => {
   it("HTTP_STATUS_SINK is null without a provider when injected with optional", () => {
     TestBed.configureTestingModule({});
 
-    expect(TestBed.inject(HTTP_STATUS_SINK, null, { optional: true })).toBe(
-      null,
-    );
+    expect(
+      TestBed.inject(HTTP_STATUS_SINK, null, { optional: true }),
+    ).toBeNull();
   });
 
   it("equivalent to explicit useValue provider", () => {

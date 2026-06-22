@@ -31,7 +31,7 @@ describe("core/state", () => {
     it("returns undefined when router not started", () => {
       router.stop();
 
-      expect(router.getState()).toBe(undefined);
+      expect(router.getState()).toBeUndefined();
     });
 
     it("returns state after navigation", async () => {

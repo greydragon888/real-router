@@ -55,7 +55,7 @@ describe("getRouteFromEvent", () => {
   it("returns undefined when neither history.state nor the location match", () => {
     const evt = makePopStateEvent(undefined);
 
-    expect(getRouteFromEvent(evt, api, "/nope")).toBe(undefined);
+    expect(getRouteFromEvent(evt, api, "/nope")).toBeUndefined();
   });
 });
 
