@@ -2,7 +2,7 @@ import { defineConfig } from "vitest/config";
 import path from "node:path";
 
 /**
- * Vitest configuration for Stryker mutation testing (logger)
+ * Vitest configuration for Stryker mutation testing (fsm)
  *
  * Standalone config - does not extend base to avoid sandbox resolution issues.
  * Optimized for mutation testing speed and isolation.
@@ -10,12 +10,13 @@ import path from "node:path";
 export default defineConfig({
   cacheDir: "./.vitest-stryker",
 
-  // Resolve package imports to local src (required for Stryker sandbox)
-  // The sandbox has node_modules symlinked to original, which contains workspace symlinks
+  // Resolve package imports to local src (required for Stryker sandbox).
+  // Functional tests import via relative paths (../../src/fsm.js), which already
+  // hit the sandbox-mutated src — this self-alias is kept for parity with the
+  // other stryker configs and future package-name imports.
   resolve: {
     alias: {
-      // Main package - resolve to local src
-      "@real-router/logger": path.resolve(import.meta.dirname, "./src"),
+      "@real-router/fsm": path.resolve(import.meta.dirname, "./src"),
     },
   },
 

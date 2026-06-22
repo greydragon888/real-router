@@ -46,6 +46,8 @@
     "test": "vitest run",
     "test:properties": "vitest --config vitest.config.properties.mts --run",
     "test:stress": "vitest run --config vitest.config.stress.mts",
+    "test:mutation": "stryker run",
+    "test:mutation:report": "open reports/mutation-report.html",
     "bench": "NODE_OPTIONS='--expose-gc --max-old-space-size=4096' npx tsx tests/benchmarks/index.ts",
     "bundle": "tsdown --config-loader unrun"
   },
