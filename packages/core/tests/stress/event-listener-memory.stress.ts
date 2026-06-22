@@ -24,8 +24,9 @@ describe("S2. Event listener memory leaks", () => {
     const after = takeHeapSnapshot();
     const delta = after - before;
 
-    // Healthy (cleanup runs): ~10 KB. Leak (skip unsub): ~1.6 MB (9,000 live
-    // listeners). Threshold sits >3x below the leak and >50x above healthy.
+    // Healthy (cleanup runs): ~36 KB. Leak (skip unsub): ~1.6 MB (9,000 live
+    // listeners). Threshold sits >3x below the leak and ~14x above healthy
+    // (mutation-validated 2026-06-22: healthy 35.9 KB, threshold 0.5 MB, leak 1.6 MB).
     expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(0.5 * MB);
 
     router.stop();
