@@ -31,7 +31,7 @@ describe("core/dependencies/getDependency", () => {
     // @ts-expect-error: testing null value
     deps.set("bar", null);
 
-    expect(deps.get("bar")).toBe(null);
+    expect(deps.get("bar")).toBeNull();
 
     // @ts-expect-error: testing false value
     deps.set("foo", false);

@@ -51,7 +51,7 @@ describe("core/dependencies/getDependencies", () => {
     const depsObj = deps.getAll();
 
     expect(depsObj.foo).toBe(0);
-    expect(depsObj.bar).toBe(null);
+    expect(depsObj.bar).toBeNull();
   });
 
   it("should protect structure but not content (shallow copy)", () => {

@@ -34,8 +34,8 @@ describe("useRouteNode", () => {
     });
 
     expect(result!.navigator).toBe(getNavigator(router));
-    expect(result!.route.current).toStrictEqual(undefined);
-    expect(result!.previousRoute.current).toStrictEqual(undefined);
+    expect(result!.route.current).toBeUndefined();
+    expect(result!.previousRoute.current).toBeUndefined();
   });
 
   it("should not return a null route with a default route and the router started", async () => {
@@ -88,7 +88,7 @@ describe("useRouteNode", () => {
     await router.start();
     flushSync();
 
-    expect(result!.route.current?.name).toStrictEqual(undefined);
+    expect(result!.route.current?.name).toBeUndefined();
 
     await router.navigate("items");
     flushSync();

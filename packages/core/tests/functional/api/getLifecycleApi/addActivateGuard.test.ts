@@ -42,7 +42,7 @@ describe("core/route-lifecycle/addActivateGuard", () => {
     try {
       await router.navigate("admin");
     } catch (error: any) {
-      expect(error).toBe(undefined);
+      expect(error).toBeUndefined();
     }
 
     expect(router.getState()?.name).toBe("admin");
@@ -55,7 +55,7 @@ describe("core/route-lifecycle/addActivateGuard", () => {
     try {
       await router.navigate("admin");
     } catch (error: any) {
-      expect(error).toBe(undefined);
+      expect(error).toBeUndefined();
     }
 
     expect(router.getState()?.name).toBe("admin");

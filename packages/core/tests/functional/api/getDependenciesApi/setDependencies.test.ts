@@ -151,7 +151,7 @@ describe("core/dependencies/setDependencies", () => {
     });
 
     expect(deps.get("foo")).toBe(0);
-    expect(deps.get("bar")).toBe(null);
+    expect(deps.get("bar")).toBeNull();
     expect(deps.get("baz")).toBe(false);
     expect(deps.get("qux")).toStrictEqual({});
   });

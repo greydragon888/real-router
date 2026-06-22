@@ -30,11 +30,11 @@ describe("search-params strategies", () => {
       });
 
       it("should return null for undefined", () => {
-        expect(noneBooleanStrategy.decodeUndefined()).toBe(null);
+        expect(noneBooleanStrategy.decodeUndefined()).toBeNull();
       });
 
       it("should return null for decodeRaw (no raw matching)", () => {
-        expect(noneBooleanStrategy.decodeRaw("anything")).toBe(null);
+        expect(noneBooleanStrategy.decodeRaw("anything")).toBeNull();
       });
 
       it("should return value as-is for decodeValue", () => {
@@ -49,13 +49,13 @@ describe("search-params strategies", () => {
       });
 
       it("should return null for undefined", () => {
-        expect(autoBooleanStrategy.decodeUndefined()).toBe(null);
+        expect(autoBooleanStrategy.decodeUndefined()).toBeNull();
       });
 
       it("should parse true/false strings in decodeRaw", () => {
         expect(autoBooleanStrategy.decodeRaw("true")).toBe(true);
         expect(autoBooleanStrategy.decodeRaw("false")).toBe(false);
-        expect(autoBooleanStrategy.decodeRaw("other")).toBe(null);
+        expect(autoBooleanStrategy.decodeRaw("other")).toBeNull();
       });
 
       it("should return value as-is for decodeValue", () => {
@@ -78,7 +78,7 @@ describe("search-params strategies", () => {
       it("should decode raw 'true'/'false' to booleans, null otherwise", () => {
         expect(emptyTrueBooleanStrategy.decodeRaw("true")).toBe(true);
         expect(emptyTrueBooleanStrategy.decodeRaw("false")).toBe(false);
-        expect(emptyTrueBooleanStrategy.decodeRaw("anything")).toBe(null);
+        expect(emptyTrueBooleanStrategy.decodeRaw("anything")).toBeNull();
       });
 
       it("should return value as-is for decodeValue", () => {
@@ -104,8 +104,8 @@ describe("search-params strategies", () => {
   describe("number strategies", () => {
     describe("noneNumberStrategy", () => {
       it("should return null (passthrough)", () => {
-        expect(noneNumberStrategy.decode("123")).toBe(null);
-        expect(noneNumberStrategy.decode("abc")).toBe(null);
+        expect(noneNumberStrategy.decode("123")).toBeNull();
+        expect(noneNumberStrategy.decode("abc")).toBeNull();
       });
     });
 
@@ -123,12 +123,12 @@ describe("search-params strategies", () => {
       });
 
       it("should return null for non-numeric strings", () => {
-        expect(autoNumberStrategy.decode("abc")).toBe(null);
-        expect(autoNumberStrategy.decode("12abc")).toBe(null);
-        expect(autoNumberStrategy.decode("")).toBe(null);
-        expect(autoNumberStrategy.decode(".5")).toBe(null);
-        expect(autoNumberStrategy.decode("1.")).toBe(null);
-        expect(autoNumberStrategy.decode("1.2.3")).toBe(null);
+        expect(autoNumberStrategy.decode("abc")).toBeNull();
+        expect(autoNumberStrategy.decode("12abc")).toBeNull();
+        expect(autoNumberStrategy.decode("")).toBeNull();
+        expect(autoNumberStrategy.decode(".5")).toBeNull();
+        expect(autoNumberStrategy.decode("1.")).toBeNull();
+        expect(autoNumberStrategy.decode("1.2.3")).toBeNull();
       });
 
       it("should decode negative numbers (round-trips with build/navigate)", () => {
@@ -138,17 +138,17 @@ describe("search-params strategies", () => {
       });
 
       it("should return null for a bare minus or non-canonical negatives", () => {
-        expect(autoNumberStrategy.decode("-")).toBe(null);
-        expect(autoNumberStrategy.decode("-007")).toBe(null); // leading zero
-        expect(autoNumberStrategy.decode("-.5")).toBe(null); // dot right after sign
-        expect(autoNumberStrategy.decode("-5.")).toBe(null); // trailing dot
+        expect(autoNumberStrategy.decode("-")).toBeNull();
+        expect(autoNumberStrategy.decode("-007")).toBeNull(); // leading zero
+        expect(autoNumberStrategy.decode("-.5")).toBeNull(); // dot right after sign
+        expect(autoNumberStrategy.decode("-5.")).toBeNull(); // trailing dot
       });
 
       it("should return null for negative zero (not round-trippable)", () => {
         // `-0` is a valid number, but build(-0) emits "0" and String(-0) === "0",
         // so it can't round-trip; "-0"/"-0.0" must stay strings. (#898)
-        expect(autoNumberStrategy.decode("-0")).toBe(null);
-        expect(autoNumberStrategy.decode("-0.0")).toBe(null);
+        expect(autoNumberStrategy.decode("-0")).toBeNull();
+        expect(autoNumberStrategy.decode("-0.0")).toBeNull();
       });
 
       it("should preserve leading zeros as strings (not parse as numbers)", () => {

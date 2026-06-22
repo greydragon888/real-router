@@ -461,7 +461,7 @@ describe("popstate handler", () => {
       lifecycle.onStop?.();
 
       expect(removeSpy).toHaveBeenCalledTimes(1);
-      expect(shared.removePopStateListener).toBe(undefined);
+      expect(shared.removePopStateListener).toBeUndefined();
     });
 
     it("onStop is a no-op when no listener is registered", () => {
@@ -479,7 +479,7 @@ describe("popstate handler", () => {
       lifecycle.teardown?.();
 
       expect(removeSpy).toHaveBeenCalledTimes(1);
-      expect(shared.removePopStateListener).toBe(undefined);
+      expect(shared.removePopStateListener).toBeUndefined();
       expect(cleanup).toHaveBeenCalledTimes(1);
     });
 

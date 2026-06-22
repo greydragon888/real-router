@@ -81,7 +81,7 @@ describe("useRouteNode", () => {
       await router.start();
     });
 
-    expect(result.current.route?.name).toStrictEqual(undefined);
+    expect(result.current.route?.name).toBeUndefined();
 
     await act(async () => {
       await router.navigate("items");
