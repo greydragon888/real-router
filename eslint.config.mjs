@@ -871,12 +871,17 @@ export default tsEslint.config(
   // ============================================
   // 11. SONARJS CONFIGURATION
   // ============================================
-  // Updated for eslint-plugin-sonarjs v4.0.2
+  // Updated for eslint-plugin-sonarjs v4.1.0
   // Repo moved from archived SonarSource/eslint-plugin-sonarjs to SonarSource/SonarJS
   // Changelog: https://github.com/SonarSource/SonarJS/blob/master/packages/analysis/src/jsts/rules/CHANGELOG.md
   // v4 breaking: removed enforce-trailing-comma, super-invocation (covered by eslint core)
   // v4 new: hardcoded-secret-signatures, dynamically-constructed-templates,
   //         review-blockchain-mnemonic, no-session-cookies-on-static-assets (all recommended)
+  // v4.1.0: dropped 11 security-hotspot rules (cookies, encryption, sockets, …);
+  //         added 10 recommended rules — 6 fire zero violations (kept on); the
+  //         3 test-assertion/float ones below are disabled (see rules), and the
+  //         new ReDoS rule super-linear-regex is kept on (inline-disabled at the
+  //         3 already-vetted bounded-input regexes in path-matcher, alongside slow-regex)
   {
     files: ["**/*.ts", "**/*.tsx"],
     plugins: {
@@ -893,6 +898,18 @@ export default tsEslint.config(
       // v4.0.0: New security rules — disable irrelevant for client-side router
       "sonarjs/review-blockchain-mnemonic": "off",
       "sonarjs/no-session-cookies-on-static-assets": "off",
+
+      // v4.1.0: New recommended test-assertion / float rules — disabled as
+      // false positives or deliberate idioms for this codebase:
+      //  - prefer-specific-assertions: 48 cosmetic test nits, no autofix;
+      //    adoption tracked in #915
+      //  - no-floating-point-equality: exact literal / mock values (e.g.
+      //    Number("12.5") === 12.5), not float arithmetic
+      //  - no-trivial-assertions: intentional `expect(true).toBe(true)` reach
+      //    markers in stress/property tests + type-level `Equal` assertions
+      "sonarjs/prefer-specific-assertions": "off",
+      "sonarjs/no-floating-point-equality": "off",
+      "sonarjs/no-trivial-assertions": "off",
     },
   },
 

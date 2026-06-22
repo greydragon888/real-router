@@ -37,7 +37,7 @@ export interface RegistrationState {
 // Constants
 // =============================================================================
 
-// eslint-disable-next-line sonarjs/slow-regex -- Constraint pattern regex - bounded input from route definitions, not user input
+// eslint-disable-next-line sonarjs/super-linear-regex -- Constraint pattern regex - bounded input from route definitions, not user input
 const CONSTRAINT_PATTERN_RGX = /<[^>]*>/g;
 
 // =============================================================================
