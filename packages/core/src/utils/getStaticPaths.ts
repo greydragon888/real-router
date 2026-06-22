@@ -8,16 +8,26 @@ export type StaticPathEntries = Record<
   () => Promise<Record<string, string>[]>
 >;
 
-function getLeafRouteNames(node: RouteTree): string[] {
-  const result: string[] = [];
-
+function collectLeafRouteNames(node: RouteTree, result: string[]): void {
   for (const child of node.children.values()) {
     if (child.children.size === 0) {
       result.push(child.fullName);
     } else {
-      result.push(...getLeafRouteNames(child));
+      // Accumulate into the shared array rather than
+      // `result.push(...getLeafRouteNames(child))`: the spread passes one
+      // argument per leaf, and V8 caps spread/apply arguments (~124k on Node 24),
+      // so a section with that many static leaf routes threw
+      // `RangeError: Maximum call stack size exceeded`. Accumulating also drops
+      // the per-subtree intermediate-array allocation.
+      collectLeafRouteNames(child, result);
     }
   }
+}
+
+function getLeafRouteNames(node: RouteTree): string[] {
+  const result: string[] = [];
+
+  collectLeafRouteNames(node, result);
 
   return result;
 }
