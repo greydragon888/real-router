@@ -499,6 +499,16 @@ Guards registered via `getLifecycleApi(router)` run during the transition pipeli
 
 ---
 
+## getStaticPaths (SSG enumeration)
+
+`getStaticPaths(router, entries?)` enumerates leaf routes and builds their URLs for SSG pre-rendering (`src/utils/getStaticPaths.ts`).
+
+| #   | Invariant                     | Description                                                                                                                                                                                                                                                                                              |
+| --- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | Leaf-enumeration completeness | `getStaticPaths(router)` emits exactly the full-paths of the tree's **leaf** routes (a leaf = a node with `children.size === 0`) — one path per leaf, no dropped leaf, no enumerated parent, no duplicate. Verified **model-based**: the expected leaf set is computed from a generated tree shape, independent of `getStaticPaths`' own traversal. |
+
+---
+
 ## Test Files
 
 | File                                                    | Invariants | Category                                      |
@@ -531,4 +541,5 @@ Guards registered via `getLifecycleApi(router)` run during the transition pipeli
 | `tests/property/error/circular-refs.properties.ts`      | 8          | Deep-freeze with circular references          |
 | `tests/property/error/constants.properties.ts`          | 11         | errorCodes object invariants                  |
 | `tests/property/serializeRouterState.properties.ts`     | 7          | SSR transport (XSS-safe JSON, transition strip) |
+| `tests/property/getStaticPaths.properties.ts`           | 1          | SSG leaf-path enumeration (model-based)         |
 | `tests/property/tree-changed.properties.ts`             | 6          | TREE_CHANGED atomicity, op discriminator, replace diff, nested-subtree flatten, update conditional emit |
