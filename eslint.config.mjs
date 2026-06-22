@@ -60,6 +60,15 @@ const UNICORN_NON_SHIPPED_OFF = {
   "unicorn/no-useless-fallback-in-spread": "off",
   "unicorn/prefer-at": "off",
   "unicorn/prefer-object-from-entries": "off",
+  // v68 new recommended rules — idiomatic in non-shipped code, churn with no
+  // shipped value (see .claude/unicorn-v68-rules-audit.md):
+  "unicorn/prefer-promise-with-resolvers": "off", // adopted in src; tests build raw Promises
+  "unicorn/prefer-continue": "off", // adopted in src; loop style in tests/bench is fine
+  "unicorn/consistent-conditional-object-spread": "off",
+  "unicorn/prefer-array-from-async": "off",
+  "unicorn/prefer-math-constants": "off", // tests use literal floats (3.14159 ≠ Math.PI) intentionally
+  "unicorn/no-duplicate-if-branches": "off", // stress tests deliberately exercise identical branches
+  "unicorn/no-nonstandard-builtin-properties": "off", // proto-pollution tests touch nonstandard Symbol props
 };
 
 export default tsEslint.config(
@@ -605,8 +614,10 @@ export default tsEslint.config(
   // ============================================
   // 8. UNICORN CONFIGURATION (Modern JS/TS patterns)
   // ============================================
-  // Updated for eslint-plugin-unicorn v67.0.0
+  // Updated for eslint-plugin-unicorn v68.0.0
   // Changelog: https://github.com/sindresorhus/eslint-plugin-unicorn/releases
+  // v68 audit (38 new rules + prevent-abbreviations→name-replacements rename):
+  // .claude/unicorn-v68-rules-audit.md
   {
     files: ["**/*.ts", "**/*.tsx"],
     plugins: {
@@ -684,9 +695,13 @@ export default tsEslint.config(
           exceptions: ["_", "i", "j"],
         },
       ],
-      "unicorn/prevent-abbreviations": [
+      // v68: `prevent-abbreviations` renamed to `name-replacements` (options 1:1).
+      "unicorn/name-replacements": [
         "error",
         {
+          // File naming is the project's domain (cf. `unicorn/filename-case: off`).
+          // v68 default replacements newly flag filenames like `configuration.bench.ts`.
+          checkFilenames: false,
           replacements: {
             i: false,
             idx: false,
@@ -726,9 +741,18 @@ export default tsEslint.config(
             dist: false,
             prev: false,
             curr: false,
+            // v68 added these to default replacements; all are domain vocabulary
+            // here (dependency-injection `deps`, proto-pollution test `proto`,
+            // benchmark `perf`) — keep them allowed, matching the rest of this map.
+            dep: false,
+            deps: false,
+            proto: false,
+            perf: false,
+            ident: false, // fast-check `arbIdent` in property tests
+            idents: false,
           },
         },
-      ], // Allow fn, err, props, params, etc.
+      ], // Allow fn, err, props, params, deps, proto, perf, etc.
       "unicorn/no-null": "off", // null is used in DOM API and some libraries
       "unicorn/prefer-top-level-await": "off", // Not supported everywhere
       "unicorn/no-array-reduce": "warn", // Only warning, reduce is sometimes convenient
@@ -871,12 +895,17 @@ export default tsEslint.config(
   // ============================================
   // 11. SONARJS CONFIGURATION
   // ============================================
-  // Updated for eslint-plugin-sonarjs v4.0.2
+  // Updated for eslint-plugin-sonarjs v4.1.0
   // Repo moved from archived SonarSource/eslint-plugin-sonarjs to SonarSource/SonarJS
   // Changelog: https://github.com/SonarSource/SonarJS/blob/master/packages/analysis/src/jsts/rules/CHANGELOG.md
   // v4 breaking: removed enforce-trailing-comma, super-invocation (covered by eslint core)
   // v4 new: hardcoded-secret-signatures, dynamically-constructed-templates,
   //         review-blockchain-mnemonic, no-session-cookies-on-static-assets (all recommended)
+  // v4.1.0: dropped 11 security-hotspot rules (cookies, encryption, sockets, …);
+  //         added 10 recommended rules — 6 fire zero violations (kept on); the
+  //         3 test-assertion/float ones below are disabled (see rules), and the
+  //         new ReDoS rule super-linear-regex is kept on (inline-disabled at the
+  //         3 already-vetted bounded-input regexes in path-matcher, alongside slow-regex)
   {
     files: ["**/*.ts", "**/*.tsx"],
     plugins: {
@@ -893,6 +922,18 @@ export default tsEslint.config(
       // v4.0.0: New security rules — disable irrelevant for client-side router
       "sonarjs/review-blockchain-mnemonic": "off",
       "sonarjs/no-session-cookies-on-static-assets": "off",
+
+      // v4.1.0: New recommended test-assertion / float rules — disabled as
+      // false positives or deliberate idioms for this codebase:
+      //  - prefer-specific-assertions: 48 cosmetic test nits, no autofix;
+      //    adoption tracked in #915
+      //  - no-floating-point-equality: exact literal / mock values (e.g.
+      //    Number("12.5") === 12.5), not float arithmetic
+      //  - no-trivial-assertions: intentional `expect(true).toBe(true)` reach
+      //    markers in stress/property tests + type-level `Equal` assertions
+      "sonarjs/prefer-specific-assertions": "off",
+      "sonarjs/no-floating-point-equality": "off",
+      "sonarjs/no-trivial-assertions": "off",
     },
   },
 
@@ -1154,6 +1195,7 @@ export default tsEslint.config(
       "**/*.bench.ts",
       "**/*.mitata.ts",
       "**/benchmarks/**/*.ts",
+      "**/benchmarks/**/*.tsx",
     ],
     rules: UNICORN_NON_SHIPPED_OFF,
   },

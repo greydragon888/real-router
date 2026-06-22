@@ -36,12 +36,14 @@ function invokeAttributesOnClick(value: unknown, evt: MouseEvent): void {
     const handlers = value as OnClickHandler[];
 
     for (const fn of handlers) {
-      if (typeof fn === "function") {
-        fn(evt);
+      if (typeof fn !== "function") {
+        continue;
+      }
 
-        if (evt.defaultPrevented) {
-          return;
-        }
+      fn(evt);
+
+      if (evt.defaultPrevented) {
+        return;
       }
     }
   }

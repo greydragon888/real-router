@@ -43,6 +43,7 @@ export function isState<P extends Params = Params>(
  * isStateStrict({ name: 'home', params: {}, path: '/' }); // true
  * isStateStrict({ name: 'home', params: 'invalid', path: '/' }); // false
  */
+// eslint-disable-next-line sonarjs/no-identical-functions -- intentional historical alias of isState (same required-field check); see JSDoc
 export function isStateStrict<P extends Params = Params>(
   value: unknown,
 ): value is State<P> {
@@ -54,9 +55,5 @@ export function isStateStrict<P extends Params = Params>(
   const obj = value as Record<string, unknown>;
 
   // Check required fields and their types
-  if (!isRequiredFields(obj)) {
-    return false;
-  }
-
-  return true;
+  return isRequiredFields(obj);
 }

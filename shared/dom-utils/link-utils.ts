@@ -234,10 +234,12 @@ export function buildActiveClassName(
     const seen = new Set(baseTokens);
 
     for (const token of activeTokens) {
-      if (!seen.has(token)) {
-        seen.add(token);
-        baseTokens.push(token);
+      if (seen.has(token)) {
+        continue;
       }
+
+      seen.add(token);
+      baseTokens.push(token);
     }
 
     return baseTokens.join(" ");

@@ -15,9 +15,6 @@ export function isSlowConnection(): boolean {
   if (connection.saveData) {
     return true;
   }
-  if (connection.effectiveType?.includes("2g")) {
-    return true;
-  }
 
-  return false;
+  return Boolean(connection.effectiveType?.includes("2g"));
 }

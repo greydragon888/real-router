@@ -226,6 +226,7 @@ export class RxObservable<T> {
     return result;
   }
 
+  // eslint-disable-next-line unicorn/no-nonstandard-builtin-properties -- intentional TC39 Observable interop protocol (paired with ["@@observable"] below)
   [Symbol.observable](): this {
     return this;
   }
@@ -299,6 +300,7 @@ export class RxObservable<T> {
           break;
         }
 
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- Promise.withResolvers<void>() trips @typescript-eslint/no-invalid-void-type; the resolver is captured into the outer `resolve` by design
         await new Promise<void>((_resolve) => {
           resolve = _resolve;
         });

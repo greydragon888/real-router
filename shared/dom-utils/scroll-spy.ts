@@ -433,11 +433,13 @@ const createObserverPair = (
     // stale "was intersecting" state for a removed node cannot be picked
     // by `pickTopmost` after the node is gone.
     for (const element of observed) {
-      if (!element.isConnected) {
-        io.unobserve(element);
-        observed.delete(element);
-        pending.delete(element);
+      if (element.isConnected) {
+        continue;
       }
+
+      io.unobserve(element);
+      observed.delete(element);
+      pending.delete(element);
     }
 
     observeMatches();

@@ -263,13 +263,15 @@ function processParamChunk(
   let hasBrackets = false;
 
   for (let i = start; i < nameSourceEnd; i++) {
-    if (searchPart.codePointAt(i) === 91) {
-      // '['
-      nameEnd = i;
-      hasBrackets = true;
-
-      break;
+    if (searchPart.codePointAt(i) !== 91) {
+      continue;
     }
+
+    // '['
+    nameEnd = i;
+    hasBrackets = true;
+
+    break;
   }
 
   const decodedName = decodeValue(searchPart.slice(start, nameEnd));

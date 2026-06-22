@@ -14,13 +14,15 @@ export function getInvalidKeys(
   const keys = new Set<string>();
 
   for (const issue of issues) {
-    if (issue.path && issue.path.length > 0) {
-      const segment = issue.path[0];
-      const key =
-        typeof segment === "object" && "key" in segment ? segment.key : segment;
-
-      keys.add(String(key));
+    if (!(issue.path && issue.path.length > 0)) {
+      continue;
     }
+
+    const segment = issue.path[0];
+    const key =
+      typeof segment === "object" && "key" in segment ? segment.key : segment;
+
+    keys.add(String(key));
   }
 
   return keys;

@@ -304,22 +304,28 @@ export class SegmentMatcher {
     let hasKeys = false;
 
     for (const name of route.declaredQueryParams) {
-      if (name in params) {
-        queryObj[name] = params[name];
-        hasKeys = true;
+      if (!(name in params)) {
+        continue;
       }
+
+      queryObj[name] = params[name];
+      hasKeys = true;
     }
 
     if (queryParamsMode === "loose") {
       for (const paramKey in params) {
         if (
-          Object.hasOwn(params, paramKey) &&
-          !route.declaredQueryParamsSet.has(paramKey) &&
-          !route.buildParamNamesSet.has(paramKey)
+          !(
+            Object.hasOwn(params, paramKey) &&
+            !route.declaredQueryParamsSet.has(paramKey) &&
+            !route.buildParamNamesSet.has(paramKey)
+          )
         ) {
-          queryObj[paramKey] = params[paramKey];
-          hasKeys = true;
+          continue;
         }
+
+        queryObj[paramKey] = params[paramKey];
+        hasKeys = true;
       }
     }
 

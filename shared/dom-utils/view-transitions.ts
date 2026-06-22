@@ -54,6 +54,7 @@ export function createViewTransitions(router: Router): ViewTransitions {
       // captured `resolve` inside the callback, subscribe would see closeVT
       // still null and skip resolving — the deferred would hang for 4s
       // until the VT API aborts with TimeoutError.
+      // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- frozen shared primitive; resolver captured synchronously before startViewTransition() by design (see comment above)
       const deferred = new Promise<void>((resolve) => {
         closeVT = resolve;
       });
