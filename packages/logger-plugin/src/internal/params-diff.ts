@@ -43,10 +43,12 @@ export const getParamsDiff = (
 
   // Find added
   for (const key in toParams) {
-    if (!(key in fromParams)) {
-      added[key] = toParams[key];
-      hasChanges = true;
+    if (key in fromParams) {
+      continue;
     }
+
+    added[key] = toParams[key];
+    hasChanges = true;
   }
 
   // Return null if there are no changes

@@ -53,18 +53,17 @@ function setMultipleDependencies(
   const overwrittenKeys: string[] = [];
 
   for (const key in deps) {
-    if (deps[key] !== undefined) {
-      if (Object.hasOwn(store.dependencies, key)) {
-        overwrittenKeys.push(key);
-      } else {
-        validator?.dependencies.validateDependencyCount(
-          store,
-          "setDependencies",
-        );
-      }
-
-      (store.dependencies as Record<string, unknown>)[key] = deps[key];
+    if (deps[key] === undefined) {
+      continue;
     }
+
+    if (Object.hasOwn(store.dependencies, key)) {
+      overwrittenKeys.push(key);
+    } else {
+      validator?.dependencies.validateDependencyCount(store, "setDependencies");
+    }
+
+    (store.dependencies as Record<string, unknown>)[key] = deps[key];
   }
 
   if (overwrittenKeys.length > 0) {

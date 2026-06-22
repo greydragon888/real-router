@@ -166,7 +166,7 @@ export function buildRenderList(
     notFoundChildren: null,
   };
   let activeMatchFound = false;
-  let fallback: FallbackType = undefined;
+  let fallback: FallbackType;
   let hasPerMatchKA = false;
   const rendered: VNode[] = [];
 

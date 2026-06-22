@@ -169,6 +169,7 @@ export function createRequestScope<
     router,
     signal,
     dispose,
+    // eslint-disable-next-line unicorn/no-nonstandard-builtin-properties -- Symbol.asyncDispose is a standard ES2023 well-known symbol (`await using`)
     [Symbol.asyncDispose]: dispose,
   };
 }

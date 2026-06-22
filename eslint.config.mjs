@@ -60,6 +60,15 @@ const UNICORN_NON_SHIPPED_OFF = {
   "unicorn/no-useless-fallback-in-spread": "off",
   "unicorn/prefer-at": "off",
   "unicorn/prefer-object-from-entries": "off",
+  // v68 new recommended rules — idiomatic in non-shipped code, churn with no
+  // shipped value (see .claude/unicorn-v68-rules-audit.md):
+  "unicorn/prefer-promise-with-resolvers": "off", // adopted in src; tests build raw Promises
+  "unicorn/prefer-continue": "off", // adopted in src; loop style in tests/bench is fine
+  "unicorn/consistent-conditional-object-spread": "off",
+  "unicorn/prefer-array-from-async": "off",
+  "unicorn/prefer-math-constants": "off", // tests use literal floats (3.14159 ≠ Math.PI) intentionally
+  "unicorn/no-duplicate-if-branches": "off", // stress tests deliberately exercise identical branches
+  "unicorn/no-nonstandard-builtin-properties": "off", // proto-pollution tests touch nonstandard Symbol props
 };
 
 export default tsEslint.config(
@@ -605,8 +614,10 @@ export default tsEslint.config(
   // ============================================
   // 8. UNICORN CONFIGURATION (Modern JS/TS patterns)
   // ============================================
-  // Updated for eslint-plugin-unicorn v67.0.0
+  // Updated for eslint-plugin-unicorn v68.0.0
   // Changelog: https://github.com/sindresorhus/eslint-plugin-unicorn/releases
+  // v68 audit (38 new rules + prevent-abbreviations→name-replacements rename):
+  // .claude/unicorn-v68-rules-audit.md
   {
     files: ["**/*.ts", "**/*.tsx"],
     plugins: {
@@ -684,9 +695,13 @@ export default tsEslint.config(
           exceptions: ["_", "i", "j"],
         },
       ],
-      "unicorn/prevent-abbreviations": [
+      // v68: `prevent-abbreviations` renamed to `name-replacements` (options 1:1).
+      "unicorn/name-replacements": [
         "error",
         {
+          // File naming is the project's domain (cf. `unicorn/filename-case: off`).
+          // v68 default replacements newly flag filenames like `configuration.bench.ts`.
+          checkFilenames: false,
           replacements: {
             i: false,
             idx: false,
@@ -726,9 +741,18 @@ export default tsEslint.config(
             dist: false,
             prev: false,
             curr: false,
+            // v68 added these to default replacements; all are domain vocabulary
+            // here (dependency-injection `deps`, proto-pollution test `proto`,
+            // benchmark `perf`) — keep them allowed, matching the rest of this map.
+            dep: false,
+            deps: false,
+            proto: false,
+            perf: false,
+            ident: false, // fast-check `arbIdent` in property tests
+            idents: false,
           },
         },
-      ], // Allow fn, err, props, params, etc.
+      ], // Allow fn, err, props, params, deps, proto, perf, etc.
       "unicorn/no-null": "off", // null is used in DOM API and some libraries
       "unicorn/prefer-top-level-await": "off", // Not supported everywhere
       "unicorn/no-array-reduce": "warn", // Only warning, reduce is sometimes convenient
@@ -1171,6 +1195,7 @@ export default tsEslint.config(
       "**/*.bench.ts",
       "**/*.mitata.ts",
       "**/benchmarks/**/*.ts",
+      "**/benchmarks/**/*.tsx",
     ],
     rules: UNICORN_NON_SHIPPED_OFF,
   },
