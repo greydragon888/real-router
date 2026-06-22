@@ -3,7 +3,6 @@
 // Router-dependent types (re-exported from @real-router/types)
 
 export type {
-  BuildStateResultWithSegments,
   GuardFnFactory,
   PluginFactory,
   Route,

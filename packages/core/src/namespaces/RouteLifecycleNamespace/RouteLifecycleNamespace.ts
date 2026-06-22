@@ -76,8 +76,6 @@ export class RouteLifecycleNamespace<
     this.#canActivateFunctions,
   ];
 
-  readonly #registering = new Set<string>();
-
   #deps!: RouteLifecycleDependencies<Dependencies>;
   #limits: Limits = DEFAULT_LIMITS;
   #getValidator: (() => RouterValidator | null) | null = null;
@@ -433,9 +431,6 @@ export class RouteLifecycleNamespace<
 
     targetMap.set(name, factory);
 
-    // Mark route as being registered before calling user factory
-    this.#registering.add(name);
-
     try {
       const fn = this.#deps.compileFactory(factory);
 
@@ -459,8 +454,6 @@ export class RouteLifecycleNamespace<
       }
 
       throw error;
-    } finally {
-      this.#registering.delete(name);
     }
   }
 

@@ -19,7 +19,7 @@ The `RouterValidator` interface is organized into 8 namespaces, matching core's 
 | `options`      | `validateLimitValue`, `validateLimits`, `validateOptions`, `validateResolvedDefaultRoute`                                                                                     |
 | `dependencies` | `validateDependencyName`, `validateSetDependencyArgs`, `validateDependenciesObject`, `validateDependencyExists`, `validateDependencyLimit`, `validateDependenciesStructure`, `validateCloneArgs` |
 | `plugins`      | `validatePluginLimit`, `validateNoDuplicatePlugins`, `validatePluginKeys` (validates hook names: `onStart`, `onStop`, `onTransitionStart`, `onTransitionLeaveApprove`, `onTransitionSuccess`, `onTransitionError`, `onTransitionCancel`, `teardown`), `validateCountThresholds`, `validateAddInterceptorArgs` |
-| `lifecycle`    | `validateHandler`, `validateNotRegistering`, `validateHandlerLimit`, `validateCountThresholds`                                                                                |
+| `lifecycle`    | `validateHandler`, `validateHandlerLimit`, `validateCountThresholds`                                                                                |
 | `navigation`   | `validateNavigateArgs`, `validateNavigateToDefaultArgs`, `validateNavigationOptions`, `validateParams`, `validateStartArgs`                                                   |
 | `state`        | `validateMakeStateArgs`, `validateAreStatesEqualArgs`                                                                                                                         |
 | `eventBus`     | `validateEventName`, `validateListenerArgs` — validates event names: `$start`, `$stop`, `$$start`, `$$leaveApprove`, `$$cancel`, `$$success`, `$$error`                      |

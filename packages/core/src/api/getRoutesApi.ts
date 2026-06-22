@@ -1,4 +1,5 @@
 import { logger } from "@real-router/logger";
+import { nodeToDefinition } from "route-tree";
 
 import { throwIfDisposed } from "./helpers";
 import { guardRouteStructure } from "../guards";
@@ -17,7 +18,9 @@ import {
   assertAddable,
   buildAddArtifacts,
   buildReplaceArtifacts,
+  commitTreeChanges,
   refreshForwardMap,
+  resetStore,
 } from "../namespaces/RoutesNamespace/routesStore";
 
 import type { RoutesApi } from "./types";
@@ -501,7 +504,7 @@ function removeRoute<
     store.lifecycleNamespace!,
   );
 
-  store.treeOperations.commitTreeChanges(store);
+  commitTreeChanges(store);
 
   return true;
 }
@@ -643,7 +646,7 @@ function getRoute<
 
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- segments is non-empty (checked above)
   const targetNode = segments.at(-1)! as RouteTree;
-  const definition = store.treeOperations.nodeToDefinition(targetNode);
+  const definition = nodeToDefinition(targetNode);
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
   const factories = store.lifecycleNamespace!.getFactories();
 
@@ -654,9 +657,23 @@ function getRoute<
 // API factory
 // ============================================================================
 
+// Cache the assembled RoutesApi per router — mirrors getPluginApi()/getNavigator():
+// avoids re-allocating the 9-closure bag on each call (adapters/plugins poll it
+// from constructors) and gives spy/stub helpers a stable object identity. Closures
+// capture `ctx`/`store`, both stable for the router's lifetime, so caching is safe.
+// Single cast site: the value is stored as `unknown` (RoutesApi is invariant in
+// Dependencies, so one typed map can't hold every instantiation) and cast on read.
+const cache = new WeakMap<object, unknown>();
+
 export function getRoutesApi<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(router: Router<Dependencies>): RoutesApi<Dependencies> {
+  const cached = cache.get(router);
+
+  if (cached) {
+    return cached as RoutesApi<Dependencies>;
+  }
+
   const ctx = getInternals(router);
 
   const store = ctx.routeGetStore();
@@ -668,7 +685,7 @@ export function getRoutesApi<
     ctx.treeChanged.emit(event as TreeChangedEvent);
   };
 
-  return {
+  const api: RoutesApi<Dependencies> = {
     add: (routes, options) => {
       throwIfDisposed(ctx.isDisposed);
 
@@ -833,7 +850,7 @@ export function getRoutesApi<
           ? Object.freeze([...collectFlatRoutes(store, () => true).values()])
           : undefined;
 
-      store.treeOperations.resetStore(store);
+      resetStore(store);
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
       store.lifecycleNamespace!.clearAll();
       ctx.clearState();
@@ -903,4 +920,8 @@ export function getRoutesApi<
 
     subscribeChanges: (handler) => ctx.treeChanged.subscribe(handler),
   };
+
+  cache.set(router, api);
+
+  return api;
 }

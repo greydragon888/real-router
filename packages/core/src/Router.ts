@@ -33,7 +33,7 @@ import {
 import { CACHED_ALREADY_STARTED_ERROR } from "./namespaces/RouterLifecycleNamespace/constants";
 import { RouterError } from "./RouterError";
 import { getTransitionPath } from "./transitionPath";
-import { isLoggerConfig } from "./typeGuards";
+import { assertLoggerConfig } from "./typeGuards";
 import { RouterWiringBuilder, wireRouter } from "./wiring";
 
 import type { RouterInternals } from "./internals";
@@ -129,7 +129,8 @@ export class Router<
     // router options.
     const { logger: loggerConfig, ...routerOptions } = options;
 
-    if (loggerConfig && isLoggerConfig(loggerConfig)) {
+    if (loggerConfig) {
+      assertLoggerConfig(loggerConfig);
       logger.configure(loggerConfig);
     }
 
@@ -606,6 +607,10 @@ export class Router<
       this.#limits,
     );
     for (const plugin of filtered) {
+      // `getAll()` sits inside the optional-chain argument on purpose: with no
+      // validator installed (production default) the `?.` short-circuits and the
+      // array is never allocated. Hoisting it out would either allocate on the
+      // no-validator hot path or push the dev-only branch out of coverage.
       ctx.validator?.plugins.validateNoDuplicatePlugins(
         plugin,
         this.#plugins.getAll(),
