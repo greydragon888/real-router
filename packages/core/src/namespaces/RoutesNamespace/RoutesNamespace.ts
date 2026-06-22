@@ -556,7 +556,7 @@ export class RoutesNamespace<
       if (visited.has(current)) {
         const chain = [...visited, current].join(" → ");
 
-        throw new Error(`Circular forwardTo detected: ${chain}`);
+        throw new Error(`Circular forwardTo: ${chain}`);
       }
 
       visited.add(current);
