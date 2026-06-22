@@ -38,6 +38,18 @@ export function validatePluginLimit(
   }
 }
 
+export function validateNoDuplicatePlugins(
+  factory: unknown,
+  factories: unknown[],
+): void {
+  if (factories.includes(factory)) {
+    throw new Error(
+      `[router.usePlugin] Plugin factory already registered. ` +
+        `To re-register, first unsubscribe the existing plugin.`,
+    );
+  }
+}
+
 export function validateCountThresholds(
   count: number,
   maxPlugins: number,
