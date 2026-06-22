@@ -1,5 +1,13 @@
 # @real-router/core
 
+## 0.60.1
+
+### Patch Changes
+
+- [#918](https://github.com/greydragon888/real-router/pull/918) [`13c8b67`](https://github.com/greydragon888/real-router/commit/13c8b672ccff188b1b90214fcc0ac7e0a0b27c99) Thanks [@greydragon888](https://github.com/greydragon888)! - Unify circular `forwardTo` error message ([#916](https://github.com/greydragon888/real-router/issues/916))
+
+  The dynamic forward resolver (`#resolveDynamicForward`) threw `Circular forwardTo detected: …` while the static resolver (`resolveForwardChain`) threw `Circular forwardTo: …`. Both paths now use the same `Circular forwardTo: …` wording. Cosmetic only — no API change; both already threw an `Error` matching `/Circular forwardTo/`.
+
 ## 0.60.0
 
 ### Minor Changes
