@@ -65,8 +65,16 @@ describe("S22: isActiveRoute performance", () => {
       }
     }
 
-    expect(trueCount).toBeGreaterThan(0);
-    expect(falseCount).toBeGreaterThan(0);
+    // `level0_0` is an ANCESTOR of the current leaf, so the result is
+    // deterministic by `strict`: loose → active (isActiveRoute #3), strict →
+    // blocked (isActiveRoute #4). The loop alternates `strict` every iteration
+    // (i % 2) → exactly 2500 each. Pin the exact input→result mapping + counts;
+    // the old `> 0` / `> 0` passed even if strict/loose semantics were inverted
+    // (both branches still occur under alternation).
+    expect(router.isActiveRoute("level0_0", {}, false)).toBe(true);
+    expect(router.isActiveRoute("level0_0", {}, true)).toBe(false);
+    expect(trueCount).toBe(2500);
+    expect(falseCount).toBe(2500);
   }, 30_000);
 
   it("S22.3: isActiveRoute() with ignoreQueryParams", async () => {

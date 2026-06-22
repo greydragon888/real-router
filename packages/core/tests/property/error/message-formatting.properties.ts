@@ -33,18 +33,6 @@ describe("RouterError Message Formatting Properties", () => {
     );
 
     test.prop([errorCodeArbitrary], { numRuns: 5000 })(
-      "default message contains only printable ASCII characters and spaces",
-      (code) => {
-        const err = new RouterError(code);
-
-        // Printable ASCII: 32-126, plus newline (10), tab (9)
-        const isPrintable = /^[\t\n\u0020-\u007E]*$/.test(err.message);
-
-        expect(isPrintable).toBe(true);
-      },
-    );
-
-    test.prop([errorCodeArbitrary], { numRuns: 5000 })(
       "identical codes give identical default messages",
       (code) => {
         const err1 = new RouterError(code);
@@ -148,37 +136,16 @@ describe("RouterError Message Formatting Properties", () => {
 
   describe("Message length and structure", () => {
     test.prop([errorCodeArbitrary], { numRuns: 5000 })(
-      "default message has reasonable length (< 1000 characters)",
+      "default message is the code verbatim (no transformation, no spurious whitespace)",
       (code) => {
-        const err = new RouterError(code);
-
-        expect(err.message.length).toBeLessThan(1000);
-      },
-    );
-
-    test.prop([errorCodeArbitrary], { numRuns: 5000 })(
-      "default message does not start with space (except code with spaces)",
-      (code) => {
-        const err = new RouterError(code);
-
-        // If message === code, this is expected behavior (copied as is)
-        // Check only if message != code
-        if (err.message.length > 0 && err.message !== code) {
-          expect(err.message[0]).not.toBe(" ");
-        }
-      },
-    );
-
-    test.prop([errorCodeArbitrary], { numRuns: 5000 })(
-      "default message does not end with space (except code with spaces)",
-      (code) => {
-        const err = new RouterError(code);
-
-        // If message === code, this is expected behavior (copied as is)
-        // Check only if message != code
-        if (err.message.length > 0 && err.message !== code) {
-          expect(err.message.at(-1)).not.toBe(" ");
-        }
+        // The default message is the code copied as-is. This subsumes the three
+        // removed tests here ("length < 1000", "no leading space", "no trailing
+        // space"): the latter two were DEAD — their `message !== code` guard can
+        // never be true for a default message (it ALWAYS equals the code) — and
+        // "length < 1000" was vacuous (codes are bounded to ≤50 chars). The
+        // verbatim `=== code` invariant catches any added prefix/suffix/
+        // whitespace or truncation directly.
+        expect(new RouterError(code).message).toBe(code);
       },
     );
 
@@ -262,7 +229,11 @@ describe("RouterError Message Formatting Properties", () => {
       (code, customMessage) => {
         const err = new RouterError(code, { message: customMessage });
 
-        const json = structuredClone(err);
+        // Actually exercise the JSON roundtrip via toJSON — the old version used
+        // structuredClone, which clones the native Error.message and bypasses
+        // toJSON entirely, so it never tested the named path.
+        // eslint-disable-next-line unicorn/prefer-structured-clone -- the point is to exercise the JSON serialization path (toJSON), NOT to deep-clone; structuredClone would bypass toJSON entirely
+        const json = JSON.parse(JSON.stringify(err)) as { message: string };
 
         expect(json.message).toBe(customMessage);
       },
@@ -275,7 +246,9 @@ describe("RouterError Message Formatting Properties", () => {
 
         expect(() => JSON.stringify(err)).not.toThrow();
 
-        const json = structuredClone(err);
+        // JSON roundtrip via toJSON (not structuredClone, which bypasses it).
+        // eslint-disable-next-line unicorn/prefer-structured-clone -- the point is to exercise the JSON serialization path (toJSON), NOT to deep-clone; structuredClone would bypass toJSON entirely
+        const json = JSON.parse(JSON.stringify(err)) as { message: string };
 
         expect(json.message).toBe(err.message);
       },

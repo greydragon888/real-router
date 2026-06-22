@@ -7,6 +7,27 @@ import { DEFAULT_TRANSITION } from "../../../src/constants";
 
 import type { Params, State } from "@real-router/types";
 
+/** Recursively assert every nested object/array is frozen (deep-freeze check). */
+function assertDeeplyFrozen(
+  value: unknown,
+  seen = new WeakSet<object>(),
+): void {
+  if (value === null || typeof value !== "object") {
+    return;
+  }
+  if (seen.has(value)) {
+    return;
+  }
+
+  seen.add(value);
+
+  expect(Object.isFrozen(value)).toBe(true);
+
+  for (const nested of Object.values(value as Record<string, unknown>)) {
+    assertDeeplyFrozen(nested, seen);
+  }
+}
+
 describe("RouterError Circular References Properties", () => {
   describe("Handling circular references in params", () => {
     it("deepFreezeState handles circular reference in params", () => {
@@ -195,17 +216,23 @@ describe("RouterError Circular References Properties", () => {
       ],
       { numRuns: 1000 },
     )(
-      "deepFreezeState always successfully handles arbitrary State (without circular references)",
+      "deepFreezeState DEEPLY freezes arbitrary State (every nested object/array, not just the top level)",
       (state) => {
-        // Note: fc.anything() does not generate circular references, but may contain
-        // any other data types
+        // fc.anything() produces nested objects/arrays (no functions/symbols/
+        // circular refs by default). The redirect is deep-cloned + frozen.
         const err = new RouterError("ERR", { redirect: state as State });
         const frozenState = err.redirect;
 
+        expect(frozenState).toBeDefined();
+
         if (frozenState) {
-          expect(Object.isFrozen(frozenState)).toBe(true);
           expect(frozenState.name).toBe(state.name);
           expect(frozenState.path).toBe(state.path);
+
+          // DEEP freeze: the old test only checked Object.isFrozen(frozenState)
+          // at the TOP level — a shallow-only freeze (nested params left mutable)
+          // would have passed. Walk every nested object/array.
+          assertDeeplyFrozen(frozenState);
         }
       },
     );

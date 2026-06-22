@@ -9,7 +9,7 @@ import {
 } from "@real-router/core";
 import { getPluginApi } from "@real-router/core/api";
 
-import { createStressRouter, takeHeapSnapshot, MB } from "./helpers";
+import { createStressRouter } from "./helpers";
 
 import type { Router } from "@real-router/core";
 
@@ -24,6 +24,12 @@ const delayedResolveGuardFactory = (() => {
   return () => guardFn;
 })();
 
+// Functional suite for navigateToNotFound(). The discriminating invariants are
+// the committed UNKNOWN_ROUTE state shape, the cancellation of in-flight
+// navigations, the exact listener fan-out, and that the pipeline is bypassed (no
+// TRANSITION_START). Heap was dropped: navigateToNotFound is last-write-wins
+// (sets state directly, previous UNKNOWN states unreferenced/reclaimed), so a
+// snapshot here could not discriminate a leak.
 describe("S12: navigateToNotFound() stress", () => {
   let router: Router;
 
@@ -32,11 +38,9 @@ describe("S12: navigateToNotFound() stress", () => {
     router.dispose();
   });
 
-  it("S12.1: 1,000 synchronous navigateToNotFound calls — heap delta < 5 MB", async () => {
+  it("S12.1: 1,000 synchronous navigateToNotFound calls — correct UNKNOWN_ROUTE state each time", async () => {
     router = createStressRouter(5, { allowNotFound: true });
     await router.start("/route0");
-
-    const heapBefore = takeHeapSnapshot();
 
     for (let i = 0; i < 1000; i++) {
       const state = router.navigateToNotFound(`/not-found-${i}`);
@@ -44,14 +48,9 @@ describe("S12: navigateToNotFound() stress", () => {
       expect(state.name).toBe(UNKNOWN_ROUTE);
       expect(state.path).toBe(`/not-found-${i}`);
     }
-
-    const heapAfter = takeHeapSnapshot();
-    const delta = heapAfter - heapBefore;
-
-    expect(delta).toBeLessThan(1 * MB);
   }, 30_000);
 
-  it("S12.2: navigateToNotFound during navigate — navigate cancelled, state = UNKNOWN_ROUTE", async () => {
+  it("S12.2: navigateToNotFound during navigate — navigate cancelled every time, state = UNKNOWN_ROUTE", async () => {
     const routes = [
       { name: "home", path: "/home" },
       { name: "slow", path: "/slow" },
@@ -66,7 +65,6 @@ describe("S12: navigateToNotFound() stress", () => {
 
     await router.start("/home");
 
-    const heapBefore = takeHeapSnapshot();
     let cancelledCount = 0;
 
     for (let i = 0; i < 500; i++) {
@@ -87,11 +85,10 @@ describe("S12: navigateToNotFound() stress", () => {
       expect(router.getState()?.name).toBe(UNKNOWN_ROUTE);
     }
 
-    const heapAfter = takeHeapSnapshot();
-    const delta = heapAfter - heapBefore;
-
-    expect(cancelledCount).toBeGreaterThan(0);
-    expect(delta).toBeLessThan(2.5 * MB);
+    // The synchronous navigateToNotFound supersedes the in-flight (slow-guard)
+    // navigate on every one of the 500 iterations → all 500 must cancel. The old
+    // `> 0` passed even if 499 navigations slipped through uncancelled.
+    expect(cancelledCount).toBe(500);
   }, 60_000);
 
   it("S12.3: navigateToNotFound + 50 subscribe listeners — onTransitionSuccess × 1,000, no TRANSITION_START", async () => {
@@ -117,16 +114,11 @@ describe("S12: navigateToNotFound() stress", () => {
       unsubscribers.push(unsub);
     }
 
-    const heapBefore = takeHeapSnapshot();
-
     for (let i = 0; i < 1000; i++) {
       router.navigateToNotFound(`/path-${i}`);
     }
 
     await Promise.resolve();
-
-    const heapAfter = takeHeapSnapshot();
-    const delta = heapAfter - heapBefore;
 
     removeStartListener();
 
@@ -134,16 +126,17 @@ describe("S12: navigateToNotFound() stress", () => {
       unsub();
     }
 
+    // 50 listeners × 1000 not-found navigations = 50,000 success callbacks, and
+    // navigateToNotFound bypasses the pipeline → ZERO TRANSITION_START events.
+    // The `=== 0` is the strong behavioral invariant (a regression routing
+    // not-found through the pipeline would make it non-zero).
     expect(successCallCount).toBe(50_000);
     expect(transitionStartCount).toBe(0);
-    expect(delta).toBeLessThan(0.25 * MB);
   }, 30_000);
 
-  it("S12.4: navigateToNotFound → navigate away cycle × 500 — heap stable", async () => {
+  it("S12.4: navigateToNotFound → navigate away cycle × 500 — both legs land correctly", async () => {
     router = createStressRouter(5, { allowNotFound: true });
     await router.start("/route0");
-
-    const heapBefore = takeHeapSnapshot();
 
     for (let i = 0; i < 500; i++) {
       router.navigateToNotFound(`/lost-${i}`);
@@ -156,10 +149,5 @@ describe("S12: navigateToNotFound() stress", () => {
 
       expect(router.getState()?.name).toBe(`route${target}`);
     }
-
-    const heapAfter = takeHeapSnapshot();
-    const delta = heapAfter - heapBefore;
-
-    expect(delta).toBeLessThan(0.75 * MB);
   }, 30_000);
 });

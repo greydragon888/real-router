@@ -2,18 +2,11 @@ import { describe, it, expect } from "vitest";
 
 import { getNavigator, RouterError, errorCodes } from "@real-router/core";
 
-import {
-  createStressRouter,
-  formatBytes,
-  MB,
-  takeHeapSnapshot,
-} from "./helpers";
+import { createStressRouter } from "./helpers";
 
 describe("S18: getNavigator WeakMap lifecycle", () => {
-  it("S18.1 getNavigator 1,000x same router: always same reference, heap stable", () => {
+  it("S18.1 getNavigator 1,000x same router: always same reference (WeakMap identity cache)", () => {
     const router = createStressRouter(5);
-
-    const heapBefore = takeHeapSnapshot();
 
     const first = getNavigator(router);
     let allSame = true;
@@ -26,11 +19,12 @@ describe("S18: getNavigator WeakMap lifecycle", () => {
       }
     }
 
-    const heapAfter = takeHeapSnapshot();
-    const delta = heapAfter - heapBefore;
-
+    // WeakMap identity is the discriminating invariant: getNavigator caches ONE
+    // frozen navigator per router, so 1,000 calls must return the same ref. (The
+    // old heap line was theatre — a single cached navigator is hard-capped at
+    // ~KB, structurally far below any MB threshold, so it passed even if the
+    // cache were broken.)
     expect(allSame).toBe(true);
-    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(MB);
 
     router.stop();
     router.dispose();

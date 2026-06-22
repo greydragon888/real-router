@@ -37,7 +37,16 @@ describe("S14: Rapid stop/start cycles", () => {
     const heapAfter = takeHeapSnapshot();
     const delta = heapAfter - heapBefore;
 
+    // Loop ends with stop() → inactive; and after 8000 cycles the router still
+    // starts + navigates correctly (the discriminating functional check).
     expect(router.isActive()).toBe(false);
+
+    await router.start("/route0");
+
+    expect(router.getState()?.name).toBe("route0");
+
+    // Throughput guard: a single reused router with last-write-wins state and
+    // plugins added once → no accumulation (hard-capped, not a leak detector).
     expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(1.5 * MB);
 
     router.dispose();
@@ -68,7 +77,10 @@ describe("S14: Rapid stop/start cycles", () => {
       await navPromise;
     }
 
-    expect(cancelledCount).toBeGreaterThan(0);
+    // stop() interrupts the in-flight (slow-guard) navigation every cycle, so
+    // ALL 100 must cancel — the old `> 0` passed even if 99 of 100 leaked
+    // through. The test name promises "always cancelled".
+    expect(cancelledCount).toBe(100);
     expect(router.isActive()).toBe(false);
 
     router.dispose();
@@ -131,6 +143,9 @@ describe("S14: Rapid stop/start cycles", () => {
       expect(stopCounts[p]).toBe(8000);
     }
 
+    // Throughput guard (single reused router, last-write-wins state, plugins
+    // added once — hard-capped); the per-plugin ===8000 counts above are the
+    // discriminating invariant.
     expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(1.5 * MB);
 
     router.dispose();

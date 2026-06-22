@@ -2,8 +2,6 @@ import { describe, it, expect } from "vitest";
 
 import { createRouter } from "@real-router/core";
 
-import { formatBytes, MB, takeHeapSnapshot } from "./helpers";
-
 import type { Route } from "@real-router/core";
 
 describe("S16: forwardTo chain resolution", () => {
@@ -37,8 +35,6 @@ describe("S16: forwardTo chain resolution", () => {
 
     await router.start("/home");
 
-    const heapBefore = takeHeapSnapshot();
-
     for (let i = 0; i < 200; i++) {
       if (i % 2 === 0) {
         const state = await router.navigate("start");
@@ -49,14 +45,16 @@ describe("S16: forwardTo chain resolution", () => {
       }
     }
 
-    const heapAfter = takeHeapSnapshot();
-    const delta = heapAfter - heapBefore;
-
     router.stop();
     router.dispose();
 
-    expect(callCount).toBeGreaterThan(0);
-    expect(delta, `heap delta: ${formatBytes(delta)}`).toBeLessThan(1 * MB);
+    // 100 navigations to "start" (even i), each resolving the 2-hop dynamic
+    // chain start → mid → end → 2 callback invocations apiece = exactly 200.
+    // Exact count discriminates a regression where forwardTo stops re-firing
+    // (dynamic callbacks must run on every navigation, not be cached) or fires
+    // the wrong number of hops — the old `> 0` passed even if 199 of 200
+    // navigations skipped the chain.
+    expect(callCount).toBe(200);
   }, 30_000);
 
   it("S16.3: Chain depth=99 resolves OK, depth=100+ throws (MAX_DEPTH=100 in RoutesNamespace)", async () => {
@@ -108,15 +106,20 @@ describe("S16: forwardTo chain resolution", () => {
 
       await router.start("/errHome");
 
-      let threw = false;
+      let error: unknown;
 
       try {
         await router.navigate("err0");
-      } catch {
-        threw = true;
+      } catch (error_) {
+        error = error_;
       }
 
-      expect(threw).toBe(true);
+      // Assert it threw the SPECIFIC depth-cap error, not just "some error".
+      // The old `threw === true` passed for any throw (e.g. a route-not-found
+      // if the chain were mis-wired), so it didn't prove the MAX_DEPTH guard
+      // actually fired.
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toContain("maximum depth");
 
       router.stop();
       router.dispose();
@@ -124,9 +127,19 @@ describe("S16: forwardTo chain resolution", () => {
   }, 30_000);
 
   it("S16.4: Mixed static→dynamic chains, 200 navigations — full chain resolves correctly", async () => {
+    let dynamicCalls = 0;
+
     const routes: Route[] = [
       { name: "start", path: "/start", forwardTo: "mid" },
-      { name: "mid", path: "/mid", forwardTo: () => "end" },
+      {
+        name: "mid",
+        path: "/mid",
+        forwardTo: () => {
+          dynamicCalls++;
+
+          return "end";
+        },
+      },
       { name: "end", path: "/end" },
       { name: "home", path: "/home" },
     ];
@@ -134,8 +147,6 @@ describe("S16: forwardTo chain resolution", () => {
     const router = createRouter(routes, { defaultRoute: "home" });
 
     await router.start("/home");
-
-    const heapBefore = takeHeapSnapshot();
 
     for (let i = 0; i < 200; i++) {
       if (i % 2 === 0) {
@@ -147,12 +158,15 @@ describe("S16: forwardTo chain resolution", () => {
       }
     }
 
-    const heapAfter = takeHeapSnapshot();
-    const delta = heapAfter - heapBefore;
-
     router.stop();
     router.dispose();
 
-    expect(delta, `heap delta: ${formatBytes(delta)}`).toBeLessThan(0.5 * MB);
+    // 100 navigations to "start" resolve the mixed static (start→mid) then
+    // dynamic (mid→end) chain → the dynamic leg's callback fires exactly once
+    // per navigation = 100. Discriminates a regression in static→dynamic
+    // chaining (would drop to 0 / land on "mid") on top of the in-loop
+    // state.name check. (Replaces an un-anchored, GC-masked heap assert —
+    // navigation-allocation churn is covered by navigation-memory.)
+    expect(dynamicCalls).toBe(100);
   }, 30_000);
 });

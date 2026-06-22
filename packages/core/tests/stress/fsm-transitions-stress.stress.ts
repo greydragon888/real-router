@@ -137,6 +137,10 @@ describe("S8: FSM transitions", () => {
     const after = takeHeapSnapshot();
     const delta = after - before;
 
+    // Last navigation (i=999) → route${(999 % 9) + 1} = route1: 1000 transition
+    // cycles never derailed. Heap is a throughput guard (persistent router; per-
+    // nav state retention is validated discriminatingly by guards-stress S5.3).
+    expect(router.getState()?.name).toBe("route1");
     expect(delta, `heap grew by ${formatBytes(delta)}`).toBeLessThan(0.5 * MB);
 
     router.stop();
@@ -157,6 +161,11 @@ describe("S8: FSM transitions", () => {
     const after = takeHeapSnapshot();
     const delta = after - before;
 
+    // Last navigation (i=499) → route${(499 % 9) + 1} = route5: 500 sync
+    // navigations all committed. Heap is a throughput guard — sync-path
+    // AbortControllers are released unaborted (#722) and unreferenced, so a
+    // snapshot can't discriminate a per-nav controller leak here.
+    expect(router.getState()?.name).toBe("route5");
     expect(delta, `heap grew by ${formatBytes(delta)}`).toBeLessThan(0.5 * MB);
 
     router.stop();

@@ -24,6 +24,7 @@ describe("RouterError Constants Properties", () => {
         "TRANSITION_CANCELLED",
         "ROUTER_DISPOSED",
         "PLUGIN_CONFLICT",
+        "CONTEXT_NAMESPACE_ALREADY_CLAIMED",
       ];
 
       for (const code of requiredCodes) {
@@ -41,12 +42,10 @@ describe("RouterError Constants Properties", () => {
       expect(uniqueValues.size).toBe(values.length);
     });
 
-    it("all errorCodes keys are unique", () => {
-      const keys = Object.keys(errorCodes);
-      const uniqueKeys = new Set(keys);
-
-      expect(uniqueKeys.size).toBe(keys.length);
-    });
+    // Removed "all errorCodes keys are unique": object keys are inherently
+    // unique in JS, so `new Set(keys).size === keys.length` can never fail —
+    // vacuous (no invariant to violate). "values are unique" above IS real:
+    // two distinct codes could collide on the same string value.
   });
 
   describe("errorCodes invariants", () => {

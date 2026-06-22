@@ -32,8 +32,6 @@ describe("S10: AbortController / Signal stress", () => {
   });
 
   it("S10.1: External abort signal × 200 navigations — all rejected with TRANSITION_CANCELLED", async () => {
-    const heapBefore = takeHeapSnapshot();
-
     const results = await Promise.allSettled(
       Array.from({ length: 200 }, (_, i) => {
         const controller = new AbortController();
@@ -49,9 +47,6 @@ describe("S10: AbortController / Signal stress", () => {
       }),
     );
 
-    const heapAfter = takeHeapSnapshot();
-    const delta = heapAfter - heapBefore;
-
     const cancelled = results.filter(
       (r) =>
         r.status === "rejected" &&
@@ -59,8 +54,11 @@ describe("S10: AbortController / Signal stress", () => {
         r.reason.code === errorCodes.TRANSITION_CANCELLED,
     );
 
+    // Every pre-aborted navigation rejects with TRANSITION_CANCELLED — the
+    // discriminating invariant. (Dropped a decorative, GC-masked heap line: the
+    // per-iteration controllers/promises are unreferenced and reclaimed; the
+    // dedicated controller-accumulation guard is S10.4.)
     expect(cancelled).toHaveLength(200);
-    expect(delta).toBeLessThan(4 * MB);
   }, 30_000);
 
   it("S10.2: Concurrent cancel — new navigation cancels previous × 100 pairs", async () => {
@@ -68,8 +66,6 @@ describe("S10: AbortController / Signal stress", () => {
       "route1",
       delayedResolveGuardFactory,
     );
-
-    const heapBefore = takeHeapSnapshot();
 
     let completedCount = 0;
     let cancelledCount = 0;
@@ -116,12 +112,20 @@ describe("S10: AbortController / Signal stress", () => {
       await Promise.all([p1, p2]);
     }
 
-    const heapAfter = takeHeapSnapshot();
-    const delta = heapAfter - heapBefore;
-
+    // Liveness: every one of the 200 navigations settles (no hang/deadlock).
     expect(completedCount + cancelledCount).toBe(200);
+    // At least one nav per pair is superseded/same-state → cancelled.
     expect(cancelledCount).toBeGreaterThanOrEqual(50);
-    expect(delta).toBeLessThan(1 * MB);
+
+    // Post-condition: after 100 concurrent cancel pairs the router is still
+    // fully functional — a fresh navigation commits correctly. A cancellation
+    // path that left the FSM stuck mid-transition would fail this; the dropped,
+    // GC-masked heap line couldn't see it. route7 is guard-free (sync success);
+    // if it happens to be the current state, the same-state no-op still leaves
+    // getState() === route7.
+    await router.navigate("route7").catch(() => {});
+
+    expect(router.getState()?.name).toBe("route7");
   }, 60_000);
 
   it("S10.3: Signal in guards (cooperative cancellation) — 100 navigations", async () => {
@@ -157,7 +161,6 @@ describe("S10: AbortController / Signal stress", () => {
 
     lifecycle.addActivateGuard("route1", signalAwareGuard);
 
-    const heapBefore = takeHeapSnapshot();
     const errors: unknown[] = [];
 
     // Each iteration starts navigating to route1 (its async guard suspends on the
@@ -174,18 +177,18 @@ describe("S10: AbortController / Signal stress", () => {
       await superseded;
     }
 
-    const heapAfter = takeHeapSnapshot();
-    const delta = heapAfter - heapBefore;
-
     // Every one of the 100 superseded navigations MUST propagate its abort into
     // the in-flight guard. If signal propagation regressed, abortedCount stays 0.
+    // (Dropped a decorative, GC-masked heap line — these are the discriminating
+    // invariants.)
     expect(abortedCount).toBe(100);
     expect(errors).toHaveLength(100);
-    expect(delta).toBeLessThan(2 * MB);
   }, 30_000);
 
   it("S10.4: AbortController leak check — 500 navigate cycles, no accumulation", async () => {
     const heapBefore = takeHeapSnapshot();
+
+    let lastTarget = 0;
 
     for (let i = 0; i < 500; i++) {
       const controller = new AbortController();
@@ -194,11 +197,19 @@ describe("S10: AbortController / Signal stress", () => {
       await router
         .navigate(`route${target}`, {}, { signal: controller.signal })
         .catch(() => {});
+      lastTarget = target;
     }
 
     const heapAfter = takeHeapSnapshot();
     const delta = heapAfter - heapBefore;
 
+    // Functional: all 500 (fresh-signal) navigations actually commit — the last
+    // lands on its target. Core releases its internal AbortController unaborted
+    // on success (#722); a controller that leaked would accumulate on this
+    // persistent router. The heap ceiling is a throughput guard — per-nav signal
+    // churn at N=500 sits near the noise floor, so controller-release
+    // correctness is covered discriminatingly by the #722 suite, not here.
+    expect(router.getState()?.name).toBe(`route${lastTarget}`);
     expect(delta).toBeLessThan(1 * MB);
   }, 30_000);
 });

@@ -96,6 +96,12 @@ describe("S7: EventEmitter recursion and depth", () => {
     const after = takeHeapSnapshot();
     const delta = after - before;
 
+    // Last navigation (i=999) → route${(999 % 9) + 1} = route1: depth tracking
+    // never derailed navigation over 1000 transitions — the discriminating
+    // invariant. Heap is a throughput guard: the depth map is cleared per
+    // navigation (bounded), and per-nav state retention on this persistent
+    // router is the case validated discriminatingly by guards-stress S5.3.
+    expect(router.getState()?.name).toBe("route1");
     expect(delta, `heap delta: ${formatBytes(delta)}`).toBeLessThan(2 * MB);
 
     router.stop();

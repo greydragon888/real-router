@@ -2,6 +2,7 @@ import { fc, test } from "@fast-check/vitest";
 
 import {
   arbEncoding,
+  arbMatchSafeEncodableSplatValue,
   arbMatchSafeEncodableValue,
   arbNonNumericParam,
   arbNumericParam,
@@ -383,16 +384,29 @@ describe("Matching Properties", () => {
   });
 
   describe("roundtrip — optional param values preserved through build→match", () => {
-    const matcher = createOptionalParamMatcher();
-
-    test.prop([arbSafeParamValue], { numRuns: NUM_RUNS.standard })(
-      "optional param value survives build→match roundtrip",
-      (query: string) => {
+    // Strengthened: was a fixpoint generator (arbSafeParamValue) with no
+    // anti-identity, so an under-encoding stub on the optional path survived.
+    // Now an encode-requiring value across all 4 strategies + anti-identity,
+    // mirroring the required-param test below.
+    test.prop([arbEncoding, arbMatchSafeEncodableValue], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "optional param value survives build→match, and non-none encodes it in the URL",
+      (enc, query: string) => {
+        const matcher = createOptionalParamMatcher({ urlParamsEncoding: enc });
         const path = matcher.buildPath("search", { query });
         const result = matcher.match(path);
 
         expect(result).toBeDefined();
         expect(result!.params).toStrictEqual({ query });
+
+        // anti-identity: space is raw under `none`, percent-encoded otherwise.
+        if (enc === "none") {
+          expect(path).toContain(" ");
+        } else {
+          expect(path).not.toContain(" ");
+          expect(path).toContain("%");
+        }
       },
     );
   });
@@ -423,6 +437,33 @@ describe("Matching Properties", () => {
         } else {
           expect(path).not.toContain(" ");
           expect(path).toContain("%");
+        }
+      },
+    );
+  });
+
+  describe("roundtrip — splat build→match across all 4 encodings, with anti-identity", () => {
+    test.prop([arbEncoding, arbMatchSafeEncodableSplatValue], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "build→match preserves an encode-requiring splat, and non-none encodes its segments",
+      (enc, path: string) => {
+        const matcher = createSplatMatcher({ urlParamsEncoding: enc });
+        const builtPath = matcher.buildPath("files", { path });
+        const result = matcher.match(builtPath);
+
+        expect(result).toBeDefined();
+        expect(result!.params).toStrictEqual({ path });
+
+        // anti-identity: splat encodes PER SEGMENT — each segment's space is raw
+        // under `none`, %20 otherwise (the "/" separators stay raw under all
+        // strategies). The fixpoint splat roundtrip above can't see an
+        // under-encoding stub on the splat path; this can.
+        if (enc === "none") {
+          expect(builtPath).toContain(" ");
+        } else {
+          expect(builtPath).not.toContain(" ");
+          expect(builtPath).toContain("%");
         }
       },
     );

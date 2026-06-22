@@ -1,4 +1,4 @@
-import { test } from "@fast-check/vitest";
+import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 
 import { getPluginApi } from "@real-router/core/api";
@@ -9,6 +9,22 @@ import {
   arbSearchParams,
   NUM_RUNS,
 } from "./helpers";
+
+/**
+ * `:id` values that REQUIRE percent-encoding yet still roundtrip cleanly: every
+ * value contains a literal space, so a correct `buildPath` must emit `%20` (and
+ * never a raw space), and `matchPath` must decode it back. The surrounding
+ * alphanumerics keep the value match-safe. `arbIdParam` (the `[a-zA-Z0-9_-]`
+ * charset used by the other roundtrip tests) never needs encoding, so a
+ * `decode∘encode` roundtrip over it is BLIND to under-encoding — `encode=identity`
+ * survives it. This generator + the anti-identity assert below close that gap.
+ */
+const arbEncodableId = fc
+  .tuple(
+    fc.stringMatching(/^[a-zA-Z0-9]{1,4}$/),
+    fc.stringMatching(/^[a-zA-Z0-9]{1,4}$/),
+  )
+  .map(([a, b]) => `${a} ${b}`);
 
 describe("buildPath ↔ matchPath Roundtrip Properties", () => {
   const router = createFixtureRouter();
@@ -24,6 +40,27 @@ describe("buildPath ↔ matchPath Roundtrip Properties", () => {
       expect(matched!.name).toBe("users.view");
       // Path params are always strings after URL decode
       expect(matched!.params).toStrictEqual({ id: params.id });
+    },
+  );
+
+  test.prop([arbEncodableId], { numRuns: NUM_RUNS.standard })(
+    "encode-requiring values: buildPath actually percent-encodes AND roundtrips",
+    (id) => {
+      const path = router.buildPath("users.view", { id });
+
+      // Anti-identity: a value needing encoding must NOT appear raw — the space
+      // must be percent-encoded. A roundtrip alone can't see this (permissive
+      // decode inverts raw segments too, so encode=identity would survive it);
+      // this assert is what catches under-encoding / a stripped encoder.
+      expect(path).not.toContain(" ");
+      expect(path).toContain("%20");
+
+      // Roundtrip: decode recovers the exact original value (catches over/wrong
+      // decode in the other direction).
+      const matched = pluginApi.matchPath(path);
+
+      expect(matched!.name).toBe("users.view");
+      expect(matched!.params).toStrictEqual({ id });
     },
   );
 

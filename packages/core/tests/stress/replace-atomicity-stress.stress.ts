@@ -95,11 +95,18 @@ describe("S25: replace() atomicity under concurrent navigation", () => {
           : target;
 
       await router.navigate(targetRoute);
+
+      // Each replace+navigate must land on the rebuilt target route — the
+      // discriminating invariant the old heap-only assert lacked.
+      expect(router.getState()?.name).toBe(targetRoute);
     }
 
     const after = takeHeapSnapshot();
     const delta = after - before;
 
+    // Throughput guard: replace() rebuilds the tree (old tree GC'd, last-write-
+    // wins), so accumulation is hard-capped to one generation and a heap snapshot
+    // can't discriminate it; the per-cycle landing check above does.
     expect(delta, `heap delta: ${formatBytes(delta)}`).toBeLessThan(1.8 * MB);
   });
 });

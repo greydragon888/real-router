@@ -62,35 +62,40 @@ describe("S13: Dependencies store churn", () => {
     router.dispose();
   });
 
-  it("S13.3 limit boundary: 100 deps fit, 101st throws, recover after remove", () => {
+  it("S13.3 store churn + recovery: set 101, remove 50, refill 50 — has() stays consistent", () => {
+    // NOTE: maxDependencies is enforced by @real-router/validation-plugin
+    // (validateDependencyLimit, inclusive `totalCount >= max`), NOT by core.
+    // This stress router has no validation-plugin, so the limit is inert and no
+    // set throws — the discriminating invariant here is the store's set/remove/
+    // refill bookkeeping (has() below), not limit enforcement. (The previous
+    // title "101st throws" described the WITH-plugin behavior the test never
+    // exercises; limit-throw is covered by the validation-plugin suite.)
     const router = createRouter<Record<string, number>>([], {
       limits: { maxDependencies: 100 },
     });
     const deps = getDependenciesApi(router);
 
     for (let i = 0; i < 100; i++) {
-      expect(() => {
-        deps.set(`dep${i}`, i);
-      }).not.toThrow();
+      deps.set(`dep${i}`, i);
     }
 
-    expect(() => {
-      deps.set("dep100", 100);
-    }).not.toThrow();
+    // The 101st set is accepted (no enforcement without the plugin).
+    deps.set("dep100", 100);
 
     for (let i = 0; i < 50; i++) {
       deps.remove(`dep${i}`);
     }
 
     for (let i = 0; i < 50; i++) {
-      expect(() => {
-        deps.set(`newdep${i}`, i);
-      }).not.toThrow();
+      deps.set(`newdep${i}`, i);
     }
 
+    // Recovery invariants: survivor kept, removed gone, refilled present, and the
+    // 101st set actually landed (no inert-limit drop).
     expect(deps.has("dep50")).toBe(true);
     expect(deps.has("dep0")).toBe(false);
     expect(deps.has("newdep0")).toBe(true);
+    expect(deps.has("dep100")).toBe(true);
 
     router.stop();
     router.dispose();

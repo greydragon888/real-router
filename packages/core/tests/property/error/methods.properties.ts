@@ -168,6 +168,29 @@ describe("RouterError Methods Properties", () => {
       },
     );
 
+    test.prop(
+      [
+        errorCodeArbitrary,
+        fc.constantFrom("code", "segment", "path", "redirect"),
+        fc.string(),
+      ],
+      { numRuns: 1000 },
+    )(
+      "throws TypeError for reserved DATA property keys",
+      (code, reservedKey, value) => {
+        const err = new RouterError(code);
+
+        // Reserved DATA properties (code/segment/path/redirect) — distinct from
+        // the reserved METHODS covered below — must be REJECTED, not silently
+        // dropped. The shared `customFieldsArbitrary` filters these keys out, so
+        // this throw path (RouterError.setAdditionalFields) had no generative
+        // coverage at all.
+        expect(() => {
+          err.setAdditionalFields({ [reservedKey]: value });
+        }).toThrow(TypeError);
+      },
+    );
+
     test.prop([errorCodeArbitrary, customFieldsArbitrary], { numRuns: 5000 })(
       "does not overwrite methods",
       (code, fields) => {

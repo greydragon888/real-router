@@ -29,7 +29,11 @@ describe("TREE_CHANGED memory", () => {
     const after = takeHeapSnapshot();
     const delta = after - before;
 
-    // 2 events per cycle (add + remove) — payloads must not be retained.
+    // received === 20_000 (2 events/cycle) is the discriminating delivery
+    // invariant. The heap line is a throughput guard: TREE_CHANGED payloads are
+    // transient (consumed by the callback, not retained), so a snapshot can't see
+    // a payload leak; handler-ref retention is the one validated discriminatingly
+    // by the 50k subscribe/unsubscribe test below.
     expect(received).toBe(20_000);
     expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(5 * MB);
 
@@ -95,6 +99,10 @@ describe("TREE_CHANGED memory", () => {
     const after = takeHeapSnapshot();
     const delta = after - before;
 
+    // invocations === 100_000 (1000 × 2 ops × 50 subscribers) is the
+    // discriminating fan-out invariant. The heap line is a throughput guard —
+    // the tree is add+clear (replaced, not accumulated) and payloads are
+    // transient, so it is hard-capped below the threshold.
     expect(invocations).toBe(100_000);
     expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(5 * MB);
 

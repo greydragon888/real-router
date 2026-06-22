@@ -12,16 +12,20 @@ import {
 
 import type { Route } from "@real-router/core";
 
-// These are catastrophic-leak guards: navigation has no test-side cleanup to
-// remove, so the only simulatable leak is "core/app retains one State per
-// navigation" (~335 B/nav, measured). At these iteration counts that signal is
-// the same order as healthy heap noise, so thresholds are tightened to ~5-18x
-// the (rock-stable) healthy delta — catching a moderate per-nav leak without the
-// flakiness/runtime cost of inflating navigation counts to 10k+. The
-// high-volume retention case is covered by event-listener-memory's 250k-
-// invocation test.
-describe("S1. Navigation memory leaks", () => {
-  it("should not leak memory during 1,000 simple navigations between 2 routes", async () => {
+// IMPORTANT — what these tests do and do NOT guard:
+//  - The heap deltas are THROUGHPUT guards, not leak detectors. Navigation has
+//    no test-side cleanup to skip, and the only simulatable leak ("core retains
+//    one State per navigation", ~335 B/nav measured) is, at these iteration
+//    counts, the same order as healthy heap noise (~5-18x headroom). A heap
+//    snapshot therefore cannot discriminate that leak here.
+//  - The DISCRIMINATING per-nav state-retention leak is validated elsewhere:
+//    guards-stress S5.3 retains every state at N=20k (leak ~7 MB vs healthy
+//    ~0.48 MB, 2 MB threshold between) and trips on the mutation.
+//  - So each test below also asserts NAVIGATION CORRECTNESS (the committed state
+//    after the churn), which the bare heap line never did — that is the real
+//    discriminating power; the heap line stays as a cheap catastrophe ceiling.
+describe("S1. Navigation memory / throughput", () => {
+  it("should stay correct + bounded during 1,000 simple navigations between 2 routes", async () => {
     const router = createStressRouter(10);
 
     await router.start("/route0");
@@ -35,13 +39,15 @@ describe("S1. Navigation memory leaks", () => {
     const after = takeHeapSnapshot();
     const delta = after - before;
 
+    // Last navigation (i=999, odd) targets route0 — correctness invariant.
+    expect(router.getState()?.name).toBe("route0");
     expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(1 * MB);
 
     router.stop();
     router.dispose();
   });
 
-  it("should not leak memory during 2,000 round-robin navigations across 10 routes", async () => {
+  it("should stay correct + bounded during 2,000 round-robin navigations across 10 routes", async () => {
     const router = createStressRouter(10);
 
     await router.start("/route0");
@@ -55,13 +61,15 @@ describe("S1. Navigation memory leaks", () => {
     const after = takeHeapSnapshot();
     const delta = after - before;
 
+    // Last navigation (i=1999) targets route${2000 % 10} = route0.
+    expect(router.getState()?.name).toBe("route0");
     expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(1 * MB);
 
     router.stop();
     router.dispose();
   });
 
-  it("should not leak memory during 1,000 navigations with unique params", async () => {
+  it("should stay correct + bounded during 1,000 navigations with unique params", async () => {
     const routes = createParamRoutes(5);
     const router = createRouter(routes, { defaultRoute: "routeP0" });
 
@@ -76,13 +84,16 @@ describe("S1. Navigation memory leaks", () => {
     const after = takeHeapSnapshot();
     const delta = after - before;
 
+    // Last navigation (i=999) → routeP4 with id "999".
+    expect(router.getState()?.name).toBe("routeP4");
+    expect(router.getState()?.params.id).toBe("999");
     expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(0.5 * MB);
 
     router.stop();
     router.dispose();
   });
 
-  it("should resolve all 500 fire-and-forget navigations without memory leak", async () => {
+  it("should resolve all 500 fire-and-forget navigations and stay functional", async () => {
     const router = createStressRouter(10);
 
     await router.start("/route0");
@@ -100,13 +111,20 @@ describe("S1. Navigation memory leaks", () => {
     const after = takeHeapSnapshot();
     const delta = after - before;
 
+    // After the concurrent storm settles the router is still fully functional —
+    // a fresh navigation commits correctly (concurrent navs supersede each
+    // other, so the final committed target is racy; this is the deterministic
+    // post-condition).
+    await router.navigate("route3").catch(() => {});
+
+    expect(router.getState()?.name).toBe("route3");
     expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(1 * MB);
 
     router.stop();
     router.dispose();
   });
 
-  it("should not leak memory during 500 navigations through forwardTo redirect chains", async () => {
+  it("should stay correct + bounded during 500 navigations through forwardTo redirect chains", async () => {
     const routes: Route[] = [
       { name: "home", path: "/home" },
       { name: "about", path: "/about" },
@@ -131,6 +149,11 @@ describe("S1. Navigation memory leaks", () => {
     const after = takeHeapSnapshot();
     const delta = after - before;
 
+    // Last navigation (i=499) → targets[499 % 5 = 4] = "home". (Redirect
+    // resolution itself is exercised every 5th iter via redirectA→home /
+    // redirectB→about and asserted by forward-to-chains; here the invariant is
+    // the committed terminal route after the churn.)
+    expect(router.getState()?.name).toBe("home");
     expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(0.5 * MB);
 
     router.stop();

@@ -130,7 +130,12 @@ describe("S6: Route tree scaling", () => {
 
       await router.navigate(`route${i % 5}`).catch(() => {});
 
-      expect(router.getState()).toBeDefined();
+      // The committed state must still resolve to a real route in the *new*
+      // tree after the replace. The old `toBeDefined()` passed even if
+      // state.name dangled at a route the replace had removed.
+      const state = router.getState();
+
+      expect(state && routesApi.has(state.name)).toBe(true);
     }
 
     router.stop();

@@ -1,33 +1,33 @@
-import { test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 
 import { errorCodes, RouterError } from "@real-router/core";
-import { cloneRouter, getRoutesApi } from "@real-router/core/api";
+import {
+  cloneRouter,
+  getDependenciesApi,
+  getRoutesApi,
+} from "@real-router/core/api";
 
 import {
   createFixtureRouter,
   createStartedRouter,
-  arbStartPath,
   FIXTURE_ROUTE_NAMES,
-  NUM_RUNS,
 } from "./helpers";
 
 describe("cloneRouter Properties", () => {
-  test.prop([arbStartPath], { numRuns: NUM_RUNS.fast })(
-    "route preservation: cloned router has same routes as source",
-    (path) => {
-      const router = createFixtureRouter();
-      const cloned = cloneRouter(router);
-      const sourceRoutes = getRoutesApi(router);
-      const clonedRoutes = getRoutesApi(cloned);
+  it("route preservation: clone contains every route from the source", () => {
+    const router = createFixtureRouter();
+    const cloned = cloneRouter(router);
+    const clonedRoutes = getRoutesApi(cloned);
 
-      for (const name of FIXTURE_ROUTE_NAMES) {
-        expect(clonedRoutes.has(name)).toBe(sourceRoutes.has(name));
-      }
-
-      void path;
-    },
-  );
+    // Independent oracle: every known fixture route must be present in the clone.
+    // The old version compared clonedRoutes.has(name) to sourceRoutes.has(name)
+    // (a symmetric self-check on the same impl) AND discarded its generated
+    // `arbStartPath` input (`void path`) — a fake property that asserted nothing
+    // an independent truth could.
+    for (const name of FIXTURE_ROUTE_NAMES) {
+      expect(clonedRoutes.has(name)).toBe(true);
+    }
+  });
 
   it("state independence: cloned router starts with no state", () => {
     const router = createFixtureRouter();
@@ -36,19 +36,38 @@ describe("cloneRouter Properties", () => {
     expect(cloned.getState()).toBeUndefined();
   });
 
-  it("dependency merge: override deps are merged with source", () => {
-    const router = createFixtureRouter();
-
-    interface Deps {
+  it("dependency merge: clone keeps source deps, applies overrides (override wins), stays independent", () => {
+    interface Deps extends Record<string, unknown> {
       apiUrl: string;
+      sourceOnly: string;
       token: string;
     }
-    const cloned = cloneRouter<Deps>(router as never, {
-      apiUrl: "https://test",
-      token: "abc",
-    });
 
-    expect(cloned).toBeDefined();
+    const router = createFixtureRouter();
+    const sourceDeps = getDependenciesApi<Deps>(router as never);
+
+    sourceDeps.set("apiUrl", "https://source");
+    sourceDeps.set("sourceOnly", "kept");
+
+    const cloned = cloneRouter(
+      router as never,
+      {
+        apiUrl: "https://override",
+        token: "abc",
+      } as never,
+    );
+    const clonedDeps = getDependenciesApi<Deps>(cloned);
+
+    // The old test only asserted `expect(cloned).toBeDefined()` — a clone that
+    // dropped deps entirely would have passed. Assert the actual merge contract:
+    expect(clonedDeps.get("token")).toBe("abc"); // override-only dep applied
+    expect(clonedDeps.get("sourceOnly")).toBe("kept"); // source-only dep preserved
+    expect(clonedDeps.get("apiUrl")).toBe("https://override"); // override wins on conflict
+
+    // clone deps are independent of the source (no shared store)
+    clonedDeps.set("token", "changed");
+
+    expect(sourceDeps.has("token")).toBe(false);
   });
 
   it("disposed source throws ROUTER_DISPOSED", async () => {

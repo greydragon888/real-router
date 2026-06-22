@@ -1,4 +1,4 @@
-import { test } from "@fast-check/vitest";
+import { fc, test } from "@fast-check/vitest";
 import { describe, expect } from "vitest";
 
 import { RouterError } from "@real-router/core";
@@ -150,6 +150,19 @@ describe("RouterError Constructor Properties", () => {
             expect((err as Record<string, unknown>)[key]).toBe(value);
           }
         }
+      },
+    );
+
+    test.prop([errorCodeArbitrary, fc.string()], { numRuns: 1000 })(
+      "throws TypeError when a custom field collides with the reserved 'code' key",
+      (code, value) => {
+        // `code` is the positional arg, not an option — passing it inside the
+        // options object makes it a custom field, which collides with the
+        // reserved data property and must throw. (segment/path/redirect are
+        // destructured options, so only `code` reaches THIS ctor throw path;
+        // setAdditionalFields covers all four.) The shared customFieldsArbitrary
+        // filters reserved keys, so this throw had no generative coverage.
+        expect(() => new RouterError(code, { code: value })).toThrow(TypeError);
       },
     );
 

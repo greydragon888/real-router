@@ -2,12 +2,7 @@ import { describe, afterEach, it, expect } from "vitest";
 
 import { getPluginApi } from "@real-router/core/api";
 
-import {
-  createStressRouter,
-  formatBytes,
-  takeHeapSnapshot,
-  MB,
-} from "./helpers";
+import { createStressRouter } from "./helpers";
 
 import type { Router } from "@real-router/core";
 
@@ -25,8 +20,6 @@ describe("S24: setRootPath concurrent changes", () => {
 
     const pluginApi = getPluginApi(router);
 
-    const heapBefore = takeHeapSnapshot();
-
     for (let i = 0; i < 3000; i++) {
       const prefix = `/app${i}`;
 
@@ -39,11 +32,12 @@ describe("S24: setRootPath concurrent changes", () => {
       await router.navigate(`route${target}`);
     }
 
-    const heapAfter = takeHeapSnapshot();
-    const delta = heapAfter - heapBefore;
-
-    expect(router.getState()).toBeDefined();
-    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(1.5 * MB);
+    // Last navigation (i=2999) → route${(2999 % 9) + 1} = route3. The in-loop
+    // getRootPath() check already discriminates setRootPath; this pins the
+    // committed route too. (Dropped a hard-capped heap line — rootPath is a
+    // single last-write-wins scalar, ~bytes retained, structurally below any MB
+    // threshold, so the old heap assert passed even if setRootPath leaked.)
+    expect(router.getState()?.name).toBe("route3");
 
     pluginApi.setRootPath("");
   }, 30_000);

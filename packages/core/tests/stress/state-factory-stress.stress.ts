@@ -11,6 +11,12 @@ import {
 
 import type { Router } from "@real-router/core";
 
+// These factories return a fresh State each call and the result is dropped /
+// reassigned every iteration, so a heap snapshot can't see a per-call leak
+// (GC-masked) — the heap lines are throughput guards. Discrimination comes from
+// asserting each call produces the CORRECT state (name pinned to the input),
+// which catches a factory regression the old `toBeDefined()` / bare-heap form
+// would pass straight through.
 describe("S21: makeState / buildState memory", () => {
   let router: Router;
 
@@ -19,7 +25,7 @@ describe("S21: makeState / buildState memory", () => {
     router.dispose();
   });
 
-  it("S21.1: 10,000 makeState() calls with unique params — heap stable", async () => {
+  it("S21.1: 10,000 makeState() calls with unique params — correct + heap stable", async () => {
     router = createStressRouter(100);
     await router.start("/route0");
 
@@ -28,11 +34,14 @@ describe("S21: makeState / buildState memory", () => {
     const heapBefore = takeHeapSnapshot();
 
     for (let i = 0; i < 10_000; i++) {
-      pluginApi.makeState(
+      const state = pluginApi.makeState(
         `route${i % 100}`,
         { id: String(i) },
         `/route${i % 100}`,
       );
+
+      expect(state.name).toBe(`route${i % 100}`);
+      expect(state.params.id).toBe(String(i));
     }
 
     const heapAfter = takeHeapSnapshot();
@@ -41,7 +50,7 @@ describe("S21: makeState / buildState memory", () => {
     expect(delta, `heap delta: ${formatBytes(delta)}`).toBeLessThan(1 * MB);
   }, 30_000);
 
-  it("S21.2: buildState() × 10,000 — heap stable", async () => {
+  it("S21.2: buildState() × 10,000 — correct + heap stable", async () => {
     router = createStressRouter(100);
     await router.start("/route0");
 
@@ -52,7 +61,7 @@ describe("S21: makeState / buildState memory", () => {
     for (let i = 0; i < 10_000; i++) {
       const result = pluginApi.buildState(`route${i % 100}`, { id: String(i) });
 
-      expect(result).toBeDefined();
+      expect(result?.name).toBe(`route${i % 100}`);
     }
 
     const heapAfter = takeHeapSnapshot();
@@ -61,7 +70,7 @@ describe("S21: makeState / buildState memory", () => {
     expect(delta, `heap delta: ${formatBytes(delta)}`).toBeLessThan(1 * MB);
   }, 30_000);
 
-  it("S21.3: buildNavigationState() × 5,000 — heap stable", async () => {
+  it("S21.3: buildNavigationState() × 5,000 — correct + heap stable", async () => {
     router = createStressRouter(100);
     await router.start("/route0");
 
@@ -74,7 +83,7 @@ describe("S21: makeState / buildState memory", () => {
         id: String(i),
       });
 
-      expect(result).toBeDefined();
+      expect(result?.name).toBe(`route${i % 100}`);
     }
 
     const heapAfter = takeHeapSnapshot();

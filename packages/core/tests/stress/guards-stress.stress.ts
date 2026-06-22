@@ -59,7 +59,12 @@ describe("S5: Guards under load", () => {
 
     const totalCalls = callCounts.reduce((sum, c) => sum + c, 0);
 
-    expect(totalCalls).toBeGreaterThanOrEqual(500);
+    // 500 navigations, each entering exactly one guarded route → exactly 500
+    // activate-guard calls (activate guards are not auto-cleaned). The old
+    // `>= 500` passed even if guards over-fired (re-accumulation).
+    expect(totalCalls).toBe(500);
+    // Throughput guard: persistent router; per-nav state retention is the leak
+    // validated discriminatingly by S5.3 (N=20k), here N=500 keeps it in noise.
     expect(delta).toBeLessThan(2 * MB);
   }, 30_000);
 
@@ -127,8 +132,6 @@ describe("S5: Guards under load", () => {
     const errors: unknown[] = [];
     const successes: unknown[] = [];
 
-    const heapBefore = takeHeapSnapshot();
-
     for (let i = 0; i < 100; i++) {
       const p1 = router.navigate("route1").then(
         (s) => {
@@ -158,14 +161,20 @@ describe("S5: Guards under load", () => {
       await Promise.all([p1, p2]);
     }
 
-    const heapAfter = takeHeapSnapshot();
-    const delta = heapAfter - heapBefore;
-
+    // Liveness: all 200 navigations settle (no hang). The sum is tautological on
+    // its own (every promise resolves or rejects), so it only guards a deadlock —
+    // the discriminating post-condition is below.
     expect(errors.length + successes.length).toBe(200);
-    expect(delta).toBeLessThan(0.75 * MB);
+
+    // After 100 block+cancel pairs the router is still functional — a fresh
+    // navigation to a guard-free route commits. (Dropped a GC-masked heap line:
+    // superseded-nav promises settle and are reclaimed regardless of leaks.)
+    await router.navigate("route5").catch(() => {});
+
+    expect(router.getState()?.name).toBe("route5");
   }, 60_000);
 
-  it("S5.5: Mixed canActivate/canDeactivate × 20 each + 200 navigations — correct order", async () => {
+  it("S5.5: Mixed canActivate/canDeactivate × 19 each + 200 navigations — activate re-fires, deactivate is auto-cleaned (one-shot)", async () => {
     router = createStressRouter(20);
     await router.start("/route0");
 
@@ -198,8 +207,20 @@ describe("S5: Guards under load", () => {
       await router.navigate(`route${target}`);
     }
 
-    expect(activateOrder.length).toBeGreaterThan(0);
-    expect(deactivateOrder.length).toBeGreaterThan(0);
-    expect(activateOrder.length + deactivateOrder.length).toBeGreaterThan(200);
+    // Flat sibling routes, 200 navs cycling route1..19:
+    //  - activate guards re-fire on EVERY entry → exactly 200 activations
+    //    (every nav enters a guarded target; activate guards are never cleaned).
+    //  - canDeactivate guards are AUTO-CLEANED when a route deactivates
+    //    (completeTransition → clearCanDeactivate; see auto-cleanup.test.ts),
+    //    so each route's deactivate guard fires exactly ONCE — on its first
+    //    leave (i=1..19) — then is removed; subsequent leaves don't re-fire.
+    //    → exactly 19 deactivations (route1..route19, once each).
+    // Exact counts discriminate BOTH the firing AND the auto-cleanup: the old
+    // `> 0` / `> 200` asserts passed even if deactivate guards leaked (no
+    // cleanup, ~199) or 199 of 200 transitions skipped their guards.
+    // (Hierarchical innermost→outermost ORDER is covered by property suite
+    // `guards.properties.ts` #3 — flat routes here can't exercise it.)
+    expect(activateOrder).toHaveLength(200);
+    expect(deactivateOrder).toHaveLength(19);
   }, 30_000);
 });
