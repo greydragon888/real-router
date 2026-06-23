@@ -535,7 +535,7 @@ const nav = getNavigator(router);
 | `subscribeLeave`    | Subscribe to confirmed route departures (LEAVE_APPROVED phase). Listener receives `{ route: fromState, nextRoute: toState, signal: AbortSignal }`. Async listeners are awaited — the activation phase blocks until all Promises settle |
 | `isLeaveApproved`   | Returns `true` when FSM is in LEAVE_APPROVED state (deactivation done, activation pending) |
 
-**`isTransitioning()`** (on router, not navigator) returns `true` in both TRANSITION_STARTED and LEAVE_APPROVED states — covers the entire navigation window. Backward compatible: callers that checked `isTransitioning()` before LEAVE_APPROVED existed still get correct results.
+**Transition-in-flight signal.** `isLeaveApproved()` (public, on router and navigator) returns `true` only in the LEAVE_APPROVED phase (deactivation done, activation pending). There is **no public `isTransitioning()` method on the Router class today** — `isTransitioning()` exists only internally (`RouterInternals`, spanning TRANSITION_STARTED + LEAVE_APPROVED) for cross-namespace plumbing. Whether to promote it to the public surface is an open research question (ROI vs. `isLeaveApproved()` + `getState()` already covering the observable cases) — see issue #924.
 
 ## Gotchas
 
@@ -686,6 +686,21 @@ Both options default to on. `matchPath()` rebuilds `state.path` via `buildPath()
 - Means "intentionally kept after v8 ignore audit — do not remove without re-auditing"
 - Do NOT use for defensive guards against TypeScript-enforced invariants
 - All `@preserve` blocks must have clear explanatory comments
+
+### Mutation testing (Stryker)
+
+Mutation score sits at ~90 % (`/mutation-score` skill; full record in `.claude/mutation-audit-2026-06-22.md`). **Do NOT chase 100 % by silencing survivors** — the honest ceiling is ~90–92 %. The remainder is structurally not worth disabling:
+
+- **Entangled** — the same mutator has a *killed* AND a *survived* variant on one line (`CE→true` killed, `CE→false` survived). `// Stryker disable <Mutator>` would drop the kill. Un-silenceable by design.
+- **Equivalents** — no test can kill them: cache short-circuit (recompute is identical), `>0→>=0` on an empty collection, `++→--` on identity-only ids, `{once}` listener redundancy, defensive-redundancy cancel-checks.
+- **Validator-opt-in** — `ctx.validator?.…` branches are dead in core (validator is `null`), covered in `@real-router/validation-plugin`. Left documented (the comment says where they're tested), not disabled.
+
+Rules:
+
+- **`survived ≠ equivalent`.** Disable ONLY after proving equivalence empirically (manual mutation + full suite green). Multiple survivors here *looked* equivalent but were killable — the `finally` controller-cleanup, cache *conditions* (a stale-hit returns the wrong cached value), the `isActive` fast-path. Silencing an unproven survivor hides a real coverage gap — the exact anti-pattern mutation testing exists to catch.
+- A **killable** survivor → close it with a **test** (that strengthens the suite), never a `disable`.
+- A **proven** equivalent → `// Stryker disable next-line <Mutator>: reason`, listing only mutators with no killed sibling on that line. If un-targetable — entangled, or a `finally` body whose catch-`}` and `finally-{` share one line — document with a plain comment and leave it survived.
+- Score is a proxy for test strength, not a target. Inflating it by silencing is net-negative.
 
 ### Promise-Based Navigation API
 
