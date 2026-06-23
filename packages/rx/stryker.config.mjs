@@ -1,5 +1,5 @@
 /**
- * Stryker mutation testing configuration for real-router
+ * Stryker mutation testing configuration for rx
  *
  * Standalone config - does not extend base to avoid sandbox resolution issues.
  *
@@ -16,12 +16,12 @@ export default {
     "@stryker-mutator/typescript-checker",
   ],
 
-  // Mutate real-router source files
+  // Mutate rx source files
   mutate: [
     "src/**/*.ts",
     "!src/index.ts", // Barrel export - skip
-    "!src/internals.ts", // Internal re-exports - skip
-    "!src/constants.ts", // Constants - skip
+    "!src/types.ts", // Type definitions - skip
+    "!src/operators/index.ts", // Operators barrel - skip
   ],
 
   // Vitest runner configuration
@@ -36,11 +36,14 @@ export default {
   // Local tsconfig
   tsconfigFile: "tsconfig.json",
 
-  // Mutation score thresholds
+  // Mutation score thresholds (public package - moderate thresholds).
+  // Note: stryker runs only the unit/integration `.test.ts` suite; the
+  // property/stress suites are excluded by convention. Async/operator/lifecycle
+  // depth lives there, so measure the real score on first run and tune.
   thresholds: {
     high: 90,
-    low: 80,
-    break: 70,
+    low: 70,
+    break: 60,
   },
 
   // Performance settings
@@ -49,21 +52,9 @@ export default {
   timeoutFactor: 3, // 3x safety margin
 
   // Reporters
-  // "json" emits the machine-readable mutation-testing-report-schema as a plain
-  // JSON file — parse it directly (jq/node) instead of eval-extracting the blob
-  // embedded in the multi-MB HTML report.
-  reporters: ["progress", "clear-text", "html", "json"],
+  reporters: ["progress", "clear-text", "html"],
   htmlReporter: {
     fileName: "reports/mutation-report.html",
-  },
-  jsonReporter: {
-    fileName: "reports/mutation-report.json",
-  },
-  // skipFull hides 100%-killed files so the clear-text tail lists only files
-  // that still have survivors; reportMutants prints each survivor inline.
-  clearTextReporter: {
-    reportMutants: true,
-    skipFull: true,
   },
 
   // DO NOT exclude tests/ - they are needed in sandbox!
@@ -86,6 +77,6 @@ export default {
   // Strict type checking for each mutant
   disableTypeChecks: false,
 
-  // Fresh runner for each mutant (matches vitest-react-profiler)
+  // Fresh runner for each mutant
   maxTestRunnerReuse: 0,
 };
