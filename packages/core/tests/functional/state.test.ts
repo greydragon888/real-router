@@ -1,13 +1,8 @@
-import { createRouteTree, createMatcher } from "route-tree";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import { createRouter } from "@real-router/core";
 import { getPluginApi, getRoutesApi } from "@real-router/core/api";
 
-import {
-  buildNameFromSegments,
-  createRouteState,
-} from "../../src/namespaces/RoutesNamespace/RoutesNamespace";
 import { createTestRouter } from "../helpers";
 
 import type { Router, Route } from "@real-router/core";
@@ -88,98 +83,10 @@ describe("core/state", () => {
 });
 
 describe("core/stateBuilder", () => {
-  describe("buildNameFromSegments", () => {
-    it("builds dot-separated name from segments", () => {
-      const tree = createRouteTree("", "", [
-        {
-          name: "users",
-          path: "/users",
-          children: [{ name: "profile", path: "/:id" }],
-        },
-      ]);
-
-      const matcher = createMatcher();
-
-      matcher.registerTree(tree);
-      const result = matcher.match("/users/123");
-
-      expect(result).not.toBeNull();
-      expect(buildNameFromSegments(result!.segments)).toBe("users.profile");
-    });
-
-    it("returns empty string for no segments", () => {
-      expect(buildNameFromSegments([])).toBe("");
-    });
-
-    it("skips segments with empty names", () => {
-      const tree = createRouteTree("", "", [{ name: "home", path: "/home" }]);
-
-      const matcher = createMatcher();
-
-      matcher.registerTree(tree);
-      const result = matcher.match("/home");
-
-      expect(result).not.toBeNull();
-      expect(buildNameFromSegments(result!.segments)).toBe("home");
-    });
-
-    it("returns fullName from last segment", () => {
-      const segments = [{ fullName: "users" }, { fullName: "users.profile" }];
-
-      expect(buildNameFromSegments(segments as any)).toBe("users.profile");
-    });
-
-    it("returns empty string when last segment has no fullName", () => {
-      const segments = [{ fullName: undefined }];
-
-      expect(buildNameFromSegments(segments as any)).toBe("");
-    });
-  });
-
-  describe("createRouteState", () => {
-    it("creates RouteTreeState from MatchResult", () => {
-      const tree = createRouteTree("", "", [
-        {
-          name: "users",
-          path: "/users",
-          children: [{ name: "view", path: "/:id" }],
-        },
-      ]);
-
-      const matcher = createMatcher();
-
-      matcher.registerTree(tree);
-      const result = matcher.match("/users/123");
-
-      expect(result).not.toBeNull();
-
-      const state = createRouteState(result!);
-
-      expect(state).toStrictEqual({
-        name: "users.view",
-        params: { id: "123" },
-        meta: {
-          users: {},
-          "users.view": { id: "url" },
-        },
-      });
-    });
-
-    it("uses explicit name when provided", () => {
-      const tree = createRouteTree("", "", [{ name: "route", path: "/route" }]);
-
-      const matcher = createMatcher();
-
-      matcher.registerTree(tree);
-      const result = matcher.match("/route");
-
-      expect(result).not.toBeNull();
-
-      const state = createRouteState(result!, "custom.name");
-
-      expect(state.name).toBe("custom.name");
-    });
-  });
+  // buildNameFromSegments / createRouteState (formerly white-box here) are now
+  // covered through the public matcher: every `matchPath()` / navigation drives
+  // createRouteState, and `state.name` is the exact `segments.at(-1).fullName`
+  // output. See routes/matchPath.test.ts + the rewrite/forwardTo cases below.
 
   describe("not found state via start with allowNotFound", () => {
     it("creates not found state when starting at unknown path", async () => {

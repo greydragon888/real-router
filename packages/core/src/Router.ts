@@ -144,6 +144,7 @@ export class Router<
     // Unconditional guard-level validation before creating namespaces
     guardDependencies(dependencies);
 
+    // Stryker disable next-line EqualityOperator: equivalent — `>= 0` is always true, but `guardRouteStructure([])` on an empty array is a no-op, so validating an empty list behaves identically to skipping it. (ConditionalExpression stays live: `→false` skips validation of a real route list and is killable.)
     if (routes.length > 0) {
       guardRouteStructure(routes);
     }
@@ -293,7 +294,6 @@ export class Router<
       // Clone support (issue #173)
       cloneOptions: () => ({ ...this.#options.get() }),
       cloneDependencies: () => ({ ...this.#dependenciesStore.dependencies }),
-      getLifecycleFactories: () => this.#routeLifecycle.getFactories(),
       getPluginFactories: () => this.#plugins.getAll(),
       routeGetStore: () => this.#routes.getStore(),
       // Cross-namespace state (issue #174)
@@ -503,6 +503,7 @@ export class Router<
   }
 
   dispose(): void {
+    // Stryker disable next-line BlockStatement: equivalent — emptying the early-return re-runs the dispose body on a 2nd call, but it is fully idempotent (FSM `send(DISPOSE)` no-ops from DISPOSED, `disposeAll()` already cleared `#unsubscribes`, every clear is idempotent). (ConditionalExpression stays live: `→true` always-returns and never disposes = killed.)
     if (this.#eventBus.isDisposed()) {
       return;
     }
@@ -722,6 +723,7 @@ export class Router<
    * Pre-allocated callback for #suppressUnhandledRejection.
    * Avoids creating a new closure on every navigate() call.
    */
+  // Stryker disable next-line BlockStatement: equivalent — the handler suppresses fire-and-forget rejections by merely existing as a .catch; its body only logs UNEXPECTED errors, unreachable in core (every navigate rejection carries a suppressed RouterError code; plugin/listener throws are isolated by the EventEmitter and never reach the navigate promise).
   static readonly #onSuppressedError = (error: unknown): void => {
     if (
       error instanceof RouterError &&
@@ -730,6 +732,7 @@ export class Router<
       return;
     }
 
+    // Stryker disable next-line StringLiteral: unreachable — the "Unexpected navigation error" log fires only for a non-suppressed navigate rejection, which cannot occur in core (see the #onSuppressedError contract above).
     logger.error("router.navigate", "Unexpected navigation error", error);
   };
 

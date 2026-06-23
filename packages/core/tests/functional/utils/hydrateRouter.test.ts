@@ -2,10 +2,9 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import { errorCodes } from "@real-router/core";
 import { getPluginApi } from "@real-router/core/api";
+import { hydrateRouter, serializeRouterState } from "@real-router/core/utils";
 import { getInternals } from "@real-router/core/validation";
 
-import { hydrateRouter } from "../../../src/utils/hydrateRouter";
-import { serializeRouterState } from "../../../src/utils/serializeRouterState";
 import { createTestRouter } from "../../helpers";
 
 import type { Router, State } from "@real-router/core";

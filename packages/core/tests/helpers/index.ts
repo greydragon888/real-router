@@ -77,3 +77,5 @@ export async function captureUnhandledRejections(
 
   return captured;
 }
+
+export { DEFAULT_TRANSITION } from "../../src/constants";

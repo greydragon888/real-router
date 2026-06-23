@@ -1,7 +1,8 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
+import { getDependenciesApi } from "@real-router/core/api";
+
 import { createDependenciesTestRouter } from "./setup";
-import { getDependenciesApi } from "../../../../src/api";
 
 import type { TestDependencies } from "./setup";
 import type { Router } from "@real-router/core";

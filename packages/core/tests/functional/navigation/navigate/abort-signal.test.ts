@@ -444,7 +444,7 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
       vi.useRealTimers();
     });
 
-    it("14. signal.reason propagated — error has TRANSITION_CANCELLED code", async () => {
+    it("14. signal.reason propagated — error carries TRANSITION_CANCELLED + the abort reason", async () => {
       const reason = new Error("custom abort reason");
       const controller = new AbortController();
 
@@ -454,8 +454,34 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
         .navigate("users", {}, { signal: controller.signal })
         .catch((error_: unknown) => error_);
 
+      // The pre-aborted signal is caught up front; the error must carry the
+      // signal's `reason` (not just the code) — `{ reason }` metadata.
       expect(error).toMatchObject({
         code: errorCodes.TRANSITION_CANCELLED,
+        reason,
+      });
+    });
+
+    it("14b. signal aborted DURING an async guard → error still carries the reason", async () => {
+      const reason = new Error("aborted mid-guard");
+      const controller = new AbortController();
+
+      // Aborting from inside the guard hits the post-guard `externalSignal.aborted`
+      // re-check (a different throw site than the pre-aborted path of test 14);
+      // it must attach the same `{ reason }` metadata.
+      lifecycle.addActivateGuard("users", () => async () => {
+        controller.abort(reason);
+
+        return true;
+      });
+
+      const error = await router
+        .navigate("users", {}, { signal: controller.signal })
+        .catch((error_: unknown) => error_);
+
+      expect(error).toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+        reason,
       });
     });
 

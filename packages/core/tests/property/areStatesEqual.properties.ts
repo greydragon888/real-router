@@ -2,7 +2,7 @@ import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 
 import { arbState, createFixtureRouter, NUM_RUNS } from "./helpers";
-import { DEFAULT_TRANSITION } from "../../src/constants";
+import { DEFAULT_TRANSITION } from "../helpers";
 
 import type { Params, State } from "@real-router/core";
 

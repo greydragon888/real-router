@@ -7,7 +7,7 @@ import {
   getRoutesApi,
 } from "@real-router/core/api";
 
-import { DEFAULT_TRANSITION } from "../../src/constants";
+import { DEFAULT_TRANSITION } from "../helpers";
 
 import type { Route, Router, State } from "@real-router/core";
 

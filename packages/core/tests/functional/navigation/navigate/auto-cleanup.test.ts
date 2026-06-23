@@ -3,325 +3,212 @@ import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 import { createRouter, errorCodes } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
 
-import { getInternals } from "../../../../src/internals";
-
 import type { Router } from "@real-router/core";
 import type { LifecycleApi } from "@real-router/core/api";
 
+/**
+ * Auto-cleanup of `canDeactivate` guards, tested through the PUBLIC API only.
+ *
+ * Behaviour, not bookkeeping: auto-cleanup removes a route's `canDeactivate`
+ * guard once that route is deactivated. A guard can only be cleaned up on the
+ * leave it permitted (a blocking guard never leaves), so "removed" is observed
+ * via the guard's call count — it fires on the single leave that removes it and
+ * does NOT fire on a later leave. A guard that should be RETAINED (route still
+ * active, or a failed transition) keeps firing / keeps blocking. These spy/throw
+ * assertions exercise the compiled guard the navigation pipeline actually runs
+ * (`#canDeactivateFunctions`), not the internal factory record.
+ */
 describe("router.navigate() - auto cleanup", () => {
-  describe("navigation with options.autoCleanUp === true", () => {
-    let router: Router;
-    let lifecycle: LifecycleApi;
+  let router: Router;
+  let lifecycle: LifecycleApi;
 
-    beforeEach(async () => {
-      router = createRouter(
-        [
-          { name: "home", path: "/" },
-          {
-            name: "users",
-            path: "/users",
-            children: [
-              { name: "list", path: "/list" },
-              { name: "view", path: "/view/:id" },
-            ],
-          },
-          {
-            name: "orders",
-            path: "/orders",
-            children: [
-              { name: "pending", path: "/pending" },
-              { name: "completed", path: "/completed" },
-            ],
-          },
-          { name: "profile", path: "/profile" },
-          {
-            name: "settings",
-            path: "/settings",
-            children: [
-              { name: "general", path: "/general" },
-              { name: "account", path: "/account" },
-            ],
-          },
-        ],
+  beforeEach(async () => {
+    router = createRouter(
+      [
+        { name: "home", path: "/" },
         {
-          defaultRoute: "home",
+          name: "users",
+          path: "/users",
+          children: [
+            { name: "list", path: "/list" },
+            { name: "view", path: "/view/:id" },
+          ],
         },
-      );
+        {
+          name: "orders",
+          path: "/orders",
+          children: [
+            { name: "pending", path: "/pending" },
+            { name: "completed", path: "/completed" },
+          ],
+        },
+        { name: "profile", path: "/profile" },
+      ],
+      { defaultRoute: "home" },
+    );
 
-      await router.start("/home");
+    await router.start("/home");
 
-      lifecycle = getLifecycleApi(router);
-    });
+    lifecycle = getLifecycleApi(router);
+  });
 
-    afterEach(() => {
+  afterEach(() => {
+    if (router.isActive()) {
       router.stop();
-    });
-
-    function hasCanDeactivate(routeName: string): boolean {
-      const [deactivateFactories] =
-        getInternals(router).getLifecycleFactories();
-
-      return routeName in deactivateFactories;
     }
+  });
 
-    describe("basic autoCleanUp functionality", () => {
-      it("should remove canDeactivate for previously active segments that become inactive", async () => {
-        const usersDeactivateGuard = vi.fn().mockReturnValue(true);
-        const ordersDeactivateGuard = vi.fn().mockReturnValue(true);
+  describe("basic autoCleanUp functionality", () => {
+    it("removes a canDeactivate guard when its route becomes inactive (does not fire on a later leave)", async () => {
+      const usersGuard = vi.fn(() => true);
 
-        // Navigate to users first to establish a baseline
-        await router.navigate("users");
+      await router.navigate("users");
+      lifecycle.addDeactivateGuard("users", () => usersGuard);
 
-        // Set up guards for routes
-        lifecycle.addDeactivateGuard("users", () => usersDeactivateGuard);
-        lifecycle.addDeactivateGuard("orders", () => ordersDeactivateGuard);
+      // Leave users → guard runs (permits), users is deactivated → cleaned up.
+      await router.navigate("orders");
 
-        expect(hasCanDeactivate("users")).toBe(true);
-        expect(hasCanDeactivate("orders")).toBe(true);
+      expect(usersGuard).toHaveBeenCalledTimes(1);
 
-        // Navigate to orders - users becomes inactive and should be cleaned up
-        await router.navigate("orders");
+      // Re-enter users (the cleaned external guard is NOT re-added) and leave
+      // again — a removed guard must not run a second time.
+      await router.navigate("users");
+      await router.navigate("orders");
 
-        // users guard should be removed (was active, now inactive)
-        expect(hasCanDeactivate("users")).toBe(false);
-        // orders guard should remain (it's now active)
-        expect(hasCanDeactivate("orders")).toBe(true);
-
-        // Navigate back to users - orders becomes inactive
-        await router.navigate("users");
-
-        // orders guard should be removed
-        expect(hasCanDeactivate("orders")).toBe(false);
-      });
-
-      it("should only clean up segments that are not in active path for nested routes", async () => {
-        // Navigate to users first to establish baseline
-        await router.navigate("users");
-
-        // Set up guards
-        const usersDeactivateGuard = vi.fn().mockReturnValue(true);
-        const usersListDeactivateGuard = vi.fn().mockReturnValue(true);
-        const usersViewDeactivateGuard = vi.fn().mockReturnValue(true);
-
-        lifecycle.addDeactivateGuard("users", () => usersDeactivateGuard);
-        lifecycle.addDeactivateGuard(
-          "users.list",
-          () => usersListDeactivateGuard,
-        );
-        lifecycle.addDeactivateGuard(
-          "users.view",
-          () => usersViewDeactivateGuard,
-        );
-
-        expect(hasCanDeactivate("users")).toBe(true);
-        expect(hasCanDeactivate("users.list")).toBe(true);
-        expect(hasCanDeactivate("users.view")).toBe(true);
-
-        // Navigate to users.list
-        await router.navigate("users.list");
-
-        // Navigate to users.view (users remains active, but users.list becomes inactive)
-        await router.navigate("users.view", { id: 123 });
-
-        // users.list should be removed (was active, now inactive)
-        expect(hasCanDeactivate("users.list")).toBe(false);
-
-        // users should remain (still in active path)
-        expect(hasCanDeactivate("users")).toBe(true);
-
-        // users.view should remain (now active)
-        expect(hasCanDeactivate("users.view")).toBe(true);
-      });
-
-      it("should handle complex nested route transitions correctly", async () => {
-        // Navigate to users first
-        await router.navigate("users");
-
-        // Set up guards
-        const settingsDeactivateGuard = vi.fn().mockReturnValue(true);
-        const settingsGeneralDeactivateGuard = vi.fn().mockReturnValue(true);
-        const settingsAccountDeactivateGuard = vi.fn().mockReturnValue(true);
-
-        lifecycle.addDeactivateGuard("settings", () => settingsDeactivateGuard);
-        lifecycle.addDeactivateGuard(
-          "settings.general",
-          () => settingsGeneralDeactivateGuard,
-        );
-        lifecycle.addDeactivateGuard(
-          "settings.account",
-          () => settingsAccountDeactivateGuard,
-        );
-
-        // Navigate through nested routes: settings.general -> settings.account -> users
-        await router.navigate("settings.general");
-
-        expect(hasCanDeactivate("settings")).toBe(true);
-        expect(hasCanDeactivate("settings.general")).toBe(true);
-        expect(hasCanDeactivate("settings.account")).toBe(true);
-
-        // Navigate within settings hierarchy
-        await router.navigate("settings.account");
-
-        // settings.general should be removed (settings remains active)
-        expect(hasCanDeactivate("settings.general")).toBe(false);
-        expect(hasCanDeactivate("settings")).toBe(true);
-        expect(hasCanDeactivate("settings.account")).toBe(true);
-
-        // Navigate out of settings hierarchy completely
-        await router.navigate("users");
-
-        // All settings guards should be removed
-        expect(hasCanDeactivate("settings")).toBe(false);
-        expect(hasCanDeactivate("settings.account")).toBe(false);
-      });
+      expect(usersGuard).toHaveBeenCalledTimes(1); // still 1 ⇒ was removed
     });
 
-    describe("autoCleanUp with transition errors", () => {
-      it("should not remove canDeactivate when activate guard blocks transition", async () => {
-        const usersDeactivateGuard = vi.fn().mockReturnValue(true);
+    it("keeps a parent guard while only the inactive child segment is cleaned up (nested)", async () => {
+      const usersGuard = vi.fn(() => true);
+      const listGuard = vi.fn(() => true);
 
-        await router.navigate("users", {}, {});
+      await router.navigate("users.list");
+      lifecycle.addDeactivateGuard("users", () => usersGuard);
+      lifecycle.addDeactivateGuard("users.list", () => listGuard);
 
-        lifecycle.addDeactivateGuard("users", () => usersDeactivateGuard);
+      // list → view: users.list deactivated (cleaned), users stays active.
+      await router.navigate("users.view", { id: 1 });
 
-        expect(hasCanDeactivate("users")).toBe(true);
+      expect(listGuard).toHaveBeenCalledTimes(1); // users.list left ⇒ fired
+      expect(usersGuard).not.toHaveBeenCalled(); // users still active ⇒ not left
 
-        const blockingActivateGuard = vi.fn().mockReturnValue(false);
+      // users.list was removed: re-enter + leave does not re-run it.
+      await router.navigate("users.list");
+      await router.navigate("users.view", { id: 2 });
 
-        lifecycle.addActivateGuard("orders", () => blockingActivateGuard);
+      expect(listGuard).toHaveBeenCalledTimes(1); // still 1 ⇒ removed
 
-        try {
-          await router.navigate("orders", {}, {});
+      // users was retained: leaving users entirely now runs its guard.
+      await router.navigate("orders");
 
-          expect.fail("Should have thrown error");
-        } catch (error) {
-          expect((error as any)?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-        }
-
-        expect(hasCanDeactivate("users")).toBe(true);
-      });
-
-      it("should not remove canDeactivate when canActivate blocks transition", async () => {
-        const usersDeactivateGuard = vi.fn().mockReturnValue(true);
-        const blockingActivateGuard = vi.fn().mockReturnValue(false);
-
-        lifecycle.addDeactivateGuard("users", () => usersDeactivateGuard);
-        lifecycle.addActivateGuard("profile", () => blockingActivateGuard);
-
-        await router.navigate("users", {}, {});
-
-        expect(hasCanDeactivate("users")).toBe(true);
-
-        try {
-          await router.navigate("profile", {}, {});
-
-          expect.fail("Should have thrown error");
-        } catch (error) {
-          expect((error as any)?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-        }
-
-        // Guard should NOT be removed (transition failed)
-        expect(hasCanDeactivate("users")).toBe(true);
-      });
-
-      it.todo(
-        "should not remove canDeactivate when canDeactivate blocks transition (TODO: fix guard blocking)",
-        async () => {
-          const normalDeactivateGuard = vi.fn().mockReturnValue(true);
-
-          // Navigate to users first with normal guard
-          lifecycle.addDeactivateGuard("users", () => normalDeactivateGuard);
-
-          await router.navigate("users");
-
-          // Replace with blocking guard that returns false
-          const blockingDeactivateGuard = vi.fn().mockReturnValue(false);
-
-          lifecycle.addDeactivateGuard("users", () => blockingDeactivateGuard);
-
-          expect(hasCanDeactivate("users")).toBe(true);
-
-          // Try to navigate away (should be blocked)
-          await expect(router.navigate("orders")).rejects.toMatchObject({
-            code: errorCodes.CANNOT_DEACTIVATE,
-          });
-
-          // Guard should NOT be removed (transition failed)
-          expect(hasCanDeactivate("users")).toBe(true);
-        },
-      );
+      expect(usersGuard).toHaveBeenCalledTimes(1); // fired on real leave ⇒ retained
     });
 
-    describe("autoCleanUp edge cases", () => {
-      it("should handle navigation when no canDeactivate guards are set", async () => {
-        // No guards set - just verify navigation works
-        await router.navigate("users", {}, {});
+    it("retains the guard of a route REACTIVATED by its own param change (not cleaned)", async () => {
+      const viewGuard = vi.fn(() => true);
 
-        await router.navigate("orders", {}, {});
+      await router.navigate("users.view", { id: 1 });
+      lifecycle.addDeactivateGuard("users.view", () => viewGuard);
 
-        // No guards to check - just verify no errors
-        expect(router.getState()?.name).toBe("orders");
+      // id 1 → 2 re-mounts users.view (its own `:id` changed): the route is in
+      // BOTH toDeactivate and toActivate (reactivated). Its guard fires on this
+      // leave, but auto-cleanup must NOT remove it — the `!toActivate.includes(name)`
+      // exclusion keeps a reactivated route's guard alive (kills the `&&`→`||` bug).
+      await router.navigate("users.view", { id: 2 });
+
+      expect(viewGuard).toHaveBeenCalledTimes(1); // fired on the re-mount leave
+
+      // Because it was RETAINED, leaving view entirely fires it again. A guard
+      // wrongly cleaned on the reactivation would stay at 1.
+      await router.navigate("orders");
+
+      expect(viewGuard).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("autoCleanUp with transition errors (from-route guard retained)", () => {
+    it("does not remove canDeactivate when an activation guard blocks the transition", async () => {
+      await router.navigate("users");
+
+      const usersGuard = vi.fn(() => true); // permits leaving (not the blocker)
+
+      lifecycle.addDeactivateGuard("users", () => usersGuard);
+      lifecycle.addActivateGuard("orders", () => () => false); // blocks activation
+
+      await expect(router.navigate("orders")).rejects.toMatchObject({
+        code: errorCodes.CANNOT_ACTIVATE,
       });
+      expect(usersGuard).toHaveBeenCalledTimes(1); // ran during the failed attempt
 
-      it("should not remove guard when navigating to same route", async () => {
-        const usersDeactivateGuard = vi.fn().mockReturnValue(true);
+      // Transition failed ⇒ users was NOT deactivated ⇒ guard retained ⇒ runs
+      // again on a real leave.
+      await router.navigate("profile");
 
-        await router.navigate("users", {}, {});
+      expect(usersGuard).toHaveBeenCalledTimes(2);
+    });
 
-        lifecycle.addDeactivateGuard("users", () => usersDeactivateGuard);
+    it("does not remove canDeactivate when the canDeactivate guard itself blocks the transition", async () => {
+      // Previously parked as `it.todo` — the behaviour is correct, just untested.
+      await router.navigate("users");
 
-        expect(hasCanDeactivate("users")).toBe(true);
+      const usersGuard = vi.fn(() => false); // blocks leaving users
 
-        // Navigate to same route with force option
-        await router.navigate("users", {}, { force: true });
+      lifecycle.addDeactivateGuard("users", () => usersGuard);
 
-        // Guard should NOT be removed (same route is still active)
-        expect(hasCanDeactivate("users")).toBe(true);
+      await expect(router.navigate("orders")).rejects.toMatchObject({
+        code: errorCodes.CANNOT_DEACTIVATE,
       });
+      expect(usersGuard).toHaveBeenCalledTimes(1);
+      expect(router.getState()?.name).toBe("users"); // still on users
 
-      it("should handle autoCleanUp when navigating away from guarded route", async () => {
-        const usersDeactivateGuard = vi.fn().mockReturnValue(true);
-        const profileDeactivateGuard = vi.fn().mockReturnValue(true);
-
-        await router.navigate("users", {}, {});
-
-        lifecycle.addDeactivateGuard("users", () => usersDeactivateGuard);
-        lifecycle.addDeactivateGuard("profile", () => profileDeactivateGuard);
-
-        expect(hasCanDeactivate("users")).toBe(true);
-        expect(hasCanDeactivate("profile")).toBe(true);
-
-        const state = await router.navigate("orders", {}, {});
-
-        expect(state.name).toBe("orders");
-
-        expect(hasCanDeactivate("users")).toBe(false);
-        expect(hasCanDeactivate("profile")).toBe(true);
+      // Guard not auto-removed (the block left users active) ⇒ still blocks.
+      await expect(router.navigate("orders")).rejects.toMatchObject({
+        code: errorCodes.CANNOT_DEACTIVATE,
       });
+      expect(usersGuard).toHaveBeenCalledTimes(2);
+    });
+  });
 
-      it("should not cleanup guards that were never in active path", async () => {
-        const usersDeactivateGuard = vi.fn().mockReturnValue(true);
-        const neverActiveGuard = vi.fn().mockReturnValue(true);
+  describe("autoCleanUp edge cases", () => {
+    it("does not clean up the guard when navigating to the same route (force)", async () => {
+      await router.navigate("users");
 
-        // Navigate to users first
-        await router.navigate("users", {}, {});
+      const usersGuard = vi.fn(() => true);
 
-        // Set up guards: one for active route, one for route we'll never visit
-        lifecycle.addDeactivateGuard("users", () => usersDeactivateGuard);
-        lifecycle.addDeactivateGuard("profile", () => neverActiveGuard);
+      lifecycle.addDeactivateGuard("users", () => usersGuard);
 
-        expect(hasCanDeactivate("users")).toBe(true);
-        expect(hasCanDeactivate("profile")).toBe(true);
+      // Same-route force-nav: users never becomes inactive ⇒ guard retained.
+      await router.navigate("users", {}, { force: true });
 
-        // Navigate to orders (profile was never active, so shouldn't be cleaned)
-        await router.navigate("orders", {}, {});
+      await router.navigate("orders");
 
-        // users should be removed (was active)
-        expect(hasCanDeactivate("users")).toBe(false);
+      expect(usersGuard).toHaveBeenCalledTimes(1); // fired on the real leave ⇒ retained
+    });
 
-        // profile should NOT be removed (was never active)
-        expect(hasCanDeactivate("profile")).toBe(true);
-      });
+    it("does not clean up a guard for a route that was never active", async () => {
+      await router.navigate("users");
+
+      const profileGuard = vi.fn(() => true);
+
+      lifecycle.addDeactivateGuard("profile", () => profileGuard);
+
+      // profile was never active, so this navigation must not clean it up.
+      await router.navigate("orders");
+
+      expect(profileGuard).not.toHaveBeenCalled();
+
+      // Guard survived: it runs when we eventually visit and leave profile.
+      await router.navigate("profile");
+      await router.navigate("home");
+
+      expect(profileGuard).toHaveBeenCalledTimes(1);
+    });
+
+    it("navigates fine when no canDeactivate guards are set", async () => {
+      await router.navigate("users");
+      await router.navigate("orders");
+
+      expect(router.getState()?.name).toBe("orders");
     });
   });
 });

@@ -48,6 +48,28 @@ describe("core/routes/routeTree/getRouteConfig", () => {
 
       expect(pluginApi.getRouteConfig("gc-basic")).toBeUndefined();
     });
+
+    it("treats every STANDARD_ROUTE_KEY as structural — none leak into custom fields", () => {
+      // STANDARD_ROUTE_KEYS classifies config keys (structural) vs plugin
+      // custom fields. If any key string is blanked, that key stops being
+      // recognized as structural and leaks into routeCustomFields. A route
+      // built from ONLY standard keys must therefore expose NO custom fields.
+      // The basic test above only covers name/path; this one covers the
+      // remaining structural keys (children/guards/forwardTo/encode/decode).
+      routesApi.add({
+        name: "gc-allstd",
+        path: "/gc-allstd/:id",
+        canActivate: () => () => true,
+        canDeactivate: () => () => true,
+        forwardTo: "gc-allstd.kid",
+        encodeParams: (p) => p,
+        decodeParams: (p) => p,
+        defaultParams: { id: "1" },
+        children: [{ name: "kid", path: "/kid" }],
+      });
+
+      expect(pluginApi.getRouteConfig("gc-allstd")).toBeUndefined();
+    });
   });
 
   describe("with nested routes", () => {

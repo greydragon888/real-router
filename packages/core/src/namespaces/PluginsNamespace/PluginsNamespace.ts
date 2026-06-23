@@ -48,6 +48,7 @@ export class PluginsNamespace<
     this.#deps = deps;
   }
 
+  // Stryker disable next-line BlockStatement: equivalent — #limits is write-only here (stored then `void`-ed; never read). setLimits is a stub awaiting validator integration, so emptying the body has no observable effect.
   setLimits(limits: Limits): void {
     this.#limits = limits;
     // eslint-disable-next-line sonarjs/void-use -- @preserve: limits passed to validator via RouterInternals; void suppresses TS6133 until plugin implements validateCountThresholds

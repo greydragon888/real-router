@@ -1,7 +1,7 @@
 import type { DependenciesStore } from "./namespaces";
 import type { RoutesStore } from "./namespaces/RoutesNamespace";
 import type { Router as RouterClass } from "./Router";
-import type { EventMethodMap, GuardFnFactory, PluginFactory } from "./types";
+import type { EventMethodMap, PluginFactory } from "./types";
 import type { RouterValidator } from "./types/RouterValidator";
 import type { SerializedRouterState } from "./utils";
 import type {
@@ -106,10 +106,6 @@ export interface RouterInternals<
   // Clone support (issue #173)
   readonly cloneOptions: () => Options;
   readonly cloneDependencies: () => Record<string, unknown>;
-  readonly getLifecycleFactories: () => [
-    Record<string, GuardFnFactory<D>>,
-    Record<string, GuardFnFactory<D>>,
-  ];
   readonly getPluginFactories: () => PluginFactory<D>[];
 
   // Consolidated route data store (issue #174 Phase 2)

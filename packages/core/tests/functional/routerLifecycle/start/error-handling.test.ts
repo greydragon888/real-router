@@ -509,8 +509,11 @@ describe("router.start() - error handling", () => {
     it("should still allow await start() to reject with ROUTE_NOT_FOUND when caller catches", async () => {
       const localRouter = createTestRouter({ allowNotFound: false });
 
+      // The error must carry the unmatched path as `{ path }` metadata, not just
+      // the code (otherwise `RouterLifecycle`'s `{ path: startPath }` survives).
       await expect(localRouter.start("/nonexistent")).rejects.toMatchObject({
         code: errorCodes.ROUTE_NOT_FOUND,
+        path: "/nonexistent",
       });
     });
   });

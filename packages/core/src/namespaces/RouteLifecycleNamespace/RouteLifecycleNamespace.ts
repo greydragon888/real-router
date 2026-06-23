@@ -20,23 +20,6 @@ function booleanToFactory<Dependencies extends DefaultDependencies>(
 }
 
 /**
- * Origin of a registered guard. `"definition"` — declared in route config and
- * thus subject to `clearDefinitionGuards()` cleanup during `replace()`.
- * `"external"` — registered post-hoc via `getLifecycleApi().add*Guard(...)`
- * and survives `replace()`.
- *
- * Storage is split per origin (two Maps per kind, four Maps total) so origin
- * is a primary invariant rather than a derived Set-tracked property. The
- * compiled function (`#canActivateFunctions` / `#canDeactivateFunctions`)
- * reflects the **last add wins** semantic for the slot (regardless of
- * origin) — matching the pre-refactor behaviour and the
- * `replaceRoutes.test.ts` "definition wins on replace" contract. On clear,
- * the function falls back to whichever origin Map still holds an entry
- * (external preferred if both remain after a partial clear).
- */
-export type GuardOrigin = "definition" | "external";
-
-/**
  * Independent namespace for managing route lifecycle handlers.
  *
  * Static methods handle input validation (called by facade).
@@ -89,6 +72,7 @@ export class RouteLifecycleNamespace<
    *
    * @param limits - Limits configuration with maxLifecycleHandlers
    */
+  // Stryker disable next-line BlockStatement: equivalent — #limits is write-only here (stored then `void`-ed; never read). setLimits is a stub awaiting validator integration, so emptying the body has no observable effect.
   setLimits(limits: Limits): void {
     this.#limits = limits;
     // eslint-disable-next-line sonarjs/void-use -- @preserve: Wave 3 validator reads limits via RouterInternals; void suppresses TS6133 until then
@@ -179,46 +163,31 @@ export class RouteLifecycleNamespace<
   }
 
   /**
-   * Removes a canActivate guard for a route.
+   * Removes a canActivate guard for a route — both the definition and external
+   * slots. (Origin-selective clearing was removed: no caller ever needed it;
+   * `clearDefinitionGuards()` handles the definition-only case on `replace()`.)
    *
    * @param name - Route name (already validated by facade)
-   * @param origin - Optional origin filter. `"definition"` clears only the
-   *   definition slot; `"external"` clears only the external slot; omitted
-   *   (default) clears both — backward compatible with pre-refactor semantics.
    */
-  clearCanActivate(name: string, origin?: GuardOrigin): void {
-    let cleared = false;
+  clearCanActivate(name: string): void {
+    const clearedDefinition = this.#definitionActivateFactories.delete(name);
+    const clearedExternal = this.#externalActivateFactories.delete(name);
 
-    if (origin !== "external") {
-      cleared = this.#definitionActivateFactories.delete(name) || cleared;
-    }
-
-    if (origin !== "definition") {
-      cleared = this.#externalActivateFactories.delete(name) || cleared;
-    }
-
-    if (cleared) {
+    if (clearedDefinition || clearedExternal) {
       this.#recompileSlot("activate", name);
     }
   }
 
   /**
-   * Removes a canDeactivate guard for a route.
+   * Removes a canDeactivate guard for a route (both slots).
    *
    * Symmetric counterpart to {@link clearCanActivate}.
    */
-  clearCanDeactivate(name: string, origin?: GuardOrigin): void {
-    let cleared = false;
+  clearCanDeactivate(name: string): void {
+    const clearedDefinition = this.#definitionDeactivateFactories.delete(name);
+    const clearedExternal = this.#externalDeactivateFactories.delete(name);
 
-    if (origin !== "external") {
-      cleared = this.#definitionDeactivateFactories.delete(name) || cleared;
-    }
-
-    if (origin !== "definition") {
-      cleared = this.#externalDeactivateFactories.delete(name) || cleared;
-    }
-
-    if (cleared) {
+    if (clearedDefinition || clearedExternal) {
       this.#recompileSlot("deactivate", name);
     }
   }

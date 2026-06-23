@@ -32,25 +32,6 @@ const FROZEN_EMPTY_ARRAY: string[] = [];
 Object.freeze(FROZEN_EMPTY_ARRAY);
 
 /**
- * Builds a reversed copy of a string array.
- * Optimization: single pass instead of creating intermediate array with .toReversed().
- *
- * @param arr - Source array
- * @returns New array with elements in reverse order
- * @internal
- */
-function reverseArray(arr: string[]): string[] {
-  const length = arr.length;
-  const result: string[] = [];
-
-  for (let i = length - 1; i >= 0; i--) {
-    result.push(arr[i]);
-  }
-
-  return result;
-}
-
-/**
  * Handles conversion of route names with many segments (5+).
  * Internal helper for nameToIDs function.
  *
@@ -202,6 +183,7 @@ const nameToIDsCache = new Map<string, string[]>();
 export function nameToIDs(name: string): string[] {
   const cached = nameToIDsCache.get(name);
 
+  // Stryker disable next-line BlockStatement: equivalent — dropping the cache-hit early return recomputes the identical frozen id chain (the cache is a perf optimization, not a correctness gate).
   if (cached) {
     return cached;
   }
@@ -233,12 +215,15 @@ function computeNameToIDs(name: string): string[] {
 
   const thirdDot = name.indexOf(ROUTE_SEGMENT_SEPARATOR, secondDot + 1);
 
+  // Stryker disable next-line UnaryOperator,BlockStatement: equivalent — inverting/emptying the 3-segment fast path routes the name through nameToIDsGeneral (below), which yields the identical id chain (same rationale as the L242 ArithmeticOperator disable). The ConditionalExpression/EqualityOperator siblings stay live (→true and !== are killed).
   if (thirdDot === -1) {
     return [name.slice(0, firstDot), name.slice(0, secondDot), name];
   }
 
+  // Stryker disable next-line ArithmeticOperator: equivalent — `thirdDot - 1` makes fourthDot non-(-1), routing 5+ segment names through nameToIDsGeneral, which yields the identical id chain.
   const fourthDot = name.indexOf(ROUTE_SEGMENT_SEPARATOR, thirdDot + 1);
 
+  // Stryker disable next-line UnaryOperator,BlockStatement: equivalent — inverting/emptying the 4-segment fast path routes the name through nameToIDsGeneral (below), which yields the identical id chain (same rationale as the L242 ArithmeticOperator disable). The ConditionalExpression/EqualityOperator siblings stay live (→true and !== are killed).
   if (fourthDot === -1) {
     return [
       name.slice(0, firstDot),
@@ -359,16 +344,23 @@ function computeTransitionPath(
   const fromMetaParams = getStateMetaParams(fromState);
 
   if (!toMetaParams && !fromMetaParams) {
+    // FAST PATH 3 (both states meta-less) is reached ONLY via `shouldUpdateNode`
+    // — the order-sensitive consumers (the navigate pipeline, `canNavigateTo`)
+    // always carry at least one meta-aware state (navigate/getState() attach
+    // meta) and so take the STANDARD PATH below. `shouldUpdateNode` reads
+    // `toDeactivate` by MEMBERSHIP (`.includes`), not order, so the from-chain is
+    // returned as-is (root→leaf) — no reverse needed.
     return {
       intersection: EMPTY_INTERSECTION,
       toActivate: nameToIDs(toState.name),
-      toDeactivate: reverseArray(nameToIDs(fromState.name)),
+      toDeactivate: nameToIDs(fromState.name),
     };
   }
 
   // ===== STANDARD PATH: Routes with parameters =====
   const toStateIds = nameToIDs(toState.name);
   const fromStateIds = nameToIDs(fromState.name);
+  // Stryker disable next-line MethodExpression: equivalent — Math.max reads one index past the shorter id array; that slot is undefined, so the `toSegment !== fromSegment` check in pointOfDifference returns the same divergence index Math.min would stop at.
   const maxI = Math.min(fromStateIds.length, toStateIds.length);
 
   const i = pointOfDifference(
@@ -414,6 +406,7 @@ export function getTransitionPath(
   toState: State,
   fromState?: State,
 ): TransitionPath {
+  // Stryker disable BlockStatement: equivalent — both cache short-circuits below; emptying either early-return recomputes the identical TransitionPath (computeTransitionPath is deterministic for the same to/from states) and re-caches it. Restored right after.
   if (
     cached1Result !== null &&
     toState === cached1To &&
@@ -430,6 +423,7 @@ export function getTransitionPath(
   ) {
     return cached2Result;
   }
+  // Stryker restore BlockStatement
 
   const result = computeTransitionPath(toState, fromState);
 

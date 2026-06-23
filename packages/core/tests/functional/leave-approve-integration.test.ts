@@ -7,7 +7,6 @@ import {
   getPluginApi,
 } from "@real-router/core/api";
 
-import { getInternals } from "../../src/internals";
 import { createTestRouter } from "../helpers";
 
 import type { Router } from "@real-router/core";
@@ -70,49 +69,53 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
       expect(activateOrder).toBeLessThan(successOrder);
     });
 
-    it("FSM state: TRANSITION_STARTED → LEAVE_APPROVED → READY across navigation lifecycle", async () => {
+    it("FSM lifecycle: state stays uncommitted through LEAVE_APPROVED, commits on SUCCESS", async () => {
+      // Public signals only. `isLeaveApproved()` marks the LEAVE_APPROVED phase;
+      // `getState().name` proves the transition is still in flight (the OLD route
+      // stays committed) until SUCCESS. The internal `isTransitioning()` span
+      // (TRANSITION_STARTED + LEAVE_APPROVED) has no public method today — #924.
       const observed = {
-        onStart: { isTransitioning: false, isLeaveApproved: false },
-        onLeaveApprove: { isTransitioning: false, isLeaveApproved: false },
-        onSuccess: { isTransitioning: false, isLeaveApproved: false },
+        onStart: { committed: "", isLeaveApproved: false },
+        onLeaveApprove: { committed: "", isLeaveApproved: false },
+        onSuccess: { committed: "", isLeaveApproved: false },
       };
 
       lifecycle.addDeactivateGuard("home", () => () => true);
       lifecycle.addActivateGuard("users", () => () => true);
 
       getPluginApi(router).addEventListener(events.TRANSITION_START, () => {
-        observed.onStart.isTransitioning =
-          getInternals(router).isTransitioning();
+        observed.onStart.committed = router.getState()!.name;
         observed.onStart.isLeaveApproved = router.isLeaveApproved();
       });
 
       getPluginApi(router).addEventListener(
         events.TRANSITION_LEAVE_APPROVE,
         () => {
-          observed.onLeaveApprove.isTransitioning =
-            getInternals(router).isTransitioning();
+          observed.onLeaveApprove.committed = router.getState()!.name;
           observed.onLeaveApprove.isLeaveApproved = router.isLeaveApproved();
         },
       );
 
       router.usePlugin(() => ({
         onTransitionSuccess: () => {
-          observed.onSuccess.isTransitioning =
-            getInternals(router).isTransitioning();
+          observed.onSuccess.committed = router.getState()!.name;
           observed.onSuccess.isLeaveApproved = router.isLeaveApproved();
         },
       }));
 
       await router.navigate("users");
 
-      expect(observed.onStart.isTransitioning).toBe(true);
+      // TRANSITION_STARTED: not leave-approved, old route still committed.
       expect(observed.onStart.isLeaveApproved).toBe(false);
+      expect(observed.onStart.committed).toBe("home");
 
-      expect(observed.onLeaveApprove.isTransitioning).toBe(true);
+      // LEAVE_APPROVED: leave-approved, old route STILL committed (activation pending).
       expect(observed.onLeaveApprove.isLeaveApproved).toBe(true);
+      expect(observed.onLeaveApprove.committed).toBe("home");
 
-      expect(observed.onSuccess.isTransitioning).toBe(false);
+      // SUCCESS / READY: no longer leave-approved, new route now committed.
       expect(observed.onSuccess.isLeaveApproved).toBe(false);
+      expect(observed.onSuccess.committed).toBe("users");
     });
 
     it("usePlugin() onTransitionLeaveApprove hook called with (toState, fromState)", async () => {

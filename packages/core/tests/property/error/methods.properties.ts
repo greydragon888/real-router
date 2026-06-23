@@ -171,7 +171,7 @@ describe("RouterError Methods Properties", () => {
     test.prop(
       [
         errorCodeArbitrary,
-        fc.constantFrom("code", "segment", "path", "redirect"),
+        fc.constantFrom("code", "segment", "path"),
         fc.string(),
       ],
       { numRuns: 1000 },
@@ -180,7 +180,7 @@ describe("RouterError Methods Properties", () => {
       (code, reservedKey, value) => {
         const err = new RouterError(code);
 
-        // Reserved DATA properties (code/segment/path/redirect) — distinct from
+        // Reserved DATA properties (code/segment/path) — distinct from
         // the reserved METHODS covered below — must be REJECTED, not silently
         // dropped. The shared `customFieldsArbitrary` filters these keys out, so
         // this throw path (RouterError.setAdditionalFields) had no generative

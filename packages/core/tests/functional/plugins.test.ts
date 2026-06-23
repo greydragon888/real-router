@@ -882,6 +882,41 @@ describe("core/plugins", () => {
 
         errorSpy.mockRestore();
       });
+
+      it("multi-plugin unsubscribe: a throwing teardown is isolated, logged, and does not block sibling cleanup", () => {
+        // The single-plugin fast path and the multi-plugin (>=2 factories) path
+        // have separate cleanup loops. The test above exercises the fast path;
+        // this one drives the multi-plugin loop's try/catch + error message.
+        const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+
+        const teardownError = new Error("Teardown failed");
+        const aTeardown = vi.fn(() => {
+          throw teardownError;
+        });
+        const bTeardown = vi.fn();
+
+        const unsub = router.usePlugin(
+          () => ({ teardown: aTeardown }),
+          () => ({ teardown: bTeardown }),
+        );
+
+        // Catch must isolate the throw (empty catch would propagate it).
+        expect(() => {
+          unsub();
+        }).not.toThrow();
+
+        // Sibling cleanup still runs after the throwing one.
+        expect(bTeardown).toHaveBeenCalledTimes(1);
+
+        // The logged message must survive (blanked StringLiteral mutant).
+        expect(errorSpy).toHaveBeenCalledWith(
+          "router.usePlugin",
+          "Error during cleanup:",
+          teardownError,
+        );
+
+        errorSpy.mockRestore();
+      });
     });
 
     // 🟢 DESIRABLE: Edge cases

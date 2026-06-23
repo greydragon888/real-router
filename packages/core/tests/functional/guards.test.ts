@@ -169,4 +169,52 @@ describe("core/crash guards (always enforced, no plugin required)", () => {
       router.stop();
     });
   });
+
+  // Ported from the former guards.unit.test.ts (white-box) — drives the same
+  // crash guards through the public ctor with exact-message assertions, so the
+  // error StringLiterals and each `||` operand are pinned (not just `TypeError`).
+  describe("error messages & operands (mutation precision)", () => {
+    it("guardDependencies: every non-plain-object input throws the same message", () => {
+      for (const bad of [null, 5, "x", true, [], new Date()]) {
+        expect(() => createRouter([], {}, bad as any)).toThrow(
+          "dependencies must be a plain object",
+        );
+      }
+    });
+
+    it("guardDependencies: class instance (constructor !== Object) is rejected", () => {
+      // Date's constructor is Date, not Object — exercises the constructor operand
+      // independently of the array case (which Array.isArray would also catch).
+      expect(() => createRouter([], {}, new Date() as any)).toThrow(
+        "dependencies must be a plain object",
+      );
+    });
+
+    it("guardDependencies: getter message names the offending key", () => {
+      const deps = {};
+
+      Object.defineProperty(deps, "svc", { get: () => 1, enumerable: true });
+
+      expect(() => createRouter([], {}, deps as any)).toThrow(/getters: "svc"/);
+    });
+
+    it("guardRouteStructure: null / primitive / array routes throw the same message", () => {
+      expect(() => createRouter([null as any])).toThrow(
+        "route must be a non-array object",
+      );
+      expect(() => createRouter([5 as any])).toThrow(
+        "route must be a non-array object",
+      );
+      // Array.isArray operand — a route that is itself an array.
+      expect(() => createRouter([[] as any])).toThrow(
+        "route must be a non-array object",
+      );
+    });
+
+    it("guardRouteStructure: recurses into children and rejects an invalid child", () => {
+      expect(() =>
+        createRouter([{ name: "a", path: "/a", children: [null] } as any]),
+      ).toThrow("route must be a non-array object");
+    });
+  });
 });

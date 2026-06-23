@@ -1,9 +1,9 @@
 import { describe, afterEach, it, expect } from "vitest";
 
 import { getLifecycleApi } from "@real-router/core/api";
+import { getInternals } from "@real-router/core/validation";
 
 import { createStressRouter } from "./helpers";
-import { getInternals } from "../../src/internals";
 
 import type { Router } from "@real-router/core";
 
@@ -130,7 +130,9 @@ describe("S20: Dynamic guard management", () => {
     // removeActivateGuard that leaked even one generation would leave entries
     // here. This is the discriminating count the old hard-capped heap line
     // (Map last-add-wins → bounded to one generation) could never catch.
-    const [, activateFactories] = getInternals(router).getLifecycleFactories();
+    const [, activateFactories] = getInternals(router)
+      .routeGetStore()
+      .lifecycleNamespace!.getFactories();
 
     expect(Object.keys(activateFactories)).toHaveLength(0);
   }, 30_000);

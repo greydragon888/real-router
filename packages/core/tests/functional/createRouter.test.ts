@@ -145,4 +145,96 @@ describe("createRouter", () => {
       expect(getPluginApi(router).getOptions().defaultRoute).toBe("home");
     });
   });
+
+  describe("logger config validation surface (assertLoggerConfig via ctor, #789)", () => {
+    // The ctor gates `assertLoggerConfig` behind `if (loggerConfig)`, so every
+    // case below drives the real validator through the public createRouter path.
+    // (The lone unreachable branch — `config === null`, a TS-narrowing guard —
+    // is covered directly in typeGuards.test.ts.)
+
+    it("accepts an empty logger object", () => {
+      expect(() => createRouter([], { logger: {} })).not.toThrow();
+    });
+
+    it("accepts each valid level", () => {
+      for (const level of [
+        "all",
+        "warn-error",
+        "error-only",
+        "none",
+      ] as const) {
+        expect(() => createRouter([], { logger: { level } })).not.toThrow();
+      }
+    });
+
+    it("accepts callbackIgnoresLevel: false", () => {
+      expect(() =>
+        createRouter([], { logger: { callbackIgnoresLevel: false } }),
+      ).not.toThrow();
+    });
+
+    it("accepts undefined on optional properties", () => {
+      // `as any`: exactOptionalPropertyTypes forbids explicit `undefined`, but the
+      // runtime guard (`obj.level !== undefined`) must still skip validation for it.
+      expect(() =>
+        createRouter([], {
+          logger: {
+            level: undefined,
+            callback: undefined,
+            callbackIgnoresLevel: undefined,
+          } as any,
+        }),
+      ).not.toThrow();
+    });
+
+    it("rejects a truthy non-object logger (number/string/boolean)", () => {
+      for (const bad of [123, "x", true]) {
+        expect(() => createRouter([], { logger: bad as any })).toThrow(
+          "Logger config must be an object",
+        );
+      }
+    });
+
+    it("rejects an unknown property with its name", () => {
+      expect(() =>
+        createRouter([], { logger: { unknown: "value" } as any }),
+      ).toThrow('Unknown logger config property: "unknown"');
+    });
+
+    it("rejects an invalid level and lists the valid set", () => {
+      expect(() =>
+        createRouter([], { logger: { level: "invalid" as any } }),
+      ).toThrow('"all" | "warn-error" | "error-only" | "none"');
+    });
+
+    it("formats a string level WITH quotes (formatValue string branch)", () => {
+      expect(() =>
+        createRouter([], { logger: { level: "invalid" as any } }),
+      ).toThrow('Invalid logger level: "invalid"');
+    });
+
+    it("formats an object level via JSON.stringify (formatValue object branch)", () => {
+      expect(() =>
+        createRouter([], { logger: { level: { nested: true } as any } }),
+      ).toThrow('Invalid logger level: {"nested":true}');
+    });
+
+    it("formats a non-string/non-object level via String() (formatValue fallback)", () => {
+      expect(() =>
+        createRouter([], { logger: { level: Symbol("test") as any } }),
+      ).toThrow("Invalid logger level: Symbol(test)");
+    });
+
+    it("rejects a non-function callback", () => {
+      expect(() =>
+        createRouter([], { logger: { callback: "nope" as any } }),
+      ).toThrow("Logger callback must be a function");
+    });
+
+    it("rejects a non-boolean callbackIgnoresLevel", () => {
+      expect(() =>
+        createRouter([], { logger: { callbackIgnoresLevel: "yes" as any } }),
+      ).toThrow("Logger callbackIgnoresLevel must be a boolean");
+    });
+  });
 });

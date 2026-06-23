@@ -1,3 +1,4 @@
+import { logger } from "@real-router/logger";
 import {
   describe,
   beforeEach,
@@ -51,6 +52,37 @@ describe("router.navigate() - concurrent navigation", () => {
       expect(result).toBeInstanceOf(Promise);
 
       await result; // Clean up
+    });
+
+    it("warns with the SSR cloneRouter() hint when a navigation starts mid-flight", async () => {
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+      // An async guard pins the first navigation in-flight (FSM transitioning),
+      // so the second navigate sees `isTransitioning()` and emits the
+      // shared-instance warning.
+      let releaseGuard!: () => void;
+      const gate = new Promise<boolean>((resolve) => {
+        releaseGuard = () => {
+          resolve(true);
+        };
+      });
+
+      lifecycle.addActivateGuard("orders", () => () => gate);
+
+      const inFlight = router.navigate("orders"); // → transitioning
+      const concurrent = router.navigate("profile"); // sees in-flight → warns
+
+      releaseGuard();
+      await Promise.allSettled([inFlight, concurrent]);
+
+      // Must carry the actionable SSR hint, not just the heading — the
+      // `"For SSR, use cloneRouter()…"` literal.
+      expect(warnSpy).toHaveBeenCalledWith(
+        "router.navigate",
+        expect.stringContaining("For SSR, use cloneRouter()"),
+      );
+
+      warnSpy.mockRestore();
     });
 
     it("should cancel navigation via router.stop() and reject with TRANSITION_CANCELLED error", async () => {

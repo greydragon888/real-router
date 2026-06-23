@@ -22,12 +22,13 @@ const routes: Route[] = [
   {
     name: "auth-protected",
     path: "/auth-protected",
-    // Redirect via Promise.reject with plain object (not Error)
-    // This allows the redirect field to be preserved in RouterError
+    // Guard rejects with a plain object (not an Error) — exercises the
+    // wrapSyncError plain-object path. Guards cannot redirect; the object's
+    // fields are merely carried as RouterError metadata.
     canActivate: () => () =>
       // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
       Promise.reject({
-        redirect: { name: "sign-in", params: {}, path: "/sign-in" },
+        attemptedRedirect: { name: "sign-in", params: {}, path: "/sign-in" },
       }),
   },
   {

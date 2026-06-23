@@ -1,4 +1,5 @@
-import { describe, it, expect } from "vitest";
+import { logger } from "@real-router/logger";
+import { describe, it, expect, vi } from "vitest";
 
 import { createRouter, events } from "@real-router/core";
 import {
@@ -74,6 +75,27 @@ describe("core/limits (integration via public API)", () => {
       expect(() => {
         getPluginApi(router).addEventListener(events.ROUTER_START, () => {});
       }).toThrow("Listener limit");
+    });
+
+    it("warns (without throwing) when an event's listener count exceeds warnListeners", () => {
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+      // warnListeners below maxListeners (default 10000): exceeding it warns,
+      // it does not throw. Drives the EventEmitter onListenerWarn callback +
+      // its context/message strings.
+      const router = createRouter([], { limits: { warnListeners: 2 } });
+      const api = getPluginApi(router);
+
+      api.addEventListener(events.ROUTER_START, () => {});
+      api.addEventListener(events.ROUTER_START, () => {});
+      api.addEventListener(events.ROUTER_START, () => {}); // exceeds 2 → warns
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        "router.addEventListener",
+        expect.stringContaining("possible memory leak"),
+      );
+
+      warnSpy.mockRestore();
     });
   });
 

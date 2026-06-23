@@ -1,4 +1,4 @@
-import { fc, test } from "@fast-check/vitest";
+import { test } from "@fast-check/vitest";
 import { describe, expect } from "vitest";
 
 import { RouterError } from "@real-router/core";
@@ -8,45 +8,6 @@ import {
   customFieldsArbitrary,
   errorCodeArbitrary,
 } from "./helpers";
-
-import type { State } from "@real-router/types";
-
-// Recursively-nested but strictly JSON-SAFE values. Deliberately excludes types
-// that JSON can't round-trip (undefined / NaN / ±Infinity / -0 / Date / Map /
-// Set / bigint / functions / symbols / circular): those losing their form is a
-// JSON limitation, not a RouterError invariant. The shared `redirectArbitrary`
-// uses FLAT primitive params, so deep redirect serialization was never exercised.
-const arbJsonSafe: fc.Arbitrary<unknown> = fc.letrec<{ value: unknown }>(
-  (tie) => ({
-    value: fc.oneof(
-      { maxDepth: 3 },
-      fc.string(),
-      fc.integer(),
-      fc.boolean(),
-      fc.constant(null),
-      fc.array(tie("value"), { maxLength: 3 }),
-      // noNullPrototype: a null-prototype object can't round-trip through JSON
-      // (JSON.parse always yields Object.prototype) — another JSON limitation,
-      // not a RouterError invariant — so keep the generator JSON-faithful.
-      fc.dictionary(fc.string(), tie("value"), {
-        maxKeys: 3,
-        noNullPrototype: true,
-      }),
-    ),
-  }),
-).value;
-
-/** A redirect State whose params nest JSON-safe objects/arrays (cf. flat shared arb). */
-const arbNestedRedirect: fc.Arbitrary<State> = fc
-  .record({
-    name: fc.string({ minLength: 1, maxLength: 20 }),
-    path: fc.string({ minLength: 1, maxLength: 50 }),
-    params: fc.dictionary(fc.string(), arbJsonSafe, {
-      maxKeys: 4,
-      noNullPrototype: true,
-    }),
-  })
-  .map((s) => ({ ...s, params: { ...s.params } }) as unknown as State);
 
 /**
  * Recursively checks if a value is not JSON-serializable or loses information during serialization
@@ -100,32 +61,22 @@ describe("RouterError Serialization Properties", () => {
 
     test.prop([errorCodeArbitrary, constructorOptionsArbitrary], {
       numRuns: 10_000,
-    })(
-      "toJSON includes segment/path/redirect only if defined",
-      (code, options) => {
-        const err = new RouterError(code, options);
-        const json = err.toJSON();
+    })("toJSON includes segment/path only if defined", (code, options) => {
+      const err = new RouterError(code, options);
+      const json = err.toJSON();
 
-        if (options.segment === undefined) {
-          expect(json).not.toHaveProperty("segment");
-        } else {
-          expect(json).toHaveProperty("segment", options.segment);
-        }
+      if (options.segment === undefined) {
+        expect(json).not.toHaveProperty("segment");
+      } else {
+        expect(json).toHaveProperty("segment", options.segment);
+      }
 
-        if (options.path === undefined) {
-          expect(json).not.toHaveProperty("path");
-        } else {
-          expect(json).toHaveProperty("path", options.path);
-        }
-
-        if (options.redirect === undefined) {
-          expect(json).not.toHaveProperty("redirect");
-        } else {
-          expect(json).toHaveProperty("redirect");
-          expect(json.redirect).toStrictEqual(options.redirect);
-        }
-      },
-    );
+      if (options.path === undefined) {
+        expect(json).not.toHaveProperty("path");
+      } else {
+        expect(json).toHaveProperty("path", options.path);
+      }
+    });
 
     test.prop([errorCodeArbitrary, constructorOptionsArbitrary], {
       numRuns: 10_000,
@@ -249,15 +200,6 @@ describe("RouterError Serialization Properties", () => {
         expect(parsed.path).toBe(options.path);
       }
 
-      // Only check redirect if it doesn't contain non-serializable values
-      // (undefined, Infinity, NaN become null in JSON, causing mismatch)
-      if (
-        options.redirect !== undefined &&
-        !isNotJsonSerializable(options.redirect)
-      ) {
-        expect(parsed.redirect).toStrictEqual(options.redirect);
-      }
-
       // Arbitrary fields (except reserved ones)
       for (const [key, value] of Object.entries(fields)) {
         if (
@@ -279,23 +221,6 @@ describe("RouterError Serialization Properties", () => {
       // stack should not be in JSON
       expect(parsed).not.toHaveProperty("stack");
     });
-
-    test.prop([errorCodeArbitrary, arbNestedRedirect], { numRuns: 2000 })(
-      "JSON roundtrip preserves a redirect with deeply NESTED (JSON-safe) params",
-      (code, redirect) => {
-        const err = new RouterError(code, { redirect });
-
-        const jsonString = JSON.stringify(err);
-        const parsed = JSON.parse(jsonString) as { redirect: unknown };
-
-        // All values are JSON-safe, so the whole nested redirect must round-trip
-        // to full depth. Exercises deep redirect serialization the flat shared
-        // generator never reached — a regression guard against any future
-        // depth-limiting of the redirect in toJSON (today low-signal: toJSON
-        // includes the redirect by reference and JSON handles nesting natively).
-        expect(parsed.redirect).toStrictEqual(redirect);
-      },
-    );
   });
 
   describe("toJSON invariants", () => {

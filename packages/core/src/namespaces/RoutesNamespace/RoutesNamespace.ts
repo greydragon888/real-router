@@ -45,13 +45,7 @@ function collectUrlParamsArray(segments: readonly RouteTree[]): string[] {
   return params;
 }
 
-export function buildNameFromSegments(
-  segments: readonly { fullName: string }[],
-): string {
-  return segments.at(-1)?.fullName ?? "";
-}
-
-export function createRouteState<P extends RouteParams = RouteParams>(
+function createRouteState<P extends RouteParams = RouteParams>(
   matchResult: {
     readonly segments: readonly { fullName: string }[];
     readonly params: Readonly<Record<string, unknown>>;
@@ -59,7 +53,12 @@ export function createRouteState<P extends RouteParams = RouteParams>(
   },
   name?: string,
 ): RouteTreeState<P> {
-  const resolvedName = name ?? buildNameFromSegments(matchResult.segments);
+  // The matcher yields ≥1 segment for every successful match, each carrying the
+  // cumulative route name as `fullName`, so the last element is always present.
+  // (Formerly `buildNameFromSegments` with a `?? ""` fallback — that branch was
+  // unreachable defensive cruft propped up by a white-box test; inlined here.)
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- matcher invariant: a successful match is never empty
+  const resolvedName = name ?? matchResult.segments.at(-1)!.fullName;
 
   return {
     name: resolvedName,
@@ -484,6 +483,7 @@ export class RoutesNamespace<
   getUrlParams(name: string): string[] {
     const cached = this.#store.urlParamsCache.get(name);
 
+    // Stryker disable next-line BlockStatement: equivalent — cache short-circuit; emptying the early-return recomputes the identical value (getUrlParams is deterministic per route name) and re-caches it. (ConditionalExpression stays live: `→true` returns undefined on a cache miss = killed.)
     if (cached !== undefined) {
       return cached;
     }
@@ -517,6 +517,7 @@ export class RoutesNamespace<
   }
 
   #getBuildPathOptions(options?: Options): CachedBuildPathOpts {
+    // Stryker disable next-line BlockStatement: equivalent — cache short-circuit; emptying the early-return rebuilds the identical buildPath options (deterministic) and re-caches them. (ConditionalExpression stays live: `→false` always rebuilds but a real consumer test pins the cached identity.)
     if (this.#cachedBuildPathOpts) {
       return this.#cachedBuildPathOpts;
     }

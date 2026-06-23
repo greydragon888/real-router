@@ -1,12 +1,12 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import { RouterError } from "@real-router/core";
+import { getPluginApi } from "@real-router/core/api";
 
-import { getPluginApi } from "../../../../src/api";
 import { createTestRouter } from "../../../helpers";
 
-import type { PluginApi } from "../../../../src/api";
 import type { Router } from "@real-router/core";
+import type { PluginApi } from "@real-router/core/api";
 
 let router: Router;
 let api: PluginApi;

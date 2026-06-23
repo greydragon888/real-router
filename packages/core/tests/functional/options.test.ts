@@ -91,6 +91,27 @@ describe("core/options", () => {
       customRouter.stop();
     });
 
+    // deepFreeze recurses into plain objects only (constructor === Object);
+    // array and class-instance values are intentionally left un-recursed. A
+    // nested array value must therefore stay UNfrozen — this pins the
+    // constructor check against a ConditionalExpression mutant that would
+    // recurse into everything (and over-freeze the caller's array).
+    it("does not recurse into non-plain (array) nested option values", () => {
+      const customRouter = createTestRouter({
+        defaultParams: { tags: ["a", "b"] },
+      });
+
+      const opts = getPluginApi(customRouter).getOptions();
+
+      // The plain object is frozen, but its array value is not recursed into.
+      expect(Object.isFrozen(opts.defaultParams)).toBe(true);
+      expect(
+        Object.isFrozen((opts.defaultParams as Record<string, unknown>).tags),
+      ).toBe(false);
+
+      customRouter.stop();
+    });
+
     // 🔴 CRITICAL: Default values
     it("should return all options with default values when no custom options provided", () => {
       const opts = getPluginApi(router).getOptions();

@@ -184,6 +184,7 @@ export function matchSourceTrailingSlash(
   const pathPart =
     queryIndex === -1 ? rewrittenPath : rewrittenPath.slice(0, queryIndex);
 
+  // Stryker disable next-line LogicalOperator: equivalent — buildPath strips trailing slashes, so the rewritten path never ends with "/" unless it IS "/" (already caught by the `=== "/"` operand). `endsWith("/")` is unreachable-true, so `||` ≡ `&&`.
   if (pathPart === "/" || pathPart.endsWith("/")) {
     return rewrittenPath;
   }
