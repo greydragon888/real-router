@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-06-24]
 
+### @real-router/core@0.61.1
+
+### Patch Changes
+
+- [#929](https://github.com/greydragon888/real-router/pull/929) [`76be2cb`](https://github.com/greydragon888/real-router/commit/76be2cbbcb41c4574cbf9b0ae7fa39f40189e461) Thanks [@greydragon888](https://github.com/greydragon888)! - Harden the internal `route-tree` dependency via mutation testing ([#928](https://github.com/greydragon888/real-router/issues/928))
+
+  Test-only and runtime-no-op changes to `route-tree` (consumed by `@real-router/core`): kill surviving mutants with targeted tests, remove dead write-only `MutableRouteNode` fields, and document/disable proven-equivalent mutants — raising its mutation score from 94.62% to 98.90%. No observable behavior change in `@real-router/core`.
+
+
 ### @real-router/core@0.61.0
 
 ### Minor Changes
