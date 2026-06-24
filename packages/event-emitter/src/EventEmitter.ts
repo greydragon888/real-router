@@ -213,6 +213,7 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
     arg3: unknown,
     arg4: unknown,
   ): void {
+    // Stryker disable next-line BlockStatement: equivalent — emptying the single-listener fast path falls through to the `[...set]` fallback below, which calls the lone listener identically (proven by injection: forcing the fallback leaves the suite green). The fast path is a perf shortcut only; the `→true`/`→false` ConditionalExpression variants on this line ARE killed by the multi-listener tests.
     if (set.size === 1) {
       const [cb] = set;
 
@@ -349,6 +350,7 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       const remaining = depthMap.get(eventName)! - 1;
 
+      // Stryker disable next-line ConditionalExpression,EqualityOperator: equivalent — delete-at-0 is depthMap heap-hygiene only (#750). A later emit reads `depthMap.get(name) ?? 0`, so an absent entry and a retained `{name → 0}` are indistinguishable: no functional test can observe the delete-vs-set choice. The dynamic-name heap leak from never deleting is guarded by tests/stress S2 (invisible to Stryker).
       if (remaining === 0) {
         // Outermost frame — release the entry so dynamic event names don't
         // accumulate {name → 0} records unbounded. See #750.

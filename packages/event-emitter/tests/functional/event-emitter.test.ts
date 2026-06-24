@@ -138,6 +138,27 @@ describe("EventEmitter", () => {
 
       expect(emitter.listenerCount("hover")).toBe(0);
     });
+
+    it("should keep the remaining listeners when one of several is removed (cleanup gated on size === 0)", () => {
+      const emitter = createEmitter();
+      const cb1 = vi.fn();
+      const cb2 = vi.fn();
+
+      emitter.on("click", cb1);
+      emitter.on("click", cb2);
+
+      // off() one of two — the per-event Set must NOT be released (size is 1, not 0),
+      // so cb2 stays registered. Guards the `set.size === 0` cleanup condition: a
+      // `true`/`!== 0` mutant would drop the whole Set here and lose cb2.
+      emitter.off("click", cb1);
+
+      expect(emitter.listenerCount("click")).toBe(1);
+
+      emitter.emit("click", 1, 2);
+
+      expect(cb1).not.toHaveBeenCalled();
+      expect(cb2).toHaveBeenCalledWith(1, 2);
+    });
   });
 
   // ===========================================================================
@@ -254,6 +275,20 @@ describe("EventEmitter", () => {
       emitter.emit("reset");
 
       expect(emitter.listenerCount("reset")).toBe(1);
+    });
+
+    it("should call a zero-arg listener with EXACTLY zero arguments (switch case 0)", () => {
+      const emitter = createEmitter();
+      const cb = vi.fn();
+
+      emitter.on("reset", cb);
+      emitter.emit("reset");
+
+      // `reset: []` → argc 0 → switch case 0 calls cb() with no args. A `case 0`
+      // fallthrough mutant routes to case 1 → cb(undefined), i.e. arity 1. Assert
+      // the exact arity, not just that cb ran.
+      expect(cb).toHaveBeenCalledTimes(1);
+      expect(cb.mock.calls[0]).toHaveLength(0);
     });
   });
 
@@ -634,6 +669,54 @@ describe("EventEmitter", () => {
 
       expect(onListenerError).toHaveBeenCalledTimes(2);
     });
+
+    it("should throw at EXACTLY maxEventDepth, not one level deeper (>= boundary)", () => {
+      const emitter = createEmitter({
+        limits: { maxListeners: 0, warnListeners: 0, maxEventDepth: 1 },
+      });
+
+      let calls = 0;
+
+      emitter.on("reset", () => {
+        calls += 1;
+        emitter.emit("reset"); // recursive
+      });
+
+      expect(() => {
+        emitter.emit("reset");
+      }).toThrow("Maximum recursion depth");
+
+      // maxEventDepth: 1 → the listener runs once (depth 0), the nested emit at
+      // depth 1 hits `1 >= 1` and throws. A `depth > maxEventDepth` mutant allows
+      // one extra level, so the listener would run twice before the throw.
+      expect(calls).toBe(1);
+    });
+
+    it("should fully recover depth after a legal recursion completes (every unwind frame decrements)", () => {
+      const emitter = createEmitter({
+        limits: { maxListeners: 0, warnListeners: 0, maxEventDepth: 2 },
+      });
+
+      let calls = 0;
+
+      emitter.on("reset", () => {
+        calls += 1;
+        if (calls === 1) {
+          emitter.emit("reset"); // recurse exactly once: depth 0 → 1, then unwind
+        }
+      });
+
+      emitter.emit("reset"); // legal recursion to depth 1 — must unwind back to 0
+
+      // If the unwind `else` branch fails to write the decremented depth back,
+      // the entry is left at an elevated value and a FRESH legal emit starts above
+      // 0 and throws spuriously. The recovery emit must run cleanly to prove the
+      // depth was fully released.
+      expect(() => {
+        emitter.emit("reset");
+      }).not.toThrow();
+      expect(calls).toBe(3);
+    });
   });
 
   // ===========================================================================
@@ -820,6 +903,15 @@ describe("EventEmitter", () => {
       expect(onListenerError).not.toHaveBeenCalled();
       // The sentinel halts the snapshot iteration — later listeners do not run.
       expect(secondListener).not.toHaveBeenCalled();
+    });
+
+    it("should expose name === 'RecursionDepthError' (cross-bundle name check contract)", () => {
+      // Subclasses don't auto-set `name`; the constructor sets it explicitly so
+      // `error.name === "RecursionDepthError"` holds at catch sites that can't use
+      // `instanceof` across bundle boundaries. An empty-string mutant breaks it.
+      expect(new RecursionDepthError("overflow").name).toBe(
+        "RecursionDepthError",
+      );
     });
   });
 
