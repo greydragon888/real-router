@@ -56,6 +56,9 @@ export default {
   htmlReporter: {
     fileName: "reports/mutation-report.html",
   },
+  jsonReporter: {
+    fileName: "reports/mutation-report.json",
+  },
 
   // DO NOT exclude tests/ - they are needed in sandbox!
   ignorePatterns: [

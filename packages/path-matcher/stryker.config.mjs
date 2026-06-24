@@ -51,9 +51,12 @@ export default {
   timeoutFactor: 3, // 3x safety margin
 
   // Reporters
-  reporters: ["progress", "clear-text", "html"],
+  reporters: ["progress", "clear-text", "html", "json"],
   htmlReporter: {
     fileName: "reports/mutation-report.html",
+  },
+  jsonReporter: {
+    fileName: "reports/mutation-report.json",
   },
 
   // DO NOT exclude tests/ - they are needed in sandbox!
