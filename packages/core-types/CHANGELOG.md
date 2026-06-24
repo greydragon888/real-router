@@ -1,5 +1,13 @@
 # @real-router/types
 
+## 0.37.0
+
+### Minor Changes
+
+- [#926](https://github.com/greydragon888/real-router/pull/926) [`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove the unused `redirect` field from the router-error details type ([#925](https://github.com/greydragon888/real-router/issues/925))
+
+  The error-details type no longer declares `redirect: State | undefined` — it was never produced or consumed (guards return `boolean` only; redirect is declarative `forwardTo`). Paired with the `@real-router/core` change that drops the runtime field.
+
 ## 0.36.1
 
 ### Patch Changes
