@@ -441,6 +441,31 @@ describe("takeUntil()", () => {
     expect(notifierCleanups).toStrictEqual([1]);
   });
 
+  it("should release the SOURCE subscription when the notifier errors after subscription", () => {
+    let notifierErrorFn: ((error: Error) => void) | undefined;
+
+    const notifier = new RxObservable<void>((observer) => {
+      notifierErrorFn = (error) => observer.error?.(error);
+
+      return () => {};
+    });
+
+    const sourceCleanups: number[] = [];
+    const source = new RxObservable<number>(() => {
+      return () => sourceCleanups.push(1);
+    });
+
+    source.pipe(takeUntil(notifier)).subscribe({ error: () => {} });
+
+    // The notifier errors AFTER the source is subscribed, so the notifier-error
+    // handler's `if (sourceSubscription) sourceSubscription.unsubscribe()` is the
+    // ONLY thing that releases the source: error() is non-terminal, so the main
+    // teardown never runs here (unlike complete(), which finalizes downstream).
+    notifierErrorFn?.(new Error("notifier error"));
+
+    expect(sourceCleanups).toStrictEqual([1]);
+  });
+
   it("should release the notifier subscription when the notifier emits synchronously", () => {
     const notifierCleanups: number[] = [];
 

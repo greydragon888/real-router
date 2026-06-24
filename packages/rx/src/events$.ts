@@ -114,8 +114,10 @@ export function events$(router: Router): RxObservable<RouterEvent> {
       );
       /* eslint-enable unicorn/prefer-single-call */
       /* v8 ignore start -- defensive: partial listener registration failure */
+      // Stryker disable next-line BlockStatement: intentional defensive — this catch runs only if an `api.addEventListener` throws mid-registration; it unwinds the already-registered listeners (v8-ignored, NoCoverage by design).
     } catch (error) {
       // Clean up any listeners that were successfully registered
+      // Stryker disable next-line BlockStatement: intentional defensive — partial-registration unwind loop on the same v8-ignored throw path as the catch above.
       for (const unsub of unsubscribes) {
         unsub();
       }

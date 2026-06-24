@@ -44,6 +44,7 @@ export function debounceTime<T>(duration: number): Operator<T, T> {
           observer.error?.(error);
         },
         complete: () => {
+          // Stryker disable next-line ConditionalExpression,EqualityOperator,BlockStatement: equivalent — clearing the pending timer at complete is a no-op shortcut: a stray timer self-clears (sets `timeoutId = undefined`) and its `if (hasValue)` guard is false after the flush below; `clearTimeout(undefined)` is itself a no-op, and complete() is terminal (injection-proven green).
           if (timeoutId !== undefined) {
             clearTimeout(timeoutId);
             timeoutId = undefined;
@@ -51,6 +52,7 @@ export function debounceTime<T>(duration: number): Operator<T, T> {
 
           if (hasValue) {
             observer.next?.(latestValue);
+            // Stryker disable next-line BooleanLiteral: equivalent — resetting hasValue after the terminal flush is moot; complete() ends the stream so nothing reads it again (injection-proven green).
             hasValue = false;
           }
 
@@ -59,6 +61,7 @@ export function debounceTime<T>(duration: number): Operator<T, T> {
       });
 
       return () => {
+        // Stryker disable next-line ConditionalExpression,EqualityOperator,BlockStatement: equivalent — clearing the pending timer on teardown is unobservable: a timer firing after unsubscribe hits the closed observer (emit dropped) and self-clears; `clearTimeout(undefined)` is a no-op (injection-proven green; debounce-timer-churn.stress stays green).
         if (timeoutId !== undefined) {
           clearTimeout(timeoutId);
           timeoutId = undefined;

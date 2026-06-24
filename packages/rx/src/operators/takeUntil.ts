@@ -15,18 +15,22 @@ export function takeUntil<T>(notifier: RxObservable<unknown>): Operator<T, T> {
 
       const complete = () => {
         /* v8 ignore start -- defensive: race condition guard */
+        // Stryker disable next-line ConditionalExpression,BlockStatement: equivalent — defensive double-completion guard (#773); the eager unsubscribe below closes the race so complete() never re-enters with completed===true (v8-ignored; injection-proven: removing it leaves the suite green).
         if (completed) {
           return;
         }
         /* v8 ignore stop */
 
+        // Stryker disable next-line BooleanLiteral: equivalent — the flag is redundant for this path: the unsubscribe below drops the source, so no later value reaches the L79 `if (!completed)` gate (injection-proven green).
         completed = true;
 
         // sourceSubscription may be undefined if notifier emits synchronously
+        // Stryker disable next-line BlockStatement: equivalent — redundant with the main teardown: `observer.complete?.()` finalizes the downstream subscription, which runs the `return () => { source.unsubscribe(); … }` teardown anyway (injection-proven green).
         if (sourceSubscription) {
           sourceSubscription.unsubscribe();
         }
         // notifierSubscription may be undefined if we're inside notifier.subscribe() call
+        // Stryker disable next-line BlockStatement: equivalent — redundant with the main teardown (same as the source unsubscribe above) — finalize releases the notifier (injection-proven green).
         if (notifierSubscription) {
           notifierSubscription.unsubscribe();
         }
@@ -40,6 +44,7 @@ export function takeUntil<T>(notifier: RxObservable<unknown>): Operator<T, T> {
         },
         error: (error) => {
           /* v8 ignore start -- defensive: notifier error after completion */
+          // Stryker disable next-line ConditionalExpression,BlockStatement: equivalent — defensive guard against an error arriving after completion; the notifier is unsubscribed on the first terminal so it cannot re-fire (v8-ignored; injection-proven green).
           if (completed) {
             return;
           }
@@ -83,6 +88,7 @@ export function takeUntil<T>(notifier: RxObservable<unknown>): Operator<T, T> {
         },
         error: (error) => {
           /* v8 ignore start -- defensive: race condition guard */
+          // Stryker disable next-line ConditionalExpression,BlockStatement: equivalent — defensive guard against a source error after the notifier already completed; completed===true is unreachable on entry here because completion unsubscribes the source first (v8-ignored; injection-proven green).
           if (completed) {
             return;
           }

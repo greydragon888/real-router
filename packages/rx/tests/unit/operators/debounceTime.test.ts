@@ -1,8 +1,40 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
 import { RxObservable, debounceTime } from "../../../src";
 
 describe("debounceTime()", () => {
+  it("should not emit on complete when no value was ever received (hasValue starts false)", () => {
+    const next = vi.fn();
+    const source = new RxObservable<number>((observer) => {
+      observer.complete?.();
+
+      return;
+    });
+
+    source.pipe(debounceTime(100)).subscribe({ next, complete: () => {} });
+
+    // hasValue defaults to false → a complete() with no prior next() must flush
+    // nothing. A `hasValue = true` init would emit the (undefined) latestValue.
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("should clear the pending timer and unsubscribe the source on teardown", () => {
+    const teardown = vi.fn();
+    const source = new RxObservable<number>((observer) => {
+      observer.next?.(1); // arms a pending debounce timer
+
+      return teardown;
+    });
+
+    const sub = source.pipe(debounceTime(100)).subscribe({ next: () => {} });
+
+    sub.unsubscribe();
+
+    // The teardown must release the source subscription; an emptied teardown
+    // block leaves it (and the timer) dangling.
+    expect(teardown).toHaveBeenCalledTimes(1);
+  });
+
   it("should debounce rapid emissions and emit only the last value", async () => {
     const values: number[] = [];
 

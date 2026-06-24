@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { distinctUntilChanged } from "../../../src/operators/distinctUntilChanged";
+import { map } from "../../../src/operators/map";
 import { RxObservable } from "../../../src/RxObservable";
 
 describe("distinctUntilChanged", () => {
@@ -224,5 +225,32 @@ describe("distinctUntilChanged", () => {
 
     expect(values1).toStrictEqual([1, 2]);
     expect(values2).toStrictEqual([1, 2]);
+  });
+
+  it("should unsubscribe from the source when the consumer unsubscribes (stateful-operator teardown)", () => {
+    const teardown = vi.fn();
+    const source = new RxObservable<number>(() => teardown);
+
+    const sub = source
+      .pipe(distinctUntilChanged())
+      .subscribe({ next: () => {} });
+
+    sub.unsubscribe();
+
+    // The teardown returned by createStatefulOperator must call
+    // source.unsubscribe(); an emptied teardown leaks the source subscription.
+    expect(teardown).toHaveBeenCalledTimes(1);
+  });
+
+  it("should unsubscribe from the source through a stateless operator (createOperator teardown)", () => {
+    const teardown = vi.fn();
+    const source = new RxObservable<number>(() => teardown);
+
+    // map() is built on createOperator; its teardown must release the source.
+    const sub = source.pipe(map((x) => x)).subscribe({ next: () => {} });
+
+    sub.unsubscribe();
+
+    expect(teardown).toHaveBeenCalledTimes(1);
   });
 });

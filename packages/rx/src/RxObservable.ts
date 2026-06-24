@@ -50,6 +50,7 @@ export class RxObservable<T> {
     // removeEventListener is idempotent, so the double call is harmless.
     const finalize = () => {
       if (abortHandler) {
+        // Stryker disable next-line OptionalChaining: equivalent — `abortHandler` is assigned only when a `signal` was provided, so `if (abortHandler)` implies `signal` is non-null; `?.` can never short-circuit here (injection-proven green).
         signal?.removeEventListener("abort", abortHandler);
       }
 
@@ -98,6 +99,7 @@ export class RxObservable<T> {
       closed = true;
 
       try {
+        // Stryker disable next-line OptionalChaining: equivalent — the surrounding try/catch swallows handler errors, so `observer.complete()` on a missing handler throws a caught TypeError — observably identical to the `?.` no-op (injection-proven green).
         observer.complete?.();
       } catch {
         // Errors in complete handler are caught silently
@@ -212,6 +214,7 @@ export class RxObservable<T> {
   ): RxObservable<I>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   pipe(...operators: Operator<any, any>[]): any {
+    // Stryker disable next-line BlockStatement: equivalent — zero-operator fast path; emptying `{ return this }` falls through to the loop below, which with no operators never iterates and returns `result` (initialized to `this`) — the identical identity return. The ConditionalExpression →true sibling on this line stays killed (returning `this` WITH operators would drop the pipeline).
     if (operators.length === 0) {
       return this;
     }
@@ -265,6 +268,7 @@ export class RxObservable<T> {
       },
       complete: () => {
         completed = true;
+        // Stryker disable next-line ConditionalExpression: equivalent — `if (resolve)` vs `if (true)` is indistinguishable here: when a consumer is awaiting, `resolve` is set; when none is, `resolve` is null and the `next`/`complete` paths that would dereference it are not reached in that state (injection-proven green; `if (true)` would otherwise call a null `resolveCallback`).
         if (resolve) {
           const resolveCallback = resolve;
 
