@@ -140,6 +140,21 @@ describe("createRouteTree", () => {
       }).toThrow(TypeError);
       expect(node.paramMeta.urlParams).not.toContain("HACKED");
     });
+
+    // A leaf node (no children) gets its empty children map / nonAbsoluteChildren
+    // from the shared *frozen* sentinels — not a fresh per-node allocation. If the
+    // leaf fast-path were skipped (children built via the general path), those
+    // collections would be freshly allocated and left unfrozen, leaking a mutable
+    // surface on a supposedly-immutable tree. Assert the leaf collections are frozen.
+    it("should freeze a leaf node's empty children map and nonAbsoluteChildren", () => {
+      const tree = createRouteTree("", "", [{ name: "home", path: "/" }]);
+      const leaf = tree.children.get("home")!;
+
+      expect(leaf.children.size).toBe(0);
+      expect(leaf.nonAbsoluteChildren).toHaveLength(0);
+      expect(Object.isFrozen(leaf.children)).toBe(true);
+      expect(Object.isFrozen(leaf.nonAbsoluteChildren)).toBe(true);
+    });
   });
 });
 

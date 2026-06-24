@@ -41,6 +41,22 @@ describe("validateRoute", () => {
       }).toThrow(TypeError);
     });
 
+    it("should report 'must be an object' (not 'plain object') for a truthy primitive", () => {
+      // A truthy non-object primitive (string/number/boolean) is rejected by the
+      // `typeof route !== "object"` operand, not by `!route`. The wording must be
+      // the early "Route must be an object", distinct from the downstream
+      // prototype check's "Route must be a plain object".
+      expect(() => {
+        validateRoute("string", methodName);
+      }).toThrow("[router.add] Route must be an object, got string");
+      expect(() => {
+        validateRoute(123, methodName);
+      }).toThrow("[router.add] Route must be an object, got number");
+      expect(() => {
+        validateRoute(true, methodName);
+      }).toThrow("[router.add] Route must be an object, got boolean");
+    });
+
     it("should throw TypeError for class instances", () => {
       class RouteClass {
         name = "class-route";
@@ -194,6 +210,14 @@ describe("validateRoute", () => {
       expect(() => {
         validateRoute({ name: "café", path: "/cafe" }, methodName);
       }).toThrow(/Invalid route name/);
+      // Full message: both concatenated halves (prefix + format hint) must appear.
+      expect(() => {
+        validateRoute({ name: "café", path: "/cafe" }, methodName);
+      }).toThrow(
+        '[router.add] Invalid route name "café". ' +
+          "Name must start with a letter or underscore, " +
+          "followed by letters, numbers, underscores, or hyphens.",
+      );
     });
 
     it("should throw for missing path", () => {
@@ -537,6 +561,13 @@ describe("validateRoute", () => {
       expect(() => {
         validateRoute({ name: "users.profile", path: "/profile" }, methodName);
       }).toThrow(/cannot contain dots/);
+      // Full message includes the actionable second sentence.
+      expect(() => {
+        validateRoute({ name: "users.profile", path: "/profile" }, methodName);
+      }).toThrow(
+        '[router.add] Route name "users.profile" cannot contain dots. ' +
+          "Use children array or { parent } option in addRoute() instead.",
+      );
     });
 
     it("should throw TypeError for multi-level dot-notation", () => {

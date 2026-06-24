@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { createRouteTree } from "../../src/builder/createRouteTree";
 import { createMatcher } from "../../src/createMatcher";
 
 import type { Matcher } from "../../src/createMatcher";
@@ -37,6 +38,22 @@ describe("createMatcher", () => {
     });
 
     expect(matcher).toBeDefined();
+  });
+
+  it("should forward caseSensitive:false to the matcher (case-insensitive lookup)", () => {
+    // SegmentMatcher defaults to caseSensitive:true. createMatcher must forward
+    // an explicit caseSensitive:false so an upper-cased URL still matches a
+    // lower-cased route. If the option were dropped, matching would fall back to
+    // the case-sensitive default and "/USERS" would not match "/users".
+    const tree = createRouteTree("", "", [{ name: "users", path: "/users" }]);
+    const matcher = createMatcher({ caseSensitive: false });
+
+    matcher.registerTree(tree);
+
+    const result = matcher.match("/USERS");
+
+    expect(result).toBeDefined();
+    expect(result?.segments.at(-1)?.name).toBe("users");
   });
 
   it("should inject parseQueryString from search-params", () => {
