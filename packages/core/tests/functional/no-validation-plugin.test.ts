@@ -9,7 +9,6 @@ import {
   getRoutesApi,
 } from "@real-router/core/api";
 
-import { EventBusNamespace } from "../../src/namespaces/EventBusNamespace";
 import { createTestRouter } from "../helpers";
 
 import type { Router } from "@real-router/core";
@@ -337,6 +336,12 @@ describe("core/without validation plugin", () => {
         router.subscribe("not a function" as any);
       }).toThrow("Expected a function");
 
+      // The actionable hint (second message line) must survive — asserting it
+      // kills the StringLiteral mutant that blanks the rx-package recommendation.
+      expect(() => {
+        router.subscribe("not a function" as any);
+      }).toThrow("@real-router/rx");
+
       router.stop();
     });
 
@@ -383,19 +388,10 @@ describe("core/without validation plugin", () => {
     });
   });
 
-  describe("internal validator static methods (coverage for validators still in core)", () => {
-    it("should throw TypeError when subscribe listener is not a function (validateSubscribeListener)", () => {
-      expect(() => {
-        EventBusNamespace.validateSubscribeListener(null);
-      }).toThrow(TypeError);
-    });
-
-    it("should not throw when subscribe listener is a function (validateSubscribeListener)", () => {
-      expect(() => {
-        EventBusNamespace.validateSubscribeListener(() => {});
-      }).not.toThrow();
-    });
-
+  describe("setRootPath crash guard", () => {
+    // `validateSubscribeListener` is covered publicly by `router.subscribe(...)`
+    // above (valid fn + non-function → TypeError + "Expected a function" +
+    // "@real-router/rx" hint), so the former direct static cases were redundant.
     it("should throw for non-string setRootPath (runtime crash when path.startsWith fails)", () => {
       const router = createTestRouter();
 

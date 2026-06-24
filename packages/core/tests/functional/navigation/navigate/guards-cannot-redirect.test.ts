@@ -3,8 +3,7 @@ import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 import { RouterError, errorCodes } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
 
-import { DEFAULT_TRANSITION } from "../../../../src/constants";
-import { createTestRouter } from "../../../helpers";
+import { createTestRouter, DEFAULT_TRANSITION } from "../../../helpers";
 
 import type { Router } from "@real-router/core";
 import type { LifecycleApi } from "@real-router/core/api";

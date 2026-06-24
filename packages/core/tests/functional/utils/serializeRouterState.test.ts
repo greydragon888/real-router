@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { serializeRouterState } from "../../../src/utils/serializeRouterState";
+import { serializeRouterState } from "@real-router/core/utils";
 
 import type { State } from "@real-router/core";
 

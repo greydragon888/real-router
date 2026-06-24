@@ -1,7 +1,7 @@
 import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { createRouter } from "@real-router/core";
+import { createRouter, errorCodes } from "@real-router/core";
 import {
   getLifecycleApi,
   getPluginApi,
@@ -332,6 +332,31 @@ describe("core/routes/replaceRoutes", () => {
       expect(router.getState()?.name).toBe("updated");
     });
 
+    it("should treat routesApi.update({ canDeactivate }) as definition guard (cleared on replace)", async () => {
+      // Mirror of the canActivate-via-update test for the update() canDeactivate
+      // branch: the guard must be registered as definition-sourced
+      // (isFromDefinition=true), so replace() clears it. If it were tracked as
+      // external, it would survive replace() and keep blocking.
+      routesApi.add({ name: "updated", path: "/updated" });
+      routesApi.update("updated", { canDeactivate: () => () => false });
+
+      await router.navigate("updated");
+
+      // Update-registered canDeactivate blocks leaving
+      await expect(router.navigate("home")).rejects.toThrow();
+
+      // Replace with same route but no guard
+      routesApi.replace([
+        { name: "home", path: "/home" },
+        { name: "updated", path: "/updated" },
+      ]);
+
+      // Definition guard from update is tracked and removed — can leave now
+      await router.navigate("home");
+
+      expect(router.getState()?.name).toBe("home");
+    });
+
     it("should clear definition canDeactivate guards on replace", async () => {
       routesApi.add({
         name: "sticky-def",
@@ -422,6 +447,64 @@ describe("core/routes/replaceRoutes", () => {
 
       // Definition guard now blocks navigation
       await expect(router.navigate("contested")).rejects.toThrow();
+    });
+
+    it("replace() clears the definition slot but preserves a co-existing external guard's compiled function (cross-origin)", async () => {
+      // "cross" carries BOTH a definition canActivate (blocks) AND an external
+      // addActivateGuard (allows). External wins at compile time, so navigation
+      // is allowed. On replace(), clearDefinitionGuards must drop the definition
+      // factory WITHOUT deleting the compiled function (the external slot still
+      // holds it) — so the external guard keeps working after the swap.
+      routesApi.add({
+        name: "cross",
+        path: "/cross",
+        canActivate: () => () => false, // definition: block
+      });
+      lifecycle.addActivateGuard("cross", () => () => true); // external: allow (wins)
+
+      // External wins → navigation allowed.
+      await router.navigate("cross");
+
+      expect(router.getState()?.name).toBe("cross");
+
+      await router.navigate("home");
+
+      // Replace WITHOUT a definition guard for "cross" — definition is cleared,
+      // the external guard's compiled function must survive.
+      routesApi.replace([
+        { name: "home", path: "/home" },
+        { name: "cross", path: "/cross" }, // no canActivate
+      ]);
+
+      // Surviving external guard (allow) still applies.
+      await router.navigate("cross");
+
+      expect(router.getState()?.name).toBe("cross");
+    });
+
+    it("replace() preserves a co-existing external canDeactivate guard's compiled function (cross-origin, symmetric)", async () => {
+      routesApi.add({
+        name: "cd",
+        path: "/cd",
+        canDeactivate: () => () => true, // definition: allow leaving
+      });
+      lifecycle.addDeactivateGuard("cd", () => () => false); // external: block (wins)
+
+      await router.navigate("cd");
+
+      expect(router.getState()?.name).toBe("cd");
+
+      // Replace WITHOUT a definition canDeactivate — definition slot cleared,
+      // the external (blocking) compiled function must survive.
+      routesApi.replace([
+        { name: "home", path: "/home" },
+        { name: "cd", path: "/cd" }, // no canDeactivate
+      ]);
+
+      // Surviving external guard still blocks leaving.
+      await expect(router.navigate("home")).rejects.toMatchObject({
+        code: errorCodes.CANNOT_DEACTIVATE,
+      });
     });
 
     it("should have no stale entries after removeActivateGuard + replace", async () => {

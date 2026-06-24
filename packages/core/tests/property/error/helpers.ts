@@ -2,8 +2,6 @@ import { fc } from "@fast-check/vitest";
 
 import { errorCodes } from "@real-router/core";
 
-import type { State } from "@real-router/types";
-
 // ============================================================================
 // Constants
 // ============================================================================
@@ -61,39 +59,6 @@ export const pathArbitrary = fc.oneof(
 );
 
 /**
- * State generator for redirect
- */
-const jsonPrimitive = fc.oneof(
-  fc.string(),
-  fc.integer(),
-  fc.boolean(),
-  fc.constant(null),
-  fc.double({ noNaN: true, noDefaultInfinity: true }),
-);
-
-export const stateArbitrary = fc
-  .record({
-    name: fc.string({ minLength: 1, maxLength: 50 }),
-    path: fc.string({ minLength: 1, maxLength: 100 }),
-    params: fc.dictionary(fc.string(), jsonPrimitive),
-  })
-  .map(
-    (s) =>
-      ({
-        ...s,
-        params: { ...s.params },
-      }) as unknown as State,
-  );
-
-/**
- * Redirect generator (optional State)
- */
-export const redirectArbitrary = fc.oneof(
-  fc.constant(undefined),
-  stateArbitrary,
-);
-
-/**
  * Arbitrary additional fields generator
  * Excludes reserved method names and dangerous keys
  */
@@ -112,7 +77,6 @@ export const customFieldsArbitrary = fc.dictionary(
         "code",
         "segment",
         "path",
-        "redirect",
         "message",
         "stack",
         // `name` is Error metadata: the constructor sets it to "RouterError"
@@ -133,7 +97,6 @@ export const constructorOptionsArbitrary = fc.record(
     message: messageArbitrary,
     segment: segmentArbitrary,
     path: pathArbitrary,
-    redirect: redirectArbitrary,
   },
   { requiredKeys: [] },
 );

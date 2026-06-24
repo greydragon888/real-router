@@ -1,13 +1,14 @@
 import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
+import { getDependenciesApi, getLifecycleApi } from "@real-router/core/api";
+
 import {
   createLifecycleTestRouter,
   errorCodes,
   noop,
   type Router,
 } from "./setup";
-import { getDependenciesApi, getLifecycleApi } from "../../../../src/api";
 
 let router: Router;
 let lifecycle: ReturnType<typeof getLifecycleApi>;
@@ -271,6 +272,23 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       expect(() => {
         lifecycle.addActivateGuard("invalid", false);
       }).not.toThrow();
+    });
+
+    it("rolls back a failed external add by recompiling from the surviving definition guard (cross-origin)", async () => {
+      // "admin-protected" carries a definition canActivate (route config) that
+      // blocks. Adding a FAILING external guard for the same name must roll
+      // back AND recompile the slot from the surviving definition factory — so
+      // the route stays blocked, not left guardless. Exercises the cross-origin
+      // rollback path in #registerHandler (otherMap.has → recompileSlot).
+      expect(() => {
+        // @ts-expect-error: factory returns a non-function → compile throws
+        lifecycle.addActivateGuard("admin-protected", () => null);
+      }).toThrow(TypeError);
+
+      // Definition guard survived the cross-origin rollback → still blocked.
+      await expect(router.navigate("admin-protected")).rejects.toMatchObject({
+        code: errorCodes.CANNOT_ACTIVATE,
+      });
     });
 
     it("should maintain consistency after failed registration", async () => {

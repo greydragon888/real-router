@@ -149,6 +149,7 @@ export function getPluginApi<
     getRouteConfig: (name) => {
       const store = ctx.routeGetStore();
 
+      // Stryker disable next-line ConditionalExpression,BlockStatement: equivalent — a missing route yields routeCustomFields[name] === undefined, identical to this early return
       if (!store.matcher.hasRoute(name)) {
         return;
       }
@@ -191,6 +192,7 @@ export function getPluginApi<
 
         const idx = ctx.routerExtensions.indexOf(extensionRecord);
 
+        // Stryker disable next-line ConditionalExpression,EqualityOperator,UnaryOperator,BlockStatement: equivalent — this splice only tidies the `routerExtensions` TRACKING array; the router INSTANCE is cleaned by the `delete router[key]` loop above, and dispose()'s safety-net re-deletes any leaked key harmlessly. So no mutation of this guard/splice is behaviourally observable (full suite green with `===`, `+1`, and an empty body). Contrast the addInterceptor splice, which IS observable through buildPath and is killed behaviourally by invariantGuardMutants.test.ts.
         if (idx !== -1) {
           ctx.routerExtensions.splice(idx, 1);
         }

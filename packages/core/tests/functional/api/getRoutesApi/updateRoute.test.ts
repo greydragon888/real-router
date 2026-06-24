@@ -1,8 +1,8 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import { errorCodes } from "@real-router/core";
+import { cloneRouter, getPluginApi, getRoutesApi } from "@real-router/core/api";
 
-import { cloneRouter, getPluginApi, getRoutesApi } from "../../../../src/api";
 import { createTestRouter } from "../../../helpers";
 
 import type {

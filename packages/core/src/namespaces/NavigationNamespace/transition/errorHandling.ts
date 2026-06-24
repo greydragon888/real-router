@@ -67,12 +67,7 @@ export function rethrowAsRouterError(
   throw new RouterError(errorCode, wrapSyncError(error, segment));
 }
 
-const reservedRouterErrorProps = new Set([
-  "code",
-  "segment",
-  "path",
-  "redirect",
-]);
+const reservedRouterErrorProps = new Set(["code", "segment", "path"]);
 
 /**
  * Wraps a synchronously thrown value into structured error metadata.

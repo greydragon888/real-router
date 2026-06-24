@@ -9,7 +9,6 @@ import {
   errorCodeArbitrary,
   messageArbitrary,
   pathArbitrary,
-  redirectArbitrary,
   segmentArbitrary,
 } from "./helpers";
 
@@ -28,14 +27,6 @@ describe("RouterError Constructor Properties", () => {
         expect(err1.message).toBe(err2.message);
         expect(err1.segment).toBe(err2.segment);
         expect(err1.path).toBe(err2.path);
-
-        // redirect should be equal by content
-        if (options.redirect) {
-          expect(err1.redirect).toStrictEqual(err2.redirect);
-        } else {
-          expect(err1.redirect).toBeUndefined();
-          expect(err2.redirect).toBeUndefined();
-        }
       },
     );
   });
@@ -75,25 +66,15 @@ describe("RouterError Constructor Properties", () => {
       },
     );
 
-    test.prop(
-      [errorCodeArbitrary, segmentArbitrary, pathArbitrary, redirectArbitrary],
-      {
-        numRuns: 10_000,
-      },
-    )(
+    test.prop([errorCodeArbitrary, segmentArbitrary, pathArbitrary], {
+      numRuns: 10_000,
+    })(
       "optional fields are correctly set or remain undefined",
-      (code, segment, path, redirect) => {
-        const err = new RouterError(code, { segment, path, redirect });
+      (code, segment, path) => {
+        const err = new RouterError(code, { segment, path });
 
         expect(err.segment).toBe(segment);
         expect(err.path).toBe(path);
-
-        if (redirect) {
-          expect(err.redirect).toBeDefined();
-          expect(err.redirect).toStrictEqual(redirect);
-        } else {
-          expect(err.redirect).toBeUndefined();
-        }
       },
     );
   });
@@ -158,9 +139,9 @@ describe("RouterError Constructor Properties", () => {
       (code, value) => {
         // `code` is the positional arg, not an option — passing it inside the
         // options object makes it a custom field, which collides with the
-        // reserved data property and must throw. (segment/path/redirect are
+        // reserved data property and must throw. (segment/path are
         // destructured options, so only `code` reaches THIS ctor throw path;
-        // setAdditionalFields covers all four.) The shared customFieldsArbitrary
+        // setAdditionalFields covers all three.) The shared customFieldsArbitrary
         // filters reserved keys, so this throw had no generative coverage.
         expect(() => new RouterError(code, { code: value })).toThrow(TypeError);
       },
@@ -185,27 +166,6 @@ describe("RouterError Constructor Properties", () => {
             expect(err.hasField(key)).toBe(true);
             expect(err.getField(key)).toBe(customFields[key]);
           }
-        }
-      },
-    );
-  });
-
-  describe("Redirect deep freeze", () => {
-    test.prop([errorCodeArbitrary, redirectArbitrary], { numRuns: 5000 })(
-      "redirect is always returned frozen or undefined",
-      (code, redirect) => {
-        const err = new RouterError(code, { redirect });
-
-        if (redirect) {
-          const frozenRedirect = err.redirect;
-
-          expect(frozenRedirect).toBeDefined();
-          expect(Object.isFrozen(frozenRedirect)).toBe(true);
-
-          // Verify original redirect is not modified
-          expect(Object.isFrozen(redirect)).toBe(false);
-        } else {
-          expect(err.redirect).toBeUndefined();
         }
       },
     );

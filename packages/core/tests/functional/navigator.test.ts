@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
+import { getNavigator } from "@real-router/core";
 import { cloneRouter } from "@real-router/core/api";
 
-import { getNavigator } from "../../src/getNavigator";
 import { createTestRouter } from "../helpers";
 
 import type { Router } from "@real-router/core";
@@ -134,7 +134,7 @@ describe("core/getNavigator", () => {
 
     expect(() => {
       router.subscribeLeave("not a function" as any);
-    }).toThrow(TypeError);
+    }).toThrow("[router.subscribeLeave] Expected a function");
   });
 
   it("router.isLeaveApproved() returns false when not in LEAVE_APPROVED state", () => {

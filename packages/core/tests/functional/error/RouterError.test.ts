@@ -2,8 +2,6 @@ import { describe, it, expect } from "vitest";
 
 import { RouterError, errorCodes } from "@real-router/core";
 
-import { DEFAULT_TRANSITION } from "../../../src/constants";
-
 describe("RouterError", () => {
   it("should create an instance with code and default message", () => {
     const err = new RouterError("ERR_CODE");
@@ -12,31 +10,18 @@ describe("RouterError", () => {
     expect(err.code).toBe("ERR_CODE");
     expect(err.message).toBe("ERR_CODE");
     expect(err.segment).toBeUndefined();
-    expect(err.redirect).toBeUndefined();
   });
 
-  it("should set message, segment, redirect and custom fields", () => {
-    const redirect = {
-      name: "home",
-      path: "/",
-      params: {},
-      transition: DEFAULT_TRANSITION,
-      context: {},
-    };
+  it("should set message, segment and custom fields", () => {
     const err = new RouterError("ERR_CODE", {
       message: "Custom message",
       segment: "users",
-      redirect,
       custom: 123,
     });
 
     expect(err.code).toBe("ERR_CODE");
     expect(err.message).toBe("Custom message");
     expect(err.segment).toBe("users");
-    // redirect is a frozen clone, not the same reference
-    expect(err.redirect).not.toBe(redirect);
-    expect(err.redirect).toStrictEqual(redirect);
-    expect(Object.isFrozen(err.redirect)).toBe(true);
     expect(err.custom).toBe(123);
   });
 
@@ -195,25 +180,6 @@ describe("RouterError", () => {
       });
     });
 
-    it("should include redirect when present", () => {
-      const redirect = {
-        name: "home",
-        path: "/",
-        params: {},
-        transition: DEFAULT_TRANSITION,
-        context: {},
-      };
-      const err = new RouterError("ERR", { redirect });
-
-      const json = err.toJSON();
-
-      expect(json).toStrictEqual({
-        code: "ERR",
-        message: "ERR",
-        redirect,
-      });
-    });
-
     it("should include custom fields but exclude stack", () => {
       const err = new RouterError("ERR", {
         customField: "value",
@@ -234,18 +200,10 @@ describe("RouterError", () => {
     });
 
     it("should serialize all fields together", () => {
-      const redirect = {
-        name: "admin",
-        path: "/admin",
-        params: { id: "1" },
-        transition: DEFAULT_TRANSITION,
-        context: {},
-      };
       const err = new RouterError("FORBIDDEN", {
         message: "Access denied",
         segment: "admin",
         path: "/admin/settings",
-        redirect,
         userId: 42,
         reason: "insufficient permissions",
       });
@@ -257,33 +215,9 @@ describe("RouterError", () => {
         message: "Access denied",
         segment: "admin",
         path: "/admin/settings",
-        redirect,
         userId: 42,
         reason: "insufficient permissions",
       });
-    });
-  });
-
-  describe("redirect deep freeze", () => {
-    it("should freeze redirect state when accessed via getter", () => {
-      const redirect = {
-        name: "home",
-        path: "/",
-        params: {},
-        transition: DEFAULT_TRANSITION,
-        context: {},
-      };
-      const err = new RouterError("ERR", { redirect });
-
-      const frozenRedirect = err.redirect;
-
-      expect(Object.isFrozen(frozenRedirect)).toBe(true);
-    });
-
-    it("should return undefined when redirect is not set", () => {
-      const err = new RouterError("ERR");
-
-      expect(err.redirect).toBeUndefined();
     });
   });
 

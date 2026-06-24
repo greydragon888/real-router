@@ -3,7 +3,6 @@ import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 import { events, errorCodes } from "@real-router/core";
 import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 
-import { getInternals } from "../../../../src/internals";
 import { createTestRouter } from "../../../helpers";
 
 import type { Router } from "@real-router/core";
@@ -203,22 +202,23 @@ describe("router.navigate() - events transition leave approve (RFC §9.2)", () =
       unsubLeave();
     });
 
-    it("router is still transitioning when LEAVE_APPROVE fires (state not yet committed)", async () => {
-      let isTransitioningDuringLeaveApprove: boolean | undefined;
+    it("state is not yet committed when LEAVE_APPROVE fires (still mid-transition)", async () => {
+      let isLeaveApprovedDuring: boolean | undefined;
       let stateNameDuringLeaveApprove: string | undefined;
 
       const unsubLeave = getPluginApi(router).addEventListener(
         events.TRANSITION_LEAVE_APPROVE,
         () => {
-          isTransitioningDuringLeaveApprove =
-            getInternals(router).isTransitioning();
+          // Public proof of "mid-transition, not committed": we are in the
+          // LEAVE_APPROVED phase AND the old route is still the committed state.
+          isLeaveApprovedDuring = router.isLeaveApproved();
           stateNameDuringLeaveApprove = router.getState()?.name;
         },
       );
 
       await router.navigate("users");
 
-      expect(isTransitioningDuringLeaveApprove).toBe(true);
+      expect(isLeaveApprovedDuring).toBe(true);
       expect(stateNameDuringLeaveApprove).toBe("home");
 
       unsubLeave();

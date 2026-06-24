@@ -1,6 +1,8 @@
 import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
+import { getLifecycleApi } from "@real-router/core/api";
+
 import {
   createLifecycleTestRouter,
   errorCodes,
@@ -8,7 +10,6 @@ import {
   pickRouteIdentity,
   type Router,
 } from "./setup";
-import { getLifecycleApi } from "../../../../src/api";
 
 let router: Router;
 let lifecycle: ReturnType<typeof getLifecycleApi>;

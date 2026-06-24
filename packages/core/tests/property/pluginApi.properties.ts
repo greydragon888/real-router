@@ -2,6 +2,7 @@ import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it, vi } from "vitest";
 
 import { errorCodes, events, RouterError } from "@real-router/core";
+import { getPluginApi } from "@real-router/core/api";
 
 import {
   createFixtureRouter,
@@ -10,7 +11,6 @@ import {
   arbIdParam,
   NUM_RUNS,
 } from "./helpers";
-import { getPluginApi } from "../../src/api";
 
 function getParamsForRoute(name: string): Record<string, string> {
   if (name === "users.view" || name === "users.edit") {

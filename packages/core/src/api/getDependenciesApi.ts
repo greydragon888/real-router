@@ -15,10 +15,10 @@ function setDependency(
   dependencyName: string,
   dependencyValue: unknown,
   validator?: RouterValidator | null,
-): boolean {
+): void {
   // undefined = "don't set" (feature for conditional setting)
   if (dependencyValue === undefined) {
-    return false;
+    return;
   }
 
   const isNewKey = !Object.hasOwn(store.dependencies, dependencyName);
@@ -41,8 +41,6 @@ function setDependency(
 
   (store.dependencies as Record<string, unknown>)[dependencyName] =
     dependencyValue;
-
-  return true;
 }
 
 function setMultipleDependencies(

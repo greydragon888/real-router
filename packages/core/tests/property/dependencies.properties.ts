@@ -2,6 +2,7 @@ import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 
 import { getDependenciesApi } from "@real-router/core/api";
+import { getInternals } from "@real-router/core/validation";
 
 import {
   createFixtureRouter,
@@ -9,7 +10,6 @@ import {
   arbParamValue,
   NUM_RUNS,
 } from "./helpers";
-import { getInternals } from "../../src/internals";
 
 import type { DependenciesApi } from "@real-router/core/api";
 

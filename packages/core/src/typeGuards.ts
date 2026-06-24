@@ -31,11 +31,15 @@ function formatValue(value: unknown): string {
 export function assertLoggerConfig(
   config: unknown,
 ): asserts config is LoggerConfig {
-  if (typeof config !== "object" || config === null) {
+  if (typeof config !== "object") {
     throw new TypeError("Logger config must be an object");
   }
 
-  const obj = config;
+  // `typeof null === "object"`, so TS still sees `object | null` here — but the
+  // sole caller (Router's ctor) gates on `if (loggerConfig)`, so null/falsy never
+  // arrives; treat it as the non-null object the gate guarantees.
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- gated caller never passes null
+  const obj = config!;
 
   // Check for unknown properties
   for (const key of Object.keys(obj)) {

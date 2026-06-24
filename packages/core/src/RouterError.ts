@@ -1,16 +1,13 @@
 // packages/core/src/RouterError.ts
 
 import { errorCodes } from "./constants";
-import { deepFreezeState } from "./helpers";
-
-import type { State } from "@real-router/types";
 
 // Pre-compute Set of error code values for O(1) lookup in setCode()
 // This avoids creating array and doing linear search on every setCode() call
 const errorCodeValues = new Set(Object.values(errorCodes));
 
 // Reserved built-in properties - throw error if user tries to set these
-const reservedProperties = new Set(["code", "segment", "path", "redirect"]);
+const reservedProperties = new Set(["code", "segment", "path"]);
 
 // Reserved method names - silently ignore attempts to overwrite these
 const reservedMethods = new Set([
@@ -29,7 +26,6 @@ export class RouterError extends Error {
   // with RouterError interface in core-types
   readonly segment: string | undefined;
   readonly path: string | undefined;
-  readonly redirect: State | undefined;
 
   // Note: code appears to be writable but setCode() should be used
   // to properly update both code and message together
@@ -38,7 +34,7 @@ export class RouterError extends Error {
   /**
    * Creates a new RouterError instance.
    *
-   * The options object accepts built-in fields (message, segment, path, redirect)
+   * The options object accepts built-in fields (message, segment, path)
    * and any additional custom fields, which will all be attached to the error instance.
    *
    * @param code - The error code (e.g., "ROUTE_NOT_FOUND", "CANNOT_ACTIVATE")
@@ -46,7 +42,6 @@ export class RouterError extends Error {
    * @param options.message - Custom error message (defaults to code if not provided)
    * @param options.segment - The route segment where the error occurred
    * @param options.path - The full path where the error occurred
-   * @param options.redirect - Optional redirect state for navigation errors
    *
    * @example
    * ```typescript
@@ -63,11 +58,6 @@ export class RouterError extends Error {
    *   path: "/admin/users",
    *   userId: "123"  // custom field
    * });
-   *
-   * // Error with redirect
-   * const err4 = new RouterError("TRANSITION_ERR", {
-   *   redirect: { name: "home", path: "/", params: {} }
-   * });
    * ```
    */
   constructor(
@@ -76,14 +66,12 @@ export class RouterError extends Error {
       message,
       segment,
       path,
-      redirect,
       ...rest
     }: {
       [key: string]: unknown;
       message?: string | undefined;
       segment?: string | undefined;
       path?: string | undefined;
-      redirect?: State | undefined;
     } = {},
   ) {
     super(message ?? code);
@@ -96,8 +84,6 @@ export class RouterError extends Error {
     this.code = code;
     this.segment = segment;
     this.path = path;
-    // Deep freeze redirect to prevent mutations (creates a frozen clone)
-    this.redirect = redirect ? deepFreezeState(redirect) : undefined;
 
     // Assign custom fields, checking reserved properties and filtering out reserved method names
     // Issue #39: Throw for reserved properties to match setAdditionalFields behavior
@@ -267,7 +253,7 @@ export class RouterError extends Error {
    * Serializes the error to a JSON-compatible object.
    *
    * This method is automatically called by JSON.stringify() and includes:
-   * - Built-in fields: code, message, segment (if set), path (if set), redirect (if set)
+   * - Built-in fields: code, message, segment (if set), path (if set)
    * - All custom fields added via setAdditionalFields() or constructor
    * - Excludes: stack trace (for security/cleanliness)
    *
@@ -302,9 +288,6 @@ export class RouterError extends Error {
     if (this.path !== undefined) {
       result.path = this.path;
     }
-    if (this.redirect !== undefined) {
-      result.redirect = this.redirect;
-    }
 
     // add all public fields
     // Using Set.has() for O(1) lookup instead of Array.includes() O(n)
@@ -314,7 +297,6 @@ export class RouterError extends Error {
       "message",
       "segment",
       "path",
-      "redirect",
       "stack",
       // `name` is now an own enumerable prop (constructor sets it to
       // "RouterError"); it's class metadata, not a custom field — keep it out of

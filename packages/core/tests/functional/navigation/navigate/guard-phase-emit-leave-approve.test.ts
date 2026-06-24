@@ -1,160 +1,116 @@
-import { describe, beforeEach, it, expect, vi } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { errorCodes } from "@real-router/core";
+import { getLifecycleApi } from "@real-router/core/api";
 
-import { DEFAULT_TRANSITION } from "../../../../src/constants";
-import { executeGuardPipeline } from "../../../../src/namespaces/NavigationNamespace/transition/guardPhase";
+import { createTestRouter } from "../../../helpers";
 
-import type { GuardFn, State } from "@real-router/types";
+import type { Router } from "@real-router/core";
+import type { LifecycleApi } from "@real-router/core/api";
 
-const TO_STATE: State = {
-  name: "users",
-  path: "/users",
-  params: {},
-  transition: DEFAULT_TRANSITION,
-  context: {},
-};
-const FROM_STATE: State = {
-  name: "home",
-  path: "/home",
-  params: {},
-  transition: DEFAULT_TRANSITION,
-  context: {},
-};
-const SIGNAL: AbortSignal = new AbortController().signal;
-const ALWAYS_ACTIVE = () => true;
+/**
+ * LEAVE_APPROVE emission and guard ordering, through the REAL navigation
+ * pipeline (`router.navigate` → NavigationNamespace → guardPhase). The previous
+ * version called `executeGuardPipeline` directly with a hand-rolled
+ * `emitLeaveApprove` mock, which skipped the `emitLeaveApproveCallback` wiring
+ * (`sendLeaveApprove` / `hasLeaveListeners` / `awaitLeaveListeners`). Here the
+ * observable is `router.subscribeLeave` — it fires exactly when the pipeline
+ * emits LEAVE_APPROVE, so it proves both the emission count and the
+ * deactivation → leave-approve → activation ordering end-to-end.
+ */
+describe("navigate() — LEAVE_APPROVE emission & guard order", () => {
+  let router: Router;
+  let lifecycle: LifecycleApi;
 
-function makeGuards(entries: [string, GuardFn][]): Map<string, GuardFn> {
-  return new Map(entries);
-}
-
-describe("guardPhase — emitLeaveApprove callback", () => {
-  let emitLeaveApprove: ReturnType<typeof vi.fn> &
-    (() => Promise<void> | undefined);
-
-  beforeEach(() => {
-    emitLeaveApprove = vi.fn().mockReturnValue(undefined) as ReturnType<
-      typeof vi.fn
-    > &
-      (() => Promise<void> | undefined);
+  beforeEach(async () => {
+    router = createTestRouter();
+    await router.start("/home");
+    lifecycle = getLifecycleApi(router);
   });
 
-  it("called once after sync deactivation, before activation (call order verified)", () => {
-    const callOrder: string[] = [];
-    const deactivateGuard: GuardFn = vi.fn().mockImplementation(() => {
-      callOrder.push("deactivate");
-
-      return true;
-    });
-    const activateGuard: GuardFn = vi.fn().mockImplementation(() => {
-      callOrder.push("activate");
-
-      return true;
-    });
-
-    emitLeaveApprove.mockImplementation(() => {
-      callOrder.push("leaveApprove");
-    });
-
-    const result = executeGuardPipeline(
-      makeGuards([["home", deactivateGuard]]),
-      makeGuards([["users", activateGuard]]),
-      ["home"],
-      ["users"],
-      true,
-      true,
-      TO_STATE,
-      FROM_STATE,
-      SIGNAL,
-      ALWAYS_ACTIVE,
-      emitLeaveApprove,
-    );
-
-    expect(result).toBeUndefined();
-    expect(callOrder).toStrictEqual(["deactivate", "leaveApprove", "activate"]);
-    expect(emitLeaveApprove).toHaveBeenCalledTimes(1);
-  });
-
-  it("called after async deactivation resolves, before activation (async path)", async () => {
-    const callOrder: string[] = [];
-    const deactivateGuard: GuardFn = vi.fn().mockResolvedValue(true);
-    const activateGuard: GuardFn = vi.fn().mockImplementation(() => {
-      callOrder.push("activate");
-
-      return true;
-    });
-
-    emitLeaveApprove.mockImplementation(() => {
-      callOrder.push("leaveApprove");
-    });
-
-    const result = executeGuardPipeline(
-      makeGuards([["home", deactivateGuard]]),
-      makeGuards([["users", activateGuard]]),
-      ["home"],
-      ["users"],
-      true,
-      true,
-      TO_STATE,
-      FROM_STATE,
-      SIGNAL,
-      ALWAYS_ACTIVE,
-      emitLeaveApprove,
-    );
-
-    expect(result).toBeInstanceOf(Promise);
-
-    await result;
-
-    expect(callOrder).toStrictEqual(["leaveApprove", "activate"]);
-    expect(emitLeaveApprove).toHaveBeenCalledTimes(1);
-  });
-
-  it("NOT called when deactivation guard blocks (returns false → throws CANNOT_DEACTIVATE)", () => {
-    const deactivateGuard: GuardFn = vi.fn().mockReturnValue(false);
-
-    let thrownError: unknown;
-
-    try {
-      void executeGuardPipeline(
-        makeGuards([["home", deactivateGuard]]),
-        new Map(),
-        ["home"],
-        [],
-        true,
-        false,
-        TO_STATE,
-        FROM_STATE,
-        SIGNAL,
-        ALWAYS_ACTIVE,
-        emitLeaveApprove,
-      );
-    } catch (error) {
-      thrownError = error;
+  afterEach(() => {
+    if (router.isActive()) {
+      router.stop();
     }
-
-    expect(thrownError).toMatchObject({ code: errorCodes.CANNOT_DEACTIVATE });
-    expect(emitLeaveApprove).not.toHaveBeenCalled();
   });
 
-  it("called when shouldDeactivate is false (no deactivation guards) and activation guards exist", () => {
-    const activateGuard: GuardFn = vi.fn().mockReturnValue(true);
+  it("emits leave-approve once, between deactivation and activation guards (sync)", async () => {
+    const order: string[] = [];
 
-    void executeGuardPipeline(
-      new Map(),
-      makeGuards([["users", activateGuard]]),
-      [],
-      ["users"],
-      false,
-      true,
-      TO_STATE,
-      FROM_STATE,
-      SIGNAL,
-      ALWAYS_ACTIVE,
-      emitLeaveApprove,
-    );
+    lifecycle.addDeactivateGuard("home", () => () => {
+      order.push("deactivate");
 
-    expect(emitLeaveApprove).toHaveBeenCalledTimes(1);
-    expect(activateGuard).toHaveBeenCalledTimes(1);
+      return true;
+    });
+    lifecycle.addActivateGuard("users", () => () => {
+      order.push("activate");
+
+      return true;
+    });
+
+    const leave = vi.fn(() => {
+      order.push("leaveApprove");
+    });
+
+    router.subscribeLeave(leave);
+
+    await router.navigate("users");
+
+    expect(order).toStrictEqual(["deactivate", "leaveApprove", "activate"]);
+    expect(leave).toHaveBeenCalledTimes(1);
+  });
+
+  it("emits leave-approve after an async deactivation guard resolves, before activation", async () => {
+    const order: string[] = [];
+
+    lifecycle.addDeactivateGuard("home", () => async () => {
+      order.push("deactivate");
+
+      return true;
+    });
+    lifecycle.addActivateGuard("users", () => () => {
+      order.push("activate");
+
+      return true;
+    });
+
+    const leave = vi.fn(() => {
+      order.push("leaveApprove");
+    });
+
+    router.subscribeLeave(leave);
+
+    await router.navigate("users");
+
+    expect(order).toStrictEqual(["deactivate", "leaveApprove", "activate"]);
+    expect(leave).toHaveBeenCalledTimes(1);
+  });
+
+  it("does NOT emit leave-approve when a deactivation guard blocks the transition", async () => {
+    lifecycle.addDeactivateGuard("home", () => () => false);
+
+    const leave = vi.fn();
+
+    router.subscribeLeave(leave);
+
+    await expect(router.navigate("users")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_DEACTIVATE,
+    });
+    expect(leave).not.toHaveBeenCalled();
+  });
+
+  it("emits leave-approve even with no deactivation guards (only activation guards)", async () => {
+    const activate = vi.fn(() => true);
+
+    lifecycle.addActivateGuard("users", () => activate);
+
+    const leave = vi.fn();
+
+    router.subscribeLeave(leave);
+
+    await router.navigate("users");
+
+    expect(leave).toHaveBeenCalledTimes(1);
+    expect(activate).toHaveBeenCalledTimes(1);
   });
 });

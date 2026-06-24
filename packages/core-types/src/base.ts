@@ -105,7 +105,6 @@ export interface RouterError extends Error {
   readonly code: string;
   readonly segment: string | undefined;
   readonly path: string | undefined;
-  readonly redirect: State | undefined;
   setCode: (code: string) => void;
   setErrorInstance: (err: Error) => void;
   setAdditionalFields: (fields: Record<string, unknown>) => void;

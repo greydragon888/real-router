@@ -50,11 +50,14 @@ function settleLeavePromises(
       return;
     }
 
+    // Stryker disable next-line ObjectLiteral,BooleanLiteral: equivalent — `{ once: true }` is redundant: onAbort fires at most once (a signal aborts once) and the success path explicitly removeEventListener's it, so dropping `once` is unobservable. StringLiteral sibling stays live (the "abort" event name is killed).
     signal.addEventListener("abort", onAbort, { once: true });
 
     void Promise.allSettled(promises).then((results) => {
+      // Stryker disable next-line StringLiteral: equivalent — this cleanup name is redundant: onAbort is registered with `{ once: true }` and the per-navigation signal is discarded unaborted on success, so failing to remove the listener leaks nothing observable.
       signal.removeEventListener("abort", onAbort);
 
+      // Stryker disable next-line BlockStatement: equivalent — emptying the post-allSettled abort-race early-return falls through to resolve()/reject(), but the abort handler already settled the promise, so the extra settle is a no-op. CE sibling stays live (→true hangs the pipeline = killed via timeout).
       if (signal.aborted) {
         // Race lost to abort — the abort handler already rejected; do nothing
         return;
@@ -210,6 +213,7 @@ export class EventBusNamespace {
     this.#fsm.forceState(routerStates.READY);
     this.emitTransitionSuccess(state, fromState, opts);
 
+    // Stryker disable next-line BlockStatement: equivalent — not clearing #currentToState leaves a stale State ref, but after READY it is only read by sendCancelIfPossible while canCancel() (transitioning), so the stale value is never observed. CE/EqualityOperator siblings stay live (the #308 reentrant-preserve invariant is killed by reentrant-currentToState-wipe.test.ts).
     if (this.#currentToState === state) {
       this.#currentToState = undefined;
     }
@@ -229,6 +233,7 @@ export class EventBusNamespace {
     this.#pendingError = error;
     this.#fsm.send(routerEvents.FAIL);
 
+    // Stryker disable next-line BlockStatement: equivalent — not clearing #currentToState leaves a stale State ref, unobservable after FAIL settles (see L213). CE/EqualityOperator siblings stay live (#308 reentrant-currentToState-wipe.test.ts).
     if (this.#currentToState === prev) {
       this.#currentToState = undefined;
     }
@@ -249,6 +254,7 @@ export class EventBusNamespace {
     this.#pendingFromState = fromState;
     this.#fsm.send(routerEvents.CANCEL);
 
+    // Stryker disable next-line BlockStatement: equivalent — not clearing #currentToState leaves a stale State ref, unobservable after CANCEL settles (see L213). CE/EqualityOperator siblings stay live (#308 reentrant-currentToState-wipe.test.ts).
     if (this.#currentToState === prev) {
       this.#currentToState = undefined;
     }

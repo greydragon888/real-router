@@ -74,6 +74,50 @@ describe("resolveRemainingGuards branches", () => {
     expect(pendingSyncGuard).toHaveBeenCalledTimes(1);
   });
 
+  it("includes the failing segment name when an async guard resolves to false", async () => {
+    // resolveAsyncGuard (firstResult path): a single async guard that resolves
+    // to `false` rejects with RouterError(CANNOT_ACTIVATE, { segment }).
+    // Asserting `segment` kills the ObjectLiteral `{ segment } -> {}` mutant.
+    lifecycle.addActivateGuard("orders", () =>
+      vi.fn().mockResolvedValue(false),
+    );
+
+    await expect(router.navigate("orders.pending")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_ACTIVATE,
+      segment: "orders",
+    });
+  });
+
+  it("includes the failing segment name when a sync guard returns false in the async tail", async () => {
+    // resolveRemainingGuards tail loop: sync guard returns false after an async
+    // guard resolved. Asserting `segment` kills the ObjectLiteral mutant on the
+    // tail-loop `throw new RouterError(errorCode, { segment })`.
+    lifecycle.addActivateGuard("orders", () => vi.fn().mockResolvedValue(true));
+    lifecycle.addActivateGuard("orders.pending", () =>
+      vi.fn().mockReturnValue(false),
+    );
+
+    await expect(router.navigate("orders.pending")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_ACTIVATE,
+      segment: "orders.pending",
+    });
+  });
+
+  it("converts an AbortError thrown by a sync guard in the async tail to TRANSITION_CANCELLED", async () => {
+    // The tail-loop catch routes through handleGuardError, which maps an
+    // AbortError DOMException to TRANSITION_CANCELLED. Emptying that catch
+    // (BlockStatement mutant) would instead surface the generic CANNOT_ACTIVATE,
+    // so asserting the converted code kills it.
+    lifecycle.addActivateGuard("orders", () => vi.fn().mockResolvedValue(true));
+    lifecycle.addActivateGuard("orders.pending", () => () => {
+      throw new DOMException("aborted", "AbortError");
+    });
+
+    await expect(router.navigate("orders.pending")).rejects.toMatchObject({
+      code: errorCodes.TRANSITION_CANCELLED,
+    });
+  });
+
   it("should cancel when navigation superseded during remaining guard iteration (sync path)", async () => {
     vi.useFakeTimers();
 

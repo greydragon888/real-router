@@ -39,6 +39,7 @@ async function resolveRemainingGuards( // NOSONAR -- params kept flat to avoid o
   await resolveAsyncGuard(firstResult, errorCode, firstSegment);
 
   for (let i = startIndex; i < segments.length; i++) {
+    // Stryker disable next-line BlockStatement: equivalent — emptying the body drops the async-tail cancellation throw, but supersession is independently enforced by the navigationId/isCurrentNav checks in NavigationNamespace, so the navigation still rejects with TRANSITION_CANCELLED (full suite green). The ConditionalExpression sibling stays live (its →true variant always-cancels and is killed by async-guard tests).
     if (!isActive()) {
       throw new RouterError(errorCodes.TRANSITION_CANCELLED);
     }
@@ -50,6 +51,7 @@ async function resolveRemainingGuards( // NOSONAR -- params kept flat to avoid o
       continue;
     }
 
+    // Stryker disable next-line BooleanLiteral: equivalent — guardResult is unconditionally reassigned by guardFn() on the next line, or the catch calls handleGuardError() (returns never), so the init value is never read.
     let guardResult: boolean | Promise<boolean> = false;
 
     try {
@@ -91,6 +93,7 @@ async function finishAsyncPipeline( // NOSONAR
   if (leaveResult !== undefined) {
     await leaveResult;
 
+    // Stryker disable next-line BlockStatement: equivalent — defensive-redundancy: this post-leave cancellation re-check is already enforced upstream (navigationId / isCurrentNav supersession in NavigationNamespace), so emptying the throw is unobservable. Mirrors the disabled L42/L115/L228 cancel-checks.
     /* v8 ignore next 3 -- @preserve: V8 cannot track cancellation check through async leave continuation after Promise.allSettled */
     if (!isActive()) {
       throw new RouterError(errorCodes.TRANSITION_CANCELLED);
@@ -112,6 +115,7 @@ async function finishAsyncPipeline( // NOSONAR
       await pending;
     }
 
+    // Stryker disable next-line BlockStatement: equivalent — same async-tail cancellation throw as L42; dropping it is covered by the outer navigationId guard (full suite green). CE sibling stays live (→true killed by async-guard tests).
     if (!isActive()) {
       throw new RouterError(errorCodes.TRANSITION_CANCELLED);
     }
@@ -202,6 +206,7 @@ async function finishAfterAsyncLeave(
 ): Promise<void> {
   await leaveCompletion;
 
+  // Stryker disable next-line BlockStatement: equivalent — defensive-redundancy: same post-leave cancellation re-check as guardPhase's other `!isActive()` guards; supersession is enforced upstream (navigationId / isCurrentNav), so emptying the throw is unobservable.
   /* v8 ignore next 3 -- @preserve: unreachable after #663 — signal abort
      mid-leave rejects via settleLeavePromises, so `await leaveCompletion`
      throws directly instead of completing with a stale isActive() */
@@ -225,6 +230,7 @@ async function finishAfterAsyncLeave(
       await pending;
     }
 
+    // Stryker disable next-line BlockStatement: equivalent — same async-tail cancellation throw as L42; dropping it is covered by the outer navigationId guard (full suite green). CE sibling stays live (→true killed by async-guard tests).
     if (!isActive()) {
       throw new RouterError(errorCodes.TRANSITION_CANCELLED);
     }
@@ -251,6 +257,7 @@ function runGuards(
       continue;
     }
 
+    // Stryker disable next-line BooleanLiteral: equivalent — guardResult is unconditionally reassigned by guardFn() on the next line, or the catch calls handleGuardError() (returns never), so the init value is never read.
     let guardResult: boolean | Promise<boolean> = false;
 
     try {

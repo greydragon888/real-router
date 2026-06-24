@@ -890,8 +890,26 @@ describe("navigateToDefault", () => {
       router = createTestRouter({ defaultRoute: "" });
       await router.start("/home");
 
+      // Assert the specific routeName so the "not configured" branch (its own
+      // RouterError metadata + message) is pinned, not just the shared code —
+      // emptying that branch would fall through to "resolved to empty".
       await expect(router.navigateToDefault()).rejects.toMatchObject({
         code: errorCodes.ROUTE_NOT_FOUND,
+        routeName: "defaultRoute not configured",
+      });
+    });
+
+    it("should reject with 'resolved to empty' when a defaultRoute callback returns an empty route", async () => {
+      router.stop();
+      // A configured (truthy) callback that resolves to an empty route name —
+      // this reaches the distinct `if (!route)` branch, separate from the
+      // "not configured" branch above.
+      router = createTestRouter({ defaultRoute: () => "" });
+      await router.start("/home");
+
+      await expect(router.navigateToDefault()).rejects.toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+        routeName: "defaultRoute resolved to empty",
       });
     });
 

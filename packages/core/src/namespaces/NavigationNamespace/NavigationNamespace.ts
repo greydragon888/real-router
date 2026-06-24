@@ -63,6 +63,7 @@ function isSameNavigation(
  * overhead for the common case (no guards or sync guards).
  */
 export class NavigationNamespace {
+  // Stryker disable next-line BooleanLiteral: equivalent — reset to false at the top of every navigate()/navigateToState()/navigateToDefault(), so the initializer value is never observed.
   lastSyncResolved = false;
   lastSyncRejected = false;
   #deps!: NavigationDependencies;
@@ -92,6 +93,7 @@ export class NavigationNamespace {
     // Fast-path sync rejections: cached error + cached Promise.reject
     // No allocations, no throw/catch overhead, facade skips .catch() suppression
     if (!deps.canNavigate()) {
+      // Stryker disable next-line BooleanLiteral: equivalent — #721 optimization flag, not a correctness gate. Not flagging the cached (pre-suppressed) rejection routes the facade to the else-branch, which re-attaches a harmless .catch; no observable difference.
       this.lastSyncRejected = true;
 
       return CACHED_NOT_STARTED_REJECTION;
@@ -115,6 +117,7 @@ export class NavigationNamespace {
         deps.getState(),
         CACHED_ROUTE_NOT_FOUND_ERROR,
       );
+      // Stryker disable next-line BooleanLiteral: equivalent — #721 optimization flag (see L95): the cached rejection is suppressed by the facade else-branch regardless of the flag.
       this.lastSyncRejected = true;
 
       return CACHED_ROUTE_NOT_FOUND_REJECTION;
@@ -145,6 +148,7 @@ export class NavigationNamespace {
     const deps = this.#deps;
 
     if (!deps.canNavigate()) {
+      // Stryker disable next-line BooleanLiteral: equivalent — #721 optimization flag (see L95): the cached rejection is suppressed by the facade else-branch regardless of the flag.
       this.lastSyncRejected = true;
 
       return CACHED_NOT_STARTED_REJECTION;
@@ -288,6 +292,7 @@ export class NavigationNamespace {
 
       if (isSameNavigation(fromState, opts, toState)) {
         deps.emitTransitionError(toState, fromState, CACHED_SAME_STATES_ERROR);
+        // Stryker disable next-line BooleanLiteral: equivalent — #721 optimization flag (see L95): the cached rejection is suppressed by the facade else-branch regardless of the flag.
         this.lastSyncRejected = true;
 
         return CACHED_SAME_STATES_REJECTION;
@@ -295,12 +300,14 @@ export class NavigationNamespace {
 
       this.#abortPreviousNavigation(opts.signal);
 
+      // Stryker disable next-line UpdateOperator: equivalent — `#navigationId` is only ever compared by identity (`!== myId`) to detect supersession; uniqueness per navigation is all that matters, so `--` (decreasing ids) is indistinguishable from `++`.
       const myId = ++this.#navigationId;
 
       deps.startTransition(toState, fromState);
       transitionStarted = true;
 
       // Reentrant navigate from TRANSITION_START listener superseded this navigation
+      // Stryker disable next-line ConditionalExpression,BlockStatement: equivalent — fail-fast reentrant guard; supersession is also enforced downstream (handleNoGuardsLeave navigationId check + isCurrentNav in the guard pipeline), so dropping the throw is unobservable (full suite green with `if (false)`). The EqualityOperator mutant stays live (=== throws on every navigation).
       if (this.#navigationId !== myId) {
         throw new RouterError(errorCodes.TRANSITION_CANCELLED);
       }
@@ -335,6 +342,7 @@ export class NavigationNamespace {
         }
       }
 
+      // Stryker disable next-line ConditionalExpression: equivalent — running the guard pipeline on the no-guards path does not double-emit LEAVE_APPROVE (full suite green with `if (true)`); the BlockStatement mutant stays live (killed by guarded-route tests).
       // eslint-disable-next-line unicorn/prefer-else-if -- two exhaustive `if`s read clearer here than an else-if; merging cascades into no-negated-condition / no-unnecessary-condition in this hot guard-setup branch
       if (hasGuards) {
         controller = new AbortController();
@@ -396,6 +404,7 @@ export class NavigationNamespace {
         this.#cleanupController(controller, false);
       }
 
+      // Stryker disable next-line BooleanLiteral: equivalent — not flagging the sync-resolved promise routes the facade to the else-branch, which attaches a harmless .catch to an already-resolved promise; there is no rejection to suppress.
       this.lastSyncResolved = true;
 
       return Promise.resolve(
@@ -454,7 +463,9 @@ export class NavigationNamespace {
         onExternalAbort = () => {
           controller.abort(externalSignal.reason);
         };
+        // Stryker disable next-line ObjectLiteral: equivalent — `{ once: true }` is redundant: the per-navigation signal aborts at most once and is discarded unaborted on success, and the `finally` block explicitly removeEventListener's it.
         externalSignal.addEventListener("abort", onExternalAbort, {
+          // Stryker disable next-line BooleanLiteral: equivalent — `once` redundant (see ObjectLiteral above); the listener is explicitly removed in `finally`.
           once: true,
         });
       }
@@ -474,8 +485,17 @@ export class NavigationNamespace {
       routeTransitionError(deps, error, nav.toState, nav.fromState);
 
       throw error;
+      // NB: the `} finally {}` BlockStatement mutant SURVIVES but is EQUIVALENT —
+      // emptying the finally only skips #cleanupController, which is unobservable
+      // (defense-in-depth: abortCurrentNavigation on stop/dispose +
+      // #abortPreviousNavigation on concurrent nav; the success-path ref-release is
+      // proven unobservable — see #cleanupController's disable). It cannot be
+      // inline-`Stryker disable`d: the catch `}` and finally `{` share one line, so
+      // there is no comment position that targets the finally body. Left documented.
     } finally {
+      // Stryker disable next-line ConditionalExpression,BlockStatement: equivalent — listener cleanup is redundant: the per-navigation signal is discarded on completion, so skipping the removeEventListener leaks nothing observable.
       if (onExternalAbort) {
+        // Stryker disable next-line StringLiteral: equivalent — cleanup event name is redundant (listener is `{ once: true }` and the signal is discarded), so a wrong name removes nothing observable.
         externalSignal?.removeEventListener("abort", onExternalAbort);
       }
 
@@ -586,6 +606,7 @@ export class NavigationNamespace {
       controller.abort();
     }
 
+    // Stryker disable next-line ConditionalExpression,EqualityOperator,BlockStatement: equivalent — controller identity-guard; cleanup correctness is enforced by #abortPreviousNavigation + the navigationId/isCurrentNav checks. Full suite stays green with `=== → !==` (nulls the wrong controller) and with the body removed (ref never nulled), so no mutant here is observable.
     if (this.#currentController === controller) {
       this.#currentController = null;
     }

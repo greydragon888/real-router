@@ -142,6 +142,7 @@ export function cloneRouter<
     lifecycle.addActivateGuard(name, handler);
   }
 
+  // Stryker disable next-line EqualityOperator: equivalent — `>= 0` is always true, but `usePlugin(...[])` with an empty spread is a no-op, so entering the block on an empty list behaves identically to skipping it. (ConditionalExpression stays live: `→false` skips a real plugin list and is killable.)
   if (pluginFactories.length > 0) {
     newRouter.usePlugin(...pluginFactories);
   }

@@ -1,116 +1,105 @@
 import { describe, expect, it } from "vitest";
 
-import { normalizeParams } from "../../../src/helpers";
+import { createRouter } from "@real-router/core";
 
-import type { Params } from "@real-router/core";
+/**
+ * `normalizeParams` (src/helpers.ts) is exercised through its real caller —
+ * `router.buildPath()` (Router.ts: `buildPath(route, normalizeParams(params))`).
+ * Param normalization is fully observable on the built URL: stripped keys vanish
+ * from the query string, kept keys (incl. falsy) survive, insertion order is
+ * preserved, and inherited/prototype keys never appear. The "/" route turns any
+ * extra param into a query param with no required-param constraints.
+ *
+ * The one non-observable property of the old white-box suite — "always returns a
+ * fresh object" (identity) — is intentionally dropped: buildPath consumes the
+ * normalized object internally, so object identity is not part of the public
+ * contract.
+ */
+describe("buildPath — param normalization (normalizeParams)", () => {
+  const make = () =>
+    createRouter([{ name: "home", path: "/" }], { defaultRoute: "home" });
 
-describe("normalizeParams", () => {
-  it("returns undefined when input is undefined", () => {
-    const maybe: Params | undefined = undefined;
-    // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -- testing the undefined overload; return type intentionally narrow to undefined
-    const result = normalizeParams(maybe);
-
-    expect(result).toBeUndefined();
+  it("omits the query entirely when no params are passed (undefined input)", () => {
+    expect(make().buildPath("home")).toBe("/");
   });
 
-  it("returns empty object for empty input", () => {
-    expect(normalizeParams({})).toStrictEqual({});
+  it("omits the query for an empty params object", () => {
+    expect(make().buildPath("home", {})).toBe("/");
   });
 
-  it("returns equivalent object when no undefined values", () => {
-    const params = { a: 1, b: "str", c: true };
-
-    expect(normalizeParams(params)).toStrictEqual(params);
+  it("keeps defined params in the query", () => {
+    expect(make().buildPath("home", { a: "1", b: "2" })).toBe("/?a=1&b=2");
   });
 
   it("strips a single undefined value", () => {
-    const result = normalizeParams({ a: 1, b: undefined });
-
-    expect(result).toStrictEqual({ a: 1 });
+    expect(make().buildPath("home", { a: "1", b: undefined })).toBe("/?a=1");
   });
 
-  it("strips multiple undefined values", () => {
-    const result = normalizeParams({
-      a: 1,
-      b: undefined,
-      c: "x",
-      d: undefined,
-      e: null,
-    });
-
-    expect(result).toStrictEqual({ a: 1, c: "x", e: null });
+  it("strips multiple undefined values, keeps the rest", () => {
+    expect(
+      make().buildPath("home", {
+        a: "1",
+        b: undefined,
+        c: "x",
+        d: undefined,
+      }),
+    ).toBe("/?a=1&c=x");
   });
 
-  it("preserves falsy-but-defined values", () => {
-    const params = { zero: 0, falseVal: false, emptyStr: "", nullVal: null };
-
-    expect(normalizeParams(params)).toStrictEqual({
-      zero: 0,
-      falseVal: false,
-      emptyStr: "",
-      nullVal: null,
-    });
+  it("yields an empty query when every value is undefined", () => {
+    expect(make().buildPath("home", { a: undefined, b: undefined })).toBe("/");
   });
 
-  it("always returns a fresh object when input is defined", () => {
-    const params = { a: 1 };
-
-    expect(normalizeParams(params)).not.toBe(params);
+  it("preserves falsy-but-defined values (0, false, '', null)", () => {
+    // None of these is `undefined`, so normalizeParams keeps them all.
+    expect(
+      make().buildPath("home", {
+        a: 0,
+        b: false,
+        c: "",
+        d: null,
+      }),
+    ).toBe("/?a=0&b=false&c=&d");
   });
 
-  it("returns empty object when all values are undefined", () => {
-    const result = normalizeParams({ a: undefined, b: undefined });
-
-    expect(result).toStrictEqual({});
+  it("preserves insertion order of the surviving keys", () => {
+    expect(
+      make().buildPath("home", {
+        first: "1",
+        skip1: undefined,
+        second: "2",
+        skip2: undefined,
+        third: "3",
+      }),
+    ).toBe("/?first=1&second=2&third=3");
   });
 
-  it("does not mutate the input object", () => {
-    const input = { a: 1, b: undefined };
-    const snapshot = { ...input };
+  it("does not mutate the caller's params object", () => {
+    const input = { a: "1", b: undefined };
 
-    normalizeParams(input);
+    make().buildPath("home", input);
 
-    expect(input).toStrictEqual(snapshot);
+    // The undefined key must still be present on the caller's object.
     expect("b" in input).toBe(true);
+    expect(input).toStrictEqual({ a: "1", b: undefined });
   });
 
-  it("does not include undefined keys in the result (strictly absent)", () => {
-    const result = normalizeParams({ a: 1, b: undefined });
-
-    expect(result).toBeDefined();
-    expect("b" in result).toBe(false);
-    expect(Object.keys(result)).toStrictEqual(["a"]);
-  });
-
-  it("handles objects created with Object.create(null)", () => {
+  it("handles a params object created with Object.create(null)", () => {
     const input: Record<string, unknown> = Object.create(null);
 
-    input.a = 1;
+    input.a = "1";
     input.b = undefined;
 
-    const result = normalizeParams(input as any);
-
-    expect(result).toStrictEqual({ a: 1 });
+    expect(make().buildPath("home", input as never)).toBe("/?a=1");
   });
 
-  it("preserves insertion order of defined keys", () => {
-    const result = normalizeParams({
-      first: 1,
-      skip1: undefined,
-      second: 2,
-      skip2: undefined,
-      third: 3,
-    });
-
-    expect(Object.keys(result)).toStrictEqual(["first", "second", "third"]);
-  });
-
-  it("ignores inherited properties from prototype chain", () => {
-    const proto = { inheritedKey: "inherited" };
-    const params: Params = Object.create(proto) as Params;
+  it("ignores inherited (prototype-chain) properties", () => {
+    const proto = { inherited: "INHERITED" };
+    const params = Object.create(proto) as Record<string, unknown>;
 
     params.own = "own-value";
 
-    expect(normalizeParams(params)).toStrictEqual({ own: "own-value" });
+    // `inherited` comes from the prototype → Object.hasOwn skips it → absent.
+    expect(make().buildPath("home", params as never)).toBe("/?own=own-value");
   });
 });

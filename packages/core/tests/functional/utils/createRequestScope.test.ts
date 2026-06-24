@@ -1,14 +1,13 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
-import { getInternals } from "../../../src/internals";
-import { createRequestScope } from "../../../src/utils/createRequestScope";
+import { RouterError, errorCodes } from "@real-router/core";
+import { getDependenciesApi, getRoutesApi } from "@real-router/core/api";
+import { createRequestScope } from "@real-router/core/utils";
+
 import { createTestRouter } from "../../helpers";
 
-import type {
-  IncomingMessageLike,
-  RequestScope,
-} from "../../../src/utils/createRequestScope";
-import type { PluginFactory } from "@real-router/core";
+import type { Router } from "@real-router/core";
+import type { IncomingMessageLike } from "@real-router/core/utils";
 
 interface FakeIncomingMessage extends IncomingMessageLike {
   emitClose: () => void;
@@ -46,25 +45,29 @@ function createFakeIncomingMessage(): FakeIncomingMessage {
   return fake;
 }
 
-function isDisposed(scope: RequestScope): boolean {
-  return getInternals(scope.router).isDisposed();
-}
-
-function captureDeps<D extends Record<string, unknown>>(
-  scope: RequestScope<D>,
-): D {
-  let captured: D | undefined;
-  const plugin: PluginFactory<D> = (_router, getDependency) => {
-    captured = new Proxy({} as D, {
-      get: (_target, key) => getDependency(key as keyof D),
+/**
+ * Public disposal probe. After `dispose()`, every mutating router method throws
+ * `RouterError(ROUTER_DISPOSED)` — so a throwaway `getRoutesApi().add()` reveals
+ * disposal without reaching into `getInternals().isDisposed()`.
+ *
+ * NB: `router.isActive()` cannot be used here — it is ALSO `false` on a
+ * never-started clone, so it does not distinguish "disposed" from "idle"
+ * (audit 2026-06-23). On a live (non-disposed) clone the probe simply registers
+ * one inert route and returns `false`; the clone is torn down immediately after.
+ */
+function isRouterDisposed(router: Router): boolean {
+  try {
+    getRoutesApi(router).add({
+      name: "__dispose_probe__",
+      path: "/__dispose_probe__",
     });
 
-    return {};
-  };
-
-  scope.router.usePlugin(plugin);
-
-  return captured!;
+    return false;
+  } catch (error) {
+    return (
+      error instanceof RouterError && error.code === errorCodes.ROUTER_DISPOSED
+    );
+  }
 }
 
 describe("createRequestScope", () => {
@@ -100,7 +103,8 @@ describe("createRequestScope", () => {
         currentUser: "alice",
       });
 
-      const deps = captureDeps(scope);
+      // Public read of the cloned router's merged dependencies.
+      const deps = getDependenciesApi(scope.router).getAll() as Deps;
 
       expect(deps.currentUser).toBe("alice");
       expect(deps.abortSignal).toBe(scope.signal);
@@ -119,7 +123,7 @@ describe("createRequestScope", () => {
       await scope.dispose();
 
       expect(request.listenerCount()).toBe(0);
-      expect(isDisposed(scope)).toBe(true);
+      expect(isRouterDisposed(scope.router)).toBe(true);
 
       baseRouter.stop();
     });
@@ -129,12 +133,35 @@ describe("createRequestScope", () => {
       const request = createFakeIncomingMessage();
 
       const scope = createRequestScope(request, baseRouter);
+      const disposeSpy = vi.spyOn(scope.router, "dispose");
 
       await scope.dispose();
       await scope.dispose();
 
-      expect(isDisposed(scope)).toBe(true);
+      // the `disposed` flag must gate the body: router.dispose runs exactly once
+      // (kills the flag cond / block / assignment mutants that would re-run it)
+      expect(disposeSpy).toHaveBeenCalledTimes(1);
+      expect(request.listenerCount()).toBe(0);
+      expect(isRouterDisposed(scope.router)).toBe(true);
 
+      baseRouter.stop();
+    });
+
+    it("classifies a request with a malformed signal as Node, not Web (isRequestLike .aborted check)", () => {
+      const baseRouter = createTestRouter();
+      const fake = createFakeIncomingMessage();
+      // signal present but has no boolean `aborted` → must NOT be treated as a
+      // Web Request; isRequestLike's `typeof signal.aborted === "boolean"` rejects it
+      const request = Object.assign(fake, { signal: {} as AbortSignal });
+
+      const scope = createRequestScope(request, baseRouter);
+
+      // Node path: close listener attached + scope.signal is a real controller signal
+      expect(request.listenerCount()).toBe(1);
+      expect(typeof scope.signal.aborted).toBe("boolean");
+      expect(scope.signal).not.toBe(request.signal);
+
+      void scope.dispose();
       baseRouter.stop();
     });
 
@@ -152,7 +179,7 @@ describe("createRequestScope", () => {
       const scope = createRequestScope(request, baseRouter);
 
       await expect(scope.dispose()).resolves.toBeUndefined();
-      expect(isDisposed(scope)).toBe(true);
+      expect(isRouterDisposed(scope.router)).toBe(true);
 
       baseRouter.stop();
     });
@@ -185,7 +212,7 @@ describe("createRequestScope", () => {
 
       await scope.dispose();
 
-      expect(isDisposed(scope)).toBe(true);
+      expect(isRouterDisposed(scope.router)).toBe(true);
       expect(controller.signal.aborted).toBe(false);
 
       baseRouter.stop();
@@ -197,17 +224,17 @@ describe("createRequestScope", () => {
       const baseRouter = createTestRouter();
       const request = createFakeIncomingMessage();
 
-      let routerInternals: ReturnType<typeof getInternals> | undefined;
+      let scopedRouter: Router | undefined;
 
       {
         await using scope = createRequestScope(request, baseRouter);
 
-        routerInternals = getInternals(scope.router);
+        scopedRouter = scope.router;
 
-        expect(routerInternals.isDisposed()).toBe(false);
+        expect(isRouterDisposed(scope.router)).toBe(false);
       }
 
-      expect(routerInternals?.isDisposed()).toBe(true);
+      expect(isRouterDisposed(scopedRouter)).toBe(true);
       expect(request.listenerCount()).toBe(0);
 
       baseRouter.stop();

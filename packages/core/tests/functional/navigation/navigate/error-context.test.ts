@@ -1,7 +1,11 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { errorCodes, RouterError } from "@real-router/core";
-import { getLifecycleApi } from "@real-router/core/api";
+import { createRouter, errorCodes, RouterError } from "@real-router/core";
+import {
+  getLifecycleApi,
+  getPluginApi,
+  getRoutesApi,
+} from "@real-router/core/api";
 
 import { createTestRouter } from "../../../helpers";
 
@@ -178,12 +182,6 @@ describe("router.navigate() - error context", () => {
       expect(() => {
         err.setAdditionalFields({ path: "/overwrite" });
       }).toThrow(/Cannot set reserved property "path"/);
-
-      expect(() => {
-        err.setAdditionalFields({
-          redirect: { name: "x", params: {}, path: "/" },
-        });
-      }).toThrow(/Cannot set reserved property "redirect"/);
     });
 
     // Test 4: Non-reserved custom properties should work in constructor
@@ -220,6 +218,64 @@ describe("router.navigate() - error context", () => {
         // eslint-disable-next-line sonarjs/constructor-for-side-effects, sonarjs/no-unthrown-error
         new RouterError(errorCodes.CANNOT_ACTIVATE, { code: 500 });
       }).toThrow(TypeError);
+    });
+  });
+
+  // ROUTE_NOT_FOUND raised when a route vanishes between match and commit must
+  // carry the offending `{ routeName }` (not just the code) — the two defensive
+  // re-checks (navigateToState entry, completeTransition) each attach it.
+  describe("ROUTE_NOT_FOUND metadata when a route vanishes mid-flight", () => {
+    it("navigateToState for a state whose route was removed carries { routeName }", async () => {
+      const local = createRouter([
+        { name: "home", path: "/home" },
+        { name: "temp", path: "/temp" },
+      ]);
+
+      await local.start("/home");
+
+      const api = getPluginApi(local);
+      const state = api.makeState("temp", {});
+
+      getRoutesApi(local).remove("temp"); // gone before navigateToState commits
+
+      const error = await api
+        .navigateToState(state)
+        .catch((error_: unknown) => error_);
+
+      expect(error).toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+        routeName: "temp",
+      });
+
+      local.dispose();
+    });
+
+    it("completeTransition for a route removed by an in-flight guard carries { routeName }", async () => {
+      const local = createRouter([
+        { name: "home", path: "/home" },
+        { name: "target", path: "/target" },
+      ]);
+
+      await local.start("/home");
+
+      // An async activate guard removes the very route being entered — by commit
+      // time it no longer exists, so completeTransition fails with { routeName }.
+      getLifecycleApi(local).addActivateGuard("target", () => async () => {
+        getRoutesApi(local).remove("target");
+
+        return true;
+      });
+
+      const error = await local
+        .navigate("target")
+        .catch((error_: unknown) => error_);
+
+      expect(error).toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+        routeName: "target",
+      });
+
+      local.dispose();
     });
   });
 });

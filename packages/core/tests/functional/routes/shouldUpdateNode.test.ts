@@ -1,7 +1,5 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { DEFAULT_TRANSITION } from "../../../src/constants";
-import { getTransitionPath } from "../../../src/transitionPath";
 import { makeState, createTestRouter } from "../../helpers";
 
 import type { Router } from "@real-router/core";
@@ -51,13 +49,7 @@ describe("core/routes", () => {
       describe("toState validation", () => {
         it("should accept toState with name property", () => {
           const predicate = router.shouldUpdateNode("home");
-          const validState = {
-            name: "home",
-            params: {},
-            path: "/home",
-            transition: DEFAULT_TRANSITION,
-            context: {},
-          };
+          const validState = makeState("home", {});
 
           expect(() => {
             predicate(validState);
@@ -66,13 +58,7 @@ describe("core/routes", () => {
 
         it("should accept complete State object", () => {
           const predicate = router.shouldUpdateNode("home");
-          const currentState = {
-            name: "home",
-            params: {},
-            path: "/home",
-            transition: DEFAULT_TRANSITION,
-            context: {},
-          };
+          const currentState = makeState("home", {});
 
           expect(() => {
             predicate(currentState);
@@ -86,18 +72,29 @@ describe("core/routes", () => {
             predicate(null as any);
           }).toThrow(TypeError);
         });
+
+        it("throws with the State-guard message for every invalid toState shape", () => {
+          const predicate = router.shouldUpdateNode("home");
+          const msg = "toState must be valid State object";
+
+          // null / non-object primitive / object-without-name each fail a
+          // distinct operand of `toState && typeof === "object" && "name" in`.
+          // Asserting the MESSAGE (not just TypeError) distinguishes our guard
+          // from the native error a weakened guard would hit downstream.
+          expect(() => predicate(null as any)).toThrow(msg);
+          expect(() => predicate("home" as any)).toThrow(msg);
+          expect(() => predicate(123 as any)).toThrow(msg);
+          expect(() => predicate({} as any)).toThrow(msg);
+          expect(() => predicate({ params: {}, path: "/" } as any)).toThrow(
+            msg,
+          );
+        });
       });
 
       describe("fromState validation", () => {
         it("should accept undefined fromState (initial navigation)", () => {
           const predicate = router.shouldUpdateNode("home");
-          const toState = {
-            name: "home",
-            params: {},
-            path: "/home",
-            transition: DEFAULT_TRANSITION,
-            context: {},
-          };
+          const toState = makeState("home", {});
 
           expect(() => {
             predicate(toState, undefined);
@@ -106,20 +103,8 @@ describe("core/routes", () => {
 
         it("should accept valid fromState", () => {
           const predicate = router.shouldUpdateNode("home");
-          const toState = {
-            name: "sign-in",
-            params: {},
-            path: "/sign-in",
-            transition: DEFAULT_TRANSITION,
-            context: {},
-          };
-          const fromState = {
-            name: "home",
-            params: {},
-            path: "/home",
-            transition: DEFAULT_TRANSITION,
-            context: {},
-          };
+          const toState = makeState("sign-in", {});
+          const fromState = makeState("home", {});
 
           expect(() => {
             predicate(toState, fromState);
@@ -140,13 +125,7 @@ describe("core/routes", () => {
         const predicateHome = router.shouldUpdateNode("home");
         const predicateSignIn = router.shouldUpdateNode("sign-in");
 
-        const homeState = {
-          name: "home",
-          params: {},
-          path: "/home",
-          transition: DEFAULT_TRANSITION,
-          context: {},
-        };
+        const homeState = makeState("home", {});
 
         // home is active, so predicateHome should return true for intersection
         expect(predicateHome(homeState, homeState)).toBe(true);
@@ -158,21 +137,8 @@ describe("core/routes", () => {
       it("should work with different state objects", () => {
         const predicate = router.shouldUpdateNode("home");
 
-        const state1 = {
-          name: "home",
-          params: {},
-          path: "/home",
-          transition: DEFAULT_TRANSITION,
-          context: {},
-        };
-
-        const state2 = {
-          name: "sign-in",
-          params: {},
-          path: "/sign-in",
-          transition: DEFAULT_TRANSITION,
-          context: {},
-        };
+        const state1 = makeState("home", {});
+        const state2 = makeState("sign-in", {});
 
         // Should work with different state objects
         expect(() => {
@@ -524,16 +490,11 @@ describe("core/routes", () => {
       });
 
       it("should update root node even when it's not in toActivate list", () => {
-        // For route "a.b.c", nameToIDs function returns ["a", "a.b", "a.b.c"]
-        // Root node "" is not in this list, but should still update
+        // For route "a.b.c" the activate list is ["a", "a.b", "a.b.c"] — the root
+        // node "" is NOT among them, yet it must still update thanks to the
+        // special root check in shouldUpdateNode (asserted via the SUT below).
         const toState = makeState("a.b.c", { id: "test" });
 
-        // Verify that root node is not in toActivate
-        const { toActivate } = getTransitionPath(toState);
-
-        expect(toActivate).not.toContain("");
-
-        // But should still update thanks to special check
         expect(router.shouldUpdateNode("")(toState, undefined)).toBe(true);
       });
 
@@ -545,12 +506,8 @@ describe("core/routes", () => {
         const fromState = makeState("a.b.c", {});
         const toState = makeState("a.b.d", {});
 
-        // intersection will be "a.b", not root
-        const { intersection } = getTransitionPath(toState, fromState);
-
-        expect(intersection).not.toBe("");
-
-        // Root node updates on every transition (including intermediate ones).
+        // The intersection here is "a.b" (not root), yet the root node must still
+        // update on every transition (incl. intermediate ones) — the SUT proves it.
         expect(router.shouldUpdateNode("")(toState, fromState)).toBe(true);
       });
 
