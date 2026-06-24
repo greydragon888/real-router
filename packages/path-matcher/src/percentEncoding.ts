@@ -11,6 +11,7 @@ export function validatePercentEncoding(value: string): boolean {
 
   while (i < value.length) {
     if (value.codePointAt(i) === 0x25 /* % */) {
+      // Stryker disable next-line ArithmeticOperator,BlockStatement: equivalent — a truncated "%" is independently rejected downstream by the `?? 0` fallback (codePointAt past end -> 0, never a hex code point), so weakening (`i - 2`) or emptying this early-exit changes no observable result. Proven: removing the whole block keeps the full unit+property+stress suite green. The ConditionalExpression/EqualityOperator variants here stay live (they have killable siblings).
       if (i + 2 >= value.length) {
         return false;
       }

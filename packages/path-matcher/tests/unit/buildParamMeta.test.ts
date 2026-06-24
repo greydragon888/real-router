@@ -219,6 +219,19 @@ describe("buildParamMeta", () => {
       expect(constraint).toBeDefined();
       expect(constraint?.pattern.test("123")).toBe(true);
     });
+
+    // `extractConstraintPattern` must strip only the LEADING `<` and TRAILING
+    // `>`. The captured constraint group is `<[^>]+>`, so an interior `<` is
+    // reachable (an interior `>` never is) — this pins the `^` anchor of the
+    // strip regex: without it, every `<` would be removed, mangling the body.
+    it("strips only the leading < / trailing > (interior < preserved)", () => {
+      const meta = buildParamMeta("/x/:id<a<b>");
+      const constraint = meta.constraintPatterns.get("id");
+
+      expect(constraint?.pattern.source).toBe("^(a<b)$");
+      expect(constraint?.pattern.test("a<b")).toBe(true);
+      expect(constraint?.pattern.test("ab")).toBe(false);
+    });
   });
 
   // #738: a `?` inside a `<...>` constraint (lazy quantifier / optional group)

@@ -20,6 +20,7 @@ import type {
 /** Coerces a route param value (typed `unknown`, contractually primitive) to
  *  the string the encoder receives. Objects are JSON-stringified. */
 function stringifyParamValue(value: unknown): string {
+  // Stryker disable next-line BlockStatement: equivalent — String(value) === value for a string, so removing the early return is identical
   if (typeof value === "string") {
     return value;
   }
@@ -54,12 +55,16 @@ export class SegmentMatcher {
 
   // H1: Reusable object eliminates tuple allocation per match() call
   readonly #prepared = {
+    // Stryker disable next-line StringLiteral: equivalent — #prepared.cleanPath is overwritten by #preparePath before any read (dead initializer)
     cleanPath: "",
+    // Stryker disable next-line StringLiteral: equivalent — #prepared.normalized is overwritten by #preparePath before any read (dead initializer)
     normalized: "",
     queryString: undefined as string | undefined,
   };
 
+  // Stryker disable next-line ArrayDeclaration: equivalent — #rootQueryParams is overwritten by registerTree before any read (dead initializer)
   #rootQueryParams: readonly string[] = [];
+  // Stryker disable next-line StringLiteral: equivalent — #scanTruncated is set by #scanPath before it is read (dead initializer)
   #scanTruncated = "";
 
   readonly #caseSensitive: boolean;
@@ -110,9 +115,11 @@ export class SegmentMatcher {
 
     const cacheKey = this.#caseSensitive
       ? normalized
-      : normalized.toLowerCase();
+      : // Stryker disable next-line MethodExpression: equivalent — the case-insensitive cache key only governs a hit; a miss falls through to #traverse (also case-insensitive), same result (proven by injection)
+        normalized.toLowerCase();
     const cached = this.#staticCache.get(cacheKey);
 
+    // Stryker disable next-line BlockStatement: equivalent — emptying the cache-hit block routes through #traverse, which resolves the same route (cache is a pure optimization)
     if (cached) {
       if (
         this.#options.strictTrailingSlash &&
@@ -121,6 +128,7 @@ export class SegmentMatcher {
         return undefined;
       }
 
+      // Stryker disable next-line BlockStatement: equivalent — #buildResult recomputes cached.cachedResult identically (cache short-circuit)
       if (queryString === undefined && cached.cachedResult) {
         return cached.cachedResult;
       }
@@ -228,6 +236,7 @@ export class SegmentMatcher {
     const parts = route.buildStaticParts;
     const slots = route.buildParamSlots;
 
+    // Stryker disable next-line BlockStatement: equivalent — the general loop returns parts[0] when slots is empty, identical to this fast path
     if (slots.length === 0) {
       return parts[0];
     }
@@ -244,6 +253,7 @@ export class SegmentMatcher {
           );
         }
 
+        // Stryker disable next-line MethodExpression,StringLiteral: equivalent — at an optional-omit point result always ends in '/', so endsWith('/')/startsWith('/')/endsWith('') coincide (proven by injection)
         if (result.length > 1 && result.endsWith("/")) {
           result = result.slice(0, -1);
         }
@@ -296,14 +306,17 @@ export class SegmentMatcher {
       return "";
     }
 
+    // Stryker disable next-line BlockStatement: equivalent — the downstream !hasKeys guard also returns '' for a route with no declared query params
     if (route.declaredQueryParams.length === 0 && queryParamsMode !== "loose") {
       return "";
     }
 
     const queryObj: Record<string, unknown> = {};
+    // Stryker disable next-line BooleanLiteral: equivalent — buildQueryString({}) === '' so the hasKeys initial value is unobservable when no keys are added
     let hasKeys = false;
 
     for (const name of route.declaredQueryParams) {
+      // Stryker disable next-line BlockStatement: equivalent — buildQueryString strips undefined, so adding absent declared keys instead of continue changes nothing
       if (!(name in params)) {
         continue;
       }
@@ -329,6 +342,7 @@ export class SegmentMatcher {
       }
     }
 
+    // Stryker disable next-line BlockStatement: equivalent — buildQueryString({}) === '' so removing the !hasKeys early return yields the same ''
     if (!hasKeys) {
       return "";
     }
@@ -548,6 +562,7 @@ export class SegmentMatcher {
   ): CompiledRoute | undefined {
     const sn = splatChild.node;
 
+    // Stryker disable next-line BlockStatement: equivalent — leaf-splat fast path; the #traverseFrom fallback returns the same route+params (proven via hasChildren injection)
     if (!sn.hasChildren) {
       params[splatChild.name] = path.slice(start);
 
@@ -578,10 +593,12 @@ export class SegmentMatcher {
     for (const key in params) {
       const value = params[key];
 
+      // Stryker disable next-line StringLiteral,BlockStatement: equivalent — includes('%') is a skip-optimization; decoding a %-free value is a no-op, so always-proceeding is identical
       if (!value.includes("%")) {
         continue;
       }
 
+      // Stryker disable next-line BlockStatement: equivalent — redundant with the try/catch below — decodeURIComponent throws on the same invalid-% input (proven by injection)
       if (!validatePercentEncoding(value)) {
         return false;
       }

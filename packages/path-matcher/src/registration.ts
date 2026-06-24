@@ -125,6 +125,7 @@ function compileAndRegisterRoute(
 
   const { buildStaticParts, buildParamSlots } = compileBuildParts(
     buildPath,
+    // Stryker disable next-line MethodExpression: equivalent — slash-child buildParts: dropping the last segment vs keeping it yields identical buildStaticParts here (no own params on the slash-child). Proven by injection (full suite green).
     slashChild ? segments.slice(0, -1) : segments,
     state.options.urlParamsEncoding,
   );
@@ -145,6 +146,7 @@ function compileAndRegisterRoute(
     buildParamNamesSet: new Set(buildParamSlots.map((slot) => slot.paramName)),
   };
 
+  // Stryker disable next-line ConditionalExpression,EqualityOperator,BlockStatement: equivalent — cachedResult is a pure match() optimization; #buildResult recomputes the same value on a miss (proven: disabling the whole static cache keeps the unit+property suite green)
   if (node.paramMeta.urlParams.length === 0) {
     compiled.cachedResult = Object.freeze({
       segments: compiled.matchSegments,
@@ -212,10 +214,12 @@ function registerStandardRoute(
 ): void {
   insertIntoTrie(state, compiled, matchPath);
 
+  // Stryker disable next-line ConditionalExpression,EqualityOperator,BlockStatement: equivalent — staticCache is a pure match() optimization; #traverse resolves the same route on a miss (proven: disabling the whole static cache keeps the unit+property suite green)
   if (node.paramMeta.urlParams.length === 0) {
     const cacheKey = state.options.caseSensitive
       ? normalizedPath
-      : normalizedPath.toLowerCase();
+      : // Stryker disable next-line MethodExpression: equivalent — the case-insensitive cache key only governs a hit; a miss falls through to #traverse, which is also case-insensitive
+        normalizedPath.toLowerCase();
 
     state.staticCache.set(cacheKey, compiled);
   }
@@ -540,6 +544,7 @@ function processSegment(
 
     const child = ensureSplatChild(node, splatName, ownNodes);
 
+    // Stryker disable next-line BooleanLiteral: equivalent — sets hasChildren on the node ACQUIRING a splat child; only a splat NODE's own hasChildren is read (in #matchSplat), and splat-of-splat is unreachable (splat is terminal-greedy). Proven by injection.
     node.hasChildren = true;
 
     return child;
@@ -589,6 +594,7 @@ function compileBuildParts(
     }
   }
 
+  // Stryker disable next-line BlockStatement: equivalent — fast path; the param-compile loop below yields [normalizedPath]/[] when allUrlParams is empty — identical output. Proven by injection.
   if (allUrlParams.size === 0) {
     return { buildStaticParts: [normalizedPath], buildParamSlots: [] };
   }
@@ -638,6 +644,7 @@ function collectDeclaredQueryParams(
   rootQueryParams: readonly string[],
   segments: readonly MatcherInputNode[],
 ): readonly string[] {
+  // Stryker disable next-line ArrayDeclaration: equivalent — the array is populated then returned; a phantom seed element is never read back (declared-param loop skips absent keys, buildQueryString ignores it). Proven by injection.
   const queryParams: string[] = [];
 
   // Include query params declared on the root node (e.g., a root path like "?mode")

@@ -61,6 +61,7 @@ export const encodeURIComponentExcludingSubDelims = (
   segment: string,
 ): string => {
   // Fast path: if no special chars, return as-is
+  // Stryker disable next-line BlockStatement: equivalent — pure optimization; `replaceAll(NEEDS_ENCODING_REGEX, ...)` below is a no-op on a string with no encodable chars, so emptying this early return yields the identical value. ConditionalExpression stays live (killable `->true` sibling returns unencoded strings).
   if (!NEEDS_ENCODING_TEST.test(segment)) {
     return segment;
   }

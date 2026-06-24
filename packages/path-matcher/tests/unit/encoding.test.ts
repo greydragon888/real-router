@@ -123,4 +123,12 @@ describe("encodeParam", () => {
   it("should handle splat param with none encoding", () => {
     expect(encodeParam("a/b c/d", "none", true)).toBe("a/b c/d");
   });
+
+  // A non-splat param must encode "/" (it is a value char, not a separator).
+  // This distinguishes the `!isSpatParam` fast path from the splat branch:
+  // the splat branch splits on "/" and would preserve the separators.
+  it("should encode '/' in a non-splat param", () => {
+    expect(encodeParam("a/b", "default", false)).toBe("a%2Fb");
+    expect(encodeParam("a/b", "uriComponent", false)).toBe("a%2Fb");
+  });
 });

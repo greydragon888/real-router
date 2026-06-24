@@ -4612,3 +4612,207 @@ describe("SegmentMatcher", () => {
     });
   });
 });
+
+// =============================================================================
+// Mutation-guard tests — assert OBSERVABLE behavior of paths that 100% line
+// coverage exercised but did not pin (mutation survivors). Each kills a specific
+// surviving mutant through the public match()/buildPath() surface.
+// =============================================================================
+
+describe("mutation guards (observable-behavior kills)", () => {
+  function matcherWithRoute(
+    path: string,
+    options?: Partial<SegmentMatcherOptions>,
+  ): SegmentMatcher {
+    const matcher = createTestMatcher(options);
+    const route = createInputNode({ name: "r", path, fullName: "r" });
+    const root = createInputNode({
+      name: "",
+      path: "",
+      fullName: "",
+      children: new Map([["r", route]]),
+      nonAbsoluteChildren: [route],
+    });
+
+    matcher.registerTree(root);
+
+    return matcher;
+  }
+
+  it("'none' encoding keeps a raw invalid-percent param value (no decode/validate)", () => {
+    // urlParamsEncoding:"none" → #decode === null → #decodeParams short-circuits,
+    // so "%zz" is NOT rejected by validatePercentEncoding. Pins the `=== "none"`
+    // branch that nulls the decoder.
+    const matcher = matcherWithRoute("/:id", { urlParamsEncoding: "none" });
+
+    expect(matcher.match("/%zz")?.params).toStrictEqual({ id: "%zz" });
+  });
+
+  it("buildPath reports a missing required param (not a constraint failure) for null", () => {
+    // A null value is "absent", so the constraint check must SKIP it and the
+    // missing-required-param error must fire — not a constraint-mismatch error.
+    const matcher = matcherWithRoute(String.raw`/:id<\d+>`);
+
+    expect(() => matcher.buildPath("r", { id: null })).toThrow(
+      "Missing required param 'id'",
+    );
+  });
+
+  it("buildPath validates an object/array constraint value via JSON.stringify", () => {
+    // JSON.stringify([5]) === "[5]" violates <\d+>; String([5]) === "5" would
+    // wrongly pass — pins the `typeof === "object" ? JSON.stringify : String`.
+    const matcher = matcherWithRoute(String.raw`/:id<\d+>`);
+
+    expect(() => matcher.buildPath("r", { id: [5] })).toThrow(
+      "does not match constraint",
+    );
+  });
+
+  it("default query mode drops undeclared params; loose mode keeps them", () => {
+    // Route declares query "q" (so the length===0 fast-return is bypassed).
+    // Default mode must ignore "extra"; loose mode must append it but never echo
+    // the path param "id" as a query key.
+    const matcher = matcherWithRoute("/:id?q");
+
+    expect(matcher.buildPath("r", { id: "5", extra: "x" })).toBe("/5");
+    expect(
+      matcher.buildPath(
+        "r",
+        { id: "5", extra: "x" },
+        { queryParamsMode: "loose" },
+      ),
+    ).toBe("/5?extra=x");
+  });
+
+  it("rejects a path missing its leading slash (no tail-alignment match)", () => {
+    // "hello" lacks a leading "/"; the guard must reject it rather than treat
+    // "h" as the slash and match "/ello" on the remaining "ello".
+    const matcher = matcherWithRoute("/ello");
+
+    expect(matcher.match("hello")).toBeUndefined();
+  });
+
+  it("rejects a path with a U+0080 code point (non-ASCII boundary >= 0x80)", () => {
+    // 0x80 is the exact lower bound of the non-ASCII reject; `> 0x80` would admit
+    // it, and a non `-2` sentinel would mis-handle it.
+    const matcher = matcherWithRoute("/:id");
+
+    expect(matcher.match("/\u0080")).toBeUndefined();
+  });
+
+  it("rejects consecutive slashes instead of collapsing them", () => {
+    // "//" must be invalid, not silently normalized to "/" (which would match a
+    // root route). Pins the prevSlash double-slash detection.
+    const matcher = createTestMatcher();
+    const home = createInputNode({ name: "home", path: "/", fullName: "home" });
+
+    matcher.registerTree(home);
+
+    expect(matcher.match("/")).toBeDefined();
+    expect(matcher.match("//")).toBeUndefined();
+  });
+});
+
+// =============================================================================
+// Mutation guards — registration.ts. Drive registerNode/insertIntoTrie through
+// the public registerTree()/match()/buildPath() surface to pin survivors that
+// 100% line coverage exercised but did not assert.
+// =============================================================================
+
+describe("mutation guards — registration (observable-behavior kills)", () => {
+  function rootOf(children: MatcherInputNode[]): MatcherInputNode {
+    return createInputNode({
+      name: "",
+      path: "",
+      fullName: "",
+      children: new Map(children.map((c) => [c.fullName, c])),
+      nonAbsoluteChildren: children,
+    });
+  }
+
+  // --- error-message text: assert the diagnostic clauses, not just the opener ---
+  it("param-name conflict error states the binding rule AND the fix", () => {
+    const a = createInputNode({
+      name: "ua",
+      path: "/user/:id",
+      fullName: "ua",
+    });
+    const b = createInputNode({
+      name: "ub",
+      path: "/user/:slug",
+      fullName: "ub",
+    });
+
+    expect(() => {
+      createTestMatcher().registerTree(rootOf([a, b]));
+    }).toThrow(
+      /binds to a single name across every route.*cannot be captured under two names.*Rename one so both routes agree/s,
+    );
+  });
+
+  it("empty-param-name error explains the match/build disagreement", () => {
+    const bare = createInputNode({
+      name: "f",
+      path: "/files/*",
+      fullName: "f",
+    });
+
+    expect(() => {
+      createTestMatcher().registerTree(rootOf([bare]));
+    }).toThrow(
+      /must be followed by a name.*capture under an empty key.*the two disagree, so it is rejected/s,
+    );
+  });
+
+  // --- absolute path: the leading-"~" strip is GUARDED by startsWith("~"); an
+  // absolute route whose path lacks "~" must keep its full path (not lose its
+  // first char). Kills the `isAbsolute && startsWith("~")` guard mutants. ---
+  it("absolute route without a ~ prefix keeps its full path", () => {
+    const abs = createInputNode({
+      name: "abs",
+      path: "/standalone",
+      fullName: "p.abs",
+      absolute: true,
+    });
+    const parent = createInputNode({
+      name: "p",
+      path: "/parent",
+      fullName: "p",
+      children: new Map([["p.abs", abs]]),
+      nonAbsoluteChildren: [],
+    });
+
+    const matcher = createTestMatcher();
+
+    matcher.registerTree(rootOf([parent]));
+
+    expect(matcher.match("/standalone")).toBeDefined();
+    expect(matcher.match("/standalone")?.segments.at(-1)?.fullName).toBe(
+      "p.abs",
+    );
+  });
+
+  // --- slash-child (child whose path resolves to the parent's): must register
+  // in the slashChildRoute slot + build to the parent path. ---
+  it("slash-child route matches the parent path and builds back to it", () => {
+    const idx = createInputNode({ name: "idx", path: "", fullName: "sec.idx" });
+    const sec = createInputNode({
+      name: "sec",
+      path: "/section",
+      fullName: "sec",
+      children: new Map([["sec.idx", idx]]),
+      nonAbsoluteChildren: [idx],
+    });
+
+    const matcher = createTestMatcher();
+
+    matcher.registerTree(rootOf([sec]));
+
+    const r = matcher.match("/section");
+
+    expect(r).toBeDefined();
+    expect(r?.segments.at(-1)?.fullName).toBe("sec.idx");
+    expect(matcher.buildPath("sec.idx")).toBe("/section");
+    expect(matcher.buildPath("sec")).toBe("/section");
+  });
+});
