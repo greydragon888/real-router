@@ -4285,6 +4285,8 @@ Also fixed alongside: the `sonarqube-scan-action` pin comment said `# v7` while 
 
 ## Stryker self-alias must match the package name; mutation testing extended to core's foundation deps
 
+> **Superseded in part:** the manual workspace-**dep** aliases set up here for `logger-plugin` and `rx` (and called "inert"/"correct" below) were later found to silently understate those packages' scores. See "Mutation testing: explicit `plugins` + dep resolution via `internal-source` condition" below. The **self**-alias guidance in this section still stands.
+
 ### Problem
 
 `pnpm -F @real-router/logger test:mutation` (`stryker run`) failed, while `@real-router/core`'s ran fine. The standalone `vitest.stryker.config.mts` aliased the bare key `logger` → `./src`, but the package is published/imported as `@real-router/logger` and every logger test imports `from "@real-router/logger"`. Vite/Vitest match aliases by module-id prefix segments, not substring (`"@real-router/logger".startsWith("logger")` is `false`), so the alias never fired. The **self-alias is load-bearing**: it redirects the package-under-test's own imports to the sandbox-mutated `src/`. With it dead, `@real-router/logger` resolved via the node_modules self-symlink → `exports.import` → unmutated `dist/`, so the mutated sandbox `src/` was never executed → every mutant survived → score ≈ 0% → below `thresholds.break: 60` → Stryker exits non-zero. The failure mode is silent degradation ("all mutants survive"), not a crash — easy to mistake for a tooling problem. This was a copy-paste slip when templating from core (`"@real-router/core"` got mis-renamed to bare `logger`).
@@ -4302,3 +4304,36 @@ Separately, several packages down core's foundation chain had no mutation testin
 ### Why
 
 `break: 60` is intentionally conservative for fsm/event-emitter: the actual mutation score can't be measured without running Stryker (and only one Stryker run is safe at a time — concurrent runs in the same checkout contend), so a moderate floor avoids a spurious first-run failure. Both are foundation primitives with 100% coverage + property tests (event-emitter also stress tests), so the real score should sit well above the floor — tighten `break`/`low`/`high` after the first measured run. `.gitignore` already covers `.stryker-tmp/`, `packages/*/reports/`, and `.vitest-stryker`, so no ignore changes were needed.
+
+## Mutation testing: explicit `plugins` + dep resolution via `internal-source` condition, NOT dep-aliases (logger-plugin, rx)
+
+Two separate defects surfaced running `test:mutation` on `@real-router/logger-plugin`, then the second was found to also affect `@real-router/rx`. This section **supersedes the dep-alias guidance** in "Stryker self-alias must match the package name" above for these two packages — the manual workspace-dep aliases described there as correct are in fact the root cause of silently understated scores.
+
+### Problem
+
+**(1) Crash — missing `plugins` array.** `stryker run` in `logger-plugin` aborted at startup: `Could not inject [class CheckerWorker]. Cause: Cannot find Checker plugin "typescript". In fact, no Checker plugins were loaded.` The config set `checkers: ["typescript"]` but had no `plugins` array. Under pnpm's strict, non-hoisted `node_modules`, Stryker cannot auto-discover its plugins — they must be listed explicitly. logger-plugin was the **only** one of the 10 stryker configs missing it (its header says "based on router-error" — it predates the others gaining explicit `plugins`).
+
+**(2) Silent false 0% — dep-aliases break vitest module dedup.** With (1) fixed, logger-plugin scored **63.57 %** with `plugin.ts` at **102 NoCoverage / 0 killed**, and rx had **~112 NoCoverage** (`state$`, `events$`, `debounceTime`, `takeUntil`, `map`, `filter`, `createOperator` all 0 killed). This is **not** a missing-test gap: normal `vitest` catches `plugin.ts` mutations (injecting a changed log string fails 4 tests). The pattern: source reached **only transitively** — via the barrel (`../../src` → `index` → `factory` → `plugin`) or driven through a workspace dep — loads a **second, non-instrumented module instance**, so Stryker's `stryMutAct(N)` never sees the active mutant. Source imported **directly by file path** (`../../../src/internal/*`, `../../src/RxObservable`) loads once and is killed normally. Bisection that pinned it: directly constructing `new LoggerPlugin()` from `../../src/plugin` in a sync test → **8 killed**; the identical class reached via `loggerPluginFactory()` (barrel) → **0 killed** → two copies of `plugin.ts` in one run. Tell-tale signature: the coverage counter still fires (so the file shows **Survived**, not NoCoverage, when imported via a shorter chain), but no mutant ever activates. Ruled out by experiment (none fixed it): `server.deps.inline`, `pool: "threads"` + `isolate: false` (broke the console-spy tests), a side-effect `import "../../src/plugin"`, and self-alias file-vs-dir form.
+
+The trigger is the **manual cross-package dep-alias** itself (`@real-router/core` / `logger` / `core-types` → absolute or `../core/src` path). A hand-written alias to one absolute path, plus the dep's own resolution via the sandbox `node_modules` self-symlink, yields **two distinct resolved specifiers for the same file**, which Vite/Vitest do not dedupe → two module instances → diverging Stryker activation context. logger-plugin's `plugin.ts` imports `@real-router/core` only **type-only** (erased at runtime), yet the mere presence of the dep-aliases in the config still split its module graph — so the cause is config-level dedup breakage, not which file imports what.
+
+### Solution
+
+Replace the manual workspace-dep aliases with resolution via the existing `@real-router/internal-source` export condition (see "Custom `@real-router/internal-source` Export Condition" above). Keep **only** the load-bearing self-alias:
+
+```js
+resolve: {
+  // workspace deps → their src via node_modules symlinks + the internal-source
+  // export condition; ONE module graph, dedup intact. No manual dep-aliases.
+  conditions: ["@real-router/internal-source", "import", "node"],
+  alias: { "@real-router/<self>": resolve(__dirname, "./src" /* or ./src/index.ts */) },
+},
+```
+
+- **logger-plugin:** added the `plugins` array (`@stryker-mutator/vitest-runner`, `@stryker-mutator/typescript-checker`) and switched to the condition. **63.57 % → 90.51 %**; `plugin.ts` 0 killed / 102 NoCoverage → **79 killed / 0 NoCoverage**; `internal/*` + `validation.ts` unchanged (no regression).
+- **rx:** switched to the condition (dropping the `@real-router/core` + `@real-router/core/api` aliases). NoCoverage **112 → 5**, score **84.26 %**; `state$`/`events$`/`debounceTime`/`takeUntil`/`map`/`filter`/`createOperator` all now properly mutated. The `/api` subpath resolves through the condition without a dedicated alias (core's `exports["./api"]` declares `@real-router/internal-source`).
+- **Scope:** audited all 10 stryker configs — logger-plugin and rx were the **only two** with cross-package dep-aliases (core/route-tree/fsm and the self-contained internal packages carry none). Both fixed; the residual survivors (logger-plugin 24, rx 29 + 5 NoCoverage) are now genuine mutation-score work, not artifacts.
+
+### Why
+
+The `@real-router/internal-source` condition is already how `tsc`, the normal Vitest config, and ESLint resolve workspace `@real-router/*` to `src/` — routing the stryker Vitest config through the same mechanism keeps a **single resolution path** (node_modules symlink → `src`) and therefore a single deduped module per file, so the instrumented module and the activation context stay the same object. A bespoke alias to a different absolute path is what forks them. Note the asymmetry with the normal `vitest.config.common.mts`, which deliberately uses `resolve.alias` (not `resolve.conditions`) to avoid a preact dual-package hazard from condition-order interference — that hazard doesn't apply to node-environment internal/plugin packages, so the simpler `conditions` form is safe here. The fix is **Stryker-only**: `vitest.stryker.config.mts` is read solely via `stryker.config.mjs`'s `vitest.configFile`; the normal `test` task uses `vitest.config.mts`, so application behavior and regular coverage are untouched. Failure-mode lesson: an understated mutation score from a resolution bug looks identical to weak tests — when a whole file reports 0 % / all-NoCoverage but its `vitest run --coverage` is green, suspect the sandbox module graph (inject a mutation and run the **normal** suite to confirm the tests are real before chasing "missing tests").
